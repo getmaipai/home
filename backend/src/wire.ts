@@ -48,3 +48,21 @@ export interface ResolvedSetting {
    * stored, without ever revealing it (lib/settings.ts's resolveForResponse). */
   isSet?: boolean;
 }
+
+export interface BackupInfo {
+  filename: string;
+  createdAt: string;
+  bytes: number;
+}
+
+// The role-string half of lib/access.ts's isOwnerOrAdmin(actor: PersonRow):
+// that function takes a full PersonRow (an "@/types" dependency this file
+// can't have), so this is the underlying string check, shared for real
+// with a frontend client instead of being hand-copied a third time. A
+// code review (2026-09-04) found frontend/src/apps/settings/SettingsPage.tsx
+// had grown its own inline `role === "owner" || role === "admin"` on top
+// of frontend/src/apps/people/roles.ts's requiresSecret doing the
+// identical check for an unrelated reason - both now call this.
+export function isOwnerOrAdminRole(role: string): boolean {
+  return role === "owner" || role === "admin";
+}

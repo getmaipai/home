@@ -1,4 +1,4 @@
-import type { Role } from "@/lib/api";
+import { isOwnerOrAdminRole, type Role } from "@/lib/api";
 
 export const ROLE_LABELS: Record<Role, string> = {
   owner: "Owner",
@@ -38,7 +38,11 @@ export function canManagePeople(actorRole: Role): boolean {
 
 // 4.1: an owner or admin profile requires a secret (a PIN-free owner/
 // admin is a one-request takeover for anyone who can reach the API) -
-// matches routes/people.ts's own check exactly.
+// matches routes/people.ts's own check exactly. Shares the real
+// definition (backend/src/wire.ts's isOwnerOrAdminRole) with
+// backend/src/lib/access.ts's isOwnerOrAdmin and with
+// SettingsPage.tsx's backups gate, rather than a third hand-copy of the
+// same expression (a code review, 2026-09-04, found exactly that).
 export function requiresSecret(role: Role): boolean {
-  return role === "owner" || role === "admin";
+  return isOwnerOrAdminRole(role);
 }

@@ -9,9 +9,14 @@ import { eq } from "drizzle-orm";
 import { db } from "@/db";
 import { people } from "@/db/schema";
 import type { PersonRow } from "@/types";
+import { isOwnerOrAdminRole } from "@/wire";
 
+// The role-string check itself now lives in @/wire (alias-free) so a
+// frontend client can share it too (a code review, 2026-09-04, found a
+// third hand-copy of this exact expression); this wrapper is what every
+// existing PersonRow-based call site here keeps using.
 export function isOwnerOrAdmin(actor: PersonRow): boolean {
-  return actor.role === "owner" || actor.role === "admin";
+  return isOwnerOrAdminRole(actor.role);
 }
 
 // Batch form, for a caller filtering many records against many different

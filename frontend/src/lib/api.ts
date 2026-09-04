@@ -1,7 +1,14 @@
 import type { SafetyResult } from "@maipai/spec/gen/ts/safety-result.js";
 import type { SettingsKey } from "@maipai/spec/gen/ts/settings-key.js";
 import type { Person } from "@maipai/spec/gen/ts/person.js";
-import type { Roster, TurnValue, ConversationTurnRow, ResolvedSetting } from "@maipai/home-backend/src/wire";
+import type {
+  Roster,
+  TurnValue,
+  ConversationTurnRow,
+  ResolvedSetting,
+  BackupInfo,
+} from "@maipai/home-backend/src/wire";
+import { isOwnerOrAdminRole } from "@maipai/home-backend/src/wire";
 
 // GET /api/people (routes/people.ts) returns toRoster()'s output directly
 // - the same Omit<Person, "birthdate"> shape Roster wraps, minus
@@ -22,7 +29,8 @@ export type Role = Person["role"];
 // depends on @maipai/home-backend as a workspace package for this;
 // re-export the types here so the rest of the frontend imports from one
 // place.
-export type { Roster, TurnValue, ConversationTurnRow, ResolvedSetting };
+export type { Roster, TurnValue, ConversationTurnRow, ResolvedSetting, BackupInfo };
+export { isOwnerOrAdminRole };
 // SettingsKey is spec-generated (@maipai/spec), not backend-only, so it's
 // imported directly rather than through @/wire.
 export type { SettingsKey };
@@ -101,4 +109,6 @@ export const api = {
       method: "POST",
       body: JSON.stringify(input),
     }),
+  backups: () => request<BackupInfo[]>("/api/backups"),
+  runBackup: () => request<BackupInfo>("/api/backups/run", { method: "POST" }),
 };

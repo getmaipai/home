@@ -1266,6 +1266,66 @@ set. Full architecture: platform plan chapters 1, 3, and 4.
       exists to link to yet); re-running screenshots automatically as
       part of a release (the release skill's drift check, not built).
 
+- [x] A Backups view, the fifteenth slice, picked next after ruling out
+      the obvious candidate: `routes/backups.ts`'s own comment explains
+      exactly why there's no restore route yet - swapping a live database
+      safely needs the staged update/rollback machinery 2.4 describes,
+      which doesn't exist since no release has ever been cut. Building a
+      restore button without that machinery would be the unsafe thing to
+      ship, not the missing thing, so this slice is the half that's
+      actually safe: list what exists (`GET /api/backups`) and trigger
+      one on demand (`POST /api/backups/run`), both owner/admin-only
+      routes that were already real and tested, with zero UI before
+      tonight.
+    - `frontend/src/apps/settings/BackupsSection.tsx`: a new section on
+      the Settings page, gated to owner/admin
+      (`person.role === "owner" || "admin"`, matching the routes' own
+      gate) - a child correctly sees no trace of it. `formatBytes.ts`
+      (pure, tested) formats a backup's size in binary units (1024, not
+      1000), matching what `du`/`ls -h`/every OS file browser already
+      shows, so the number on screen matches the number a person would
+      see looking at the file directly.
+    - **Backend: `BackupInfo` moved to `@/wire`**, the same alias-free-
+      module fix the shell/kit/Chat and settings-renderer slices used for
+      `Roster`/`TurnValue`/`ConversationTurnRow`/`ResolvedSetting`, for
+      the identical reason (`lib/backup.ts`'s own `@/lib/paths` and `@/db`
+      imports make it unresolvable directly from another workspace
+      package).
+    - Exercised for real, on Jesse's actual dev household, not just a
+      demo one: clicked "Back up now," got a real encrypted backup file
+      and watched it appear in the list with a real timestamp and a
+      correctly-formatted size (84 KB), confirmed the section is
+      completely absent for a child profile (Nova), and confirmed signing
+      back in as the owner still shows the same backup - real persistence,
+      not a session-local list. 5 new frontend tests (`formatBytes.test.ts`),
+      no backend test changes needed since the two routes already had
+      coverage. No console errors.
+    - **A `code-review` pass (medium effort) before committing found two
+      real issues, both fixed.** `formatBytes` rounded before checking
+      whether the rounded value crosses a unit boundary: 1048575 bytes
+      (one byte under 1 MB) is 1023.999... KB, which fails the `>= 1024`
+      loop check but rounds to 1024 - "1024 KB" instead of "1 MB." Fixed
+      by re-checking after rounding and promoting once more; a regression
+      test covers the exact boundary. Separately, `SettingsPage.tsx`'s
+      `role === "owner" || role === "admin"` was a third independent copy
+      of a check that already existed twice - `lib/access.ts`'s
+      `isOwnerOrAdmin` (extracted there specifically for this reason
+      after an earlier duplication) and `apps/people/roles.ts`'s
+      `requiresSecret`. Fixed properly, not just within the frontend: the
+      string-level check moved to `@/wire` as `isOwnerOrAdminRole`
+      (`access.ts`'s `isOwnerOrAdmin` is now a thin `PersonRow` wrapper
+      around it), and both `requiresSecret` and `SettingsPage`'s gate call
+      the same shared function a frontend client can actually import -
+      one real definition across the whole stack, not just consolidated
+      on one side of it.
+    - **Deliberately deferred, real 2.5 scope not attempted:** restore,
+      for the safety reason above; a "what's inside a backup" detail view;
+      the emergency kit printing the backup key at setup; `hub`/`smb`
+      remote targets (one local store exists); a restore drill wired into
+      a release (no release has been cut); the retention-tier label
+      (daily/weekly/monthly) on each row - `listBackups()` doesn't surface
+      which tier kept a given file, only that it's still there.
+
 ## API routes and `@hono/zod-openapi` (tracked debt)
 
 `getmaipai/CLAUDE.md` > Documentation requires every Hono route to be

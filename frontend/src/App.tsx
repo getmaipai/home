@@ -40,7 +40,7 @@ export function App() {
         <Routes>
           <Route path="/" element={<ChatPage person={person} />} />
           <Route path="/people" element={<PeoplePage person={person} />} />
-          <Route path="/settings" element={<SettingsPage />} />
+          <Route path="/settings" element={<SettingsPage person={person} />} />
         </Routes>
       </Shell>
     </BrowserRouter>

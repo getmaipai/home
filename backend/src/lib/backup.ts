@@ -110,11 +110,12 @@ function decryptFile(inPath: string, outPath: string): void {
   writeFileSync(outPath, plain, { mode: 0o600 });
 }
 
-export interface BackupInfo {
-  filename: string;
-  createdAt: string;
-  bytes: number;
-}
+// Defined in @/wire (alias-free) so a frontend client can import the real
+// shape through the @maipai/home-backend workspace dependency, the same
+// pattern Roster/TurnValue/ConversationTurnRow/ResolvedSetting already
+// use; re-exported here since this is where callers already look for it.
+import type { BackupInfo } from "@/wire";
+export type { BackupInfo } from "@/wire";
 
 // A random suffix, not just the timestamp: two backups started within the
 // same millisecond (a manual "run now" right after a scheduled one, or a
