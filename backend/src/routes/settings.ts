@@ -47,5 +47,11 @@ settingsRoutes.post("/reset", requireAuth, async (c) => {
   if (!body.scope || !body.key) return c.json({ error: "scope and key are required" }, 400);
   const result = resetValue(actor, body.scope, body.key);
   if (!result.ok) return fail(c, result);
-  return c.json({ success: true });
+  // `success: true` was this route's whole response body before today;
+  // a code review (2026-09-04) flagged replacing it outright as a
+  // repurposed field under CLAUDE.md > Compatibility's "API changes are
+  // additive" rule (no current caller reads it - the frontend was updated
+  // in the same commit - but the rule exists for the clients that will).
+  // Kept alongside the richer body rather than dropped.
+  return c.json({ ...result.value, success: true });
 });

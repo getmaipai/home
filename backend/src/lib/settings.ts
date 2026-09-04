@@ -124,18 +124,13 @@ function validateSelectorValue(keyDef: SettingsKey, value: unknown): SettingsOpR
   return { ok: true, value: true };
 }
 
-export interface ResolvedSetting {
-  key: string;
-  value: unknown;
-  source: "user" | "default" | "package" | "sync";
-  label: string;
-  help?: string;
-  level: "basic" | "advanced" | "expert";
-  secret: boolean;
-  /** Only meaningful when secret is true: whether a real value has been
-   * stored, without ever revealing it (see resolveForResponse below). */
-  isSet?: boolean;
-}
+// Defined in @/wire (alias-free) so a frontend client can import the real
+// shape through the @maipai/home-backend workspace dependency, the same
+// pattern Roster/TurnValue/ConversationTurnRow already use (2026-09-04
+// code review, shell/kit/Chat slice); re-exported here since this is
+// where callers already look for it.
+import type { ResolvedSetting } from "@/wire";
+export type { ResolvedSetting } from "@/wire";
 
 // CLAUDE.md > Credentials and secrets is a hard rule: "No secret value in
 // ... API responses (status = present, expires, never the value)." A
@@ -251,8 +246,12 @@ export function getHouseholdSettingValue(key: string): unknown {
 
 /** Reset a key back to its registry default: a real delete (this table
  * makes no "never hard-deletes" promise the way memory does; there's no
- * history to preserve for a settings reset, 6.6 Rule 6). */
-export function resetValue(actor: PersonRow, scope: string, key: string): SettingsOpResult<true> {
+ * history to preserve for a settings reset, 6.6 Rule 6). Returns the
+ * resolved default, symmetric with setValue's return - a code review
+ * (2026-09-04) found the earlier `{ok: true, value: true}` shape forced
+ * every caller into a second round trip (a full list re-fetch) just to
+ * learn the value it already knew was the registry default. */
+export function resetValue(actor: PersonRow, scope: string, key: string): SettingsOpResult<ResolvedSetting> {
   const parsed = parseScope(scope);
   if (!parsed) return { ok: false, status: 400, error: `invalid scope: ${scope}` };
   const keyDef = getRegistryKey(key);
@@ -262,5 +261,5 @@ export function resetValue(actor: PersonRow, scope: string, key: string): Settin
   if (!auth.ok) return auth;
 
   db.delete(settingsValues).where(and(eq(settingsValues.scope, scope), eq(settingsValues.key, key))).run();
-  return { ok: true, value: true };
+  return { ok: true, value: resolveForResponse(keyDef, keyDef.default, "default") };
 }

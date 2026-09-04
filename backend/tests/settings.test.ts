@@ -128,6 +128,16 @@ describe("POST /api/settings/reset", () => {
 
     const reset = await owner.post("/api/settings/reset", { scope: "household", key: "household.locale" });
     expect(reset.status).toBe(200);
+    // A code review (2026-09-04) found this returned only {success: true},
+    // forcing every caller into a second round trip just to learn the
+    // value it already knew was the registry default; now symmetric with
+    // PUT's ResolvedSetting response, with `success` kept alongside (a
+    // second review found dropping it outright repurposed a field under
+    // CLAUDE.md > Compatibility's additive-only rule).
+    const resetBody = (await reset.json()) as { key: string; value: unknown; source: string; success: boolean };
+    expect(resetBody.value).toBe("en-US");
+    expect(resetBody.source).toBe("default");
+    expect(resetBody.success).toBe(true);
 
     const res = await owner.get("/api/settings?scope=household");
     const body = (await res.json()) as Array<{ key: string; value: unknown; source: string }>;

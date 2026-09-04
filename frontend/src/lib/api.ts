@@ -1,5 +1,6 @@
 import type { SafetyResult } from "@maipai/spec/gen/ts/safety-result.js";
-import type { Roster, TurnValue, ConversationTurnRow } from "@maipai/home-backend/src/wire";
+import type { SettingsKey } from "@maipai/spec/gen/ts/settings-key.js";
+import type { Roster, TurnValue, ConversationTurnRow, ResolvedSetting } from "@maipai/home-backend/src/wire";
 
 // Real backend types, imported from @/wire (not hand-duplicated): a code
 // review (2026-09-04) flagged an earlier version of this file for
@@ -12,7 +13,10 @@ import type { Roster, TurnValue, ConversationTurnRow } from "@maipai/home-backen
 // depends on @maipai/home-backend as a workspace package for this;
 // re-export the types here so the rest of the frontend imports from one
 // place.
-export type { Roster, TurnValue, ConversationTurnRow };
+export type { Roster, TurnValue, ConversationTurnRow, ResolvedSetting };
+// SettingsKey is spec-generated (@maipai/spec), not backend-only, so it's
+// imported directly rather than through @/wire.
+export type { SettingsKey };
 // SafetyResult flows through TurnValue.safety; re-exported for callers
 // that want it by name without reaching into @maipai/spec directly.
 export type { SafetyResult };
@@ -68,5 +72,18 @@ export const api = {
     request<TurnValue>("/api/turn", {
       method: "POST",
       body: JSON.stringify({ surface: "chat", text }),
+    }),
+  settingsRegistry: () => request<SettingsKey[]>("/api/settings/registry"),
+  settingsValues: (scope: string) =>
+    request<ResolvedSetting[]>(`/api/settings?scope=${encodeURIComponent(scope)}`),
+  setSetting: (scope: string, key: string, value: unknown) =>
+    request<ResolvedSetting>("/api/settings", {
+      method: "PUT",
+      body: JSON.stringify({ scope, key, value }),
+    }),
+  resetSetting: (scope: string, key: string) =>
+    request<ResolvedSetting>("/api/settings/reset", {
+      method: "POST",
+      body: JSON.stringify({ scope, key }),
     }),
 };

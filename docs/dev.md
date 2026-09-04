@@ -1001,6 +1001,137 @@ set. Full architecture: platform plan chapters 1, 3, and 4.
       settings renderer is real, separate scope from tonight's Chat-only
       slice.
 
+- [x] The settings renderer (docs/SETTINGS.md, **split, not full**), the
+      twelfth slice of hub core, picked next because it was this session's
+      own deferred item above: a real UI for the registry that already
+      existed server-side with zero way to reach it. Full scope (a gear
+      in every package's header opening a right-pane sheet, a "for
+      everyone / just me" toggle, a generated settings index driving a
+      command palette and `@modified`/`@app:`/`@level:` search, per-role
+      AI cards) needs the right pane and command palette (chapter 6, not
+      built) and more than the two keys the registry has today to prove
+      itself against; this pass is the generic renderer itself, as a
+      dedicated page.
+    - `frontend/src/kit/settings/`: `groupSettings.ts` (pure, tested) does
+      the real Rule 4 disclosure logic - filters to one scope kind and
+      `honoured_by: ["home"]`, drops `expert` entirely (no Developer
+      Tools destination exists to hold it, so hiding it is honest, faking
+      one would not be), groups by `lives_in` (no real key has a
+      `section` yet, so that's the only grouping data available), and
+      folds a section's advanced keys behind a "Show N advanced settings"
+      toggle only once there are three or more, exactly Rule 4's
+      threshold. `SettingField.tsx` renders one row per key: text/number/
+      select/boolean are real controls (`Select`/`Switch` are new kit
+      components over Radix); duration/time/entity/area/person/media are
+      typed in `SettingsKey`'s own schema but render "Not supported in
+      this hub version yet" - entity/area need a Home Assistant
+      integration that doesn't exist, and none of today's two keys need
+      any of the six anyway. `secret: true` keys render a static "Set" /
+      "Not set" status, never an editable value, matching
+      `resolveForResponse()`'s server-side redaction contract exactly
+      (CLAUDE.md > Credentials and secrets) - untested through the HTTP
+      layer since no real secret key exists yet, same posture
+      `resolveForResponse` itself already documented. `SettingsRenderer.tsx`
+      is the actual generic renderer: one component, pointed at a scope,
+      fetching `/registry` and `/?scope=` and live-applying every change
+      through `PUT`/`POST /reset`.
+    - **Backend: `ResolvedSetting` moved to `@/wire`**, the same
+      alias-free-module fix the shell/kit/Chat slice used for
+      `Roster`/`TurnValue`/`ConversationTurnRow`, for the identical reason
+      (a frontend client needs the real type, and `settings.ts`'s own
+      `@/db` imports make it unresolvable directly from another workspace
+      package).
+    - A router (`react-router-dom`) is installed for real this time: the
+      shell/kit/Chat slice removed it as unused with exactly one page;
+      Settings is the second page that justifies it. `Shell.tsx`'s nav is
+      a small hand-written array of `{to, icon, label}` rendered with
+      `NavLink` - the real per-package nav blueprint chapter 6 describes
+      (a manifest field, read by a package-loading system) needs both of
+      those to exist first.
+    - Exercised for real: booted the backend and Vite dev server, drove
+      it in a real browser - opened Settings from the nav rail (active-
+      state highlighting works), changed the locale select and confirmed
+      it applied and revealed "Reset to default," changed the retention
+      number on blur, reset both back to their registry defaults, and
+      **hard-reloaded on a direct `/settings` URL** (not just client-side
+      navigation) to confirm Vite's dev SPA fallback serves it - then
+      rebuilt `frontend/dist` and confirmed the same direct-URL case
+      through the production `serveStatic` path. 19 frontend tests (9 new
+      in `groupSettings.test.ts`, 6 more added after the code-review pass
+      below), the existing 185 backend + 93 spec tests, all green.
+    - **A real bug found live, not by a review pass: `SettingField`'s
+      local `draft` string only synced from `resolved.value` on mount.**
+      Resetting a setting (or any external re-fetch) updated the
+      underlying data but left the input showing whatever was last typed
+      - confirmed by watching it happen (reset the retention key from 45,
+      the field kept showing 45 until a full page reload). Fixed with a
+      `useEffect` keyed on `resolved.value` that re-syncs `draft` on every
+      external change, without touching it while a person is mid-keystroke
+      (that path never changes `resolved.value` until a blur commits it).
+      Re-verified live after the fix: reset now updates the field
+      immediately.
+    - **A `code-review` pass (medium effort) before committing found four
+      more real issues, three fixed, the fourth reversed a judgment call
+      from earlier in this same slice.** `commitDraft` never reverted the
+      draft when the backend rejected a write (a value below a key's
+      `min`, say): `resolved.value` doesn't change on failure, so the
+      resync effect above never fires either, leaving an invalid draft on
+      screen forever. Separately, `Number("")` is `0`, not `NaN`, so
+      clearing a number field and blurring silently committed 0 instead
+      of being treated as "never mind." Both fixed together in
+      `commitDraft`: an empty (trimmed) draft now reverts locally without
+      calling `onChange` at all, and `onChange` itself now returns whether
+      the write landed, so a `false` reverts the draft to the real current
+      value instead of leaving the rejected one displayed.
+      `POST /api/settings/reset` returned only `{success: true}`, forcing
+      `SettingsRenderer.handleReset` into a second round trip (a full list
+      re-fetch) just to learn the value it already knew was the registry
+      default; `resetValue` now returns the resolved default via the same
+      `resolveForResponse()` helper `setValue` already uses, symmetric
+      with `PUT`'s response, and the existing reset test now asserts the
+      response body directly instead of only the status code.
+      **Reversed: this slice originally deferred component-level UI
+      tests** (reasoning: standing up a DOM test environment is real
+      infrastructure, not a five-minute addition, and the live-browser
+      verification above was offered as the evidence instead). The review
+      correctly pushed back - the org's testing standard says a real
+      failure becomes a permanent regression test *first*, not after
+      weighing the infrastructure cost - so the harness got built anyway:
+      `@testing-library/react` + `@happy-dom/global-registrator`,
+      `frontend/bunfig.toml`/`tests/preload.ts` mirroring
+      `backend/bunfig.toml`'s existing shape. **A real, separate
+      Bun-specific bug surfaced building it, worth its own note**:
+      `@testing-library/dom`'s global `screen` export is computed once at
+      module-load time (its own `dist/screen.js` checks whether `document`
+      is defined and has a `body`, right there in the module body), before
+      Bun's test preload has necessarily finished registering happy-dom's
+      globals, and permanently falls back
+      to a stub that throws "a global document has to be available" no
+      matter how real `document` is by the time a test body actually runs
+      - confirmed by a minimal repro outside this component entirely.
+      Every new test uses `render()`'s own bound queries instead of the
+      global `screen`, which sidesteps the stale singleton completely. Six
+      new tests in `SettingField.test.tsx` cover all three number-selector
+      bugs above (the original resync bug plus these two), a bare-minimum
+      real regression suite for this slice's actual failures, not a
+      comprehensive component-test pass on every control.
+      `groupSettings.ts`'s own logic (the fold threshold, the
+      expert/honoured_by/scope filters) is pure and was already fully
+      covered without needing one.
+    - **Deliberately deferred, real SETTINGS.md scope not attempted:**
+      person/device scope rendering (`SettingsRenderer` supports the
+      prop, nothing calls it with one - no profile picker or device list
+      exists to open it from); the central Household/Profile list as a
+      second render site for the same renderer (Rule 2's destinations
+      don't exist); the gear-in-header sheet (Settings is a full page,
+      not an in-app overlay); the generated settings index and command
+      palette (Rule 5, needs the command palette, chapter 6); per-role AI
+      cards (Rule 3, needs model roles beyond `chat`, 4.11); a real
+      `section.order`/`collapsed` sort (no registry key declares one
+      yet); live sync of a setting changed by another device/session
+      (`SettingsRenderer` only refetches on mount and after its own
+      writes).
+
 ## API routes and `@hono/zod-openapi` (tracked debt)
 
 `getmaipai/CLAUDE.md` > Documentation requires every Hono route to be

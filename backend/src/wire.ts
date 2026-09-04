@@ -35,3 +35,16 @@ export interface TurnValue {
 }
 
 export type ConversationTurnRow = typeof conversationTurns.$inferSelect;
+
+export interface ResolvedSetting {
+  key: string;
+  value: unknown;
+  source: "user" | "default" | "package" | "sync";
+  label: string;
+  help?: string;
+  level: "basic" | "advanced" | "expert";
+  secret: boolean;
+  /** Only meaningful when secret is true: whether a real value has been
+   * stored, without ever revealing it (lib/settings.ts's resolveForResponse). */
+  isSet?: boolean;
+}
