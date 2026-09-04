@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Page } from "@/kit/primitives/Page";
 import { MessageThread, type ThreadMessage } from "@/kit/primitives/MessageThread";
 import { Form } from "@/kit/primitives/Form";
@@ -6,6 +6,7 @@ import { Progress } from "@/kit/primitives/Progress";
 import { Button } from "@/kit/components/Button";
 import { api, ApiError, type Roster } from "@/lib/api";
 import { rowsToMessages } from "@/apps/chat/mapRows";
+import { StreamingWavPlayer } from "@/lib/streamingWavPlayer";
 
 interface ChatPageProps {
   person: Roster;
@@ -38,6 +39,106 @@ export function ChatPage({ person }: ChatPageProps) {
   // the ability to enable in chats when needed"): a per-message opt-in,
   // not a standing setting, since most turns don't need the extra latency.
   const [thinking, setThinking] = useState(false);
+  // The tts role (spec/voice/, 2026-09-04): "I don't think chat works
+  // with voice on the web for me to test" - a manual "Listen" button per
+  // reply, not autoplay (Jesse, same session, after trying an
+  // auto-playing version: "again, I dont want auto play").
+  const [loadingId, setLoadingId] = useState<string | null>(null);
+  const [playingId, setPlayingId] = useState<string | null>(null);
+  const [playError, setPlayError] = useState<string | null>(null);
+  const playerRef = useRef<StreamingWavPlayer | null>(null);
+  // Guards every state update below against a superseded call: a second
+  // "Listen" click before the first finishes calls playerRef.current's
+  // stop() immediately (cutting the old chunks off in real time, the
+  // point of per-chunk scheduling - streamingWavPlayer.ts), but that
+  // stop() doesn't synchronously unwind the first call's own async
+  // fetch/read loop, which could otherwise still land a stale state
+  // update after the second click has already taken over. The same class
+  // of live-verified bug (2026-09-04) an earlier <audio>-element version
+  // of this feature hit from a different angle (a stale rejected
+  // audio.play() promise), now guarded against directly rather than
+  // relying on stop() alone.
+  const playRequestIdRef = useRef(0);
+
+  useEffect(() => {
+    return () => {
+      playerRef.current?.stop();
+    };
+  }, []);
+
+  async function handlePlay(message: ThreadMessage) {
+    const requestId = ++playRequestIdRef.current;
+    playerRef.current?.stop();
+    setPlayError(null);
+    setLoadingId(message.id);
+    // Unconditionally, not left for the new player's own onFirstAudio/
+    // onEnded to overwrite: a code review (2026-09-04) found that if the
+    // PREVIOUS message's onEnded never got a chance to fire before being
+    // superseded (e.g. this new reply's audio has zero playable frames,
+    // so its own onFirstAudio never runs and its onEnded fires without
+    // matching `current === message.id`), the old message stayed stuck
+    // showing "Playing…", disabled, for the rest of the session. Only
+    // one thing can ever be loading or playing at a time (one shared
+    // playerRef), so resetting here is always correct, not just a
+    // narrow patch for this one edge case.
+    setPlayingId(null);
+
+    // Created synchronously, before the network fetch below: an
+    // AudioContext only counts as unlocked by this click's real user
+    // gesture if it exists before the call stack returns, not after an
+    // awaited fetch (streamingWavPlayer.ts's own constructor comment;
+    // flagged by a code review, 2026-09-04, against the previous
+    // <audio>-element version, which created its element only after the
+    // fetch resolved).
+    const player = new StreamingWavPlayer();
+    playerRef.current = player;
+    player.onFirstAudio = () => {
+      if (requestId !== playRequestIdRef.current) return;
+      setLoadingId(null);
+      setPlayingId(message.id);
+    };
+    player.onEnded = () => {
+      if (requestId !== playRequestIdRef.current) return;
+      // Also loadingId, not just playingId: a code review (2026-09-04)
+      // found that a reply whose synthesized audio has zero playable
+      // frames never calls onFirstAudio at all (StreamingWavPlayer.
+      // finish() fires onEnded directly in that case), so loadingId was
+      // left set to this message forever - the button stuck on
+      // "Loading…", disabled, with no way to retry short of a reload.
+      setLoadingId((current) => (current === message.id ? null : current));
+      setPlayingId((current) => (current === message.id ? null : current));
+    };
+
+    try {
+      const response = await api.streamSpeech(message.text);
+      if (requestId !== playRequestIdRef.current) {
+        player.stop();
+        return;
+      }
+      const reader = response.body!.getReader();
+      // Streams chunks straight into the player as they arrive, rather
+      // than waiting for the whole reply - the entire point (2026-09-04,
+      // Jesse: "make sure you are streaming responses as you get [them]
+      // instead of generating the entire wav and then just playing
+      // that").
+      while (true) {
+        const { done, value } = await reader.read();
+        if (requestId !== playRequestIdRef.current) {
+          player.stop();
+          return;
+        }
+        if (done) break;
+        if (value) player.addChunk(value);
+      }
+      player.finish();
+    } catch {
+      if (requestId !== playRequestIdRef.current) return;
+      setPlayError(message.id);
+      setLoadingId(null);
+      setPlayingId(null);
+      player.stop();
+    }
+  }
 
   const loadHistory = useCallback(() => {
     setLoadError(false);
@@ -124,6 +225,10 @@ export function ChatPage({ person }: ChatPageProps) {
         <MessageThread
           messages={messages}
           emptyState={{ icon: "message-circle", text: "Nothing here yet. Say hello." }}
+          onPlay={handlePlay}
+          loadingId={loadingId}
+          playingId={playingId}
+          errorId={playError}
         />
       )}
       {sending ? (

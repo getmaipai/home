@@ -55,11 +55,6 @@ export class ApiError extends Error {
   }
 }
 
-// Every request is same-origin (Vite's dev proxy in dev, backend's own
-// serveStatic in prod: vite.config.ts and app.ts) with the session
-// cookie included: there is no header-based auth path at all
-// (middleware/auth.ts), so `credentials: "include"` is not optional.
-//
 // `timeoutMs` is opt-in, not a default: most calls here (download-job
 // polling, a multi-GB select) are legitimately long-running by design, so
 // a global fetch timeout would be wrong for them. It exists for calls
@@ -70,10 +65,34 @@ export class ApiError extends Error {
 // wait server-side (routes/host.ts); this is the second, independent
 // layer in case the hang is a dead connection the server never even
 // sees.
-async function request<T>(path: string, init?: RequestInit & { timeoutMs?: number }): Promise<T> {
-  const { timeoutMs, ...rest } = init ?? {};
+//
+// Shared by request<T>() and streamSpeech(): a code review (2026-09-04)
+// found the two had independently hand-rolled the same
+// AbortController-plus-setTimeout mechanics, which meant a future fix to
+// one (like the signal-passthrough fix below) had to be remembered and
+// reapplied to the other by hand.
+function withTimeout(timeoutMs: number | undefined): { signal: AbortSignal | undefined; clear: () => void } {
   const controller = timeoutMs ? new AbortController() : undefined;
   const timer = controller ? setTimeout(() => controller.abort(), timeoutMs) : undefined;
+  return {
+    signal: controller?.signal,
+    clear: () => {
+      if (timer) clearTimeout(timer);
+    },
+  };
+}
+
+function isAbortError(err: unknown): boolean {
+  return err instanceof DOMException && err.name === "AbortError";
+}
+
+// Every request is same-origin (Vite's dev proxy in dev, backend's own
+// serveStatic in prod: vite.config.ts and app.ts) with the session
+// cookie included: there is no header-based auth path at all
+// (middleware/auth.ts), so `credentials: "include"` is not optional.
+async function request<T>(path: string, init?: RequestInit & { timeoutMs?: number }): Promise<T> {
+  const { timeoutMs, ...rest } = init ?? {};
+  const { signal, clear } = withTimeout(timeoutMs);
   try {
     const res = await fetch(path, {
       ...rest,
@@ -87,7 +106,7 @@ async function request<T>(path: string, init?: RequestInit & { timeoutMs?: numbe
       // timeout was actually requested; otherwise passes through
       // whatever the caller gave (undefined, same as before this option
       // existed, or their own real signal).
-      signal: controller?.signal ?? rest.signal,
+      signal: signal ?? rest.signal,
     });
     const body = await res.json().catch(() => ({}));
     if (!res.ok) {
@@ -95,12 +114,12 @@ async function request<T>(path: string, init?: RequestInit & { timeoutMs?: numbe
     }
     return body as T;
   } catch (err) {
-    if (err instanceof DOMException && err.name === "AbortError") {
+    if (isAbortError(err)) {
       throw new ApiError(`Timed out after ${(timeoutMs ?? 0) / 1000}s`, 0, "timeout");
     }
     throw err;
   } finally {
-    if (timer) clearTimeout(timer);
+    clear();
   }
 }
 
@@ -171,4 +190,40 @@ export const api = {
   // safety net (a dead connection the server never sees), never races a
   // legitimate server-side response that's about to arrive.
   restartEngine: () => request<EngineStatus>("/api/host/engine/restart", { method: "POST", timeoutMs: 100_000 }),
+  // Not routed through request<T>(): that helper always parses the body
+  // as JSON and fully awaits it, and POST /api/tts's real success body is
+  // a streamed audio/wav response (routes/tts.ts) a caller needs to read
+  // chunk by chunk as it arrives, not JSON to await in one piece -
+  // streaming instead of buffering the whole reply first is the entire
+  // point (2026-09-04, Jesse). Returns the raw Response so the caller
+  // (ChatPage.tsx, via streamingWavPlayer.ts) can read `response.body`
+  // directly. The timeout only bounds waiting for the response to begin
+  // (a first spawn of the Pocket TTS sidecar can take a while -
+  // ttsSupervisor.ts's 180s health wait); once headers arrive this
+  // function returns and the timer is cleared, so a long reply's
+  // streaming playback itself is never cut off by it.
+  streamSpeech: async (text: string): Promise<Response> => {
+    const { signal, clear } = withTimeout(185_000);
+    try {
+      const res = await fetch("/api/tts", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text }),
+        signal,
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new ApiError(body.error ?? res.statusText, res.status, body.code);
+      }
+      return res;
+    } catch (err) {
+      if (isAbortError(err)) {
+        throw new ApiError("Timed out waiting for voice", 0, "timeout");
+      }
+      throw err;
+    } finally {
+      clear();
+    }
+  },
 };

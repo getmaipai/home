@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { EmptyState } from "@/kit/primitives/EmptyState";
 import { Avatar } from "@/kit/components/Avatar";
+import { getIcon } from "@/kit/icons";
 import { cn } from "@/kit/utils";
 
 export interface ThreadMessage {
@@ -18,6 +19,18 @@ export interface ThreadMessage {
 interface MessageThreadProps {
   messages: ThreadMessage[];
   emptyState?: { icon: string; text: string };
+  /** Optional per-message "listen" action, Chat's real caller today
+   * (ChatPage.tsx, the tts role - 2026-09-04). Undefined leaves every
+   * other consumer of this shared primitive unchanged: no button renders
+   * at all unless a caller opts in. `loadingId` is the message currently
+   * fetching audio; `playingId` is the one actively playing - kept
+   * separate from `loadingId` so the button doesn't keep showing
+   * "Loading…" once audio is already sounding; `errorId` marks the one
+   * whose most recent attempt failed. */
+  onPlay?: (message: ThreadMessage) => void;
+  loadingId?: string | null;
+  playingId?: string | null;
+  errorId?: string | null;
 }
 
 const SCROLL_FOLLOW_THRESHOLD_PX = 48;
@@ -28,9 +41,11 @@ const SCROLL_FOLLOW_THRESHOLD_PX = 48;
 // rather than reused code: follow new messages to the bottom only while
 // the person hasn't scrolled up to read something earlier, so a reply
 // arriving mid-scrollback doesn't yank them back down.
-export function MessageThread({ messages, emptyState }: MessageThreadProps) {
+export function MessageThread({ messages, emptyState, onPlay, loadingId, playingId, errorId }: MessageThreadProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [stickToBottom, setStickToBottom] = useState(true);
+  const VolumeIcon = getIcon("volume-2");
+  const LoaderIcon = getIcon("loader");
 
   useEffect(() => {
     const el = containerRef.current;
@@ -75,6 +90,28 @@ export function MessageThread({ messages, emptyState }: MessageThreadProps) {
             </div>
             {m.failed ? (
               <span className="text-xs text-[hsl(var(--destructive))]">Not sent. Try again.</span>
+            ) : null}
+            {onPlay && !m.isSelf ? (
+              <button
+                type="button"
+                onClick={() => onPlay(m)}
+                disabled={loadingId === m.id || playingId === m.id}
+                aria-label={loadingId === m.id ? "Loading" : playingId === m.id ? "Playing" : "Listen"}
+                className="flex items-center gap-1 text-xs text-[hsl(var(--muted-foreground))] hover:text-[hsl(var(--foreground))] disabled:opacity-60"
+              >
+                {loadingId === m.id ? (
+                  <LoaderIcon className="h-3.5 w-3.5 animate-spin" aria-hidden />
+                ) : (
+                  <VolumeIcon className="h-3.5 w-3.5" aria-hidden />
+                )}
+                {errorId === m.id
+                  ? "Couldn't play. Try again."
+                  : loadingId === m.id
+                    ? "Loading…"
+                    : playingId === m.id
+                      ? "Playing…"
+                      : "Listen"}
+              </button>
             ) : null}
           </div>
         </div>

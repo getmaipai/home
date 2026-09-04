@@ -1807,6 +1807,176 @@ set. Full architecture: platform plan chapters 1, 3, and 4.
       already set - building the real `tts` role is a separate, real
       slice of work, deliberately not started tonight given how much
       this session had already covered.
+- [x] **The `tts` role, real end to end: "I don't think chat works with
+      voice on the web for me to test" (2026-09-04, same session as the
+      decision above).** `spec/voice/` (new, mirrors `spec/llm/`'s wire-
+      contract-plus-stub shape): `PocketTtsClient` (real HTTP against
+      `pocket-tts serve`'s two endpoints, `/health` and `/tts`) and
+      `stubServer.ts` for tests. `backend/src/lib/ttsSupervisor.ts`
+      mirrors `llmSupervisor.ts`'s lazy-start-once shape scaled down to
+      one backend (no catalog entry or download job yet - see
+      `spec/voice/README.md` for why): `MAIPAI_TTS_URL` override, else a
+      real `uvx pocket-tts serve` spawn when `uv` is on `PATH`, else the
+      stub. `backend/src/lib/tts.ts` + `POST /api/tts`
+      (`backend/src/routes/tts.ts`) mirror `llm.ts`/`POST /api/llm/chat`'s
+      validate-then-typed-result shape. `ChatPage.tsx` gets a manual
+      "Listen" button per reply (`MessageThread.tsx`'s `onPlay` prop,
+      opt-in so other consumers of that shared primitive are unaffected) -
+      manual, not autoplay, so a household member chooses to hear each
+      one rather than every reply talking on its own.
+    - **A real stack deviation, flagged rather than absorbed
+      (`spec/voice/README.md`):** every other `chat`-role dependency is a
+      plain downloaded file Bun spawns directly; this is the first hub
+      feature whose real backend needs `uv`/Python present on the host at
+      *run* time. `ttsSupervisor.ts` detects `uv`'s absence and falls back
+      to the stub instead of crashing, so a fresh install without `uv`
+      still boots, just without real voice replies until `uv` is
+      installed.
+    - **First cut shipped buffered (whole WAV, then an `<audio>` element),
+      then rewritten to real chunked streaming the same session** once
+      Jesse actually tried it ("make sure you are streaming responses as
+      you get [them] instead of generating the entire wav and then just
+      playing that" - his own older, non-streaming version of this
+      pipeline was slow and word-by-word streaming was the specific gap he
+      wanted fixed). `spec/voice/ts/client.ts`'s `synthesizeStream()`
+      returns the raw, unbuffered response stream; `POST /api/tts`
+      (`routes/tts.ts`) pipes it straight through rather than buffering
+      server-side; `frontend/src/lib/streamingWavPlayer.ts` (new) decodes
+      and schedules each PCM chunk via the Web Audio API as it arrives,
+      the same technique Pocket TTS's own demo page uses. Verified live
+      with `curl`: `Transfer-Encoding: chunked`, time-to-first-byte 17ms
+      vs. 715ms total for a real reply - genuinely streaming, not just
+      claimed to be. This also resolved a real, load-bearing quirk rather
+      than working around it: Pocket TTS's response ships a bogus
+      placeholder WAV header size (~2,000,000,000 bytes, confirmed live) -
+      the buffered version had to detect and rewrite it before handing a
+      file to `<audio>`; the streaming player never trusts the header's
+      declared size at all (only the format fields), so the quirk stopped
+      being a problem to work around rather than getting fixed differently.
+      Per-chunk scheduling (rather than one opaque element) is also the
+      real mechanism a future barge-in feature needs (Jesse, same
+      session: the old project "didn't allow for barge in... because of
+      no gaps") - `StreamingWavPlayer.stop()` already cuts every
+      currently-scheduled chunk immediately, not built on yet.
+    - **Real bugs found live across both passes, each fixed and
+      regression-tested, not just reasoned about:** (1) the WAV
+      placeholder-header bug above (buffered-version-only, moot once
+      streaming replaced it, but real while it lasted - a short reply's
+      "Listen" button stuck forever on "Playing…"); (2) a shared-resource
+      race, first seen as a stale `<audio>.play()` rejection landing on
+      the wrong message, then reproduced again in the streaming rewrite
+      as a stale late failure doing the same thing - fixed with a
+      per-call request-token guard in `ChatPage.tsx`'s `handlePlay` that
+      every async continuation checks before touching state
+      (`ChatPage.test.tsx`, new: reproduces the real interleaving - click
+      first, click second before the first settles, THEN let the first
+      fail - confirmed to actually fail without the guard, not just pass
+      trivially); (3) a second-order gap the review that caught (2) also
+      found: a superseded message's stale `playingId` was never cleared
+      up front, so if the *new* message's audio ended up with zero
+      playable frames (`onFirstAudio` never fires), the *old* message
+      could stay stuck showing "Playing…", permanently disabled - fixed
+      by resetting `playingId` unconditionally at the start of every
+      `handlePlay` call rather than relying on the new call's own
+      callbacks to overwrite the old value; (4) `ttsSupervisor.ts`'s
+      `waitForHealth` polled `client.health()` for the *entire* 180s
+      timeout even when the spawned process had already exited (missing
+      package, broken venv, a taken port) - fixed to check
+      `Bun.Subprocess.exitCode` on every poll and fail within seconds
+      instead of three minutes (`ttsSupervisor.test.ts`: a real child
+      process that really exits, not a mocked one, proves the fast path).
+    - **Verified live, not just unit-tested, on both passes**: a real
+      `uvx pocket-tts serve` spawn from a real, running hub backend,
+      `curl`'d directly (`POST /api/tts`, real signed-in session, real WAV
+      bytes back) and played through this Mac's real speakers with
+      `afplay`; the "Listen" button driven for real in the browser against
+      the running hub (Jesse's own household, PIN-signed-in) for both a
+      single click and the rapid-second-click race, confirmed via
+      screenshots to reach a clean "Listen" state on its own once playback
+      finished, no stuck states, no console errors. The buffered-version
+      pass had one thing it could not confirm through the automation
+      tooling (whether `<audio>.play()` ever actually completed in the
+      CDP-driven browser tab this session's tooling uses - both a
+      detached `Audio()` and a DOM-attached `<audio controls>` stalled at
+      `readyState 0` indefinitely); the streaming rewrite's Web Audio API
+      approach does not hit that same wall and was confirmed working
+      end-to-end in the same tooling, though whether the original stall
+      was that CDP tab's own audio pipeline or the WebKit-style
+      user-activation-window risk a review flagged (creating the player
+      only after an awaited fetch) was never isolated - moot now that the
+      real fix (a synchronously-created `AudioContext`, before any
+      `await`) addresses the activation risk regardless of which one it
+      was.
+    - **Auto-play: tried, then explicitly reverted, same session.** Jesse
+      first asked for it ("I still have to click listen though - it
+      doesnt auto speak replies"), it shipped (`handleSend` calling
+      `handlePlay` automatically), then two things happened worth keeping
+      the reasons for. First, a real cross-browser gotcha Jesse caught by
+      testing in his own two browsers: audible in the Chrome tab this
+      session's browser tooling drives, silent in Safari - consistent
+      with Safari's autoplay policy strictly requiring a *fresh* user
+      gesture, which the `AudioContext` created after `await
+      api.sendTurn(...)`'s network round trip no longer has (Chrome is
+      more lenient about the gap). Second and overriding: Jesse decided
+      he doesn't want auto-play at all ("again, I dont want auto play"),
+      independent of the Safari bug. Fully reverted - `handleSend` no
+      longer calls `handlePlay`, the "Listen" button is the only way to
+      hear a reply, same as the first cut. Worth a code review pass
+      anyway before the revert landed: it found a real unmount-safety gap
+      (navigating away from Chat mid-synthesis left audio playing with no
+      owner and no way to stop it) that would have mattered for any
+      future feature that plays audio outside a direct click handler -
+      recorded here rather than fixed, since the feature it applied to no
+      longer exists. One more real bug survived that review and the two
+      before it, on the manual "Listen" button itself: `onEnded` cleared
+      `playingId` but never `loadingId`, so a reply whose synthesized
+      audio has zero playable frames (`StreamingWavPlayer.finish()`
+      calling `onEnded` directly, since `onFirstAudio` never got the
+      chance to fire) left that message's button stuck on "Loading…",
+      disabled, with no way to retry short of a reload - fixed by
+      clearing both, `ChatPage.test.tsx` covers the exact zero-frame WAV
+      shape that reproduces it.
+    - **What Jesse actually meant by "streamed"**: the legacy hub
+      (`home-legacy.git`) never had a manual button or a post-hoc
+      autoplay decision at all - `useCompanionVoice.ts` watched the
+      LLM's reply *stream in* token by token, fired TTS the instant each
+      completed sentence boundary appeared in the growing text (a real,
+      tuned sentence/clause-boundary chunker,
+      `useCompanionVoice.ts`'s own header comment: "flush on the first
+      sentence terminator... or the first clause boundary once it's long
+      enough, whichever comes first, to minimize time-to-first-audio"),
+      and
+      `TTSPlaybackScheduler`/`VoicePlayback` played each sentence's PCM
+      back-to-back via the Web Audio API as later sentences were still
+      being synthesized - sound starts while the model is still writing.
+      This session's `/api/turn` has no text streaming to hook that into
+      yet (`spec/llm/README.md`: "non-streaming only this pass," `stream:
+      false` always sent to llama-server) - that is the real, larger
+      prerequisite this pattern needs, not a frontend change. Recorded
+      here as the concrete target once LLM streaming lands: reuse
+      `useCompanionVoice.ts`'s sentence-boundary chunker (hard-won,
+      already tuned against real jarring-mid-phrase-chop failures) and
+      `TTSPlaybackScheduler`'s gapless-scheduling approach (which
+      `streamingWavPlayer.ts` already independently arrived at the same
+      Web Audio API shape for, one call's byte chunks rather than
+      multiple sentence calls) rather than re-deriving either from
+      scratch.
+    - **Still not built**: voice selection or cloning (every reply uses
+      Pocket TTS's own default voice - the cloning-capable checkpoint's
+      HF-gating gap from the decision entry above is still unresolved),
+      speech normalization (numbers/units/dates spoken naturally),
+      barge-in (the per-chunk scheduling that would make it possible now
+      exists; nothing calls `stop()` on a new user utterance yet), the
+      chat-mode switcher (wakeword, continual chat, voice reply, text
+      only) Jesse asked for the same session - voice reply and text only
+      are real extensions of what exists here; wakeword and continual
+      chat need voice *input* (microphone capture, speech-to-text), which
+      does not exist anywhere in this codebase yet and is real, separate,
+      Hub v0.3-sized scope, not a quick addition to this slice (confirmed
+      with Jesse: ship the two real modes now, list the other two as
+      visibly not-yet-built rather than leaving them out or faking them),
+      and real streaming LLM text through `POST /api/turn` - the actual
+      prerequisite for "what Jesse actually meant by streamed," above.
 
 ## API routes and `@hono/zod-openapi` (tracked debt)
 
