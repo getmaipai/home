@@ -78,12 +78,42 @@ hostRoutes.post("/engine/stop", requireRole("owner", "admin"), async (c) => {
 // check (seconds), not a multi-GB download, so one request/response is
 // the honest shape rather than inventing a second progress-polling path
 // for a much shorter wait.
+// A code review of the live incident this same night (2026-09-04): a
+// hung getChatClient() used to hold this HTTP response open indefinitely
+// - the browser's own fetch has no default timeout either, so the page
+// showed "Starting..." forever with no way to recover short of a full
+// reload. This bounds the wait: past RESTART_TIMEOUT_MS the route
+// answers with a clear timeout error instead of hanging - the underlying
+// spawn attempt isn't cancelled (there's no cooperative-cancellation
+// story for a llama-server health-check loop), so if it does eventually
+// succeed, the next status poll picks it up; if it doesn't, the household
+// member gets a real error and a Restart button to try again rather than
+// a spinner with no way out.
+const RESTART_TIMEOUT_MS = 90_000;
+
 hostRoutes.post("/engine/restart", requireRole("owner", "admin"), async (c) => {
   await restartChatBackend();
+  // A code review (2026-09-04) found the timer here was never cleared
+  // once the race settled, keeping a live setTimeout handle (and the
+  // event loop) alive for up to 90s after a fast, successful restart -
+  // harmless (its callback just rejects an already-settled race), but a
+  // real handle leak on every single restart call. Cleared in `finally`
+  // regardless of which side of the race won.
+  let timeoutHandle: ReturnType<typeof setTimeout> | undefined;
   try {
-    await getChatClient();
+    await Promise.race([
+      getChatClient(),
+      new Promise<never>((_, reject) => {
+        timeoutHandle = setTimeout(
+          () => reject(new Error(`timed out waiting for the chat engine after ${RESTART_TIMEOUT_MS / 1000}s`)),
+          RESTART_TIMEOUT_MS,
+        );
+      }),
+    ]);
   } catch (err) {
     return c.json({ error: (err as Error).message }, 503);
+  } finally {
+    clearTimeout(timeoutHandle);
   }
   return c.json(getEngineStatus());
 });

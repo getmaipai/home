@@ -27,6 +27,10 @@
 //      spec/llm/README.md's "What's real vs. stubbed".
 import { existsSync } from "node:fs";
 import { join } from "node:path";
+import { execFile } from "node:child_process";
+import { promisify } from "node:util";
+
+const execFileAsync = promisify(execFile);
 import { LlamaServerClient } from "@maipai/spec/llm/ts/client.js";
 import { startStubLlmServer } from "@maipai/spec/llm/ts/stubServer.js";
 import type { ModelCapabilities } from "@maipai/spec/gen/ts/model-capabilities.js";
@@ -83,6 +87,81 @@ async function waitForHealth(client: LlamaServerClient, timeoutMs: number): Prom
   throw new Error(`llama-server did not become healthy within ${timeoutMs}ms`);
 }
 
+// Kills whatever's listening on `port`, best-effort. Real, observed
+// failure mode this guards against (2026-09-04): `bun run --hot`'s file
+// watcher reloads on ANY change under the repo it's watching - including
+// `check.sh` regenerating `spec/gen/`, unrelated to this module at all -
+// and a hot reload wipes every module-level `let` (chatBackend,
+// startingPromise) without touching the real child process it was
+// tracking. That process keeps running, still bound to the fixed port,
+// now untracked by the fresh module instance. The next spawn attempt
+// (e.g. a household member clicking Restart) then either fails to bind
+// the port (Bun.spawn's process exits immediately) or, worse, the health
+// check against that fixed port passes by polling the orphaned process
+// rather than the one just spawned - either way the UI gets stuck showing
+// "Starting..." forever, exactly what Jesse hit live tonight. Freeing the
+// port before every spawn makes "restart" actually mean restart,
+// regardless of what a dev-mode reload left behind.
+//
+// `ps`, not `lsof`: this same machine's `lsof` proved unreliably slow
+// (multiple times this session, unrelated to this feature) enough that
+// this module's own first version - lsof-based - made a passing test
+// start timing out. `ps aux` plus a plain-text match on the exact
+// `--port <N>` argument spawnLlamaServer always passes is faster and
+// matches the process this function actually needs to find, not "every
+// process with an open socket on this port" in general. Best-effort
+// throughout (no-op if `ps` is missing, or nothing matches) - this is a
+// robustness improvement, not something a spawn should ever hard-fail
+// over.
+// Exported for a real test (kills an actual listening process, not a
+// mock of ps/kill), the same "prove the real mechanism, not a simulation
+// of it" standard this module's other tests already hold to.
+export async function freePort(port: number): Promise<void> {
+  // A code review (2026-09-04) found the original version matched
+  // `--port ${port}` as a plain substring - true for "--port 87889" when
+  // freeing port 8788, since 8788 is a numeric prefix of 87889. Anchored
+  // to a word boundary after the number so it only ever matches the exact
+  // port, not anything with it as a prefix.
+  const portPattern = new RegExp(`--port[= ]${port}\\b`);
+  const findPids = async (): Promise<number[]> => {
+    try {
+      const { stdout } = await execFileAsync("ps", ["aux"], { timeout: 5_000 });
+      return stdout
+        .split("\n")
+        .filter((line) => portPattern.test(line))
+        .map((line) => Number(line.trim().split(/\s+/)[1]))
+        .filter((n) => Number.isFinite(n) && n > 0);
+    } catch {
+      return [];
+    }
+  };
+
+  const pids = await findPids();
+  for (const pid of pids) {
+    try {
+      process.kill(pid, "SIGKILL");
+    } catch {
+      // already gone
+    }
+  }
+  if (pids.length === 0) return;
+
+  // Give the OS a moment to actually release the socket before the
+  // caller tries to bind it again - SIGKILL is immediate but the kernel's
+  // own port teardown isn't guaranteed synchronous. A real connect
+  // attempt (not another ps scan) is both faster and the thing that
+  // actually matters: can something bind this port yet.
+  const deadline = Date.now() + 3_000;
+  while (Date.now() < deadline) {
+    const stillUp = await fetch(`http://127.0.0.1:${port}`, { signal: AbortSignal.timeout(300) }).then(
+      () => true,
+      () => false,
+    );
+    if (!stillUp) return;
+    await new Promise((resolve) => setTimeout(resolve, 100));
+  }
+}
+
 async function spawnLlamaServer(
   bin: string,
   modelPath: string,
@@ -95,6 +174,7 @@ async function spawnLlamaServer(
   // (e.g. router) would need real port allocation, deferred with the rest
   // of the multi-role residency policy.
   const port = Number(process.env.MAIPAI_LLAMA_SERVER_PORT ?? 8788);
+  await freePort(port);
   const args = [
     bin,
     "--model",

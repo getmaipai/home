@@ -59,17 +59,49 @@ export class ApiError extends Error {
 // serveStatic in prod: vite.config.ts and app.ts) with the session
 // cookie included: there is no header-based auth path at all
 // (middleware/auth.ts), so `credentials: "include"` is not optional.
-async function request<T>(path: string, init?: RequestInit): Promise<T> {
-  const res = await fetch(path, {
-    ...init,
-    credentials: "include",
-    headers: { "Content-Type": "application/json", ...init?.headers },
-  });
-  const body = await res.json().catch(() => ({}));
-  if (!res.ok) {
-    throw new ApiError(body.error ?? res.statusText, res.status, body.code);
+//
+// `timeoutMs` is opt-in, not a default: most calls here (download-job
+// polling, a multi-GB select) are legitimately long-running by design, so
+// a global fetch timeout would be wrong for them. It exists for calls
+// where a hang is never correct - a live incident (2026-09-04) left the
+// AI models page stuck showing "Starting..." forever with no way out,
+// because neither this client nor the browser's own fetch has any
+// default timeout at all. The backend route itself now bounds the same
+// wait server-side (routes/host.ts); this is the second, independent
+// layer in case the hang is a dead connection the server never even
+// sees.
+async function request<T>(path: string, init?: RequestInit & { timeoutMs?: number }): Promise<T> {
+  const { timeoutMs, ...rest } = init ?? {};
+  const controller = timeoutMs ? new AbortController() : undefined;
+  const timer = controller ? setTimeout(() => controller.abort(), timeoutMs) : undefined;
+  try {
+    const res = await fetch(path, {
+      ...rest,
+      credentials: "include",
+      headers: { "Content-Type": "application/json", ...rest.headers },
+      // A code review (2026-09-04) found this unconditionally overwrote
+      // whatever `signal` a caller passed via `init` - harmless today
+      // (no call site passes its own signal), but silently discarding a
+      // future caller's own cancellation the moment they didn't also
+      // request `timeoutMs`. Only substitutes the timeout's signal when a
+      // timeout was actually requested; otherwise passes through
+      // whatever the caller gave (undefined, same as before this option
+      // existed, or their own real signal).
+      signal: controller?.signal ?? rest.signal,
+    });
+    const body = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      throw new ApiError(body.error ?? res.statusText, res.status, body.code);
+    }
+    return body as T;
+  } catch (err) {
+    if (err instanceof DOMException && err.name === "AbortError") {
+      throw new ApiError(`Timed out after ${(timeoutMs ?? 0) / 1000}s`, 0, "timeout");
+    }
+    throw err;
+  } finally {
+    if (timer) clearTimeout(timer);
   }
-  return body as T;
 }
 
 export const api = {
@@ -133,6 +165,10 @@ export const api = {
   modelSelectStatus: (id: string) => request<ModelJob>(`/api/host/models/${encodeURIComponent(id)}/select-status`),
   engineStatus: () => request<EngineStatus>("/api/host/engine/status"),
   engineStats: () => request<EngineStatsSample[]>("/api/host/engine/stats"),
-  stopEngine: () => request<EngineStatus>("/api/host/engine/stop", { method: "POST" }),
-  restartEngine: () => request<EngineStatus>("/api/host/engine/restart", { method: "POST" }),
+  stopEngine: () => request<EngineStatus>("/api/host/engine/stop", { method: "POST", timeoutMs: 15_000 }),
+  // 100s: a little past the backend's own 90s bound (routes/host.ts), so
+  // this client-side timeout only ever fires as the second, independent
+  // safety net (a dead connection the server never sees), never races a
+  // legitimate server-side response that's about to arrive.
+  restartEngine: () => request<EngineStatus>("/api/host/engine/restart", { method: "POST", timeoutMs: 100_000 }),
 };
