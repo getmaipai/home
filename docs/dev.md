@@ -1149,8 +1149,10 @@ between now and when the relevant piece gets built.
   per turn, is the shape if it gets built at all.
   **Two decisions from Jesse, 2026-09-04, that this note now sits on top
   of.** *The model lineup comes from the legacy hub*, not a fresh pick:
-  `loki-doki`'s `backend/src/lib/catalog.ts` had two hardware-tiered sets,
-  default `original` (chat `mannix/llama3.1-8b-abliterated`, vision
+  `home-legacy.git`'s `backend/src/lib/catalog.ts` (byte-identical to the
+  copy in the older, out-of-reference-set `loki-doki`, confirmed by diff -
+  the two lineages hadn't diverged on this file) had two hardware-tiered
+  sets, default `original` (chat `mannix/llama3.1-8b-abliterated`, vision
   `gemma3:4b-it-qat`, router LLM `granite4.1:3b`, embeddings
   `nomic-embed-text`, routing embedder `all-minilm`) and `latest` (chat
   `huihui_ai/qwen3.5-abliterated:9b`, router `qwen3.5:4b`, embeddings
@@ -1189,3 +1191,46 @@ between now and when the relevant piece gets built.
   Grammar-constrained decoding through llama-server matters more than the
   model's own tool-calling ability either way, since a GBNF grammar makes
   a small model's call valid by construction.
+
+- **Wake word and voice-pipeline findings from `home-legacy.git`** (this
+  content also exists, effectively unchanged, in the older `loki-doki`
+  lineage it grew from - confirmed by diff, not assumed), to revalidate
+  when 4.11's voice sidecar lands (Hub v0.3). Everything below is a
+  mid-2026 engineering estimate,
+  not a verified current fact, and should be re-measured before it is
+  trusted. **Wake word:** openWakeWord (one shared mel-spectrogram/
+  embedding stage, a swappable per-phrase detector ONNX), run client-side
+  via `onnxruntime-web` WASM or server-side (Wyoming) for headless
+  satellites. A custom-trained "hey loki" detector used a calibrated
+  threshold of 0.47 (stock phrases default to 0.5) with 2-frame hysteresis
+  in-browser and 4-frame server-side (an always-listening satellite pays
+  more for a false accept). Measured 2026-07-01 against a synthetic
+  adversarial bank: 44 false-accepts/hr at 83% recall (browser), 22 FA/hr
+  at 67% recall (server); almost every false accept came from phonetic
+  near-misses, not noise or silence. **This recall/FA pair should not be
+  trusted at face value**: the org's 2026-08-31 wake-word incident
+  (`.github/CLAUDE.md` > Training models) happened to a shipped detector
+  from this same lineage, and the training-data/validation gaps that
+  incident uncovered (missing augmentation packs, synthetic-only
+  validation, no near-miss negatives) may have already been present when
+  this 83%/67% number was measured. **Wake-to-STT gap:** no pre-roll
+  buffering meant a fast run-on command ("hey maipai, turn off the lights"
+  in one breath) clipped the command's head; fixed with a ~1.5s rolling
+  pre-roll buffer replayed into STT on wake. **STT:** Whisper `tiny.en`
+  via `@huggingface/transformers` in a Node sidecar; a full-buffer
+  re-decode after the silence endpoint cost 800ms+, the largest measured
+  latency chunk. A native whisper.cpp path was designed (Metal RTF ~0.04,
+  CPU AVX2 ~15x realtime) but never shipped or validated on real
+  production hardware. **TTS:** Kokoro-82M ONNX, sentence-chunked
+  streaming, ~450ms/sentence on CPU int4. Rejected alternatives worth
+  keeping the reasons for: Supertonic (faster, audibly more robotic),
+  Orpheus-3B (needs ~8GB VRAM), NeuTTS Air (Qwen2 backbone, excluded by
+  the org's model-origin policy at the time, which should itself be
+  re-confirmed as still current before it blocks anything). **Endpointing:**
+  a 0.7-0.8s silence timeout was the single largest "dead air"
+  contributor; a semantic endpointer (Smart Turn v3, ~12ms CPU) was
+  designed but never shipped. The source plan's own audit states its
+  dev-machine numbers "do not transfer" to the real production box and
+  that most of the pipeline was never measured on real target hardware,
+  only estimated - treat all of the above as a starting hypothesis for
+  the 4.11 voice sidecar eval, not as settled numbers.
