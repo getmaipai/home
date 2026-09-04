@@ -8,6 +8,37 @@ checklist (`docs/dev.md`); no release has been cut yet.
 ## [Unreleased]
 
 ### Added
+- The `chat` model role and a llama-server router skeleton (platform plan
+  4.11, split), the seventh slice of hub core: `spec/llm/` has a
+  hand-written, language-portable wire contract for llama-server's
+  OpenAI-compatible chat-completions surface (non-streaming; no tools,
+  JSON schema, or grammar yet), a real `LlamaServerClient`, and an
+  in-process stub server for dev and test that speaks the identical
+  contract, so the router path (start a backend, health-check it, send a
+  request, parse a response) is exercised for real end to end without a
+  GGUF. `backend/src/lib/llmSupervisor.ts` picks the backend lazily on
+  first use: `MAIPAI_LLAMA_SERVER_URL` to point at an already-running
+  server, `MAIPAI_LLAMA_SERVER_BIN` + `MAIPAI_CHAT_MODEL_PATH` to spawn a
+  real one, or the stub when neither is set, which is every dev machine
+  and the test suite today. `backend/src/lib/llm.ts` is the role port:
+  only `chat` is implemented, every other role (`router`, `embed`,
+  `vision`, `image`, `video`, `coding`, `tts`, `stt`, `wakeword`) is a
+  real, named `capability_missing`/`unsupported_role`, not a silent gap.
+  New route: `POST /api/llm/chat`, the same "provisional real caller
+  ahead of the turn engine" pattern `/api/safety/check` set for the
+  safety layer. `host.llm.complete` in `packageHost.ts` deliberately stays
+  `capability_missing`: the `Host` RPC boundary is synchronous and a real
+  chat completion is inherently async network I/O, a real architectural
+  gap (needs both recipe interpreters to support async host calls) kept
+  distinct from "not built yet." No GGUF, engine binary, residency policy,
+  or `ModelCapabilities` record exist yet; which default chat model to pin
+  and what hardware to build the real (non-stub) path against are flagged
+  as Jesse's call, not guessed. A same-day review found and fixed a real
+  bug: a failed backend start left a rejected promise cached forever,
+  permanently wedging the `chat` role after one transient failure until
+  the process restarted; also flagged, and deferred rather than guessed
+  at, a missing rate limit on `POST /api/llm/chat`. Full reasoning in
+  `spec/llm/README.md`.
 - The scheduler (platform plan 4.7), the sixth slice of hub core: a
   durable job store (`backend/src/lib/scheduler.ts`, `scheduled_jobs`
   table) with one-shot and recurring jobs, persisted and surviving

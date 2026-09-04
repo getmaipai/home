@@ -499,6 +499,109 @@ set. Full architecture: platform plan chapters 1, 3, and 4.
       `bot` needs one), the interpreter input-carrying gap (above), and
       real RRULE-style recurrence (the `every:<n><unit>` grammar is a
       placeholder).
+- [x] The `chat` model role and a llama-server router skeleton (4.11,
+      **split, not full**), the seventh slice of hub core. 4.11 describes
+      ten model roles, a multi-role residency policy with GPU placement
+      and KV cache tuning, real GGUF downloads pinned by sha256 for three
+      platforms, and a `ModelCapabilities` catalog record: too large for
+      one slice (flagged as a real risk before starting; confirmed true
+      after re-reading 4.11 in full). Split into a router skeleton against
+      a stub/mock model this pass, real downloads and the rest of the
+      roles later, per the judgment call this session was explicitly
+      asked to make rather than guess at the whole thing.
+    - `spec/llm/` (mirroring `spec/safety/`'s precedent: language-portable
+      design, not a spec-schema record): `ts/types.ts` is a hand-written
+      OpenAI-compatible chat-completions subset (non-streaming; no tools,
+      JSON schema, grammar, or `chat_template_kwargs` yet), deliberately
+      not run through the schema+codegen pipeline since it mirrors an
+      external wire contract rather than a MaiPai-defined stored record.
+      `ts/client.ts`'s `LlamaServerClient` is real: it makes real HTTP
+      requests to whatever base URL it's given, so it works unmodified
+      against either a real llama-server or `ts/stubServer.ts`'s
+      in-process stand-in (both speak `/health`, `/v1/models`,
+      `/v1/chat/completions`). Every stub reply is prefixed `[stub model:
+      no real model loaded, this is a canned reply]`, mirroring
+      `host-emulator.ts`'s existing `llm.complete` wording, so a canned
+      answer can never be mistaken for a real one downstream.
+      `spec/llm/README.md` is the design record: full scope, what's
+      deferred, and why.
+    - `backend/src/lib/llmSupervisor.ts`: picks the `chat` backend lazily
+      on first use, in order: `MAIPAI_LLAMA_SERVER_URL` (point at an
+      already-running server), `MAIPAI_LLAMA_SERVER_BIN` +
+      `MAIPAI_CHAT_MODEL_PATH` (spawn a real `llama-server` process via
+      `Bun.spawn`, poll `/health` until ready), or the in-process stub
+      when neither is set, which is every dev machine and the test suite
+      today since neither env var is configured anywhere in this repo.
+      `backend/src/lib/llm.ts` is the role port: `LlmRole` names all ten
+      4.11 roles, but only `chat` is in `IMPLEMENTED_ROLES`; every other
+      role returns a real `unsupported_role` result, not a crash or a
+      silent stub. `complete()` validates the messages array (non-empty,
+      each message's role in system/user/assistant) before ever touching
+      the supervisor.
+    - New route: `POST /api/llm/chat` (any signed-in person, no role
+      gate, matching `/api/safety/check`'s posture for a person's own
+      request), the real (if provisional) caller ahead of the turn engine
+      (4.5), which doesn't exist yet to call this role internally.
+    - **`host.llm.complete` in `packageHost.ts` deliberately still throws
+      `capability_missing`, for a different and more precise reason than
+      before.** It used to be "no LLM role exists"; now the role is real
+      but the `Host` interface (`spec/emulators/ts/host-emulator.ts`) is
+      entirely synchronous and `runRecipe()` never awaits a host call
+      (`spec/interpreters/ts/recipe-interpreter.ts`), while a real chat
+      completion is inherently async network I/O. There is no correct way
+      to make that synchronous; wiring this through for real needs the
+      interpreter itself to support async host calls, in both TS and
+      Python kept behaviorally identical, out of scope here, the same
+      category of deferral as the scheduler's recipe-input-carrying gap.
+      Zero live blast radius: no recipe step type calls `llm.complete`
+      today (`recipe.schema.json` has no "llm" step).
+    - Exercised for real: booted the server (stub-backed, since no real
+      llama-server binary or GGUF exists on this dev machine or anywhere
+      in this repo) and drove an authenticated chat completion, an
+      unauthenticated rejection, an unsupported-role rejection, and a
+      missing-messages rejection with `curl`, in addition to 7 spec-level
+      tests (the client against the stub, over a real loopback socket)
+      and 12 backend tests (the role port, the supervisor's retry
+      behavior, the route, and `packageHost.ts`'s `llm.complete` gap),
+      all green.
+    - **A `code-review` pass (medium effort) on this slice before
+      committing** found one confirmed bug and one real, deferred gap.
+      **Confirmed and fixed:** `llmSupervisor.ts`'s `getChatClient()`
+      never cleared `startingPromise` on a failed start, so any transient
+      spawn failure (a briefly-wrong model path, a taken port, a slow
+      first load past the health timeout) permanently wedged the `chat`
+      role for the rest of the process's life, replaying the same stale
+      rejection on every later call instead of retrying, until a full
+      restart. Fixed by clearing `startingPromise` in a `.catch` before
+      rethrowing; proven with a regression test
+      (`backend/tests/llmSupervisor.test.ts`) that first confirms the
+      buggy version fails it (a bad `MAIPAI_LLAMA_SERVER_BIN`, then a
+      second call after clearing the env var, without ever calling the
+      test-reset helper) before confirming the fix passes it.
+      **Real, deferred, not fixed here:** `POST /api/llm/chat` has no
+      rate limit or role gate, so any signed-in person (including a
+      `guest` or `child`) can fire unlimited concurrent requests against
+      the one supervised `chat` process. Matches `/api/safety/check`'s
+      existing posture, and a real fix needs information this pass
+      doesn't have (the real engine's concurrency behavior, `-np`, once
+      Jesse picks one); documented as tracked debt in
+      `spec/llm/README.md` rather than guessed at.
+    - **Deliberately deferred, real 4.11 scope not attempted:** every
+      role but `chat`; the real engine (no GGUF, no engine binary, no
+      platform-pinned downloads); the multi-role residency policy
+      (`/models/load`/`unload`, GPU placement, KV cache tuning, only
+      meaningful with more than one resident model); streaming, tools,
+      JSON schema, and grammar on the chat contract; a `ModelCapabilities`
+      spec record (nothing to populate it yet, no catalog, no install
+      flow); `host.llm.complete` wiring (above). Full reasoning in
+      `spec/llm/README.md`.
+    - **A decision left to Jesse, not guessed:** which GGUF is the
+      default `chat` model, and what hardware the real household hub runs
+      on (this dev machine has Apple Silicon/Metal; the deployed hub's
+      hardware is unknown to this session). Nothing in this pass blocks
+      on that: the stub keeps the whole router path provable without it,
+      and the three env vars are ready to point at a real answer the
+      moment Jesse picks one.
 
 ## API routes and `@hono/zod-openapi` (tracked debt)
 
@@ -522,8 +625,11 @@ every route at once, once there are enough of them that the generated
 no shell, no Go client, nothing reading the OpenAPI spec yet). Revisit
 when the package host (4.9) or Go (chapter 10) creates a real reason to
 need it, not on a fixed schedule.
-- [ ] Core, still to build: the turn engine, the scheduler, the package
-      host, the llama-server router.
+- [ ] Core, still to build: the turn engine (4.5, blocked on nothing
+      infrastructural now that the `chat` role, memory, safety, and the
+      package host all exist; needs its own dedicated slice) and the rest
+      of 4.11 (every role but `chat`, the real engine and residency
+      policy, streaming/tools/JSON-schema on the chat contract).
 - [ ] The shell and kit, Chat and Companions as packages, the wizard,
       backups, self-update - not started.
 - [ ] README.md still needs the full org skeleton (logo, screenshot strip,

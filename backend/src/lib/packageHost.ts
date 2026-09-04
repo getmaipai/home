@@ -18,13 +18,22 @@
 // (household scope only), schedule (lib/scheduler.ts, with a known gap,
 // see that call site below), log (with real redaction). Everything else
 // (fetch, home.call_service, integration.call, speak.sentence,
-// llm.complete, camera.still, ocr.read, files.*, action.emit,
-// diagnostics) has no backing service yet (no rate limiter, no Home
-// Assistant link, no LLM role, no turn engine to route actions to, no
-// package file storage) and throws `capability_missing`, checked against
-// the permission it would need first so the error is as specific as it
-// can honestly be. See docs/dev.md's Package Host section for what's
-// deferred and why.
+// camera.still, ocr.read, files.*, action.emit, diagnostics) has no
+// backing service yet (no rate limiter, no Home Assistant link, no turn
+// engine to route actions to, no package file storage) and throws
+// `capability_missing`, checked against the permission it would need
+// first so the error is as specific as it can honestly be. `llm.complete`
+// is the same code but a different reason: the `chat` role IS real now
+// (lib/llm.ts, lib/llmSupervisor.ts, spec/llm/), but every method on this
+// interface is synchronous and runRecipe() never awaits a host call
+// (spec/interpreters/ts/recipe-interpreter.ts), while a real chat
+// completion is inherently async network I/O. Wiring this through needs
+// the interpreter itself to support async host calls (both TS and Python,
+// kept behaviorally identical), out of scope here; no recipe step calls
+// llm.complete today either (recipe.schema.json has no "llm" step), so
+// this has zero live blast radius. See spec/llm/README.md for the full
+// reasoning and docs/dev.md's Package Host section for everything else
+// that's deferred and why.
 import type { Host, FetchOptions, MemoryRecordLike } from "@maipai/spec/emulators/ts/host-emulator.js";
 import { HostError, redactSecrets } from "@maipai/spec/emulators/ts/host-emulator.js";
 import type { PackageManifest } from "@maipai/spec/gen/ts/manifest.js";

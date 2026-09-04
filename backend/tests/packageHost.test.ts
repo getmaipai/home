@@ -127,6 +127,23 @@ describe("packageHost unimplemented methods", () => {
       expect((err as HostError).code).toBe("permission_denied");
     }
   });
+
+  // llm.complete is a deliberate exception in this describe block: the
+  // `chat` role IS real now (lib/llm.ts), but the Host RPC boundary is
+  // synchronous and a chat completion is inherently async network I/O
+  // (see the header comment in packageHost.ts and spec/llm/README.md).
+  // This pins that the gap stays honest (capability_missing, permission
+  // checked first) rather than silently regressing to some other code.
+  test("llm.complete still reports capability_missing (sync Host boundary, async chat role)", async () => {
+    const actor = await owner();
+    const host = createHost(actor, manifest({ permissions: ["llm:complete"] }));
+    try {
+      host.llm.complete({ messages: [{ role: "user", content: "hi" }] });
+      throw new Error("should have thrown");
+    } catch (err) {
+      expect((err as HostError).code).toBe("capability_missing");
+    }
+  });
 });
 
 describe("packageHost data.forget", () => {
