@@ -49,10 +49,23 @@ export class PocketTtsClient {
    * (sampleRate/channels/bitsPerSample) and treats everything after as
    * raw PCM until the stream itself ends - frontend/src/lib/
    * streamingWavPlayer.ts is that consumer, the same technique Pocket
-   * TTS's own reference implementation uses. */
-  async synthesizeStream(text: string): Promise<TtsSynthesizeResult> {
+   * TTS's own reference implementation uses.
+   *
+   * `voiceUrl` (2026-09-04, "per user selection of voice"): a built-in
+   * preset name (confirmed live: `voice_url=vera` synthesizes real
+   * audio in that voice) or a full http(s)/hf:// URL - Pocket TTS's real
+   * `/tts` validates this itself (`voice_url must start with http://,
+   * https://, or hf://` for anything not one of its own known preset
+   * names), so this client sends it through unvalidated rather than
+   * duplicating that check; the caller (backend/src/settings/
+   * voiceKeys.ts) is what actually restricts which values can ever
+   * reach here. Omitted (not sent as an empty form field) when absent,
+   * so a request with no voice choice behaves exactly as it did before
+   * this parameter existed. */
+  async synthesizeStream(text: string, voiceUrl?: string): Promise<TtsSynthesizeResult> {
     const form = new FormData();
     form.append("text", text);
+    if (voiceUrl) form.append("voice_url", voiceUrl);
     let res: Response;
     try {
       res = await fetch(`${this.baseUrl}/tts`, { method: "POST", body: form });

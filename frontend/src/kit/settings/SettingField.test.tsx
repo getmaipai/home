@@ -1,6 +1,6 @@
 import { describe, expect, test, mock, afterEach } from "bun:test";
 import { render, cleanup, fireEvent, act } from "@testing-library/react";
-import { SettingField } from "@/kit/settings/SettingField";
+import { SettingField, titleCaseOption } from "@/kit/settings/SettingField";
 import type { MergedSetting } from "@/kit/settings/groupSettings";
 
 afterEach(cleanup);
@@ -131,5 +131,25 @@ describe("SettingField - number selector", () => {
       fireEvent.blur(input);
     });
     expect(input).toHaveValue(30);
+  });
+});
+
+// A code review on tts.voice_id (2026-09-04, "per user selection of
+// voice") found every `select`-selector value rendered as its raw
+// machine token ("quantized", "bill_boerst") with no label transform at
+// all - the same rough edge the People page's role picker already fixed
+// for its own raw role slugs, just never generalized here.
+describe("titleCaseOption (select option labels)", () => {
+  test("capitalizes a single word", () => {
+    expect(titleCaseOption("auto")).toBe("Auto");
+    expect(titleCaseOption("vera")).toBe("Vera");
+  });
+
+  test("splits underscores into separate capitalized words", () => {
+    expect(titleCaseOption("bill_boerst")).toBe("Bill Boerst");
+  });
+
+  test("leaves an empty string alone", () => {
+    expect(titleCaseOption("")).toBe("");
   });
 });

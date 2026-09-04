@@ -4,6 +4,23 @@ import { Input } from "@/kit/components/Input";
 import { Select } from "@/kit/components/Select";
 import { Switch } from "@/kit/components/Switch";
 
+// Every `select`-selector registry value is a raw machine token today
+// ("auto", "quantized", "vera") - a code review on tts.voice_id
+// (2026-09-04, "per user selection of voice") found a raw preset name
+// like "bill_boerst" meaningless to a family member choosing a voice, the
+// same rough edge the People page's role picker already had to fix for
+// its own raw role slugs ("owner", "child") with a hand-built label map.
+// A generic word-split title-case, not a per-key label table: nothing
+// here is voice-specific, and it improves every existing select key too
+// ("quantized" -> "Quantized") for free.
+export function titleCaseOption(value: string): string {
+  if (!value) return value;
+  return value
+    .split("_")
+    .map((word) => (word ? word[0]!.toUpperCase() + word.slice(1) : word))
+    .join(" ");
+}
+
 interface SettingFieldProps {
   setting: MergedSetting;
   /** Resolves true if the write landed, false if the backend rejected it
@@ -85,7 +102,14 @@ export function SettingField({ setting, onChange, onReset, disabled }: SettingFi
   } else if (def.selector === "select") {
     const options = (def.range as { options?: string[] } | undefined)?.options ?? [];
     control = (
-      <Select value={String(resolved.value)} onValueChange={onChange} options={options} disabled={disabled} aria-label={def.label} />
+      <Select
+        value={String(resolved.value)}
+        onValueChange={onChange}
+        options={options}
+        getLabel={titleCaseOption}
+        disabled={disabled}
+        aria-label={def.label}
+      />
     );
   } else if (def.selector === "number") {
     const range = def.range as { min?: number; max?: number } | undefined;

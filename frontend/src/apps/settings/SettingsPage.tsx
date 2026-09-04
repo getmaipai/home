@@ -16,11 +16,18 @@ interface SettingsPageProps {
   onPersonChange: () => void;
 }
 
-// Household settings only tonight (Rule 2's Profile-scope settings -
-// identity, appearance, notifications - need a profile picker/editor
-// that doesn't exist yet). Person- and device-scope rendering work the
-// same way through SettingsRenderer; only the scope prop changes once
-// there's a UI surface to open them from.
+// Household settings, plus the signed-in person's OWN person-scope
+// settings (2026-09-04, tts.voice_id - "per user selection of voice"):
+// the first real UI surface SettingsRenderer's person-scope rendering
+// ever had (its own header comment named this exact gap - "Person- and
+// device-scope rendering work the same way through SettingsRenderer;
+// only the scope prop changes once there's a UI surface to open them
+// from"). Still no Household/Profile picker (Rule 2's identity/
+// appearance/notifications settings need one that doesn't exist yet) -
+// this renders only the CURRENT person's own scope, not any other
+// household member's, which is exactly the settings.ts authorization
+// model already allows without a picker (canAccessPerson: always your
+// own id, an owner/admin's children besides).
 export function SettingsPage({ person, onPersonChange }: SettingsPageProps) {
   // Shares the real definition (backend/src/wire.ts's isOwnerOrAdminRole,
   // the same one backend/src/lib/access.ts's isOwnerOrAdmin and
@@ -32,6 +39,7 @@ export function SettingsPage({ person, onPersonChange }: SettingsPageProps) {
     <Page title="Settings">
       <div className="flex flex-1 flex-col gap-6 overflow-y-auto">
         <SettingsRenderer scope="household" scopeValue="household" />
+        <SettingsRenderer scope="person" scopeValue={`person:${person.id}`} />
         <div className="flex flex-col gap-6 px-4 pb-4">
           <ChangeSecretSection person={person} onChanged={onPersonChange} />
           {canManageBackups ? <ModelsSection /> : null}

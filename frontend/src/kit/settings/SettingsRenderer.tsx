@@ -13,13 +13,40 @@ interface SettingsRendererProps {
   scopeValue: string;
 }
 
+// The registry (unlike a scope's values) never varies by which
+// SettingsRenderer is asking - every instance on the page wants the
+// exact same GET /api/settings/registry response. A code review
+// (2026-09-04, on SettingsPage.tsx gaining a second instance - person
+// scope, alongside the original household one) found each instance
+// fetching it independently with no cache between them: two identical
+// registry requests on every Settings page visit, a duplication that
+// only compounds as the Household/Profile picker (Rule 2's still-missing
+// second real render site) adds more instances. Cached for the page
+// session, not just deduped mid-flight: the registry is generated at
+// build/dev time (spec/settings/keys.json), not something that changes
+// while a household is looking at the Settings page.
+let cachedRegistry: Promise<SettingsKey[]> | null = null;
+function fetchRegistryCached(): Promise<SettingsKey[]> {
+  if (!cachedRegistry) {
+    cachedRegistry = api.settingsRegistry().catch((err: unknown) => {
+      cachedRegistry = null; // a failed fetch shouldn't wedge every later instance - let the next one retry
+      throw err;
+    });
+  }
+  return cachedRegistry;
+}
+
+/** Test-only: cachedRegistry is module state, shared across every test in
+ * a file unless reset between them. */
+export function __resetSettingsRegistryCacheForTests(): void {
+  cachedRegistry = null;
+}
+
 // docs/SETTINGS.md's generic renderer: "one declaration, one
-// implementation," pointed at a scope. Tonight this is invoked from
-// exactly one place (SettingsPage.tsx, household scope) - the central
-// Household/Profile lists Rule 2 describes as a second render site for
-// the same component don't exist yet (no Household or Profile page has
-// been built), so that reuse is real but currently unexercised, the same
-// "typed, one caller so far" posture the rest of this codebase uses.
+// implementation," pointed at a scope. Two real instances now
+// (SettingsPage.tsx: household, then person, 2026-09-04) - the central
+// Household/Profile lists Rule 2 describes as a further, still-missing
+// render site for the same component.
 export function SettingsRenderer({ scope, scopeValue }: SettingsRendererProps) {
   const [registry, setRegistry] = useState<SettingsKey[] | null>(null);
   const [values, setValues] = useState<ResolvedSetting[] | null>(null);
@@ -29,7 +56,7 @@ export function SettingsRenderer({ scope, scopeValue }: SettingsRendererProps) {
 
   const load = useCallback(() => {
     setError(null);
-    Promise.all([api.settingsRegistry(), api.settingsValues(scopeValue)])
+    Promise.all([fetchRegistryCached(), api.settingsValues(scopeValue)])
       .then(([reg, vals]) => {
         setRegistry(reg);
         setValues(vals);

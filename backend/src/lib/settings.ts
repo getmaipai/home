@@ -261,10 +261,38 @@ export function setHouseholdSettingValue(key: string, value: unknown): SettingsO
 export function getHouseholdSettingValue(key: string): unknown {
   const keyDef = getRegistryKey(key);
   if (!keyDef) return undefined;
+  return resolveStoredValue("household", keyDef);
+}
+
+/** The signed-in actor's OWN person-scope setting, resolved with no
+ * separate authorization check - safe by construction, not just by
+ * convention: a code review (2026-09-04) found the original version took
+ * a bare `personId` string, which compiled and worked for its one real
+ * caller (routes/tts.ts, always `c.get("person").id`) but had no way to
+ * stop a future caller from passing someone ELSE's id and silently
+ * reading their setting with no 403 - the real authorization every other
+ * person-scoped read in this file goes through (listValues()'s
+ * assertCanAccessScope()). Taking the actor itself instead of an id
+ * closes that off at the type level: there is no parameter a caller
+ * could mis-supply to read anyone but themselves. */
+export function getPersonSettingValue(actor: PersonRow, key: string): unknown {
+  const keyDef = getRegistryKey(key);
+  if (!keyDef || keyDef.scope !== "person") return undefined;
+  return resolveStoredValue(`person:${actor.id}`, keyDef);
+}
+
+/** Shared by getHouseholdSettingValue() and getPersonSettingValue() above
+ * (a code review, 2026-09-04, found the two had drifted into
+ * near-identical copies of the same lookup/default-resolution logic): the
+ * one place that reads a stored value's row and falls back to the
+ * registry default, given an already-resolved key definition. Each
+ * public function still owns its own registry lookup and scope-kind
+ * guard - only the actual row query is shared. */
+function resolveStoredValue(scope: string, keyDef: SettingsKey): unknown {
   const row = db
     .select()
     .from(settingsValues)
-    .where(and(eq(settingsValues.scope, "household"), eq(settingsValues.key, key)))
+    .where(and(eq(settingsValues.scope, scope), eq(settingsValues.key, keyDef.key)))
     .get();
   return row ? JSON.parse(row.value) : keyDef.default;
 }

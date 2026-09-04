@@ -8,6 +8,11 @@ export interface TtsHealthResponse {
 
 export interface TtsSynthesizeRequest {
   text: string;
+  /** Optional Pocket TTS built-in preset name (e.g. "alba") or a
+   * http(s)/hf:// voice URL - see client.ts's synthesizeStream() for the
+   * real endpoint's exact validation. Omitted entirely (not sent, not
+   * `undefined` in the form body) uses Pocket TTS's own default voice. */
+  voiceUrl?: string;
 }
 
 /** `POST /tts` returns the WAV bytes directly (content-type: audio/wav),

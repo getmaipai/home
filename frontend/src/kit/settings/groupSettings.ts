@@ -21,6 +21,7 @@ export interface SettingsGroup {
 // separate gap for whenever a key actually declares one.
 const SECTION_TITLES: Record<string, string> = {
   "household.system": "System",
+  "person.voice": "Voice",
 };
 
 export function sectionTitle(id: string): string {

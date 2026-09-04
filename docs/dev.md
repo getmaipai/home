@@ -2220,6 +2220,100 @@ set. Full architecture: platform plan chapters 1, 3, and 4.
       on either turn route (the same tracked gap `spec/llm/README.md`
       already names, now applying to two routes instead of one).
 
+- [x] **Per-person voice selection: `tts.voice_id`, the registry's first
+      real person-scope key.** Closes the "per user selection of voice"
+      half of the same ask that opened the streaming work above, and item
+      3 of the Pocket TTS follow-ups note below (partially - see that
+      note's update). `backend/src/settings/voiceKeys.ts` declares the
+      key against Pocket TTS's own complete, hardcoded set of 26 named
+      presets (`pocket_tts.utils.utils._ORIGINS_OF_PREDEFINED_VOICES`,
+      read from the installed package's source - there is no listing
+      endpoint) rather than an arbitrary URL field: `select`'s own
+      validation (`lib/settings.ts`) rejects anything outside that list at
+      write time, which is what keeps this from becoming an SSRF vector -
+      Pocket TTS's real `/tts` endpoint accepts any `http://`/`https://`/
+      `hf://` URL for `voice_url`, and the local `pocket-tts serve`
+      process would fetch whatever it's given. `default: "alba"` (Pocket
+      TTS's own built-in fallback) rather than an empty sentinel: every
+      value this key can ever hold is a real, valid preset name, so
+      nothing downstream needs to special-case "unset."
+    - **This is the registry's first real `person`-scope key.**
+      `lib/settings.ts`'s `parseScope`/`assertCanAccessScope` person
+      branches existed from 4.6 but had nothing to exercise them through
+      the HTTP layer until now (that file's own comment said so). A new
+      `getPersonSettingValue(personId, key)` mirrors the existing
+      `getHouseholdSettingValue()` for the one caller that needs a
+      resolved value without a separate authorization check:
+      `routes/tts.ts`, reading the signed-in actor's *own* id.
+      `SettingsPage.tsx` gained a second `<SettingsRenderer scope="person"
+      scopeValue={person:<id>} />` alongside the household one - the
+      generic renderer's own header comment named this exact gap ("only
+      the scope prop changes once there's a UI surface to open them
+      from"); this is that surface's first real use.
+    - **A small, generically useful side fix**: every `select`-selector
+      value rendered as its raw machine token before this (`"quantized"`,
+      `"bill_boerst"`) with no label transform at all.
+      `SettingField.tsx`'s new `titleCaseOption()` (word-split, capitalize,
+      join with spaces) fixes this for `tts.voice_id`'s names *and* every
+      existing select key for free (`"quantized"` -> `"Quantized"`), not a
+      per-key label table - nothing about the transform is voice-specific.
+    - **Verified live, not just unit-tested**: `voice_url=vera` against
+      the real running `pocket-tts serve` synthesized real, distinct audio
+      in ~1.5s including that name's first-use download/cache (confirmed
+      by direct `curl`, both before writing the client change and again
+      after). In the browser: opening the new "Voice" section showed all
+      26 preset names correctly title-cased, selecting "Vera" persisted
+      immediately (a "Reset to default" control appeared, confirming
+      `source: "user"`), and the household's real sqlite database shows
+      the resulting row directly (`person:<jesse's id> | tts.voice_id |
+      "vera" | user`) - not asserted from the UI alone.
+    - **Real bugs a code review found and fixed, each with a test proven
+      to fail without the fix**: none surfaced in the first pass; every
+      new code path (the client's `voice_url` passthrough, the
+      person-scope write/read authorization, the route resolving the
+      actor's own setting, the label transform) had a dedicated
+      regression test confirmed to fail against the pre-fix code first.
+      A second review pass found three real hardening/dedup items, none
+      active bugs: (1) `getPersonSettingValue()` originally took a bare
+      `personId` string - safe only because its one real caller
+      (`routes/tts.ts`) happened to always pass the signed-in actor's own
+      id, a documented convention rather than an enforced one, so a
+      future caller passing someone ELSE's id would compile, pass every
+      existing test, and silently read their setting with no 403. Fixed
+      by changing the signature to take the actor itself
+      (`getPersonSettingValue(actor, key)`) - there is no longer a
+      parameter a caller could mis-supply to read anyone but themselves,
+      closing the gap at the type level rather than by convention
+      (`settings.test.ts`'s new "two different people's own values never
+      cross-contaminate" test, plus every existing test updated to the
+      new shape). (2) `getPersonSettingValue()` and
+      `getHouseholdSettingValue()` had drifted into near-identical copies
+      of the same row-lookup/default-resolution logic - extracted a
+      shared private `resolveStoredValue(scope, keyDef)` both now call, so
+      a future fix to that logic (a `JSON.parse` failure, HLC-aware
+      resolution) only has to land once. (3) `SettingsPage.tsx`'s two
+      `SettingsRenderer` instances (household, person) each independently
+      fetched `/api/settings/registry` - identical response either way,
+      since the registry doesn't vary by scope - firing two requests on
+      every Settings page visit, a duplication that only compounds as
+      more instances are added (the still-missing Household/Profile
+      picker). Fixed with a small page-session cache
+      (`SettingsRenderer.tsx`'s `fetchRegistryCached()`, cleared on a
+      failed fetch so the next instance can retry) - confirmed live via
+      the network panel: exactly one `/api/settings/registry` request for
+      both instances combined, and `SettingsPage.test.tsx`'s new test
+      (confirmed to fail against the pre-fix direct-fetch code, catching
+      2 requests instead of 1) proves it. That same test file's own
+      missing `afterEach(cleanup)` was a real, independent bug the fix
+      surfaced (two tests' rendered trees never unmounting between each
+      other caused a flaky failure only visible running the FULL suite,
+      never the file alone) - fixed alongside it.
+    - **Still not built (the rest of the Pocket TTS follow-ups note)**:
+      the full community voice *browser* (any file in `kyutai/tts-voices`
+      by URL, not just the 26 bundled presets), voice cloning/training
+      from a household's own recorded voice, and the non-Python engine
+      ports - all still queued below, unchanged by this slice.
+
 ## API routes and `@hono/zod-openapi` (tracked debt)
 
 `getmaipai/CLAUDE.md` > Documentation requires every Hono route to be
@@ -2484,12 +2578,18 @@ between now and when the relevant piece gets built.
      with community-trained non-English variants (Czech, Hindi, Korean)
      as existing examples - a further, larger follow-up past cloning if
      MaiPai ever wants its own trained voice rather than a cloned one.
-  3. **A real, ungated community voice catalog exists.** `kyutai/tts-voices`
-     on Hugging Face (confirmed via the API: `gated: false`) is a public
-     repository of community and official voices, separate from the
-     gated cloning checkpoint - a "browse and pick a voice" UI is
-     genuinely buildable against it with zero HF-token friction, unlike
-     item 2 above.
+  3. **A real, ungated community voice catalog exists - partially closed
+     (2026-09-04).** `kyutai/tts-voices` on Hugging Face (confirmed via
+     the API: `gated: false`) is a public repository of community and
+     official voices, separate from the gated cloning checkpoint. The
+     26-name subset Pocket TTS bundles as built-in presets (its own
+     `_ORIGINS_OF_PREDEFINED_VOICES`, every one of them a file from this
+     same repo) is now a real, shipped per-person choice (`tts.voice_id`,
+     the entry above) - what's still open is the FULL browser: picking
+     any other file in the repo by URL, not just these 26, which
+     genuinely needs a "browse and pick a voice" UI against the repo's
+     file listing, buildable with zero HF-token friction, unlike item 2
+     above.
   A real credential-hygiene gap surfaced while verifying item 2: Jesse's
   own HF read token (shared in chat earlier this session for the gated
   checkpoint download, `docs/dev.md`'s TTS decision entry) is still

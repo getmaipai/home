@@ -2,7 +2,7 @@ import { describe, expect, test, beforeEach } from "bun:test";
 import { TestClient } from "./client";
 import { resetDb } from "./reset-db";
 import { __resetThrottleForTests } from "@/lib/secretThrottle";
-import { parseScope, assertCanAccessScope, resolveForResponse } from "@/lib/settings";
+import { parseScope, assertCanAccessScope, resolveForResponse, getPersonSettingValue } from "@/lib/settings";
 import { nextHlc, compareHlc, seedHlc, __resetHlcForTests } from "@/lib/hlc";
 import { eq } from "drizzle-orm";
 import { db } from "@/db";
@@ -20,7 +20,11 @@ async function ownerAndChild() {
   const child = (await created.json()) as { id: string };
   const childClient = new TestClient();
   await childClient.post("/api/auth/select", { personId: child.id });
-  return { owner, childClient, childId: child.id };
+  // getPersonSettingValue() takes the actor's real row (2026-09-04, a
+  // code review closing off the id-substitution footgun the old
+  // bare-personId signature allowed), not just its id.
+  const childPerson = db.select().from(people).where(eq(people.id, child.id)).get()!;
+  return { owner, childClient, childId: child.id, childPerson };
 }
 
 describe("GET /api/settings/registry", () => {
@@ -114,6 +118,117 @@ describe("PUT /api/settings (write)", () => {
       body: { scope: `person:${person.id}`, key: "household.locale", value: "en-GB" },
     });
     expect(res.status).toBe(400);
+  });
+});
+
+// tts.voice_id (2026-09-04, "per user selection of voice") is the
+// registry's first real person-scope key - settings.ts's parseScope/
+// assertCanAccessScope person branches existed but had nothing to
+// exercise them through the HTTP layer until this key was declared.
+describe("PUT /api/settings for tts.voice_id (the registry's first real person-scope key)", () => {
+  test("a person can set their own voice; list reflects it with source=user", async () => {
+    const { childClient, childId } = await ownerAndChild();
+    const put = await childClient.request("/api/settings", {
+      method: "PUT",
+      body: { scope: `person:${childId}`, key: "tts.voice_id", value: "vera" },
+    });
+    expect(put.status).toBe(200);
+
+    const res = await childClient.get(`/api/settings?scope=person:${childId}`);
+    const body = (await res.json()) as Array<{ key: string; value: unknown; source: string }>;
+    const voice = body.find((s) => s.key === "tts.voice_id");
+    expect(voice?.value).toBe("vera");
+    expect(voice?.source).toBe("user");
+  });
+
+  test("resolves to the registry default (alba) when nothing is stored", async () => {
+    const { childClient, childId } = await ownerAndChild();
+    const res = await childClient.get(`/api/settings?scope=person:${childId}`);
+    const body = (await res.json()) as Array<{ key: string; value: unknown; source: string }>;
+    const voice = body.find((s) => s.key === "tts.voice_id");
+    expect(voice?.value).toBe("alba");
+    expect(voice?.source).toBe("default");
+  });
+
+  test("an owner can set a child's voice on the child's behalf", async () => {
+    const { owner, childId } = await ownerAndChild();
+    const put = await owner.request("/api/settings", {
+      method: "PUT",
+      body: { scope: `person:${childId}`, key: "tts.voice_id", value: "jean" },
+    });
+    expect(put.status).toBe(200);
+  });
+
+  test("a value outside Pocket TTS's known preset names is refused", async () => {
+    const { childClient, childId } = await ownerAndChild();
+    const res = await childClient.request("/api/settings", {
+      method: "PUT",
+      body: { scope: `person:${childId}`, key: "tts.voice_id", value: "not-a-real-voice" },
+    });
+    expect(res.status).toBe(400);
+  });
+
+  test("a person cannot set another person's voice", async () => {
+    const owner = new TestClient();
+    await owner.post("/api/auth/setup", { displayName: "Sage", secret: "correcthorse" });
+    const created = await owner.post("/api/people", { displayName: "Bramble", role: "child" });
+    const { id: childId } = (await created.json()) as { id: string };
+    const created2 = await owner.post("/api/people", { displayName: "Marlow", role: "child" });
+    const { id: otherChildId } = (await created2.json()) as { id: string };
+    const childClient = new TestClient();
+    await childClient.post("/api/auth/select", { personId: childId });
+
+    const res = await childClient.request("/api/settings", {
+      method: "PUT",
+      body: { scope: `person:${otherChildId}`, key: "tts.voice_id", value: "vera" },
+    });
+    expect(res.status).toBe(403);
+  });
+});
+
+describe("lib/settings.ts getPersonSettingValue()", () => {
+  test("resolves the registry default when nothing is stored", async () => {
+    const { childPerson } = await ownerAndChild();
+    expect(getPersonSettingValue(childPerson, "tts.voice_id")).toBe("alba");
+  });
+
+  test("resolves a stored value once one exists", async () => {
+    const { childClient, childId, childPerson } = await ownerAndChild();
+    await childClient.request("/api/settings", {
+      method: "PUT",
+      body: { scope: `person:${childId}`, key: "tts.voice_id", value: "estelle" },
+    });
+    expect(getPersonSettingValue(childPerson, "tts.voice_id")).toBe("estelle");
+  });
+
+  test("returns undefined for an unknown key", async () => {
+    const { childPerson } = await ownerAndChild();
+    expect(getPersonSettingValue(childPerson, "not.a.real_key")).toBeUndefined();
+  });
+
+  test("returns undefined for a household-scope key (wrong scope for this getter)", async () => {
+    const { childPerson } = await ownerAndChild();
+    expect(getPersonSettingValue(childPerson, "household.locale")).toBeUndefined();
+  });
+
+  // The whole point of the actor-shaped signature (2026-09-04): there is
+  // no personId parameter left to mis-supply. This isn't really testable
+  // as a runtime "wrong behavior" case the old signature would have
+  // gotten wrong - it's a type-level guarantee - but this at least proves
+  // two different actors resolve two different, correctly-isolated rows.
+  test("two different people's own values never cross-contaminate", async () => {
+    const { owner, childClient, childId, childPerson } = await ownerAndChild();
+    const ownerPerson = db.select().from(people).where(eq(people.displayName, "Sage")).get()!;
+    await owner.request("/api/settings", {
+      method: "PUT",
+      body: { scope: `person:${ownerPerson.id}`, key: "tts.voice_id", value: "jean" },
+    });
+    await childClient.request("/api/settings", {
+      method: "PUT",
+      body: { scope: `person:${childId}`, key: "tts.voice_id", value: "estelle" },
+    });
+    expect(getPersonSettingValue(ownerPerson, "tts.voice_id")).toBe("jean");
+    expect(getPersonSettingValue(childPerson, "tts.voice_id")).toBe("estelle");
   });
 });
 

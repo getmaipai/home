@@ -111,5 +111,49 @@
       "home",
       "bot"
     ]
+  },
+  {
+    "key": "tts.voice_id",
+    "scope": "person",
+    "selector": "select",
+    "range": {
+      "options": [
+        "alba",
+        "cosette",
+        "marius",
+        "javert",
+        "jean",
+        "anna",
+        "vera",
+        "fantine",
+        "charles",
+        "paul",
+        "eponine",
+        "azelma",
+        "george",
+        "mary",
+        "jane",
+        "michael",
+        "eve",
+        "bill_boerst",
+        "peter_yearsley",
+        "stuart_bell",
+        "caro_davy",
+        "giovanni",
+        "lola",
+        "juergen",
+        "rafael",
+        "estelle"
+      ]
+    },
+    "default": "alba",
+    "label": "Speaking voice",
+    "help": "The voice MaiPai uses when it reads its replies aloud to you.",
+    "level": "basic",
+    "secret": false,
+    "lives_in": "person.voice",
+    "honoured_by": [
+      "home"
+    ]
   }
 ]

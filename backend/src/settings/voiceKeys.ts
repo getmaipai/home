@@ -1,0 +1,87 @@
+// Voice settings (docs/SETTINGS.md Rule 3: "One card per role"). The
+// `tts` role's first real settings key: `tts.voice_id` is a real, ship-
+// ready slice of the "per user selection of voice" ask (Jesse,
+// 2026-09-04, alongside chat mode selection) and of the "official
+// included voices" item from that same session's Pocket TTS follow-ups
+// note (docs/dev.md) - not the full community-voice browser/downloader
+// (any HF `kyutai/tts-voices` file via a URL), which is a real, larger,
+// separate gap this key doesn't attempt to close.
+//
+// `person` scope, not `household`: each household member hears their own
+// replies in their own chosen voice, the same "a household member's own
+// preference" posture ChatPage.tsx's per-message `thinking` toggle
+// already takes, just persisted instead of per-message. This is the
+// registry's first real `person`-scope key - lib/settings.ts's
+// `parseScope`/`assertCanAccessScope` already had the person branch built
+// and unexercised through the HTTP layer; this is what finally exercises
+// it for real.
+//
+// The option list is Pocket TTS's own complete, hardcoded set of 26 named
+// presets (`pocket_tts.utils.utils._ORIGINS_OF_PREDEFINED_VOICES`,
+// confirmed by reading the installed package's source, 2026-09-04 -
+// there is no public listing endpoint, so this list has to be copied,
+// not fetched). Every name resolves to a real, non-gated `hf://` file
+// Pocket TTS downloads and caches itself the first time it's used
+// (confirmed live: `voice_url=vera` on a running `pocket-tts serve`
+// synthesized real audio in ~1.5s including that first download).
+// `default: "alba"` rather than an empty "no choice yet" sentinel:
+// "alba" is Pocket TTS's own built-in fallback (`DEFAULT_VOICE_FALLBACK`),
+// so sending `voice_url=alba` explicitly produces the exact same audio as
+// sending no `voice_url` at all - every value this key can ever hold is a
+// real, valid preset name, with nothing else needing to special-case an
+// out-of-band "unset" value anywhere downstream (routes/tts.ts always has
+// a real name to send).
+//
+// Restricting to this fixed list matters for more than UX: `select`'s
+// own validation (lib/settings.ts's `validateSelectorValue`) rejects
+// anything not in `range.options` at write time, which is what keeps
+// this key from ever becoming an arbitrary-URL field a household member
+// (or a compromised session) could point at an internal address - Pocket
+// TTS's real `/tts` endpoint accepts any `http://`/`https://`/`hf://`
+// URL for `voice_url`, and the local `pocket-tts serve` process would
+// fetch whatever it's given.
+import { SettingsKey } from "@maipai/spec/gen/ts/settings-key.js";
+
+export const VOICE_PRESET_NAMES = [
+  "alba",
+  "cosette",
+  "marius",
+  "javert",
+  "jean",
+  "anna",
+  "vera",
+  "fantine",
+  "charles",
+  "paul",
+  "eponine",
+  "azelma",
+  "george",
+  "mary",
+  "jane",
+  "michael",
+  "eve",
+  "bill_boerst",
+  "peter_yearsley",
+  "stuart_bell",
+  "caro_davy",
+  "giovanni",
+  "lola",
+  "juergen",
+  "rafael",
+  "estelle",
+] as const;
+
+export const VOICE_SETTINGS_KEYS: SettingsKey[] = [
+  SettingsKey.parse({
+    key: "tts.voice_id",
+    scope: "person",
+    selector: "select",
+    range: { options: [...VOICE_PRESET_NAMES] },
+    default: "alba",
+    label: "Speaking voice",
+    help: "The voice MaiPai uses when it reads its replies aloud to you.",
+    level: "basic",
+    lives_in: "person.voice",
+    honoured_by: ["home"],
+  }),
+];

@@ -50,4 +50,44 @@ describe("PocketTtsClient against the stub server", () => {
       fixtureServer.stop(true);
     }
   });
+
+  // A code review-adjacent gap this same feature could otherwise hide: a
+  // naive test asserting only "synthesizeStream resolved" would pass even
+  // if the client silently dropped `voice_url` on the floor. A fixture
+  // that echoes back exactly what it received in the request body proves
+  // the parameter genuinely reaches the wire, not just that the call
+  // returns something.
+  test("synthesizeStream sends voice_url through to the server when given one", async () => {
+    const fixtureServer = Bun.serve({
+      port: 0,
+      fetch: async (req) => {
+        const form = await req.formData();
+        return new Response(String(form.get("voice_url") ?? "none"));
+      },
+    });
+    try {
+      const client = new PocketTtsClient(`http://127.0.0.1:${fixtureServer.port}`);
+      const result = await client.synthesizeStream("hi", "vera");
+      expect(await new Response(result.body).text()).toBe("vera");
+    } finally {
+      fixtureServer.stop(true);
+    }
+  });
+
+  test("synthesizeStream omits voice_url entirely when none is given", async () => {
+    const fixtureServer = Bun.serve({
+      port: 0,
+      fetch: async (req) => {
+        const form = await req.formData();
+        return new Response(form.has("voice_url") ? "present" : "absent");
+      },
+    });
+    try {
+      const client = new PocketTtsClient(`http://127.0.0.1:${fixtureServer.port}`);
+      const result = await client.synthesizeStream("hi");
+      expect(await new Response(result.body).text()).toBe("absent");
+    } finally {
+      fixtureServer.stop(true);
+    }
+  });
 });

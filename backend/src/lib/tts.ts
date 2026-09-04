@@ -21,7 +21,14 @@ export type TtsOpResult =
   | { ok: true; value: TtsSynthesizeValue }
   | { ok: false; status: 400 | 503; code: "invalid_input" | "unavailable"; error: string };
 
-export async function synthesizeSpeech(text: string): Promise<TtsOpResult> {
+/** `voiceUrl` (2026-09-04, "per user selection of voice"): the caller's
+ * already-resolved choice (routes/tts.ts reads it from the signed-in
+ * actor's `tts.voice_id` person setting) - this function stays a plain
+ * passthrough, the same "validate/resolve/call" shape as before this
+ * parameter existed, since which values are even reachable here is
+ * already restricted by that setting key's own `select` options, not
+ * anything this function re-checks. */
+export async function synthesizeSpeech(text: string, voiceUrl?: string): Promise<TtsOpResult> {
   if (typeof text !== "string" || text.trim().length === 0) {
     return { ok: false, status: 400, code: "invalid_input", error: "text must be a non-empty string" };
   }
@@ -37,7 +44,7 @@ export async function synthesizeSpeech(text: string): Promise<TtsOpResult> {
   }
 
   try {
-    const result = await client.synthesizeStream(text);
+    const result = await client.synthesizeStream(text, voiceUrl);
     return { ok: true, value: { stream: result.body, contentType: result.contentType } };
   } catch (err) {
     const message = err instanceof TtsClientError ? err.message : (err as Error).message;
