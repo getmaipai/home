@@ -2760,6 +2760,118 @@ between now and when the relevant piece gets built.
   only estimated - treat all of the above as a starting hypothesis for
   the 4.11 voice sidecar eval, not as settled numbers.
 
+- **Wake word, pulled forward from Hub v0.3 - the concrete plan
+  (2026-09-04).** Jesse: "we need to build out wake word with training.
+  We need to research best into use and review training learnings and
+  implantation of old project. Our custom wake word accuracy of the old
+  project was poor." Same pattern as the `tts` role above (built ahead of
+  Hub v0.3's own sequencing because Jesse asked, not because the plan's
+  order arrived) - only the *plan* is written here; the build itself
+  hasn't started. This is HOME's own browser-side wakeword chat mode (the
+  entry above already named it: "wakeword and continual chat need voice
+  *input*... which does not exist anywhere in this codebase yet"), not
+  the robot's on-device system - `bot` already has a bench-proven wake
+  word pipeline of its own (a separate product, separate hardware, out of
+  scope here).
+  - **Engine: openWakeWord, not microWakeWord or Porcupine - already the
+    right call, just reconfirmed.** The wake-word findings note right
+    above already recorded this as the pre-rebuild robot's shipped
+    choice, deployable client-side via `onnxruntime-web` WASM - exactly
+    the browser-only runtime this feature needs, no server round trip.
+    microWakeWord targets TFLite-micro on constrained embedded hardware
+    (Home Assistant's own pick for that reason), which isn't the target
+    here: a browser tab has no TFLite-micro runtime and orders of
+    magnitude more compute than an embedded satellite. Porcupine is
+    commercial (ruled out, `.github/CLAUDE.md`'s licensing stance).
+  - **The old recall/false-accept numbers (83%/67%, 44/22 FA per hour)
+    are explicitly not to be trusted or reused** - the note above already
+    flags that the training-data and validation gaps the 2026-08-31
+    incident uncovered (missing augmentation packs, synthetic-only
+    validation, no near-miss negatives) may have already been present
+    when those numbers were measured. Nothing from that eval carries over
+    except the mechanism (openWakeWord + WASM) and the calibration
+    starting points (0.47 threshold, 2-frame hysteresis) as hypotheses to
+    re-measure, never as settled values.
+  - **Every rule in `.github/CLAUDE.md` > "Training models (wake words,
+    and anything like them)" is a hard gate on this work, not guidance**
+    - that section exists *because of* a shipped "Hey MaiPai" detector
+    from this exact lineage failing in exactly this way (0.955 on its own
+    phrase, 0.979 on "hey my bike"). Concretely: verify every training
+    data pack actually landed before a run starts (no best-effort silent
+    skip); validate the shipped model against real human speech through a
+    real microphone, never only synthetic; train negatives against actual
+    near-miss confusions, not just unrelated phrases; harvest real
+    household false-triggers as the highest-value negative data there is;
+    never let unverified/unconfirmed audio become training data; retrain
+    everything trained the same way if a data-level fault is found in one
+    model.
+  - **The one real gap the legacy pipeline never closed, and the one this
+    plan exists to close**: every validation pass was 100% synthetic TTS
+    voices, never a real microphone. Pocket TTS's own range (26 voices,
+    multiple languages, real emotional presets) makes the *training* set
+    broad and cheap - covered in the Pocket TTS follow-ups note below,
+    genuinely useful there - but does not close this gap on its own
+    (Jesse asked directly this session why varied TTS training, plus
+    negatives, wasn't good enough - the answer given, summarized here for
+    the same reason every other decision in this file is): synthetic
+    audio, however varied, is a closed loop with training (evaluating on
+    the same class of generator that made the training set measures
+    fitting that generator, not generalization), has its own acoustic
+    fingerprint no real microphone/room/device introduces, and cannot
+    surface confusions nobody scripted. The validation set - the number
+    that decides whether a model ships - has
+    to be real recorded speech, held out, never synthesized.
+  - **What this needs from Jesse that cannot be fabricated in a session**:
+    real recorded "Hey MaiPai" utterances from actual household voices
+    (adults and kids both - kids specifically are a gap no voice-cloning
+    catalog covers), through a real browser microphone, in real rooms,
+    for both training augmentation and the held-out validation set; and,
+    once anything real is deployed even informally, a path to harvest
+    real false triggers from real usage for the retrain loop. Nothing
+    past the infrastructure phase below can respect the hard gates above
+    without this.
+  - **Concrete phases, narrowest first:**
+    1. **Infrastructure proof, no custom model yet.** Browser microphone
+       capture (`getUserMedia`) feeding `onnxruntime-web` running an
+       EXISTING, already-trained openWakeWord stock model (e.g. one of
+       its published "hey jarvis"/"hey mycroft"-style detectors) end to
+       end: mic -> mel-spectrogram/embedding -> detector -> a real wake
+       event that flips the chat page into listening. Proves the
+       mechanism this codebase has never had at all (no mic-capture code
+       exists anywhere in `home` today), with zero training-data risk
+       since nothing is trained yet - the wrong wake phrase, on purpose,
+       is an acceptable placeholder the same way the `tts` role's
+       "voice_id" default was a real, working thing before per-person
+       choice existed.
+    2. **Port the training pipeline, not rebuild it.** `bot-legacy.git`'s
+       already-fixed pipeline (post-2026-08-31: pack verification,
+       real-noise augmentation, a near-miss phrase bank, the harvest-and-
+       retrain loop) is hard-won logic - `.github/CLAUDE.md`'s own rule
+       for "copy from legacy" applies directly. Adapted, not copied
+       verbatim: this pass's synthetic half can lean on Pocket TTS's
+       voice/language/emotion range (queued in the Pocket TTS follow-ups
+       note) for broader, cheaper training coverage than whatever the
+       legacy pipeline used, provided the near-miss bank and real-noise
+       packs still get generated with equal or greater care - broader
+       voices does not substitute for either.
+    3. **The hard gate: real-microphone validation, before any custom
+       model ships**, per the rule above - this is where Jesse's real
+       recordings are required, not optional. No detector reaches even an
+       opt-in "try it" state in the UI without a validation pass against
+       real audio a household member actually spoke.
+    4. **Calibrate for THIS runtime specifically.** The legacy 0.47
+       threshold / 2-frame hysteresis was tuned for a different pipeline
+       version on different hardware; re-measure fresh against this
+       browser runtime's real mic input and real household audio, not
+       copied forward as a default.
+  - **Explicitly out of scope for this plan**: server-side/Wyoming
+    deployment (satellite/headless use - robot-adjacent, `bot`'s own
+    territory), the rest of the voice sidecar this note's neighbor above
+    covers (STT, the wake-to-STT pre-roll gap, endpointing - Hub v0.3
+    scope, unchanged), and continual-chat mode (the other still-stubbed
+    chat mode, which needs always-on STT rather than a wake detector and
+    is a separate, later piece of work).
+
 - **Speech, slot filling and the vector store: three decisions taken
   2026-09-04**, after reviewing a suggested library list (a third-party
   shopping list of roughly a hundred Python packages for a home hub and
