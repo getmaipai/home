@@ -5,6 +5,7 @@ import type { MemoryRecord } from "@maipai/spec/gen/ts/memory-record.js";
 import type {
   Roster,
   TurnValue,
+  TurnStreamEvent,
   ConversationTurnRow,
   ResolvedSetting,
   BackupInfo,
@@ -15,6 +16,7 @@ import type {
   EngineStatsSample,
 } from "@maipai/home-backend/src/wire";
 import { isOwnerOrAdminRole } from "@maipai/home-backend/src/wire";
+import { readTextLines } from "@maipai/spec/streaming/ts/lineReader.js";
 
 // GET /api/people (routes/people.ts) returns toRoster()'s output directly
 // - the same Omit<Person, "birthdate"> shape Roster wraps, minus
@@ -35,7 +37,7 @@ export type Role = Person["role"];
 // depends on @maipai/home-backend as a workspace package for this;
 // re-export the types here so the rest of the frontend imports from one
 // place.
-export type { Roster, TurnValue, ConversationTurnRow, ResolvedSetting, BackupInfo, HardwareInfo, ModelFit, ModelJob, EngineStatus, EngineStatsSample };
+export type { Roster, TurnValue, TurnStreamEvent, ConversationTurnRow, ResolvedSetting, BackupInfo, HardwareInfo, ModelFit, ModelJob, EngineStatus, EngineStatsSample };
 export type { MemoryRecord };
 export { isOwnerOrAdminRole };
 // SettingsKey is spec-generated (@maipai/spec), not backend-only, so it's
@@ -123,6 +125,61 @@ async function request<T>(path: string, init?: RequestInit & { timeoutMs?: numbe
   }
 }
 
+// Shared by streamSpeech() and streamTurn(): both POST JSON and want the
+// raw Response back (a streamed body the caller reads chunk by chunk),
+// never routed through request<T>() since that always parses and awaits
+// the whole body as JSON. `timeoutMs` only ever bounds waiting for the
+// response to begin, never the body it streams back afterward - once
+// headers arrive this returns and the timer clears, so a long stream's
+// own duration is never cut off by it.
+// `timeoutMessage` defaults to a generic string but every real caller
+// passes its own: a code review (2026-09-04) found folding streamSpeech's
+// timeout handling in here had silently replaced its specific "Timed out
+// waiting for voice" with this generic text, a real if minor UX
+// regression from the refactor.
+async function rawStreamPost(
+  path: string,
+  body: unknown,
+  timeoutMs: number,
+  timeoutMessage = "Timed out waiting for a response",
+): Promise<Response> {
+  const { signal, clear } = withTimeout(timeoutMs);
+  try {
+    const res = await fetch(path, {
+      method: "POST",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+      signal,
+    });
+    if (!res.ok) {
+      const parsed = await res.json().catch(() => ({}));
+      throw new ApiError(parsed.error ?? res.statusText, res.status, parsed.code);
+    }
+    return res;
+  } catch (err) {
+    if (isAbortError(err)) {
+      throw new ApiError(timeoutMessage, 0, "timeout");
+    }
+    throw err;
+  } finally {
+    clear();
+  }
+}
+
+/** Parses one POST /api/turn/stream response body into its real events
+ * (wire.ts's TurnStreamEvent): newline-delimited JSON, one event per
+ * line. readTextLines (@maipai/spec/streaming/ts/lineReader.js) owns the
+ * buffer/decode/final-flush mechanics shared with spec/llm/ts/client.ts's
+ * own SSE reader - a real bug (a missing TextDecoder final flush) had to
+ * be fixed once per copy before this was centralized, a code review
+ * (2026-09-04) flagged as the direct cause. */
+export async function* readTurnStream(response: Response): AsyncGenerator<TurnStreamEvent, void, void> {
+  for await (const line of readTextLines(response.body!.getReader())) {
+    yield JSON.parse(line) as TurnStreamEvent;
+  }
+}
+
 export const api = {
   profiles: () => request<Roster[]>("/api/auth/profiles"),
   setup: (displayName: string, secret: string) =>
@@ -148,11 +205,6 @@ export const api = {
   me: () => request<Roster>("/api/auth/me"),
   logout: () => request<{ success: true }>("/api/auth/logout", { method: "POST" }),
   conversations: () => request<ConversationTurnRow[]>("/api/conversations"),
-  sendTurn: (text: string, thinking?: boolean) =>
-    request<TurnValue>("/api/turn", {
-      method: "POST",
-      body: JSON.stringify({ surface: "chat", text, thinking }),
-    }),
   settingsRegistry: () => request<SettingsKey[]>("/api/settings/registry"),
   settingsValues: (scope: string) =>
     request<ResolvedSetting[]>(`/api/settings?scope=${encodeURIComponent(scope)}`),
@@ -190,40 +242,20 @@ export const api = {
   // safety net (a dead connection the server never sees), never races a
   // legitimate server-side response that's about to arrive.
   restartEngine: () => request<EngineStatus>("/api/host/engine/restart", { method: "POST", timeoutMs: 100_000 }),
-  // Not routed through request<T>(): that helper always parses the body
-  // as JSON and fully awaits it, and POST /api/tts's real success body is
-  // a streamed audio/wav response (routes/tts.ts) a caller needs to read
-  // chunk by chunk as it arrives, not JSON to await in one piece -
-  // streaming instead of buffering the whole reply first is the entire
-  // point (2026-09-04, Jesse). Returns the raw Response so the caller
-  // (ChatPage.tsx, via streamingWavPlayer.ts) can read `response.body`
-  // directly. The timeout only bounds waiting for the response to begin
-  // (a first spawn of the Pocket TTS sidecar can take a while -
-  // ttsSupervisor.ts's 180s health wait); once headers arrive this
-  // function returns and the timer is cleared, so a long reply's
-  // streaming playback itself is never cut off by it.
-  streamSpeech: async (text: string): Promise<Response> => {
-    const { signal, clear } = withTimeout(185_000);
-    try {
-      const res = await fetch("/api/tts", {
-        method: "POST",
-        credentials: "include",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text }),
-        signal,
-      });
-      if (!res.ok) {
-        const body = await res.json().catch(() => ({}));
-        throw new ApiError(body.error ?? res.statusText, res.status, body.code);
-      }
-      return res;
-    } catch (err) {
-      if (isAbortError(err)) {
-        throw new ApiError("Timed out waiting for voice", 0, "timeout");
-      }
-      throw err;
-    } finally {
-      clear();
-    }
-  },
+  // Returns the raw Response so the caller (sentenceSpeechScheduler.ts)
+  // can read the streamed audio/wav body directly. 185s: a first spawn of
+  // the Pocket TTS sidecar can take a while (ttsSupervisor.ts's 180s
+  // health wait); only bounds waiting for the response to begin, per
+  // rawStreamPost's own doc comment.
+  streamSpeech: (text: string) => rawStreamPost("/api/tts", { text }, 185_000, "Timed out waiting for voice"),
+  // Real token-by-token streaming (2026-09-04): the reply text arrives as
+  // it's generated instead of all at once, the prerequisite for speaking
+  // it sentence by sentence as it's typed (spec/voice/README.md's "what
+  // Jesse actually meant by streamed"). No client-side timeout: an
+  // ordinary reply's own generation time is exactly the wait this call
+  // has to tolerate, and routes/turn.ts has no server-side bound on it
+  // either - a hung stream is a real, separate gap to close later, not
+  // guessed at with an arbitrary number here.
+  streamTurn: (text: string, thinking?: boolean) =>
+    rawStreamPost("/api/turn/stream", { surface: "chat", text, thinking }, 0),
 };

@@ -18,21 +18,54 @@ export interface StubLlmServerHandle {
 
 const STUB_PREFIX = "[stub model: no real model loaded, this is a canned reply]";
 
-function handleChatCompletion(request: ChatCompletionRequest): ChatCompletionResponse {
+function stubReplyText(request: ChatCompletionRequest): string {
   const lastUser = [...request.messages].reverse().find((m) => m.role === "user");
   const echoed = lastUser?.content ?? "(no user message)";
+  return `${STUB_PREFIX} ${echoed}`;
+}
+
+function handleChatCompletion(request: ChatCompletionRequest): ChatCompletionResponse {
   return {
     id: `stub-${Date.now()}`,
     model: request.model || "stub-chat",
     choices: [
       {
         index: 0,
-        message: { role: "assistant", content: `${STUB_PREFIX} ${echoed}` },
+        message: { role: "assistant", content: stubReplyText(request) },
         finish_reason: "stop",
       },
     ],
     usage: { prompt_tokens: 0, completion_tokens: 0, total_tokens: 0 },
   };
+}
+
+/** Real word-by-word SSE, the same line shape a real llama-server sends
+ * (spec/llm/README.md), so the streaming client/turn-engine path is
+ * exercised for real in tests rather than degenerating into one big
+ * chunk. Split on spaces, each word (plus its trailing space, so
+ * concatenating every delta reproduces the original text exactly) is its
+ * own chunk. */
+function streamChatCompletion(request: ChatCompletionRequest): ReadableStream<Uint8Array> {
+  const text = stubReplyText(request);
+  const words = text.split(" ");
+  const id = `stub-${Date.now()}`;
+  const model = request.model || "stub-chat";
+  const encoder = new TextEncoder();
+  const sseLine = (choice: unknown) =>
+    encoder.encode(`data: ${JSON.stringify({ id, model, choices: [choice] })}\n\n`);
+
+  return new ReadableStream<Uint8Array>({
+    start(controller) {
+      controller.enqueue(sseLine({ index: 0, delta: { role: "assistant" }, finish_reason: null }));
+      words.forEach((word, i) => {
+        const content = i === 0 ? word : ` ${word}`;
+        controller.enqueue(sseLine({ index: 0, delta: { content }, finish_reason: null }));
+      });
+      controller.enqueue(sseLine({ index: 0, delta: {}, finish_reason: "stop" }));
+      controller.enqueue(encoder.encode("data: [DONE]\n\n"));
+      controller.close();
+    },
+  });
 }
 
 /** port 0 lets the OS assign a free port, avoiding a fixed-port clash
@@ -52,6 +85,11 @@ export function startStubLlmServer(port = 0): StubLlmServerHandle {
         const body = (await req.json().catch(() => null)) as ChatCompletionRequest | null;
         if (!body || !Array.isArray(body.messages)) {
           return Response.json({ error: "messages is required" }, { status: 400 });
+        }
+        if (body.stream) {
+          return new Response(streamChatCompletion(body), {
+            headers: { "content-type": "text/event-stream" },
+          });
         }
         return Response.json(handleChatCompletion(body));
       }

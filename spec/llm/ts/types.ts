@@ -29,6 +29,12 @@ export interface ChatCompletionRequest {
    * mode per request, overriding llmSupervisor.ts's spawn-time
    * `--chat-template-kwargs` default. */
   chat_template_kwargs?: Record<string, unknown>;
+  /** Always set explicitly by client.ts (`false` for chatComplete(),
+   * `true` for chatCompleteStream()), never left to llama-server's own
+   * default - the two methods read completely different response shapes
+   * (one JSON body vs. SSE lines), so which one a caller gets can never
+   * be ambiguous. */
+  stream?: boolean;
 }
 
 export interface ChatCompletionChoice {
@@ -52,4 +58,29 @@ export interface ChatCompletionResponse {
 
 export interface ModelInfo {
   id: string;
+}
+
+// The streaming half of the chat-completions subset (2026-09-04): real
+// token-by-token generation, needed so a reply can start being spoken
+// (and shown) before the model finishes writing it - see
+// spec/voice/README.md's "what Jesse actually meant by streamed." Confirmed
+// live against a real llama-server (`stream: true`, SSE `data: {...}`
+// lines terminated by `data: [DONE]`): each chunk's `delta.content` is the
+// next slice of text, empty/absent on the first chunk (role-only) and the
+// last (finish_reason only).
+export interface ChatCompletionChunkDelta {
+  role?: ChatRole;
+  content?: string | null;
+}
+
+export interface ChatCompletionChunkChoice {
+  index: number;
+  delta: ChatCompletionChunkDelta;
+  finish_reason: string | null;
+}
+
+export interface ChatCompletionChunk {
+  id: string;
+  model: string;
+  choices: ChatCompletionChunkChoice[];
 }

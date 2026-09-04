@@ -1977,6 +1977,248 @@ set. Full architecture: platform plan chapters 1, 3, and 4.
       visibly not-yet-built rather than leaving them out or faking them),
       and real streaming LLM text through `POST /api/turn` - the actual
       prerequisite for "what Jesse actually meant by streamed," above.
+- [x] **Real end-to-end streaming: the LLM's text and the reply's speech
+      both arrive as they're generated, same session as the entry
+      above.** Closes the prerequisite that entry named: "start on it
+      now" (Jesse), after pointing at the legacy hub's real
+      `useCompanionVoice.ts`/`voice-playback.ts`/
+      `tts-playback-scheduler.ts` as the pattern to port rather than
+      re-derive.
+    - **The LLM wire contract streams for real.** `spec/llm/ts/client.ts`'s
+      `chatCompleteStream()` sends `stream: true` and parses llama-server's
+      real SSE (`data: {...}` lines, `data: [DONE]` - confirmed live
+      against a real spawn, not assumed from docs). `stubServer.ts`'s
+      canned reply now streams too, word by word, so the test suite
+      exercises the real mechanism rather than a fake one-shot stand-in.
+      `backend/src/lib/llm.ts`'s `startCompleteStream()` mirrors
+      `complete()`'s validate-then-resolve-a-backend shape exactly, so a
+      bad request or a down engine still gets a proper HTTP status before
+      any byte streams - only actual token generation is where a failure
+      can no longer change the response status.
+    - **`turnEngine.ts` gained `runTurnStream()` alongside `runTurn()`**,
+      sharing a new `prepareTurn()` helper for the identical safety-first
+      routing and deterministic skill floor both need. A safety refusal or
+      a skill reply answers as a single "immediate" event (both are
+      already complete, deterministic text with nothing to gain from a
+      fake trickle); only the `chat` role's own fallback answer streams.
+      `POST /api/turn/stream` (`routes/turn.ts`) is newline-delimited
+      JSON, not SSE - one real response body, no `text/event-stream`
+      framing needed for a wire shape this simple (`wire.ts`'s
+      `TurnStreamEvent`: `delta`, `done`, `error`). The old, non-streaming
+      `POST /api/turn` stays exactly as it was - not every caller needs
+      streaming, and it costs nothing to keep both.
+    - **The frontend speaks sentence by sentence as the reply is
+      typed**, ported in spirit (not verbatim - Pocket TTS and this
+      hub's own wire shapes differ from the legacy stack) from
+      `home-legacy.git`'s real, tuned pattern. `frontend/src/lib/
+      sentenceChunker.ts` is the ported sentence/clause-boundary
+      detector (`useCompanionVoice.ts`'s own regexes and the reasoning
+      behind them, including the "don't clause-split a short sentence"
+      lesson that file's header comment already recorded).
+      `frontend/src/lib/sentenceSpeechScheduler.ts` fetches and speaks
+      each completed sentence with bounded parallelism (2 in flight,
+      matching the legacy hub's own `MAX_PARALLEL_SENTENCE_FETCHES`) but
+      schedules playback strictly in issue order via the Web Audio API,
+      gapless, the same `nextStartTime` bookkeeping
+      `streamingWavPlayer.ts` already uses for one call's byte chunks -
+      unlike that file, each sentence is buffered whole and decoded with
+      the browser's native `decodeAudioData` rather than hand-rolled PCM
+      math, since the real latency win here is sentence-level pipelining,
+      not sub-sentence streaming (the legacy backend made the identical
+      trade). `ChatPage.tsx`'s `handleSend` creates the scheduler
+      *synchronously*, before any `await` - the fix for the Safari
+      autoplay-policy gotcha the reverted auto-play attempt hit, this
+      time built into the architecture instead of bolted on after the
+      fact. A `<think>` block (the `thinking` toggle) is buffered and
+      never shown or spoken until its closing tag arrives; `stripThinking()`
+      still runs on the final `done` event as the authoritative fallback
+      for any edge case (a reasoning-only reply, a stream that never
+      closes its think block) the incremental version can't resolve on
+      its own.
+    - **Verified live, not just unit-tested**: a raw `curl -N` against
+      `POST /api/turn/stream` streaming real token deltas from the real
+      spawned Qwen3 engine, ending in a `done` event whose reply text
+      exactly matches every delta concatenated; the safety-refusal path
+      confirmed as a single immediate event. In the browser, three real
+      sends (two, four, and eight-sentence replies) each produced exactly
+      one `/api/turn/stream` request and one `/api/tts` request per
+      sentence (2, 4, and 13 - the last including one extra flushed
+      fragment), all 200s, zero console errors, confirmed via the
+      network panel rather than assumed from the code.
+    - **Real bugs found and fixed before commit, each with a test that
+      fails without the fix**: a naive test asserting only "was
+      `enqueueSentence` called" would have passed against broken code, so
+      every regression test here was verified to actually fail first
+      (the same discipline the tts-role entry's own tests already
+      established) - `ChatPage.test.tsx`'s streaming-send tests, proven
+      against a deliberately neutered `scheduler.enqueueSentence` call.
+      Two more found by a code review pass before this landed: (1) the
+      `<think>`-block detector decided "is this a think block" from a
+      single delta, so real token-level streaming splitting `<think>`
+      itself across several deltas (a tokenizer's own boundaries rarely
+      align with a tag's characters) locked in "not a think block" the
+      moment the first delta alone didn't match the full tag, leaking raw
+      reasoning into the thread and out loud - fixed to wait until enough
+      characters have arrived to know for certain either way
+      (`ChatPage.test.tsx`'s "split across many small deltas" test feeds
+      the tag one character at a time, worse than any real tokenizer
+      would produce, and was confirmed to fail against the original
+      check). (2) Both streaming readers (`api.ts`'s `readTurnStream()`
+      and `client.ts`'s `chatCompleteStream()`) never gave `TextDecoder`
+      a final, non-streaming flush call once their source exhausted -
+      real `TextDecoder` behavior, not speculative: a multi-byte UTF-8
+      character (an emoji, an accented letter) split across the last two
+      network chunks would have its trailing bytes silently buffered and
+      dropped. Both now flush and drain any remaining buffered line after
+      their read loop ends. A further review pass on those two fixes
+      found four more, real ones: (3) a mid-stream "error" ndjson event
+      was thrown in `ChatPage.tsx` as a plain `Error`, which the catch
+      block's `e instanceof ApiError && e.code === "unavailable"` check
+      can never match, so an engine crash mid-generation always fell
+      through to the generic "Could not reach the hub" message instead of
+      the intended, more actionable one - fixed to throw a real `ApiError`
+      with that code. (4) The `<think>` detector was still a one-shot
+      flag even after fix (1) above: it could resolve the *first* block
+      but had no way to re-arm for a second one appearing later in the
+      same stream, so a second block's raw text leaked into the live
+      preview even though `stripThinking()`'s global regex would have
+      caught it in the final saved text - the preview and the saved reply
+      silently disagreeing. Rewritten as a real small state machine
+      (`insideThink` toggles per block rather than latching) that handles
+      any number of blocks, not just guards against a second one
+      (`ChatPage.test.tsx`'s "two separate think blocks" test). (5) A
+      stream that ended without ever sending a "done" or "error" event
+      (an abnormal connection drop between deltas) left the frontend's
+      read loop exiting silently - no exception, so the reply bubble just
+      stopped growing with no banner and no way to tell it failed rather
+      than finished; `handleSend` now throws its own "unavailable" error
+      when the loop ends without a terminal event
+      (`ChatPage.test.tsx`'s "ends without a done or error event" test).
+      (6) `routes/turn.ts`'s catch block emitted the "error" event but
+      never called `result.finalize()`, so a reply that had already
+      streamed several real sentences into the household's own thread -
+      shown and spoken before the engine crashed - was never written to
+      conversation history at all, as if the exchange had never happened;
+      fixed to still finalize (and so still log) whatever text streamed
+      before the failure. Bun's own `ReadableStream` masks a mid-stream
+      server-side error as a clean close from the client's side
+      (confirmed live while writing the regression test - neither
+      `controller.error()` nor a thrown `pull()` ever reaches the reader
+      as a rejection, only as a silently truncated body), so this
+      couldn't be reproduced end to end through a real fixture engine;
+      the fix is proven instead by extracting the route's stream-building
+      logic into `streamTurnEvents()`, a directly-testable generator
+      driven with a real, hand-built failing token generator
+      (`turnEngine.test.ts`'s two new tests). A further, smaller review
+      pass over *those* fixes found two more: (7) folding `streamSpeech`
+      into the new shared `rawStreamPost` helper had silently dropped its
+      specific "Timed out waiting for voice" message in favor of a
+      generic one - fixed by giving the helper an optional per-caller
+      message. (8) `chatCompleteStream`'s early exit on `data: [DONE]`
+      never released the reader lock, a real connection-pool leak under
+      sustained chat traffic if llama-server keeps the TCP connection
+      open briefly after the last chunk - fixed with a best-effort
+      `reader.cancel()`. One more, non-bug finding acted on: the
+      line-buffering/decode/final-flush mechanics behind fix (2) were
+      duplicated near-verbatim between `api.ts` and `client.ts`, which is
+      exactly how that bug needed fixing twice in the first place -
+      centralized into `spec/streaming/ts/lineReader.ts`'s
+      `readTextLines()`, a new small shared module both now call,
+      keeping only their own per-line meaning (ndjson vs. SSE `data:`
+      framing) to themselves. `api.sendTurn` (the frontend wrapper for
+      the now-unused-by-ChatPage non-streaming `POST /api/turn` call)
+      was also removed as genuine dead code the same review flagged; the
+      backend route itself stays, the same "provisional real caller"
+      posture `/api/llm/chat` already has. A fourth review pass, run
+      wide (line-by-line, removed-behavior, and cross-file angles)
+      before commit, found five more real ones: (9) `resolveRaw()`
+      (the `<think>` detector, again) still only ever searched for the
+      opening tag at the very *start* of the unresolved remainder, not
+      anywhere within it - real text arriving ahead of a tag inside the
+      same delta (a network chunk batching a lead-in phrase together
+      with the start of a reasoning block) got the tag, and everything
+      after it, dumped straight into the visible preview unresolved.
+      Rewritten to search the whole remainder (`indexOf`, not
+      `startsWith`), with a `searchFrom` cursor added at the same time
+      so a long think block isn't rescanned from `scanPos` on every
+      single delta (`ChatPage.test.tsx`'s "real text arriving before a
+      `<think>` tag in the same delta" test, confirmed to fail against
+      the `startsWith`-only version). (10) `sending` cleared on the
+      *first* token rather than the whole turn, re-enabling Send while a
+      reply was still streaming; a second concurrent `handleSend` shares
+      `setBanner`/`setThinking` state with the first, with no way to
+      tell whose update is whose - one call's error banner could be
+      silently wiped by the other's success. Split into two flags:
+      `sending` now stays true for the entire turn (gates Send),
+      `awaitingFirstToken` is the separate, narrower one that only hides
+      the thinking spinner. (11) `logTurn()`'s real DB write (a plain
+      call, unguarded) propagated straight up through every caller in
+      `turnEngine.ts`: a completely correct generation got reported as a
+      *failed* turn just because its own logging failed afterward -
+      `runTurn()` rejected an otherwise-successful reply outright, and
+      `runTurnStream()`'s `finalize` closure made `streamTurnEvents()`
+      report a mid-stream "error" for a reply that had already fully,
+      correctly rendered to the household. Wrapped in a new
+      `logTurnSafely()` at all three call sites, swallowing the failure
+      to `console.error` instead - there's nothing useful left to
+      retract once the reply already rendered; the failure is real but
+      belongs in the server log, not the household's chat thread
+      (`turnEngine.test.ts`'s new test forces a *real* SQLite
+      `FOREIGN KEY constraint failed` by writing with an actor id that
+      was never in `people`, not a mock, and confirms both that
+      `runTurn()` still returns the correct successful reply and that no
+      row was written - proving the failure was genuine, not a silent
+      no-op). (12) `client.ts`'s `chatCompleteStream()` guarded against
+      an empty `choices` array but not a chunk that omitted the field
+      entirely (a valid-JSON, non-standard SSE frame some backends emit,
+      e.g. an inline usage/error frame): `chunk.choices[0]` threw before
+      the `?.` ever applied, killing the whole generation on one stray
+      frame instead of skipping it, unlike the malformed-JSON case two
+      lines up which already degraded gracefully - fixed to
+      `chunk.choices?.[0]?.delta?.content` (`llm.test.ts`'s new test
+      spins up a raw server emitting a well-formed choices-less frame
+      ahead of a real one, confirming it's skipped rather than fatal).
+      (13) `TurnStreamResult`'s error arm duplicated `TurnOpResult`'s
+      failure union by hand - extracted a shared `TurnFailure` type both
+      now reference, so the two can't drift into reporting different
+      codes for what should be the identical failure. Two lower-priority
+      findings from the same pass were left as-is: a timeout-message
+      branch that's unreachable in practice, and a suggestion to move
+      the `<think>`-detection logic server-side, a real architectural
+      improvement but a larger change than this slice, noted here rather
+      than built. A fifth, final review pass before commit found two
+      more: (14) the "done" handler's trailing-fragment flush
+      (`finalText.slice(spokenLength)`) assumed `spokenLength` (tracked
+      against `visible`, resolveRaw()'s incremental preview) lined up
+      character-for-character with `finalText` (stripThinking()'s
+      separately-computed authoritative text) - they didn't whenever a
+      `<think>` block was followed by whitespace: stripThinking()'s own
+      `<\/think>\s*` regex consumes that whitespace, but resolveRaw() only
+      ever advanced past the tag itself, keeping the whitespace in
+      `visible` verbatim. The two coordinate spaces drifted apart by
+      exactly that whitespace the moment any sentence after the think
+      block got spoken mid-stream, corrupting the trailing fragment (its
+      leading characters silently dropped). Fixed by making resolveRaw()
+      skip trailing whitespace after a closing tag the same way
+      stripThinking() does, keeping the two in sync
+      (`ChatPage.test.tsx`'s "trailing fragment after a `<think>` block"
+      test, built around exactly this shape - one space before the tag,
+      two after - confirmed to fail without the fix). (15)
+      `awaitingFirstToken` (the thinking spinner) is only ever cleared
+      once a stream event arrives, but the `finally` block only reset
+      `sending`, never `awaitingFirstToken` - a failure before any event
+      (the fetch itself rejecting, e.g. a real network error) left the
+      spinner showing forever even though the error banner correctly
+      appeared right next to it. Fixed by resetting it in the same
+      `finally` block (`ChatPage.test.tsx`'s "clears the thinking
+      spinner" test).
+    - **Still not built**: barge-in itself (the scheduler's `stop()`
+      already supports cutting in cleanly; nothing calls it on a new
+      user utterance while a reply is still speaking, only on a brand
+      new *send*), tier 2 native tool calling over the streamed
+      contract (4.5's own deferred scope, unchanged), and rate limiting
+      on either turn route (the same tracked gap `spec/llm/README.md`
+      already names, now applying to two routes instead of one).
 
 ## API routes and `@hono/zod-openapi` (tracked debt)
 
@@ -2202,12 +2444,64 @@ have schema pages.
 Not actionable yet; captured here so the reason for a choice isn't lost
 between now and when the relevant piece gets built.
 
-- **TTS candidates for the voice sidecar (4.11, `spec/voice/`, lands with
-  Hub v0.3):** Jesse wants Chatterbox Turbo evaluated for the hub and
-  Chatterbox Nano for the robot, alongside Piper (the current `STACK.md`
-  default for non-English voices) and sherpa-onnx's built-in options, when
-  voice work starts. No decision made yet: this is an item to put in the
-  eval, not a chosen engine.
+- **TTS candidates for the voice sidecar - superseded.** This note
+  originally said no decision was made yet; one was, the same night
+  (`docs/dev.md`'s TTS model decision entry: Kyutai Pocket TTS, live
+  tested and picked over Kokoro-82M, Chatterbox Turbo/Nano, Dia-1.6B, and
+  CSM-1B), and the `tts` role is now real end to end (the entry right
+  after it). Kept here only so a future reader doesn't wonder whether an
+  eval ever ran.
+
+- **Three real Pocket TTS follow-ups, found by Jesse reading its actual
+  capabilities more closely than this session's original research did
+  (2026-09-04), each verified live before being queued here rather than
+  assumed:**
+  1. **Community, non-Python ports could close the `uv`/Python stack
+     deviation.** The official repo (`kyutai-labs/pocket-tts`) lists 8
+     real community ports/bindings, none needing Python: Rust+WASM,
+     ONNX/Web, Rust+Candle+WASM, JAX/JS, **MLX (Apple Silicon - this dev
+     Mac's own architecture)**, C++ with ONNX Runtime (CLI + HTTP server
+     + FFI C API - the closest shape to how `engineCatalog.ts` already
+     handles llama-server as a downloaded native binary), sherpa-onnx (12
+     languages), C#/.NET. Worth a real evaluation (speed, quality parity,
+     and critically, since these are unofficial community projects, a
+     trust/maintenance check) before picking one to replace the `uvx
+     pocket-tts serve` sidecar `ttsSupervisor.ts` spawns today.
+  2. **Voice cloning already works today, verified live** (not
+     hypothetical): `uvx pocket-tts export-voice <audio> <out>.safetensors`
+     converts a reference clip into a reusable voice - tested against a
+     real sample of Jesse's own voice, real success, ~3 seconds. The
+     catch, also verified rather than assumed: cloning needs the
+     `kyutai/pocket-tts` checkpoint, which really is HF-gated
+     (`gated: "auto"`, confirmed via a clean unauthenticated call to HF's
+     own API) - the default `kyutai/pocket-tts-without-voice-cloning`
+     model `ttsSupervisor.ts` actually runs is not gated, and never grew
+     cloning ability. A real distribution-story gap, the same one the TTS
+     decision entry already named for the built-in named voices (alba,
+     george, etc.), now confirmed to also cover cloning from a
+     household's own recorded voice. The official repo also carries a
+     real `training/` directory (actual fine-tuning, not just cloning),
+     with community-trained non-English variants (Czech, Hindi, Korean)
+     as existing examples - a further, larger follow-up past cloning if
+     MaiPai ever wants its own trained voice rather than a cloned one.
+  3. **A real, ungated community voice catalog exists.** `kyutai/tts-voices`
+     on Hugging Face (confirmed via the API: `gated: false`) is a public
+     repository of community and official voices, separate from the
+     gated cloning checkpoint - a "browse and pick a voice" UI is
+     genuinely buildable against it with zero HF-token friction, unlike
+     item 2 above.
+  A real credential-hygiene gap surfaced while verifying item 2: Jesse's
+  own HF read token (shared in chat earlier this session for the gated
+  checkpoint download, `docs/dev.md`'s TTS decision entry) is still
+  cached at `~/.cache/huggingface/token` on this Mac - not a scratch file
+  this session created and cleaned up, but a persistent credential store
+  the `huggingface_hub` library wrote to on its own the first time the
+  token was used. Left in place since the household is actively working
+  with gated Kyutai resources (items 1-2 above need it again); flagged
+  here rather than silently left for the same reason every other
+  credential note in this session was: the org's own hard rule (`.github/
+  CLAUDE.md` > Credentials and secrets) treats an unflagged lingering
+  credential as the failure mode, not just an unrotated one.
 
 - **Tier 2 tool calling: measure the floor's miss rate before building it
   (4.5, `backend/src/lib/turnEngine.ts`).** Discussed with Jesse

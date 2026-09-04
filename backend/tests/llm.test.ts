@@ -3,7 +3,7 @@ import { TestClient } from "./client";
 import { resetDb } from "./reset-db";
 import { __resetThrottleForTests } from "@/lib/secretThrottle";
 import { __resetLlmSupervisorForTests } from "@/lib/llmSupervisor";
-import { complete } from "@/lib/llm";
+import { complete, startCompleteStream } from "@/lib/llm";
 
 beforeEach(() => {
   resetDb();
@@ -43,6 +43,38 @@ describe("lib/llm.ts complete()", () => {
     const result = await complete("chat", [{ role: "narrator" as never, content: "hi" }]);
     expect(result.ok).toBe(false);
     if (!result.ok) expect(result.code).toBe("invalid_input");
+  });
+});
+
+describe("lib/llm.ts startCompleteStream()", () => {
+  test("chat role streams real deltas from the stub backend that concatenate to the same reply complete() gives", async () => {
+    const started = await startCompleteStream("chat", [{ role: "user", content: "what's for dinner" }]);
+    expect(started.ok).toBe(true);
+    if (!started.ok) return;
+
+    const deltas: string[] = [];
+    for await (const delta of started.tokens) deltas.push(delta);
+    expect(deltas.length).toBeGreaterThan(1);
+    const streamed = deltas.join("");
+
+    const buffered = await complete("chat", [{ role: "user", content: "what's for dinner" }]);
+    expect(buffered.ok).toBe(true);
+    if (buffered.ok) expect(streamed).toBe(buffered.value.text);
+  });
+
+  test("an unimplemented role fails before any streaming starts, the same real gap complete() reports", async () => {
+    const started = await startCompleteStream("embed", [{ role: "user", content: "hi" }]);
+    expect(started.ok).toBe(false);
+    if (!started.ok) {
+      expect(started.code).toBe("unsupported_role");
+      expect(started.status).toBe(400);
+    }
+  });
+
+  test("rejects an empty messages array before any streaming starts", async () => {
+    const started = await startCompleteStream("chat", []);
+    expect(started.ok).toBe(false);
+    if (!started.ok) expect(started.code).toBe("invalid_input");
   });
 });
 

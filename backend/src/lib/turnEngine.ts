@@ -14,12 +14,13 @@
 import { evaluateSafety } from "@/lib/safety";
 import { listPackageIds, loadPackage, meetsMinRole, runSkill } from "@/lib/skills";
 import { recall, type RecallMatch } from "@/lib/memory";
-import { complete } from "@/lib/llm";
+import { complete, startCompleteStream, type LlmMessage } from "@/lib/llm";
 import { tokenize } from "@/lib/text";
 import { logTurn } from "@/lib/conversationHistory";
 import type { Role } from "@/middleware/auth";
 import type { PersonRow } from "@/types";
 import type { PackageManifest } from "@maipai/spec/gen/ts/manifest.js";
+import type { SafetyResult } from "@maipai/spec/gen/ts/safety-result.js";
 // TurnReply/TurnValue moved to @/wire (alias-free, so a frontend client
 // can import the real shape through the @maipai/home-backend workspace
 // dependency instead of a hand-duplicated mirror); re-exported here since
@@ -35,9 +36,35 @@ export type { TurnReply, TurnValue } from "@/wire";
 export type Surface = "chat" | "overlay" | "pod" | "robot" | "tv" | "phone";
 const IMPLEMENTED_SURFACES: ReadonlySet<Surface> = new Set(["chat"]);
 
-export type TurnOpResult =
-  | { ok: true; value: TurnValue }
-  | { ok: false; status: 400 | 503; code: "unsupported_surface" | "invalid_input" | "unavailable"; error: string };
+/** Shared by TurnOpResult and TurnStreamResult: runTurn() and
+ * runTurnStream() run the identical validation/safety/skill-floor logic
+ * (prepareTurn(), below) and so must report the identical error
+ * vocabulary for the identical failure states - a code review
+ * (2026-09-04) found the two had drifted into independently-hand-typed
+ * copies of the same union, one bad refactor away from silently
+ * reporting different codes for what should be the same failure. */
+export type TurnFailure = { ok: false; status: 400 | 503; code: "unsupported_surface" | "invalid_input" | "unavailable"; error: string };
+
+export type TurnOpResult = { ok: true; value: TurnValue } | TurnFailure;
+
+/** logTurn (conversationHistory.ts) is a real DB write, so it can fail on
+ * its own (disk pressure, a lock) even after a completely correct
+ * generation. A code review (2026-09-04) found every real caller below
+ * let that failure propagate straight up, turning "the reply worked, its
+ * own logging didn't" into "the reply failed" from the caller's point of
+ * view - runTurn() would reject an otherwise-successful turn outright,
+ * and runTurnStream()'s `finalize` closure would make streamTurnEvents.ts
+ * (routes/turn.ts) report a mid-stream "error" event for a reply that had
+ * already fully, correctly rendered to the household. There is nothing
+ * useful left to retract at that point; the failure is real but belongs
+ * in the server log, not in the household's chat thread. */
+function logTurnSafely(actor: PersonRow, surface: Surface, userText: string, value: TurnValue): void {
+  try {
+    logTurn(actor, surface, userText, value);
+  } catch (err) {
+    console.error(`[turn] logTurn failed for an otherwise-successful turn: ${(err as Error).message}`);
+  }
+}
 
 const REFUSAL_TEXT = "I can't help with that.";
 const CRISIS_RESOURCES_TEXT =
@@ -243,6 +270,64 @@ function route(text: string, actor: PersonRow, loaded: LoadedManifest[]): Routed
   return best ? { id: best.id, args: best.args } : null;
 }
 
+type PreparedTurn =
+  | { kind: "immediate"; value: TurnValue }
+  | { kind: "model"; messages: LlmMessage[]; safety: SafetyResult; crisisResources?: string };
+
+/** Safety-first routing and the deterministic skill floor (4.5), shared
+ * by runTurn() and runTurnStream(): identical for both, and the only real
+ * difference between "a normal reply" and "a streamed one" is how the
+ * `chat` role's own answer gets to the caller, never whether safety ran
+ * or which skill matched. Only the `kind: "model"` branch differs between
+ * the two callers - runTurn() awaits complete(), runTurnStream() awaits
+ * startCompleteStream() instead. */
+function prepareTurn(actor: PersonRow, text: string, loaded: LoadedManifest[]): PreparedTurn {
+  const safety = evaluateSafety(text, actor.role as Role);
+  if (safety.action === "refuse") {
+    return { kind: "immediate", value: { reply: { text: REFUSAL_TEXT }, source: "safety_refuse", safety } };
+  }
+  const crisisResources = safety.action === "allow_with_resources" ? CRISIS_RESOURCES_TEXT : undefined;
+
+  const routed = route(text, actor, loaded);
+  if (routed) {
+    const result = runSkill(routed.id, actor, routed.args);
+    if (result.ok) {
+      const reply = result.value.reply ?? { text: "Done." };
+      return {
+        kind: "immediate",
+        value: { reply, source: "skill", skill_id: routed.id, safety, crisis_resources: crisisResources },
+      };
+    }
+    // A pre-filtered deterministic match failing at runSkill is a real, if
+    // rare, gap (a role change or a bad manifest between the router's
+    // check and the run); surfaced as a plain apology rather than leaking
+    // the internal error string to a household member, logged for anyone
+    // debugging it. `source: "skill_error"` on the returned `TurnValue` is
+    // the intended way to detect it, not the top-level `ok` flag (a review,
+    // 2026-09-04, flagged this could otherwise look indistinguishable from
+    // a real success to a caller branching on `.ok` alone).
+    console.log(`[turn] skill ${routed.id} matched but failed to run: ${result.error}`);
+    return {
+      kind: "immediate",
+      value: {
+        reply: { text: "Sorry, I couldn't do that." },
+        source: "skill_error",
+        skill_id: routed.id,
+        safety,
+        crisis_resources: crisisResources,
+      },
+    };
+  }
+
+  const memoryMatches = recall(actor, text);
+  const systemPrompt = buildSystemPrompt(memoryMatches, loaded);
+  const messages: LlmMessage[] = [
+    { role: "system", content: systemPrompt },
+    { role: "user", content: text },
+  ];
+  return { kind: "model", messages, safety, crisisResources };
+}
+
 /** Runs one conversation turn end to end: safety first, then the
  * deterministic skill floor, then the chat model as the phrasing fallback. */
 export async function runTurn(
@@ -263,65 +348,105 @@ export async function runTurn(
     return { ok: false, status: 400, code: "invalid_input", error: "text is required" };
   }
 
-  const safety = evaluateSafety(text, actor.role as Role);
-  let value: TurnValue;
-
-  if (safety.action === "refuse") {
-    value = { reply: { text: REFUSAL_TEXT }, source: "safety_refuse", safety };
-    logTurn(actor, surface, text, value);
-    return { ok: true, value };
-  }
-  const crisisResources = safety.action === "allow_with_resources" ? CRISIS_RESOURCES_TEXT : undefined;
   const loaded = loadAllManifests(); // one catalog scan, shared below
+  const prepared = prepareTurn(actor, text, loaded);
 
-  const routed = route(text, actor, loaded);
-  if (routed) {
-    const result = runSkill(routed.id, actor, routed.args);
-    if (result.ok) {
-      const reply = result.value.reply ?? { text: "Done." };
-      value = { reply, source: "skill", skill_id: routed.id, safety, crisis_resources: crisisResources };
-    } else {
-      // A pre-filtered deterministic match failing at runSkill is a real,
-      // if rare, gap (a role change or a bad manifest between the router's
-      // check and the run); surfaced as a plain apology rather than leaking
-      // the internal error string to a household member, logged for anyone
-      // debugging it. Deliberately `ok: true`, not `ok: false`: the turn
-      // engine successfully produced a reply for the person, same as the
-      // safety_refuse and model paths, and a real HTTP error here would hand
-      // a chat surface a raw error to render mid-conversation instead of a
-      // spoken apology. A review (2026-09-04) flagged that this makes a
-      // failed skill run indistinguishable from a real success to a caller
-      // branching on `.ok` alone: `source: "skill_error"` on the returned
-      // `TurnValue` is the intended way to detect it (routes/turn.ts's own
-      // JSON body carries it straight through), not the top-level `ok` flag.
-      console.log(`[turn] skill ${routed.id} matched but failed to run: ${result.error}`);
-      value = {
-        reply: { text: "Sorry, I couldn't do that." },
-        source: "skill_error",
-        skill_id: routed.id,
-        safety,
-        crisis_resources: crisisResources,
-      };
-    }
+  let value: TurnValue;
+  if (prepared.kind === "immediate") {
+    value = prepared.value;
   } else {
-    const memoryMatches = recall(actor, text);
-    const systemPrompt = buildSystemPrompt(memoryMatches, loaded);
-    const completion = await complete(
-      "chat",
-      [
-        { role: "system", content: systemPrompt },
-        { role: "user", content: text },
-      ],
-      { thinking: opts.thinking },
-    );
+    const completion = await complete("chat", prepared.messages, { thinking: opts.thinking });
     if (!completion.ok) {
       return { ok: false, status: 503, code: "unavailable", error: completion.error };
     }
-    value = { reply: { text: completion.value.text }, source: "model", safety, crisis_resources: crisisResources };
+    value = {
+      reply: { text: completion.value.text },
+      source: "model",
+      safety: prepared.safety,
+      crisis_resources: prepared.crisisResources,
+    };
   }
 
-  logTurn(actor, surface, text, value);
+  logTurnSafely(actor, surface, text, value);
   return { ok: true, value };
+}
+
+export type TurnStreamResult =
+  | TurnFailure
+  | { ok: true; kind: "immediate"; value: TurnValue }
+  | {
+      ok: true;
+      kind: "stream";
+      tokens: AsyncGenerator<string, void, void>;
+      /** Builds the final TurnValue once the caller has drained `tokens`
+       * to completion and knows the full reply text - also logs the turn
+       * (conversationHistory.ts), the same "log once the real reply is
+       * known" timing runTurn() already has, just triggered by the
+       * caller finishing the stream instead of by this function awaiting
+       * it directly. */
+      finalize: (replyText: string) => TurnValue;
+    };
+
+/** Same safety-first routing and deterministic skill floor as runTurn(),
+ * but the `chat` role's own answer streams token by token instead of
+ * arriving as one blocking call - the real prerequisite for speaking a
+ * reply sentence by sentence as it's generated (spec/voice/README.md's
+ * "what Jesse actually meant by streamed"), not just a byte-chunked
+ * `POST /api/tts`. `kind: "immediate"` still covers safety refusals and
+ * skill replies: both are already complete, deterministic text with
+ * nothing to gain from streaming, so they answer in one line instead of
+ * pretending to trickle in. */
+export async function runTurnStream(
+  actor: PersonRow,
+  surface: Surface,
+  text: string,
+  opts: { thinking?: boolean } = {},
+): Promise<TurnStreamResult> {
+  if (!IMPLEMENTED_SURFACES.has(surface)) {
+    return {
+      ok: false,
+      status: 400,
+      code: "unsupported_surface",
+      error: `the ${surface} surface is not implemented on this host build yet (4.5)`,
+    };
+  }
+  if (typeof text !== "string" || text.trim().length === 0) {
+    return { ok: false, status: 400, code: "invalid_input", error: "text is required" };
+  }
+
+  const loaded = loadAllManifests();
+  const prepared = prepareTurn(actor, text, loaded);
+
+  if (prepared.kind === "immediate") {
+    logTurnSafely(actor, surface, text, prepared.value);
+    return { ok: true, kind: "immediate", value: prepared.value };
+  }
+
+  const started = await startCompleteStream("chat", prepared.messages, { thinking: opts.thinking });
+  if (!started.ok) {
+    // Collapsed to "unavailable", the same as runTurn()'s own handling of
+    // complete()'s failure: llm.ts's own "unsupported_role"/"invalid_input"
+    // codes describe a role/messages problem this function's own prior
+    // validation already ruled out for `chat` - by the time startCompleteStream
+    // fails, it's a real down-engine case, not a request-shape one.
+    return { ok: false, status: 503, code: "unavailable", error: started.error };
+  }
+
+  return {
+    ok: true,
+    kind: "stream",
+    tokens: started.tokens,
+    finalize: (replyText: string): TurnValue => {
+      const value: TurnValue = {
+        reply: { text: replyText },
+        source: "model",
+        safety: prepared.safety,
+        crisis_resources: prepared.crisisResources,
+      };
+      logTurnSafely(actor, surface, text, value);
+      return value;
+    },
+  };
 }
 
 // Not built this pass, deliberately (see docs/dev.md):

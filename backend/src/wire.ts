@@ -41,6 +41,19 @@ export interface TurnValue {
 
 export type ConversationTurnRow = typeof conversationTurns.$inferSelect;
 
+// POST /api/turn/stream's real wire shape (2026-09-04): newline-delimited
+// JSON, one event per line (the same shape the legacy hub's own
+// POST /api/tts/stream used - docs/dev.md's tts-role entry). A "delta"
+// event's `text` is the next slice of the reply (the whole thing in one
+// event for a safety-refusal or skill reply, since neither has anything
+// to gain from trickling in); exactly one "done" event ends the stream,
+// carrying the same TurnValue shape POST /api/turn already returns so a
+// client needs only one code path to read the final result either way.
+export type TurnStreamEvent =
+  | { type: "delta"; text: string }
+  | { type: "done"; value: TurnValue }
+  | { type: "error"; error: string };
+
 export interface ResolvedSetting {
   key: string;
   value: unknown;

@@ -4,9 +4,11 @@ import { MessageThread, type ThreadMessage } from "@/kit/primitives/MessageThrea
 import { Form } from "@/kit/primitives/Form";
 import { Progress } from "@/kit/primitives/Progress";
 import { Button } from "@/kit/components/Button";
-import { api, ApiError, type Roster } from "@/lib/api";
+import { api, readTurnStream, ApiError, type Roster } from "@/lib/api";
 import { rowsToMessages } from "@/apps/chat/mapRows";
 import { StreamingWavPlayer } from "@/lib/streamingWavPlayer";
+import { SentenceSpeechScheduler } from "@/lib/sentenceSpeechScheduler";
+import { splitReadyChunks } from "@/lib/sentenceChunker";
 
 interface ChatPageProps {
   person: Roster;
@@ -33,7 +35,19 @@ export function stripThinking(text: string): string {
 export function ChatPage({ person }: ChatPageProps) {
   const [messages, setMessages] = useState<ThreadMessage[] | null>(null);
   const [loadError, setLoadError] = useState(false);
+  // Stays true for the ENTIRE turn (send through its final done/error
+  // event), gating the Send button - a code review (2026-09-04) found an
+  // earlier version cleared this as soon as the first token arrived
+  // (often a fraction of a second in), which re-enabled Send while the
+  // first reply was still streaming and speaking. A second handleSend
+  // call starting mid-stream shares component state with the first
+  // (setBanner, setThinking) with no way to tell whose update is whose -
+  // one call's error banner could be silently wiped by the other's
+  // `setBanner(null)`. `awaitingFirstToken` is the separate, narrower
+  // flag for "hide the thinking spinner once real content starts
+  // arriving" - it never gates whether another send can start.
   const [sending, setSending] = useState(false);
+  const [awaitingFirstToken, setAwaitingFirstToken] = useState(false);
   const [banner, setBanner] = useState<string | null>(null);
   // Off by default (Jesse, 2026-09-04: "thinking mode off by default with
   // the ability to enable in chats when needed"): a per-message opt-in,
@@ -59,16 +73,24 @@ export function ChatPage({ person }: ChatPageProps) {
   // audio.play() promise), now guarded against directly rather than
   // relying on stop() alone.
   const playRequestIdRef = useRef(0);
+  // The live, currently-streaming reply's own speech (below): a separate
+  // player from playerRef's single-shot "Listen" replay, since a fresh
+  // reply speaks sentence by sentence as it arrives while any earlier
+  // message's "Listen" button still replays the old, single-utterance
+  // way. Never let two overlap: starting either one stops the other.
+  const turnSchedulerRef = useRef<SentenceSpeechScheduler | null>(null);
 
   useEffect(() => {
     return () => {
       playerRef.current?.stop();
+      turnSchedulerRef.current?.stop();
     };
   }, []);
 
   async function handlePlay(message: ThreadMessage) {
     const requestId = ++playRequestIdRef.current;
     playerRef.current?.stop();
+    turnSchedulerRef.current?.stop();
     setPlayError(null);
     setLoadingId(message.id);
     // Unconditionally, not left for the new player's own onFirstAudio/
@@ -160,31 +182,206 @@ export function ChatPage({ person }: ChatPageProps) {
     loadHistory();
   }, [loadHistory]);
 
+  // Real end-to-end streaming (2026-09-04): the reply's TEXT arrives
+  // token by token from POST /api/turn/stream, and each completed
+  // sentence is spoken (SentenceSpeechScheduler) the moment it's ready,
+  // not after the whole reply finishes generating - the actual thing
+  // Jesse asked for ("check our old project - we didnt do autoplay - we
+  // streamed"), ported in spirit from home-legacy.git's
+  // useCompanionVoice.ts. No manual "Listen" click needed for a fresh
+  // reply; that button (handlePlay, above) still exists for replaying an
+  // earlier one.
   async function handleSend(values: Record<string, string>) {
     const text = values.message;
     if (!text) return;
     setBanner(null);
     const pendingId = `pending-${crypto.randomUUID()}`;
+    const replyId = `${pendingId}-reply`;
     setMessages((prev) => [
       ...(prev ?? []),
       { id: pendingId, sender: person.display_name, text, isSelf: true },
+      { id: replyId, sender: "MaiPai", text: "", isSelf: false },
     ]);
     setSending(true);
+    setAwaitingFirstToken(true);
+
+    // Stop whatever the manual "Listen" button or an earlier live reply
+    // was still speaking - never two voices at once. Created
+    // synchronously, before any await: an AudioContext only counts as
+    // unlocked by THIS click's real user gesture if it exists before the
+    // call stack returns (streamingWavPlayer.ts's own constructor
+    // comment; the exact risk a code review flagged in an earlier,
+    // <audio>-element version of this feature).
+    playerRef.current?.stop();
+    turnSchedulerRef.current?.stop();
+    const scheduler = new SentenceSpeechScheduler();
+    turnSchedulerRef.current = scheduler;
+
+    // `raw` is every byte received so far, unstripped. `visible` is the
+    // real, displayable/speakable answer built up incrementally with
+    // every <think>...</think> block (llm.ts's `thinking` option)
+    // resolved out of it as soon as each one closes - nothing inside an
+    // open block is ever shown or spoken, streaming raw reasoning into
+    // the thread word by word being exactly the dump stripThinking()
+    // (below) was built to prevent, just done incrementally instead of
+    // after the fact. `scanPos` is how far into `raw` has been fully
+    // resolved into `visible` or discarded as think-block content, so a
+    // later delta only re-scans genuinely new bytes. `insideThink` toggles
+    // on/off around each block rather than latching permanently once one
+    // resolves (a code review, 2026-09-04, found the original one-shot
+    // flag couldn't handle a second block appearing later in the same
+    // stream - unusual for this hub's own model, but nothing here should
+    // assume it can't happen). `spokenLength` is how much of `visible`
+    // has already been handed to the scheduler.
+    let raw = "";
+    let scanPos = 0;
+    let visible = "";
+    let insideThink = false;
+    // How far into `raw` a search for the relevant tag has already come
+    // up empty, so the next delta's search resumes from there instead of
+    // re-scanning already-confirmed-clean text from `scanPos` every time
+    // (a code review, 2026-09-04, found the original version re-scanned
+    // the whole accumulated reasoning block from scratch on every single
+    // delta - real, avoidable quadratic cost on a long think block).
+    let searchFrom = 0;
+    let spokenLength = 0;
+    let gotAnyEvent = false;
+    let sawTerminalEvent = false;
+
+    function setVisibleText(text: string) {
+      setMessages((prev) => (prev ?? []).map((m) => (m.id === replyId ? { ...m, text } : m)));
+      return text;
+    }
+
+    // Resolves as much of `raw.slice(scanPos)` as currently possible into
+    // `visible`, holding back only a still-ambiguous suffix that might
+    // yet become "<think>" (real token-level streaming can split the tag
+    // itself across several deltas - a tokenizer's own boundaries rarely
+    // align with a tag's characters). A code review (2026-09-04) found
+    // the original version only ever recognized the tag when it sat at
+    // the very START of the unresolved remainder - real text arriving
+    // ahead of a tag within the same delta (a network chunk batching a
+    // lead-in phrase with a reasoning block, or a second block's tag not
+    // landing exactly on a delta boundary) got the tag and everything
+    // after it dumped into `visible` unresolved. This searches the whole
+    // remainder for the tag, not just its start.
+    function resolveRaw(): void {
+      const OPEN_TAG = "<think>";
+      const CLOSE_TAG = "</think>";
+      for (;;) {
+        if (insideThink) {
+          const closeIdx = raw.indexOf(CLOSE_TAG, Math.max(scanPos, searchFrom));
+          if (closeIdx === -1) {
+            // Hold back only the last CLOSE_TAG.length - 1 characters,
+            // which could still become the start of "</think>" once more
+            // arrives; everything before that has been confirmed clean.
+            searchFrom = Math.max(scanPos, raw.length - (CLOSE_TAG.length - 1));
+            return;
+          }
+          scanPos = closeIdx + CLOSE_TAG.length;
+          // stripThinking()'s own regex (`<\/think>\s*`) consumes
+          // whitespace right after the closing tag too. A code review
+          // (2026-09-04) found this didn't, so `visible` kept whitespace
+          // stripThinking() drops - `visible`'s coordinate space silently
+          // drifted out of sync with `finalText` (below), and
+          // `spokenLength` (tracked against `visible`) then sliced
+          // `finalText` at the wrong offset once "done" recomputed the
+          // authoritative text, corrupting the trailing spoken fragment.
+          while (scanPos < raw.length && /\s/.test(raw[scanPos]!)) scanPos++;
+          searchFrom = scanPos;
+          insideThink = false;
+          continue;
+        }
+        const remainder = raw.slice(scanPos);
+        const openIdx = remainder.indexOf(OPEN_TAG);
+        if (openIdx === -1) {
+          // No complete opening tag yet - hold back only a trailing
+          // suffix that's still a genuine prefix of "<think>" (it could
+          // complete the tag once more text arrives); everything before
+          // that is definitely real, visible text.
+          let holdBack = 0;
+          for (let i = 1; i < OPEN_TAG.length && i <= remainder.length; i++) {
+            if (OPEN_TAG.startsWith(remainder.slice(remainder.length - i))) holdBack = i;
+          }
+          const safeLength = remainder.length - holdBack;
+          visible += remainder.slice(0, safeLength);
+          scanPos += safeLength;
+          return;
+        }
+        visible += remainder.slice(0, openIdx); // everything before the tag is real text
+        scanPos += openIdx + OPEN_TAG.length;
+        searchFrom = scanPos;
+        insideThink = true;
+        continue;
+      }
+    }
+
     try {
-      const value = await api.sendTurn(text, thinking);
-      setMessages((prev) => [
-        ...(prev ?? []),
-        { id: `${pendingId}-reply`, sender: "MaiPai", text: stripThinking(value.reply.text), isSelf: false },
-      ]);
-      // 4.3: "offer, never block" - shown alongside the reply, never in
-      // place of it, and never suppressing anything else in the thread.
-      if (value.crisis_resources) setBanner(value.crisis_resources);
+      const response = await api.streamTurn(text, thinking);
+      for await (const event of readTurnStream(response)) {
+        if (!gotAnyEvent) {
+          gotAnyEvent = true;
+          setAwaitingFirstToken(false); // the growing bubble is the live feedback from here on
+        }
+        if (event.type === "delta") {
+          raw += event.text;
+          resolveRaw();
+          setVisibleText(visible);
+          const pending = visible.slice(spokenLength);
+          const { chunks, consumed } = splitReadyChunks(pending, spokenLength === 0);
+          for (const chunk of chunks) scheduler.enqueueSentence(chunk);
+          spokenLength += consumed;
+        } else if (event.type === "done") {
+          sawTerminalEvent = true;
+          // Authoritative, not just the incrementally-built preview: a
+          // reasoning-only reply (never saw a real </think>), a stream
+          // that ended mid-block, or any other edge case all resolve
+          // correctly here, the same stripThinking() fallback the old
+          // non-streaming path already relied on.
+          const finalText = setVisibleText(stripThinking(event.value.reply.text));
+          const trailing = finalText.slice(spokenLength).trim();
+          if (trailing) scheduler.enqueueSentence(trailing);
+          scheduler.finish();
+          // 4.3: "offer, never block" - shown alongside the reply, never
+          // in place of it, and never suppressing anything else in the
+          // thread.
+          if (event.value.crisis_resources) setBanner(event.value.crisis_resources);
+        } else {
+          sawTerminalEvent = true;
+          // A code review (2026-09-04) found this thrown as a plain
+          // Error, which the catch block below's `e instanceof ApiError
+          // && e.code === "unavailable"` check can never match - a
+          // mid-stream engine crash always fell through to the generic
+          // "Could not reach the hub" message instead of the intended,
+          // more actionable one.
+          throw new ApiError(event.error, 503, "unavailable");
+        }
+      }
+      if (!sawTerminalEvent) {
+        // A code review (2026-09-04) found that a connection dropped
+        // abnormally (a proxy cutoff, a crash) between deltas and a real
+        // "done"/"error" event left this loop ending silently: no
+        // exception, so the catch below never ran, and the reply bubble
+        // just stopped growing with no banner and no way to tell it
+        // failed rather than finished.
+        throw new ApiError("The connection ended before MaiPai finished replying.", 0, "unavailable");
+      }
     } catch (e) {
-      // A code review (2026-09-04) found the earlier version left the
-      // optimistic bubble above looking sent even when it never reached
-      // the backend, so a reload silently dropped it with no explanation.
-      // Mark that exact message failed instead of only banner-ing below.
-      setMessages((prev) => (prev ?? []).map((m) => (m.id === pendingId ? { ...m, failed: true } : m)));
+      // A code review (2026-09-04) found an earlier version of this
+      // catch left the optimistic user bubble looking sent even when it
+      // never reached the backend, so a reload silently dropped it with
+      // no explanation. Mark that exact message failed instead of only
+      // banner-ing below.
+      setMessages((prev) =>
+        (prev ?? [])
+          .map((m) => (m.id === pendingId ? { ...m, failed: true } : m))
+          // An empty reply bubble (the error landed before any delta
+          // ever arrived) would otherwise sit in the thread forever
+          // looking broken; a partial reply that DID get some real text
+          // stays, same as any other real (if short) answer.
+          .filter((m) => !(m.id === replyId && m.text.length === 0)),
+      );
+      scheduler.finish(); // let whatever already started speaking finish naturally, enqueue nothing more
       // turnEngine.ts's "unavailable" code covers every real down-state
       // (still downloading, crashed, never selected): one friendly,
       // actionable message rather than the developer-facing reason string
@@ -199,6 +396,13 @@ export function ChatPage({ person }: ChatPageProps) {
       );
     } finally {
       setSending(false);
+      // A code review (2026-09-04) found this never reset
+      // `awaitingFirstToken`: it's only ever cleared once a stream event
+      // arrives (above), so a failure before any event - the fetch itself
+      // rejecting, e.g. a network error - left the "MaiPai is thinking..."
+      // spinner showing forever even though the error banner correctly
+      // appeared right next to it.
+      setAwaitingFirstToken(false);
       // Back to off after every send: a per-message opt-in, not a mode a
       // household member could forget is still on and pay the latency for
       // every later reply.
@@ -231,7 +435,7 @@ export function ChatPage({ person }: ChatPageProps) {
           errorId={playError}
         />
       )}
-      {sending ? (
+      {awaitingFirstToken ? (
         <div className="px-4 pb-1">
           <Progress mode="spinner" label="MaiPai is thinking…" />
         </div>

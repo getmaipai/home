@@ -52,11 +52,13 @@ export type LlmOpResult =
 
 const VALID_MESSAGE_ROLES: ReadonlySet<string> = new Set(["system", "user", "assistant"]);
 
-export async function complete(
-  role: LlmRole,
-  messages: LlmMessage[],
-  opts: LlmCompleteOptions = {},
-): Promise<LlmOpResult> {
+type LlmValidationError = Extract<LlmOpResult, { ok: false }>;
+
+/** Shared by complete() and startCompleteStream(): role/messages
+ * validation is identical either way, and doing it up front (before
+ * either function ever touches the client) means an invalid request
+ * fails the same way regardless of which path answers it. */
+function validate(role: LlmRole, messages: LlmMessage[]): LlmValidationError | null {
   if (!IMPLEMENTED_ROLES.has(role)) {
     return {
       ok: false,
@@ -78,6 +80,16 @@ export async function complete(
       };
     }
   }
+  return null;
+}
+
+export async function complete(
+  role: LlmRole,
+  messages: LlmMessage[],
+  opts: LlmCompleteOptions = {},
+): Promise<LlmOpResult> {
+  const invalid = validate(role, messages);
+  if (invalid) return invalid;
 
   let client;
   try {
@@ -103,4 +115,50 @@ export async function complete(
     const message = err instanceof LlmClientError ? err.message : (err as Error).message;
     return { ok: false, status: 503, code: "unavailable", error: `chat model unavailable: ${message}` };
   }
+}
+
+export type LlmStreamStartResult =
+  | { ok: true; tokens: AsyncGenerator<string, void, void> }
+  | { ok: false; status: 400 | 503; code: "unsupported_role" | "invalid_input" | "unavailable"; error: string };
+
+/** Real token-by-token streaming (2026-09-04): validates and resolves a
+ * backend synchronously, exactly like complete(), so a bad request or a
+ * down engine still gets a proper HTTP status before any byte streams -
+ * only the actual generation (the `tokens` generator) is where a failure
+ * can no longer change the response status, since by then the caller
+ * (turnEngine.ts's runTurnStream) has already committed to a streaming
+ * response. A mid-stream failure surfaces there as a thrown error from
+ * the generator, not a return value. */
+export async function startCompleteStream(
+  role: LlmRole,
+  messages: LlmMessage[],
+  opts: LlmCompleteOptions = {},
+): Promise<LlmStreamStartResult> {
+  const invalid = validate(role, messages);
+  if (invalid) return invalid;
+
+  let client;
+  try {
+    client = await getChatClient();
+  } catch (err) {
+    return { ok: false, status: 503, code: "unavailable", error: `chat model unavailable: ${(err as Error).message}` };
+  }
+
+  const { thinking, ...rest } = opts;
+  async function* tokens(): AsyncGenerator<string, void, void> {
+    try {
+      for await (const delta of client!.chatCompleteStream({
+        model: "chat",
+        messages,
+        ...rest,
+        chat_template_kwargs: { enable_thinking: !!thinking },
+      })) {
+        yield delta;
+      }
+    } catch (err) {
+      const message = err instanceof LlmClientError ? err.message : (err as Error).message;
+      throw new Error(`chat model unavailable: ${message}`);
+    }
+  }
+  return { ok: true, tokens: tokens() };
 }
