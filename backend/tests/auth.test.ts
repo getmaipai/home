@@ -250,3 +250,144 @@ describe("forwarded-header trust (only behind TRUST_PROXY)", () => {
     expect(setCookie.toLowerCase()).not.toContain("secure");
   });
 });
+
+describe("change-secret (self-service PIN/password change)", () => {
+  test("changes a PIN with the correct current one, and the new one signs in afterward", async () => {
+    const owner = new TestClient();
+    const { person } = await setUpOwner(owner);
+
+    const res = await owner.post("/api/auth/change-secret", {
+      currentSecret: "correcthorse",
+      newSecret: "newpassword123",
+    });
+    expect(res.status).toBe(200);
+
+    const fresh = new TestClient();
+    const signedIn = await fresh.post("/api/auth/verify-secret", {
+      personId: person.id,
+      secret: "newpassword123",
+    });
+    expect(signedIn.status).toBe(200);
+
+    // The old secret must no longer work.
+    const staleClient = new TestClient();
+    const stale = await staleClient.post("/api/auth/verify-secret", {
+      personId: person.id,
+      secret: "correcthorse",
+    });
+    expect(stale.status).toBe(401);
+  });
+
+  test("rejects a wrong current secret and counts the attempt down, same as verify-secret", async () => {
+    const owner = new TestClient();
+    await setUpOwner(owner);
+
+    const res = await owner.post("/api/auth/change-secret", {
+      currentSecret: "wrong",
+      newSecret: "newpassword123",
+    });
+    expect(res.status).toBe(401);
+    const body = (await res.json()) as { attemptsLeft: number };
+    expect(body.attemptsLeft).toBe(4);
+  });
+
+  test("requires currentSecret when a credential already exists", async () => {
+    const owner = new TestClient();
+    await setUpOwner(owner);
+
+    const res = await owner.post("/api/auth/change-secret", { newSecret: "newpassword123" });
+    expect(res.status).toBe(400);
+  });
+
+  test("rejects a too-short new secret before touching the current one", async () => {
+    const owner = new TestClient();
+    await setUpOwner(owner);
+
+    const res = await owner.post("/api/auth/change-secret", {
+      currentSecret: "correcthorse",
+      newSecret: "ab",
+    });
+    expect(res.status).toBe(400);
+  });
+
+  test("a PIN-free profile can set one for the first time with no currentSecret", async () => {
+    const owner = new TestClient();
+    await setUpOwner(owner);
+    const created = await owner.post("/api/people", { displayName: "Bramble", role: "child" });
+    const child = (await created.json()) as { id: string };
+
+    const childClient = new TestClient();
+    const selected = await childClient.post("/api/auth/select", { personId: child.id });
+    expect(selected.status).toBe(200);
+
+    const res = await childClient.post("/api/auth/change-secret", { newSecret: "kidpassword1" });
+    expect(res.status).toBe(200);
+
+    const fresh = new TestClient();
+    const signedIn = await fresh.post("/api/auth/verify-secret", {
+      personId: child.id,
+      secret: "kidpassword1",
+    });
+    expect(signedIn.status).toBe(200);
+  });
+
+  // Real bug, code review 2026-09-04: personCredentials.personId is the
+  // primary key, and the original version branched on a SELECT to decide
+  // INSERT vs UPDATE - two concurrent requests for a PIN-free profile
+  // could both see no record and both attempt an INSERT, the second
+  // throwing a primary-key violation instead of the intended idempotent
+  // "set the PIN" outcome. Fixed with a single atomic upsert
+  // (onConflictDoUpdate); this proves both concurrent requests succeed.
+  test("two concurrent first-time sets for the same PIN-free profile do not race", async () => {
+    const owner = new TestClient();
+    await setUpOwner(owner);
+    const created = await owner.post("/api/people", { displayName: "Bramble", role: "child" });
+    const child = (await created.json()) as { id: string };
+
+    const childClient = new TestClient();
+    await childClient.post("/api/auth/select", { personId: child.id });
+
+    const [first, second] = await Promise.all([
+      childClient.post("/api/auth/change-secret", { newSecret: "kidpassword1" }),
+      childClient.post("/api/auth/change-secret", { newSecret: "kidpassword2" }),
+    ]);
+    expect(first.status).toBe(200);
+    expect(second.status).toBe(200);
+
+    // Whichever write landed last, exactly one of the two secrets works -
+    // not both, and not neither.
+    const triedFirst = await new TestClient().post("/api/auth/verify-secret", {
+      personId: child.id,
+      secret: "kidpassword1",
+    });
+    const triedSecond = await new TestClient().post("/api/auth/verify-secret", {
+      personId: child.id,
+      secret: "kidpassword2",
+    });
+    expect([triedFirst.status, triedSecond.status].sort()).toEqual([200, 401]);
+  });
+
+  test("locks out after five wrong current-secret attempts, even with the right new one", async () => {
+    // Unlike verify-secret's own lockout test, every attempt here has to
+    // come from the SAME authenticated client: change-secret requires
+    // requireAuth, so this is the realistic threat it defends against - a
+    // stolen, already-signed-in session cookie repeatedly guessing the
+    // real PIN, not an anonymous attacker who was never signed in at all.
+    const owner = new TestClient();
+    await setUpOwner(owner);
+
+    for (let i = 0; i < 5; i++) {
+      const res = await owner.post("/api/auth/change-secret", {
+        currentSecret: "wrong",
+        newSecret: "newpassword123",
+      });
+      expect(res.status).toBe(401);
+    }
+
+    const locked = await owner.post("/api/auth/change-secret", {
+      currentSecret: "correcthorse",
+      newSecret: "newpassword123",
+    });
+    expect(locked.status).toBe(429);
+  });
+});

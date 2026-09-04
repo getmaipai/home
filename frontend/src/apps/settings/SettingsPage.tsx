@@ -1,6 +1,7 @@
 import { Page } from "@/kit/primitives/Page";
 import { SettingsRenderer } from "@/kit/settings/SettingsRenderer";
 import { BackupsSection } from "@/apps/settings/BackupsSection";
+import { ChangeSecretSection } from "@/apps/settings/ChangeSecretSection";
 import { isOwnerOrAdminRole, type Roster } from "@/lib/api";
 
 interface SettingsPageProps {
@@ -23,11 +24,10 @@ export function SettingsPage({ person }: SettingsPageProps) {
     <Page title="Settings">
       <div className="flex flex-1 flex-col gap-6 overflow-y-auto">
         <SettingsRenderer scope="household" scopeValue="household" />
-        {canManageBackups ? (
-          <div className="px-4 pb-4">
-            <BackupsSection />
-          </div>
-        ) : null}
+        <div className="flex flex-col gap-6 px-4 pb-4">
+          <ChangeSecretSection person={person} />
+          {canManageBackups ? <BackupsSection /> : null}
+        </div>
       </div>
     </Page>
   );

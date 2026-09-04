@@ -1376,6 +1376,72 @@ set. Full architecture: platform plan chapters 1, 3, and 4.
       per-person memory export (`GET /api/memory/export`, a different
       surface than this browsing page).
 
+- [x] Self-service PIN/password change, the seventeenth slice: 4.1 has had
+      no way for a person to change their own PIN since it shipped - only
+      creation (`POST /api/people`, owner/admin only) and verification.
+      Picked next after building four straight read-then-write pages
+      because it's a real, plain security gap: today, once set, a PIN
+      is permanent for that person's whole lifetime on the hub.
+    - `backend/src/routes/auth.ts`: new `POST /api/auth/change-secret`,
+      self-service only (`requireAuth`'s actor is always the target - no
+      "change someone else's PIN" here, matching `routes/people.ts` having
+      no edit-person route at all yet). Reuses `/verify-secret`'s exact
+      throttle/lockout shape (per-profile exponential backoff and per-IP
+      throttle) for the current-secret check: a stolen session cookie
+      alone must not be enough to silently lock a family member out of
+      their own profile by racing guesses at their current PIN. A
+      PIN-free profile (a child, 4.1's bare-tap case) can set one for the
+      first time with no `currentSecret` at all.
+    - `frontend/src/apps/settings/ChangeSecretSection.tsx`: a new section
+      on the Settings page, visible to *everyone* (not gated to owner/
+      admin like `BackupsSection` - changing your own PIN is a personal
+      action any role can take). Branches its own copy and required
+      fields on `person.hasSecret` (real, current/new/confirm vs. a
+      first-time "choose one," not two versions of the form).
+    - Exercised for real, on Jesse's and Nova's actual profiles - **this
+      changed real credentials on the running dev household**: changed
+      Jesse's PIN from `482913` to `759124` (signed out, confirmed the
+      new one works and the old one no longer does), then set a first
+      PIN (`1234`) for Nova, confirmed the sign-in picker immediately
+      required it where it previously allowed a bare tap, and confirmed
+      it too. 6 new backend tests
+      (`auth.test.ts`'s new `describe("change-secret...")`, including a
+      lockout test using one authenticated client throughout rather than
+      a fresh one per attempt - unlike `/verify-secret`'s own lockout
+      test, this route requires `requireAuth`, so the realistic threat it
+      defends is a stolen already-signed-in session repeatedly guessing
+      the real PIN, not an anonymous unauthenticated attacker).
+    - **A known, accepted gap, not a bug:** the Settings page still shows
+      "doesn't have one yet" immediately after successfully setting a
+      first PIN, in the same session, until the next full page load -
+      `person` is loaded once by `App.tsx` and this page has no way to
+      refresh it. The backend state is real and correct the whole time
+      (confirmed above); only the label is stale for the rest of that
+      one session. Wiring a refresh callback through `Shell`/`App` is
+      real, small, deferred scope, not attempted tonight.
+    - **A `code-review` pass (medium effort) before committing found two
+      real issues in security-sensitive code, both fixed.** A genuine
+      race: the write was a SELECT-then-branch (update if a record
+      exists, insert if not), and `personId` is that table's primary
+      key - two concurrent requests for the same PIN-free profile
+      (a double-submit, or a retry after a slow response) could both see
+      no record and both attempt an INSERT, the second throwing a
+      primary-key violation instead of the intended idempotent "set the
+      PIN" outcome. Fixed with a single atomic `onConflictDoUpdate`
+      upsert; a new regression test fires two real concurrent requests
+      and asserts both succeed, with exactly one of the two secrets
+      ending up valid afterward. Separately, the throttle/lockout/verify/
+      failure-bookkeeping sequence was copied near-verbatim from
+      `/verify-secret` instead of shared - extracted into one
+      `verifyAgainstRecord` helper both routes call, parameterized only
+      by the wrong-secret message each wants to show; `/verify-secret`'s
+      own IP-throttle-before-existence-checks ordering was preserved
+      exactly (the throttle call stays in each route, not folded into the
+      shared helper, specifically so this behavior couldn't drift while
+      extracting it). All 191 pre-existing backend tests plus the new one
+      still pass unchanged, confirming the refactor is behavior-preserving
+      for the untouched route.
+
 ## API routes and `@hono/zod-openapi` (tracked debt)
 
 `getmaipai/CLAUDE.md` > Documentation requires every Hono route to be

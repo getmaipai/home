@@ -84,6 +84,11 @@ export const api = {
       method: "POST",
       body: JSON.stringify({ personId, secret }),
     }),
+  changeSecret: (currentSecret: string | undefined, newSecret: string) =>
+    request<{ success: true }>("/api/auth/change-secret", {
+      method: "POST",
+      body: JSON.stringify({ currentSecret, newSecret }),
+    }),
   me: () => request<Roster>("/api/auth/me"),
   logout: () => request<{ success: true }>("/api/auth/logout", { method: "POST" }),
   conversations: () => request<ConversationTurnRow[]>("/api/conversations"),

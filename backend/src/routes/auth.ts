@@ -1,4 +1,4 @@
-import { Hono } from "hono";
+import { Hono, type Context } from "hono";
 import { getCookie, deleteCookie } from "hono/cookie";
 import { eq, isNull } from "drizzle-orm";
 import { db } from "@/db";
@@ -18,6 +18,52 @@ import { validateDisplayName, validateSecret } from "@/lib/validation";
 import type { AppEnv } from "@/types";
 
 export const auth = new Hono<AppEnv>();
+
+// Shared by /verify-secret and /change-secret: "prove you know this
+// person's current secret" is the identical lockout-check, verify,
+// failure-bookkeeping, success-reset sequence either way. A code review
+// (2026-09-04) found this duplicated near-verbatim between the two the
+// moment a second real consumer (change-secret) needed it - the same
+// "extract on the second consumer" pattern lib/access.ts's own header
+// comment documents. Callers still run their own IP throttleCheck first
+// (not folded in here): verify-secret's real behavior is to check that
+// before even confirming the person/record exist, and change-secret's
+// record-exists branch needs to decide whether to throttle-check at all
+// before this function has anything to verify against.
+async function verifyAgainstRecord(
+  c: Context<AppEnv>,
+  ip: string,
+  personId: string,
+  record: { secretHash: string; lockedUntil: string | null },
+  providedSecret: string,
+  wrongSecretMessage: string,
+): Promise<{ ok: true } | { ok: false; response: Response }> {
+  if (record.lockedUntil && new Date(record.lockedUntil).getTime() > Date.now()) {
+    const retryAfter = Math.ceil((new Date(record.lockedUntil).getTime() - Date.now()) / 1000);
+    return { ok: false, response: c.json({ error: "Too many attempts", retryAfter }, 429) };
+  }
+
+  const valid = await verifySecret(providedSecret, record.secretHash);
+  if (!valid) {
+    throttleFail(ip);
+    // Atomic re-read-and-increment (lib/secret.ts): a code review
+    // (2026-09-04) found an earlier inline `record.failedAttempts + 1`
+    // used a count read before this function's `await` above, so
+    // concurrent requests for the same profile could undercount real
+    // attempts.
+    const { failedAttempts } = recordFailedAttempt(personId);
+    return {
+      ok: false,
+      response: c.json(
+        { error: wrongSecretMessage, attemptsLeft: Math.max(0, LOCKOUT_THRESHOLD - failedAttempts) },
+        401,
+      ),
+    };
+  }
+
+  throttleReset(ip);
+  return { ok: true };
+}
 
 // The profile picker: every non-deleted person, never a secret hash, and
 // never a birthdate (3.1: core-only). Public (unauthenticated) by design,
@@ -149,29 +195,9 @@ auth.post("/verify-secret", async (c) => {
     .get();
   if (!record) return c.json({ error: "No PIN or password set for this profile" }, 400);
 
-  if (record.lockedUntil && new Date(record.lockedUntil).getTime() > Date.now()) {
-    const retryAfter = Math.ceil(
-      (new Date(record.lockedUntil).getTime() - Date.now()) / 1000,
-    );
-    return c.json({ error: "Too many attempts", retryAfter }, 429);
-  }
+  const verified = await verifyAgainstRecord(c, ip, personId, record, secret, "Invalid PIN or password");
+  if (!verified.ok) return verified.response;
 
-  const valid = await verifySecret(secret, record.secretHash);
-
-  if (!valid) {
-    throttleFail(ip);
-    // Atomic re-read-and-increment (lib/secret.ts): a code review
-    // (2026-09-04) found the old inline `record.failedAttempts + 1` used
-    // a count read before this function's `await` above, so concurrent
-    // requests for the same profile could undercount real attempts.
-    const { failedAttempts } = recordFailedAttempt(personId);
-    return c.json(
-      { error: "Invalid PIN or password", attemptsLeft: Math.max(0, LOCKOUT_THRESHOLD - failedAttempts) },
-      401,
-    );
-  }
-
-  throttleReset(ip);
   db.update(personCredentials)
     .set({ failedAttempts: 0, lockedUntil: null, updatedAt: new Date().toISOString() })
     .where(eq(personCredentials.personId, personId))
@@ -189,6 +215,71 @@ auth.get("/me", requireAuth, async (c) => {
     .where(eq(personCredentials.personId, person.id))
     .get();
   return c.json({ ...toRoster(person), hasSecret: !!cred });
+});
+
+// A person changing (or, for a PIN-free profile, first setting) their own
+// PIN or password. Never another person's: routes/people.ts has no
+// edit-person route yet (docs/dev.md's own deferred list), and this
+// isn't that - self-service only, requireAuth's actor is always the
+// target. Reuses /verify-secret's exact throttle/lockout shape (both the
+// per-profile exponential backoff and the per-IP throttle) for the
+// current-secret check: a stolen session cookie alone must not be enough
+// to silently lock a family member out of their own profile by racing
+// guesses at their current PIN.
+auth.post("/change-secret", requireAuth, async (c) => {
+  const actor = c.get("person");
+  const body = (await c.req.json().catch(() => ({}))) as {
+    currentSecret?: string;
+    newSecret?: string;
+  };
+  const newSecret = validateSecret(body.newSecret);
+  if (!newSecret.ok) return c.json({ error: newSecret.error }, 400);
+
+  const record = db
+    .select()
+    .from(personCredentials)
+    .where(eq(personCredentials.personId, actor.id))
+    .get();
+
+  if (record) {
+    if (!body.currentSecret) return c.json({ error: "currentSecret is required" }, 400);
+
+    const ip = getClientIp(c);
+    const throttled = throttleCheck(ip);
+    if (throttled.blocked) {
+      return c.json({ error: "Too many attempts", retryAfter: throttled.retryAfter }, 429);
+    }
+
+    const verified = await verifyAgainstRecord(
+      c,
+      ip,
+      actor.id,
+      record,
+      body.currentSecret,
+      "Current PIN or password is incorrect",
+    );
+    if (!verified.ok) return verified.response;
+  }
+  // else: no existing credential (a PIN-free profile adding one for the
+  // first time) - nothing to verify against.
+
+  const now = new Date().toISOString();
+  const secretHash = await hashSecret(newSecret.value);
+  // A single atomic upsert, not a read-branched insert-or-update: a code
+  // review (2026-09-04) found the earlier version raced on a PIN-free
+  // profile (personId is the primary key) - two concurrent requests with
+  // no currentSecret could both see `record` as absent and both attempt
+  // an INSERT, the second failing with a primary-key violation instead of
+  // the intended idempotent "set the PIN" outcome.
+  db.insert(personCredentials)
+    .values({ personId: actor.id, secretHash, failedAttempts: 0, createdAt: now, updatedAt: now })
+    .onConflictDoUpdate({
+      target: personCredentials.personId,
+      set: { secretHash, failedAttempts: 0, lockedUntil: null, updatedAt: now },
+    })
+    .run();
+
+  return c.json({ success: true });
 });
 
 auth.post("/logout", requireAuth, async (c) => {
