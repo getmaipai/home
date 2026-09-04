@@ -15,20 +15,22 @@
 // a new code.
 //
 // What's real: memory.recall, memory.remember, data.forget, config.get
-// (household scope only), log (with real redaction). Everything else
+// (household scope only), schedule (lib/scheduler.ts, with a known gap,
+// see that call site below), log (with real redaction). Everything else
 // (fetch, home.call_service, integration.call, speak.sentence,
-// llm.complete, camera.still, ocr.read, schedule, files.*, action.emit,
+// llm.complete, camera.still, ocr.read, files.*, action.emit,
 // diagnostics) has no backing service yet (no rate limiter, no Home
 // Assistant link, no LLM role, no turn engine to route actions to, no
-// scheduler, no package file storage) and throws `capability_missing`,
-// checked against the permission it would need first so the error is as
-// specific as it can honestly be. See docs/dev.md's Package Host section
-// for what's deferred and why.
+// package file storage) and throws `capability_missing`, checked against
+// the permission it would need first so the error is as specific as it
+// can honestly be. See docs/dev.md's Package Host section for what's
+// deferred and why.
 import type { Host, FetchOptions, MemoryRecordLike } from "@maipai/spec/emulators/ts/host-emulator.js";
 import { HostError, redactSecrets } from "@maipai/spec/emulators/ts/host-emulator.js";
 import type { PackageManifest } from "@maipai/spec/gen/ts/manifest.js";
 import * as memory from "@/lib/memory";
 import * as settings from "@/lib/settings";
+import { scheduleJob } from "@/lib/scheduler";
 import type { PersonRow } from "@/types";
 
 function mapWriteFailure(status: 400 | 403 | 404, error: string): never {
@@ -172,9 +174,15 @@ export function createHost(actor: PersonRow, manifest: PackageManifest, secrets:
       };
       console.log(JSON.stringify(entry));
     },
-    schedule(_when: string, _job: string): string {
+    // Real, but with a known gap: neither this interface nor the
+    // interpreter's schedule-step handling carries the recipe's input
+    // scope through, so the job re-fires the package with an empty
+    // input scope, not today's inputs. See lib/scheduler.ts's header.
+    schedule(when: string, job: string): string {
       requirePermission("schedule");
-      notImplemented("schedule");
+      const result = scheduleJob(actor, manifest.id, job, when, {});
+      if (!result.ok) mapWriteFailure(result.status, result.error);
+      return result.value.id;
     },
     files: {
       read(path: string): unknown {

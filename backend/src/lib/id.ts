@@ -18,3 +18,10 @@ export function randomSuffix(length: number): string {
 export function newPersonId(): string {
   return `person-${randomSuffix(10)}`;
 }
+
+// Not a spec-shaped id (scheduled jobs aren't a spec 3.1 record type,
+// see lib/scheduler.ts's header comment for why), so no schema pattern
+// to match: just a stable, collision-resistant local id.
+export function newJobId(): string {
+  return `job-${randomSuffix(10)}`;
+}

@@ -107,3 +107,27 @@ export const settingsValues = sqliteTable(
   },
   (table) => [primaryKey({ columns: [table.scope, table.key] })],
 );
+
+// The durable scheduler port (4.7): "one-shot and recurring jobs...
+// persisted, survives restarts." Not a spec 3.1 record type (chapter 3's
+// own record table has no Job entry, and 4.7 doesn't ask for one), so
+// this is hub-internal storage, not a spec/schemas/*.schema.json shape,
+// the same way `sessions` and `id_sequences` are internal. See
+// lib/scheduler.ts for why, and what's deferred (device targets,
+// quiet-hours, the notification system) until this needs to be a spec
+// shape for real robot parity.
+export const scheduledJobs = sqliteTable("scheduled_jobs", {
+  id: text("id").primaryKey(),
+  kind: text("kind").notNull(), // "skill" | "core"
+  packageId: text("package_id").notNull(),
+  job: text("job").notNull(),
+  personId: text("person_id").references(() => people.id),
+  inputs: text("inputs").notNull(),
+  when: text("when").notNull(),
+  recurring: integer("recurring", { mode: "boolean" }).notNull().default(false),
+  nextRunAt: text("next_run_at").notNull(),
+  status: text("status").notNull().default("pending"), // "pending" | "done" | "cancelled"
+  createdAt: text("created_at").notNull(),
+  lastRunAt: text("last_run_at"),
+  lastError: text("last_error"),
+});

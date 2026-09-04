@@ -8,6 +8,31 @@ checklist (`docs/dev.md`); no release has been cut yet.
 ## [Unreleased]
 
 ### Added
+- The scheduler (platform plan 4.7), the sixth slice of hub core: a
+  durable job store (`backend/src/lib/scheduler.ts`, `scheduled_jobs`
+  table) with one-shot and recurring jobs, persisted and surviving
+  restarts, polled every 60s by `backend/src/index.ts`. Backs
+  `host.schedule` for real (previously `capability_missing`) and finally
+  gives `lib/memory.ts`'s maintenance pass a real timer instead of a
+  manual-only trigger: a `memory.maintenance` core job seeds itself
+  idempotently at every boot. New routes: `GET /api/scheduler/jobs`,
+  `POST /api/scheduler/jobs/:id/cancel`, `POST /api/scheduler/run-due`.
+  Scope is deliberately narrower than 4.7's full description: no device
+  target, no quiet-hours policy, no notification-system integration (all
+  need infrastructure that doesn't exist yet), and recurrence is a
+  minimal `every:<n><unit>` grammar, not RRULE. A same-day review found
+  and fixed three real issues: a past one-shot time was silently
+  accepted as immediately due despite the code's own docstring and error
+  message claiming rejection; a recurring job's reschedule advanced from
+  the moment it actually fired rather than from its own due time, which
+  would have permanently drifted a daily job's time-of-day later on
+  every late tick (the fix needed a second pass once tested against a
+  very overdue job, landing on a direct "next aligned slot" calculation
+  rather than catching up one interval at a time); and cancelling a job
+  that had already run could silently flip its status after the fact.
+  Full detail, including the one known gap (a job scheduled from inside
+  a recipe can't carry that recipe's input scope through yet), in
+  `docs/dev.md`.
 - The package host (platform plan 4.9), Tier 0 only, the fifth slice of
   hub core: `backend/src/lib/packageHost.ts` builds a real `host.*`
   implementation per package invocation, backing `memory.recall`/

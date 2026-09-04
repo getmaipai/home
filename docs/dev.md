@@ -401,13 +401,104 @@ set. Full architecture: platform plan chapters 1, 3, and 4.
       this review; documented rather than papered over with a code the
       catalogue doesn't actually support.
     - **Deliberately deferred:** Tier 1 (Deno sandbox, MCP), the rate
-      limiter behind `host.fetch` (4.9/"we are the user"), the scheduler
-      backing `host.schedule` (4.7), package file storage, real
-      `home.call_service`/`integration.call`/`speak`/`llm`/`camera`/`ocr`
-      backing (each needs its own not-yet-built subsystem), the catalog
-      and install flow (packages are read straight off disk from
-      `backend/packages/`), package signing, and the `errors.json`
-      code gap noted above.
+      limiter behind `host.fetch` (4.9/"we are the user"), package file
+      storage, real `home.call_service`/`integration.call`/`speak`/
+      `llm`/`camera`/`ocr` backing (each needs its own not-yet-built
+      subsystem), the catalog and install flow (packages are read
+      straight off disk from `backend/packages/`), package signing, and
+      the `errors.json` code gap noted above. `host.schedule` itself is
+      real as of the next slice below.
+- [x] The scheduler (4.7), the sixth slice of hub core. Picked next for
+      the same reason the package host was: genuinely buildable today
+      (pure logic, a timer, and SQLite; no LLM, no Deno, no Home
+      Assistant link), and it directly unblocks two deferrals already on
+      record: `host.schedule` (packageHost.ts, previously
+      `capability_missing`) and memory maintenance's manual-only trigger
+      (`lib/memory.ts`'s own comment: "no scheduler exists yet... a
+      manually-triggered pass for now").
+    - **Not a spec record.** Chapter 3.1's record type table has no Job
+      entry, and 4.7 doesn't ask for one, so `scheduledJobs` is
+      hub-internal storage (`backend/src/db/schema.ts`), the same way
+      `sessions` and `id_sequences` are, not a new `spec/schemas/*`
+      shape. This may need to become a real spec shape later for robot
+      parity (the robot needs its own scheduler too, per "the robot is
+      complete without a hub"), deferred until `bot` exists as real
+      content to need it.
+    - **Scope, narrower than 4.7's full description, same discipline as
+      every slice this session:** no device target (3.1's Device record
+      doesn't exist), no quiet-hours policy (no settings key declared
+      for one), no notification-system integration (4.13 isn't built; a
+      fired job runs and logs, the way `safety.ts`'s HTTP route stands
+      in for the turn engine). `when`'s "recurrence expression" (the
+      recipe schema's own words) is a deliberately minimal `every:<n>
+      <m|h|d>` grammar (`lib/scheduler.ts`'s `parseWhen`), not RRULE; a
+      one-shot `when` is a plain ISO datetime, and a past one is
+      rejected, not silently treated as "fire immediately."
+    - `lib/scheduler.ts`: `scheduleJob` (persists a "skill" job: re-run
+      a package for a person with saved inputs when `when` fires),
+      `ensureCoreJob` (idempotent, called at every boot to seed the
+      `memory.maintenance` core job), `listJobs`/`cancelJob` (owner/admin
+      see every job, anyone else only their own; cancelling only ever
+      applies to a still-pending job), and `runDueJobs` (fires every
+      pending job whose `nextRunAt` has passed; a recurring job
+      reschedules from its *own* due time, not from when it actually
+      fired, landing on the next slot at or after `now` in one step so a
+      long outage doesn't mean firing once per missed interval to catch
+      up, and never drifts a daily job's time-of-day later just because
+      a tick was late). `index.ts` is the one real entrypoint that seeds
+      the core job and starts a 60s poll calling `runDueJobs`; `app.ts`/
+      routes stay import-only so a test booting the app via Hono's
+      `.request()` never starts a live timer.
+    - A known, documented gap, not silently worked around: neither the
+      `Host` interface's `schedule(when, job)` nor the interpreter's own
+      schedule-step handling carries the recipe's input scope through, so
+      a job scheduled from *within* a recipe re-fires its package with an
+      empty input scope, not the inputs the original call had. Fixing
+      this needs an interpreter-level change (both TS and Python, kept
+      behaviorally identical) out of scope here; a job scheduled directly
+      via `scheduleJob()` (not through a recipe step) doesn't have this
+      limitation, since its caller passes inputs explicitly.
+    - `GET /api/scheduler/jobs`, `POST /api/scheduler/jobs/:id/cancel`,
+      `POST /api/scheduler/run-due` (owner/admin, the same
+      "manual-trigger stand-in" `POST /api/memory/maintenance/run`
+      already established).
+    - Exercised for real: booted the server, confirmed the
+      `memory.maintenance` core job seeds itself on boot, forced it due
+      with a direct SQL update, fired it through the real HTTP route, and
+      confirmed it rescheduled to a real future slot rather than getting
+      stuck near a stale timestamp, in addition to 18 backend tests, all
+      green.
+    - **A `code-review` pass (medium effort) on this slice before
+      committing** found and fixed three real issues, one serious enough
+      that fixing it properly required redesigning the catch-up math, not
+      just patching the reported line: `parseWhen` silently accepted a
+      one-shot time already in the past (scheduling it as immediately
+      due) despite its own docstring and `scheduleJob`'s own error
+      message both claiming rejection: fixed by actually enforcing it.
+      A recurring job's reschedule advanced from `now` (when it actually
+      fired) instead of from its own scheduled `nextRunAt`, which would
+      have permanently pushed a daily job's time-of-day later by however
+      late each tick was: the first fix (advance from `nextRunAt` by one
+      interval) turned out to be incomplete once tested against a very
+      overdue job (the test suite's own "force it due" pattern sets
+      `nextRunAt` to the Unix epoch): advancing one interval at a time
+      from 1970 would take on the order of ten days of continuous 60s
+      polling to catch up to the present. Redesigned to compute the next
+      aligned slot directly (`originalNextRunAt + N * intervalMs` for the
+      smallest `N` landing at or after `now`), which preserves the
+      original time-of-day exactly regardless of how large the gap is.
+      `cancelJob` didn't check a job was still pending, so an
+      already-"done" job could be flipped to "cancelled" after the fact,
+      corrupting the one field an operator or future UI reads to answer
+      "did this actually run." All three have regression tests pinning
+      the fixed behavior, including one that fires a job 3 hours late and
+      asserts the reschedule lands exactly one interval past the
+      *original* due time, not past the moment it fired.
+    - **Deliberately deferred:** device targets, quiet-hours, the
+      notification system (all above), a spec-shaped Job record (until
+      `bot` needs one), the interpreter input-carrying gap (above), and
+      real RRULE-style recurrence (the `every:<n><unit>` grammar is a
+      placeholder).
 
 ## API routes and `@hono/zod-openapi` (tracked debt)
 
