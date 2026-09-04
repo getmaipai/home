@@ -1,6 +1,16 @@
 MaiPai Home
 Third-Party Licenses and Attributions
 
-This is a fresh repo (the platform rebuild, see docs/dev.md). No
-third-party components are bundled yet. When one lands, its attribution
-goes here, per docs/PACKAGES.md in getmaipai/.github.
+This is a fresh repo (the platform rebuild, see docs/dev.md). Attributions
+below cover components bundled into the shipped frontend
+(frontend/src/kit, the shell, the Chat package); backend dependencies are
+server-side only and not redistributed as part of a build artifact.
+
+- React, React DOM (MIT) - https://react.dev
+- Radix UI: react-slot, react-avatar (MIT) - https://www.radix-ui.com
+- lucide-react (ISC) - https://lucide.dev
+- clsx (MIT) - https://github.com/lukeed/clsx
+- tailwind-merge (MIT) - https://github.com/dcastil/tailwind-merge
+
+When another component lands, its attribution goes here, per
+docs/PACKAGES.md in getmaipai/.github.

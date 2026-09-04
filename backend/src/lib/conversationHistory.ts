@@ -27,7 +27,12 @@ import type { Role } from "@/middleware/auth";
 import type { TurnValue, Surface } from "@/lib/turnEngine";
 import type { PersonRow } from "@/types";
 
-export type ConversationTurnRow = typeof conversationTurns.$inferSelect;
+// Defined in @/wire (alias-free, typeof conversationTurns.$inferSelect
+// via a relative import) so a frontend client can import the real row
+// shape through the @maipai/home-backend workspace dependency; re-exported
+// here since this is where callers already look for it.
+import type { ConversationTurnRow } from "@/wire";
+export type { ConversationTurnRow } from "@/wire";
 
 export type ConversationOpResult<T> =
   | { ok: true; value: T }

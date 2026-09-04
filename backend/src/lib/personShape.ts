@@ -32,6 +32,15 @@ export function toRoster(row: PersonRow): Omit<Person, "birthdate"> {
   return roster;
 }
 
+// The exact wire shape routes/auth.ts hands back for every roster entry:
+// toRoster()'s fields plus hasSecret, spread in at the route (`{
+// ...toRoster(person), hasSecret }`). Defined in @/wire (alias-free) so a
+// client (frontend/src/lib/api.ts) can import the real shape through the
+// @maipai/home-backend workspace dependency instead of a hand-duplicated
+// mirror that could silently drift from it; re-exported here since this
+// is where the shape conceptually belongs.
+export type { Roster } from "@/wire";
+
 // The other direction: validate a candidate Person BEFORE it reaches
 // SQLite, the same discipline lib/memory.ts's remember() already uses. A
 // code review (2026-09-04) found routes/people.ts inserting

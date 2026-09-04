@@ -19,8 +19,13 @@ import { tokenize } from "@/lib/text";
 import { logTurn } from "@/lib/conversationHistory";
 import type { Role } from "@/middleware/auth";
 import type { PersonRow } from "@/types";
-import type { SafetyResult } from "@maipai/spec/gen/ts/safety-result.js";
 import type { PackageManifest } from "@maipai/spec/gen/ts/manifest.js";
+// TurnReply/TurnValue moved to @/wire (alias-free, so a frontend client
+// can import the real shape through the @maipai/home-backend workspace
+// dependency instead of a hand-duplicated mirror); re-exported here since
+// this is where callers already look for them.
+import type { TurnValue } from "@/wire";
+export type { TurnReply, TurnValue } from "@/wire";
 
 // 4.5 names six surfaces (chat, overlay, pod, robot, tv, phone), each
 // changing memory sensitivity, discretion and presentation. Only `chat`
@@ -29,22 +34,6 @@ import type { PackageManifest } from "@maipai/spec/gen/ts/manifest.js";
 // llm.ts's IMPLEMENTED_ROLES, not silently missing.
 export type Surface = "chat" | "overlay" | "pod" | "robot" | "tv" | "phone";
 const IMPLEMENTED_SURFACES: ReadonlySet<Surface> = new Set(["chat"]);
-
-export interface TurnReply {
-  text: string;
-  speech?: string;
-}
-
-export interface TurnValue {
-  reply: TurnReply;
-  source: "safety_refuse" | "skill" | "skill_error" | "model";
-  skill_id?: string;
-  safety: SafetyResult;
-  /** 4.3: "offer, never block." Set only on allow_with_resources, kept
-   * separate from `reply` so a surface can present it alongside the
-   * answer rather than have it silently reshape the model's own words. */
-  crisis_resources?: string;
-}
 
 export type TurnOpResult =
   | { ok: true; value: TurnValue }

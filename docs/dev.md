@@ -873,6 +873,134 @@ set. Full architecture: platform plan chapters 1, 3, and 4.
       drill wired into the release skill (no release has been cut); an
       HTTP restore route (above).
 
+- [x] The shell, kit, and Chat package (chapter 6, **split, not full**), the
+      eleventh slice of hub core. Chapter 6 describes a full cross-platform
+      shell (SwiftUI targets too), a complete pattern catalog, a generic
+      `UiNode` interpreter, Module Federation, TV/kids adaptation, i18n
+      catalog infrastructure, and PWA polish: too large for one slice, the
+      same reasoning 4.5 and 4.11 needed splitting (confirmed after
+      re-reading chapter 6 in full). Split into a real web shell, the kit
+      primitives Chat actually needs, and a real hand-built Chat page
+      against the live backend this pass; the generic interpreter and
+      everything cross-platform later, a judgment call made overnight
+      without Jesse (asleep, "keep building, make the decisions for me").
+    - `frontend/` (new workspace member): Vite + React 19 + TypeScript,
+      Tailwind v4 via `@tailwindcss/vite`, per `STACK.md`. `src/kit/` is
+      `@maipai/ui`-to-be, kept in-repo for now rather than its own
+      workspace package or catalog entry - extraction is real work that
+      only pays off once a second consumer (Companions, Videos) exists:
+      `tokens.css` (light/dark via `prefers-color-scheme` plus a
+      `data-theme` override nothing sets yet; Home's real cyan accent
+      from `.github/brand/README.md`'s per-product table, not a guessed
+      color), `icons.ts` (the lucide name -> component registry
+      `docs/UI.md` requires - "icons: lucide only, by name"), `components/`
+      (hand-written `Button`/`Input`/`Avatar` matching shadcn/ui's usual
+      API rather than the shadcn CLI's network fetch mid-session - a
+      drop-in swap later, not an API change), `primitives/` (`Page`,
+      `Section`, `EmptyState`, `Progress`, `MessageThread`, `Form`: the six
+      v0 `spec/ui/schema.json` node kinds Chat needs).
+    - **`MessageThread` carries the one real hard-won technique reused
+      from the legacy hub tonight (principle 8):** follow new messages to
+      the bottom only while the person hasn't scrolled up to read
+      something earlier, so a reply arriving mid-scrollback doesn't yank
+      them back down. The legacy resumable-SSE-reconnect technique was
+      **not** reused: this backend's turn engine is single-shot JSON, not
+      streaming, so there is nothing yet to resume.
+    - **Real sign-in** (`src/shell/SignIn.tsx`), hand-built (not yet a
+      declared page - v0 of `spec/ui` only covers Chat): the
+      `GET /api/auth/profiles` picker, first-run `POST /api/auth/setup`,
+      and `POST /api/auth/select`/`POST /api/auth/verify-secret` for
+      everyone else, including the lockout/back path.
+    - **Real Chat page** (`src/apps/chat/ChatPage.tsx`): loads
+      `GET /api/conversations` on mount, maps each row to two thread
+      entries (`mapRows.ts`, tested - `ConversationTurnRow` is one row per
+      turn, `message_thread` wants one sender+text per entry), submits via
+      `POST /api/turn`, appends the real `TurnValue` reply, and surfaces
+      `crisis_resources` alongside the reply, never in place of it,
+      matching 4.3's "offer, never block" (`turnEngine.ts`'s own field
+      comment).
+    - **Fixed `spec/ui/pages/chat.json`'s routes to match the real
+      backend:** it was written against `/api/chat/turns`,
+      `/api/chat/send`, `/api/chat/status`, `/api/chat/suggestions`, none
+      of which the backend serves. Now binds to the real
+      `/api/conversations` and `/api/turn`; `spec/ui/README.md` documents
+      the fix and that this is still only a conformance fixture, not
+      something a runtime interpreter reads (below).
+    - **Backend: `serveStatic` added to `app.ts`**, mounted after every
+      `/api/*` route so it can never shadow one, serving `frontend/dist`
+      when built - a single self-hosted process in production, no reverse
+      proxy required. Dev instead uses Vite's own proxy
+      (`frontend/vite.config.ts`) so the browser only ever sees one
+      origin, matching the session cookie's `SameSite=Strict` and the CSRF
+      Origin check (`middleware/auth.ts`) without configuring CORS, which
+      does not exist anywhere in this backend.
+    - Exercised for real: booted the backend and the Vite dev server and
+      drove the whole thing in a real browser - first-run owner setup,
+      sign-out, profile-picker + PIN sign-in, a real chat turn against the
+      stub model, a page reload confirming history persists via
+      `GET /api/conversations` - screenshotted at each step, no console
+      errors, plus the production `serveStatic` path (built
+      `frontend/dist`, confirmed `/` serves it and an unknown `/api/*`
+      path still 404s rather than falling through to the SPA shell), in
+      addition to 4 new frontend tests (`mapRows.test.ts`) and the
+      existing 185 backend + 93 spec tests, all green
+      (`scripts/check.sh`, extended tonight with a frontend
+      typecheck/test/build section).
+    - **Two `code-review` passes (medium effort) before committing**
+      found five real, confirmed issues, all fixed. A failed send used to
+      leave the optimistic bubble looking sent with nothing telling the
+      person it never reached the backend (`MessageThread`'s new `failed`
+      flag, verified live: killed the backend mid-send, confirmed the
+      bubble marks itself "Not sent," restarted the backend, confirmed
+      recovery). A failed history load rendered the same empty state as a
+      genuinely new household (`ChatPage.tsx`'s `loadError` state and
+      retry button; type-checked and reviewed, not separately
+      live-clicked - the failed-send path above exercises the same UI
+      pattern for real). `Roster`/`TurnValue`/`ConversationTurnRow` were
+      hand-duplicated in `api.ts` instead of imported, a real "one
+      definition, one place" violation; fixed by adding
+      `backend/src/wire.ts`, an alias-free module (no `@/...` imports, so
+      `frontend`'s own tsconfig can resolve it through the new
+      `@maipai/home-backend` workspace dependency) that `turnEngine.ts`,
+      `conversationHistory.ts`, and `personShape.ts` now re-export from
+      rather than defining inline. `serveStatic` was gated on an
+      `existsSync()` read at import time, so a backend started before
+      `frontend/dist` existed would 404 forever even after the frontend
+      finished building; fixed to check per request and cache
+      `index.html`'s content once found rather than re-reading it every
+      time. `chat.json`'s `sender_field`/`text_field` still described
+      `TurnValue`'s shape after the route fix, not the flat
+      `ConversationTurnRow` `/api/conversations` actually returns, and
+      more fundamentally can't: one row is a whole turn, `message_thread`
+      renders one sender+text per item, and no field rename closes that
+      gap (`spec/ui/README.md` now documents this as the reason the
+      fixture stays a conformance-only reference, not something a future
+      interpreter could execute as-is). A stray NOTICE gap (five new
+      shipped runtime dependencies, unlisted) and seven em dashes in new
+      comments (`.github/CLAUDE.md`'s writing-style rule) were also
+      caught and fixed.
+    - **Deliberately deferred, real chapter 6 scope not attempted:** the
+      generic `UiNode`-tree interpreter (pages stay hand-built React
+      against the kit primitives; a safe generic renderer with
+      conditions/bindings/five action kinds is its own slice); streaming
+      UI (the turn engine is single-shot; `chat.json`'s `stream` flag is
+      `false` until it isn't); the Module Federation escape hatch; SwiftUI
+      targets (iPhone, Apple TV); TV and kids-preset adaptation; the full
+      pattern catalog (chapter 6 names GOV.UK/Material 3/WCAG/tvOS/Alexa
+      references for dozens of patterns; only what Chat needed got built);
+      i18n catalog infrastructure; PWA polish beyond a basic manifest (icon
+      sizes beyond the one master PNG, an offline page, install-hint
+      handling); a router (one page exists; add `react-router-dom` -
+      installed, then removed tonight as unused - the moment a second one
+      does); light mode was implemented but not screenshotted (this
+      session's browser defaulted to dark; the token CSS covers both, only
+      one was visually verified).
+    - **A gap left for a future session, not guessed at:** the settings
+      registry (`docs/SETTINGS.md`, `spec/settings/keys.json`) already
+      exists server-side and has no UI at all; chapter 6's generic
+      settings renderer is real, separate scope from tonight's Chat-only
+      slice.
+
 ## API routes and `@hono/zod-openapi` (tracked debt)
 
 `getmaipai/CLAUDE.md` > Documentation requires every Hono route to be

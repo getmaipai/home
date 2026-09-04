@@ -43,6 +43,17 @@ if [ -d backend/src ]; then
   (cd backend && bun test)
 fi
 
+if [ -d frontend/src ]; then
+  echo "== frontend: bun test"
+  (cd frontend && bun test)
+
+  # build's own script is "tsc --noEmit && vite build" (frontend/package.json):
+  # one step covers both the typecheck and the real compile, so there is no
+  # separate typecheck line here the way backend has one.
+  echo "== frontend: build (includes typecheck)"
+  (cd frontend && bun run build >/dev/null)
+fi
+
 STANDARDS_DIR="${MAIPAI_STANDARDS_DIR:-../.github}"
 if [ ! -d "$STANDARDS_DIR/standards" ]; then
   echo "missing @maipai/standards checkout at $STANDARDS_DIR (pin std-v0.2.0)"

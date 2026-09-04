@@ -38,3 +38,44 @@ pattern components the Videos and Music pages need do not exist here yet.
 Platform plan 6.2 calls out Chat, Videos, and Music as the three hardest
 pages to express and says to time-box each in turn, not invent primitives
 ahead of need; this file follows that.
+
+## `pages/chat.json` describes the real backend, but nothing executes it yet
+
+Originally written against placeholder routes (`/api/chat/turns`,
+`/api/chat/send`, `/api/chat/status`, `/api/chat/suggestions`) that never
+existed. Fixed (`home/docs/dev.md`'s shell/kit/Chat slice) to the real
+routes the backend actually serves: `message_thread` binds to
+`GET /api/conversations` (`stream: false` - the turn engine is single-shot
+JSON today, not the incremental `turn.token` delivery 7.2 describes; flip
+this back to `true` once it is), and the form's `on_submit` calls
+`POST /api/turn` with `text`, not `message`. The `progress` node's `bind`
+was dropped rather than pointed at a route: there is no separate status
+poll, a turn's in-flight state is derived from the pending request itself.
+
+**`sender_field`/`text_field` are honest about what exists, not about
+what a real Chat page renders.** A first fix (caught by code review,
+2026-09-04) left them as `speaker.display_name`/`reply.text` - fields
+that describe `TurnValue`'s shape, not what `GET /api/conversations`
+actually returns. The real rows (`backend/src/wire.ts`'s
+`ConversationTurnRow`) are flat: `personId`, `userText`, `replyText`, no
+`speaker` or `reply` object anywhere. They're now `personId`/`replyText`,
+which at least resolve to real fields, but this does not make the fixture
+executable: **one `ConversationTurnRow` is a whole turn (a person's
+message and MaiPai's reply together), while `message_thread` renders one
+sender+text pair per bound item.** No field-path fix closes that gap; it
+needs either a richer schema shape (a row expanding to two rendered
+items) or a backend endpoint that already returns one entry per message.
+Neither exists, and inventing either tonight would be exactly the kind of
+generic-interpreter scope this file already defers. The frontend's real
+mapping (`frontend/src/apps/chat/mapRows.ts`, tested) does the one-row-
+to-two-messages expansion directly in code instead.
+
+This file is still only a conformance fixture (`spec/tests/ts/ui-schema.test.ts`
+validates its shape against `schema.json`), not something a renderer reads
+at runtime: the frontend's actual Chat page
+(`frontend/src/apps/chat/ChatPage.tsx`) is hand-written directly against
+the kit primitives to match this shape, because a generic `UiNode`-tree
+interpreter (bindings, conditions, the five action kinds) doesn't exist
+yet. Building one is real, separate scope - `docs/dev.md` tracks it as a
+deferred slice, the same category of gap as the turn engine's tier-2
+tool-calling deferral.
