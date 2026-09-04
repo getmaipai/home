@@ -184,3 +184,15 @@ See platform plan chapter 13. Order: Hub v0.1 ("the family can chat"),
 Hub v0.2 ("media and the store"), Hub v0.3 ("voice, devices, the link"),
 then Robot v0.1 once spec v0.1 exists, then Go once three default packages
 have schema pages.
+
+## Notes for later
+
+Not actionable yet; captured here so the reason for a choice isn't lost
+between now and when the relevant piece gets built.
+
+- **TTS candidates for the voice sidecar (4.11, `spec/voice/`, lands with
+  Hub v0.3):** Jesse wants Chatterbox Turbo evaluated for the hub and
+  Chatterbox Nano for the robot, alongside Piper (the current `STACK.md`
+  default for non-English voices) and sherpa-onnx's built-in options, when
+  voice work starts. No decision made yet: this is an item to put in the
+  eval, not a chosen engine.
