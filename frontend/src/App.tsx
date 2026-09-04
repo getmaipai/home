@@ -4,6 +4,7 @@ import { SignIn } from "@/shell/SignIn";
 import { Shell } from "@/shell/Shell";
 import { ChatPage } from "@/apps/chat/ChatPage";
 import { SettingsPage } from "@/apps/settings/SettingsPage";
+import { PeoplePage } from "@/apps/people/PeoplePage";
 import { Progress } from "@/kit/primitives/Progress";
 import { api, type Roster } from "@/lib/api";
 
@@ -38,6 +39,7 @@ export function App() {
       <Shell person={person} onSignOut={() => api.logout().finally(() => setPerson(null))}>
         <Routes>
           <Route path="/" element={<ChatPage person={person} />} />
+          <Route path="/people" element={<PeoplePage person={person} />} />
           <Route path="/settings" element={<SettingsPage />} />
         </Routes>
       </Shell>

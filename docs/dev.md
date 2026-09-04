@@ -1132,6 +1132,63 @@ set. Full architecture: platform plan chapters 1, 3, and 4.
       (`SettingsRenderer` only refetches on mount and after its own
       writes).
 
+- [x] A People page (4.2, **split, not full**), the thirteenth slice of
+      hub core, picked next because `routes/people.ts` (identity/people,
+      the very first hub-core slice) had full roster read/create with no
+      UI at all - the sign-in picker only ever showed whoever
+      `POST /api/auth/setup` created. Full scope (edit a person, delete/
+      deactivate, birthdate and age-band, avatar customization, device
+      list) needs routes this backend doesn't have yet - `routes/
+      people.ts`'s own comment says so explicitly ("no route in this
+      slice deletes or changes a person's role after creation") - so
+      there's nothing to build an edit flow against; this pass is list +
+      add, the two operations that exist.
+    - `frontend/src/apps/people/`: `roles.ts` (pure, tested) holds
+      `ROLE_LABELS`, `requiresSecret` (mirrors 4.1's "an owner or admin
+      profile requires a secret" exactly), and `creatableRoles` -
+      **a real, acknowledged duplication**: `routes/people.ts`'s
+      `CREATABLE_BY` (only an owner may create another owner or admin) is
+      copied here for the picker's shown options only, nothing links the
+      two, and the server re-checks on every `POST` regardless of what
+      the picker offers, so a mismatch means a rejected role with a real
+      error message, never a security gap. A "what can I create"
+      capability endpoint would remove the duplication; noted as a real
+      gap rather than built tonight. `PeoplePage.tsx` lists the roster
+      (`GET /api/people`) and, only for an owner or admin
+      (`canManagePeople`), a hand-built add-person form - not the kit's
+      `Form` primitive, which is shaped for Chat's one-field composer,
+      not a multi-field structured form with a conditional PIN field.
+    - Exercised for real, and this one is a genuine cross-feature
+      integration proof, not just its own page in isolation: added a real
+      child profile ("Nova") as the owner, confirmed she appeared
+      immediately in the sign-in picker with the bare-tap flow a
+      secret-free profile gets (4.1), signed in as her, confirmed her
+      Chat history is genuinely her own (empty, not Jesse's - proves
+      `lib/access.ts`'s per-person scoping through the whole stack, not
+      just the API), and confirmed the "Add someone" section correctly
+      does not render for a child (`canManagePeople` gating the read
+      side too, not just blocking the POST). 3 new frontend tests
+      (`roles.test.ts`), no backend changes needed - `routes/people.ts`
+      already did everything this page needed. No console errors.
+    - **A `code-review` pass (medium effort) before committing found one
+      real issue:** the role picker showed raw slugs ("owner", "child")
+      instead of the `ROLE_LABELS` the roster list two lines above
+      already used. Fixed generically rather than one-off: `kit/
+      components/Select.tsx` gained an optional `getLabel` prop
+      (defaulting to identity, so `SettingsRenderer`'s existing
+      `en-US`/`en-GB` usage needed no change) instead of a People-page-
+      specific patch, so the next selector with a value/label split
+      inherits the fix instead of reinventing it. Re-verified live: the
+      trigger and the open list both show "Adult"/"Child"/etc. now, and
+      Settings' locale picker is unaffected.
+    - **Deliberately deferred, real 4.2 scope not attempted:** edit/
+      delete/deactivate a person (no route); the capability endpoint
+      above; birthdate and age-band display (core-only per 3.1, and this
+      page never asked for it); avatar customization beyond the
+      deterministic initials fallback (3.1, deferred since the shell/kit/
+      Chat slice); a device list (4.2 names it, nothing tracks a device
+      as its own entity yet).
+
 ## API routes and `@hono/zod-openapi` (tracked debt)
 
 `getmaipai/CLAUDE.md` > Documentation requires every Hono route to be

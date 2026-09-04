@@ -1,4 +1,4 @@
-import { MessageCircle, Send, LogOut, User, Loader2, HelpCircle, Settings, type LucideIcon } from "lucide-react";
+import { MessageCircle, Send, LogOut, User, Users, Loader2, HelpCircle, Settings, type LucideIcon } from "lucide-react";
 
 // docs/UI.md: "Icons: lucide only, by name... no other icon set." The kit
 // owns the name -> component registry so app code (and, later, JSON page
@@ -10,6 +10,7 @@ const REGISTRY: Record<string, LucideIcon> = {
   send: Send,
   "log-out": LogOut,
   user: User,
+  users: Users,
   loader: Loader2,
   settings: Settings,
 };

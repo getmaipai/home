@@ -6,11 +6,17 @@ interface SelectProps {
   value: string;
   onValueChange: (value: string) => void;
   options: string[];
+  /** Maps an option's raw value to what's shown for it. Defaults to the
+   * raw value itself (fine for household.locale's "en-US"/"en-GB", which
+   * are already display strings); a code review (2026-09-04) found the
+   * People page's role picker showing raw slugs ("owner", "child") this
+   * way instead of the ROLE_LABELS the rest of that page already uses. */
+  getLabel?: (value: string) => string;
   disabled?: boolean;
   "aria-label": string;
 }
 
-export function Select({ value, onValueChange, options, disabled, ...rest }: SelectProps) {
+export function Select({ value, onValueChange, options, getLabel = (v) => v, disabled, ...rest }: SelectProps) {
   return (
     <RadixSelect.Root value={value} onValueChange={onValueChange} disabled={disabled}>
       <RadixSelect.Trigger
@@ -46,7 +52,7 @@ export function Select({ value, onValueChange, options, disabled, ...rest }: Sel
                 <RadixSelect.ItemIndicator className="absolute left-2 inline-flex items-center">
                   <Check className="h-4 w-4" aria-hidden />
                 </RadixSelect.ItemIndicator>
-                <RadixSelect.ItemText>{opt}</RadixSelect.ItemText>
+                <RadixSelect.ItemText>{getLabel(opt)}</RadixSelect.ItemText>
               </RadixSelect.Item>
             ))}
           </RadixSelect.Viewport>

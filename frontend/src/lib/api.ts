@@ -1,6 +1,15 @@
 import type { SafetyResult } from "@maipai/spec/gen/ts/safety-result.js";
 import type { SettingsKey } from "@maipai/spec/gen/ts/settings-key.js";
+import type { Person } from "@maipai/spec/gen/ts/person.js";
 import type { Roster, TurnValue, ConversationTurnRow, ResolvedSetting } from "@maipai/home-backend/src/wire";
+
+// GET /api/people (routes/people.ts) returns toRoster()'s output directly
+// - the same Omit<Person, "birthdate"> shape Roster wraps, minus
+// Roster's own hasSecret (that field only exists on /api/auth/profiles'
+// response, added by that route, not toRoster() itself). Derived from
+// the real spec type rather than hand-listing fields again.
+export type PersonRosterEntry = Omit<Person, "birthdate">;
+export type Role = Person["role"];
 
 // Real backend types, imported from @/wire (not hand-duplicated): a code
 // review (2026-09-04) flagged an earlier version of this file for
@@ -85,5 +94,11 @@ export const api = {
     request<ResolvedSetting>("/api/settings/reset", {
       method: "POST",
       body: JSON.stringify({ scope, key }),
+    }),
+  people: () => request<PersonRosterEntry[]>("/api/people"),
+  createPerson: (input: { displayName: string; role: Role; secret?: string }) =>
+    request<PersonRosterEntry>("/api/people", {
+      method: "POST",
+      body: JSON.stringify(input),
     }),
 };
