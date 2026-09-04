@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 import { api, ApiError, type Roster } from "@/lib/api";
 import { Button } from "@/kit/components/Button";
 import { Input } from "@/kit/components/Input";
@@ -21,6 +21,13 @@ export function SignIn({ onSignedIn }: SignInProps) {
   const [newSecret, setNewSecret] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  // A PIN-style auto-submit that came back wrong must not keep re-firing
+  // on every later keystroke - see the auto-submit effect below for why.
+  // Reset whenever a different profile is selected (a fresh attempt).
+  const autoSubmitDisabledRef = useRef(false);
+  useEffect(() => {
+    autoSubmitDisabledRef.current = false;
+  }, [selected]);
 
   useEffect(() => {
     api
@@ -28,6 +35,35 @@ export function SignIn({ onSignedIn }: SignInProps) {
       .then(setProfiles)
       .catch((e: unknown) => setError(e instanceof Error ? e.message : "Could not reach the hub"));
   }, []);
+
+  // Phone-lock-style auto-submit (Jesse, 2026-09-04): a 4-digit numeric
+  // PIN submits itself the instant the 4th digit lands, no separate tap.
+  // Scoped tightly on purpose - only fires for a value that's ALL digits
+  // at EXACTLY 4 characters, so a household member with a longer PIN or a
+  // real alphanumeric password is never cut off mid-entry; they just keep
+  // typing and press Sign in as before, exactly like today. Must live up
+  // here with the other hooks, above every conditional `return` below -
+  // React's rules of hooks, not just style (a first pass that put this
+  // after the early returns crashed with "Rendered more hooks than
+  // during the previous render" the moment profiles finished loading).
+  //
+  // At most one auto-fire per selected profile, full stop - the ref flips
+  // the instant this decides to fire, before the request even goes out,
+  // not just on a later failure. A real bug caught live in this file's own
+  // test: on SUCCESS, `secret` is never cleared and `busy` cycles back to
+  // false once the request resolves, so a version that only disabled
+  // itself on failure re-ran this effect and fired again, forever, in an
+  // infinite loop - normally hidden because a real app's onSignedIn()
+  // unmounts this component almost immediately, which is exactly the kind
+  // of "works by accident, breaks the moment that assumption changes"
+  // fragility worth closing here instead of relying on.
+  useEffect(() => {
+    if (!selected || busy) return;
+    if (autoSubmitDisabledRef.current) return;
+    if (!/^\d{4}$/.test(secret)) return;
+    autoSubmitDisabledRef.current = true;
+    void handleSecretSubmit();
+  }, [secret, selected, busy]);
 
   if (error) {
     return (
@@ -59,8 +95,8 @@ export function SignIn({ onSignedIn }: SignInProps) {
     }
   }
 
-  async function handleSecretSubmit(e: FormEvent) {
-    e.preventDefault();
+  async function handleSecretSubmit(e?: FormEvent) {
+    e?.preventDefault();
     if (!selected) return;
     setBusy(true);
     setError(null);
@@ -68,6 +104,11 @@ export function SignIn({ onSignedIn }: SignInProps) {
       await api.verifySecret(selected.id, secret);
       onSignedIn();
     } catch (e) {
+      // Whether this call came from the auto-submit effect (which already
+      // flipped autoSubmitDisabledRef before calling this) or a manual
+      // Sign-in click, a wrong PIN just shows the error - manual Sign-in
+      // keeps working normally either way, same as before this feature
+      // existed.
       setError(e instanceof ApiError ? e.message : "Sign-in failed");
     } finally {
       setBusy(false);
