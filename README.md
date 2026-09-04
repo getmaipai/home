@@ -7,18 +7,46 @@
 
 <h3 align="center">A private, self-hosted AI hub for families.</h3>
 
-<p align="center">Documentation · <a href="https://github.com/getmaipai/home/releases">Releases</a></p>
+<p align="center"><a href="docs/dev.md">Documentation</a> · <a href="https://github.com/getmaipai/home/releases">Releases</a></p>
 
 Your own AI, music, videos, podcasts, maps, books, and more, on your own
 hardware, online or offline, for protection, privacy, and independence.
+Nothing leaves your house.
+
+<p align="center">
+  <img src="docs/assets/hero.png" alt="Chat, People, and Settings running in a browser, dark theme">
+</p>
+
+## Features
+
+- **Chat**: talk with your own AI, running entirely on your hardware.
+- **People**: a real household roster with PIN/password sign-in per person,
+  including kid-safe profiles that need no password at all.
+- **Settings**: household preferences like conversation retention and
+  language, changed live, no restart.
+
+## Getting started
+
+No packaged installer yet: MaiPai Home is pre-alpha and only runs from
+source today. With [Bun](https://bun.sh) installed:
+
+```
+git clone https://github.com/getmaipai/home.git
+cd home && bun install
+cd frontend && bun run build && cd ../backend && bun run start
+```
+
+The hub listens on `http://localhost:8787`. The first person who signs in
+becomes the household owner.
 
 ## Status
 
-Fresh rebuild in progress. This repo was reset to a clean history on
-2026-09-03 to start over on the platform design (see
-[docs/dev.md](docs/dev.md)); nothing runs yet. The prior version ran a
-household daily for months and is preserved locally as a reference,
-never as a requirement of what gets rebuilt.
+Pre-alpha. The shell, sign-in, a household roster, Chat, and basic
+settings are real and running end to end, verified in a real browser
+against the real backend - but nothing is deployed to a real household
+yet, and Chat answers with a placeholder until you point it at a real
+local model. See [docs/dev.md](docs/dev.md) for exactly what's built and
+what's deliberately deferred.
 
 ## Development
 

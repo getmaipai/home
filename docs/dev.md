@@ -1189,6 +1189,83 @@ set. Full architecture: platform plan chapters 1, 3, and 4.
       Chat slice); a device list (4.2 names it, nothing tracks a device
       as its own entity yet).
 
+- [x] A real README and its screenshot pipeline (`STYLE.md`'s README
+      skeleton and platform screenshot pipeline), the fourteenth slice,
+      picked next because the README's own `dev.md` line said so
+      explicitly: "needs the full org skeleton... once there is a running
+      app to screenshot" - and by tonight there was one.
+    - `scripts/screenshot.ts` (new root script, `bun run screenshots`):
+      builds the frontend, boots a throwaway backend on a temp port
+      pointed at a temp `MAIPAI_DATA_DIR` (never Jesse's real dev data,
+      confirmed untouched afterward), seeds a small demo household
+      through the real API (persona-roster names only - Sage/owner,
+      Marlow/teen, Nova/child - `.github/CLAUDE.md` > Privacy), drives a
+      real headless Chromium to the People page, and writes
+      `docs/assets/hero.png`. Opened and reviewed the actual image before
+      using it anywhere, per the org's mandatory screenshot rule.
+    - **Scope for tonight, not the full pipeline**: `STYLE.md` describes
+      fixed viewports for phone/tablet/desktop/TV/Apple sizes, three
+      themes (light/dark/high contrast), and a vision-model pass that
+      reviews every shot and writes a verdict into a per-shot manifest -
+      building all of that is its own slice. This is one viewport
+      (1280x800), one theme (dark, the only one this session ever
+      verified live), one shot, reviewed by a person (this session)
+      reading the image, not a vision-model pass.
+    - **The hero shot is People, not Chat, and that was a deliberate
+      call:** this dev machine has no real GGUF configured (`docs/dev.md`
+      > the chat model role slice), so a Chat screenshot today would show
+      the stub model's `[stub model: no real model loaded...]` reply -
+      honest, but not representative of the product's actual promise.
+      People needs no model to look and be completely real.
+    - **Two real bugs found getting the script working, both genuine
+      Bun-specific findings, not app bugs:** Playwright's own
+      `context.request` (its built-in HTTP client, meant to share a
+      cookie jar with the browser) throws `"/api/auth/setup" cannot be
+      parsed as a URL` inside `playwright-core`'s own `Set-Cookie`
+      parsing when run under Bun instead of Node - worked around by
+      seeding through Bun's native `fetch` instead and handing the
+      resulting session cookie to the browser context by hand via
+      `context.addCookies`. Separately, `page.getByText("Household")` is
+      ambiguous by Playwright's own case-insensitive substring matching
+      (it also matches "Loading household" and the "Add to household"
+      button); switched to `getByRole("heading", {name: "Household"})`,
+      the one element that only exists once real data has actually loaded
+      - the fix that matters for "never screenshot a loading state," not
+      just a selector nit.
+    - README.md rewritten to the real skeleton: the logo (unchanged), a
+      features list (three real ones - Chat, People, Settings - not
+      padded to the skeleton's 10-15 ceiling), an honest "no packaged
+      installer yet" getting-started with the real from-source commands,
+      the hero screenshot, and a status line that says plainly this runs
+      in dev, verified live, but isn't deployed to a real household yet.
+      Documentation links point at `docs/dev.md` only: no user-tier docs
+      site or generated API explorer exists for this fresh repo yet (the
+      tracked `@hono/zod-openapi` debt above is exactly why the API tier
+      has nothing to link to).
+    - Exercised for real: ran `bun run screenshots` clean end to end
+      after both fixes, confirmed the real dev backend on port 8787
+      (Jesse's actual data) was never touched, `scripts/check.sh` green
+      including the prose lint - which caught a real, non-obvious gotcha
+      of its own: markdown's image syntax (a leading bang before the
+      bracketed alt text) trips the literal-exclamation-point rule, which
+      is almost certainly why every
+      other repo's README already uses an HTML `<img>` tag for its logo
+      instead of markdown image syntax; the hero screenshot now does the
+      same.
+    - **A `code-review` pass (medium effort) before committing found one
+      real issue:** `chromium.launch()`'s browser was only closed on the
+      success path; any error after launch (a slow render, a selector
+      that never appears) skipped `browser.close()` while the backend
+      still got killed in `finally`, leaving an orphaned headless
+      Chromium process on a failed run. Fixed by declaring `browser`
+      before the `try` and closing it in `finally` too. Re-ran the whole
+      script clean afterward and confirmed no leftover Chromium process.
+    - **Deliberately deferred:** the rest of the platform screenshot
+      pipeline (other viewports, other themes, the vision-model review
+      pass, per-shot manifests); user-tier and API-tier docs (nothing
+      exists to link to yet); re-running screenshots automatically as
+      part of a release (the release skill's drift check, not built).
+
 ## API routes and `@hono/zod-openapi` (tracked debt)
 
 `getmaipai/CLAUDE.md` > Documentation requires every Hono route to be
