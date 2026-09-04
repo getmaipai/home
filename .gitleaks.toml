@@ -1,0 +1,43 @@
+title = "MaiPai Home gitleaks config"
+
+# Extends gitleaks' own default rule set (no rules redefined here) - this
+# file exists only to skip paths, never to weaken detection.
+[extend]
+useDefault = true
+
+# `gitleaks dir` scans the real filesystem, not git, so it has no idea
+# .gitignore exists and re-scans every gitignored byte on every commit
+# regardless. Found live (2026-09-04, Jesse: "the gitleaks seems to take
+# a ton of time"): `data/models/` alone (the downloaded Qwen3 GGUF,
+# multi-GB, `.gitignore`'s own "nothing under data/ ever enters git" rule)
+# was most of a measured 5.03 GB / 15-minute scan. Scanning content that
+# can structurally never reach a commit finds nothing `gitleaks git`
+# doesn't already cover from the other direction - this mirrors
+# .gitignore's own list entry for entry, so keep the two in sync: a new
+# .gitignore entry needs a matching line here too, or it silently goes
+# back to being rescanned in full on every commit.
+#
+# Every pattern is anchored to a real path segment - `(^|/)name(/|$)` for
+# a directory, `(^|/)name$`/`\.ext$` for a bare filename or extension -
+# never a bare substring: a code review (2026-09-04) found the first cut
+# of this file used unanchored patterns for everything except `data/` and
+# `backups/`, which would have silently skipped a real, committed
+# directory that merely contained one of these strings as a substring
+# (e.g. a genuine `frontend/dist-preview/` folder), the opposite of what
+# an allowlist should ever do.
+[allowlist]
+paths = [
+  '''(^|/)node_modules(/|$)''',
+  '''(^|/)\.venv(/|$)''',
+  '''(^|/)data(/|$)''',
+  '''(^|/)backups(/|$)''',
+  '''(^|/)__pycache__(/|$)''',
+  '''(^|/)\.pytest_cache(/|$)''',
+  '''(^|/)\.ruff_cache(/|$)''',
+  '''(^|/)frontend/dist(/|$)''',
+  '''(^|/)spec/schemas\.resolved(/|$)''',
+  '''(^|/)\.demo-data(/|$)''',
+  '''(^|/)\.DS_Store$''',
+  '''\.pyc$''',
+  '''\.tsbuildinfo$''',
+]
