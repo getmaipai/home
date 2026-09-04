@@ -4,6 +4,7 @@ import { BackupsSection } from "@/apps/settings/BackupsSection";
 import { ModelsSection } from "@/apps/settings/ModelsSection";
 import { ChangeSecretSection } from "@/apps/settings/ChangeSecretSection";
 import { VoiceCatalogSection } from "@/apps/settings/VoiceCatalogSection";
+import { HuggingFaceTokenSection } from "@/apps/settings/HuggingFaceTokenSection";
 import { isOwnerOrAdminRole, type Roster } from "@/lib/api";
 
 interface SettingsPageProps {
@@ -44,6 +45,10 @@ export function SettingsPage({ person, onPersonChange }: SettingsPageProps) {
         <div className="flex flex-col gap-6 px-4 pb-4">
           <VoiceCatalogSection personId={person.id} />
           <ChangeSecretSection person={person} onChanged={onPersonChange} />
+          {/* voice.hf_token is a household-scope key: writing it already
+              requires owner/admin (lib/settings.ts's assertCanAccessScope),
+              same gate as backups/models below. */}
+          {canManageBackups ? <HuggingFaceTokenSection /> : null}
           {canManageBackups ? <ModelsSection /> : null}
           {canManageBackups ? <BackupsSection /> : null}
         </div>

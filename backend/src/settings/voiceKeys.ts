@@ -84,4 +84,31 @@ export const VOICE_SETTINGS_KEYS: SettingsKey[] = [
     lives_in: "person.voice",
     honoured_by: ["home"],
   }),
+  // Voice cloning (2026-09-04, the last open Pocket TTS follow-up):
+  // needs the gated `kyutai/pocket-tts` checkpoint, which the default
+  // `kyutai/pocket-tts-without-voice-cloning` model this hub actually
+  // runs never grew (docs/dev.md's TTS decision entry). The gate is
+  // auto-approved on accepting Kyutai's terms (confirmed live,
+  // 2026-09-04: `gated: "auto"`, not a manual review queue), so a
+  // household can unblock cloning themselves with their own free HF
+  // account - this key is that credential, not the cloning feature
+  // itself (still not built - see docs/dev.md). `household` scope, not
+  // `person`: one token authenticates the hub's own outbound requests,
+  // the same "a household's own account, not a per-person one" shape
+  // other whole-hub integrations take. `secret: true` is the first real
+  // key to exercise lib/settings.ts's at-rest encryption
+  // (lib/secrets.ts) - a plain text field otherwise, so this key holding
+  // an actual bearer token is exactly what that encryption exists for.
+  SettingsKey.parse({
+    key: "voice.hf_token",
+    scope: "household",
+    selector: "text",
+    default: "",
+    label: "Hugging Face token (for voice cloning)",
+    help: "Needed to clone a voice from a recording. Accept the terms at huggingface.co/kyutai/pocket-tts, then create a read token at huggingface.co/settings/tokens and paste it here.",
+    level: "advanced",
+    secret: true,
+    lives_in: "household.ai",
+    honoured_by: ["home"],
+  }),
 ];

@@ -9,8 +9,29 @@ import { settingsValues, people } from "@/db/schema";
 import { getRegistry, getRegistryKey } from "@/lib/settingsRegistry";
 import { nextHlc, compareHlc, seedHlc } from "@/lib/hlc";
 import { isOwnerOrAdmin, canAccessPerson } from "@/lib/access";
+import { encryptSecret, decryptSecret } from "@/lib/secrets";
 import type { SettingsKey } from "@maipai/spec/gen/ts/settings-key.js";
 import type { PersonRow } from "@/types";
+
+// `CLAUDE.md` > Credentials and secrets: "Any reversible secret the app
+// stores... is encrypted with the keystore... never plaintext in a
+// table or JSON file." A code review (2026-09-04) found a `secret: true`
+// registry key's real value went straight into `settings_values` as
+// plain JSON - resolveForResponse() below already redacted it from every
+// API response, but nothing encrypted it at rest, an unenforced half of
+// the same rule (voice.ts's `hf_token` is the first real key that needed
+// this to actually be true, not just documented). Operates on the
+// SERIALIZED JSON text, not the raw value, so any value type (not just
+// strings) round-trips identically whether or not the key is secret. */
+function encodeForStorage(keyDef: SettingsKey, value: unknown): string {
+  const serialized = JSON.stringify(value);
+  return keyDef.secret ? encryptSecret(serialized) : serialized;
+}
+
+function decodeStoredRow(keyDef: SettingsKey, storedText: string): unknown {
+  const jsonText = keyDef.secret ? decryptSecret(storedText) : storedText;
+  return JSON.parse(jsonText);
+}
 
 export type SettingsOpResult<T> =
   | { ok: true; value: T }
@@ -169,7 +190,7 @@ export function listValues(actor: PersonRow, scope: string): SettingsOpResult<Re
     .filter((k) => k.scope === parsed.kind)
     .map((k) => {
       const row = storedByKey.get(k.key);
-      const rawValue = row ? JSON.parse(row.value) : k.default;
+      const rawValue = row ? decodeStoredRow(k, row.value) : k.default;
       const source = row ? (row.source as ResolvedSetting["source"]) : "default";
       return resolveForResponse(k, rawValue, source);
     });
@@ -210,7 +231,7 @@ function writeValue(
   }
 
   const now = new Date().toISOString();
-  const serialized = JSON.stringify(value);
+  const serialized = encodeForStorage(keyDef, value);
   if (existing) {
     db.update(settingsValues)
       .set({ value: serialized, hlc, source: "user", updatedAt: now })
@@ -323,7 +344,7 @@ function resolveStoredValue(scope: string, keyDef: SettingsKey): unknown {
     .from(settingsValues)
     .where(and(eq(settingsValues.scope, scope), eq(settingsValues.key, keyDef.key)))
     .get();
-  return row ? JSON.parse(row.value) : keyDef.default;
+  return row ? decodeStoredRow(keyDef, row.value) : keyDef.default;
 }
 
 /** Reset a key back to its registry default: a real delete (this table

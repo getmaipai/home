@@ -2480,15 +2480,67 @@ set. Full architecture: platform plan chapters 1, 3, and 4.
       (`person:<jesse's id> | tts.voice_id |
       "hf://kyutai/tts-voices/expresso/ex01-ex02_default_001_channel1_168s.wav"
       | user`), zero console errors.
-    - **Still not built**: audio preview before picking, and the other
-      remaining Pocket TTS follow-up (voice cloning/training) - genuinely
-      blocked on a distribution question (the cloning-capable checkpoint
-      is HF-gated with auto-approval on accepting terms, so it needs a
-      household-supplied HF token; this codebase has no reversible-secret
-      storage yet at all - `.github/CLAUDE.md`'s own `lib/secrets`
-      AES-256-GCM module doesn't exist in this rebuild, only the
-      PIN/password one-way hasher does - so cloning needs that
-      foundational piece built first, not just a UI).
+    - **Still not built**: audio preview before picking. The other
+      remaining Pocket TTS follow-up (voice cloning/training) needed a
+      real credential first - see the entry right below, and the actual
+      cloning feature (spawning `pocket-tts export-voice`, recording/
+      uploading a sample) is still separately not built past that.
+
+- [x] **Reversible secret storage, for real: `lib/secrets.ts`
+      (AES-256-GCM), and the household's first real credential
+      (2026-09-04).** `.github/CLAUDE.md`'s own named module
+      ("`lib/secrets`: AES-256-GCM, key in `data/keys` or `SECRETS_KEY`")
+      didn't exist anywhere in this rebuild until now - only `lib/secret.ts`,
+      the one-way PIN/password hasher, did. Ported from `home-legacy.git`'s
+      own `lib/secrets.ts` (hard-won crypto logic, reused). Unblocks the
+      last open Pocket TTS follow-up: voice cloning needs the gated
+      `kyutai/pocket-tts` checkpoint, which the default model this hub
+      actually runs never grew - the gate turned out to be auto-approved
+      on accepting Kyutai's terms (confirmed live: `gated: "auto"`, not a
+      manual review queue), so a household can unblock it themselves with
+      their own free HF account. This slice is that credential, not the
+      cloning feature itself (still not built - a separate, later piece
+      of work: spawning `pocket-tts export-voice`, recording or uploading
+      a sample, managing the resulting cloned voices).
+    - **A real, previously undetected gap closed at the same time**: the
+      settings registry's `secret: true` flag already redacted a value
+      from every API response (`resolveForResponse()`, an earlier
+      session), but nothing actually encrypted it at rest - a
+      `secret: true` key's real value went straight into
+      `settings_values` as plain JSON, an unenforced half of
+      `.github/CLAUDE.md`'s own rule ("never plaintext in a table").
+      `writeValue()`/`resolveStoredValue()`/`listValues()` now route
+      every read and write through `encodeForStorage()`/
+      `decodeStoredRow()`, which encrypt/decrypt the SERIALIZED JSON text
+      (not just string values) whenever `keyDef.secret` is true - so any
+      value type round-trips identically whether or not a key is secret,
+      and `getHouseholdSettingValue()`/`getPersonSettingValue()`
+      transparently decrypt for the internal callers that genuinely need
+      the real value.
+    - **The new key**: `voice.hf_token` (household scope, `secret: true`,
+      `level: "advanced"`) - the registry's first real secret key,
+      finally exercising the redaction path something actually needed
+      rather than an untested guard. A dedicated paste-and-confirm UI
+      (`HuggingFaceTokenSection.tsx`) - `SettingField.tsx`'s own comment
+      already named this as the real way to change a secret key ("needs
+      its own flow... that no key exercises yet"); the generic dropdown/
+      status row was never going to grow a raw-text input for a bearer
+      token.
+    - **Verified live against the real household database, not just the
+      test suite**: pasted a real-shaped fake token through the actual
+      running Settings page, confirmed the real `hub.db` row is genuine
+      ciphertext (`WUd8zTjWWsNfpaRH:eFtTp6Ensml5wo/w4L/8Ag==:...`, no
+      trace of the plaintext), confirmed the generic
+      `GET /api/settings?scope=household` response still returns
+      `value: null, isSet: true` for it, and confirmed "Remove" deletes
+      the row outright. A dedicated regression test
+      (`the real database row is never the plaintext value`) was
+      confirmed to fail against the pre-fix plain-JSON code before this
+      landed.
+    - **Still not built**: the voice-cloning feature itself (this is only
+      the credential), and anything that would actually use this token
+      today - nothing reads `voice.hf_token` yet beyond the settings
+      store round-trip.
 
 ## API routes and `@hono/zod-openapi` (tracked debt)
 
@@ -2765,13 +2817,18 @@ between now and when the relevant piece gets built.
      (`gated: "auto"`, confirmed via a clean unauthenticated call to HF's
      own API) - the default `kyutai/pocket-tts-without-voice-cloning`
      model `ttsSupervisor.ts` actually runs is not gated, and never grew
-     cloning ability. A real distribution-story gap, the same one the TTS
-     decision entry already named for the built-in named voices (alba,
-     george, etc.), now confirmed to also cover cloning from a
-     household's own recorded voice. The official repo also carries a
-     real `training/` directory (actual fine-tuning, not just cloning),
-     with community-trained non-English variants (Czech, Hindi, Korean)
-     as existing examples - a further, larger follow-up past cloning if
+     cloning ability. **The distribution gap this named is now half
+     closed (2026-09-04)**: `gated: "auto"` means auto-approval on
+     accepting terms, not a manual review queue, so a household can
+     unblock it with their own free HF account - `voice.hf_token`
+     (this file's own shipped entry above) is that credential, real,
+     encrypted at rest, settable through a real UI today. What's still
+     missing is the cloning FEATURE itself: nothing yet spawns
+     `export-voice`, records or accepts an uploaded sample, or manages
+     the resulting cloned voices. The official repo also carries a real
+     `training/` directory (actual fine-tuning, not just cloning), with
+     community-trained non-English variants (Czech, Hindi, Korean) as
+     existing examples - a further, larger follow-up past cloning if
      MaiPai ever wants its own trained voice rather than a cloned one.
   3. **A real, ungated community voice catalog exists - fully closed
      (2026-09-04).** `kyutai/tts-voices` on Hugging Face (confirmed via

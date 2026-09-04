@@ -155,5 +155,19 @@
     "honoured_by": [
       "home"
     ]
+  },
+  {
+    "key": "voice.hf_token",
+    "scope": "household",
+    "selector": "text",
+    "default": "",
+    "label": "Hugging Face token (for voice cloning)",
+    "help": "Needed to clone a voice from a recording. Accept the terms at huggingface.co/kyutai/pocket-tts, then create a read token at huggingface.co/settings/tokens and paste it here.",
+    "level": "advanced",
+    "secret": true,
+    "lives_in": "household.ai",
+    "honoured_by": [
+      "home"
+    ]
   }
 ]

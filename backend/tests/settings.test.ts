@@ -2,11 +2,18 @@ import { describe, expect, test, beforeEach } from "bun:test";
 import { TestClient } from "./client";
 import { resetDb } from "./reset-db";
 import { __resetThrottleForTests } from "@/lib/secretThrottle";
-import { parseScope, assertCanAccessScope, resolveForResponse, getPersonSettingValue } from "@/lib/settings";
+import {
+  parseScope,
+  assertCanAccessScope,
+  resolveForResponse,
+  getPersonSettingValue,
+  getHouseholdSettingValue,
+  setHouseholdSettingValue,
+} from "@/lib/settings";
 import { nextHlc, compareHlc, seedHlc, __resetHlcForTests } from "@/lib/hlc";
-import { eq } from "drizzle-orm";
+import { eq, and } from "drizzle-orm";
 import { db } from "@/db";
-import { people } from "@/db/schema";
+import { people, settingsValues } from "@/db/schema";
 
 beforeEach(() => {
   resetDb();
@@ -409,5 +416,53 @@ describe("HLC recovery across a restart", () => {
     seedHlc("1:0:zzzzzz"); // deliberately tiny
     const b = nextHlc();
     expect(compareHlc(b, a)).toBeGreaterThan(0);
+  });
+});
+
+// voice.hf_token (2026-09-04) is the registry's first real `secret: true`
+// key - `.github/CLAUDE.md` > Credentials and secrets' hard rule that a
+// reversible secret is "never plaintext in a table" had nothing to
+// exercise it through the real settings store until now.
+describe("secret: true settings keys are encrypted at rest", () => {
+  test("the real database row is never the plaintext value", async () => {
+    const owner = new TestClient();
+    await owner.post("/api/auth/setup", { displayName: "Sage", secret: "correcthorse" });
+    const plain = "hf_aVeryRealLookingToken1234567890";
+    const put = await owner.request("/api/settings", {
+      method: "PUT",
+      body: { scope: "household", key: "voice.hf_token", value: plain },
+    });
+    expect(put.status).toBe(200);
+
+    const row = db
+      .select()
+      .from(settingsValues)
+      .where(and(eq(settingsValues.scope, "household"), eq(settingsValues.key, "voice.hf_token")))
+      .get();
+    expect(row).toBeDefined();
+    expect(row!.value).not.toContain(plain);
+  });
+
+  test("the generic settings list route never returns the real value", async () => {
+    const owner = new TestClient();
+    await owner.post("/api/auth/setup", { displayName: "Sage", secret: "correcthorse" });
+    await owner.request("/api/settings", {
+      method: "PUT",
+      body: { scope: "household", key: "voice.hf_token", value: "hf_realtoken" },
+    });
+    const res = await owner.get("/api/settings?scope=household");
+    const body = (await res.json()) as Array<{ key: string; value: unknown; isSet?: boolean }>;
+    const token = body.find((s) => s.key === "voice.hf_token");
+    expect(token?.value).toBeNull();
+    expect(token?.isSet).toBe(true);
+  });
+
+  test("getHouseholdSettingValue decrypts the real value for internal use", () => {
+    setHouseholdSettingValue("voice.hf_token", "hf_realtoken_for_internal_use");
+    expect(getHouseholdSettingValue("voice.hf_token")).toBe("hf_realtoken_for_internal_use");
+  });
+
+  test("the unset default (an empty string, never encrypted) round-trips cleanly", () => {
+    expect(getHouseholdSettingValue("voice.hf_token")).toBe("");
   });
 });
