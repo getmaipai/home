@@ -1,4 +1,4 @@
-import { sqliteTable, text, integer } from "drizzle-orm/sqlite-core";
+import { sqliteTable, text, integer, real } from "drizzle-orm/sqlite-core";
 
 // Mirrors spec/schemas/person.schema.json (spec/gen/ts/person.ts is the
 // validated shape; this is its storage). `role` and `source` are the
@@ -45,4 +45,42 @@ export const sessions = sqliteTable("sessions", {
   tokenHash: text("token_hash").notNull().unique(),
   expiresAt: text("expires_at").notNull(),
   createdAt: text("created_at").notNull(),
+});
+
+// Backs the spec's {prefix}{seq}-{device6} id shape (3.1) for
+// memory/entity/episode records: one monotonic counter per record_kind.
+// See lib/id.ts.
+export const idSequences = sqliteTable("id_sequences", {
+  kind: text("kind").primaryKey(),
+  next: integer("next").notNull(),
+});
+
+// Mirrors spec/schemas/memory-record.schema.json (4.4): one table for all
+// three record_kinds (memory, entity, episode), matching the spec's "one
+// row, one field set" shape. Never hard-deleted by the routine store
+// operations (supersede/archive); a real DELETE only happens through
+// lib/memory.ts's forget(), the deliberate per-person erasure right
+// (2.2's privacy architecture, distinct from the judge's normal
+// never-hard-delete lifecycle).
+export const memoryRecords = sqliteTable("memory_records", {
+  id: text("id").primaryKey(),
+  recordKind: text("record_kind").notNull(),
+  text: text("text").notNull(),
+  category: text("category").notNull(),
+  tier: text("tier").notNull(),
+  status: text("status").notNull(),
+  scope: text("scope").notNull(),
+  person: text("person").references(() => people.id),
+  source: text("source").notNull(),
+  importance: real("importance").notNull(),
+  pinned: integer("pinned", { mode: "boolean" }).notNull().default(false),
+  sensitive: integer("sensitive", { mode: "boolean" }).notNull().default(false),
+  uses: integer("uses").notNull().default(0),
+  createdAt: text("created_at").notNull(),
+  lastUsedAt: text("last_used_at").notNull(),
+  validFrom: text("valid_from"),
+  validTo: text("valid_to"),
+  expiredAt: text("expired_at"),
+  supersededBy: text("superseded_by"),
+  embeddingSpace: text("embedding_space"),
 });

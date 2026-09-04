@@ -8,6 +8,30 @@ checklist (`docs/dev.md`); no release has been cut yet.
 ## [Unreleased]
 
 ### Added
+- Memory (platform plan 4.4), the third slice of hub core: the store
+  (`backend/src/lib/memory.ts`), built directly on the `MemoryRecord`
+  shape spec v0.1 already defined, no spec changes needed. `remember`
+  validates against the generated Zod schema before writing; `list`
+  browses without touching usage; `recall` scores by entity-first-then-
+  keyword-overlap (a documented deterministic stand-in for real
+  embedding-based "scored vectors", which need the embed role, 4.11) and
+  does touch usage; `supersede` and `archive` are the routine tombstoning
+  lifecycle (a real status transition, never a row delete); `forget` and
+  `exportPerson` are the per-person privacy pair (2.2), and `forget` is
+  the one real DELETE in the file, a deliberate exception to "never
+  hard-deletes" for the deliberate erasure right. `runMaintenance`'s decay
+  scoring is adapted from the legacy hub's tuned exponential-decay
+  formula (principle 8); durable memories are protected from decay, a
+  `state`-category memory always expires after 7 days, and unlike the
+  legacy source this pass never hard-deletes a tombstone, since platform
+  plan 4.4 says the store never does outside `forget()`. Visibility rules:
+  household memories to any signed-in person (sensitive ones admin/owner-
+  only), a person's own `scope: person` memories, plus a child's (not a
+  teen's or an adult's) to owner/admin; `scope: self` is never returned to
+  anyone, per the schema's own description. Deferred: the sleep-time judge
+  itself, profile paragraphs, and real embedding-based recall (all need an
+  LLM and/or embedder that don't exist yet), mood/unfinished-business
+  reads (robot-specific), and real scheduled maintenance (4.7).
 - The safety layer (platform plan 4.3), the second slice of hub core: a
   deterministic multi-signal classifier for the eight floor categories
   (self-harm, harmful requests, credible threats, CSAM, grooming, PII

@@ -151,8 +151,94 @@ set. Full architecture: platform plan chapters 1, 3, and 4.
       through the notification system (2.6, stubbed as a log line), and
       turn-engine wiring (4.5 doesn't exist, so nothing calls this on a
       real conversation turn yet).
-- [ ] Core, still to build: memory, the turn engine, settings and its
-      renderer, the scheduler, the package host, the llama-server router.
+- [x] Memory (4.4): the store, core, backed by the `MemoryRecord` shape
+      spec v0.1 already defined (memory/entity/episode as one table, one
+      field set, `record_kind` the discriminator; no spec changes needed
+      this pass). `backend/src/lib/memory.ts` is the core memory port:
+      `remember` (validates against the generated `MemoryRecord` Zod
+      schema via `safeParse` before writing, so an invalid record can
+      never reach the table), `list` (browsing, doesn't touch usage),
+      `recall` (a real query, does), `supersede` and `archive` (the
+      routine lifecycle: retire and replace, tombstone; both a real
+      status transition, never a row delete), `forget` and `exportPerson`
+      (the per-person privacy pair, 2.2), `runMaintenance` (decay and
+      archival). Ids follow the spec's `{prefix}{seq}-{device6}` pattern
+      for real (`lib/memoryId.ts`, an atomic per-kind counter plus a
+      persisted per-install 6-char tag in `lib/deviceId.ts`, a stand-in
+      for the real Device record, 3.1, deferred). `lib/memoryShape.ts`
+      applies the same discipline `lib/personShape.ts` learned the hard
+      way: every response is parsed through the generated Zod schema
+      before it goes out, from the start this time.
+    - **Entity-first recall then scored vectors (4.4):** entity-first is
+      real: a query whose words fully cover a known entity's name (the
+      words before the first colon/period/comma in its `text`, since the
+      spec's entity shape has no separate `name`/`aliases` field to index)
+      boosts every record whose own words cover that same name, word-set
+      containment rather than a raw substring check (`tests/memory.test.ts`
+      has a case proving a short name like "Ann" doesn't false-match
+      inside "annual"). "Scored vectors" needs an embedder (4.11, not
+      built); the deterministic stand-in is a keyword-overlap score,
+      documented in the code as a placeholder, not semantic search.
+    - **Visibility and sensitivity:** any signed-in person sees household
+      memories (sensitive ones admin/owner-only); a person always sees
+      their own `scope: person` memories; owner/admin additionally see a
+      **child's** `scope: person` memories in full, nothing of a teen's or
+      adult's. This is narrower than 4.14's stated rule ("a summary and
+      safety flags for a teen's"), a deliberate judgment call: there's no
+      summarization mechanism to safely implement partial teen visibility
+      yet, so teens get full privacy instead of a half-built compromise.
+      `scope: self` is never returned by any read path, to any role,
+      full stop: the schema's own field description calls it "not shared
+      with anyone" and this pass takes that literally.
+    - **`forget` is a real DELETE**, not a tombstone, unlike the routine
+      judge lifecycle: 2.2's privacy architecture makes `host.data.forget
+      (person)` a mandatory erasure right, distinct from the "never
+      hard-deletes" rule 4.4 states for normal memory maintenance. Scoped
+      to that person's `scope: person` records only; household memories
+      that happen to mention them are out of scope (redaction from shared
+      text is a much harder problem, not attempted).
+    - **Decay and archival** (`runMaintenance`) is adapted from the legacy
+      hub's `lib/memory/maintenance.ts` (principle 8: a real, tuned
+      Generative-Agents-style exponential decay formula from production
+      use, `0.995^hours-since-used` blended with importance and a gentle
+      usage boost, not invented from scratch). `durable`-tier memories are
+      never touched by decay or the per-scope cap, matching legacy exactly
+      ("never touches durable memories"); this pass additionally treats
+      the spec's `observation` tier (which legacy didn't have) the same as
+      `episodic` for decay, a documented judgment call. A `state`-category
+      memory always expires after 7 days regardless of tier or score,
+      ported ahead of the judge that will eventually keep that promise for
+      real. **One deliberate departure:** legacy's file also hard-deletes
+      ("purges") archived/superseded rows after 90 days, despite its own
+      header comment claiming nothing is hard-deleted, a real
+      inconsistency in the legacy source. This pass does not carry that
+      forward: platform plan 4.4 says the store "never hard-deletes"
+      outside `forget()`'s deliberate erasure right, so every tombstone
+      stays in place indefinitely here. Revisit if unbounded archive
+      growth becomes a real problem on actual households. No scheduler
+      exists yet (4.7) to run this on a timer; `POST /api/memory/
+      maintenance/run` (owner/admin) is a manual trigger for now.
+    - Exercised for real: booted the server and drove remember (household
+      fact, an entity, a memory mentioning it), recall (confirmed the
+      entity boost separates a mentioning record from an unrelated one,
+      and that a short name doesn't false-match a longer word), supersede,
+      archive, the full child-profile forget/export/visibility path, and
+      maintenance (backdated a durable low-importance fact and an 8-day-
+      old `state` memory directly in `hub.db`, confirmed the durable one
+      survived and the state one archived) with `curl`, in addition to 26
+      backend tests (47 assertions), all green.
+    - **Deliberately deferred, all needing pieces that don't exist yet:**
+      the sleep-time judge itself (deciding *what* to remember from a
+      conversation needs an LLM, 4.11, and the turn engine, 4.5); profile
+      paragraphs (LLM-synthesized, same dependency); mood and unfinished-
+      business reads, the robot's reflect jobs (robot-specific, Robot
+      v0.1); real embedding-based recall (4.11's embed role); a real
+      scheduler running `runMaintenance` on a timer instead of the manual
+      `POST /api/memory/maintenance/run` trigger (4.7); the decay
+      thresholds are hardcoded constants pending a real settings key
+      (4.6). All noted at the point they matter in `lib/memory.ts`.
+- [ ] Core, still to build: the turn engine, settings and its renderer,
+      the scheduler, the package host, the llama-server router.
 - [ ] The shell and kit, Chat and Companions as packages, the wizard,
       backups, self-update - not started.
 - [ ] README.md still needs the full org skeleton (logo, screenshot strip,
@@ -177,6 +263,9 @@ Empty until that review pass runs.
 | tvOS Top Shelf continue-watching endpoint | Not reviewed | Media-specific (Videos, Hub v0.2); not relevant to identity. |
 | CSAM guard (`lib/safety/csamGuard.ts`): obfuscation-resistant term-intersection blocklist for text prompts, plus a two-pass VLM image classifier | Rebuild as designed (text); deferred (image) | Hard-won: real security hardening (NFKD normalization, separator-stripped "tight" matching to defeat `l.o.l.i`-style evasion, a standalone-term list, a broad age/sexual-term vocabulary). Reused in `spec/safety/ts/signals.ts`'s `detectCsam`. The image half (`screenImage`, two-pass VLM confirmation) has no consumer yet (no generation port, 4.11) and is deferred, noted in `spec/safety/README.md` as a pattern worth reusing when it lands. |
 | Text safety floor (`lib/safety/textFloor.ts`): an "absolute limits" paragraph prepended to every LLM system prompt, trusting the model to honor it | Redesign | This is the architecture 4.3 explicitly replaces ("no model in the loop for the floor"). Not reused: the fresh safety layer refuses before any model runs, deterministically, instead of asking the model to police itself. Noted explicitly in `spec/safety/README.md` so a future session doesn't reach for this pattern by habit. |
+| Memory decay and archival (`lib/memory/maintenance.ts`): exponential recency decay blended with importance and usage, a per-scope cap, tier protection for durable memories, a 7-day hard expiry for `state`-category memories | Rebuild as designed, minus the purge | Hard-won: a real, production-tuned scoring formula. Reused in `backend/src/lib/memory.ts`'s `runMaintenance`. Not reused: the file's own hard-delete of old archived/superseded rows ("purge"), which contradicts its own header comment ("nothing is hard-deleted") and platform plan 4.4's explicit "never hard-deletes" outside `forget()`. |
+| Memory recall (`lib/memory/recall.ts`): entity-first (alias-indexed) pass, then cosine-similarity vector search with tuned per-tier thresholds, prompt-budget formatting for LLM injection | Deferred, not reviewed | Deeply tied to a real embedder and a companion/character scoping model, neither of which exist in the fresh design yet (4.11, 5.4). The entity-first *concept* (tokenized name matching before falling back to similarity) shaped this pass's `recall()`, but the file's tuned cosine thresholds don't transfer to a keyword-overlap fallback; a real review has to wait until embeddings exist. |
+| Memory judge, sweep orchestrator, consolidation, mood, curiosity, inner life, profile paragraphs, episode summaries, block cache, audit (`lib/memory/judge.ts`, `sweep.ts`, `consolidate.ts`, `mood.ts`, `curiosity.ts`, `innerLife.ts`, `profile.ts`, `episode.ts`, `blockCache.ts`, `audit.ts`) | Deferred, not reviewed | All depend on an LLM (4.11) and/or the turn engine (4.5), neither built. Real review waits until those exist; noted here so a future session knows the reference material exists and roughly what it covers before starting from scratch. |
 
 ## Roadmap
 
