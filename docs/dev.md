@@ -1326,6 +1326,56 @@ set. Full architecture: platform plan chapters 1, 3, and 4.
       (daily/weekly/monthly) on each row - `listBackups()` doesn't surface
       which tier kept a given file, only that it's still there.
 
+- [x] A Memory page, the sixteenth slice: `lib/memory.ts`'s real store
+      (entity-first recall, decay, tiers, per-person scoping) has had no
+      way for a family to see what's actually remembered about them since
+      it shipped. This is the read half plus the one safe write: list
+      what the signed-in person can already see (`list()`'s own
+      `canRead` rule does the real scoping, unchanged) and Archive (a
+      status change, not a delete).
+    - `frontend/src/apps/memory/`: `memoryLabels.ts` (pure, tested) maps
+      a record's `category` to a real label and resolves `scope: "person"`
+      records against the roster (`GET /api/people`, fetched alongside
+      the memory list) so a family member reads "Nova," never a raw
+      `person-xxxxxx` id - falling back to "A household member" rather
+      than a raw id if that person is ever unresolvable, matching the
+      dad-test standard the rest of the UI already holds to.
+      `MemoryPage.tsx` is the fourth nav entry.
+    - **`forget()` deliberately not wired up, and that was a real,
+      considered call, not an oversight:** `lib/memory.ts`'s `forget()`
+      is a genuine permanent bulk `DELETE` of every person-scope record
+      about someone - the one sanctioned hard-delete this whole subsystem
+      allows. A destructive action at that scale needs a real confirm
+      dialog, and chapter 6's dialog pattern doesn't exist yet; reaching
+      for a bare browser `confirm()` instead would also make the button
+      untestable through this session's own browser automation, which is
+      barred from triggering native dialogs. Both are real reasons to
+      wait for the real primitive, not just tonight's time budget.
+    - Exercised for real, and this one closes a real loop across three
+      slices built tonight: sent "remember that trash day is Tuesday" in
+      Chat, watched the deterministic skill floor fire ("Got it, I'll
+      remember that," no model call, matching the turn engine's own
+      `source: "skill"` path), confirmed the real record appeared on the
+      Memory page labeled "Household · Fact," archived it, confirmed it
+      disappeared, and confirmed a hard reload still shows it gone - a
+      real status change, not a client-side filter. No console errors.
+      6 new frontend tests (`memoryLabels.test.ts`), no backend changes
+      needed - `routes/memory.ts` already did everything this page
+      needed.
+    - **Deliberately deferred, real 4.4 scope not attempted:** `forget()`
+      (above); a recall/search box (`POST /api/memory/recall` exists and
+      is real, has a side effect on `uses`/`last_used_at` per its own
+      route comment, and has no UI reason to fire yet without one);
+      supersede (`POST /api/memory/:id/supersede`, editing a fact rather
+      than retiring it); sensitive-record redaction in this UI (`sensitive`
+      is a real field on every record; this page shows every field it
+      gets back verbatim, so a sensitive record's text is visible here to
+      whoever can already read the record at all - matches `list()`'s own
+      access rule, but a dedicated masked-by-default treatment for
+      `sensitive: true` records is real, separate UI work not attempted);
+      per-person memory export (`GET /api/memory/export`, a different
+      surface than this browsing page).
+
 ## API routes and `@hono/zod-openapi` (tracked debt)
 
 `getmaipai/CLAUDE.md` > Documentation requires every Hono route to be

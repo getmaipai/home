@@ -5,6 +5,7 @@ import { Shell } from "@/shell/Shell";
 import { ChatPage } from "@/apps/chat/ChatPage";
 import { SettingsPage } from "@/apps/settings/SettingsPage";
 import { PeoplePage } from "@/apps/people/PeoplePage";
+import { MemoryPage } from "@/apps/memory/MemoryPage";
 import { Progress } from "@/kit/primitives/Progress";
 import { api, type Roster } from "@/lib/api";
 
@@ -40,6 +41,7 @@ export function App() {
         <Routes>
           <Route path="/" element={<ChatPage person={person} />} />
           <Route path="/people" element={<PeoplePage person={person} />} />
+          <Route path="/memory" element={<MemoryPage />} />
           <Route path="/settings" element={<SettingsPage person={person} />} />
         </Routes>
       </Shell>

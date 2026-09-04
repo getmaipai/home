@@ -15,11 +15,12 @@ interface ShellProps {
 // docs/UI.md's real nav blueprint (a package declares {to, icon, label},
 // the shell owns rendering it) doesn't exist yet - no manifest field for
 // it, no package-loading system to read one from. This is that shape by
-// hand, for the three pages that exist; becomes data-driven the moment a
-// fourth package needs to add an entry without editing this file.
+// hand, for the pages that exist; becomes data-driven the moment a
+// fifth package needs to add an entry without editing this file.
 const NAV_ENTRIES = [
   { to: "/", icon: "message-circle", label: "Chat" },
   { to: "/people", icon: "users", label: "People" },
+  { to: "/memory", icon: "brain", label: "Memory" },
   { to: "/settings", icon: "settings", label: "Settings" },
 ] as const;
 

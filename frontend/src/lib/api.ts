@@ -1,6 +1,7 @@
 import type { SafetyResult } from "@maipai/spec/gen/ts/safety-result.js";
 import type { SettingsKey } from "@maipai/spec/gen/ts/settings-key.js";
 import type { Person } from "@maipai/spec/gen/ts/person.js";
+import type { MemoryRecord } from "@maipai/spec/gen/ts/memory-record.js";
 import type {
   Roster,
   TurnValue,
@@ -30,6 +31,7 @@ export type Role = Person["role"];
 // re-export the types here so the rest of the frontend imports from one
 // place.
 export type { Roster, TurnValue, ConversationTurnRow, ResolvedSetting, BackupInfo };
+export type { MemoryRecord };
 export { isOwnerOrAdminRole };
 // SettingsKey is spec-generated (@maipai/spec), not backend-only, so it's
 // imported directly rather than through @/wire.
@@ -111,4 +113,7 @@ export const api = {
     }),
   backups: () => request<BackupInfo[]>("/api/backups"),
   runBackup: () => request<BackupInfo>("/api/backups/run", { method: "POST" }),
+  memories: () => request<MemoryRecord[]>("/api/memory"),
+  archiveMemory: (id: string) =>
+    request<MemoryRecord>(`/api/memory/${encodeURIComponent(id)}/archive`, { method: "POST" }),
 };
