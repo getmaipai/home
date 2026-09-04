@@ -8,6 +8,34 @@ checklist (`docs/dev.md`); no release has been cut yet.
 ## [Unreleased]
 
 ### Added
+- The turn engine (platform plan 4.5, split), the eighth slice of hub core:
+  `backend/src/lib/turnEngine.ts`'s `runTurn()` is the real pipeline behind
+  a conversation turn on the `chat` surface (the only surface implemented;
+  overlay/pod/robot/tv/phone are a named gap, same shape as 4.11's role
+  list). Safety runs first (a `refuse` verdict returns a deterministic
+  refusal with no skill routing and no model call; `allow_with_resources`
+  proceeds normally with crisis resources riding alongside the reply,
+  never replacing it). Then the deterministic skill floor: a bundled
+  package's `routing.patterns` (a single `*` wildcard capturing an
+  argument) or `routing.examples` (keyword-overlap, the same
+  documented-placeholder move `lib/memory.ts`'s recall() already made for
+  real embeddings) can fire a Tier 0 skill with no model involved at all;
+  a `consequential` package only fires on a real pattern match, never a
+  fuzzy one. When nothing clears the floor, a stable-first prompt (persona
+  and rules, content policy, standing instructions, the bundled skills
+  list, then the volatile zone: recalled memories, then the current time)
+  goes to the real `chat` role, with a hard character budget
+  (`PROMPT_SYSTEM_CHAR_BUDGET`) proven by a test with 50 long memories.
+  New route: `POST /api/turn`. `lib/text.ts` extracts the shared
+  tokenizer memory.ts's recall() and the turn engine's example matching
+  both need, one definition instead of two. **Deliberately not built:**
+  tier 2 native tool calling, remote candidates, `ask`-continuation (the
+  spec's `SkillResult.ask` exists but no recipe step type can ever produce
+  one, a real interpreter-level gap, not a skipped feature), a real
+  Persona/style record (a fixed default stands in), and conversation
+  history/summary/cross-surface context (platform plan 4.14, not built:
+  every turn is stateless beyond a fresh memory recall). Full reasoning in
+  `docs/dev.md`.
 - The `chat` model role and a llama-server router skeleton (platform plan
   4.11, split), the seventh slice of hub core: `spec/llm/` has a
   hand-written, language-portable wire contract for llama-server's

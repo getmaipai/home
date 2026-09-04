@@ -14,6 +14,7 @@ import { memoryRecords, people } from "@/db/schema";
 import { newMemoryRecordId } from "@/lib/memoryId";
 import { toMemoryRecord } from "@/lib/memoryShape";
 import { isOwnerOrAdmin, rolesById, canAccessPerson } from "@/lib/access";
+import { tokenize } from "@/lib/text";
 import { MemoryRecord } from "@maipai/spec/gen/ts/memory-record.js";
 import type { PersonRow, MemoryRecordRow } from "@/types";
 
@@ -175,21 +176,6 @@ export function list(actor: PersonRow, opts: ListOptions = {}): MemoryRecord[] {
     return b.lastUsedAt.localeCompare(a.lastUsedAt);
   });
   return rows.slice(0, 100).map(toMemoryRecord);
-}
-
-const STOPWORDS = new Set([
-  "a", "an", "the", "is", "are", "was", "were", "to", "of", "in", "on", "at",
-  "for", "and", "or", "my", "our", "your", "i", "we", "you", "it", "do", "does",
-  "what", "who", "when", "where", "how", "with", "about",
-]);
-
-function tokenize(text: string): Set<string> {
-  return new Set(
-    text
-      .toLowerCase()
-      .split(/[^a-z0-9']+/)
-      .filter((w) => w.length > 1 && !STOPWORDS.has(w)),
-  );
 }
 
 export interface RecallMatch {

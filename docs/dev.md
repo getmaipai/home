@@ -603,6 +603,102 @@ set. Full architecture: platform plan chapters 1, 3, and 4.
       and the three env vars are ready to point at a real answer the
       moment Jesse picks one.
 
+- [x] The turn engine (4.5, **split, not full**), the eighth slice of hub
+      core. 4.5 describes one turn engine for six surfaces, stable-first
+      prompt assembly for prefix caching, safety-first routing through a
+      two-tier deterministic skill floor, remote candidates, and `ask`
+      lets a deterministic follow-up match without a model: too large for
+      one slice on the same reasoning 4.11 needed splitting (confirmed
+      after re-reading 4.5 in full). Split into one surface, a real
+      deterministic floor, and a real stable-first prompt this pass; tier
+      2 tool calling, remote candidates, and the other five surfaces
+      later, the judgment call this session was explicitly asked to make.
+    - `backend/src/lib/turnEngine.ts`: `runTurn(actor, surface, text)`.
+      Pipeline, safety first per 4.5: `evaluateSafety()` runs before
+      anything else; a `refuse` verdict returns a deterministic refusal
+      (`"I can't help with that."`) with no skill routing and no model
+      call, matching 4.3's "no model in the loop for the floor."
+      `allow_with_resources` (self-harm's floor behavior) does not divert
+      the turn: it proceeds through routing/model normally, and a
+      `crisis_resources` string rides alongside the real reply on the
+      `TurnValue`, kept as a separate field rather than concatenated into
+      the reply text, a deliberate judgment call so a surface can present
+      it "alongside... never blocking" (4.3's own words) instead of having
+      it silently reshape the model's own phrasing.
+    - **The deterministic skill floor (4.5's "tier 1 example-embedding
+      match"), real but without an embedder:** no embed role exists
+      (4.11), so `routing.examples` is matched by keyword-overlap coverage
+      against the utterance instead, the same documented-placeholder move
+      `lib/memory.ts`'s recall() already made for "scored vectors";
+      `lib/text.ts` (new) extracts the shared tokenizer both now use, one
+      definition instead of two, the same discipline `lib/access.ts`
+      applied to `canAccessPerson`. `routing.patterns` is matched for
+      real: a pattern with exactly one `*` wildcard is a real regex
+      capture. **Neither `routing.patterns`' wildcard semantics nor how a
+      capture binds to a manifest's `args` schema is spelled out anywhere
+      in the plan or spec** (grepped for any existing consumer: none):
+      this pass is the first real consumer, so the binding rule is this
+      session's own documented judgment call: a captured wildcard binds
+      only when the package needs zero or exactly one required string
+      argument (`deterministicArgs()`); anything richer has no capture to
+      bind to and falls through toward the model. A `consequential`
+      package (4.9's manifest field) only fires on a real pattern match,
+      never a fuzzy example score, however high, matching 4.5's "a
+      consequential package raises the bar" literally.
+    - **Stable-first prompt assembly, for real:** `buildSystemPrompt()`
+      builds persona/rules (a fixed default: no Persona/style record
+      exists yet, 3.1 lists the type but nothing implements it), a content
+      policy line, standing instructions, and the bundled skills list as
+      one stable prefix (unchanged from turn to turn on a given install,
+      so genuinely prefix-cacheable once a real engine sits behind
+      `llmSupervisor.ts`), then the volatile zone 4.5 names: recalled
+      memories (via the real `memory.recall()`), then the current time,
+      last. 4.5 also names notes, methods, summary and context in the
+      volatile zone: notes/methods need persona/companion state (not
+      built), summary needs conversation history (4.14, not built), and
+      context needs hub-side ambient-context wiring the robot side already
+      has but the hub doesn't; all three are real, named gaps.
+      **`PROMPT_SYSTEM_CHAR_BUDGET` (4000 chars) is a real, tested budget**
+      (4.5: "a prompt budget as a test"), not just a comment: the memory
+      section is truncated to fit its own carve-out, and the whole prompt
+      is hard-capped, proven by a test that seeds 50 long memory records
+      and asserts the assembled prompt still fits.
+    - **A real, load-bearing interpreter gap found and documented, not
+      worked around:** `SkillResult.ask` (`result.schema.json`, "lets a
+      deterministic follow-up match without a model") is a real spec
+      shape, but `spec/interpreters/ts/recipe-interpreter.ts`'s
+      `runRecipe()` never produces one (it always sets `reply`, from any
+      `format` step regardless of the step's own `as` value); grepped
+      confirmed no code anywhere constructs an `ask` result today. Same
+      category of gap as the scheduler's recipe-input-carrying limitation
+      and `host.llm.complete`'s sync/async wall: fixing it needs an
+      interpreter-level change (both TS and Python, kept behaviorally
+      identical), out of scope here. Nothing in this pass builds a fake
+      version; `ask`-continuation is a clean, named deferral.
+    - New route: `POST /api/turn` (any signed-in person, no role gate,
+      matching `/api/safety/check` and `/api/llm/chat`'s posture: a
+      person's own conversation turn isn't a privileged action). Those two
+      routes stay as-is, useful in their own right (direct diagnostics),
+      now that this is the real caller they were both standing in for.
+    - Exercised for real: booted the server and drove, with `curl`, the
+      safety-refuse path (a harmful-request corpus phrase, confirmed no
+      skill or model call fired), the allow_with-resources path (a
+      self-harm corpus phrase, confirmed `crisis_resources` carries "988"
+      alongside a real reply), the deterministic skill floor (`"remember
+      that trash day is Tuesday"` fired `remember` with `source: "skill"`,
+      no model call, and the fact landed in a real recall), the model
+      fallback for ordinary conversation, and the unimplemented-surface
+      rejection, in addition to 11 new backend tests (30 assertions), all
+      green.
+    - **Deliberately deferred, real 4.5 scope not attempted:** every
+      surface but `chat`; tier 2 native tool calling (the model choosing
+      and calling a skill when the deterministic floor doesn't clear,
+      needs tool support on the chat contract, itself deferred in
+      `spec/llm/README.md`); remote candidates (no remote backend
+      configured anywhere); `ask`-continuation (above); a real
+      Persona/style record; conversation history, summary and
+      cross-surface context (4.14, a separate un-built chapter).
+
 ## API routes and `@hono/zod-openapi` (tracked debt)
 
 `getmaipai/CLAUDE.md` > Documentation requires every Hono route to be
@@ -625,11 +721,10 @@ every route at once, once there are enough of them that the generated
 no shell, no Go client, nothing reading the OpenAPI spec yet). Revisit
 when the package host (4.9) or Go (chapter 10) creates a real reason to
 need it, not on a fixed schedule.
-- [ ] Core, still to build: the turn engine (4.5, blocked on nothing
-      infrastructural now that the `chat` role, memory, safety, and the
-      package host all exist; needs its own dedicated slice) and the rest
-      of 4.11 (every role but `chat`, the real engine and residency
-      policy, streaming/tools/JSON-schema on the chat contract).
+- [ ] Core, still to build: the rest of 4.5 (tier 2 native tool calling,
+      remote candidates, `ask`-continuation, every surface but `chat`) and
+      the rest of 4.11 (every role but `chat`, the real engine and
+      residency policy, streaming/tools/JSON-schema on the chat contract).
 - [ ] The shell and kit, Chat and Companions as packages, the wizard,
       backups, self-update - not started.
 - [ ] README.md still needs the full org skeleton (logo, screenshot strip,

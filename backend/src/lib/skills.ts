@@ -66,7 +66,7 @@ export function loadPackage(id: string): SkillOpResult<LoadedPackage> {
   return { ok: true, value: { manifest: manifestParsed.data, recipe: recipeParsed.data } };
 }
 
-function meetsMinRole(actorRole: string, minRole: string): boolean {
+export function meetsMinRole(actorRole: string, minRole: string): boolean {
   const actorIdx = ROLE_LADDER.indexOf(actorRole as Role);
   const minIdx = ROLE_LADDER.indexOf(minRole as Role);
   if (actorIdx === -1 || minIdx === -1) return false;

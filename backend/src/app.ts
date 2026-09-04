@@ -7,6 +7,7 @@ import { settingsRoutes } from "@/routes/settings";
 import { skillsRoutes } from "@/routes/skills";
 import { schedulerRoutes } from "@/routes/scheduler";
 import { llmRoutes } from "@/routes/llm";
+import { turnRoutes } from "@/routes/turn";
 import type { AppEnv } from "@/types";
 
 export const app = new Hono<AppEnv>();
@@ -21,3 +22,4 @@ app.route("/api/settings", settingsRoutes);
 app.route("/api/skills", skillsRoutes);
 app.route("/api/scheduler", schedulerRoutes);
 app.route("/api/llm", llmRoutes);
+app.route("/api/turn", turnRoutes);
