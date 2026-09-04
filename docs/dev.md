@@ -1692,6 +1692,122 @@ set. Full architecture: platform plan chapters 1, 3, and 4.
       so a slow `check.sh` on this machine going forward isn't mistaken
       for something broken.
 
+- [x] **TTS model decision: Kyutai Pocket TTS, live-tested and picked over
+      Kokoro-82M, Chatterbox Turbo/Nano, Dia-1.6B, and CSM-1B (2026-09-04,
+      same overnight/live session as the model-provisioning slice above).**
+      `spec/llm/README.md`'s TTS section and the earlier legacy-hub notes
+      both flagged the `tts` role's model choice as unverified; this
+      closes that with a real, live-tested pick rather than a literature
+      survey.
+    - **Why Kokoro was rejected**: Jesse's own ear, on the legacy hub's
+      shipped voice - "no feel, doesn't sound lifelike." Real, not
+      guessed: this session's earlier research had it as the best
+      *independently benchmarked* CPU option (RTF 0.57, MOS 4.45), but a
+      benchmark score isn't the same question as "does a person want to
+      listen to it."
+    - **Chatterbox Turbo, live-tested on this Mac (MPS)**: RTF 1.4-1.6x
+      (slower than real-time), no streaming API at all (`generate()` only
+      returns after the full utterance finishes) - a 66-character reply
+      took 5+ silent seconds before any audio existed. Real independent
+      quality evidence exists (TTS Arena beats ElevenLabs, 63.75%
+      preference) but the latency disqualifies it outright for a live
+      voice assistant as tested. A real bug was found and fixed getting
+      this far: Resemble's `perth` watermarking dependency silently
+      failed to import because newer `setuptools` dropped `pkg_resources`
+      it still needs; pinning `setuptools<81` fixed it.
+    - **Orpheus-TTS (3B, GGUF via llama.cpp), live-tested on this Mac**:
+      architecturally the most interesting candidate - it speaks GGUF,
+      meaning it could have reused the exact llama-server engine this
+      session already built for chat, not a second heavy Python ML stack.
+      CPU: RTF 1.6-2.2x, ~2.4-3.1s to first audio chunk. A real bug found
+      along the way: the `orpheus-cpp` wrapper defaults to `n_ctx=0`
+      ("auto" = the model's full trained context), which chokes Metal's
+      KV cache allocation with `llama_decode returned -3`; an isolated
+      test proved Metal itself works fine on this model (a bare
+      `llama_cpp.Llama` call with `n_gpu_layers=-1, n_ctx=2048` ran in
+      0.39s for 8 tokens) - patching the wrapper's default to `n_ctx=4096`
+      fixed it. Metal result: RTF 1.26-1.53x, ~2.0s to first chunk - real
+      streaming (10-156 chunks depending on length, audio genuinely
+      arrives progressively), but still short of the "faster than Alexa"
+      bar Jesse set, and the ~2s floor traces to something past the LLM
+      itself (isolated token generation alone was fast, 67 tok/s) -
+      likely the SNAC audio-token decode step or wrapper overhead, never
+      profiled further once Pocket TTS won on both speed and quality.
+    - **Dia-1.6B and CSM-1B**: researched, not live-tested, both ruled
+      out on real evidence. Dia: real reputation for non-verbal cues
+      (laughs, coughs) in dialogue, but confirmed batch-only, no
+      streaming, community guidance is "use a cloud GPU." CSM-1B: the
+      viral "indistinguishable from human" reputation belongs to Sesame's
+      hosted Maya product demo, not the open-sourced checkpoint, which is
+      a base model with reported artifacts on longer text and has been
+      unmaintained ~16 months - the reputation does not transfer to what
+      MaiPai would actually self-host.
+    - **Kyutai Pocket TTS (100M, CPU-only) - the winner.** A second-
+      opinion research pass (from Fable, a different Claude session)
+      proposed it; verified independently against the real repo (9,350
+      stars, MIT, pushed the day before this session) and the real GitHub
+      issue thread it cited (`pocket-tts#115`, "Prosody and audio quality
+      worse than Kokoro"), including a real comment from a Kyutai
+      maintainer confirming the shipped default voices are weak and
+      voice-cloned quality is real and strong - checked, not trusted
+      blind, same standard applied to every other claim tonight. Live
+      numbers on this Mac, CPU only, **beat the vendor's own claimed
+      numbers**: RTF ~0.09-0.10 (9.4-12.5x faster than real-time),
+      consistent across every voice and text length tested - dramatically
+      faster than Kokoro's 0.57 and the only candidate that cleared "as
+      fast as Kokoro" at all.
+    - **Real listening tests, not just numbers** (Jesse judged all of
+      these by ear, not from a report): the default English voice
+      ("alba" in Kyutai's naming, but the non-cloning model's baked-in
+      voice turned out to read as male by ear, not the female voice the
+      name implied - corrected after Jesse actually listened, a good
+      example of why this session's whole approach was "generate and
+      listen," never trust the label). Six distinct cloned voices tested
+      (anna, jane, mary - female; george, michael - male, plus the
+      default), all good. A same-speaker, same-text, different-reference-
+      clip emotion test (Kyutai's own EARS dataset ships `emo_*_freeform`
+      clips per speaker specifically for this) across amusement/anger/
+      contentment, one female speaker and one male speaker: judged as
+      genuinely different-sounding per emotion, not samey. A same-voice,
+      different-*text*-only emotion test (excited/angry/content wording,
+      same neutral reference clip) also judged as sounding good. A
+      written-cue test (`*clears throat*`, `*cough*` literally in the
+      text) failed - those don't render as real non-verbal sounds, only
+      spoken-word fillers/stutters ("um," "uh," "s-sorry") came through
+      naturally. No emotive-tag syntax like Chatterbox's `<cough>`/
+      `<laugh>` exists in Pocket TTS; whatever "feel" comes from the
+      cloned reference clip's own delivery style and natural text
+      phrasing, not from inline markup.
+    - **Two real, unresolved gaps before this can actually ship:**
+      (1) **The voice-cloning-capable checkpoint is gated on Hugging
+      Face** (an acceptable-use click-through, not a commercial
+      restriction, but still requires an authenticated HF account to
+      accept it and a token to download it programmatically) - tonight's
+      test used Jesse's own personal read token, fine for evaluation, not
+      a real distribution story: a shipped product cannot require every
+      household to create an HF account. Needs either a pre-accepted,
+      MaiPai-controlled mirror/re-host (checking the license permits
+      that) or some other resolution before this becomes a real
+      `modelDownloadJobs.ts`-style pinned download. (2) **The Pi/Bot
+      side is completely unbenchmarked** - Fable's proposal was Pocket
+      TTS on both hub and Pi, but per the org's own "a hypothesis until
+      measured through the real speaker" rule, nobody has run this on
+      Pi 5 hardware yet; the bot's old project code can reportedly wire a
+      quick bench once Jesse powers it on, not done this session.
+      **Licensing note for whatever ships as the default voice**: the
+      VCTK-sourced voices tested (anna/george/jane/mary) are CC BY 4.0,
+      fine even if MaiPai is ever sold; the EARS emotion-set voices are
+      CC BY-NC (non-commercial only) - fine for a household's own use,
+      wrong choice for a shipped default.
+    - **Not built this session**: no `tts` role backend, no catalog
+      entries, no engine supervisor, no routes, no turn-engine wiring to
+      actually speak a reply. This entry is the decision and the
+      evidence behind it, the same "researched and recorded, not yet
+      implemented" precedent `modelCatalog.ts`'s image/video entries
+      already set - building the real `tts` role is a separate, real
+      slice of work, deliberately not started tonight given how much
+      this session had already covered.
+
 ## API routes and `@hono/zod-openapi` (tracked debt)
 
 `getmaipai/CLAUDE.md` > Documentation requires every Hono route to be
