@@ -9,6 +9,7 @@ import { rowsToMessages } from "@/apps/chat/mapRows";
 import { StreamingWavPlayer } from "@/lib/streamingWavPlayer";
 import { SentenceSpeechScheduler } from "@/lib/sentenceSpeechScheduler";
 import { splitReadyChunks } from "@/lib/sentenceChunker";
+import { WakeWordToggle } from "@/apps/chat/WakeWordToggle";
 
 interface ChatPageProps {
   person: Roster;
@@ -443,7 +444,20 @@ export function ChatPage({ person }: ChatPageProps) {
       {banner ? (
         <div className="mx-4 mb-2 rounded-[var(--radius)] bg-[hsl(var(--muted))] px-3 py-2 text-sm">{banner}</div>
       ) : null}
-      <div className="flex items-center justify-end px-4 pb-1">
+      <div className="flex items-center justify-end gap-2 px-4 pb-1">
+        {/* Phase 1 of the wake-word plan (docs/dev.md, 2026-09-04):
+            "infrastructure proof, no custom model yet" - fires on
+            openWakeWord's stock "hey jarvis" phrase, not a MaiPai-trained
+            one. No auto-send/auto-listen wiring yet: STT doesn't exist
+            anywhere in this codebase, so a real detection only shows a
+            banner proving the mechanism, the same honest "real, narrow
+            slice, not the full feature" posture the tts role's own first
+            pass took. */}
+        <WakeWordToggle
+          onWakeDetected={(event) =>
+            setBanner(`Wake word heard: "${event.modelId}" (demo only - MaiPai isn't listening for real commands yet)`)
+          }
+        />
         <button
           type="button"
           onClick={() => setThinking((v) => !v)}

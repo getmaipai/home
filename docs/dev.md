@@ -2314,6 +2314,120 @@ set. Full architecture: platform plan chapters 1, 3, and 4.
       from a household's own recorded voice, and the non-Python engine
       ports - all still queued below, unchanged by this slice.
 
+- [x] **Wake word, phase 1: infrastructure proof, real mic capture and
+      real WASM inference, no custom model yet (2026-09-04).** The first
+      real slice of the wake-word plan (this file's "Wake word, pulled
+      forward from Hub v0.3" note) that doesn't need Jesse's own
+      recordings: nothing anywhere in `home` had ever captured a
+      microphone before this. Fires on openWakeWord's stock "hey jarvis"
+      phrase, on purpose - proves the mechanism (mic -> onnxruntime-web
+      WASM -> a real wake event) with zero training-data risk, since
+      nothing is trained yet.
+    - **Ported, not re-derived, from `home-legacy.git`'s own working
+      implementation** (`.github/CLAUDE.md`'s "copy from legacy" rule for
+      hard-won logic, applied for real this time): `mic-capture.ts` (16kHz
+      AudioWorklet capture + resampling), `wake-word-runtime.ts` (lazy
+      ONNX session loading, injectable for tests), `wake-word-pipeline.ts`
+      (the mel/embedding/detector chain's exact constants - kept
+      byte-for-byte, since the legacy repo's own comments record a real,
+      previously-diagnosed bug from computing mel per-chunk instead of
+      over a rolling window: "features only ~0.71 cosine-similar to
+      openWakeWord... detectors fire on any speech"), and
+      `wake-word-loop.ts` (hysteresis, score smoothing, post-wake
+      suppression, buffer-reset-on-enable - each one a real false-fire
+      fix in the codebase this was ported from). Discovered by searching
+      the legacy git mirror's full history for wake-word/ONNX-related
+      files rather than re-deriving the DSP pipeline from a blog post's
+      simplified description, which would have missed the per-chunk-mel
+      bug entirely.
+    - **A real Chrome-only addition the legacy code never had**:
+      `voiceIsolation: true` in `mic-capture.ts`'s `getUserMedia` constraints
+      (Jesse, 2026-09-04) - confirmed absent from the full git history of
+      `home-legacy`, `bot-legacy`, and `loki-doki` alike before adding it,
+      so this is a genuine improvement, not a restored feature. Safe
+      cross-browser since an unrecognized constraint name is ignored per
+      spec, the same graceful-degradation posture the other three
+      constraints already have.
+    - **Every model asset is pinned and checksum-verified**
+      (`backend/src/lib/wakewordAssets.ts`): `melspectrogram.onnx`,
+      `embedding_model.onnx`, and the stock `hey_jarvis_v0.1.onnx`
+      detector, all from openWakeWord's real `v0.5.1` GitHub release -
+      URLs found in the legacy repo's own `download.ts`, but every SHA-256
+      was computed fresh this session against files downloaded live, not
+      copied from that listing. Served at `GET /api/voice/wakeword/:file`
+      against a fixed allow-list (never a path built from the request) and
+      `GET /api/voice/wakewords` for discovery, reusing the repo's existing
+      generic `downloadUrl()` (modelDownload.ts) rather than building a
+      second download mechanism.
+    - **A real concurrency bug caught and fixed before it shipped**: the
+      frontend pipeline loads mel, embedding, and the detector as three
+      concurrent requests (`wake-word-pipeline.ts`'s `loadPipeline()`),
+      which would have raced multiple `downloadUrl()` calls against the
+      same destination file on first use - `downloadUrl()` has no locking
+      of its own. Fixed with one shared in-flight promise
+      (`ensureWakewordAssets()`), the identical shape
+      `llmSupervisor.ts`'s `getChatClient()` already carries for the
+      identical reason.
+    - **Real tests for the ported logic**, not just "it compiles":
+      `wake-word-loop.test.ts` drives the loop with a fake ONNX session
+      factory (real DSP math, fake scores) and proves hysteresis, score
+      smoothing, threshold fallback, post-wake suppression, and the
+      warmup window all behave correctly - every assertion confirmed to
+      fail against a deliberately broken version first, catching one real
+      self-inflicted bug along the way: an early "post-wake suppression"
+      test never actually exercised suppression at all (it ran out of
+      queued high scores for unrelated reasons and passed for the wrong
+      reason), found by disabling the real suppression code and watching
+      the test still pass. `wakewordAssets.test.ts` and `WakeWordToggle.test.tsx`
+      stay fully offline (pre-placed placeholder files, a stubbed
+      `getUserMedia` rejection) rather than exercising the real GitHub
+      download or a real microphone, matching this repo's own "no live
+      network/hardware calls in the automated suite" testing standard.
+    - **A code review before commit found two more real issues, both
+      fixed with a regression test proven to fail first**: (1)
+      `WakeWordToggle.tsx`'s unmount cleanup never bumped its own
+      `requestIdRef`, unlike its `stop()` function - clicking the toggle
+      then navigating away from Chat before the mic-permission prompt or
+      the model registry fetch resolved let that stale, in-flight
+      `start()` install a live microphone stream on an already-unmounted
+      component, with nothing left mounted to ever stop it. Fixed by
+      bumping the same ref on unmount that `stop()` already bumps on a
+      second click - the identical stale-continuation guard, just
+      triggered by navigation instead of a click
+      (`WakeWordToggle.test.tsx`'s new test fakes just enough of the Web
+      Audio surface - `AudioContext`, `AudioWorkletNode` - to let
+      `startMicCapture()` actually reach its success path in a test,
+      resolves a controlled `getUserMedia` promise *after* unmounting,
+      and confirms the mic track's `stop()` still gets called). (2)
+      `wake-word-models.ts`'s `registerWakeWordModels()` - ported
+      verbatim from legacy - kept a parallel `ENTRIES` array beside the
+      `REGISTRY` map that only ever grew, never updated in place:
+      re-registering an id already present updated the map but left
+      `listWakeWordModels()` returning the old, stale object for that id
+      forever. Fixed by deleting the second copy of the state entirely -
+      the map is now the only source of truth, `listWakeWordModels()`
+      just reads `[...REGISTRY.values()]`
+      (`wake-word-models.test.ts`'s two new tests, confirmed to fail
+      against the original dual-state version).
+    - **Live-verified up to a real, expected boundary**: clicking the new
+      "Wake word (experimental)" toggle in a real running browser
+      correctly reaches `navigator.mediaDevices.getUserMedia` and
+      triggers a genuine native microphone-permission prompt
+      (`navigator.permissions.query({name:"microphone"})` confirmed state
+      `"prompt"`, not an error) - proving the wiring is real, not stubbed.
+      Automated browser tooling has no way to click a native OS-level
+      permission dialog (nor should it - that gate is deliberately
+      human-controlled), so the actual "inference runs on real captured
+      audio" step needs a person to click Allow once in a real browser;
+      untested past that specific point in this session.
+    - **Still not built**: everything past phase 1 in the wake-word plan
+      above - a MaiPai-trained "hey maipai" detector (needs the ported
+      training-pipeline logic from `bot-legacy.git`, phase 2), and the
+      hard real-microphone validation gate before any custom model ships
+      (phase 3, blocked on real household recordings). The toggle also
+      does nothing with a detection yet beyond a demo banner - no STT
+      exists anywhere in this codebase to act on what was heard.
+
 ## API routes and `@hono/zod-openapi` (tracked debt)
 
 `getmaipai/CLAUDE.md` > Documentation requires every Hono route to be
@@ -2550,17 +2664,36 @@ between now and when the relevant piece gets built.
   capabilities more closely than this session's original research did
   (2026-09-04), each verified live before being queued here rather than
   assumed:**
-  1. **Community, non-Python ports could close the `uv`/Python stack
-     deviation.** The official repo (`kyutai-labs/pocket-tts`) lists 8
-     real community ports/bindings, none needing Python: Rust+WASM,
-     ONNX/Web, Rust+Candle+WASM, JAX/JS, **MLX (Apple Silicon - this dev
-     Mac's own architecture)**, C++ with ONNX Runtime (CLI + HTTP server
-     + FFI C API - the closest shape to how `engineCatalog.ts` already
-     handles llama-server as a downloaded native binary), sherpa-onnx (12
-     languages), C#/.NET. Worth a real evaluation (speed, quality parity,
-     and critically, since these are unofficial community projects, a
-     trust/maintenance check) before picking one to replace the `uvx
-     pocket-tts serve` sidecar `ttsSupervisor.ts` spawns today.
+  1. **Community, non-Python ports evaluated (2026-09-04) - keeping the
+     `uvx pocket-tts serve` Python sidecar, not switching.** Real research
+     against each of the 8 candidates the official repo lists (repo
+     metadata, READMEs, contributor/commit history - not guessed):
+     `pocket-tts-csharp` is disqualified outright (no license file at
+     all - default all-rights-reserved, not AGPL-compatible or usable).
+     The four browser/WASM ports (`LaurentMazare/xn`,
+     `KevinAHM/pocket-tts-onnx-export`, the Candle fork, `jax-js`) are the
+     wrong shape entirely for this decision - they run *inside a
+     browser tab*, not as a backend sidecar our server spawns; relevant to
+     the wake-word plan's own in-browser pattern above, not to this.
+     `pocket-tts-mlx` doesn't solve the actual problem - still a Python
+     package underneath, just swapping `torch` for `mlx`, no
+     runtime-dependency win. `sherpa-onnx` (14.6k stars, 30+ contributors,
+     genuinely the most mature option here) has no ready-made TTS HTTP
+     server at all - its own `http_server.py` is for its speech
+     *recognition* demo; adopting it means writing and maintaining a
+     wrapper ourselves. `PocketTTS.cpp` is the most compelling candidate
+     on paper (real cited numbers: 9.2x realtime, 30ms time-to-first-audio
+     on a Ryzen 7 3800X, beating the official server's own ~200ms TTFB /
+     ~6x RTF) but is a single-maintainer, five-commit-total repo - too
+     thin a track record to bet a shipped feature's backend on, and its
+     API isn't a drop-in either (JSON body vs. our multipart form, raw
+     PCM vs. a WAV header, local `.wav` files vs. HF-name-resolved
+     voices - our 26-preset catalog would need pre-downloading and
+     re-hosting). **Verdict: no candidate is clearly better than the
+     status quo today.** Revisit triggered by either `PocketTTS.cpp`
+     gaining real community traction, or the Python/`uv` runtime
+     dependency causing an actual field failure (not a hypothetical one) -
+     a documented, deliberate "not yet," not a silent gap.
   2. **Voice cloning already works today, verified live** (not
      hypothetical): `uvx pocket-tts export-voice <audio> <out>.safetensors`
      converts a reference clip into a reusable voice - tested against a

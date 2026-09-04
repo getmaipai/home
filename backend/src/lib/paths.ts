@@ -27,3 +27,11 @@ export const backupDir =
 // isolation for both (they resolve from dataDir, not a separate env var).
 export const modelsDir = resolve(dataDir, "models");
 export const enginesDir = resolve(dataDir, "engines");
+
+// The wake-word pipeline's shared feature models (melspectrogram +
+// embedding) plus per-phrase detectors (2026-09-04, the wake-word plan
+// in docs/dev.md): same shape as models/engines above, `voice/wakewords`
+// matching the legacy hub's own directory name exactly (`home-legacy.git`
+// download.ts's `WAKEWORD_DIR_REL`) since nothing about that path is
+// legacy-specific.
+export const wakewordDir = resolve(dataDir, "voice", "wakewords");
