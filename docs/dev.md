@@ -1175,6 +1175,15 @@ between now and when the relevant piece gets built.
   privacy page's "what leaves the house" row plus a token bucket at a
   single choke point are required in the same commit as the first real
   search call.
+  **A refinement from Jesse, 2026-09-04, same day:** uncensored/abliterated
+  should be the default where feasible, but at minimum every household
+  needs a real choice for it, not one locked-in model. 4.11's "bring your
+  own model" (any catalog or OpenAI-compatible model, opt-in per role,
+  listed on the privacy page, a child profile can't drop below the band's
+  safety floor regardless) is already the structural answer; this makes
+  explicit that the shipped default must never be the *only* option, even
+  where hardware or a future licensing constraint forces something else
+  as the out-of-box pick for some tier.
   **Still open:** which GGUF actually backs the `chat` role, and what
   hardware the deployed hub runs (`spec/llm/README.md`).
   Grammar-constrained decoding through llama-server matters more than the
