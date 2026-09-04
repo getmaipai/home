@@ -2055,3 +2055,140 @@ between now and when the relevant piece gets built.
   that most of the pipeline was never measured on real target hardware,
   only estimated - treat all of the above as a starting hypothesis for
   the 4.11 voice sidecar eval, not as settled numbers.
+
+- **Speech, slot filling and the vector store: three decisions taken
+  2026-09-04**, after reviewing a suggested library list (a third-party
+  shopping list of roughly a hundred Python packages for a home hub and
+  a robot) against what is actually built here. None of it is actionable
+  yet: the voice sidecar is Hub v0.3 (4.11) and the `embed` role does not
+  exist.
+  Recorded so a future session does not re-derive the same three answers,
+  and does not re-shop the same list.
+  The list's own thesis, that deterministic text work belongs in a library
+  rather than in a prompt asking a small model to spell out numbers
+  reliably, is already `.github/CLAUDE.md` principle 6 word for word.
+  Nothing below is a new principle; it is where that principle lands in
+  this codebase. The framing the list proposes, a new `normalization/`
+  layer before and after the model, is the one thing to reject: this
+  architecture already has both seams, the deterministic skill floor
+  before (`lib/turnEngine.ts`) and `reply.speech` after
+  (`spec/schemas/result.schema.json`), and adding a third layer beside two
+  that exist is the second copy principle 1 rejects.
+  **The structural constraint the list ignores, and the reason each answer
+  below is what it is:** the hub is Bun and TypeScript, the robot is
+  Python (`STACK.md`), and the package runtime is Deno on the hub with the
+  Python SDK on the robot. So almost every Python-only library on that list
+  has to answer which of three runtimes it lives in, and the answer sets
+  its real price. In the voice sidecar it costs one implementation shared
+  by both products. In the turn engine it costs two implementations plus
+  the conformance discipline `spec/interpreters/{ts,py}` already carries.
+  Backing a catalog package it costs correctness outright: a Python-only
+  library structurally cannot back a package declaring
+  `platforms: ["home", "bot"]`, which is worth writing into
+  `docs/PACKAGES.md` before an outside contributor discovers it the hard
+  way.
+
+  **1. Speech normalization lives in the voice sidecar and fills
+  `reply.speech` centrally, never per recipe.** Today
+  `spec/interpreters/ts/recipe-interpreter.ts`'s `format` step defaults
+  `speech` to the screen string verbatim, so a package author who wants
+  "CPU usage is eighty-three percent" instead of "CPU is at 83%" has to
+  hand-write a second template, in every package, forever. That is one
+  definition in two places multiplied by the whole catalog, exactly what
+  principle 4 exists to prevent. The normalizer belongs at the TTS
+  boundary in `spec/voice/` (Python, one implementation, and the robot's
+  speech stack is Python already), doing numbers, ordinals, plurals,
+  units, dates, currency, abbreviations, emoji and sentence splitting
+  before streaming. Three rules go with it. It runs last, on the way to
+  TTS only: it never touches `reply.text`, never touches what
+  `lib/conversationHistory.ts` logs, and never runs before
+  `evaluateSafety`. It is a renderer, so a package opts out by supplying
+  its own `speech` string, never by asking the model to format. And the
+  pronunciation problem is narrower than the list suggests: Piper and
+  Kokoro phonemize internally, so what is actually needed is a small
+  lexicon of overrides for names the models get wrong, starting with
+  "MaiPai" itself, not a phonemization stage duplicating theirs.
+  This is also where issue #6's "round before injection" item belongs
+  (unrounded values parroted into speech as "68.9F"): same class of
+  problem, same layer, and the spoken-register style policy it sits under
+  cannot fix what the data hands it.
+
+  **2. Slot types are declared in the manifest, extracted by shared code,
+  and land below tier 2.** The tier 2 note above names the gap precisely:
+  `deterministicArgs()` binds exactly two shapes, no required args or one
+  required string arg, so "any mail from grandma this week" structurally
+  cannot bind no matter how good the pattern is. Deterministic slot
+  filling closes that without a model and without the autonomous loop
+  chapter 4.5 does not want: a datetime, duration, quantity, number,
+  person or device parsed out of the utterance and bound to a declared
+  arg. The design constraint is that slots are **declared, not coded**: a
+  `routing.slots` block in the manifest mapping an arg name to a slot
+  type, the same shape `routing.patterns` and the settings registry
+  already have, with one shared extractor drawing from the declaration. A
+  hand-written extractor per package is the anti-pattern this note exists
+  to prevent. Library-wise the robot side is the list's `dateparser`,
+  `word2number`, `quantulum3`, `pint` and `RapidFuzz`; the hub side is
+  `chrono-node` and `uFuzzy` or `fuse.js`. Every one of those licences
+  gets confirmed AGPL-compatible at adoption, not assumed here. This is
+  the two-implementation case, so it is spec-first with a normative
+  fixture corpus and a conformance test, priced that way before anyone
+  starts. Sequencing is unchanged: build `embed` first, ship real skills,
+  count fall-throughs from `lib/conversationHistory.ts`, and let the
+  measured miss rate decide how much of this is worth building.
+  Separately and much cheaper, fuzzy matching belongs in `recall()`'s
+  entity pass (`lib/memory.ts`), which already does tokenized name
+  matching through `lib/text.ts`. Typos and mishearings ("living rom lite")
+  are a real household failure mode, and this improves the entity-first
+  half that survives embeddings landing rather than competing with it.
+
+  **3. The vector store is `sqlite-vec` or brute force, never a second
+  index.** When the `embed` role lands, vectors go in `hub.db` beside the
+  memory records: one store to back up (`lib/backup.ts`), one to sync to
+  the robot, one transaction boundary. FAISS or hnswlib is a second index
+  that has to be kept consistent with SQLite by hand, which is the second
+  copy principle 1 rejects, and neither earns its keep at household scale.
+  Measure before adding the dependency at all: brute-force cosine over a
+  few thousand memory rows is single-digit milliseconds, and 4.4's own
+  recall path is already scoped and filtered before ranking. If
+  `sqlite-vec` does land, it is a loadable extension binary, so the
+  pinned-URL-and-checksum rule applies and it stays core-only: packages
+  use `node:sqlite` with no FFI per `STACK.md`, so nothing in the sandbox
+  can reach it.
+
+  **What that review found already covered, so nobody re-shops it.** The
+  voice stack (openWakeWord, Moonshine, Piper, speaker ID via sherpa
+  CAM++) is the pre-rebuild robot's shipped choice, recorded above.
+  Software echo cancellation and noise suppression are answered by the
+  XVF3800 doing it in hardware, which is also why the 3.5mm-analog speaker
+  requirement above is not negotiable. OCR is RapidOCR rather than
+  PaddleOCR deliberately, because its models ship inside the wheel so the
+  lockfile delivers them and nothing fetches at runtime; the same reasoning
+  picked zxing-cpp for barcodes. Scheduling is `lib/scheduler.ts`, already
+  durable and already spec-shaped so its records can sync, which an
+  in-process job runner would not be. Device discovery and control is
+  answered by Home Assistant being the integration path, which is a better
+  answer than a dozen device libraries in core. `lib/hardware.ts` already
+  covers machine stats.
+  Two things worth taking from the vision half, neither of them a model:
+  AprilTag is the standout for docking and location markers because it
+  runs on CPU through OpenCV and costs the Hailo nothing, which matters
+  given the one-model-exclusive-per-HAT constraint recorded in `bot`'s dev
+  doc. And `parseWhen`'s `every:<n><m|h|d>` grammar, which its own comment
+  already calls a placeholder, should become RRULE through `rrule.js` and
+  `dateutil.rrule` rather than a grammar we invent, the moment routines
+  need "every weekday at 7".
+  One item from that review was real enough to file rather than record:
+  Unicode confusables and zero-width characters walk past every detector
+  in the safety floor, reproduced against the real code and written up as
+  issue #10.
+
+  **Two open items, both Jesse's call, neither blocking anything today.**
+  Whether the two-implementation cost of pre-model slot filling is worth
+  paying at all, or whether the near-miss confirmation prompt already named
+  in the tier 2 note above gets most of the value for a fraction of the
+  work. And whether face recognition is in scope: InsightFace is the
+  obvious library and its released model weights carry a non-commercial
+  research restriction, which quietly forecloses the commercial licensing
+  and sale that sole copyright ownership exists to keep open. Verify the
+  actual model card before anyone builds on it. MediaPipe and OpenCV are
+  clean either way.
