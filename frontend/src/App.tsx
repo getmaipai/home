@@ -16,11 +16,29 @@ import { api, type Roster } from "@/lib/api";
 export function App() {
   const [person, setPerson] = useState<Roster | null | undefined>(undefined);
 
-  useEffect(() => {
-    api
+  // Fail-closed: used only where "we don't yet know who's signed in" is
+  // the real question (first load, right after sign-in) - api.me()
+  // failing there genuinely means treat this as signed out.
+  function loadPerson() {
+    return api
       .me()
       .then(setPerson)
       .catch(() => setPerson(null));
+  }
+
+  // A code review (2026-09-04) found ChangeSecretSection's onChanged
+  // reusing loadPerson's fail-closed behavior for the wrong question: a
+  // person who just successfully changed their own PIN is definitely
+  // still signed in (the session cookie is untouched by a secret
+  // change), so a transient network blip on this re-fetch should not
+  // silently drop them to the sign-in screen. This only updates on
+  // success and leaves the existing `person` alone otherwise.
+  function revalidatePerson() {
+    return api.me().then(setPerson).catch(() => {});
+  }
+
+  useEffect(() => {
+    loadPerson();
   }, []);
 
   if (person === undefined) {
@@ -32,7 +50,7 @@ export function App() {
   }
 
   if (person === null) {
-    return <SignIn onSignedIn={() => api.me().then(setPerson).catch(() => setPerson(null))} />;
+    return <SignIn onSignedIn={loadPerson} />;
   }
 
   return (
@@ -42,7 +60,10 @@ export function App() {
           <Route path="/" element={<ChatPage person={person} />} />
           <Route path="/people" element={<PeoplePage person={person} />} />
           <Route path="/memory" element={<MemoryPage />} />
-          <Route path="/settings" element={<SettingsPage person={person} />} />
+          <Route
+            path="/settings"
+            element={<SettingsPage person={person} onPersonChange={revalidatePerson} />}
+          />
         </Routes>
       </Shell>
     </BrowserRouter>

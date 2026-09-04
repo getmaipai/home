@@ -1411,14 +1411,40 @@ set. Full architecture: platform plan chapters 1, 3, and 4.
       test, this route requires `requireAuth`, so the realistic threat it
       defends is a stolen already-signed-in session repeatedly guessing
       the real PIN, not an anonymous unauthenticated attacker).
-    - **A known, accepted gap, not a bug:** the Settings page still shows
-      "doesn't have one yet" immediately after successfully setting a
-      first PIN, in the same session, until the next full page load -
-      `person` is loaded once by `App.tsx` and this page has no way to
-      refresh it. The backend state is real and correct the whole time
-      (confirmed above); only the label is stale for the rest of that
-      one session. Wiring a refresh callback through `Shell`/`App` is
-      real, small, deferred scope, not attempted tonight.
+    - **Closed later the same night:** the Settings page used to keep
+      showing "doesn't have one yet" immediately after successfully
+      setting a first PIN, until the next full page load - `person` was
+      loaded once by `App.tsx` with no way for a page to ask for a fresh
+      copy. `App.tsx` now has two distinct refetch functions, not one
+      reused for both jobs (a code-review pass on this exact fix found
+      the first version's single `refreshPerson` answering two different
+      questions): `loadPerson` (fail-closed - used for the first load and
+      right after sign-in, where "who's signed in" genuinely being
+      unknown on failure means treat it as signed out) and
+      `revalidatePerson` (used for `SettingsPage`'s `onPersonChange` -
+      someone who just changed their own PIN is definitely still signed
+      in, so a transient failure here only leaves the existing `person`
+      alone instead of forcing them back to the sign-in screen). The
+      review also flagged `SignIn`'s `onSignedIn` hand-copying
+      `loadPerson`'s body instead of calling it; now does. 2 new
+      component tests (`ChangeSecretSection.test.tsx`, stubbing
+      `globalThis.fetch` rather than `mock.module()`-ing `@/lib/api`:
+      this file's static import of the component under test means Bun's
+      module cache would not reliably re-bind a module mock registered
+      inside a test body). Verified live again after the split: created a
+      fresh PIN-free adult, watched the section switch from "choose one"
+      to "current/new" copy instantly on save, no reload.
+    - **A known, accepted edge case in the fix itself, not a new bug:**
+      a second review pass on this exact change flagged its own tradeoff
+      - `revalidatePerson`'s deliberate fail-open (above) means a
+      *transient* failure on the post-change `api.me()` call leaves the
+      stale "doesn't have one yet" copy showing a little longer, on the
+      rare request that genuinely fails right after a genuinely
+      successful change. The PIN change itself is never affected either
+      way; only this one label can lag until the next reload. A retry or
+      a visible "couldn't confirm, refresh to check" state would close
+      it fully; not built tonight; the review's own verdict was
+      "plausible-severity awareness," not a bug to fix now.
     - **A `code-review` pass (medium effort) before committing found two
       real issues in security-sensitive code, both fixed.** A genuine
       race: the write was a SELECT-then-branch (update if a record

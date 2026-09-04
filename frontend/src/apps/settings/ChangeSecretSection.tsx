@@ -6,6 +6,11 @@ import { api, ApiError, type Roster } from "@/lib/api";
 
 interface ChangeSecretSectionProps {
   person: Roster;
+  /** Called after a successful change so App.tsx's `person` (and this
+   * section's own "doesn't have one yet" copy, driven by person.hasSecret)
+   * reflects reality without waiting for a full page reload - a real gap
+   * this session found and deferred earlier tonight, now closed. */
+  onChanged: () => void;
 }
 
 // 4.1's self-service PIN/password change (backend/src/routes/auth.ts's
@@ -14,7 +19,7 @@ interface ChangeSecretSectionProps {
 // gated to owner/admin like BackupsSection: changing your own PIN is a
 // personal action any role can take, distinct from the household-admin
 // actions the rest of this page's owner/admin gate covers.
-export function ChangeSecretSection({ person }: ChangeSecretSectionProps) {
+export function ChangeSecretSection({ person, onChanged }: ChangeSecretSectionProps) {
   const [currentSecret, setCurrentSecret] = useState("");
   const [newSecret, setNewSecret] = useState("");
   const [confirmSecret, setConfirmSecret] = useState("");
@@ -37,6 +42,7 @@ export function ChangeSecretSection({ person }: ChangeSecretSectionProps) {
       setNewSecret("");
       setConfirmSecret("");
       setSuccess(true);
+      onChanged();
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Could not change it.");
     } finally {
