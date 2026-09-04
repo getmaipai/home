@@ -1468,6 +1468,104 @@ set. Full architecture: platform plan chapters 1, 3, and 4.
       still pass unchanged, confirming the refactor is behavior-preserving
       for the untouched route.
 
+- [x] **Hardware detection and the model-selection wizard's informational
+      half (2026-09-04, self-picked after the PIN-change slice, session
+      continued interactively with Jesse rather than overnight-autonomous
+      this time).** Platform plan 4.11's deferred decision ("which GGUF is
+      the default `chat` model, and what hardware the real household hub
+      runs on" - `spec/llm/README.md`) had a real answer to build toward:
+      Jesse's actual hardware is this Mac (M4 Pro, 24GB unified) plus an
+      MSI laptop (RTX 2070 Super 8GB built-in, RTX 3070 8GB always-docked
+      eGPU). Built:
+    - `backend/src/lib/hardware.ts`: real detection, ported from the
+      archived legacy hub's `lib/hwfit.ts` (hard-won logic, principle 8) -
+      `nvidia-smi` for CUDA VRAM/utilization, `os.totalmem()` for Apple
+      Silicon's unified-memory ceiling (no separate VRAM concept on
+      Metal, same simplification the legacy code made). Live-verified: it
+      correctly detects this actual machine as 24GB Apple Silicon.
+    - `spec/schemas/model-capabilities.schema.json`: 4.11's own named
+      `ModelCapabilities` record, deferred by `spec/llm/README.md` until
+      "a real producer and consumer" existed - they do now (hardware.ts,
+      and this session's settings-page wizard). Populated fields only
+      (id, role, license, engine, sizing, pros/cons, implemented); the
+      plan's fuller field list (tools, JSON schema, grammar, sampling)
+      stays a named gap, not guessed at. Two sizing shapes via `oneOf`:
+      `transformer_gguf` (param count, bits/weight, GQA-correct
+      num_kv_heads/head_dim for the KV cache formula) and `diffusion`
+      (a flat measured-VRAM figure); round-trips through both the TS/Zod
+      and Python/Pydantic generators, fixtures added to both
+      `fixtures.test.ts` and `test_fixtures.py` per platform plan 3's
+      dual round-trip proof.
+    - `backend/src/lib/modelCatalog.ts`: the fit calculator. Two research
+      passes (this session, 2026-09-04) validated the formula against
+      real prior art before writing it: weights ≈ params x bits/8 x
+      (1 + GGUF overhead), KV cache = 2 x layers x **kv_heads** (not total
+      attention heads - a GQA model like Qwen3 has far fewer, and using
+      the wrong count overestimates the cache 4-8x) x head_dim x context
+      x bytes/element. Diffusion entries compare a flat working-VRAM
+      figure against raw budget with no chat-model overhead subtraction
+      (that overhead is calibrated for an always-resident server sharing
+      a card with the OS compositor, which doesn't apply to a dedicated
+      image/video card). Catalog seeded with the researched, decided
+      picks: Qwen3 8B Instruct (chat, `implemented: true`, the one role
+      with a real engine), Juggernaut XL Ragnarok and FLUX.2 [klein] 4B
+      (image, both `implemented: false` - recorded as a real LoRA-
+      ecosystem tradeoff for the wizard to show, not one this session
+      picked for the household), Wan 2.2 TI2V-5B FP8 (video, same
+      status). `GET /api/host/hardware` and `GET /api/host/models?role=`
+      (owner/admin only, matching backups.ts's posture: host-level data,
+      not a personal preference) expose it.
+    - `frontend/src/apps/settings/ModelsSection.tsx`: shows detected
+      hardware in plain language, then every catalog entry per role with
+      its fit, pros, and cons - **deliberately no "choose this" control**.
+      There is no download queue or engine-launch wiring yet (nothing
+      Jesse's earlier "the wizard can present options with pros/cons"
+      design has to act on), so a selection button would look actionable
+      and silently do nothing, worse than the honest read-only view this
+      session shipped instead. Live-verified against this real Mac
+      (a throwaway backend instance on a scratch data dir, never Jesse's
+      real household database): correct hardware line, correct fit
+      figures, correct "not runnable yet" labeling on the image/video
+      entries, screenshotted via Claude in Chrome before calling it done.
+    - **Judgment calls made without asking, confirmed compatible with
+      what Jesse said afterward rather than guessed blind:** (1) a static
+      "dedicate X% of this box" allocation slider was considered and
+      rejected after research (real precedent - Windows Game Mode's
+      dynamic foreground-priority throttling, Docker Desktop's move away
+      from manual sliders toward auto-scaling, Kubernetes' request/limit/
+      Burstable pattern - all point away from a static split, which wastes
+      whatever percentage sits idle) in favor of the fit calculator's
+      existing behavior: recommend against a modest assumed baseline,
+      let the real engine use whatever's actually free, degrade to
+      queue-and-wait (the legacy hub's own pattern for chat-vs-image-gen
+      contention) once a second real workload exists to contend with
+      chat. (2) The legacy safety architecture (`csamGuard.ts`'s
+      always-on, non-bypassable-by-consent floor; `contentPolicy.ts`'s
+      per-profile dials with an `IRREDUCIBLE_CORE` that's never
+      removable) was confirmed, not redesigned, against the new org's
+      neutrality and non-removable-child-safety rules - it already
+      matches; porting it forward is the next step when an image/video
+      backend exists to protect.
+    - **Deliberately deferred, all real gaps, not silently skipped:** no
+      GGUF is downloaded, no `llama-server` binary is fetched, no
+      download-job queue exists (a multi-GB action onto Jesse's real
+      machines, flagged rather than auto-triggered) - the wizard's
+      "choose and provision" half needs that queue built first. No
+      auto-tuned engine launch flags (flash attention, quantized KV
+      cache, `-ngl auto`) either: `llmSupervisor.ts`'s spawn path has
+      nothing to pass flags to without a real model file, and building
+      that now would be exercising nothing, the same discipline
+      `spec/llm/README.md` already applied to `ModelCapabilities` itself.
+      No image/video generation package (ComfyUI-equivalent sidecar,
+      routes, safety wiring) exists; the catalog entries for those roles
+      are real, researched data with nothing to run them yet.
+    - Download URLs/sha256 checksums are intentionally absent from every
+      catalog entry this pass: fabricating a checksum would be actively
+      wrong (every future integrity check would either silently accept
+      tampered bytes or permanently fail), and the real values weren't
+      looked up. A real gap for whoever builds the download queue, not a
+      guess.
+
 ## API routes and `@hono/zod-openapi` (tracked debt)
 
 `getmaipai/CLAUDE.md` > Documentation requires every Hono route to be
@@ -1677,6 +1775,8 @@ Empty until that review pass runs.
 | Memory decay and archival (`lib/memory/maintenance.ts`): exponential recency decay blended with importance and usage, a per-scope cap, tier protection for durable memories, a 7-day hard expiry for `state`-category memories | Rebuild as designed, minus the purge | Hard-won: a real, production-tuned scoring formula. Reused in `backend/src/lib/memory.ts`'s `runMaintenance`. Not reused: the file's own hard-delete of old archived/superseded rows ("purge"), which contradicts its own header comment ("nothing is hard-deleted") and platform plan 4.4's explicit "never hard-deletes" outside `forget()`. |
 | Memory recall (`lib/memory/recall.ts`): entity-first (alias-indexed) pass, then cosine-similarity vector search with tuned per-tier thresholds, prompt-budget formatting for LLM injection | Deferred, not reviewed | Deeply tied to a real embedder and a companion/character scoping model, neither of which exist in the fresh design yet (4.11, 5.4). The entity-first *concept* (tokenized name matching before falling back to similarity) shaped this pass's `recall()`, but the file's tuned cosine thresholds don't transfer to a keyword-overlap fallback; a real review has to wait until embeddings exist. |
 | Memory judge, sweep orchestrator, consolidation, mood, curiosity, inner life, profile paragraphs, episode summaries, block cache, audit (`lib/memory/judge.ts`, `sweep.ts`, `consolidate.ts`, `mood.ts`, `curiosity.ts`, `innerLife.ts`, `profile.ts`, `episode.ts`, `blockCache.ts`, `audit.ts`) | Deferred, not reviewed | All depend on an LLM (4.11) and/or the turn engine (4.5), neither built. Real review waits until those exist; noted here so a future session knows the reference material exists and roughly what it covers before starting from scratch. |
+| Chat catalog (`lib/catalog.ts`'s "abliterated" Llama 3.1 8B / Gemma 4 12B defaults, `lib/contentPolicy.ts`'s dial system) | Redesign (model choice); rebuild as designed (dial architecture) | The legacy catalog defaulted to refusal-stripped fine-tunes shipped as the recommendation. Conflicts with the new org's neutrality rule (ships neutral, unrestricted mode is a one-time adult opt-in, never the shipped default). Redesigned: `modelCatalog.ts`'s chat entry is a plain instruct model (Qwen3 8B); the dial system's actual architecture (per-profile clamped dials, an `IRREDUCIBLE_CORE` floor never removable even at "unrestricted") is sound and matches the new safety layer already built - reuse the architecture, not the model recommendation. |
+| Image/video model stack (`docs/models.md`'s Juggernaut XL Ragnarok, IP-Adapter FaceID Plus v2, AnimateDiff XL, Stable Video Diffusion XT) | Redesign (checkpoints); rebuild as designed (pipeline shape) | Researched against 2026 alternatives (2026-09-04, two research passes) rather than carried forward on the "it worked before" assumption Jesse explicitly asked to check. Base image checkpoint and video model are superseded for 8GB-class cards: FLUX.2 [klein] 4B (sharper, purpose-built for 8GB, real and growing LoRA ecosystem) and Wan 2.2 TI2V-5B FP8 (720p on 8GB, active LoRA community) are the current picks, recorded in `modelCatalog.ts` alongside Juggernaut XL (kept as the largest-LoRA-library alternative, a real tradeoff put to the wizard rather than decided for the household). IP-Adapter FaceID and ComfyUI itself: no supersession found, kept as-is. `csamGuard.ts`'s hard floor (screenPrompt/screenImage, non-bypassable by the uncensored-consent flag): kept exactly, matches the new org's non-removable child-safety rule already. |
 
 ## Roadmap
 

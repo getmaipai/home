@@ -3,6 +3,7 @@
 
 export * from "./recipe.js";
 export * from "./setting-value.js";
+export * from "./model-capabilities.js";
 export * from "./person.js";
 export * from "./settings-key.js";
 export * from "./safety-result.js";

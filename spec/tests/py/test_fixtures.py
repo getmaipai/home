@@ -13,6 +13,7 @@ from pydantic import ValidationError
 
 from gen.py.manifest_schema import PackageManifest
 from gen.py.memory_record_schema import MemoryRecord
+from gen.py.model_capabilities_schema import ModelCapabilities
 from gen.py.person_schema import Person
 from gen.py.safety_result_schema import SafetyResult
 from gen.py.setting_value_schema import SettingValue
@@ -62,6 +63,13 @@ def test_error_catalogue_entries():
     assert len(entries) > 0
     for entry in entries:
         ErrorEntry.model_validate(entry)
+
+
+@pytest.mark.parametrize("kind", ["chat", "image"])
+def test_model_capabilities_fixtures(kind):
+    ModelCapabilities.model_validate(
+        load_fixture(f"model-capabilities.{kind}.example.json")
+    )
 
 
 def test_person_missing_required_field_is_rejected():

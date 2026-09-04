@@ -8,6 +8,8 @@ import type {
   ConversationTurnRow,
   ResolvedSetting,
   BackupInfo,
+  HardwareInfo,
+  ModelFit,
 } from "@maipai/home-backend/src/wire";
 import { isOwnerOrAdminRole } from "@maipai/home-backend/src/wire";
 
@@ -30,7 +32,7 @@ export type Role = Person["role"];
 // depends on @maipai/home-backend as a workspace package for this;
 // re-export the types here so the rest of the frontend imports from one
 // place.
-export type { Roster, TurnValue, ConversationTurnRow, ResolvedSetting, BackupInfo };
+export type { Roster, TurnValue, ConversationTurnRow, ResolvedSetting, BackupInfo, HardwareInfo, ModelFit };
 export type { MemoryRecord };
 export { isOwnerOrAdminRole };
 // SettingsKey is spec-generated (@maipai/spec), not backend-only, so it's
@@ -121,4 +123,6 @@ export const api = {
   memories: () => request<MemoryRecord[]>("/api/memory"),
   archiveMemory: (id: string) =>
     request<MemoryRecord>(`/api/memory/${encodeURIComponent(id)}/archive`, { method: "POST" }),
+  hardware: () => request<HardwareInfo>("/api/host/hardware"),
+  models: (role: string) => request<ModelFit[]>(`/api/host/models?role=${encodeURIComponent(role)}`),
 };

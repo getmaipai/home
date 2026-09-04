@@ -1,0 +1,22 @@
+{
+  "id": "qwen3-8b-instruct-q4-k-m",
+  "role": "chat",
+  "label": "Qwen3 8B Instruct",
+  "license": "Apache-2.0",
+  "engine": "llama-server",
+  "implemented": true,
+  "quality_tier": "standard",
+  "tags": ["recommended", "fast"],
+  "pros": ["Runs well on a single 8GB GPU", "Fast replies"],
+  "cons": ["Less capable than a larger model on hard reasoning tasks"],
+  "sizing": {
+    "kind": "transformer_gguf",
+    "param_count_billion": 8.2,
+    "bits_per_weight": 4,
+    "gguf_overhead_fraction": 0.1,
+    "num_layers": 36,
+    "num_kv_heads": 8,
+    "head_dim": 128,
+    "max_context": 32768
+  }
+}

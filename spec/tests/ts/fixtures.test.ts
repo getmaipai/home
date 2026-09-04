@@ -11,6 +11,7 @@ import { SettingsKey } from "../../gen/ts/settings-key.js";
 import { MemoryRecord } from "../../gen/ts/memory-record.js";
 import { PackageManifest } from "../../gen/ts/manifest.js";
 import { SafetyResult } from "../../gen/ts/safety-result.js";
+import { ModelCapabilities } from "../../gen/ts/model-capabilities.js";
 // ErrorEntry is standards-owned (std-v0.2.0), not generated here; the error
 // catalogue's shape is imported from the sibling .github checkout, the same
 // way spec/schemas/manifest.schema.json imports PrivacyRow by $ref.
@@ -58,6 +59,14 @@ describe("record fixtures validate against their generated Zod models", () => {
       SafetyResult.parse(loadFixture("safety-result.example.json")),
     ).not.toThrow();
   });
+
+  for (const kind of ["chat", "image"]) {
+    test(`model-capabilities.${kind}.example.json`, () => {
+      expect(() =>
+        ModelCapabilities.parse(loadFixture(`model-capabilities.${kind}.example.json`)),
+      ).not.toThrow();
+    });
+  }
 
   test("error catalogue entries", () => {
     const errors = JSON.parse(

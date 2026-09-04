@@ -1,0 +1,16 @@
+{
+  "id": "flux2-klein-4b",
+  "role": "image",
+  "label": "FLUX.2 [klein] 4B",
+  "license": "Apache-2.0",
+  "engine": "comfyui",
+  "implemented": false,
+  "quality_tier": "high",
+  "tags": ["recommended"],
+  "pros": ["Sharper output than SDXL-class checkpoints", "Purpose-built for 8GB cards"],
+  "cons": ["Smaller community LoRA library than SDXL, though real and growing"],
+  "sizing": {
+    "kind": "diffusion",
+    "approx_vram_bytes": 7500000000
+  }
+}

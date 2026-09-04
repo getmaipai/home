@@ -33,16 +33,21 @@ before it can do its real job. Both are additive: the request/response
 shapes above only grow fields, so a future pass doesn't need to change
 what's here, just add to it.
 
-**No `ModelCapabilities` record this pass.** 4.11 names one ("context,
-tools, JSON schema, grammar, vision, think-mode key, template source,
-sampling, engine flags, quality tier, safety notes, licence"), but it
-exists to describe *catalog model packages* and *dropped-in GGUFs a user
-picked*, neither of which exist yet (no catalog, no install flow, 4.10).
-Writing that schema now, with nothing to populate it and no code that
-reads it, would be a speculative shape guessed from the plan's prose
-rather than grounded in a real producer and consumer. Deferred until the
-package host's store/install flow (4.10) or a real BYO-model UI exists to
-need it; noted here so it isn't rediscovered as a surprise gap.
+**`ModelCapabilities` landed 2026-09-04, narrower than 4.11's full list.**
+This section originally deferred it ("nothing to populate it and no code
+that reads it... a speculative shape") until a real producer and consumer
+existed. Both do now: `backend/src/lib/hardware.ts` (real hardware
+detection) and the model-selection wizard's informational half
+(`frontend/src/apps/settings/ModelsSection.tsx`). `spec/schemas/model-
+capabilities.schema.json` only carries the fields those two actually use
+(id, role, license, engine, sizing, pros/cons, implemented) - 4.11's
+fuller list ("tools, JSON schema, grammar, vision, think-mode key,
+template source, sampling, safety notes") stays a named gap, still
+unpopulated because nothing yet produces or reads those specific fields.
+See `docs/dev.md`'s "Hardware detection and the model-selection wizard"
+entry for what was built and what's still deferred (the download queue,
+engine-launch auto-tuning, and any real image/video backend to run the
+catalog's `image`/`video` entries against).
 
 ## What's real vs. stubbed
 
@@ -117,14 +122,15 @@ of 4.5 (the turn engine, which will own real request budgeting) or a
 later 4.11 pass (once a real engine's concurrency behavior is known)
 addresses it, not fixed with a guess here.
 
-## A decision genuinely left to Jesse, not guessed
+## Narrowed, not fully closed
 
-Which GGUF is the default `chat` model, and what hardware the real
-household hub runs on (this dev machine has Apple Silicon/Metal; the
-deployed hub is unknown hardware to this session). Both determine real
-choices (context size, quantization, whether CUDA/Vulkan/Metal binaries
-matter) that the archived legacy hub's own latency/eval numbers (4.11)
-are the bar to clear. Nothing in this pass blocks on that decision: the
-stub keeps the whole router path provable without it, and
-`MAIPAI_LLAMA_SERVER_URL`/`_BIN`/`MAIPAI_CHAT_MODEL_PATH` are ready to
-point at a real answer the moment Jesse picks one.
+The hardware is now known (2026-09-04): this dev machine (Apple Silicon,
+24GB unified) and Jesse's MSI laptop (RTX 2070 Super 8GB built-in, RTX
+3070 8GB always-docked eGPU). `modelCatalog.ts`'s catalog recommends
+Qwen3 8B Instruct (Q4_K_M) as the `chat` role's pick, fit-checked against
+both. What's still genuinely open: no GGUF has been downloaded, no
+`llama-server` binary fetched for either platform (Metal vs CUDA), and no
+download-job queue exists to do either safely (a multi-GB action onto
+Jesse's real machines, deliberately not auto-triggered - see docs/dev.md).
+`MAIPAI_LLAMA_SERVER_URL`/`_BIN`/`MAIPAI_CHAT_MODEL_PATH` are still ready
+to point at a real answer the moment that queue exists and downloads one.

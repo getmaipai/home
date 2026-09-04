@@ -1,6 +1,11 @@
 import type { Person } from "@maipai/spec/gen/ts/person.js";
 import type { SafetyResult } from "@maipai/spec/gen/ts/safety-result.js";
+import type { ModelCapabilities } from "@maipai/spec/gen/ts/model-capabilities.js";
 import type { conversationTurns } from "./db/schema";
+// hardware.ts has zero "@/"-aliased imports of its own, unlike backup.ts
+// and modelCatalog.ts below, so its types are re-exported directly
+// instead of hand-copied a second time.
+export type { HardwareInfo, CudaDevice } from "./lib/hardware";
 
 // The wire shapes a browser client needs, kept alias-free (relative
 // imports only, never "@/...") so frontend/src/lib/api.ts can import this
@@ -53,6 +58,17 @@ export interface BackupInfo {
   filename: string;
   createdAt: string;
   bytes: number;
+}
+
+// Inlined rather than re-exported from lib/modelCatalog.ts (which uses
+// "@/"-aliased imports internally, unlike lib/hardware.ts above): the
+// same reason BackupInfo is a hand-copy of backup.ts's shape.
+export interface ModelFit {
+  model: ModelCapabilities;
+  fits: boolean;
+  contextUsed?: number;
+  requiredBytes: number;
+  budgetBytes: number;
 }
 
 // The role-string half of lib/access.ts's isOwnerOrAdmin(actor: PersonRow):

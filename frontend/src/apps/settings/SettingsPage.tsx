@@ -1,6 +1,7 @@
 import { Page } from "@/kit/primitives/Page";
 import { SettingsRenderer } from "@/kit/settings/SettingsRenderer";
 import { BackupsSection } from "@/apps/settings/BackupsSection";
+import { ModelsSection } from "@/apps/settings/ModelsSection";
 import { ChangeSecretSection } from "@/apps/settings/ChangeSecretSection";
 import { isOwnerOrAdminRole, type Roster } from "@/lib/api";
 
@@ -33,6 +34,7 @@ export function SettingsPage({ person, onPersonChange }: SettingsPageProps) {
         <SettingsRenderer scope="household" scopeValue="household" />
         <div className="flex flex-col gap-6 px-4 pb-4">
           <ChangeSecretSection person={person} onChanged={onPersonChange} />
+          {canManageBackups ? <ModelsSection /> : null}
           {canManageBackups ? <BackupsSection /> : null}
         </div>
       </div>

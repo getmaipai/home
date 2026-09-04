@@ -1,0 +1,100 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://getmaipai.github.io/home/spec/schemas/model-capabilities.schema.json",
+  "title": "ModelCapabilities",
+  "description": "One catalog entry: a specific model file (or checkpoint set) for one of backend/src/lib/llm.ts's roles, plus what it takes to run it. Platform plan 4.11 names this record ('context, tools, JSON schema, grammar, vision, think-mode key, template source, sampling, engine flags, quality tier, safety notes, licence') for describing catalog model packages and BYO GGUFs; spec/llm/README.md deferred writing it until a real producer (hardware detection) and consumer (the model-selection wizard/settings page) existed. Only the fields those actually use are populated; the rest of the plan's field list stays a named future gap, not guessed at here.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["id", "role", "label", "license", "engine", "sizing", "implemented"],
+  "properties": {
+    "id": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9-]*$",
+      "description": "Catalog id, e.g. 'qwen3-8b-instruct-q4-k-m'. Stable once published: settings values reference it by this id."
+    },
+    "role": {
+      "type": "string",
+      "enum": ["chat", "router", "embed", "vision", "image", "video", "coding", "tts", "stt", "wakeword"],
+      "description": "Matches backend/src/lib/llm.ts's LlmRole."
+    },
+    "label": { "type": "string", "minLength": 1, "description": "Display name, e.g. 'Qwen3 8B Instruct'." },
+    "license": { "type": "string", "minLength": 1 },
+    "engine": {
+      "type": "string",
+      "enum": ["llama-server", "comfyui"],
+      "description": "Which runtime hosts this model. Only llama-server is wired to a real backend today (llmSupervisor.ts); comfyui entries are catalog data ahead of that package existing."
+    },
+    "implemented": {
+      "type": "boolean",
+      "description": "False for a role with no real backend yet (image, video): the entry documents the decided pick without claiming it can be selected and run today."
+    },
+    "quality_tier": {
+      "type": "string",
+      "enum": ["draft", "standard", "high"]
+    },
+    "tags": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "pros": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Short, dad-readable upsides shown in the model-selection wizard."
+    },
+    "cons": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Short, dad-readable tradeoffs shown in the model-selection wizard."
+    },
+    "safety_notes": { "type": "string" },
+    "download": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["url", "sha256", "approx_bytes"],
+      "properties": {
+        "url": { "type": "string", "format": "uri" },
+        "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+        "approx_bytes": { "type": "integer", "minimum": 1 }
+      },
+      "description": "Absent for a placeholder entry with nowhere to download from yet."
+    },
+    "sizing": { "$ref": "#/$defs/sizing" }
+  },
+  "$defs": {
+    "sizing": {
+      "oneOf": [
+        { "$ref": "#/$defs/transformer_gguf_sizing" },
+        { "$ref": "#/$defs/diffusion_sizing" }
+      ]
+    },
+    "transformer_gguf_sizing": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "param_count_billion", "bits_per_weight", "num_layers", "num_kv_heads", "head_dim", "max_context"],
+      "properties": {
+        "kind": { "const": "transformer_gguf" },
+        "param_count_billion": { "type": "number", "exclusiveMinimum": 0 },
+        "bits_per_weight": { "type": "number", "exclusiveMinimum": 0, "description": "e.g. 4 for Q4_K_M, 8 for Q8_0." },
+        "gguf_overhead_fraction": {
+          "type": "number",
+          "minimum": 0,
+          "default": 0.1,
+          "description": "GGUF block metadata/scales over raw bit-packing (~0.05 for Q8_0, ~0.10 for Q4_K_M)."
+        },
+        "num_layers": { "type": "integer", "exclusiveMinimum": 0 },
+        "num_kv_heads": { "type": "integer", "exclusiveMinimum": 0, "description": "GQA key/value head count, not total attention heads. Using num_heads here overestimates KV cache by the GQA ratio." },
+        "head_dim": { "type": "integer", "exclusiveMinimum": 0 },
+        "max_context": { "type": "integer", "exclusiveMinimum": 0 }
+      }
+    },
+    "diffusion_sizing": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "approx_vram_bytes"],
+      "properties": {
+        "kind": { "const": "diffusion" },
+        "approx_vram_bytes": { "type": "integer", "minimum": 1, "description": "Measured/vendor-reported working VRAM for one generation at the checkpoint's normal resolution, not just the file size." }
+      }
+    }
+  }
+}
