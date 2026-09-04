@@ -13,6 +13,8 @@
 // doesn't fetch it here either - Pocket TTS's own server resolves and
 // caches the real `hf://` file itself, the same way it already does for
 // the 26 built-in presets (spec/voice/README.md).
+import { singleflight } from "@/lib/singleflight";
+
 // Overridable for tests only (MAIPAI_VOICE_CATALOG_URL, tests/preload.ts) -
 // the same "point the real fetch logic at a local fixture instead of the
 // real internet" shape MAIPAI_LLAMA_SERVER_URL/MAIPAI_TTS_URL already use,
@@ -85,31 +87,25 @@ interface CatalogCache {
 }
 
 let cache: CatalogCache | null = null;
-let fetching: Promise<VoiceCatalogEntry[]> | null = null;
 // A household session's own cache, not a background refresh job: this
 // list changes rarely (a fixed upstream dataset), so "refetch once per
 // hour of active use" is already generous, the same "cache like a
 // client" posture the org's third-party-service rules ask for.
 const CACHE_TTL_MS = 60 * 60 * 1000;
 
+const fetchCatalogOnce = singleflight(async () => {
+  const entries = await fetchFullCatalog();
+  cache = { entries, fetchedAt: Date.now() };
+  return entries;
+});
+
 /** The full catalog, fetched live on first use (or once the cache goes
- * stale) and shared by every concurrent caller in the meantime - the
- * same in-flight-promise-dedup shape llmSupervisor.ts's getChatClient()
- * and wakewordAssets.ts's ensureWakewordAssets() already use, so three
- * browser tabs opening the voice browser at once don't triple-fetch it. */
+ * stale) and shared by every concurrent caller in the meantime -
+ * singleflight() (lib/singleflight.ts) means three browser tabs opening
+ * the voice browser at once don't triple-fetch it. */
 export async function getVoiceCatalog(): Promise<VoiceCatalogEntry[]> {
   if (cache && Date.now() - cache.fetchedAt < CACHE_TTL_MS) return cache.entries;
-  if (!fetching) {
-    fetching = fetchFullCatalog()
-      .then((entries) => {
-        cache = { entries, fetchedAt: Date.now() };
-        return entries;
-      })
-      .finally(() => {
-        fetching = null;
-      });
-  }
-  return fetching;
+  return fetchCatalogOnce();
 }
 
 /** True only once a live catalog fetch has actually succeeded once -
@@ -124,5 +120,5 @@ export function isVoiceCatalogPath(entries: VoiceCatalogEntry[], path: string): 
 /** Test-only: the cache and in-flight fetch are module state. */
 export function __resetVoiceCatalogForTests(): void {
   cache = null;
-  fetching = null;
+  fetchCatalogOnce.__resetForTests();
 }

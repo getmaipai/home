@@ -19,6 +19,7 @@ import { existsSync } from "node:fs";
 import { join } from "node:path";
 import { downloadUrl } from "@/lib/modelDownload";
 import { wakewordDir } from "@/lib/paths";
+import { singleflight } from "@/lib/singleflight";
 
 const OWW_RELEASE_BASE = "https://github.com/dscripka/openWakeWord/releases/download/v0.5.1";
 
@@ -61,8 +62,6 @@ export function isWakewordAssetInstalled(file: string): boolean {
   return existsSync(wakewordAssetPath(file));
 }
 
-let ensuring: Promise<void> | null = null;
-
 /** Downloads every pinned wake-word asset not already on disk. Safe to
  * call on every request that needs one (routes/voice.ts): the frontend
  * pipeline loads mel, embedding, and the detector as three concurrent
@@ -70,21 +69,12 @@ let ensuring: Promise<void> | null = null;
  * otherwise race multiple downloadUrl() calls against the same
  * destination file - downloadUrl() has no locking of its own, so two
  * concurrent calls for the same file could corrupt each other's `.part`
- * file. One shared in-flight promise (llmSupervisor.ts's getChatClient()
- * carries the identical fix for the identical reason) means every
- * concurrent caller awaits the same real download instead of starting
- * their own; a failed attempt clears the cache so the next call retries
- * fresh rather than replaying the same rejection forever. */
-export async function ensureWakewordAssets(): Promise<void> {
-  if (!ensuring) {
-    ensuring = (async () => {
-      for (const asset of WAKEWORD_ALL_ASSETS) {
-        await downloadUrl(asset.url, wakewordAssetPath(asset.file), { expectedSha256: asset.sha256 });
-      }
-    })().catch((err) => {
-      ensuring = null;
-      throw err;
-    });
+ * file. singleflight() (lib/singleflight.ts) means every concurrent
+ * caller awaits the same real download instead of starting their own,
+ * and a failed attempt clears itself so the next call retries fresh
+ * rather than replaying the same rejection forever. */
+export const ensureWakewordAssets = singleflight(async (): Promise<void> => {
+  for (const asset of WAKEWORD_ALL_ASSETS) {
+    await downloadUrl(asset.url, wakewordAssetPath(asset.file), { expectedSha256: asset.sha256 });
   }
-  return ensuring;
-}
+});
