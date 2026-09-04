@@ -93,17 +93,8 @@
     },
     "data_sources": {
       "type": "array",
-      "items": {
-        "type": "object",
-        "additionalProperties": false,
-        "required": ["id", "destination", "retention"],
-        "properties": {
-          "id": { "type": "string" },
-          "destination": { "type": "string" },
-          "retention": { "type": "string" }
-        }
-      },
-      "description": "Feeds the generated privacy row (docs/ENGINEERING.md > Privacy)."
+      "items": { "$ref": "https://getmaipai.github.io/.github/standards/schemas/privacy-row.schema.json" },
+      "description": "Feeds the generated privacy row (docs/ENGINEERING.md > Privacy). The shape is @maipai/standards' PrivacyRow, imported by $ref (std-v0.2.0)."
     },
     "permissions": {
       "type": "array",

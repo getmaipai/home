@@ -10,19 +10,30 @@ import prettier from "prettier";
 const SCHEMAS_DIR = join(import.meta.dir, "..", "schemas");
 const OUT_DIR = join(import.meta.dir, "..", "gen", "ts");
 
-// Every schema's $id lives under this published-but-not-yet-live base URL
-// (spec/dev.md explains why: JSON Schema resolves relative $refs against
-// $id, so a same-repo $ref like "settings-key.schema.json" needs this base
-// mapped back to the local schemas/ dir for tooling that runs before
-// anything is actually published there).
-const ID_BASE = "https://getmaipai.github.io/home/spec/schemas/";
+// Every schema's $id lives under one of two published-but-not-yet-live base
+// URLs (spec/README.md explains why: JSON Schema resolves relative $refs
+// against $id, so a same-repo $ref like "settings-key.schema.json" needs
+// its base mapped back to a local dir for tooling that runs before
+// anything is actually published there). manifest.schema.json's
+// data_sources[] $refs the standards-owned PrivacyRow shape cross-repo, the
+// same way settings-key.schema.json is $ref'd within this repo.
+const LOCAL_ID_BASE = "https://getmaipai.github.io/home/spec/schemas/";
+const STANDARDS_ID_BASE = "https://getmaipai.github.io/.github/standards/schemas/";
+const STANDARDS_DIR = join(
+  process.env.MAIPAI_STANDARDS_DIR ?? join(import.meta.dir, "..", "..", "..", ".github"),
+  "standards",
+  "schemas",
+);
 
-const localIdResolver = {
+const idResolver = {
   order: 1,
-  canRead: (file: { url: string }) => file.url.startsWith(ID_BASE),
+  canRead: (file: { url: string }) =>
+    file.url.startsWith(LOCAL_ID_BASE) || file.url.startsWith(STANDARDS_ID_BASE),
   read: async (file: { url: string }) => {
-    const local = join(SCHEMAS_DIR, file.url.slice(ID_BASE.length));
-    return readFile(local);
+    if (file.url.startsWith(LOCAL_ID_BASE)) {
+      return readFile(join(SCHEMAS_DIR, file.url.slice(LOCAL_ID_BASE.length)));
+    }
+    return readFile(join(STANDARDS_DIR, file.url.slice(STANDARDS_ID_BASE.length)));
   },
 };
 
@@ -43,7 +54,7 @@ async function main() {
   for (const file of files) {
     const path = join(SCHEMAS_DIR, file);
     const dereferenced = await $RefParser.dereference(path, {
-      resolve: { http: localIdResolver },
+      resolve: { http: idResolver },
     } as Parameters<typeof $RefParser.dereference>[1]);
     const fileBase = basename(file, ".schema.json");
     // Match the Python side (datamodel-code-generator names the root class

@@ -8,14 +8,20 @@ import json
 from pathlib import Path
 
 import pytest
+from _standards import load_standards_module
 from pydantic import ValidationError
 
-from gen.py.error_entry_schema import ErrorEntry
 from gen.py.manifest_schema import PackageManifest
 from gen.py.memory_record_schema import MemoryRecord
 from gen.py.person_schema import Person
 from gen.py.setting_value_schema import SettingValue
 from gen.py.settings_key_schema import SettingsKey
+
+# ErrorEntry is standards-owned (std-v0.2.0), not generated here; loaded
+# from the sibling .github checkout the same way spec/schemas/manifest
+# .schema.json imports PrivacyRow by $ref. See tests/py/_standards.py for
+# why this isn't a plain "from gen.py..." import.
+ErrorEntry = load_standards_module("error_entry_schema").ErrorEntry
 
 SPEC_DIR = Path(__file__).resolve().parents[2]
 FIXTURES_DIR = SPEC_DIR / "fixtures" / "records"

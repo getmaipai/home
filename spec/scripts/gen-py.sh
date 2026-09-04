@@ -5,9 +5,12 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
+echo '== bundling schemas (resolves the cross-repo standards $ref)'
+bun run scripts/bundle-schemas.ts
+
 rm -rf gen/py
 uv run datamodel-codegen \
-  --input schemas \
+  --input schemas.resolved \
   --input-file-type jsonschema \
   --output gen/py \
   --output-model-type pydantic_v2.BaseModel \

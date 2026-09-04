@@ -10,7 +10,10 @@ import { SettingValue } from "../../gen/ts/setting-value.js";
 import { SettingsKey } from "../../gen/ts/settings-key.js";
 import { MemoryRecord } from "../../gen/ts/memory-record.js";
 import { PackageManifest } from "../../gen/ts/manifest.js";
-import { ErrorEntry } from "../../gen/ts/error-entry.js";
+// ErrorEntry is standards-owned (std-v0.2.0), not generated here; the error
+// catalogue's shape is imported from the sibling .github checkout, the same
+// way spec/schemas/manifest.schema.json imports PrivacyRow by $ref.
+import { ErrorEntry } from "../../../../.github/standards/gen/ts/error-entry.js";
 
 const FIXTURES_DIR = join(import.meta.dir, "..", "..", "fixtures", "records");
 

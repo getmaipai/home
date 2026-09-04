@@ -7,7 +7,7 @@ from typing import Any, Literal
 
 from pydantic import AnyUrl, BaseModel, ConfigDict, Field, conint, constr
 
-from . import settings_key_schema
+from . import privacy_row_schema, settings_key_schema
 
 
 class Routing(BaseModel):
@@ -20,15 +20,6 @@ class Routing(BaseModel):
         min_length=5,
     )
     patterns: list[constr(min_length=1)] | None = None
-
-
-class DataSource(BaseModel):
-    model_config = ConfigDict(
-        extra='forbid',
-    )
-    id: str
-    destination: str
-    retention: str
 
 
 class Source(BaseModel):
@@ -106,9 +97,9 @@ class PackageManifest(BaseModel):
         ..., description='Stated offline behavior, required at bronze.'
     )
     config: list[settings_key_schema.SettingsKey] | None = None
-    data_sources: list[DataSource] | None = Field(
+    data_sources: list[privacy_row_schema.PrivacyRow] | None = Field(
         None,
-        description='Feeds the generated privacy row (docs/ENGINEERING.md > Privacy).',
+        description="Feeds the generated privacy row (docs/ENGINEERING.md > Privacy). The shape is @maipai/standards' PrivacyRow, imported by $ref (std-v0.2.0).",
     )
     permissions: list[str] | None = Field(
         None,

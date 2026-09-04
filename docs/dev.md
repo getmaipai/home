@@ -42,19 +42,24 @@ set. Full architecture: platform plan chapters 1, 3, and 4.
 ## Hub v0.1 status
 
 - [x] `home/spec/` v0.1: JSON Schema for Person, Setting, Memory/Entity/
-      Episode, the package manifest/recipe/result shapes, the error
-      catalogue; the settings registry (empty, ready for the first
-      declaration) and the capability/permissions vocabularies; UI schema
-      v0 for Chat only; both recipe interpreters (TS and Python, kept
-      behaviorally identical) and both host emulators; generated Zod and
-      Pydantic v2 bindings for every schema, committed; fixtures that
-      round-trip through both, plus recipe conformance fixtures proving
-      both interpreters agree. See `spec/README.md`. Not yet done: cutting
-      the `spec-v0.1.0` tag (nothing pins it yet, since `bot` doesn't
-      exist as real content in this session) and the standards schemas
-      import (`logging.json`/`trace.json`/`errors.json`/`budgets.json`/
-      `privacy.json` from `@maipai/standards`, which doesn't have them
-      yet either, per its own README's "later versions add" list).
+      Episode, the package manifest/recipe/result shapes; the settings
+      registry (empty, ready for the first declaration) and the
+      capability/permissions vocabularies; UI schema v0 for Chat only;
+      both recipe interpreters (TS and Python, kept behaviorally
+      identical) and both host emulators; generated Zod and Pydantic v2
+      bindings for every schema, committed; fixtures that round-trip
+      through both, plus recipe conformance fixtures proving both
+      interpreters agree. See `spec/README.md`.
+- [x] `@maipai/standards` std-v0.2.0 (`.github`): the five cross-cutting
+      schemas (logging line, trace span, error entry, budget, privacy
+      row), each generated to both bindings and fixture-tested there too.
+      `home/spec/`'s error catalogue and the manifest's `data_sources[]`
+      import `ErrorEntry`/`PrivacyRow` from it by cross-repo `$ref`; see
+      spec/README.md's "Cross-repo schemas" section for exactly how,
+      including a real codegen gotcha (recipe.schema.json's internal
+      oneOf breaks if the cross-repo resolution is done too bluntly).
+- [ ] Not yet done: cutting the `spec-v0.1.0` tag (nothing pins it yet,
+      since `bot` doesn't exist as real content in this session).
 - [ ] Core (identity, people, safety layer, memory, turn engine, settings,
       scheduler, package host, llama-server router) - not started.
 - [ ] The shell and kit, Chat and Companions as packages, the wizard,

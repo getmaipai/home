@@ -2,22 +2,29 @@
 
 Source of truth for everything the hub and robot agree on. Platform plan
 chapter 3. This is **spec v0.1**: Person, Setting, Memory/Entity/Episode,
-the package manifest/recipe/result shapes, the error catalogue, the
-settings registry, the capability and permissions vocabularies, UI schema
-v0 (Chat only), both recipe interpreters, and both host emulators, per the
-Hub v0.1 scope in the platform plan's roadmap (chapter 13). Everything else
-chapter 3 describes (Capability grant, Content ceiling, Integration,
-Device, the link API, the LLM and voice contracts) lands with the release
-that needs it, not now.
+the package manifest/recipe/result shapes, the settings registry, the
+capability and permissions vocabularies, UI schema v0 (Chat only), both
+recipe interpreters, and both host emulators, per the Hub v0.1 scope in
+the platform plan's roadmap (chapter 13). Everything else chapter 3
+describes (Capability grant, Content ceiling, Integration, Device, the
+link API, the LLM and voice contracts) lands with the release that needs
+it, not now.
+
+The error catalogue's *shape* (`ErrorEntry`) and the privacy row shape
+(`PrivacyRow`, used by the manifest's `data_sources[]`) are owned by
+`@maipai/standards` (std-v0.2.0) and imported by `$ref`, not defined here;
+see "Cross-repo schemas" below. The populated error catalogue itself
+(`errors/errors.json`) is this repo's own content.
 
 ## Layout
 
 | Path | What it is | Hand-written or generated |
 |---|---|---|
 | `schemas/*.schema.json` | JSON Schema 2020-12, the source of truth for every record and package shape | hand-written |
+| `schemas.resolved/` | A local-only copy of `schemas/` with the cross-repo standards `$ref` swapped for a local file; not committed, `gen-py.sh`'s input | generated build output, gitignored |
 | `gen/ts/` | Zod schemas + TS types, one file per `schemas/*.schema.json` | generated, committed. `bun run gen:ts` |
 | `gen/py/` | Pydantic v2 models, same schemas | generated, committed. `bash scripts/gen-py.sh` |
-| `errors/errors.json` | The error catalogue (conforms to `schemas/error-entry.schema.json`) | hand-written |
+| `errors/errors.json` | The error catalogue, conforming to `@maipai/standards`' `ErrorEntry` shape | hand-written |
 | `settings/keys.json` | The settings registry (conforms to `schemas/settings-key.schema.json`); empty until core or a package declares a key | generated from declarations, currently empty |
 | `vocab/capabilities.json` | The capability vocabulary (3.2) | hand-written |
 | `vocab/permissions.json` | The permissions vocabulary, the install prompt's fixed enum (3.2) | hand-written |
@@ -51,6 +58,39 @@ uv run ruff check . && uv run ruff format --check .
 ```
 
 All of this runs from `home`'s `scripts/check.sh`.
+
+## Cross-repo schemas: how `@maipai/standards` gets imported
+
+`manifest.schema.json`'s `data_sources[]` `$ref`s
+`https://getmaipai.github.io/.github/standards/schemas/privacy-row.schema.json`
+(a sibling repo's schema, the same way `settings-key.schema.json` is
+`$ref`'d within this repo). Both codegen targets need this resolved
+before they can run, but differently:
+
+- **TS** (`scripts/gen-ts.ts`): `$RefParser.dereference()` inlines it
+  directly via a resolver override that maps the standards `$id` base back
+  to `../.github/standards/schemas/` on disk (`MAIPAI_STANDARDS_DIR`
+  overrides the sibling path).
+- **Python** (`scripts/gen-py.sh`): first runs `scripts/bundle-schemas.ts`,
+  which copies every `schemas/*.schema.json` byte-for-byte into
+  `schemas.resolved/`, rewrites only the standards `$ref` string to a bare
+  local filename, and copies the referenced standards schema alongside it.
+  `datamodel-code-generator` then resolves it exactly the way it already
+  resolves `settings-key.schema.json`: as a same-directory file, producing
+  a real `from . import privacy_row_schema` line, not an inlined blob.
+
+Both stop short of `$RefParser.dereference()`/`.bundle()` on the *whole*
+document: either one, tried first, corrupted `recipe.schema.json`'s
+internal `oneOf` of seven step types into a pile of duplicate, oddly
+numbered classes (or, for `.bundle()`, something `json-schema-to-zod`
+couldn't follow at all and silently fell back to `z.any()`, losing
+validation entirely). The `gen-ts.ts`/`bundle-schemas.ts` comments explain
+this in more detail; don't "simplify" either script back to a blanket
+resolve without re-checking `recipe.ts`'s `steps` field afterward.
+
+This means `standards/gen/ts/` and `standards/gen/py/` (in the sibling
+`.github` checkout) need to already be generated before `home`'s codegen
+runs; `home`'s `check.sh` doesn't currently verify that for you.
 
 ## How the robot pins this
 
