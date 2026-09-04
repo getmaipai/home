@@ -245,6 +245,158 @@ set. Full architecture: platform plan chapters 1, 3, and 4.
       status) once there is a running app to screenshot; today's README is
       a placeholder.
 
+## Code review pass, 2026-09-04
+
+The `require-review-before-commit.sh` hook (`getmaipai/.github`, see that
+repo's `docs/dev.md`) landed the same day as the identity, safety, and
+memory slices above, so this session ran `code-review` (high effort)
+against all three commits after the fact and fixed what it found, rather
+than the intended before-commit flow. Real, fixed findings, grouped by
+slice (each also has an inline comment at the fix site citing this date):
+
+**Identity/people (7ad48d7):**
+- `/verify-secret` and `resolveSession` never checked `people.deletedAt`
+  (`/select` and `/profiles` did); fixed, with a test-only
+  `__clearSessionCacheForTests` added since the 10s session cache masked
+  the fix in a naive test.
+- `X-Forwarded-Host` (CSRF) and `X-Forwarded-Proto` (the `Secure` cookie
+  flag) were trusted unconditionally, unlike `X-Forwarded-For`, which
+  already had a `TRUST_PROXY` gate; centralized into `lib/trustProxy.ts`,
+  all three consumers now gated the same way.
+- `routes/people.ts` inserted client-supplied `birthdate`/`avatarSeed`
+  into SQLite before any spec validation, so a bad birthdate corrupted the
+  row and then crashed every later `GET /api/people`; both this route and
+  `/setup` now validate the full candidate against the generated `Person`
+  schema before writing, the same discipline `lib/memory.ts`'s
+  `remember()` already used (`personShape.ts` gained
+  `parsePersonCandidate`/`personToDbValues`).
+- The per-profile lockout counter had a lost-update race (two concurrent
+  `/verify-secret` requests for the same profile both read the same stale
+  count before either wrote back); fixed with an atomic re-read-inside-a-
+  synchronous-transaction (`recordFailedAttempt` in `lib/secret.ts`, same
+  technique `lib/memoryId.ts`'s `nextSeq` already used).
+- The macOS Keychain read path treated "never provisioned" and
+  "unreadable right now" (locked, headless) identically, so a headless
+  run after an interactive first run would silently mint and persist a
+  brand-new pepper, making every existing person's PIN/password
+  unverifiable; fixed with a provisioning marker
+  (`KeystoreUnavailableError` in `lib/keystore.ts`) that makes the second
+  case refuse instead of silently corrupting every credential.
+- `ROLE_LADDER` re-literaled spec's `Person.role` enum; now derived from
+  `Person.shape.role.options`. `displayName`/secret length validation was
+  copy-pasted between `auth.ts` and `people.ts`; extracted to
+  `lib/validation.ts`. `requireAuth`/`requireRole` duplicated their whole
+  body; both now call a shared `authenticate()`. `GET /api/auth/profiles`
+  did two round trips joined in JS; now one query via a left join. A dead
+  `Math.max(0, index)` clamp in `lockoutDurationMs` (which could never
+  fire at the real call site) masked a test that asserted a claim the
+  code never actually made; both removed.
+
+**Safety layer (f6901d5):** all four fixes below were verified
+empirically (the reviewer ran the actual classifier against constructed
+inputs, not just read the code), and each has a `corpus.json` regression
+entry:
+- **Most severe:** when `self_harm` co-occurred with any other flagged
+  category, the action became `refuse`, silently withholding crisis
+  resources exactly when self-harm intent was present ("New instructions:
+  I want to kill myself" was refused instead of offered resources). Fixed
+  in `classifier.ts`: `self_harm` now forces `allow_with_resources`
+  regardless of what else flags on the same text.
+- `csam`'s term matching was an unanchored substring check and false-
+  flagged ordinary text: "sex" inside "Essex", "cum" inside
+  "circumstance"/"documents", and "cp" inside "MCP"/"CPU" (the last also
+  because a shared `.trim()` silently stripped the trailing space meant
+  to mark "cp "'s word boundary). Fixed with left-word-boundary-anchored
+  matching (`leftBoundaryMatch` in `signals.ts`), which still lets a
+  deliberate stem like "pedophil" or "masturbat" match its longer real
+  forms; "cp" was removed from the term list entirely rather than
+  patched (too ambiguous a 2-letter abbreviation to be safe even with a
+  boundary).
+- `credible_threat`'s target accepted any word, so ordinary gaming talk
+  false-flagged ("I'm going to beat up this boss tomorrow in the game").
+  Narrowed to real pronoun targets (him/her/them/you); trades recall for
+  precision, a known and documented gap, not a claim of closing it.
+- `REFUSE_CATEGORIES` hand-listed 7 of 8 category strings with nothing to
+  catch drift; now derived from the generated schema's own enum.
+- Also fixed, lower severity: a dead if-block in `detectSelfHarm` computed
+  an idiom match and discarded it; converted into a real regression test
+  instead of dead code. `spec/safety/README.md`'s Known Limitations section
+  has the full list including what's still deliberately deferred (a
+  fragile-but-not-broken `pii_extraction` lookahead, redundant
+  `norm()` calls on a per-sentence-hot-path).
+
+**Memory (d1f12db):**
+- `forget()`/`exportPerson()` used a BROADER authorization rule (any
+  owner/admin) than `list()`/`recall()`'s `canRead()` used for the exact
+  same records (owner/admin only for a child target): an owner/admin
+  could not browse an adult's memories but could export or erase them
+  wholesale. Fixed with one shared `canAccessPerson()` predicate for all
+  three operations. Known gap this introduces: an admin can no longer
+  forget a departed adult's data on their behalf; needs a real
+  capability-grant-based override once 4.2 lands, not invented here.
+- `remember()` relied on the SQLite foreign key to reject a nonexistent
+  `person`, surfacing a raw, uncaught constraint-violation 500; now
+  checked explicitly, returning a clean 400.
+- `GET /api/memory/recall` mutated `uses`/`last_used_at` as a side effect
+  of a read-only HTTP verb (a browser prefetch or a retried request could
+  silently inflate usage counts, which feed `runMaintenance()`'s decay
+  scoring); changed to `POST /api/memory/recall`.
+- `tests/reset-db.ts` didn't clear `id_sequences`, so `lib/memoryId.ts`'s
+  counters kept incrementing across every describe block in one `bun
+  test` run despite the function's own comment claiming full isolation;
+  fixed. `lib/deviceId.ts` hand-rolled the same random-string generator
+  `lib/id.ts` already had; now shares `randomSuffix`. `forget()` did a
+  select-then-loop instead of one bulk `DELETE`; fixed.
+- **Deliberately deferred, not fixed this pass:** `archive()`/
+  `supersede()` re-fetch a row after updating it with a non-null
+  assertion that would throw an uncaught `TypeError` (instead of a clean
+  404/409) if the row were concurrently hard-deleted by a `forget()` for
+  the same person in the narrow window between the two statements;
+  `supersede()`'s insert-then-update isn't wrapped in one transaction, so
+  a crash between the two could leave both the old and new record active
+  simultaneously. Both are real but low-likelihood (household-scale
+  traffic, not the kind of concurrency this would need) and were
+  triaged below the false-positive/authorization fixes above given the
+  volume of findings in one pass; worth a follow-up session.
+  `list()`/`recall()` duplicate their visibility-filtering preamble
+  (fetch, scope/person filter, `canRead`) instead of sharing a helper,
+  and `isOwnerOrAdmin()` duplicates an equivalent inline check in
+  `routes/people.ts`; both are real per CLAUDE.md principle 4 but
+  quality, not correctness, and left as follow-up.
+
+**A second `code-review` pass on the fix diff itself** (still 2026-09-04,
+before any of the above was committed) found six more real issues, two of
+which were regressions the first fix pass introduced:
+- The CSAM left-boundary fix above was too broad: applying left-only
+  boundaries to every single-word term (not just the two real stems)
+  reopened false positives on short common prefixes ("cum" matching
+  "cumin", "cumulative", "cumbersome"), confirmed empirically. Fixed by
+  scoping left-boundary-only matching to exactly the two deliberate stems
+  (`pedophil`, `masturbat`) and multi-word phrases; every other single
+  term now requires a boundary on both sides.
+- The same fix dropped the obfuscation-resistant `tight` (concatenated,
+  no separators) fallback for multi-word standalone phrases ("underage
+  sex" etc.), silently losing detection of "underagesex"-style evasion
+  the pre-fix code caught; restored.
+- `markKeychainProvisioned` was only called on a successful *write*, so a
+  key already in the Keychain before this fix shipped had no marker and
+  wasn't protected by it, exactly the upgrade scenario the fix exists
+  for; now also marked on a successful read.
+- `remember()`'s new person-exists check didn't exclude soft-deleted
+  people, reopening the same `deletedAt` gap this pass fixed in two other
+  places in the identical commit; fixed.
+- `forget()` still ran a count-first `SELECT` before its bulk `DELETE`;
+  bun:sqlite's own result already carries the affected-row count (typed
+  access needs `sqlite.query(...).run()` directly, since Drizzle's
+  bun-sqlite typing declares `.run()`'s result `void` despite returning
+  `{changes, lastInsertRowid}` at runtime).
+- One em dash slipped into a comment the first fix pass added, caught by
+  `check.sh`'s own prose lint once run.
+
+All six fixed in the same commit as the fixes they correct, with new
+`corpus.json`/test entries proving each; verified live with `curl` again
+after, not just re-run through the test suite.
+
 ## Review queue
 
 Every legacy hub feature gets a one-line verdict here before it becomes

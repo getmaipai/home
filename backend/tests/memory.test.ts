@@ -5,7 +5,7 @@ import { resetDb } from "./reset-db";
 import { __resetThrottleForTests } from "@/lib/secretThrottle";
 import { eq } from "drizzle-orm";
 import { db } from "@/db";
-import { memoryRecords } from "@/db/schema";
+import { memoryRecords, people } from "@/db/schema";
 
 beforeEach(() => {
   resetDb();
@@ -97,6 +97,45 @@ describe("POST /api/memory (remember)", () => {
       category: "not-a-real-category",
       tier: "durable",
       scope: "household",
+      source: "test",
+      importance: 0.5,
+    });
+    expect(res.status).toBe(400);
+  });
+
+  test("a typo'd person id is a clean 400, not a raw FK-constraint 500", async () => {
+    // A code review (2026-09-04) found this reaching the SQLite foreign
+    // key and surfacing an uncaught "FOREIGN KEY constraint failed" 500.
+    const owner = new TestClient();
+    await owner.post("/api/auth/setup", { displayName: "Sage", secret: "correcthorse" });
+    const res = await owner.post("/api/memory", {
+      text: "test",
+      category: "fact",
+      tier: "durable",
+      scope: "person",
+      person: "person-doesnotexist",
+      source: "test",
+      importance: 0.5,
+    });
+    expect(res.status).toBe(400);
+  });
+
+  test("a soft-deleted person is not a valid write target either", async () => {
+    // A follow-up review found the first cut of the FK-existence check
+    // above didn't exclude deletedAt, unlike the deletedAt-awareness this
+    // same pass added to resolveSession()/verify-secret.
+    const { owner, childId } = await ownerAndChild();
+    db.update(people)
+      .set({ deletedAt: new Date().toISOString() })
+      .where(eq(people.id, childId))
+      .run();
+
+    const res = await owner.post("/api/memory", {
+      text: "test",
+      category: "fact",
+      tier: "durable",
+      scope: "person",
+      person: childId,
       source: "test",
       importance: 0.5,
     });
@@ -214,7 +253,7 @@ describe("GET /api/memory (list) and visibility", () => {
   });
 });
 
-describe("GET /api/memory/recall", () => {
+describe("POST /api/memory/recall", () => {
   test("scores by keyword overlap and touches usage on returned matches", async () => {
     const owner = new TestClient();
     await owner.post("/api/auth/setup", { displayName: "Sage", secret: "correcthorse" });
@@ -235,7 +274,7 @@ describe("GET /api/memory/recall", () => {
       importance: 0.1,
     });
 
-    const res = await owner.get("/api/memory/recall?q=" + encodeURIComponent("what milk does Riff like"));
+    const res = await owner.post("/api/memory/recall", { q: "what milk does Riff like" });
     const body = (await res.json()) as Array<{ record: MemoryRecord; score: number }>;
     expect(body.length).toBeGreaterThan(0);
     expect(body[0]!.record.text).toContain("oat milk");
@@ -272,7 +311,7 @@ describe("GET /api/memory/recall", () => {
       importance: 0.3,
     });
 
-    const res = await owner.get("/api/memory/recall?q=" + encodeURIComponent("Sprout"));
+    const res = await owner.post("/api/memory/recall", { q: "Sprout" });
     const body = (await res.json()) as Array<{ record: MemoryRecord; score: number }>;
     const vetMatch = body.find((m) => m.record.text.includes("vet appointment"));
     const carMatch = body.find((m) => m.record.text.includes("oil change"));
@@ -301,7 +340,7 @@ describe("GET /api/memory/recall", () => {
       importance: 0.3,
     });
 
-    const res = await owner.get("/api/memory/recall?q=" + encodeURIComponent("Ann"));
+    const res = await owner.post("/api/memory/recall", { q: "Ann" });
     const body = (await res.json()) as Array<{ record: MemoryRecord; score: number }>;
     const picnicMatch = body.find((m) => m.record.text.includes("annual picnic"));
     expect(picnicMatch).toBeUndefined();
@@ -392,6 +431,51 @@ describe("forget and export", () => {
     const clientA = new TestClient();
     await clientA.post("/api/auth/verify-secret", { personId: a.id, secret: "pass1234" });
     const res = await clientA.post("/api/memory/forget", { personId: b.id });
+    expect(res.status).toBe(403);
+  });
+
+  // A code review (2026-09-04) found forget()/exportPerson() using a
+  // BROADER rule than list()/recall()'s canRead(): an owner/admin could
+  // not browse an adult's person-scoped memories but could export or
+  // erase them wholesale. These two tests prove the fixed, shared rule:
+  // owner/admin access to a person's memories (read, export, or forget)
+  // matches exactly, same as a child's does above.
+  test("an owner/admin cannot export an adult's memories, only a child's", async () => {
+    const owner = new TestClient();
+    await owner.post("/api/auth/setup", { displayName: "Sage", secret: "correcthorse" });
+    const createdAdult = await owner.post("/api/people", {
+      displayName: "Nova",
+      role: "adult",
+      secret: "correcthorse2",
+    });
+    const adult = (await createdAdult.json()) as { id: string };
+    const adultClient = new TestClient();
+    await adultClient.post("/api/auth/verify-secret", { personId: adult.id, secret: "correcthorse2" });
+    await adultClient.post("/api/memory", {
+      text: "Nova's private memory",
+      category: "fact",
+      tier: "durable",
+      scope: "person",
+      person: adult.id,
+      source: "test",
+      importance: 0.5,
+    });
+
+    const res = await owner.get(`/api/memory/export?personId=${adult.id}`);
+    expect(res.status).toBe(403);
+  });
+
+  test("an owner/admin cannot forget an adult's memories, only a child's", async () => {
+    const owner = new TestClient();
+    await owner.post("/api/auth/setup", { displayName: "Sage", secret: "correcthorse" });
+    const createdAdult = await owner.post("/api/people", {
+      displayName: "Nova",
+      role: "adult",
+      secret: "correcthorse2",
+    });
+    const adult = (await createdAdult.json()) as { id: string };
+
+    const res = await owner.post("/api/memory/forget", { personId: adult.id });
     expect(res.status).toBe(403);
   });
 

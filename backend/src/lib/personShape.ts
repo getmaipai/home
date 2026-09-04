@@ -31,3 +31,31 @@ export function toRoster(row: PersonRow): Omit<Person, "birthdate"> {
   const { birthdate: _birthdate, ...roster } = toPerson(row);
   return roster;
 }
+
+// The other direction: validate a candidate Person BEFORE it reaches
+// SQLite, the same discipline lib/memory.ts's remember() already uses. A
+// code review (2026-09-04) found routes/people.ts inserting
+// client-supplied birthdate/avatarSeed straight into the table with only
+// ad hoc length checks, so an invalid birthdate corrupted the row and
+// then crashed toRoster()'s Person.parse() on every later read of the
+// whole roster (not just that request). safeParse here means a bad
+// candidate is rejected before any write happens.
+export function parsePersonCandidate(candidate: unknown) {
+  return Person.safeParse(candidate);
+}
+
+export function personToDbValues(person: Person) {
+  return {
+    id: person.id,
+    displayName: person.display_name,
+    nickname: person.nickname,
+    birthdate: person.birthdate,
+    role: person.role,
+    avatarSeed: person.avatar_seed,
+    source: person.source,
+    localOnly: person.local_only,
+    createdAt: person.created_at,
+    updatedAt: person.updated_at,
+    deletedAt: person.deleted_at,
+  };
+}

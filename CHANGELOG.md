@@ -7,6 +7,26 @@ checklist (`docs/dev.md`); no release has been cut yet.
 
 ## [Unreleased]
 
+### Fixed
+- A `code-review` pass (2026-09-04) across the identity, safety, and
+  memory slices found and fixed real bugs, the most severe being a
+  safety-invariant violation: `self_harm` co-occurring with another
+  flagged category (e.g. a jailbreak framing wrapped around a genuine
+  self-harm statement) silently withheld crisis resources instead of
+  offering them. Also fixed: `csam` and `credible_threat` false-positives
+  on ordinary text ("MCP", "Essex", gaming talk); a soft-deleted person's
+  session and credentials still working; `X-Forwarded-Host`/`-Proto`
+  trusted unconditionally (CSRF and cookie-security gaps matching a fix
+  already applied to `X-Forwarded-For`); an owner/admin able to export or
+  erase an adult's private memories despite being unable to browse them; a
+  lost-update race in the sign-in lockout counter; a macOS Keychain
+  failure mode that could silently corrupt every stored PIN/password. A
+  second review pass on the fix diff itself, before committing, caught
+  two regressions the first pass introduced (an over-broad CSAM
+  false-positive fix, a dropped obfuscation-resistance check) plus four
+  smaller gaps; all fixed in the same commit. Full list with fix-site
+  details in `docs/dev.md`'s "Code review pass, 2026-09-04" section.
+
 ### Added
 - Memory (platform plan 4.4), the third slice of hub core: the store
   (`backend/src/lib/memory.ts`), built directly on the `MemoryRecord`

@@ -6,6 +6,7 @@
 
 import { getConnInfo } from "hono/bun";
 import type { Context } from "hono";
+import { TRUST_PROXY } from "@/lib/trustProxy";
 
 const WINDOW_MS = 15 * 60_000;
 const MAX_FAILS = 20;
@@ -17,14 +18,6 @@ interface Bucket {
   lockedUntil: number;
 }
 const buckets = new Map<string, Bucket>();
-
-// Only trust X-Forwarded-For when a reverse proxy is actually in front of
-// us. On a direct-exposed Bun appliance (the default), an attacker can
-// forge XFF on every request to get a fresh throttle bucket each time,
-// defeating the per-IP limit.
-const TRUST_PROXY =
-  process.env.TRUST_PROXY === "1" ||
-  !!(process.env.APP_ORIGIN ?? process.env.PUBLIC_ORIGIN);
 
 export function getClientIp(c: Context): string {
   if (TRUST_PROXY) {

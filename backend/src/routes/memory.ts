@@ -44,13 +44,27 @@ memoryRoutes.get("/", requireAuth, async (c) => {
   return c.json(list(actor, opts));
 });
 
-memoryRoutes.get("/recall", requireAuth, async (c) => {
+// POST, not GET: recall has a real side effect (it bumps uses/
+// last_used_at on every match, feeding decay scoring), so it isn't safe
+// for a client, proxy, or browser prefetch to replay. A code review
+// (2026-09-04) found this as a GET and pointed out exactly that risk
+// (link-prefetch, a polling dashboard, or a retried request after a
+// timeout silently inflating usage counts on records nobody actually
+// used).
+memoryRoutes.post("/recall", requireAuth, async (c) => {
   const actor = c.get("person");
-  const query = new URL(c.req.url).searchParams;
-  const q = query.get("q");
-  if (!q) return c.json({ error: "q is required" }, 400);
-  const opts = parseListOptions(query);
-  return c.json(recall(actor, q, opts));
+  const body = (await c.req.json().catch(() => ({}))) as {
+    q?: string;
+    scope?: string;
+    person?: string;
+  };
+  if (!body.q) return c.json({ error: "q is required" }, 400);
+  const opts: ListOptions = {};
+  if (body.scope === "household" || body.scope === "person" || body.scope === "self") {
+    opts.scope = body.scope;
+  }
+  if (body.person) opts.person = body.person;
+  return c.json(recall(actor, body.q, opts));
 });
 
 memoryRoutes.get("/export", requireAuth, async (c) => {

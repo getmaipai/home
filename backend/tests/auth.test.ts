@@ -1,9 +1,13 @@
 import { describe, expect, test, beforeEach } from "bun:test";
+import { eq } from "drizzle-orm";
 import { Person } from "@maipai/spec/gen/ts/person.js";
 import { app } from "@/app";
+import { db } from "@/db";
+import { people } from "@/db/schema";
 import { TestClient } from "./client";
 import { resetDb } from "./reset-db";
 import { __resetThrottleForTests } from "@/lib/secretThrottle";
+import { __clearSessionCacheForTests } from "@/middleware/auth";
 
 beforeEach(() => {
   resetDb();
@@ -175,5 +179,74 @@ describe("unauthenticated access", () => {
   test("/api/people requires a session", async () => {
     const res = await app.request("/api/people");
     expect(res.status).toBe(401);
+  });
+});
+
+// No route soft-deletes a person yet (delete-person is deferred, see
+// docs/dev.md), so these tests set deletedAt directly, the same way
+// tests/memory.test.ts backdates timestamps to test maintenance. A code
+// review (2026-09-04) found both /verify-secret and an existing session's
+// resolution never checked this.
+describe("soft-deleted people cannot authenticate", () => {
+  test("verify-secret refuses a soft-deleted profile even with the correct secret", async () => {
+    const setupClient = new TestClient();
+    const { person } = await setUpOwner(setupClient);
+    db.update(people)
+      .set({ deletedAt: new Date().toISOString() })
+      .where(eq(people.id, person.id as string))
+      .run();
+
+    const client = new TestClient();
+    const res = await client.post("/api/auth/verify-secret", {
+      personId: person.id,
+      secret: "correcthorse",
+    });
+    expect(res.status).toBe(404);
+  });
+
+  test("an existing session stops authenticating once the person is soft-deleted", async () => {
+    const client = new TestClient();
+    const { person } = await setUpOwner(client);
+    const meBefore = await client.get("/api/auth/me");
+    expect(meBefore.status).toBe(200);
+
+    db.update(people)
+      .set({ deletedAt: new Date().toISOString() })
+      .where(eq(people.id, person.id as string))
+      .run();
+    // The 10s session cache (documented in middleware/auth.ts) bounds how
+    // fast a DB-side deletion propagates to an already-cached session,
+    // same as any other profile edit; clear it here to test the read
+    // path itself rather than waiting out the TTL in a test.
+    __clearSessionCacheForTests();
+
+    const meAfter = await client.get("/api/auth/me");
+    expect(meAfter.status).toBe(401);
+  });
+});
+
+describe("forwarded-header trust (only behind TRUST_PROXY)", () => {
+  test("X-Forwarded-Host does not widen the CSRF allowlist when not trusting a proxy", async () => {
+    const client = new TestClient();
+    await setUpOwner(client);
+    const res = await client.post("/api/auth/logout", undefined, {
+      origin: "https://evil.example",
+      host: "hub.local",
+      "x-forwarded-host": "evil.example",
+    });
+    expect(res.status).toBe(403);
+  });
+
+  test("X-Forwarded-Proto does not flip the Secure cookie flag when not trusting a proxy", async () => {
+    const res = await app.request("/api/auth/setup", {
+      method: "POST",
+      headers: { "content-type": "application/json", "x-forwarded-proto": "https" },
+      body: JSON.stringify({ displayName: "Sage", secret: "correcthorse" }),
+    });
+    expect(res.status).toBe(201);
+    const setCookie = res.headers.get("set-cookie") ?? "";
+    // The real connection in this test harness is plain http, so Secure
+    // must NOT be set even though a spoofed X-Forwarded-Proto: https was sent.
+    expect(setCookie.toLowerCase()).not.toContain("secure");
   });
 });

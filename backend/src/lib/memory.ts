@@ -8,8 +8,8 @@
 // What's built here and what's deferred is documented in
 // docs/dev.md and repeated at the point it matters below; read that
 // before extending this file.
-import { eq, and, lt } from "drizzle-orm";
-import { db } from "@/db";
+import { eq, and, lt, isNull } from "drizzle-orm";
+import { db, sqlite } from "@/db";
 import { memoryRecords, people } from "@/db/schema";
 import { newMemoryRecordId } from "@/lib/memoryId";
 import { toMemoryRecord } from "@/lib/memoryShape";
@@ -29,22 +29,34 @@ function rolesById(): Map<string, string> {
   return new Map(rows.map((r) => [r.id, r.role]));
 }
 
+// Whether `actor` may access (read, export, or forget) `personId`'s own
+// scope=person records: themself, or owner/admin ONLY when the target is
+// a child (parity with 4.14's conversation-visibility rule: a parent sees
+// a child's, nothing of an adult's; teen support needs a summary
+// mechanism that doesn't exist yet, so teens are treated like adults
+// here, a deliberately conservative judgment call recorded in
+// docs/dev.md). A code review (2026-09-04) found forget()/exportPerson()
+// using a DIFFERENT, broader rule (any owner/admin, regardless of the
+// target's role) than list()/recall()'s canRead() used for the exact same
+// records, so an owner/admin could not browse an adult's memories but
+// could export or delete them wholesale. One predicate now, shared by
+// both: an owner/admin who cannot read an adult's memories cannot export
+// or erase them either. Known gap this introduces: an admin can no longer
+// forget a DEPARTED adult's data on their behalf (they'd need that
+// person's own session); worth a real capability-grant-based override
+// once 4.2's capability grants exist, not invented here.
+function canAccessPerson(actor: PersonRow, personId: string, roleOf: Map<string, string>): boolean {
+  if (actor.id === personId) return true;
+  return isOwnerOrAdmin(actor) && roleOf.get(personId) === "child";
+}
+
 // scope=self is "not shared with anyone" per the schema's own field
-// description: no read path, however privileged, ever returns it. scope=
-// person is visible to the person themself, or to owner/admin ONLY when
-// the owning person is a child (parity with 4.14's conversation-visibility
-// rule: a parent sees a child's, nothing of an adult's; teen support needs
-// a summary mechanism that doesn't exist yet, so teens are treated like
-// adults here for now, a deliberately conservative judgment call recorded
-// in docs/dev.md). Sensitive household memories are owner/admin only.
+// description: no read path, however privileged, ever returns it.
+// Sensitive household memories are owner/admin only.
 function canRead(actor: PersonRow, record: MemoryRecordRow, roleOf: Map<string, string>): boolean {
   if (record.scope === "self") return false;
   if (record.scope === "person") {
-    if (actor.id === record.person) return true;
-    if (isOwnerOrAdmin(actor) && record.person && roleOf.get(record.person) === "child") {
-      return true;
-    }
-    return false;
+    return !!record.person && canAccessPerson(actor, record.person, roleOf);
   }
   // household
   if (!record.sensitive) return true;
@@ -92,6 +104,25 @@ export function remember(actor: PersonRow, input: RememberInput): MemoryOpResult
   const person = input.scope === "person" ? (input.person ?? null) : null;
   const auth = assertCanWrite(actor, scope, person);
   if (!auth.ok) return auth;
+
+  // Checked here, not left to the SQLite foreign key: a code review
+  // (2026-09-04) found an owner/admin writing scope=person with a typo'd
+  // personId reached the FK constraint at insert time and got a raw,
+  // uncaught "FOREIGN KEY constraint failed" 500 instead of a clean 400.
+  // Only needed for the owner/admin path (assertCanWrite already proved
+  // actor.id === person on the self-write path, and an authenticated
+  // actor always exists). Excludes soft-deleted people too (a follow-up
+  // review found the first cut of this check didn't), matching the
+  // deletedAt-awareness this same pass added to resolveSession() and
+  // /verify-secret: a deleted person is not a valid write target either.
+  if (person && person !== actor.id) {
+    const exists = db
+      .select({ id: people.id })
+      .from(people)
+      .where(and(eq(people.id, person), isNull(people.deletedAt)))
+      .get();
+    if (!exists) return { ok: false, status: 400, error: `person not found: ${person}` };
+  }
 
   const recordKind = input.record_kind ?? "memory";
   const now = new Date().toISOString();
@@ -333,7 +364,7 @@ export function supersede(
 }
 
 function assertCanForgetOrExport(actor: PersonRow, personId: string): MemoryOpResult<true> {
-  if (actor.id === personId || isOwnerOrAdmin(actor)) return { ok: true, value: true };
+  if (canAccessPerson(actor, personId, rolesById())) return { ok: true, value: true };
   return { ok: false, status: 403, error: "cannot forget or export another person's memories" };
 }
 
@@ -342,19 +373,24 @@ function assertCanForgetOrExport(actor: PersonRow, personId: string): MemoryOpRe
  * distinct from the routine lifecycle above: this is a real DELETE, not a
  * tombstone. Only scope=person records for this person are touched;
  * household memories that happen to mention them are out of scope (a
- * much harder redaction problem, not attempted here). */
+ * much harder redaction problem, not attempted here). One bulk DELETE, not
+ * a select-then-loop (a code review, 2026-09-04, flagged the N+1 version). */
 export function forget(actor: PersonRow, personId: string): MemoryOpResult<{ deleted: number }> {
   const auth = assertCanForgetOrExport(actor, personId);
   if (!auth.ok) return auth;
-  const rows = db
-    .select({ id: memoryRecords.id })
-    .from(memoryRecords)
-    .where(and(eq(memoryRecords.scope, "person"), eq(memoryRecords.person, personId)))
-    .all();
-  for (const row of rows) {
-    db.delete(memoryRecords).where(eq(memoryRecords.id, row.id)).run();
-  }
-  return { ok: true, value: { deleted: rows.length } };
+  // One DELETE, no preceding SELECT: bun:sqlite's own result already
+  // carries the affected-row count (a follow-up review, 2026-09-04, found
+  // a redundant count-first SELECT still here after the N+1 loop was
+  // already replaced with a single DELETE). Raw sqlite, not
+  // db.delete().run(): Drizzle's bun-sqlite typing declares .run()'s
+  // result as void even though it returns {changes, lastInsertRowid} at
+  // runtime, so the typed changes count needs the same raw-sqlite escape
+  // hatch lib/secret.ts's recordFailedAttempt and lib/memoryId.ts's
+  // nextSeq already use.
+  const result = sqlite
+    .query("DELETE FROM memory_records WHERE scope = 'person' AND person = ?")
+    .run(personId);
+  return { ok: true, value: { deleted: result.changes } };
 }
 
 /** Per-person export (4.14): every scope=person record about them,

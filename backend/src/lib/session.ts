@@ -4,6 +4,7 @@ import { lt } from "drizzle-orm";
 import { randomBytes, createHash } from "node:crypto";
 import { db } from "@/db";
 import { sessions } from "@/db/schema";
+import { TRUST_PROXY } from "@/lib/trustProxy";
 import type { AppEnv } from "@/types";
 
 // Adapted from the legacy hub's lib/session.ts (principle 8).
@@ -45,8 +46,12 @@ export function issueSession(c: Context<AppEnv>, personId: string): void {
   // Secure automatically when the request arrived over HTTPS (directly or
   // via a TLS-terminating reverse proxy), without breaking plain-HTTP-on-LAN
   // deployments where a Secure cookie would simply never be sent.
+  // X-Forwarded-Proto is only trusted behind an actual reverse proxy
+  // (lib/trustProxy.ts): a code review (2026-09-04) found this trusted the
+  // header unconditionally, letting a direct client flip its own cookie's
+  // Secure flag by forging the header.
   const proto =
-    c.req.header("x-forwarded-proto")?.split(",")[0]?.trim() ??
+    (TRUST_PROXY ? c.req.header("x-forwarded-proto")?.split(",")[0]?.trim() : undefined) ??
     new URL(c.req.url).protocol.replace(":", "");
 
   setCookie(c, "session", token, {

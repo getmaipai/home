@@ -1,17 +1,9 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { randomBytes } from "node:crypto";
 import { dataDir } from "@/lib/paths";
+import { randomSuffix } from "@/lib/id";
 
-const ALPHABET = "abcdefghijklmnopqrstuvwxyz0123456789";
 const PATH = join(dataDir, "device-id6.txt");
-
-function generate(): string {
-  const bytes = randomBytes(6);
-  let out = "";
-  for (let i = 0; i < 6; i++) out += ALPHABET[bytes[i]! % ALPHABET.length];
-  return out;
-}
 
 let cached: string | null = null;
 
@@ -30,7 +22,7 @@ export function getDeviceId6(): string {
     }
   }
   if (!existsSync(dataDir)) mkdirSync(dataDir, { recursive: true, mode: 0o700 });
-  const fresh = generate();
+  const fresh = randomSuffix(6);
   writeFileSync(PATH, fresh, { mode: 0o600 });
   cached = fresh;
   return fresh;

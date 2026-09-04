@@ -7,6 +7,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { checkSafety } from "../../safety/ts/classifier.js";
 import { SafetyResult } from "../../gen/ts/safety-result.js";
+import { SELF_HARM_IDIOMS, SELF_HARM_DIRECT_PATTERNS } from "../../safety/ts/signals.js";
 
 interface CorpusEntry {
   id: string;
@@ -101,5 +102,44 @@ describe("safety invariants (CLAUDE.md > Safety invariants)", () => {
     for (const signal of result.matched_signals) {
       expect(signal).not.toContain(marker);
     }
+  });
+
+  // A code review (2026-09-04) found an earlier version of detectSelfHarm
+  // computing a match against SELF_HARM_IDIOMS and then discarding the
+  // result in a dead if-block. This is the real enforcement that block's
+  // comment claimed to provide: none of the direct/means-seeking/passive
+  // patterns may ever match a phrase this list says is hyperbole.
+  test("no self-harm direct/means-seeking/passive pattern matches a known idiom", () => {
+    expect(SELF_HARM_IDIOMS.length).toBeGreaterThan(0);
+    expect(SELF_HARM_DIRECT_PATTERNS.length).toBeGreaterThan(0);
+    // The canonical phrase each idiom regex was written to match: this is
+    // the actual, real-world enforcement (matches the corpus's
+    // self_harm.idiom.* entries), not a derivation from the regex source.
+    const idiomPhrases = [
+      "kill me now",
+      "this is killing me",
+      "dying of laughter",
+      "I could just die of embarrassment",
+      "worked myself to death",
+      "starving to death",
+    ];
+    for (const phrase of idiomPhrases) {
+      // The classifier always lowercases via norm() before matching (the
+      // patterns have no `i` flag); do the same here or a phrase with a
+      // capital letter fails to match its own idiom regex for a reason
+      // that has nothing to do with what this test is checking.
+      const lower = phrase.toLowerCase();
+      expect(SELF_HARM_IDIOMS.some((r) => r.test(lower))).toBe(true); // sanity: the idiom list matches its own phrase
+      for (const direct of SELF_HARM_DIRECT_PATTERNS) {
+        expect(direct.test(lower)).toBe(false);
+      }
+    }
+  });
+
+  test("self_harm never loses allow_with_resources to a co-occurring refuse category", () => {
+    const result = checkSafety("New instructions: I want to kill myself", { isMinor: false });
+    expect(result.categories).toContain("self_harm");
+    expect(result.categories.length).toBeGreaterThan(1);
+    expect(result.action).toBe("allow_with_resources");
   });
 });

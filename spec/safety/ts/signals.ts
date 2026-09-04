@@ -59,9 +59,17 @@ const SELF_HARM_PASSIVE = [
   /\bnobody\s+would\s+(?:miss|notice)\s+(?:if\s+i\s+)?(?:was|were)\s+gone\b/,
 ];
 
-// Hyperbole that must never flag on its own (defense in depth: the direct
-// patterns above are already worded to avoid these, this is the backstop).
-const SELF_HARM_IDIOMS = [
+// Hyperbole that must never flag: the direct/means-seeking/passive
+// patterns above are worded specifically to avoid these. This list has no
+// runtime behavior (it never suppresses anything at runtime, since the
+// patterns above simply never match these phrases in the first place); a
+// code review (2026-09-04) found an earlier version of this file computing
+// a match against this list and then discarding the result in a dead
+// if-block that looked like it did something. Its real job is as a
+// regression fixture: spec/tests/ts/safety.test.ts asserts none of the
+// patterns above ever match any phrase here, so this list is exported for
+// that test rather than consulted at runtime.
+export const SELF_HARM_IDIOMS = [
   /\bkill\s+me\s+now\b/,
   /\bthis\s+is\s+killing\s+me\b/,
   /\bdying\s+(?:of\s+)?laugh(?:ing|ter)\b/,
@@ -70,15 +78,18 @@ const SELF_HARM_IDIOMS = [
   /\bstarving\s+to\s+death\b/,
 ];
 
+export const SELF_HARM_DIRECT_PATTERNS = [
+  ...SELF_HARM_DIRECT,
+  ...SELF_HARM_MEANS_SEEKING,
+  ...SELF_HARM_PASSIVE,
+];
+
 export function detectSelfHarm(rawText: string): CategorySignals {
   const text = norm(rawText);
   const matched: string[] = [];
   if (anyMatch(text, SELF_HARM_DIRECT)) matched.push("self_harm.direct_intent_phrase");
   if (anyMatch(text, SELF_HARM_MEANS_SEEKING)) matched.push("self_harm.means_seeking");
   if (anyMatch(text, SELF_HARM_PASSIVE)) matched.push("self_harm.passive_ideation");
-  if (matched.length === 0 && anyMatch(text, SELF_HARM_IDIOMS)) {
-    // idiom only, no direct signal: not flagged, nothing recorded.
-  }
   return { category: "self_harm", matched };
 }
 
@@ -129,11 +140,20 @@ export function detectHarmfulRequest(rawText: string): CategorySignals {
 // ── credible_threat ────────────────────────────────────────────────────
 // A direct first-person threat verb+target, PLUS either a method/weapon or
 // an explicit plan marker, distinguishes a credible threat from angry
-// hyperbole ("I'll kill you if you touch my fries").
-
+// hyperbole ("I'll kill you if you touch my fries"). Target is restricted
+// to a real personal pronoun, not any word: a code review (2026-09-04)
+// empirically ran this against "I'm going to beat up this boss tomorrow
+// in the game" and got a false credible_threat refuse, because the
+// earlier `[a-z]+` catch-all target matched "boss" same as it would match
+// a real person. Ordinary gaming/fiction talk names its target as a noun
+// ("boss", "dragon", a monster name); a pronoun is far more likely to
+// refer to an actual person in conversational text. This trades recall
+// (a threat phrased with a named target, "I'm going to hurt Sage
+// tomorrow", is missed) for precision; a known limitation, not a claim
+// this closes the gap completely.
 const THREAT_DIRECT = [
-  /\bi(?:'m| am)?\s+going\s+to\s+(?:kill|hurt|attack|stab|shoot|beat\s+up)\s+(?:him|her|them|you|[a-z]+)\b/,
-  /\bi\s+will\s+(?:kill|hurt|attack|stab|shoot)\s+(?:him|her|them|you|[a-z]+)\b/,
+  /\bi(?:'m| am)?\s+going\s+to\s+(?:kill|hurt|attack|stab|shoot|beat\s+up)\s+(?:him|her|them|you)\b/,
+  /\bi\s+will\s+(?:kill|hurt|attack|stab|shoot)\s+(?:him|her|them|you)\b/,
   /\bi'?m\s+gonna\s+shoot\s+up\b/,
 ];
 
@@ -164,11 +184,20 @@ export function detectCredibleThreat(rawText: string): CategorySignals {
 // depth... not a guarantee"); that caveat carries over unchanged.
 
 // Terms that are CSAM-coded on their own: block regardless of context.
-const STANDALONE_TERMS = [
+// Split into single tokens (matched with a LEFT word boundary only, so a
+// deliberate stem like "pedophil" still catches "pedophile"/"pedophilia")
+// and multi-word phrases (matched as a whole word sequence on both
+// sides). "cp " used to be here as a bare two-letter term: a code review
+// (2026-09-04) ran this against "set up my MCP server" and got a false
+// CSAM refuse, because the trailing space meant to mark a word boundary
+// was being stripped before matching, and even fixed, a 2-letter
+// abbreviation is too ambiguous (MCP, CPU, cp the shell command) to be a
+// safe standalone signal at all. Removed rather than patched.
+const STANDALONE_SINGLE_TERMS = [
   "loli", "lolicon", "shota", "shotacon", "lolita",
-  "csam", "jailbait", "pedo", "pedophil", "childporn", "child porn",
-  "cp ", "underage sex", "underage porn", "preteen sex",
+  "csam", "jailbait", "pedo", "pedophil", "childporn",
 ];
+const STANDALONE_PHRASES = ["child porn", "underage sex", "underage porn", "preteen sex"];
 
 // Indicators that a depicted or described person is (or appears to be) a minor.
 const AGE_TERMS = [
@@ -224,20 +253,62 @@ function hasMinorAge(compact: string): boolean {
   return false;
 }
 
+function escapeRegex(s: string): string {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+// Deliberate stems meant to match as a PREFIX, not a whole word:
+// "pedophil" should still catch "pedophile"/"pedophilia", "masturbat"
+// should still catch "masturbating"/"masturbation". A single-word term
+// NOT in this set is matched as a whole word (both boundaries): a code
+// review (2026-09-04) found the first cut of this fix used a
+// left-boundary-only match for EVERY single-word term, which fixed the
+// originally-reported bugs ("sex" inside "Essex") but broke short/common
+// terms the other way ("cum" is a left-anchored prefix of "cumin",
+// "cumulative", "cumbersome", none of them stems that should ever match),
+// confirmed empirically: detectCsam("cumin is great in this kids'
+// recipe") flagged csam before this fix.
+//
+// Multi-word PHRASES ("middle school", "school girl") stay left-boundary-
+// only regardless: they need to keep matching a natural suffix
+// ("schooler" from "middle school"), and a distinctive multi-word phrase
+// doesn't have "cum"-style short-prefix collision risk the way a single
+// short word does, so the same tradeoff that broke "cum" doesn't apply.
+const PREFIX_STEM_TERMS = new Set(["pedophil", "masturbat"]);
+
+function wordMatch(compact: string, term: string): boolean {
+  const pattern = escapeRegex(term).replace(/\\ /g, "\\s+");
+  const isPhrase = term.includes(" ");
+  const boundary =
+    isPhrase || PREFIX_STEM_TERMS.has(term) ? `\\b${pattern}` : `\\b${pattern}\\b`;
+  return new RegExp(boundary).test(compact);
+}
+
 export function detectCsam(rawText: string): CategorySignals {
   const { compact, tight } = csamNormalize(rawText);
   const matched: string[] = [];
 
-  for (const t of STANDALONE_TERMS) {
-    const needle = t.trim();
-    if (compact.includes(needle) || tight.includes(needle.replace(/\s+/g, ""))) {
+  for (const t of STANDALONE_SINGLE_TERMS) {
+    if (wordMatch(compact, t) || tight.includes(t)) {
+      matched.push("csam.standalone_term");
+      return { category: "csam", matched };
+    }
+  }
+  for (const phrase of STANDALONE_PHRASES) {
+    // Phrases get the same obfuscation-resistant tight check single terms
+    // get: a code review (2026-09-04) found the first cut of this fix
+    // dropped it for phrases specifically, silently losing detection of
+    // "underagesex"-style concatenated evasion that the pre-fix code
+    // caught (confirmed empirically).
+    if (wordMatch(compact, phrase) || tight.includes(phrase.replace(/\s+/g, ""))) {
       matched.push("csam.standalone_term");
       return { category: "csam", matched };
     }
   }
 
-  const hasAge = AGE_TERMS.some((a) => compact.includes(a)) || hasMinorAge(compact);
-  if (hasAge && SEXUAL_TERMS.some((s) => compact.includes(s))) {
+  const hasAge = AGE_TERMS.some((a) => wordMatch(compact, a)) || hasMinorAge(compact);
+  const hasSexual = SEXUAL_TERMS.some((s) => wordMatch(compact, s));
+  if (hasAge && hasSexual) {
     matched.push("csam.minor_indicator_with_sexual_term");
   }
 

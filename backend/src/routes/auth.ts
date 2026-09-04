@@ -4,7 +4,7 @@ import { eq, isNull } from "drizzle-orm";
 import { db } from "@/db";
 import { people, personCredentials, sessions } from "@/db/schema";
 import { hashSessionToken, issueSession } from "@/lib/session";
-import { hashSecret, verifySecret, lockoutDurationMs, LOCKOUT_THRESHOLD } from "@/lib/secret";
+import { hashSecret, verifySecret, recordFailedAttempt, LOCKOUT_THRESHOLD } from "@/lib/secret";
 import {
   getClientIp,
   throttleCheck,
@@ -13,7 +13,8 @@ import {
 } from "@/lib/secretThrottle";
 import { newPersonId } from "@/lib/id";
 import { requireAuth, invalidateSessionCache } from "@/middleware/auth";
-import { toPerson, toRoster } from "@/lib/personShape";
+import { toRoster, parsePersonCandidate, personToDbValues } from "@/lib/personShape";
+import { validateDisplayName, validateSecret } from "@/lib/validation";
 import type { AppEnv } from "@/types";
 
 export const auth = new Hono<AppEnv>();
@@ -23,16 +24,19 @@ export const auth = new Hono<AppEnv>();
 // same as the legacy hub's /profiles: the picker has to render before
 // anyone is signed in.
 auth.get("/profiles", async (c) => {
-  const rows = db.select().from(people).where(isNull(people.deletedAt)).all();
-
-  const creds = db
-    .select({ personId: personCredentials.personId })
-    .from(personCredentials)
+  // One query via a left join, not two round trips joined in JS (a code
+  // review, 2026-09-04, flagged the old version on this exact point: this
+  // is the most frequently hit route in the app, rendered before anyone
+  // is signed in).
+  const rows = db
+    .select({ person: people, credentialPersonId: personCredentials.personId })
+    .from(people)
+    .leftJoin(personCredentials, eq(people.id, personCredentials.personId))
+    .where(isNull(people.deletedAt))
     .all();
-  const withSecret = new Set(creds.map((r) => r.personId));
 
   return c.json(
-    rows.map((r) => ({ ...toRoster(r), hasSecret: withSecret.has(r.id) })),
+    rows.map((r) => ({ ...toRoster(r.person), hasSecret: r.credentialPersonId !== null })),
   );
 });
 
@@ -47,33 +51,40 @@ auth.post("/setup", async (c) => {
     displayName?: string;
     secret?: string;
   };
-  const displayName = body.displayName?.trim();
-  const secret = body.secret;
-  if (!displayName || displayName.length < 1 || displayName.length > 80) {
-    return c.json({ error: "displayName is required (1-80 characters)" }, 400);
-  }
-  if (!secret || secret.length < 4 || secret.length > 128) {
-    return c.json({ error: "secret must be 4-128 characters" }, 400);
-  }
+  const displayName = validateDisplayName(body.displayName);
+  if (!displayName.ok) return c.json({ error: displayName.error }, 400);
+  const secret = validateSecret(body.secret);
+  if (!secret.ok) return c.json({ error: secret.error }, 400);
 
   const now = new Date().toISOString();
   const id = newPersonId();
-  db.insert(people)
-    .values({
-      id,
-      displayName,
-      role: "owner",
-      avatarSeed: id,
-      source: "hub",
-      localOnly: false,
-      createdAt: now,
-      updatedAt: now,
-    })
-    .run();
+
+  // Validate the full candidate against the spec BEFORE writing (the same
+  // discipline lib/memory.ts's remember() uses): a code review
+  // (2026-09-04) found the previous version of this route inserting
+  // unvalidated fields straight into SQLite.
+  const candidate = parsePersonCandidate({
+    id,
+    display_name: displayName.value,
+    nickname: null,
+    birthdate: null,
+    role: "owner",
+    avatar_seed: id,
+    source: "hub",
+    local_only: false,
+    created_at: now,
+    updated_at: now,
+    deleted_at: null,
+  });
+  if (!candidate.success) {
+    return c.json({ error: candidate.error.issues.map((i) => i.message).join("; ") }, 400);
+  }
+
+  db.insert(people).values(personToDbValues(candidate.data)).run();
   db.insert(personCredentials)
     .values({
       personId: id,
-      secretHash: await hashSecret(secret),
+      secretHash: await hashSecret(secret.value),
       failedAttempts: 0,
       createdAt: now,
       updatedAt: now,
@@ -81,8 +92,7 @@ auth.post("/setup", async (c) => {
     .run();
 
   issueSession(c, id);
-  const row = db.select().from(people).where(eq(people.id, id)).get()!;
-  return c.json({ person: toPerson(row) }, 201);
+  return c.json({ person: candidate.data }, 201);
 });
 
 // Select a secret-free profile (4.1: a child's picker entry can be a bare
@@ -124,6 +134,14 @@ auth.post("/verify-secret", async (c) => {
     return c.json({ error: "Too many attempts", retryAfter: throttled.retryAfter }, 429);
   }
 
+  // A code review (2026-09-04) found this route never checked
+  // people.deletedAt, unlike /select and /profiles: a soft-deleted
+  // person's credentials would keep working. No route in this slice sets
+  // deletedAt yet (delete-person is deferred, see docs/dev.md), but the
+  // check is added now so the invariant already holds when one lands.
+  const person = db.select().from(people).where(eq(people.id, personId)).get();
+  if (!person || person.deletedAt) return c.json({ error: "Profile not found" }, 404);
+
   const record = db
     .select()
     .from(personCredentials)
@@ -139,28 +157,23 @@ auth.post("/verify-secret", async (c) => {
   }
 
   const valid = await verifySecret(secret, record.secretHash);
-  const now = new Date().toISOString();
 
   if (!valid) {
     throttleFail(ip);
-    const newAttempts = record.failedAttempts + 1;
-    const lockedUntil =
-      newAttempts >= LOCKOUT_THRESHOLD
-        ? new Date(Date.now() + lockoutDurationMs(newAttempts)).toISOString()
-        : null;
-    db.update(personCredentials)
-      .set({ failedAttempts: newAttempts, lockedUntil, updatedAt: now })
-      .where(eq(personCredentials.personId, personId))
-      .run();
+    // Atomic re-read-and-increment (lib/secret.ts): a code review
+    // (2026-09-04) found the old inline `record.failedAttempts + 1` used
+    // a count read before this function's `await` above, so concurrent
+    // requests for the same profile could undercount real attempts.
+    const { failedAttempts } = recordFailedAttempt(personId);
     return c.json(
-      { error: "Invalid PIN or password", attemptsLeft: Math.max(0, LOCKOUT_THRESHOLD - newAttempts) },
+      { error: "Invalid PIN or password", attemptsLeft: Math.max(0, LOCKOUT_THRESHOLD - failedAttempts) },
       401,
     );
   }
 
   throttleReset(ip);
   db.update(personCredentials)
-    .set({ failedAttempts: 0, lockedUntil: null, updatedAt: now })
+    .set({ failedAttempts: 0, lockedUntil: null, updatedAt: new Date().toISOString() })
     .where(eq(personCredentials.personId, personId))
     .run();
 

@@ -1,11 +1,12 @@
 import { Hono } from "hono";
-import { eq, isNull } from "drizzle-orm";
+import { isNull } from "drizzle-orm";
 import { db } from "@/db";
 import { people, personCredentials } from "@/db/schema";
 import { hashSecret } from "@/lib/secret";
 import { newPersonId } from "@/lib/id";
 import { requireAuth, requireRole, ROLE_LADDER, type Role } from "@/middleware/auth";
-import { toRoster } from "@/lib/personShape";
+import { toRoster, parsePersonCandidate, personToDbValues } from "@/lib/personShape";
+import { validateDisplayName, validateSecret } from "@/lib/validation";
 import type { AppEnv } from "@/types";
 
 export const peopleRoutes = new Hono<AppEnv>();
@@ -44,10 +45,8 @@ peopleRoutes.post("/", requireRole("owner", "admin"), async (c) => {
     localOnly?: boolean;
   };
 
-  const displayName = body.displayName?.trim();
-  if (!displayName || displayName.length < 1 || displayName.length > 80) {
-    return c.json({ error: "displayName is required (1-80 characters)" }, 400);
-  }
+  const displayName = validateDisplayName(body.displayName);
+  if (!displayName.ok) return c.json({ error: displayName.error }, 400);
 
   const role = body.role as Role;
   if (!ROLE_LADDER.includes(role)) {
@@ -65,32 +64,46 @@ peopleRoutes.post("/", requireRole("owner", "admin"), async (c) => {
   if ((role === "owner" || role === "admin") && !body.secret) {
     return c.json({ error: `a ${role} profile requires a secret` }, 400);
   }
-  if (body.secret && (body.secret.length < 4 || body.secret.length > 128)) {
-    return c.json({ error: "secret must be 4-128 characters" }, 400);
+  let secret: string | undefined;
+  if (body.secret !== undefined) {
+    const validated = validateSecret(body.secret);
+    if (!validated.ok) return c.json({ error: validated.error }, 400);
+    secret = validated.value;
   }
 
   const now = new Date().toISOString();
   const id = newPersonId();
-  db.insert(people)
-    .values({
-      id,
-      displayName,
-      nickname: body.nickname ?? null,
-      birthdate: body.birthdate ?? null,
-      role,
-      avatarSeed: body.avatarSeed ?? id,
-      source: "hub",
-      localOnly: body.localOnly ?? false,
-      createdAt: now,
-      updatedAt: now,
-    })
-    .run();
 
-  if (body.secret) {
+  // Validate the full candidate against the spec BEFORE writing: a code
+  // review (2026-09-04) found this route inserting client-supplied
+  // birthdate/avatarSeed straight into SQLite with only ad hoc length
+  // checks, so an invalid birthdate corrupted the row and then crashed
+  // every later GET /api/people (toRoster's Person.parse throwing inside
+  // the .map()), not just the request that created it.
+  const candidate = parsePersonCandidate({
+    id,
+    display_name: displayName.value,
+    nickname: body.nickname ?? null,
+    birthdate: body.birthdate ?? null,
+    role,
+    avatar_seed: body.avatarSeed ?? id,
+    source: "hub",
+    local_only: body.localOnly ?? false,
+    created_at: now,
+    updated_at: now,
+    deleted_at: null,
+  });
+  if (!candidate.success) {
+    return c.json({ error: candidate.error.issues.map((i) => i.message).join("; ") }, 400);
+  }
+
+  db.insert(people).values(personToDbValues(candidate.data)).run();
+
+  if (secret) {
     db.insert(personCredentials)
       .values({
         personId: id,
-        secretHash: await hashSecret(body.secret),
+        secretHash: await hashSecret(secret),
         failedAttempts: 0,
         createdAt: now,
         updatedAt: now,
@@ -98,6 +111,6 @@ peopleRoutes.post("/", requireRole("owner", "admin"), async (c) => {
       .run();
   }
 
-  const created = db.select().from(people).where(eq(people.id, id)).get()!;
-  return c.json(toRoster(created), 201);
+  const { birthdate: _birthdate, ...roster } = candidate.data;
+  return c.json(roster, 201);
 });

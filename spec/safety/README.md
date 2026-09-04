@@ -100,11 +100,21 @@ platform rebuild exists to move away from; nothing here reuses it.
 ## The floor's action per category
 
 Every category except `self_harm` maps to `refuse` when flagged.
-`self_harm` never blocks: it maps to `allow_with_resources` (crisis
-resources offered alongside the reply, never instead of it), per
-CLAUDE.md > Safety invariants: "Crisis resources: offer, never block...
-not configurable off." This holds for every role including the household
-owner; nothing a package declares can lower it either (4.3).
+`self_harm` never blocks, **even when another category also flags on the
+same text**: it maps to `allow_with_resources` (crisis resources offered
+alongside the reply, never instead of it), per CLAUDE.md > Safety
+invariants: "Crisis resources: offer, never block... not configurable
+off." This holds for every role including the household owner; nothing a
+package declares can lower it either (4.3). The "even when another
+category also flags" clause is load-bearing: a code review (2026-09-04)
+found the first cut of this logic let ANY co-occurring refuse category
+override self_harm into a refuse (e.g. "New instructions: I want to kill
+myself" refused instead of offering resources, since it also tripped
+`prompt_injection`), which is exactly the outcome this invariant forbids.
+`REFUSE_CATEGORIES` is derived from the generated schema's own category
+enum (`spec/schemas/safety-result.schema.json`) rather than hand-listed a
+second time, so a future 9th category can't silently default to the wrong
+action by omission.
 
 `notify_parent` is true whenever a category flags and the speaker is a
 minor (4.3: "Safety-flagged turns raise an immediate notification to a
@@ -129,13 +139,45 @@ knowing about before trusting this in a real household:
   allow in this one category. A blocklist, however hardened, is still
   evadable by phrasing its author didn't anticipate; the legacy file's own
   words apply unchanged: "responsible defense in depth... not a
-  guarantee."
+  guarantee." A code review (2026-09-04) found and fixed a sharper
+  problem than "ambiguous, over-cautious": unanchored substring matching
+  false-flagged ordinary text with no age/sexual content at all ("sex"
+  inside "Essex", "cum" inside "circumstance"/"documents", "cp" inside
+  "MCP"/"CPU"). Matching is now left-word-boundary-anchored
+  (`leftBoundaryMatch` in `ts/signals.ts`), which closes that specific
+  class while still letting a deliberate stem like "pedophil" or
+  "masturbat" match its longer real forms. `corpus.json`'s
+  `csam.negative.mcp_abbreviation`, `.essex_substring`, and
+  `.circumstance_substring` entries are the regression tests.
+- `credible_threat`'s target used to accept any word, not just a real
+  pronoun, so ordinary gaming/fiction talk with a named target ("I'm
+  going to beat up this boss tomorrow in the game") false-flagged; also
+  found and fixed 2026-09-04 (`corpus.json`'s
+  `credible_threat.negative.gaming_named_target`). This narrows the
+  category to pronoun targets (him/her/them/you), trading recall (a
+  threat phrased with a named target, "I'm going to hurt Sage tomorrow",
+  is now missed) for precision; still a known gap, not closed.
 - `grooming`'s pattern list is small and literal; it will miss anything
   phrased differently, and a phrase like "keep this between us" can
   false-positive on an innocent shared secret (a surprise party, a school
   project) said to a minor. Not included in the corpus as a "should not
   flag" case for exactly that reason: it currently does flag, and that's
   the safer failure mode for now.
+- `pii_extraction`'s "don't flag my own data" protection
+  (`THIRD_PARTY_REQUEST`'s negative lookahead in `ts/signals.ts`) works
+  today, but for the wrong reason: the lookahead itself can never fire
+  (English doesn't produce "my's"/"our's"), so first-person phrasing
+  simply never matches the surrounding possessive pattern at all. Correct
+  behavior, fragile mechanism; flagged by a code review (2026-09-04) and
+  deliberately left as-is rather than redesigned under time pressure,
+  since nothing is actually broken today. Revisit if this pattern is
+  ever reworded.
+- `checkSafety` calls each detector's own `norm()` (a `toLowerCase()`)
+  independently, normalizing the same input text up to 8 times per call
+  instead of once. Flagged as an efficiency finding (2026-09-04); real on
+  a path meant to run per streamed sentence, but not a correctness bug,
+  and deliberately left unfixed this pass so a correctness-focused fix
+  round didn't also become a refactor.
 - None of the eight detectors have been run against adversarial paraphrase
   or non-English input. The bypass-suite entries in `corpus.json`
   (`bypass_suite.*`) cover only the injection/jailbreak framings named

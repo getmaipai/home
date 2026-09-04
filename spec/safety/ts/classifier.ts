@@ -6,7 +6,7 @@
 // does not exist yet, so this file is written to stay language-portable
 // (plain string matching, no TS-only tricks) even though only the TS side
 // exists today.
-import type { SafetyResult } from "../../gen/ts/safety-result.js";
+import { SafetyResult } from "../../gen/ts/safety-result.js";
 import {
   detectSelfHarm,
   detectHarmfulRequest,
@@ -23,19 +23,14 @@ export type { SafetyContext } from "./signals.js";
 
 type Category = SafetyResult["categories"][number];
 
-// self_harm never blocks (CLAUDE.md > Safety invariants: "Crisis
-// resources: offer, never block... not configurable off"). Every other
-// floor category refuses; nothing may lower this, including for the
-// household's own admin (4.3, CLAUDE.md > Safety invariants).
-const REFUSE_CATEGORIES: ReadonlySet<Category> = new Set([
-  "harmful_request",
-  "credible_threat",
-  "csam",
-  "grooming",
-  "pii_extraction",
-  "prompt_injection",
-  "jailbreak",
-]);
+// Every category refuses except self_harm, derived from the generated
+// schema's own enum rather than a hand-kept second list: a code review
+// (2026-09-04) found this file hand-listing 7 of the 8 category strings,
+// with nothing to catch drift if a 9th category is ever added.
+const ALL_CATEGORIES = SafetyResult.shape.categories.element.options;
+const REFUSE_CATEGORIES: ReadonlySet<Category> = new Set(
+  ALL_CATEGORIES.filter((c) => c !== "self_harm"),
+);
 
 export function checkSafety(text: string, ctx: SafetyContext): SafetyResult {
   const results = [
@@ -59,11 +54,22 @@ export function checkSafety(text: string, ctx: SafetyContext): SafetyResult {
   }
 
   const flagged = categories.length > 0;
+  // self_harm never blocks, even when another category also flags on the
+  // same text (CLAUDE.md > Safety invariants: "Crisis resources: offer,
+  // never block... not configurable off"). A code review (2026-09-04)
+  // found the previous version treated ANY co-occurring refuse category
+  // as overriding self_harm into a refuse, which is exactly what this
+  // invariant forbids: a message showing self-harm intent must never lose
+  // its crisis resources because it also tripped another detector.
+  const hasSelfHarm = categories.includes("self_harm");
+  const hasOtherRefuse = categories.some((c) => c !== "self_harm" && REFUSE_CATEGORIES.has(c));
   const action: SafetyResult["action"] = !flagged
     ? "allow"
-    : categories.some((c) => REFUSE_CATEGORIES.has(c))
-      ? "refuse"
-      : "allow_with_resources"; // self_harm is the only category that can reach here alone
+    : hasSelfHarm
+      ? "allow_with_resources"
+      : hasOtherRefuse
+        ? "refuse"
+        : "allow_with_resources";
 
   return {
     flagged,

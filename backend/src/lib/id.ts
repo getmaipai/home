@@ -2,7 +2,10 @@ import { randomBytes } from "node:crypto";
 
 const ALPHABET = "abcdefghijklmnopqrstuvwxyz0123456789";
 
-function randomSuffix(length: number): string {
+// Exported so lib/deviceId.ts doesn't hand-roll the same "random base36
+// string from crypto bytes" loop a second time (a code review,
+// 2026-09-04, found it had).
+export function randomSuffix(length: number): string {
   const bytes = randomBytes(length);
   let out = "";
   for (let i = 0; i < length; i++) {

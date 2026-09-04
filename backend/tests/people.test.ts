@@ -105,6 +105,32 @@ describe("creating people", () => {
     const res = await owner.post("/api/people", { displayName: "Quill", role: "superuser" });
     expect(res.status).toBe(400);
   });
+
+  test("an invalid birthdate is rejected before it reaches the database", async () => {
+    // A code review (2026-09-04) found this used to insert an invalid
+    // birthdate straight into SQLite (only displayName/secret were
+    // checked), which then crashed every later GET /api/people. Proving
+    // the 400 here isn't enough on its own; the next test proves the
+    // roster survives.
+    const owner = await ownerClient();
+    const res = await owner.post("/api/people", {
+      displayName: "Bramble",
+      role: "child",
+      birthdate: "09/03/2026",
+    });
+    expect(res.status).toBe(400);
+  });
+
+  test("a rejected candidate never corrupts the roster for later reads", async () => {
+    const owner = await ownerClient();
+    await owner.post("/api/people", {
+      displayName: "Bramble",
+      role: "child",
+      birthdate: "not-a-date",
+    });
+    const res = await owner.get("/api/people");
+    expect(res.status).toBe(200);
+  });
 });
 
 describe("listing people", () => {

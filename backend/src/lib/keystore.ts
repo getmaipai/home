@@ -33,6 +33,56 @@ function keyFile(name: string): string {
   return join(KEYS_DIR, `${name}.key`);
 }
 
+// Marks that a key was successfully provisioned into the OS keychain, so
+// a LATER read failure can be told apart from "never provisioned yet". A
+// code review (2026-09-04) found readStored() treating "not found" and
+// "keychain unreadable" identically: `security find-generic-password`
+// returns null for both a genuinely first-ever run AND a locked/headless
+// keychain on a machine that already has a key in it. Treating the second
+// case as "not found" silently mints and persists a brand-new pepper,
+// which makes every existing person's stored PIN/password hash
+// unverifiable (they were hashed with the old pepper), a silent,
+// permanent household-wide lockout with no error anywhere. This marker
+// (not a secret, just a flag) lets readStored refuse instead of silently
+// minting when it can tell a key SHOULD be there.
+function keychainMarkerFile(name: string): string {
+  return join(KEYS_DIR, `${name}.keychain-marker`);
+}
+
+// Exported (not just internal): this is the actual new decision logic,
+// separate from the real macOS Keychain calls above, which tests
+// deliberately never exercise (MAIPAI_KEYSTORE_BACKEND=file exists
+// specifically so a test run never touches the developer's real login
+// keychain). Testing these directly is how that new logic gets covered
+// without touching the real keychain.
+export function markKeychainProvisioned(name: string): void {
+  ensureKeysDir();
+  try {
+    writeFileSync(keychainMarkerFile(name), "1", { mode: 0o600 });
+  } catch {
+    /* best-effort; a failed write here just means we fall back to
+     * silent-remint behavior for this key, no worse than before this fix */
+  }
+}
+
+export function wasKeychainProvisioned(name: string): boolean {
+  return existsSync(keychainMarkerFile(name));
+}
+
+export class KeystoreUnavailableError extends Error {
+  constructor(name: string) {
+    super(
+      `Keystore key "${name}" was previously provisioned into the OS keychain ` +
+        `but can't be read right now (locked, headless, or the keychain service ` +
+        `is unavailable). Refusing to generate a replacement key: doing so would ` +
+        `silently invalidate every secret hashed or encrypted with the original ` +
+        `one. Unlock the keychain (or run this as an interactive session once) ` +
+        `and retry.`,
+    );
+    this.name = "KeystoreUnavailableError";
+  }
+}
+
 function ensureKeysDir(): void {
   if (!existsSync(KEYS_DIR)) mkdirSync(KEYS_DIR, { recursive: true, mode: 0o700 });
   try {
@@ -169,13 +219,26 @@ const FORCE_FILE_BACKEND = process.env.MAIPAI_KEYSTORE_BACKEND === "file";
 function readStored(name: string): string | null {
   if (process.platform === "darwin" && !FORCE_FILE_BACKEND) {
     const fromChain = keychainRead(name);
-    if (fromChain && /^[0-9a-fA-F]+$/.test(fromChain)) return fromChain;
+    if (fromChain && /^[0-9a-fA-F]+$/.test(fromChain)) {
+      // Mark on a successful READ too, not only on write: a code review
+      // (2026-09-04) found the marker only got set by writeStored(), so a
+      // key that was already in the Keychain before this fix shipped (or
+      // provisioned some other way) had no marker and the protection
+      // didn't apply to it until the next write, missing the exact
+      // upgrade scenario the fix exists for.
+      markKeychainProvisioned(name);
+      return fromChain;
+    }
+    if (wasKeychainProvisioned(name)) throw new KeystoreUnavailableError(name);
   }
   return fileRead(name);
 }
 
 function writeStored(name: string, hex: string): void {
-  if (process.platform === "darwin" && !FORCE_FILE_BACKEND && keychainWrite(name, hex)) return;
+  if (process.platform === "darwin" && !FORCE_FILE_BACKEND && keychainWrite(name, hex)) {
+    markKeychainProvisioned(name);
+    return;
+  }
   fileWrite(name, hex);
 }
 
