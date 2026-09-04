@@ -31,6 +31,7 @@ see "Cross-repo schemas" below. The populated error catalogue itself
 | `ui/schema.json`, `ui/pages/*.json` | UI schema v0 (Chat only) and the Chat page itself | hand-written; see `ui/README.md` for why this isn't codegen'd |
 | `interpreters/ts/`, `interpreters/py/` | The Tier 0 recipe interpreter, one per language, kept behaviorally identical | hand-written |
 | `emulators/ts/`, `emulators/py/` | A deterministic offline stand-in for the `host.*` RPC surface (4.9), one per language | hand-written |
+| `safety/ts/`, `safety/corpus/` | The deterministic multi-signal safety classifier (4.3), TS only for now (see `safety/README.md`); the labelled corpus it's tested against | hand-written |
 | `fixtures/records/` | One valid example per record schema, round-tripped through both generated model sets | hand-written |
 | `fixtures/recipes/` | Recipe + inputs + expected result, run through both interpreters to prove they agree | hand-written |
 | `tests/ts/`, `tests/py/` | The tests that make every proof above real, not asserted | hand-written |

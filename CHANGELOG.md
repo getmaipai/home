@@ -8,6 +8,23 @@ checklist (`docs/dev.md`); no release has been cut yet.
 ## [Unreleased]
 
 ### Added
+- The safety layer (platform plan 4.3), the second slice of hub core: a
+  deterministic multi-signal classifier for the eight floor categories
+  (self-harm, harmful requests, credible threats, CSAM, grooming, PII
+  extraction, prompt injection, jailbreak framing), text only. Design and
+  code live in `spec/safety/` so a Python port can mirror it later the way
+  `spec/interpreters/` does; TS only for now, no `bot` content exists yet
+  to pin it. New shared shape `SafetyResult` (dual-codegen'd), a labelled
+  corpus (`spec/safety/corpus/corpus.json`, synthetic and persona-roster
+  only), and `spec/safety/README.md` as the full design record including
+  known limitations. The CSAM detector is adapted from the legacy hub's
+  hardened, obfuscation-resistant blocklist (principle 8); the legacy
+  hub's model-trusting "text floor" is explicitly not reused, since 4.3
+  replaces exactly that architecture with a pre-model refusal. Hub-side:
+  `backend/src/lib/safety.ts` applies the per-band policy (self-harm never
+  refuses, only offers resources; every other category refuses; a minor
+  speaker always sets `notify_parent`), `POST /api/safety/check` is the
+  real caller until the turn engine (4.5) exists to call it internally.
 - Hub backend skeleton (`backend/`, Bun and Hono, per `STACK.md`): a Bun
   workspace root joins it to `spec/`, so both share one lockfile and the
   backend imports `home/spec/`'s generated Person schema directly.

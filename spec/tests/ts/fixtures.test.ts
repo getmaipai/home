@@ -10,6 +10,7 @@ import { SettingValue } from "../../gen/ts/setting-value.js";
 import { SettingsKey } from "../../gen/ts/settings-key.js";
 import { MemoryRecord } from "../../gen/ts/memory-record.js";
 import { PackageManifest } from "../../gen/ts/manifest.js";
+import { SafetyResult } from "../../gen/ts/safety-result.js";
 // ErrorEntry is standards-owned (std-v0.2.0), not generated here; the error
 // catalogue's shape is imported from the sibling .github checkout, the same
 // way spec/schemas/manifest.schema.json imports PrivacyRow by $ref.
@@ -49,6 +50,12 @@ describe("record fixtures validate against their generated Zod models", () => {
   test("manifest.example.json", () => {
     expect(() =>
       PackageManifest.parse(loadFixture("manifest.example.json")),
+    ).not.toThrow();
+  });
+
+  test("safety-result.example.json", () => {
+    expect(() =>
+      SafetyResult.parse(loadFixture("safety-result.example.json")),
     ).not.toThrow();
   });
 

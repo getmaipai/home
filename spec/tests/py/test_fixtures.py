@@ -14,6 +14,7 @@ from pydantic import ValidationError
 from gen.py.manifest_schema import PackageManifest
 from gen.py.memory_record_schema import MemoryRecord
 from gen.py.person_schema import Person
+from gen.py.safety_result_schema import SafetyResult
 from gen.py.setting_value_schema import SettingValue
 from gen.py.settings_key_schema import SettingsKey
 
@@ -50,6 +51,10 @@ def test_memory_record_fixtures(kind):
 
 def test_manifest_fixture():
     PackageManifest.model_validate(load_fixture("manifest.example.json"))
+
+
+def test_safety_result_fixture():
+    SafetyResult.model_validate(load_fixture("safety-result.example.json"))
 
 
 def test_error_catalogue_entries():

@@ -1,0 +1,8 @@
+{
+  "flagged": true,
+  "categories": ["self_harm"],
+  "action": "allow_with_resources",
+  "notify_parent": true,
+  "matched_signals": ["self_harm.direct_intent_phrase"],
+  "checked_at": "2026-09-04T12:00:00Z"
+}

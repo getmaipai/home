@@ -118,9 +118,41 @@ set. Full architecture: platform plan chapters 1, 3, and 4.
         `spec/README.md`), age-band derivation from birthdate (so no route
         yet computes or exposes `age_range`), and any People-management UI
         (this pass is backend/API only; no shell or kit work has started).
-- [ ] Core, still to build: the safety layer, memory, the turn engine,
-      settings and its renderer, the scheduler, the package host, the
-      llama-server router.
+- [x] The safety layer (4.3): a deterministic multi-signal classifier for
+      the eight floor categories (self_harm, harmful_request,
+      credible_threat, csam, grooming, pii_extraction, prompt_injection,
+      jailbreak). Design and code live in `spec/safety/` (not
+      `backend/`), written to stay language-portable even though only the
+      TS side exists today, matching the recipe interpreters' precedent;
+      `spec/safety/README.md` is the full design record, including
+      documented false-positive/false-negative limitations, read it before
+      extending any detector. New spec shape: `SafetyResult`
+      (`spec/schemas/safety-result.schema.json`), dual-codegen'd,
+      deliberately carries only category/action/matched-signal-ids, never
+      the checked text (4.3: "logged with the fact, never the
+      transcript"). A labelled corpus (`spec/safety/corpus/corpus.json`,
+      synthetic and persona-roster only, ~50 entries covering every
+      category plus idiom/framing/context-gating edge cases and a small
+      bypass-suite subset) is proven against the classifier in
+      `spec/tests/ts/safety.test.ts`. Hub-side: `backend/src/lib/safety.ts`
+      wraps it with the per-band policy (role teen/child treated as
+      "minor speaker" pending real age-band derivation) and a fact-only
+      log line; `POST /api/safety/check` (any signed-in person, checks
+      their own text) is today's real caller since the turn engine (4.5)
+      doesn't exist yet to call it internally. Exercised for real: booted
+      the server and drove benign text, self-harm (confirmed
+      `allow_with_resources`, never `refuse`), a harmful actionable
+      request, a jailbreak attempt, and a child-speaker grooming pattern
+      (confirmed `notify_parent: true`) with `curl`, plus 50 spec-level
+      corpus tests and 5 backend integration tests, all green.
+      **Deliberately deferred:** image/video guards (4.11 doesn't exist),
+      the Python port (Robot v0.1), a small local model "second opinion"
+      for adults (4.3 allows one, not built), real notification delivery
+      through the notification system (2.6, stubbed as a log line), and
+      turn-engine wiring (4.5 doesn't exist, so nothing calls this on a
+      real conversation turn yet).
+- [ ] Core, still to build: memory, the turn engine, settings and its
+      renderer, the scheduler, the package host, the llama-server router.
 - [ ] The shell and kit, Chat and Companions as packages, the wizard,
       backups, self-update - not started.
 - [ ] README.md still needs the full org skeleton (logo, screenshot strip,
@@ -143,6 +175,8 @@ Empty until that review pass runs.
 | Avatar rendering (DiceBear SVG, initials fallback, PNG rasterization, `/avatar/:userId`) | Deferred, not reviewed | No shell or kit work has started (6); `avatar_seed` exists on Person but nothing renders it yet. Revisit when the shell's profile picker is built. |
 | Quick Connect (TV sign-in via phone approval) | Deferred, not reviewed | Real feature named in 4.1, but out of scope for this pass's "prove identity and people work" slice; needs a UI to approve from, which doesn't exist yet. |
 | tvOS Top Shelf continue-watching endpoint | Not reviewed | Media-specific (Videos, Hub v0.2); not relevant to identity. |
+| CSAM guard (`lib/safety/csamGuard.ts`): obfuscation-resistant term-intersection blocklist for text prompts, plus a two-pass VLM image classifier | Rebuild as designed (text); deferred (image) | Hard-won: real security hardening (NFKD normalization, separator-stripped "tight" matching to defeat `l.o.l.i`-style evasion, a standalone-term list, a broad age/sexual-term vocabulary). Reused in `spec/safety/ts/signals.ts`'s `detectCsam`. The image half (`screenImage`, two-pass VLM confirmation) has no consumer yet (no generation port, 4.11) and is deferred, noted in `spec/safety/README.md` as a pattern worth reusing when it lands. |
+| Text safety floor (`lib/safety/textFloor.ts`): an "absolute limits" paragraph prepended to every LLM system prompt, trusting the model to honor it | Redesign | This is the architecture 4.3 explicitly replaces ("no model in the loop for the floor"). Not reused: the fresh safety layer refuses before any model runs, deterministically, instead of asking the model to police itself. Noted explicitly in `spec/safety/README.md` so a future session doesn't reach for this pattern by habit. |
 
 ## Roadmap
 
