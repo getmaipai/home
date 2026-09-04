@@ -1,0 +1,11 @@
+{
+  "name": "@maipai/home",
+  "version": "0.1.0",
+  "private": true,
+  "description": "MaiPai Home: the self-hosted family AI hub. See docs/dev.md.",
+  "license": "AGPL-3.0",
+  "workspaces": [
+    "spec",
+    "backend"
+  ]
+}

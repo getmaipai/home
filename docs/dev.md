@@ -60,8 +60,67 @@ set. Full architecture: platform plan chapters 1, 3, and 4.
       oneOf breaks if the cross-repo resolution is done too bluntly).
 - [ ] Not yet done: cutting the `spec-v0.1.0` tag (nothing pins it yet,
       since `bot` doesn't exist as real content in this session).
-- [ ] Core (identity, people, safety layer, memory, turn engine, settings,
-      scheduler, package host, llama-server router) - not started.
+- [x] Hub backend skeleton: `backend/` (Bun, Hono, Drizzle ORM on SQLite),
+      joined to `spec/` by a root `package.json` workspace so both share one
+      lockfile and the backend imports `spec/gen/ts/` directly. Boots with
+      `bun run --hot src/index.ts` (or `bun run src/index.ts`), listens on
+      `PORT` (default 8787), data lives in `data/` at the repo root
+      (already gitignored). See `backend/src/app.ts` for the route list.
+- [x] Identity and sign-in (4.1) and people (4.2), the first slice of core:
+      - Profiles on a picker, with or without a PIN/password. Argon2id via
+        `Bun.password` (memoryCost 65536, timeCost 3), HMAC-peppered before
+        hashing so the pepper (not just a salt) sits outside the database;
+        the pepper is held by `backend/src/lib/keystore.ts` (macOS Keychain,
+        Windows DPAPI, or a 0600 key file, never in `hub.db`).
+      - Per-profile lockout (5 failed attempts, then 30s/2m/10m/1h
+        exponential backoff) plus a global per-IP throttle, so one host
+        can't brute-force every profile in parallel.
+      - Sessions: `HttpOnly`/`SameSite=Strict` cookies, `Secure` set
+        automatically when the request arrived over HTTPS, a 10s in-memory
+        resolution cache keyed by token hash (never a raw token), and a
+        CSRF origin check on every mutating route on top of `SameSite`.
+      - The role ladder (`owner, admin, adult, teen, child, guest`, 4.2)
+        gates every mutating route; `requireRole` checks exact membership,
+        not a rank comparison (grants are per-capability, a later release).
+      - First-run setup (`POST /api/auth/setup`) creates the household
+        owner once, then refuses; `POST /api/people` is the ongoing way to
+        add people, `requireRole("owner", "admin")`-gated.
+      - Every API response goes through `backend/src/lib/personShape.ts`,
+        which converts Drizzle's camelCase row to the spec's snake_case
+        `Person` shape *and* validates it by parsing through the generated
+        Zod schema, so the API can't silently drift from `spec/schemas/
+        person.schema.json`. This caught a real bug during this pass (the
+        first cut returned camelCase field names straight from Drizzle);
+        the fix and the regression test are in the same commit.
+      - `docs/ENGINEERING.md`'s schema-version rule is live:
+        `backend/src/db/schema-version.ts` stamps `PRAGMA user_version` and
+        refuses to open a database stamped newer than the running build
+        understands. Bump `CURRENT_SCHEMA_VERSION` in the same commit as
+        any add/remove/rename of a persisted table or column.
+      - Exercised for real, not just by tests: booted the server, drove
+        setup, profile creation and role enforcement, login, lockout,
+        session logout, and the CSRF rejection with `curl` against the
+        running process (see the `bun test` suite in `backend/tests/` for
+        the same flows as regression tests, 28 tests, all green).
+      - **Judgment calls made without asking** (platform plan 4.2 doesn't
+        spell these out; capability grants for "manage people" are a later
+        release, so this session had to pick something to enforce meanwhile):
+        only the owner may create another owner or an admin profile; an
+        admin may create adult, teen, child or guest profiles but not a
+        peer admin or an owner. An owner or admin profile always requires a
+        secret at creation (a secret-free admin account would be a
+        one-request takeover). Revisit both when capability grants land.
+      - **Deliberately deferred**, to keep this slice honest and fully
+        verified rather than half-built: WebAuthn passkeys, TOTP for
+        owner/admin, device tokens and Quick Connect, the approval queue
+        (Ask to Install/Browse), capability grants and content ceilings
+        (the spec doesn't have these record types yet either, see
+        `spec/README.md`), age-band derivation from birthdate (so no route
+        yet computes or exposes `age_range`), and any People-management UI
+        (this pass is backend/API only; no shell or kit work has started).
+- [ ] Core, still to build: the safety layer, memory, the turn engine,
+      settings and its renderer, the scheduler, the package host, the
+      llama-server router.
 - [ ] The shell and kit, Chat and Companions as packages, the wizard,
       backups, self-update - not started.
 - [ ] README.md still needs the full org skeleton (logo, screenshot strip,
@@ -77,7 +136,13 @@ Empty until that review pass runs.
 
 | Legacy feature | Verdict | Reason |
 |---|---|---|
-| _(none reviewed yet)_ | | |
+| PIN/password hashing (`lib/pin.ts`): Argon2id via `Bun.password`, HMAC pepper from a keystore file/keychain | Rebuild as designed | Hard-won crypto logic (principle 8), reused near-verbatim in `backend/src/lib/secret.ts`; generalized from PIN-only to PIN-or-password since 4.1 wants both under one path. |
+| Keystore (`lib/keystore.ts`): macOS Keychain / Windows DPAPI / 0600 file, key never in the DB | Rebuild as designed | Hard-won: this is the exact fix for the 2026-08-29 keystore-key-readable-by-every-account incident (`CLAUDE.md` > Credentials and secrets). Reused in `backend/src/lib/keystore.ts`, minus the legacy `app_settings` migration path (nothing to migrate from in a fresh install). |
+| Per-profile + per-IP lockout (`lib/pin.ts`, `lib/pinThrottle.ts`) | Rebuild as designed | Hard-won: the two-layer lockout (per-profile exponential backoff, per-IP throttle so one host can't hammer every profile in parallel) is exactly right for a household PIN, which is short by design. Reused in `backend/src/lib/secret.ts` and `secretThrottle.ts`. |
+| Session cookies + CSRF origin check (`lib/session.ts`, `middleware/auth.ts`) | Rebuild as designed | Hard-won: `HttpOnly`/`SameSite=Strict` plus an Origin-vs-Host check (with reverse-proxy awareness) is the right defense-in-depth shape; the session-cache-by-token-hash pattern avoids two DB round trips per authed request. Reused in `backend/src/lib/session.ts` and `middleware/auth.ts`, with `admin`-boolean generalized to the full role ladder. |
+| Avatar rendering (DiceBear SVG, initials fallback, PNG rasterization, `/avatar/:userId`) | Deferred, not reviewed | No shell or kit work has started (6); `avatar_seed` exists on Person but nothing renders it yet. Revisit when the shell's profile picker is built. |
+| Quick Connect (TV sign-in via phone approval) | Deferred, not reviewed | Real feature named in 4.1, but out of scope for this pass's "prove identity and people work" slice; needs a UI to approve from, which doesn't exist yet. |
+| tvOS Top Shelf continue-watching endpoint | Not reviewed | Media-specific (Videos, Hub v0.2); not relevant to identity. |
 
 ## Roadmap
 
