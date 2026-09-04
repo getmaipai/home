@@ -5,6 +5,10 @@ node_modules/
 # Local data, never committed (org rule: nothing under data/ ever enters git)
 data/
 
+# Backups (2.5): encrypted, but still real household data end to end;
+# same "never in git, ever" rule as data/.
+backups/
+
 # Editor/OS
 .DS_Store
 

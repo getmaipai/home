@@ -783,6 +783,95 @@ set. Full architecture: platform plan chapters 1, 3, and 4.
       back into the turn engine's own prompt as prior conversational
       context (today's turn engine is still stateless in its *reasoning*,
       even though the history now exists for real).
+- [x] Backups (2.5, **split, not full**), the tenth slice of hub core.
+      Picked next: the hub has stored real family data (people, memories,
+      conversations) for several sessions with zero backup story, a real
+      product gap, and everything it needs (the keystore, the scheduler)
+      already existed, the same "genuinely buildable now" bar as every
+      other pick this build. Full 2.5 has real product surface (a Storage
+      page, an emergency kit at setup printing the backup key, restore as
+      onboarding's second screen, `hub`/`smb` targets for robots and a
+      NAS, a restore drill wired into the release skill): none of that
+      exists yet (shell hasn't started; no release has ever been cut), so
+      this is the real backend mechanism underneath, split the same way
+      as every model-role and turn-engine slice.
+    - `backend/src/lib/backup.ts`: `runBackup()` takes a real, consistent
+      snapshot via SQLite's own `VACUUM INTO` (not a raw file copy, which
+      could catch a WAL-mode database mid-checkpoint), encrypts it
+      AES-256-GCM with a dedicated `backup` key from the existing keystore
+      (`lib/keystore.ts`, the same macOS Keychain/Windows DPAPI/0600-file
+      mechanism the PIN pepper already uses, a new named key so a rotated
+      pepper can never also invalidate every backup), and writes it to
+      the `local` target (`lib/paths.ts`'s new `backupDir`, a sibling of
+      `data/`, `MAIPAI_BACKUP_DIR` overridable the same way
+      `MAIPAI_DATA_DIR` is). `hub`/`smb` targets don't exist (no robot or
+      NAS integration built). `listBackups()` and `pruneBackups()`
+      (below) round out the store; `restoreBackup()` is real and tested
+      but deliberately not wired to any HTTP route (its own comment
+      explains why, see below).
+    - **Retention, a real grandfather-father-son scheme bounded by actual
+      time windows, not just bucket counts:** 2.5 says "seven daily, four
+      weekly, three monthly, oldest pruned first." `pruneBackups()`
+      partitions every backup into exactly one of three non-overlapping
+      age windows (the last 7 days, the 4 weeks after that, the 3 30-day
+      months after that) by its own age, then keeps at most one per
+      distinct day/week/month within its window; anything outside all
+      three windows, or that loses its bucket to a newer backup, is
+      deleted. **A real bug caught by writing the test for it, not by a
+      review:** the first cut let a backup that lost its daily-bucket slot
+      "fall back" to try the weekly tier too, since the weekly window's
+      span also covers "today." That meant two same-day backups (a manual
+      "run now" on top of the scheduled one) both survived instead of one
+      being pruned, defeating the same-day dedup entirely. Fixed by
+      replacing the fallback with strict, non-overlapping windows (a
+      backup's age places it in exactly one tier, never more than one),
+      caught by `tests/backup.test.ts`'s "multiple backups on the same
+      day only ever keep one" test failing against the buggy version
+      first. No size cap per target yet (2.5 asks for one): no settings
+      key exists to declare it, the same provisional gap
+      `lib/memory.ts`'s decay thresholds already have.
+    - **Scheduled from the start, no manual-only phase:** `backup.run` is
+      a real `CORE_JOBS` entry (`lib/scheduler.ts`) seeded at boot
+      (`index.ts`, `every:1d`), the same "the scheduler already exists,
+      no reason to defer real wiring" call the conversation history slice
+      already made for `conversation.retention`. 2.5's "at a household-set
+      time in the nightly window" isn't honored: the scheduler's `when`
+      grammar has no time-of-day concept, a pre-existing, already-
+      documented gap (`lib/scheduler.ts`'s own header comment), reused
+      here rather than re-solved.
+    - **`restoreBackup()` is real and proven, deliberately not an HTTP
+      route:** decrypts one archive into a fresh, valid SQLite file at any
+      path, verified by `tests/backup.test.ts` actually opening the
+      restored file and querying real rows (a person, a memory, a
+      conversation turn), not by trusting the encryption round-trips.
+      GCM's own auth tag rejects a tampered or corrupted archive before
+      any plaintext is written (proven with a real bit-flip test), which
+      is 2.5's "archives are signed and a tampered one is refused." Not
+      wired to any route or to the live `data/hub.db`: safely swapping a
+      running process's live database needs the staged verify/backup/
+      migrate/swap/health-check machinery 2.4's updates describe, which
+      doesn't exist (no release has ever been cut, so there's no
+      update/rollback path to reuse for a restore either).
+    - New routes, owner/admin only (a backup isn't scoped to one person,
+      it's the whole household's): `GET /api/backups`,
+      `POST /api/backups/run`.
+    - Exercised for real: booted the server, drove a real backup through
+      `POST /api/backups/run`, confirmed the encrypted `.db.enc` file on
+      disk with `0600` permissions, confirmed the seeded `backup.run`
+      scheduled job, confirmed a child is 403'd, and (outside the HTTP
+      layer, since restore has no route) ran `restoreBackup()` directly
+      against that real backup file and queried the restored database for
+      the real person, memory, and conversation turn it had just written,
+      in addition to 9 new backend tests (25 assertions: real backup +
+      restore, a tampered-archive rejection, an unknown-backup rejection,
+      listing order, and the retention window/dedup cases), all green.
+    - **Deliberately deferred, real 2.5 scope not attempted:** "built from
+      declarations" (a real multi-store registry: only one store exists
+      today, hub.db, so there's nothing yet to prove a registry needs);
+      `hub`/`smb` targets; the emergency kit and any Storage page UI
+      (chapter 6); a per-target size cap (no settings key); the restore
+      drill wired into the release skill (no release has been cut); an
+      HTTP restore route (above).
 
 ## API routes and `@hono/zod-openapi` (tracked debt)
 
@@ -809,10 +898,13 @@ need it, not on a fixed schedule.
 - [ ] Core, still to build: the rest of 4.5 (tier 2 native tool calling,
       remote candidates, `ask`-continuation, every surface but `chat`); the
       rest of 4.11 (every role but `chat`, the real engine and residency
-      policy, streaming/tools/JSON-schema on the chat contract); and the
-      rest of 4.14 (search, summarization, an audit log, robot parity).
+      policy, streaming/tools/JSON-schema on the chat contract); the rest
+      of 4.14 (search, summarization, an audit log, robot parity); and the
+      rest of 2.5 (a multi-store registry, `hub`/`smb` targets, a size
+      cap, the restore drill, an HTTP restore route).
 - [ ] The shell and kit, Chat and Companions as packages, the wizard,
-      backups, self-update - not started.
+      self-update, updates (2.4, blocked on a real release existing to
+      update to or from) - not started.
 - [ ] README.md still needs the full org skeleton (logo, screenshot strip,
       status) once there is a running app to screenshot; today's README is
       a placeholder.
@@ -1009,3 +1101,53 @@ between now and when the relevant piece gets built.
   default for non-English voices) and sherpa-onnx's built-in options, when
   voice work starts. No decision made yet: this is an item to put in the
   eval, not a chosen engine.
+
+- **Tier 2 tool calling: measure the floor's miss rate before building it
+  (4.5, `backend/src/lib/turnEngine.ts`).** Discussed with Jesse
+  2026-09-04, prompted by a question about whether the hub should have an
+  agent system that can be told to check email or search the web. The
+  conclusion worth keeping: a prebuilt skill *is* the answer to "check my
+  email". A package's `routing` block is its deterministic door and its
+  manifest `args` schema is its model-callable door, one declaration with
+  two ways in, so tier 2 adds no capability. It is a fallback router for
+  phrasing and slot-filling, and should be justified by a measured miss
+  rate rather than assumed.
+  **The three real gaps tier 1 has:** an utterance that shares almost no
+  tokens with any `routing.examples` entry ("did the school send anything
+  about Friday") scores too low to fire a skill the hub genuinely has, and
+  falling through to chat there is worse than not having the skill,
+  because it teaches the household the hub does not do email; arguments
+  beyond `deterministicArgs()`'s one-required-string-arg binding rule
+  ("any mail from grandma this week" needs two) structurally cannot bind
+  no matter how good the pattern is; and pattern collision across packages
+  is fine at five installed and will not hold at sixty once the catalog
+  exists.
+  **Why not now:** tier 1 has never been seen working. `routing.examples`
+  is matched by keyword overlap standing in for the `embed` role (4.11),
+  so today's fall-through rate measures the placeholder, not the design. A
+  real embedder plausibly closes most of the phrasing gap at roughly 5ms
+  and no engine dependency, which is the cheaper fix and lands first.
+  **The actual plan:** build `embed`, ship real skills, then count
+  fall-throughs to chat using conversation history (4.14 already logs
+  every turn, refusals included, so the data collects itself), and decide
+  from that. Two cheaper moves to try before tier 2: a near-miss
+  confirmation ("I can check your email, want me to?") when the top
+  candidate scores close but under threshold, which costs no model call;
+  and keeping composition ("check the school email and put it on the
+  calendar") as a recipe the model selects, never a plan it assembles.
+  **What is explicitly not wanted, whatever the miss rate says:** an
+  autonomous plan/call/observe loop over the `Host` tool surface. Each
+  iteration regrows the prompt tail that `buildSystemPrompt()`'s
+  stable-first assembly exists to keep cacheable, on a small quantized
+  model sharing an 8GB card with everything else; multi-step tool chaining
+  degrades badly at that size, which is the same reason the deterministic
+  floor exists; the `consequential` gate (4.9) fires only on an exact
+  pattern match by design and a loop walks straight through it; and the
+  privacy page's "what leaves the house" table needs outbound calls to be
+  enumerable, which a model deciding at runtime how many searches to run
+  is not. Bounded selection, capped at one or two schema-constrained calls
+  per turn, is the shape if it gets built at all.
+  **Related open decision:** the default chat model (`spec/llm/README.md`)
+  is a real input here. Grammar-constrained decoding through llama-server
+  matters more than the model's own tool-calling ability, since a GBNF
+  grammar makes a small model's call valid by construction.

@@ -8,6 +8,32 @@ checklist (`docs/dev.md`); no release has been cut yet.
 ## [Unreleased]
 
 ### Added
+- Backups (platform plan 2.5, split), the tenth slice of hub core:
+  `backend/src/lib/backup.ts`'s `runBackup()` takes a real, consistent
+  snapshot of the live database via SQLite's own `VACUUM INTO`, encrypts
+  it AES-256-GCM with a dedicated key from the existing keystore, and
+  writes it to the `local` target (a new sibling directory of `data/`,
+  `MAIPAI_BACKUP_DIR` overridable). `pruneBackups()` is a real
+  grandfather-father-son retention scheme (seven daily, four weekly,
+  three monthly, bounded by real non-overlapping time windows, not just
+  bucket counts) wired as a genuine daily scheduled job
+  (`backup.run`) from the start. `restoreBackup()` decrypts an archive
+  back into a valid, queryable SQLite file, proven by tests that actually
+  open the restored database and read real rows back, including a
+  deliberate bit-flip test confirming a tampered archive is refused
+  (GCM's own auth tag) rather than silently restoring garbage; it's real
+  and tested but deliberately not wired to any HTTP route, since safely
+  swapping a running process's live database needs staged update/rollback
+  machinery (2.4) that doesn't exist (no release has ever been cut). New
+  routes, owner/admin only: `GET /api/backups`, `POST /api/backups/run`.
+  A bug in the retention window logic (a same-day duplicate backup could
+  spill into the weekly tier instead of being pruned) was caught by
+  writing the test for it, not by a review, and fixed with strict
+  non-overlapping windows instead of a cross-tier fallback. **Not built:**
+  a multi-store declaration registry (only one store exists to declare),
+  `hub`/`smb` targets, a per-target size cap, the emergency kit and
+  Storage page (chapter 6), and the restore drill (no release cut yet).
+  Full reasoning in `docs/dev.md`.
 - Conversation history (platform plan 4.14, split), the ninth slice of hub
   core: `backend/src/lib/conversationHistory.ts`'s `logTurn()` writes a
   real row (new `conversation_turns` table, schema version 5) for every

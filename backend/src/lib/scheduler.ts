@@ -34,6 +34,7 @@ import { newJobId } from "@/lib/id";
 import { isOwnerOrAdmin } from "@/lib/access";
 import { runMaintenance } from "@/lib/memory";
 import { runRetention } from "@/lib/conversationHistory";
+import { runBackup, pruneBackups } from "@/lib/backup";
 import type { SkillOpResult } from "@/lib/skills";
 import type { SkillResult } from "@maipai/spec/interpreters/ts/recipe-interpreter.js";
 import type { PersonRow } from "@/types";
@@ -168,6 +169,10 @@ const CORE_JOBS: Record<string, () => void> = {
   },
   "conversation.retention": () => {
     runRetention();
+  },
+  "backup.run": () => {
+    runBackup();
+    pruneBackups();
   },
 };
 

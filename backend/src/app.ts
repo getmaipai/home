@@ -9,6 +9,7 @@ import { schedulerRoutes } from "@/routes/scheduler";
 import { llmRoutes } from "@/routes/llm";
 import { turnRoutes } from "@/routes/turn";
 import { conversationsRoutes } from "@/routes/conversations";
+import { backupsRoutes } from "@/routes/backups";
 import type { AppEnv } from "@/types";
 
 export const app = new Hono<AppEnv>();
@@ -25,3 +26,4 @@ app.route("/api/scheduler", schedulerRoutes);
 app.route("/api/llm", llmRoutes);
 app.route("/api/turn", turnRoutes);
 app.route("/api/conversations", conversationsRoutes);
+app.route("/api/backups", backupsRoutes);
