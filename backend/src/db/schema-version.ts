@@ -6,7 +6,7 @@ import type { Database } from "bun:sqlite";
 // release, see docs/UPDATES.md) that opened a database a newer version had
 // already written to would silently corrupt or drop data; refusing to open
 // a too-new database is what makes the rollback safe.
-export const CURRENT_SCHEMA_VERSION = 2;
+export const CURRENT_SCHEMA_VERSION = 3;
 
 export class SchemaTooNewError extends Error {
   constructor(

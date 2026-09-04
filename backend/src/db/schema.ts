@@ -1,4 +1,4 @@
-import { sqliteTable, text, integer, real } from "drizzle-orm/sqlite-core";
+import { sqliteTable, text, integer, real, primaryKey } from "drizzle-orm/sqlite-core";
 
 // Mirrors spec/schemas/person.schema.json (spec/gen/ts/person.ts is the
 // validated shape; this is its storage). `role` and `source` are the
@@ -84,3 +84,26 @@ export const memoryRecords = sqliteTable("memory_records", {
   supersededBy: text("superseded_by"),
   embeddingSpace: text("embedding_space"),
 });
+
+// Mirrors spec/schemas/setting-value.schema.json (4.6): one row per
+// (scope, key), scope holding the full spec string ("household",
+// "person:<id>", or "device:<id>") rather than a separate kind+id pair,
+// so this table matches the spec shape exactly with no denormalization.
+// `value` is JSON-serialized (its real shape depends on the key's
+// selector in the registry, spec/settings/keys.json, validated at the
+// lib/settings.ts layer, not by SQLite). Deleting a row (a settings
+// "reset") is always a genuine erasure, not a tombstone: unlike memory,
+// nothing here promises "never hard-deletes" and a reset-to-default has
+// no reason to keep history.
+export const settingsValues = sqliteTable(
+  "settings_values",
+  {
+    scope: text("scope").notNull(),
+    key: text("key").notNull(),
+    value: text("value").notNull(),
+    hlc: text("hlc").notNull(),
+    source: text("source").notNull(),
+    updatedAt: text("updated_at").notNull(),
+  },
+  (table) => [primaryKey({ columns: [table.scope, table.key] })],
+);

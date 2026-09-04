@@ -1,5 +1,5 @@
 import { db } from "@/db";
-import { people, personCredentials, sessions, memoryRecords, idSequences } from "@/db/schema";
+import { people, personCredentials, sessions, memoryRecords, idSequences, settingsValues } from "@/db/schema";
 
 // All test files in one `bun test` run share the same imported `@/db`
 // module (Bun's module cache is process-wide, not per-file), so every
@@ -17,6 +17,7 @@ import { people, personCredentials, sessions, memoryRecords, idSequences } from 
 // hidden dependency on what ran before it in the same process.
 export function resetDb(): void {
   db.delete(memoryRecords).run();
+  db.delete(settingsValues).run();
   db.delete(idSequences).run();
   db.delete(sessions).run();
   db.delete(personCredentials).run();

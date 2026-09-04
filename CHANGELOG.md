@@ -28,6 +28,26 @@ checklist (`docs/dev.md`); no release has been cut yet.
   details in `docs/dev.md`'s "Code review pass, 2026-09-04" section.
 
 ### Added
+- Settings (platform plan 4.6), the fourth slice of hub core: the store,
+  built on the `SettingValue`/`SettingsKey` shapes spec v0.1 already
+  defined. `spec/settings/keys.json` is generated, not hand-edited, from
+  `backend/src/settings/coreKeys.ts` via a new `bun run gen:settings`
+  script wired into `check.sh`'s drift check; one real key so far,
+  `household.locale`. Values are keyed by scope (`household`,
+  `person:<id>`, `device:<id>`) with a real hybrid logical clock
+  (`lib/hlc.ts`) generated and compared on every write for genuine
+  per-field last-writer-wins, even before real sync exists. Household
+  settings: read by anyone, written by owner/admin. Person settings: self,
+  or owner/admin for a child (the same rule memory uses, now shared via a
+  new `lib/access.ts` rather than a second copy). Chosen over the turn
+  engine as the next slice since the turn engine fundamentally needs an
+  LLM and packages that don't exist yet; full reasoning in `docs/dev.md`.
+  A same-day review before committing found and fixed a real gap: a
+  `secret: true` registry key had no redaction anywhere in the response
+  path, untested only because today's one declared key isn't secret; also
+  fixed an HLC-recovery gap (a wall-clock regression after a restart
+  could permanently block writes to a key) and an inefficient full-table
+  role lookup. Details in `docs/dev.md`.
 - Memory (platform plan 4.4), the third slice of hub core: the store
   (`backend/src/lib/memory.ts`), built directly on the `MemoryRecord`
   shape spec v0.1 already defined, no spec changes needed. `remember`

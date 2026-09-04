@@ -1,0 +1,249 @@
+// The settings store (platform plan 4.6): "Values by scope (household,
+// person, device) with per-field last-writer-wins on the oplog;
+// definitions from the registry (3.2) and from package manifests." This
+// is the store and its API; the generic renderer and the UI rules in
+// 6.5/6.6 are shell/kit work (chapter 6, not started).
+import { eq, and, isNull } from "drizzle-orm";
+import { db } from "@/db";
+import { settingsValues, people } from "@/db/schema";
+import { getRegistry, getRegistryKey } from "@/lib/settingsRegistry";
+import { nextHlc, compareHlc, seedHlc } from "@/lib/hlc";
+import { isOwnerOrAdmin, canAccessPerson } from "@/lib/access";
+import type { SettingsKey } from "@maipai/spec/gen/ts/settings-key.js";
+import type { PersonRow } from "@/types";
+
+export type SettingsOpResult<T> =
+  | { ok: true; value: T }
+  | { ok: false; status: 400 | 403; error: string };
+
+// Recover HLC monotonicity across a restart (see lib/hlc.ts's seedHlc
+// comment for the failure this prevents): seed from every hlc already on
+// disk once, at module load, before any write can happen.
+for (const row of db.select({ hlc: settingsValues.hlc }).from(settingsValues).all()) {
+  seedHlc(row.hlc);
+}
+
+type ScopeKind = "household" | "person" | "device";
+
+export interface ParsedScope {
+  kind: ScopeKind;
+  id: string | null;
+}
+
+// Matches spec/schemas/setting-value.schema.json's scope pattern exactly:
+// "household", "person:<id>", or "device:<id>". Exported (not test-only:
+// this is real logic worth testing on its own, the same as lib/secret.ts's
+// lockoutDurationMs) since there's no person-scope key in the registry
+// yet to exercise its person/device branches through the HTTP layer.
+export function parseScope(scope: string): ParsedScope | null {
+  if (scope === "household") return { kind: "household", id: null };
+  const personMatch = /^person:([a-z0-9-]+)$/.exec(scope);
+  if (personMatch) return { kind: "person", id: personMatch[1]! };
+  const deviceMatch = /^device:([a-z0-9-]+)$/.exec(scope);
+  if (deviceMatch) return { kind: "device", id: deviceMatch[1]! };
+  return null;
+}
+
+// device:<id> has no real authorization model yet: 3.1's Device record
+// type isn't built (deferred, see docs/dev.md), so there's no ownership
+// or pairing concept to check against. Owner/admin only for now,
+// provisional until Device exists. Exported for the same reason as
+// parseScope above.
+export function assertCanAccessScope(
+  actor: PersonRow,
+  parsed: ParsedScope,
+  purpose: "read" | "write",
+): SettingsOpResult<true> {
+  if (parsed.kind === "household") {
+    if (purpose === "read" || isOwnerOrAdmin(actor)) return { ok: true, value: true };
+    return { ok: false, status: 403, error: "only owner or admin may change household settings" };
+  }
+  if (parsed.kind === "person") {
+    if (canAccessPerson(actor, parsed.id!)) return { ok: true, value: true };
+    return { ok: false, status: 403, error: "cannot access another person's settings" };
+  }
+  // device
+  if (isOwnerOrAdmin(actor)) return { ok: true, value: true };
+  return { ok: false, status: 403, error: "only owner or admin may access device settings" };
+}
+
+function validateSelectorValue(keyDef: SettingsKey, value: unknown): SettingsOpResult<true> {
+  const range = keyDef.range as Record<string, unknown> | undefined;
+  switch (keyDef.selector) {
+    case "boolean":
+      if (typeof value !== "boolean") return { ok: false, status: 400, error: "expected a boolean" };
+      break;
+    case "number":
+    case "duration": {
+      if (typeof value !== "number" || !Number.isFinite(value)) {
+        return { ok: false, status: 400, error: "expected a number" };
+      }
+      if (keyDef.selector === "duration" && value < 0) {
+        return { ok: false, status: 400, error: "duration must be non-negative" };
+      }
+      const min = range?.min as number | undefined;
+      const max = range?.max as number | undefined;
+      if (min !== undefined && value < min) return { ok: false, status: 400, error: `must be >= ${min}` };
+      if (max !== undefined && value > max) return { ok: false, status: 400, error: `must be <= ${max}` };
+      break;
+    }
+    case "text":
+      if (typeof value !== "string") return { ok: false, status: 400, error: "expected a string" };
+      break;
+    case "select": {
+      const options = range?.options as unknown[] | undefined;
+      if (!options || !options.includes(value)) {
+        return { ok: false, status: 400, error: `must be one of ${JSON.stringify(options ?? [])}` };
+      }
+      break;
+    }
+    case "time":
+      if (typeof value !== "string" || !/^([01]\d|2[0-3]):[0-5]\d$/.test(value)) {
+        return { ok: false, status: 400, error: "expected a 24-hour HH:MM string" };
+      }
+      break;
+    case "person": {
+      if (typeof value !== "string") return { ok: false, status: 400, error: "expected a person id" };
+      const exists = db
+        .select({ id: people.id })
+        .from(people)
+        .where(and(eq(people.id, value), isNull(people.deletedAt)))
+        .get();
+      if (!exists) return { ok: false, status: 400, error: `unknown person: ${value}` };
+      break;
+    }
+    case "entity":
+    case "area":
+    case "media":
+      // No Home Assistant entity/area concept and no media library exist
+      // yet (both later integrations/features); loose string validation
+      // only, a documented gap until those land.
+      if (typeof value !== "string") return { ok: false, status: 400, error: "expected a string" };
+      break;
+  }
+  return { ok: true, value: true };
+}
+
+export interface ResolvedSetting {
+  key: string;
+  value: unknown;
+  source: "user" | "default" | "package" | "sync";
+  label: string;
+  help?: string;
+  level: "basic" | "advanced" | "expert";
+  secret: boolean;
+  /** Only meaningful when secret is true: whether a real value has been
+   * stored, without ever revealing it (see resolveForResponse below). */
+  isSet?: boolean;
+}
+
+// CLAUDE.md > Credentials and secrets is a hard rule: "No secret value in
+// ... API responses (status = present, expires, never the value)." A
+// review (2026-09-04) found this had no enforcement anywhere: a
+// secret:true registry key's real value went straight into every list/
+// set response, an untested gap since household.locale (today's only
+// key) isn't secret. Every response now goes through this before
+// leaving the function, so the day a real secret-selector key (an API
+// key, an OAuth token) is declared, it's covered from that key's first
+// commit rather than needing its own retrofit. Exported (not test-only)
+// since there's no real secret key in the registry yet to exercise this
+// through the HTTP layer; tests construct a SettingsKey directly instead.
+export function resolveForResponse(
+  keyDef: SettingsKey,
+  rawValue: unknown,
+  source: ResolvedSetting["source"],
+): ResolvedSetting {
+  const base = { key: keyDef.key, source, label: keyDef.label, help: keyDef.help, level: keyDef.level, secret: keyDef.secret };
+  if (!keyDef.secret) return { ...base, value: rawValue };
+  return { ...base, value: null, isSet: source !== "default" };
+}
+
+/** Every registered key whose scope kind matches, each resolved to its
+ * stored value or the registry default (4.6: a setting always has a
+ * value, even before anyone customizes it). */
+export function listValues(actor: PersonRow, scope: string): SettingsOpResult<ResolvedSetting[]> {
+  const parsed = parseScope(scope);
+  if (!parsed) return { ok: false, status: 400, error: `invalid scope: ${scope}` };
+  const auth = assertCanAccessScope(actor, parsed, "read");
+  if (!auth.ok) return auth;
+
+  const stored = db.select().from(settingsValues).where(eq(settingsValues.scope, scope)).all();
+  const storedByKey = new Map(stored.map((row) => [row.key, row]));
+
+  const results: ResolvedSetting[] = getRegistry()
+    .filter((k) => k.scope === parsed.kind)
+    .map((k) => {
+      const row = storedByKey.get(k.key);
+      const rawValue = row ? JSON.parse(row.value) : k.default;
+      const source = row ? (row.source as ResolvedSetting["source"]) : "default";
+      return resolveForResponse(k, rawValue, source);
+    });
+  return { ok: true, value: results };
+}
+
+export function setValue(
+  actor: PersonRow,
+  scope: string,
+  key: string,
+  value: unknown,
+): SettingsOpResult<ResolvedSetting> {
+  const parsed = parseScope(scope);
+  if (!parsed) return { ok: false, status: 400, error: `invalid scope: ${scope}` };
+
+  const keyDef = getRegistryKey(key);
+  if (!keyDef) return { ok: false, status: 400, error: `unknown settings key: ${key}` };
+  if (keyDef.scope !== parsed.kind) {
+    return { ok: false, status: 400, error: `${key} is a ${keyDef.scope}-scope key, not ${parsed.kind}` };
+  }
+
+  const auth = assertCanAccessScope(actor, parsed, "write");
+  if (!auth.ok) return auth;
+
+  const validated = validateSelectorValue(keyDef, value);
+  if (!validated.ok) return validated;
+
+  const existing = db
+    .select()
+    .from(settingsValues)
+    .where(and(eq(settingsValues.scope, scope), eq(settingsValues.key, key)))
+    .get();
+
+  const hlc = nextHlc();
+  // Per-field last-writer-wins (7.3): a fresh local hlc is always newer
+  // than whatever's stored today (no remote writer exists yet), but the
+  // comparison is real, not assumed, so a future sync-originated write
+  // with an independently-generated hlc resolves correctly with no
+  // change to this function.
+  if (existing && compareHlc(hlc, existing.hlc) <= 0) {
+    return { ok: false, status: 400, error: "a newer value already exists for this key" };
+  }
+
+  const now = new Date().toISOString();
+  const serialized = JSON.stringify(value);
+  if (existing) {
+    db.update(settingsValues)
+      .set({ value: serialized, hlc, source: "user", updatedAt: now })
+      .where(and(eq(settingsValues.scope, scope), eq(settingsValues.key, key)))
+      .run();
+  } else {
+    db.insert(settingsValues).values({ scope, key, value: serialized, hlc, source: "user", updatedAt: now }).run();
+  }
+
+  return { ok: true, value: resolveForResponse(keyDef, value, "user") };
+}
+
+/** Reset a key back to its registry default: a real delete (this table
+ * makes no "never hard-deletes" promise the way memory does; there's no
+ * history to preserve for a settings reset, 6.6 Rule 6). */
+export function resetValue(actor: PersonRow, scope: string, key: string): SettingsOpResult<true> {
+  const parsed = parseScope(scope);
+  if (!parsed) return { ok: false, status: 400, error: `invalid scope: ${scope}` };
+  const keyDef = getRegistryKey(key);
+  if (!keyDef) return { ok: false, status: 400, error: `unknown settings key: ${key}` };
+
+  const auth = assertCanAccessScope(actor, parsed, "write");
+  if (!auth.ok) return auth;
+
+  db.delete(settingsValues).where(and(eq(settingsValues.scope, scope), eq(settingsValues.key, key))).run();
+  return { ok: true, value: true };
+}

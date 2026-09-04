@@ -28,6 +28,14 @@ if [ -d backend/src ]; then
   echo "== backend: install"
   bun install --silent
 
+  echo "== backend: settings registry, regenerate and check for drift"
+  (cd backend && bun run gen:settings >/dev/null)
+  if ! git diff --quiet -- spec/settings/keys.json; then
+    echo "spec/settings/keys.json is out of date with backend/src/settings/coreKeys.ts. Run 'bun run gen:settings' in backend/ and commit the result."
+    git --no-pager diff --stat -- spec/settings/keys.json
+    exit 1
+  fi
+
   echo "== backend: typecheck"
   (cd backend && bunx tsc --noEmit)
 

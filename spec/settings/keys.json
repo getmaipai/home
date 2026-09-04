@@ -1,1 +1,23 @@
-[]
+[
+  {
+    "key": "household.locale",
+    "scope": "household",
+    "selector": "select",
+    "range": {
+      "options": [
+        "en-US",
+        "en-GB"
+      ]
+    },
+    "default": "en-US",
+    "label": "Language and region",
+    "help": "Sets the household's date, time, and unit formatting.",
+    "level": "basic",
+    "secret": false,
+    "lives_in": "household.system",
+    "honoured_by": [
+      "home",
+      "bot"
+    ]
+  }
+]

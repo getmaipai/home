@@ -13,42 +13,13 @@ import { db, sqlite } from "@/db";
 import { memoryRecords, people } from "@/db/schema";
 import { newMemoryRecordId } from "@/lib/memoryId";
 import { toMemoryRecord } from "@/lib/memoryShape";
+import { isOwnerOrAdmin, rolesById, canAccessPerson } from "@/lib/access";
 import { MemoryRecord } from "@maipai/spec/gen/ts/memory-record.js";
 import type { PersonRow, MemoryRecordRow } from "@/types";
 
 export type MemoryOpResult<T> =
   | { ok: true; value: T }
   | { ok: false; status: 400 | 403 | 404; error: string };
-
-function isOwnerOrAdmin(actor: PersonRow): boolean {
-  return actor.role === "owner" || actor.role === "admin";
-}
-
-function rolesById(): Map<string, string> {
-  const rows = db.select({ id: people.id, role: people.role }).from(people).all();
-  return new Map(rows.map((r) => [r.id, r.role]));
-}
-
-// Whether `actor` may access (read, export, or forget) `personId`'s own
-// scope=person records: themself, or owner/admin ONLY when the target is
-// a child (parity with 4.14's conversation-visibility rule: a parent sees
-// a child's, nothing of an adult's; teen support needs a summary
-// mechanism that doesn't exist yet, so teens are treated like adults
-// here, a deliberately conservative judgment call recorded in
-// docs/dev.md). A code review (2026-09-04) found forget()/exportPerson()
-// using a DIFFERENT, broader rule (any owner/admin, regardless of the
-// target's role) than list()/recall()'s canRead() used for the exact same
-// records, so an owner/admin could not browse an adult's memories but
-// could export or delete them wholesale. One predicate now, shared by
-// both: an owner/admin who cannot read an adult's memories cannot export
-// or erase them either. Known gap this introduces: an admin can no longer
-// forget a DEPARTED adult's data on their behalf (they'd need that
-// person's own session); worth a real capability-grant-based override
-// once 4.2's capability grants exist, not invented here.
-function canAccessPerson(actor: PersonRow, personId: string, roleOf: Map<string, string>): boolean {
-  if (actor.id === personId) return true;
-  return isOwnerOrAdmin(actor) && roleOf.get(personId) === "child";
-}
 
 // scope=self is "not shared with anyone" per the schema's own field
 // description: no read path, however privileged, ever returns it.
