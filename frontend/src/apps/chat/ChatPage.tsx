@@ -14,11 +14,30 @@ interface ChatPageProps {
 // The real Chat page (spec/ui/pages/chat.json), hand-built against the
 // kit primitives rather than executed by a generic UiNode interpreter
 // (none exists yet, home/docs/dev.md documents that as a deferred slice).
+// Qwen3's hybrid thinking mode wraps its reasoning in a `<think>...</think>`
+// block ahead of the real answer when enabled (llm.ts's `thinking` option);
+// stripped here rather than shown inline so turning it on for one hard
+// question doesn't dump a paragraph of raw reasoning into the thread - a
+// household member who wants to see it can still ask.
+export function stripThinking(text: string): string {
+  const stripped = text.replace(/<think>[\s\S]*?<\/think>\s*/g, "").trim();
+  // A code review (2026-09-04) found the earlier `|| text` fallback here
+  // defeated the whole point when a reply was reasoning-only (no final
+  // answer after the </think> tag): stripped becomes "", which is
+  // falsy, so `|| text` re-surfaced the raw, un-stripped block it exists
+  // to hide. Never fall back to the unstripped text.
+  return stripped || "MaiPai thought about it but didn't give a final answer. Try asking again.";
+}
+
 export function ChatPage({ person }: ChatPageProps) {
   const [messages, setMessages] = useState<ThreadMessage[] | null>(null);
   const [loadError, setLoadError] = useState(false);
   const [sending, setSending] = useState(false);
   const [banner, setBanner] = useState<string | null>(null);
+  // Off by default (Jesse, 2026-09-04: "thinking mode off by default with
+  // the ability to enable in chats when needed"): a per-message opt-in,
+  // not a standing setting, since most turns don't need the extra latency.
+  const [thinking, setThinking] = useState(false);
 
   const loadHistory = useCallback(() => {
     setLoadError(false);
@@ -51,10 +70,10 @@ export function ChatPage({ person }: ChatPageProps) {
     ]);
     setSending(true);
     try {
-      const value = await api.sendTurn(text);
+      const value = await api.sendTurn(text, thinking);
       setMessages((prev) => [
         ...(prev ?? []),
-        { id: `${pendingId}-reply`, sender: "MaiPai", text: value.reply.text, isSelf: false },
+        { id: `${pendingId}-reply`, sender: "MaiPai", text: stripThinking(value.reply.text), isSelf: false },
       ]);
       // 4.3: "offer, never block" - shown alongside the reply, never in
       // place of it, and never suppressing anything else in the thread.
@@ -65,9 +84,24 @@ export function ChatPage({ person }: ChatPageProps) {
       // the backend, so a reload silently dropped it with no explanation.
       // Mark that exact message failed instead of only banner-ing below.
       setMessages((prev) => (prev ?? []).map((m) => (m.id === pendingId ? { ...m, failed: true } : m)));
-      setBanner(e instanceof ApiError ? e.message : "Could not reach the hub. Try again.");
+      // turnEngine.ts's "unavailable" code covers every real down-state
+      // (still downloading, crashed, never selected): one friendly,
+      // actionable message rather than the developer-facing reason string
+      // (e.g. "llama-server did not become healthy within 60000ms")
+      // leaking straight into the household's chat thread.
+      setBanner(
+        e instanceof ApiError && e.code === "unavailable"
+          ? "MaiPai's AI isn't answering right now. If you just picked a new AI model it may still be getting ready - check Household → AI models, then try again."
+          : e instanceof ApiError
+            ? e.message
+            : "Could not reach the hub. Try again.",
+      );
     } finally {
       setSending(false);
+      // Back to off after every send: a per-message opt-in, not a mode a
+      // household member could forget is still on and pay the latency for
+      // every later reply.
+      setThinking(false);
     }
   }
 
@@ -100,6 +134,20 @@ export function ChatPage({ person }: ChatPageProps) {
       {banner ? (
         <div className="mx-4 mb-2 rounded-[var(--radius)] bg-[hsl(var(--muted))] px-3 py-2 text-sm">{banner}</div>
       ) : null}
+      <div className="flex items-center justify-end px-4 pb-1">
+        <button
+          type="button"
+          onClick={() => setThinking((v) => !v)}
+          aria-pressed={thinking}
+          className={`rounded-full px-3 py-1 text-sm transition-colors ${
+            thinking
+              ? "bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))]"
+              : "bg-[hsl(var(--muted))] text-[hsl(var(--muted-foreground))]"
+          }`}
+        >
+          {thinking ? "Thinking on for next message" : "Think longer"}
+        </button>
+      </div>
       <Form
         fields={[{ name: "message", selector: "text", placeholder: "Message" }]}
         submitIcon="send"

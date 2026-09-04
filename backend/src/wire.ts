@@ -71,6 +71,50 @@ export interface ModelFit {
   budgetBytes: number;
 }
 
+// Mirrors modelDownloadJobs.ts's JobRow (hand-copied, same reason as
+// ModelFit/BackupInfo above: that file's own imports aren't
+// alias-free).
+export type ModelJobStatus =
+  | "queued"
+  | "downloading_engine"
+  | "downloading_model"
+  | "verifying"
+  | "loading"
+  | "testing"
+  | "ready"
+  | "failed"
+  | "none";
+
+export interface ModelJob {
+  modelId: string;
+  status: ModelJobStatus;
+  phase: string;
+  completedBytes: number;
+  totalBytes: number;
+  error: string | null;
+  postLoadCheck: { estimatedBytes: number; actualBytes: number | null; driftPct: number | null } | null;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+// Mirrors llmSupervisor.ts's EngineStatus/BackendKind and
+// engineStats.ts's EngineStatsSample (hand-copied, same reason as
+// ModelFit/BackupInfo above).
+export type EngineKind = "url" | "override" | "selection" | "stub" | "stopped" | "starting" | "none";
+
+export interface EngineStatus {
+  kind: EngineKind;
+  modelId: string | null;
+  pid: number | null;
+  startedAt: string | null;
+}
+
+export interface EngineStatsSample {
+  at: string;
+  memoryBytes: number | null;
+  cpuPercent: number | null;
+}
+
 // The role-string half of lib/access.ts's isOwnerOrAdmin(actor: PersonRow):
 // that function takes a full PersonRow (an "@/types" dependency this file
 // can't have), so this is the underlying string check, shared for real

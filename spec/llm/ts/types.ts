@@ -23,6 +23,12 @@ export interface ChatCompletionRequest {
   messages: ChatMessage[];
   temperature?: number;
   max_tokens?: number;
+  /** Forwarded verbatim into the model's Jinja chat template. This
+   * pass's one real use (llm.ts's `thinking` option): Qwen3's template
+   * reads `enable_thinking` to switch its hybrid thinking/non-thinking
+   * mode per request, overriding llmSupervisor.ts's spawn-time
+   * `--chat-template-kwargs` default. */
+  chat_template_kwargs?: Record<string, unknown>;
 }
 
 export interface ChatCompletionChoice {

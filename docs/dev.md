@@ -1566,6 +1566,132 @@ set. Full architecture: platform plan chapters 1, 3, and 4.
       looked up. A real gap for whoever builds the download queue, not a
       guess.
 
+- [x] **The model-provisioning slice: a real download queue, a real
+      engine, engine control, thinking mode, and a friendlier down-state
+      (2026-09-04, overnight, Jesse explicitly authorized working
+      autonomously without waiting for check-ins).** Closes the "deferred,
+      all real gaps" list the previous entry and `spec/llm/README.md` both
+      named: no GGUF downloaded, no `llama-server` binary fetched, no
+      download-job queue, no auto-tuned launch flags. See
+      `spec/llm/README.md`'s own rewritten "real engine, live end to end"
+      section for the technical detail; this entry is the narrative and
+      the judgment calls.
+    - **Real pins, looked up for real, not guessed.** Qwen3 8B Instruct
+      Q4_K_M's GGUF: Qwen's own official HF repo (not a third-party
+      requant), pinned to one git revision so the sha256 can never drift
+      out from under it (`d98cdcbd...`, 5,027,783,488 bytes). The
+      llama-server engine: ggml-org/llama.cpp build b10797, one pin per
+      platform/arch/GPU-vendor (`engineCatalog.ts`). The macOS arm64
+      (Metal) pin was downloaded, extracted, and run for real this
+      session - `verified: true`. The Windows CUDA x64 pin (plus its
+      separate cudart runtime package) was downloaded and hashed for
+      real too, but never run: no Windows/CUDA box exists in this
+      session, so it's honestly marked `verified: false` rather than
+      assumed to work from the code alone.
+    - **Verified live, end to end, on this real Mac**, not just unit
+      tested: a real ~5GB download (resumable, checksum-verified) through
+      the real "choose this" button, a real llama-server spawn with
+      auto-tuned flags, a real post-load check (one real chat completion
+      plus real memory measurement - 11-12% drift against the formula,
+      logged as routine info, first real data point on whether
+      `modelCatalog.ts`'s weights/KV-cache formula needs revisiting), and
+      a real reply ("The capital of France is Paris.") through the actual
+      Chat UI. Caught and fixed a real bug this way: the first launch
+      used `--chat-template-kwargs` to default thinking mode off, and
+      llama-server logged it as deprecated in favor of `--reasoning off`
+      - exactly the class of thing a live spawn catches that a mocked
+      unit test never would. Also verified live: the "think longer"
+      per-message toggle (a real reasoning trace - 201 generated tokens
+      against a ~20-word visible reply - stripped from display rather
+      than shown raw), and engine Stop/Start/Restart from the AI models
+      page (a stopped engine correctly refused to silently auto-respawn,
+      and surfaced a friendly "check Household → AI models" message in
+      Chat instead of a raw error string).
+    - **Verification used a throwaway household, never Jesse's real
+      one.** His actual dev data dir already had a real household (Jesse/
+      Nova/Marlow) signed in with a PIN this session doesn't know and
+      had no business resetting. Instead: his real backend process was
+      stopped, a second backend was started against a scratch
+      `MAIPAI_DATA_DIR` with a throwaway "Verify" household, the whole
+      flow ran there, and his real backend was restarted identically
+      afterward - his real database was never opened by the verification
+      run at all. The one deliberate write to his real environment: the
+      verified GGUF and engine binary were copied into his real `data/
+      models`/`data/engines` afterward (pre-warming the cache so his own
+      first "Use this" click is instant instead of a fresh 5GB download),
+      but `chat.model_id` itself was left unset in his real household -
+      that selection stays his to make.
+    - **Also shipped:** engine resource stats (`engineStats.ts`, an
+      in-memory 60s/2h ring buffer of memory + CPU% for the running
+      engine process - never persisted, this is closer to `ps` than to
+      household data) answering "how busy has the machine been"; the AI
+      models page was redesigned around Jesse's live feedback mid-session
+      ("ugly and too technical for a dad... take up a lot of space") into
+      `docs/SETTINGS.md` Rule 3's actual shape (one card per role, the
+      chosen model, "change," advanced details folded) instead of the
+      flat pros/cons dump the previous entry shipped.
+    - **The catalog-repo request, answered honestly rather than faked.**
+      Jesse asked for the AI-models page to "pull options from our
+      catalog repo" with a cached-copy fallback if it's down. Checked
+      `getmaipai/catalog` for real: it's pre-code (its own README says
+      so) - no package manifests, no signed TUF index, none of the
+      lint/pack/sign/index tooling `docs/PACKAGES.md`'s supply-chain
+      section describes. Building a "fetch from the catalog" against a
+      catalog with nothing real to serve would mean either faking the
+      fetch or half-building real signing/verification infrastructure as
+      a side effect of a chat-model slice - neither is honest. Answer
+      given instead: `modelCatalog.ts`'s bundled, compiled-in `CATALOG`
+      already has zero outage risk by construction (it never depends on
+      a network at all), which is a stronger version of "still works
+      when the catalog repo is down" than any fetch-with-fallback layer
+      would be. The real catalog-repo integration is a named, deferred
+      gap blocked on the TUF signing infrastructure not existing yet -
+      flagged to Jesse rather than quietly built around.
+    - **TTS (Chatterbox Turbo/Nano) researched, not adopted**, per
+      Jesse's note asking for an evaluation, not an implementation. Both
+      models are real (MIT, Resemble AI) but PyTorch-only with zero
+      independent CPU/edge benchmarks found anywhere; every published
+      number is vendor-claimed, almost certainly measured on Resemble's
+      own hosted GPU service. The legacy Kokoro-82M ONNX pick has a real
+      independent CPU benchmark (RTX-free 4-core Xeon, sub-1.0 RTF, best
+      measured quality in that comparison) and a genuine CPU-only/ARM
+      runtime story via ONNX Runtime - a materially better-evidenced fit
+      for both Home (re-verify Kokoro locally before deciding) and Bot
+      (Chatterbox Nano has no Hailo-10H path and no Pi-class benchmark;
+      Piper turned up as a candidate worth a look for the robot's
+      edge constraints, not part of Jesse's original note). Recorded here
+      rather than acted on: no TTS backend exists yet to run any of this
+      against (same `implemented: false`, catalog-data-only precedent as
+      the image/video entries).
+    - **Two things Jesse flagged that this entry answers rather than
+      builds:** (1) using Home for coding - not built (the `coding` role
+      still throws `capability_missing`, no consumer exists anywhere in
+      this repo, same as `spec/llm/README.md` always said); flagged back
+      to Jesse as a real design question rather than silently scoped in,
+      since a "bonus, not my main use case" role deserves its own
+      decision on model choice and system-prompt shape, not a rushed
+      add-on to a chat-model-download slice. (2) The hub/bot standalone-
+      with-sync architecture (heartbeats, check-ins, syncing rules/users/
+      memories) - not touched, and correctly so on inspection: this
+      slice's new state (`chat.model_id` and the three launch-flag
+      overrides in `settings/aiKeys.ts`) is `honoured_by: ["home"]` only,
+      the same hub-internal-vs-spec-shared line `scheduledJobs`/
+      `conversationTurns` already draw, since the bot's own hardware
+      (Hailo-10H, not llama-server the same way) makes this exact chat-
+      engine machinery hub-specific by nature. The real link/sync design
+      itself is still unbuilt anywhere in the codebase, hub or bot
+      (`lib/settings.ts`'s own comment: "the link and sync design in
+      home/spec/dev.md once it exists") - a real, separate, foundational
+      platform feature, not something this slice should have shoehorned
+      in.
+    - **A real operational note, not a bug:** the standards' gitleaks
+      scan took ~15 minutes on this run (previously seconds) because it
+      walks the working tree regardless of `.gitignore`, and `data/` now
+      holds the cached 5GB model. Not fixed (deleting Jesse's pre-warmed
+      cache to make `check.sh` faster would be a bad trade), just flagged
+      so a slow `check.sh` on this machine going forward isn't mistaken
+      for something broken.
+
 ## API routes and `@hono/zod-openapi` (tracked debt)
 
 `getmaipai/CLAUDE.md` > Documentation requires every Hono route to be

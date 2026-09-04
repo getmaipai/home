@@ -10,6 +10,9 @@ import type {
   BackupInfo,
   HardwareInfo,
   ModelFit,
+  ModelJob,
+  EngineStatus,
+  EngineStatsSample,
 } from "@maipai/home-backend/src/wire";
 import { isOwnerOrAdminRole } from "@maipai/home-backend/src/wire";
 
@@ -32,7 +35,7 @@ export type Role = Person["role"];
 // depends on @maipai/home-backend as a workspace package for this;
 // re-export the types here so the rest of the frontend imports from one
 // place.
-export type { Roster, TurnValue, ConversationTurnRow, ResolvedSetting, BackupInfo, HardwareInfo, ModelFit };
+export type { Roster, TurnValue, ConversationTurnRow, ResolvedSetting, BackupInfo, HardwareInfo, ModelFit, ModelJob, EngineStatus, EngineStatsSample };
 export type { MemoryRecord };
 export { isOwnerOrAdminRole };
 // SettingsKey is spec-generated (@maipai/spec), not backend-only, so it's
@@ -94,10 +97,10 @@ export const api = {
   me: () => request<Roster>("/api/auth/me"),
   logout: () => request<{ success: true }>("/api/auth/logout", { method: "POST" }),
   conversations: () => request<ConversationTurnRow[]>("/api/conversations"),
-  sendTurn: (text: string) =>
+  sendTurn: (text: string, thinking?: boolean) =>
     request<TurnValue>("/api/turn", {
       method: "POST",
-      body: JSON.stringify({ surface: "chat", text }),
+      body: JSON.stringify({ surface: "chat", text, thinking }),
     }),
   settingsRegistry: () => request<SettingsKey[]>("/api/settings/registry"),
   settingsValues: (scope: string) =>
@@ -125,4 +128,11 @@ export const api = {
     request<MemoryRecord>(`/api/memory/${encodeURIComponent(id)}/archive`, { method: "POST" }),
   hardware: () => request<HardwareInfo>("/api/host/hardware"),
   models: (role: string) => request<ModelFit[]>(`/api/host/models?role=${encodeURIComponent(role)}`),
+  modelSelection: () => request<{ modelId: string | null }>("/api/host/models/selection"),
+  selectModel: (id: string) => request<ModelJob>(`/api/host/models/${encodeURIComponent(id)}/select`, { method: "POST" }),
+  modelSelectStatus: (id: string) => request<ModelJob>(`/api/host/models/${encodeURIComponent(id)}/select-status`),
+  engineStatus: () => request<EngineStatus>("/api/host/engine/status"),
+  engineStats: () => request<EngineStatsSample[]>("/api/host/engine/stats"),
+  stopEngine: () => request<EngineStatus>("/api/host/engine/stop", { method: "POST" }),
+  restartEngine: () => request<EngineStatus>("/api/host/engine/restart", { method: "POST" }),
 };

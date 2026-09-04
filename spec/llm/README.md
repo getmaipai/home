@@ -66,14 +66,77 @@ path (start a backend, health-check it, send a real HTTP request, parse
 a real HTTP response) is exercised for real end to end, the only thing
 that differs when a real engine is configured is which process answers.
 
-## Deliberately deferred, all real 4.11 scope not attempted this pass
+## The real engine, live end to end (2026-09-04)
 
-- **The real engine.** No GGUF is downloaded, pinned by sha256, or
-  installed by this pass; no llama-server binary is fetched for any
-  platform (Windows CUDA, macOS Metal, Linux CUDA/Vulkan). `llmSupervisor.
-  ts`'s spawn path is real code (`Bun.spawn`) but has never been run
-  against a real binary in this repo; it needs a real binary and model to
-  prove.
+The download queue, engine binary, and real spawn this section used to
+list as deferred are now real, verified against a live spawn on Jesse's
+dev Mac, not just unit-tested:
+
+- **`backend/src/lib/modelDownload.ts`**: a resumable, checksum-verified
+  URL download (Range-header resume, an idle-stall timeout, retry with
+  backoff, a post-download integrity gate that deletes and re-throws on a
+  bad size/checksum rather than leaving a corrupt file believed good) -
+  ported from the archived legacy hub's `lib/download.ts`, the org's
+  named "hard-won logic" precedent for this exact kind of thing.
+- **`backend/src/lib/engineCatalog.ts`**: pinned llama-server binaries
+  (build b10797), one entry per platform/arch/GPU-vendor combination. The
+  macOS arm64 (Metal) pin is `verified: true` - downloaded, extracted,
+  spawned, and proven against a real chat completion this session. The
+  Windows CUDA x64 pin is real (downloaded and hashed for real, both the
+  main archive and its separate cudart runtime package) but
+  `verified: false`: no Windows/CUDA box exists in this session to prove
+  it against, so `modelDownloadJobs.ts` will happily use it but the pin
+  itself says plainly that nobody has run it yet.
+- **`backend/src/lib/modelDownloadJobs.ts`**: the download-job queue
+  (`model_download_jobs` table, `db/schema.ts`) ModelsSection.tsx's
+  "choose this" button drives: fetch the engine binary if missing, fetch
+  the GGUF, verify both, select it as the household's chat model, spawn
+  it for real, run the post-load check - one job, one thing to poll.
+- **`backend/src/lib/engineAutotune.ts`**: real launch-flag auto-tuning
+  (context size searched against the exact fit-calculator formula,
+  flash attention, a quantized KV cache), each overridable by an advanced
+  household setting (`settings/aiKeys.ts`). Flag names and defaults were
+  confirmed against a real `llama-server --help` on the pinned binary,
+  not assumed from older docs - which caught a real bug: the first launch
+  used `--chat-template-kwargs '{"enable_thinking":false}'` to default
+  thinking mode off, and a live spawn logged it as deprecated in favor of
+  `--reasoning off`. Fixed and re-verified live before this note was
+  written, exactly the kind of thing "verify live end to end" catches
+  that a unit test alone never would.
+- **`backend/src/lib/enginePostLoadCheck.ts`**: "rather than trusting the
+  fit calculator alone" - every real spawn sends one real chat completion
+  and measures actual memory (nvidia-smi per-process on CUDA, the
+  process's own RSS on Apple Silicon/CPU, where there's no discrete VRAM
+  concept), logging drift against `modelCatalog.ts`'s own formula. Real
+  measured drift on the verified spawn: 11-12% (estimated 6.93GB vs.
+  actual ~7.7GB) - within the 25% warn threshold, logged as routine info,
+  a first real data point for whether the formula needs revisiting later.
+- **Thinking mode, off by default** (Jesse, 2026-09-04): the engine
+  launches with `--reasoning off`; `llm.ts`'s `thinking` option overrides
+  it per request via `chat_template_kwargs: {enable_thinking}` on
+  `/v1/chat/completions` - proven live (a "think longer" turn generated
+  201 tokens against a ~20-word visible reply, i.e. a real reasoning
+  trace, which `ChatPage.tsx` strips before display rather than showing
+  raw). No auto-detect-when-to-think heuristic was built: that's a real,
+  unbuilt research problem (closer to a router role), not something to
+  guess at as a side effect of this slice.
+- **Engine control**: `llmSupervisor.ts`'s `getEngineStatus`/
+  `stopChatBackend`/`restartChatBackend` back real Stop/Restart/Start
+  buttons on the AI models page, plus `engineStats.ts`'s in-memory
+  resource-trend sampler (memory + CPU%, 60s cadence, 2h window - never
+  persisted, this is operational telemetry about a local child process,
+  not household data). A manual stop is sticky: `getChatClient()` refuses
+  to silently auto-respawn a household member's explicit "stop," unlike
+  every other not-yet-running state.
+- **A friendlier down-state in Chat.** `turnEngine.ts`'s "unavailable"
+  code (a stopped engine, a still-downloading model, a crashed spawn) used
+  to surface the raw developer-facing error string straight into the
+  household's chat thread; `ChatPage.tsx` now shows one generic, actionable
+  message ("check Household → AI models") instead, verified live by
+  stopping the engine mid-session and sending a message.
+
+What's still real deferred scope, unchanged by any of the above:
+
 - **The residency policy.** 4.11 describes a router process fronting many
   models with `/models/load`/`/models/unload`, role-specific residency
   (chat and embedders pinned, router 30 minutes, vision 15), GPU
@@ -128,9 +191,28 @@ The hardware is now known (2026-09-04): this dev machine (Apple Silicon,
 24GB unified) and Jesse's MSI laptop (RTX 2070 Super 8GB built-in, RTX
 3070 8GB always-docked eGPU). `modelCatalog.ts`'s catalog recommends
 Qwen3 8B Instruct (Q4_K_M) as the `chat` role's pick, fit-checked against
-both. What's still genuinely open: no GGUF has been downloaded, no
-`llama-server` binary fetched for either platform (Metal vs CUDA), and no
-download-job queue exists to do either safely (a multi-GB action onto
-Jesse's real machines, deliberately not auto-triggered - see docs/dev.md).
-`MAIPAI_LLAMA_SERVER_URL`/`_BIN`/`MAIPAI_CHAT_MODEL_PATH` are still ready
-to point at a real answer the moment that queue exists and downloads one.
+both, and the download queue above is real and proven on the Mac. Genuinely
+still open:
+
+- **The MSI's Windows/CUDA path is unverified.** `engineCatalog.ts`'s
+  Windows CUDA pin is real (downloaded, hashed) but has never spawned a
+  process anywhere - no cudart-merge-into-one-directory step, no
+  `llama-server.exe` launch, no post-load check has ever run on real CUDA
+  hardware. Treat it as "should work" from the code and the pin, not as
+  proven, until it runs on the MSI for real.
+- **No rate limit on `/api/turn`/`/api/llm/chat`** - the gap this file
+  already named below is unchanged: a real engine now answers those
+  routes, which makes the gap more real than when it was stub-only, but
+  fixing it well still needs a real engine's measured concurrency
+  behavior, which this pass didn't set out to measure.
+- **`chat.model_id` is a plain settings key with no download-progress
+  history beyond the one active job row** - a browser open during a
+  download sees live progress; nothing shows "here's what happened to
+  past downloads" yet, a real but minor gap.
+- **The one-time model download itself is multi-GB, always a real
+  household action** (the org's third-party-model rule + this task's own
+  brief: "flag the actual download... since it's multi-GB"). Nothing
+  about the queue above changes that: `POST /api/host/models/:id/select`
+  only ever runs because a signed-in owner/admin clicked "Use this" (or,
+  this session, because Jesse explicitly authorized autonomous
+  verification overnight - see docs/dev.md).

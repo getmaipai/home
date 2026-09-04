@@ -142,6 +142,27 @@ export const conversationTurns = sqliteTable("conversation_turns", {
   createdAt: text("created_at").notNull(),
 });
 
+// The model-provisioning download-job queue (4.11's deferred "download
+// queue" gap, spec/llm/README.md): one row per catalog model id a
+// household has ever chosen, tracking a real multi-phase job (fetch the
+// engine binary if missing, fetch the GGUF, verify both, spawn, run the
+// post-load check) so progress survives a browser refresh and a crash
+// mid-download resumes rather than restarting silently. Not a spec 3.1
+// record type (chapter 3's record table has no download-job entry
+// either), the same "hub-internal, revisit for robot parity later" call
+// `scheduledJobs` and `conversationTurns` already made.
+export const modelDownloadJobs = sqliteTable("model_download_jobs", {
+  modelId: text("model_id").primaryKey(),
+  status: text("status").notNull(), // queued|downloading_engine|downloading_model|verifying|loading|testing|ready|failed
+  phase: text("phase").notNull(),
+  completedBytes: integer("completed_bytes").notNull().default(0),
+  totalBytes: integer("total_bytes").notNull().default(0),
+  error: text("error"),
+  postLoadCheck: text("post_load_check"), // JSON: { estimatedBytes, actualBytes, driftPct }
+  createdAt: text("created_at").notNull(),
+  updatedAt: text("updated_at").notNull(),
+});
+
 export const scheduledJobs = sqliteTable("scheduled_jobs", {
   id: text("id").primaryKey(),
   kind: text("kind").notNull(), // "skill" | "core"

@@ -2,6 +2,7 @@ import { app } from "@/app";
 import { ensureCoreJob, runDueJobs } from "@/lib/scheduler";
 import { runSkill } from "@/lib/skills";
 import { cleanupStaleSnapshots } from "@/lib/backup";
+import { sampleEngineStats } from "@/lib/engineStats";
 
 const port = Number(process.env.PORT ?? 8787);
 
@@ -28,6 +29,10 @@ ensureCoreJob("backup.run", "every:1d");
 // the next scheduled run.
 cleanupStaleSnapshots();
 setInterval(() => runDueJobs(runSkill), 60_000);
+// engineStats.ts's ring buffer, same 60s cadence as the job poll above -
+// "how busy the machine has been" (Jesse, 2026-09-04) doesn't need finer
+// granularity than that to show a real trend.
+setInterval(() => void sampleEngineStats(), 60_000);
 
 console.log(`MaiPai Home hub listening on http://localhost:${port}`);
 

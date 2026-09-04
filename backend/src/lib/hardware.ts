@@ -22,6 +22,10 @@ export interface CudaDevice {
 
 export interface HardwareInfo {
   platform: NodeJS.Platform;
+  /** engineCatalog.ts's other half of a binary pin match, alongside
+   * `platform`; kept here rather than re-read via node:os a second time
+   * so every platform-matching decision trusts the one real detection. */
+  arch: string;
   totalRamGb: number;
   cpuCount: number;
   isAppleSilicon: boolean;
@@ -90,6 +94,7 @@ export async function detectHardware(): Promise<HardwareInfo> {
   const cudaDevices = isAppleSilicon ? [] : await detectCudaDevices();
   const info: HardwareInfo = {
     platform: process.platform,
+    arch: process.arch,
     totalRamGb,
     cpuCount: os.cpus().length,
     isAppleSilicon,

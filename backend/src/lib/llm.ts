@@ -30,6 +30,15 @@ export interface LlmMessage {
 export interface LlmCompleteOptions {
   temperature?: number;
   max_tokens?: number;
+  /** Off by default (Jesse, 2026-09-04: "thinking mode off by default
+   * with the ability to enable in chats when needed"): a household
+   * member turns it on per message, not a standing mode, since the
+   * catalog's one chat model (Qwen3 8B) answers noticeably slower with it
+   * on and most turns don't need it. No auto-detect heuristic here on
+   * purpose - guessing "does this question need reasoning" is a real,
+   * unbuilt research problem (a router role, 4.11's other deferred role),
+   * not something to improvise as a side effect of this slice. */
+  thinking?: boolean;
 }
 
 export interface LlmCompleteValue {
@@ -78,7 +87,13 @@ export async function complete(
   }
 
   try {
-    const response = await client.chatComplete({ model: "chat", messages, ...opts });
+    const { thinking, ...rest } = opts;
+    const response = await client.chatComplete({
+      model: "chat",
+      messages,
+      ...rest,
+      chat_template_kwargs: { enable_thinking: !!thinking },
+    });
     const choice = response.choices[0];
     if (!choice) {
       return { ok: false, status: 503, code: "unavailable", error: "chat model returned no choices" };

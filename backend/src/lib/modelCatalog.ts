@@ -38,6 +38,16 @@ export const CATALOG: ModelCapabilities[] = [
     tags: ["recommended", "fast"],
     pros: ["Runs well on a single 8GB GPU", "Fast replies"],
     cons: ["Less capable than a larger model on hard reasoning tasks"],
+    // Qwen's own official GGUF repo (not a third-party requant), pinned to
+    // one revision so the file this sha256 describes can never change out
+    // from under it. sha256 is the repo's real git-lfs oid (HF's own
+    // "authoritative checksum" convention, download.ts's precedent),
+    // confirmed against a live HEAD on the resolve URL, 2026-09-04.
+    download: {
+      url: "https://huggingface.co/Qwen/Qwen3-8B-GGUF/resolve/7c41481f57cb95916b40956ab2f0b139b296d974/Qwen3-8B-Q4_K_M.gguf",
+      sha256: "d98cdcbd03e17ce47681435b5150e34c1417f50b5c0019dd560e4882c5745785",
+      approx_bytes: 5_027_783_488,
+    },
     sizing: {
       kind: "transformer_gguf",
       param_count_billion: 8.2,
@@ -127,6 +137,15 @@ export function weightsBytes(sizing: Extract<ModelCapabilities["sizing"], { kind
   );
 }
 
+/** What's left for a transformer_gguf model's weights + KV cache after
+ * display/CUDA overhead, at the given quantization. Exported so
+ * engineAutotune.ts's context-size search uses the exact same figure
+ * `fitsWithin` checks against, instead of re-deriving it (and possibly
+ * drifting from it) a second time. */
+export function usableChatBudgetBytes(budgetBytes: number): number {
+  return Math.max(0, budgetBytes * USABLE_FRACTION - OVERHEAD_BYTES);
+}
+
 /** Fit one catalog entry against a byte budget. `contextLength` only
  * matters for transformer_gguf sizing; diffusion entries are a flat
  * working-VRAM figure with no context concept. */
@@ -142,7 +161,7 @@ export function fitsWithin(model: ModelCapabilities, budgetBytes: number, contex
     const required = model.sizing.approx_vram_bytes;
     return { model, fits: required <= usable, requiredBytes: required, budgetBytes: usable };
   }
-  const usable = Math.max(0, budgetBytes * USABLE_FRACTION - OVERHEAD_BYTES);
+  const usable = usableChatBudgetBytes(budgetBytes);
   const ctx = Math.min(contextLength ?? 8192, model.sizing.max_context);
   const required = weightsBytes(model.sizing) + kvCacheBytes(model.sizing, ctx);
   return { model, fits: required <= usable, contextUsed: ctx, requiredBytes: required, budgetBytes: usable };

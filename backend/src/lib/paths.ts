@@ -17,3 +17,13 @@ export const dataDir =
 // temp data dirs would.
 export const backupDir =
   process.env.MAIPAI_BACKUP_DIR ?? resolve(dataDir, "..", "backups");
+
+// Downloaded GGUF weights and llama-server engine binaries (4.11's
+// deferred download-job queue): both real household data in the sense
+// that a household chose and paid bandwidth/disk for them, but neither is
+// ever synced, backed up, or read by anything except the engine
+// supervisor, so they get their own subdirectories under data/ rather
+// than crowding hub.db's world. `MAIPAI_DATA_DIR` already covers test
+// isolation for both (they resolve from dataDir, not a separate env var).
+export const modelsDir = resolve(dataDir, "models");
+export const enginesDir = resolve(dataDir, "engines");

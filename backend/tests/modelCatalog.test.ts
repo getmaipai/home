@@ -7,6 +7,7 @@ const GB = 1_000_000_000;
 function hw(overrides: Partial<HardwareInfo>): HardwareInfo {
   return {
     platform: "linux",
+    arch: "x64",
     totalRamGb: 32,
     cpuCount: 8,
     isAppleSilicon: false,

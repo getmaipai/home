@@ -13,9 +13,9 @@ export const turnRoutes = new Hono<AppEnv>();
 // checks) now that this one exists.
 turnRoutes.post("/", requireAuth, async (c) => {
   const actor = c.get("person");
-  const body = (await c.req.json().catch(() => ({}))) as { surface?: string; text?: string };
+  const body = (await c.req.json().catch(() => ({}))) as { surface?: string; text?: string; thinking?: boolean };
   const surface = (body.surface ?? "chat") as Surface;
-  const result = await runTurn(actor, surface, body.text ?? "");
+  const result = await runTurn(actor, surface, body.text ?? "", { thinking: body.thinking });
   if (!result.ok) {
     return c.json({ error: result.error, code: result.code }, result.status);
   }

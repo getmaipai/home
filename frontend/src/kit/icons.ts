@@ -9,6 +9,9 @@ import {
   Settings,
   Brain,
   Archive,
+  CheckCircle2,
+  ChevronDown,
+  AlertTriangle,
   type LucideIcon,
 } from "lucide-react";
 
@@ -27,6 +30,9 @@ const REGISTRY: Record<string, LucideIcon> = {
   settings: Settings,
   brain: Brain,
   archive: Archive,
+  check: CheckCircle2,
+  "chevron-down": ChevronDown,
+  "alert-triangle": AlertTriangle,
 };
 
 export function getIcon(name: string): LucideIcon {

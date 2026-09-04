@@ -176,24 +176,13 @@ export function listValues(actor: PersonRow, scope: string): SettingsOpResult<Re
   return { ok: true, value: results };
 }
 
-export function setValue(
-  actor: PersonRow,
-  scope: string,
-  key: string,
-  value: unknown,
-): SettingsOpResult<ResolvedSetting> {
-  const parsed = parseScope(scope);
-  if (!parsed) return { ok: false, status: 400, error: `invalid scope: ${scope}` };
-
-  const keyDef = getRegistryKey(key);
-  if (!keyDef) return { ok: false, status: 400, error: `unknown settings key: ${key}` };
-  if (keyDef.scope !== parsed.kind) {
-    return { ok: false, status: 400, error: `${key} is a ${keyDef.scope}-scope key, not ${parsed.kind}` };
-  }
-
-  const auth = assertCanAccessScope(actor, parsed, "write");
-  if (!auth.ok) return auth;
-
+/** The validate-then-write core shared by setValue (actor-gated, every
+ * person-facing write) and setHouseholdSettingValue (actor-less, for core
+ * background jobs already gated elsewhere - see that function's doc).
+ * Caller is responsible for scope/key/authorization checks; this only
+ * validates the value against the key's selector and persists it. */
+function writeValue(scope: string, keyDef: SettingsKey, value: unknown): SettingsOpResult<ResolvedSetting> {
+  const key = keyDef.key;
   const validated = validateSelectorValue(keyDef, value);
   if (!validated.ok) return validated;
 
@@ -225,6 +214,42 @@ export function setValue(
   }
 
   return { ok: true, value: resolveForResponse(keyDef, value, "user") };
+}
+
+export function setValue(
+  actor: PersonRow,
+  scope: string,
+  key: string,
+  value: unknown,
+): SettingsOpResult<ResolvedSetting> {
+  const parsed = parseScope(scope);
+  if (!parsed) return { ok: false, status: 400, error: `invalid scope: ${scope}` };
+
+  const keyDef = getRegistryKey(key);
+  if (!keyDef) return { ok: false, status: 400, error: `unknown settings key: ${key}` };
+  if (keyDef.scope !== parsed.kind) {
+    return { ok: false, status: 400, error: `${key} is a ${keyDef.scope}-scope key, not ${parsed.kind}` };
+  }
+
+  const auth = assertCanAccessScope(actor, parsed, "write");
+  if (!auth.ok) return auth;
+
+  return writeValue(scope, keyDef, value);
+}
+
+/** Household-scope write with no actor gate: for a core background job
+ * that already checked access at the HTTP route that started it
+ * (modelDownloadJobs.ts's select flow runs behind requireRole("owner",
+ * "admin"), same as getHouseholdSettingValue's read-side counterpart) and
+ * needs to persist a result well after that request has returned. Still
+ * runs the selector's own validation - a bad value here is a code bug,
+ * not a hostile request, but the check is nearly free either way. Never
+ * exposed through a route. */
+export function setHouseholdSettingValue(key: string, value: unknown): SettingsOpResult<ResolvedSetting> {
+  const keyDef = getRegistryKey(key);
+  if (!keyDef) return { ok: false, status: 400, error: `unknown settings key: ${key}` };
+  if (keyDef.scope !== "household") return { ok: false, status: 400, error: `${key} is a ${keyDef.scope}-scope key, not household` };
+  return writeValue("household", keyDef, value);
 }
 
 /** A household setting's resolved value with no actor gate: for core

@@ -245,7 +245,12 @@ function route(text: string, actor: PersonRow, loaded: LoadedManifest[]): Routed
 
 /** Runs one conversation turn end to end: safety first, then the
  * deterministic skill floor, then the chat model as the phrasing fallback. */
-export async function runTurn(actor: PersonRow, surface: Surface, text: string): Promise<TurnOpResult> {
+export async function runTurn(
+  actor: PersonRow,
+  surface: Surface,
+  text: string,
+  opts: { thinking?: boolean } = {},
+): Promise<TurnOpResult> {
   if (!IMPLEMENTED_SURFACES.has(surface)) {
     return {
       ok: false,
@@ -301,10 +306,14 @@ export async function runTurn(actor: PersonRow, surface: Surface, text: string):
   } else {
     const memoryMatches = recall(actor, text);
     const systemPrompt = buildSystemPrompt(memoryMatches, loaded);
-    const completion = await complete("chat", [
-      { role: "system", content: systemPrompt },
-      { role: "user", content: text },
-    ]);
+    const completion = await complete(
+      "chat",
+      [
+        { role: "system", content: systemPrompt },
+        { role: "user", content: text },
+      ],
+      { thinking: opts.thinking },
+    );
     if (!completion.ok) {
       return { ok: false, status: 503, code: "unavailable", error: completion.error };
     }
