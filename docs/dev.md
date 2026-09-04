@@ -1147,7 +1147,36 @@ between now and when the relevant piece gets built.
   enumerable, which a model deciding at runtime how many searches to run
   is not. Bounded selection, capped at one or two schema-constrained calls
   per turn, is the shape if it gets built at all.
-  **Related open decision:** the default chat model (`spec/llm/README.md`)
-  is a real input here. Grammar-constrained decoding through llama-server
-  matters more than the model's own tool-calling ability, since a GBNF
-  grammar makes a small model's call valid by construction.
+  **Two decisions from Jesse, 2026-09-04, that this note now sits on top
+  of.** *The model lineup comes from the legacy hub*, not a fresh pick:
+  `loki-doki`'s `backend/src/lib/catalog.ts` had two hardware-tiered sets,
+  default `original` (chat `mannix/llama3.1-8b-abliterated`, vision
+  `gemma3:4b-it-qat`, router LLM `granite4.1:3b`, embeddings
+  `nomic-embed-text`, routing embedder `all-minilm`) and `latest` (chat
+  `huihui_ai/qwen3.5-abliterated:9b`, router `qwen3.5:4b`, embeddings
+  `qwen3-embedding:0.6b`). The `pc-32` tier ("RTX 3070 / RX 6800 XT+") is
+  the real machine, so it is the one that matters first. Two carry-over
+  caveats: every one of those roles ran on Ollama and 4.11 mandates
+  llama-server only, so these are model *choices* needing GGUF equivalents
+  and sha256 pins, not a runtime to copy; and the abliterated chat models
+  stay but their legacy justification does not, since `catalog.ts`'s own
+  comment ("behavior is controlled by the safety system prompt injected
+  per-user") is exactly the `textFloor.ts` pattern the Review queue above
+  already marked Redesign. The deterministic pre-model floor (4.3) is what
+  makes that model choice safe, and the org's non-removable child-safety
+  invariant rests on the floor, never on a model's fine-tuning. Directly
+  useful here: `all-minilm` is the concrete answer to this note's "build
+  `embed` first" step, and `granite4.1:3b`/`qwen3.5:4b` are the
+  small-router-LLM shape tier 2 would want.
+  *Web search is permitted and required*, closing the question this note
+  originally left open. That sharpens rather than softens the case against
+  an autonomous loop above: a model deciding at runtime how many searches
+  to fire is a live fan-out risk now, not a hypothetical one, and the
+  privacy page's "what leaves the house" row plus a token bucket at a
+  single choke point are required in the same commit as the first real
+  search call.
+  **Still open:** which GGUF actually backs the `chat` role, and what
+  hardware the deployed hub runs (`spec/llm/README.md`).
+  Grammar-constrained decoding through llama-server matters more than the
+  model's own tool-calling ability either way, since a GBNF grammar makes
+  a small model's call valid by construction.
