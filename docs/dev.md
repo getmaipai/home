@@ -696,8 +696,93 @@ set. Full architecture: platform plan chapters 1, 3, and 4.
       needs tool support on the chat contract, itself deferred in
       `spec/llm/README.md`); remote candidates (no remote backend
       configured anywhere); `ask`-continuation (above); a real
-      Persona/style record; conversation history, summary and
-      cross-surface context (4.14, a separate un-built chapter).
+      Persona/style record; summary and cross-surface context (4.14's
+      other pieces, see the next slice for conversation history itself).
+- [x] Conversation history (4.14, **split, not full**), the ninth slice of
+      hub core. Picked next on the same "genuinely buildable now, directly
+      unblocks the last slice's own documented gap" reasoning as every
+      other pick this build: the turn engine's biggest deferred item was
+      "every turn is stateless"; `lib/access.ts`'s `canAccessPerson`
+      already carried a comment naming 4.14's visibility rule as the
+      reason it was extracted, before this file existed, a strong signal
+      this was the intended next consumer.
+    - `backend/src/lib/conversationHistory.ts`: `logTurn()` (called once
+      from `turnEngine.runTurn()` for every real completed path, refusals
+      included: a parent should be able to see that a request was made
+      and refused, the same oversight motive `notify_parent` serves),
+      `list()` (a person's own turns, or owner/admin for a child's, empty
+      list on denial, matching `memory.ts`'s browsing precedent), and
+      `exportPerson()` (the full per-person archive; a real 403 on denial,
+      matching `memory.ts`'s `exportPerson()` precedent instead, since
+      export is a privileged single-target action, not filtered browsing).
+      New table `conversation_turns` (schema version bumped to 5): not a
+      spec 3.1 record type (chapter 3's table has no Conversation entry
+      either), the same "hub-internal, revisit for robot parity later"
+      call `lib/scheduler.ts`'s Job made.
+    - **Visibility is the exact rule `memory.ts` and `settings.ts` already
+      share**, reused directly via `lib/access.ts`'s `canAccessPerson`:
+      self, or owner/admin only for a **child** target. 4.14's own text
+      asks for "a summary and safety flags for a teen's," but there's no
+      summarization mechanism to safely implement that yet; this pass
+      applies the identical narrowing judgment call `memory.ts`'s
+      scope:person visibility already made and documented (nothing of a
+      teen's or an adult's, full privacy instead of a half-built
+      compromise), which `canAccessPerson`'s own comment had already named
+      as this exact 4.14 rule.
+    - **Retention, a real household setting wired through for real:**
+      `household.conversation_retention_days` (`backend/src/settings/
+      coreKeys.ts`, selector `number`, range 7-365, default 90) is the
+      first core settings key besides `household.locale` to actually get
+      read by anything (`lib/settings.ts` gained `getHouseholdSettingValue()`,
+      a no-actor-gate internal read for core maintenance jobs, never
+      exposed through a route). `runRetention()` hard-deletes turns past
+      the window. **No summarize-then-purge:** 4.14 describes turning old
+      conversations into a summary, but that needs an LLM (4.11's other
+      roles) that doesn't exist, so this pass is a real hard delete,
+      stricter than the plan's design but the privacy-safer default
+      (nothing kept indefinitely past its stated window) until
+      summarization lands, a deliberate, documented departure the same
+      shape as `memory.ts`'s decision not to carry forward legacy's purge.
+    - **The kid-safety floor, a real judgment call with no number given in
+      the plan:** 4.14 says retention is "a household setting with a
+      floor for kid safety logs" but names no floor value. This pass picks
+      90 days (matching the retention default itself, so a household that
+      never touches the setting sees no floor effect at all) and applies
+      it only to turns that are both safety-flagged **and** from a minor
+      speaker (captured at write time as `minorSpeaker`, not re-derived by
+      joining to `people` later, since a person's role can change and the
+      floor should reflect who they were when they spoke). The floor only
+      ever *extends* the effective window: a household that sets retention
+      longer than 90 days is unaffected, since the general rule already
+      keeps those turns longer.
+    - **Wired as a real daily scheduled job from the start**
+      (`conversation.retention` in `lib/scheduler.ts`'s `CORE_JOBS`,
+      seeded at boot in `index.ts`), not a manual-only trigger: unlike
+      `memory.ts`'s `runMaintenance()` when it first shipped, the
+      scheduler (4.7) already existed by the time this was built, so there
+      was no reason to defer real wiring. New routes: `GET
+      /api/conversations` (own, or `?person=<id>` for owner/admin),
+      `GET /api/conversations/export` (same, 403 on denial).
+    - Exercised for real: booted the server and drove, with `curl`, a real
+      turn writing a real row, a refused turn logging with its safety
+      metadata (never leaking the refused text into a separate audit
+      channel, it's just the conversation itself), a child's turn visible
+      to the owner via `?person=`, the `household.conversation_retention_days`
+      key appearing in the real registry at its default, and the full
+      scheduled path end to end: forced the seeded `conversation.retention`
+      job due, backdated a normal turn to 2020, fired it through the real
+      `POST /api/scheduler/run-due` route, and confirmed the old normal
+      turn was deleted while a recent safety-flagged turn survived, in
+      addition to 17 new backend tests (33 assertions), all green.
+    - **Deliberately deferred, real 4.14 scope not attempted:** household
+      search across content types (needs the shell palette, chapter 6, and
+      content types like notes/media that don't exist); 90-day
+      summarization instead of hard delete (above); an audit of who viewed
+      what; a synced spec-shaped record for robot parity (needs the link,
+      7.3, and `bot` to exist as real content); feeding recalled history
+      back into the turn engine's own prompt as prior conversational
+      context (today's turn engine is still stateless in its *reasoning*,
+      even though the history now exists for real).
 
 ## API routes and `@hono/zod-openapi` (tracked debt)
 
@@ -722,9 +807,10 @@ no shell, no Go client, nothing reading the OpenAPI spec yet). Revisit
 when the package host (4.9) or Go (chapter 10) creates a real reason to
 need it, not on a fixed schedule.
 - [ ] Core, still to build: the rest of 4.5 (tier 2 native tool calling,
-      remote candidates, `ask`-continuation, every surface but `chat`) and
-      the rest of 4.11 (every role but `chat`, the real engine and
-      residency policy, streaming/tools/JSON-schema on the chat contract).
+      remote candidates, `ask`-continuation, every surface but `chat`); the
+      rest of 4.11 (every role but `chat`, the real engine and residency
+      policy, streaming/tools/JSON-schema on the chat contract); and the
+      rest of 4.14 (search, summarization, an audit log, robot parity).
 - [ ] The shell and kit, Chat and Companions as packages, the wizard,
       backups, self-update - not started.
 - [ ] README.md still needs the full org skeleton (logo, screenshot strip,

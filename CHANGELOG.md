@@ -8,6 +8,29 @@ checklist (`docs/dev.md`); no release has been cut yet.
 ## [Unreleased]
 
 ### Added
+- Conversation history (platform plan 4.14, split), the ninth slice of hub
+  core: `backend/src/lib/conversationHistory.ts`'s `logTurn()` writes a
+  real row (new `conversation_turns` table, schema version 5) for every
+  completed turn from `turnEngine.runTurn()`, refusals included. Visibility
+  reuses the exact rule `memory.ts` and `settings.ts` already share
+  (`lib/access.ts`'s `canAccessPerson`: self, or owner/admin only for a
+  child, nothing of a teen's or an adult's, the same documented narrowing
+  `memory.ts`'s scope:person visibility already made since there's no
+  summarization mechanism yet to safely honor 4.14's "a summary and safety
+  flags for a teen's"). `household.conversation_retention_days` (default
+  90, `backend/src/settings/coreKeys.ts`) is the first core settings key
+  besides locale to actually get read by anything; `runRetention()` hard-
+  deletes turns past the window (no summarize-then-purge yet, no LLM to do
+  it), except a safety-flagged turn from a minor speaker, which is never
+  deleted before 90 days regardless of how short the household sets
+  retention. Wired as a real daily scheduled job from the start
+  (`conversation.retention`), not a manual trigger, since the scheduler
+  (4.7) already existed. New routes: `GET /api/conversations` (own, or
+  `?person=<id>` for owner/admin), `GET /api/conversations/export` (a real
+  403 on denial, unlike list's empty-result browsing precedent). **Not
+  built:** search across content types, summarization, an audit log, and a
+  synced spec-shaped record for robot parity. Full reasoning in
+  `docs/dev.md`.
 - The turn engine (platform plan 4.5, split), the eighth slice of hub core:
   `backend/src/lib/turnEngine.ts`'s `runTurn()` is the real pipeline behind
   a conversation turn on the `chat` surface (the only surface implemented;

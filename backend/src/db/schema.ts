@@ -116,6 +116,32 @@ export const settingsValues = sqliteTable(
 // lib/scheduler.ts for why, and what's deferred (device targets,
 // quiet-hours, the notification system) until this needs to be a spec
 // shape for real robot parity.
+// Conversation history (4.14, split): one row per completed turnEngine
+// turn, kept per person and per surface. Not a spec 3.1 record type
+// today (chapter 3's record table has no Conversation entry either), the
+// same "hub-internal, revisit for robot parity later" call scheduledJobs
+// made; see lib/conversationHistory.ts for the visibility and retention
+// rules built on top of this table.
+export const conversationTurns = sqliteTable("conversation_turns", {
+  id: text("id").primaryKey(),
+  personId: text("person_id")
+    .notNull()
+    .references(() => people.id),
+  surface: text("surface").notNull(),
+  userText: text("user_text").notNull(),
+  replyText: text("reply_text").notNull(),
+  source: text("source").notNull(), // "safety_refuse" | "skill" | "skill_error" | "model"
+  skillId: text("skill_id"),
+  safetyFlagged: integer("safety_flagged", { mode: "boolean" }).notNull().default(false),
+  safetyAction: text("safety_action").notNull(), // "allow" | "allow_with_resources" | "refuse"
+  // Captured at write time, not re-derived by joining to `people` later:
+  // a person's role can change, and this must reflect who they were when
+  // they spoke, the same "recorded, not recomputed" reasoning
+  // memory-record scoping already uses.
+  minorSpeaker: integer("minor_speaker", { mode: "boolean" }).notNull().default(false),
+  createdAt: text("created_at").notNull(),
+});
+
 export const scheduledJobs = sqliteTable("scheduled_jobs", {
   id: text("id").primaryKey(),
   kind: text("kind").notNull(), // "skill" | "core"

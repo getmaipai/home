@@ -25,3 +25,9 @@ export function newPersonId(): string {
 export function newJobId(): string {
   return `job-${randomSuffix(10)}`;
 }
+
+// Not a spec-shaped id either (conversation turns aren't a spec 3.1
+// record type, see lib/conversationHistory.ts's header comment for why).
+export function newConversationTurnId(): string {
+  return `turn-${randomSuffix(10)}`;
+}

@@ -232,6 +232,23 @@ export function setValue(
   return { ok: true, value: resolveForResponse(keyDef, value, "user") };
 }
 
+/** A household setting's resolved value with no actor gate: for core
+ * maintenance jobs (conversation retention, and eventually memory decay)
+ * that need a real settings value but aren't acting on any one person's
+ * behalf, the same way lib/scheduler.ts's core jobs call lib/memory.ts's
+ * runMaintenance() directly. Never exposed through a route: a person-
+ * facing read always goes through listValues()'s real authorization. */
+export function getHouseholdSettingValue(key: string): unknown {
+  const keyDef = getRegistryKey(key);
+  if (!keyDef) return undefined;
+  const row = db
+    .select()
+    .from(settingsValues)
+    .where(and(eq(settingsValues.scope, "household"), eq(settingsValues.key, key)))
+    .get();
+  return row ? JSON.parse(row.value) : keyDef.default;
+}
+
 /** Reset a key back to its registry default: a real delete (this table
  * makes no "never hard-deletes" promise the way memory does; there's no
  * history to preserve for a settings reset, 6.6 Rule 6). */

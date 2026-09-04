@@ -16,6 +16,7 @@ import { listPackageIds, loadPackage, meetsMinRole, runSkill } from "@/lib/skill
 import { recall, type RecallMatch } from "@/lib/memory";
 import { complete } from "@/lib/llm";
 import { tokenize } from "@/lib/text";
+import { logTurn } from "@/lib/conversationHistory";
 import type { Role } from "@/middleware/auth";
 import type { PersonRow } from "@/types";
 import type { SafetyResult } from "@maipai/spec/gen/ts/safety-result.js";
@@ -101,10 +102,12 @@ const MAX_SKILLS_SECTION_CHARS = 800;
 // and the skills list are the same for every turn on this install, so they
 // sit first for prefix caching; the volatile zone (memory, then time)
 // comes after. 4.5 also names notes, methods, summary and context in the
-// volatile zone: notes/methods need persona/companion state (not built),
-// summary needs conversation history (4.14, not built), and context needs
-// the ambient-context wiring the robot side already has but the hub
-// doesn't yet: all three are real gaps, not silently skipped.
+// volatile zone: notes/methods need persona/companion state (not built);
+// summary needs an LLM to distill conversation history into one (the raw
+// history now exists for real, lib/conversationHistory.ts, but nothing
+// summarizes it, 4.11's other roles); context needs the ambient-context
+// wiring the robot side already has but the hub doesn't yet: all three
+// are real gaps, not silently skipped.
 export function buildSystemPrompt(memoryMatches: RecallMatch[], loaded: LoadedManifest[] = loadAllManifests()): string {
   let skillsSection = skillsListLine(loaded);
   if (skillsSection.length > MAX_SKILLS_SECTION_CHARS) {
@@ -267,9 +270,12 @@ export async function runTurn(actor: PersonRow, surface: Surface, text: string):
   }
 
   const safety = evaluateSafety(text, actor.role as Role);
+  let value: TurnValue;
 
   if (safety.action === "refuse") {
-    return { ok: true, value: { reply: { text: REFUSAL_TEXT }, source: "safety_refuse", safety } };
+    value = { reply: { text: REFUSAL_TEXT }, source: "safety_refuse", safety };
+    logTurn(actor, surface, text, value);
+    return { ok: true, value };
   }
   const crisisResources = safety.action === "allow_with_resources" ? CRISIS_RESOURCES_TEXT : undefined;
   const loaded = loadAllManifests(); // one catalog scan, shared below
@@ -279,48 +285,45 @@ export async function runTurn(actor: PersonRow, surface: Surface, text: string):
     const result = runSkill(routed.id, actor, routed.args);
     if (result.ok) {
       const reply = result.value.reply ?? { text: "Done." };
-      return { ok: true, value: { reply, source: "skill", skill_id: routed.id, safety, crisis_resources: crisisResources } };
-    }
-    // A pre-filtered deterministic match failing at runSkill is a real,
-    // if rare, gap (a role change or a bad manifest between the router's
-    // check and the run); surfaced as a plain apology rather than leaking
-    // the internal error string to a household member, logged for anyone
-    // debugging it. Deliberately `ok: true`, not `ok: false`: the turn
-    // engine successfully produced a reply for the person, same as the
-    // safety_refuse and model paths, and a real HTTP error here would hand
-    // a chat surface a raw error to render mid-conversation instead of a
-    // spoken apology. A review (2026-09-04) flagged that this makes a
-    // failed skill run indistinguishable from a real success to a caller
-    // branching on `.ok` alone: `source: "skill_error"` on the returned
-    // `TurnValue` is the intended way to detect it (routes/turn.ts's own
-    // JSON body carries it straight through), not the top-level `ok` flag.
-    console.log(`[turn] skill ${routed.id} matched but failed to run: ${result.error}`);
-    return {
-      ok: true,
-      value: {
+      value = { reply, source: "skill", skill_id: routed.id, safety, crisis_resources: crisisResources };
+    } else {
+      // A pre-filtered deterministic match failing at runSkill is a real,
+      // if rare, gap (a role change or a bad manifest between the router's
+      // check and the run); surfaced as a plain apology rather than leaking
+      // the internal error string to a household member, logged for anyone
+      // debugging it. Deliberately `ok: true`, not `ok: false`: the turn
+      // engine successfully produced a reply for the person, same as the
+      // safety_refuse and model paths, and a real HTTP error here would hand
+      // a chat surface a raw error to render mid-conversation instead of a
+      // spoken apology. A review (2026-09-04) flagged that this makes a
+      // failed skill run indistinguishable from a real success to a caller
+      // branching on `.ok` alone: `source: "skill_error"` on the returned
+      // `TurnValue` is the intended way to detect it (routes/turn.ts's own
+      // JSON body carries it straight through), not the top-level `ok` flag.
+      console.log(`[turn] skill ${routed.id} matched but failed to run: ${result.error}`);
+      value = {
         reply: { text: "Sorry, I couldn't do that." },
         source: "skill_error",
         skill_id: routed.id,
         safety,
         crisis_resources: crisisResources,
-      },
-    };
+      };
+    }
+  } else {
+    const memoryMatches = recall(actor, text);
+    const systemPrompt = buildSystemPrompt(memoryMatches, loaded);
+    const completion = await complete("chat", [
+      { role: "system", content: systemPrompt },
+      { role: "user", content: text },
+    ]);
+    if (!completion.ok) {
+      return { ok: false, status: 503, code: "unavailable", error: completion.error };
+    }
+    value = { reply: { text: completion.value.text }, source: "model", safety, crisis_resources: crisisResources };
   }
 
-  const memoryMatches = recall(actor, text);
-  const systemPrompt = buildSystemPrompt(memoryMatches, loaded);
-  const completion = await complete("chat", [
-    { role: "system", content: systemPrompt },
-    { role: "user", content: text },
-  ]);
-  if (!completion.ok) {
-    return { ok: false, status: 503, code: "unavailable", error: completion.error };
-  }
-
-  return {
-    ok: true,
-    value: { reply: { text: completion.value.text }, source: "model", safety, crisis_resources: crisisResources },
-  };
+  logTurn(actor, surface, text, value);
+  return { ok: true, value };
 }
 
 // Not built this pass, deliberately (see docs/dev.md):
@@ -338,5 +341,8 @@ export async function runTurn(actor: PersonRow, surface: Surface, text: string):
 //   deterministically today.
 // - A real Persona/style record (3.1 lists the type; nothing implements
 //   it yet): the system prompt's persona/rules line is a fixed default.
-// - Conversation history, summary and cross-surface context (4.14): every
-//   turn is stateless beyond what memory.recall() surfaces fresh.
+// - Cross-surface context and 90-day summarization (4.14: conversation
+//   history itself is real now, see lib/conversationHistory.ts; a turn's
+//   own *reasoning* is still stateless beyond what memory.recall()
+//   surfaces fresh, the recalled history isn't fed back into the prompt
+//   as prior conversational context yet).

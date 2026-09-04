@@ -26,6 +26,13 @@ import { SettingsKey } from "@maipai/spec/gen/ts/settings-key.js";
 // language rule requires English, and STACK.md's robot speech stack notes
 // Moonshine (the default English STT) is English-only, so a genuinely
 // multi-locale household waits on that work landing, not on this key.
+// Backs lib/conversationHistory.ts's runRetention() (4.14: "retention
+// defaults: conversations ninety days then summarised... each is a
+// household setting with a floor for kid safety logs"). No summarization
+// mechanism exists yet (4.11's other roles), so this pass's retention is
+// a hard delete at the boundary rather than summarize-then-purge, stricter
+// than 4.14 describes but consistent with not keeping raw transcripts
+// past their stated window; see conversationHistory.ts for the floor.
 export const CORE_SETTINGS_KEYS: SettingsKey[] = [
   SettingsKey.parse({
     key: "household.locale",
@@ -38,5 +45,17 @@ export const CORE_SETTINGS_KEYS: SettingsKey[] = [
     level: "basic",
     lives_in: "household.system",
     honoured_by: ["home", "bot"],
+  }),
+  SettingsKey.parse({
+    key: "household.conversation_retention_days",
+    scope: "household",
+    selector: "number",
+    range: { min: 7, max: 365 },
+    default: 90,
+    label: "Conversation history retention",
+    help: "How long chat history is kept before it's deleted. A safety-flagged conversation involving a teen or child is always kept for at least 90 days regardless of this setting.",
+    level: "advanced",
+    lives_in: "household.system",
+    honoured_by: ["home"],
   }),
 ];

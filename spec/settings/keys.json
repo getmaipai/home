@@ -1,5 +1,23 @@
 [
   {
+    "key": "household.conversation_retention_days",
+    "scope": "household",
+    "selector": "number",
+    "range": {
+      "min": 7,
+      "max": 365
+    },
+    "default": 90,
+    "label": "Conversation history retention",
+    "help": "How long chat history is kept before it's deleted. A safety-flagged conversation involving a teen or child is always kept for at least 90 days regardless of this setting.",
+    "level": "advanced",
+    "secret": false,
+    "lives_in": "household.system",
+    "honoured_by": [
+      "home"
+    ]
+  },
+  {
     "key": "household.locale",
     "scope": "household",
     "selector": "select",

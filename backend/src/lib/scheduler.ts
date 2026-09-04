@@ -33,6 +33,7 @@ import { scheduledJobs, people } from "@/db/schema";
 import { newJobId } from "@/lib/id";
 import { isOwnerOrAdmin } from "@/lib/access";
 import { runMaintenance } from "@/lib/memory";
+import { runRetention } from "@/lib/conversationHistory";
 import type { SkillOpResult } from "@/lib/skills";
 import type { SkillResult } from "@maipai/spec/interpreters/ts/recipe-interpreter.js";
 import type { PersonRow } from "@/types";
@@ -164,6 +165,9 @@ export function cancelJob(actor: PersonRow, id: string): SchedulerOpResult<true>
 const CORE_JOBS: Record<string, () => void> = {
   "memory.maintenance": () => {
     runMaintenance();
+  },
+  "conversation.retention": () => {
+    runRetention();
   },
 };
 

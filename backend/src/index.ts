@@ -13,6 +13,7 @@ const port = Number(process.env.PORT ?? 8787);
 // wanted since it shipped ("no scheduler exists yet... manually-
 // triggered for now"): daily, idempotent, safe to call on every boot.
 ensureCoreJob("memory.maintenance", "every:1d");
+ensureCoreJob("conversation.retention", "every:1d");
 setInterval(() => runDueJobs(runSkill), 60_000);
 
 console.log(`MaiPai Home hub listening on http://localhost:${port}`);
