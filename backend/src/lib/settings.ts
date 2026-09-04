@@ -181,10 +181,17 @@ export function listValues(actor: PersonRow, scope: string): SettingsOpResult<Re
  * background jobs already gated elsewhere - see that function's doc).
  * Caller is responsible for scope/key/authorization checks; this only
  * validates the value against the key's selector and persists it. */
-function writeValue(scope: string, keyDef: SettingsKey, value: unknown): SettingsOpResult<ResolvedSetting> {
+function writeValue(
+  scope: string,
+  keyDef: SettingsKey,
+  value: unknown,
+  opts: { skipValidation?: boolean } = {},
+): SettingsOpResult<ResolvedSetting> {
   const key = keyDef.key;
-  const validated = validateSelectorValue(keyDef, value);
-  if (!validated.ok) return validated;
+  if (!opts.skipValidation) {
+    const validated = validateSelectorValue(keyDef, value);
+    if (!validated.ok) return validated;
+  }
 
   const existing = db
     .select()
@@ -279,6 +286,28 @@ export function getPersonSettingValue(actor: PersonRow, key: string): unknown {
   const keyDef = getRegistryKey(key);
   if (!keyDef || keyDef.scope !== "person") return undefined;
   return resolveStoredValue(`person:${actor.id}`, keyDef);
+}
+
+/** Sets the signed-in actor's own `tts.voice_id` to an arbitrary value
+ * the `select` selector's fixed 26-name option list would normally
+ * reject - the community voice catalog (2026-09-04, lib/voiceCatalog.ts)
+ * needs this for the other ~2,000 real voices in `kyutai/tts-voices`
+ * that aren't among the bundled presets. The exact same "advanced escape
+ * hatch, not the generic PUT route" shape `chat.model_id`'s own registry
+ * comment already describes for an identical reason
+ * (`ModelsSection.tsx`'s "choose this" flow, never a plain value write):
+ * `tts.voice_id` itself stays a normal, fully-`select`-validated `basic`
+ * key for the common case (the settings page's own dropdown still only
+ * ever offers the 26 curated presets), and this is the one, narrowly-
+ * named bypass. The caller (routes/voice.ts) is entirely responsible for
+ * validating `hfPath` against the real, live-fetched catalog before
+ * calling this - it trusts the value completely, the same contract
+ * `setHouseholdSettingValue()` already has ("caller already gated this
+ * elsewhere"). */
+export function setPersonTtsVoiceUnchecked(actor: PersonRow, hfPath: string): SettingsOpResult<ResolvedSetting> {
+  const keyDef = getRegistryKey("tts.voice_id");
+  if (!keyDef) return { ok: false, status: 400, error: "unknown settings key: tts.voice_id" };
+  return writeValue(`person:${actor.id}`, keyDef, hfPath, { skipValidation: true });
 }
 
 /** Shared by getHouseholdSettingValue() and getPersonSettingValue() above

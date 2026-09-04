@@ -213,6 +213,14 @@ export const api = {
       method: "PUT",
       body: JSON.stringify({ scope, key, value }),
     }),
+  // The community voice catalog (2026-09-04): every real file in
+  // `kyutai/tts-voices`, not just the 26 bundled presets.
+  voiceCatalog: () => request<{ entries: { path: string; collection: string }[] }>("/api/voice/catalog"),
+  selectVoiceFromCatalog: (path: string) =>
+    request<ResolvedSetting>("/api/voice/catalog/select", {
+      method: "POST",
+      body: JSON.stringify({ path }),
+    }),
   resetSetting: (scope: string, key: string) =>
     request<ResolvedSetting>("/api/settings/reset", {
       method: "POST",

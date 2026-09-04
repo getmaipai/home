@@ -3,6 +3,7 @@ import { SettingsRenderer } from "@/kit/settings/SettingsRenderer";
 import { BackupsSection } from "@/apps/settings/BackupsSection";
 import { ModelsSection } from "@/apps/settings/ModelsSection";
 import { ChangeSecretSection } from "@/apps/settings/ChangeSecretSection";
+import { VoiceCatalogSection } from "@/apps/settings/VoiceCatalogSection";
 import { isOwnerOrAdminRole, type Roster } from "@/lib/api";
 
 interface SettingsPageProps {
@@ -41,6 +42,7 @@ export function SettingsPage({ person, onPersonChange }: SettingsPageProps) {
         <SettingsRenderer scope="household" scopeValue="household" />
         <SettingsRenderer scope="person" scopeValue={`person:${person.id}`} />
         <div className="flex flex-col gap-6 px-4 pb-4">
+          <VoiceCatalogSection personId={person.id} />
           <ChangeSecretSection person={person} onChanged={onPersonChange} />
           {canManageBackups ? <ModelsSection /> : null}
           {canManageBackups ? <BackupsSection /> : null}

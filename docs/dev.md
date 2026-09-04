@@ -2428,6 +2428,68 @@ set. Full architecture: platform plan chapters 1, 3, and 4.
       does nothing with a detection yet beyond a demo banner - no STT
       exists anywhere in this codebase to act on what was heard.
 
+- [x] **The full community voice catalog: item 3 of the Pocket TTS
+      follow-ups, closed (2026-09-04).** Every real file in
+      `kyutai/tts-voices`, not just the 26 built-in presets `tts.voice_id`
+      already offered - confirmed live via HF's own cursor-paginated tree
+      API: 2,069 real voice files (`.wav`/`.mp3`/`.safetensors`) across 3
+      pages, grouped into 6 collections (vctk, expresso, ears,
+      alba-mackenna, cml-tts, unmute-prod-website). Never downloads any
+      audio itself - only the file listing, cached in memory for an hour
+      (`lib/voiceCatalog.ts`); Pocket TTS's own server resolves and
+      caches the real `hf://` file the same way it already does for the
+      26 bundled presets.
+    - **A deliberate, narrow escape hatch around `tts.voice_id`'s own
+      `select` validation, not a widening of it.** The setting stays a
+      normal, fully-validated `basic` key for the common case (the
+      generic settings dropdown still only ever offers the 26 curated
+      names) - `writeValue()` gained an internal `skipValidation` option,
+      used by exactly one new function
+      (`setPersonTtsVoiceUnchecked()`), whose only caller
+      (`POST /api/voice/catalog/select`) validates the picked path
+      against the REAL, live-fetched catalog before ever calling it. The
+      same generic PUT route still rejects the identical value outright -
+      proven by a dedicated test, so the bypass can't silently widen into
+      a general one by accident later.
+    - **Real security consideration, not an afterthought**: Pocket TTS's
+      actual `/tts` endpoint accepts any `http://`/`https://`/`hf://` URL
+      for `voice_url` and would fetch whatever it's given - exactly why
+      `tts.voice_id`'s own registry entry stays restricted to the 26
+      names for the generic route. The catalog select endpoint closes
+      the same gap a different way: never trusting a client-supplied
+      path directly, always checking it against the real catalog first
+      (`isVoiceCatalogPath()`) - confirmed live to reject a fabricated
+      path (a code review-style test proven to fail if that check is
+      ever removed).
+    - **A real UX tradeoff, made deliberately**: picking a catalog voice
+      doesn't show up in the generic "Speaking voice" dropdown afterward
+      (Radix Select shows its placeholder for a value outside its known
+      options, not a crash) - the new "More voices" section shows the
+      current value itself instead ("Currently using a catalog voice:
+      ..."), so a pick never looks like it silently did nothing. No audio
+      preview: 2,069 files makes browse-by-listening impractical for a
+      v1, so a household picks by filename/collection and hears the
+      result once they next get a reply spoken.
+    - **Verified live against the real network, not just the test
+      fixture**: the settings page's "Browse the full community voice
+      catalog" section, searching "expresso," and "Use this voice"
+      against the actual running `kyutai/tts-voices` catalog - real
+      filenames returned (`ex01-ex02_default_001_channel1_168s.wav` and
+      its sibling `.safetensors` embedding), the pick persisted to the
+      real household database
+      (`person:<jesse's id> | tts.voice_id |
+      "hf://kyutai/tts-voices/expresso/ex01-ex02_default_001_channel1_168s.wav"
+      | user`), zero console errors.
+    - **Still not built**: audio preview before picking, and the other
+      remaining Pocket TTS follow-up (voice cloning/training) - genuinely
+      blocked on a distribution question (the cloning-capable checkpoint
+      is HF-gated with auto-approval on accepting terms, so it needs a
+      household-supplied HF token; this codebase has no reversible-secret
+      storage yet at all - `.github/CLAUDE.md`'s own `lib/secrets`
+      AES-256-GCM module doesn't exist in this rebuild, only the
+      PIN/password one-way hasher does - so cloning needs that
+      foundational piece built first, not just a UI).
+
 ## API routes and `@hono/zod-openapi` (tracked debt)
 
 `getmaipai/CLAUDE.md` > Documentation requires every Hono route to be
@@ -2711,18 +2773,16 @@ between now and when the relevant piece gets built.
      with community-trained non-English variants (Czech, Hindi, Korean)
      as existing examples - a further, larger follow-up past cloning if
      MaiPai ever wants its own trained voice rather than a cloned one.
-  3. **A real, ungated community voice catalog exists - partially closed
+  3. **A real, ungated community voice catalog exists - fully closed
      (2026-09-04).** `kyutai/tts-voices` on Hugging Face (confirmed via
      the API: `gated: false`) is a public repository of community and
      official voices, separate from the gated cloning checkpoint. The
      26-name subset Pocket TTS bundles as built-in presets (its own
      `_ORIGINS_OF_PREDEFINED_VOICES`, every one of them a file from this
-     same repo) is now a real, shipped per-person choice (`tts.voice_id`,
-     the entry above) - what's still open is the FULL browser: picking
-     any other file in the repo by URL, not just these 26, which
-     genuinely needs a "browse and pick a voice" UI against the repo's
-     file listing, buildable with zero HF-token friction, unlike item 2
-     above.
+     same repo) shipped first as a real, per-person choice
+     (`tts.voice_id`); the full browser against all 2,069 real files in
+     the repo shipped the same night (the entry below), so this item is
+     done, not just started.
   A real credential-hygiene gap surfaced while verifying item 2: Jesse's
   own HF read token (shared in chat earlier this session for the gated
   checkpoint download, `docs/dev.md`'s TTS decision entry) is still
