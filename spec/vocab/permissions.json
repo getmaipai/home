@@ -1,0 +1,20 @@
+{
+  "$comment": "The permissions vocabulary (platform plan 3.2): the fixed enum shown on the install prompt (docs/UI.md pattern table > Permission prompt). Entries ending in a colon take a parameter (a host, an action kind, a package id, a path); literal entries do not.",
+  "permissions": [
+    { "id": "net:<host>", "parameterized": true, "description": "Reach this specific host through host.fetch." },
+    { "id": "memory:read", "parameterized": false, "description": "Call host.memory.recall." },
+    { "id": "memory:write", "parameterized": false, "description": "Call host.memory.remember." },
+    { "id": "history:read", "parameterized": false, "description": "Read ctx.history." },
+    { "id": "location", "parameterized": false, "description": "Read ctx.home's location." },
+    { "id": "identity:name", "parameterized": false, "description": "Read the speaker's name, not just their id and role." },
+    { "id": "actions:<kind>", "parameterized": true, "description": "Emit an action of this kind via host.action.emit." },
+    { "id": "integration:<id>", "parameterized": true, "description": "Call this specific integration through host.integration.call." },
+    { "id": "camera:still", "parameterized": false, "description": "Call host.camera.still." },
+    { "id": "ocr", "parameterized": false, "description": "Call host.ocr.read." },
+    { "id": "llm:complete", "parameterized": false, "description": "Call host.llm.complete." },
+    { "id": "speak", "parameterized": false, "description": "Call host.speak.sentence." },
+    { "id": "schedule", "parameterized": false, "description": "Call host.schedule." },
+    { "id": "files:<path>", "parameterized": true, "description": "Read or write this path through host.files." },
+    { "id": "logbook:read", "parameterized": false, "description": "Read the household logbook." }
+  ]
+}

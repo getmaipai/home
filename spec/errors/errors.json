@@ -1,0 +1,79 @@
+[
+  {
+    "code": "timeout",
+    "message": "Package handle() exceeded its timeout_ms.",
+    "spoken_fallback": "That's taking too long, so I stopped.",
+    "ui_message": "This took too long and was stopped. Try again.",
+    "retriable": true
+  },
+  {
+    "code": "permission_denied",
+    "message": "The call needs a permission this package's manifest does not declare, or the person's role does not clear min_role.",
+    "spoken_fallback": "I'm not allowed to do that.",
+    "ui_message": "This needs a permission that isn't granted.",
+    "retriable": false
+  },
+  {
+    "code": "capability_missing",
+    "message": "A required capability from manifest.requires is not present on this node.",
+    "spoken_fallback": "I can't do that on this device.",
+    "ui_message": "This needs something this device doesn't have.",
+    "retriable": false
+  },
+  {
+    "code": "rate_limited",
+    "message": "host.fetch's per-service token bucket has no capacity left.",
+    "spoken_fallback": "I need to slow down before trying that again.",
+    "ui_message": "This service is being asked to slow down. Try again shortly.",
+    "retriable": true
+  },
+  {
+    "code": "network_unreachable",
+    "message": "host.fetch could not reach the target host.",
+    "spoken_fallback": "I couldn't reach that right now.",
+    "ui_message": "Couldn't connect. Check your internet connection.",
+    "retriable": true
+  },
+  {
+    "code": "invalid_input",
+    "message": "The call's arguments failed validation against the manifest's args schema.",
+    "spoken_fallback": "I didn't understand that request.",
+    "ui_message": "That request wasn't valid.",
+    "retriable": false
+  },
+  {
+    "code": "not_found",
+    "message": "The requested record, package, or resource does not exist.",
+    "spoken_fallback": "I couldn't find that.",
+    "ui_message": "That wasn't found.",
+    "retriable": false
+  },
+  {
+    "code": "unauthorized",
+    "message": "The caller's session or device token is missing or invalid.",
+    "spoken_fallback": "I need you to sign in again.",
+    "ui_message": "Please sign in again.",
+    "retriable": false
+  },
+  {
+    "code": "model_unavailable",
+    "message": "The requested model role has no healthy model loaded (4.11).",
+    "spoken_fallback": "I can't think right now.",
+    "ui_message": "No model is available for this right now.",
+    "retriable": true
+  },
+  {
+    "code": "package_faulted",
+    "message": "This package crashed or timed out three times and is disabled for the session (4.9).",
+    "spoken_fallback": "That's not working right now.",
+    "ui_message": "This is temporarily disabled. See Repairs for details.",
+    "retriable": false
+  },
+  {
+    "code": "internal_error",
+    "message": "An unmapped failure. The host wraps it so a package never leaks a raw stack trace past the boundary.",
+    "spoken_fallback": "Something went wrong on my end.",
+    "ui_message": "Something went wrong. Try again, or check Repairs.",
+    "retriable": true
+  }
+]

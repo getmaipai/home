@@ -1,0 +1,22 @@
+{
+  "id": "ent0077-a1b2c3",
+  "record_kind": "entity",
+  "text": "Sprout: the family dog, a golden retriever.",
+  "category": "thing",
+  "tier": "durable",
+  "status": "active",
+  "scope": "household",
+  "person": null,
+  "source": "onboarding-wizard",
+  "importance": 0.6,
+  "pinned": true,
+  "sensitive": false,
+  "uses": 12,
+  "created_at": "2026-07-15T14:00:00Z",
+  "last_used_at": "2026-09-03T08:00:00Z",
+  "valid_from": null,
+  "valid_to": null,
+  "expired_at": null,
+  "superseded_by": null,
+  "embedding_space": "hub-bge-m3"
+}

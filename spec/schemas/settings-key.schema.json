@@ -1,0 +1,61 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://getmaipai.github.io/home/spec/schemas/settings-key.schema.json",
+  "title": "SettingsKey",
+  "description": "One entry in the settings registry (spec/settings/keys.json) or a package manifest's config[]. See platform plan 3.2 and .github's docs/SETTINGS.md.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["key", "scope", "selector", "default", "label", "level", "lives_in", "honoured_by"],
+  "properties": {
+    "key": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*)+$"
+    },
+    "scope": {
+      "type": "string",
+      "enum": ["household", "person", "device"]
+    },
+    "selector": {
+      "type": "string",
+      "enum": [
+        "number", "select", "text", "boolean", "duration", "time",
+        "entity", "area", "person", "media"
+      ],
+      "description": "Home Assistant's selector names (3.2)."
+    },
+    "range": {
+      "description": "Selector-specific: min/max for number, a duration unit, an option list for select, and so on. Shape depends on selector."
+    },
+    "default": {},
+    "label": { "type": "string", "minLength": 1 },
+    "help": { "type": "string" },
+    "section": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "id": { "type": "string" },
+        "collapsed": { "type": "boolean", "default": false },
+        "order": { "type": "integer" }
+      }
+    },
+    "level": {
+      "type": "string",
+      "enum": ["basic", "advanced", "expert"]
+    },
+    "secret": { "type": "boolean", "default": false },
+    "needs": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Capabilities required for this key to apply."
+    },
+    "lives_in": {
+      "type": "string",
+      "description": "The package, companion, integration, or central page id that renders this key."
+    },
+    "honoured_by": {
+      "type": "array",
+      "items": { "type": "string", "enum": ["home", "bot"] },
+      "minItems": 1
+    }
+  }
+}

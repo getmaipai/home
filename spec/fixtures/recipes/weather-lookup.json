@@ -1,0 +1,45 @@
+{
+  "description": "fetch + pick + format: the recipe reads through host.fetch, the rate limiter's single choke point (never a raw fetch on the side)",
+  "recipe": {
+    "id": "weather-lookup",
+    "inputs": [{ "name": "city", "selector": "text" }],
+    "steps": [
+      {
+        "op": "fetch",
+        "as": "raw",
+        "url": "https://weather.example.com/v1/current?city={city}",
+        "method": "GET"
+      },
+      {
+        "op": "pick",
+        "as": "temp",
+        "from": "raw",
+        "path": "current.temp_f"
+      },
+      {
+        "op": "format",
+        "as": "reply",
+        "text": "It's {temp} degrees in {city}.",
+        "speech": "It's {temp} degrees in {city} right now."
+      }
+    ]
+  },
+  "inputs": { "city": "Portland" },
+  "host_setup": {
+    "fetch": {
+      "https://weather.example.com/v1/current?city=Portland": {
+        "current": { "temp_f": 61 }
+      }
+    }
+  },
+  "expected": {
+    "reply": {
+      "text": "It's 61 degrees in Portland.",
+      "speech": "It's 61 degrees in Portland right now."
+    },
+    "actions": [],
+    "scheduled_jobs": [],
+    "home_calls": [],
+    "memory_added": []
+  }
+}

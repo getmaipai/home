@@ -1,0 +1,139 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://getmaipai.github.io/home/spec/schemas/recipe.schema.json",
+  "title": "Recipe",
+  "description": "A Tier 0 declarative package body, interpreted natively by the TS and Python interpreters in spec/interpreters/. See platform plan 5.2. A recipe is a named set of inputs plus a list of steps; each step is one of the primitives below.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["id", "steps"],
+  "properties": {
+    "id": { "type": "string", "minLength": 1 },
+    "inputs": {
+      "type": "array",
+      "description": "Selectors a family fills in to instantiate this recipe (e.g. 'bedtime reminder for {person}').",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["name", "selector"],
+        "properties": {
+          "name": { "type": "string", "pattern": "^[a-z][a-z0-9_]*$" },
+          "selector": {
+            "type": "string",
+            "enum": [
+              "number", "select", "text", "boolean", "duration", "time",
+              "entity", "area", "person", "media"
+            ]
+          },
+          "required": { "type": "boolean", "default": true }
+        }
+      }
+    },
+    "steps": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/step" }
+    }
+  },
+  "$defs": {
+    "step": {
+      "oneOf": [
+        { "$ref": "#/$defs/fetch_step" },
+        { "$ref": "#/$defs/pick_step" },
+        { "$ref": "#/$defs/format_step" },
+        { "$ref": "#/$defs/home_call_service_step" },
+        { "$ref": "#/$defs/action_step" },
+        { "$ref": "#/$defs/remember_step" },
+        { "$ref": "#/$defs/schedule_step" }
+      ]
+    },
+    "fetch_step": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["op", "as", "url"],
+      "properties": {
+        "op": { "const": "fetch" },
+        "as": { "type": "string", "description": "Binds the result into the recipe's variable scope under this name." },
+        "url": { "type": "string", "description": "May reference input/variable names in {braces}." },
+        "method": { "type": "string", "enum": ["GET", "POST"], "default": "GET" },
+        "headers": { "type": "object", "additionalProperties": { "type": "string" } },
+        "body": {}
+      },
+      "description": "Goes through host.fetch (the rate limiter's single choke point). A recipe never bypasses it."
+    },
+    "pick_step": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["op", "as", "from"],
+      "properties": {
+        "op": { "const": "pick" },
+        "as": { "type": "string" },
+        "from": { "type": "string", "description": "A variable name to read from." },
+        "path": { "type": "string", "description": "A dotted path into that variable, e.g. results.0.title." }
+      }
+    },
+    "format_step": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["op", "as", "text"],
+      "properties": {
+        "op": { "const": "format" },
+        "as": { "type": "string" },
+        "text": { "type": "string", "description": "A template with {variable} interpolation for the on-screen reply." },
+        "speech": { "type": "string", "description": "A template for the spoken form. Falls back to text if omitted." }
+      }
+    },
+    "home_call_service_step": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["op", "domain", "service", "target"],
+      "properties": {
+        "op": { "const": "home.call_service" },
+        "domain": { "type": "string" },
+        "service": { "type": "string" },
+        "target": { "type": "object", "additionalProperties": true },
+        "data": { "type": "object", "additionalProperties": true }
+      },
+      "description": "Goes through host.home.call_service; security domains are never covered by a wildcard target (4.2)."
+    },
+    "action_step": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["op", "kind"],
+      "properties": {
+        "op": { "const": "action" },
+        "kind": { "type": "string" },
+        "payload": { "type": "object", "additionalProperties": true }
+      },
+      "description": "Emits an action via host.action.emit; kind must match the recipe's declared permissions (actions:<kind>)."
+    },
+    "remember_step": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["op", "text"],
+      "properties": {
+        "op": { "const": "remember" },
+        "text": { "type": "string" },
+        "category": {
+          "type": "string",
+          "enum": [
+            "person", "place", "thing", "preference", "identity", "event",
+            "project", "goal", "relationship", "fact", "state"
+          ]
+        },
+        "scope": { "type": "string", "enum": ["household", "person", "self"] }
+      },
+      "description": "Calls host.memory.remember."
+    },
+    "schedule_step": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["op", "when"],
+      "properties": {
+        "op": { "const": "schedule" },
+        "when": { "type": "string", "description": "A one-shot ISO time or a recurrence expression." },
+        "job": { "type": "string", "description": "The job id this schedules, resolved by host.schedule." }
+      },
+      "description": "Calls host.schedule."
+    }
+  }
+}

@@ -1,0 +1,46 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://getmaipai.github.io/home/spec/schemas/result.schema.json",
+  "title": "SkillResult",
+  "description": "What a package's handle() (or a recipe's interpreted run) returns. See platform plan 4.9.",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "reply": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["text"],
+      "properties": {
+        "text": { "type": "string" },
+        "speech": { "type": "string" }
+      }
+    },
+    "data": {},
+    "synthesis_hint": { "type": "string" },
+    "actions": {
+      "type": "array",
+      "items": { "type": "object", "additionalProperties": true },
+      "default": []
+    },
+    "directive": { "type": "object", "additionalProperties": true },
+    "confirm": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "prompt": { "type": "string" },
+        "on_confirm": { "type": "object", "additionalProperties": true }
+      }
+    },
+    "ask": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Lets a deterministic follow-up match without a model (4.5).",
+      "properties": {
+        "prompt": { "type": "string" },
+        "expects": { "type": "string" }
+      }
+    },
+    "end_conversation": { "type": "boolean" },
+    "article": { "type": "object", "additionalProperties": true }
+  }
+}

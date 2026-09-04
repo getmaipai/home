@@ -1,0 +1,33 @@
+{
+  "$comment": "The capability vocabulary (platform plan 3.2): one list, used by nodes, packages, and integrations alike. A package's manifest.requires/optional and a Device's capabilities both draw from this list. Not to be confused with the robot's 20-item capability GRANT list (3.1), which is a later (Hub v0.3 / robot authorization) addition, out of spec v0.1 scope.",
+  "capabilities": [
+    "mic",
+    "speaker",
+    "screen",
+    "camera",
+    "motors",
+    "nav",
+    "lights",
+    "barcode",
+    "ocr",
+    "gpu_llm",
+    "embeddings",
+    "internet",
+    "lan",
+    "media_library",
+    "media_player",
+    "home_control",
+    "security_control",
+    "camera_events",
+    "weather",
+    "calendar",
+    "location",
+    "knowledge_base",
+    "shopping_list",
+    "logbook",
+    "reminders",
+    "timers",
+    "hailo",
+    "cpu_llm"
+  ]
+}

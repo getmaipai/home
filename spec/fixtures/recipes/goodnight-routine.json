@@ -1,0 +1,48 @@
+{
+  "description": "home.call_service + action + remember + format: a routine that turns off lights, emits a directive, and remembers the preference it used",
+  "recipe": {
+    "id": "goodnight-routine",
+    "inputs": [{ "name": "person", "selector": "person" }],
+    "steps": [
+      {
+        "op": "home.call_service",
+        "domain": "light",
+        "service": "turn_off",
+        "target": { "area": "living_room" }
+      },
+      {
+        "op": "action",
+        "kind": "lock_doors",
+        "payload": { "confirm": true }
+      },
+      {
+        "op": "remember",
+        "text": "{person} runs the goodnight routine most nights.",
+        "category": "preference",
+        "scope": "person"
+      },
+      {
+        "op": "format",
+        "as": "reply",
+        "text": "Goodnight, {person}. Lights off and doors locked.",
+        "speech": "Goodnight {person}. I turned off the lights and locked the doors."
+      }
+    ]
+  },
+  "inputs": { "person": "Riff" },
+  "host_setup": {},
+  "expected": {
+    "reply": {
+      "text": "Goodnight, Riff. Lights off and doors locked.",
+      "speech": "Goodnight Riff. I turned off the lights and locked the doors."
+    },
+    "actions": [{ "kind": "lock_doors", "payload": { "confirm": true } }],
+    "scheduled_jobs": [],
+    "home_calls": [
+      { "domain": "light", "service": "turn_off", "target": { "area": "living_room" }, "data": null }
+    ],
+    "memory_added": [
+      { "text": "Riff runs the goodnight routine most nights.", "category": "preference", "scope": "person" }
+    ]
+  }
+}

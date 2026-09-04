@@ -1,0 +1,35 @@
+{
+  "description": "format + schedule: the bedtime-reminder skill from spec/fixtures/records/manifest.example.json",
+  "recipe": {
+    "id": "bedtime-reminder",
+    "inputs": [
+      { "name": "person", "selector": "person" },
+      { "name": "time", "selector": "time" }
+    ],
+    "steps": [
+      {
+        "op": "format",
+        "as": "confirmation",
+        "text": "Bedtime reminder set for {person} at {time}.",
+        "speech": "I'll remind {person} to go to bed at {time}."
+      },
+      {
+        "op": "schedule",
+        "when": "{time}",
+        "job": "bedtime-reminder"
+      }
+    ]
+  },
+  "inputs": { "person": "Riff", "time": "21:00" },
+  "host_setup": {},
+  "expected": {
+    "reply": {
+      "text": "Bedtime reminder set for Riff at 21:00.",
+      "speech": "I'll remind Riff to go to bed at 21:00."
+    },
+    "actions": [],
+    "scheduled_jobs": [{ "when": "21:00", "job": "bedtime-reminder" }],
+    "home_calls": [],
+    "memory_added": []
+  }
+}

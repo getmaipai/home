@@ -1,0 +1,15 @@
+{
+  "key": "household.locale",
+  "scope": "household",
+  "selector": "select",
+  "range": { "options": ["en-US", "en-GB", "es-MX"] },
+  "default": "en-US",
+  "label": "Household language and region",
+  "help": "Used for dates, units, and currency across every surface.",
+  "section": { "id": "general", "collapsed": false, "order": 0 },
+  "level": "basic",
+  "secret": false,
+  "needs": [],
+  "lives_in": "core",
+  "honoured_by": ["home", "bot"]
+}

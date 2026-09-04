@@ -1,0 +1,200 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://getmaipai.github.io/home/spec/schemas/manifest.schema.json",
+  "title": "PackageManifest",
+  "description": "One manifest format for every package kind (skill, app, companion, integration, model, wakeword, voice, theme, module). See platform plan 5.1 and .github's docs/PACKAGES.md.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "id", "version", "kind", "category", "display", "description",
+    "author", "license", "platforms", "min_role", "consequential",
+    "offline", "min_app", "tier"
+  ],
+  "properties": {
+    "id": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9_-]{0,63}$",
+      "description": "Unique in the catalog. No third-party name in it."
+    },
+    "version": {
+      "type": "string",
+      "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$"
+    },
+    "kind": {
+      "type": "string",
+      "enum": [
+        "skill", "app", "companion", "integration", "model",
+        "wakeword", "voice", "theme", "module"
+      ]
+    },
+    "category": {
+      "type": "string",
+      "enum": [
+        "Home", "Family", "Info", "Fun", "Media", "Robot body",
+        "Health", "Learning", "Utilities"
+      ]
+    },
+    "display": { "type": "string", "minLength": 1, "maxLength": 60 },
+    "description": { "type": "string", "minLength": 1, "maxLength": 200 },
+    "author": { "type": "string", "minLength": 1 },
+    "license": { "type": "string", "minLength": 1 },
+    "homepage": { "type": "string", "format": "uri" },
+    "routing": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "examples": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 },
+          "minItems": 5,
+          "description": "Five or more, required at bronze (docs/PACKAGES.md)."
+        },
+        "patterns": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 }
+        }
+      }
+    },
+    "args": {
+      "description": "A JSON Schema for this package's call arguments."
+    },
+    "requires": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Capabilities from the capability vocabulary (spec/vocab/capabilities.json) this package cannot run without."
+    },
+    "optional": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Capabilities that add behavior but are not required."
+    },
+    "platforms": {
+      "type": "array",
+      "items": { "type": "string", "enum": ["home", "bot", "web"] },
+      "minItems": 1
+    },
+    "min_role": {
+      "type": "string",
+      "enum": ["owner", "admin", "adult", "teen", "child", "guest"],
+      "description": "The floor role a person needs to invoke this package."
+    },
+    "consequential": {
+      "type": "boolean",
+      "description": "Raises the routing bar (4.5): a consequential skill needs more confidence before it fires."
+    },
+    "offline": {
+      "type": "string",
+      "enum": ["full", "degraded", "unavailable"],
+      "description": "Stated offline behavior, required at bronze."
+    },
+    "config": {
+      "type": "array",
+      "items": { "$ref": "settings-key.schema.json" }
+    },
+    "data_sources": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "destination", "retention"],
+        "properties": {
+          "id": { "type": "string" },
+          "destination": { "type": "string" },
+          "retention": { "type": "string" }
+        }
+      },
+      "description": "Feeds the generated privacy row (docs/ENGINEERING.md > Privacy)."
+    },
+    "permissions": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "From the fixed permissions enum (spec/vocab/permissions.json)."
+    },
+    "notifications": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Notification ids this package declares, per docs/NOTIFICATIONS.md."
+    },
+    "cache": {
+      "type": "object",
+      "additionalProperties": true,
+      "description": "key_template, ttl_s, stale_ok_s, max_bytes, max_age_s, scope, platform overrides (4.10)."
+    },
+    "warm": {
+      "type": "object",
+      "additionalProperties": true,
+      "description": "schedule, keys, warm_on (4.10)."
+    },
+    "backup": {
+      "type": "string",
+      "enum": ["hot", "cold", "exclude"]
+    },
+    "background": { "type": "boolean", "default": false },
+    "contributes": {
+      "type": "array",
+      "items": { "type": "object" },
+      "description": "Shell blueprints (6.1): nav entries, pages, right-pane panels, settings sections, commands, quick actions, player hooks, admin sections."
+    },
+    "pages": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Ids of UI schema page documents this package ships (6.2)."
+    },
+    "setup": {
+      "type": "object",
+      "additionalProperties": true,
+      "description": "A declared setup flow, the one escape hatch beyond a plain settings form (docs/SETTINGS.md rule 1)."
+    },
+    "provides": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "For integrations: what this package makes available to others (5.4)."
+    },
+    "min_app": {
+      "type": "string",
+      "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$",
+      "description": "Minimum hub/robot version this package needs."
+    },
+    "kit_version": {
+      "type": "string",
+      "description": "The @maipai/ui ui-v tag this package's UI was built against, if it ships one."
+    },
+    "reply": {
+      "type": "object",
+      "additionalProperties": true,
+      "description": "Default reply shape hints for the router, if any."
+    },
+    "timeout_ms": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "Bounds handle(). Defaults per 4.9: 4000 on the robot, 8000 on the hub."
+    },
+    "tier": {
+      "type": "integer",
+      "enum": [0, 1],
+      "description": "0: declarative (a recipe or prompt body). 1: Deno code."
+    },
+    "smoke": {
+      "type": "object",
+      "additionalProperties": true,
+      "description": "The smoke test entry, run at install, update, and on a schedule."
+    },
+    "quality_scale": {
+      "type": "string",
+      "enum": ["bronze", "silver", "gold"]
+    },
+    "content_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "signature": { "type": "string" },
+    "signer": { "type": "string" },
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "repo": { "type": "string" },
+        "ref": { "type": "string" },
+        "sha": { "type": "string" }
+      },
+      "description": "For a package that graduated to its own repo (5.1)."
+    }
+  }
+}

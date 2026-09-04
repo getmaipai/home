@@ -1,0 +1,100 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://getmaipai.github.io/home/spec/schemas/memory-record.schema.json",
+  "title": "MemoryRecord",
+  "description": "The shared shape for Memory, Entity, and Episode (platform plan 3.1 lists them as one row with one field set); record_kind is the discriminator. Embeddings themselves never sync (embedding_space only names the space). See 4.4 for the store's recall and maintenance rules this shape supports.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "id", "record_kind", "text", "category", "tier", "status", "scope",
+    "source", "importance", "pinned", "sensitive", "uses",
+    "created_at", "last_used_at"
+  ],
+  "properties": {
+    "id": {
+      "type": "string",
+      "pattern": "^(mem|ent|ep)[0-9]+-[a-z0-9]{6}$",
+      "description": "{prefix}{seq}-{device6}. Prefix follows record_kind: mem for memory, ent for entity, ep for episode."
+    },
+    "record_kind": {
+      "type": "string",
+      "enum": ["memory", "entity", "episode"]
+    },
+    "text": {
+      "type": "string",
+      "minLength": 1
+    },
+    "category": {
+      "type": "string",
+      "enum": [
+        "person", "place", "thing", "preference", "identity", "event",
+        "project", "goal", "relationship", "fact", "state"
+      ]
+    },
+    "tier": {
+      "type": "string",
+      "enum": ["durable", "episodic", "observation"]
+    },
+    "status": {
+      "type": "string",
+      "enum": ["active", "superseded", "archived"]
+    },
+    "scope": {
+      "type": "string",
+      "enum": ["household", "person", "self"],
+      "description": "self: the companion's own memory of itself, not shared with anyone."
+    },
+    "person": {
+      "type": ["string", "null"],
+      "pattern": "^person-[a-z0-9]{6,}$",
+      "description": "Required when scope is person; null for household or self scope."
+    },
+    "source": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Free-text provenance (e.g. a conversation turn id, a package id, an import job id)."
+    },
+    "importance": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1
+    },
+    "pinned": { "type": "boolean" },
+    "sensitive": {
+      "type": "boolean",
+      "description": "Withheld on shared surfaces and, on the robot, unless the person is confirmed present and alone (4.4)."
+    },
+    "uses": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "created_at": { "type": "string", "format": "date-time" },
+    "last_used_at": { "type": "string", "format": "date-time" },
+    "valid_from": {
+      "type": ["string", "null"],
+      "format": "date-time",
+      "default": null
+    },
+    "valid_to": {
+      "type": ["string", "null"],
+      "format": "date-time",
+      "default": null,
+      "description": "When the fact stopped being true, distinct from expired_at (when we retired it)."
+    },
+    "expired_at": {
+      "type": ["string", "null"],
+      "format": "date-time",
+      "default": null
+    },
+    "superseded_by": {
+      "type": ["string", "null"],
+      "pattern": "^(mem|ent|ep)[0-9]+-[a-z0-9]{6}$",
+      "default": null
+    },
+    "embedding_space": {
+      "type": ["string", "null"],
+      "default": null,
+      "description": "Names the embedding space this record was indexed under, e.g. hub-bge-m3 or bot-minilm. The embedding vector itself is never part of this record and never syncs (4.11)."
+    }
+  }
+}

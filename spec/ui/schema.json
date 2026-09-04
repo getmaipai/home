@@ -1,0 +1,174 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://getmaipai.github.io/home/spec/ui/schema.json",
+  "title": "UiNode",
+  "description": "v0 of the declared UI schema (platform plan 6.2): a page is a tree of these nodes, rendered natively by React (web shell, PWA) today and by SwiftUI (iPhone, Apple TV) later. v0 covers only what the Chat page needs, the first of the plan's three hardest pages; List, CardGrid, MediaShelf, DetailPane, SplitView, and the Videos/Music pattern components are added when those pages are tackled, not invented ahead of need.",
+  "type": "object",
+  "oneOf": [
+    { "$ref": "#/$defs/page" },
+    { "$ref": "#/$defs/section" },
+    { "$ref": "#/$defs/message_thread" },
+    { "$ref": "#/$defs/form" },
+    { "$ref": "#/$defs/empty_state" },
+    { "$ref": "#/$defs/progress" }
+  ],
+  "$defs": {
+    "binding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["source", "path"],
+      "properties": {
+        "source": {
+          "type": "string",
+          "enum": ["route", "host"],
+          "description": "route: the app's own backend route. host: a host.* RPC method (4.9)."
+        },
+        "path": { "type": "string", "minLength": 1 },
+        "stream": {
+          "type": "boolean",
+          "default": false,
+          "description": "True when this binding delivers incremental updates (turn.token during a Chat reply, 7.2) rather than one value."
+        }
+      }
+    },
+    "action": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "navigate": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["to"],
+          "properties": { "to": { "type": "string" } }
+        },
+        "call": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["target"],
+          "properties": {
+            "target": { "type": "string", "description": "A route or host.* method." },
+            "args": { "type": "object", "additionalProperties": true }
+          }
+        },
+        "play": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["media_id"],
+          "properties": { "media_id": { "type": "string" } }
+        },
+        "confirm": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["prompt", "on_confirm"],
+          "properties": {
+            "prompt": { "type": "string" },
+            "on_confirm": { "$ref": "#/$defs/action" }
+          }
+        },
+        "ask": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["prompt", "expects"],
+          "properties": {
+            "prompt": { "type": "string" },
+            "expects": { "type": "string" }
+          }
+        }
+      },
+      "minProperties": 1,
+      "maxProperties": 1,
+      "description": "Exactly one of the five declared actions (6.2)."
+    },
+    "page": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "id", "title", "body"],
+      "properties": {
+        "type": { "const": "page" },
+        "id": { "type": "string", "minLength": 1 },
+        "title": { "type": "string", "minLength": 1 },
+        "body": {
+          "type": "array",
+          "items": { "$ref": "#" },
+          "minItems": 1
+        }
+      }
+    },
+    "section": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "children"],
+      "properties": {
+        "type": { "const": "section" },
+        "heading": { "type": "string" },
+        "condition": { "type": "string", "description": "A simple expression string evaluated against page state; absent means always shown." },
+        "children": {
+          "type": "array",
+          "items": { "$ref": "#" },
+          "minItems": 1
+        }
+      }
+    },
+    "message_thread": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "bind", "sender_field", "text_field"],
+      "description": "The Chat pattern component (6.2 names Chat as one of the three hardest pages to express; this is the pattern component that resulted, not one of the plan's named generic primitives). A scrolling list of turns, newest last, that appends in place as bind.stream delivers tokens.",
+      "properties": {
+        "type": { "const": "message_thread" },
+        "bind": { "$ref": "#/$defs/binding" },
+        "sender_field": { "type": "string", "description": "Dotted path within one turn to who sent it." },
+        "text_field": { "type": "string", "description": "Dotted path within one turn to its display text." },
+        "speech_hint_field": { "type": "string", "description": "Dotted path to a spoken-form hint, if different from text_field." },
+        "empty_state": { "$ref": "#/$defs/empty_state" }
+      }
+    },
+    "form": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "fields", "on_submit"],
+      "properties": {
+        "type": { "const": "form" },
+        "fields": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["name", "selector"],
+            "properties": {
+              "name": { "type": "string" },
+              "selector": {
+                "type": "string",
+                "enum": ["number", "select", "text", "boolean", "duration", "time", "entity", "area", "person", "media"]
+              },
+              "placeholder": { "type": "string" }
+            }
+          }
+        },
+        "on_submit": { "$ref": "#/$defs/action" }
+      }
+    },
+    "empty_state": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "icon", "text"],
+      "properties": {
+        "type": { "const": "empty_state" },
+        "icon": { "type": "string", "description": "A lucide icon name (docs/UI.md > Icons)." },
+        "text": { "type": "string" },
+        "action": { "$ref": "#/$defs/action" }
+      }
+    },
+    "progress": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "mode"],
+      "properties": {
+        "type": { "const": "progress" },
+        "mode": { "type": "string", "enum": ["spinner", "determinate"] },
+        "bind": { "$ref": "#/$defs/binding" }
+      }
+    }
+  }
+}

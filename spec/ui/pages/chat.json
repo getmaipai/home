@@ -1,0 +1,34 @@
+{
+  "type": "page",
+  "id": "chat",
+  "title": "Chat",
+  "body": [
+    {
+      "type": "message_thread",
+      "bind": { "source": "route", "path": "/api/chat/turns", "stream": true },
+      "sender_field": "speaker.display_name",
+      "text_field": "reply.text",
+      "speech_hint_field": "reply.speech",
+      "empty_state": {
+        "type": "empty_state",
+        "icon": "message-circle",
+        "text": "Nothing here yet. Say hello.",
+        "action": {
+          "call": { "target": "/api/chat/suggestions" }
+        }
+      }
+    },
+    {
+      "type": "progress",
+      "mode": "spinner",
+      "bind": { "source": "route", "path": "/api/chat/status" }
+    },
+    {
+      "type": "form",
+      "fields": [{ "name": "message", "selector": "text", "placeholder": "Message" }],
+      "on_submit": {
+        "call": { "target": "/api/chat/send", "args": { "message": "{message}" } }
+      }
+    }
+  ]
+}

@@ -8,16 +8,19 @@ design doc; it grows as the hub is built.
 
 ## What happened to the old repo
 
-The pre-rebuild hub's full history (979-adjacent commits' worth of the
-Bun/Hono monolith, ~250 SQLite tables, 61 code tools, Ollama-based models)
-is preserved outside GitHub: a full git mirror at
-`legacy-backups/home-legacy.git` next to this repo on the dev machine,
-plus its 21 releases' metadata (tags, notes, asset lists with sha256) in
+The pre-rebuild hub's full history (244 commits of the Bun/Hono monolith,
+~250 SQLite tables, 61 code tools, Ollama-based models) is preserved
+outside GitHub: a full git mirror at `legacy-backups/home-legacy.git` next
+to this repo on the dev machine, plus its 21 releases' metadata (tags,
+notes, asset lists with sha256) in
 `legacy-backups/home-releases-metadata/`. Nothing was migrated into this
-repo. Per platform plan principle 8, legacy code is a read-only reference
-for hard-won logic only (resolvers, sync, limiters, drivers,
-measurements), never for feature scope or UI; every legacy feature gets a
-one-line review verdict here before anything is rebuilt (section 5.8).
+repo. (This is a separate lineage from the older, already-archived
+`loki-doki` repo, which predates the `getmaipai` org migration entirely
+and is not part of this rebuild's reference set.) Per platform plan
+principle 8, legacy code is a read-only reference for hard-won logic only
+(resolvers, sync, limiters, drivers, measurements), never for feature
+scope or UI; every legacy feature gets a one-line review verdict here
+before anything is rebuilt (section 5.8).
 
 The live legacy hub (on the MSI) keeps running until this repo's v0.1 is
 ready to take over; nothing about this repo's rebuild has stopped it.
@@ -35,10 +38,23 @@ set. Full architecture: platform plan chapters 1, 3, and 4.
 - [x] Repo reset to a clean history, with LICENSE (AGPL-3.0), NOTICE, this
       design record, and `scripts/check.sh` pinned to `@maipai/standards`
       std-v0.1.0.
-- [ ] `home/spec/` (the JSON Schema record types, settings registry,
-      capability vocabulary, UI schema v0, the recipe interpreters and
-      host emulators) - not started. This blocks everything else; it is
-      the first real content, per Hub v0.1 in the roadmap.
+
+## Hub v0.1 status
+
+- [x] `home/spec/` v0.1: JSON Schema for Person, Setting, Memory/Entity/
+      Episode, the package manifest/recipe/result shapes, the error
+      catalogue; the settings registry (empty, ready for the first
+      declaration) and the capability/permissions vocabularies; UI schema
+      v0 for Chat only; both recipe interpreters (TS and Python, kept
+      behaviorally identical) and both host emulators; generated Zod and
+      Pydantic v2 bindings for every schema, committed; fixtures that
+      round-trip through both, plus recipe conformance fixtures proving
+      both interpreters agree. See `spec/README.md`. Not yet done: cutting
+      the `spec-v0.1.0` tag (nothing pins it yet, since `bot` doesn't
+      exist as real content in this session) and the standards schemas
+      import (`logging.json`/`trace.json`/`errors.json`/`budgets.json`/
+      `privacy.json` from `@maipai/standards`, which doesn't have them
+      yet either, per its own README's "later versions add" list).
 - [ ] Core (identity, people, safety layer, memory, turn engine, settings,
       scheduler, package host, llama-server router) - not started.
 - [ ] The shell and kit, Chat and Companions as packages, the wizard,

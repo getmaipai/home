@@ -1,0 +1,58 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://getmaipai.github.io/home/spec/schemas/person.schema.json",
+  "title": "Person",
+  "description": "A household member or guest. Core holds the birthdate; packages only ever see age_range, derived server-side and never stored on the record a package can read. See platform plan 3.1 and 4.2.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["id", "display_name", "role", "avatar_seed", "source", "created_at", "updated_at"],
+  "properties": {
+    "id": {
+      "type": "string",
+      "pattern": "^person-[a-z0-9]{6,}$",
+      "description": "Stable id, never reused, even after deletedAt is set."
+    },
+    "display_name": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 80
+    },
+    "nickname": {
+      "type": ["string", "null"],
+      "maxLength": 80,
+      "description": "What a companion calls this person, if different from display_name."
+    },
+    "birthdate": {
+      "type": ["string", "null"],
+      "format": "date",
+      "description": "Core only. Never present in any shape a package's ctx exposes; packages see age_range on Person derived from this."
+    },
+    "role": {
+      "type": "string",
+      "enum": ["owner", "admin", "adult", "teen", "child", "guest"],
+      "description": "The role ladder (4.2). Two minor bands (teen 13-17, child under 13) so there is no thirteen-year cliff."
+    },
+    "avatar_seed": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Deterministic seed for a generated avatar; never a photo of a real person by default."
+    },
+    "source": {
+      "type": "string",
+      "enum": ["hub", "local"],
+      "description": "hub: authoritative on the hub, replicated to robots. local: a robot-only guest, never synced to the hub (4.2's local_only concept for a whole person)."
+    },
+    "local_only": {
+      "type": "boolean",
+      "default": false,
+      "description": "Keeps this person off the overlay network entirely (4.2, 4.12)."
+    },
+    "created_at": { "type": "string", "format": "date-time" },
+    "updated_at": { "type": "string", "format": "date-time" },
+    "deleted_at": {
+      "type": ["string", "null"],
+      "format": "date-time",
+      "default": null
+    }
+  }
+}

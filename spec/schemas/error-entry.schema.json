@@ -1,0 +1,28 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://getmaipai.github.io/home/spec/schemas/error-entry.schema.json",
+  "title": "ErrorEntry",
+  "description": "One code in the shared error catalogue (spec/errors/errors.json). Every package error the host wraps maps to one of these. See platform plan 4.9 and docs/ENGINEERING.md > Errors.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["code", "message", "spoken_fallback", "ui_message", "retriable"],
+  "properties": {
+    "code": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_]*$"
+    },
+    "message": {
+      "type": "string",
+      "description": "Developer-facing, goes in logs and diagnostics."
+    },
+    "spoken_fallback": {
+      "type": "string",
+      "description": "What the robot or a voice surface says when this error surfaces mid-conversation."
+    },
+    "ui_message": {
+      "type": "string",
+      "description": "What the shell shows: specific title, what happened, what to do (docs/UI.md pattern table > Errors)."
+    },
+    "retriable": { "type": "boolean" }
+  }
+}

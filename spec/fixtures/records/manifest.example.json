@@ -1,0 +1,46 @@
+{
+  "id": "bedtime-reminder",
+  "version": "0.1.0",
+  "kind": "skill",
+  "category": "Family",
+  "display": "Bedtime reminder",
+  "description": "Sets a spoken reminder at a chosen time for a chosen person.",
+  "author": "MaiPai",
+  "license": "AGPL-3.0",
+  "homepage": "https://github.com/getmaipai/catalog",
+  "routing": {
+    "examples": [
+      "remind Riff to go to bed at 9",
+      "set a bedtime reminder for Sprout at 8:30",
+      "bedtime reminder for the kids at 8",
+      "tell me when it's bedtime",
+      "wake, remind Riff about bedtime at nine"
+    ],
+    "patterns": ["bedtime reminder", "remind * to go to bed"]
+  },
+  "args": {
+    "type": "object",
+    "required": ["person", "time"],
+    "properties": {
+      "person": { "type": "string" },
+      "time": { "type": "string" }
+    }
+  },
+  "requires": [],
+  "optional": ["speaker"],
+  "platforms": ["home", "bot"],
+  "min_role": "child",
+  "consequential": false,
+  "offline": "full",
+  "config": [],
+  "data_sources": [],
+  "permissions": ["schedule", "speak"],
+  "notifications": [],
+  "backup": "hot",
+  "background": false,
+  "contributes": [],
+  "pages": [],
+  "min_app": "0.1.0",
+  "tier": 0,
+  "quality_scale": "bronze"
+}

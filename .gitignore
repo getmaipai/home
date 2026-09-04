@@ -1,0 +1,18 @@
+# Dependencies
+node_modules/
+.venv/
+
+# Local data, never committed (org rule: nothing under data/ ever enters git)
+data/
+
+# Editor/OS
+.DS_Store
+
+# Python
+__pycache__/
+*.pyc
+.pytest_cache/
+.ruff_cache/
+
+# Bun/TS
+*.tsbuildinfo

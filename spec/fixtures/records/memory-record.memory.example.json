@@ -1,0 +1,22 @@
+{
+  "id": "mem1042-a1b2c3",
+  "record_kind": "memory",
+  "text": "Riff prefers oat milk in coffee.",
+  "category": "preference",
+  "tier": "durable",
+  "status": "active",
+  "scope": "person",
+  "person": "person-a1b2c3",
+  "source": "conversation-turn-8831",
+  "importance": 0.4,
+  "pinned": false,
+  "sensitive": false,
+  "uses": 3,
+  "created_at": "2026-08-01T09:00:00Z",
+  "last_used_at": "2026-09-02T18:30:00Z",
+  "valid_from": null,
+  "valid_to": null,
+  "expired_at": null,
+  "superseded_by": null,
+  "embedding_space": "hub-bge-m3"
+}

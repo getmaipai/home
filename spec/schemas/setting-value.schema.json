@@ -1,0 +1,34 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://getmaipai.github.io/home/spec/schemas/setting-value.schema.json",
+  "title": "SettingValue",
+  "description": "One row per (scope, key). Per-field last-writer-wins on the oplog via hlc. See platform plan 3.1, 3.2, and docs/SETTINGS.md in .github.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["scope", "key", "value", "hlc", "source"],
+  "properties": {
+    "scope": {
+      "type": "string",
+      "pattern": "^(household|person:[a-z0-9-]+|device:[a-z0-9-]+)$",
+      "description": "household, person:<id>, or device:<id>."
+    },
+    "key": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*)+$",
+      "description": "Dotted, lowercase, owned by exactly one package (docs/PACKAGES.md naming rule). Must exist in the settings registry."
+    },
+    "value": {
+      "description": "Shape depends on the key's selector type in the settings registry; validated against that, not here."
+    },
+    "hlc": {
+      "type": "string",
+      "pattern": "^[0-9]+:[0-9]+:[a-z0-9]{6,}$",
+      "description": "Hybrid logical clock: wall_ms:counter:node (7.3)."
+    },
+    "source": {
+      "type": "string",
+      "enum": ["user", "default", "package", "sync"],
+      "description": "Where this value last came from, for the settings UI's modified filter."
+    }
+  }
+}
