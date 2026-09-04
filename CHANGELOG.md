@@ -7,6 +7,36 @@ checklist (`docs/dev.md`); no release has been cut yet.
 
 ## [Unreleased]
 
+### Added
+- The package host (platform plan 4.9), Tier 0 only, the fifth slice of
+  hub core: `backend/src/lib/packageHost.ts` builds a real `host.*`
+  implementation per package invocation, backing `memory.recall`/
+  `memory.remember`/`data.forget` and `config.get` against the real
+  memory and settings stores, permission-checked against the manifest's
+  declared `permissions` first. Everything without a real backing
+  service yet (fetch, home control, integrations, speech, the LLM role,
+  camera, OCR, scheduling, files, actions, diagnostics) honestly throws
+  `capability_missing` rather than silently no-opping.
+  `backend/src/lib/skills.ts` loads a bundled package's manifest and
+  recipe from `backend/packages/<id>/`, validates both against spec's
+  schemas, checks `min_role`, validates the call's inputs against the
+  manifest's own `args` JSON Schema with `ajv`, and runs it through
+  spec's real interpreter. `backend/packages/remember/` is the first
+  bundled package, the plan's own named example. New routes:
+  `GET /api/skills`, `POST /api/skills/:id/run`. `spec/emulators/ts/
+  host-emulator.ts` gained an exported `Host` interface so the
+  interpreter types against a contract instead of the concrete emulator
+  class, which also surfaced and fixed a real bug: the generated
+  `Recipe` step type was silently `any`, defeating the interpreter's
+  exhaustiveness check. A same-day review found and fixed four real
+  issues (a missing required input silently writing a literal
+  `{placeholder}` to memory, a raw `TypeError` escaping `host.fetch` on
+  a malformed url, duplicated redaction logic that had already drifted
+  between the real host and the emulator, and a documented mismatch in
+  `capability_missing`'s catalogue wording). Full detail, including what
+  Tier 1 and every other deferred `host.*` method still need, in
+  `docs/dev.md`.
+
 ### Fixed
 - A `code-review` pass (2026-09-04) across the identity, safety, and
   memory slices found and fixed real bugs, the most severe being a

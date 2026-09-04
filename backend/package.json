@@ -16,6 +16,7 @@
   },
   "dependencies": {
     "@maipai/spec": "workspace:*",
+    "ajv": "^8.20.0",
     "drizzle-orm": "^0.44.6",
     "hono": "^4.10.7",
     "zod": "^4.0.0"

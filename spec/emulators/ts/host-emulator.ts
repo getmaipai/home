@@ -36,7 +36,78 @@ export interface LogEntry {
 
 const REDACTED = "[redacted]";
 
-export class HostEmulator {
+// Shared by this emulator's log() and the real host's
+// (backend/src/lib/packageHost.ts), so a redaction fix (a depth limit, a
+// regex-metachar-safe replace) lands once instead of needing to be
+// remembered and reapplied to a second copy — a review (2026-09-04)
+// found the two had already drifted (this one didn't recurse into
+// arrays) before either implementation shipped.
+export function redactSecrets(value: unknown, secrets: readonly string[]): unknown {
+  if (typeof value === "string") {
+    let out = value;
+    for (const secret of secrets) {
+      if (secret) out = out.split(secret).join(REDACTED);
+    }
+    return out;
+  }
+  if (Array.isArray(value)) return value.map((v) => redactSecrets(v, secrets));
+  if (value && typeof value === "object") {
+    return Object.fromEntries(Object.entries(value).map(([k, v]) => [k, redactSecrets(v, secrets)]));
+  }
+  return value;
+}
+
+// The real host.* RPC surface's shape (4.9), extracted so a real
+// implementation (backend/src/lib/packageHost.ts) can be typed against
+// the same contract the interpreter runs against, instead of the
+// interpreter being tied to this emulator's concrete class. The Python
+// interpreter never had this problem (recipe_interpreter.py's `host`
+// parameter is already `Any`, pure duck typing); this is a TS-only
+// tightening, not a spec/record shape change.
+export interface Host {
+  fetch(url: string, opts?: FetchOptions): unknown;
+  memory: {
+    recall(query: string, opts?: { scope?: string; person?: string }): MemoryRecordLike[];
+    remember(text: string, category?: string, scope?: string, person?: string | null): string;
+  };
+  action: {
+    emit(kind: string, payload?: unknown): void;
+  };
+  home: {
+    call_service(domain: string, service: string, target: unknown, data?: unknown): void;
+  };
+  integration: {
+    call(id: string, method: string, args?: unknown): unknown;
+  };
+  speak: {
+    sentence(text: string): void;
+  };
+  llm: {
+    complete(opts: unknown): unknown;
+  };
+  camera: {
+    still(): unknown;
+  };
+  ocr: {
+    read(image: unknown): string;
+  };
+  config: {
+    get(key: string): unknown;
+  };
+  log(level: string, message: string, fields?: Record<string, unknown>): void;
+  schedule(when: string, job: string): string;
+  files: {
+    read(path: string): unknown;
+    write(path: string, data: unknown): void;
+    list(prefix: string): string[];
+  };
+  data: {
+    forget(person: string): number;
+  };
+  diagnostics(): unknown;
+}
+
+export class HostEmulator implements Host {
   private fetchResponses = new Map<string, unknown>();
   private configValues = new Map<string, unknown>();
   private secrets: string[] = [];
@@ -158,20 +229,11 @@ export class HostEmulator {
   };
 
   log(level: string, message: string, fields: Record<string, unknown> = {}): void {
-    const redact = (v: unknown): unknown => {
-      if (typeof v === "string") {
-        let out = v;
-        for (const secret of this.secrets) {
-          out = out.split(secret).join(REDACTED);
-        }
-        return out;
-      }
-      if (v && typeof v === "object") {
-        return Object.fromEntries(Object.entries(v as Record<string, unknown>).map(([k, val]) => [k, redact(val)]));
-      }
-      return v;
-    };
-    this.logs.push({ level, message: redact(message) as string, fields: redact(fields) as Record<string, unknown> });
+    this.logs.push({
+      level,
+      message: redactSecrets(message, this.secrets) as string,
+      fields: redactSecrets(fields, this.secrets) as Record<string, unknown>,
+    });
   }
 
   schedule(when: string, job: string): string {

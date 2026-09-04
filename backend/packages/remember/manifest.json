@@ -1,0 +1,45 @@
+{
+  "id": "remember",
+  "version": "0.1.0",
+  "kind": "skill",
+  "category": "Utilities",
+  "display": "Remember",
+  "description": "Remembers a fact you tell it, the way asking to remember something works (4.4/4.9).",
+  "author": "MaiPai",
+  "license": "AGPL-3.0",
+  "homepage": "https://github.com/getmaipai/home",
+  "routing": {
+    "examples": [
+      "remember that I take my medicine at 8am",
+      "remember I'm allergic to peanuts",
+      "please remember our wifi password is on the fridge",
+      "remember that Friday is pizza night",
+      "can you remember I have a dentist appointment next week"
+    ],
+    "patterns": ["remember that *", "remember *"]
+  },
+  "args": {
+    "type": "object",
+    "required": ["fact"],
+    "properties": {
+      "fact": { "type": "string", "minLength": 1 }
+    }
+  },
+  "requires": [],
+  "optional": [],
+  "platforms": ["home", "bot"],
+  "min_role": "child",
+  "consequential": false,
+  "offline": "full",
+  "config": [],
+  "data_sources": [],
+  "permissions": ["memory:write"],
+  "notifications": [],
+  "backup": "hot",
+  "background": false,
+  "contributes": [],
+  "pages": [],
+  "min_app": "0.1.0",
+  "tier": 0,
+  "quality_scale": "bronze"
+}

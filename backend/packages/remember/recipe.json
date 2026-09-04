@@ -1,0 +1,18 @@
+{
+  "id": "remember",
+  "inputs": [{ "name": "fact", "selector": "text" }],
+  "steps": [
+    {
+      "op": "remember",
+      "text": "{fact}",
+      "category": "fact",
+      "scope": "household"
+    },
+    {
+      "op": "format",
+      "as": "reply",
+      "text": "Got it, I'll remember that.",
+      "speech": "Got it, I'll remember that."
+    }
+  ]
+}

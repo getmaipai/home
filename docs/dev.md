@@ -315,6 +315,99 @@ set. Full architecture: platform plan chapters 1, 3, and 4.
       keys sent on `hello` (needs the link, Hub v0.3); package manifest
       `config[]` as a second registry source (needs the package host,
       4.9); real oplog-based sync consuming the hlc field (needs 7.3).
+- [x] The package host (4.9), Tier 0 only, the fifth slice of hub core.
+      Picked next (not the turn engine) for the same reason settings was:
+      Tier 0 recipes are explicitly "no process" (5.2), and the
+      interpreter and host emulator already existed from spec v0.1, so a
+      real host was buildable today without Deno/MCP or an LLM.
+    - `spec/emulators/ts/host-emulator.ts` gained an exported `Host`
+      interface (the emulator's existing method shapes, extracted) so
+      `spec/interpreters/ts/recipe-interpreter.ts`'s `runRecipe()` types
+      against the interface, not the concrete `HostEmulator` class,
+      letting a real implementation exist without inheriting the
+      emulator's test-only state. Python's interpreter already took
+      `host: Any` (pure duck typing), so no parity change was needed
+      there. Fixing this also surfaced a real, separate bug: `Recipe`'s
+      generated `steps` field types as `any` (`json-schema-to-zod` can't
+      emit a discriminated union for `oneOf`), which had silently
+      defeated the interpreter's exhaustiveness check and left every
+      `step.xxx` access untyped throughout the switch, invisible only
+      because `spec/` had never run a standalone `tsc --noEmit` before
+      `backend/` started importing this file. Fixed with a hand-written
+      `RecipeStep` union mirroring the schema's 7 step defs.
+    - `backend/src/lib/packageHost.ts`: a real `Host` for one package
+      invocation, scoped to the acting person and that package's
+      manifest. `memory.recall`/`memory.remember` and `data.forget` are
+      real, backed by `lib/memory.ts`; `config.get` resolves against the
+      real household settings store (`lib/settings.ts`); `log()` really
+      redacts, sharing one `redactSecrets()` with the emulator
+      (`spec/emulators/ts/host-emulator.ts`) rather than a second copy.
+      Every method that maps to an entry in `spec/vocab/permissions.json`
+      checks the manifest's declared `permissions` first and throws
+      `permission_denied` (a catalogue code, `spec/errors/errors.json`)
+      if it wasn't declared, before doing anything else.
+    - Everything else (`fetch`, `home.call_service`, `integration.call`,
+      `speak.sentence`, `llm.complete`, `camera.still`, `ocr.read`,
+      `schedule`, `files.*`, `action.emit`, `diagnostics`) has no backing
+      service yet (no rate limiter, no Home Assistant link, no LLM role,
+      no turn engine to route actions to, no scheduler, no package file
+      storage) and throws `capability_missing`. That code's catalogue
+      description ("a required capability... is not present on this
+      node") doesn't quite fit "the host hasn't built this RPC on any
+      node yet"; `errors.json` has no code for that distinction. Left as
+      the closest existing fit rather than inventing an out-of-catalogue
+      code, flagged here as a real, open gap for a future `errors.json`
+      revision. Zero live blast radius today: no turn engine routes to
+      any of these, and the one bundled package doesn't call them.
+    - `backend/src/lib/skills.ts`: loads a bundled package's
+      `manifest.json`/`recipe.json` from `backend/packages/<id>/`,
+      validates both against spec's generated Zod schemas, rejects a
+      tier-1 manifest (no Deno sandbox yet), checks `min_role` against
+      the real role ladder before running, validates the call's inputs
+      against the manifest's own `args` JSON Schema with `ajv` (matching
+      `spec/tests/ts/ui-schema.test.ts`'s existing choice of engine and
+      2020-12 dialect) before ever handing them to the interpreter, then
+      runs the recipe through spec's real `runRecipe()`.
+    - `backend/packages/remember/`: the first bundled Tier 0 package,
+      the plan's own named example ("remember and forget as ways of
+      asking will be a default skill package calling the core memory
+      port," 4.4). One `remember` step plus a `format` reply. No
+      `forget` recipe step exists in `recipe.schema.json` (`forget` isn't
+      a Tier 0 primitive), so this package covers "remember" only;
+      erasure stays `host.data.forget`, reachable from a Tier 1 package
+      or an admin flow, not from any recipe.
+    - `GET /api/skills` (lists bundled manifests) and
+      `POST /api/skills/:id/run` (runs one).
+    - Exercised for real: booted the server and drove the full path with
+      `curl` (setup, list, run, the fact landing in a real recall,
+      unauthenticated and unknown-package rejections), in addition to 25
+      backend tests, all green.
+    - **A `code-review` pass (medium effort) on this slice before
+      committing** found and fixed four real issues: a missing required
+      input reached the interpreter, left its `{fact}` placeholder
+      un-interpolated by `interpolate()`, and was written to the real
+      memory store as literal text with a 200 back: the `ajv`
+      args-validation step above is the fix, with a regression test and
+      a live `curl` check that confirms nothing gets written. `host.fetch`
+      called `new URL()` before any error handling, so a malformed url
+      raised a raw `TypeError` instead of a `HostError`, breaking "the
+      host wraps errors so a package cannot throw an unmapped one past
+      the boundary": fixed with a try/catch mapping to `invalid_input`.
+      The redaction logic in `packageHost.ts`'s `log()` duplicated the
+      emulator's inline version, and the two had already drifted (the
+      emulator's didn't recurse into arrays) before either shipped:
+      extracted to the shared `redactSecrets()` both now call. The
+      `capability_missing` semantic mismatch above was also raised by
+      this review; documented rather than papered over with a code the
+      catalogue doesn't actually support.
+    - **Deliberately deferred:** Tier 1 (Deno sandbox, MCP), the rate
+      limiter behind `host.fetch` (4.9/"we are the user"), the scheduler
+      backing `host.schedule` (4.7), package file storage, real
+      `home.call_service`/`integration.call`/`speak`/`llm`/`camera`/`ocr`
+      backing (each needs its own not-yet-built subsystem), the catalog
+      and install flow (packages are read straight off disk from
+      `backend/packages/`), package signing, and the `errors.json`
+      code gap noted above.
 
 ## API routes and `@hono/zod-openapi` (tracked debt)
 
