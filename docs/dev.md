@@ -2128,6 +2128,30 @@ between now and when the relevant piece gets built.
   Grammar-constrained decoding through llama-server matters more than the
   model's own tool-calling ability either way, since a GBNF grammar makes
   a small model's call valid by construction.
+  **Three plan amendments, Jesse, 2026-09-04, now written into 4.5 and
+  4.11 and standing on top of everything above.** Prompted by "what
+  router are we planning, and is it the best option, since a regex router
+  is fragile." The answer: the plan was never a regex router; tier 0
+  patterns are a fast path for exact commands, and the piece that answers
+  a multi-skill utterance is tier 2. The amendments: (1) tier 1's
+  embedding match is also the *tool pre-filter* for tier 2, so the model
+  is offered only the top few candidate packages by similarity, which is
+  what keeps the prompt small and pattern collision bounded once the
+  catalog exists; (2) the `router` model role is optional per device: the
+  hub routes with the `chat` model in non-thinking mode in the same
+  cached process by default, and a dedicated small tool-calling model
+  (the legacy `granite4.1:3b`/`qwen3.5:4b` shape above, re-picked from
+  the Berkeley Function Calling Leaderboard when needed) loads only where
+  measurement says the chat model is too slow, the robot's likely case;
+  (3) a routing eval set becomes a permanent test in the shape of
+  `spec/safety/corpus/`: utterance, expected skill or none, expected
+  arguments, multi-skill combinations, and near-misses that must not
+  fire, with every routing miss seen in the house added as a row before
+  it is fixed. Two independent skills in one utterance ("weather and
+  showtimes") are one model response with two parallel calls, inside the
+  one-or-two-calls cap above; chained composition stays a recipe. Nothing
+  here changes the order: `embed` first, real skills, count
+  fall-throughs, then decide on tier 2 from the eval number.
 
 - **Wake word and voice-pipeline findings from `home-legacy.git`** (this
   content also exists, effectively unchanged, in the older `loki-doki`
