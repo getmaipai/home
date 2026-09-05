@@ -4800,7 +4800,7 @@ bundle-level name is now a converged, two-vendor standard, not
 Anthropic's choice alone - stronger grounds for the rename above.
 Recommended (Claude's pure-instructions shape for MaiPai's new `skill`
 kind) over OpenAI's broader instructions-plus-code shape, for three
-reasons, not just "Jesse asked for Claude compatibility": it is the
+reasons beyond "Jesse asked for Claude compatibility": it is the
 shape that's actually safe for anyone to author with zero review (no
 code, no network, nothing to audit); it keeps `skill` and `plugin`
 meaning genuinely different things instead of blurring into each other
