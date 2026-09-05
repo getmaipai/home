@@ -3549,6 +3549,81 @@ set. Full architecture: platform plan chapters 1, 3, and 4.
       are all real, tractable work for a session with either a real HA
       instance to test against or explicit sign-off to ship unverified.
 
+- [x] **`home.call_service` - the two named gaps closed, real Home
+      Assistant control built.** The permission-vocab gap: `home:<domain>`
+      (`spec/vocab/permissions.json`), structurally never a wildcard the
+      same way `net:<host>` isn't - `requirePermission` does exact string
+      matching, so a manifest can't declare `home:*`. The security-domain
+      design gap: a fixed set (`lock`, `alarm_control_panel`, `cover`,
+      `garage_door`, `valve`) that additionally requires the manifest to
+      declare `consequential: true`, on top of the ordinary `home:<domain>`
+      permission - a package only touching `light`/`switch`/`climate`
+      never needs to clear that bar.
+    - Real backing: two new household settings
+      (`backend/src/settings/homeAssistantKeys.ts` - `home.base_url`,
+      plain text, and `home.access_token`, `secret: true` so it's
+      encrypted at rest the same way `voice.hf_token` already is) and a
+      real `host.home.call_service` in `packageHost.ts` that POSTs to
+      `<base_url>/api/services/<domain>/<service>` with a bearer token,
+      target and data merged into one JSON body (Home Assistant's own
+      REST shape). Deliberately no retry (a service call is a real
+      action, not an idempotent GET - retrying a toggle that actually
+      succeeded but timed out on the response would flip it back) and
+      deliberately no SSRF guard (the target is `home.base_url`, a value
+      the household configured, never something a package supplies -
+      reaching the household's own LAN device is the entire point here,
+      not a hole in it, unlike host.fetch's arbitrary-URL surface).
+    - Making the real call meant the recipe interpreter had to `await`
+      `home.call_service` in both languages (`recipe-interpreter.ts`,
+      `recipe_interpreter.py`), the same async conversion `fetch` got the
+      night before - the `Host` interface's `home.call_service` returns
+      `Promise<void>` now, not `void`. Skipping this would have let
+      TypeScript's own `void`-return assignability quirk (an async
+      function silently satisfies a sync `void`-returning slot) turn a
+      real network failure into an unhandled promise rejection, and let a
+      reply return to the user before the physical action actually
+      happened - a real correctness and safety gap for the one capability
+      that controls physical things in the house, caught before it shipped
+      rather than after.
+    - **Two rounds of review, both real findings, both fixed with
+      regression tests**: `JSON.stringify` of the merged target/data ran
+      outside the network `try` block, so a non-serializable value (a
+      BigInt, a circular reference) would throw a raw, unmapped
+      `TypeError` past this file's own "every failure is a `HostError`"
+      contract - moved into its own narrow `try`, deliberately NOT folded
+      into the network call's `try` (fetch itself throws a plain
+      `TypeError` for a genuine connection failure per the Fetch spec,
+      and folding the two together would have misclassified a real
+      unreachable-host failure as a bad request). And the security-domain
+      check compared the called domain against a lowercase-only set with
+      no normalization, while `requirePermission` matched on whatever
+      exact casing the manifest declared - a manifest declaring
+      `home:Lock` and calling with matching casing could skip the
+      `consequential: true` requirement entirely. Fixed by lowercasing the
+      domain once, used for every decision (permission, security check,
+      and the real call) - the same protection `net:<host>` gets for free
+      from `URL`'s own hostname lowercasing.
+    - **Live-verified the reachable half, honestly not the rest.** The
+      settings UI: `groupSettings.ts`'s `SECTION_TITLES` got
+      `"household.integrations": "Integrations"` proactively (the exact
+      gap `person.persona` and `household.ai` hit live the night before)
+      - confirmed in the browser against a fresh, isolated household
+      (`MAIPAI_DATA_DIR` pointed at a scratch directory, not the real
+      one - see the flagged entry above on why that matters now): the
+      "Integrations" section renders with its real title, the URL field
+      is editable and its value survives a full page reload, and the
+      token field correctly shows "Not set" rather than a raw empty
+      string or a crash. The real HTTP mechanics (permission →
+      consequential → settings lookup → rate limit → the POST itself,
+      body shape, bearer header, non-2xx handling, no-retry behavior) are
+      proven against a local mock server in `packageHost.test.ts`, the
+      same rigor `performHttpFetch`'s own tests use - genuinely tested,
+      not claimed on faith. What's still NOT verified, honestly: no real
+      Home Assistant instance exists in this environment, so nothing here
+      has been proven to work against one, and no bundled skill package
+      yet emits a `home.call_service` step - this closes the platform gap,
+      it doesn't ship a "turn on the lights" skill.
+
 - [ ] **FLAGGED FOR JESSE, NOT FIXED: real conversation history contains
       dev/test traffic, and one already-cleaned-up test memory left orphaned
       chat turns behind.** Found 2026-09-05 while investigating why a
