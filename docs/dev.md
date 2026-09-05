@@ -5846,3 +5846,66 @@ frontend in parallel from its own worktree `../home-b`).
   to spawn one), and the chat role the same way via
   `MAIPAI_LLAMA_SERVER_URL` or `MAIPAI_LLAMA_SERVER_BIN` +
   `MAIPAI_CHAT_MODEL_PATH`.
+
+## Session A: step 1, the speaker and household blocks, and local time (2026-09-05)
+
+`buildSystemPrompt` (`lib/turnEngine.ts`) now takes the actor and adds
+three volatile-zone pieces the audit's "the prompt doesn't know who's
+talking" finding named directly (`docs/BACKLOG.md`'s "A speaker block in
+the prompt" and "A household context block"):
+
+- **Speaker line**: display name, nickname (when set), role, an age band,
+  and the household's locale. `POST /api/turn`'s stub-model reply can't
+  demonstrate this (the stub only ever echoes the last user message, see
+  `spec/llm/ts/stubServer.ts`), so this is proven by the unit tests
+  asserting on the constructed prompt string directly, and by exercising
+  `POST /api/turn` against the running backend to confirm the new blocks
+  don't crash a real turn (`good morning` -> a real 200, source `model`).
+- **Household line**: every active person's display name and role
+  (`lib/access.ts`'s new `listActivePeople()`, reused rather than a
+  second copy of `routes/people.ts`'s own roster query). Presence is
+  unknown for now, as the step names: no presence signal exists on the
+  hub (that's the robot/ambient-context side, not built here).
+- **Local time**: `Friday 3:40 pm` style via `Intl.DateTimeFormat`, never
+  raw ISO UTC. No household timezone setting exists yet (3.2 hasn't
+  landed one), so this renders in the hub process's own system timezone,
+  correct for a self-hosted install physically in the house;
+  `household.locale` only changes date/time formatting conventions, not
+  the zone. Locale comes from `household.locale`
+  (`getHouseholdSettingValue`), not `persona.active_id`-style person
+  scope - the plan's own text says "locale from `core.locale`" but the
+  registry's real key (`backend/src/settings/coreKeys.ts`) is
+  `household.locale`, household-scoped; used that instead of inventing a
+  second key.
+
+**Judgment call: age band, not the wider `age_range`.** The plan asks
+for "age band derived from birthdate when present." `docs/BACKLOG.md`
+separately tracks a real, wider `age_range`-on-Person-ctx question under
+"roles versus grants" (package-visible, schema-level, still undecided).
+This step does NOT touch that: the age band here is computed inline in
+`turnEngine.ts`, never stored or exposed to a package, and uses exactly
+the role ladder's own two minor bands (`person.schema.json`: "teen
+13-17, child under 13") rather than inventing a finer taxonomy nothing
+in the spec or platform plan defines. When a birthdate is on file it's
+a real, independent cross-check computed from it; when it's absent, the
+speaker's own role already carries the same distinction, so that's the
+fallback. Revisit once the roles-versus-grants decision lands a real
+`age_range`.
+
+The old raw-ISO `Current time:` line is replaced outright by the new
+`Local time:` line (same "time last, never truncated" placement, 4.5);
+no caller parsed the old format (grepped for `Current time:` across the
+repo before removing it).
+
+Tests: 8 new in `tests/turnEngine.test.ts` (speaker name and role, a
+nickname, a child speaker from birthdate, a teen speaker from role alone
+with no birthdate, a same-day-before-18th-birthday edge case proving the
+month/day subtraction is real and not just a year diff, the local time
+line's format, the household roster line, and `household.locale`
+changing the rendered line). Every existing `buildSystemPrompt()` call
+site and test updated for the new `actor` parameter. Full suite green
+(575 backend, 201 frontend, 200+37 spec).
+
+Not built this step (named, not silently skipped): presence ("who's
+home now" vs. "who lives here"), a real household timezone setting, and
+the wider `age_range` field question above.

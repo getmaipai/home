@@ -12,7 +12,29 @@ import { db } from "@/db";
 import { people, conversationTurns } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import type { TurnStreamEvent } from "@/wire";
+import type { PersonRow } from "@/types";
 import { PackageManifest } from "@maipai/spec/gen/ts/manifest.js";
+import { setHouseholdSettingValue } from "@/lib/settings";
+
+// A PersonRow with no DB row behind it, for the buildSystemPrompt() unit
+// tests below that only need a shaped actor to render the speaker block,
+// not a real signed-in session (owner()'s full /api/auth/setup flow).
+function fakeActor(overrides: Partial<PersonRow> = {}): PersonRow {
+  return {
+    id: "person-faketest",
+    displayName: "Testy",
+    nickname: null,
+    birthdate: null,
+    role: "adult",
+    avatarSeed: "seed",
+    source: "hub",
+    localOnly: false,
+    createdAt: "2026-01-01T00:00:00.000Z",
+    updatedAt: "2026-01-01T00:00:00.000Z",
+    deletedAt: null,
+    ...overrides,
+  };
+}
 
 beforeEach(() => {
   resetDb();
@@ -210,12 +232,12 @@ describe("buildSystemPrompt() prompt budget", () => {
       if (created.ok) matches.push({ record: created.value, score: 1 });
     }
 
-    const prompt = buildSystemPrompt("what's the calendar rule", matches);
+    const prompt = buildSystemPrompt(actor, "what's the calendar rule", matches);
     expect(prompt.length).toBeLessThanOrEqual(PROMPT_SYSTEM_CHAR_BUDGET);
   });
 
   test("with no memories, the prompt is still well under budget", () => {
-    const prompt = buildSystemPrompt("hi there", []);
+    const prompt = buildSystemPrompt(fakeActor(), "hi there", []);
     expect(prompt.length).toBeLessThanOrEqual(PROMPT_SYSTEM_CHAR_BUDGET);
     expect(prompt).toContain("MaiPai");
   });
@@ -240,15 +262,15 @@ describe("buildSystemPrompt() prompt budget", () => {
     expect(created.ok).toBe(true);
     if (!created.ok) return;
 
-    const prompt = buildSystemPrompt("hi there", [{ record: created.value, score: 1 }]);
+    const prompt = buildSystemPrompt(actor, "hi there", [{ record: created.value, score: 1 }]);
     expect(prompt.length).toBeLessThanOrEqual(PROMPT_SYSTEM_CHAR_BUDGET);
-    const timeLineMatch = prompt.match(/\n\nCurrent time: [0-9T:.Z-]+$/);
+    const timeLineMatch = prompt.match(/\n\nLocal time: \w+ \d{1,2}:\d{2} (am|pm)$/);
     expect(timeLineMatch).not.toBeNull();
   });
 
   test("a persona's composed fragment replaces the default, and its own known constants are never touched by INFORMATION_HANDLING_POLICY", () => {
-    const defaultPrompt = buildSystemPrompt("hi there", []);
-    const tutorPrompt = buildSystemPrompt("hi there", [], undefined, resolvePersona("tutor"));
+    const defaultPrompt = buildSystemPrompt(fakeActor(), "hi there", []);
+    const tutorPrompt = buildSystemPrompt(fakeActor(), "hi there", [], undefined, resolvePersona("tutor"));
     expect(tutorPrompt).not.toBe(defaultPrompt);
     expect(tutorPrompt).toContain("without contractions");
     // The universal information-handling rules are unaffected by persona.
@@ -257,15 +279,75 @@ describe("buildSystemPrompt() prompt budget", () => {
   });
 });
 
+describe("buildSystemPrompt() speaker and household (step 1)", () => {
+  test("the prompt names the speaker and their role", () => {
+    const prompt = buildSystemPrompt(fakeActor({ displayName: "Sage", role: "adult" }), "hi there", []);
+    expect(prompt).toContain("Sage");
+    expect(prompt).toContain("role adult");
+  });
+
+  test("a nickname appears alongside the display name when set", () => {
+    const prompt = buildSystemPrompt(fakeActor({ displayName: "Bartholomew", nickname: "Bart" }), "hi there", []);
+    expect(prompt).toContain("Bartholomew");
+    expect(prompt).toContain("goes by Bart");
+  });
+
+  test("a child speaker yields the child age band, derived from birthdate over role", () => {
+    const tenYearsAgo = new Date();
+    tenYearsAgo.setFullYear(tenYearsAgo.getFullYear() - 10);
+    const prompt = buildSystemPrompt(
+      fakeActor({ role: "child", birthdate: tenYearsAgo.toISOString().slice(0, 10) }),
+      "hi there",
+      [],
+    );
+    expect(prompt).toContain("age band child");
+  });
+
+  test("a teen speaker with no birthdate on file still yields the teen band, from role alone", () => {
+    const prompt = buildSystemPrompt(fakeActor({ role: "teen", birthdate: null }), "hi there", []);
+    expect(prompt).toContain("age band teen");
+  });
+
+  test("an adult born fewer than 13 calendar years ago (impossible in practice, but proves the math) still isn't misclassified past 18", () => {
+    // Real regression: age must subtract a year when the birthday hasn't
+    // happened yet this calendar year, not just diff year numbers.
+    const almostBirthday = new Date();
+    almostBirthday.setFullYear(almostBirthday.getFullYear() - 18);
+    almostBirthday.setDate(almostBirthday.getDate() + 1); // birthday is tomorrow: still 17
+    const prompt = buildSystemPrompt(fakeActor({ role: "adult", birthdate: almostBirthday.toISOString().slice(0, 10) }), "hi", []);
+    expect(prompt).toContain("age band teen");
+  });
+
+  test("the local time line is locale-formatted, never raw ISO", () => {
+    const prompt = buildSystemPrompt(fakeActor(), "hi there", []);
+    expect(prompt).not.toContain("T00:00:00");
+    expect(prompt).toMatch(/Local time: \w+ \d{1,2}:\d{2} (am|pm)/);
+  });
+
+  test("the household block lists every active person's display name and role", async () => {
+    const { actor } = await owner();
+    const prompt = buildSystemPrompt(actor, "who lives here", []);
+    expect(prompt).toContain("Who lives here:");
+    expect(prompt).toContain(`- ${actor.displayName} (${actor.role})`);
+  });
+
+  test("household.locale changes the formatted time's conventions, not just a raw pass-through", () => {
+    setHouseholdSettingValue("household.locale", "en-GB");
+    const prompt = buildSystemPrompt(fakeActor(), "hi there", []);
+    expect(prompt).toMatch(/Local time: \w+ \d{1,2}:\d{2} (am|pm)/);
+    expect(prompt).toContain("locale en-GB");
+  });
+});
+
 describe("buildSystemPrompt() skill composition (2026-09-05, the real skill kind)", () => {
   // Real end-to-end proof using the actual bundled storytime-style skill,
   // not a fake - the default `skills` param really does load it.
   test("a relevant utterance composes the real bundled skill's instructions in; an irrelevant one doesn't", () => {
-    const relevant = buildSystemPrompt("can you tell a bedtime story", []);
+    const relevant = buildSystemPrompt(fakeActor(), "can you tell a bedtime story", []);
     expect(relevant).toContain("bedtime story");
     expect(relevant).toContain("happy ending");
 
-    const irrelevant = buildSystemPrompt("what's the weather like", []);
+    const irrelevant = buildSystemPrompt(fakeActor(), "what's the weather like", []);
     expect(irrelevant).not.toContain("happy ending");
   });
 
@@ -311,7 +393,7 @@ describe("buildSystemPrompt() skill composition (2026-09-05, the real skill kind
       fakeSkill("c", "tell me a joke please", "SKILL-C-MARKER"),
       fakeSkill("d", "tell me a joke please", "SKILL-D-MARKER"),
     ];
-    const prompt = buildSystemPrompt("tell me a joke please", [], undefined, undefined, skills);
+    const prompt = buildSystemPrompt(fakeActor(), "tell me a joke please", [], undefined, undefined, skills);
     const matchedCount = ["SKILL-A-MARKER", "SKILL-B-MARKER", "SKILL-C-MARKER", "SKILL-D-MARKER"].filter((m) =>
       prompt.includes(m),
     ).length;
@@ -321,7 +403,7 @@ describe("buildSystemPrompt() skill composition (2026-09-05, the real skill kind
 
   test("a skill scoring under the match threshold never composes in", () => {
     const skills = [fakeSkill("unrelated", "completely unrelated topic about gardening", "SKILL-MARKER-SHOULD-NOT-APPEAR")];
-    const prompt = buildSystemPrompt("what time is it", [], undefined, undefined, skills);
+    const prompt = buildSystemPrompt(fakeActor(), "what time is it", [], undefined, undefined, skills);
     expect(prompt).not.toContain("SKILL-MARKER-SHOULD-NOT-APPEAR");
   });
 });

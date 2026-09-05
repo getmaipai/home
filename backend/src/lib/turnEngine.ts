@@ -22,7 +22,8 @@ import { tokenize } from "@/lib/text";
 import { logTurn } from "@/lib/conversationHistory";
 import { pickRefusalVariant, varyKnownConstant } from "@/lib/replyVariation";
 import { normalizeForSpeech } from "@maipai/spec/voice/ts/normalizeForSpeech.js";
-import { getPersonSettingValue } from "@/lib/settings";
+import { getPersonSettingValue, getHouseholdSettingValue } from "@/lib/settings";
+import { listActivePeople } from "@/lib/access";
 import { composePersonaPrompt, resolvePersona, DEFAULT_PERSONA, INFORMATION_HANDLING_POLICY, type Persona } from "@/lib/persona";
 import type { Role } from "@/middleware/auth";
 import type { PersonRow } from "@/types";
@@ -168,27 +169,102 @@ function skillsSection(text: string, skills: LoadedSkill[]): string {
   return `\n\n${matching.map((m) => m.skill.body).join("\n\n")}`;
 }
 
+// Age band derivation (session-a-intelligence.md step 1). Deliberately
+// narrow: just enough to calibrate the model's phrasing for the speaker
+// in front of it, computed inline for the prompt only. This is NOT the
+// wider `age_range`-on-Person-ctx question BACKLOG.md tracks separately
+// under "roles versus grants" (a package-visible, schema-level field);
+// nothing here is stored or exposed to a package. The three bands mirror
+// the role ladder's own two minor bands (person.schema.json: "teen 13-17,
+// child under 13") rather than inventing a finer taxonomy nothing in the
+// spec or platform plan defines - a real, independent cross-check
+// computed from birthdate when one is on file, falling back to the
+// speaker's role (which already carries the same distinction) when it
+// isn't.
+type AgeBand = "child" | "teen" | "adult";
+
+function ageInYears(birthdate: string, now: Date): number {
+  const dob = new Date(birthdate);
+  let age = now.getUTCFullYear() - dob.getUTCFullYear();
+  const monthDiff = now.getUTCMonth() - dob.getUTCMonth();
+  if (monthDiff < 0 || (monthDiff === 0 && now.getUTCDate() < dob.getUTCDate())) age--;
+  return age;
+}
+
+function ageBandFromRole(role: string): AgeBand {
+  if (role === "child") return "child";
+  if (role === "teen") return "teen";
+  return "adult"; // owner/admin/adult/guest: role carries no minor signal
+}
+
+function speakerAgeBand(actor: PersonRow, now: Date): AgeBand {
+  if (!actor.birthdate) return ageBandFromRole(actor.role);
+  const years = ageInYears(actor.birthdate, now);
+  if (years < 13) return "child";
+  if (years < 18) return "teen";
+  return "adult";
+}
+
+// No household timezone setting exists yet (3.2's clock/timezone key
+// hasn't landed), so this renders in the hub process's own system
+// timezone - correct for a self-hosted install physically in the house,
+// revisit once a real timezone key exists. `household.locale` only
+// changes date/time formatting conventions (4.5: "Friday 3:40 pm" style,
+// never raw ISO UTC"), not the zone itself.
+function formatLocalTime(now: Date, locale: string): string {
+  const weekday = new Intl.DateTimeFormat(locale, { weekday: "long" }).format(now);
+  const time = new Intl.DateTimeFormat(locale, { hour: "numeric", minute: "2-digit", hour12: true })
+    .format(now)
+    .toLowerCase();
+  return `${weekday} ${time}`;
+}
+
+function speakerLine(actor: PersonRow, locale: string, now: Date): string {
+  const nicknamePart = actor.nickname ? ` (goes by ${actor.nickname})` : "";
+  const band = speakerAgeBand(actor, now);
+  return `\n\nYou're talking with ${actor.displayName}${nicknamePart} right now: role ${actor.role}, age band ${band}, locale ${locale}.`;
+}
+
+// "Presence unknown for now" (step 1): no presence signal exists on the
+// hub yet (that's the robot/ambient-context side, 4.16, not built here),
+// so this lists who lives here, never who's home right now.
+function householdLine(): string {
+  const household = listActivePeople();
+  if (household.length === 0) return "";
+  const lines = household.map((p) => `- ${p.displayName} (${p.role})`);
+  return `\n\nWho lives here:\n${lines.join("\n")}`;
+}
+
 // Stable-first (4.5): persona/rules/content-policy/standing-instructions
 // and the plugins list are the same for every turn on this install, so they
-// sit first for prefix caching; the volatile zone (memory, then time)
-// comes after. Matching skills sit with memory in the volatile zone, not
-// with the stable prefix: unlike the plugins list (every installed
-// plugin, unconditionally, every turn), which skills compose in
-// genuinely depends on this turn's own utterance. 4.5 also names notes,
-// methods, summary and context in the volatile zone: notes/methods need
-// persona/companion state (not built); summary needs an LLM to distill
-// conversation history into one (the raw history now exists for real,
-// lib/conversationHistory.ts, but nothing summarizes it, 4.11's other
-// roles); context needs the ambient-context wiring the robot side
-// already has but the hub doesn't yet: all three are real gaps, not
-// silently skipped.
+// sit first for prefix caching; the volatile zone (speaker, household,
+// memory, then time) comes after. Matching skills sit with memory in the
+// volatile zone, not with the stable prefix: unlike the plugins list
+// (every installed plugin, unconditionally, every turn), which skills
+// compose in genuinely depends on this turn's own utterance. 4.5 also
+// names notes, methods, summary and context in the volatile zone:
+// notes/methods need persona/companion state (not built); summary needs
+// an LLM to distill conversation history into one (the raw history now
+// exists for real, lib/conversationHistory.ts, but nothing summarizes it,
+// 4.11's other roles); context needs the ambient-context wiring the robot
+// side already has but the hub doesn't yet: all three are real gaps, not
+// silently skipped. Full stable-first re-ordering with a persona
+// re-anchor and per-section budgets is step 4's job, not this one -
+// today's order (persona/policy, speaker/household, plugins, memory,
+// skills, time) is step 1's minimum: get the actor and the blocks in,
+// keep the overall budget honest.
 export function buildSystemPrompt(
+  actor: PersonRow,
   text: string,
   memoryMatches: RecallMatch[],
   loaded: LoadedManifest[] = loadAllManifests(),
   persona: Persona = DEFAULT_PERSONA,
   skills: LoadedSkill[] = loadAllSkills(),
 ): string {
+  const now = new Date();
+  const localeValue = getHouseholdSettingValue("household.locale");
+  const locale = typeof localeValue === "string" ? localeValue : "en-US";
+
   let pluginsSection = pluginsListLine(loaded);
   if (pluginsSection.length > MAX_PLUGINS_SECTION_CHARS) {
     pluginsSection = pluginsSection.slice(0, MAX_PLUGINS_SECTION_CHARS) + "...";
@@ -208,7 +284,8 @@ export function buildSystemPrompt(
     skillsPart = skillsPart.slice(0, MAX_SKILLS_SECTION_CHARS) + "...";
   }
 
-  const timeLine = `\n\nCurrent time: ${new Date().toISOString()}`;
+  const speakerAndHousehold = speakerLine(actor, locale, now) + householdLine();
+  const localTimeLine = `\n\nLocal time: ${formatLocalTime(now, locale)}`;
 
   // The time line is appended last (4.5: "...time last") and must never
   // itself be truncated: a review (2026-09-04) found the first cut
@@ -218,12 +295,16 @@ export function buildSystemPrompt(
   // total over budget. Truncating the body first, then appending a
   // never-truncated time line, keeps every truncation boundary inside
   // prose meant to be cut, never inside the one line a caller might parse.
+  // The same protection now covers the speaker/household blocks too (step
+  // 1: "if it cannot [keep the budget], the blocks shrink, not the
+  // budget") by including them in the truncatable body rather than
+  // appending them after the slice the way the time line is.
   const registerFragment = composePersonaPrompt(persona) + " " + INFORMATION_HANDLING_POLICY;
-  let body = STABLE_SYSTEM_PREFIX + " " + registerFragment + pluginsSection + memorySection + skillsPart;
-  const bodyBudget = Math.max(0, PROMPT_SYSTEM_CHAR_BUDGET - timeLine.length);
+  let body = STABLE_SYSTEM_PREFIX + " " + registerFragment + speakerAndHousehold + pluginsSection + memorySection + skillsPart;
+  const bodyBudget = Math.max(0, PROMPT_SYSTEM_CHAR_BUDGET - localTimeLine.length);
   if (body.length > bodyBudget) body = body.slice(0, bodyBudget);
 
-  return body + timeLine;
+  return body + localTimeLine;
 }
 
 // Tier 1 of the deterministic plugin floor (4.5: "tier 1 example-embedding
@@ -477,7 +558,7 @@ async function prepareTurn(
 
   const memoryMatches = recall(actor, text);
   const persona = resolvePersona(getPersonSettingValue(actor, "persona.active_id"));
-  const systemPrompt = buildSystemPrompt(text, memoryMatches, loaded, persona, skills);
+  const systemPrompt = buildSystemPrompt(actor, text, memoryMatches, loaded, persona, skills);
   const messages: LlmMessage[] = [
     { role: "system", content: systemPrompt },
     { role: "user", content: text },

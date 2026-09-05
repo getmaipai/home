@@ -5,7 +5,7 @@
 // of anything is wrong even when it is faster") and the lesson from a
 // code review that same day (memory.ts's own isOwnerOrAdmin() duplicated
 // an equivalent inline check elsewhere).
-import { eq } from "drizzle-orm";
+import { eq, isNull } from "drizzle-orm";
 import { db } from "@/db";
 import { people } from "@/db/schema";
 import type { PersonRow } from "@/types";
@@ -55,4 +55,13 @@ export function canAccessPerson(actor: PersonRow, personId: string, roleOf?: Map
   if (!isOwnerOrAdmin(actor)) return false;
   const role = roleOf ? roleOf.get(personId) : getPersonRole(personId);
   return role === "child";
+}
+
+// Every active (non-deleted) person in the household - turnEngine.ts's
+// household block (session-a-intelligence.md step 1, platform plan 4.5's
+// "who lives here" volatile-zone content) needs the whole roster, not one
+// row. Sorted by createdAt then id so the prompt's household list is
+// deterministic turn to turn, never dependent on SQLite's own row order.
+export function listActivePeople(): PersonRow[] {
+  return db.select().from(people).where(isNull(people.deletedAt)).orderBy(people.createdAt, people.id).all();
 }
