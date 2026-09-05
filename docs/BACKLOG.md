@@ -452,13 +452,16 @@ into a conversation with someone who knows who is talking.
       on each fact and put a one-line reminder after the memory block
       because small models drift toward the freshest tokens. Today's
       block is bare bullets.
-- [ ] **Bi-temporal validity and a clock on every memory** (S in the
-      spec, then hub) - `valid_from`/`valid_to` alongside the existing
-      supersede, plus `hlc`. "Did this change" and "we never discussed
-      that" are the two cases assistants fail most (LongMemEval); the
-      2026 temporal-memory results say to organize by when things
-      happened, not when they were said. Spec change first, per the org
-      rule; also listed under Portability because sync needs the clock.
+- [ ] **Use the bi-temporal fields, and add a clock to every memory**
+      (S in the spec, then hub) - the record already has `valid_from`/
+      `valid_to` next to supersede, and `memory.ts` writes null to both;
+      nothing reads them. The judge sets them (a trip has an end), recall
+      prefers currently-valid facts, and `hlc` is added to the shape.
+      "Did this change" and "we never discussed that" are the two cases
+      assistants fail most (LongMemEval); the 2026 temporal-memory
+      results say to organize by when things happened, not when they
+      were said. Spec change first, per the org rule; also listed under
+      Portability because sync needs the clock.
 - [ ] **Schedule `runMaintenance`, fix usage inflation** (S) - decay
       exists and is only reachable by a manual route; `recall` bumps
       `uses` on 20 matches while 5 reach the model.
