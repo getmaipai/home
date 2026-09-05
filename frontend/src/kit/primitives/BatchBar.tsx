@@ -22,7 +22,17 @@ interface BatchBarProps {
  * wording differs per list); this is only the bar itself. */
 export function BatchBar({ count, onExit, children }: BatchBarProps) {
   return (
-    <div className="flex flex-wrap items-center gap-2" role="toolbar" aria-label="Batch actions">
+    // `self-start`: found live (2026-09-05, docs/plans/session-b-ui.md
+    // step 5) - a flex-column caller (kit/schema/NodeRenderer.tsx's list
+    // node; any hand-written page stacking this above a List the same
+    // way) defaults its children to `align-items: stretch`, which
+    // otherwise stretches this bar to the FULL cross-axis width and, for
+    // `SelectModeToggle` below (a bare Button with no wrapping row of its
+    // own), centers its short label in all that extra space - reading as
+    // an oversized, wrongly-centered heading rather than a compact
+    // toolbar row. Neither component should ever depend on its caller
+    // remembering `items-start`.
+    <div className="flex flex-wrap items-center gap-2 self-start" role="toolbar" aria-label="Batch actions">
       <span className="text-base text-muted-foreground">{count} selected</span>
       {children}
       <Button variant="ghost" onClick={onExit}>
@@ -41,7 +51,10 @@ interface SelectModeToggleProps {
  * list's entry point looks and behaves the same way. */
 export function SelectModeToggle({ label, onClick }: SelectModeToggleProps) {
   return (
-    <Button variant="ghost" onClick={onClick}>
+    // `self-start`: same fix, same reason as BatchBar's own root above -
+    // a bare Button with no row of its own is the shape most exposed to
+    // a flex-column caller's default stretch.
+    <Button variant="ghost" onClick={onClick} className="self-start">
       {label}
     </Button>
   );

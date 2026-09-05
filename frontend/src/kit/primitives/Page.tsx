@@ -12,9 +12,9 @@ interface PageProps {
 // has nothing to split into yet with exactly one page in the whole app).
 export function Page({ title, children }: PageProps) {
   return (
-    <div className="flex h-full flex-col">
+    <div className="flex h-full min-w-0 flex-col">
       <h1 className="sr-only">{title}</h1>
-      <div className="flex min-h-0 flex-1 flex-col">{children}</div>
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col">{children}</div>
     </div>
   );
 }

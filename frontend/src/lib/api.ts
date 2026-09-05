@@ -101,7 +101,12 @@ function isAbortError(err: unknown): boolean {
 // serveStatic in prod: vite.config.ts and app.ts) with the session
 // cookie included: there is no header-based auth path at all
 // (middleware/auth.ts), so `credentials: "include"` is not optional.
-async function request<T>(path: string, init?: RequestInit & { timeoutMs?: number }): Promise<T> {
+// Exported for the schema interpreter (kit/schema/binding.ts, step 5):
+// a `route`-sourced binding or a `call` action target a JSON page
+// authors is just a path string, not one of the named methods below, so
+// the interpreter needs the same request plumbing (credentials,
+// timeout, error shape) directly rather than duplicating it.
+export async function request<T>(path: string, init?: RequestInit & { timeoutMs?: number }): Promise<T> {
   const { timeoutMs, ...rest } = init ?? {};
   const { signal, clear } = withTimeout(timeoutMs);
   try {

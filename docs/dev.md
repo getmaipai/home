@@ -6342,3 +6342,194 @@ own stateful stub once the mutation started reconciling with a real
 refetch on `onSettled` - a fixed fixture would have undone the optimistic
 removal the instant that refetch landed. Fixed the same way (a `dismissed`
 flag flipped by the stubbed dismiss call, read by the list response).
+
+## Session B: step 4, chat on assistant-ui (2026-09-05)
+
+ChatPage.tsx rebuilt on `@assistant-ui/react` (0.15.18) plus its own
+shadcn-compatible registry (`src/kit/assistant-ui/`, relocated there from
+a flat `src/kit/` after finding the registry's own generated files
+reference nested `assistant-ui/elements/...` import paths the CLI didn't
+actually create - fixed once at the source rather than per-file). The
+delicate think-tag-stripping/sentence-chunked-TTS/error-handling logic
+that used to live directly in `handleSend` ported into
+`chatModelAdapter.ts`'s `ChatModelAdapter.run()`, an async generator that
+yields the CUMULATIVE visible text on every delta (the runtime replaces a
+running message's content with each yield, not merge-appends it) while
+the same think-tag resolution and TTS scheduling keep running as side
+effects hung off the same deltas - unchanged in substance, every one of
+its own code-review paper trail comments carried over verbatim.
+
+Session A's real per-thread conversation routes (`docs/plans/
+session-a-intelligence.md`'s contract: `turn_meta`, `GET /api/
+conversations` returning distinct threads, batch delete, clear-all)
+haven't landed yet, so `chatThreadListAdapter.ts` mocks a single thread
+("main") and `chatHistoryAdapter.ts` reads the EXISTING, pre-Session-A
+`GET /api/conversations` (still the flat turn list) through
+`ExportedMessageRepository.fromArray()`, stamping each message's
+`metadata.custom.turnId` with the row's real id - the seam "remember
+this"/"forget this" (below) and the memory-updated chip need, already
+shaped so swapping in Session A's real routes later is a one-file
+change (`chatThreadListAdapter.ts`), not a redesign.
+
+**New, real features, not just a migration.** Listen (a per-message TTS
+replay, `chatListenStore.ts`, a Zustand store since each message now
+mounts its own action-bar instance rather than one page-wide render).
+Remember this/forget this (`chatMemoryActions.ts`, `chatActionBar.tsx`):
+writes a real `POST /api/memory` record attributed to the message's own
+turn id, disabled on a live-session message that has no turn id yet
+(honest about the gap, not a broken button). A day divider and per-
+message timestamp (`chatDayDivider.tsx`) that assistant-ui's own
+generated Thread has neither of - computed once per messages-array
+change via a `DayBoundaryContext` (a code review, 2026-09-05, caught the
+first version scanning the full thread array inside EVERY message's own
+component instance: O(n) per message times N mounted messages, O(n^2)
+per render pass with nothing bounding N). A "memory updated" chip
+(`chatMemoryChip.tsx`) reading `NotificationDeliveryView` defensively for
+a `payload` field Session A's contract doesn't actually promise the
+delivery view itself will carry - the chip stays dark until it does,
+which is today's honest state since the notification type doesn't exist
+yet either. `MemoryPage.tsx` gained a `?ids=` filter as the chip's deep
+link target.
+
+**A real, live-caught environment gap, not a code bug.**
+`@happy-dom/global-registrator`'s `ReadableStream`/`WritableStream`/
+`TransformStream` are incomplete (no real `getReader()`-backed piping) -
+harmless for `@testing-library/react`'s DOM needs, but `assistant-stream`
+(pulled in by the thread-list adapter's `generateTitle()`) needs the real
+web-streams spec and threw `TypeError: stream.getReader is not a
+function` the moment a test actually iterated one. Fixed once, for every
+test in the suite: `tests/preload.ts` now captures Bun's native
+implementations before `GlobalRegistrator.register()` runs and restores
+them immediately after.
+
+**Code review pass (medium effort), seven findings, all fixed or
+verified as already covered.** `MemoryPage.tsx`'s `isEmpty` checked the
+unfiltered list while the `?ids=` render branch filtered separately - a
+chip linking to already-archived or unreadable ids showed "Showing 0
+memory updates" over a blank list instead of the real empty state; both
+now share one `visibleMemories()` helper. The remembered-turn-to-memory-
+id map (`chatMemoryActions.ts`) was in-memory only, losing which turns
+were already remembered on every reload (`chatHistoryAdapter.ts`'s own
+`load()` runs on every mount) even though the memory record itself was
+still real - persisted to `localStorage` now, per-browser rather than
+per-household (the real fix waits on Session A's per-turn `memory_ids`).
+`chatListenStore.ts`'s superseded-request guard stopped updating state
+for an old "Listen" click but never actually cancelled its in-flight
+`/api/tts` fetch - `api.streamSpeech()` gained an optional `AbortSignal`
+parameter, wired to an `AbortController` the store now aborts on every
+new click. Three new/updated test files (`chatHistoryAdapter.test.ts`
+gained back two regression tests `mapRows.test.ts`'s deletion had
+dropped: empty history mapping to an empty thread, and a safety-refused
+turn still rendering both sides) plus a fixture-naming fix
+(`chatHistoryAdapter.test.ts`/`chatThreadListAdapter.test.ts`/
+`ChatPage.test.tsx` used "Jesse" as a generic household-member name
+instead of the persona roster `.github/CLAUDE.md` requires for fixture
+data - "Jesse" stays the one allowed exception for author identity, not
+test data). The eslint exemption extending `src/kit/ui/**`'s "generated,
+not authored" carve-out to `src/kit/assistant-ui/**` is file-glob-wide
+even though `thread.aui.tsx` in that same directory was hand-edited to
+wire in real app components - a real, but today inert, gap (none of the
+hand-added lines actually trip the exempted rules), left as-is,
+consistent with the identical structural gap `src/kit/ui/**`'s own
+hand-fixed files (`button.tsx`, `switch.tsx`...) already have. Not
+pursued further: an automated click-through test for "Remember this"/
+"Forget this" through assistant-ui's `ActionBarMorePrimitive` dropdown -
+confirmed live in the running app, but the dropdown's content never
+actually opens under happy-dom no matter how it's triggered (unlike
+`NotificationBell.tsx`'s simpler `RadixPopover`, which does), a real
+environment gap rather than something worth chasing further given the
+underlying functions are unit-tested directly.
+
+Verified against the running app (backend on the stub model): a real
+message streams in, sentence-by-sentence TTS fires automatically as it
+does, "Listen" replays an earlier reply, "Remember this" creates a real
+memory record visible on the Memory page, a page reload correctly shows
+"Remembered"/"Forget this" (the turn id landing from history) where a
+live-session message correctly showed the disabled "available once
+saved" state first, and no console errors across the whole flow.
+
+## Session B: step 5, schema pages (2026-09-05)
+
+The generic `UiNode` interpreter v0's own README called "real, separate
+scope, deferred" now exists: `frontend/src/kit/schema/` (`SchemaPage`,
+`NodeRenderer`, `binding.ts` wrapping TanStack Query per `{source,
+path}`, `actions.ts` dispatching all five declared actions including a
+real confirm dialog, `condition.ts`'s minimal three-form evaluator,
+`fieldPath.ts`'s `{field}`/`{count}` templating). `schema.json` gained
+`list`, `card_grid`, `media_shelf`, `detail_pane`, `split_view` (the
+platform plan's five named primitives kit/primitives/ already had built
+- 2026-09-05's "five missing kit primitives" - just not wired to the
+schema yet) and a `batch_action` shape (`scope: "selected" | "all"`, the
+backlog's named "clear-all where the whole list is disposable" rule).
+`message_thread` simplified to a bare mount point now that step 4 moved
+every real Chat concern into React; a new `settings_editor` node plays
+the identical role for Settings' own existing generic renderer.
+
+**What actually converted, and the recorded decision on what didn't**
+(`spec/ui/README.md` has the full reasoning per-page). Memory converted
+for real (`spec/ui/pages/memory.json`, `MemoryPage.tsx` is now a thin
+mount) - the one page genuinely shaped the way the interpreter handles
+well. People and Privacy stayed hand-written React: People's batch-
+select sits on a permission matrix plus inline per-row edit and a
+write-only secret field, none of which the schema's `action`/`condition`
+vocabulary reaches without inventing a permission-predicate system and an
+inline-edit node kind nothing else needs yet; Privacy's one list has a
+rich multi-field row template plus grammar-aware conditional prose
+(`joinNames`) `list`'s single-field-per-row template can't express
+without a much richer per-row template mechanism. Settings kept its own
+existing generic renderer (`SettingsRenderer.tsx`, already registry-
+driven per docs/SETTINGS.md) rather than gaining a second, competing JSON
+description of the same data - step 7 ("settings as an editor") extends
+that renderer directly, never a UiNode rewrite. This is exactly the
+platform plan's own "time-box the hard pages, don't invent primitives
+ahead of need" methodology (6.2, aimed at Chat/Videos/Music), turning out
+to apply to two pages that looked simple until actually inspected closely.
+
+**Three real, live-caught CSS bugs in shared kit code, none specific to
+Memory's own new page.** None of People, Privacy, Chat or Settings had
+ever rendered a `renderItem` string long enough to expose them - Memory's
+own stub-model canned reply ("[stub model: no real model loaded, this is
+a canned reply] ...") was the first content anywhere in the app long
+enough to. `<main data-slot="sidebar-inset">` (`kit/ui/sidebar.tsx`, a
+shadcn-generated file, hand-fixed here the same way step 1's accessibility
+floor fixes were) had no `min-w-0` - a flex item next to the shadcn
+Sidebar in the outer row, its own `flex-1` still respected the row's
+default `min-width: auto` (its content's own min-content width) with
+nothing to override it, so ONE unwrapped, un-truncatable string deep
+inside was enough to push the entire main content column past the
+viewport, `document.body.scrollWidth` (1012px) exceeding `window.
+innerWidth` (800px) with no visible horizontal scrollbar to even hint at
+it. `Page.tsx`'s own inner wrapper had the identical gap one level down.
+And `BatchBar.tsx`'s `SelectModeToggle` - a bare `<Button>` with no row
+of its own - silently stretched to its flex-column caller's full cross-
+axis width under the default `align-items: stretch` (a lone "Select
+memories" button rendering as a giant, wrongly-centered heading instead
+of a compact left-aligned control); fixed with `self-start` on both it
+and `BatchBar`'s own root, so neither component depends on every future
+caller remembering `items-start`.
+
+Tests: `catalog.test.ts` (the schema/catalog agreement check, both
+directions - every schema.json `$def`'s `type` const has a NODE_TYPES
+entry and vice versa), `fieldPath.test.ts`, `condition.test.ts`,
+`NodeRenderer.test.tsx` (a full render-and-interact suite against
+synthetic list fixtures: row rendering, the empty state, a row_action's
+real fetch call, a batch action over selected items, a batch action with
+`scope: "all"` ignoring selection entirely, cancelling a confirm running
+nothing), `MemoryPage.test.tsx` rewritten for the thin mount (the one
+real behavior change - raw scope instead of a resolved name - is now
+what it asserts), plus `spec/tests/ts/ui-schema.test.ts` gained coverage
+for every new node kind and the now-bare `message_thread`/
+`settings_editor` shapes. Verified against the running app: Memory's
+list, per-row archive (no confirm, matching the pre-conversion
+behavior), entering select mode, "Archive selected" and "Clear all"'s
+confirm dialogs (both interpolating `{count}` correctly), the empty state
+after clearing, and - after the sidebar/Page/BatchBar fixes -
+re-confirmed Chat, People, Privacy and Settings all still render
+correctly with no new console errors, on the same running backend.
+
+**Dependency added:** `zod` (MIT) to the frontend directly (previously
+only `spec`'s own dependency); `assistant-stream` (MIT) as a direct
+frontend dependency too, for `chatThreadListAdapter.ts`'s
+`createAssistantStream()` - it was already a transitive dependency of
+`@assistant-ui/react`, just never imported directly before this session's
+`generateTitle()` implementation.

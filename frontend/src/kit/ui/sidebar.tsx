@@ -306,7 +306,17 @@ function SidebarInset({ className, ...props }: React.ComponentProps<"main">) {
     <main
       data-slot="sidebar-inset"
       className={cn(
-        "relative flex w-full flex-1 flex-col bg-background sm:peer-data-[variant=inset]:m-2 sm:peer-data-[variant=inset]:ml-0 sm:peer-data-[variant=inset]:rounded-xl sm:peer-data-[variant=inset]:shadow-sm sm:peer-data-[variant=inset]:peer-data-[state=collapsed]:ml-2",
+        // `min-w-0` added by hand (generated file, docs/plans/session-b-ui.md
+        // step 1's precedent for a hand-fixed shadcn primitive): without it,
+        // this flex item (a sibling of Sidebar in the outer row) never
+        // shrinks below its content's own unwrapped min-content width -
+        // Shell.tsx already sets min-w-0 on the div it renders INSIDE this
+        // <main>, but that inner fix is moot if <main> itself never shrinks
+        // to the space actually available. Found live (2026-09-05) once a
+        // page's own content had a long enough unwrapped string
+        // (kit/schema/NodeRenderer.tsx's truncating list rows) to expose it -
+        // no earlier page's content was long enough to.
+        "relative flex w-full min-w-0 flex-1 flex-col bg-background sm:peer-data-[variant=inset]:m-2 sm:peer-data-[variant=inset]:ml-0 sm:peer-data-[variant=inset]:rounded-xl sm:peer-data-[variant=inset]:shadow-sm sm:peer-data-[variant=inset]:peer-data-[state=collapsed]:ml-2",
         className
       )}
       {...props}

@@ -3,12 +3,12 @@ import { cleanup, fireEvent, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { MemoryPage } from "@/apps/memory/MemoryPage";
 import { renderWithQueryClient } from "../../../tests/renderWithQueryClient";
-import type { MemoryRecord, PersonRosterEntry } from "@/lib/api";
+import type { MemoryRecord } from "@/lib/api";
 
 afterEach(cleanup);
 
-// A Router wrapper (PhoneNav.test.tsx's own convention): MemoryPage now
-// reads ?ids= via useSearchParams (the "memory updated" chip's deep link,
+// A Router wrapper (PhoneNav.test.tsx's own convention): MemoryPage reads
+// ?ids= via useSearchParams (the "memory updated" chip's deep link,
 // docs/plans/session-b-ui.md step 4).
 function renderMemoryPage(path = "/memory") {
   return renderWithQueryClient(
@@ -18,7 +18,6 @@ function renderMemoryPage(path = "/memory") {
   );
 }
 
-// Matching memoryLabels.test.ts's own fixture builder exactly.
 function record(overrides: Partial<MemoryRecord> = {}): MemoryRecord {
   return {
     id: "mem1-abc123",
@@ -45,21 +44,6 @@ function record(overrides: Partial<MemoryRecord> = {}): MemoryRecord {
   };
 }
 
-function person(id: string, name: string): PersonRosterEntry {
-  return {
-    id,
-    display_name: name,
-    nickname: null,
-    role: "child",
-    avatar_seed: id,
-    source: "hub",
-    local_only: false,
-    created_at: "2026-09-04T00:00:00.000Z",
-    updated_at: "2026-09-04T00:00:00.000Z",
-    deleted_at: null,
-  };
-}
-
 function stubFetch(byPath: Record<string, unknown>): () => void {
   const original = globalThis.fetch;
   globalThis.fetch = mock((input: RequestInfo | URL) => {
@@ -81,19 +65,8 @@ function stubFetch(byPath: Record<string, unknown>): () => void {
 }
 
 describe("MemoryPage", () => {
-  test("is readable while it loads, not a blank page", async () => {
-    const restore = stubFetch({ "/api/memory": [], "/api/people": [] });
-    try {
-      const { getByRole } = renderMemoryPage();
-      expect(getByRole("status", { name: "Loading memory" })).toBeInTheDocument();
-      await waitFor(() => {});
-    } finally {
-      restore();
-    }
-  });
-
   test("shows the empty state for a household with nothing remembered yet", async () => {
-    const restore = stubFetch({ "/api/memory": [], "/api/people": [] });
+    const restore = stubFetch({ "/api/memory": [] });
     try {
       const { findByText } = renderMemoryPage();
       expect(await findByText("Nothing remembered yet.")).toBeInTheDocument();
@@ -102,22 +75,25 @@ describe("MemoryPage", () => {
     }
   });
 
-  test("renders a memory with its scope resolved against the roster", async () => {
-    const restore = stubFetch({
-      "/api/memory": [record()],
-      "/api/people": [person("person-abc123", "Nova")],
-    });
+  // The schema page (spec/ui/pages/memory.json) shows the raw scope/
+  // category value, not a name resolved against the people roster - the
+  // hand-rolled version this replaced joined against a second `/api/people`
+  // fetch, which the generic interpreter has no join mechanism for
+  // (MemoryPage.tsx's own comment has the full reasoning); this is the
+  // one documented behavior change from that version.
+  test("renders a memory with its raw category and scope", async () => {
+    const restore = stubFetch({ "/api/memory": [record()] });
     try {
       const { findByText } = renderMemoryPage();
       expect(await findByText("Likes dinosaurs")).toBeInTheDocument();
-      expect(await findByText(/Nova · Preference/)).toBeInTheDocument();
+      expect(await findByText("preference · person")).toBeInTheDocument();
     } finally {
       restore();
     }
   });
 
   test("offers a retry rather than a blank page when the fetch fails", async () => {
-    const restore = stubFetch({ "/api/memory": 500, "/api/people": 500 });
+    const restore = stubFetch({ "/api/memory": 500 });
     try {
       const { findByRole } = renderMemoryPage();
       expect(await findByRole("button", { name: "Try again" })).toBeInTheDocument();
@@ -127,12 +103,10 @@ describe("MemoryPage", () => {
   });
 
   test("archiving a memory removes it from the list", async () => {
-    // Stateful, not a fixed fixture: the mutation invalidates and
-    // refetches the list (kit's own "mutations with invalidation"
-    // pattern), so a stub that always returns the same array regardless
-    // of the archive call would never actually prove removal - it would
-    // just leave the memory on screen and the test waiting forever for
-    // an assertion that can never come true.
+    // Stateful, not a fixed fixture: the row_action's call invalidates
+    // every schema-bound query (kit/schema/actions.ts), so a stub that
+    // always returns the same array regardless of the archive call would
+    // never actually prove removal.
     let archived = false;
     const original = globalThis.fetch;
     globalThis.fetch = mock((input: RequestInfo | URL) => {
@@ -143,9 +117,6 @@ describe("MemoryPage", () => {
       }
       if (url.includes("/api/memory")) {
         return Promise.resolve(new Response(JSON.stringify(archived ? [] : [record()]), { status: 200 }));
-      }
-      if (url.includes("/api/people")) {
-        return Promise.resolve(new Response(JSON.stringify([person("person-abc123", "Nova")]), { status: 200 }));
       }
       throw new Error(`unstubbed fetch: ${url}`);
     }) as unknown as typeof fetch;
@@ -165,13 +136,13 @@ describe("MemoryPage", () => {
   test("?ids= filters the list to just those memories, with a way back to the full list", async () => {
     const restore = stubFetch({
       "/api/memory": [record({ id: "mem1-abc123", text: "Likes dinosaurs" }), record({ id: "mem2-def456", text: "Allergic to peanuts" })],
-      "/api/people": [person("person-abc123", "Nova")],
     });
     try {
       const { findByText, queryByText } = renderMemoryPage("/memory?ids=mem1-abc123");
       await findByText("Likes dinosaurs");
       expect(queryByText("Allergic to peanuts")).toBeNull();
       await findByText("Show all");
+      await findByText("Showing 1 memory update");
     } finally {
       restore();
     }

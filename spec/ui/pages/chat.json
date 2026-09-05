@@ -4,26 +4,7 @@
   "title": "Chat",
   "body": [
     {
-      "type": "message_thread",
-      "bind": { "source": "route", "path": "/api/conversations", "stream": false },
-      "sender_field": "personId",
-      "text_field": "replyText",
-      "empty_state": {
-        "type": "empty_state",
-        "icon": "message-circle",
-        "text": "Nothing here yet. Say hello."
-      }
-    },
-    {
-      "type": "progress",
-      "mode": "spinner"
-    },
-    {
-      "type": "form",
-      "fields": [{ "name": "message", "selector": "text", "placeholder": "Message" }],
-      "on_submit": {
-        "call": { "target": "/api/turn", "args": { "text": "{message}" } }
-      }
+      "type": "message_thread"
     }
   ]
 }

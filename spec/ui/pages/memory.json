@@ -1,0 +1,53 @@
+{
+  "type": "page",
+  "id": "memory",
+  "title": "Memory",
+  "body": [
+    {
+      "type": "list",
+      "bind": { "source": "route", "path": "/api/memory" },
+      "item_key_field": "id",
+      "item_label_field": "text",
+      "item_subtitle_field": "{category} · {scope}",
+      "item_badge_field": "pinned",
+      "item_badge_label": "Pinned",
+      "row_action": {
+        "icon": "archive",
+        "label": "Archive \"{text}\"",
+        "action": { "call": { "target": "/api/memory/{id}/archive" } }
+      },
+      "batch": {
+        "select_label": "Select memories",
+        "actions": [
+          {
+            "label": "Archive selected",
+            "scope": "selected",
+            "variant": "destructive",
+            "action": {
+              "confirm": {
+                "prompt": "Archive {count} memories?",
+                "on_confirm": { "call": { "target": "/api/memory/{id}/archive" } }
+              }
+            }
+          },
+          {
+            "label": "Clear all",
+            "scope": "all",
+            "variant": "destructive",
+            "action": {
+              "confirm": {
+                "prompt": "Archive all {count} memories? This cannot be undone.",
+                "on_confirm": { "call": { "target": "/api/memory/{id}/archive" } }
+              }
+            }
+          }
+        ]
+      },
+      "empty_state": {
+        "type": "empty_state",
+        "icon": "brain",
+        "text": "Nothing remembered yet."
+      }
+    }
+  ]
+}

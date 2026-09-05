@@ -1,143 +1,59 @@
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { Link, useSearchParams } from "react-router-dom";
-import { Page } from "@/kit/primitives/Page";
-import { AsyncState } from "@/kit/primitives/AsyncState";
-import { Button } from "@/kit/ui/button";
-import { getIcon } from "@/kit/icons";
-import { api, ApiError, type MemoryRecord, type PersonRosterEntry } from "@/lib/api";
-import { CATEGORY_LABELS, scopeLabel } from "@/apps/memory/memoryLabels";
-
-interface MemoryData {
-  memories: MemoryRecord[];
-  nameById: Map<string, string>;
-}
+import { SchemaPage } from "@/kit/schema/SchemaPage";
+import { RowFilterContext } from "@/kit/schema/NodeRenderer";
+import { api, type MemoryRecord } from "@/lib/api";
+import memoryPage from "../../../../spec/ui/pages/memory.json";
 
 // 4.4's real memory store (backend/src/lib/memory.ts: entity-first
 // recall, decay, tiers) has had no way for a family to see what's
-// actually remembered. This is the read half plus the one safe write:
-// list what the signed-in person can see (list()'s own canRead rule
-// already scopes this correctly - household, their own person-scope
-// records, and self-scope only for whoever admin can read those), and
-// Archive (a status change, not a delete). "Forget everything about a
-// person" (lib/memory.ts's forget(), a real permanent bulk DELETE) is
-// deliberately not wired up here: a destructive action like that needs a
-// real confirm dialog, and chapter 6's dialog pattern doesn't exist yet -
-// building it with a bare browser confirm() would also be untestable
-// through this session's own browser automation, which is barred from
-// triggering native dialogs.
+// actually remembered. Session B step 5 converts this to a real schema
+// page (spec/ui/pages/memory.json, the interpreter in kit/schema/) - the
+// first page this session's generic UiNode renderer actually executes
+// at runtime, not just validates. docs/dev.md's A2UI entry records why
+// People, Privacy and Settings stayed hand-written React instead.
+//
+// One real behavior change from the hand-rolled version this replaces:
+// a memory's scope line no longer resolves a person id to their display
+// name (that needed a second bound list - the people roster - joined
+// against this one by id, which the interpreter has no join mechanism
+// for; inventing one for a single page is exactly the kind of ahead-of-
+// need primitive docs/plans/session-b-ui.md step 5 says not to build).
+// The subtitle shows the raw scope value instead.
 export function MemoryPage() {
-  const queryClient = useQueryClient();
   // Chat's "memory updated" chip (chatMemoryChip.tsx, step 4) deep-links
   // here with ?ids=<memory ids>: a client-side filter over the same list
-  // this page already fetches, not a new backend query - GET /api/memory
-  // already returns everything the actor can see.
+  // the schema page's own binding already fetches (kit/schema/binding.ts's
+  // shared `["schema-binding", path]` query key), not a second fetch.
   const [searchParams] = useSearchParams();
   const idsParam = searchParams.get("ids");
   const filterIds = idsParam ? new Set(idsParam.split(",")) : null;
-  // Shared by isEmpty and the render prop below - a code review
-  // (2026-09-05) caught isEmpty checking the UNFILTERED list while the
-  // render prop filtered separately, so a chip linking to ids that are
-  // gone (already archived, or never readable by this actor) rendered
-  // "Showing 0 memory updates" over a blank list instead of the real
-  // empty state.
-  const visibleMemories = (memories: MemoryRecord[]): MemoryRecord[] =>
-    filterIds ? memories.filter((m) => filterIds.has(m.id)) : memories;
 
   const memoriesQuery = useQuery<MemoryRecord[]>({
-    queryKey: ["memories"],
+    queryKey: ["schema-binding", "/api/memory"],
     queryFn: () => api.memories(),
   });
-  // The same `["people"]` key `PeoplePage.tsx` uses, not a bundled fetch
-  // of its own - a code review (2026-09-05) found the two pages fetching
-  // and caching the same roster independently, and archiving a memory
-  // (which only ever invalidates `["memories"]`) was still re-fetching
-  // this via the old bundled query key regardless.
-  const peopleQuery = useQuery<PersonRosterEntry[]>({
-    queryKey: ["people"],
-    queryFn: () => api.people(),
-  });
-
-  const error = memoriesQuery.isError || peopleQuery.isError;
-  const isFetching = memoriesQuery.isFetching || peopleQuery.isFetching;
-  const data: MemoryData | undefined =
-    memoriesQuery.data && peopleQuery.data
-      ? { memories: memoriesQuery.data, nameById: new Map(peopleQuery.data.map((p) => [p.id, p.display_name])) }
-      : undefined;
-
-  const archiveMutation = useMutation({
-    mutationFn: (id: string) => api.archiveMemory(id),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["memories"] }),
-  });
-  const archivingId = archiveMutation.isPending ? archiveMutation.variables : null;
-
-  const ArchiveIcon = getIcon("archive");
+  const visibleCount = filterIds
+    ? (memoriesQuery.data?.filter((m) => filterIds.has(m.id)).length ?? 0)
+    : undefined;
 
   return (
-    <Page title="Memory">
-      <div className="flex flex-1 flex-col gap-3 overflow-y-auto p-4">
-        {archiveMutation.isError ? (
-          <div className="rounded-lg bg-muted px-3 py-2 text-sm text-destructive">
-            {archiveMutation.error instanceof ApiError ? archiveMutation.error.message : "Could not archive that memory."}
-          </div>
-        ) : null}
-        <AsyncState
-          data={data}
-          error={error}
-          isFetching={isFetching}
-          onRetry={() => {
-            if (memoriesQuery.isError) memoriesQuery.refetch();
-            if (peopleQuery.isError) peopleQuery.refetch();
-          }}
-          errorMessage={
-            (memoriesQuery.error ?? peopleQuery.error) instanceof ApiError
-              ? ((memoriesQuery.error ?? peopleQuery.error) as ApiError).message
-              : "Could not load memory."
-          }
-          isEmpty={(d) => visibleMemories(d.memories).length === 0}
-          emptyIcon="brain"
-          emptyText={filterIds ? "None of these memories are here anymore." : "Nothing remembered yet."}
-          loadingLabel="Loading memory"
-        >
-          {(d) => {
-            const visible = visibleMemories(d.memories);
-            return (
-              <>
-                {filterIds ? (
-                  <div className="flex items-center justify-between gap-2 rounded-lg bg-muted px-3 py-2 text-sm">
-                    <span>Showing {visible.length} memory update{visible.length === 1 ? "" : "s"}</span>
-                    <Link to="/memory" className="text-primary underline">
-                      Show all
-                    </Link>
-                  </div>
-                ) : null}
-                {visible.map((m) => (
-                  <div
-                    key={m.id}
-                    className="flex items-start justify-between gap-4 rounded-lg border border-border p-3"
-                  >
-                    <div className="flex flex-col gap-1">
-                      <span className="text-base">{m.text}</span>
-                      <span className="text-sm text-muted-foreground">
-                        {scopeLabel(m, d.nameById)} · {CATEGORY_LABELS[m.category]}
-                        {m.pinned ? " · Pinned" : ""}
-                      </span>
-                    </div>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => archiveMutation.mutate(m.id)}
-                      disabled={archivingId === m.id}
-                      aria-label={`Archive "${m.text}"`}
-                    >
-                      <ArchiveIcon className="h-5 w-5" aria-hidden />
-                    </Button>
-                  </div>
-                ))}
-              </>
-            );
-          }}
-        </AsyncState>
-      </div>
-    </Page>
+    <RowFilterContext.Provider value={filterIds ? (row) => filterIds.has(String(row.id)) : () => true}>
+      <SchemaPage
+        page={memoryPage}
+        beforeBody={
+          filterIds ? (
+            <div className="flex items-center justify-between gap-2 rounded-lg bg-muted px-3 py-2 text-sm">
+              <span>
+                Showing {visibleCount ?? 0} memory update{visibleCount === 1 ? "" : "s"}
+              </span>
+              <Link to="/memory" className="text-primary underline">
+                Show all
+              </Link>
+            </div>
+          ) : null
+        }
+      />
+    </RowFilterContext.Provider>
   );
 }
