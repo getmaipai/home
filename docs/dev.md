@@ -4324,6 +4324,85 @@ between now and when the relevant piece gets built.
   here changes the order: `embed` first, real skills, count
   fall-throughs, then decide on tier 2 from the eval number.
 
+- **A concrete example stress-tested against the tier 2 note above
+  (2026-09-05): "is my softball game going to be cancelled?"** Jesse asked
+  how this would be answered - it needs a calendar lookup (find the
+  softball event), a weather check for that event's date/location, and an
+  email search for a cancellation notice, then one sentence combining all
+  three ("No emails about cancellation, but it's going to rain right
+  before your game"). This is a sketch to think about the shape, not a
+  spec - a proper version of this needs a more capable agent working
+  through it deliberately, with real testing against the actual local
+  model, not an architecture note.
+  **Today, honestly: this doesn't work at all.** `route()` picks at most
+  one Tier 0 package per turn; the plain model fallback gets whatever
+  `recall()`'s keyword search finds in memory, nothing else. No calendar
+  package exists. No email package exists. Neither is a small gap.
+  **Where this fits the tier 2 note's own decisions, without reopening
+  them.** The note above is explicit that chained composition "stays a
+  recipe the model selects, never a plan it assembles" - and this example
+  fits that better than it first looks. `pick`/`format` steps already
+  read from a shared `scope`, so a single recipe can chain fetch-then-
+  fetch-then-format today: look up the event (`calendar.find`), pick its
+  date/location into the scope, fetch weather *for that date/location*
+  using the picked values, fetch/search email for that event's name, then
+  format one reply. No model in the loop, no autonomous tool selection,
+  nothing for the privacy page's "what leaves the house" table to fail to
+  enumerate - exactly the bounded, author-time shape the note already
+  wants, once `calendar` and `email` packages exist to chain.
+  **The one real gap this example finds that the note doesn't cover: real
+  conditional synthesis.** "No cancellation email, but rain" is a
+  judgment call between two fetched facts, and `format`'s templating can
+  only interpolate values into a fixed sentence - it cannot branch on
+  what came back (the same limitation `recall`'s own hardcoded
+  `NOTHING_RECALLED` fallback already works around one special case of,
+  not a general answer). Two ways to close this, both narrower than the
+  autonomous loop the note already rejects: (a) a real conditional/branch
+  step added to the recipe language - a bigger spec change, but still
+  Tier 0, still no model; or (b) a new, bounded **compose** step: the
+  recipe's own last step hands its already-gathered scope values (not
+  raw tool access) to the chat model for exactly one call, asked only to
+  phrase a sentence from known facts - never to decide what to fetch or
+  in what order. (b) is the closer fit to what this example actually
+  needs and stays inside every constraint the tier 2 note already set:
+  one bounded call, not a loop; the tool sequence fixed by the recipe
+  author, never chosen by the model at runtime; nothing for the privacy
+  table to fail to enumerate, since a compose step touches no network
+  itself.
+  **What's still missing, named honestly, not glossed over:**
+  - **Two integrations that don't exist at all**: a calendar (self-hosted
+    entry within MaiPai, or a real CalDAV/OAuth connection to a family's
+    existing Google/Apple/Nextcloud calendar - matching the "direct
+    household-to-service connection, nothing of ours in the data path"
+    architecture rule) and email search. Email is meaningfully more
+    sensitive than anything integrated so far - full inbox access has no
+    slot in `spec/vocab/permissions.json` today, and probably shouldn't
+    reuse `net:<host>`'s shape at all; it likely wants its own consent
+    step in the spirit of the unrestricted-mode adult acknowledgment, not
+    just a permission checkbox on an install prompt.
+  - **A `compose` step is a real, new spec primitive**, not a small
+    addition to sneak in: its exact shape, how tightly its own prompt is
+    bounded (so it can't be turned into a general chat surface by a
+    cleverly-worded recipe), and whether it needs its own settings/model
+    role at all (the tier 2 note's own router-model discussion may apply
+    here directly) are real design questions, not implementation details.
+  - **A recipe with three real network calls in sequence is slower than
+    anything shipped tonight** (weather/define/joke/trivia are each one
+    fetch). Worth measuring against a real calendar+email+weather chain
+    before assuming it is fast enough for a voice reply, not assuming it.
+  - **New untrusted content entering a reply for the first time**: an
+    email body is the first data source in this whole platform that is
+    third-party *and* not something the household directly asked to see
+    verbatim - a real prompt-injection surface (a scam email telling
+    "the assistant reading this" to do something) that host.fetch's
+    existing SSRF/rate-limit protections say nothing about. Worth its own
+    threat-modeling pass before an email package ships, not an
+    afterthought.
+  This stays a note, not a plan: the tier 2 section above already
+  established the right sequencing (`embed` first, ship real skills,
+  measure the real miss rate, then decide), and nothing here changes
+  that order or argues for building any of this next.
+
 - **Wake word and voice-pipeline findings from `home-legacy.git`** (this
   content also exists, effectively unchanged, in the older `loki-doki`
   lineage it grew from - confirmed by diff, not assumed), to revalidate
