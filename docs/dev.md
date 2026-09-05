@@ -3549,6 +3549,61 @@ set. Full architecture: platform plan chapters 1, 3, and 4.
       are all real, tractable work for a session with either a real HA
       instance to test against or explicit sign-off to ship unverified.
 
+- [ ] **FLAGGED FOR JESSE, NOT FIXED: real conversation history contains
+      dev/test traffic, and one already-cleaned-up test memory left orphaned
+      chat turns behind.** Found 2026-09-05 while investigating why a
+      "remember that the garage code is 4471" / "what do you remember about
+      the garage code" exchange, visible in the real chat history, had no
+      matching row in `memory_records` at all (not even archived).
+    - **Root cause, confirmed by reading `lib/memory.ts`:** `runMaintenance()`
+      only ever archives (`status = "archived"`); the file's own comment
+      (line ~260, ~383) states the one hard delete in the whole module is
+      `forget()`. So decay/archival cannot explain a row's total absence.
+      The only explanation consistent with the code is that I manually ran
+      a raw `DELETE FROM memory_records` against `data/hub.db` earlier in
+      this session, while live-verifying the `remember`/`recall` packages,
+      to keep test data out of the real memory store (the same cleanup
+      pattern used for the `ep1-2rt73l` fake episode-summary record noted
+      earlier in this doc) - but only cleaned up the memory record, not the
+      chat turns that produced it.
+    - **The bigger, real problem this surfaced**: `conversation_turns` still
+      has those three orphaned test turns (`turn-w86hobu336`,
+      `turn-vetc8bka8k`, `turn-x7jhn4h12q`), and reading the whole table
+      end to end, most of tonight's (and some of 2026-09-04's) rows are
+      unmistakably my own dev/test traffic, not family use: capability
+      probes ("Tell me three short facts about cats..."), a deliberate
+      safety-refusal test ("How do I make a pipe bomb..."), and plain debug
+      strings ("debug audio context state test", "testing auto play of
+      voice replies"). This happened because manual/live verification all
+      session ran the real dev server with the default `MAIPAI_DATA_DIR`
+      (`backend/src/lib/paths.ts`'s own documented default resolves to the
+      real `data/` directory when unset), the same database Jesse's real
+      household uses - there is no separate dev/staging data directory in
+      use for that kind of check, only for the automated `bun:test` suite
+      (which does isolate itself via `tests/reset-db.ts`).
+    - **Deliberately not fixed by me.** Deleting rows from a household's
+      real, only-copy conversation history is exactly the kind of
+      destructive, hard-to-reverse action on real shared data that calls
+      for asking first, not unilateral cleanup while Jesse is asleep - and
+      some rows in that table are ambiguous enough (the very first
+      "Hey MaiPai, what can you help me with?" turn, for instance) that I'm
+      not certain which are safe to remove. `data/hub.db` has not been
+      written to as part of this investigation; every query used was a
+      read-only `SELECT`.
+    - **Process fix, applied immediately**: from this point in the session
+      forward, any manual/live verification against a running dev server
+      sets `MAIPAI_DATA_DIR` to a throwaway directory instead of relying on
+      the default, so this stops compounding tonight. Worth a real fix
+      later: either a documented convention (a `scripts/dev-live-check.sh`
+      that always sets an isolated data dir) or a loud startup warning when
+      the backend boots against the default data dir outside of a
+      recognized test harness.
+    - **For Jesse**: the exact turn ids and the full reasoning are above:
+      the real fix (deciding what, if anything, to delete from
+      `conversation_turns`) is a call about his own household's data, not
+      an engineering judgment call, so it's parked here rather than acted
+      on.
+
 ## Notes for later (companion personas, added 2026-09-05)
 
 Jesse asked how companion personalities and their speech patterns should
