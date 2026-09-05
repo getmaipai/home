@@ -24,6 +24,7 @@ import { join } from "node:path";
 import { backupDir, ensureDataDir } from "@/lib/paths";
 import { getOrCreateHexKey } from "@/lib/keystore";
 import { randomSuffix } from "@/lib/id";
+import { getHouseholdSettingValue } from "@/lib/settings";
 import { sqlite } from "@/db";
 
 const BACKUP_KEY_NAME = "backup";
@@ -198,10 +199,17 @@ function monthKey(d: Date): string {
 // coarser fallback, caught by tests/backup.test.ts's same-day case): a
 // tier represents a distinct time granularity, not an overflow queue for
 // same-day duplicates, which get pruned like anything else that loses its
-// bucket to a newer backup. No size cap per target yet (2.5 asks for
-// one): no settings key exists to declare it, the same "provisional
-// until a real key exists" gap `lib/memory.ts`'s decay thresholds
-// document for the identical reason.
+// bucket to a newer backup.
+//
+// A size cap per target (2.5's own "with a size cap per target"),
+// `backup.max_total_gb` (backupKeys.ts, 0 = no extra limit) enforced
+// AFTER the tiered scheme above, not instead of it: the tiers decide
+// WHICH backups are worth keeping at all (a spread across time, not just
+// "the N most recent"); the cap then trims that already-sensible set
+// further, oldest first, if it's still too much disk. Binary GB (1024^3),
+// matching formatBytes.ts's own reasoning ("matching what du/ls -h/every
+// OS file browser already shows").
+const GB = 1024 * 1024 * 1024;
 const DAILY_WINDOW_MS = DAILY_KEEP * DAY_MS;
 const WEEKLY_WINDOW_MS = DAILY_WINDOW_MS + WEEKLY_KEEP * 7 * DAY_MS;
 const MONTHLY_WINDOW_MS = WEEKLY_WINDOW_MS + MONTHLY_KEEP * 30 * DAY_MS;
@@ -239,6 +247,29 @@ export function pruneBackups(): { deleted: number } {
       }
     }
     if (placed) kept.add(b.filename);
+  }
+
+  const maxBytes = (getHouseholdSettingValue("backup.max_total_gb") as number) * GB;
+  if (maxBytes > 0) {
+    const keptOldestFirst = all
+      .filter((b) => kept.has(b.filename))
+      .sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+    let total = keptOldestFirst.reduce((sum, b) => sum + b.bytes, 0);
+    for (const b of keptOldestFirst) {
+      if (total <= maxBytes) break;
+      // A code review (2026-09-04) found no floor here: a cap smaller
+      // than even the single newest backup (a typo'd GB-for-MB value, or
+      // just a number smaller than the current snapshot) would evict
+      // every kept backup, including that newest one, leaving the
+      // household with zero restorable backups - defeating the whole
+      // feature's point, and staying that way on every future scheduled
+      // run too. The cap is a real limit, but never at the cost of the
+      // household having NO backup at all; a household that wants that
+      // trade-off can just disable backups outright, a different control.
+      if (kept.size <= 1) break;
+      kept.delete(b.filename);
+      total -= b.bytes;
+    }
   }
 
   let deleted = 0;

@@ -1,5 +1,23 @@
 [
   {
+    "key": "backup.max_total_gb",
+    "scope": "household",
+    "selector": "number",
+    "range": {
+      "min": 0,
+      "max": 1000
+    },
+    "default": 0,
+    "label": "Backup storage limit (GB)",
+    "help": "Once total backup storage passes this, the oldest backups are deleted first - checked after the normal seven-daily/four-weekly/three-monthly schedule. 0 means no extra limit.",
+    "level": "advanced",
+    "secret": false,
+    "lives_in": "household.system",
+    "honoured_by": [
+      "home"
+    ]
+  },
+  {
     "key": "chat.context_size_override",
     "scope": "household",
     "selector": "number",

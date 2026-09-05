@@ -9,11 +9,12 @@ import { join } from "node:path";
 import { CORE_SETTINGS_KEYS } from "../src/settings/coreKeys.js";
 import { AI_SETTINGS_KEYS } from "../src/settings/aiKeys.js";
 import { VOICE_SETTINGS_KEYS } from "../src/settings/voiceKeys.js";
+import { BACKUP_SETTINGS_KEYS } from "../src/settings/backupKeys.js";
 
 const outPath = join(import.meta.dir, "..", "..", "spec", "settings", "keys.json");
 
-const sorted = [...CORE_SETTINGS_KEYS, ...AI_SETTINGS_KEYS, ...VOICE_SETTINGS_KEYS].sort((a, b) =>
-  a.key.localeCompare(b.key),
+const sorted = [...CORE_SETTINGS_KEYS, ...AI_SETTINGS_KEYS, ...VOICE_SETTINGS_KEYS, ...BACKUP_SETTINGS_KEYS].sort(
+  (a, b) => a.key.localeCompare(b.key),
 );
 writeFileSync(outPath, JSON.stringify(sorted, null, 2) + "\n");
 console.log(`Wrote ${sorted.length} settings key(s) to ${outPath}`);

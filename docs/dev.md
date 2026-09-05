@@ -2704,6 +2704,34 @@ set. Full architecture: platform plan chapters 1, 3, and 4.
         `clearMatchingValues()` export above, which also fixed the
         `PORT` bug at the same time.
 
+- [x] Backups' own real gap, closed: `pruneBackups()`'s own comment named
+      "no size cap per target yet (2.5 asks for one): no settings key
+      exists to declare it" - now one does. `backupKeys.ts`'s new
+      `backup.max_total_gb` (household, `0` = no extra limit beyond the
+      seven-daily/four-weekly/three-monthly tiers) is enforced AFTER
+      those tiers, not instead of them: the tiers decide which backups
+      are worth keeping at all (a spread across time), the cap then
+      trims that set further, oldest first, if it's still too much disk.
+      Binary GB (1024³), matching `formatBytes.ts`'s own reasoning. No
+      frontend work needed - it's just another household-scope key, so
+      the generic `SettingsRenderer` already renders it (confirmed live:
+      saved `5` through the real running Settings page, watched the real
+      `settings_values` row, ran a real backup to confirm nothing broke
+      with the key present, then reset it back to `0`). Two regression
+      tests (one confirming `0` changes nothing, one confirming a real
+      cap trims oldest-first with real backup byte sizes) prove the
+      mechanism, the second confirmed to fail against the pre-fix code.
+    - **A second review pass found a real, dangerous edge case**: the
+      cap had no floor - a value smaller than even the single newest
+      backup (a typo'd GB-for-MB, or just a number under the current
+      snapshot's size) would evict every kept backup, leaving zero
+      restorable backups, and staying that way on every future scheduled
+      run too. Fixed by never letting the cap prune the last remaining
+      backup regardless of how far over the limit it is; a third
+      regression test (a 1-byte cap against real backups) confirms at
+      least one always survives, confirmed to fail against the pre-fix
+      code.
+
 ## API routes and `@hono/zod-openapi` (tracked debt)
 
 `getmaipai/CLAUDE.md` > Documentation requires every Hono route to be

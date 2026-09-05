@@ -8,6 +8,7 @@ import { resetDb } from "./reset-db";
 import { __resetThrottleForTests } from "@/lib/secretThrottle";
 import { runBackup, listBackups, restoreBackup, pruneBackups, cleanupStaleSnapshots } from "@/lib/backup";
 import { backupDir } from "@/lib/paths";
+import { setHouseholdSettingValue } from "@/lib/settings";
 
 // backupDir is a real filesystem directory, not a DB table resetDb()
 // clears: unlike every other test file, this one has to clean up its own
@@ -160,6 +161,59 @@ describe("pruneBackups()", () => {
     backupAt(0); // fills today's daily slot first, since listBackups() sorts newest-first
     pruneBackups();
     expect(listBackups().some((b) => b.filename === old)).toBe(false);
+  });
+
+  test("backup.max_total_gb defaulting to 0 adds no extra pruning beyond the tiers", async () => {
+    await owner();
+    for (let d = 0; d < 5; d++) backupAt(d);
+    pruneBackups();
+    expect(listBackups().length).toBe(5); // all 5 fit inside the 7-daily tier alone
+  });
+
+  // 2.5: "retention... with a size cap per target" - backupKeys.ts's own
+  // comment names this as the exact gap this closes.
+  test("a size cap trims the tiered-kept set further, oldest pruned first", async () => {
+    await owner();
+    const filenames: string[] = [];
+    for (let d = 0; d < 5; d++) filenames.push(backupAt(d)); // days 0-4: all land in the daily tier
+    const beforeCap = listBackups();
+    expect(beforeCap.length).toBe(5);
+    const totalBytes = beforeCap.reduce((sum, b) => sum + b.bytes, 0);
+
+    // A cap under the real total, but above a single backup's size, so
+    // pruning has to stop partway through rather than deleting everything
+    // or nothing.
+    const capBytes = Math.floor(totalBytes * 0.6);
+    setHouseholdSettingValue("backup.max_total_gb", capBytes / (1024 * 1024 * 1024));
+
+    pruneBackups();
+    const survivors = listBackups();
+    const survivorBytes = survivors.reduce((sum, b) => sum + b.bytes, 0);
+
+    expect(survivorBytes).toBeLessThanOrEqual(capBytes);
+    expect(survivors.length).toBeLessThan(5);
+    // Day 0 (newest) must survive; day 4 (oldest) must not - proves the
+    // cap prunes oldest-first, not by insertion order or arbitrarily.
+    expect(survivors.some((b) => b.filename === filenames[0])).toBe(true);
+    expect(survivors.some((b) => b.filename === filenames[4])).toBe(false);
+  });
+
+  // A code review (2026-09-04) found the cap had no floor: set smaller
+  // than even the single newest backup, it would evict every kept
+  // backup, leaving the household with zero restorable backups - the
+  // opposite of what a backup feature exists to guarantee.
+  test("a cap smaller than even the newest backup still leaves at least one", async () => {
+    await owner();
+    backupAt(1);
+    const newest = backupAt(0);
+    // 1 byte: guaranteed smaller than any real backup file.
+    setHouseholdSettingValue("backup.max_total_gb", 1 / (1024 * 1024 * 1024));
+
+    pruneBackups();
+    const survivors = listBackups();
+
+    expect(survivors.length).toBe(1);
+    expect(survivors[0]!.filename).toBe(newest);
   });
 });
 
