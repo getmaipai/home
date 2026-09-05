@@ -5807,3 +5807,42 @@ fan-out excluding minors, per-person Telegram opt-in vs. a non-
 configurable type's forced default, ownership isolation on read/dismiss,
 and a real end-to-end `runTurn()` test proving a minor's flagged turn
 notifies every adult). Full suite green (566 backend, 201 frontend).
+
+## Session A: step 0, setup (2026-09-05)
+
+Working from `docs/plans/session-a-intelligence.md` (backend and spec
+half of the 2026-09-05 audit; Session B runs `session-b-ui.md` on the
+frontend in parallel from its own worktree `../home-b`).
+
+- Worktree: `git worktree add -b session-a-intelligence ../home-a main`,
+  a sibling of `home/`, matching the layout Session B already used
+  (`../home-b`). A worktree nested under `home/.claude/worktrees/`
+  was tried first and rejected: `spec/tests/ts/fixtures.test.ts` imports
+  the standards-owned `ErrorEntry` type by a hardcoded relative path
+  (`../../../../.github/...`) that only resolves when the checkout sits
+  exactly four levels above a sibling `.github`, which a nested worktree
+  breaks. The sibling layout keeps that path valid, so no code change was
+  needed there.
+- Backend runs from `backend/` with `MAIPAI_DATA_DIR=<worktree>/data-a
+  PORT=8797 bun run dev`, its own SQLite file under `data-a/` (gitignored,
+  never the shared `data/`).
+- `scripts/check.sh` green at the baseline: 200 spec bun tests, 37 spec
+  pytest, 567 backend bun tests, 201 frontend bun tests, standards core
+  (gitleaks, PII wordlist, prose lint, licence check) all passing before
+  any step-1 change.
+- Stub-backed by default, confirmed rather than assumed:
+  `backend/tests/embedSupervisor.test.ts` already asserts
+  `getEmbedBackendKind()` reports `"stub"` when neither
+  `MAIPAI_EMBED_URL` nor a spawnable binary is configured, the same
+  precedent `llmSupervisor.ts` uses for the chat role. Both stubs are
+  `spec/llm/ts/stubServer.ts`, an in-process OpenAI-compatible server that
+  prefixes every reply `[stub model: no real model loaded, this is a
+  canned reply]`, so no step in this plan needs a real model to write or
+  run its per-commit tests.
+- **Bench run pointer** (not run this step, recorded for step 5's and
+  step 6's on-demand bench commands): point the embed backend at the real
+  engine with `MAIPAI_EMBED_URL=http://<host>:<port>/v1` (or
+  `MAIPAI_EMBED_PORT` plus a real `llama-server` binary for the supervisor
+  to spawn one), and the chat role the same way via
+  `MAIPAI_LLAMA_SERVER_URL` or `MAIPAI_LLAMA_SERVER_BIN` +
+  `MAIPAI_CHAT_MODEL_PATH`.

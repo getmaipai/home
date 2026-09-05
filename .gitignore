@@ -2,8 +2,11 @@
 node_modules/
 .venv/
 
-# Local data, never committed (org rule: nothing under data/ ever enters git)
+# Local data, never committed (org rule: nothing under data/ ever enters git).
+# data-*/ covers a parallel session's own worktree data dir (e.g. data-a,
+# data-b), same rule, never the shared data/.
 data/
+data-*/
 
 # Backups (2.5): encrypted, but still real household data end to end;
 # same "never in git, ever" rule as data/.
