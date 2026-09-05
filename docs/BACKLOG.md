@@ -10,6 +10,48 @@ does.
 Rough size tags: **S** (a session or less), **M** (a real slice, days),
 **L** (a platform-level capability, needs its own design pass first).
 
+## Skill standards (definition of done)
+
+Jesse's call (2026-09-05): this should rank alongside, not after, building
+more skills - a standard nobody's held to gets more expensive to retrofit
+the more packages exist, not cheaper. `getmaipai/.github/docs/PACKAGES.md`
+already defines a real bar for every package (skills included); checked
+against what the 6 bundled skills actually have today, none of them
+clear it in full:
+
+- [ ] **A real `quality_scale.yaml` per package** (S per package) - today
+      `quality_scale` is one string field inside `manifest.json`, not the
+      separate file with bronze/silver/gold criteria the standard
+      describes (tests green, five-plus routing examples, a privacy row
+      per data source, stated offline behavior, a smoke test, README and
+      changelog present, lint clean). The routing-examples and privacy-row
+      and offline-behavior parts are genuinely met already; the smoke test
+      and the file itself are not.
+- [ ] **A `smoke` entry per package** (S-M per package, M to design the
+      mechanism once) - "runs where the package will live, at install, at
+      every update, and on a schedule; a failure leaves it installed but
+      disabled with a Repairs item." No smoke-test mechanism or Repairs
+      concept exists anywhere in this codebase yet - this is real
+      infrastructure, not just a per-package checkbox.
+- [ ] **A user-tier `README.md` and `CHANGELOG.md` per package** (S per
+      package) - the "store card" a household or the catalog's browse UI
+      would show; none of the 6 bundled packages has either today.
+- [ ] **Real i18n for skills** (L) - genuinely undecided, not just
+      unbuilt: no `getmaipai/.github` standard mentions i18n at all today,
+      so this needs a design decision before any code. At minimum:
+      `manifest.json`'s `display`/`description` and a recipe's `format`
+      step text are hardcoded English strings today, and `routing.
+      examples`/`routing.patterns` (the deterministic floor's whole
+      matching mechanism) would need real per-locale variants for
+      anything beyond English to route at all - not a small addition
+      once the `embed` role and Tier 2 both eventually depend on
+      matching against those same examples.
+
+Default packages are held to the same bar as community ones per
+`PACKAGES.md` - the release skill is meant to refuse shipping a default
+set with anything below bronze, which today it structurally can't check
+(there's no `quality_scale.yaml`/smoke mechanism for it to look at).
+
 ## Skills (Tier 0 catalog)
 
 Bundled today: `remember`, `recall`, `weather`, `define`, `joke`, `trivia`.
@@ -144,6 +186,80 @@ Priority-1 lookup landing first):**
 - [ ] Accessibility audit (M) - never done against any shipped page.
 - [ ] Any UI for calendar, email, camera/vision, or generation (blocked on
       each of those existing first)
+- [ ] **Skills as home-screen widgets - cards and rows** (L, needs its own
+      design pass before any code - Jesse, 2026-09-05). The idea: a
+      skill's data shown on a dashboard as a card (or, for some skills, a
+      horizontal row of cards) instead of only being reachable by asking
+      for it in chat. Nothing here is decided yet - the card/row system
+      itself, which skills opt in, how a manifest declares it - this is
+      a real gap, not a small addition.
+      **Real prior art from the legacy app**, kept as reference for the
+      design pass, not as something to port (the org's "copy from legacy"
+      allowance is for hard-won logic, never UI or feature scope - so this
+      informs a fresh design, it isn't the design):
+      - `homeWidgets.ts` was a single source-of-truth catalog (id, title,
+        description, icon, an `allowWide` flag for a full-width 2-column
+        tile, and a `toolId` gating availability on whether the backing
+        tool/skill was actually installed - the direct precedent for "a
+        widget only exists if a real skill backs it," never a "coming
+        soon" tile).
+      - A `supportsRowMode` flag: some widgets, expanded to full width,
+        switched from a vertical card to a horizontal strip of smaller
+        cards - the actual "cards vs. rows" distinction Jesse's asking
+        about, already had a real precedent.
+      - `CardSizeControl.tsx` - a popover slider (range 180-560px, step
+        10, default 260) driving one CSS variable
+        (`--takeover-card-min`) that every grid consumed via `repeat(
+        auto-fill, minmax(var(--takeover-card-min), 1fr))`, persisted per
+        app per device. Its own comment names the inspiration directly:
+        the Apple Photos / Plex / Lightroom toolbar-zoom pattern. This is
+        the "slider to dynamically adjust card size" Jesse referenced -
+        real, working code in the legacy app, a good reference point for
+        a fresh implementation, not a drop-in port.
+      **What a real design pass needs to decide, not guessed at here**:
+      whether a manifest's existing `contributes`/`pages` field is the
+      right hook for "this package offers a widget," how a lookup skill's
+      recipe output (today just `reply.text`/`speech`) maps to structured
+      widget data, whether cards refresh live or only on demand, and how
+      this interacts with the proactive/caching idea noted below (a
+      widget is the most natural place a proactively-fetched fact would
+      actually surface).
+
+## Proactive / ambient intelligence
+
+- [ ] **Cache skill lookups proactively, and surface them unprompted when
+      relevant** (L, needs its own design pass - Jesse, 2026-09-05).
+      The example: a person who knows you like video games might say "oh,
+      Grand Theft Auto VI comes out today" without being asked - MaiPai
+      doesn't do anything like this today; every skill only ever runs
+      when a person's own message routes to it. Three genuinely separate
+      pieces, worth naming separately since they're different sizes:
+    - **A caching/freshness layer for skill results** (S-M) - the
+      scheduler (`host.schedule`/`runDueJobs`) already exists and is real;
+      this is "run certain lookups on a schedule and keep the last result
+      somewhere," which is mostly new plumbing on top of infrastructure
+      that's already built, not a new subsystem.
+    - **Matching a cached fact to what a specific person actually cares
+      about** (M-L) - needs a real answer to "how does the hub know
+      someone likes video games" at all. `memory.ts`'s existing recall
+      already does keyword-overlap matching against stored facts, which
+      is a plausible starting point (a remembered "I love video games"
+      fact matching a cached "GTA VI released" fact), but a dedicated
+      interest/preference model would work better and doesn't exist -
+      real design work, not just wiring.
+    - **Deciding when and how to actually say it** (L) - the hardest and
+      most product-sensitive part. Surfacing something unprompted in the
+      middle of a conversation risks landing as useful or as intrusive
+      depending entirely on timing and judgment a fixed `format` template
+      cannot express (the same "no conditional branching in a recipe"
+      limit the tier 2 compose-step note above already names). This
+      overlaps real estate with the notification system below (both are
+      "tell someone something they didn't ask for") but is a distinct
+      surface - a notification is its own explicit channel; this is
+      about weaving a fact naturally into an ongoing chat, which is
+      closer to the persona work's "engagement depth" dimension
+      (`docs/dev.md`, companion personas note) than to notifications.
+      Worth deciding together with that note rather than separately.
 
 ## Voice / robot
 
