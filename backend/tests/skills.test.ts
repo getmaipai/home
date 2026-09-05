@@ -80,6 +80,27 @@ describe("the bundled define package", () => {
   });
 });
 
+// The third real skill built on host.fetch (2026-09-05), and the first
+// with zero inputs - no wildcard capture, `deterministicArgs()`'s
+// no-required-args path fires it with `{}`. Same posture as the other
+// two: no automated test calls the real icanhazdadjoke.com; the recipe's
+// own step logic has its own conformance fixture
+// (spec/fixtures/recipes/joke.json). Live-verified through both
+// runSkill directly and the full turn engine's real deterministic
+// routing.
+describe("the bundled joke package", () => {
+  test("is discoverable and its manifest + recipe validate against spec's schemas", () => {
+    expect(listPackageIds()).toContain("joke");
+    const loaded = loadPackage("joke");
+    expect(loaded.ok).toBe(true);
+    if (!loaded.ok) return;
+    expect(loaded.value.manifest.id).toBe("joke");
+    expect(loaded.value.manifest.permissions).toContain("net:icanhazdadjoke.com");
+    expect(loaded.value.recipe.inputs).toEqual([]);
+    expect(loaded.value.recipe.steps.length).toBeGreaterThan(0);
+  });
+});
+
 async function owner() {
   const client = new TestClient();
   await client.post("/api/auth/setup", { displayName: "Sage", secret: "correcthorse" });

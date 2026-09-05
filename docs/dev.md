@@ -3490,6 +3490,65 @@ set. Full architecture: platform plan chapters 1, 3, and 4.
       and offline; `skills.test.ts` separately proves the package's
       manifest and recipe are real and well-formed.
 
+- [x] **The `joke` package: the third real skill built on `host.fetch`,
+      and the first with zero inputs.** A real dad joke via
+      icanhazdadjoke.com (free, no key, purpose-built for exactly this
+      family-friendly use case). No wildcard capture at all ("tell me a
+      joke" has no variable part) - `deterministicArgs()`'s own
+      no-required-args path (`required.length === 0`) already handled
+      this correctly, the first real package to exercise it. Live-
+      verified through both `runSkill` directly and the full turn
+      engine's real deterministic routing, with real jokes back both
+      times. A quick reliability check after the `define` skill's own
+      lesson tonight: three real calls, all under 100ms - unlike
+      dictionaryapi.dev, this specific host showed no flakiness in this
+      pass's testing.
+    - A dedicated conformance fixture (`spec/fixtures/recipes/joke.json`)
+      proves the exact shipped recipe's own step logic against both
+      interpreters, using a response shape captured from a real call;
+      `skills.test.ts` separately proves the package's manifest and
+      recipe are real and well-formed, plus that a genuinely empty
+      `inputs: []` recipe loads and validates correctly.
+
+- [x] **`home.call_service` (Home Assistant) - deliberately NOT attempted
+      this session, and why**, recorded here so it reads as a real,
+      considered decision rather than something simply skipped. Real
+      integrations were the natural next step after three real
+      `host.fetch`-based skills, and Home Assistant's own REST API
+      (`POST /api/services/<domain>/<service>`, a bearer token, a JSON
+      body) is well-documented and would reuse every piece of
+      infrastructure built tonight (the rate limiter, the retry policy,
+      the same real-HTTP-mechanics test pattern). Two real, unresolved
+      gaps stopped it short of shipping:
+    - **No permission exists yet for it.** `spec/vocab/permissions.json`
+      has no `home`-shaped entry at all - `net:<host>`, `memory:*`,
+      `actions:<kind>`, `integration:<id>`, `camera:still`, `ocr`,
+      `llm:complete`, `speak`, `schedule`, `files:<path>`,
+      `logbook:read`, none of them fit calling into the household's own
+      home-automation domains. `home_call_service_step`'s own schema
+      comment already names a real, adjacent design requirement -
+      "security domains are never covered by a wildcard target" - that
+      has no implementation anywhere yet either (nothing currently
+      distinguishes `light.turn_off` from `lock.unlock` at the host
+      layer). Building the real HTTP client without first closing either
+      gap would ship home control with no permission model and no
+      security-domain restriction, exactly backwards for the one
+      category of `host.*` call that can unlock a door.
+    - **No real Home Assistant instance to verify against.** Every other
+      real integration this session shipped was live-verified against
+      its actual backing service before being called done; this one has
+      none available in this environment. The request-construction logic
+      itself is buildable and testable against a local mock server the
+      same way `packageHost.test.ts` already tests `performHttpFetch`'s
+      real HTTP mechanics, but that only proves the SHAPE of the request
+      is right, not that a real Home Assistant instance accepts it - a
+      materially weaker bar than everything else shipped tonight, for
+      the one feature capable of controlling physical things in the
+      house. The honest call: closing the permission-vocab gap, deciding
+      the security-domain restriction design, and building the client
+      are all real, tractable work for a session with either a real HA
+      instance to test against or explicit sign-off to ship unverified.
+
 ## Notes for later (companion personas, added 2026-09-05)
 
 Jesse asked how companion personalities and their speech patterns should

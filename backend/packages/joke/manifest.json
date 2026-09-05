@@ -1,0 +1,48 @@
+{
+  "id": "joke",
+  "version": "0.1.0",
+  "kind": "skill",
+  "category": "Fun",
+  "display": "Joke",
+  "description": "A real dad joke on demand (2026-09-05, the third real skill built on host.fetch), via icanhazdadjoke.com's free, no-key, family-friendly API.",
+  "author": "MaiPai",
+  "license": "AGPL-3.0",
+  "homepage": "https://github.com/getmaipai/home",
+  "routing": {
+    "examples": [
+      "tell me a joke",
+      "tell me a dad joke",
+      "got any jokes",
+      "make me laugh",
+      "know any good jokes"
+    ],
+    "patterns": ["tell me a joke", "tell me a dad joke", "got any jokes"]
+  },
+  "requires": [],
+  "optional": [],
+  "platforms": ["home"],
+  "min_role": "child",
+  "consequential": false,
+  "offline": "unavailable",
+  "config": [],
+  "data_sources": [
+    {
+      "id": "icanhazdadjoke",
+      "destination": "icanhazdadjoke.com, a free public dad-joke API",
+      "when": "each time the family asks for a joke",
+      "what": "nothing personal - a plain request for a random joke",
+      "who": "icanhazdadjoke.com",
+      "opt_in": true,
+      "retention": "unknown, see icanhazdadjoke.com's own policy"
+    }
+  ],
+  "permissions": ["net:icanhazdadjoke.com"],
+  "notifications": [],
+  "backup": "exclude",
+  "background": false,
+  "contributes": [],
+  "pages": [],
+  "min_app": "0.1.0",
+  "tier": 0,
+  "quality_scale": "bronze"
+}

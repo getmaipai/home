@@ -1,0 +1,20 @@
+{
+  "id": "joke",
+  "inputs": [],
+  "steps": [
+    {
+      "op": "fetch",
+      "as": "result",
+      "url": "https://icanhazdadjoke.com/",
+      "method": "GET",
+      "headers": { "Accept": "application/json" }
+    },
+    { "op": "pick", "as": "joke", "from": "result", "path": "joke" },
+    {
+      "op": "format",
+      "as": "reply",
+      "text": "{joke}",
+      "speech": "{joke}"
+    }
+  ]
+}

@@ -1,0 +1,43 @@
+{
+  "description": "The real backend/packages/joke/recipe.json (2026-09-05, the third real skill built on host.fetch): a single, zero-input fetch+pick chain against icanhazdadjoke.com, using a response shape captured from a real call.",
+  "recipe": {
+    "id": "joke",
+    "inputs": [],
+    "steps": [
+      {
+        "op": "fetch",
+        "as": "result",
+        "url": "https://icanhazdadjoke.com/",
+        "method": "GET",
+        "headers": { "Accept": "application/json" }
+      },
+      { "op": "pick", "as": "joke", "from": "result", "path": "joke" },
+      {
+        "op": "format",
+        "as": "reply",
+        "text": "{joke}",
+        "speech": "{joke}"
+      }
+    ]
+  },
+  "inputs": {},
+  "host_setup": {
+    "fetch": {
+      "https://icanhazdadjoke.com/": {
+        "id": "vcNJRnrcNCd",
+        "joke": "How does Darth Vader like his toast? On the dark side.",
+        "status": 200
+      }
+    }
+  },
+  "expected": {
+    "reply": {
+      "text": "How does Darth Vader like his toast? On the dark side.",
+      "speech": "How does Darth Vader like his toast? On the dark side."
+    },
+    "actions": [],
+    "scheduled_jobs": [],
+    "home_calls": [],
+    "memory_added": []
+  }
+}
