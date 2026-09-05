@@ -9,7 +9,7 @@ from pathlib import Path
 
 import pytest
 
-from emulators.py.host_emulator import HostEmulator
+from emulators.py.host_emulator import HostEmulator, MemoryRecordLike
 from gen.py.recipe_schema import Recipe
 from interpreters.py.recipe_interpreter import run_recipe
 
@@ -29,6 +29,8 @@ def test_recipe_conformance(fixture_path: Path):
         host.set_fetch_response(url, body)
     for key, value in fixture["host_setup"].get("config", {}).items():
         host.seed_config(key, value)
+    for record in fixture["host_setup"].get("memory", []):
+        host.seed_memory([MemoryRecordLike(**record)])
 
     result = run_recipe(recipe, fixture["inputs"], host)
 

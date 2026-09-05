@@ -5,7 +5,7 @@ from __future__ import annotations
 
 from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, constr
+from pydantic import BaseModel, ConfigDict, Field, conint, constr
 
 
 class Input(BaseModel):
@@ -133,6 +133,23 @@ class RememberStep(BaseModel):
     scope: Literal['household', 'person', 'self'] | None = None
 
 
+class RecallStep(BaseModel):
+    """
+    Calls host.memory.recall and binds a ready-to-speak summary of the top matches into the recipe's variable scope - a plain 'nothing found' phrase if there are none, since the recipe language has no conditional step to branch on that itself.
+    """
+
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    op: Literal['recall']
+    as_: str = Field(..., alias='as')
+    query: str = Field(
+        ..., description='May reference input/variable names in {braces}.'
+    )
+    scope: Literal['household', 'person', 'self'] | None = None
+    limit: conint(ge=1, le=10) | None = 3
+
+
 class ScheduleStep(BaseModel):
     """
     Calls host.schedule.
@@ -170,5 +187,6 @@ class Recipe(BaseModel):
         | HomeCallServiceStep
         | ActionStep
         | RememberStep
+        | RecallStep
         | ScheduleStep
     ] = Field(..., min_length=1)

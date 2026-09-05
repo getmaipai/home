@@ -43,6 +43,7 @@
         { "$ref": "#/$defs/home_call_service_step" },
         { "$ref": "#/$defs/action_step" },
         { "$ref": "#/$defs/remember_step" },
+        { "$ref": "#/$defs/recall_step" },
         { "$ref": "#/$defs/schedule_step" }
       ]
     },
@@ -123,6 +124,19 @@
         "scope": { "type": "string", "enum": ["household", "person", "self"] }
       },
       "description": "Calls host.memory.remember."
+    },
+    "recall_step": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["op", "as", "query"],
+      "properties": {
+        "op": { "const": "recall" },
+        "as": { "type": "string" },
+        "query": { "type": "string", "description": "May reference input/variable names in {braces}." },
+        "scope": { "type": "string", "enum": ["household", "person", "self"] },
+        "limit": { "type": "integer", "minimum": 1, "maximum": 10, "default": 3 }
+      },
+      "description": "Calls host.memory.recall and binds a ready-to-speak summary of the top matches into the recipe's variable scope - a plain 'nothing found' phrase if there are none, since the recipe language has no conditional step to branch on that itself."
     },
     "schedule_step": {
       "type": "object",

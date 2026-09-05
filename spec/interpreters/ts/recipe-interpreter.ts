@@ -30,7 +30,17 @@ type RecipeStep =
   | { op: "home.call_service"; domain: string; service: string; target: Record<string, unknown>; data?: Record<string, unknown> }
   | { op: "action"; kind: string; payload?: Record<string, unknown> }
   | { op: "remember"; text: string; category?: string; scope?: string }
+  | { op: "recall"; as: string; query: string; scope?: string; limit?: number }
   | { op: "schedule"; when: string; job?: string };
+
+// No conditional step exists in this declarative language to branch a
+// reply on "did recall find anything" - a `format` step only ever
+// interpolates a scalar. So the recall step itself resolves that here,
+// binding one ready-to-speak string either way, the same "resolve it at
+// the interpreter, not by asking the recipe author for a branch that
+// doesn't exist" call `remember`'s own fixed confirmation text already
+// makes.
+const NOTHING_RECALLED = "I don't remember anything about that.";
 
 function interpolate(template: string, scope: Scope): string {
   return template.replace(/\{([a-zA-Z_][a-zA-Z0-9_]*)\}/g, (match, name: string) => {
@@ -85,6 +95,13 @@ export function runRecipe(recipe: Recipe, inputs: Scope, host: Host): SkillResul
       case "remember": {
         const text = interpolate(step.text, scope);
         host.memory.remember(text, step.category, step.scope);
+        break;
+      }
+      case "recall": {
+        const query = interpolate(step.query, scope);
+        const matches = host.memory.recall(query, { scope: step.scope });
+        const top = matches.slice(0, step.limit ?? 3);
+        scope[step.as] = top.length > 0 ? top.map((m) => m.text).join("; ") : NOTHING_RECALLED;
         break;
       }
       case "schedule": {

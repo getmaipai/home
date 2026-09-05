@@ -140,6 +140,21 @@ export const Recipe = z
               .describe("Calls host.memory.remember."),
             z
               .object({
+                op: z.literal("recall"),
+                as: z.string(),
+                /**May reference input/variable names in {braces}.*/
+                query: z
+                  .string()
+                  .describe("May reference input/variable names in {braces}."),
+                scope: z.enum(["household", "person", "self"]).optional(),
+                limit: z.number().int().gte(1).lte(10).default(3),
+              })
+              .strict()
+              .describe(
+                "Calls host.memory.recall and binds a ready-to-speak summary of the top matches into the recipe's variable scope - a plain 'nothing found' phrase if there are none, since the recipe language has no conditional step to branch on that itself.",
+              ),
+            z
+              .object({
                 op: z.literal("schedule"),
                 /**A one-shot ISO time or a recurrence expression.*/
                 when: z

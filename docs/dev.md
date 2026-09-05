@@ -2804,6 +2804,63 @@ set. Full architecture: platform plan chapters 1, 3, and 4.
         still be waiting on the household's first-ever spawn - so it was
         fixed there too in the same pass, with the same kind of test.
 
+- [x] The `recall` package, the second real Tier 0 skill - picked after
+      ruling out the plan's own literal next step (4.5's "build embed,
+      ship real skills, count fall-throughs, then decide on tier 2"):
+      wiring real embeddings into `turnEngine.ts`'s routing match would
+      need a threshold recalibrated against real usage data that doesn't
+      exist yet (no eval corpus - the plan's own "every routing miss
+      seen in the house added as a row" hasn't started), and a "reminder/
+      timer" skill hits two real, already-documented interpreter gaps
+      (`lib/scheduler.ts`'s own comment: a job scheduled from within a
+      recipe re-fires with an EMPTY input scope, so it can't carry "what"
+      through to when it fires; `parseWhen` has no natural-language
+      relative-time parsing either). `recall` needed neither: it's the
+      exact read-side mirror of the already-shipped `remember` skill,
+      using `host.memory.recall` - already real, already permission-
+      gated (`memory:read`) - that the interpreter simply had no step
+      exposing yet.
+    - **A new recipe step, not just a new package**: `recall_step` added
+      to `recipe.schema.json` (both generated bindings regenerated),
+      and a `recall` case in BOTH interpreters (`spec/interpreters/ts`
+      and `spec/interpreters/py`), kept behaviorally identical per this
+      repo's own standing rule - proven by two new conformance fixtures
+      (`recall-topic.json`, `recall-nothing-found.json`) run by both
+      language suites. The step resolves the "did it find anything"
+      branch itself (a fixed `NOTHING_RECALLED` string, byte-identical
+      in both languages) rather than needing a conditional step the
+      recipe language doesn't have - the same "resolve it at the
+      interpreter, not by asking the recipe author for a branch that
+      doesn't exist" call `remember`'s own fixed confirmation text
+      already makes.
+    - **`HostEmulator.seedMemory()`/`seed_memory()` already existed in
+      both languages, unused until now**: wired into both conformance
+      test runners' `host_setup.memory` reading for the first time -
+      no new emulator method needed, just a real first consumer.
+    - `backend/packages/recall/` (manifest + recipe.json), the read-side
+      mirror of `backend/packages/remember/`: `memory:read`, `min_role:
+      "child"`, one required `topic` arg, two routing patterns ("what do
+      you remember about *", "do you remember *") plus five fuzzy
+      examples for the tier-1 keyword-overlap floor.
+    - Verified live end to end through the real turn engine, not just
+      the direct skill-run API: `remember`ed a real fact through a real
+      chat turn, then asked "what do you remember about the garage
+      code" through another real chat turn - the deterministic floor
+      pattern-matched to `recall` (`source: "skill"`, `skill_id:
+      "recall"`), called the real `host.memory.recall`, and spoke the
+      real fact back. A second real turn for a topic never remembered
+      confirmed the honest "I don't remember anything about that." reply,
+      not a crash or an empty string.
+    - **A real, named limitation left as-is, not fixed here**: today's
+      keyword-overlap tier-1 matching (the same documented placeholder
+      for the real `embed` role that now exists but isn't wired into
+      routing yet) could occasionally favor `remember`'s own examples
+      over `recall`'s for an ambiguously-phrased utterance containing
+      the word "remember" in both directions - an accepted, inherent
+      property of the placeholder matcher the plan's own text already
+      names, not something to chase down before `embed` is wired into
+      routing.
+
 ## API routes and `@hono/zod-openapi` (tracked debt)
 
 `getmaipai/CLAUDE.md` > Documentation requires every Hono route to be

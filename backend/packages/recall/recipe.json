@@ -1,0 +1,18 @@
+{
+  "id": "recall",
+  "inputs": [{ "name": "topic", "selector": "text" }],
+  "steps": [
+    {
+      "op": "recall",
+      "as": "summary",
+      "query": "{topic}",
+      "scope": "household"
+    },
+    {
+      "op": "format",
+      "as": "reply",
+      "text": "{summary}",
+      "speech": "{summary}"
+    }
+  ]
+}

@@ -21,6 +21,18 @@ describe("the bundled remember package", () => {
   });
 });
 
+describe("the bundled recall package", () => {
+  test("is discoverable and its manifest + recipe validate against spec's schemas", () => {
+    expect(listPackageIds()).toContain("recall");
+    const loaded = loadPackage("recall");
+    expect(loaded.ok).toBe(true);
+    if (!loaded.ok) return;
+    expect(loaded.value.manifest.id).toBe("recall");
+    expect(loaded.value.manifest.permissions).toContain("memory:read");
+    expect(loaded.value.recipe.steps.length).toBeGreaterThan(0);
+  });
+});
+
 async function owner() {
   const client = new TestClient();
   await client.post("/api/auth/setup", { displayName: "Sage", secret: "correcthorse" });
@@ -87,5 +99,39 @@ describe("POST /api/skills/remember/run", () => {
     const recall = await client.post("/api/memory/recall", { q: "fact" });
     const matches = (await recall.json()) as Array<{ record: { text: string } }>;
     expect(matches.some((m) => m.record.text.includes("{fact}"))).toBe(false);
+  });
+});
+
+describe("POST /api/skills/recall/run", () => {
+  test("runs the recipe end to end: finds and speaks back a real remembered fact", async () => {
+    const client = await owner();
+    const remembered = await client.post("/api/skills/remember/run", { fact: "the wifi password is on the fridge" });
+    expect(remembered.status).toBe(200);
+
+    const res = await client.post("/api/skills/recall/run", { topic: "wifi password" });
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { reply?: { text: string } };
+    expect(body.reply?.text).toContain("wifi password");
+  });
+
+  test("a plain, honest reply when nothing matches - not an empty string or an error", async () => {
+    const client = await owner();
+    const res = await client.post("/api/skills/recall/run", { topic: "the moon landing" });
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { reply?: { text: string } };
+    expect(body.reply?.text).toBe("I don't remember anything about that.");
+  });
+
+  test("a child, exactly at the min_role floor, can still run it", async () => {
+    const ownerClient = await owner();
+    const childClient = await child(ownerClient);
+    const res = await childClient.post("/api/skills/recall/run", { topic: "anything" });
+    expect(res.status).toBe(200);
+  });
+
+  test("400s for a missing required input", async () => {
+    const client = await owner();
+    const res = await client.post("/api/skills/recall/run", {});
+    expect(res.status).toBe(400);
   });
 });

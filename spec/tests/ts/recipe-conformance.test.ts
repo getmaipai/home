@@ -15,7 +15,11 @@ interface ConformanceFixture {
   description: string;
   recipe: unknown;
   inputs: Record<string, unknown>;
-  host_setup: { fetch?: Record<string, unknown>; config?: Record<string, unknown> };
+  host_setup: {
+    fetch?: Record<string, unknown>;
+    config?: Record<string, unknown>;
+    memory?: { text: string; category?: string; scope?: string; person?: string }[];
+  };
   expected: {
     reply: { text: string; speech?: string } | null;
     actions: { kind: string; payload?: unknown }[];
@@ -39,6 +43,9 @@ describe("recipe conformance", () => {
       }
       for (const [key, value] of Object.entries(fixture.host_setup.config ?? {})) {
         host.seedConfig(key, value);
+      }
+      if (fixture.host_setup.memory) {
+        host.seedMemory(fixture.host_setup.memory);
       }
 
       const result = runRecipe(recipe, fixture.inputs, host);

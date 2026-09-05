@@ -1,0 +1,31 @@
+{
+  "description": "recall + format: binds a ready-to-speak summary from host.memory.recall - the Recall skill's own shape (backend/packages/recall/)",
+  "recipe": {
+    "id": "recall-topic",
+    "inputs": [{ "name": "topic", "selector": "text" }],
+    "steps": [
+      { "op": "recall", "as": "summary", "query": "{topic}", "scope": "household" },
+      { "op": "format", "as": "reply", "text": "{summary}", "speech": "{summary}" }
+    ]
+  },
+  "inputs": { "topic": "wifi password" },
+  "host_setup": {
+    "memory": [
+      { "text": "the wifi password is on the fridge", "category": "fact", "scope": "household" },
+      { "text": "Nova is allergic to peanuts", "category": "fact", "scope": "household" }
+    ]
+  },
+  "expected": {
+    "reply": {
+      "text": "the wifi password is on the fridge",
+      "speech": "the wifi password is on the fridge"
+    },
+    "actions": [],
+    "scheduled_jobs": [],
+    "home_calls": [],
+    "memory_added": [
+      { "text": "the wifi password is on the fridge", "category": "fact", "scope": "household" },
+      { "text": "Nova is allergic to peanuts", "category": "fact", "scope": "household" }
+    ]
+  }
+}

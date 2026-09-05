@@ -1,0 +1,23 @@
+{
+  "description": "recall with no matches: binds the plain 'nothing found' phrase, not an empty string or an error - the recipe language has no conditional step to phrase this itself",
+  "recipe": {
+    "id": "recall-nothing",
+    "inputs": [{ "name": "topic", "selector": "text" }],
+    "steps": [
+      { "op": "recall", "as": "summary", "query": "{topic}", "scope": "household" },
+      { "op": "format", "as": "reply", "text": "{summary}", "speech": "{summary}" }
+    ]
+  },
+  "inputs": { "topic": "dentist appointment" },
+  "host_setup": { "memory": [] },
+  "expected": {
+    "reply": {
+      "text": "I don't remember anything about that.",
+      "speech": "I don't remember anything about that."
+    },
+    "actions": [],
+    "scheduled_jobs": [],
+    "home_calls": [],
+    "memory_added": []
+  }
+}

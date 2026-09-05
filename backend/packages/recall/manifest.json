@@ -1,0 +1,45 @@
+{
+  "id": "recall",
+  "version": "0.1.0",
+  "kind": "skill",
+  "category": "Utilities",
+  "display": "Recall",
+  "description": "Tells you what it remembers about something you ask (4.4/4.9) - the read-side counterpart to Remember.",
+  "author": "MaiPai",
+  "license": "AGPL-3.0",
+  "homepage": "https://github.com/getmaipai/home",
+  "routing": {
+    "examples": [
+      "what do you remember about the wifi password",
+      "do you remember what I said about my allergies",
+      "what have I told you to remember about pizza night",
+      "what do you know about my dentist appointment",
+      "remind me what I said about the school schedule"
+    ],
+    "patterns": ["what do you remember about *", "do you remember *"]
+  },
+  "args": {
+    "type": "object",
+    "required": ["topic"],
+    "properties": {
+      "topic": { "type": "string", "minLength": 1 }
+    }
+  },
+  "requires": [],
+  "optional": [],
+  "platforms": ["home", "bot"],
+  "min_role": "child",
+  "consequential": false,
+  "offline": "full",
+  "config": [],
+  "data_sources": [],
+  "permissions": ["memory:read"],
+  "notifications": [],
+  "backup": "hot",
+  "background": false,
+  "contributes": [],
+  "pages": [],
+  "min_app": "0.1.0",
+  "tier": 0,
+  "quality_scale": "bronze"
+}
