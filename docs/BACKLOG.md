@@ -12,20 +12,20 @@ Rough size tags: **S** (a session or less), **M** (a real slice, days),
 
 ## Naming: rename `skill` to `plugin`, add real `skill` and `command`
 
-Decided (2026-09-05, full research and reasoning in `docs/dev.md`'s
-"Naming: skill, plugin, command, connector" entry) but NOT executed -
-flagged for Jesse's go-ahead before starting, since the blast radius
-crosses repos, not just files in this one.
+Decided 2026-09-05 (full research and reasoning in `docs/dev.md`'s
+"Naming: skill, plugin, command, connector" entry). The rename itself is
+done; the other two items are still real, tracked work.
 
-- [ ] **Rename the `skill` manifest kind to `plugin`** (M-L) - no
-      behavior change to `weather`/`joke`/`trivia`/`define`/`remember`/
-      `recall`, just the correct name for what they already are (a
-      self-contained, permissioned, installable capability - matching
-      Claude's actual Plugin shape, not its Skill shape). Touches the
-      manifest JSON schema (spec-level), `getmaipai/.github/docs/
-      PACKAGES.md` (org-wide, affects `bot` and `catalog` too), the
-      planned `catalog` repo layout, and every doc/test reference to
-      "skill" from tonight's work.
+- [x] **Rename the `skill` manifest kind to `plugin`** (M-L, done
+      2026-09-05, `docs/dev.md`'s "The skill -> plugin rename, executed"
+      entry) - no behavior change to `weather`/`joke`/`trivia`/`define`/
+      `remember`/`recall`, just the correct name for what they already
+      are. Included a real data migration for `conversation_turns` rows
+      with genuine data from tonight's live testing, not just a schema
+      change. Still open: `getmaipai/.github/docs/PACKAGES.md` (org-wide,
+      affects `bot` and `catalog` too) and the planned `catalog` repo
+      layout haven't been updated to match yet - a separate repo's commit,
+      tracked here so it isn't forgotten.
 - [ ] **Add a real `skill` kind: plain instructions, Claude-`SKILL.md`-
       compatible, no independent permissions** (M) - genuinely new
       capability. Composed into context the same way `lib/persona.ts`

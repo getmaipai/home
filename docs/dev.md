@@ -4977,3 +4977,57 @@ frontend, which currently fails in `apps/chat` and `apps/settings` on the
 in-flight `skill` to `plugin` rename happening in a parallel session.
 Nothing under `src/kit/` errors, and the Vite build and the full test
 suite are green. Those files are that session's to fix.
+
+## The `skill` -> `plugin` rename, executed (2026-09-05)
+
+The first of the three items decided in this file's earlier "Naming:
+skill, plugin, command, connector" entry is done: every place this
+platform meant "a self-contained, permissioned, installable capability"
+(`weather`, `joke`, `trivia`, `define`, `remember`, `recall`) now calls
+that a `plugin`, not a `skill`. No behavior change to any of the six
+bundled packages - only the name.
+
+Touched, in order: `spec/schemas/manifest.schema.json`'s `kind` enum and
+`result.schema.json`'s title (`SkillResult` -> `PluginResult`),
+regenerated TS/Python types, both recipe interpreters' `PluginResult`;
+`backend/src/lib/skills.ts` -> `lib/plugins.ts` (`runSkill` ->
+`runPlugin`), `routes/skills.ts` -> `routes/plugins.ts` (`/api/skills` ->
+`/api/plugins`); `turnEngine.ts`'s `TurnValue.source` (`"skill"`/
+`"skill_error"` -> `"plugin"`/`"plugin_error"`) and `RoutedSkill` ->
+`RoutedPlugin`; `scheduler.ts`'s `JobKind`; `conversationHistory.ts`'s
+`RoutingStats` (`skill`/`skillError`/`bySkill` -> `plugin`/`pluginError`/
+`byPlugin`); all 6 manifests; every fixture, test, and prose comment
+referencing the concept; the frontend's `routingStats()` call site and
+`RoutingStatsSection`'s "Plugin routing" heading (picking up the parallel
+session's kit primitives cleanly - no overlap, confirmed by diff before
+either side committed).
+
+**A real data migration, not just a schema change.** `conversation_turns.
+skill_id` and its `source` column had genuine data from tonight's live
+testing - the joke/weather/trivia turns verified earlier, and even the
+`skill_error` rows from the real `dictionaryapi.dev` outage. Hand-written
+(`0007_rename_skill_to_plugin.sql`, plus its journal entry and drizzle-kit
+snapshot): `drizzle-kit generate`'s rename-vs-drop-and-add prompt needs a
+TTY this environment doesn't have, and it wouldn't have written the data
+migration either way. `scheduled_jobs.kind` was also normalized, though
+confirmed first that no real row could have `"skill"` there - no bundled
+recipe has ever used the `schedule` step. Verified against fresh,
+isolated test databases running the full migration chain from scratch
+(every `bun test` run gets its own `mkdtempSync` data dir); the real
+household database was never touched by any command in this whole rename.
+
+**Left alone, deliberately.** Historical narrative earlier in this file
+(what a recipe or a test was called AT THE TIME it was built) stays as
+written - it's a record of what was true when written, not current
+terminology, the same posture already established for the garage-code
+data-hygiene entry. Past migration snapshots (`0004`-`0006`) are
+untouched for the same reason: they represent real prior schema states.
+`lib/backup.ts`'s "the release skill" is a different concept entirely
+(the Claude Code slash-command that runs the release ceremony) and was
+never in scope.
+
+**Not done, tracked in `docs/BACKLOG.md`:** the real `skill` kind
+(Claude-`SKILL.md`-compatible plain instructions), a first-class
+`command` primitive, and updating the org-wide `getmaipai/.github/docs/
+PACKAGES.md` standard to match (affects `bot` and `catalog` too, a
+separate repo's commit).
