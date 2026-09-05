@@ -4,9 +4,9 @@ import { resetDb } from "./reset-db";
 import { __resetThrottleForTests } from "@/lib/secretThrottle";
 import { __resetLlmSupervisorForTests } from "@/lib/llmSupervisor";
 import { runTurn } from "@/lib/turnEngine";
-import { list, exportPerson, runRetention, routingStats } from "@/lib/conversationHistory";
+import { list, exportPerson, runRetention, routingStats, summarizeBeforeDelete } from "@/lib/conversationHistory";
 import { db } from "@/db";
-import { people, conversationTurns } from "@/db/schema";
+import { people, conversationTurns, memoryRecords } from "@/db/schema";
 import { eq } from "drizzle-orm";
 
 beforeEach(() => {
@@ -212,6 +212,97 @@ describe("exportPerson()", () => {
   });
 });
 
+describe("summarizeBeforeDelete()", () => {
+  afterEach(() => {
+    delete process.env.MAIPAI_LLAMA_SERVER_URL;
+  });
+
+  test("no-ops on an empty batch", async () => {
+    await summarizeBeforeDelete([]);
+    expect(db.select().from(memoryRecords).all().length).toBe(0);
+  });
+
+  test("never stores a canned reply as a memory when only the stub backend is available", async () => {
+    const { actor } = await owner();
+    await runTurn(actor, "chat", "good morning"); // falls through to the stub chat backend
+    const rows = db.select().from(conversationTurns).where(eq(conversationTurns.personId, actor.id)).all();
+
+    await summarizeBeforeDelete(rows);
+
+    expect(db.select().from(memoryRecords).where(eq(memoryRecords.recordKind, "episode")).all().length).toBe(0);
+  });
+
+  test("writes a real episode memory record from a real (if stub-shaped) completion", async () => {
+    const { actor } = await owner();
+    await runTurn(actor, "chat", "remember that trash day is Tuesday"); // the skill floor, no chat call yet
+    const rows = db.select().from(conversationTurns).where(eq(conversationTurns.personId, actor.id)).all();
+
+    const { startStubLlmServer } = await import("@maipai/spec/llm/ts/stubServer.js");
+    const stub = startStubLlmServer();
+    process.env.MAIPAI_LLAMA_SERVER_URL = stub.url;
+    try {
+      await summarizeBeforeDelete(rows);
+    } finally {
+      stub.stop();
+    }
+
+    const episodes = db.select().from(memoryRecords).where(eq(memoryRecords.recordKind, "episode")).all();
+    expect(episodes.length).toBe(1);
+    expect(episodes[0]!.person).toBe(actor.id);
+    expect(episodes[0]!.scope).toBe("person");
+    expect(episodes[0]!.category).toBe("event");
+    // The stub echoes the last "user" message back, which here is the
+    // whole summarization prompt this function built - proves the real
+    // prompt actually reached the client, not a canned string.
+    expect(episodes[0]!.text).toContain("Summarize the key facts");
+  });
+
+  test("an unreachable model resolves cleanly, not rejected - the delete must never depend on this", async () => {
+    const { actor } = await owner();
+    await runTurn(actor, "chat", "good morning");
+    const rows = db.select().from(conversationTurns).where(eq(conversationTurns.personId, actor.id)).all();
+
+    // The URL override tier constructs a client with no health probe, so
+    // this fails inside complete()'s own try/catch (a real connection
+    // refusal), the realistic way a completion actually fails here -
+    // exercising the `!result.ok` branch, not summarizeBeforeDelete()'s
+    // own outer catch (a separate, more defensive guard against
+    // anything else in this loop throwing, e.g. remember() itself).
+    process.env.MAIPAI_LLAMA_SERVER_URL = "http://127.0.0.1:1"; // never reachable
+    await expect(summarizeBeforeDelete(rows)).resolves.toBeUndefined();
+
+    expect(db.select().from(memoryRecords).where(eq(memoryRecords.recordKind, "episode")).all().length).toBe(0);
+  });
+
+  // A code review (2026-09-04) found the person lookup matched a
+  // SOFT-deleted person too (the household removed them since these
+  // turns were written), writing them a brand-new episode memory
+  // anyway - the same isNull(deletedAt) guard scheduler.ts's own
+  // core-job person lookup already has, missing here.
+  test("never attributes a summary to a person who's been deleted since these turns were written", async () => {
+    const { client } = await owner();
+    const child = await addPerson(client, "Bramble", "child");
+    // The skill floor, not a generic message: a generic one falls
+    // through to the chat role during turn creation itself, which would
+    // resolve (and cache) the DEFAULT test backend before this test
+    // gets a chance to point MAIPAI_LLAMA_SERVER_URL at its own stub.
+    await runTurn(child, "chat", "remember that I like pizza");
+    const rows = db.select().from(conversationTurns).where(eq(conversationTurns.personId, child.id)).all();
+    db.update(people).set({ deletedAt: new Date().toISOString() }).where(eq(people.id, child.id)).run();
+
+    const { startStubLlmServer } = await import("@maipai/spec/llm/ts/stubServer.js");
+    const stub = startStubLlmServer();
+    process.env.MAIPAI_LLAMA_SERVER_URL = stub.url;
+    try {
+      await summarizeBeforeDelete(rows);
+    } finally {
+      stub.stop();
+    }
+
+    expect(db.select().from(memoryRecords).where(eq(memoryRecords.recordKind, "episode")).all().length).toBe(0);
+  });
+});
+
 describe("runRetention()", () => {
   test("deletes a normal turn past the default 90-day retention", async () => {
     const { actor } = await owner();
@@ -250,6 +341,43 @@ describe("runRetention()", () => {
     const result = runRetention();
     expect(result.deleted).toBe(0);
     expect(list(ownerActor, child.id).length).toBe(1);
+  });
+
+  // Proves the one real line connecting runRetention() to
+  // summarizeBeforeDelete() (already exhaustively tested on its own
+  // above) actually fires with the real rows about to be deleted, not
+  // just that the two functions exist independently. Fire-and-forget
+  // by design (runRetention()'s own doc comment), so this polls briefly
+  // for the background write rather than awaiting anything runRetention()
+  // itself exposes.
+  test("summarizes before deleting when a real model is configured, without delaying the delete itself", async () => {
+    const { actor } = await owner();
+    await runTurn(actor, "chat", "remember that trash day is Tuesday");
+    const staleDate = new Date(Date.now() - 100 * 24 * 60 * 60 * 1000).toISOString();
+    db.update(conversationTurns).set({ createdAt: staleDate }).where(eq(conversationTurns.personId, actor.id)).run();
+
+    const { startStubLlmServer } = await import("@maipai/spec/llm/ts/stubServer.js");
+    const stub = startStubLlmServer();
+    process.env.MAIPAI_LLAMA_SERVER_URL = stub.url;
+    try {
+      const result = runRetention();
+      // The delete already happened synchronously, before any
+      // summarization work could possibly have finished.
+      expect(result.deleted).toBe(1);
+      expect(db.select().from(conversationTurns).where(eq(conversationTurns.personId, actor.id)).all().length).toBe(0);
+
+      const deadline = Date.now() + 2_000;
+      let episodes: unknown[] = [];
+      while (Date.now() < deadline) {
+        episodes = db.select().from(memoryRecords).where(eq(memoryRecords.recordKind, "episode")).all();
+        if (episodes.length > 0) break;
+        await new Promise((r) => setTimeout(r, 25));
+      }
+      expect(episodes.length).toBe(1);
+    } finally {
+      stub.stop();
+      delete process.env.MAIPAI_LLAMA_SERVER_URL;
+    }
   });
 
   test("a normal (non-flagged) turn from the same child is deleted once past the shortened setting, floor or not", async () => {

@@ -9,20 +9,33 @@
 //
 // Full 4.14 is bigger than this: household search across content types
 // (needs the shell palette, chapter 6, and content types like notes/media
-// that don't exist), 90-day summarization instead of a hard delete (needs
-// an LLM, 4.11's other roles), an audit of who viewed what, and a synced
+// that don't exist), an audit of who viewed what, and a synced
 // spec-shaped record for robot parity (needs the link, 7.3, and `bot` to
 // exist as real content) are all out of scope, most documented at the
 // point they matter below. Not a spec 3.1 record type today: chapter 3's
 // own record table has no Conversation entry, the same "hub-internal,
 // revisit for robot parity later" call lib/scheduler.ts's Job made.
-import { eq } from "drizzle-orm";
+//
+// 90-day summarization instead of a hard delete (2026-09-04) is real
+// now: runRetention() best-effort summarizes each person's about-to-
+// expire turns into one real `record_kind: "episode"` memory record
+// (3.1's shape has always had this kind; nothing had ever created one
+// until now) via the `chat` role, before deleting the raw turns. Never
+// gates the actual deletion on it succeeding - a household's retention
+// promise ("gone after N days") is the hard guarantee; a summary is a
+// best-effort upgrade on top of it, not a precondition. See
+// summarizeBeforeDelete()'s own comment for exactly what that means
+// when no real model is running yet.
+import { eq, or, and, not, lt, isNull } from "drizzle-orm";
 import { db, sqlite } from "@/db";
-import { conversationTurns } from "@/db/schema";
+import { conversationTurns, people } from "@/db/schema";
 import { newConversationTurnId } from "@/lib/id";
 import { canAccessPerson } from "@/lib/access";
 import { isMinorRole } from "@/lib/safety";
 import { getHouseholdSettingValue } from "@/lib/settings";
+import { complete } from "@/lib/llm";
+import { getEngineStatus } from "@/lib/llmSupervisor";
+import { remember } from "@/lib/memory";
 import type { Role } from "@/middleware/auth";
 import type { TurnValue, Surface } from "@/lib/turnEngine";
 import type { PersonRow } from "@/types";
@@ -113,20 +126,113 @@ const DEFAULT_RETENTION_DAYS = 90;
 const SAFETY_FLAGGED_MINOR_FLOOR_DAYS = 90;
 const DAY_MS = 86_400_000;
 
-/** Hard-deletes turns past the household's retention window (4.6's
+const MAX_SUMMARY_INPUT_CHARS = 8_000;
+
+/** Turns a batch of one person's about-to-expire turns into one real
+ * `record_kind: "episode"` memory record (household 3.1's shape already
+ * had this kind; nothing had ever created one before this). Best effort,
+ * on purpose: skipped entirely (returns without writing anything, and
+ * without throwing) whenever there's no REAL model to ask - storing the
+ * stub's own canned "[stub model: no real model loaded]" text as a
+ * permanent memory record would be worse than no summary at all. Checked
+ * both BEFORE calling complete() (a cheap bulk skip once a process
+ * already knows it's on the stub, the common case on every retention
+ * tick after the first) and AFTER each call (the only way to know for a
+ * process's very first completion ever, since getChatClient() resolves
+ * lazily - `getEngineStatus()` only reports "none" beforehand, and
+ * complete() itself is what decides real-vs-stub). A real model that's
+ * merely slow, or a completion that fails for any other reason, is
+ * treated the same way: logged, not thrown, since runRetention()'s own
+ * deletion must never wait on or be blocked by this. The most recent
+ * `MAX_SUMMARY_INPUT_CHARS` of transcript (not the oldest) is what gets
+ * summarized when a person's batch is large - recency is more useful to
+ * a future reader than completeness, and this keeps the prompt well
+ * inside even a modest context window. */
+// Exported for a real test (a real completion round trip against a real
+// stub-shaped server, not a mock of complete()) - the same "prove the
+// real mechanism, not a simulation of it" standard this session's other
+// supervisor tests already hold to. runRetention() calls this the same
+// way, fire-and-forget.
+export async function summarizeBeforeDelete(rows: ConversationTurnRow[]): Promise<void> {
+  const byPerson = new Map<string, ConversationTurnRow[]>();
+  for (const row of rows) {
+    if (!byPerson.has(row.personId)) byPerson.set(row.personId, []);
+    byPerson.get(row.personId)!.push(row);
+  }
+  if (byPerson.size === 0) return;
+  if (getEngineStatus().kind === "stub") return;
+
+  for (const [personId, personRows] of byPerson) {
+    // isNull(deletedAt), not a bare id match: a code review (2026-09-04)
+    // found the original version still found a SOFT-deleted person (the
+    // household removed them since these turns were written) and wrote
+    // them a brand-new episode memory anyway - the same pattern
+    // scheduler.ts's own core-job person lookup already guards against
+    // for the identical reason.
+    const person = db.select().from(people).where(and(eq(people.id, personId), isNull(people.deletedAt))).get();
+    if (!person) continue; // deleted since these turns were written; nothing to attribute a summary to
+
+    personRows.sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+    let transcript = personRows.map((r) => `User: ${r.userText}\nReply: ${r.replyText}`).join("\n\n");
+    if (transcript.length > MAX_SUMMARY_INPUT_CHARS) {
+      transcript = transcript.slice(transcript.length - MAX_SUMMARY_INPUT_CHARS);
+    }
+
+    try {
+      const result = await complete("chat", [
+        {
+          role: "user",
+          content:
+            "Summarize the key facts, requests, and events from this conversation history in 2-4 sentences, " +
+            "for future reference. Do not quote exact wording, just the substance.\n\n" +
+            transcript,
+        },
+      ]);
+      if (!result.ok) {
+        console.log(`[conversationHistory] retention summary skipped for ${personId}: ${result.error}`);
+        continue;
+      }
+      if (getEngineStatus().kind === "stub") {
+        // Resolved to the stub for the first time just now (this
+        // process's very first completion ever) - a canned reply is
+        // worse than no summary; skip the rest of this batch too.
+        return;
+      }
+      const written = remember(person, {
+        record_kind: "episode",
+        text: result.value.text,
+        category: "event",
+        tier: "durable",
+        scope: "person",
+        person: personId,
+        source: "conversation-retention-summary",
+        importance: 0.3,
+      });
+      if (!written.ok) {
+        console.log(`[conversationHistory] retention summary for ${personId} failed to save: ${written.error}`);
+      }
+    } catch (err) {
+      console.log(`[conversationHistory] retention summary failed for ${personId}: ${(err as Error).message}`);
+    }
+  }
+}
+
+/** Best-effort summarizes (see summarizeBeforeDelete()), then hard-
+ * deletes, turns past the household's retention window (4.6's
  * `household.conversation_retention_days`, default 90). A safety-flagged
  * turn from a minor speaker is never deleted before it's at least
  * `SAFETY_FLAGGED_MINOR_FLOOR_DAYS` old, regardless of how short the
  * household sets retention: the floor only ever *extends* the effective
  * window (a household that sets retention longer than the floor is
- * unaffected; the general rule already keeps those turns longer). No
- * summarize-then-purge: 4.14 describes turning old conversations into a
- * summary rather than deleting them outright, but that needs an LLM
- * (4.11's other roles) that doesn't exist, so this is a real hard delete,
- * stricter than the plan's design but the privacy-safer default (nothing
- * kept indefinitely past its stated window) until summarization lands.
- * Wired as a real daily core job (lib/scheduler.ts), not a manual-only
- * trigger: unlike memory.ts's runMaintenance() when it first shipped, the
+ * unaffected; the general rule already keeps those turns longer). The
+ * summary step never gates or delays the delete: retention's "gone
+ * after N days" is the hard privacy guarantee this function exists to
+ * keep, a summary is a best-effort upgrade on top of it, never a
+ * precondition - so the delete always proceeds this same tick whether
+ * or not summarization succeeded, and callers don't need to await the
+ * summarization to get an accurate `deleted` count back. Wired as a
+ * real daily core job (lib/scheduler.ts), not a manual-only trigger:
+ * unlike memory.ts's runMaintenance() when it first shipped, the
  * scheduler (4.7) already exists by the time this was built. */
 export function runRetention(): { deleted: number } {
   const retentionDays = getHouseholdSettingValue("household.conversation_retention_days") as number | undefined;
@@ -139,6 +245,26 @@ export function runRetention(): { deleted: number } {
   // general cutoff alone is already stricter and the floor never binds.
   const floorCutoff = new Date(now - SAFETY_FLAGGED_MINOR_FLOOR_DAYS * DAY_MS).toISOString();
   const flaggedMinorCutoff = generalCutoff < floorCutoff ? generalCutoff : floorCutoff;
+
+  // Read what's about to be deleted BEFORE deleting it, so there's real
+  // text left to summarize - the exact same two cohorts the DELETE
+  // statements below select, combined. Fired without awaiting: see
+  // runRetention()'s own doc comment for why the delete must never wait
+  // on this.
+  const isFlaggedMinor = and(eq(conversationTurns.safetyFlagged, true), eq(conversationTurns.minorSpeaker, true));
+  const expiring = db
+    .select()
+    .from(conversationTurns)
+    .where(
+      or(
+        and(not(isFlaggedMinor!), lt(conversationTurns.createdAt, generalCutoff))!,
+        and(isFlaggedMinor!, lt(conversationTurns.createdAt, flaggedMinorCutoff))!,
+      ),
+    )
+    .all();
+  void summarizeBeforeDelete(expiring).catch((err: Error) =>
+    console.log(`[conversationHistory] retention summarization batch failed: ${err.message}`),
+  );
 
   // Raw sqlite for a real affected-row count, not db.delete().run(): the
   // same escape hatch lib/memory.ts's forget() uses (Drizzle's bun-sqlite

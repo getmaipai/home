@@ -2888,6 +2888,65 @@ set. Full architecture: platform plan chapters 1, 3, and 4.
       testing, the exact number the plan needs before deciding anything
       about tier 2.
 
+- [x] Real conversation summarization before retention deletes turns
+      (4.14: "retention defaults: conversations ninety days then
+      summarised... a household setting with a floor for kid safety
+      logs" - the summarization half was the one part of this file's
+      own retention entry marked deferred, "needs an LLM, 4.11's other
+      roles"; the `chat` role is real now, so it no longer does).
+      `record_kind: "episode"` (3.1's shape has always had this kind
+      alongside memory/entity; nothing had ever created one until now)
+      is exactly the right shape for "something that happened," not a
+      new one invented for this.
+    - `lib/conversationHistory.ts`'s new `summarizeBeforeDelete()`
+      groups a person's about-to-expire turns, asks the `chat` role for
+      a 2-4 sentence summary, and writes one real episode memory record
+      (`scope: "person"`, `category: "event"`) - fired without being
+      awaited from `runRetention()`, and never gates or delays the
+      actual delete: a household's retention promise ("gone after N
+      days") is the hard guarantee this function exists to keep: a
+      summary is a best-effort upgrade on top of it, never a
+      precondition. Checked both before AND after each completion
+      whether the backend resolved to the stub (nothing configured
+      yet) - storing the stub's own canned "[stub model: ...]" text as
+      a permanent memory record would be worse than no summary at all,
+      and `getEngineStatus()` only ever reports "none" (not yet known)
+      before a process's very first completion, so the after-check is
+      the only way to catch that specific case.
+    - Six regression tests, including one proving the exact wiring from
+      `runRetention()` to `summarizeBeforeDelete()` is real (polls
+      briefly for the background write rather than awaiting anything
+      `runRetention()` itself exposes, since it's deliberately fire-
+      and-forget) - confirmed to fail against a version with that one
+      line disconnected, and confirmed the "never store the stub's
+      canned reply" guard actually matters by removing it and watching
+      the same test fail.
+    - Verified live against the real, locally-running Qwen3 8B model
+      (not just the stub server automated tests use): fed it two real
+      fake conversation turns (a "remember the garage code" skill call
+      and a banana-bread-recipe question) and got back a genuinely
+      accurate, well-formed 3-sentence summary covering both, written
+      as a real `ep1-...` episode record and confirmed via direct
+      `sqlite3` query before being cleaned up (test data, not real
+      household information).
+    - **Deliberately not attempted**: extending the same treatment to
+      the safety-flagged-minor floor's own (longer) retention window -
+      those turns already get the identical summarization pass today
+      since `summarizeBeforeDelete()` runs on the combined batch, no
+      special-casing needed; what's NOT built is anything that changes
+      what a parent sees in oversight review based on a summary
+      existing (4.14's own "a summary... for a teen's" ask is still the
+      separate, unbuilt visibility feature `list()`'s own comment
+      already names).
+    - **A code review before commit found a real gap**: the person
+      lookup matched a SOFT-deleted person too (removed since these
+      turns were written), so a household that deleted someone still
+      got a brand-new episode memory attributed to them on the very
+      next retention run - the exact `isNull(deletedAt)` guard
+      `scheduler.ts`'s own core-job person lookup already carries for
+      the identical reason, missing here. Fixed, with a regression test
+      confirmed to fail against the pre-fix code.
+
 ## API routes and `@hono/zod-openapi` (tracked debt)
 
 `getmaipai/CLAUDE.md` > Documentation requires every Hono route to be
