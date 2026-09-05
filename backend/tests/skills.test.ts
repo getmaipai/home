@@ -101,6 +101,26 @@ describe("the bundled joke package", () => {
   });
 });
 
+// The fourth real skill built on host.fetch (2026-09-05). Same posture as
+// the others: no automated test here calls the real opentdb.com; the
+// recipe's own step logic has its own conformance fixture
+// (spec/fixtures/recipes/trivia.json), using a real captured response that
+// includes opentdb.com's own unconditional HTML-entity encoding - the fixture
+// that drove interpolate()'s entity-decoding fix (recipe-interpreter.ts,
+// recipe_interpreter.py) landing the same day.
+describe("the bundled trivia package", () => {
+  test("is discoverable and its manifest + recipe validate against spec's schemas", () => {
+    expect(listPackageIds()).toContain("trivia");
+    const loaded = loadPackage("trivia");
+    expect(loaded.ok).toBe(true);
+    if (!loaded.ok) return;
+    expect(loaded.value.manifest.id).toBe("trivia");
+    expect(loaded.value.manifest.permissions).toContain("net:opentdb.com");
+    expect(loaded.value.recipe.inputs).toEqual([]);
+    expect(loaded.value.recipe.steps.length).toBeGreaterThan(0);
+  });
+});
+
 async function owner() {
   const client = new TestClient();
   await client.post("/api/auth/setup", { displayName: "Sage", secret: "correcthorse" });

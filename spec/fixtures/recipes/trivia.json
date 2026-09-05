@@ -1,0 +1,51 @@
+{
+  "description": "The real backend/packages/trivia/recipe.json (2026-09-05, the fourth real skill built on host.fetch): a single, zero-input fetch+pick+pick+format chain against opentdb.com, using a response shape captured from a real call - including its HTML-entity-encoded text (Cartoon &amp; Animations, &quot;killed&quot;), proving interpolate()'s entity-decoding fix works in the actual shipped skill, not just the regression fixture.",
+  "recipe": {
+    "id": "trivia",
+    "inputs": [],
+    "steps": [
+      {
+        "op": "fetch",
+        "as": "result",
+        "url": "https://opentdb.com/api.php?amount=1&type=multiple",
+        "method": "GET"
+      },
+      { "op": "pick", "as": "question", "from": "result", "path": "results.0.question" },
+      { "op": "pick", "as": "answer", "from": "result", "path": "results.0.correct_answer" },
+      {
+        "op": "format",
+        "as": "reply",
+        "text": "{question} The answer: {answer}.",
+        "speech": "{question} ... The answer: {answer}."
+      }
+    ]
+  },
+  "inputs": {},
+  "host_setup": {
+    "fetch": {
+      "https://opentdb.com/api.php?amount=1&type=multiple": {
+        "response_code": 0,
+        "results": [
+          {
+            "type": "multiple",
+            "difficulty": "medium",
+            "category": "Entertainment: Cartoon &amp; Animations",
+            "question": "What is the name of the Alligator that The Simpsons &quot;killed&quot; in the episode &quot;Kill The Alligator and Run&quot;?",
+            "correct_answer": "Captain Jack",
+            "incorrect_answers": ["Captain Jake", "Captain Hector", "Captain Flynn"]
+          }
+        ]
+      }
+    }
+  },
+  "expected": {
+    "reply": {
+      "text": "What is the name of the Alligator that The Simpsons \"killed\" in the episode \"Kill The Alligator and Run\"? The answer: Captain Jack.",
+      "speech": "What is the name of the Alligator that The Simpsons \"killed\" in the episode \"Kill The Alligator and Run\"? ... The answer: Captain Jack."
+    },
+    "actions": [],
+    "scheduled_jobs": [],
+    "home_calls": [],
+    "memory_added": []
+  }
+}

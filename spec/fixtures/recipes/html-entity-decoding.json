@@ -1,0 +1,41 @@
+{
+  "description": "Regression fixture (2026-09-05, found building the trivia skill): opentdb.com HTML-entity-encodes every response unconditionally (Jojo&#039;s stand). Proves interpolate() decodes entities in a value substituted from a real fetch response, in both format's text/speech and remember's text - not a trivia-specific fixture, a general interpreter behavior fixture.",
+  "recipe": {
+    "id": "html-entity-decoding-regression",
+    "inputs": [],
+    "steps": [
+      {
+        "op": "fetch",
+        "as": "result",
+        "url": "https://example.com/entities",
+        "method": "GET"
+      },
+      { "op": "pick", "as": "fact", "from": "result", "path": "fact" },
+      {
+        "op": "format",
+        "as": "reply",
+        "text": "Did you know: {fact}",
+        "speech": "{fact}"
+      },
+      { "op": "remember", "text": "{fact}", "category": "fact", "scope": "household" }
+    ]
+  },
+  "inputs": {},
+  "host_setup": {
+    "fetch": {
+      "https://example.com/entities": {
+        "fact": "Jojo&#039;s Bizarre Adventure &amp; friends &lt;3"
+      }
+    }
+  },
+  "expected": {
+    "reply": {
+      "text": "Did you know: Jojo's Bizarre Adventure & friends <3",
+      "speech": "Jojo's Bizarre Adventure & friends <3"
+    },
+    "actions": [],
+    "scheduled_jobs": [],
+    "home_calls": [],
+    "memory_added": [{ "text": "Jojo's Bizarre Adventure & friends <3", "category": "fact", "scope": "household" }]
+  }
+}

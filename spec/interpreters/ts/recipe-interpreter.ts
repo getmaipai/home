@@ -3,6 +3,7 @@
 // eval: every step is one of the seven declared primitives. This must stay
 // behaviorally identical to spec/interpreters/py/recipe_interpreter.py; the
 // conformance fixtures in spec/fixtures/recipes/ prove that.
+import { decode } from "he";
 import type { Recipe } from "../../gen/ts/recipe.js";
 import type { Host } from "../../emulators/ts/host-emulator.js";
 
@@ -42,10 +43,23 @@ type RecipeStep =
 // makes.
 const NOTHING_RECALLED = "I don't remember anything about that.";
 
+// Decodes HTML entities in the SUBSTITUTED VALUE, never the template
+// itself (the template is always our own authored manifest/recipe text,
+// which never contains entities; the value can come from `fetch`, an
+// arbitrary external API). Found building the `trivia` skill (2026-09-05):
+// opentdb.com HTML-entity-encodes every response unconditionally
+// ("Jojo&#039;s stand"), and nothing in this interpreter decoded it -
+// every future text-returning API that does the same (a real, common
+// practice for APIs meant to be embedded directly in a web page) would
+// have shown raw entities in a chat reply or spoken them literally aloud.
+// `he` (a maintained, complete HTML entity library, not a hand-rolled
+// regex) per the org's "prebuilt over hand-built" rule - decoding plain
+// text with no entities is a no-op, so this is safe for every existing
+// interpolation (`define`, `weather`, `joke`, `remember`'s own text).
 function interpolate(template: string, scope: Scope): string {
   return template.replace(/\{([a-zA-Z_][a-zA-Z0-9_]*)\}/g, (match, name: string) => {
     const value = scope[name];
-    return value === undefined ? match : String(value);
+    return value === undefined ? match : decode(String(value));
   });
 }
 

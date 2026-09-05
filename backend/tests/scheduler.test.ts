@@ -21,8 +21,16 @@ async function owner() {
 }
 
 describe("parseWhen", () => {
+  // A hardcoded target datetime compared against the real wall clock
+  // (parseWhen's own default `from: Date = new Date()`) is a ticking time
+  // bomb - this test passed for months, then started failing the moment
+  // real time caught up to the "future" date it hardcoded, on
+  // 2026-09-05, the exact day this fix landed. `parseWhen` already takes
+  // an injectable `from` for exactly this reason (the recurring test
+  // below already used it); this test just hadn't.
   test("parses a one-shot ISO datetime as non-recurring", () => {
-    const parsed = parseWhen("2026-09-05T08:00:00.000Z");
+    const from = new Date("2026-01-01T00:00:00.000Z");
+    const parsed = parseWhen("2026-09-05T08:00:00.000Z", from);
     expect(parsed?.recurring).toBe(false);
     expect(parsed?.nextRunAt.toISOString()).toBe("2026-09-05T08:00:00.000Z");
   });

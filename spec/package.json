@@ -10,10 +10,12 @@
     "test": "bun test"
   },
   "dependencies": {
+    "he": "^1.2.0",
     "zod": "^4.0.0"
   },
   "devDependencies": {
     "@apidevtools/json-schema-ref-parser": "^16.0.1",
+    "@types/he": "^1.2.3",
     "ajv": "^8.20.0",
     "ajv-formats": "^3.0.1",
     "json-schema-to-zod": "^2.6.1",

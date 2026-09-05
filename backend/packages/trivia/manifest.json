@@ -1,0 +1,48 @@
+{
+  "id": "trivia",
+  "version": "0.1.0",
+  "kind": "skill",
+  "category": "Fun",
+  "display": "Trivia",
+  "description": "A random trivia question and its answer (2026-09-05, the fourth real skill built on host.fetch), via the free, no-key Open Trivia Database.",
+  "author": "MaiPai",
+  "license": "AGPL-3.0",
+  "homepage": "https://github.com/getmaipai/home",
+  "routing": {
+    "examples": [
+      "give me a trivia question",
+      "ask me a trivia question",
+      "tell me some trivia",
+      "quiz me",
+      "got any trivia"
+    ],
+    "patterns": ["give me a trivia question", "ask me a trivia question", "tell me some trivia", "quiz me"]
+  },
+  "requires": [],
+  "optional": [],
+  "platforms": ["home"],
+  "min_role": "child",
+  "consequential": false,
+  "offline": "unavailable",
+  "config": [],
+  "data_sources": [
+    {
+      "id": "opentdb",
+      "destination": "opentdb.com, the free Open Trivia Database",
+      "when": "each time the family asks for trivia",
+      "what": "nothing personal - a plain request for a random question",
+      "who": "opentdb.com",
+      "opt_in": true,
+      "retention": "unknown, see opentdb.com's own policy"
+    }
+  ],
+  "permissions": ["net:opentdb.com"],
+  "notifications": [],
+  "backup": "exclude",
+  "background": false,
+  "contributes": [],
+  "pages": [],
+  "min_app": "0.1.0",
+  "tier": 0,
+  "quality_scale": "bronze"
+}
