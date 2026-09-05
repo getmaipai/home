@@ -351,8 +351,20 @@ Sources consulted (this research pass, 2026-09-05): [ChatGPT Projects guide](htt
       run at all.
 - [ ] Admin / parental-controls surface beyond the generic settings
       renderer (M)
+- [ ] **The rest of accessibility** (M) - the 2026-09-05 pass measured
+      what can be measured mechanically (targets, names, text size,
+      overflow, focus rings). Untouched: colour contrast ratios against
+      the real token palette in both themes, a screen-reader read-through
+      of each page, keyboard-trap testing, reduced-motion, and the TV
+      surface (which has no input-mode detection yet, so there is nothing
+      to test). Worth wiring the measurable half into a script the
+      screenshot pipeline runs, so it cannot regress silently.
 - [ ] Onboarding beyond the one-time initial household setup (M)
-- [ ] Accessibility audit (M) - never done against any shipped page.
+- [x] Accessibility audit (M) - done 2026-09-05, driven against the
+      running app at phone and desktop, not read off the source: 142
+      violations found, all fixed, re-measured at zero. See `docs/dev.md`,
+      "The accessibility audit". Not covered and still open below: colour
+      contrast, screen-reader flow, keyboard traps, and the TV surface.
 - [ ] Any UI for calendar, email, camera/vision, or generation (blocked on
       each of those existing first)
 - [ ] **The `app` kind: full, multi-page apps (Videos/Weather/Podcasts-

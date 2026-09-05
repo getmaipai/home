@@ -5331,3 +5331,65 @@ Partial success is reported, never swallowed: a batch where one item is
 refused deletes the rest and says which was kept and why. Selecting five
 people, hitting one protected profile, and getting nothing done with no
 explanation is the failure this rule exists to prevent.
+
+
+## The accessibility audit (2026-09-05)
+
+`docs/UI.md` has named the floor since before any page existed (WCAG 2.2
+AA, 48px targets, a visible focus ring, 16px body on phone and desktop,
+nothing wider than the viewport) and nothing had ever been measured
+against it. This was that pass: every shipped page driven in a real
+browser at phone (390) and desktop (1280), measuring the real rendered
+geometry rather than reading the source. 142 violations, now zero.
+
+**The structural one first.** `Shell.tsx`'s `<main>` is a flex item, and
+a flex item defaults to `min-width: auto`, so it could not shrink below
+its widest child: one settings row pushed the whole page to 510px inside
+a 390px viewport. Every other phone measurement was being taken through
+a layout that was already broken, which is the argument for fixing
+overflow before anything else.
+
+**By kind, and what each was really about.** The nav rail is icon-only
+on phone with its label hidden, so every entry was an unnamed link to a
+screen reader, on the only navigation the product has. Controls that
+were the sole way to reach an action sat at 36px or less, which is
+precisely what `Button.tsx`'s own note says `sm` must never be used for:
+"desktop/mouse-only and never the only way to reach an action a touch or
+TV surface must also use." Body copy across settings was 14px against a
+stated 16px floor. A file input had no accessible name.
+
+**The review's catch was the useful part.** Raising the "Reset to
+default" link beside a `Switch` to 48px while leaving the switch itself
+at 32px is worse than not having done the pass, because it looks
+finished. Same for the select-mode checkbox at 20px, the only way to
+multi-select on a phone, in a file the pass had edited heavily. Both now
+keep their visual size and get a 48px hit area (a transparent
+pseudo-element on the switch, a wrapping label on the checkbox), because
+the target and the artwork are different things. The review also caught
+that raising body text without raising the titles above it had inverted
+the type hierarchy in six places: a subtitle rendering larger than the
+heading it belongs to.
+
+**Two things no automated check would have found**, both from looking at
+the real screen. Settings rows put label and control side by side at
+every width, which squeezed the control column on a phone until a text
+input was clipped at the screen edge - and the overflow check passed,
+because the page itself never scrolled sideways. And once the chat
+pills' type was bumped they had nowhere to go on a narrow screen. The
+lesson is the one the org standard already states about screenshots:
+look at the picture. A measurement suite tells you what it was told to
+measure.
+
+**A methodology note worth keeping.** The first "142 down to 10" result
+was wrong, and catching it mattered more than the number. The backend
+caches `index.html` in memory, so after a frontend rebuild it serves an
+index pointing at asset hashes that no longer exist, the module fails to
+load, and every page renders blank. A blank page passes an
+accessibility audit perfectly. Restarting the backend after a rebuild is
+part of the procedure, and the tell was an audit reporting zero of a
+kind of finding it had reported many of a minute earlier.
+
+**What is still open**, in `docs/BACKLOG.md` rather than quietly
+implied: colour contrast against the real palette in both themes, a
+screen-reader read-through, keyboard traps, reduced-motion, and TV
+(which has no input-mode detection to test against yet).
