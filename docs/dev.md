@@ -5807,3 +5807,67 @@ fan-out excluding minors, per-person Telegram opt-in vs. a non-
 configurable type's forced default, ownership isolation on read/dismiss,
 and a real end-to-end `runTurn()` test proving a minor's flagged turn
 notifies every adult). Full suite green (566 backend, 201 frontend).
+
+## Session B: step 0, verify, pin, baseline (2026-09-05)
+
+Started `docs/plans/session-b-ui.md`, the frameworks-not-hand-rolled
+frontend rebuild. Worktree `../home-b` on branch `session-b-ui`, off
+`main` (`d93495d`), parallel to Session A's `../home-a`. Manual checks
+run against `MAIPAI_DATA_DIR=<worktree>/data-b PORT=8798` in `backend/`;
+never the shared `data/`.
+
+**Baseline, before any change:** `bun install` (370 packages, clean),
+then `scripts/check.sh` green end to end: spec typecheck/tests/ruff/
+pytest, backend 567 tests, frontend 201 tests plus a clean `vite build`,
+and `@maipai/standards` core (gitleaks, PII wordlist, prose lint, licence
+check). This is the state every later step's own green run is measured
+against.
+
+**Framework table re-verified against the live npm registry today**
+(`registry.npmjs.org/<pkg>/latest`, not `npm view` - this box has no
+`npm` binary, only `bun`), matching the plan's table exactly, nothing
+moved since it was written a few hours ago:
+
+| Package | Version | Licence |
+|---|---|---|
+| `shadcn` | 4.21.0 | MIT |
+| `lucide-react` | 1.41.0 | ISC (plan said "present"; the installed one already pins this) |
+| `@assistant-ui/react` | 0.15.18 | MIT |
+| `@assistant-ui/react-markdown` | 0.14.14 | MIT |
+| `@tanstack/react-query` | 5.102.8 | MIT |
+| `react-router` | 8.3.1 | MIT |
+| `@json-render/core` / `react` / `shadcn` | 0.20.0 | Apache-2.0 |
+| `@noriginmedia/norigin-spatial-navigation` | 3.3.0 | MIT |
+| `usehooks-ts` | 3.1.1 | MIT |
+| `vite-plugin-pwa` | 1.3.0 (+ `workbox-window` 7.4.1) | MIT |
+| `react-error-boundary` | 6.1.5 | MIT |
+| `eslint` | 10.10.0 | MIT |
+| `typescript-eslint` | 8.69.0 | MIT |
+| `eslint-plugin-react-hooks` | 7.1.1 | MIT |
+| `eslint-plugin-jsx-a11y` | 6.10.2 | MIT |
+| `eslint-plugin-better-tailwindcss` | 4.7.0 | MIT |
+| `@axe-core/playwright` | 4.13.0 | MPL-2.0 |
+| `remark-gfm` / `rehype-sanitize` / `react-markdown` | 4.0.1 / 6.0.0 / 10.1.0 | MIT (ships inside `@assistant-ui/react-markdown`, not installed directly) |
+
+MPL-2.0 (`@axe-core/playwright`) is a dev-only test dependency, never
+bundled into the shipped app, so it carries no AGPL compatibility
+question the way a runtime dependency would; still listed in `NOTICE`
+per the org rule (any third-party component gets an entry).
+
+**react-router: v8, not v7.** v8.3.1's peers are `react >=19.2.7` and
+`react-dom >=19.2.7`; both are already `^19.2.8` here, and Vite is
+already `^8.2.2` (v8 wants Vite 7+). The only real cost is `react-router-
+dom` going away (v8 folds the DOM exports into `react-router` itself,
+imported today from `react-router-dom` nowhere yet since the router
+hasn't been wired up), so there is no migration to do, only a fresh
+install choosing the current major.
+
+**`@json-render/core` peer-requires `zod ^4.0.0`.** Already the pin in
+both `backend/package.json` and `spec/package.json`, so no version
+conflict crosses the workspace. **`@a2ui/react`'s peer is `zod ^3.25.76`,
+which would conflict** - moot for now, since the plan has A2UI evaluated
+and written up (step 5), never installed as a dependency.
+
+**Nothing wrong at install time.** Every row still matches what the plan
+recorded; no fallback substitutions needed. Step 1 starts the actual
+`shadcn init` and first `bun add` calls.
