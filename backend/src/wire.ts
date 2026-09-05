@@ -141,6 +141,19 @@ export interface EngineStatsSample {
   cpuPercent: number | null;
 }
 
+// Mirrors lib/conversationHistory.ts's RoutingStats (hand-copied, same
+// reason as BackupInfo/ModelFit above: that file has "@/"-aliased
+// imports of its own).
+export interface RoutingStats {
+  total: number;
+  skill: number;
+  skillError: number;
+  model: number;
+  safetyRefuse: number;
+  fallthroughRate: number | null;
+  bySkill: { skillId: string; count: number }[];
+}
+
 // The role-string half of lib/access.ts's isOwnerOrAdmin(actor: PersonRow):
 // that function takes a full PersonRow (an "@/types" dependency this file
 // can't have), so this is the underlying string check, shared for real

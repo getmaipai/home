@@ -6,6 +6,7 @@ import { ChangeSecretSection } from "@/apps/settings/ChangeSecretSection";
 import { VoiceCatalogSection } from "@/apps/settings/VoiceCatalogSection";
 import { ClonedVoicesSection } from "@/apps/settings/ClonedVoicesSection";
 import { HuggingFaceTokenSection } from "@/apps/settings/HuggingFaceTokenSection";
+import { RoutingStatsSection } from "@/apps/settings/RoutingStatsSection";
 import { isOwnerOrAdminRole, type Roster } from "@/lib/api";
 
 interface SettingsPageProps {
@@ -57,6 +58,7 @@ export function SettingsPage({ person, onPersonChange }: SettingsPageProps) {
           {canManageBackups ? <HuggingFaceTokenSection /> : null}
           {canManageBackups ? <ModelsSection /> : null}
           {canManageBackups ? <BackupsSection /> : null}
+          {canManageBackups ? <RoutingStatsSection /> : null}
         </div>
       </div>
     </Page>

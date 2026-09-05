@@ -2861,6 +2861,33 @@ set. Full architecture: platform plan chapters 1, 3, and 4.
       names, not something to chase down before `embed` is wired into
       routing.
 
+- [x] The fall-through measurement itself (4.5: "count fall-throughs...
+      and decide on tier 2 from the eval number") - no new logging
+      needed, since every turn already records its `source`; this is
+      the first place that number is actually shown to anyone.
+      `lib/conversationHistory.ts`'s new `routingStats()` aggregates the
+      real `conversation_turns` table: total, per-source counts, a
+      per-skill breakdown, and the fall-through rate itself
+      (`model / (skill + skillError + model)`, deliberately excluding
+      `safety_refuse` from both sides - a refused turn never reaches
+      routing at all, so counting it would understate the real rate).
+      `GET /api/skills/stats` (owner/admin only, aggregate counts carry
+      no turn text or per-person breakdown - the same "systems metric,
+      not personal history" gate hardware/engine status already use),
+      and a real `RoutingStatsSection` in Settings, since nothing
+      admin-facing in this app ships backend-only without a UI to read
+      it - the same standard Backups and AI models already set.
+    - A regression test locks in the exact denominator (1 model / 3
+      routable = 33%, not 1/4 counting the refusal too), confirmed to
+      fail against a version that included `safety_refuse` in the
+      denominator.
+    - Verified live against this session's own real accumulated usage,
+      not seeded fixtures: the real Settings page showed 85% fall-
+      through, 4 skill matches (2 `remember`, 2 `recall`), and 22 turns
+      answered by the model - genuine data from tonight's own live
+      testing, the exact number the plan needs before deciding anything
+      about tier 2.
+
 ## API routes and `@hono/zod-openapi` (tracked debt)
 
 `getmaipai/CLAUDE.md` > Documentation requires every Hono route to be

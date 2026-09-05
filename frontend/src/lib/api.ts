@@ -15,6 +15,7 @@ import type {
   EngineStatus,
   EngineStatsSample,
   ClonedVoiceInfo,
+  RoutingStats,
 } from "@maipai/home-backend/src/wire";
 import { isOwnerOrAdminRole } from "@maipai/home-backend/src/wire";
 import { readTextLines } from "@maipai/spec/streaming/ts/lineReader.js";
@@ -38,7 +39,7 @@ export type Role = Person["role"];
 // depends on @maipai/home-backend as a workspace package for this;
 // re-export the types here so the rest of the frontend imports from one
 // place.
-export type { Roster, TurnValue, TurnStreamEvent, ConversationTurnRow, ResolvedSetting, BackupInfo, HardwareInfo, ModelFit, ModelJob, EngineStatus, EngineStatsSample, ClonedVoiceInfo };
+export type { Roster, TurnValue, TurnStreamEvent, ConversationTurnRow, ResolvedSetting, BackupInfo, HardwareInfo, ModelFit, ModelJob, EngineStatus, EngineStatsSample, ClonedVoiceInfo, RoutingStats };
 export type { MemoryRecord };
 export { isOwnerOrAdminRole };
 // SettingsKey is spec-generated (@maipai/spec), not backend-only, so it's
@@ -265,6 +266,10 @@ export const api = {
     }),
   backups: () => request<BackupInfo[]>("/api/backups"),
   runBackup: () => request<BackupInfo>("/api/backups/run", { method: "POST" }),
+  // The plan's own "count fall-throughs... and decide on tier 2 from the
+  // eval number" measurement (4.5), owner/admin only - aggregate counts,
+  // not any one person's conversation content.
+  routingStats: () => request<RoutingStats>("/api/skills/stats"),
   memories: () => request<MemoryRecord[]>("/api/memory"),
   archiveMemory: (id: string) =>
     request<MemoryRecord>(`/api/memory/${encodeURIComponent(id)}/archive`, { method: "POST" }),

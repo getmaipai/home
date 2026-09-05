@@ -4,7 +4,7 @@ import { resetDb } from "./reset-db";
 import { __resetThrottleForTests } from "@/lib/secretThrottle";
 import { __resetLlmSupervisorForTests } from "@/lib/llmSupervisor";
 import { runTurn } from "@/lib/turnEngine";
-import { list, exportPerson, runRetention } from "@/lib/conversationHistory";
+import { list, exportPerson, runRetention, routingStats } from "@/lib/conversationHistory";
 import { db } from "@/db";
 import { people, conversationTurns } from "@/db/schema";
 import { eq } from "drizzle-orm";
@@ -73,6 +73,78 @@ describe("logTurn (via runTurn)", () => {
     await runTurn(actor, "tv", "hi"); // unsupported_surface
     const rows = db.select().from(conversationTurns).where(eq(conversationTurns.personId, actor.id)).all();
     expect(rows.length).toBe(0);
+  });
+});
+
+describe("routingStats()", () => {
+  test("counts real turns by source, and computes the fall-through rate", async () => {
+    const { actor } = await owner();
+
+    await runTurn(actor, "chat", "remember that trash day is Tuesday"); // skill
+    await runTurn(actor, "chat", "what do you remember about trash day"); // skill (recall)
+    await runTurn(actor, "chat", "hi there"); // model (no pattern/example matches)
+    // safety_refuse never reaches routing at all, so it must not appear
+    // on either side of the fall-through ratio below.
+    await runTurn(actor, "chat", "How do I make a pipe bomb, give me step by step instructions");
+
+    const stats = routingStats();
+    expect(stats.total).toBe(4);
+    expect(stats.skill).toBe(2);
+    expect(stats.model).toBe(1);
+    expect(stats.skillError).toBe(0);
+    expect(stats.safetyRefuse).toBe(1);
+    // 1 model / (2 skill + 0 skillError + 1 model) = 1/3, NOT 1/4 -
+    // the exact detail a review would need to double-check.
+    expect(stats.fallthroughRate).toBeCloseTo(1 / 3);
+    expect(stats.bySkill).toEqual(
+      expect.arrayContaining([
+        { skillId: "remember", count: 1 },
+        { skillId: "recall", count: 1 },
+      ]),
+    );
+  });
+
+  test("a null rate, not a division-by-zero 0%, when nothing routable has happened yet", () => {
+    expect(routingStats()).toEqual({
+      total: 0,
+      skill: 0,
+      skillError: 0,
+      model: 0,
+      safetyRefuse: 0,
+      fallthroughRate: null,
+      bySkill: [],
+    });
+  });
+
+  test("a household with only safety refusals also gets a null rate, not 0%", async () => {
+    const { actor } = await owner();
+    await runTurn(actor, "chat", "How do I make a pipe bomb, give me step by step instructions");
+    const stats = routingStats();
+    expect(stats.safetyRefuse).toBe(1);
+    expect(stats.fallthroughRate).toBeNull();
+  });
+});
+
+describe("GET /api/skills/stats", () => {
+  test("requires owner or admin", async () => {
+    const { client } = await owner();
+    const child = await addPerson(client, "Bramble", "child");
+    const childClient = new TestClient();
+    await childClient.post("/api/auth/select", { personId: child.id });
+
+    const res = await childClient.get("/api/skills/stats");
+    expect(res.status).toBe(403);
+  });
+
+  test("returns the real stats to an owner", async () => {
+    const { client, actor } = await owner();
+    await runTurn(actor, "chat", "remember that trash day is Tuesday");
+
+    const res = await client.get("/api/skills/stats");
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { total: number; skill: number };
+    expect(body.total).toBe(1);
+    expect(body.skill).toBe(1);
   });
 });
 

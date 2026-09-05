@@ -154,3 +154,74 @@ export function runRetention(): { deleted: number } {
 
   return { deleted: normal.changes + flaggedMinor.changes };
 }
+
+export interface RoutingStats {
+  total: number;
+  skill: number;
+  skillError: number;
+  model: number;
+  safetyRefuse: number;
+  /** model / (skill + skillError + model) - the exact number 4.5's own
+   * plan names as the decision input ("count fall-throughs... and decide
+   * on tier 2 from the eval number"). `safety_refuse` never reaches
+   * routing at all (prepareTurn() checks safety before the deterministic
+   * floor even runs), so it's excluded from both sides of this ratio -
+   * counting it would understate the real fall-through rate against
+   * everything routing actually had a chance to match. Null with zero
+   * routable turns, never a division by zero silently reading as 0%. */
+  fallthroughRate: number | null;
+  /** Which skills are actually firing, most first - the plan's own "add
+   * a row before it is fixed" eval-set idea needs to know not just THAT
+   * routing falls through, but which utterances it should have matched
+   * and didn't; this is the "did match" half of that picture. */
+  bySkill: { skillId: string; count: number }[];
+}
+
+/** Household-wide, not per-person (unlike list()/exportPerson() above):
+ * aggregate counts carry no turn text and no per-person breakdown, the
+ * same "a systems metric, not personal history" posture engine status
+ * and hardware detection already take - gated by the route's own
+ * requireRole("owner", "admin"), not an actor param here, matching
+ * lib/hardware.ts's detectHardware() precedent for the identical shape. */
+export function routingStats(): RoutingStats {
+  const rows = db.select({ source: conversationTurns.source, skillId: conversationTurns.skillId }).from(conversationTurns).all();
+
+  let skill = 0;
+  let skillError = 0;
+  let model = 0;
+  let safetyRefuse = 0;
+  const skillCounts = new Map<string, number>();
+
+  for (const row of rows) {
+    switch (row.source) {
+      case "skill":
+        skill++;
+        if (row.skillId) skillCounts.set(row.skillId, (skillCounts.get(row.skillId) ?? 0) + 1);
+        break;
+      case "skill_error":
+        skillError++;
+        break;
+      case "model":
+        model++;
+        break;
+      case "safety_refuse":
+        safetyRefuse++;
+        break;
+    }
+  }
+
+  const routable = skill + skillError + model;
+  const bySkill = [...skillCounts.entries()]
+    .map(([skillId, count]) => ({ skillId, count }))
+    .sort((a, b) => b.count - a.count);
+
+  return {
+    total: rows.length,
+    skill,
+    skillError,
+    model,
+    safetyRefuse,
+    fallthroughRate: routable > 0 ? model / routable : null,
+    bySkill,
+  };
+}
