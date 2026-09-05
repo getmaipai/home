@@ -3716,7 +3716,10 @@ set. Full architecture: platform plan chapters 1, 3, and 4.
     - `trivia`'s own conformance fixture
       (`spec/fixtures/recipes/trivia.json`) uses a real captured response,
       entities included, so the shipped skill itself proves the fix works
-      end to end, not just the synthetic regression fixture.
+      end to end, not just the synthetic regression fixture. Live-verified
+      through the real Chat UI too ("quiz me" against the real opentdb.com):
+      a real question and answer came back with clean text, no raw
+      entities visible.
     - Along the way, running the full suite surfaced a real, unrelated
       test bug: `scheduler.test.ts`'s one-shot `parseWhen` test hardcoded
       a specific "future" ISO datetime compared against the real wall
