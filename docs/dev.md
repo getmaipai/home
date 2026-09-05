@@ -4775,3 +4775,110 @@ Jesse's go-ahead rather than executed unprompted, the same posture taken
 tonight for anything crossing from "engineering judgment call" into
 "decision with a blast radius beyond this repo." Tracked as its own
 backlog item (`docs/BACKLOG.md`) rather than left only here.
+
+**ChatGPT's actual current shape, researched separately** (Jesse asked
+for this specifically before finalizing, since the first pass treated
+Claude more thoroughly). OpenAI's **Skill** (2026): "reusable, shareable
+workflows... instructions, examples, and **code**... reusable steps and
+scripts," auto-invoked "when helpful" - meaningfully broader than
+Claude's instructions-only Skill, and closer to what MaiPai already
+calls a "skill" package today than to Claude's narrower shape. As of
+July 9, 2026 OpenAI's **Plugin** converged onto the same meaning Claude
+already used - a bundle of "skills, apps, and app templates" - and
+OpenAI's **App** absorbed the old "Connector" term entirely (Apps are
+now "the umbrella term that includes both interactive Apps SDK apps and
+connected apps, formerly called connectors").
+
+|  | Claude | ChatGPT (2026) |
+|---|---|---|
+| Skill | plain instructions only, no code, no permissions | instructions + code/scripts, auto-invoked |
+| Bundle/discovery unit | Plugin | Plugin (converged, July 2026) |
+| External integration | Connector | App (absorbed "Connector") |
+
+**This sharpens rather than changes the decision.** "Plugin" as the
+bundle-level name is now a converged, two-vendor standard, not
+Anthropic's choice alone - stronger grounds for the rename above.
+Recommended (Claude's pure-instructions shape for MaiPai's new `skill`
+kind) over OpenAI's broader instructions-plus-code shape, for three
+reasons, not just "Jesse asked for Claude compatibility": it is the
+shape that's actually safe for anyone to author with zero review (no
+code, no network, nothing to audit); it keeps `skill` and `plugin`
+meaning genuinely different things instead of blurring into each other
+(a code-carrying skill would just be a plugin with an inconsistent
+name); and it matches the platform's own standing preference for
+constrained, declared primitives over "let arbitrary code run"
+wherever safety or predictability matters (the recipe interpreter's own
+"no process, no eval" design).
+
+**Apps: full multi-page, same-process, no iframe, no remote hosting.**
+Jesse's ask: `app` packages should be full apps like the legacy Videos,
+Weather, and Podcasts apps - substantial, multi-page, not a chat skill
+or a small dashboard card - and initially floated "could be hosted
+outside the hub." First recommendation (real research into OpenAI's
+Apps SDK: an app's UI is fetched by URL from the developer's own server
+and rendered in a sandboxed iframe, communicating over a postMessage
+bridge) was to build MaiPai's `app` kind the same way, since it's the
+real precedent for "hosted outside the hub." **Jesse corrected this: he
+did not mean literally hosted elsewhere**, and asked for a
+recommendation that avoids added complexity, performance cost,
+new breakage modes, and new security surface. Decided: drop the
+iframe/remote-hosting model entirely. An `app` package is its own
+directory (mirroring how `backend/packages/<id>/` already works),
+exporting its own nested route subtree mounted into the SAME frontend,
+same process, same origin - exactly the pattern the legacy hub already
+used for Videos and Podcasts (`<Route path="/videos" element={
+<VideosLayout />}>` wrapping many child routes). No new mechanism, no
+new failure mode (an iframe/remote host adds "what if the remote server
+is unreachable" as an entirely new class of thing to detect and handle;
+a local route subtree fails exactly like the rest of the frontend
+already does), no new trust boundary (an iframe pointing at a URL is
+real new attack surface - a swapped or compromised URL, a sandbox-escape
+class of bug - that same-origin code loaded like the rest of the
+already-trusted frontend simply doesn't have). The "could be standalone"
+property survives as a property of clean modularity (a genuinely
+self-contained app directory could be extracted and run elsewhere
+later, if anyone ever wanted to) rather than a runtime feature built and
+maintained now for a want that turned out not to be literal.
+
+**UI consistency across apps: already decided, in detail, by
+`getmaipai/.github/docs/UI.md` - not a new design question.** Jesse
+asked how to keep every app's sidebar/cards/search/theme consistent.
+Checked the org's own UI standard before proposing anything: "the
+platform owns all chrome... an app never writes its own chrome,
+breakpoint, or one-off pattern." Sidebar, top bar, search, dialogs,
+breadcrumbs, the command palette - all shell-owned. An app declares
+contributions as typed blueprints (nav entries, pages, settings
+sections, quick actions); its pages are trees of the kit's shared
+primitives (`Page`, `Section`, `CardGrid`, `MediaShelf`, `List`,
+`DetailPane`, `SplitView`, `Form`...) with data bindings, never
+hand-written chrome. Themes are a small generated token object (seed
+color, mode, variant, contrast, radius, density, font), never raw CSS,
+so theme conformance is structural rather than a convention to
+remember. A real precedence order fills gaps (GOV.UK for flows,
+Material 3 for component behavior, WCAG 2.2 AA as the floor) instead of
+per-app improvisation.
+
+**This retracts the "three shell tiers" idea floated earlier in this
+same conversation** (bare / simple `RailNav` / rich custom rail, pulled
+from real legacy code as prior art). That research was accurate about
+what the legacy app actually did, but `docs/UI.md`'s already-decided
+model is stronger and supersedes it: there is no per-app tier choice at
+all: the shell owns chrome uniformly, always, and an app only ever
+declares data.
+
+**The real gap is execution, not design - checked against the actual
+code, not assumed.** `frontend/src/shell/Shell.tsx`'s nav list is
+hand-hardcoded today, with its own honest comment: "the platform owns
+all chrome... doesn't exist yet - no manifest field for it, no
+package-loading system to read one from... becomes data-driven the
+moment a fifth package needs to add an entry." None of the richer
+content primitives the standard calls for (`CardGrid`, `MediaShelf`,
+`List`, `DetailPane`, `SplitView`) exist in `frontend/src/kit/` yet -
+only `Page`, `Section`, `EmptyState`, `Form`, `Progress`,
+`MessageThread`, and basic form controls do. Recommendation: build the
+missing kit primitives and make the nav blueprint genuinely data-driven
+BEFORE the first full multi-page app, not alongside it - so that app is
+forced into the shared vocabulary because it's the only thing available
+to reach for, rather than risking the exact failure mode that produced
+legacy's separate `VideosRail`/`MusicRail`/`PodcastRail`/`NewsLayout`
+for what should have been one shared component.

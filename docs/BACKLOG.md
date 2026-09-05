@@ -31,7 +31,11 @@ crosses repos, not just files in this one.
       capability. Composed into context the same way `lib/persona.ts`
       already composes text fragments; safely user-authorable with no
       review gate since it can't touch the network or any permission
-      surface.
+      surface. Confirmed against ChatGPT's own current shape too, not
+      just Claude's: OpenAI's 2026 "Skill" allows code/scripts and is
+      closer to what MaiPai already calls a plugin - the pure-
+      instructions shape was picked deliberately over that broader one
+      (see `docs/dev.md`'s entry for the three reasons), not by default.
 - [ ] **Formalize `command` as a first-class, user-creatable primitive**
       (M) - the matching mechanism already exists (`routing.patterns` /
       `matchPattern` in `turnEngine.ts`); this is a lighter-weight
@@ -324,6 +328,33 @@ Sources consulted (this research pass, 2026-09-05): [ChatGPT Projects guide](htt
 - [ ] Accessibility audit (M) - never done against any shipped page.
 - [ ] Any UI for calendar, email, camera/vision, or generation (blocked on
       each of those existing first)
+- [ ] **The `app` kind: full, multi-page apps (Videos/Weather/Podcasts-
+      style), decided architecture, not built** (L; full reasoning in
+      `docs/dev.md`'s "Naming" entry, 2026-09-05). Decided: same process,
+      same origin, no iframe, no remote hosting - an `app` package is its
+      own directory (mirroring `backend/packages/<id>/`) exporting its
+      own nested route subtree, mounted into the one frontend the same
+      way the legacy hub nested Videos'/Podcasts' many pages under one
+      layout route. Picked explicitly over an iframe/postMessage model
+      (the real precedent behind ChatGPT's Apps SDK, researched and then
+      rejected here) for lower complexity, no new failure mode, and no
+      new trust boundary - Jesse's own stated bar, not assumed.
+- [ ] **Build the missing kit primitives before the first full app, not
+      alongside it** (M) - `getmaipai/.github/docs/UI.md` already
+      decided that apps never build their own chrome (sidebar, search,
+      cards): they declare typed blueprint contributions and compose
+      pages from shared kit primitives (`CardGrid`, `MediaShelf`, `List`,
+      `DetailPane`, `SplitView`...), never hand-rolled UI. Checked against
+      the real code: none of those primitives exist in `frontend/src/
+      kit/` yet (only `Page`, `Section`, `EmptyState`, `Form`, `Progress`,
+      `MessageThread`, and basic form controls do), and `Shell.tsx`'s nav
+      list is still hand-hardcoded, by its own comment, pending "the
+      moment a fifth package needs to add an entry." That moment is
+      whenever the app work above starts - building the primitives and a
+      real data-driven nav blueprint first is what forces the first app
+      into the shared vocabulary instead of risking a repeat of legacy's
+      separate `VideosRail`/`MusicRail`/`PodcastRail`/`NewsLayout` for
+      what should be one shared component.
 - [ ] **Skills as home-screen widgets - cards and rows** (L, needs its own
       design pass before any code - Jesse, 2026-09-05). The idea: a
       skill's data shown on a dashboard as a card (or, for some skills, a
