@@ -19,7 +19,11 @@ export default defineConfig({
   server: {
     proxy: {
       "/api": {
-        target: "http://localhost:8787",
+        // Overridable so a parallel session's worktree (docs/plans/
+        // session-b-ui.md: "own data directory and ports") can point this
+        // dev server at its own backend instance instead of the shared
+        // default.
+        target: `http://localhost:${process.env.VITE_BACKEND_PORT ?? "8787"}`,
         changeOrigin: false,
       },
     },

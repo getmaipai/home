@@ -1,13 +1,21 @@
 import { describe, expect, test, mock, afterEach } from "bun:test";
 import { cleanup, fireEvent, waitFor } from "@testing-library/react";
+import { MemoryRouter } from "react-router-dom";
 import { MemoryPage } from "@/apps/memory/MemoryPage";
 import { renderWithQueryClient } from "../../../tests/renderWithQueryClient";
 import type { MemoryRecord, PersonRosterEntry } from "@/lib/api";
 
 afterEach(cleanup);
 
-function renderMemoryPage() {
-  return renderWithQueryClient(<MemoryPage />);
+// A Router wrapper (PhoneNav.test.tsx's own convention): MemoryPage now
+// reads ?ids= via useSearchParams (the "memory updated" chip's deep link,
+// docs/plans/session-b-ui.md step 4).
+function renderMemoryPage(path = "/memory") {
+  return renderWithQueryClient(
+    <MemoryRouter initialEntries={[path]}>
+      <MemoryPage />
+    </MemoryRouter>,
+  );
 }
 
 // Matching memoryLabels.test.ts's own fixture builder exactly.
@@ -148,6 +156,24 @@ describe("MemoryPage", () => {
       await waitFor(() => expect(queryByText("Likes dinosaurs")).toBeNull());
     } finally {
       globalThis.fetch = original;
+    }
+  });
+
+  // Chat's "memory updated" chip (chatMemoryChip.tsx, step 4) deep-links
+  // here with ?ids= - a client-side filter over the same list, not a new
+  // backend query.
+  test("?ids= filters the list to just those memories, with a way back to the full list", async () => {
+    const restore = stubFetch({
+      "/api/memory": [record({ id: "mem1-abc123", text: "Likes dinosaurs" }), record({ id: "mem2-def456", text: "Allergic to peanuts" })],
+      "/api/people": [person("person-abc123", "Nova")],
+    });
+    try {
+      const { findByText, queryByText } = renderMemoryPage("/memory?ids=mem1-abc123");
+      await findByText("Likes dinosaurs");
+      expect(queryByText("Allergic to peanuts")).toBeNull();
+      await findByText("Show all");
+    } finally {
+      restore();
     }
   });
 });

@@ -6,5 +6,21 @@ import { GlobalRegistrator } from "@happy-dom/global-registrator";
 import { expect } from "bun:test";
 import * as matchers from "@testing-library/jest-dom/matchers";
 
+// happy-dom's own ReadableStream/WritableStream/TransformStream are
+// incomplete (no real `getReader()`-backed piping) - fine for
+// @testing-library/react's DOM needs, but a real streaming library
+// (assistant-stream, step 4's chatThreadListAdapter.ts) built against
+// the actual web-streams spec breaks the moment GlobalRegistrator
+// replaces these globals with happy-dom's versions. Captured before
+// registration and restored right after: Bun's own native
+// implementations, not happy-dom's, for every test in the suite.
+const nativeStreams = {
+  ReadableStream: globalThis.ReadableStream,
+  WritableStream: globalThis.WritableStream,
+  TransformStream: globalThis.TransformStream,
+};
+
 GlobalRegistrator.register();
+Object.assign(globalThis, nativeStreams);
+
 expect.extend(matchers);

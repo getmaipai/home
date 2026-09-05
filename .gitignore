@@ -2,8 +2,13 @@
 node_modules/
 .venv/
 
-# Local data, never committed (org rule: nothing under data/ ever enters git)
+# Local data, never committed (org rule: nothing under data/ ever enters git).
+# data-a/, data-b/, ...: each parallel worktree session's own data
+# directory (session-a-intelligence.md / session-b-ui.md's "own data
+# directory and port" rule) - the same real household-shaped data as
+# data/ itself, just per-worktree instead of shared.
 data/
+data-*/
 
 # Backups (2.5): encrypted, but still real household data end to end;
 # same "never in git, ever" rule as data/.

@@ -1,4 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { Link, useSearchParams } from "react-router-dom";
 import { Page } from "@/kit/primitives/Page";
 import { AsyncState } from "@/kit/primitives/AsyncState";
 import { Button } from "@/kit/ui/button";
@@ -26,6 +27,21 @@ interface MemoryData {
 // triggering native dialogs.
 export function MemoryPage() {
   const queryClient = useQueryClient();
+  // Chat's "memory updated" chip (chatMemoryChip.tsx, step 4) deep-links
+  // here with ?ids=<memory ids>: a client-side filter over the same list
+  // this page already fetches, not a new backend query - GET /api/memory
+  // already returns everything the actor can see.
+  const [searchParams] = useSearchParams();
+  const idsParam = searchParams.get("ids");
+  const filterIds = idsParam ? new Set(idsParam.split(",")) : null;
+  // Shared by isEmpty and the render prop below - a code review
+  // (2026-09-05) caught isEmpty checking the UNFILTERED list while the
+  // render prop filtered separately, so a chip linking to ids that are
+  // gone (already archived, or never readable by this actor) rendered
+  // "Showing 0 memory updates" over a blank list instead of the real
+  // empty state.
+  const visibleMemories = (memories: MemoryRecord[]): MemoryRecord[] =>
+    filterIds ? memories.filter((m) => filterIds.has(m.id)) : memories;
 
   const memoriesQuery = useQuery<MemoryRecord[]>({
     queryKey: ["memories"],
@@ -77,38 +93,49 @@ export function MemoryPage() {
               ? ((memoriesQuery.error ?? peopleQuery.error) as ApiError).message
               : "Could not load memory."
           }
-          isEmpty={(d) => d.memories.length === 0}
+          isEmpty={(d) => visibleMemories(d.memories).length === 0}
           emptyIcon="brain"
-          emptyText="Nothing remembered yet."
+          emptyText={filterIds ? "None of these memories are here anymore." : "Nothing remembered yet."}
           loadingLabel="Loading memory"
         >
-          {(d) => (
-            <>
-              {d.memories.map((m) => (
-                <div
-                  key={m.id}
-                  className="flex items-start justify-between gap-4 rounded-lg border border-border p-3"
-                >
-                  <div className="flex flex-col gap-1">
-                    <span className="text-base">{m.text}</span>
-                    <span className="text-sm text-muted-foreground">
-                      {scopeLabel(m, d.nameById)} · {CATEGORY_LABELS[m.category]}
-                      {m.pinned ? " · Pinned" : ""}
-                    </span>
+          {(d) => {
+            const visible = visibleMemories(d.memories);
+            return (
+              <>
+                {filterIds ? (
+                  <div className="flex items-center justify-between gap-2 rounded-lg bg-muted px-3 py-2 text-sm">
+                    <span>Showing {visible.length} memory update{visible.length === 1 ? "" : "s"}</span>
+                    <Link to="/memory" className="text-primary underline">
+                      Show all
+                    </Link>
                   </div>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => archiveMutation.mutate(m.id)}
-                    disabled={archivingId === m.id}
-                    aria-label={`Archive "${m.text}"`}
+                ) : null}
+                {visible.map((m) => (
+                  <div
+                    key={m.id}
+                    className="flex items-start justify-between gap-4 rounded-lg border border-border p-3"
                   >
-                    <ArchiveIcon className="h-5 w-5" aria-hidden />
-                  </Button>
-                </div>
-              ))}
-            </>
-          )}
+                    <div className="flex flex-col gap-1">
+                      <span className="text-base">{m.text}</span>
+                      <span className="text-sm text-muted-foreground">
+                        {scopeLabel(m, d.nameById)} · {CATEGORY_LABELS[m.category]}
+                        {m.pinned ? " · Pinned" : ""}
+                      </span>
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => archiveMutation.mutate(m.id)}
+                      disabled={archivingId === m.id}
+                      aria-label={`Archive "${m.text}"`}
+                    >
+                      <ArchiveIcon className="h-5 w-5" aria-hidden />
+                    </Button>
+                  </div>
+                ))}
+              </>
+            );
+          }}
         </AsyncState>
       </div>
     </Page>

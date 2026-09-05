@@ -8,7 +8,11 @@ import { pauseTvNavForOverlay } from "@/shell/tvNav";
 import { api, type NotificationDeliveryView } from "@/lib/api";
 
 const POLL_MS = 15_000;
-const QUERY_KEY = ["notifications"];
+// Exported: chatMemoryChip.tsx reads this same cached list (the "memory
+// updated" chip, docs/plans/session-b-ui.md step 4) rather than
+// duplicating the query key and risking the two drifting apart.
+export const NOTIFICATIONS_QUERY_KEY = ["notifications"];
+const QUERY_KEY = NOTIFICATIONS_QUERY_KEY;
 
 // The header half of the pending-list surface (getmaipai/.github/docs/
 // NOTIFICATIONS.md: "the shell's notification center"), and the one
