@@ -18,6 +18,8 @@ import type {
   RoutingStats,
   PrivacyConnection,
   PendingRestore,
+  CommandRow,
+  CommandAction,
 } from "@maipai/home-backend/src/wire";
 import { isOwnerOrAdminRole } from "@maipai/home-backend/src/wire";
 import { readTextLines } from "@maipai/spec/streaming/ts/lineReader.js";
@@ -41,7 +43,7 @@ export type Role = Person["role"];
 // depends on @maipai/home-backend as a workspace package for this;
 // re-export the types here so the rest of the frontend imports from one
 // place.
-export type { Roster, TurnValue, TurnStreamEvent, ConversationTurnRow, ResolvedSetting, BackupInfo, HardwareInfo, ModelFit, ModelJob, EngineStatus, EngineStatsSample, ClonedVoiceInfo, RoutingStats, PrivacyConnection, PendingRestore };
+export type { Roster, TurnValue, TurnStreamEvent, ConversationTurnRow, ResolvedSetting, BackupInfo, HardwareInfo, ModelFit, ModelJob, EngineStatus, EngineStatsSample, ClonedVoiceInfo, RoutingStats, PrivacyConnection, PendingRestore, CommandRow, CommandAction };
 export type { MemoryRecord };
 export { isOwnerOrAdminRole };
 // SettingsKey is spec-generated (@maipai/spec), not backend-only, so it's
@@ -292,6 +294,11 @@ export const api = {
       body: JSON.stringify({ ids }),
     }),
   privacy: () => request<{ connections: PrivacyConnection[]; offlinePlugins: string[] }>("/api/privacy"),
+  commands: () => request<CommandRow[]>("/api/commands"),
+  createCommand: (input: { trigger: string; minRole: string; action: CommandAction }) =>
+    request<CommandRow>("/api/commands", { method: "POST", body: JSON.stringify(input) }),
+  deleteCommand: (id: string) =>
+    request<{ id: string }>(`/api/commands/${encodeURIComponent(id)}`, { method: "DELETE" }),
   memories: () => request<MemoryRecord[]>("/api/memory"),
   archiveMemory: (id: string) =>
     request<MemoryRecord>(`/api/memory/${encodeURIComponent(id)}/archive`, { method: "POST" }),

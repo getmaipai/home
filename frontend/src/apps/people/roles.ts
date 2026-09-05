@@ -9,6 +9,20 @@ export const ROLE_LABELS: Record<Role, string> = {
   guest: "Guest",
 };
 
+// Mirrors backend/src/middleware/auth.ts's ROLE_LADDER and
+// backend/src/lib/plugins.ts's meetsMinRole exactly - the same
+// "acknowledged duplication, worst case hides a button" risk
+// CREATABLE_BY below already documents for the identical reason (the
+// server re-checks every one of these itself).
+export const ROLE_LADDER: readonly Role[] = ["owner", "admin", "adult", "teen", "child", "guest"];
+
+export function meetsMinRole(actorRole: Role, minRole: Role): boolean {
+  const actorIdx = ROLE_LADDER.indexOf(actorRole);
+  const minIdx = ROLE_LADDER.indexOf(minRole);
+  if (actorIdx === -1 || minIdx === -1) return false;
+  return actorIdx <= minIdx;
+}
+
 // Mirrors backend/src/routes/people.ts's CREATABLE_BY exactly (a
 // documented judgment call there, home/docs/dev.md: only the owner may
 // create another owner or an admin, so an admin can never mint a peer).

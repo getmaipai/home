@@ -219,3 +219,26 @@ export interface PendingRestore {
   stagedAt: string;
   stagedByPersonId: string;
 }
+
+// Mirrors lib/commands.ts's CommandRow/CommandAction (hand-copied, same
+// reason as BackupInfo/ModelFit/RoutingStats above: that file has
+// "@/"-aliased imports of its own, and pulls in a Zod schema besides -
+// this is the plain wire shape a frontend client actually needs).
+export type CommandAction =
+  | { kind: "reply"; text: string; speech?: string }
+  | {
+      kind: "home_call_service";
+      domain: string;
+      service: string;
+      target: Record<string, unknown>;
+      data?: Record<string, unknown>;
+    };
+
+export interface CommandRow {
+  id: string;
+  creatorId: string;
+  trigger: string;
+  minRole: string;
+  action: CommandAction;
+  createdAt: string;
+}

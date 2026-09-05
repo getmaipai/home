@@ -7,6 +7,7 @@ import { VoiceCatalogSection } from "@/apps/settings/VoiceCatalogSection";
 import { ClonedVoicesSection } from "@/apps/settings/ClonedVoicesSection";
 import { HuggingFaceTokenSection } from "@/apps/settings/HuggingFaceTokenSection";
 import { RoutingStatsSection } from "@/apps/settings/RoutingStatsSection";
+import { CommandsSection } from "@/apps/settings/CommandsSection";
 import { isOwnerOrAdminRole, type Roster } from "@/lib/api";
 
 interface SettingsPageProps {
@@ -52,6 +53,11 @@ export function SettingsPage({ person, onPersonChange }: SettingsPageProps) {
               delete carry their own, narrower checks (routes/voice.ts). */}
           <ClonedVoicesSection person={person} />
           <ChangeSecretSection person={person} onChanged={onPersonChange} />
+          {/* Household-wide list, visible to anyone signed in (the same
+              GET /api/plugins visibility); create/delete carry their own,
+              narrower checks (lib/commands.ts), rendered inside the
+              section itself rather than gating the whole thing here. */}
+          <CommandsSection person={person} />
           {/* voice.hf_token is a household-scope key: writing it already
               requires owner/admin (lib/settings.ts's assertCanAccessScope),
               same gate as backups/models below. */}
