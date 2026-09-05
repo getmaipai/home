@@ -17,6 +17,7 @@ import type {
   ClonedVoiceInfo,
   RoutingStats,
   PrivacyConnection,
+  PendingRestore,
 } from "@maipai/home-backend/src/wire";
 import { isOwnerOrAdminRole } from "@maipai/home-backend/src/wire";
 import { readTextLines } from "@maipai/spec/streaming/ts/lineReader.js";
@@ -40,7 +41,7 @@ export type Role = Person["role"];
 // depends on @maipai/home-backend as a workspace package for this;
 // re-export the types here so the rest of the frontend imports from one
 // place.
-export type { Roster, TurnValue, TurnStreamEvent, ConversationTurnRow, ResolvedSetting, BackupInfo, HardwareInfo, ModelFit, ModelJob, EngineStatus, EngineStatsSample, ClonedVoiceInfo, RoutingStats, PrivacyConnection };
+export type { Roster, TurnValue, TurnStreamEvent, ConversationTurnRow, ResolvedSetting, BackupInfo, HardwareInfo, ModelFit, ModelJob, EngineStatus, EngineStatsSample, ClonedVoiceInfo, RoutingStats, PrivacyConnection, PendingRestore };
 export type { MemoryRecord };
 export { isOwnerOrAdminRole };
 // SettingsKey is spec-generated (@maipai/spec), not backend-only, so it's
@@ -271,6 +272,25 @@ export const api = {
   // eval number" measurement (4.5), owner/admin only - aggregate counts,
   // not any one person's conversation content.
   routingStats: () => request<RoutingStats>("/api/plugins/stats"),
+  pendingRestore: () => request<{ pending: PendingRestore | null }>("/api/backups/restore/pending"),
+  stageRestore: (filename: string) =>
+    request<{ pending: PendingRestore }>(`/api/backups/${encodeURIComponent(filename)}/restore`, { method: "POST" }),
+  cancelRestore: () => request<{ cancelled: boolean }>("/api/backups/restore/cancel", { method: "POST" }),
+  updatePerson: (
+    id: string,
+    edit: { displayName?: string; nickname?: string | null; role?: string },
+  ) =>
+    request<PersonRosterEntry>(`/api/people/${encodeURIComponent(id)}`, {
+      method: "PATCH",
+      body: JSON.stringify(edit),
+    }),
+  deletePerson: (id: string) =>
+    request<{ erased: Record<string, number> }>(`/api/people/${encodeURIComponent(id)}`, { method: "DELETE" }),
+  deletePeople: (ids: string[]) =>
+    request<{ outcomes: Array<{ id: string; deleted: boolean; reason?: string }> }>("/api/people/batch-delete", {
+      method: "POST",
+      body: JSON.stringify({ ids }),
+    }),
   privacy: () => request<{ connections: PrivacyConnection[]; offlinePlugins: string[] }>("/api/privacy"),
   memories: () => request<MemoryRecord[]>("/api/memory"),
   archiveMemory: (id: string) =>

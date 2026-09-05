@@ -57,7 +57,7 @@ export function SettingsPage({ person, onPersonChange }: SettingsPageProps) {
               same gate as backups/models below. */}
           {canManageBackups ? <HuggingFaceTokenSection /> : null}
           {canManageBackups ? <ModelsSection /> : null}
-          {canManageBackups ? <BackupsSection /> : null}
+          {canManageBackups ? <BackupsSection person={person} /> : null}
           {canManageBackups ? <RoutingStatsSection /> : null}
         </div>
       </div>
