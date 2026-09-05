@@ -113,7 +113,7 @@ export function PrivacyPage() {
                 <p className="text-base text-[hsl(var(--muted-foreground))]">
                   <span className="text-[hsl(var(--foreground))]">How long they keep it:</span> {row.retention}
                 </p>
-                <p className="text-sm text-[hsl(var(--muted-foreground))]">
+                <p className="text-base text-[hsl(var(--muted-foreground))]">
                   {/* Just the name, no noun. "The Weather skill" would
                       now be wrong (a `skill` is a different package kind
                       since the 2026-09-05 rename) and "plugin" is jargon

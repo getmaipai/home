@@ -108,7 +108,7 @@ export function WakeWordToggle({ onWakeDetected: onWake }: WakeWordToggleProps) 
         type="button"
         onClick={() => (enabled ? stop() : start())}
         aria-pressed={enabled}
-        className={`rounded-full px-3 py-1 text-sm transition-colors ${
+        className={`min-h-12 rounded-full px-4 py-1 text-base transition-colors ${
           enabled
             ? "bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))]"
             : "bg-[hsl(var(--muted))] text-[hsl(var(--muted-foreground))]"
@@ -120,7 +120,7 @@ export function WakeWordToggle({ onWakeDetected: onWake }: WakeWordToggleProps) 
             ? "Wake word: starting…"
             : "Wake word (experimental)"}
       </button>
-      {error ? <span className="text-sm text-[hsl(var(--destructive))]">{error}</span> : null}
+      {error ? <span className="text-base text-[hsl(var(--destructive))]">{error}</span> : null}
     </div>
   );
 }

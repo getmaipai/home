@@ -95,21 +95,21 @@ export function ClonedVoicesSection({ person }: ClonedVoicesSectionProps) {
 
   return (
     <Section heading="Cloned voices">
-      <p className="text-sm text-[hsl(var(--muted-foreground))]">
+      <p className="text-base text-[hsl(var(--muted-foreground))]">
         Upload a real audio recording of a voice - your own, or anyone in the household who's consented - and use it
         for text-to-speech. Requires a Hugging Face token above.
       </p>
       {loadError ? (
         <div className="flex flex-col items-start gap-2">
-          <p className="text-sm text-[hsl(var(--destructive))]">{loadError}</p>
-          <Button variant="secondary" size="sm" onClick={load}>
+          <p className="text-base text-[hsl(var(--destructive))]">{loadError}</p>
+          <Button variant="secondary" onClick={load}>
             Try again
           </Button>
         </div>
       ) : (
         <>
           {currentIsCloned ? (
-            <p className="text-sm text-[hsl(var(--muted-foreground))]">Currently using a cloned voice.</p>
+            <p className="text-base text-[hsl(var(--muted-foreground))]">Currently using a cloned voice.</p>
           ) : null}
           <form onSubmit={handleUpload} className="flex max-w-sm flex-col gap-3">
             <Input
@@ -121,33 +121,34 @@ export function ClonedVoicesSection({ person }: ClonedVoicesSectionProps) {
             />
             <Input
               type="file"
+            aria-label="Choose an audio recording to clone"
               accept="audio/*"
               onChange={(e) => setFile(e.target.files?.[0] ?? null)}
               disabled={uploading}
               required
             />
-            {uploadError ? <p className="text-sm text-[hsl(var(--destructive))]">{uploadError}</p> : null}
-            <Button type="submit" size="sm" disabled={uploading || !file} className="w-fit">
+            {uploadError ? <p className="text-base text-[hsl(var(--destructive))]">{uploadError}</p> : null}
+            <Button type="submit" disabled={uploading || !file} className="w-fit">
               {uploading ? "Uploading…" : "Upload"}
             </Button>
           </form>
-          {actionError ? <p className="text-sm text-[hsl(var(--destructive))]">{actionError}</p> : null}
+          {actionError ? <p className="text-base text-[hsl(var(--destructive))]">{actionError}</p> : null}
           {voices === null ? null : voices.length === 0 ? (
-            <p className="text-sm text-[hsl(var(--muted-foreground))]">No cloned voices yet.</p>
+            <p className="text-base text-[hsl(var(--muted-foreground))]">No cloned voices yet.</p>
           ) : (
             <ul className="flex flex-col divide-y divide-[hsl(var(--border))]">
               {voices.map((voice) => (
                 <li key={voice.id} className="flex items-center justify-between gap-3 py-2">
                   <div className="flex flex-col">
-                    <span className="text-sm">{voice.label}</span>
-                    <span className="text-sm text-[hsl(var(--muted-foreground))]">Uploaded by {voice.creatorName}</span>
+                    <span className="text-base">{voice.label}</span>
+                    <span className="text-base text-[hsl(var(--muted-foreground))]">Uploaded by {voice.creatorName}</span>
                   </div>
                   <div className="flex gap-2">
-                    <Button variant="secondary" size="sm" disabled={pendingId === voice.id} onClick={() => selectVoice(voice.id)}>
+                    <Button variant="secondary" disabled={pendingId === voice.id} onClick={() => selectVoice(voice.id)}>
                       {pendingId === voice.id ? "Setting…" : "Use this voice"}
                     </Button>
                     {canManage || voice.creatorId === person.id ? (
-                      <Button variant="secondary" size="sm" disabled={pendingId === voice.id} onClick={() => deleteVoice(voice.id)}>
+                      <Button variant="secondary" disabled={pendingId === voice.id} onClick={() => deleteVoice(voice.id)}>
                         Delete
                       </Button>
                     ) : null}

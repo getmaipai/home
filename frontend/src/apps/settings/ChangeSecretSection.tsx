@@ -63,7 +63,7 @@ export function ChangeSecretSection({ person, onChanged }: ChangeSecretSectionPr
             required
           />
         ) : (
-          <p className="text-sm text-[hsl(var(--muted-foreground))]">
+          <p className="text-base text-[hsl(var(--muted-foreground))]">
             Your profile doesn't have one yet. Add one below.
           </p>
         )}
@@ -83,9 +83,9 @@ export function ChangeSecretSection({ person, onChanged }: ChangeSecretSectionPr
           disabled={submitting}
           required
         />
-        {error ? <p className="text-sm text-[hsl(var(--destructive))]">{error}</p> : null}
-        {success ? <p className="text-sm text-[hsl(var(--primary))]">Done.</p> : null}
-        <Button type="submit" size="sm" disabled={submitting} className="w-fit">
+        {error ? <p className="text-base text-[hsl(var(--destructive))]">{error}</p> : null}
+        {success ? <p className="text-base text-[hsl(var(--primary))]">Done.</p> : null}
+        <Button type="submit" disabled={submitting} className="w-fit">
           {submitting ? "Saving…" : person.hasSecret ? "Change it" : "Set it"}
         </Button>
       </form>

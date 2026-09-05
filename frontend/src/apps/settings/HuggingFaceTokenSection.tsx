@@ -77,13 +77,13 @@ export function HuggingFaceTokenSection() {
 
   return (
     <Section heading="Hugging Face token (for voice cloning)">
-      <p className="text-sm text-[hsl(var(--muted-foreground))]">
+      <p className="text-base text-[hsl(var(--muted-foreground))]">
         Needed to clone a voice from a recording. Accept the terms at huggingface.co/kyutai/pocket-tts, then create a
         read token at huggingface.co/settings/tokens and paste it below.
       </p>
-      {loadError ? <p className="text-sm text-[hsl(var(--destructive))]">{loadError}</p> : null}
+      {loadError ? <p className="text-base text-[hsl(var(--destructive))]">{loadError}</p> : null}
       {isSet !== null ? (
-        <p className="text-sm text-[hsl(var(--muted-foreground))]">
+        <p className="text-base text-[hsl(var(--muted-foreground))]">
           {isSet ? "A token is connected." : "No token connected yet."}
         </p>
       ) : null}
@@ -96,14 +96,14 @@ export function HuggingFaceTokenSection() {
           disabled={submitting}
           required
         />
-        {error ? <p className="text-sm text-[hsl(var(--destructive))]">{error}</p> : null}
-        {success ? <p className="text-sm text-[hsl(var(--primary))]">Saved.</p> : null}
+        {error ? <p className="text-base text-[hsl(var(--destructive))]">{error}</p> : null}
+        {success ? <p className="text-base text-[hsl(var(--primary))]">Saved.</p> : null}
         <div className="flex gap-2">
-          <Button type="submit" size="sm" disabled={submitting} className="w-fit">
+          <Button type="submit" disabled={submitting} className="w-fit">
             {submitting ? "Saving…" : "Save"}
           </Button>
           {isSet ? (
-            <Button type="button" variant="secondary" size="sm" disabled={submitting} onClick={handleRemove}>
+            <Button type="button" variant="secondary" disabled={submitting} onClick={handleRemove}>
               Remove
             </Button>
           ) : null}

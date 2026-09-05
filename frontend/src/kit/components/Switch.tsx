@@ -15,7 +15,14 @@ export function Switch({ checked, onCheckedChange, disabled, ...rest }: SwitchPr
       onCheckedChange={onCheckedChange}
       disabled={disabled}
       className={cn(
+        // The track stays 32px because that is what a switch should look
+        // like; the TAP AREA is stretched to the kit's 48px minimum with
+        // a transparent pseudo-element (docs/UI.md, WCAG 2.2 AA 2.5.5).
+        // A code review (2026-09-05) caught the accessibility pass
+        // raising the "Reset to default" link beside this to 48px and
+        // leaving the control people actually tap at 32.
         "relative h-8 w-14 shrink-0 rounded-full transition-colors disabled:opacity-50",
+        "before:absolute before:inset-x-0 before:-top-2 before:-bottom-2 before:content-['']",
         checked ? "bg-[hsl(var(--primary))]" : "bg-[hsl(var(--muted))]",
         FOCUS_RING,
       )}

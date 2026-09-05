@@ -19,7 +19,7 @@ export function EmptyState({ icon, text, actionLabel, onAction }: EmptyStateProp
       <Icon className="h-10 w-10 text-[hsl(var(--muted-foreground))]" aria-hidden />
       <p className="text-base text-[hsl(var(--muted-foreground))]">{text}</p>
       {actionLabel && onAction ? (
-        <Button variant="secondary" size="sm" onClick={onAction}>
+        <Button variant="secondary" onClick={onAction}>
           {actionLabel}
         </Button>
       ) : null}

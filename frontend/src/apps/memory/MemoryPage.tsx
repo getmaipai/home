@@ -56,7 +56,7 @@ export function MemoryPage() {
       <Page title="Memory">
         <div className="flex flex-1 flex-col items-center justify-center gap-3 p-8 text-center">
           <p className="text-base text-[hsl(var(--destructive))]">{error}</p>
-          <Button variant="secondary" size="sm" onClick={load}>
+          <Button variant="secondary" onClick={load}>
             Try again
           </Button>
         </div>

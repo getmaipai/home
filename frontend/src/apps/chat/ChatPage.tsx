@@ -473,7 +473,7 @@ export function ChatPage({ person }: ChatPageProps) {
           <p className="text-base text-[hsl(var(--destructive))]">
             Could not load your conversation. The hub might be unreachable.
           </p>
-          <Button variant="secondary" size="sm" onClick={loadHistory}>
+          <Button variant="secondary" onClick={loadHistory}>
             Try again
           </Button>
         </div>
@@ -497,9 +497,9 @@ export function ChatPage({ person }: ChatPageProps) {
         </div>
       ) : null}
       {banner ? (
-        <div className="mx-4 mb-2 rounded-[var(--radius)] bg-[hsl(var(--muted))] px-3 py-2 text-sm">{banner}</div>
+        <div className="mx-4 mb-2 rounded-[var(--radius)] bg-[hsl(var(--muted))] px-3 py-2 text-base">{banner}</div>
       ) : null}
-      <div className="flex items-center justify-end gap-2 px-4 pb-1">
+      <div className="flex flex-wrap items-center justify-end gap-2 px-4 pb-1">
         {/* Phase 1 of the wake-word plan (docs/dev.md, 2026-09-04):
             "infrastructure proof, no custom model yet" - fires on
             openWakeWord's stock "hey jarvis" phrase, not a MaiPai-trained
@@ -517,7 +517,7 @@ export function ChatPage({ person }: ChatPageProps) {
           type="button"
           onClick={() => setThinking((v) => !v)}
           aria-pressed={thinking}
-          className={`rounded-full px-3 py-1 text-sm transition-colors ${
+          className={`min-h-12 rounded-full px-4 py-1 text-base transition-colors ${
             thinking
               ? "bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))]"
               : "bg-[hsl(var(--muted))] text-[hsl(var(--muted-foreground))]"

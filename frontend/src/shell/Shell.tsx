@@ -59,9 +59,15 @@ export function Shell({ person, onSignOut, children }: ShellProps) {
                 key={entry.to}
                 to={entry.to}
                 end={entry.to === "/"}
+                // The label is hidden on phone, where this rail is
+                // icon-only, so without an aria-label every nav entry
+                // was an unnamed link to a screen reader - and it is the
+                // only navigation in the product. Found by the
+                // accessibility pass, 2026-09-05.
+                aria-label={entry.label}
                 className={({ isActive }) =>
                   cn(
-                    "flex items-center gap-3 rounded-[var(--radius)] px-3 py-2 sm:justify-start",
+                    "flex min-h-12 items-center gap-3 rounded-[var(--radius)] px-3 py-2 sm:justify-start",
                     isActive ? "bg-[hsl(var(--muted))]" : "hover:bg-[hsl(var(--muted))]",
                   )
                 }
@@ -72,7 +78,13 @@ export function Shell({ person, onSignOut, children }: ShellProps) {
             );
           })}
         </nav>
-        <main className="flex min-h-0 flex-1 flex-col">{children}</main>
+        {/* `min-w-0` is load-bearing, not tidiness: a flex item defaults
+            to min-width:auto, so without it this column cannot shrink
+            below its widest child and one wide settings row pushed the
+            whole page to 510px inside a 390px phone viewport. Found by
+            the accessibility pass, 2026-09-05; docs/UI.md counts
+            anything wider than the viewport as a failure. */}
+        <main className="flex min-h-0 min-w-0 flex-1 flex-col">{children}</main>
       </div>
     </div>
   );

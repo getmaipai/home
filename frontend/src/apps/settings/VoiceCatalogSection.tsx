@@ -79,13 +79,13 @@ export function VoiceCatalogSection({ personId }: VoiceCatalogSectionProps) {
   return (
     <Section heading="More voices">
       {!expanded ? (
-        <button type="button" onClick={expand} className="w-fit text-sm text-[hsl(var(--primary))] hover:underline">
+        <button type="button" onClick={expand} className="min-h-12 w-fit text-base text-[hsl(var(--primary))] hover:underline">
           Browse the full community voice catalog (2,000+ voices)
         </button>
       ) : loadError ? (
         <div className="flex flex-col items-start gap-2">
-          <p className="text-sm text-[hsl(var(--destructive))]">{loadError}</p>
-          <Button variant="secondary" size="sm" onClick={expand}>
+          <p className="text-base text-[hsl(var(--destructive))]">{loadError}</p>
+          <Button variant="secondary" onClick={expand}>
             Try again
           </Button>
         </div>
@@ -94,7 +94,7 @@ export function VoiceCatalogSection({ personId }: VoiceCatalogSectionProps) {
       ) : (
         <div className="flex flex-col gap-2">
           {currentIsCatalogVoice ? (
-            <p className="text-sm text-[hsl(var(--muted-foreground))]">
+            <p className="text-base text-[hsl(var(--muted-foreground))]">
               Currently using a catalog voice: {currentCatalogLabel}
             </p>
           ) : null}
@@ -105,22 +105,22 @@ export function VoiceCatalogSection({ personId }: VoiceCatalogSectionProps) {
             aria-label="Search the voice catalog"
             className="w-full"
           />
-          {selectError ? <p className="text-sm text-[hsl(var(--destructive))]">{selectError}</p> : null}
+          {selectError ? <p className="text-base text-[hsl(var(--destructive))]">{selectError}</p> : null}
           {search.trim().length > 0 && search.trim().length < MIN_SEARCH_LENGTH ? (
-            <p className="text-sm text-[hsl(var(--muted-foreground))]">Keep typing to search.</p>
+            <p className="text-base text-[hsl(var(--muted-foreground))]">Keep typing to search.</p>
           ) : search.trim().length >= MIN_SEARCH_LENGTH && matches.length === 0 ? (
-            <p className="text-sm text-[hsl(var(--muted-foreground))]">No voices match "{search}".</p>
+            <p className="text-base text-[hsl(var(--muted-foreground))]">No voices match "{search}".</p>
           ) : (
             <ul className="flex flex-col divide-y divide-[hsl(var(--border))]">
               {matches.map((entry) => (
                 <li key={entry.path} className="flex items-center justify-between gap-3 py-2">
                   <div className="flex flex-col">
-                    <span className="text-sm">{entry.path.split("/").pop()}</span>
-                    <span className="text-sm text-[hsl(var(--muted-foreground))]">{titleCaseOption(entry.collection)}</span>
+                    <span className="text-base">{entry.path.split("/").pop()}</span>
+                    <span className="text-base text-[hsl(var(--muted-foreground))]">{titleCaseOption(entry.collection)}</span>
                   </div>
                   <Button
                     variant="secondary"
-                    size="sm"
+                   
                     disabled={pendingPath === entry.path}
                     onClick={() => selectVoice(entry.path)}
                   >

@@ -186,18 +186,17 @@ export function PeoplePage({ person }: PeoplePageProps) {
                     </span>
                     <Button
                       variant="destructive"
-                      size="sm"
                       disabled={selected.size === 0}
                       onClick={() => setConfirmingDelete("batch")}
                     >
                       Remove selected
                     </Button>
-                    <Button variant="ghost" size="sm" onClick={leaveSelectMode}>
+                    <Button variant="ghost" onClick={leaveSelectMode}>
                       Done
                     </Button>
                   </>
                 ) : (
-                  <Button variant="ghost" size="sm" onClick={() => setSelectMode(true)}>
+                  <Button variant="ghost" onClick={() => setSelectMode(true)}>
                     Select people
                   </Button>
                 )}
@@ -264,13 +263,19 @@ export function PeoplePage({ person }: PeoplePageProps) {
                 return (
                   <div className="flex min-w-0 flex-1 items-center gap-3">
                     {selectMode && canDeletePerson(actorRole, person.id, { id: p.id, role: p.role as Role }) ? (
-                      <input
-                        type="checkbox"
-                        checked={selected.has(p.id)}
-                        onChange={() => toggle(p.id)}
-                        aria-label={`Select ${p.display_name}`}
-                        className="h-5 w-5 shrink-0 accent-[hsl(var(--primary))]"
-                      />
+                      // The box stays 20px; the label around it is the
+                      // 48px tap area (docs/UI.md's floor). A code review
+                      // (2026-09-05) caught this as the only way to
+                      // multi-select on a phone, at 20px square.
+                      <label className="-m-3 flex min-h-12 min-w-12 shrink-0 cursor-pointer items-center justify-center p-3">
+                        <input
+                          type="checkbox"
+                          checked={selected.has(p.id)}
+                          onChange={() => toggle(p.id)}
+                          aria-label={`Select ${p.display_name}`}
+                          className="h-5 w-5 accent-[hsl(var(--primary))]"
+                        />
+                      </label>
                     ) : null}
                     <Avatar name={p.display_name} className="h-10 w-10 shrink-0" />
                     <div className="flex min-w-0 flex-col">
@@ -284,10 +289,10 @@ export function PeoplePage({ person }: PeoplePageProps) {
                 if (editingId === p.id) {
                   return (
                     <div className="flex gap-2">
-                      <Button size="sm" onClick={() => handleSaveEdit(p.id)} disabled={busy}>
+                      <Button onClick={() => handleSaveEdit(p.id)} disabled={busy}>
                         Save
                       </Button>
-                      <Button variant="ghost" size="sm" onClick={() => setEditingId(null)}>
+                      <Button variant="ghost" onClick={() => setEditingId(null)}>
                         Cancel
                       </Button>
                     </div>
@@ -296,10 +301,10 @@ export function PeoplePage({ person }: PeoplePageProps) {
                 if (confirmingDelete === p.id) {
                   return (
                     <div className="flex gap-2">
-                      <Button variant="destructive" size="sm" onClick={() => handleDeleteOne(p.id)} disabled={busy}>
+                      <Button variant="destructive" onClick={() => handleDeleteOne(p.id)} disabled={busy}>
                         {busy ? "Removing…" : "Yes, remove"}
                       </Button>
-                      <Button variant="ghost" size="sm" onClick={() => setConfirmingDelete(null)}>
+                      <Button variant="ghost" onClick={() => setConfirmingDelete(null)}>
                         Keep them
                       </Button>
                     </div>
@@ -314,7 +319,6 @@ export function PeoplePage({ person }: PeoplePageProps) {
                     {mayEdit ? (
                       <Button
                         variant="ghost"
-                        size="sm"
                         aria-label={`Edit ${p.display_name}`}
                         onClick={() => {
                           setEditingId(p.id);
@@ -328,7 +332,6 @@ export function PeoplePage({ person }: PeoplePageProps) {
                     {mayDelete ? (
                       <Button
                         variant="ghost"
-                        size="sm"
                         aria-label={`Remove ${p.display_name}`}
                         onClick={() => setConfirmingDelete(p.id)}
                       >

@@ -113,7 +113,7 @@ export function SettingsRenderer({ scope, scopeValue }: SettingsRendererProps) {
     return (
       <div className="flex flex-1 flex-col items-center justify-center gap-3 p-8 text-center">
         <p className="text-base text-[hsl(var(--destructive))]">{error}</p>
-        <Button variant="secondary" size="sm" onClick={load}>
+        <Button variant="secondary" onClick={load}>
           Try again
         </Button>
       </div>
@@ -147,7 +147,7 @@ export function SettingsRenderer({ scope, scopeValue }: SettingsRendererProps) {
   return (
     <div className="flex flex-col gap-6 p-4">
       {error ? (
-        <div className="rounded-[var(--radius)] bg-[hsl(var(--muted))] px-3 py-2 text-sm text-[hsl(var(--destructive))]">
+        <div className="rounded-[var(--radius)] bg-[hsl(var(--muted))] px-3 py-2 text-base text-[hsl(var(--destructive))]">
           {error}
         </div>
       ) : null}
@@ -172,7 +172,7 @@ export function SettingsRenderer({ scope, scopeValue }: SettingsRendererProps) {
                 <button
                   type="button"
                   onClick={() => setAdvancedOpen((prev) => ({ ...prev, [group.id]: true }))}
-                  className="w-fit text-sm text-[hsl(var(--muted-foreground))] hover:underline"
+                  className="min-h-12 w-fit text-base text-[hsl(var(--muted-foreground))] hover:underline"
                 >
                   Show {group.advanced.length} advanced settings
                 </button>

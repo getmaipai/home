@@ -22,11 +22,11 @@ export function RoutingStatsSection() {
 
   return (
     <Section heading="Plugin routing">
-      <p className="text-sm text-[hsl(var(--muted-foreground))]">
+      <p className="text-base text-[hsl(var(--muted-foreground))]">
         How often a chat message matches a plugin directly versus falling through to the model.
       </p>
       {error ? (
-        <p className="text-sm text-[hsl(var(--destructive))]">{error}</p>
+        <p className="text-base text-[hsl(var(--destructive))]">{error}</p>
       ) : stats === null ? (
         <Progress mode="spinner" label="Loading routing stats" />
       ) : stats.total === 0 ? (
