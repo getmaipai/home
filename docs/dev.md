@@ -6064,3 +6064,146 @@ confirmation staying an inline card rather than the suggested
 `AlertDialog` is docs/UI.md's own explicit, deliberate decision
 ("PeoplePage's existing Remove pattern... is the model, not an exception
 to standardize away"), recorded the same night this session started.
+
+## Session B: step 2, the shell (2026-09-05)
+
+Every piece docs/UI.md's shell contract names, built for real: a
+data-driven nav (`shell/nav.ts`, five entries today, matching a new
+`nav_entry` def in `spec/ui/schema.json`), shadcn's `Sidebar` on tablet
+and desktop, a five-entry bottom bar on phone (`shell/PhoneNav.tsx`), the
+same Sidebar again on TV driven by real arrow-key/remote focus, a header
+profile switcher replacing sign-out as the primary action, and the
+appearance setting (`ui.appearance`, `backend/src/settings/uiKeys.ts`)
+actually applied.
+
+**`useSurface()` (`kit/useSurface.ts`).** `{ pointer, hover, input, far }`:
+`pointer`/`hover` from `usehooks-ts`'s `useMediaQuery` (capability),
+`input`/`far` from a hand-written keydown/pointerdown/gamepadconnected
+listener (what's actually in use) plus a webOS/Tizen/Fire TV user-agent
+check for `far` - arrow keys alone are indistinguishable from a keyboard's
+on a real TV browser, the exact gap the framework table's own note named.
+7 tests, mocking `matchMedia` directly rather than relying on happy-dom's
+real CSS evaluation (it doesn't implement `pointer`/`hover` media
+features).
+
+**The layout bug only a real browser caught.** The first draft put the
+header outside the Sidebar/SidebarInset pair shadcn's own components
+expect as direct `SidebarProvider` children (its `Sidebar` positions
+itself with `fixed inset-y-0`, viewport-relative, regardless of DOM
+nesting) - the header rendered, looked fine in a screenshot taken before
+any interaction, and was completely unclickable near the trigger, because
+the sidebar's fixed layer sat on top of it. jsdom never lays anything out,
+so no test could have caught this; a Playwright click on the real trigger
+did, immediately. Fixed by moving the header inside `SidebarInset`, the
+structure shadcn's own examples use.
+
+**`useIsMobile` (`kit/hooks/use-mobile.ts`) repointed from 768px to the
+kit's own 640px tablet breakpoint** (`kit/responsive.ts`'s
+`SURFACE_MIN_WIDTH_PX.tablet`), and every `md:` class inside the generated
+`kit/ui/sidebar.tsx` changed to `sm:` to match - without this, the
+Sidebar's internal mobile/Sheet cutover (768px) would have disagreed with
+where `PhoneNav`'s own `sm:hidden` takes over (640px), producing a dead
+zone between the two widths where neither nav rendered anything. Verified
+at exactly 800px (tablet): the real Sidebar, not a Sheet.
+
+**The accessibility floor, reapplied a second time.** Step 1 fixed the
+generated form controls; this step found the same undershoot in
+`SidebarMenuButton` (`h-8`/`text-sm`, 32px/14px against the 48px/16px
+floor) and fixed it the same way (default/lg sizes raised, even
+icon-collapsed forced to an important-modifier `size-12` rather than the
+generated `size-8`, since the shell's own nav is the sole way to reach
+every page on desktop). **A
+second real bug the size change itself introduced**, caught by Jesse
+watching a screenshot live, not by any test: raising icon-collapsed from
+32px to 48px left just enough room for a clipped sliver of the label's
+first letter to peek through (`[&>span:last-child]:truncate` only
+truncates overflow, it doesn't hide it, and at the smaller original size
+the icon and padding alone already overflowed completely, hiding the text
+by accident rather than by a real rule). Fixed with an explicit
+`group-data-[collapsible=icon]:[&>span:last-child]:hidden`, verified with
+a 1-second-settled screenshot after the collapse animation, not the
+300ms first check that still showed the sliver.
+
+**TV nav, really working, not just wired up.** `shell/tvNav.ts` calls
+`@noriginmedia/norigin-spatial-navigation`'s `init()` once, the first time
+`useSurface().far` is true; each nav row calls `useFocusable()`
+unconditionally (rules of hooks) and only lets its `focused` state affect
+styling when `far` - a mouse/touch/keyboard surface never notices the
+library is loaded. The library's own docs are explicit that "set the
+initial focus" is the app's job, not automatic - missed on the first pass
+(arrow keys did nothing at all), fixed with `forceFocus` on the first nav
+item when `far`. Verified with real simulated key events against a
+`Web0S` user agent: `ArrowDown` moves a `ring-2` class between "Chat" and
+"People" in the real DOM, and `Enter` on "People" navigates to `/people`
+- not asserted from reading the code, executed. Radix's Popover-based
+NotificationBell and ProfileSwitcher call a new `pauseTvNavForOverlay()`
+on open/close so a remote navigating a menu never also drives the rail
+underneath it (a no-op on every other surface, and before `far` has ever
+initialized the service).
+
+**The profile switcher (`shell/ProfileSwitcher.tsx`).** A Popover, not a
+Dialog or the generated DropdownMenu - matching NotificationBell's own
+"never blocks the rest of the page" precedent rather than inventing a
+second small-panel pattern. Lists every other household member, PIN
+prompt inline for secured ones (`api.select`/`api.verifySecret`, the same
+routes `SignIn.tsx`'s picker already calls, since the backend's session-
+cookie model needs no separate "switch profile" endpoint), sign-out moved
+inside as the last item. The PIN auto-submit-on-4-digits behavior is
+duplicated in small form from `SignIn.tsx` rather than extracted - an
+accepted, recorded tradeoff given this session's time budget, not an
+oversight.
+
+**The appearance setting, applied not just declared.**
+`backend/src/settings/uiKeys.ts`: `ui.appearance` (system/light/dark) and
+`ui.pinned_apps` (a JSON-array-in-a-`text`-selector stand-in - no real
+list selector exists in the Home Assistant vocabulary docs/SETTINGS.md
+uses; `level: "expert"` since the real editing UI is a pin/unpin gesture,
+step 6, not a JSON text box), registered in `backend/scripts/gen-
+settings-registry.ts` (a "one-line registration" the plan explicitly
+grants across the ownership boundary). `shell/useAppearance.ts` reads it
+once per person and applies a `.dark`/`.light` class plus the
+`theme-color` meta tag; the generic `SettingsRenderer` already renders it
+as a real "select" control with zero bespoke UI, exactly the declarative
+settings system doing its job. `prefers-reduced-motion` is one global CSS
+rule in `tokens.css` rather than a per-component check.
+
+**Deferred, matching the plan's own "don't invent ahead of need" rule
+rather than a gap found late:** the "Search, Home, then Your apps, then
+More" fixed-row structure the plan describes presupposes a Home page and
+a pinned-apps UI that don't exist until step 6 - today's sidebar and
+bottom bar show the five real pages directly, with the mechanism (nav.ts,
+PhoneNav's overflow branch) already shaped for when Search/Home/pinning
+land. Auto-collapse in consumption modes has no real consumer yet either
+(no media package exists).
+
+Verified against the running app: phone (390), tablet (800, the exact
+breakpoint boundary), desktop (1280) and a 1920×1080 `far` emulation
+(webOS user agent) of Chat, the sidebar collapsed to icons, the profile
+switcher open, and real keyboard-driven TV navigation - screenshots
+opened and read, the TV focus mechanism verified by script rather than by
+eye (a `ring-2` class moving between DOM nodes on `ArrowDown`, a real
+route change on `Enter`). 20 new tests (`useSurface` 7, `PhoneNav` 5,
+`ProfileSwitcher` 4, `useAppearance` 4). `scripts/check.sh` green
+(backend 567, frontend 241, lint, build, `@maipai/standards` core).
+
+**Dependencies added:** `usehooks-ts`, `@noriginmedia/norigin-spatial-
+navigation` (MIT both).
+
+**Code review pass (medium effort), two real findings, both fixed.**
+Collapsing the sidebar to icons hides each nav link's label with CSS
+(the fix for the clipped-sliver bug above), and a `display:none` element
+contributes nothing to a link's accessible name - unnaming every nav
+link the moment someone actually uses the collapse-to-icons feature this
+step makes newly discoverable, the exact class of bug the 2026-09-05
+accessibility pass already fixed once on the pre-shadcn rail. Fixed with
+an explicit `aria-label` on the `NavLink`, verified live (collapsed the
+sidebar, read every button's computed accessible name back out of the
+DOM: all five present). Separately, `pauseTvNavForOverlay`'s pause/resume
+was a plain boolean toggle with no reference count - harmless while only
+one overlay existed, a real bug the moment a second one could be open at
+the same time (closing the second-opened overlay would resume the TV nav
+rail while the first was still on screen). Fixed with a count; two new
+regression tests using `spyOn` on the library's own exported `pause`/
+`resume` functions (Bun's live ES module bindings make this work even
+though `tvNav.ts` imports and calls them directly, unlike the fetch-stub
+approach files touching `@/lib/api` need for the same reason).

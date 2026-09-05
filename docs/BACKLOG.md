@@ -733,10 +733,12 @@ implemented on the hub yet.
       `VideosRail`/`MusicRail`/`PodcastRail`/`NewsLayout` for what should
       be one shared component. Details in `docs/dev.md`, "The five
       missing kit primitives".
-      **Still open, the other half of this item:** a real data-driven nav
-      blueprint. `Shell.tsx`'s nav list is still hand-hardcoded, by its
-      own comment, pending "the moment a fifth package needs to add an
-      entry" - which is whenever the `app` kind work above starts.
+      **The other half of this item, done 2026-09-05:** `frontend/src/
+      shell/nav.ts` is now the data-driven nav registry `Shell.tsx` reads
+      (matching `spec/ui/schema.json`'s new `nav_entry` def field-for-
+      field); core's five pages register there by hand until a package's
+      manifest `contributes.pages` can feed a sixth entry in without
+      editing this file. See `docs/dev.md`, "Session B: step 2".
 - [ ] **Skills as home-screen widgets - cards and rows** (L, needs its own
       design pass before any code - Jesse, 2026-09-05). The idea: a
       skill's data shown on a dashboard as a card (or, for some skills, a
@@ -839,26 +841,38 @@ implemented on the hub yet.
       with one caveat for that item: the local metasearch sidecar fits
       the "we are the user" rule, scraping Google from the hub's address
       does not.
-- [ ] **Input-mode detection in the kit** (M, everything TV depends on
-      it) - one `useSurface()` hook from `pointer: coarse`, `hover:
-      none`, keyboard-only and remote/gamepad, so TV becomes a real
-      surface instead of an undefined one. Legacy's `use-coarse-pointer`
-      existed because Tailwind `hover:` made video controls unreachable
-      on touch for months; its TV pages each hand-rolled `{row, col}`
-      focus, the lesson being one spatial-navigation hook in the kit,
-      never per page.
-- [ ] **Two render profiles per component, near and far** (M, after the
-      hook) - focus scale, the tvOS type scale, no free text entry on
-      far, as schema-level rules per plan 6.4's "TV in one rule", so no
-      package does TV work.
-- [ ] **Phone chrome per UI.md** (M) - a five-entry bottom bar with More,
-      replacing the 64 px icon-only rail that ships under 640 today (the
-      08-25 note already warned icon-only nav raises cognitive load for
-      occasional users; it is the phone default now).
-- [ ] **A profile switcher in the header** (S) - sign-out is the only way
-      to change person, which on a shared tablet or TV is the primary
-      gesture. Sign-in already has the picker; reuse it with the PIN
-      prompt.
+- [x] **Input-mode detection in the kit** (M, everything TV depends on
+      it) - done 2026-09-05. `kit/useSurface.ts`: `{ pointer, hover,
+      input, far }` from `usehooks-ts`'s `useMediaQuery` (`pointer`,
+      `hover`) plus a hand-written keydown/pointerdown/gamepadconnected
+      listener for `input`, and a webOS/Tizen/Fire TV user-agent check
+      for `far` (arrow keys alone are indistinguishable from a keyboard's
+      - the real signal legacy's own table row named). See `docs/dev.md`,
+      "Session B: step 2".
+- [x] **Two render profiles per component, near and far, partial** (M) -
+      done 2026-09-05 for the shell's own nav: the Sidebar renders as a
+      real focusable TV rail via `@noriginmedia/norigin-spatial-
+      navigation`'s `useFocusable` when `useSurface().far` is true (arrow
+      keys move focus, Enter navigates - verified live against a
+      simulated webOS user agent), and a `.surface-far` class bumps the
+      type scale. **Still open:** this is the shell's chrome only: no
+      schema-level "TV in one rule" exists yet for a package's own pages
+      (plan 6.4), and no free-text-entry-on-far rule is enforced anywhere
+      (nothing on `far` takes free text yet to enforce it against).
+- [x] **Phone chrome per UI.md** (M) - done 2026-09-05. `shell/PhoneNav.tsx`:
+      a five-entry bottom bar (today's five real pages fit exactly, so
+      "More" has no content yet; the mechanism exists for a sixth),
+      replacing the icon-only rail under 640px. See `docs/dev.md`,
+      "Session B: step 2".
+- [x] **A profile switcher in the header** (S) - done 2026-09-05.
+      `shell/ProfileSwitcher.tsx`: a Popover (matching NotificationBell's
+      own non-modal pattern, not a Dialog) listing every other household
+      member, a PIN prompt for secured ones (reusing `api.select`/
+      `api.verifySecret`, the same routes SignIn's picker already calls),
+      and sign-out moved inside it as a secondary item. A known, accepted
+      duplication: the PIN auto-submit-on-4-digits behavior is copied
+      from `SignIn.tsx` in small form rather than extracted into a shared
+      hook under this session's time budget - a real follow-up.
 - [ ] **The UiNode renderer, and the schema catching up to the kit**
       (M-L; sharpens the `app` item above) - `spec/ui/schema.json` has
       six node kinds and renders nothing; CardGrid, MediaShelf, List,
@@ -928,12 +942,17 @@ implemented on the hub yet.
       on `controllerchange`; plus `lazyRetry` (stale-chunk reload once
       per session, hit right after an update) and an error boundary,
       neither of which exists.
-- [ ] **Reduced motion, type floor, theme colour** (S) - no
-      `prefers-reduced-motion` handling anywhere; `text-[10px]` and
-      `text-xs` below the 16 px phone floor in the bell and thread; the
-      `theme-color` meta is hardcoded dark. Add an appearance setting
-      (light, dark, system) per person, the first step toward plan
-      decision 13's per-person generated themes.
+- [x] **Reduced motion, type floor, theme colour** (S) - done 2026-09-05.
+      `kit/tokens.css` now has one global `prefers-reduced-motion: reduce`
+      rule (zeroes animation/transition duration everywhere); the
+      appearance setting (`ui.appearance`: system/light/dark, person
+      scope, `backend/src/settings/uiKeys.ts`) exists and `shell/
+      useAppearance.ts` applies it (a `.dark`/`.light` class, and drives
+      `theme-color` off the resolved value instead of the hardcoded dark
+      meta tag). **Still open:** the bell badge and thread timestamp
+      `text-[10px]`/`text-xs` instances themselves weren't hunted down
+      and fixed in this pass (a real, separate audit-style sweep, not
+      folded into the shell rebuild).
 - [ ] **A screenshot matrix in the pipeline** (M; sharpens the tracked
       "wire the measurable half" note) - every page at every surface,
       light and dark, with overflow and target checks, per UI.md; today

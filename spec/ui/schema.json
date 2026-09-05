@@ -169,6 +169,17 @@
         "mode": { "type": "string", "enum": ["spinner", "determinate"] },
         "bind": { "$ref": "#/$defs/binding" }
       }
+    },
+    "nav_entry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["to", "icon", "label"],
+      "description": "One row in the shell's nav (docs/plans/session-b-ui.md step 2, frontend/src/shell/nav.ts). Not part of the root `oneOf` above: a nav entry is never a page-body node a page's `body`/`children` array renders - it describes the shell's own chrome, the same distinction `page` (a route) already draws from `section`/`form` (page content). A package's manifest `contributes.pages` field will emit this shape once packages exist; core's own pages declare it by hand in nav.ts today.",
+      "properties": {
+        "to": { "type": "string", "minLength": 1, "description": "A route path, matching a `page.id`'s route." },
+        "icon": { "type": "string", "description": "A lucide icon name (docs/UI.md > Icons)." },
+        "label": { "type": "string", "minLength": 1 }
+      }
     }
   }
 }

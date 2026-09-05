@@ -165,7 +165,10 @@ export default tseslint.config(
         // The two logo-swap classes are real CSS in tokens.css, just not
         // Tailwind utilities (docs/dev.md's brand-logo comment explains
         // why they're plain rules rather than a Tailwind variant).
-        { ignore: ["brand-logo-light", "brand-logo-dark"] },
+        // `surface-far` is the TV type-scale class (kit/tokens.css),
+        // applied directly rather than as a Tailwind utility since it's
+        // driven by `useSurface().far`, not a media query.
+        { ignore: ["brand-logo-light", "brand-logo-dark", "surface-far"] },
       ],
       "better-tailwindcss/no-conflicting-classes": "error",
       "better-tailwindcss/no-restricted-classes": [

@@ -214,3 +214,27 @@ body {
 .dark .brand-logo-dark {
   display: inline;
 }
+
+/* docs/UI.md > Responsive: "prefers-reduced-motion disables transitions
+ * and spinners' spin." One rule, everywhere, rather than every component
+ * that animates checking the media query itself. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* The TV surface's type scale (docs/UI.md: "TV sizes for ten feet"),
+ * applied by the shell as a class on its root when `useSurface().far` is
+ * true - not a media query, since `far` is input-mode detection, not a
+ * viewport width (kit/useSurface.ts). Kept to the one property that
+ * actually matters at ten feet; layout stays the same. */
+.surface-far {
+  font-size: 20px;
+}
+

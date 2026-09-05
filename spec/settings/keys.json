@@ -279,6 +279,41 @@
     ]
   },
   {
+    "key": "ui.appearance",
+    "scope": "person",
+    "selector": "select",
+    "range": {
+      "options": [
+        "system",
+        "light",
+        "dark"
+      ]
+    },
+    "default": "system",
+    "label": "Appearance",
+    "help": "Light, dark, or match this device's own setting.",
+    "level": "basic",
+    "secret": false,
+    "lives_in": "profile.appearance",
+    "honoured_by": [
+      "home"
+    ]
+  },
+  {
+    "key": "ui.pinned_apps",
+    "scope": "person",
+    "selector": "text",
+    "default": "[]",
+    "label": "Pinned apps (advanced)",
+    "help": "A JSON list of nav entry ids, in the order they should appear. Normally set by pinning an app, not by editing this directly.",
+    "level": "expert",
+    "secret": false,
+    "lives_in": "profile.appearance",
+    "honoured_by": [
+      "home"
+    ]
+  },
+  {
     "key": "voice.hf_token",
     "scope": "household",
     "selector": "text",

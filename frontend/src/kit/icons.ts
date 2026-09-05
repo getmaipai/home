@@ -19,6 +19,8 @@ import {
   X,
   Bell,
   Inbox,
+  MoreHorizontal,
+  PanelLeft,
   type LucideIcon,
 } from "lucide-react";
 
@@ -47,6 +49,8 @@ const REGISTRY: Record<string, LucideIcon> = {
   x: X,
   bell: Bell,
   inbox: Inbox,
+  "more-horizontal": MoreHorizontal,
+  "panel-left": PanelLeft,
 };
 
 export function getIcon(name: string): LucideIcon {

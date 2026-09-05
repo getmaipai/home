@@ -3,6 +3,7 @@ import * as RadixPopover from "@radix-ui/react-popover";
 import { Button } from "@/kit/ui/button";
 import { getIcon } from "@/kit/icons";
 import { useToast } from "@/kit/primitives/Toast";
+import { pauseTvNavForOverlay } from "@/shell/tvNav";
 import { api, type NotificationDeliveryView } from "@/lib/api";
 
 const POLL_MS = 15_000;
@@ -71,7 +72,13 @@ export function NotificationBell() {
   }
 
   return (
-    <RadixPopover.Root open={open} onOpenChange={setOpen}>
+    <RadixPopover.Root
+      open={open}
+      onOpenChange={(next) => {
+        setOpen(next);
+        pauseTvNavForOverlay(next);
+      }}
+    >
       <RadixPopover.Trigger asChild>
         <Button variant="ghost" size="icon" aria-label={`Notifications${items.length > 0 ? ` (${items.length} pending)` : ""}`} className="relative">
           <BellIcon className="h-5 w-5" aria-hidden />
