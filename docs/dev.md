@@ -6207,3 +6207,138 @@ regression tests using `spyOn` on the library's own exported `pause`/
 `resume` functions (Bun's live ES module bindings make this work even
 though `tvNav.ts` imports and calls them directly, unlike the fetch-stub
 approach files touching `@/lib/api` need for the same reason).
+
+## Session B: step 3, the data layer (2026-09-05)
+
+TanStack Query replaces the hand-rolled load/error/retry triad in every
+page that had one: Chat (the initial history fetch only - a live turn
+still mutates `messages` as local state token by token, which doesn't fit
+a query's cache; rebuilding that as part of the runtime is step 4's job,
+not this one's), Memory, Privacy, People, and the settings renderer.
+NotificationBell's own hand-rolled `setInterval` poll became
+`refetchInterval`. One `QueryClient` (`src/lib/queryClient.ts`'s
+`createQueryClient()`, not a bare `new QueryClient()` at every call site):
+`retry: false`, because the hub is a local machine on the household's own
+network, not a flaky public API - TanStack Query's default of three
+silent retries with backoff before a query ever reports `isError` was
+just delaying `AsyncState`'s own retry UI by several seconds, found live
+in a browser check (a stubbed 500 response took the "Try again" button
+several seconds to appear).
+
+**A real simplification, not just a migration.** `SettingsRenderer.tsx`
+had a hand-rolled module-level `Promise` cache (`cachedRegistry`) purely
+to stop two `SettingsRenderer` instances on the same page (household,
+person scope) from each independently fetching the identical settings
+registry - exactly what a query cache already does for free. Deleted,
+along with the `__resetSettingsRegistryCacheForTests` escape hatch its
+own tests needed (module state surviving between tests); every test that
+rendered a migrated page now gets its own fresh `QueryClient` instead,
+via `createQueryClient()`, and `staleTime: Infinity` on the registry
+query replicates the "cached for the page session" behavior the old
+promise cache existed for. `PrivacyPage.tsx` had its own hand-rolled
+requestId race guard (a code review, 2026-09-04, found the retry button
+made a slower stale response overwrite a newer one) - TanStack Query
+already guarantees only the latest request's result is ever committed,
+so that guard is gone too.
+
+**A real bug a live browser check caught, not a test.** `NavItem`'s
+`useFocusable()` (step 2's TV nav) is called on every render regardless
+of surface; `@noriginmedia/norigin-spatial-navigation`'s service sets up
+its `layoutAdapter` only inside `init()`, which step 2 only ever called
+when `useSurface().far` was true - so on every OTHER surface, a
+focusable component still tried to register itself against a
+`layoutAdapter` that was never created, throwing "Cannot read properties
+of undefined (reading 'measureLayout')" on every single page, on every
+surface, caught only because this step's own verification attached a
+`page.on("pageerror")` listener step 2's screenshots-only pass never
+did. Unconditionally calling `init()` on every surface was considered
+and rejected: the library's key listener calls `preventDefault()`/
+`stopPropagation()` on any mapped key globally with no awareness of the
+event's target, which would have broken arrow-key text editing in every
+input and textarea on every non-TV surface. Fixed by splitting the
+component instead of branching inside it: `NavItem` (plain, no norigin)
+and `TvNavItem` (calls `useFocusable`, only rendered once `far` is true)
+are two separate components, and `SidebarMenu` is keyed by
+`far ? "tv" : "standard"` so switching between them is a clean remount
+rather than one component conditionally calling a hook - React's rules
+of hooks forbid the latter. A second, related ordering bug: calling
+`ensureTvNavInit()` from a `useEffect` in `Shell` raced against
+`TvNavItem`'s own mount-time registration, since React fires a child's
+effects before its parent's - moved to a plain, idempotent call during
+render instead.
+
+**A test-design bug of this session's own making, not a code bug.** The
+new `MemoryPage.test.tsx`'s archive test hung for the full suite timeout
+on first write: mutating via `invalidateQueries` means the test's own
+fetch stub has to actually reflect the archive in its next GET response,
+or the list a query refetches is identical to the one before and the
+assertion waiting for the item to disappear can never pass. Fixed with a
+small stateful stub (an `archived` flag flipped by the archive call,
+read by the list response) rather than a fixed fixture - the same
+"stateful stub, not a static fixture" pattern `PeoplePage.test.tsx`'s own
+`stubApi` already uses for its batch-delete outcomes.
+
+Every migrated page's existing test file needed a `QueryClientProvider`
+wrapper (a fresh `createQueryClient()` per render, so no test's cache
+bleeds into another's) - `PeoplePage.test.tsx`, `PrivacyPage.test.tsx`,
+`ChatPage.test.tsx`, `SettingsPage.test.tsx`. `MemoryPage.test.tsx` and
+`NotificationBell.test.tsx` are new; neither page had any test before
+tonight.
+
+Verified against the running app: every migrated page's real fetch,
+People's add-a-person flow round-tripping through the new query layer
+without a full reload, and a real network failure (an aborted `/api/
+memory` request) showing `AsyncState`'s retry button and actually
+recovering once the network came back - not just a screenshot, a
+scripted click-and-recover. 27 new/updated tests. `scripts/check.sh`
+green (backend 567, frontend 251, lint, build, `@maipai/standards`
+core).
+
+**Dependency added:** `@tanstack/react-query` (MIT).
+
+**Code review pass (medium effort), six real findings, all fixed.**
+`ChatPage.tsx` initialized `messages` to `null` rather than `undefined` -
+`AsyncState`'s contract treats `null` as a confirmed-empty result, so
+every single mount showed "Nothing here yet. Say hello." instead of the
+loading skeleton until the history query actually resolved. Fixed (the
+sentinel is `undefined` now; a real loaded-but-empty conversation is `[]`,
+which `MessageThread`'s own `emptyState` prop already renders) and
+covered by a new regression test that freezes the history fetch mid-
+flight and asserts the skeleton, not the empty state, is what's on
+screen. Separately, `AsyncState` checked `error` before `data ===
+undefined`, so a query's `isError` staying true until a retry actually
+settles (TanStack Query's own behavior) made `onRetry` look unresponsive:
+the identical stale error screen stayed up with no visual change for
+however long the retry took. Fixed with a new `isFetching` prop, checked
+first, threaded through every migrated page's `AsyncState` call.
+
+`NotificationBell.tsx`'s dismiss was a bare optimistic `setQueryData` plus
+a hand-rolled try/catch - the one write among the migrated pages not
+already using a mutation, and a real race with its own `refetchInterval`
+poll (a tick landing between the optimistic removal and the dismiss
+actually reaching the server could bring a just-dismissed notification
+back). Rebuilt as a real `useMutation` (`onMutate` cancels any poll
+already in flight and snapshots the previous list for rollback,
+`onSettled` always reconciles with a real refetch), the standard
+TanStack optimistic-update pattern. `MemoryPage.tsx`'s memories and
+people fetch were bundled under one `["memories"]` query key, so
+archiving a memory (invalidating that key) also forced a redundant
+`GET /api/people` refetch every time, with no cache sharing against
+`PeoplePage.tsx`'s own separate `["people"]` query for the same roster -
+split into two independent queries, the people one now using the exact
+same key so the two pages actually share a cache. `SettingsRenderer.tsx`
+refetched both the registry and values queries on retry regardless of
+which one actually failed; now retries only the one that did.
+
+Last, six test files (`ChatPage`, `MemoryPage`, `PeoplePage`,
+`PrivacyPage`, `SettingsPage`, `NotificationBell`) each hand-rolled the
+identical `QueryClientProvider`-plus-fresh-`createQueryClient()` wrapper.
+Extracted to `tests/renderWithQueryClient.tsx`, used from all six -
+a future change to how tests provision a client happens once.
+
+A test-design bug of the fix's own making, same shape as the earlier
+archive-test one: `NotificationBell.test.tsx`'s dismiss test needed its
+own stateful stub once the mutation started reconciling with a real
+refetch on `onSettled` - a fixed fixture would have undone the optimistic
+removal the instant that refetch landed. Fixed the same way (a `dismissed`
+flag flipped by the stubbed dismiss call, read by the list response).

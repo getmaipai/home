@@ -1,11 +1,15 @@
-import { useCallback, useEffect, useState } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Page } from "@/kit/primitives/Page";
-import { EmptyState } from "@/kit/primitives/EmptyState";
-import { Progress } from "@/kit/primitives/Progress";
+import { AsyncState } from "@/kit/primitives/AsyncState";
 import { Button } from "@/kit/ui/button";
 import { getIcon } from "@/kit/icons";
-import { api, ApiError, type MemoryRecord } from "@/lib/api";
+import { api, ApiError, type MemoryRecord, type PersonRosterEntry } from "@/lib/api";
 import { CATEGORY_LABELS, scopeLabel } from "@/apps/memory/memoryLabels";
+
+interface MemoryData {
+  memories: MemoryRecord[];
+  nameById: Map<string, string>;
+}
 
 // 4.4's real memory store (backend/src/lib/memory.ts: entity-first
 // recall, decay, tiers) has had no way for a family to see what's
@@ -21,96 +25,91 @@ import { CATEGORY_LABELS, scopeLabel } from "@/apps/memory/memoryLabels";
 // through this session's own browser automation, which is barred from
 // triggering native dialogs.
 export function MemoryPage() {
-  const [memories, setMemories] = useState<MemoryRecord[] | null>(null);
-  const [nameById, setNameById] = useState<Map<string, string>>(new Map());
-  const [error, setError] = useState<string | null>(null);
-  const [archivingId, setArchivingId] = useState<string | null>(null);
+  const queryClient = useQueryClient();
 
-  const load = useCallback(() => {
-    setError(null);
-    Promise.all([api.memories(), api.people()])
-      .then(([mems, people]) => {
-        setMemories(mems);
-        setNameById(new Map(people.map((p) => [p.id, p.display_name])));
-      })
-      .catch((e: unknown) => setError(e instanceof ApiError ? e.message : "Could not load memory."));
-  }, []);
+  const memoriesQuery = useQuery<MemoryRecord[]>({
+    queryKey: ["memories"],
+    queryFn: () => api.memories(),
+  });
+  // The same `["people"]` key `PeoplePage.tsx` uses, not a bundled fetch
+  // of its own - a code review (2026-09-05) found the two pages fetching
+  // and caching the same roster independently, and archiving a memory
+  // (which only ever invalidates `["memories"]`) was still re-fetching
+  // this via the old bundled query key regardless.
+  const peopleQuery = useQuery<PersonRosterEntry[]>({
+    queryKey: ["people"],
+    queryFn: () => api.people(),
+  });
 
-  useEffect(load, [load]);
+  const error = memoriesQuery.isError || peopleQuery.isError;
+  const isFetching = memoriesQuery.isFetching || peopleQuery.isFetching;
+  const data: MemoryData | undefined =
+    memoriesQuery.data && peopleQuery.data
+      ? { memories: memoriesQuery.data, nameById: new Map(peopleQuery.data.map((p) => [p.id, p.display_name])) }
+      : undefined;
 
-  async function handleArchive(id: string) {
-    setArchivingId(id);
-    setError(null);
-    try {
-      await api.archiveMemory(id);
-      setMemories((prev) => (prev ?? []).filter((m) => m.id !== id));
-    } catch (e) {
-      setError(e instanceof ApiError ? e.message : "Could not archive that memory.");
-    } finally {
-      setArchivingId(null);
-    }
-  }
-
-  if (error && memories === null) {
-    return (
-      <Page title="Memory">
-        <div className="flex flex-1 flex-col items-center justify-center gap-3 p-8 text-center">
-          <p className="text-base text-[var(--destructive)]">{error}</p>
-          <Button variant="secondary" onClick={load}>
-            Try again
-          </Button>
-        </div>
-      </Page>
-    );
-  }
-
-  if (memories === null) {
-    return (
-      <Page title="Memory">
-        <div className="flex flex-1 items-center justify-center">
-          <Progress mode="spinner" label="Loading memory" />
-        </div>
-      </Page>
-    );
-  }
+  const archiveMutation = useMutation({
+    mutationFn: (id: string) => api.archiveMemory(id),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["memories"] }),
+  });
+  const archivingId = archiveMutation.isPending ? archiveMutation.variables : null;
 
   const ArchiveIcon = getIcon("archive");
 
   return (
     <Page title="Memory">
       <div className="flex flex-1 flex-col gap-3 overflow-y-auto p-4">
-        {error ? (
-          <div className="rounded-[var(--radius)] bg-[var(--muted)] px-3 py-2 text-sm text-[var(--destructive)]">
-            {error}
+        {archiveMutation.isError ? (
+          <div className="rounded-lg bg-muted px-3 py-2 text-sm text-destructive">
+            {archiveMutation.error instanceof ApiError ? archiveMutation.error.message : "Could not archive that memory."}
           </div>
         ) : null}
-        {memories.length === 0 ? (
-          <EmptyState icon="brain" text="Nothing remembered yet." />
-        ) : (
-          memories.map((m) => (
-            <div
-              key={m.id}
-              className="flex items-start justify-between gap-4 rounded-[var(--radius)] border border-[var(--border)] p-3"
-            >
-              <div className="flex flex-col gap-1">
-                <span className="text-base">{m.text}</span>
-                <span className="text-sm text-[var(--muted-foreground)]">
-                  {scopeLabel(m, nameById)} · {CATEGORY_LABELS[m.category]}
-                  {m.pinned ? " · Pinned" : ""}
-                </span>
-              </div>
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => handleArchive(m.id)}
-                disabled={archivingId === m.id}
-                aria-label={`Archive "${m.text}"`}
-              >
-                <ArchiveIcon className="h-5 w-5" aria-hidden />
-              </Button>
-            </div>
-          ))
-        )}
+        <AsyncState
+          data={data}
+          error={error}
+          isFetching={isFetching}
+          onRetry={() => {
+            if (memoriesQuery.isError) memoriesQuery.refetch();
+            if (peopleQuery.isError) peopleQuery.refetch();
+          }}
+          errorMessage={
+            (memoriesQuery.error ?? peopleQuery.error) instanceof ApiError
+              ? ((memoriesQuery.error ?? peopleQuery.error) as ApiError).message
+              : "Could not load memory."
+          }
+          isEmpty={(d) => d.memories.length === 0}
+          emptyIcon="brain"
+          emptyText="Nothing remembered yet."
+          loadingLabel="Loading memory"
+        >
+          {(d) => (
+            <>
+              {d.memories.map((m) => (
+                <div
+                  key={m.id}
+                  className="flex items-start justify-between gap-4 rounded-lg border border-border p-3"
+                >
+                  <div className="flex flex-col gap-1">
+                    <span className="text-base">{m.text}</span>
+                    <span className="text-sm text-muted-foreground">
+                      {scopeLabel(m, d.nameById)} · {CATEGORY_LABELS[m.category]}
+                      {m.pinned ? " · Pinned" : ""}
+                    </span>
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => archiveMutation.mutate(m.id)}
+                    disabled={archivingId === m.id}
+                    aria-label={`Archive "${m.text}"`}
+                  >
+                    <ArchiveIcon className="h-5 w-5" aria-hidden />
+                  </Button>
+                </div>
+              ))}
+            </>
+          )}
+        </AsyncState>
       </div>
     </Page>
   );

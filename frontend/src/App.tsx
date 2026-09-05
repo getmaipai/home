@@ -1,5 +1,7 @@
 import { useEffect, useState } from "react";
+import { QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { createQueryClient } from "@/lib/queryClient";
 import { SignIn } from "@/shell/SignIn";
 import { Shell } from "@/shell/Shell";
 import { ChatPage } from "@/apps/chat/ChatPage";
@@ -11,6 +13,10 @@ import { Progress } from "@/kit/primitives/Progress";
 import { ToastProvider } from "@/kit/primitives/Toast";
 import { TooltipProvider } from "@/kit/ui/tooltip";
 import { api, type Roster } from "@/lib/api";
+
+// One QueryClient for the app's lifetime (docs/plans/session-b-ui.md
+// step 3): created once, outside the component, not per render.
+const queryClient = createQueryClient();
 
 // Sign-in gate -> shell -> routed pages. A router (react-router-dom)
 // landed with the Settings page, the second page to exist tonight -
@@ -57,27 +63,29 @@ export function App() {
   }
 
   return (
-    <ToastProvider>
-      <TooltipProvider>
-        <BrowserRouter>
-          <Shell
-            person={person}
-            onSignOut={() => api.logout().finally(() => setPerson(null))}
-            onPersonChange={revalidatePerson}
-          >
-            <Routes>
-              <Route path="/" element={<ChatPage person={person} />} />
-              <Route path="/people" element={<PeoplePage person={person} />} />
-              <Route path="/memory" element={<MemoryPage />} />
-              <Route path="/privacy" element={<PrivacyPage />} />
-              <Route
-                path="/settings"
-                element={<SettingsPage person={person} onPersonChange={revalidatePerson} />}
-              />
-            </Routes>
-          </Shell>
-        </BrowserRouter>
-      </TooltipProvider>
-    </ToastProvider>
+    <QueryClientProvider client={queryClient}>
+      <ToastProvider>
+        <TooltipProvider>
+          <BrowserRouter>
+            <Shell
+              person={person}
+              onSignOut={() => api.logout().finally(() => setPerson(null))}
+              onPersonChange={revalidatePerson}
+            >
+              <Routes>
+                <Route path="/" element={<ChatPage person={person} />} />
+                <Route path="/people" element={<PeoplePage person={person} />} />
+                <Route path="/memory" element={<MemoryPage />} />
+                <Route path="/privacy" element={<PrivacyPage />} />
+                <Route
+                  path="/settings"
+                  element={<SettingsPage person={person} onPersonChange={revalidatePerson} />}
+                />
+              </Routes>
+            </Shell>
+          </BrowserRouter>
+        </TooltipProvider>
+      </ToastProvider>
+    </QueryClientProvider>
   );
 }

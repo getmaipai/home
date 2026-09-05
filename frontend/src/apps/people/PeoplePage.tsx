@@ -1,8 +1,9 @@
-import { useEffect, useState, type FormEvent } from "react";
+import { useState, type FormEvent } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Page } from "@/kit/primitives/Page";
 import { Section } from "@/kit/primitives/Section";
 import { List } from "@/kit/primitives/List";
-import { Progress } from "@/kit/primitives/Progress";
+import { AsyncState } from "@/kit/primitives/AsyncState";
 import { Avatar } from "@/kit/primitives/Avatar";
 import { Input } from "@/kit/ui/input";
 import { Select } from "@/kit/primitives/Select";
@@ -33,8 +34,16 @@ interface PeoplePageProps {
 // confirmation that names them and says what goes, never a bare button,
 // and the batch version names the count.
 export function PeoplePage({ person }: PeoplePageProps) {
-  const [roster, setRoster] = useState<PersonRosterEntry[] | null>(null);
-  const [loadError, setLoadError] = useState(false);
+  const queryClient = useQueryClient();
+  const rosterQuery = useQuery<PersonRosterEntry[]>({
+    queryKey: ["people"],
+    queryFn: () => api.people(),
+  });
+  const roster = rosterQuery.data;
+  function invalidateRoster() {
+    return queryClient.invalidateQueries({ queryKey: ["people"] });
+  }
+
   const [displayName, setDisplayName] = useState("");
   const [role, setRole] = useState<Role>("adult");
   const [secret, setSecret] = useState("");
@@ -54,16 +63,6 @@ export function PeoplePage({ person }: PeoplePageProps) {
   const actorRole = person.role as Role;
   const canManage = canManagePeople(actorRole);
   const roleOptions = canManage ? creatableRoles(actorRole) : [];
-
-  function load() {
-    setLoadError(false);
-    api
-      .people()
-      .then(setRoster)
-      .catch(() => setLoadError(true));
-  }
-
-  useEffect(load, []);
 
   const deletable = (roster ?? []).filter((p) =>
     canDeletePerson(actorRole, person.id, { id: p.id, role: p.role as Role }),
@@ -96,7 +95,7 @@ export function PeoplePage({ person }: PeoplePageProps) {
       });
       setDisplayName("");
       setSecret("");
-      load();
+      await invalidateRoster();
     } catch (err) {
       setFormError(err instanceof ApiError ? err.message : "Could not add that person.");
     } finally {
@@ -117,7 +116,7 @@ export function PeoplePage({ person }: PeoplePageProps) {
         role: target && editRole !== target.role ? editRole : undefined,
       });
       setEditingId(null);
-      load();
+      await invalidateRoster();
     } catch (err) {
       setActionError(err instanceof ApiError ? err.message : "Could not save those changes.");
     } finally {
@@ -131,7 +130,7 @@ export function PeoplePage({ person }: PeoplePageProps) {
     try {
       await api.deletePerson(id);
       setConfirmingDelete(null);
-      load();
+      await invalidateRoster();
     } catch (err) {
       setActionError(err instanceof ApiError ? err.message : "Could not remove that person.");
     } finally {
@@ -153,7 +152,7 @@ export function PeoplePage({ person }: PeoplePageProps) {
         setActionError(`${names.join(", ")} could not be removed: ${refused[0]?.reason ?? "not allowed"}`);
       }
       leaveSelectMode();
-      load();
+      await invalidateRoster();
     } catch (err) {
       setActionError(err instanceof ApiError ? err.message : "Could not remove those people.");
     } finally {
@@ -166,18 +165,15 @@ export function PeoplePage({ person }: PeoplePageProps) {
       <div className="flex flex-1 flex-col gap-6 overflow-y-auto p-4">
         {actionError ? <p className="text-base text-[var(--destructive)]">{actionError}</p> : null}
 
-        {loadError ? (
-          <div className="flex flex-1 flex-col items-center justify-center gap-3 p-8 text-center">
-            <p className="text-base text-[var(--destructive)]">Could not load the household.</p>
-            <Button variant="secondary" onClick={load}>
-              Try again
-            </Button>
-          </div>
-        ) : roster === null ? (
-          <div className="flex flex-1 items-center justify-center">
-            <Progress mode="spinner" label="Loading household" />
-          </div>
-        ) : (
+        <AsyncState
+          data={roster}
+          error={rosterQuery.isError}
+          isFetching={rosterQuery.isFetching}
+          onRetry={() => rosterQuery.refetch()}
+          errorMessage="Could not load the household."
+          loadingLabel="Loading household"
+        >
+          {(loadedRoster) => (
           <Section heading="Household">
             {canManage && deletable.length > 0 ? (
               selectMode ? (
@@ -216,7 +212,7 @@ export function PeoplePage({ person }: PeoplePageProps) {
             ) : null}
 
             <List
-              items={roster}
+              items={loadedRoster}
               getKey={(p) => p.id}
               label="Household"
               renderItem={(p) => {
@@ -334,7 +330,8 @@ export function PeoplePage({ person }: PeoplePageProps) {
               }}
             />
           </Section>
-        )}
+          )}
+        </AsyncState>
 
         {canManage ? (
           <Section heading="Add someone">

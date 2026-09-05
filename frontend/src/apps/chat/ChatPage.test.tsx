@@ -1,9 +1,14 @@
 import { describe, expect, test, mock, afterEach } from "bun:test";
-import { render, cleanup, fireEvent, waitFor, act } from "@testing-library/react";
+import { cleanup, fireEvent, waitFor, act } from "@testing-library/react";
 import { ChatPage } from "@/apps/chat/ChatPage";
+import { renderWithQueryClient } from "../../../tests/renderWithQueryClient";
 import type { ConversationTurnRow, Roster } from "@/lib/api";
 
 afterEach(cleanup);
+
+function renderChatPage(person: Roster) {
+  return renderWithQueryClient(<ChatPage person={person} />);
+}
 
 function makePerson(): Roster {
   return {
@@ -143,6 +148,40 @@ function stubEnvironment(rows: ConversationTurnRow[]) {
   };
 }
 
+describe("ChatPage loading state", () => {
+  // A code review (2026-09-05) caught `messages` initialized to `null`
+  // rather than `undefined`: AsyncState treats `null` as a confirmed-
+  // empty result, so this showed "Nothing here yet. Say hello." on every
+  // single mount, however briefly, instead of the loading skeleton,
+  // until the history query actually resolved.
+  test("shows the loading skeleton, not the empty state, before history resolves", async () => {
+    const originalFetch = globalThis.fetch;
+    let resolveHistory: (rows: ConversationTurnRow[]) => void = () => {};
+    const historyPromise = new Promise<ConversationTurnRow[]>((resolve) => {
+      resolveHistory = resolve;
+    });
+    globalThis.fetch = mock((input: RequestInfo | URL) => {
+      const url = typeof input === "string" ? input : input.toString();
+      if (url.includes("/api/conversations")) {
+        return historyPromise.then((rows) => new Response(JSON.stringify(rows), { status: 200 }));
+      }
+      throw new Error(`unstubbed fetch: ${url}`);
+    }) as unknown as typeof fetch;
+    try {
+      const { getByRole, queryByText } = renderChatPage(makePerson());
+      expect(getByRole("status")).toBeTruthy();
+      expect(queryByText("Nothing here yet. Say hello.")).toBeNull();
+      await act(async () => {
+        resolveHistory([]);
+        await historyPromise;
+      });
+      await waitFor(() => expect(queryByText("Nothing here yet. Say hello.")).toBeInTheDocument());
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+  });
+});
+
 describe("ChatPage Listen button", () => {
   // The real live bug (2026-09-04, docs/dev.md's tts-role entry): a
   // superseded "Listen" call's own eventual failure landed on the wrong
@@ -154,7 +193,7 @@ describe("ChatPage Listen button", () => {
     const rows = [makeRow("row-1", "first reply"), makeRow("row-2", "second reply")];
     const env = stubEnvironment(rows);
     try {
-      const { findAllByText, getAllByText, queryAllByText } = render(<ChatPage person={makePerson()} />);
+      const { findAllByText, getAllByText, queryAllByText } = renderChatPage(makePerson());
       const listenButtons = await findAllByText("Listen");
       expect(listenButtons).toHaveLength(2);
 
@@ -229,7 +268,7 @@ describe("ChatPage Listen button", () => {
     }) as unknown as typeof fetch;
 
     try {
-      const { findByText, queryByText } = render(<ChatPage person={makePerson()} />);
+      const { findByText, queryByText } = renderChatPage(makePerson());
       const listenButton = await findByText("Listen");
       await act(async () => {
         fireEvent.click(listenButton);
@@ -341,7 +380,7 @@ describe("ChatPage streaming send", () => {
     }) as unknown as typeof fetch;
 
     try {
-      const { findByLabelText, findByText } = render(<ChatPage person={makePerson()} />);
+      const { findByLabelText, findByText } = renderChatPage(makePerson());
       const input = await findByLabelText("Message");
       await act(async () => {
         fireEvent.change(input, { target: { value: "hi there" } });
@@ -403,7 +442,7 @@ describe("ChatPage streaming send", () => {
     }) as unknown as typeof fetch;
 
     try {
-      const { findByLabelText, findByText, queryByText } = render(<ChatPage person={makePerson()} />);
+      const { findByLabelText, findByText, queryByText } = renderChatPage(makePerson());
       const input = await findByLabelText("Message");
       await act(async () => {
         fireEvent.change(input, { target: { value: "hi there" } });
@@ -467,7 +506,7 @@ describe("ChatPage streaming send", () => {
     }) as unknown as typeof fetch;
 
     try {
-      const { findByLabelText, findByText, queryByText } = render(<ChatPage person={makePerson()} />);
+      const { findByLabelText, findByText, queryByText } = renderChatPage(makePerson());
       const input = await findByLabelText("Message");
       await act(async () => {
         fireEvent.change(input, { target: { value: "hi there" } });
@@ -533,7 +572,7 @@ describe("ChatPage streaming send", () => {
     }) as unknown as typeof fetch;
 
     try {
-      const { findByLabelText, findByText, queryByText } = render(<ChatPage person={makePerson()} />);
+      const { findByLabelText, findByText, queryByText } = renderChatPage(makePerson());
       const input = await findByLabelText("Message");
       await act(async () => {
         fireEvent.change(input, { target: { value: "what's the answer" } });
@@ -601,7 +640,7 @@ describe("ChatPage streaming send", () => {
     }) as unknown as typeof fetch;
 
     try {
-      const { findByLabelText, findByText, queryByText } = render(<ChatPage person={makePerson()} />);
+      const { findByLabelText, findByText, queryByText } = renderChatPage(makePerson());
       const input = await findByLabelText("Message");
       await act(async () => {
         fireEvent.change(input, { target: { value: "what's the answer" } });
@@ -670,7 +709,7 @@ describe("ChatPage streaming send", () => {
     }) as unknown as typeof fetch;
 
     try {
-      const { findByLabelText, findByText, queryByText } = render(<ChatPage person={makePerson()} />);
+      const { findByLabelText, findByText, queryByText } = renderChatPage(makePerson());
       const input = await findByLabelText("Message");
       await act(async () => {
         fireEvent.change(input, { target: { value: "what's the answer" } });
@@ -734,7 +773,7 @@ describe("ChatPage streaming send", () => {
     }) as unknown as typeof fetch;
 
     try {
-      const { findByLabelText, findByText, queryByText } = render(<ChatPage person={makePerson()} />);
+      const { findByLabelText, findByText, queryByText } = renderChatPage(makePerson());
       const input = await findByLabelText("Message");
       await act(async () => {
         fireEvent.change(input, { target: { value: "hi" } });
@@ -780,7 +819,7 @@ describe("ChatPage streaming send", () => {
     }) as unknown as typeof fetch;
 
     try {
-      const { findByLabelText, findByText } = render(<ChatPage person={makePerson()} />);
+      const { findByLabelText, findByText } = renderChatPage(makePerson());
       const input = await findByLabelText("Message");
       await act(async () => {
         fireEvent.change(input, { target: { value: "hi" } });
@@ -820,7 +859,7 @@ describe("ChatPage streaming send", () => {
     }) as unknown as typeof fetch;
 
     try {
-      const { findByLabelText, findByText } = render(<ChatPage person={makePerson()} />);
+      const { findByLabelText, findByText } = renderChatPage(makePerson());
       const input = await findByLabelText("Message");
       await act(async () => {
         fireEvent.change(input, { target: { value: "hi" } });
@@ -896,7 +935,7 @@ describe("ChatPage streaming send", () => {
     }) as unknown as typeof fetch;
 
     try {
-      const { findByLabelText, findByText } = render(<ChatPage person={makePerson()} />);
+      const { findByLabelText, findByText } = renderChatPage(makePerson());
       const input = await findByLabelText("Message");
       await act(async () => {
         fireEvent.change(input, { target: { value: "what's the answer" } });
@@ -939,7 +978,7 @@ describe("ChatPage streaming send", () => {
     }) as unknown as typeof fetch;
 
     try {
-      const { findByLabelText, findByText, queryByText } = render(<ChatPage person={makePerson()} />);
+      const { findByLabelText, findByText, queryByText } = renderChatPage(makePerson());
       const input = await findByLabelText("Message");
       await act(async () => {
         fireEvent.change(input, { target: { value: "hi" } });

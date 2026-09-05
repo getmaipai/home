@@ -1,10 +1,12 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { Page } from "@/kit/primitives/Page";
 import { MessageThread, type ThreadMessage } from "@/kit/primitives/MessageThread";
 import { Form } from "@/kit/primitives/Form";
+import { AsyncState } from "@/kit/primitives/AsyncState";
 import { Progress } from "@/kit/primitives/Progress";
 import { Button } from "@/kit/ui/button";
-import { api, readTurnStream, ApiError, type Roster } from "@/lib/api";
+import { api, readTurnStream, ApiError, type ConversationTurnRow, type Roster } from "@/lib/api";
 import { rowsToMessages } from "@/apps/chat/mapRows";
 import { StreamingWavPlayer } from "@/lib/streamingWavPlayer";
 import { SentenceSpeechScheduler } from "@/lib/sentenceSpeechScheduler";
@@ -35,8 +37,15 @@ export function stripThinking(text: string): string {
 }
 
 export function ChatPage({ person }: ChatPageProps) {
-  const [messages, setMessages] = useState<ThreadMessage[] | null>(null);
-  const [loadError, setLoadError] = useState(false);
+  // `undefined`, not `null`: AsyncState's contract treats `null` as a
+  // confirmed-empty result and `undefined` as still loading (a code
+  // review, 2026-09-05, caught this page passing its own "not loaded
+  // yet" sentinel as `null`, which showed "Nothing here yet" on every
+  // single mount instead of the loading skeleton, however briefly,
+  // until the history query resolved). A real loaded-but-empty
+  // conversation is `[]`, which MessageThread's own `emptyState` prop
+  // already renders - AsyncState never needs to tell the two apart here.
+  const [messages, setMessages] = useState<ThreadMessage[] | undefined>(undefined);
   // Stays true for the ENTIRE turn (send through its final done/error
   // event), gating the Send button - a code review (2026-09-04) found an
   // earlier version cleared this as soon as the first token arrived
@@ -180,25 +189,20 @@ export function ChatPage({ person }: ChatPageProps) {
     }
   }
 
-  const loadHistory = useCallback(() => {
-    setLoadError(false);
-    api
-      .conversations()
-      .then((rows) => setMessages(rowsToMessages(rows, person.display_name)))
-      .catch(() => {
-        // A code review (2026-09-04) found this used to render the same
-        // "Nothing here yet" empty state on a real load failure as on a
-        // genuinely new household, with no way to tell the two apart or
-        // retry. Keep `messages` as whatever it was (null on first load,
-        // the last good list on a background refresh) and show a real
-        // error state instead of pretending the history is empty.
-        setLoadError(true);
-      });
-  }, [person.display_name]);
-
+  // The data layer (docs/plans/session-b-ui.md step 3) owns the fetch
+  // itself; `messages` stays local state seeded from it, because a live
+  // turn mutates `messages` token by token (below) in ways that don't fit
+  // a query's own cache - rebuilding that streaming buffer on top of
+  // TanStack Query is step 4's job (assistant-ui's runtime), not this
+  // one's. The load/error/retry chrome this triad used to hand-roll is
+  // gone either way.
+  const historyQuery = useQuery<ConversationTurnRow[]>({
+    queryKey: ["conversations"],
+    queryFn: () => api.conversations(),
+  });
   useEffect(() => {
-    loadHistory();
-  }, [loadHistory]);
+    if (historyQuery.data) setMessages(rowsToMessages(historyQuery.data, person.display_name));
+  }, [historyQuery.data, person.display_name]);
 
   // Real end-to-end streaming (2026-09-04): the reply's TEXT arrives
   // token by token from POST /api/turn/stream, and each completed
@@ -468,29 +472,25 @@ export function ChatPage({ person }: ChatPageProps) {
 
   return (
     <Page title="Chat">
-      {messages === null && loadError ? (
-        <div className="flex flex-1 flex-col items-center justify-center gap-3 p-8 text-center">
-          <p className="text-base text-[var(--destructive)]">
-            Could not load your conversation. The hub might be unreachable.
-          </p>
-          <Button variant="secondary" onClick={loadHistory}>
-            Try again
-          </Button>
-        </div>
-      ) : messages === null ? (
-        <div className="flex flex-1 items-center justify-center">
-          <Progress mode="spinner" label="Loading conversation" />
-        </div>
-      ) : (
-        <MessageThread
-          messages={messages}
-          emptyState={{ icon: "message-circle", text: "Nothing here yet. Say hello." }}
-          onPlay={handlePlay}
-          loadingId={loadingId}
-          playingId={playingId}
-          errorId={playError}
-        />
-      )}
+      <AsyncState
+        data={messages}
+        error={historyQuery.isError && messages === undefined}
+        isFetching={historyQuery.isFetching}
+        onRetry={() => historyQuery.refetch()}
+        errorMessage="Could not load your conversation. The hub might be unreachable."
+        loadingLabel="Loading conversation"
+      >
+        {(loadedMessages) => (
+          <MessageThread
+            messages={loadedMessages}
+            emptyState={{ icon: "message-circle", text: "Nothing here yet. Say hello." }}
+            onPlay={handlePlay}
+            loadingId={loadingId}
+            playingId={playingId}
+            errorId={playError}
+          />
+        )}
+      </AsyncState>
       {awaitingFirstToken ? (
         <div className="px-4 pb-1">
           <Progress mode="spinner" label="MaiPai is thinking…" />

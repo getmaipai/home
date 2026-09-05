@@ -1,4 +1,4 @@
-import { useEffect, type ReactNode } from "react";
+import type { ReactNode } from "react";
 import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import { useFocusable } from "@noriginmedia/norigin-spatial-navigation";
 import {
@@ -35,48 +35,66 @@ function isActivePath(pathname: string, to: string): boolean {
   return to === "/" ? pathname === "/" : pathname.startsWith(to);
 }
 
-/** One nav row. Always calls `useFocusable` (React's rules of hooks -
- * conditionally calling it only when `far` would break on every other
- * surface); its `focused` state only ever drives styling when the TV
- * surface actually initialized the spatial-navigation service, so a
- * mouse/touch/keyboard surface never notices it exists.
+function navItemContent(entry: NavEntry, active: boolean) {
+  const Icon = getIcon(entry.icon);
+  return (
+    <SidebarMenuButton asChild isActive={active} tooltip={entry.label}>
+      {/* aria-label, not just the visible span: icon-collapsed hides the
+          label with CSS (the fix for the earlier clipped-sliver bug
+          above), and a display:none element contributes nothing to the
+          accessible name, silently unnaming every link the moment
+          someone collapses the sidebar - the exact class of bug the
+          accessibility pass (2026-09-05) already fixed once on the
+          pre-shadcn nav rail, caught here by a code review rather than a
+          live pass this time. */}
+      <NavLink to={entry.to} end={entry.to === "/"} aria-label={entry.label}>
+        <Icon aria-hidden />
+        <span>{entry.label}</span>
+      </NavLink>
+    </SidebarMenuButton>
+  );
+}
+
+/** The plain nav row: no `@noriginmedia/norigin-spatial-navigation`
+ * involvement at all. Kept as a separate component from `TvNavItem`
+ * (not one component calling `useFocusable` conditionally) because the
+ * library's service has to be `init()`-ed before any `useFocusable()`
+ * call is safe, and `init()` is only ever called on the TV surface
+ * (below) - it globally hijacks arrow keys, which would break arrow-key
+ * text editing in every input/textarea on every other surface. React's
+ * rules of hooks forbid calling a hook conditionally within one
+ * component, so the split happens one level up instead (`far` picks
+ * which component renders, via a `key` that forces a clean remount if it
+ * ever changes mid-session). */
+function NavItem({ entry }: { entry: NavEntry }) {
+  const location = useLocation();
+  const active = isActivePath(location.pathname, entry.to);
+  return <SidebarMenuItem>{navItemContent(entry, active)}</SidebarMenuItem>;
+}
+
+/** The TV nav row: real arrow-key/remote focus via `useFocusable`, only
+ * ever mounted once `ensureTvNavInit()` has run (below), so its internal
+ * `layoutAdapter` already exists - calling `useFocusable()` before
+ * `init()` throws (found live: "Cannot read properties of undefined
+ * (reading 'measureLayout')").
  *
  * `forceFocus` on the first item only: the library's own docs are
  * explicit that a real app has to "set the initial focus" itself -
  * nothing is focused by default, so arrow keys had nowhere to move from
  * without this (found live: `init()` alone was not enough). */
-function NavItem({ entry, far, isFirst }: { entry: NavEntry; far: boolean; isFirst: boolean }) {
+function TvNavItem({ entry, isFirst }: { entry: NavEntry; isFirst: boolean }) {
   const location = useLocation();
   const navigate = useNavigate();
   const { ref, focused } = useFocusable<HTMLDivElement>({
     onEnterPress: () => navigate(entry.to),
-    forceFocus: far && isFirst,
+    forceFocus: isFirst,
   });
-  const Icon = getIcon(entry.icon);
   const active = isActivePath(location.pathname, entry.to);
 
   return (
     <SidebarMenuItem>
-      <div ref={ref}>
-        <SidebarMenuButton
-          asChild
-          isActive={active}
-          tooltip={entry.label}
-          className={cn(far && focused && "ring-2 ring-ring")}
-        >
-          {/* aria-label, not just the visible span: icon-collapsed hides
-              the label with CSS (the fix for the earlier clipped-sliver
-              bug above), and a display:none element contributes nothing
-              to the accessible name, silently unnaming every link the
-              moment someone collapses the sidebar - the exact class of
-              bug the accessibility pass (2026-09-05) already fixed once
-              on the pre-shadcn nav rail, caught here by a code review
-              rather than a live pass this time. */}
-          <NavLink to={entry.to} end={entry.to === "/"} aria-label={entry.label}>
-            <Icon aria-hidden />
-            <span>{entry.label}</span>
-          </NavLink>
-        </SidebarMenuButton>
+      <div ref={ref} className={cn(focused && "rounded-md ring-2 ring-ring")}>
+        {navItemContent(entry, active)}
       </div>
     </SidebarMenuItem>
   );
@@ -100,9 +118,13 @@ export function Shell({ person, onSignOut, onPersonChange, children }: ShellProp
   const surface = useSurface();
   useAppearance(person.id);
 
-  useEffect(() => {
-    if (surface.far) ensureTvNavInit();
-  }, [surface.far]);
+  // Called during render, not inside a `useEffect`: React runs a child's
+  // effects before its parent's, and `TvNavItem` below calls
+  // `useFocusable()` the moment it mounts - if `ensureTvNavInit()` ran in
+  // an effect here, it could still lose that race the first time `far`
+  // becomes true. The function is idempotent (a module-level guard), so
+  // calling it unconditionally on every render of every surface is cheap.
+  if (surface.far) ensureTvNavInit();
 
   return (
     <SidebarProvider>
@@ -115,10 +137,14 @@ export function Shell({ person, onSignOut, onPersonChange, children }: ShellProp
       <Sidebar collapsible="icon" className="hidden sm:flex">
         <SidebarHeader />
         <SidebarContent>
-          <SidebarMenu>
-            {NAV_ENTRIES.map((entry, i) => (
-              <NavItem key={entry.to} entry={entry} far={surface.far} isFirst={i === 0} />
-            ))}
+          {/* Keyed by `far`: if the surface flips mid-session (a gamepad
+              connects), the whole list remounts as the other component
+              rather than any single item conditionally changing which
+              hooks it calls. */}
+          <SidebarMenu key={surface.far ? "tv" : "standard"}>
+            {surface.far
+              ? NAV_ENTRIES.map((entry, i) => <TvNavItem key={entry.to} entry={entry} isFirst={i === 0} />)
+              : NAV_ENTRIES.map((entry) => <NavItem key={entry.to} entry={entry} />)}
           </SidebarMenu>
         </SidebarContent>
         <SidebarRail />

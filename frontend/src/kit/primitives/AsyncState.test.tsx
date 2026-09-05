@@ -53,4 +53,28 @@ describe("AsyncState", () => {
     expect(getByText("Nova")).toBeTruthy();
     expect(queryByRole("status")).toBeNull();
   });
+
+  // A code review (2026-09-05) caught a query's `isError` staying true
+  // until a retry actually settles (TanStack Query's own behavior -
+  // `refetch()` doesn't clear it early), which left a retry in flight
+  // looking identical to not having retried at all: the same stale error
+  // screen, no visual change, for however long the retry took.
+  test("shows the loading skeleton, not the stale error, while a retry is in flight", () => {
+    const { getByRole, queryByText } = render(
+      <AsyncState data={undefined} error isFetching errorMessage="Couldn't connect." onRetry={() => {}}>
+        {() => <p>never rendered</p>}
+      </AsyncState>,
+    );
+    expect(getByRole("status")).toBeTruthy();
+    expect(queryByText("Couldn't connect.")).toBeNull();
+  });
+
+  test("still shows the error once a failed query has settled and stopped fetching", () => {
+    const { getByText } = render(
+      <AsyncState data={undefined} error isFetching={false} errorMessage="Couldn't connect." onRetry={() => {}}>
+        {() => <p>never rendered</p>}
+      </AsyncState>,
+    );
+    expect(getByText("Couldn't connect.")).toBeTruthy();
+  });
 });

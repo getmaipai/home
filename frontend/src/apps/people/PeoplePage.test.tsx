@@ -1,12 +1,17 @@
 import { describe, expect, test, mock, afterEach } from "bun:test";
-import { render, cleanup, fireEvent, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, waitFor } from "@testing-library/react";
 import { PeoplePage } from "@/apps/people/PeoplePage";
+import { renderWithQueryClient } from "../../../tests/renderWithQueryClient";
 import type { PersonRosterEntry, Roster } from "@/lib/api";
 
 afterEach(cleanup);
 
 // Every query comes from render()'s own returned queries, never the
 // global `screen` singleton (see ChatPage.test.tsx's header comment).
+
+function renderPeoplePage(person: Roster) {
+  return renderWithQueryClient(<PeoplePage person={person} />);
+}
 
 const OWNER_ID = "person-owner";
 
@@ -81,7 +86,7 @@ describe("removing a person", () => {
   test("Remove asks first, naming them and what goes", async () => {
     const { calls, restore } = stubApi();
     try {
-      const { findByRole, getByText } = render(<PeoplePage person={actor("owner")} />);
+      const { findByRole, getByText } = renderPeoplePage(actor("owner"));
       fireEvent.click(await findByRole("button", { name: "Remove Bramble" }));
 
       expect(getByText("Remove Bramble from your household?")).toBeInTheDocument();
@@ -95,7 +100,7 @@ describe("removing a person", () => {
   test("backing out removes nobody", async () => {
     const { calls, restore } = stubApi();
     try {
-      const { findByRole, getByRole } = render(<PeoplePage person={actor("owner")} />);
+      const { findByRole, getByRole } = renderPeoplePage(actor("owner"));
       fireEvent.click(await findByRole("button", { name: "Remove Bramble" }));
       fireEvent.click(getByRole("button", { name: "Keep them" }));
 
@@ -108,7 +113,7 @@ describe("removing a person", () => {
   test("confirming removes them", async () => {
     const { calls, restore } = stubApi();
     try {
-      const { findByRole, getByRole } = render(<PeoplePage person={actor("owner")} />);
+      const { findByRole, getByRole } = renderPeoplePage(actor("owner"));
       fireEvent.click(await findByRole("button", { name: "Remove Bramble" }));
       fireEvent.click(getByRole("button", { name: "Yes, remove" }));
 
@@ -125,7 +130,7 @@ describe("removing a person", () => {
   test("nobody is offered a Remove button for themselves", async () => {
     const { restore } = stubApi();
     try {
-      const { findByRole, queryByRole } = render(<PeoplePage person={actor("owner")} />);
+      const { findByRole, queryByRole } = renderPeoplePage(actor("owner"));
       await findByRole("button", { name: "Remove Bramble" });
       expect(queryByRole("button", { name: "Remove Sage" })).toBeNull();
     } finally {
@@ -137,7 +142,7 @@ describe("removing a person", () => {
     const { restore } = stubApi();
     try {
       const admin = { ...actor("admin"), id: "person-admin" };
-      const { findByRole, queryByRole } = render(<PeoplePage person={admin} />);
+      const { findByRole, queryByRole } = renderPeoplePage(admin);
       await findByRole("button", { name: "Remove Bramble" });
       expect(queryByRole("button", { name: "Remove Sage" })).toBeNull();
     } finally {
@@ -153,7 +158,7 @@ describe("removing several people at once", () => {
   test("selecting people and removing them in one go", async () => {
     const { calls, restore } = stubApi();
     try {
-      const { findByRole, getByRole, getByLabelText, getByText } = render(<PeoplePage person={actor("owner")} />);
+      const { findByRole, getByRole, getByLabelText, getByText } = renderPeoplePage(actor("owner"));
       fireEvent.click(await findByRole("button", { name: "Select people" }));
       fireEvent.click(getByLabelText("Select Bramble"));
       fireEvent.click(getByLabelText("Select Clover"));
@@ -176,7 +181,7 @@ describe("removing several people at once", () => {
   test("the batch confirmation names the count, and backing out sends nothing", async () => {
     const { calls, restore } = stubApi();
     try {
-      const { findByRole, getByRole, getByLabelText } = render(<PeoplePage person={actor("owner")} />);
+      const { findByRole, getByRole, getByLabelText } = renderPeoplePage(actor("owner"));
       fireEvent.click(await findByRole("button", { name: "Select people" }));
       fireEvent.click(getByLabelText("Select Bramble"));
       fireEvent.click(getByRole("button", { name: "Remove selected" }));
@@ -197,7 +202,7 @@ describe("removing several people at once", () => {
       ],
     });
     try {
-      const { findByRole, getByRole, getByLabelText, findByText } = render(<PeoplePage person={actor("owner")} />);
+      const { findByRole, getByRole, getByLabelText, findByText } = renderPeoplePage(actor("owner"));
       fireEvent.click(await findByRole("button", { name: "Select people" }));
       fireEvent.click(getByLabelText("Select Bramble"));
       fireEvent.click(getByLabelText("Select Clover"));
@@ -213,7 +218,7 @@ describe("removing several people at once", () => {
   test("only people this person may actually remove are selectable", async () => {
     const { restore } = stubApi();
     try {
-      const { findByRole, queryByLabelText } = render(<PeoplePage person={actor("owner")} />);
+      const { findByRole, queryByLabelText } = renderPeoplePage(actor("owner"));
       fireEvent.click(await findByRole("button", { name: "Select people" }));
       expect(queryByLabelText("Select Bramble")).not.toBeNull();
       // Yourself is never selectable: the backend refuses it outright.
@@ -228,7 +233,7 @@ describe("editing a person", () => {
   test("renaming someone sends just the new name", async () => {
     const { calls, restore } = stubApi();
     try {
-      const { findByRole, getByRole, getByLabelText } = render(<PeoplePage person={actor("owner")} />);
+      const { findByRole, getByRole, getByLabelText } = renderPeoplePage(actor("owner"));
       fireEvent.click(await findByRole("button", { name: "Edit Bramble" }));
       fireEvent.change(getByLabelText("Name for Bramble"), { target: { value: "Bram" } });
       fireEvent.click(getByRole("button", { name: "Save" }));
@@ -249,7 +254,7 @@ describe("editing a person", () => {
     const { calls, restore } = stubApi();
     try {
       const admin = { ...actor("admin"), id: "person-admin" };
-      const { findByRole, getByRole, getByLabelText } = render(<PeoplePage person={admin} />);
+      const { findByRole, getByRole, getByLabelText } = renderPeoplePage(admin);
       fireEvent.click(await findByRole("button", { name: "Edit Bramble" }));
       fireEvent.change(getByLabelText("Name for Bramble"), { target: { value: "Bram" } });
       fireEvent.click(getByRole("button", { name: "Save" }));
@@ -267,7 +272,7 @@ describe("editing a person", () => {
     const { restore } = stubApi();
     try {
       const admin = { ...actor("admin"), id: "person-admin" };
-      const { findByRole, queryByLabelText } = render(<PeoplePage person={admin} />);
+      const { findByRole, queryByLabelText } = renderPeoplePage(admin);
       fireEvent.click(await findByRole("button", { name: "Edit Bramble" }));
       expect(queryByLabelText("Role for Bramble")).toBeNull();
     } finally {

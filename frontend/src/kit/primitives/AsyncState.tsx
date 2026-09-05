@@ -11,6 +11,15 @@ interface AsyncStateProps<T> {
    * this existed (docs/BACKLOG.md > "Kit gaps found by the audit"). */
   data: T | null | undefined;
   error?: boolean;
+  /** TanStack Query's own `isFetching`: true for the initial load AND
+   * for a retry in flight. Without this, a query whose `isError` stays
+   * true until a retry actually settles (TanStack Query's own behavior -
+   * `refetch()` does not clear it early) left `onRetry` looking
+   * unresponsive: the same stale error page stayed up, with no visual
+   * change at all, for however long the retry took (a code review,
+   * 2026-09-05). Optional so a caller with no query behind it (a plain
+   * boolean `error`) isn't forced to invent one. */
+  isFetching?: boolean;
   onRetry: () => void;
   /** The catalogue message (`spec/errors/errors.json`'s `ui_message`)
    * already arrives on the failed response as `ApiError.message` - the
@@ -34,6 +43,7 @@ interface AsyncStateProps<T> {
 export function AsyncState<T>({
   data,
   error,
+  isFetching,
   onRetry,
   errorMessage = "Something went wrong.",
   emptyIcon = "inbox",
@@ -42,6 +52,19 @@ export function AsyncState<T>({
   loadingLabel = "Loading",
   children,
 }: AsyncStateProps<T>) {
+  const loading = (
+    <div className="flex flex-col gap-3 p-4" role="status" aria-label={loadingLabel}>
+      <Skeleton className="h-12 w-full" />
+      <Skeleton className="h-12 w-full" />
+      <Skeleton className="h-12 w-3/4" />
+    </div>
+  );
+
+  // Checked before `error`: a query's `isError` stays true until a
+  // retry actually settles, so without this a retry in flight looked
+  // identical to not having retried at all.
+  if (isFetching && data === undefined) return loading;
+
   if (error) {
     return (
       <div className="flex flex-1 flex-col items-center justify-center gap-3 p-8 text-center">
@@ -53,15 +76,7 @@ export function AsyncState<T>({
     );
   }
 
-  if (data === undefined) {
-    return (
-      <div className="flex flex-col gap-3 p-4" role="status" aria-label={loadingLabel}>
-        <Skeleton className="h-12 w-full" />
-        <Skeleton className="h-12 w-full" />
-        <Skeleton className="h-12 w-3/4" />
-      </div>
-    );
-  }
+  if (data === undefined) return loading;
 
   if (data === null || (isEmpty && isEmpty(data))) {
     return <EmptyState icon={emptyIcon} text={emptyText} />;

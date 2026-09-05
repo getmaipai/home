@@ -1,13 +1,17 @@
-import { describe, expect, test, mock, beforeEach, afterEach } from "bun:test";
-import { render, cleanup, waitFor } from "@testing-library/react";
+import { describe, expect, test, mock, afterEach } from "bun:test";
+import { cleanup, waitFor } from "@testing-library/react";
 import { SettingsPage } from "@/apps/settings/SettingsPage";
-import { __resetSettingsRegistryCacheForTests } from "@/kit/settings/SettingsRenderer";
+import { renderWithQueryClient } from "../../../tests/renderWithQueryClient";
 import type { Roster, SettingsKey, ResolvedSetting } from "@/lib/api";
 
-// SettingsRenderer's registry cache is module state shared across every
-// test in this process, not reset automatically between tests.
-beforeEach(__resetSettingsRegistryCacheForTests);
 afterEach(cleanup);
+
+// A fresh QueryClient per render, not the app's module-level singleton:
+// the registry query's `staleTime: Infinity` means a shared client would
+// carry one test's cached registry into the next.
+function renderSettingsPage(props: Parameters<typeof SettingsPage>[0]) {
+  return renderWithQueryClient(<SettingsPage {...props} />);
+}
 
 // `@testing-library/dom`'s global `screen` singleton is computed once at
 // module-load time, before Bun's test preload finishes registering
@@ -100,7 +104,7 @@ describe("SettingsPage renders the signed-in person's own voice settings", () =>
     }) as unknown as typeof fetch;
 
     try {
-      const { findByText } = render(<SettingsPage person={person} onPersonChange={() => {}} />);
+      const { findByText } = renderSettingsPage({ person, onPersonChange: () => {} });
 
       await findByText("Speaking voice");
       await waitFor(() => expect(requestedScopes).toContain(`person:${person.id}`));
@@ -145,7 +149,7 @@ describe("SettingsPage renders the signed-in person's own voice settings", () =>
     }) as unknown as typeof fetch;
 
     try {
-      const { findByText } = render(<SettingsPage person={person} onPersonChange={() => {}} />);
+      const { findByText } = renderSettingsPage({ person, onPersonChange: () => {} });
       await findByText("Speaking voice");
       await findByText("Language and region");
       expect(registryFetchCount).toBe(1);

@@ -1,8 +1,9 @@
-import { useCallback, useEffect, useState } from "react";
+import { useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, ApiError, type SettingsKey, type ResolvedSetting } from "@/lib/api";
 import { groupSettings, sectionTitle, type SettingsGroup } from "@/kit/settings/groupSettings";
 import { SettingField } from "@/kit/settings/SettingField";
-import { Progress } from "@/kit/primitives/Progress";
+import { AsyncState } from "@/kit/primitives/AsyncState";
 import { Section } from "@/kit/primitives/Section";
 import { Button } from "@/kit/ui/button";
 
@@ -18,29 +19,14 @@ interface SettingsRendererProps {
 // exact same GET /api/settings/registry response. A code review
 // (2026-09-04, on SettingsPage.tsx gaining a second instance - person
 // scope, alongside the original household one) found each instance
-// fetching it independently with no cache between them: two identical
-// registry requests on every Settings page visit, a duplication that
-// only compounds as the Household/Profile picker (Rule 2's still-missing
-// second real render site) adds more instances. Cached for the page
-// session, not just deduped mid-flight: the registry is generated at
-// build/dev time (spec/settings/keys.json), not something that changes
-// while a household is looking at the Settings page.
-let cachedRegistry: Promise<SettingsKey[]> | null = null;
-function fetchRegistryCached(): Promise<SettingsKey[]> {
-  if (!cachedRegistry) {
-    cachedRegistry = api.settingsRegistry().catch((err: unknown) => {
-      cachedRegistry = null; // a failed fetch shouldn't wedge every later instance - let the next one retry
-      throw err;
-    });
-  }
-  return cachedRegistry;
-}
-
-/** Test-only: cachedRegistry is module state, shared across every test in
- * a file unless reset between them. */
-export function __resetSettingsRegistryCacheForTests(): void {
-  cachedRegistry = null;
-}
+// fetching it independently with no cache between them. The data layer
+// (docs/plans/session-b-ui.md step 3) owns this now: one query key,
+// `staleTime: Infinity` since the registry is generated at build/dev time
+// (spec/settings/keys.json) and never changes while a household is
+// looking at the page, shared by every SettingsRenderer instance through
+// the app's one QueryClient rather than a hand-rolled module-level
+// promise cache.
+const REGISTRY_QUERY_KEY = ["settings-registry"];
 
 // docs/SETTINGS.md's generic renderer: "one declaration, one
 // implementation," pointed at a scope. Two real instances now
@@ -48,26 +34,25 @@ export function __resetSettingsRegistryCacheForTests(): void {
 // Household/Profile lists Rule 2 describes as a further, still-missing
 // render site for the same component.
 export function SettingsRenderer({ scope, scopeValue }: SettingsRendererProps) {
-  const [registry, setRegistry] = useState<SettingsKey[] | null>(null);
-  const [values, setValues] = useState<ResolvedSetting[] | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const queryClient = useQueryClient();
+  const registryQuery = useQuery<SettingsKey[]>({
+    queryKey: REGISTRY_QUERY_KEY,
+    queryFn: () => api.settingsRegistry(),
+    staleTime: Infinity,
+  });
+  const valuesQuery = useQuery<ResolvedSetting[]>({
+    queryKey: ["settings-values", scopeValue],
+    queryFn: () => api.settingsValues(scopeValue),
+  });
+
+  const [writeError, setWriteError] = useState<string | null>(null);
   const [pendingKey, setPendingKey] = useState<string | null>(null);
   const [advancedOpen, setAdvancedOpen] = useState<Record<string, boolean>>({});
 
-  const load = useCallback(() => {
-    setError(null);
-    Promise.all([fetchRegistryCached(), api.settingsValues(scopeValue)])
-      .then(([reg, vals]) => {
-        setRegistry(reg);
-        setValues(vals);
-      })
-      .catch((e: unknown) => setError(e instanceof ApiError ? e.message : "Could not load settings."));
-  }, [scopeValue]);
-
-  useEffect(load, [load]);
-
   function replaceValue(next: ResolvedSetting) {
-    setValues((prev) => (prev ?? []).map((v) => (v.key === next.key ? next : v)));
+    queryClient.setQueryData<ResolvedSetting[]>(["settings-values", scopeValue], (prev) =>
+      (prev ?? []).map((v) => (v.key === next.key ? next : v)),
+    );
   }
 
   // Returns whether the write actually landed: a code review (2026-09-04)
@@ -78,13 +63,13 @@ export function SettingsRenderer({ scope, scopeValue }: SettingsRendererProps) {
   // this comes back false.
   async function handleChange(key: string, value: unknown): Promise<boolean> {
     setPendingKey(key);
-    setError(null);
+    setWriteError(null);
     try {
       const updated = await api.setSetting(scopeValue, key, value);
       replaceValue(updated);
       return true;
     } catch (e) {
-      setError(e instanceof ApiError ? e.message : "Could not save that change.");
+      setWriteError(e instanceof ApiError ? e.message : "Could not save that change.");
       return false;
     } finally {
       setPendingKey(null);
@@ -93,7 +78,7 @@ export function SettingsRenderer({ scope, scopeValue }: SettingsRendererProps) {
 
   async function handleReset(key: string) {
     setPendingKey(key);
-    setError(null);
+    setWriteError(null);
     try {
       // A code review (2026-09-04) found this used to ignore the reset
       // response and re-fetch the whole scope just to learn the value it
@@ -103,32 +88,15 @@ export function SettingsRenderer({ scope, scopeValue }: SettingsRendererProps) {
       const restored = await api.resetSetting(scopeValue, key);
       replaceValue(restored);
     } catch (e) {
-      setError(e instanceof ApiError ? e.message : "Could not reset that setting.");
+      setWriteError(e instanceof ApiError ? e.message : "Could not reset that setting.");
     } finally {
       setPendingKey(null);
     }
   }
 
-  if (error && registry === null) {
-    return (
-      <div className="flex flex-1 flex-col items-center justify-center gap-3 p-8 text-center">
-        <p className="text-base text-[var(--destructive)]">{error}</p>
-        <Button variant="secondary" onClick={load}>
-          Try again
-        </Button>
-      </div>
-    );
-  }
-
-  if (registry === null || values === null) {
-    return (
-      <div className="flex flex-1 items-center justify-center">
-        <Progress mode="spinner" label="Loading settings" />
-      </div>
-    );
-  }
-
-  const groups: SettingsGroup[] = groupSettings(registry, values, scope);
+  const error = registryQuery.isError || valuesQuery.isError;
+  const data =
+    registryQuery.data && valuesQuery.data ? { registry: registryQuery.data, values: valuesQuery.data } : undefined;
 
   // Found live in the browser (2026-09-05, while checking that the new
   // persona.active_id setting actually renders): `flex-1 overflow-y-auto`
@@ -146,54 +114,73 @@ export function SettingsRenderer({ scope, scopeValue }: SettingsRendererProps) {
   // inside already provides the real scrolling.
   return (
     <div className="flex flex-col gap-6 p-4">
-      {error ? (
-        <div className="rounded-[var(--radius)] bg-[var(--muted)] px-3 py-2 text-base text-[var(--destructive)]">
-          {error}
-        </div>
+      {writeError ? (
+        <div className="rounded-lg bg-muted px-3 py-2 text-base text-destructive">{writeError}</div>
       ) : null}
-      {groups.length === 0 ? (
-        <p className="text-base text-[var(--muted-foreground)]">No settings yet.</p>
-      ) : (
-        groups.map((group) => (
-          <Section key={group.id} heading={sectionTitle(group.id)}>
-            <div className="divide-y divide-[var(--border)]">
-              {group.basic.map((s) => (
-                <SettingField
-                  key={s.def.key}
-                  setting={s}
-                  onChange={(v) => handleChange(s.def.key, v)}
-                  onReset={() => handleReset(s.def.key)}
-                  disabled={pendingKey === s.def.key}
-                />
+      <AsyncState
+        data={data}
+        error={error}
+        isFetching={registryQuery.isFetching || valuesQuery.isFetching}
+        onRetry={() => {
+          // Only the query that actually failed, not both unconditionally
+          // (a code review, 2026-09-05, caught the registry - staleTime:
+          // Infinity, so it succeeds once and never needs retrying again
+          // - being re-fetched every time only the values query failed).
+          if (registryQuery.isError) registryQuery.refetch();
+          if (valuesQuery.isError) valuesQuery.refetch();
+        }}
+        errorMessage="Could not load settings."
+        loadingLabel="Loading settings"
+      >
+        {({ registry, values }) => {
+          const groups: SettingsGroup[] = groupSettings(registry, values, scope);
+          return groups.length === 0 ? (
+            <p className="text-base text-muted-foreground">No settings yet.</p>
+          ) : (
+            <>
+              {groups.map((group) => (
+                <Section key={group.id} heading={sectionTitle(group.id)}>
+                  <div className="divide-y divide-border">
+                    {group.basic.map((s) => (
+                      <SettingField
+                        key={s.def.key}
+                        setting={s}
+                        onChange={(v) => handleChange(s.def.key, v)}
+                        onReset={() => handleReset(s.def.key)}
+                        disabled={pendingKey === s.def.key}
+                      />
+                    ))}
+                  </div>
+                  {group.advanced.length > 0 ? (
+                    group.foldAdvanced && !advancedOpen[group.id] ? (
+                      <Button
+                        type="button"
+                        variant="link"
+                        onClick={() => setAdvancedOpen((prev) => ({ ...prev, [group.id]: true }))}
+                        className="h-auto min-h-12 w-fit text-muted-foreground"
+                      >
+                        Show {group.advanced.length} advanced settings
+                      </Button>
+                    ) : (
+                      <div className="divide-y divide-border border-t border-border pt-1">
+                        {group.advanced.map((s) => (
+                          <SettingField
+                            key={s.def.key}
+                            setting={s}
+                            onChange={(v) => handleChange(s.def.key, v)}
+                            onReset={() => handleReset(s.def.key)}
+                            disabled={pendingKey === s.def.key}
+                          />
+                        ))}
+                      </div>
+                    )
+                  ) : null}
+                </Section>
               ))}
-            </div>
-            {group.advanced.length > 0 ? (
-              group.foldAdvanced && !advancedOpen[group.id] ? (
-                <Button
-                  type="button"
-                  variant="link"
-                  onClick={() => setAdvancedOpen((prev) => ({ ...prev, [group.id]: true }))}
-                  className="h-auto min-h-12 w-fit text-muted-foreground"
-                >
-                  Show {group.advanced.length} advanced settings
-                </Button>
-              ) : (
-                <div className="divide-y divide-[var(--border)] border-t border-[var(--border)] pt-1">
-                  {group.advanced.map((s) => (
-                    <SettingField
-                      key={s.def.key}
-                      setting={s}
-                      onChange={(v) => handleChange(s.def.key, v)}
-                      onReset={() => handleReset(s.def.key)}
-                      disabled={pendingKey === s.def.key}
-                    />
-                  ))}
-                </div>
-              )
-            ) : null}
-          </Section>
-        ))
-      )}
+            </>
+          );
+        }}
+      </AsyncState>
     </div>
   );
 }
