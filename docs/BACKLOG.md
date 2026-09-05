@@ -314,17 +314,37 @@ Sources consulted (this research pass, 2026-09-05): [ChatGPT Projects guide](htt
 
 ## UI / shell
 
-- [ ] Person edit and delete (M) - no backend route exists for either,
-      not just missing UI. `PeoplePage.tsx`'s own comment documents this
-      as a deliberate scope cut, not an oversight - still needs doing.
-- [ ] Backup restore, end to end (S) - `restoreBackup()` is real and
-      tested; there's no HTTP route calling it and no UI.
+- [x] Person edit and delete (M) - done 2026-09-05. `PATCH`/`DELETE`
+      `/api/people/:id` plus `POST /api/people/batch-delete`, the rules
+      in `lib/personLifecycle.ts`, and real UI with multi-select. A
+      deleted person's memories, conversations, settings, jobs and
+      recordings are erased for real; the person row becomes a tombstone.
+      See `docs/dev.md`, "Person edit and delete".
+- [x] Backup restore, end to end (S) - done 2026-09-05. Staged, not
+      applied live: the route decrypts and verifies, `db/index.ts`
+      swaps it in at the next start. Owner-only, with a real
+      confirmation. See `docs/dev.md`, "Restore, staged and applied at
+      boot".
 - [x] A privacy page ("what leaves the house") (M) - done 2026-09-05.
       `GET /api/privacy` aggregates every bundled package's
       `data_sources[]` plus the hub's own downloads (models, engine,
       wake word, TTS program, TTS model, voice files, embeddings);
       `/privacy` renders it in dad-test language. See `docs/dev.md`,
       "The privacy page".
+- [ ] **Batch select and clear-all everywhere else** (M) - the org rule
+      landed 2026-09-05 (`getmaipai/.github/docs/UI.md` > Batch actions,
+      Jesse: "every section should provide easy batch and or delete all
+      mechanism"). People has it. Memory does not, and is the case Jesse
+      named specifically: it needs multi-select archive/forget plus a
+      real clear-all, which also finally gives `lib/memory.ts`'s
+      `forget()` a UI (`MemoryPage.tsx`'s own comment deferred it for
+      want of a confirmation pattern; `PeoplePage.tsx` now has one worth
+      lifting into the kit). Conversation history and notifications
+      inherit the same rule when they get surfaces.
+- [ ] **The kit owns the batch-selection pattern** (S) - `PeoplePage.tsx`
+      hand-rolls selection mode, the count, the confirmation panel and
+      the partial-success report. The second consumer (Memory, above) is
+      the moment that becomes a kit primitive rather than a copy.
 - [ ] Notifications UI (L, blocked on the notification system below)
 - [ ] Package/skill catalog browsing and install (L) - blocked on the
       `catalog` repo existing for real; today only local bundled packages

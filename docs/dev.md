@@ -5211,3 +5211,123 @@ plugin-vs-skill priority fix), the full backend suite passing alongside
 a second session's own concurrent, unrelated work in this same shared
 checkout, spec (144 + 30), and a clean frontend build - plus the real
 HTTP calls above against the actual running backend.
+
+
+## Restore, staged and applied at boot (2026-09-05)
+
+`restoreBackup()` had been real and tested since backups shipped, with
+no route and no UI. Two places said why, in the same words: swapping a
+live database needs machinery this build does not have, and a restore
+button without it would be the unsafe thing rather than the missing
+thing. That was right about the danger and wrong that nothing could
+ship.
+
+**The decision: staged, not live.** `db/index.ts` opens `hub.db` once at
+import and every query in the hub is bound to that handle, so a route
+cannot safely replace the file underneath a running process. The route
+decrypts the chosen backup to `hub.db.pending-restore`, verifies it, and
+stops. `applyPendingRestore()` runs in `db/index.ts` before anything is
+opened, the one moment with no handle open and no request in flight. The
+family restarts to finish. The alternative (quiesce, close, replace,
+reopen) is a bigger change whose failure mode is a running process bound
+to a database that no longer exists; staging's worst case is that
+nothing has happened yet.
+
+Owner-only, a deliberate step up from the owner/admin gate on listing
+and running backups: restoring replaces every person, memory and
+conversation in the house, including the roster that decides who is an
+admin at all.
+
+**What the code review caught, and why each mattered.** Five findings,
+every one a way this could have left a family worse off than before it
+ran:
+
+- The staged file was verified when it was staged and never again.
+  `decryptFile`'s `writeFileSync` does not fsync, and a power cut is
+  precisely how a family "restarts MaiPai Home to finish" an appliance
+  restore, so a truncated file could be renamed over a good database and
+  `checkSchemaVersion` would then refuse to open it at import: a hub
+  that will not start, from a button labelled restore. It is verified
+  again at apply time, and a failure leaves the live database untouched.
+- The replaced database's WAL was deleted. In WAL mode a committed
+  transaction lives in that journal until a checkpoint, and
+  auto-checkpoint only fires at 1000 pages, so a hub that was
+  power-cycled rather than shut down cleanly can hold real committed
+  data there. Deleting it silently emptied `hub.db.pre-restore`, the
+  only undo a family has. The journal now moves with the database it
+  belongs to, under SQLite's own naming convention.
+- A second restore overwrote the first `hub.db.pre-restore`. Restore A,
+  restart, realise it was wrong, restore B, restart, and the household's
+  original database was gone for good.
+- The empty-roster check counted tombstones, which every sign-in path
+  filters out, so an all-deleted backup passed the guard that exists to
+  prevent exactly that lockout.
+- The route returned every error verbatim, sending a browser Node's
+  "Unsupported state or unable to authenticate data" for a corrupt
+  archive and an absolute server path for a filesystem failure. Only
+  `RestoreRefused` messages are written for a person; the rest are
+  logged and flattened.
+
+Verified end to end for real, not only in tests: staged through the UI,
+the hub restarted, `[restore] applied backup ...` in the log, and the
+person added after the backup gone from the roster afterward.
+
+## Person edit and delete (2026-09-05)
+
+Neither had a route, not just no UI. Both are real now, with the rules
+in `lib/personLifecycle.ts` where each reads as its own sentence.
+
+**Who may manage whom** follows the ladder creation already set, for the
+same reason it was set: an admin who could delete or demote another
+admin, or the owner, could take the household over in one request.
+Everyone edits their own name, nickname, birthdate and avatar; only the
+owner hands out roles; nobody changes their own role (an admin
+promoting themselves is the obvious hole, an owner demoting themselves
+the less obvious one); the last owner cannot be demoted or deleted; and
+nobody reaches owner or admin without a PIN, which `POST` already
+required and promotion would otherwise have quietly skipped.
+
+**What happens to a deleted person's data.** Their memories,
+conversations, person-scope settings, scheduled jobs, credentials,
+sessions and recorded voices are hard-deleted, following `memory.ts`'s
+`forget()` precedent. The person row becomes a tombstone rather than
+vanishing, because org standard 3 needs it to: a row that simply
+disappears is indistinguishable, to a robot syncing later, from one it
+has not been told about yet, so the delete would undo itself on the next
+sync. Nickname and birthdate go with the rest of their data; the display
+name stays, because a tombstone that cannot say who it was is not much
+of a record. A test walks the live schema and fails if any table still
+holds rows for a deleted person, so a table added later that keeps
+person data cannot quietly stop being covered by this.
+
+**The bug the tests found.** Writing "their session stops working
+immediately" failed: deleting the session rows is not enough, because
+`resolveSession` keeps a 10-second in-memory cache, so a deleted person
+kept making authenticated requests until it expired and a demoted admin
+kept admin access just as long. `auth.ts` has had
+`invalidateSessionCacheForPerson` since 2026-09-04 with the note "no
+caller yet... kept ready for when a delete-person or role-change route
+lands". This is that caller, on both paths. Worth noting how it
+surfaced: not from reading the code, but from asserting the promise a
+person cares about.
+
+## Batch actions, as a standing rule (2026-09-05)
+
+Jesse, mid-session: "every section should provide easy batch and or
+delete all mechanism. Ex users should have a multi select option to
+batch delete users, same with memories. But then some like memories also
+have a clear all button."
+
+Recorded as an org-wide UI rule rather than a feature request
+(`getmaipai/.github/docs/UI.md` > Batch actions, commit 4a834a7), since
+it applies to every list any product in the org ships. People has it
+now. Memory is the case Jesse named and does not, which also finally
+gives `lib/memory.ts`'s `forget()` a UI: `MemoryPage.tsx` deferred that
+for want of a confirmation pattern, and `PeoplePage.tsx` now has one.
+Both are in the backlog, along with lifting the selection pattern into
+the kit at its second consumer rather than at its first.
+
+Partial success is reported, never swallowed: a batch where one item is
+refused deletes the rest and says which was kept and why. Selecting five
+people, hitting one protected profile, and getting nothing done with no
+explanation is the failure this rule exists to prevent.
