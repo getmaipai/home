@@ -3692,6 +3692,40 @@ set. Full architecture: platform plan chapters 1, 3, and 4.
       an engineering judgment call, so it's parked here rather than acted
       on.
 
+- [x] **The `trivia` package: the fourth real skill built on `host.fetch`,
+      and a real interpreter-level fix it surfaced.** A random trivia
+      question and its answer via opentdb.com (free, no key). Building it
+      found that opentdb.com HTML-entity-encodes every response
+      unconditionally (`Jojo&#039;s Bizarre Adventure`, `&quot;killed&quot;`)
+      - and neither recipe interpreter's `interpolate()` decoded anything
+      at all, meaning any future text-returning API doing the same thing
+      (a genuinely common practice for APIs meant to be embedded in a web
+      page) would have shown raw entities in a chat reply or spoken them
+      literally aloud via TTS.
+    - Fixed at the interpreter level, not worked around inside the
+      `trivia` recipe: decodes the SUBSTITUTED VALUE, never the template
+      itself (the template is always our own authored manifest text,
+      never entity-encoded - only values coming back from a real `fetch`
+      need this). `he` on the TS side (a maintained, complete entity
+      library, not a hand-rolled regex, per the "prebuilt over hand-built"
+      platform principle); the standard library's `html.unescape` on the
+      Python side, no new dependency needed there at all. A dedicated
+      regression fixture (`spec/fixtures/recipes/html-entity-decoding.json`)
+      proves the general behavior independent of any one skill - confirmed
+      to fail on both interpreters before the fix landed, pass after.
+    - `trivia`'s own conformance fixture
+      (`spec/fixtures/recipes/trivia.json`) uses a real captured response,
+      entities included, so the shipped skill itself proves the fix works
+      end to end, not just the synthetic regression fixture.
+    - Along the way, running the full suite surfaced a real, unrelated
+      test bug: `scheduler.test.ts`'s one-shot `parseWhen` test hardcoded
+      a specific "future" ISO datetime compared against the real wall
+      clock, so it started failing the moment real time caught up to it -
+      on 2026-09-05, the exact day this landed. `parseWhen` already takes
+      an injectable `from` for exactly this reason (the recurring test
+      right below it already used it); fixed by using it here too, rather
+      than just pushing the hardcoded date further out.
+
 ## Notes for later (companion personas, added 2026-09-05)
 
 Jesse asked how companion personalities and their speech patterns should
