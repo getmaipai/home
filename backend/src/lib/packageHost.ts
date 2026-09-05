@@ -24,9 +24,9 @@
 // (lib/ssrfGuard.ts - a package's generic fetch has no business landing
 // on the household's own LAN; home.call_service/integration.call are the
 // real, permissioned paths for that). This was the one thing genuinely
-// blocking every fetch-based skill until the interpreter itself could
+// blocking every fetch-based plugin until the interpreter itself could
 // await a host call at all (recipe-interpreter.ts, both languages, made
-// async the same day this landed) - `runSkill()`/`prepareTurn()` now
+// async the same day this landed) - `runPlugin()`/`prepareTurn()` now
 // await through to here.
 //
 // Everything else (home.call_service, integration.call, speak.sentence,
@@ -130,7 +130,7 @@ async function readBodyWithLimit(response: Response, url: string): Promise<strin
 }
 
 // A real, live-verified reliability gap found building the `define`
-// skill (2026-09-05): dictionaryapi.dev, a real public API, failed
+// plugin (2026-09-05): dictionaryapi.dev, a real public API, failed
 // (timed out) roughly half the time in rigorous back-to-back testing
 // tonight - a real third-party host, not a bug in host.fetch's own
 // networking (see ssrfGuard.ts's own comment on the dead-end chased

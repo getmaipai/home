@@ -1,5 +1,5 @@
 {
-  "description": "The real backend/packages/trivia/recipe.json (2026-09-05, the fourth real skill built on host.fetch): a single, zero-input fetch+pick+pick+format chain against opentdb.com, using a response shape captured from a real call - including its HTML-entity-encoded text (Cartoon &amp; Animations, &quot;killed&quot;), proving interpolate()'s entity-decoding fix works in the actual shipped skill, not just the regression fixture.",
+  "description": "The real backend/packages/trivia/recipe.json (2026-09-05, the fourth real plugin built on host.fetch): a single, zero-input fetch+pick+pick+format chain against opentdb.com, using a response shape captured from a real call - including its HTML-entity-encoded text (Cartoon &amp; Animations, &quot;killed&quot;), proving interpolate()'s entity-decoding fix works in the actual shipped plugin, not just the regression fixture.",
   "recipe": {
     "id": "trivia",
     "inputs": [],

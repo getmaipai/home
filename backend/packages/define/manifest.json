@@ -1,10 +1,10 @@
 {
   "id": "define",
   "version": "0.1.0",
-  "kind": "skill",
+  "kind": "plugin",
   "category": "Utilities",
   "display": "Define",
-  "description": "Looks up a real dictionary definition for a word (2026-09-05, the second real skill built on host.fetch), via the free, no-key dictionaryapi.dev.",
+  "description": "Looks up a real dictionary definition for a word (2026-09-05, the second real plugin built on host.fetch), via the free, no-key dictionaryapi.dev.",
   "author": "MaiPai",
   "license": "AGPL-3.0",
   "homepage": "https://github.com/getmaipai/home",

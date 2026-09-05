@@ -1,7 +1,7 @@
 {
   "id": "bedtime-reminder",
   "version": "0.1.0",
-  "kind": "skill",
+  "kind": "plugin",
   "category": "Family",
   "display": "Bedtime reminder",
   "description": "Sets a spoken reminder at a chosen time for a chosen person.",

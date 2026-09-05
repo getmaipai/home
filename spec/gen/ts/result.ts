@@ -5,7 +5,7 @@
 import { z } from "zod";
 
 /**What a package's handle() (or a recipe's interpreted run) returns. See platform plan 4.9.*/
-export const SkillResult = z
+export const PluginResult = z
   .object({
     reply: z
       .object({ text: z.string(), speech: z.string().optional() })
@@ -35,4 +35,4 @@ export const SkillResult = z
   .describe(
     "What a package's handle() (or a recipe's interpreted run) returns. See platform plan 4.9.",
   );
-export type SkillResult = z.infer<typeof SkillResult>;
+export type PluginResult = z.infer<typeof PluginResult>;

@@ -269,7 +269,7 @@ export const api = {
   // The plan's own "count fall-throughs... and decide on tier 2 from the
   // eval number" measurement (4.5), owner/admin only - aggregate counts,
   // not any one person's conversation content.
-  routingStats: () => request<RoutingStats>("/api/skills/stats"),
+  routingStats: () => request<RoutingStats>("/api/plugins/stats"),
   memories: () => request<MemoryRecord[]>("/api/memory"),
   archiveMemory: (id: string) =>
     request<MemoryRecord>(`/api/memory/${encodeURIComponent(id)}/archive`, { method: "POST" }),

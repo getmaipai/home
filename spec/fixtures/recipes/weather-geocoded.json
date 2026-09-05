@@ -1,5 +1,5 @@
 {
-  "description": "The real backend/packages/weather/recipe.json (2026-09-05, the first real skill built on host.fetch): geocode a place name, then forecast its coordinates, using response shapes captured from a real Open-Meteo call.",
+  "description": "The real backend/packages/weather/recipe.json (2026-09-05, the first real plugin built on host.fetch): geocode a place name, then forecast its coordinates, using response shapes captured from a real Open-Meteo call.",
   "recipe": {
     "id": "weather",
     "inputs": [{ "name": "place", "selector": "text" }],

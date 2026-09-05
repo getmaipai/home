@@ -1,7 +1,7 @@
 {
   "id": "remember",
   "version": "0.1.0",
-  "kind": "skill",
+  "kind": "plugin",
   "category": "Utilities",
   "display": "Remember",
   "description": "Remembers a fact you tell it, the way asking to remember something works (4.4/4.9).",

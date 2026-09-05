@@ -10,7 +10,7 @@ function row(overrides: Partial<ConversationTurnRow> = {}): ConversationTurnRow 
     userText: "hello",
     replyText: "hi there",
     source: "model",
-    skillId: null,
+    pluginId: null,
     safetyFlagged: false,
     safetyAction: "allow",
     minorSpeaker: false,

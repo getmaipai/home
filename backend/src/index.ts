@@ -1,6 +1,6 @@
 import { app } from "@/app";
 import { ensureCoreJob, runDueJobs } from "@/lib/scheduler";
-import { runSkill } from "@/lib/skills";
+import { runPlugin } from "@/lib/plugins";
 import { cleanupStaleSnapshots } from "@/lib/backup";
 import { sampleEngineStats } from "@/lib/engineStats";
 
@@ -29,7 +29,7 @@ ensureCoreJob("backup.run", "every:1d");
 // the next scheduled run.
 cleanupStaleSnapshots();
 setInterval(() => {
-  runDueJobs(runSkill).catch((err: Error) => console.error(`[scheduler] runDueJobs failed: ${err.message}`));
+  runDueJobs(runPlugin).catch((err: Error) => console.error(`[scheduler] runDueJobs failed: ${err.message}`));
 }, 60_000);
 // engineStats.ts's ring buffer, same 60s cadence as the job poll above -
 // "how busy the machine has been" (Jesse, 2026-09-04) doesn't need finer

@@ -1,7 +1,7 @@
 {
   "id": "recall",
   "version": "0.1.0",
-  "kind": "skill",
+  "kind": "plugin",
   "category": "Utilities",
   "display": "Recall",
   "description": "Tells you what it remembers about something you ask (4.4/4.9) - the read-side counterpart to Remember.",

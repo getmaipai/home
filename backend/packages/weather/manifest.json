@@ -1,10 +1,10 @@
 {
   "id": "weather",
   "version": "0.1.0",
-  "kind": "skill",
+  "kind": "plugin",
   "category": "Utilities",
   "display": "Weather",
-  "description": "Real current temperature for a named place (2026-09-05: the first real skill built on host.fetch), via Open-Meteo's free, no-key geocoding and forecast APIs.",
+  "description": "Real current temperature for a named place (2026-09-05: the first real plugin built on host.fetch), via Open-Meteo's free, no-key geocoding and forecast APIs.",
   "author": "MaiPai",
   "license": "AGPL-3.0",
   "homepage": "https://github.com/getmaipai/home",

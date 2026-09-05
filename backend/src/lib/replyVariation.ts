@@ -15,11 +15,11 @@
 //
 // Deliberately NOT a general "vary any reply" transform: it only ever
 // touches a reply that is ALREADY one of these known, fixed constants
-// (the safety refusal, a skill error, a skill's own default confirmation,
+// (the safety refusal, a plugin error, a plugin's own default confirmation,
 // or one of the two known constant confirmations the recall/remember
 // packages produce today - backend/packages/remember/recipe.json and
 // spec/interpreters/{ts,py}/recipe-interpreter.ts's own NOTHING_RECALLED).
-// A model's own freeform reply, or a skill's real dynamic content (a
+// A model's own freeform reply, or a plugin's real dynamic content (a
 // recalled fact, a weather number), is never touched - there is nothing
 // fixed there to rotate, and guessing would risk changing what was
 // actually said.
@@ -88,12 +88,12 @@ export function pickRefusalVariant(personId: string): string {
 }
 
 // ── Other known constants ──────────────────────────────────────────────
-export const SKILL_ERROR_VARIANTS: readonly string[] = [
+export const PLUGIN_ERROR_VARIANTS: readonly string[] = [
   "Sorry, I couldn't do that.",
   "That didn't work - sorry.",
   "Couldn't get that done, sorry.",
 ];
-export const SKILL_DONE_VARIANTS: readonly string[] = ["Done.", "Done!", "Got it, done.", "All set."];
+export const PLUGIN_DONE_VARIANTS: readonly string[] = ["Done.", "Done!", "Got it, done.", "All set."];
 export const RECALL_NOTHING_VARIANTS: readonly string[] = [
   "I don't remember anything about that.",
   "Nothing on that from me.",
@@ -130,9 +130,9 @@ export function pickThinkingCue(personId: string): string {
 }
 
 // Maps a still-exact match of one of the OTHER known constant reply
-// strings - turnEngine.ts's own skill-error/skill-done fallbacks, plus
+// strings - turnEngine.ts's own plugin-error/plugin-done fallbacks, plus
 // the package layer's known constant confirmations - to its pool. Keyed
-// on each constant's CURRENT exact text (not a source or skill id) since,
+// on each constant's CURRENT exact text (not a source or plugin id) since,
 // for example, spec/interpreters produces NOTHING_RECALLED for any recipe
 // that uses a `recall` step, not just the bundled `recall` package. If
 // any of these source strings ever changes, this map's key must change
@@ -142,13 +142,13 @@ export function pickThinkingCue(personId: string): string {
 // the one constant NOT in this map: it alone needs pickRefusalVariant's
 // first/repeat distinction, not plain rotation.
 const KNOWN_CONSTANT_POOLS: ReadonlyMap<string, readonly string[]> = new Map([
-  ["Sorry, I couldn't do that.", SKILL_ERROR_VARIANTS], // turnEngine.ts's own skill_error fallback
-  ["Done.", SKILL_DONE_VARIANTS], // turnEngine.ts's own no-reply skill fallback
+  ["Sorry, I couldn't do that.", PLUGIN_ERROR_VARIANTS], // turnEngine.ts's own plugin_error fallback
+  ["Done.", PLUGIN_DONE_VARIANTS], // turnEngine.ts's own no-reply plugin fallback
   ["I don't remember anything about that.", RECALL_NOTHING_VARIANTS], // spec/interpreters/{ts,py}/recipe-interpreter's NOTHING_RECALLED
   ["Got it, I'll remember that.", REMEMBER_CONFIRM_VARIANTS], // backend/packages/remember/recipe.json's own reply text
 ]);
 
-/** Applied to a skill's already-rendered reply text: if it's exactly one
+/** Applied to a plugin's already-rendered reply text: if it's exactly one
  * of the package layer's known constant confirmations, rotate it; any
  * real, dynamic content (a recalled fact, a weather number, a recipe's
  * own bespoke confirmation sentence) passes through completely

@@ -1,5 +1,5 @@
 {
-  "description": "recall + format: binds a ready-to-speak summary from host.memory.recall - the Recall skill's own shape (backend/packages/recall/)",
+  "description": "recall + format: binds a ready-to-speak summary from host.memory.recall - the Recall plugin's own shape (backend/packages/recall/)",
   "recipe": {
     "id": "recall-topic",
     "inputs": [{ "name": "topic", "selector": "text" }],

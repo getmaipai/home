@@ -35,22 +35,22 @@ import { isOwnerOrAdmin } from "@/lib/access";
 import { runMaintenance } from "@/lib/memory";
 import { runRetention } from "@/lib/conversationHistory";
 import { runBackup, pruneBackups } from "@/lib/backup";
-import type { SkillOpResult } from "@/lib/skills";
-import type { SkillResult } from "@maipai/spec/interpreters/ts/recipe-interpreter.js";
+import type { PluginOpResult } from "@/lib/plugins";
+import type { PluginResult } from "@maipai/spec/interpreters/ts/recipe-interpreter.js";
 import type { PersonRow } from "@/types";
 
-// lib/skills.ts's runSkill isn't imported directly: skills.ts already
+// lib/plugins.ts's runPlugin isn't imported directly: plugins.ts already
 // imports lib/packageHost.ts (createHost), and packageHost.ts imports
 // this file (its host.schedule needs scheduleJob below), so importing
-// skills.ts here too would close a real circular-import loop. The
-// caller (index.ts, or a test) passes its own runSkill in instead.
-type RunSkillFn = (id: string, actor: PersonRow, inputs: Record<string, unknown>) => Promise<SkillOpResult<SkillResult>>;
+// plugins.ts here too would close a real circular-import loop. The
+// caller (index.ts, or a test) passes its own runPlugin in instead.
+type RunPluginFn = (id: string, actor: PersonRow, inputs: Record<string, unknown>) => Promise<PluginOpResult<PluginResult>>;
 
 export type SchedulerOpResult<T> =
   | { ok: true; value: T }
   | { ok: false; status: 400 | 403 | 404; error: string };
 
-export type JobKind = "skill" | "core";
+export type JobKind = "plugin" | "core";
 
 const RECURRENCE = /^every:(\d+)(m|h|d)$/;
 const UNIT_MS: Record<string, number> = { m: 60_000, h: 3_600_000, d: 86_400_000 };
@@ -79,7 +79,7 @@ export function parseWhen(when: string, from: Date = new Date()): ParsedWhen | n
   return { nextRunAt: oneShot, recurring: false };
 }
 
-/** Schedules a "skill" job: re-runs `packageId` for `actor` with `inputs`
+/** Schedules a "plugin" job: re-runs `packageId` for `actor` with `inputs`
  * when `when` next fires. `job` is the recipe step's own job id (or the
  * recipe id, per the interpreter's fallback), kept for display/audit,
  * not resolved to anything else here. */
@@ -96,7 +96,7 @@ export function scheduleJob(
   db.insert(scheduledJobs)
     .values({
       id,
-      kind: "skill",
+      kind: "plugin",
       packageId,
       job,
       personId: actor.id,
@@ -185,7 +185,7 @@ const CORE_JOBS: Record<string, () => void> = {
 // 10 seconds, index.ts's 60s interval firing again mid-run, or a manual
 // POST /scheduler/run-due landing while the interval is also mid-run,
 // both become real: two runs would SELECT the same still-"pending" row
-// (the status/nextRunAt UPDATE only happens after the awaited skill
+// (the status/nextRunAt UPDATE only happens after the awaited plugin
 // resolves) and fire a one-shot job twice, or race a recurring job's own
 // reschedule math. This module-level in-flight guard makes every caller
 // share the SAME run instead: a second call while one is already running
@@ -199,15 +199,15 @@ let inFlight: Promise<{ ran: number; errors: number }> | null = null;
  * retries: a failure is recorded on the row and it's marked done, the
  * same "never a silent retry loop" choice lib/memory.ts's forget() makes
  * for its own one-shot erasure. */
-export function runDueJobs(runSkillFn: RunSkillFn, now: Date = new Date()): Promise<{ ran: number; errors: number }> {
+export function runDueJobs(runPluginFn: RunPluginFn, now: Date = new Date()): Promise<{ ran: number; errors: number }> {
   if (inFlight) return inFlight;
-  inFlight = runDueJobsUnguarded(runSkillFn, now).finally(() => {
+  inFlight = runDueJobsUnguarded(runPluginFn, now).finally(() => {
     inFlight = null;
   });
   return inFlight;
 }
 
-async function runDueJobsUnguarded(runSkillFn: RunSkillFn, now: Date): Promise<{ ran: number; errors: number }> {
+async function runDueJobsUnguarded(runPluginFn: RunPluginFn, now: Date): Promise<{ ran: number; errors: number }> {
   const due = db
     .select()
     .from(scheduledJobs)
@@ -224,10 +224,10 @@ async function runDueJobsUnguarded(runSkillFn: RunSkillFn, now: Date): Promise<{
         if (!handler) throw new Error(`no core job registered for ${row.job}`);
         handler();
       } else {
-        if (!row.personId) throw new Error(`skill job ${row.id} has no personId`);
+        if (!row.personId) throw new Error(`plugin job ${row.id} has no personId`);
         const actor = db.select().from(people).where(and(eq(people.id, row.personId), isNull(people.deletedAt))).get();
         if (!actor) throw new Error(`person ${row.personId} no longer exists`);
-        const result = await runSkillFn(row.packageId, actor, JSON.parse(row.inputs));
+        const result = await runPluginFn(row.packageId, actor, JSON.parse(row.inputs));
         if (!result.ok) throw new Error(result.error);
       }
       ran++;

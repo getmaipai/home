@@ -20,7 +20,7 @@ function manifest(overrides: Partial<PackageManifest> = {}): PackageManifest {
   return PackageManifest.parse({
     id: "test-pkg",
     version: "0.1.0",
-    kind: "skill",
+    kind: "plugin",
     category: "Utilities",
     display: "Test",
     description: "A test package.",
@@ -309,7 +309,7 @@ describe("performHttpFetch (the real HTTP mechanics, no SSRF/permission/rate-lim
 });
 
 // A real, live-verified reliability gap found building the `define`
-// skill (2026-09-05): a real public API (dictionaryapi.dev) failed
+// plugin (2026-09-05): a real public API (dictionaryapi.dev) failed
 // roughly half the time in rigorous back-to-back testing tonight - a
 // real third-party host being unreliable, not a bug in host.fetch's own
 // networking. The retry POLICY is tested here in complete isolation

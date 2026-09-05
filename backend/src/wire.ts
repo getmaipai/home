@@ -30,8 +30,8 @@ export interface TurnReply {
 
 export interface TurnValue {
   reply: TurnReply;
-  source: "safety_refuse" | "skill" | "skill_error" | "model";
-  skill_id?: string;
+  source: "safety_refuse" | "plugin" | "plugin_error" | "model";
+  plugin_id?: string;
   safety: SafetyResult;
   /** 4.3: "offer, never block." Set only on allow_with_resources, kept
    * separate from `reply` so a surface can present it alongside the
@@ -45,7 +45,7 @@ export type ConversationTurnRow = typeof conversationTurns.$inferSelect;
 // JSON, one event per line (the same shape the legacy hub's own
 // POST /api/tts/stream used - docs/dev.md's tts-role entry). A "delta"
 // event's `text` is the next slice of the reply (the whole thing in one
-// event for a safety-refusal or skill reply, since neither has anything
+// event for a safety-refusal or plugin reply, since neither has anything
 // to gain from trickling in); exactly one "done" event ends the stream,
 // carrying the same TurnValue shape POST /api/turn already returns so a
 // client needs only one code path to read the final result either way.
@@ -158,12 +158,12 @@ export interface EngineStatsSample {
 // imports of its own).
 export interface RoutingStats {
   total: number;
-  skill: number;
-  skillError: number;
+  plugin: number;
+  pluginError: number;
   model: number;
   safetyRefuse: number;
   fallthroughRate: number | null;
-  bySkill: { skillId: string; count: number }[];
+  byPlugin: { pluginId: string; count: number }[];
 }
 
 // The role-string half of lib/access.ts's isOwnerOrAdmin(actor: PersonRow):

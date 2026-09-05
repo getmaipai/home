@@ -23,7 +23,7 @@ import { lookup } from "node:dns/promises";
 import { isIP } from "node:net";
 
 // A real, live-verified DEAD END worth recording so a future session
-// doesn't re-chase it (2026-09-05): building the `define` skill against
+// doesn't re-chase it (2026-09-05): building the `define` plugin against
 // dictionaryapi.dev hit a fetch that hung 10s+ and initially looked
 // caused by this file's own `dns.lookup()` call immediately preceding
 // Bun's `fetch()` to the same host - switching to `dns.resolve4()`

@@ -26,7 +26,7 @@ NOTHING_RECALLED = "I don't remember anything about that."
 
 # Decodes HTML entities in the SUBSTITUTED VALUE, never the template
 # itself - see recipe-interpreter.ts's own interpolate() for why
-# (2026-09-05, found building the `trivia` skill: opentdb.com HTML-entity-
+# (2026-09-05, found building the `trivia` plugin: opentdb.com HTML-entity-
 # encodes every response unconditionally). `html.unescape` is the standard
 # library's own complete HTML5 entity decoder - no dependency needed, must
 # stay behaviorally equivalent to the TS side's `he` usage.

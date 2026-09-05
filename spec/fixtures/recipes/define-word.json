@@ -1,5 +1,5 @@
 {
-  "description": "The real backend/packages/define/recipe.json (2026-09-05, the second real skill built on host.fetch): a single fetch+pick chain against dictionaryapi.dev, using a response shape captured from a real call.",
+  "description": "The real backend/packages/define/recipe.json (2026-09-05, the second real plugin built on host.fetch): a single fetch+pick chain against dictionaryapi.dev, using a response shape captured from a real call.",
   "recipe": {
     "id": "define",
     "inputs": [{ "name": "word", "selector": "text" }],

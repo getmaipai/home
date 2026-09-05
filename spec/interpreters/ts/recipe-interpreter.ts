@@ -7,7 +7,7 @@ import { decode } from "he";
 import type { Recipe } from "../../gen/ts/recipe.js";
 import type { Host } from "../../emulators/ts/host-emulator.js";
 
-export interface SkillResult {
+export interface PluginResult {
   reply?: { text: string; speech?: string };
   actions: { kind: string; payload?: unknown }[];
 }
@@ -46,7 +46,7 @@ const NOTHING_RECALLED = "I don't remember anything about that.";
 // Decodes HTML entities in the SUBSTITUTED VALUE, never the template
 // itself (the template is always our own authored manifest/recipe text,
 // which never contains entities; the value can come from `fetch`, an
-// arbitrary external API). Found building the `trivia` skill (2026-09-05):
+// arbitrary external API). Found building the `trivia` plugin (2026-09-05):
 // opentdb.com HTML-entity-encodes every response unconditionally
 // ("Jojo&#039;s stand"), and nothing in this interpreter decoded it -
 // every future text-returning API that does the same (a real, common
@@ -80,7 +80,7 @@ function pickPath(value: unknown, path: string | undefined): unknown {
 // response - see backend/src/lib/packageHost.ts's own header comment on
 // why this used to be out of scope. Every other step stays exactly as
 // synchronous as it always was.
-export async function runRecipe(recipe: Recipe, inputs: Scope, host: Host): Promise<SkillResult> {
+export async function runRecipe(recipe: Recipe, inputs: Scope, host: Host): Promise<PluginResult> {
   const scope: Scope = { ...inputs };
   const actions: { kind: string; payload?: unknown }[] = [];
   let reply: { text: string; speech?: string } | undefined;

@@ -4,12 +4,19 @@
 // against a real host (lib/packageHost.ts). No catalog, no install flow,
 // no signing yet: packages here are the "default set bundled with the
 // release" the roadmap names, read straight from backend/packages/.
+//
+// Renamed from lib/skills.ts (2026-09-05): what this file loads and runs
+// is a `kind: "plugin"` package (a self-contained, permissioned,
+// installable capability - weather/joke/trivia/define/remember/recall),
+// not a Claude-shaped Skill (plain instructions, no permissions of its
+// own). See docs/dev.md's "Naming: skill, plugin, command, connector"
+// entry for the full research and reasoning.
 import { readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import Ajv2020 from "ajv/dist/2020.js";
 import { PackageManifest } from "@maipai/spec/gen/ts/manifest.js";
 import { Recipe } from "@maipai/spec/gen/ts/recipe.js";
-import { runRecipe, type SkillResult } from "@maipai/spec/interpreters/ts/recipe-interpreter.js";
+import { runRecipe, type PluginResult } from "@maipai/spec/interpreters/ts/recipe-interpreter.js";
 import { HostError } from "@maipai/spec/emulators/ts/host-emulator.js";
 import { createHost } from "@/lib/packageHost";
 import { ROLE_LADDER, type Role } from "@/middleware/auth";
@@ -29,7 +36,7 @@ export interface LoadedPackage {
   recipe: Recipe;
 }
 
-export type SkillOpResult<T> =
+export type PluginOpResult<T> =
   | { ok: true; value: T }
   | { ok: false; status: 400 | 403 | 404; error: string };
 
@@ -44,7 +51,7 @@ export function listPackageIds(): string[] {
   }
 }
 
-export function loadPackage(id: string): SkillOpResult<LoadedPackage> {
+export function loadPackage(id: string): PluginOpResult<LoadedPackage> {
   let manifestRaw: string, recipeRaw: string;
   try {
     manifestRaw = readFileSync(join(PACKAGES_DIR, id, "manifest.json"), "utf-8");
@@ -79,7 +86,7 @@ export function meetsMinRole(actorRole: string, minRole: string): boolean {
  * the same result shape every other route returns. Async (2026-09-05):
  * runRecipe() itself now is, since a real host.fetch is real network I/O -
  * see recipe-interpreter.ts and packageHost.ts. */
-export async function runSkill(id: string, actor: PersonRow, inputs: Record<string, unknown>): Promise<SkillOpResult<SkillResult>> {
+export async function runPlugin(id: string, actor: PersonRow, inputs: Record<string, unknown>): Promise<PluginOpResult<PluginResult>> {
   const loaded = loadPackage(id);
   if (!loaded.ok) return loaded;
   const { manifest, recipe } = loaded.value;

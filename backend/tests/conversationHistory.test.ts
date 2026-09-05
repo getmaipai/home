@@ -43,8 +43,8 @@ describe("logTurn (via runTurn)", () => {
     expect(rows.length).toBe(1);
     expect(rows[0]!.userText).toBe("remember that trash day is Tuesday");
     expect(REMEMBER_CONFIRM_VARIANTS).toContain(rows[0]!.replyText);
-    expect(rows[0]!.source).toBe("skill");
-    expect(rows[0]!.skillId).toBe("remember");
+    expect(rows[0]!.source).toBe("plugin");
+    expect(rows[0]!.pluginId).toBe("remember");
     expect(rows[0]!.safetyFlagged).toBe(false);
     expect(rows[0]!.minorSpeaker).toBe(false);
   });
@@ -81,8 +81,8 @@ describe("routingStats()", () => {
   test("counts real turns by source, and computes the fall-through rate", async () => {
     const { actor } = await owner();
 
-    await runTurn(actor, "chat", "remember that trash day is Tuesday"); // skill
-    await runTurn(actor, "chat", "what do you remember about trash day"); // skill (recall)
+    await runTurn(actor, "chat", "remember that trash day is Tuesday"); // plugin
+    await runTurn(actor, "chat", "what do you remember about trash day"); // plugin (recall)
     await runTurn(actor, "chat", "hi there"); // model (no pattern/example matches)
     // safety_refuse never reaches routing at all, so it must not appear
     // on either side of the fall-through ratio below.
@@ -90,17 +90,17 @@ describe("routingStats()", () => {
 
     const stats = routingStats();
     expect(stats.total).toBe(4);
-    expect(stats.skill).toBe(2);
+    expect(stats.plugin).toBe(2);
     expect(stats.model).toBe(1);
-    expect(stats.skillError).toBe(0);
+    expect(stats.pluginError).toBe(0);
     expect(stats.safetyRefuse).toBe(1);
-    // 1 model / (2 skill + 0 skillError + 1 model) = 1/3, NOT 1/4 -
+    // 1 model / (2 plugin + 0 pluginError + 1 model) = 1/3, NOT 1/4 -
     // the exact detail a review would need to double-check.
     expect(stats.fallthroughRate).toBeCloseTo(1 / 3);
-    expect(stats.bySkill).toEqual(
+    expect(stats.byPlugin).toEqual(
       expect.arrayContaining([
-        { skillId: "remember", count: 1 },
-        { skillId: "recall", count: 1 },
+        { pluginId: "remember", count: 1 },
+        { pluginId: "recall", count: 1 },
       ]),
     );
   });
@@ -108,12 +108,12 @@ describe("routingStats()", () => {
   test("a null rate, not a division-by-zero 0%, when nothing routable has happened yet", () => {
     expect(routingStats()).toEqual({
       total: 0,
-      skill: 0,
-      skillError: 0,
+      plugin: 0,
+      pluginError: 0,
       model: 0,
       safetyRefuse: 0,
       fallthroughRate: null,
-      bySkill: [],
+      byPlugin: [],
     });
   });
 
@@ -126,14 +126,14 @@ describe("routingStats()", () => {
   });
 });
 
-describe("GET /api/skills/stats", () => {
+describe("GET /api/plugins/stats", () => {
   test("requires owner or admin", async () => {
     const { client } = await owner();
     const child = await addPerson(client, "Bramble", "child");
     const childClient = new TestClient();
     await childClient.post("/api/auth/select", { personId: child.id });
 
-    const res = await childClient.get("/api/skills/stats");
+    const res = await childClient.get("/api/plugins/stats");
     expect(res.status).toBe(403);
   });
 
@@ -141,11 +141,11 @@ describe("GET /api/skills/stats", () => {
     const { client, actor } = await owner();
     await runTurn(actor, "chat", "remember that trash day is Tuesday");
 
-    const res = await client.get("/api/skills/stats");
+    const res = await client.get("/api/plugins/stats");
     expect(res.status).toBe(200);
-    const body = (await res.json()) as { total: number; skill: number };
+    const body = (await res.json()) as { total: number; plugin: number };
     expect(body.total).toBe(1);
-    expect(body.skill).toBe(1);
+    expect(body.plugin).toBe(1);
   });
 });
 
@@ -235,7 +235,7 @@ describe("summarizeBeforeDelete()", () => {
 
   test("writes a real episode memory record from a real (if stub-shaped) completion", async () => {
     const { actor } = await owner();
-    await runTurn(actor, "chat", "remember that trash day is Tuesday"); // the skill floor, no chat call yet
+    await runTurn(actor, "chat", "remember that trash day is Tuesday"); // the plugin floor, no chat call yet
     const rows = db.select().from(conversationTurns).where(eq(conversationTurns.personId, actor.id)).all();
 
     const { startStubLlmServer } = await import("@maipai/spec/llm/ts/stubServer.js");
@@ -283,7 +283,7 @@ describe("summarizeBeforeDelete()", () => {
   test("never attributes a summary to a person who's been deleted since these turns were written", async () => {
     const { client } = await owner();
     const child = await addPerson(client, "Bramble", "child");
-    // The skill floor, not a generic message: a generic one falls
+    // The plugin floor, not a generic message: a generic one falls
     // through to the chat role during turn creation itself, which would
     // resolve (and cache) the DEFAULT test backend before this test
     // gets a chance to point MAIPAI_LLAMA_SERVER_URL at its own stub.

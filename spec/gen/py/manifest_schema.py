@@ -37,7 +37,7 @@ class Source(BaseModel):
 
 class PackageManifest(BaseModel):
     """
-    One manifest format for every package kind (skill, app, companion, integration, model, wakeword, voice, theme, module). See platform plan 5.1 and .github's docs/PACKAGES.md.
+    One manifest format for every package kind (plugin, app, companion, integration, model, wakeword, voice, theme, module). See platform plan 5.1 and .github's docs/PACKAGES.md.
     """
 
     model_config = ConfigDict(
@@ -48,7 +48,7 @@ class PackageManifest(BaseModel):
     )
     version: constr(pattern=r'^[0-9]+\.[0-9]+\.[0-9]+$')
     kind: Literal[
-        'skill',
+        'plugin',
         'app',
         'companion',
         'integration',
@@ -91,7 +91,7 @@ class PackageManifest(BaseModel):
     )
     consequential: bool = Field(
         ...,
-        description='Raises the routing bar (4.5): a consequential skill needs more confidence before it fires.',
+        description='Raises the routing bar (4.5): a consequential plugin needs more confidence before it fires.',
     )
     offline: Literal['full', 'degraded', 'unavailable'] = Field(
         ..., description='Stated offline behavior, required at bronze.'

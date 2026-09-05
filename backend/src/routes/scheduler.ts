@@ -1,7 +1,7 @@
 import { Hono, type Context } from "hono";
 import { requireAuth, requireRole } from "@/middleware/auth";
 import { listJobs, cancelJob, runDueJobs, type SchedulerOpResult } from "@/lib/scheduler";
-import { runSkill } from "@/lib/skills";
+import { runPlugin } from "@/lib/plugins";
 import type { AppEnv } from "@/types";
 
 export const schedulerRoutes = new Hono<AppEnv>();
@@ -26,5 +26,5 @@ schedulerRoutes.post("/jobs/:id/cancel", requireAuth, async (c) => {
 // actually running, this just lets an owner/admin (or a test) fire it
 // on demand without waiting.
 schedulerRoutes.post("/run-due", requireRole("owner", "admin"), async (c) => {
-  return c.json(await runDueJobs(runSkill));
+  return c.json(await runDueJobs(runPlugin));
 });

@@ -1,5 +1,5 @@
 {
-  "description": "Regression fixture (2026-09-05, found building the trivia skill): opentdb.com HTML-entity-encodes every response unconditionally (Jojo&#039;s stand). Proves interpolate() decodes entities in a value substituted from a real fetch response, in both format's text/speech and remember's text - not a trivia-specific fixture, a general interpreter behavior fixture.",
+  "description": "Regression fixture (2026-09-05, found building the trivia plugin): opentdb.com HTML-entity-encodes every response unconditionally (Jojo&#039;s stand). Proves interpolate() decodes entities in a value substituted from a real fetch response, in both format's text/speech and remember's text - not a trivia-specific fixture, a general interpreter behavior fixture.",
   "recipe": {
     "id": "html-entity-decoding-regression",
     "inputs": [],

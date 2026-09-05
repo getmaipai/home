@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://getmaipai.github.io/home/spec/schemas/result.schema.json",
-  "title": "SkillResult",
+  "title": "PluginResult",
   "description": "What a package's handle() (or a recipe's interpreted run) returns. See platform plan 4.9.",
   "type": "object",
   "additionalProperties": false,

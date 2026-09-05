@@ -381,7 +381,7 @@ export function ChatPage({ person }: ChatPageProps) {
           const finalText = setVisibleText(stripThinking(event.value.reply.text));
           const trailing = finalText.slice(spokenLength).trim();
           if (trailing) {
-            // Nothing was spoken incrementally yet (an immediate skill/
+            // Nothing was spoken incrementally yet (an immediate plugin/
             // safety reply, which never emits a "delta" at all, or a
             // short model reply that streamed as a single final flush):
             // the backend's own reply.speech is authoritative here,

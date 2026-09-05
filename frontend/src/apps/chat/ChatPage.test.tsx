@@ -29,7 +29,7 @@ function makeRow(id: string, replyText: string): ConversationTurnRow {
     userText: `question ${id}`,
     replyText,
     source: "model",
-    skillId: null,
+    pluginId: null,
     safetyFlagged: false,
     safetyAction: "allow",
     minorSpeaker: false,

@@ -2,7 +2,7 @@ import { describe, expect, test, beforeEach } from "bun:test";
 import { TestClient } from "./client";
 import { resetDb } from "./reset-db";
 import { __resetThrottleForTests } from "@/lib/secretThrottle";
-import { listPackageIds, loadPackage } from "@/lib/skills";
+import { listPackageIds, loadPackage } from "@/lib/plugins";
 
 beforeEach(() => {
   resetDb();
@@ -33,7 +33,7 @@ describe("the bundled recall package", () => {
   });
 });
 
-// The first real skill built on host.fetch (2026-09-05). No automated
+// The first real plugin built on host.fetch (2026-09-05). No automated
 // test here calls the real Open-Meteo API (bun:test stays deterministic
 // and offline per .github/CLAUDE.md's testing standards); the recipe's
 // own step logic - geocode, pick coordinates, forecast, pick temperature,
@@ -57,7 +57,7 @@ describe("the bundled weather package", () => {
   });
 });
 
-// The second real skill built on host.fetch (2026-09-05). Same posture as
+// The second real plugin built on host.fetch (2026-09-05). Same posture as
 // the weather package's own test: no automated test here calls the real
 // dictionaryapi.dev (bun:test stays deterministic and offline); the
 // recipe's own step logic has its own dedicated conformance fixture
@@ -65,7 +65,7 @@ describe("the bundled weather package", () => {
 // against the real API - including a real, live-observed transient
 // outage (two consecutive 15s timeouts, recovered less than a minute
 // later) that surfaced as the ordinary, graceful "That didn't work -
-// sorry" skill-error phrasing rather than a crash or a hang, real
+// sorry" plugin-error phrasing rather than a crash or a hang, real
 // confirmation that host.fetch's timeout and error handling work under
 // a genuine failure, not just a synthetic test one.
 describe("the bundled define package", () => {
@@ -80,13 +80,13 @@ describe("the bundled define package", () => {
   });
 });
 
-// The third real skill built on host.fetch (2026-09-05), and the first
+// The third real plugin built on host.fetch (2026-09-05), and the first
 // with zero inputs - no wildcard capture, `deterministicArgs()`'s
 // no-required-args path fires it with `{}`. Same posture as the other
 // two: no automated test calls the real icanhazdadjoke.com; the recipe's
 // own step logic has its own conformance fixture
 // (spec/fixtures/recipes/joke.json). Live-verified through both
-// runSkill directly and the full turn engine's real deterministic
+// runPlugin directly and the full turn engine's real deterministic
 // routing.
 describe("the bundled joke package", () => {
   test("is discoverable and its manifest + recipe validate against spec's schemas", () => {
@@ -101,7 +101,7 @@ describe("the bundled joke package", () => {
   });
 });
 
-// The fourth real skill built on host.fetch (2026-09-05). Same posture as
+// The fourth real plugin built on host.fetch (2026-09-05). Same posture as
 // the others: no automated test here calls the real opentdb.com; the
 // recipe's own step logic has its own conformance fixture
 // (spec/fixtures/recipes/trivia.json), using a real captured response that
@@ -135,24 +135,24 @@ async function child(owner: TestClient) {
   return client;
 }
 
-describe("GET /api/skills", () => {
+describe("GET /api/plugins", () => {
   test("requires auth", async () => {
-    const res = await new TestClient().get("/api/skills");
+    const res = await new TestClient().get("/api/plugins");
     expect(res.status).toBe(401);
   });
 
   test("lists the bundled remember package's manifest", async () => {
     const client = await owner();
-    const res = await client.get("/api/skills");
+    const res = await client.get("/api/plugins");
     const body = (await res.json()) as Array<{ id: string }>;
     expect(body.some((m) => m.id === "remember")).toBe(true);
   });
 });
 
-describe("POST /api/skills/remember/run", () => {
+describe("POST /api/plugins/remember/run", () => {
   test("runs the recipe end to end: replies, and the fact lands in the real memory store", async () => {
     const client = await owner();
-    const res = await client.post("/api/skills/remember/run", { fact: "the wifi password is on the fridge" });
+    const res = await client.post("/api/plugins/remember/run", { fact: "the wifi password is on the fridge" });
     expect(res.status).toBe(200);
     const body = (await res.json()) as { reply?: { text: string } };
     expect(body.reply?.text).toBe("Got it, I'll remember that.");
@@ -165,13 +165,13 @@ describe("POST /api/skills/remember/run", () => {
   test("a child, exactly at the min_role floor, can still run it", async () => {
     const ownerClient = await owner();
     const childClient = await child(ownerClient);
-    const res = await childClient.post("/api/skills/remember/run", { fact: "loses the second remote" });
+    const res = await childClient.post("/api/plugins/remember/run", { fact: "loses the second remote" });
     expect(res.status).toBe(200);
   });
 
   test("404s for an unknown package id", async () => {
     const client = await owner();
-    const res = await client.post("/api/skills/does-not-exist/run", { fact: "x" });
+    const res = await client.post("/api/plugins/does-not-exist/run", { fact: "x" });
     expect(res.status).toBe(404);
   });
 
@@ -181,7 +181,7 @@ describe("POST /api/skills/remember/run", () => {
   // back. This is the regression test for that fix.
   test("400s and writes nothing when a required input is missing", async () => {
     const client = await owner();
-    const res = await client.post("/api/skills/remember/run", {});
+    const res = await client.post("/api/plugins/remember/run", {});
     expect(res.status).toBe(400);
 
     const recall = await client.post("/api/memory/recall", { q: "fact" });
@@ -190,13 +190,13 @@ describe("POST /api/skills/remember/run", () => {
   });
 });
 
-describe("POST /api/skills/recall/run", () => {
+describe("POST /api/plugins/recall/run", () => {
   test("runs the recipe end to end: finds and speaks back a real remembered fact", async () => {
     const client = await owner();
-    const remembered = await client.post("/api/skills/remember/run", { fact: "the wifi password is on the fridge" });
+    const remembered = await client.post("/api/plugins/remember/run", { fact: "the wifi password is on the fridge" });
     expect(remembered.status).toBe(200);
 
-    const res = await client.post("/api/skills/recall/run", { topic: "wifi password" });
+    const res = await client.post("/api/plugins/recall/run", { topic: "wifi password" });
     expect(res.status).toBe(200);
     const body = (await res.json()) as { reply?: { text: string } };
     expect(body.reply?.text).toContain("wifi password");
@@ -204,7 +204,7 @@ describe("POST /api/skills/recall/run", () => {
 
   test("a plain, honest reply when nothing matches - not an empty string or an error", async () => {
     const client = await owner();
-    const res = await client.post("/api/skills/recall/run", { topic: "the moon landing" });
+    const res = await client.post("/api/plugins/recall/run", { topic: "the moon landing" });
     expect(res.status).toBe(200);
     const body = (await res.json()) as { reply?: { text: string } };
     expect(body.reply?.text).toBe("I don't remember anything about that.");
@@ -213,13 +213,13 @@ describe("POST /api/skills/recall/run", () => {
   test("a child, exactly at the min_role floor, can still run it", async () => {
     const ownerClient = await owner();
     const childClient = await child(ownerClient);
-    const res = await childClient.post("/api/skills/recall/run", { topic: "anything" });
+    const res = await childClient.post("/api/plugins/recall/run", { topic: "anything" });
     expect(res.status).toBe(200);
   });
 
   test("400s for a missing required input", async () => {
     const client = await owner();
-    const res = await client.post("/api/skills/recall/run", {});
+    const res = await client.post("/api/plugins/recall/run", {});
     expect(res.status).toBe(400);
   });
 });

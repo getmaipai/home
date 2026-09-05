@@ -1,10 +1,10 @@
 {
   "id": "trivia",
   "version": "0.1.0",
-  "kind": "skill",
+  "kind": "plugin",
   "category": "Fun",
   "display": "Trivia",
-  "description": "A random trivia question and its answer (2026-09-05, the fourth real skill built on host.fetch), via the free, no-key Open Trivia Database.",
+  "description": "A random trivia question and its answer (2026-09-05, the fourth real plugin built on host.fetch), via the free, no-key Open Trivia Database.",
   "author": "MaiPai",
   "license": "AGPL-3.0",
   "homepage": "https://github.com/getmaipai/home",

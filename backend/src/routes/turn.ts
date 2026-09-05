@@ -126,7 +126,7 @@ turnRoutes.post("/stream", requireAuth, async (c) => {
   }
 
   if (result.kind === "immediate") {
-    // A safety refusal or a skill reply is already complete, deterministic
+    // A safety refusal or a plugin reply is already complete, deterministic
     // text - one "done" event, no artificial trickle for something with
     // nothing left to stream.
     return new Response(ndjsonLine({ type: "done", value: result.value }), {

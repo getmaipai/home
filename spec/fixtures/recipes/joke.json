@@ -1,5 +1,5 @@
 {
-  "description": "The real backend/packages/joke/recipe.json (2026-09-05, the third real skill built on host.fetch): a single, zero-input fetch+pick chain against icanhazdadjoke.com, using a response shape captured from a real call.",
+  "description": "The real backend/packages/joke/recipe.json (2026-09-05, the third real plugin built on host.fetch): a single, zero-input fetch+pick chain against icanhazdadjoke.com, using a response shape captured from a real call.",
   "recipe": {
     "id": "joke",
     "inputs": [],

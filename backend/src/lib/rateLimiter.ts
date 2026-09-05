@@ -28,7 +28,7 @@ const buckets = new Map<string, Bucket>();
  * before waiting). refillPerSecond: the sustained steady-state rate
  * once the burst is spent - together these are "a page every few
  * seconds," not a fixed interval that can't absorb a normal short burst
- * (a recipe's own fetch+pick+format steps, or a person retrying a skill
+ * (a recipe's own fetch+pick+format steps, or a person retrying a plugin
  * once). */
 export interface TokenBucketOptions {
   capacity: number;

@@ -1,5 +1,5 @@
 {
-  "description": "format + schedule: the bedtime-reminder skill from spec/fixtures/records/manifest.example.json",
+  "description": "format + schedule: the bedtime-reminder plugin from spec/fixtures/records/manifest.example.json",
   "recipe": {
     "id": "bedtime-reminder",
     "inputs": [

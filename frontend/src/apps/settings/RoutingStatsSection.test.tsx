@@ -15,18 +15,18 @@ function stubFetch(body: unknown) {
 }
 
 describe("RoutingStatsSection", () => {
-  test("shows the fall-through rate as a percentage and per-skill counts", async () => {
+  test("shows the fall-through rate as a percentage and per-plugin counts", async () => {
     const originalFetch = globalThis.fetch;
     globalThis.fetch = stubFetch({
       total: 3,
-      skill: 2,
-      skillError: 0,
+      plugin: 2,
+      pluginError: 0,
       model: 1,
       safetyRefuse: 0,
       fallthroughRate: 1 / 3,
-      bySkill: [
-        { skillId: "remember", count: 1 },
-        { skillId: "recall", count: 1 },
+      byPlugin: [
+        { pluginId: "remember", count: 1 },
+        { pluginId: "recall", count: 1 },
       ],
     });
     try {
@@ -43,12 +43,12 @@ describe("RoutingStatsSection", () => {
     const originalFetch = globalThis.fetch;
     globalThis.fetch = stubFetch({
       total: 1,
-      skill: 0,
-      skillError: 0,
+      plugin: 0,
+      pluginError: 0,
       model: 0,
       safetyRefuse: 1,
       fallthroughRate: null,
-      bySkill: [],
+      byPlugin: [],
     });
     try {
       const { findByText, queryByText } = render(<RoutingStatsSection />);
@@ -64,12 +64,12 @@ describe("RoutingStatsSection", () => {
     const originalFetch = globalThis.fetch;
     globalThis.fetch = stubFetch({
       total: 0,
-      skill: 0,
-      skillError: 0,
+      plugin: 0,
+      pluginError: 0,
       model: 0,
       safetyRefuse: 0,
       fallthroughRate: null,
-      bySkill: [],
+      byPlugin: [],
     });
     try {
       const { findByText } = render(<RoutingStatsSection />);

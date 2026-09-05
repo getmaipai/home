@@ -36,7 +36,7 @@ class Ask(BaseModel):
     expects: str | None = None
 
 
-class SkillResult(BaseModel):
+class PluginResult(BaseModel):
     """
     What a package's handle() (or a recipe's interpreted run) returns. See platform plan 4.9.
     """

@@ -1,10 +1,10 @@
 {
   "id": "joke",
   "version": "0.1.0",
-  "kind": "skill",
+  "kind": "plugin",
   "category": "Fun",
   "display": "Joke",
-  "description": "A real dad joke on demand (2026-09-05, the third real skill built on host.fetch), via icanhazdadjoke.com's free, no-key, family-friendly API.",
+  "description": "A real dad joke on demand (2026-09-05, the third real plugin built on host.fetch), via icanhazdadjoke.com's free, no-key, family-friendly API.",
   "author": "MaiPai",
   "license": "AGPL-3.0",
   "homepage": "https://github.com/getmaipai/home",

@@ -1,10 +1,10 @@
 // The turn engine (platform plan 4.5): "One turn engine for every
-// surface... safety first; the deterministic skill floor; ...the model
+// surface... safety first; the deterministic plugin floor; ...the model
 // phrases, it does not judge." Full scope (six surfaces, prefix-cached
 // prompt assembly, tier 2 native tool calling, remote candidates,
 // `ask`-continuation) is documented in docs/dev.md as too large for one
 // slice, the same judgment 4.11 made; this is the narrow real slice: one
-// surface (`chat`), safety-first routing, a deterministic Tier 0 skill
+// surface (`chat`), safety-first routing, a deterministic Tier 0 plugin
 // floor (pattern match, or a keyword-overlap stand-in for routing.examples
 // the same way memory.ts stands in for real embeddings), and a
 // stable-first prompt handed to the real `chat` role as the fallback.
@@ -12,7 +12,7 @@
 // What's deferred, and why, is repeated at the point it matters below;
 // read docs/dev.md's turn engine section before extending this file.
 import { evaluateSafety } from "@/lib/safety";
-import { listPackageIds, loadPackage, meetsMinRole, runSkill } from "@/lib/skills";
+import { listPackageIds, loadPackage, meetsMinRole, runPlugin } from "@/lib/plugins";
 import { recall, type RecallMatch } from "@/lib/memory";
 import { complete, startCompleteStream, type LlmMessage } from "@/lib/llm";
 import { tokenize } from "@/lib/text";
@@ -41,7 +41,7 @@ export type Surface = "chat" | "overlay" | "pod" | "robot" | "tv" | "phone";
 const IMPLEMENTED_SURFACES: ReadonlySet<Surface> = new Set(["chat"]);
 
 /** Shared by TurnOpResult and TurnStreamResult: runTurn() and
- * runTurnStream() run the identical validation/safety/skill-floor logic
+ * runTurnStream() run the identical validation/safety/plugin-floor logic
  * (prepareTurn(), below) and so must report the identical error
  * vocabulary for the identical failure states - a code review
  * (2026-09-04) found the two had drifted into independently-hand-typed
@@ -93,10 +93,10 @@ interface LoadedManifest {
 }
 
 // One catalog scan per turn, shared by route() and buildSystemPrompt()'s
-// skills list, instead of each loading (readFileSync + JSON.parse + Zod
+// plugins list, instead of each loading (readFileSync + JSON.parse + Zod
 // safeParse) every bundled package's manifest independently (a review,
 // 2026-09-04, found the first cut doing this twice per turn, or three
-// times for a turn that also fires a skill). Sorted by id: `route()`'s
+// times for a turn that also fires a plugin). Sorted by id: `route()`'s
 // tie-break among equally-scored candidates depends on this order, so it
 // needs to be deterministic and independent of `readdirSync`'s
 // OS-dependent enumeration order, not just "whatever order the disk
@@ -111,7 +111,7 @@ function loadAllManifests(): LoadedManifest[] {
   return out;
 }
 
-function skillsListLine(loaded: LoadedManifest[]): string {
+function pluginsListLine(loaded: LoadedManifest[]): string {
   if (loaded.length === 0) return "";
   const lines = loaded.map(({ manifest: m }) => `- ${m.display}: ${m.description}`);
   return `\n\nThings this household has set up:\n${lines.join("\n")}`;
@@ -123,10 +123,10 @@ function skillsListLine(loaded: LoadedManifest[]): string {
 export const PROMPT_SYSTEM_CHAR_BUDGET = 4000;
 const MAX_MEMORY_SNIPPETS = 5;
 const MAX_MEMORY_SECTION_CHARS = 800;
-const MAX_SKILLS_SECTION_CHARS = 800;
+const MAX_PLUGINS_SECTION_CHARS = 800;
 
 // Stable-first (4.5): persona/rules/content-policy/standing-instructions
-// and the skills list are the same for every turn on this install, so they
+// and the plugins list are the same for every turn on this install, so they
 // sit first for prefix caching; the volatile zone (memory, then time)
 // comes after. 4.5 also names notes, methods, summary and context in the
 // volatile zone: notes/methods need persona/companion state (not built);
@@ -140,9 +140,9 @@ export function buildSystemPrompt(
   loaded: LoadedManifest[] = loadAllManifests(),
   persona: Persona = DEFAULT_PERSONA,
 ): string {
-  let skillsSection = skillsListLine(loaded);
-  if (skillsSection.length > MAX_SKILLS_SECTION_CHARS) {
-    skillsSection = skillsSection.slice(0, MAX_SKILLS_SECTION_CHARS) + "...";
+  let pluginsSection = pluginsListLine(loaded);
+  if (pluginsSection.length > MAX_PLUGINS_SECTION_CHARS) {
+    pluginsSection = pluginsSection.slice(0, MAX_PLUGINS_SECTION_CHARS) + "...";
   }
 
   let memorySection = "";
@@ -165,14 +165,14 @@ export function buildSystemPrompt(
   // never-truncated time line, keeps every truncation boundary inside
   // prose meant to be cut, never inside the one line a caller might parse.
   const registerFragment = composePersonaPrompt(persona) + " " + INFORMATION_HANDLING_POLICY;
-  let body = STABLE_SYSTEM_PREFIX + " " + registerFragment + skillsSection + memorySection;
+  let body = STABLE_SYSTEM_PREFIX + " " + registerFragment + pluginsSection + memorySection;
   const bodyBudget = Math.max(0, PROMPT_SYSTEM_CHAR_BUDGET - timeLine.length);
   if (body.length > bodyBudget) body = body.slice(0, bodyBudget);
 
   return body + timeLine;
 }
 
-// Tier 1 of the deterministic skill floor (4.5: "tier 1 example-embedding
+// Tier 1 of the deterministic plugin floor (4.5: "tier 1 example-embedding
 // match"). No embedder exists (4.11's embed role), so `routing.examples`
 // is matched by keyword overlap against the utterance instead, the same
 // documented-placeholder move memory.ts's recall() already made for
@@ -247,12 +247,12 @@ function deterministicArgs(args: unknown, captured: string | null): Record<strin
   return { [name]: captured };
 }
 
-interface RoutedSkill {
+interface RoutedPlugin {
   id: string;
   args: Record<string, unknown>;
 }
 
-// The deterministic skill floor (4.5). A `consequential` package (4.9's
+// The deterministic plugin floor (4.5). A `consequential` package (4.9's
 // manifest field) "raises the routing bar": it only fires on a real
 // pattern match, never on a fuzzy example score, however high. Among
 // everything that clears its own bar, the highest-scoring candidate wins
@@ -260,7 +260,7 @@ interface RoutedSkill {
 // matches goes to whichever package sorts first by id (loadAllManifests()'s
 // deterministic order), a deliberately simple tie-break, not a claim of
 // ranking by pattern specificity.
-function route(text: string, actor: PersonRow, loaded: LoadedManifest[]): RoutedSkill | null {
+function route(text: string, actor: PersonRow, loaded: LoadedManifest[]): RoutedPlugin | null {
   let best: { id: string; args: Record<string, unknown>; score: number } | null = null;
 
   for (const { id, manifest } of loaded) {
@@ -290,11 +290,11 @@ type PreparedTurn =
   | { kind: "immediate"; value: TurnValue }
   | { kind: "model"; messages: LlmMessage[]; safety: SafetyResult; crisisResources?: string };
 
-/** Safety-first routing and the deterministic skill floor (4.5), shared
+/** Safety-first routing and the deterministic plugin floor (4.5), shared
  * by runTurn() and runTurnStream(): identical for both, and the only real
  * difference between "a normal reply" and "a streamed one" is how the
  * `chat` role's own answer gets to the caller, never whether safety ran
- * or which skill matched. Only the `kind: "model"` branch differs between
+ * or which plugin matched. Only the `kind: "model"` branch differs between
  * the two callers - runTurn() awaits complete(), runTurnStream() awaits
  * startCompleteStream() instead. */
 async function prepareTurn(actor: PersonRow, text: string, loaded: LoadedManifest[]): Promise<PreparedTurn> {
@@ -313,29 +313,29 @@ async function prepareTurn(actor: PersonRow, text: string, loaded: LoadedManifes
 
   const routed = route(text, actor, loaded);
   if (routed) {
-    const result = await runSkill(routed.id, actor, routed.args);
+    const result = await runPlugin(routed.id, actor, routed.args);
     if (result.ok) {
       const reply = result.value.reply ?? { text: "Done." };
       return {
         kind: "immediate",
-        value: { reply, source: "skill", skill_id: routed.id, safety, crisis_resources: crisisResources },
+        value: { reply, source: "plugin", plugin_id: routed.id, safety, crisis_resources: crisisResources },
       };
     }
-    // A pre-filtered deterministic match failing at runSkill is a real, if
+    // A pre-filtered deterministic match failing at runPlugin is a real, if
     // rare, gap (a role change or a bad manifest between the router's
     // check and the run); surfaced as a plain apology rather than leaking
     // the internal error string to a household member, logged for anyone
-    // debugging it. `source: "skill_error"` on the returned `TurnValue` is
+    // debugging it. `source: "plugin_error"` on the returned `TurnValue` is
     // the intended way to detect it, not the top-level `ok` flag (a review,
     // 2026-09-04, flagged this could otherwise look indistinguishable from
     // a real success to a caller branching on `.ok` alone).
-    console.log(`[turn] skill ${routed.id} matched but failed to run: ${result.error}`);
+    console.log(`[turn] plugin ${routed.id} matched but failed to run: ${result.error}`);
     return {
       kind: "immediate",
       value: {
         reply: { text: "Sorry, I couldn't do that." },
-        source: "skill_error",
-        skill_id: routed.id,
+        source: "plugin_error",
+        plugin_id: routed.id,
         safety,
         crisis_resources: crisisResources,
       },
@@ -371,7 +371,7 @@ async function prepareTurn(actor: PersonRow, text: string, loaded: LoadedManifes
  * tied to the pre-variation wording once a real override ever exists.
  *
  * Rotation itself only ever runs for the two sources that can actually
- * PRODUCE one of these known constants (`skill`/`skill_error`) plus the
+ * PRODUCE one of these known constants (`plugin`/`plugin_error`) plus the
  * safety refusal's own dedicated path - never `model`. The same review
  * found the original version called `varyKnownConstant()` unconditionally
  * for every non-refusal source, so a model reply that happened to say
@@ -384,14 +384,14 @@ function finalizeReply(actor: PersonRow, value: TurnValue): TurnValue {
   const variedText =
     value.source === "safety_refuse"
       ? pickRefusalVariant(actor.id)
-      : value.source === "skill" || value.source === "skill_error"
+      : value.source === "plugin" || value.source === "plugin_error"
         ? varyKnownConstant(actor.id, text)
         : text;
   return { ...value, reply: { text: variedText, speech: normalizeForSpeech(variedText) } };
 }
 
 /** Runs one conversation turn end to end: safety first, then the
- * deterministic skill floor, then the chat model as the phrasing fallback. */
+ * deterministic plugin floor, then the chat model as the phrasing fallback. */
 export async function runTurn(
   actor: PersonRow,
   surface: Surface,
@@ -450,13 +450,13 @@ export type TurnStreamResult =
       finalize: (replyText: string) => TurnValue;
     };
 
-/** Same safety-first routing and deterministic skill floor as runTurn(),
+/** Same safety-first routing and deterministic plugin floor as runTurn(),
  * but the `chat` role's own answer streams token by token instead of
  * arriving as one blocking call - the real prerequisite for speaking a
  * reply sentence by sentence as it's generated (spec/voice/README.md's
  * "what Jesse actually meant by streamed"), not just a byte-chunked
  * `POST /api/tts`. `kind: "immediate"` still covers safety refusals and
- * skill replies: both are already complete, deterministic text with
+ * plugin replies: both are already complete, deterministic text with
  * nothing to gain from streaming, so they answer in one line instead of
  * pretending to trickle in. */
 export async function runTurnStream(
@@ -515,12 +515,12 @@ export async function runTurnStream(
 
 // Not built this pass, deliberately (see docs/dev.md):
 // - Every surface but `chat` (overlay, pod, robot, tv, phone).
-// - Tier 2 native tool calling: the model choosing and calling a skill
+// - Tier 2 native tool calling: the model choosing and calling a plugin
 //   when the deterministic floor doesn't clear (needs the chat contract's
 //   tools support, deferred in spec/llm/README.md, and a real engine).
-// - Remote candidates when no local skill clears the bar (no remote
+// - Remote candidates when no local plugin clears the bar (no remote
 //   backend configured anywhere in this repo).
-// - `ask`-continuation: SkillResult.ask exists in the spec (result.schema.json)
+// - `ask`-continuation: PluginResult.ask exists in the spec (result.schema.json)
 //   but the recipe interpreter has no step that ever produces one
 //   (runRecipe always sets `reply`, never `ask`), an interpreter-level gap
 //   the same shape as the scheduler's input-carrying gap and

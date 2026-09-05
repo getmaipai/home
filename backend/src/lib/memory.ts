@@ -1,6 +1,6 @@
 // The memory store (platform plan 4.4): "One store, the spec shape, with
 // judge, recall and maintenance." This is the core memory port; `remember`
-// and `forget` as ways of asking will be a default skill package calling
+// and `forget` as ways of asking will be a default plugin package calling
 // it once the package host (4.9) exists, but the store itself is core and
 // usable directly today, the same way the safety layer's HTTP route
 // stands in for the turn engine that doesn't exist yet (lib/safety.ts).

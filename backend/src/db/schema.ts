@@ -130,8 +130,8 @@ export const conversationTurns = sqliteTable("conversation_turns", {
   surface: text("surface").notNull(),
   userText: text("user_text").notNull(),
   replyText: text("reply_text").notNull(),
-  source: text("source").notNull(), // "safety_refuse" | "skill" | "skill_error" | "model"
-  skillId: text("skill_id"),
+  source: text("source").notNull(), // "safety_refuse" | "plugin" | "plugin_error" | "model"
+  pluginId: text("plugin_id"),
   safetyFlagged: integer("safety_flagged", { mode: "boolean" }).notNull().default(false),
   safetyAction: text("safety_action").notNull(), // "allow" | "allow_with_resources" | "refuse"
   // Captured at write time, not re-derived by joining to `people` later:
@@ -192,7 +192,7 @@ export const clonedVoices = sqliteTable("cloned_voices", {
 
 export const scheduledJobs = sqliteTable("scheduled_jobs", {
   id: text("id").primaryKey(),
-  kind: text("kind").notNull(), // "skill" | "core"
+  kind: text("kind").notNull(), // "plugin" | "core"
   packageId: text("package_id").notNull(),
   job: text("job").notNull(),
   personId: text("person_id").references(() => people.id),
