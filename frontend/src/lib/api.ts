@@ -221,6 +221,17 @@ export const api = {
       method: "POST",
       body: JSON.stringify({ path }),
     }),
+  // Dedicated routes, not the generic setSetting/resetSetting: saving or
+  // removing voice.hf_token has to restart the tts backend so the
+  // already-running pocket-tts process picks up the change (see
+  // routes/voice.ts's own comment on why the generic PUT route has no
+  // hook for that).
+  setHfToken: (token: string) =>
+    request<ResolvedSetting>("/api/voice/hf-token", {
+      method: "POST",
+      body: JSON.stringify({ token }),
+    }),
+  removeHfToken: () => request<ResolvedSetting>("/api/voice/hf-token/remove", { method: "POST" }),
   resetSetting: (scope: string, key: string) =>
     request<ResolvedSetting>("/api/settings/reset", {
       method: "POST",

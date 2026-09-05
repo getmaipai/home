@@ -24,6 +24,7 @@ import { promisify } from "node:util";
 const execFileAsync = promisify(execFile);
 import { PocketTtsClient } from "@maipai/spec/voice/ts/client.js";
 import { startStubTtsServer } from "@maipai/spec/voice/ts/stubServer.js";
+import { getHouseholdSettingValue } from "@/lib/settings";
 
 export type TtsBackendKind = "url" | "spawned" | "stub";
 
@@ -36,6 +37,16 @@ interface TtsBackend {
 
 let ttsBackend: TtsBackend | null = null;
 let startingPromise: Promise<TtsBackend> | null = null;
+// Bumped by restartTtsBackend()/__resetTtsSupervisorForTests(): a code
+// review (2026-09-04) found a real race those two functions left open -
+// clearing `ttsBackend`/`startingPromise` does nothing to the in-flight
+// startTtsBackend() promise a concurrent getTtsClient() call is still
+// awaiting, so that spawn's own `.then()` later re-installs the stale
+// (pre-restart) backend into `ttsBackend`, clobbering the fresh state a
+// restart exists to produce. Each spawn attempt captures the generation
+// it started under; if a restart bumped it before the spawn resolves,
+// the stale backend stops itself instead of being cached.
+let generation = 0;
 
 /** `proc` is checked on every poll: a code review (2026-09-04) found the
  * original version had no visibility into whether the spawn had already
@@ -72,9 +83,24 @@ async function commandExists(bin: string): Promise<boolean> {
 
 async function spawnPocketTts(): Promise<TtsBackend> {
   const port = Number(process.env.MAIPAI_TTS_PORT ?? 8793);
+  // Pocket TTS's own model loader (2026-09-04, voice cloning) tries the
+  // real, cloning-capable checkpoint FIRST and only falls back to the
+  // non-gated one if that download fails (confirmed by reading the
+  // installed package's own source: `has_voice_cloning` starts `True`,
+  // set `False` only in the `except` branch of a failed weights
+  // download) - so a household's own HF token, once they've accepted
+  // Kyutai's terms, is the ONLY thing standing between "the default
+  // fallback" and real cloning working. Passed as an env var for this
+  // one child process only, never persisted to a token cache file or
+  // logged - the same "handled only where needed" credential rule
+  // `voice.hf_token`'s own storage already follows.
+  const hfToken = getHouseholdSettingValue("voice.hf_token") as string;
+  const env: Record<string, string | undefined> = { ...process.env };
+  if (hfToken) env.HF_TOKEN = hfToken;
   const proc = Bun.spawn(["uvx", "pocket-tts", "serve", "--port", String(port), "--host", "127.0.0.1"], {
     stdout: "inherit",
     stderr: "inherit",
+    env,
   });
   const client = new PocketTtsClient(`http://127.0.0.1:${port}`);
   try {
@@ -112,13 +138,21 @@ async function startTtsBackend(): Promise<TtsBackend> {
 export async function getTtsClient(): Promise<PocketTtsClient> {
   if (ttsBackend) return ttsBackend.client;
   if (!startingPromise) {
+    const myGeneration = generation;
     startingPromise = startTtsBackend()
       .then((backend) => {
+        if (myGeneration !== generation) {
+          // A restart landed while this spawn was still starting; the
+          // restart already owns the cache, so this spawn is an orphan -
+          // stop it rather than let it clobber whatever comes next.
+          backend.stop();
+          return backend;
+        }
         ttsBackend = backend;
         return backend;
       })
       .catch((err) => {
-        startingPromise = null;
+        if (myGeneration === generation) startingPromise = null;
         throw err;
       });
   }
@@ -133,10 +167,26 @@ export function getTtsBackendKind(): TtsBackendKind | "starting" | "none" {
   return "none";
 }
 
+/** Stops whatever's running (if any) and clears the cache, so the next
+ * getTtsClient() call re-resolves from scratch - llmSupervisor.ts's own
+ * restartChatBackend() carries the identical shape for the identical
+ * reason (a fresh download/setting change should apply without a full
+ * process restart). Voice cloning's real trigger: a household saves or
+ * removes their `voice.hf_token` AFTER the tts engine already spawned
+ * with the old value (or none) - the already-running process never
+ * re-reads the setting on its own. */
+export async function restartTtsBackend(): Promise<void> {
+  generation++;
+  ttsBackend?.stop();
+  ttsBackend = null;
+  startingPromise = null;
+}
+
 /** Test-only: stop whatever backend is running and clear the cached
  * client, the same reset-between-test-files shape as
  * __resetLlmSupervisorForTests. */
 export function __resetTtsSupervisorForTests(): void {
+  generation++;
   ttsBackend?.stop();
   ttsBackend = null;
   startingPromise = null;

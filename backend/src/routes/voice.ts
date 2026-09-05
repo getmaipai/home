@@ -12,7 +12,8 @@ import {
   wakewordAssetPath,
 } from "@/lib/wakewordAssets";
 import { getVoiceCatalog, isVoiceCatalogPath } from "@/lib/voiceCatalog";
-import { setPersonTtsVoiceUnchecked } from "@/lib/settings";
+import { setPersonTtsVoiceUnchecked, setValue, resetValue } from "@/lib/settings";
+import { restartTtsBackend } from "@/lib/ttsSupervisor";
 import type { AppEnv } from "@/types";
 
 export const voiceRoutes = new Hono<AppEnv>();
@@ -89,5 +90,37 @@ voiceRoutes.post("/catalog/select", requireAuth, async (c) => {
   }
   const result = setPersonTtsVoiceUnchecked(actor, `hf://kyutai/tts-voices/${path}`);
   if (!result.ok) return c.json({ error: result.error }, result.status);
+  return c.json(result.value);
+});
+
+// voice.hf_token has a side effect the generic PUT /api/settings route has
+// no hook for: an already-running `pocket-tts serve` process read this
+// setting once, at spawn time, and never again, so a saved or removed
+// token only takes effect once ttsSupervisor.ts's cache is cleared and the
+// next call re-spawns. This mirrors chat.model_id's own dedicated-route
+// precedent (routes/host.ts's startSelectJob, for the identical reason -
+// a setting change here needs a spawn side effect a plain write can't
+// carry). setValue()/resetValue() are the same actor-gated functions the
+// generic route itself calls, so the owner/admin check for a household
+// key is enforced exactly once, in lib/settings.ts, not re-implemented
+// here as a second requireRole gate that could drift from it.
+voiceRoutes.post("/hf-token", requireAuth, async (c) => {
+  const actor = c.get("person");
+  const body = (await c.req.json().catch(() => ({}))) as { token?: string };
+  const token = typeof body.token === "string" ? body.token.trim() : "";
+  if (!token) {
+    return c.json({ error: "token is required" }, 400);
+  }
+  const result = setValue(actor, "household", "voice.hf_token", token);
+  if (!result.ok) return c.json({ error: result.error }, result.status);
+  await restartTtsBackend();
+  return c.json(result.value);
+});
+
+voiceRoutes.post("/hf-token/remove", requireAuth, async (c) => {
+  const actor = c.get("person");
+  const result = resetValue(actor, "household", "voice.hf_token");
+  if (!result.ok) return c.json({ error: result.error }, result.status);
+  await restartTtsBackend();
   return c.json(result.value);
 });

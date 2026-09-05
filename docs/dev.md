@@ -2541,6 +2541,65 @@ set. Full architecture: platform plan chapters 1, 3, and 4.
       the credential), and anything that would actually use this token
       today - nothing reads `voice.hf_token` yet beyond the settings
       store round-trip.
+    - **Follow-up, same night: the token now actually reaches Pocket
+      TTS.** Reading the installed `pocket-tts` package's own source
+      (`tts_model.py`) found `has_voice_cloning` starts `True` and is
+      only set `False` in the `except` branch of a failed weights
+      download - the model always attempts the real, cloning-capable
+      checkpoint first, and a household's own HF token (once they've
+      accepted Kyutai's terms) is the only thing standing between the
+      fallback and real cloning. `ttsSupervisor.ts`'s `spawnPocketTts()`
+      now reads `voice.hf_token` and passes it as `HF_TOKEN` to the
+      child process only, never persisted to a file or logged.
+    - **A dedicated write/remove flow, not the generic settings route**:
+      `POST /api/voice/hf-token` and `/api/voice/hf-token/remove`
+      (`requireAuth`, owner/admin enforced by `setValue`/`resetValue`'s
+      own `assertCanAccessScope` the same way the generic route already
+      does) call the new `restartTtsBackend()` after a successful write -
+      the same `chat.model_id`-bypasses-the-generic-route precedent
+      (`routes/host.ts`'s `startSelectJob`), for the identical reason: an
+      already-running `pocket-tts serve` process read this setting once,
+      at spawn time, and a saved-but-unapplied token would otherwise do
+      nothing until the process happened to restart some other way.
+      `HuggingFaceTokenSection.tsx` now calls these instead of
+      `setSetting`/`resetSetting`.
+    - **A real bug caught live, not by the test suite first**: clicking
+      Remove right after Save left a stale "Saved." message on screen
+      (`handleRemove` never cleared the `success` flag `handleSubmit` had
+      set). Found by driving the actual page, fixed, and a regression
+      test (`removing right after a save clears the stale 'Saved.'
+      message`) confirmed to fail against the pre-fix code before it
+      landed.
+    - Verified live end to end against the real household database: saved
+      a real-shaped fake token, confirmed the `hub.db` row is genuine
+      ciphertext, clicked Remove, confirmed the row is gone and the UI
+      shows no stale state.
+    - **Code review found a real race in the new `restartTtsBackend()`**:
+      it cleared the cache but did nothing about a `startTtsBackend()`
+      call already in flight (e.g. the household's first-ever TTS call
+      spawning without a token, while a token save races in) - that
+      spawn's own `.then()` would later re-install itself into
+      `ttsBackend`, silently undoing the restart. Fixed with a
+      `generation` counter: each spawn attempt captures the generation it
+      started under and stops itself instead of caching if a restart
+      bumped it first. Proven deterministically (`ttsSupervisor.test.ts`,
+      "a spawn already in flight when a restart lands never re-populates
+      the cache") via microtask ordering, no sleep needed - confirmed to
+      fail against the pre-fix code. The identical race pre-exists in
+      `llmSupervisor.ts`'s `restartChatBackend()` (same shape, copied from
+      it); not fixed here (wider blast radius, out of scope for this
+      slice) - filed as
+      [getmaipai/home#11](https://github.com/getmaipai/home/issues/11).
+    - The review also flagged a whitespace-only token passing validation
+      (`!token` is false for `" "`) - fixed by trimming before the
+      empty-check. And that the generic `PUT /api/settings` route can
+      still technically write `voice.hf_token` directly, skipping
+      `restartTtsBackend()` - left as a documented, accepted risk on the
+      same terms `chat.model_id` already carries for the identical shape
+      (`voiceKeys.ts`'s own comment): unreachable from the frontend
+      (`SettingField.tsx` never renders an editable control for
+      `secret: true`), and closing it generally needs a settings-key-level
+      side-effect hook that doesn't exist yet.
 
 ## API routes and `@hono/zod-openapi` (tracked debt)
 

@@ -1,5 +1,5 @@
 import { describe, expect, test, afterEach } from "bun:test";
-import { getTtsClient, getTtsBackendKind, waitForHealth, __resetTtsSupervisorForTests } from "@/lib/ttsSupervisor";
+import { getTtsClient, getTtsBackendKind, waitForHealth, restartTtsBackend, __resetTtsSupervisorForTests } from "@/lib/ttsSupervisor";
 import { PocketTtsClient } from "@maipai/spec/voice/ts/client.js";
 
 afterEach(() => {
@@ -46,6 +46,24 @@ describe("ttsSupervisor getTtsClient()", () => {
     } finally {
       stub.stop();
     }
+  });
+});
+
+describe("restartTtsBackend", () => {
+  // A code review (2026-09-04) found restartTtsBackend() cleared the
+  // cache but did nothing about a spawn already in flight: that spawn's
+  // own `.then()` would later re-install itself into `ttsBackend`,
+  // silently undoing the restart. No real timing/sleep needed to prove
+  // this deterministically - restartTtsBackend() has no `await` inside,
+  // so calling it (without awaiting) between starting and awaiting
+  // getTtsClient() runs its whole body synchronously, in the same turn,
+  // strictly before the in-flight spawn's `.then()` (always a
+  // microtask) gets a chance to fire.
+  test("a spawn already in flight when a restart lands never re-populates the cache", async () => {
+    const clientPromise = getTtsClient();
+    void restartTtsBackend();
+    await clientPromise;
+    expect(getTtsBackendKind()).toBe("none");
   });
 });
 

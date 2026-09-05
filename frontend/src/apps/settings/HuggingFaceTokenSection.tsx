@@ -16,9 +16,11 @@ const KEY = "voice.hf_token";
 // write, this just keeps the control itself from rendering for someone
 // who'd get a 403 clicking it.
 //
-// Still just the credential, not voice cloning itself (docs/dev.md):
-// nothing reads this token yet to actually clone a voice - that's the
-// next, separate piece of work.
+// Saves/removes go through the dedicated /api/voice/hf-token routes, not
+// the generic setSetting/resetSetting - the generic PUT route has no hook
+// to restart the already-running pocket-tts process afterward, and a
+// saved-but-not-yet-applied token would silently do nothing until the
+// backend happened to restart some other way (see routes/voice.ts).
 export function HuggingFaceTokenSection() {
   const [isSet, setIsSet] = useState<boolean | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -48,7 +50,7 @@ export function HuggingFaceTokenSection() {
     setSuccess(false);
     setSubmitting(true);
     try {
-      await api.setSetting("household", KEY, token);
+      await api.setHfToken(token);
       setToken("");
       setSuccess(true);
       await load();
@@ -62,8 +64,9 @@ export function HuggingFaceTokenSection() {
   async function handleRemove() {
     setSubmitting(true);
     setError(null);
+    setSuccess(false);
     try {
-      await api.resetSetting("household", KEY);
+      await api.removeHfToken();
       await load();
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Could not remove it.");

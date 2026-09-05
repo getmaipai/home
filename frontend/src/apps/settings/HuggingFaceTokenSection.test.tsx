@@ -22,16 +22,16 @@ function stubFetch(opts: { initiallySet: boolean; onSave?: (value: string) => vo
     if (url.includes("/api/settings?scope=household") && method === "GET") {
       return Promise.resolve(new Response(JSON.stringify([resolvedSetting(currentlySet)]), { status: 200 }));
     }
-    if (url.includes("/api/settings") && method === "PUT") {
-      const body = JSON.parse(String(init?.body ?? "{}")) as { value?: string };
-      currentlySet = true;
-      opts.onSave?.(body.value ?? "");
-      return Promise.resolve(new Response(JSON.stringify(resolvedSetting(true)), { status: 200 }));
-    }
-    if (url.includes("/api/settings/reset") && method === "POST") {
+    if (url.includes("/api/voice/hf-token/remove") && method === "POST") {
       currentlySet = false;
       opts.onRemove?.();
       return Promise.resolve(new Response(JSON.stringify(resolvedSetting(false)), { status: 200 }));
+    }
+    if (url.includes("/api/voice/hf-token") && method === "POST") {
+      const body = JSON.parse(String(init?.body ?? "{}")) as { token?: string };
+      currentlySet = true;
+      opts.onSave?.(body.token ?? "");
+      return Promise.resolve(new Response(JSON.stringify(resolvedSetting(true)), { status: 200 }));
     }
     return Promise.reject(new Error(`unstubbed fetch: ${url} ${method}`));
   }) as unknown as typeof fetch;
@@ -89,6 +89,23 @@ describe("HuggingFaceTokenSection", () => {
       fireEvent.click(await findByText("Remove"));
       await waitFor(() => expect(removed).toBe(true));
       await findByText("No token connected yet.");
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+  });
+
+  test("removing right after a save clears the stale 'Saved.' message", async () => {
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = stubFetch({ initiallySet: false });
+    try {
+      const { findByPlaceholderText, findByText, queryByText } = render(<HuggingFaceTokenSection />);
+      const input = await findByPlaceholderText("hf_...");
+      fireEvent.change(input, { target: { value: "hf_realtoken123" } });
+      fireEvent.click(await findByText("Save"));
+      await findByText("Saved.");
+      fireEvent.click(await findByText("Remove"));
+      await findByText("No token connected yet.");
+      expect(queryByText("Saved.")).toBeNull();
     } finally {
       globalThis.fetch = originalFetch;
     }

@@ -99,6 +99,18 @@ export const VOICE_SETTINGS_KEYS: SettingsKey[] = [
   // key to exercise lib/settings.ts's at-rest encryption
   // (lib/secrets.ts) - a plain text field otherwise, so this key holding
   // an actual bearer token is exactly what that encryption exists for.
+  //
+  // The generic PUT /api/settings route can still technically write this
+  // key directly (setValue() has no per-key side-effect hook), skipping
+  // the dedicated POST /api/voice/hf-token route's restartTtsBackend()
+  // call - a saved value would then sit unapplied until the tts backend
+  // happened to restart some other way. A code review (2026-09-04) flagged
+  // this; not closed, on the same accepted-risk terms `chat.model_id`
+  // already documents for the identical shape (aiKeys.ts): the frontend
+  // has no path to it (SettingField.tsx never renders an editable control
+  // for `secret: true`), and closing it generally needs a settings-key-
+  // level "side effect" hook that doesn't exist yet, a bigger change than
+  // this one credential warrants.
   SettingsKey.parse({
     key: "voice.hf_token",
     scope: "household",
