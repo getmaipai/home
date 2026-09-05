@@ -4,6 +4,7 @@ import { BackupsSection } from "@/apps/settings/BackupsSection";
 import { ModelsSection } from "@/apps/settings/ModelsSection";
 import { ChangeSecretSection } from "@/apps/settings/ChangeSecretSection";
 import { VoiceCatalogSection } from "@/apps/settings/VoiceCatalogSection";
+import { ClonedVoicesSection } from "@/apps/settings/ClonedVoicesSection";
 import { HuggingFaceTokenSection } from "@/apps/settings/HuggingFaceTokenSection";
 import { isOwnerOrAdminRole, type Roster } from "@/lib/api";
 
@@ -44,6 +45,11 @@ export function SettingsPage({ person, onPersonChange }: SettingsPageProps) {
         <SettingsRenderer scope="person" scopeValue={`person:${person.id}`} />
         <div className="flex flex-col gap-6 px-4 pb-4">
           <VoiceCatalogSection personId={person.id} />
+          {/* Not gated to owner/admin: selecting a voice (cloned or
+              catalog) is a person-scope choice any signed-in person
+              already makes for themselves via tts.voice_id. Upload and
+              delete carry their own, narrower checks (routes/voice.ts). */}
+          <ClonedVoicesSection person={person} />
           <ChangeSecretSection person={person} onChanged={onPersonChange} />
           {/* voice.hf_token is a household-scope key: writing it already
               requires owner/admin (lib/settings.ts's assertCanAccessScope),

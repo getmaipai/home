@@ -2591,8 +2591,8 @@ set. Full architecture: platform plan chapters 1, 3, and 4.
       slice) - filed as
       [getmaipai/home#11](https://github.com/getmaipai/home/issues/11).
     - The review also flagged a whitespace-only token passing validation
-      (`!token` is false for `" "`) - fixed by trimming before the
-      empty-check. And that the generic `PUT /api/settings` route can
+      (a truthy but blank string skips the empty check) - fixed by
+      trimming first. And that the generic `PUT /api/settings` route can
       still technically write `voice.hf_token` directly, skipping
       `restartTtsBackend()` - left as a documented, accepted risk on the
       same terms `chat.model_id` already carries for the identical shape
@@ -2600,6 +2600,109 @@ set. Full architecture: platform plan chapters 1, 3, and 4.
       (`SettingField.tsx` never renders an editable control for
       `secret: true`), and closing it generally needs a settings-key-level
       side-effect hook that doesn't exist yet.
+
+- [x] Voice cloning itself, the feature `voice.hf_token` was built for:
+      upload a real audio sample and use it as `tts.voice_id` the same
+      way a preset or community-catalog voice works. No
+      `pocket-tts export-voice` subprocess for v1: Pocket TTS's own
+      model-level `@lru_cache` on `_cached_get_state_for_audio_prompt`
+      already caches the computed audio-conditioning state per URL after
+      first use, so storing the file and serving it at a stable local
+      URL is sufficient - precomputing is a later optimization (faster
+      reload), not a correctness requirement. File upload only, not live
+      browser recording (explicitly scoped down for v1).
+    - **Backend**: `db/schema.ts`'s new `cloned_voices` table (schema
+      version 6, migration `0006_eager_sumo.sql`) - household-wide
+      visibility, the same "anyone can select any voice regardless of
+      who found it" shape the community catalog already has, not a
+      per-person library. `lib/clonedVoices.ts` owns save/list/delete/
+      lookup; `lib/id.ts`'s new `newClonedVoiceId()` is longer than this
+      file's other ids (16 chars, ~83 bits) since it doubles as a bearer
+      capability for the new unauthenticated `GET /api/voice/cloned/
+      :id/file` route - `pocket-tts serve`, a separate unauthenticated
+      process, has to fetch a voice by plain URL, so unguessable-but-
+      checked-against-the-real-table is the whole safety story there,
+      the same posture session tokens take for the identical problem.
+      `lib/selfUrl.ts` is new too: the URL written into `tts.voice_id`
+      on select has to point back at wherever THIS process is actually
+      listening (`PORT`), not an assumed constant.
+    - **Not backed up**: `paths.ts`'s new `clonedVoicesDir` is real,
+      irreplaceable family data (unlike the wake-word models sharing its
+      storage shape, which are re-downloadable), but `lib/backup.ts`'s
+      `VACUUM INTO` only ever covered `hub.db` - a real, documented gap,
+      not silently accepted.
+    - **Frontend**: `ClonedVoicesSection.tsx` (upload form, household-
+      wide list, "Use this voice"/"Delete"), ungated (any signed-in
+      person can already choose their own `tts.voice_id`) - delete is
+      gated per-item (creator or owner/admin) by the backend, not the
+      section itself.
+    - **A real bug caught live, not by the test suite first**: deleting
+      a voice someone currently had selected left their `tts.voice_id`
+      pointing at a URL that now 404s, with no obvious symptom until the
+      next TTS call quietly failed. Found by driving the actual upload →
+      select → delete flow in the browser and checking the real
+      `settings_values` row afterward. Fixed in `deleteClonedVoice()`
+      (a real delete of the matching `tts.voice_id` row, mirroring
+      `resetValue()`'s own "no history to preserve" reasoning) and
+      proven with two regression tests: one confirming the selecting
+      person's setting resets, one confirming an unrelated person's own
+      selection is untouched - both confirmed to fail against the
+      pre-fix code.
+    - Verified live end to end: uploaded a real WAV through the actual
+      running Settings page, confirmed the real file and DB row, selected
+      it and fetched the stored `tts.voice_id` URL directly with `curl`
+      (no cookie, matching how `pocket-tts` would) to confirm it serves
+      the identical bytes, confirmed a made-up id 404s, then deleted it
+      and confirmed the file, the DB row, and the dangling setting are
+      all really gone.
+    - **Deliberately deferred**: `pocket-tts export-voice` precomputation
+      (an optimization once real households have cloned voices to
+      measure reload time against), live browser recording (upload-only
+      for v1), and backing up `clonedVoicesDir`'s files (needs the
+      broader "back up files under `data/`, not just `hub.db`" work
+      already scoped for wake-word models too).
+    - **A second code review pass, before the first commit, found seven
+      more real issues**, all fixed:
+      - The route buffered a whole upload into memory (`parseBody()` +
+        `file.arrayBuffer()`) before `saveClonedVoice()`'s 20MB check
+        ever ran, on a route with no role gate. Fixed with Hono's
+        `bodyLimit` middleware (rejects from a `Content-Length` header
+        up front, or counts a streamed body chunk by chunk otherwise -
+        never buffers past the cap either way), proven with a real
+        21MB upload that a mocked test could not have caught.
+      - The dangling-`tts.voice_id`-cleanup this slice added compared
+        the FULL stored URL against a freshly-computed one - silently
+        stops matching if the hub restarts on a different `PORT`
+        between select and delete. Fixed by matching on the id's own
+        path segment (`/cloned/<id>/file`) instead of the whole URL,
+        via a new `lib/settings.ts` export, `clearMatchingValues()`
+        (a `LIKE` match, key + substring, no actor gate since the
+        caller is cleaning up potentially many OTHER people's settings,
+        not its own) - proven by selecting on one `PORT` and deleting
+        on another.
+      - `getClonedVoiceFile()` had no `existsSync` check, unlike
+        `deleteClonedVoice()`'s own guard a few lines away: a row
+        surviving without its file (a crash between the write and the
+        insert, or manual cleanup) would pass a nonexistent path
+        straight to `Bun.file()` instead of a clean 404.
+      - `saveClonedVoice()`'s file write and DB insert were two
+        independent steps with no cleanup on failure - a failed insert
+        orphaned the file forever. Fixed: the file is deleted if the
+        insert throws.
+      - `deleteClonedVoice()` unlinked the file before deleting the DB
+        row, with no `try`/`catch` - a locked or permission-denied file
+        threw and left the voice fully listed and selectable even
+        though the delete appeared to fail outright. Fixed by reordering
+        (DB row first) and wrapping the unlink: the worst case is now a
+        harmless orphan file (this directory already isn't backed up),
+        never a voice stuck unable to be removed.
+      - `ensureDir()` reimplemented `lib/backup.ts`'s own
+        `ensureBackupDir()` pattern verbatim. Extracted to
+        `lib/paths.ts`'s new `ensureDataDir()`, used by both now.
+      - The raw `settingsValues` delete duplicated ownership of a table
+        `lib/settings.ts` otherwise fully owns - closed by the
+        `clearMatchingValues()` export above, which also fixed the
+        `PORT` bug at the same time.
 
 ## API routes and `@hono/zod-openapi` (tracked debt)
 

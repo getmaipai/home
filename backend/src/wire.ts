@@ -73,6 +73,19 @@ export interface BackupInfo {
   bytes: number;
 }
 
+// Mirrors lib/clonedVoices.ts's ClonedVoiceInfo (hand-copied, same reason
+// as BackupInfo above: that file has "@/"-aliased imports of its own).
+// `creatorName` is a display convenience joined in by the lib, not a raw
+// DB column - the UI shows "uploaded by Sage", never a bare person id.
+export interface ClonedVoiceInfo {
+  id: string;
+  label: string;
+  creatorId: string;
+  creatorName: string;
+  bytes: number;
+  createdAt: string;
+}
+
 // Inlined rather than re-exported from lib/modelCatalog.ts (which uses
 // "@/"-aliased imports internally, unlike lib/hardware.ts above): the
 // same reason BackupInfo is a hand-copy of backup.ts's shape.

@@ -163,6 +163,33 @@ export const modelDownloadJobs = sqliteTable("model_download_jobs", {
   updatedAt: text("updated_at").notNull(),
 });
 
+// Cloned voices (2026-09-04, voice cloning): a household member's own
+// uploaded audio sample, usable as `tts.voice_id` the same way a preset
+// or community-catalog voice is - Pocket TTS's own `/tts` route accepts
+// any http(s) URL for `voice_url` (spec/voice/ts/client.ts), and a URL
+// back to this hub's own file-serving route (routes/voice.ts's
+// `GET /cloned/:id/file`) satisfies that unchanged, no new mechanism on
+// the Pocket TTS side needed. Household-wide visibility, not per-person:
+// the same "anyone can select any voice regardless of who found it"
+// shape the community catalog already has (VoiceCatalogSection.tsx) - a
+// shared family hub, not a personal library. Deletion is creator or
+// owner/admin only (routes/voice.ts). Not backed up (lib/backup.ts's
+// VACUUM INTO only covers hub.db, not files under data/) - a real,
+// documented gap, unlike the wake-word models this shares a storage
+// shape with: those are re-downloadable, a person's recorded voice is
+// not (docs/dev.md).
+export const clonedVoices = sqliteTable("cloned_voices", {
+  id: text("id").primaryKey(),
+  creatorId: text("creator_id")
+    .notNull()
+    .references(() => people.id),
+  label: text("label").notNull(),
+  fileName: text("file_name").notNull(),
+  mimeType: text("mime_type").notNull(),
+  bytes: integer("bytes").notNull(),
+  createdAt: text("created_at").notNull(),
+});
+
 export const scheduledJobs = sqliteTable("scheduled_jobs", {
   id: text("id").primaryKey(),
   kind: text("kind").notNull(), // "skill" | "core"

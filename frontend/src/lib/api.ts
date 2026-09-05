@@ -14,6 +14,7 @@ import type {
   ModelJob,
   EngineStatus,
   EngineStatsSample,
+  ClonedVoiceInfo,
 } from "@maipai/home-backend/src/wire";
 import { isOwnerOrAdminRole } from "@maipai/home-backend/src/wire";
 import { readTextLines } from "@maipai/spec/streaming/ts/lineReader.js";
@@ -37,7 +38,7 @@ export type Role = Person["role"];
 // depends on @maipai/home-backend as a workspace package for this;
 // re-export the types here so the rest of the frontend imports from one
 // place.
-export type { Roster, TurnValue, TurnStreamEvent, ConversationTurnRow, ResolvedSetting, BackupInfo, HardwareInfo, ModelFit, ModelJob, EngineStatus, EngineStatsSample };
+export type { Roster, TurnValue, TurnStreamEvent, ConversationTurnRow, ResolvedSetting, BackupInfo, HardwareInfo, ModelFit, ModelJob, EngineStatus, EngineStatsSample, ClonedVoiceInfo };
 export type { MemoryRecord };
 export { isOwnerOrAdminRole };
 // SettingsKey is spec-generated (@maipai/spec), not backend-only, so it's
@@ -232,6 +233,25 @@ export const api = {
       body: JSON.stringify({ token }),
     }),
   removeHfToken: () => request<ResolvedSetting>("/api/voice/hf-token/remove", { method: "POST" }),
+  // Voice cloning (2026-09-04): a household member's own uploaded audio
+  // sample. uploadClonedVoice sends real multipart/form-data, not JSON -
+  // request<T>() always JSON-encodes `body`, so this bypasses it and
+  // calls fetch directly, the same reason tests/client.ts grew its own
+  // postForm() alongside post().
+  clonedVoices: () => request<{ voices: ClonedVoiceInfo[] }>("/api/voice/cloned"),
+  uploadClonedVoice: async (file: File, label: string): Promise<ClonedVoiceInfo> => {
+    const form = new FormData();
+    form.set("label", label);
+    form.set("file", file);
+    const res = await fetch("/api/voice/cloned", { method: "POST", credentials: "include", body: form });
+    const body = await res.json().catch(() => ({}));
+    if (!res.ok) throw new ApiError(body.error ?? res.statusText, res.status, body.code);
+    return body as ClonedVoiceInfo;
+  },
+  selectClonedVoice: (id: string) =>
+    request<ResolvedSetting>(`/api/voice/cloned/${encodeURIComponent(id)}/select`, { method: "POST" }),
+  deleteClonedVoice: (id: string) =>
+    request<{ success: true }>(`/api/voice/cloned/${encodeURIComponent(id)}/delete`, { method: "POST" }),
   resetSetting: (scope: string, key: string) =>
     request<ResolvedSetting>("/api/settings/reset", {
       method: "POST",

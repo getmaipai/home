@@ -3,7 +3,7 @@
 // definitions from the registry (3.2) and from package manifests." This
 // is the store and its API; the generic renderer and the UI rules in
 // 6.5/6.6 are shell/kit work (chapter 6, not started).
-import { eq, and, isNull } from "drizzle-orm";
+import { eq, and, isNull, like } from "drizzle-orm";
 import { db } from "@/db";
 import { settingsValues, people } from "@/db/schema";
 import { getRegistry, getRegistryKey } from "@/lib/settingsRegistry";
@@ -365,4 +365,28 @@ export function resetValue(actor: PersonRow, scope: string, key: string): Settin
 
   db.delete(settingsValues).where(and(eq(settingsValues.scope, scope), eq(settingsValues.key, key))).run();
   return { ok: true, value: resolveForResponse(keyDef, keyDef.default, "default") };
+}
+
+/** Clears every stored value at `key`, across every scope, whose stored
+ * JSON text contains `valueContains` - for cross-cutting cleanup when
+ * something a setting referenced was deleted out from under it (a code
+ * review, 2026-09-04, found lib/clonedVoices.ts's deleteClonedVoice()
+ * reaching directly into `settingsValues` with a hand-rolled delete: no
+ * real invariant this table enforces on a DELETE - no HLC stamp, no
+ * encode/decode-for-storage, both write-only concerns - is skipped by
+ * that raw query, but a second such need would have re-hand-rolled it a
+ * second time). No actor gate, deliberately: unlike resetValue()/
+ * setValue(), the caller isn't resetting their OWN setting - it's
+ * cleaning up EVERY person's setting that referenced something that no
+ * longer exists, and the caller (deleteClonedVoice's own creator/owner-
+ * admin check) already owns the authorization for the thing being
+ * deleted, not for touching settings directly. A substring match (SQL
+ * LIKE), not an exact one, so the caller never needs to know or rebuild
+ * whatever host/port a value happened to be resolved against when it was
+ * first written - only that a stable, unique piece of it (a real id) is
+ * still there. */
+export function clearMatchingValues(key: string, valueContains: string): void {
+  db.delete(settingsValues)
+    .where(and(eq(settingsValues.key, key), like(settingsValues.value, `%${valueContains}%`)))
+    .run();
 }

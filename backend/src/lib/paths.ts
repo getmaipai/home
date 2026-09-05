@@ -1,4 +1,5 @@
 import { resolve } from "node:path";
+import { existsSync, mkdirSync } from "node:fs";
 
 // `data/` lives at the repo root (gitignored there, see .gitignore), the
 // same place the legacy hub kept it. `MAIPAI_DATA_DIR` overrides it, used by
@@ -35,3 +36,19 @@ export const enginesDir = resolve(dataDir, "engines");
 // download.ts's `WAKEWORD_DIR_REL`) since nothing about that path is
 // legacy-specific.
 export const wakewordDir = resolve(dataDir, "voice", "wakewords");
+
+// A household member's own uploaded voice-cloning sample (2026-09-04):
+// real, irreplaceable family data (unlike wakewordDir's re-downloadable
+// base models), but still not synced/backed up yet - lib/backup.ts's
+// VACUUM INTO only covers hub.db, a real documented gap (docs/dev.md).
+export const clonedVoicesDir = resolve(dataDir, "voice", "cloned");
+
+// Shared by lib/backup.ts's ensureBackupDir() and lib/clonedVoices.ts's
+// ensureDir(): a code review (2026-09-04) found both had independently
+// hand-rolled the identical "create it, owner-only, if it's not already
+// there" check. 0700: every directory under data/ (and its backupDir
+// sibling) holds real household data, never a mode a future caller
+// should have to remember to pass.
+export function ensureDataDir(dir: string): void {
+  if (!existsSync(dir)) mkdirSync(dir, { recursive: true, mode: 0o700 });
+}

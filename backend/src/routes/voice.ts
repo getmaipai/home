@@ -4,6 +4,7 @@
 // posture /api/llm/chat and /api/tts already take for their own
 // non-privileged reads.
 import { Hono } from "hono";
+import { bodyLimit } from "hono/body-limit";
 import { requireAuth } from "@/middleware/auth";
 import {
   WAKEWORD_ALL_ASSETS,
@@ -14,6 +15,15 @@ import {
 import { getVoiceCatalog, isVoiceCatalogPath } from "@/lib/voiceCatalog";
 import { setPersonTtsVoiceUnchecked, setValue, resetValue } from "@/lib/settings";
 import { restartTtsBackend } from "@/lib/ttsSupervisor";
+import {
+  listClonedVoices,
+  saveClonedVoice,
+  deleteClonedVoice,
+  getClonedVoiceFile,
+  clonedVoiceExists,
+  clonedVoiceUrl,
+  MAX_BYTES as MAX_CLONED_VOICE_BYTES,
+} from "@/lib/clonedVoices";
 import type { AppEnv } from "@/types";
 
 export const voiceRoutes = new Hono<AppEnv>();
@@ -123,4 +133,76 @@ voiceRoutes.post("/hf-token/remove", requireAuth, async (c) => {
   if (!result.ok) return c.json({ error: result.error }, result.status);
   await restartTtsBackend();
   return c.json(result.value);
+});
+
+// Voice cloning (2026-09-04, the follow-up to voice.hf_token): a real
+// audio sample a household member uploaded, not the community catalog's
+// pre-existing files. Household-wide list, same visibility as the
+// catalog's own selection - see lib/clonedVoices.ts's own comment.
+voiceRoutes.get("/cloned", requireAuth, async (c) => {
+  return c.json({ voices: listClonedVoices() });
+});
+
+// bodyLimit rejects an oversized request as its bytes arrive (checking
+// Content-Length up front when present, otherwise counting a streamed
+// body chunk by chunk) rather than after: a code review (2026-09-04)
+// found the route buffered the WHOLE upload into memory via parseBody()
+// and file.arrayBuffer() before saveClonedVoice()'s own 20MB check ever
+// ran, so that check only ever bounded disk usage, not the memory a
+// hostile or mistaken multi-gigabyte upload could consume first - and
+// this route has no role gate, so any signed-in household member
+// (including a child) could trigger it. A margin over the real cap
+// (multipart boundaries and the label field add a little overhead) so a
+// legitimate MAX_CLONED_VOICE_BYTES file is never rejected here only to
+// pass saveClonedVoice()'s own check moments later.
+voiceRoutes.post("/cloned", requireAuth, bodyLimit({ maxSize: MAX_CLONED_VOICE_BYTES + 64 * 1024 }), async (c) => {
+  const actor = c.get("person");
+  const body = await c.req.parseBody().catch(() => ({}) as Record<string, unknown>);
+  const file = body.file;
+  const label = body.label;
+  if (!(file instanceof File)) return c.json({ error: "an audio file is required" }, 400);
+  if (typeof label !== "string") return c.json({ error: "label is required" }, 400);
+  const bytes = new Uint8Array(await file.arrayBuffer());
+  const result = saveClonedVoice(actor, label, bytes, file.type);
+  if (!result.ok) return c.json({ error: result.error }, result.status);
+  return c.json(result.value, 201);
+});
+
+// Sets the signed-in person's OWN tts.voice_id, the same
+// setPersonTtsVoiceUnchecked() escape hatch the catalog's own select
+// route uses - `clonedVoiceExists()` is this route's equivalent of that
+// route's live-catalog check, proving the id is real before it's ever
+// written into a person's setting.
+voiceRoutes.post("/cloned/:id/select", requireAuth, async (c) => {
+  const actor = c.get("person");
+  const id = c.req.param("id");
+  if (!clonedVoiceExists(id)) return c.json({ error: `cloned voice not found: ${id}` }, 404);
+  const result = setPersonTtsVoiceUnchecked(actor, clonedVoiceUrl(id));
+  if (!result.ok) return c.json({ error: result.error }, result.status);
+  return c.json(result.value);
+});
+
+// POST, not DELETE: no route anywhere in this app uses the DELETE verb
+// (settings' own reset and memory's own archive are both POST too) -
+// matching that rather than introducing the one exception.
+voiceRoutes.post("/cloned/:id/delete", requireAuth, async (c) => {
+  const actor = c.get("person");
+  const id = c.req.param("id");
+  const result = deleteClonedVoice(actor, id);
+  if (!result.ok) return c.json({ error: result.error }, result.status);
+  return c.json({ success: true });
+});
+
+// Deliberately NOT behind requireAuth: `pocket-tts serve` is a separate,
+// unauthenticated local process that fetches `voice_url` by plain HTTP
+// GET (spec/voice/ts/client.ts) - it has no session cookie to send and
+// never will. Safe because `id` is an unguessable 83-bit token
+// (lib/id.ts's newClonedVoiceId()) checked against the real table, the
+// same "unguessable, not merely hidden" posture session tokens use for
+// the identical problem (an unauthenticated bearer of a capability).
+voiceRoutes.get("/cloned/:id/file", async (c) => {
+  const id = c.req.param("id");
+  const file = getClonedVoiceFile(id);
+  if (!file) return c.json({ error: "not found" }, 404);
+  return new Response(Bun.file(file.path), { headers: { "content-type": file.mimeType } });
 });

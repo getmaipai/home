@@ -32,6 +32,20 @@ export class TestClient {
     return this.request(path, { method: "POST", body: body ?? {}, headers });
   }
 
+  // For multipart uploads (voice.test.ts's cloned-voice tests): the plain
+  // request() above always JSON-encodes `body`, which would turn a real
+  // FormData into "{}". fetch sets its own multipart boundary header from
+  // the FormData instance, so this bypasses request()'s content-type
+  // logic entirely rather than trying to make one code path handle both.
+  async postForm(path: string, form: FormData): Promise<Response> {
+    const headers: Record<string, string> = {};
+    if (this.cookie) headers["cookie"] = this.cookie;
+    const res = await app.request(path, { method: "POST", headers, body: form });
+    const setCookie = res.headers.get("set-cookie");
+    if (setCookie) this.cookie = setCookie.split(";")[0]!;
+    return res;
+  }
+
   clearCookie(): void {
     this.cookie = null;
   }

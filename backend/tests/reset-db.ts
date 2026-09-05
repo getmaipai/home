@@ -8,6 +8,7 @@ import {
   settingsValues,
   scheduledJobs,
   conversationTurns,
+  clonedVoices,
 } from "@/db/schema";
 
 // All test files in one `bun test` run share the same imported `@/db`
@@ -26,6 +27,7 @@ import {
 // hidden dependency on what ran before it in the same process.
 export function resetDb(): void {
   db.delete(scheduledJobs).run();
+  db.delete(clonedVoices).run();
   db.delete(conversationTurns).run();
   db.delete(memoryRecords).run();
   db.delete(settingsValues).run();

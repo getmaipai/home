@@ -19,9 +19,9 @@
 // same "don't front-load speculative infra" call settings.ts's registry
 // made before a second key existed to prove it needed generality.
 import { randomBytes, createCipheriv, createDecipheriv } from "node:crypto";
-import { readFileSync, writeFileSync, mkdirSync, existsSync, unlinkSync, readdirSync, statSync } from "node:fs";
+import { readFileSync, writeFileSync, existsSync, unlinkSync, readdirSync, statSync } from "node:fs";
 import { join } from "node:path";
-import { backupDir } from "@/lib/paths";
+import { backupDir, ensureDataDir } from "@/lib/paths";
 import { getOrCreateHexKey } from "@/lib/keystore";
 import { randomSuffix } from "@/lib/id";
 import { sqlite } from "@/db";
@@ -31,10 +31,6 @@ const IV_BYTES = 12;
 const AUTH_TAG_BYTES = 16;
 const FILE_SUFFIX = ".db.enc";
 const SNAPSHOT_PREFIX = ".snapshot-";
-
-function ensureBackupDir(): void {
-  if (!existsSync(backupDir)) mkdirSync(backupDir, { recursive: true, mode: 0o700 });
-}
 
 // A snapshot is an UNENCRYPTED copy of the whole household database
 // (people, memories, conversations), a real plaintext-on-disk exposure
@@ -53,7 +49,7 @@ function ensureBackupDir(): void {
 // within seconds of the next backup rather than sitting until someone
 // happens to look.
 export function cleanupStaleSnapshots(): number {
-  ensureBackupDir();
+  ensureDataDir(backupDir);
   let removed = 0;
   for (const f of readdirSync(backupDir)) {
     if (f.startsWith(SNAPSHOT_PREFIX)) {
@@ -70,7 +66,7 @@ export function cleanupStaleSnapshots(): number {
  * inconsistent set of pages). A concurrent write mid-backup can never
  * produce a half-written snapshot this way. */
 function snapshotToTempFile(): string {
-  ensureBackupDir();
+  ensureDataDir(backupDir);
   const tmpPath = join(backupDir, `${SNAPSHOT_PREFIX}${Date.now()}-${randomSuffix(8)}.db`);
   sqlite.query("VACUUM INTO ?").run(tmpPath);
   return tmpPath;
@@ -133,7 +129,7 @@ function toInfo(filename: string): BackupInfo {
 /** Every real backup on the `local` target, newest first (2.5's `hub` and
  * `smb` targets don't exist: no robot or NAS integration built yet). */
 export function listBackups(): BackupInfo[] {
-  ensureBackupDir();
+  ensureDataDir(backupDir);
   return readdirSync(backupDir)
     .filter((f) => f.endsWith(FILE_SUFFIX))
     .map(toInfo)
