@@ -13,12 +13,29 @@ Rough size tags: **S** (a session or less), **M** (a real slice, days),
 ## Skills (Tier 0 catalog)
 
 Bundled today: `remember`, `recall`, `weather`, `define`, `joke`, `trivia`.
-Everything else a family would reach for is missing:
+Everything else a family would reach for is missing, prioritized on one
+rule Jesse set (2026-09-05): **a lookup (read a fact, return it) beats a
+control/playback action (make something happen in the world) whenever
+they'd otherwise tie.** A lookup is cheaper to build (no external device
+or playback surface to actually drive, no failure mode beyond "the fetch
+failed"), safer (no consequential-gate/permission story to design), and
+still real, standalone value on its own - "what song is this" is useful
+even before "now play it" exists. A control skill also usually *depends*
+on the lookup half existing first anyway (you search for the song before
+you can play it), so building lookups first is both lower-risk and
+frequently a hard prerequisite, not just a preference.
 
-- [ ] Reminders / timers (S-M) - `host.schedule` already exists; this is
-      mostly a recipe + manifest away.
-- [ ] Shopping / todo lists (M) - needs a new record type (a list, with
-      items), so a small spec addition, not just a recipe.
+**Priority 1 - lookups (read-only, no external device/playback surface):**
+
+- [ ] Web search (S-M) - already decided as "permitted and required"
+      (`docs/dev.md`'s 2026-09-04 tier 2 note); the highest-value single
+      lookup missing, and the one most likely to replace a real fall-
+      through-to-model miss today.
+- [ ] Music / media search (S-M) - "what's this song," "who sings X,"
+      show/movie info and availability. A pure lookup against a
+      catalog/metadata API - explicitly NOT the same skill as playing
+      anything (see Priority 3 below); this is the half of "media" that's
+      cheap, safe, and useful standalone.
 - [ ] Unit and currency conversion (S) - pure `host.fetch` shape, same
       pattern as `weather`/`define` (e.g. frankfurter.app for currency).
 - [ ] Math / quick calculation (S)
@@ -26,12 +43,29 @@ Everything else a family would reach for is missing:
       that doesn't, or accept the config step.
 - [ ] Sports scores (S-M)
 - [ ] Translation (S-M)
-- [ ] Media/playback control - built extensively in the legacy pre-rebuild
-      code (YouTube integration, cookie-jar auth, session keeper), none of
-      it migrated to this platform yet. Largest single skill area by
-      legacy scope.
+
+**Priority 2 - simple local actions (writes to our own data, no external
+device or service to control):**
+
+- [ ] Reminders / timers (S-M) - `host.schedule` already exists; this is
+      mostly a recipe + manifest away.
+- [ ] Shopping / todo lists (M) - needs a new record type (a list, with
+      items), so a small spec addition, not just a recipe.
+
+**Priority 3 - control / playback (drives a real external device or
+service; lower priority by the rule above, and often blocked on its own
+Priority-1 lookup landing first):**
+
+- [ ] Media playback control (L) - built extensively in the legacy
+      pre-rebuild code (YouTube integration, cookie-jar auth, session
+      keeper), none of it migrated to this platform yet. Largest single
+      skill area by legacy scope, and the one this session's own priority
+      rule pushes behind music/media search.
 - [ ] At least one skill that actually calls `home.call_service` (S) - the
       permission/security model shipped 2026-09-05; nothing uses it yet.
+      Lower priority than the lookups above by the same rule (it drives a
+      real device), though it's already unblocked (no missing
+      integration to build first, unlike media playback).
 
 ## Integrations
 
@@ -39,13 +73,21 @@ Everything else a family would reach for is missing:
       local-only entry within MaiPai vs. a real CalDAV/OAuth connection to
       an existing family calendar (Google/Apple/Nextcloud). See the
       compose-step sketch in `docs/dev.md`'s "Notes for later" for how this
-      feeds a real multi-source answer.
+      feeds a real multi-source answer. Reading a calendar is itself a
+      lookup (Priority 1 by the Skills rule above) - it's the auth/sync
+      plumbing underneath that makes this L-sized, not the read.
 - [ ] **Email search** (L) - doesn't exist. No permission-vocab slot fits
       inbox access yet; needs its own consent design (see `docs/dev.md`'s
-      2026-09-05 note on this) before any client code.
-- [ ] **Media/streaming integrations** (L) - see Skills above; this is the
-      integration half of that gap (auth, rate limiting, the "we are the
-      user" pacing rules already written into `getmaipai/.github`).
+      2026-09-05 note on this) before any client code. Same shape as
+      calendar: the search itself is a lookup, the sensitivity and auth
+      plumbing are what make it L.
+- [ ] **Media/streaming integrations** (L) - see Skills above; split the
+      same way: metadata/search auth (feeds the Priority-1 music/media
+      search skill, and is the smaller, safer half to build first) versus
+      real playback/streaming auth (feeds the Priority-3 playback-control
+      skill - rate limiting, the "we are the user" pacing rules already
+      written into `getmaipai/.github`, and meaningfully more integration
+      surface than a metadata lookup needs).
 - [ ] Verify Home Assistant against a real instance (S, blocked on
       hardware/access, not effort) - the client is built and mock-tested;
       never proven against the real thing.
