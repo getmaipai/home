@@ -46,3 +46,23 @@ export function canManagePeople(actorRole: Role): boolean {
 export function requiresSecret(role: Role): boolean {
   return isOwnerOrAdminRole(role);
 }
+
+
+/** Who each role may edit or delete. Mirrors
+ * backend/src/lib/personLifecycle.ts's MANAGEABLE_BY, which mirrors
+ * CREATABLE_BY above, and carries the same acknowledged duplication risk
+ * documented there: the server re-checks every one of these on every
+ * request, so the worst a wrong answer here can do is show or hide a
+ * button, never let something through. */
+export function canManagePerson(actorRole: Role, actorId: string, target: { id: string; role: Role }): boolean {
+  if (actorId === target.id) return true;
+  return creatableRoles(actorRole).includes(target.role);
+}
+
+/** Deleting is the same ladder as editing, minus yourself: the backend
+ * refuses "you cannot delete your own profile", so offering the button
+ * would only produce an error a person cannot act on. */
+export function canDeletePerson(actorRole: Role, actorId: string, target: { id: string; role: Role }): boolean {
+  if (actorId === target.id) return false;
+  return creatableRoles(actorRole).includes(target.role);
+}
