@@ -34,6 +34,7 @@ import { newNotificationId } from "@/lib/id";
 import { getSettingValueForPerson } from "@/lib/settings";
 import { sendTelegramMessage } from "@/lib/telegramChannel";
 import { isMinorRole } from "@/lib/safety";
+import { listActivePeople } from "@/lib/access";
 import { getNotificationType, type NotificationChannel, type NotificationType } from "@/lib/notificationTypes";
 import type { PersonRow } from "@/types";
 import type { Role } from "@/middleware/auth";
@@ -48,7 +49,7 @@ function resolveRecipients(type: NotificationType, personId?: string): PersonRow
     const row = db.select().from(people).where(and(eq(people.id, personId), isNull(people.deletedAt))).get();
     return row ? [row] : [];
   }
-  const everyone = db.select().from(people).where(isNull(people.deletedAt)).all();
+  const everyone = listActivePeople();
   if (type.audience === "household") return everyone;
   return everyone.filter((p) => !isMinorRole(p.role as Role)); // "adults"
 }

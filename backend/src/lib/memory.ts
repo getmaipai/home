@@ -25,10 +25,23 @@ export type MemoryOpResult<T> =
 // scope=self is "not shared with anyone" per the schema's own field
 // description: no read path, however privileged, ever returns it.
 // Sensitive household memories are owner/admin only.
-function canRead(actor: PersonRow, record: MemoryRecordRow, roleOf: Map<string, string>): boolean {
+//
+// `selfOnly` (session-a-intelligence.md step 2): the turn engine's own
+// recall() call sets this true so a person-scope record is only ever
+// readable when it's the ACTOR's own, regardless of role - never another
+// person's, even a child's, even though canAccessPerson() would
+// otherwise let an owner/admin through for the explicit parental-view
+// case below. A parent's own casual conversation must never surface a
+// child's private facts into the model's context; the explicit
+// parental view (list()/recall() called with no selfOnly, the real
+// "list route's parental view", unchanged) is the only sanctioned way
+// to read someone else's person-scope memories.
+function canRead(actor: PersonRow, record: MemoryRecordRow, roleOf: Map<string, string>, selfOnly = false): boolean {
   if (record.scope === "self") return false;
   if (record.scope === "person") {
-    return !!record.person && canAccessPerson(actor, record.person, roleOf);
+    if (!record.person) return false;
+    if (selfOnly) return record.person === actor.id;
+    return canAccessPerson(actor, record.person, roleOf);
   }
   // household
   if (!record.sensitive) return true;
@@ -160,6 +173,9 @@ export function remember(actor: PersonRow, input: RememberInput): MemoryOpResult
 export interface ListOptions {
   scope?: "household" | "person" | "self";
   person?: string;
+  /** See canRead()'s own comment: turn-scoped recall only, never the
+   * parental-view routes. */
+  selfOnly?: boolean;
 }
 
 /** Browsing: sorted, filtered, but never touches uses/last_used_at (that's
@@ -169,7 +185,7 @@ export function list(actor: PersonRow, opts: ListOptions = {}): MemoryRecord[] {
   let rows = db.select().from(memoryRecords).where(eq(memoryRecords.status, "active")).all();
   if (opts.scope) rows = rows.filter((r) => r.scope === opts.scope);
   if (opts.person) rows = rows.filter((r) => r.person === opts.person);
-  rows = rows.filter((r) => canRead(actor, r, roleOf));
+  rows = rows.filter((r) => canRead(actor, r, roleOf, opts.selfOnly));
   rows.sort((a, b) => {
     if (a.pinned !== b.pinned) return a.pinned ? -1 : 1;
     if (a.importance !== b.importance) return b.importance - a.importance;
@@ -205,12 +221,40 @@ function entityNameWords(entityText: string): Set<string> {
   return tokenize(firstClause);
 }
 
-export function recall(actor: PersonRow, query: string, opts: ListOptions = {}): RecallMatch[] {
+export interface RecallOptions extends ListOptions {
+  /** Whether recall() bumps uses/last_used_at on the records it returns.
+   * Defaults to true: the direct recall API and the `recall` package
+   * (a result someone actually asked for and got back counts as
+   * "used"). The turn engine (turnEngine.ts) sets this false and bumps
+   * only the subset that actually reached the model's prompt
+   * (buildSystemPrompt's MAX_MEMORY_SNIPPETS truncation), via the
+   * separate bumpUsage() below - not every scored candidate above
+   * recall()'s own top-20 cutoff (step 2: "uses/last_used_at bump only
+   * on records that reached the prompt"). */
+  bumpUsage?: boolean;
+}
+
+/** Shared by recall()'s default behavior and turnEngine.ts's own
+ * turn-scoped call: bumps uses/last_used_at on exactly these matches,
+ * mutating each match's own `record` in place so a caller that already
+ * has the returned array sees the updated count without a re-read. */
+function bumpMatchUsage(matches: RecallMatch[]): void {
+  const now = new Date().toISOString();
+  for (const match of matches) {
+    db.update(memoryRecords)
+      .set({ uses: match.record.uses + 1, lastUsedAt: now })
+      .where(eq(memoryRecords.id, match.record.id))
+      .run();
+    match.record = { ...match.record, uses: match.record.uses + 1, last_used_at: now };
+  }
+}
+
+export function recall(actor: PersonRow, query: string, opts: RecallOptions = {}): RecallMatch[] {
   const roleOf = rolesById();
   let rows = db.select().from(memoryRecords).where(eq(memoryRecords.status, "active")).all();
   if (opts.scope) rows = rows.filter((r) => r.scope === opts.scope);
   if (opts.person) rows = rows.filter((r) => r.person === opts.person);
-  rows = rows.filter((r) => canRead(actor, r, roleOf));
+  rows = rows.filter((r) => canRead(actor, r, roleOf, opts.selfOnly));
 
   const queryWords = tokenize(query);
 
@@ -235,17 +279,20 @@ export function recall(actor: PersonRow, query: string, opts: ListOptions = {}):
   const top = scored.slice(0, 20);
 
   // Recalling touches usage, per 4.4's store lifecycle; browsing (list())
-  // does not.
-  const now = new Date().toISOString();
-  for (const match of top) {
-    db.update(memoryRecords)
-      .set({ uses: match.record.uses + 1, lastUsedAt: now })
-      .where(eq(memoryRecords.id, match.record.id))
-      .run();
-    match.record = { ...match.record, uses: match.record.uses + 1, last_used_at: now };
-  }
+  // does not. Skippable (see RecallOptions.bumpUsage's own comment) for
+  // the turn engine's own call, which bumps only what actually reached
+  // the prompt instead of every one of these top 20 candidates.
+  if (opts.bumpUsage !== false) bumpMatchUsage(top);
 
   return top;
+}
+
+/** Exported for turnEngine.ts's turn-scoped call: bumps usage only on the
+ * records that actually reached the model's prompt (buildSystemPrompt's
+ * own MAX_MEMORY_SNIPPETS truncation of recall()'s top-20 candidates),
+ * per step 2's "bump only on records that reached the prompt." */
+export function bumpUsage(matches: RecallMatch[]): void {
+  bumpMatchUsage(matches);
 }
 
 function getWritable(actor: PersonRow, id: string): MemoryOpResult<MemoryRecordRow> {

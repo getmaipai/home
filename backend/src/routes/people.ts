@@ -12,6 +12,7 @@ import {
   type Role,
 } from "@/middleware/auth";
 import { toRoster, parsePersonCandidate, personToDbValues } from "@/lib/personShape";
+import { listActivePeople } from "@/lib/access";
 import { validateDisplayName, validateSecret } from "@/lib/validation";
 import {
   canManage,
@@ -29,8 +30,7 @@ export const peopleRoutes = new Hono<AppEnv>();
 // management). Full admin views (birthdate, credential status per person)
 // are a follow-up once the People page exists (6, 12).
 peopleRoutes.get("/", requireAuth, async (c) => {
-  const rows = db.select().from(people).where(isNull(people.deletedAt)).all();
-  return c.json(rows.map(toRoster));
+  return c.json(listActivePeople().map(toRoster));
 });
 
 // Who may create which role. Not spelled out verbatim in platform plan 4.2

@@ -56,8 +56,16 @@ export type ConversationOpResult<T> =
  * was made and refused, the same oversight motive `notify_parent` serves.
  * Called once per real runTurn() call; never for a TurnOpResult that
  * failed before producing a reply (unsupported_surface, invalid_input,
- * the model being unavailable) since nothing was actually said. */
-export function logTurn(actor: PersonRow, surface: Surface, userText: string, value: TurnValue): ConversationTurnRow {
+ * the model being unavailable) since nothing was actually said.
+ *
+ * `turnId`: turnEngine.ts's prepareTurn() generates this turn's own id
+ * up front now (step 2: the same id names both this row and the
+ * provenance of anything a plugin remembered mid-turn via the package
+ * host), so this uses that id when given rather than minting a second,
+ * different one - the two would otherwise silently diverge, breaking
+ * "provenance equals the turn id". Optional and self-generating so a
+ * caller with no turn in flight (a direct test, e.g.) still works. */
+export function logTurn(actor: PersonRow, surface: Surface, userText: string, value: TurnValue, turnId?: string): ConversationTurnRow {
   // Built and returned directly from the caller's own values, not
   // re-selected after the insert: a review (2026-09-04) pointed out every
   // field is already known here, the same "don't round-trip the database
@@ -65,7 +73,7 @@ export function logTurn(actor: PersonRow, surface: Surface, userText: string, va
   // lib/memory.ts's remember() already set. This runs once per completed
   // turn, the app's hottest path.
   const row: ConversationTurnRow = {
-    id: newConversationTurnId(),
+    id: turnId ?? newConversationTurnId(),
     personId: actor.id,
     surface,
     userText,

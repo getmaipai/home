@@ -9,7 +9,7 @@ import { remember } from "@/lib/memory";
 import { REFUSAL_FIRST, REFUSAL_REPEAT, REMEMBER_CONFIRM_VARIANTS } from "@/lib/replyVariation";
 import { resolvePersona } from "@/lib/persona";
 import { db } from "@/db";
-import { people, conversationTurns } from "@/db/schema";
+import { people, conversationTurns, memoryRecords } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import type { TurnStreamEvent } from "@/wire";
 import type { PersonRow } from "@/types";
@@ -264,7 +264,7 @@ describe("buildSystemPrompt() prompt budget", () => {
 
     const prompt = buildSystemPrompt(actor, "hi there", [{ record: created.value, score: 1 }]);
     expect(prompt.length).toBeLessThanOrEqual(PROMPT_SYSTEM_CHAR_BUDGET);
-    const timeLineMatch = prompt.match(/\n\nLocal time: \w+ \d{1,2}:\d{2} (am|pm)$/);
+    const timeLineMatch = prompt.match(/\n\nLocal time: [^\n]+\d{4}[^\n]+\d{1,2}:\d{2} (am|pm)$/);
     expect(timeLineMatch).not.toBeNull();
   });
 
@@ -318,10 +318,13 @@ describe("buildSystemPrompt() speaker and household (step 1)", () => {
     expect(prompt).toContain("age band teen");
   });
 
-  test("the local time line is locale-formatted, never raw ISO", () => {
+  test("the local time line is locale-formatted, never raw ISO, and keeps the full date", () => {
     const prompt = buildSystemPrompt(fakeActor(), "hi there", []);
     expect(prompt).not.toContain("T00:00:00");
-    expect(prompt).toMatch(/Local time: \w+ \d{1,2}:\d{2} (am|pm)/);
+    // A real regression: the first cut of this line dropped month/day/
+    // year entirely (weekday and time only), a genuine information loss
+    // versus the raw-ISO line it replaced.
+    expect(prompt).toMatch(/Local time: [^\n]+\d{4}[^\n]+\d{1,2}:\d{2} (am|pm)/);
   });
 
   test("the household block lists every active person's display name and role", async () => {
@@ -331,11 +334,17 @@ describe("buildSystemPrompt() speaker and household (step 1)", () => {
     expect(prompt).toContain(`- ${actor.displayName} (${actor.role})`);
   });
 
-  test("household.locale changes the formatted time's conventions, not just a raw pass-through", () => {
+  test("household.locale changes the formatted date's actual conventions, not just a raw pass-through", () => {
+    setHouseholdSettingValue("household.locale", "en-US");
+    const usPrompt = buildSystemPrompt(fakeActor(), "hi there", []);
     setHouseholdSettingValue("household.locale", "en-GB");
-    const prompt = buildSystemPrompt(fakeActor(), "hi there", []);
-    expect(prompt).toMatch(/Local time: \w+ \d{1,2}:\d{2} (am|pm)/);
-    expect(prompt).toContain("locale en-GB");
+    const gbPrompt = buildSystemPrompt(fakeActor(), "hi there", []);
+    // en-US orders "Month Day, Year"; en-GB orders "Day Month Year" - a
+    // real difference in the rendered text, not just two prompts that
+    // both happen to match the same generic regex.
+    expect(usPrompt).not.toBe(gbPrompt);
+    expect(gbPrompt).toMatch(/Local time: [^\n]+\d{4}[^\n]+\d{1,2}:\d{2} (am|pm)/);
+    expect(gbPrompt).toContain("locale en-GB");
   });
 });
 
@@ -699,5 +708,102 @@ describe("routes/turn.ts streamTurnEvents()", () => {
     };
     for await (const _event of streamTurnEvents(result, "test-person", 5)) void _event;
     expect(loggedText).toBe("Real reply only.");
+  });
+});
+
+describe("step 2: person-scoped remember and provenance (via the real remember plugin)", () => {
+  test("a first-person statement writes scope person, attributed to the actor", async () => {
+    const { actor } = await owner();
+    const result = await runTurn(actor, "chat", "remember I'm allergic to peanuts");
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.value.source).toBe("plugin");
+
+    const rows = db.select().from(memoryRecords).where(eq(memoryRecords.text, "I'm allergic to peanuts")).all();
+    expect(rows).toHaveLength(1);
+    expect(rows[0]!.scope).toBe("person");
+    expect(rows[0]!.person).toBe(actor.id);
+  });
+
+  test("a non-first-person statement still writes household scope, unchanged", async () => {
+    const { actor } = await owner();
+    const result = await runTurn(actor, "chat", "remember that Friday is pizza night");
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+
+    const rows = db.select().from(memoryRecords).where(eq(memoryRecords.text, "Friday is pizza night")).all();
+    expect(rows).toHaveLength(1);
+    expect(rows[0]!.scope).toBe("household");
+    expect(rows[0]!.person).toBeNull();
+  });
+
+  test("provenance: the written record's source is the exact conversation_turns id logged for this same turn", async () => {
+    const { actor } = await owner();
+    const result = await runTurn(actor, "chat", "remember my dentist appointment is next week");
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+
+    const memRows = db.select().from(memoryRecords).where(eq(memoryRecords.text, "my dentist appointment is next week")).all();
+    expect(memRows).toHaveLength(1);
+    const turnRows = db.select().from(conversationTurns).where(eq(conversationTurns.personId, actor.id)).all();
+    expect(turnRows).toHaveLength(1);
+    expect(memRows[0]!.source).toBe(turnRows[0]!.id);
+  });
+});
+
+describe("step 2: usage bumps only what reached the prompt", () => {
+  test("a real turn only bumps usage on the memories that actually made it into the prompt (MAX_MEMORY_SNIPPETS), not every scored candidate", async () => {
+    const { actor } = await owner();
+    const created: string[] = [];
+    for (let i = 0; i < 8; i++) {
+      const r = remember(actor, {
+        text: `the household calendar rule about board game night entry ${i}`,
+        category: "fact",
+        tier: "durable",
+        scope: "household",
+        source: "test",
+        importance: 0.5,
+      });
+      expect(r.ok).toBe(true);
+      if (r.ok) created.push(r.value.id);
+    }
+
+    const result = await runTurn(actor, "chat", "what's the household calendar rule about board game night");
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.value.source).toBe("model");
+
+    const rows = created.map((id) => db.select().from(memoryRecords).where(eq(memoryRecords.id, id)).get()!);
+    const bumped = rows.filter((r) => r.uses > 0);
+    expect(bumped.length).toBeGreaterThan(0);
+    expect(bumped.length).toBeLessThanOrEqual(5); // MAX_MEMORY_SNIPPETS
+  });
+
+  // A code review (2026-09-05) found the first cut of this fix still
+  // bumped usage on the top-5 candidates unconditionally, even though
+  // buildSystemPrompt's own MAX_MEMORY_SECTION_CHARS truncation (or the
+  // outer PROMPT_SYSTEM_CHAR_BUDGET slice) can cut a candidate's bullet
+  // line short, or drop it, before it ever reaches the model.
+  test("a top-ranked memory whose bullet line gets cut by the per-section budget is never bumped", async () => {
+    const { actor } = await owner();
+    const hugeText = "the household calendar rule about a very specific weekend event ".repeat(20).trim();
+    const created = remember(actor, {
+      text: hugeText,
+      category: "fact",
+      tier: "durable",
+      scope: "household",
+      source: "test",
+      importance: 0.9,
+    });
+    expect(created.ok).toBe(true);
+    if (!created.ok) return;
+
+    const result = await runTurn(actor, "chat", "what's the household calendar rule about a very specific weekend event");
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.value.source).toBe("model");
+
+    const row = db.select().from(memoryRecords).where(eq(memoryRecords.id, created.value.id)).get()!;
+    expect(row.uses).toBe(0);
   });
 });

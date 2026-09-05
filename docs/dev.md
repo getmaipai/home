@@ -5909,3 +5909,104 @@ site and test updated for the new `actor` parameter. Full suite green
 Not built this step (named, not silently skipped): presence ("who's
 home now" vs. "who lives here"), a real household timezone setting, and
 the wider `age_range` field question above.
+
+## Session A: step 2, scoped recall, person-scoped remember, provenance (2026-09-05)
+
+Fixes the audit's real privacy bug and gives `remember` a real
+first-person heuristic and turn provenance, no spec changes needed.
+
+- **Privacy fix**: `lib/memory.ts`'s `recall()`/`list()` gain
+  `ListOptions.selfOnly`. `canRead()` already let owner/admin read a
+  child's `scope: person` records (the sanctioned parental-view case,
+  `GET /api/memory?person=<id>`); the turn engine's own `recall()` call
+  was passing no `person` filter at all, so a parent's ordinary chat
+  could surface a child's private facts into the model's context, "the
+  prompt doesn't know who's talking" finding's sharper edge. `selfOnly:
+  true` makes `canRead()` require `record.person === actor.id` exactly
+  for person-scope, bypassing `canAccessPerson()`'s parent-of-child
+  allowance, while household-scope records are unaffected (still subject
+  to the existing sensitive/owner-admin gate). Only
+  `turnEngine.ts`'s call sets it; every route (`GET /api/memory`,
+  `POST /api/memory/recall`) is unchanged, so the real parental view
+  still works exactly as before.
+- **Usage bumping now matches what actually reached the prompt.**
+  `recall()` used to bump `uses`/`last_used_at` on all 20 of its own
+  top-scored candidates, while `buildSystemPrompt` only ever injects the
+  top `MAX_MEMORY_SNIPPETS` (5) - a real inflation bug the fork's
+  research pass flagged. `recall()` gains `bumpUsage` (default true,
+  preserving the existing direct-API/`recall`-package contract exactly);
+  the turn engine passes `bumpUsage: false` and calls the newly exported
+  `bumpUsage()` itself on only the slice that made it into the prompt.
+- **`remember` writes person scope for first-person statements.**
+  `backend/packages/remember/recipe.json`'s `remember` step no longer
+  hardcodes `scope: "household"` (recipe.schema.json already made
+  `scope` optional on that step); `packageHost.ts`'s `Host.memory.remember`
+  auto-detects when a recipe step leaves scope unset: a word-boundary
+  `\b(i|my|mine|me)\b` match (deliberately simple, matching `remember`'s
+  own routing.patterns capture, not a semantic check) writes `scope:
+  person, person: actor.id`, otherwise `household`, unchanged. An
+  explicit `scope` from any recipe step (the existing behavior for a
+  future package with its own reason to write household explicitly)
+  still always wins over auto-detection.
+- **Provenance is the turn id, not the package id.** `turnEngine.ts`'s
+  `prepareTurn()` now generates this turn's own id once, up front
+  (`lib/id.ts`'s `newConversationTurnId()`), before routing - the SAME
+  id flows to `runPlugin()` -> `createHost()` -> `Host.memory.remember`'s
+  `source`, and back to the caller so `runTurn()`/`runTurnStream()` log
+  the turn's own `conversation_turns` row under that identical id rather
+  than a second, different one `conversationHistory.ts`'s `logTurn()`
+  used to always mint itself. Checked `memory-record.schema.json`: no
+  second field exists for the package id (`additionalProperties: false`,
+  `source` is a single free-text field), so per the plan's own fallback
+  the package id is logged (`console.log`), not stored, when a turn id is
+  present; an invocation with no turn (a direct `POST
+  /api/plugins/:id/run`, a scheduled job) keeps the old
+  `package:<id>` fallback unchanged.
+
+Tests: 8 new in `tests/memory.test.ts` (`selfOnly` excludes a child's
+record a parent can otherwise read, `selfOnly` still returns the actor's
+own person-scope and household records, `bumpUsage:false` leaves `uses`
+untouched with a later explicit `bumpUsage()` call updating exactly the
+given matches, the default-true case matching the existing contract), 5
+new in `tests/packageHost.test.ts` (auto-detected person scope, the
+household fallback with no marker, an explicit scope always winning, the
+turn-id-as-source case, the package-id fallback with no turn), 3 new in
+`tests/turnEngine.test.ts` (a first-person `remember` writes person
+scope via the real plugin, a non-first-person one still writes
+household, provenance equals the real logged turn id) plus 1 proving a
+real turn with 8 matching household memories only bumps usage on
+`MAX_MEMORY_SNIPPETS` (5) or fewer of them. Full suite green (588
+backend). Manually verified against the running backend too: `remember
+I am allergic to shellfish` -> `scope: person`, `person` the actor's own
+id, `source` a real `turn-...` id matching the exact row in
+`conversation_turns`.
+
+**Code review caught six real issues in this step (plus step 1's
+already-committed diff, re-scanned in the same pass), all fixed here:**
+the first-person regex misattributed a THIRD PARTY's fact to the
+speaker's own private scope ("remember my sister's allergy is peanuts"
+wrote person-scope for the actor, not the sister - a `my <noun>'s`
+exclusion now catches the clearest case, full resolution is step 6's
+real judge's job); `bumpUsage()` still bumped the top-5 candidates even
+when `buildSystemPrompt`'s own section or body-budget truncation cut one
+short before it reached the model (now checks the exact bullet line
+survived, uncut, in the returned prompt string); the new local-time line
+dropped month/day/year entirely versus the old raw-ISO line (added the
+full date back, still locale-formatted, never raw ISO); `ageInYears()`
+had no NaN guard for a malformed birthdate (defense in depth - Person's
+generated schema already enforces `.date()`, so this shouldn't be
+reachable today, but a safety-adjacent signal silently defaulting to
+"adult" on bad input is exactly the failure mode to guard against
+anyway); step 1's own dev.md entry claimed `listActivePeople()` was
+"reused rather than a second copy" when `routes/people.ts` and
+`lib/notifications.ts` still had their own inline copies of the same
+query - now actually true, both call the shared function; and
+`Host.memory.remember`'s new turn-provenance log line used a raw
+`console.log` instead of the sanctioned, redacted `host.log()` path
+(extracted `logEntry()` so both the public `log()` method and this
+internal call share it). One review finding not fixed, by design: two
+extra DB reads per model-routed turn (`listActivePeople()`,
+`getHouseholdSettingValue`) - real, but negligible at household scale (a
+handful of people, one indexed settings lookup); adding a cache with
+real invalidation-on-write for a query costing microseconds isn't worth
+the complexity yet, revisit if it ever actually shows up in a profile.

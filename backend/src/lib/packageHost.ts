@@ -303,6 +303,37 @@ export async function homeCallService(domain: string, service: string, target: u
   await callHomeAssistantService(baseUrl, accessToken, domain, service, target, data);
 }
 
+// First-person scope detection for Host.memory.remember (step 2). A
+// leading "I"/"my"/"me"/"mine" is enough of a signal for a package like
+// `remember` whose whole job is transcribing what the speaker just said
+// about themself - deliberately simple, matched on the whole captured
+// utterance the same way `remember`'s own routing.patterns capture it
+// (word-boundary so "my" doesn't fire on "army", and "\bi\b" alone also
+// matches the leading "i" in "i'm"/"i've"/"i'll"/"i'd" since the
+// apostrophe is itself a word-boundary character).
+//
+// A code review (2026-09-05) found the plain version misattributed a
+// THIRD PARTY's fact to the speaker's own private scope: "remember my
+// sister's allergy is peanuts" contains "my", so it wrote scope person,
+// person actor.id - the sister's allergy, filed as the parent's own
+// secret, and (combined with turnEngine.ts's selfOnly recall) invisible
+// to everyone else including the sister. `my <word>'s` names someone
+// ELSE's thing, not the speaker's own, so it's stripped before the
+// first-person check runs; a bare "i"/"me"/"mine" elsewhere still
+// counts, which doesn't fully resolve every case ("my son's teacher
+// emailed me" still has a standalone "me") - fully resolving possessives
+// from the speaker's own point of view needs real language
+// understanding, exactly what step 6's real judge is for
+// ("possessives resolved from the speaker's view... never 'likely your
+// daughter'"). This deterministic floor only ever closes the clearest,
+// most common failure shape a household member's own phrasing produces.
+const THIRD_PARTY_POSSESSIVE = /\bmy\s+\S+'s\b/gi;
+const FIRST_PERSON_PATTERN = /\b(i|my|mine|me)\b/i;
+
+function isFirstPersonStatement(text: string): boolean {
+  return FIRST_PERSON_PATTERN.test(text.replace(THIRD_PARTY_POSSESSIVE, ""));
+}
+
 function mapWriteFailure(status: 400 | 403 | 404, error: string): never {
   // A permission check above only proves the manifest declared the
   // right permission; memory.remember/forget still apply their own
@@ -318,8 +349,18 @@ function mapWriteFailure(status: 400 | 403 | 404, error: string): never {
  * person and that package's declared manifest (permissions gate what it
  * may call; `id` stamps provenance on anything it writes and every log
  * line). `secrets`: values to redact from any log() call, e.g. a
- * credential a future integration call resolved for this invocation. */
-export function createHost(actor: PersonRow, manifest: PackageManifest, secrets: readonly string[] = []): Host {
+ * credential a future integration call resolved for this invocation.
+ * `turnId` (session-a-intelligence.md step 2): when this invocation is
+ * happening inside a conversation turn, `memory.remember()`'s own
+ * `source` becomes this turn id (the spec's canonical provenance:
+ * memory-record.schema.json's `source` is "e.g. a conversation turn
+ * id... a package id"), not `package:<id>` - the memory-record shape has
+ * no second field for the package id (checked: additionalProperties is
+ * false and nothing else fits), so the package is logged instead of
+ * stored when this happens. Omitted for an invocation with no turn (a
+ * direct plugin run, a scheduled job): `source` falls back to
+ * `package:<id>`, unchanged from before this parameter existed. */
+export function createHost(actor: PersonRow, manifest: PackageManifest, secrets: readonly string[] = [], turnId?: string): Host {
   const hasPermission = (perm: string) => manifest.permissions?.includes(perm) ?? false;
 
   function requirePermission(perm: string): void {
@@ -342,6 +383,22 @@ export function createHost(actor: PersonRow, manifest: PackageManifest, secrets:
   // the misleading copy has no live blast radius today.
   function notImplemented(method: string): never {
     throw new HostError("capability_missing", `host.${method} is not implemented on this host build yet, on any node (Tier 0 only, see docs/dev.md)`);
+  }
+
+  // Extracted from the returned `log()` method (below) so an internal
+  // caller within createHost() - memory.remember()'s own turn-provenance
+  // note, step 2 - can log through the same redacted, stamped path
+  // docs/ENGINEERING.md's logging standard requires, instead of a raw
+  // console.log a code review (2026-09-05) found bypassing it.
+  function logEntry(level: string, message: string, fields: Record<string, unknown> = {}): void {
+    const entry = {
+      level,
+      timestamp: new Date().toISOString(),
+      package: manifest.id,
+      message: redactSecrets(message, secrets),
+      fields: redactSecrets(fields, secrets),
+    };
+    console.log(JSON.stringify(entry));
   }
 
   return {
@@ -390,13 +447,27 @@ export function createHost(actor: PersonRow, manifest: PackageManifest, secrets:
       },
       remember(text: string, category?: string, scope?: string, person?: string | null): string {
         requirePermission("memory:write");
+        // Step 2: "the remember recipe writes scope: person and person:
+        // actor.id for first-person statements... and household
+        // otherwise." A recipe step that already declares its own scope
+        // (recall's own "recall" step, or a future package with a real
+        // reason to write household explicitly) is left alone; auto-
+        // detection only applies when the step left scope unset, which
+        // is what backend/packages/remember/recipe.json now does.
+        const resolvedScope = scope ?? (isFirstPersonStatement(text) ? "person" : "household");
+        const resolvedPerson = resolvedScope === "person" ? (person ?? actor.id) : undefined;
+        // Provenance: the turn id when this call is happening inside a
+        // turn (see createHost()'s own comment on why there's no second
+        // field for the package id), package id otherwise.
+        const source = turnId ?? `package:${manifest.id}`;
+        if (turnId) logEntry("info", "remembered via turn", { turn_id: turnId });
         const result = memory.remember(actor, {
           text,
           category: category ?? "fact",
           tier: "durable",
-          scope: scope ?? "household",
-          person: scope === "person" ? (person ?? undefined) : undefined,
-          source: `package:${manifest.id}`,
+          scope: resolvedScope,
+          person: resolvedPerson,
+          source,
           importance: 0.5,
         });
         if (!result.ok) mapWriteFailure(result.status, result.error);
@@ -474,16 +545,7 @@ export function createHost(actor: PersonRow, manifest: PackageManifest, secrets:
         return result.value.find((v) => v.key === key)?.value ?? null;
       },
     },
-    log(level: string, message: string, fields: Record<string, unknown> = {}): void {
-      const entry = {
-        level,
-        timestamp: new Date().toISOString(),
-        package: manifest.id,
-        message: redactSecrets(message, secrets),
-        fields: redactSecrets(fields, secrets),
-      };
-      console.log(JSON.stringify(entry));
-    },
+    log: logEntry,
     // Real, but with a known gap: neither this interface nor the
     // interpreter's schedule-step handling carries the recipe's input
     // scope through, so the job re-fires the package with an empty

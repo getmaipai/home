@@ -16,7 +16,8 @@ import { listPackageIds, loadPackage, meetsMinRole, runPlugin } from "@/lib/plug
 import { loadAllSkills, type LoadedSkill } from "@/lib/skills";
 import { matchCommand, runCommand } from "@/lib/commands";
 import { trigger } from "@/lib/notifications";
-import { recall, type RecallMatch } from "@/lib/memory";
+import { recall, bumpUsage, type RecallMatch } from "@/lib/memory";
+import { newConversationTurnId } from "@/lib/id";
 import { complete, startCompleteStream, type LlmMessage } from "@/lib/llm";
 import { tokenize } from "@/lib/text";
 import { logTurn } from "@/lib/conversationHistory";
@@ -66,9 +67,9 @@ export type TurnOpResult = { ok: true; value: TurnValue } | TurnFailure;
  * already fully, correctly rendered to the household. There is nothing
  * useful left to retract at that point; the failure is real but belongs
  * in the server log, not in the household's chat thread. */
-function logTurnSafely(actor: PersonRow, surface: Surface, userText: string, value: TurnValue): void {
+function logTurnSafely(actor: PersonRow, surface: Surface, userText: string, value: TurnValue, turnId: string): void {
   try {
-    logTurn(actor, surface, userText, value);
+    logTurn(actor, surface, userText, value, turnId);
   } catch (err) {
     console.error(`[turn] logTurn failed for an otherwise-successful turn: ${(err as Error).message}`);
   }
@@ -200,6 +201,13 @@ function ageBandFromRole(role: string): AgeBand {
 function speakerAgeBand(actor: PersonRow, now: Date): AgeBand {
   if (!actor.birthdate) return ageBandFromRole(actor.role);
   const years = ageInYears(actor.birthdate, now);
+  // A malformed birthdate (Person's generated Zod schema enforces
+  // `.date()` today, so this shouldn't be reachable through any real
+  // write path, but a code review, 2026-09-05, pointed out nothing here
+  // defended against it anyway) must never silently fall through to
+  // "adult": both `years < 13` and `years < 18` are false for NaN,
+  // which is exactly the wrong direction for a safety-adjacent signal.
+  if (Number.isNaN(years)) return ageBandFromRole(actor.role);
   if (years < 13) return "child";
   if (years < 18) return "teen";
   return "adult";
@@ -210,13 +218,18 @@ function speakerAgeBand(actor: PersonRow, now: Date): AgeBand {
 // timezone - correct for a self-hosted install physically in the house,
 // revisit once a real timezone key exists. `household.locale` only
 // changes date/time formatting conventions (4.5: "Friday 3:40 pm" style,
-// never raw ISO UTC"), not the zone itself.
+// never raw ISO UTC"), not the zone itself. Includes the full date (not
+// just weekday/time): a code review, 2026-09-05, found the first cut
+// dropped month/day/year entirely, a real loss versus the old raw-ISO
+// line it replaced (a question near a month or year boundary, or "what's
+// today's date", had nothing to go on) - "never raw ISO" doesn't mean
+// "never the date", just formatted for a person, not a machine.
 function formatLocalTime(now: Date, locale: string): string {
-  const weekday = new Intl.DateTimeFormat(locale, { weekday: "long" }).format(now);
+  const date = new Intl.DateTimeFormat(locale, { weekday: "long", month: "long", day: "numeric", year: "numeric" }).format(now);
   const time = new Intl.DateTimeFormat(locale, { hour: "numeric", minute: "2-digit", hour12: true })
     .format(now)
     .toLowerCase();
-  return `${weekday} ${time}`;
+  return `${date}, ${time}`;
 }
 
 function speakerLine(actor: PersonRow, locale: string, now: Date): string {
@@ -431,8 +444,8 @@ function route(text: string, actor: PersonRow, loaded: LoadedManifest[]): Routed
 }
 
 type PreparedTurn =
-  | { kind: "immediate"; value: TurnValue }
-  | { kind: "model"; messages: LlmMessage[]; safety: SafetyResult; crisisResources?: string };
+  | { kind: "immediate"; value: TurnValue; turnId: string }
+  | { kind: "model"; messages: LlmMessage[]; safety: SafetyResult; crisisResources?: string; turnId: string };
 
 /** Safety-first routing and the deterministic plugin floor (4.5), shared
  * by runTurn() and runTurnStream(): identical for both, and the only real
@@ -440,13 +453,23 @@ type PreparedTurn =
  * `chat` role's own answer gets to the caller, never whether safety ran
  * or which plugin matched. Only the `kind: "model"` branch differs between
  * the two callers - runTurn() awaits complete(), runTurnStream() awaits
- * startCompleteStream() instead. */
+ * startCompleteStream() instead.
+ *
+ * Generates this turn's own id once, up front (step 2's provenance rule:
+ * "createHost() receives the turn id... Host.memory.remember writes
+ * source: <turn id>"), and hands it to runPlugin() (so anything a plugin
+ * remembers via the package host is attributed to this exact turn) and
+ * back to the caller (so runTurn()/runTurnStream() log this turn's own
+ * conversation_turns row under that SAME id, not a second freshly-minted
+ * one) - one id names both "the turn that happened" and "the provenance
+ * of anything it wrote to memory". */
 async function prepareTurn(
   actor: PersonRow,
   text: string,
   loaded: LoadedManifest[],
   skills: LoadedSkill[] = loadAllSkills(),
 ): Promise<PreparedTurn> {
+  const turnId = newConversationTurnId();
   const safety = evaluateSafety(text, actor.role as Role);
   if (safety.notify_parent) {
     // SafetyResult's own schema comment named this exact wiring as a
@@ -472,7 +495,7 @@ async function prepareTurn(
     // now-deleted REFUSAL_TEXT constant here, which looked editable but
     // silently wasn't). Any placeholder works; this one just reads
     // sensibly in a debugger or log before finalizeReply runs.
-    return { kind: "immediate", value: { reply: { text: "I can't help with that." }, source: "safety_refuse", safety } };
+    return { kind: "immediate", value: { reply: { text: "I can't help with that." }, source: "safety_refuse", safety }, turnId };
   }
   const crisisResources = safety.action === "allow_with_resources" ? CRISIS_RESOURCES_TEXT : undefined;
 
@@ -496,6 +519,7 @@ async function prepareTurn(
           safety,
           crisis_resources: crisisResources,
         },
+        turnId,
       };
     }
     console.log(`[turn] command ${matchedCommand.id} matched but failed to run: ${result.error}`);
@@ -508,6 +532,7 @@ async function prepareTurn(
         safety,
         crisis_resources: crisisResources,
       },
+      turnId,
     };
   }
 
@@ -527,12 +552,13 @@ async function prepareTurn(
   const routedViaFuzzyMatch = routed && !routed.viaPattern;
   const bestSkillScore = routedViaFuzzyMatch ? (matchingSkills(text, skills)[0]?.score ?? 0) : 0;
   if (routed && !(routedViaFuzzyMatch && bestSkillScore > routed.score)) {
-    const result = await runPlugin(routed.id, actor, routed.args);
+    const result = await runPlugin(routed.id, actor, routed.args, turnId);
     if (result.ok) {
       const reply = result.value.reply ?? { text: "Done." };
       return {
         kind: "immediate",
         value: { reply, source: "plugin", plugin_id: routed.id, safety, crisis_resources: crisisResources },
+        turnId,
       };
     }
     // A pre-filtered deterministic match failing at runPlugin is a real, if
@@ -553,17 +579,38 @@ async function prepareTurn(
         safety,
         crisis_resources: crisisResources,
       },
+      turnId,
     };
   }
 
-  const memoryMatches = recall(actor, text);
+  // selfOnly: true (step 2's privacy fix) - a person's own turn must
+  // never surface another person's person-scope memories into the
+  // model's context, regardless of role. Usage is bumped separately
+  // below, only on the subset that actually reached the prompt, not on
+  // every one of recall()'s top-20 candidates.
+  const memoryMatches = recall(actor, text, { selfOnly: true, bumpUsage: false });
   const persona = resolvePersona(getPersonSettingValue(actor, "persona.active_id"));
   const systemPrompt = buildSystemPrompt(actor, text, memoryMatches, loaded, persona, skills);
+  // Bumping the top MAX_MEMORY_SNIPPETS candidates unconditionally was
+  // wrong (a code review, 2026-09-05): buildSystemPrompt's own
+  // MAX_MEMORY_SECTION_CHARS truncation, or the outer PROMPT_SYSTEM_CHAR_
+  // BUDGET slice, can still cut one of those candidates' bullet lines
+  // short (or drop it entirely) before it reaches the model, exactly the
+  // "bump only on records that reached the prompt" case this was meant
+  // to fix. Checking the bullet line's exact text is a real proof, not a
+  // re-derivation of buildSystemPrompt's own truncation math in a second
+  // place: a candidate only counts as "reached the prompt" if its whole,
+  // untruncated `- <text>` line is actually still there in the string the
+  // model was sent.
+  const actuallyInjected = memoryMatches
+    .slice(0, MAX_MEMORY_SNIPPETS)
+    .filter((m) => systemPrompt.includes(`- ${m.record.text}`));
+  bumpUsage(actuallyInjected);
   const messages: LlmMessage[] = [
     { role: "system", content: systemPrompt },
     { role: "user", content: text },
   ];
-  return { kind: "model", messages, safety, crisisResources };
+  return { kind: "model", messages, safety, crisisResources, turnId };
 }
 
 /** The one central point every TurnValue passes through before it reaches
@@ -650,7 +697,7 @@ export async function runTurn(
   }
 
   value = finalizeReply(actor, value);
-  logTurnSafely(actor, surface, text, value);
+  logTurnSafely(actor, surface, text, value, prepared.turnId);
   return { ok: true, value };
 }
 
@@ -702,7 +749,7 @@ export async function runTurnStream(
 
   if (prepared.kind === "immediate") {
     const value = finalizeReply(actor, prepared.value);
-    logTurnSafely(actor, surface, text, value);
+    logTurnSafely(actor, surface, text, value, prepared.turnId);
     return { ok: true, kind: "immediate", value };
   }
 
@@ -727,7 +774,7 @@ export async function runTurnStream(
         safety: prepared.safety,
         crisis_resources: prepared.crisisResources,
       });
-      logTurnSafely(actor, surface, text, value);
+      logTurnSafely(actor, surface, text, value, prepared.turnId);
       return value;
     },
   };

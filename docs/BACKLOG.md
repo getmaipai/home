@@ -404,15 +404,19 @@ into a conversation with someone who knows who is talking.
 
 **Memory**
 
-- [ ] **Scope recall to the actor** (S, privacy bug) - `recall()` in the
-      turn passes no scope, so an owner's turn injects every child's
-      person-scoped memories. Recall with the actor's own scope plus
-      household; the parental view on the list route stays.
-- [ ] **Person-scoped `remember`, with turn provenance** (S) - the recipe
-      always writes `scope: household`, importance 0.5, `source:
-      package:remember`. First-person facts write `scope: person`; the
-      host passes the turn id so provenance is the spec's "conversation
-      turn id", not the package name.
+- [x] **Scope recall to the actor** (S, privacy bug) - shipped, Session A
+      step 2 (2026-09-05): `recall()`'s new `selfOnly` option makes the
+      turn engine's own call require `record.person === actor.id` for
+      person-scope, regardless of role; the parental view
+      (`GET /api/memory`, `POST /api/memory/recall`) is unchanged.
+- [x] **Person-scoped `remember`, with turn provenance** (S) - shipped,
+      Session A step 2 (2026-09-05): a word-boundary first-person check
+      in `packageHost.ts`'s `Host.memory.remember` writes `scope: person,
+      person: actor.id` when the recipe step leaves scope unset (an
+      explicit scope from a recipe step still always wins); `source` is
+      the real turn id end to end (`turnEngine.ts` generates it once,
+      up front, and hands it to `createHost()` and to the turn's own
+      `conversation_turns` row).
 - [ ] **Wire `embed` into recall** (M) - the role runs (nomic-embed-text
       on a second llama-server) and its only caller is a diagnostic
       route. Store vectors (sqlite-vec, or a `memory_embeddings` table
@@ -462,9 +466,12 @@ into a conversation with someone who knows who is talking.
       results say to organize by when things happened, not when they
       were said. Spec change first, per the org rule; also listed under
       Portability because sync needs the clock.
-- [ ] **Schedule `runMaintenance`, fix usage inflation** (S) - decay
-      exists and is only reachable by a manual route; `recall` bumps
-      `uses` on 20 matches while 5 reach the model.
+- [ ] **Schedule `runMaintenance`** (S) - decay exists and is only
+      reachable by a manual route; step 5 wires it to the scheduler.
+      (The other half of this item, `recall` bumping `uses` on 20
+      matches while 5 reach the model, shipped in Session A step 2,
+      2026-09-05: `recall()`'s new `bumpUsage` option lets the turn
+      engine bump usage only on what actually reached the prompt.)
 - [ ] **Memory in the chat UI** (S-M) - a "memory updated" chip when the
       judge writes, per-message "remember this" and "forget this"
       actions, a per-person memory page that an adult can edit for a

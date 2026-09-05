@@ -6,6 +6,8 @@ import { __resetThrottleForTests } from "@/lib/secretThrottle";
 import { eq } from "drizzle-orm";
 import { db } from "@/db";
 import { memoryRecords, people } from "@/db/schema";
+import { recall, remember, bumpUsage } from "@/lib/memory";
+import type { PersonRow } from "@/types";
 
 beforeEach(() => {
   resetDb();
@@ -20,6 +22,15 @@ async function ownerAndChild() {
   const childClient = new TestClient();
   await childClient.post("/api/auth/select", { personId: child.id });
   return { owner, childClient, childId: child.id };
+}
+
+// Row-level counterpart of ownerAndChild() above: the direct recall()/
+// remember() unit tests below (step 2) need a real PersonRow, not just
+// an HTTP client.
+async function ownerAndChildRows(): Promise<{ ownerRow: PersonRow; childId: string }> {
+  const { childId } = await ownerAndChild();
+  const ownerRow = db.select().from(people).where(eq(people.displayName, "Sage")).get()!;
+  return { ownerRow, childId };
 }
 
 describe("POST /api/memory (remember)", () => {
@@ -612,5 +623,99 @@ describe("POST /api/memory/maintenance/run", () => {
     await owner.post("/api/memory/maintenance/run", {});
     const row = db.select().from(memoryRecords).where(eq(memoryRecords.id, record.id)).get()!;
     expect(row.status).toBe("active");
+  });
+});
+
+describe("recall() selfOnly (step 2 privacy fix)", () => {
+  test("a parent's turn-scoped recall never returns a child's person-scope memory, even though it's otherwise readable to them", async () => {
+    const { ownerRow, childId } = await ownerAndChildRows();
+    const created = remember(ownerRow, {
+      text: "the diary entry about a secret crush",
+      category: "identity",
+      tier: "durable",
+      scope: "person",
+      person: childId,
+      source: "test",
+      importance: 0.8,
+    });
+    expect(created.ok).toBe(true);
+
+    // Proves canAccessPerson() really would let the owner read this one
+    // (a parent viewing a child's, the sanctioned parental-view case):
+    // the fix is specifically about the turn's OWN call, not about
+    // owner/admin losing that access everywhere.
+    const unrestricted = recall(ownerRow, "secret crush diary entry", { bumpUsage: false });
+    expect(unrestricted.some((m) => m.record.person === childId)).toBe(true);
+
+    const turnScoped = recall(ownerRow, "secret crush diary entry", { selfOnly: true, bumpUsage: false });
+    expect(turnScoped.some((m) => m.record.person === childId)).toBe(false);
+  });
+
+  test("selfOnly still returns the actor's own person-scope and household records", async () => {
+    const { ownerRow } = await ownerAndChildRows();
+    remember(ownerRow, {
+      text: "my own allergy is peanuts",
+      category: "identity",
+      tier: "durable",
+      scope: "person",
+      person: ownerRow.id,
+      source: "test",
+      importance: 0.8,
+    });
+    remember(ownerRow, {
+      text: "household allergy note: peanuts are banned from the kitchen",
+      category: "fact",
+      tier: "durable",
+      scope: "household",
+      source: "test",
+      importance: 0.8,
+    });
+
+    const results = recall(ownerRow, "peanuts allergy", { selfOnly: true, bumpUsage: false });
+    expect(results.some((m) => m.record.scope === "person" && m.record.person === ownerRow.id)).toBe(true);
+    expect(results.some((m) => m.record.scope === "household")).toBe(true);
+  });
+});
+
+describe("recall() bumpUsage option (step 2: usage bumps only what reached the prompt)", () => {
+  test("bumpUsage: false leaves uses untouched; a later explicit bumpUsage() call updates exactly the given matches", async () => {
+    const { ownerRow } = await ownerAndChildRows();
+    const created = remember(ownerRow, {
+      text: "the calendar rule about pizza night",
+      category: "fact",
+      tier: "durable",
+      scope: "household",
+      source: "test",
+      importance: 0.5,
+    });
+    expect(created.ok).toBe(true);
+    if (!created.ok) return;
+
+    const matches = recall(ownerRow, "the calendar rule about pizza night", { bumpUsage: false });
+    expect(matches.length).toBeGreaterThan(0);
+    const before = db.select().from(memoryRecords).where(eq(memoryRecords.id, created.value.id)).get()!;
+    expect(before.uses).toBe(0);
+
+    bumpUsage(matches);
+    const after = db.select().from(memoryRecords).where(eq(memoryRecords.id, created.value.id)).get()!;
+    expect(after.uses).toBe(1);
+  });
+
+  test("bumpUsage defaults to true, matching the existing direct-recall contract", async () => {
+    const { ownerRow } = await ownerAndChildRows();
+    const created = remember(ownerRow, {
+      text: "the calendar rule about game night",
+      category: "fact",
+      tier: "durable",
+      scope: "household",
+      source: "test",
+      importance: 0.5,
+    });
+    expect(created.ok).toBe(true);
+    if (!created.ok) return;
+
+    recall(ownerRow, "the calendar rule about game night");
+    const after = db.select().from(memoryRecords).where(eq(memoryRecords.id, created.value.id)).get()!;
+    expect(after.uses).toBe(1);
   });
 });

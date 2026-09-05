@@ -91,8 +91,22 @@ export function meetsMinRole(actorRole: string, minRole: string): boolean {
  * person needs to invoke this package) and mapping a raised HostError to
  * the same result shape every other route returns. Async (2026-09-05):
  * runRecipe() itself now is, since a real host.fetch is real network I/O -
- * see recipe-interpreter.ts and packageHost.ts. */
-export async function runPlugin(id: string, actor: PersonRow, inputs: Record<string, unknown>): Promise<PluginOpResult<PluginResult>> {
+ * see recipe-interpreter.ts and packageHost.ts.
+ *
+ * `turnId`, when this run is happening inside a conversation turn
+ * (turnEngine.ts's prepareTurn(), the only real caller that has one),
+ * is handed straight to createHost() so anything the recipe remembers
+ * is attributed to that turn (step 2's provenance rule) rather than the
+ * package id. Omitted for every other caller (a direct
+ * `POST /api/plugins/:id/run`, a scheduled job): there's no turn to
+ * attribute to, so memory.remember() falls back to the package id, same
+ * as before this existed. */
+export async function runPlugin(
+  id: string,
+  actor: PersonRow,
+  inputs: Record<string, unknown>,
+  turnId?: string,
+): Promise<PluginOpResult<PluginResult>> {
   const loaded = loadPackage(id);
   if (!loaded.ok) return loaded;
   const { manifest, recipe } = loaded.value;
@@ -112,7 +126,7 @@ export async function runPlugin(id: string, actor: PersonRow, inputs: Record<str
       return { ok: false, status: 400, error: `${id}'s inputs failed validation: ${detail}` };
     }
   }
-  const host = createHost(actor, manifest);
+  const host = createHost(actor, manifest, [], turnId);
   try {
     return { ok: true, value: await runRecipe(recipe, inputs, host) };
   } catch (err) {
