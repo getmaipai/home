@@ -10,6 +10,37 @@ does.
 Rough size tags: **S** (a session or less), **M** (a real slice, days),
 **L** (a platform-level capability, needs its own design pass first).
 
+## Naming: rename `skill` to `plugin`, add real `skill` and `command`
+
+Decided (2026-09-05, full research and reasoning in `docs/dev.md`'s
+"Naming: skill, plugin, command, connector" entry) but NOT executed -
+flagged for Jesse's go-ahead before starting, since the blast radius
+crosses repos, not just files in this one.
+
+- [ ] **Rename the `skill` manifest kind to `plugin`** (M-L) - no
+      behavior change to `weather`/`joke`/`trivia`/`define`/`remember`/
+      `recall`, just the correct name for what they already are (a
+      self-contained, permissioned, installable capability - matching
+      Claude's actual Plugin shape, not its Skill shape). Touches the
+      manifest JSON schema (spec-level), `getmaipai/.github/docs/
+      PACKAGES.md` (org-wide, affects `bot` and `catalog` too), the
+      planned `catalog` repo layout, and every doc/test reference to
+      "skill" from tonight's work.
+- [ ] **Add a real `skill` kind: plain instructions, Claude-`SKILL.md`-
+      compatible, no independent permissions** (M) - genuinely new
+      capability. Composed into context the same way `lib/persona.ts`
+      already composes text fragments; safely user-authorable with no
+      review gate since it can't touch the network or any permission
+      surface.
+- [ ] **Formalize `command` as a first-class, user-creatable primitive**
+      (M) - the matching mechanism already exists (`routing.patterns` /
+      `matchPattern` in `turnEngine.ts`); this is a lighter-weight
+      authoring path so a household can define "when I say X, do Y"
+      without writing a full plugin, not new routing logic.
+- [x] **No new "connector" concept needed** - `integration` (an
+      existing manifest kind) already is one. Nothing to build here;
+      recorded so the question doesn't get re-asked.
+
 ## Skill standards (definition of done)
 
 Jesse's call (2026-09-05): this should rank alongside, not after, building

@@ -4700,3 +4700,78 @@ between now and when the relevant piece gets built.
   and sale that sole copyright ownership exists to keep open. Verify the
   actual model card before anyone builds on it. MediaPipe and OpenCV are
   clean either way.
+
+## Naming: skill, plugin, command, connector (2026-09-05)
+
+Jesse's prompt, verbatim in spirit: "we need to completely rename skills.
+Skills and commands should be things users can create - identical to how
+Claude names and defines them - we should even support Claude format.
+Plugins (I think) should be what we currently call skills... Claude also
+has a concept of connectors... I don't think we need that separation -
+unless that's what we call integrations... Research. Think. Decide."
+
+**Real research, not recalled knowledge** (this project's own standing
+rule from the persona work: search, don't assume). Anthropic's current
+shipped shape: a **Skill** is a `SKILL.md` file of plain instructions
+teaching a repeatable procedure - no permissions or network access of its
+own, it only shapes how the agent approaches a task with whatever tools
+the host already has. A **Connector** is a packaged MCP integration
+linking Claude to an outside system (Slack, Google Drive, GitHub) - real
+read/write access to that service. A **Plugin** bundles Skills +
+Connectors + slash commands + sub-agents into one installable unit
+(shipped with Claude Cowork, January 2026; a marketplace opened the
+following month; all three unified into one directory at claude.ai/
+directory by March 2026). OpenAI's terms are less stable - Plugins (2023)
+→ GPTs → Apps + Connectors (2025) → "Plugins" revived in July 2026 with
+yet another meaning (a directory holding skills, apps, and app
+templates) - which is itself a useful data point: even the two market
+leaders haven't converged on stable terminology, so there is no single
+"correct" standard to match here, only a rough shared shape worth
+learning from.
+
+**The mismatch, stated plainly.** What MaiPai calls a "skill" today
+(`weather`, `joke`, `trivia`, `define`, `remember`, `recall`) is not a
+Claude-shaped Skill at all - each one declares its own permissions, has
+its own network access via `host.fetch`, and runs its own executable
+recipe. That is structurally a **Plugin**: self-contained, installable,
+permissioned. Jesse's own instinct was right.
+
+**The decision:**
+
+1. **Rename today's `skill` manifest kind to `plugin`.** No behavior
+   change - `weather`/`joke`/`trivia`/`define`/`remember`/`recall` stay
+   exactly what they are, just correctly named.
+2. **Introduce a real `skill` kind, Claude-format-compatible**: plain
+   instruction text (a `SKILL.md`-shaped file), no independent permission
+   model, composed into context when relevant - the same mechanism
+   `lib/persona.ts`'s prompt composition already uses, just open-ended and
+   user-authorable instead of a fixed dimension set. This is a genuinely
+   new capability, and the one users can safely create entirely
+   themselves: it can't touch the network or any permission surface, so
+   it needs no review gate a full plugin would.
+3. **Formalize `command` as its own first-class, user-creatable
+   primitive.** The mechanism already exists - `routing.patterns` (exact/
+   wildcard trigger matching, `turnEngine.ts`'s `matchPattern`) - but it's
+   locked inside a full plugin's manifest today. A household member
+   defining "when I say X, do Y" without writing a plugin is the real
+   "commands users can create" ask, and the routing engine underneath it
+   needs no new logic, only a lighter-weight authoring path.
+4. **No new "connector" concept - `integration` already is one.** Jesse's
+   own instinct here was also right: MaiPai's manifest system already has
+   a distinct `integration` kind, which is exactly the Connector shape
+   (Home Assistant today; calendar/email/media once built). Renaming it
+   would only chase a buzzword - "integration" is plain English, already
+   load-bearing throughout tonight's work and the permission vocab
+   (`integration:<id>`), and no less precise than "connector."
+
+**Why this isn't executed yet.** The rename touches the manifest JSON
+schema (a spec-level change per "shared record changes go through the
+spec first"), `getmaipai/.github/docs/PACKAGES.md` - an ORG-WIDE
+standard governing `bot` and `catalog` too, not just `home` - the
+planned `catalog` repo directory layout, and every doc/test reference
+from tonight that used "skill" to mean what should now be "plugin." A
+real, multi-repo migration, not a documentation edit - flagged for
+Jesse's go-ahead rather than executed unprompted, the same posture taken
+tonight for anything crossing from "engineering judgment call" into
+"decision with a blast radius beyond this repo." Tracked as its own
+backlog item (`docs/BACKLOG.md`) rather than left only here.
