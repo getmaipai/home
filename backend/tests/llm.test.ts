@@ -3,7 +3,8 @@ import { TestClient } from "./client";
 import { resetDb } from "./reset-db";
 import { __resetThrottleForTests } from "@/lib/secretThrottle";
 import { __resetLlmSupervisorForTests } from "@/lib/llmSupervisor";
-import { complete, startCompleteStream } from "@/lib/llm";
+import { __resetEmbedSupervisorForTests } from "@/lib/embedSupervisor";
+import { complete, startCompleteStream, embed } from "@/lib/llm";
 
 beforeEach(() => {
   resetDb();
@@ -12,6 +13,7 @@ beforeEach(() => {
 
 afterEach(() => {
   __resetLlmSupervisorForTests();
+  __resetEmbedSupervisorForTests();
 });
 
 describe("lib/llm.ts complete()", () => {
@@ -115,6 +117,55 @@ describe("POST /api/llm/chat", () => {
     await owner.post("/api/auth/setup", { displayName: "Sage", secret: "correcthorse" });
 
     const res = await owner.post("/api/llm/chat", {});
+    expect(res.status).toBe(400);
+  });
+});
+
+describe("lib/llm.ts embed()", () => {
+  test("returns a real vector per input, from the stub backend (no engine configured in tests)", async () => {
+    const result = await embed(["hello", "world"]);
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.value.vectors.length).toBe(2);
+    expect(result.value.vectors[0]!.length).toBe(768);
+    expect(result.value.vectors[0]).not.toEqual(result.value.vectors[1]);
+  });
+
+  test("rejects an empty array", async () => {
+    const result = await embed([]);
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.code).toBe("invalid_input");
+  });
+
+  test("rejects an array containing an empty string", async () => {
+    const result = await embed(["hello", ""]);
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.code).toBe("invalid_input");
+  });
+});
+
+describe("POST /api/llm/embed", () => {
+  test("requires a signed-in person", async () => {
+    const res = await new TestClient().post("/api/llm/embed", { texts: ["hi"] });
+    expect(res.status).toBe(401);
+  });
+
+  test("returns real vectors for a signed-in person", async () => {
+    const owner = new TestClient();
+    await owner.post("/api/auth/setup", { displayName: "Sage", secret: "correcthorse" });
+
+    const res = await owner.post("/api/llm/embed", { texts: ["good morning", "good night"] });
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { vectors: number[][]; model: string };
+    expect(body.vectors.length).toBe(2);
+    expect(body.vectors[0]!.length).toBe(768);
+  });
+
+  test("returns 400 for a missing texts array", async () => {
+    const owner = new TestClient();
+    await owner.post("/api/auth/setup", { displayName: "Sage", secret: "correcthorse" });
+
+    const res = await owner.post("/api/llm/embed", {});
     expect(res.status).toBe(400);
   });
 });

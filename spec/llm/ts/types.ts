@@ -84,3 +84,24 @@ export interface ChatCompletionChunk {
   model: string;
   choices: ChatCompletionChunkChoice[];
 }
+
+// The embeddings half of "OpenAI-compatible HTTP for text and
+// embeddings" this file's own header names (4.11's `embed` role,
+// 2026-09-04). `input` matches OpenAI's own `/v1/embeddings` shape (a
+// single string or a batch); llama-server's real implementation accepts
+// both when started with `--embedding`.
+export interface EmbeddingRequest {
+  model: string;
+  input: string | string[];
+}
+
+export interface EmbeddingData {
+  index: number;
+  embedding: number[];
+}
+
+export interface EmbeddingResponse {
+  model: string;
+  data: EmbeddingData[];
+  usage?: ChatCompletionUsage;
+}

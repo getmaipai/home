@@ -140,13 +140,24 @@ export async function getTtsClient(): Promise<PocketTtsClient> {
   if (!startingPromise) {
     const myGeneration = generation;
     startingPromise = startTtsBackend()
-      .then((backend) => {
+      .then(async (backend): Promise<TtsBackend> => {
         if (myGeneration !== generation) {
-          // A restart landed while this spawn was still starting; the
-          // restart already owns the cache, so this spawn is an orphan -
-          // stop it rather than let it clobber whatever comes next.
+          // A restart landed while this spawn was still starting.
+          // Simply returning the (now-stopped) `backend` here would be a
+          // second bug, not a fix: a code review (2026-09-04, found while
+          // building embedSupervisor.ts's identical shape) noticed the
+          // ORIGINAL caller of getTtsClient() already committed to
+          // `await`ing exactly this promise before the restart happened
+          // (a real, live path here - saving or removing voice.hf_token
+          // calls restartTtsBackend() while an earlier /api/tts request
+          // might still be waiting on the household's first-ever spawn),
+          // so it would still receive `.client` bound to the process just
+          // stopped above - a client to a dead server, not a retry.
+          // Recursing into getTtsClient() instead means that caller
+          // transparently lands on whatever the CURRENT generation
+          // resolves to.
           backend.stop();
-          return backend;
+          return { ...backend, client: await getTtsClient() };
         }
         ttsBackend = backend;
         return backend;

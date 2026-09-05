@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import { requireAuth } from "@/middleware/auth";
-import { complete, type LlmMessage, type LlmRole } from "@/lib/llm";
+import { complete, embed, type LlmMessage, type LlmRole } from "@/lib/llm";
 import type { AppEnv } from "@/types";
 
 export const llmRoutes = new Hono<AppEnv>();
@@ -23,6 +23,20 @@ llmRoutes.post("/chat", requireAuth, async (c) => {
     temperature: body.temperature,
     max_tokens: body.max_tokens,
   });
+  if (!result.ok) {
+    return c.json({ error: result.error, code: result.code }, result.status);
+  }
+  return c.json(result.value);
+});
+
+// Same posture as /chat above: any signed-in person, no role gate - the
+// same "provisional real caller ahead of the turn engine" reasoning
+// applies (nothing internal calls the embed role yet either; memory.ts's
+// real vector recall and turnEngine.ts's routing match are both later,
+// separate slices this one deliberately doesn't wire up).
+llmRoutes.post("/embed", requireAuth, async (c) => {
+  const body = (await c.req.json().catch(() => ({}))) as { texts?: string[] };
+  const result = await embed(body.texts ?? []);
   if (!result.ok) {
     return c.json({ error: result.error, code: result.code }, result.status);
   }

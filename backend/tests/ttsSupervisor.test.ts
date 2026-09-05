@@ -59,11 +59,24 @@ describe("restartTtsBackend", () => {
   // getTtsClient() runs its whole body synchronously, in the same turn,
   // strictly before the in-flight spawn's `.then()` (always a
   // microtask) gets a chance to fire.
-  test("a spawn already in flight when a restart lands never re-populates the cache", async () => {
+  //
+  // A SECOND review pass (2026-09-04, found while building
+  // embedSupervisor.ts's identical shape) caught that the first fix
+  // wasn't quite enough: the CALLER who started that in-flight spawn -
+  // a real, live path here, since saving or removing voice.hf_token
+  // calls restartTtsBackend() while an earlier /api/tts request might
+  // still be waiting on the household's first-ever spawn - already
+  // committed to awaiting its own promise before the restart landed, so
+  // it would still receive `.client` bound to the backend just stopped,
+  // a dead client rather than a retry. Checking `health()` on the
+  // client THIS call actually receives is what distinguishes "cache
+  // stays clean" from "the caller also gets something that works": a
+  // stopped stub server's `/health` fails.
+  test("a caller mid-flight when a restart lands still gets back a real, live client", async () => {
     const clientPromise = getTtsClient();
     void restartTtsBackend();
-    await clientPromise;
-    expect(getTtsBackendKind()).toBe("none");
+    const client = await clientPromise;
+    expect(await client.health()).toBe(true);
   });
 });
 

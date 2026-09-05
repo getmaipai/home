@@ -2732,6 +2732,78 @@ set. Full architecture: platform plan chapters 1, 3, and 4.
       least one always survives, confirmed to fail against the pre-fix
       code.
 
+- [x] The `embed` role (4.11), the next unblocked role skeleton after
+      `chat` and `tts` - **not** tier 2 native tool calling, which is a
+      recorded, deliberate deferral (`docs/dev.md`'s own earlier "Tier 2
+      tool calling: measure the floor's miss rate before building it"
+      entry): "`embed` first, real skills, count fall-throughs, then
+      decide on tier 2 from the eval number." Scoped down the same way
+      `ttsSupervisor.ts` scaled `chat`'s own shape down for `tts`: no
+      catalog entry, no download job, no household selection - there is
+      exactly one pinned model.
+    - **The model**: Nomic AI's own `nomic-embed-text-v1.5` GGUF
+      (Q4_K_M, ~84MB), Apache-2.0, confirmed not gated via the HF API.
+      SHA-256 computed locally against the file this session actually
+      downloaded (`d4e388894e0...`), not trusted from any listing -
+      `lib/embedAssets.ts`, the same discipline `wakewordAssets.ts`
+      already established. "Engine is llama-server, only" (4.11) means
+      `embed` needs no engine binary of its own: it reuses whatever's
+      already installed for `chat` (`llmSupervisor.ts`'s
+      `engineBinaryPath()`, exported for exactly this reuse), spawned
+      against the embedding model instead with `--embedding`.
+    - **Backend**: `lib/embedSupervisor.ts` (the same lazy-start-once
+      shape as `llmSupervisor.ts`/`ttsSupervisor.ts`, generation-counter
+      race guard included from the start rather than re-discovered by a
+      later review), `lib/llm.ts`'s new `embed()` function (its own
+      dedicated function, not routed through `complete()` -
+      chat-completion's messages-array shape and an embedding batch's
+      plain-string-array shape have nothing in common), and
+      `POST /api/llm/embed` (`routes/llm.ts`, same posture as `/chat`:
+      any signed-in person, no role gate, no internal caller yet).
+      `spec/llm/ts/types.ts`/`client.ts`/`stubServer.ts` gained the
+      `EmbeddingRequest`/`EmbeddingResponse` half of this file's own
+      header comment's "OpenAI-compatible HTTP for text and embeddings",
+      the embeddings half it never had until now.
+    - **Explicitly out of scope, named so it isn't quietly assumed
+      later**: wiring `turnEngine.ts`'s routing-example match to use real
+      cosine similarity instead of keyword overlap, wiring `memory.ts`'s
+      real vector recall, and any residency/GPU-placement policy across
+      roles (this pass has exactly one role and one process for `embed`,
+      the same as `tts`).
+    - Verified live end to end, not just against the stub: downloaded
+      the real model, spawned the real `llama-server --embedding`
+      directly first to confirm the wire shape (a real 768-dim vector
+      from `/v1/embeddings`) before trusting the client against it, then
+      placed the model at its real pinned path and called the actual
+      running `POST /api/llm/embed` through the real signed-in browser
+      session - a real spawn (confirmed via the running process list),
+      real vectors matching the direct test bit-for-bit for the same
+      input, and a fast cached second call proving no respawn.
+    - **A review pass before commit found two more real bugs**, both
+      fixed:
+      - `spawnEmbedServer()` never called `freePort()` before its fixed-
+        port spawn, reintroducing the exact hot-reload orphan-process bug
+        `llmSupervisor.ts`'s own `spawnLlamaServer()` calls it to prevent
+        (that file's comment: a `bun --hot` reload wipes this module's
+        tracking without killing what it already spawned, so the next
+        spawn either fails to bind or polls the orphan as if it were
+        new). Fixed by calling the same exported `freePort()`.
+      - The generation-counter fix (above) stopped a stale spawn from
+        re-populating the module cache, but not from handing its OWN
+        caller - who already committed to awaiting that exact promise
+        before the reset landed - a `.client` bound to the backend just
+        stopped. Fixed by having the stale branch recurse into
+        `getEmbedClient()` itself so that caller transparently lands on
+        whatever the current generation resolves to, proven by a test
+        checking `health()` on the client the caller actually receives
+        (not just that global state looks clean), confirmed to fail
+        against the pre-fix code. **The identical bug was already live
+        in `ttsSupervisor.ts`** (built earlier this same session) with a
+        real, wired trigger - saving or removing `voice.hf_token` calls
+        `restartTtsBackend()` while an earlier `/api/tts` request can
+        still be waiting on the household's first-ever spawn - so it was
+        fixed there too in the same pass, with the same kind of test.
+
 ## API routes and `@hono/zod-openapi` (tracked debt)
 
 `getmaipai/CLAUDE.md` > Documentation requires every Hono route to be

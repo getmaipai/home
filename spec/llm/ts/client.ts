@@ -3,7 +3,14 @@
 // the stub in stubServer.ts: both speak the same subset (health,
 // /v1/models, /v1/chat/completions), so the client can't tell them apart
 // and doesn't need to.
-import type { ChatCompletionChunk, ChatCompletionRequest, ChatCompletionResponse, ModelInfo } from "./types.js";
+import type {
+  ChatCompletionChunk,
+  ChatCompletionRequest,
+  ChatCompletionResponse,
+  ModelInfo,
+  EmbeddingRequest,
+  EmbeddingResponse,
+} from "./types.js";
 import { readTextLines } from "../../streaming/ts/lineReader.js";
 
 export class LlmClientError extends Error {
@@ -60,6 +67,26 @@ export class LlamaServerClient {
       throw new LlmClientError(`POST /v1/chat/completions returned ${res.status}`);
     }
     return (await res.json()) as ChatCompletionResponse;
+  }
+
+  /** 4.11's `embed` role (2026-09-04): a real llama-server started with
+   * `--embedding` answers this same OpenAI-compatible path. Works
+   * unmodified against stubServer.ts's canned embeddings too. */
+  async embed(request: EmbeddingRequest): Promise<EmbeddingResponse> {
+    let res: Response;
+    try {
+      res = await fetch(`${this.baseUrl}/v1/embeddings`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(request),
+      });
+    } catch (err) {
+      throw new LlmClientError(`could not reach ${this.baseUrl}`, err);
+    }
+    if (!res.ok) {
+      throw new LlmClientError(`POST /v1/embeddings returned ${res.status}`);
+    }
+    return (await res.json()) as EmbeddingResponse;
   }
 
   /** Real token-by-token streaming (2026-09-04): yields each chunk's text

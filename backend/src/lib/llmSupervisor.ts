@@ -201,8 +201,12 @@ async function spawnLlamaServer(
  * after every archive (main plus extras) has extracted. Checking the
  * binary alone would treat a crash-interrupted install (the main archive
  * extracted, a required extra like the Windows CUDA runtime didn't) as
- * ready, spawning a binary missing what it needs to actually run. */
-function engineBinaryPath(hw: Awaited<ReturnType<typeof detectHardware>>): string | null {
+ * ready, spawning a binary missing what it needs to actually run.
+ * Exported for embedSupervisor.ts (2026-09-04): "engine is llama-server,
+ * only" means every role shares this one installed binary - `embed`
+ * needing to check the identical thing chat already does is the whole
+ * point of that rule, not a coincidence to re-derive a second way. */
+export function engineBinaryPath(hw: Awaited<ReturnType<typeof detectHardware>>): string | null {
   const pin = selectEngineBinary(hw);
   if (!pin) return null;
   const dir = join(enginesDir, pin.id);

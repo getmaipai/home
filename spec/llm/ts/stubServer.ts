@@ -9,7 +9,7 @@
 // model loaded, this is a canned reply]", mirroring the emulator's own
 // llm.complete wording, so a canned answer can never be mistaken for a
 // real one downstream.
-import type { ChatCompletionRequest, ChatCompletionResponse } from "./types.js";
+import type { ChatCompletionRequest, ChatCompletionResponse, EmbeddingRequest, EmbeddingResponse } from "./types.js";
 
 export interface StubLlmServerHandle {
   url: string;
@@ -68,6 +68,49 @@ function streamChatCompletion(request: ChatCompletionRequest): ReadableStream<Ui
   });
 }
 
+// 768: nomic-embed-text-v1.5's real output dimension (backend/src/lib/
+// embedAssets.ts), so a test asserting on vector shape exercises the
+// real number, not an arbitrary stub-only one. Deterministic (same text
+// always yields the same vector, different text a different one) via a
+// plain string hash seeding a simple PRNG - no real semantic meaning,
+// same "canned but real code path" posture the chat stub's
+// STUB_PREFIX-echo already has.
+const EMBEDDING_DIMENSIONS = 768;
+
+function hashString(text: string): number {
+  let h = 2166136261;
+  for (let i = 0; i < text.length; i++) {
+    h ^= text.charCodeAt(i);
+    h = Math.imul(h, 16777619);
+  }
+  return h >>> 0;
+}
+
+function stubEmbedding(text: string): number[] {
+  let seed = hashString(text) || 1;
+  const vector: number[] = [];
+  for (let i = 0; i < EMBEDDING_DIMENSIONS; i++) {
+    // mulberry32, a small deterministic PRNG - good enough for "stable,
+    // distinct-per-input" without pulling in a real hashing/RNG library
+    // for a canned test double.
+    seed |= 0;
+    seed = (seed + 0x6d2b79f5) | 0;
+    let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    vector.push((((t ^ (t >>> 14)) >>> 0) / 4294967296) * 2 - 1);
+  }
+  return vector;
+}
+
+function handleEmbeddings(request: EmbeddingRequest): EmbeddingResponse {
+  const inputs = Array.isArray(request.input) ? request.input : [request.input];
+  return {
+    model: request.model || "stub-embed",
+    data: inputs.map((text, index) => ({ index, embedding: stubEmbedding(text) })),
+    usage: { prompt_tokens: 0, completion_tokens: 0, total_tokens: 0 },
+  };
+}
+
 /** port 0 lets the OS assign a free port, avoiding a fixed-port clash
  * when tests and a dev server both start a stub. */
 export function startStubLlmServer(port = 0): StubLlmServerHandle {
@@ -92,6 +135,13 @@ export function startStubLlmServer(port = 0): StubLlmServerHandle {
           });
         }
         return Response.json(handleChatCompletion(body));
+      }
+      if (url.pathname === "/v1/embeddings" && req.method === "POST") {
+        const body = (await req.json().catch(() => null)) as EmbeddingRequest | null;
+        if (!body || (typeof body.input !== "string" && !Array.isArray(body.input))) {
+          return Response.json({ error: "input is required" }, { status: 400 });
+        }
+        return Response.json(handleEmbeddings(body));
       }
       return new Response("not found", { status: 404 });
     },
