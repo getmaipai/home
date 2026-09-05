@@ -19,6 +19,8 @@ import { tokenize } from "@/lib/text";
 import { logTurn } from "@/lib/conversationHistory";
 import { pickRefusalVariant, varyKnownConstant } from "@/lib/replyVariation";
 import { normalizeForSpeech } from "@maipai/spec/voice/ts/normalizeForSpeech.js";
+import { getPersonSettingValue } from "@/lib/settings";
+import { composePersonaPrompt, resolvePersona, DEFAULT_PERSONA, INFORMATION_HANDLING_POLICY, type Persona } from "@/lib/persona";
 import type { Role } from "@/middleware/auth";
 import type { PersonRow } from "@/types";
 import type { PackageManifest } from "@maipai/spec/gen/ts/manifest.js";
@@ -77,28 +79,13 @@ const STABLE_SYSTEM_PREFIX = [
   "If you don't know something the household hasn't told you, say so instead of guessing.",
 ].join(" ");
 
-// The one default speech register, applied for every reply until a real
-// Persona/style record exists (3.1 names the type; nothing implements it
-// yet - `docs/dev.md`'s "Not built this pass" list, below). Kept as its
-// own separable fragment for exactly that reason: a future per-companion
-// persona (a formal tutor, a five-year-old, a teenager, a nurturing
-// grandmother - Jesse, 2026-09-05) layers its own voice on TOP of or
-// INSTEAD OF this default, rather than this being tangled inextricably
-// into STABLE_SYSTEM_PREFIX. Informed by home-legacy.git's
-// docs/internal/voice-naturalness.md (a corpus study of real recorded
-// conversation, cross-checked against the published prompts of the
-// leading voice assistants): brevity, contractions, dropping detail
-// nobody asked for, rounding, hedging secondhand information, and never
-// repeating a phrase are the highest-value, most evidence-backed levers
-// that research found - not filler words (see replyVariation.ts's own
-// comment on why fillers live in phrase rotation, not the model's own
-// prompted judgment).
-export const NATURAL_REGISTER_POLICY = [
-  "Talk the way a person actually talks, not like a written page being read aloud: use contractions (it's, you're, don't), keep most replies to a sentence or two, and answer the exact question then stop - no restating it back, no \"let me know if you need anything else.\"",
-  "Skip detail nobody asked for (exact decimals, timezones, a full date when only the day matters) and round the way people round in conversation (\"about thirty\", \"low seventies\") unless they asked for the exact number or it genuinely matters, like money or an appointment time.",
-  "Talk about anything uncertain or secondhand as uncertain, never as flat fact: forecasts, predictions, and guesses get hedged (\"it's supposed to\", \"I think\", \"probably\"), not asserted outright.",
-  "Never say the same thing the same way twice: vary how you open a reply and how you phrase something you've already said earlier in the conversation.",
-].join(" ");
+// The speech register is now the selected Persona (lib/persona.ts,
+// 2026-09-05): what used to be a single fixed NATURAL_REGISTER_POLICY
+// constant is the "default" entry in `PERSONAS`, composed through the
+// exact same mechanism every other persona uses, rather than a special
+// case. Kept separate from STABLE_SYSTEM_PREFIX for the same reason it
+// always was: a persona's own fragment can change per person turn to
+// turn while the identity/safety-posture prefix above it can't.
 
 interface LoadedManifest {
   id: string;
@@ -148,7 +135,11 @@ const MAX_SKILLS_SECTION_CHARS = 800;
 // summarizes it, 4.11's other roles); context needs the ambient-context
 // wiring the robot side already has but the hub doesn't yet: all three
 // are real gaps, not silently skipped.
-export function buildSystemPrompt(memoryMatches: RecallMatch[], loaded: LoadedManifest[] = loadAllManifests()): string {
+export function buildSystemPrompt(
+  memoryMatches: RecallMatch[],
+  loaded: LoadedManifest[] = loadAllManifests(),
+  persona: Persona = DEFAULT_PERSONA,
+): string {
   let skillsSection = skillsListLine(loaded);
   if (skillsSection.length > MAX_SKILLS_SECTION_CHARS) {
     skillsSection = skillsSection.slice(0, MAX_SKILLS_SECTION_CHARS) + "...";
@@ -173,7 +164,8 @@ export function buildSystemPrompt(memoryMatches: RecallMatch[], loaded: LoadedMa
   // total over budget. Truncating the body first, then appending a
   // never-truncated time line, keeps every truncation boundary inside
   // prose meant to be cut, never inside the one line a caller might parse.
-  let body = STABLE_SYSTEM_PREFIX + " " + NATURAL_REGISTER_POLICY + skillsSection + memorySection;
+  const registerFragment = composePersonaPrompt(persona) + " " + INFORMATION_HANDLING_POLICY;
+  let body = STABLE_SYSTEM_PREFIX + " " + registerFragment + skillsSection + memorySection;
   const bodyBudget = Math.max(0, PROMPT_SYSTEM_CHAR_BUDGET - timeLine.length);
   if (body.length > bodyBudget) body = body.slice(0, bodyBudget);
 
@@ -351,7 +343,8 @@ function prepareTurn(actor: PersonRow, text: string, loaded: LoadedManifest[]): 
   }
 
   const memoryMatches = recall(actor, text);
-  const systemPrompt = buildSystemPrompt(memoryMatches, loaded);
+  const persona = resolvePersona(getPersonSettingValue(actor, "persona.active_id"));
+  const systemPrompt = buildSystemPrompt(memoryMatches, loaded, persona);
   const messages: LlmMessage[] = [
     { role: "system", content: systemPrompt },
     { role: "user", content: text },
@@ -533,8 +526,14 @@ export async function runTurnStream(
 //   the same shape as the scheduler's input-carrying gap and
 //   host.llm.complete's sync/async gap. Nothing routes a follow-up
 //   deterministically today.
-// - A real Persona/style record (3.1 lists the type; nothing implements
-//   it yet): the system prompt's persona/rules line is a fixed default.
+// - A real Persona/style record: 2026-09-05 built a first, narrow slice
+//   (lib/persona.ts) - a small in-code catalog, a person-scope settings
+//   key to pick one, and composePersonaPrompt() rendering the pick into
+//   this prompt. NOT built: a database table or authoring/selection UI
+//   (a household can't create a custom persona, only pick from the
+//   catalog), regional dialect, a "candor" dial (deliberately kept out,
+//   see lib/persona.ts's own comment on why), and per-persona voice/
+//   speech rate. See docs/dev.md's persona entry for the full scope.
 // - Cross-surface context and 90-day summarization (4.14: conversation
 //   history itself is real now, see lib/conversationHistory.ts; a turn's
 //   own *reasoning* is still stateless beyond what memory.recall()

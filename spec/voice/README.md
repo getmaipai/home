@@ -68,10 +68,11 @@ screen (Jesse: "if you have the voice say ten O four, you still display
 central point (never per recipe) that fills every reply's `speech` field
 with it; the browser frontend imports the identical function for its own
 live, sentence-by-sentence TTS streaming (`ChatPage.tsx`), so there is
-one implementation, not two that could drift. Still real, not-yet-built:
-the register question (brevity, hedging, contractions - a PROMPT concern,
-`turnEngine.ts`'s `NATURAL_REGISTER_POLICY`, not this module) and the
-robot's own Python port, still Hub v0.3's job.
+one implementation, not two that could drift. The register question
+(brevity, hedging, contractions - a PROMPT concern, not this module) is
+real now too: `backend/src/lib/persona.ts`'s `composePersonaPrompt()`,
+2026-09-05. Still not-yet-built: the robot's own Python port, still Hub
+v0.3's job.
 
 ## What's real vs. stubbed
 

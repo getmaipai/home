@@ -7,6 +7,7 @@ import { runTurn, runTurnStream, buildSystemPrompt, matchPattern, PROMPT_SYSTEM_
 import { streamTurnEvents } from "@/routes/turn";
 import { remember } from "@/lib/memory";
 import { REFUSAL_FIRST, REFUSAL_REPEAT, REMEMBER_CONFIRM_VARIANTS } from "@/lib/replyVariation";
+import { resolvePersona } from "@/lib/persona";
 import { db } from "@/db";
 import { people, conversationTurns } from "@/db/schema";
 import { eq } from "drizzle-orm";
@@ -242,6 +243,38 @@ describe("buildSystemPrompt() prompt budget", () => {
     expect(prompt.length).toBeLessThanOrEqual(PROMPT_SYSTEM_CHAR_BUDGET);
     const timeLineMatch = prompt.match(/\n\nCurrent time: [0-9T:.Z-]+$/);
     expect(timeLineMatch).not.toBeNull();
+  });
+
+  test("a persona's composed fragment replaces the default, and its own known constants are never touched by INFORMATION_HANDLING_POLICY", () => {
+    const defaultPrompt = buildSystemPrompt([]);
+    const tutorPrompt = buildSystemPrompt([], undefined, resolvePersona("tutor"));
+    expect(tutorPrompt).not.toBe(defaultPrompt);
+    expect(tutorPrompt).toContain("without contractions");
+    // The universal information-handling rules are unaffected by persona.
+    expect(tutorPrompt).toContain("hedged");
+    expect(defaultPrompt).toContain("hedged");
+  });
+});
+
+describe("prepareTurn() persona resolution (via runTurn - prepareTurn itself isn't exported)", () => {
+  test("a person's own persona.active_id selection is honored for their model-routed turns, with no crash", async () => {
+    const { client, actor } = await owner();
+    const put = await client.request("/api/settings", {
+      method: "PUT",
+      body: { scope: `person:${actor.id}`, key: "persona.active_id", value: "tutor" },
+    });
+    expect(put.status).toBe(200);
+
+    const result = await runTurn(actor, "chat", "good morning, how's it going");
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.value.source).toBe("model");
+  });
+
+  test("nobody having ever picked a persona still resolves to the real default, not a crash or a missing key", async () => {
+    const { actor } = await owner();
+    const result = await runTurn(actor, "chat", "good morning, how's it going");
+    expect(result.ok).toBe(true);
   });
 });
 

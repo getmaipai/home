@@ -131,6 +131,28 @@
     ]
   },
   {
+    "key": "persona.active_id",
+    "scope": "person",
+    "selector": "select",
+    "range": {
+      "options": [
+        "default",
+        "tutor",
+        "buddy",
+        "pal"
+      ]
+    },
+    "default": "default",
+    "label": "Personality",
+    "help": "How MaiPai talks to you: formality, complexity, and how much it follows up on what you say.",
+    "level": "basic",
+    "secret": false,
+    "lives_in": "person.persona",
+    "honoured_by": [
+      "home"
+    ]
+  },
+  {
     "key": "tts.voice_id",
     "scope": "person",
     "selector": "select",

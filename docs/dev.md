@@ -3134,6 +3134,87 @@ set. Full architecture: platform plan chapters 1, 3, and 4.
       ran - the diff had real docs, just for the wrong feature (the
       persona research below, not this one).
 
+- [x] **A first real Persona slice** (`lib/persona.ts`), picked up
+      directly after the humanistic-speech work: Jesse, 2026-09-05,
+      correcting his own framing mid-conversation - "humanism requires
+      persona" - which is this slice's actual thesis. The old
+      `NATURAL_REGISTER_POLICY` wasn't "no persona," it was one fixed,
+      unnamed persona; this makes that explicit instead of a special
+      case. Deliberately the smallest real thing that proves the
+      mechanism end to end, resolving this session's own "Open questions
+      for Jesse" from the persona research below by judgment rather than
+      leaving them all open:
+    - **Structured dimensions only, no freeform field, no database
+      table, no authoring/selection UI.** A small, in-code catalog
+      (`PERSONAS`), the exact shape `voiceKeys.ts`'s `VOICE_PRESET_NAMES`
+      already uses for Pocket TTS's fixed preset list - a household picks
+      from the catalog, it can't create its own persona yet. The research
+      brief's own "structured vs. freeform vs. hybrid" question resolves
+      to structured-only for this pass: freeform backstory/interests
+      needs a real conversational-consistency story this pass has no use
+      for (nothing surfaces or authors one), and legacy's own lesson was
+      that a freeform field without that story just "invents a new past
+      every time."
+    - **Four dimensions**: formality, complexity, engagement (how much a
+      persona probes vs. lets something go - Jesse's own mother/teenager
+      example), and filler_density (discourse-marker CASUALNESS, not
+      literal disfluency insertion - deliberately NOT the thing the
+      research already found lowers perceived confidence when prompted
+      into confident text; replyVariation.ts's cue system is still the
+      only place actual fillers come from). Regional dialect and a
+      "candor" dial are both real, named dimensions from the research
+      that are explicitly NOT in this catalog: dialect risks caricature
+      if rushed and needs its own careful pass; candor sits right next to
+      the org's non-removable child-safety invariants and needs an
+      explicit reconciliation rule the research's own A6 finding warned
+      about, not a value dropped in beside three harmless ones.
+    - **`composePersonaPrompt()`** renders a persona's four dimensions
+      into one system-prompt fragment, one canned sentence per dimension
+      value, composed at prompt-build time - zero added latency, zero
+      risk of drifting meaning, the exact "fast, deterministic,
+      parametrized realization" shape the research found real precedent
+      for (PERSONAGE, ACL 2007/2008) and no precedent for doing safely as
+      a live rewriting pass. `INFORMATION_HANDLING_POLICY` (rounding,
+      hedging secondhand information, varying phrasing) stays
+      persona-INDEPENDENT and always included: the research's own
+      load-bearing finding was that fast, non-drifting persona control
+      needs a hard line between what's said (fixed) and how it's said
+      (the only thing a persona varies) - this split is where that line
+      actually lives in this codebase now.
+    - **`persona.active_id`** (`person` scope, `select`, the same posture
+      `tts.voice_id` already takes - each household member picks their
+      own, not one for the whole house) is the wire; `resolvePersona()`
+      always falls back to the real default persona for an unset,
+      unknown, or stale id, never an empty or broken prompt fragment.
+    - **Live-verified against the real Qwen3 8B model**: the same
+      emotional prompt ("my dog just died") through all four catalog
+      personas. `engagement` showed the clearest, most correct effect -
+      `tutor` and `buddy` (both `curious`/`balanced`) asked a real
+      follow-up question, `default` and `pal` (both `brief`) didn't -
+      the exact mother-vs-teenager behavior Jesse named as the whole
+      reason to build this. `formality` showed through in `tutor`'s more
+      elaborate phrasing. Two honest, real gaps this surfaced, not code
+      bugs: the small local model doesn't always comply with "no
+      contractions" (`tutor`'s own reply still said "it's natural") or
+      with the casual-filler instruction (`pal`'s reply used none that
+      turn) - a real small-model instruction-following limit, the same
+      class of gap `docs/internal/voice-naturalness.md`'s own corpus
+      study already found ("the local 8B model does not obey the trim
+      rule there").
+    - Real regression tests: the persona catalog itself (unique ids,
+      every id resolves, an unknown/undefined/non-string id always falls
+      back to the real default rather than crashing or producing an
+      empty fragment); `composePersonaPrompt()` per dimension (a formal
+      persona never gets the contraction instruction and does get the
+      no-contractions one; a curious persona gets the follow-up
+      instruction; changing one dimension changes the output; filler
+      density never mentions literal "um"/"uh"); `buildSystemPrompt()`
+      with a persona differs from the default while
+      `INFORMATION_HANDLING_POLICY` stays identical either way; and a
+      real end-to-end settings write (`PUT /api/settings`) proving a
+      person's own `persona.active_id` choice reaches a real `runTurn()`
+      call without a crash.
+
 ## Notes for later (companion personas, added 2026-09-05)
 
 Jesse asked how companion personalities and their speech patterns should
@@ -3143,11 +3224,14 @@ formality, region/dialect, filler density, AND conversational engagement
 style (a "mother" persona asking follow-up questions and wanting to know
 more; a "teenager" persona saying "that sucks" and moving on) - then
 correctly flagged his own list as a naive starting point, not a spec, and
-asked for real research before anything gets built. This is exactly the
-already-named "Persona/style record" gap (`turnEngine.ts`'s own "Not
-built this pass" list: "3.1 lists the type; nothing implements it yet").
-Captured here, not started; the design pass itself belongs to whoever
-picks this slice up next.
+asked for real research before anything gets built. A first, narrow slice
+of the already-named "Persona/style record" gap now exists (the punch-
+list entry directly above this section, `lib/persona.ts`) - four
+dimensions, structured only, no authoring UI. Everything below is the
+research that informed those choices, kept here for the larger surface
+area (regional dialect, candor, freeform identity, a real
+authoring/selection UI, per-persona voice) that's still real and still
+not started.
 
 **Legacy prior art (real codebase archaeology, not projected)**:
 home-legacy.git had a full, shipped companion system - 25 default
