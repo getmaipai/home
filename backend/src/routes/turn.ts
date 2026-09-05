@@ -15,9 +15,14 @@ export const turnRoutes = new Hono<AppEnv>();
 // checks) now that this one exists.
 turnRoutes.post("/", requireAuth, async (c) => {
   const actor = c.get("person");
-  const body = (await c.req.json().catch(() => ({}))) as { surface?: string; text?: string; thinking?: boolean };
+  const body = (await c.req.json().catch(() => ({}))) as {
+    surface?: string;
+    text?: string;
+    thinking?: boolean;
+    conversation_id?: string;
+  };
   const surface = (body.surface ?? "chat") as Surface;
-  const result = await runTurn(actor, surface, body.text ?? "", { thinking: body.thinking });
+  const result = await runTurn(actor, surface, body.text ?? "", { thinking: body.thinking, conversationId: body.conversation_id });
   if (!result.ok) {
     return c.json({ error: result.error, code: result.code }, result.status);
   }
@@ -118,18 +123,32 @@ export async function* streamTurnEvents(
 // event kinds. Same auth posture as POST /api/turn above.
 turnRoutes.post("/stream", requireAuth, async (c) => {
   const actor = c.get("person");
-  const body = (await c.req.json().catch(() => ({}))) as { surface?: string; text?: string; thinking?: boolean };
+  const body = (await c.req.json().catch(() => ({}))) as {
+    surface?: string;
+    text?: string;
+    thinking?: boolean;
+    conversation_id?: string;
+  };
   const surface = (body.surface ?? "chat") as Surface;
-  const result = await runTurnStream(actor, surface, body.text ?? "", { thinking: body.thinking });
+  const result = await runTurnStream(actor, surface, body.text ?? "", { thinking: body.thinking, conversationId: body.conversation_id });
   if (!result.ok) {
     return c.json({ error: result.error, code: result.code }, result.status);
   }
+
+  // The contract's first line, either way (step 3): "turn_meta" before
+  // anything else, so a client always knows which conversation and turn
+  // this reply belongs to even if it never reads past the first line.
+  const turnMeta: TurnStreamEvent =
+    result.kind === "immediate"
+      ? { type: "turn_meta", conversation_id: result.value.conversation_id, turn_id: result.value.turn_id }
+      : { type: "turn_meta", conversation_id: result.conversationId, turn_id: result.turnId };
 
   if (result.kind === "immediate") {
     // A safety refusal or a plugin reply is already complete, deterministic
     // text - one "done" event, no artificial trickle for something with
     // nothing left to stream.
-    return new Response(ndjsonLine({ type: "done", value: result.value }), {
+    const body = new Blob([ndjsonLine(turnMeta), ndjsonLine({ type: "done", value: result.value })]);
+    return new Response(body, {
       headers: { "content-type": "application/x-ndjson" },
     });
   }
@@ -137,6 +156,7 @@ turnRoutes.post("/stream", requireAuth, async (c) => {
   const stream = new ReadableStream<Uint8Array>({
     async start(controller) {
       try {
+        controller.enqueue(ndjsonLine(turnMeta));
         for await (const event of streamTurnEvents(result, actor.id)) {
           controller.enqueue(ndjsonLine(event));
         }

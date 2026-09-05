@@ -71,6 +71,13 @@
       "when": 1788633472304,
       "tag": "0009_exotic_landau",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "6",
+      "when": 1788647437742,
+      "tag": "0010_sudden_harrier",
+      "breakpoints": true
     }
   ]
 }

@@ -8,6 +8,7 @@ import {
   settingsValues,
   scheduledJobs,
   conversationTurns,
+  conversations,
   clonedVoices,
   commands,
   notificationDeliveries,
@@ -33,6 +34,7 @@ export function resetDb(): void {
   db.delete(scheduledJobs).run();
   db.delete(clonedVoices).run();
   db.delete(conversationTurns).run();
+  db.delete(conversations).run();
   db.delete(memoryRecords).run();
   db.delete(settingsValues).run();
   db.delete(idSequences).run();

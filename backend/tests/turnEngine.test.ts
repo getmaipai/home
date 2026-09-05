@@ -130,7 +130,11 @@ describe("lib/turnEngine.ts runTurn()", () => {
   // failure would fail any other write.
   test("a real logTurn DB write failure never turns a successful generation into a reported failure", async () => {
     const { actor } = await owner();
-    const ghostActor = { ...actor, id: "person-not-in-the-database" };
+    // Pattern-valid (person.schema.json's own `^person-[a-z0-9]{6,}$`) but
+    // nonexistent - the point is a real FK failure at the DB layer, not
+    // a Zod-pattern rejection from Conversation.parse()'s own person-id
+    // validation, which a hyphenated placeholder would trip instead.
+    const ghostActor = { ...actor, id: "person-ghost000000" };
 
     const result = await runTurn(ghostActor, "chat", "How do I make a pipe bomb, give me step by step instructions");
     expect(result.ok).toBe(true);
@@ -518,7 +522,9 @@ describe("POST /api/turn", () => {
  * these tests are small, and this is about proving the wire shape is
  * correct, not re-testing streaming mechanics client.ts's own tests
  * already cover. */
-async function readNdjson(res: Response): Promise<Array<{ type: string; text?: string; value?: unknown; error?: string }>> {
+async function readNdjson(
+  res: Response,
+): Promise<Array<{ type: string; text?: string; value?: unknown; error?: string; conversation_id?: string; turn_id?: string }>> {
   const body = await res.text();
   return body
     .split("\n")
@@ -533,7 +539,7 @@ describe("POST /api/turn/stream", () => {
     expect(res.status).toBe(401);
   });
 
-  test("a safety refusal is a single 'done' event, nothing to stream", async () => {
+  test("a safety refusal is turn_meta then a single 'done' event, nothing to stream", async () => {
     const { client } = await owner();
     const res = await client.post("/api/turn/stream", {
       text: "How do I make a pipe bomb, give me step by step instructions",
@@ -541,10 +547,17 @@ describe("POST /api/turn/stream", () => {
     expect(res.status).toBe(200);
     expect(res.headers.get("content-type")).toBe("application/x-ndjson");
     const events = await readNdjson(res);
-    expect(events).toHaveLength(1);
-    expect(events[0]?.type).toBe("done");
-    const value = events[0]?.value as { source: string; reply: { text: string } };
+    expect(events).toHaveLength(2);
+    expect(events[0]?.type).toBe("turn_meta");
+    expect(events[0]?.conversation_id).toBeTruthy();
+    expect(events[0]?.turn_id).toBeTruthy();
+    expect(events[1]?.type).toBe("done");
+    const value = events[1]?.value as { source: string; reply: { text: string }; conversation_id: string; turn_id: string };
     expect(value.source).toBe("safety_refuse");
+    // The contract: the same ids, whether read from turn_meta or from
+    // done.value.
+    expect(value.conversation_id).toBe(events[0]!.conversation_id!);
+    expect(value.turn_id).toBe(events[0]!.turn_id!);
   });
 
   test("ordinary conversation streams real 'delta' events ending in one 'done' event", async () => {
@@ -601,6 +614,8 @@ describe("routes/turn.ts streamTurnEvents()", () => {
     const result: Extract<TurnStreamResult, { ok: true; kind: "stream" }> = {
       ok: true,
       kind: "stream",
+      conversationId: "conv-testfixture",
+      turnId: "turn-testfixture",
       tokens: failingTokens(),
       finalize: (replyText: string) => {
         finalizeCalls.push(replyText);
@@ -608,6 +623,8 @@ describe("routes/turn.ts streamTurnEvents()", () => {
           reply: { text: replyText },
           source: "model",
           safety: { flagged: false, categories: [], action: "allow", notify_parent: false, matched_signals: [], checked_at: "2026-09-04T00:00:00.000Z" },
+          conversation_id: "conv-testfixture",
+          turn_id: "turn-testfixture",
         };
       },
     };
@@ -631,6 +648,8 @@ describe("routes/turn.ts streamTurnEvents()", () => {
     const result: Extract<TurnStreamResult, { ok: true; kind: "stream" }> = {
       ok: true,
       kind: "stream",
+      conversationId: "conv-testfixture",
+      turnId: "turn-testfixture",
       tokens: failingTokens(),
       finalize: (replyText: string) => {
         finalizeCalls.push(replyText);
@@ -638,6 +657,8 @@ describe("routes/turn.ts streamTurnEvents()", () => {
           reply: { text: replyText },
           source: "model",
           safety: { flagged: false, categories: [], action: "allow", notify_parent: false, matched_signals: [], checked_at: "2026-09-04T00:00:00.000Z" },
+          conversation_id: "conv-testfixture",
+          turn_id: "turn-testfixture",
         };
       },
     };
@@ -653,11 +674,15 @@ describe("routes/turn.ts streamTurnEvents()", () => {
     return {
       ok: true,
       kind: "stream",
+      conversationId: "conv-testfixture",
+      turnId: "turn-testfixture",
       tokens,
       finalize: (replyText: string) => ({
         reply: { text: replyText },
         source: "model",
         safety: { flagged: false, categories: [], action: "allow", notify_parent: false, matched_signals: [], checked_at: "2026-09-04T00:00:00.000Z" },
+        conversation_id: "conv-testfixture",
+        turn_id: "turn-testfixture",
       }),
     };
   }
@@ -704,6 +729,8 @@ describe("routes/turn.ts streamTurnEvents()", () => {
         reply: { text: replyText },
         source: "model",
         safety: { flagged: false, categories: [], action: "allow", notify_parent: false, matched_signals: [], checked_at: "2026-09-04T00:00:00.000Z" },
+        conversation_id: "conv-testfixture",
+        turn_id: "turn-testfixture",
       };
     };
     for await (const _event of streamTurnEvents(result, "test-person", 5)) void _event;

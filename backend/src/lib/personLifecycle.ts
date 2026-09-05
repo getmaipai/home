@@ -141,6 +141,12 @@ export function hasSecret(personId: string): boolean {
 export interface ErasureCounts {
   memories: number;
   conversations: number;
+  /** Session A step 3: conversation THREADS (the `conversations` table),
+   * distinct from `conversations` above (conversation_turns, the
+   * existing field name here since before threads existed - kept as-is
+   * rather than renamed, so nothing that reads erased.conversations
+   * today silently starts meaning something else). */
+  conversationThreads: number;
   settings: number;
   clonedVoices: number;
   scheduledJobs: number;
@@ -176,6 +182,11 @@ export function erasePersonData(personId: string): ErasureCounts {
     .query("DELETE FROM memory_records WHERE scope = 'person' AND person = ?")
     .run(personId).changes;
   const conversations = sqlite.query("DELETE FROM conversation_turns WHERE person_id = ?").run(personId).changes;
+  // The thread record itself (step 3's `conversations` table), not just
+  // its turns: left alone, this table's own person_id column would keep
+  // holding rows about a deleted person forever (caught by the schema-
+  // walking test below).
+  const conversationThreads = sqlite.query("DELETE FROM conversations WHERE person_id = ?").run(personId).changes;
   // Person-scope settings hold the spec's full scope string
   // ("person:<id>"), so they are matched by that, not by a person_id
   // column this table does not have.
@@ -200,6 +211,7 @@ export function erasePersonData(personId: string): ErasureCounts {
   return {
     memories,
     conversations,
+    conversationThreads,
     settings,
     clonedVoices: clonedVoiceRows,
     scheduledJobs: jobs,

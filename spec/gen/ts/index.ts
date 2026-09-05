@@ -11,5 +11,6 @@ export * from "./settings-key.js";
 export * from "./safety-result.js";
 export * from "./grant.js";
 export * from "./memory-record.js";
+export * from "./conversation.js";
 export * from "./result.js";
 export * from "./manifest.js";

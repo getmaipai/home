@@ -1,4 +1,4 @@
-import { sqliteTable, text, integer, real, primaryKey } from "drizzle-orm/sqlite-core";
+import { sqliteTable, text, integer, real, primaryKey, index } from "drizzle-orm/sqlite-core";
 
 // Mirrors spec/schemas/person.schema.json (spec/gen/ts/person.ts is the
 // validated shape; this is its storage). `role` and `source` are the
@@ -116,32 +116,80 @@ export const settingsValues = sqliteTable(
 // lib/scheduler.ts for why, and what's deferred (device targets,
 // quiet-hours, the notification system) until this needs to be a spec
 // shape for real robot parity.
+// Conversations (4.14, session-a-intelligence.md step 3): the thread
+// itself, spec-shaped (spec/schemas/conversation.schema.json) unlike
+// conversation_turns below, which stays hub-internal - the individual
+// turns remain a flat per-turn log; this is what a title, a rolling
+// summary, and open/closed/deleted lifecycle hang off. One open
+// conversation per (person, surface) at a time in practice, enforced by
+// lib/conversationHistory.ts's resolveOrCreateConversation(), not a DB
+// constraint here (a closed or deleted conversation for the same pair
+// may coexist, same as any append-only history).
+export const conversations = sqliteTable(
+  "conversations",
+  {
+    id: text("id").primaryKey(),
+    personId: text("person_id")
+      .notNull()
+      .references(() => people.id),
+    surface: text("surface").notNull(),
+    companionId: text("companion_id"),
+    title: text("title"),
+    status: text("status").notNull().default("open"), // open|closed|deleted
+    summary: text("summary"),
+    summaryThroughTurn: text("summary_through_turn"),
+    source: text("source").notNull().default("hub"), // hub|local
+    hlc: text("hlc").notNull(),
+    createdAt: text("created_at").notNull(),
+    updatedAt: text("updated_at").notNull(),
+  },
+  // resolveOrCreateConversation()/createConversation()/listConversations()/
+  // clearConversations() all filter by (person_id, surface, status) on
+  // every turn - a code review, 2026-09-05, found conversation_turns got
+  // its own index in this same diff but this table was missed.
+  (table) => [index("conversations_person_surface_status_idx").on(table.personId, table.surface, table.status)],
+);
+
 // Conversation history (4.14, split): one row per completed turnEngine
 // turn, kept per person and per surface. Not a spec 3.1 record type
-// today (chapter 3's record table has no Conversation entry either), the
-// same "hub-internal, revisit for robot parity later" call scheduledJobs
+// today (chapter 3's record table has no Conversation-turn entry either,
+// distinct from the `conversations` thread record above), the same
+// "hub-internal, revisit for robot parity later" call scheduledJobs
 // made; see lib/conversationHistory.ts for the visibility and retention
 // rules built on top of this table.
-export const conversationTurns = sqliteTable("conversation_turns", {
-  id: text("id").primaryKey(),
-  personId: text("person_id")
-    .notNull()
-    .references(() => people.id),
-  surface: text("surface").notNull(),
-  userText: text("user_text").notNull(),
-  replyText: text("reply_text").notNull(),
-  source: text("source").notNull(), // "safety_refuse" | "plugin" | "plugin_error" | "command" | "command_error" | "model"
-  pluginId: text("plugin_id"),
-  commandId: text("command_id"),
-  safetyFlagged: integer("safety_flagged", { mode: "boolean" }).notNull().default(false),
-  safetyAction: text("safety_action").notNull(), // "allow" | "allow_with_resources" | "refuse"
-  // Captured at write time, not re-derived by joining to `people` later:
-  // a person's role can change, and this must reflect who they were when
-  // they spoke, the same "recorded, not recomputed" reasoning
-  // memory-record scoping already uses.
-  minorSpeaker: integer("minor_speaker", { mode: "boolean" }).notNull().default(false),
-  createdAt: text("created_at").notNull(),
-});
+export const conversationTurns = sqliteTable(
+  "conversation_turns",
+  {
+    id: text("id").primaryKey(),
+    personId: text("person_id")
+      .notNull()
+      .references(() => people.id),
+    surface: text("surface").notNull(),
+    // Nullable: a migration backfills one conversation per (person, surface)
+    // for every pre-existing row (step 3), but every real write path now
+    // sets this - lib/conversationHistory.ts's logTurn() requires it as a
+    // real parameter. Only nullable for the backfilled history's sake.
+    conversationId: text("conversation_id").references(() => conversations.id),
+    userText: text("user_text").notNull(),
+    replyText: text("reply_text").notNull(),
+    source: text("source").notNull(), // "safety_refuse" | "plugin" | "plugin_error" | "command" | "command_error" | "model"
+    pluginId: text("plugin_id"),
+    commandId: text("command_id"),
+    safetyFlagged: integer("safety_flagged", { mode: "boolean" }).notNull().default(false),
+    safetyAction: text("safety_action").notNull(), // "allow" | "allow_with_resources" | "refuse"
+    // Captured at write time, not re-derived by joining to `people` later:
+    // a person's role can change, and this must reflect who they were when
+    // they spoke, the same "recorded, not recomputed" reasoning
+    // memory-record scoping already uses.
+    minorSpeaker: integer("minor_speaker", { mode: "boolean" }).notNull().default(false),
+    createdAt: text("created_at").notNull(),
+  },
+  // buildConversationWindow() and maybeRefreshConversationSummary() (step 3)
+  // both filter by conversation_id on every model-routed turn - the
+  // hottest path in the app (a code review, 2026-09-05, flagged the
+  // missing index: a full table scan on every turn as history grows).
+  (table) => [index("conversation_turns_conversation_id_idx").on(table.conversationId)],
+);
 
 // The model-provisioning download-job queue (4.11's deferred "download
 // queue" gap, spec/llm/README.md): one row per catalog model id a

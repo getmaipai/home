@@ -4,12 +4,35 @@ import { resetDb } from "./reset-db";
 import { __resetThrottleForTests } from "@/lib/secretThrottle";
 import { __resetLlmSupervisorForTests } from "@/lib/llmSupervisor";
 import { runTurn } from "@/lib/turnEngine";
-import { list, exportPerson, runRetention, routingStats, summarizeBeforeDelete } from "@/lib/conversationHistory";
+import {
+  list,
+  exportPerson,
+  runRetention,
+  routingStats,
+  summarizeBeforeDelete,
+  logTurn,
+  resolveOrCreateConversation,
+  getConversation,
+  updateConversationTitle,
+  listConversationTurns,
+  buildConversationWindow,
+  maybeRefreshConversationSummary,
+} from "@/lib/conversationHistory";
 import { createCommand } from "@/lib/commands";
 import { REMEMBER_CONFIRM_VARIANTS } from "@/lib/replyVariation";
 import { db } from "@/db";
-import { people, conversationTurns, memoryRecords } from "@/db/schema";
+import { people, conversationTurns, conversations, memoryRecords } from "@/db/schema";
 import { eq } from "drizzle-orm";
+import type { TurnValue } from "@/wire";
+
+const SAFE: TurnValue["safety"] = {
+  flagged: false,
+  categories: [],
+  action: "allow",
+  notify_parent: false,
+  matched_signals: [],
+  checked_at: new Date().toISOString(),
+};
 
 beforeEach(() => {
   resetDb();
@@ -423,17 +446,30 @@ describe("runRetention()", () => {
   });
 });
 
-describe("GET /api/conversations", () => {
+describe("GET /api/conversations (step 3: now lists conversation THREADS, not turns)", () => {
   test("requires a signed-in person", async () => {
     const client = new TestClient();
     const res = await client.get("/api/conversations");
     expect(res.status).toBe(401);
   });
 
-  test("returns the caller's own turns by default", async () => {
+  test("returns the caller's own conversation summaries, with a real turn_count", async () => {
     const { client } = await owner();
     await client.post("/api/turn", { text: "good morning" });
     const res = await client.get("/api/conversations");
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as Array<{ id: string; surface: string; turn_count: number }>;
+    expect(body.length).toBe(1);
+    expect(body[0]!.surface).toBe("chat");
+    expect(body[0]!.turn_count).toBe(1);
+  });
+});
+
+describe("GET /api/conversations/turns (the pre-existing flat-turn-list behaviour, moved here unchanged)", () => {
+  test("returns the caller's own turns by default", async () => {
+    const { client } = await owner();
+    await client.post("/api/turn", { text: "good morning" });
+    const res = await client.get("/api/conversations/turns");
     expect(res.status).toBe(200);
     const body = (await res.json()) as unknown[];
     expect(body.length).toBe(1);
@@ -451,5 +487,394 @@ describe("GET /api/conversations/export", () => {
     await adultClient.post("/api/auth/select", { personId: adult.id });
     const res = await adultClient.get(`/api/conversations/export?person=${teen.id}`);
     expect(res.status).toBe(403);
+  });
+});
+
+describe("buildConversationWindow() (step 3)", () => {
+  test("the newest 4 turns are always included verbatim; oldest dropped first past the 1,200-token estimate", async () => {
+    const { actor } = await owner();
+    const conv = resolveOrCreateConversation(actor, "chat");
+    if (!conv.ok) throw new Error(conv.error);
+
+    // ~400 chars each side (~100 tokens), so 10 turns (~2,000 tokens)
+    // comfortably exceeds the 1,200-token budget once several exist.
+    const longText = "x".repeat(400);
+    for (let i = 0; i < 10; i++) {
+      logTurn(actor, "chat", `${longText} turn ${i}`, {
+        reply: { text: `${longText} reply ${i}` },
+        source: "model",
+        safety: SAFE,
+        conversation_id: conv.value.id,
+        turn_id: `turn-window${i}`,
+      });
+    }
+
+    const window = buildConversationWindow(conv.value);
+    expect(window.messages.length).toBeLessThan(20); // 10 turns * 2 messages each
+    expect(window.messages.some((m) => m.content.includes("turn 9"))).toBe(true); // newest, always kept
+    expect(window.messages.some((m) => m.content.includes("turn 0"))).toBe(false); // oldest, dropped first
+  });
+
+  test("with nothing fallen out of the window yet, there's no summary line even if a summary exists", async () => {
+    const { actor } = await owner();
+    const conv = resolveOrCreateConversation(actor, "chat");
+    if (!conv.ok) throw new Error(conv.error);
+    db.update(conversations).set({ summary: "a prior summary" }).where(eq(conversations.id, conv.value.id)).run();
+    logTurn(actor, "chat", "hi", { reply: { text: "hello" }, source: "model", safety: SAFE, conversation_id: conv.value.id, turn_id: "turn-onlyone" });
+
+    const refreshed = getConversation(actor, conv.value.id);
+    if (!refreshed.ok) throw new Error(refreshed.error);
+    const window = buildConversationWindow(refreshed.value);
+    expect(window.summaryLine).toBeUndefined();
+  });
+
+  test("a summary line appears once older turns exist beyond the token budget and a summary is on file", async () => {
+    const { actor } = await owner();
+    const conv = resolveOrCreateConversation(actor, "chat");
+    if (!conv.ok) throw new Error(conv.error);
+    // Long enough (like the token-budget test above) that some genuinely
+    // fall outside the window - a short-text conversation never has
+    // "uncovered older" turns even with a summary on file, and the
+    // summary line only ever covers what the window itself dropped.
+    const longText = "x".repeat(400);
+    for (let i = 0; i < 10; i++) {
+      logTurn(actor, "chat", `${longText} turn ${i}`, {
+        reply: { text: `${longText} reply ${i}` },
+        source: "model",
+        safety: SAFE,
+        conversation_id: conv.value.id,
+        turn_id: `turn-summaryline${i}`,
+      });
+    }
+    db.update(conversations).set({ summary: "Riff asked about the weather earlier." }).where(eq(conversations.id, conv.value.id)).run();
+
+    const refreshed = getConversation(actor, conv.value.id);
+    if (!refreshed.ok) throw new Error(refreshed.error);
+    const window = buildConversationWindow(refreshed.value);
+    expect(window.summaryLine).toBeDefined();
+    expect(window.summaryLine as string).toContain("Riff asked about the weather earlier.");
+  });
+});
+
+describe("maybeRefreshConversationSummary() (step 3: runs when due, not before)", () => {
+  afterEach(() => {
+    delete process.env.MAIPAI_LLAMA_SERVER_URL;
+  });
+
+  test("does not run before at least 4 turns have fallen out of the window", async () => {
+    const { actor } = await owner();
+    const conv = resolveOrCreateConversation(actor, "chat");
+    if (!conv.ok) throw new Error(conv.error);
+    for (let i = 0; i < 4; i++) {
+      logTurn(actor, "chat", `msg ${i}`, { reply: { text: `reply ${i}` }, source: "model", safety: SAFE, conversation_id: conv.value.id, turn_id: `turn-early${i}` });
+    }
+    await maybeRefreshConversationSummary(conv.value.id);
+    const row = getConversation(actor, conv.value.id);
+    if (!row.ok) throw new Error(row.error);
+    expect(row.value.summary).toBeNull();
+  });
+
+  test("skips entirely on the stub model - a canned reply is worse than no summary", async () => {
+    const { actor } = await owner();
+    const conv = resolveOrCreateConversation(actor, "chat");
+    if (!conv.ok) throw new Error(conv.error);
+    for (let i = 0; i < 8; i++) {
+      logTurn(actor, "chat", `msg ${i}`, { reply: { text: `reply ${i}` }, source: "model", safety: SAFE, conversation_id: conv.value.id, turn_id: `turn-stub${i}` });
+    }
+    await maybeRefreshConversationSummary(conv.value.id);
+    const row = getConversation(actor, conv.value.id);
+    if (!row.ok) throw new Error(row.error);
+    expect(row.value.summary).toBeNull();
+  });
+
+  test("runs once at least 4 turns have fallen out of the window, using a real (if stub-shaped) completion", async () => {
+    const { actor } = await owner();
+    const conv = resolveOrCreateConversation(actor, "chat");
+    if (!conv.ok) throw new Error(conv.error);
+    for (let i = 0; i < 8; i++) {
+      logTurn(actor, "chat", `msg ${i}`, { reply: { text: `reply ${i}` }, source: "model", safety: SAFE, conversation_id: conv.value.id, turn_id: `turn-real${i}` });
+    }
+
+    const { startStubLlmServer } = await import("@maipai/spec/llm/ts/stubServer.js");
+    const stub = startStubLlmServer();
+    process.env.MAIPAI_LLAMA_SERVER_URL = stub.url;
+    try {
+      await maybeRefreshConversationSummary(conv.value.id);
+    } finally {
+      stub.stop();
+    }
+
+    const row = getConversation(actor, conv.value.id);
+    if (!row.ok) throw new Error(row.error);
+    expect(row.value.summary).not.toBeNull();
+    expect(row.value.summary_through_turn).not.toBeNull();
+  });
+});
+
+describe("conversation window feeds the prior exchange into the next turn (step 3 acceptance)", () => {
+  test("a follow-up turn shares the same conversation, whose window then contains the first exchange", async () => {
+    const { actor } = await owner();
+    const first = await runTurn(actor, "chat", "what's the weather like");
+    expect(first.ok).toBe(true);
+    if (!first.ok) return;
+
+    const second = await runTurn(actor, "chat", "and tomorrow?");
+    expect(second.ok).toBe(true);
+    if (!second.ok) return;
+    expect(second.value.conversation_id).toBe(first.value.conversation_id);
+
+    const conv = getConversation(actor, first.value.conversation_id);
+    if (!conv.ok) throw new Error(conv.error);
+    const window = buildConversationWindow(conv.value);
+    expect(window.messages.some((m) => m.content.includes("what's the weather like"))).toBe(true);
+  });
+});
+
+describe("POST /api/conversations (step 3 CRUD)", () => {
+  test("creates a real conversation, defaulting surface to chat", async () => {
+    const { client } = await owner();
+    const res = await client.post("/api/conversations", {});
+    expect(res.status).toBe(201);
+    const body = (await res.json()) as { id: string; surface: string; status: string };
+    expect(body.surface).toBe("chat");
+    expect(body.status).toBe("open");
+  });
+
+  test("closes (never deletes) whichever conversation was previously open for the same surface", async () => {
+    const { client, actor } = await owner();
+    await client.post("/api/turn", { text: "good morning" }); // opens one implicitly
+    const before = getConversation(actor, (await (await client.get("/api/conversations")).json() as Array<{ id: string }>)[0]!.id);
+    if (!before.ok) throw new Error(before.error);
+    expect(before.value.status).toBe("open");
+
+    await client.post("/api/conversations", {});
+
+    const stillThere = getConversation(actor, before.value.id);
+    if (!stillThere.ok) throw new Error(stillThere.error);
+    expect(stillThere.value.status).toBe("closed");
+  });
+
+  // A code review (2026-09-05) found no validation at all: a bogus
+  // surface reached insertNewConversation()'s Conversation.parse() and
+  // threw an uncaught ZodError - an unhandled 500 - instead of a clean
+  // 400 matching POST /api/turn's own handling of the identical bad input.
+  test("a bogus surface is a clean 400, not an unhandled 500", async () => {
+    const { client } = await owner();
+    const res = await client.post("/api/conversations", { surface: "bogus" });
+    expect(res.status).toBe(400);
+  });
+});
+
+describe("resolveOrCreateConversation() surface check (step 3, code review 2026-09-05)", () => {
+  test("a conversation_id from a different surface is refused, not silently reattached", async () => {
+    const { actor } = await owner();
+    const chatConv = resolveOrCreateConversation(actor, "chat");
+    if (!chatConv.ok) throw new Error(chatConv.error);
+
+    const result = resolveOrCreateConversation(actor, "tv", chatConv.value.id);
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.status).toBe(400);
+  });
+});
+
+describe("updateConversationTitle() validates through the spec (step 3, code review 2026-09-05)", () => {
+  test("a title over the schema's 200-char maxLength is refused, not silently truncated or accepted", async () => {
+    const { client, actor } = await owner();
+    await client.post("/api/turn", { text: "good morning" });
+    const list = (await (await client.get("/api/conversations")).json()) as Array<{ id: string }>;
+    const id = list[0]!.id;
+
+    const result = updateConversationTitle(actor, id, "x".repeat(201));
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.status).toBe(400);
+
+    // Refused before the write, not after: the conversation's own title
+    // is still whatever it was before this call.
+    const unchanged = getConversation(actor, id);
+    if (!unchanged.ok) throw new Error(unchanged.error);
+    expect(unchanged.value.title).toBeNull();
+  });
+
+  test("a real rename regenerates hlc, proving every write bumps the clock", async () => {
+    const { client, actor } = await owner();
+    await client.post("/api/turn", { text: "good morning" });
+    const list = (await (await client.get("/api/conversations")).json()) as Array<{ id: string }>;
+    const id = list[0]!.id;
+    const before = getConversation(actor, id);
+    if (!before.ok) throw new Error(before.error);
+
+    const result = updateConversationTitle(actor, id, "Morning chat");
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.value.hlc).not.toBe(before.value.hlc);
+  });
+});
+
+describe("GET /api/conversations/:id/turns since (step 3, code review 2026-09-05)", () => {
+  test("a since turn id from a DIFFERENT conversation is ignored, not treated as a valid cutoff", async () => {
+    const { actor } = await owner();
+    const convA = resolveOrCreateConversation(actor, "chat");
+    if (!convA.ok) throw new Error(convA.error);
+    logTurn(actor, "chat", "a1", { reply: { text: "a1r" }, source: "model", safety: SAFE, conversation_id: convA.value.id, turn_id: "turn-crossconv-a1" });
+
+    const convB = resolveOrCreateConversation(actor, "tv");
+    if (!convB.ok) throw new Error(convB.error);
+    logTurn(actor, "tv", "b1", { reply: { text: "b1r" }, source: "model", safety: SAFE, conversation_id: convB.value.id, turn_id: "turn-crossconv-b1" });
+
+    // A turn id that belongs to conversation B, used as `since` against
+    // conversation A: must not silently supply a valid-looking cutoff.
+    const result = listConversationTurns(actor, convA.value.id, { since: "turn-crossconv-b1" });
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.value).toHaveLength(1); // a1 still returned in full, not filtered out
+  });
+});
+
+describe("GET/PATCH/DELETE /api/conversations/:id (step 3 CRUD)", () => {
+  test("GET returns the conversation; a stranger gets 404, not 403 (never confirms it exists)", async () => {
+    const { client } = await owner();
+    await client.post("/api/turn", { text: "good morning" });
+    const list = (await (await client.get("/api/conversations")).json()) as Array<{ id: string }>;
+    const id = list[0]!.id;
+
+    const res = await client.get(`/api/conversations/${id}`);
+    expect(res.status).toBe(200);
+
+    const stranger = await addPerson(client, "Marlow", "adult");
+    const strangerClient = new TestClient();
+    await strangerClient.post("/api/auth/select", { personId: stranger.id });
+    const strangerRes = await strangerClient.get(`/api/conversations/${id}`);
+    expect(strangerRes.status).toBe(404);
+  });
+
+  test("PATCH sets the title", async () => {
+    const { client } = await owner();
+    await client.post("/api/turn", { text: "good morning" });
+    const list = (await (await client.get("/api/conversations")).json()) as Array<{ id: string }>;
+    const id = list[0]!.id;
+
+    const res = await client.request(`/api/conversations/${id}`, { method: "PATCH", body: { title: "Morning chat" } });
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { title: string };
+    expect(body.title).toBe("Morning chat");
+  });
+
+  test("DELETE removes the conversation from listings, deletes its turns, but keeps memories it produced", async () => {
+    const { client } = await owner();
+    await client.post("/api/turn", { text: "remember that Friday is pizza night" });
+    const list = (await (await client.get("/api/conversations")).json()) as Array<{ id: string }>;
+    const id = list[0]!.id;
+
+    const memBefore = db.select().from(memoryRecords).where(eq(memoryRecords.text, "Friday is pizza night")).all();
+    expect(memBefore.length).toBe(1);
+
+    const res = await client.request(`/api/conversations/${id}`, { method: "DELETE" });
+    expect(res.status).toBe(200);
+
+    const afterList = (await (await client.get("/api/conversations")).json()) as Array<{ id: string }>;
+    expect(afterList.some((c) => c.id === id)).toBe(false);
+    expect(db.select().from(conversationTurns).where(eq(conversationTurns.conversationId, id)).all()).toHaveLength(0);
+    // The memory the turn produced (step 2's provenance: source is the
+    // turn id) outlives the deleted chat, exactly the contract's promise.
+    const memAfter = db.select().from(memoryRecords).where(eq(memoryRecords.text, "Friday is pizza night")).all();
+    expect(memAfter.length).toBe(1);
+
+    // The get-by-id route treats a deleted conversation as gone too.
+    expect((await client.get(`/api/conversations/${id}`)).status).toBe(404);
+
+    const row = db.select().from(conversations).where(eq(conversations.id, id)).get()!;
+    expect(row.status).toBe("deleted");
+    expect(row.title).toBeNull();
+    expect(row.summary).toBeNull();
+  });
+});
+
+describe("POST /api/conversations/batch-delete and /clear (step 3, batch-actions rule)", () => {
+  test("batch-delete removes exactly the given ids", async () => {
+    const { client } = await owner();
+    await client.post("/api/conversations", { surface: "chat" });
+    await client.post("/api/conversations", { surface: "overlay" });
+    const list = (await (await client.get("/api/conversations")).json()) as Array<{ id: string }>;
+    expect(list.length).toBe(2);
+
+    const res = await client.request("/api/conversations/batch-delete", { method: "POST", body: { ids: [list[0]!.id] } });
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { deleted: number };
+    expect(body.deleted).toBe(1);
+
+    const after = (await (await client.get("/api/conversations")).json()) as Array<{ id: string }>;
+    expect(after.length).toBe(1);
+  });
+
+  test("clear removes every one of the caller's own conversations", async () => {
+    const { client } = await owner();
+    await client.post("/api/conversations", { surface: "chat" });
+    await client.post("/api/conversations", { surface: "overlay" });
+
+    const res = await client.request("/api/conversations/clear", { method: "POST" });
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { deleted: number };
+    expect(body.deleted).toBe(2);
+
+    const after = (await (await client.get("/api/conversations")).json()) as Array<{ id: string }>;
+    expect(after.length).toBe(0);
+  });
+});
+
+describe("GET /api/conversations/:id/turns (step 3: memory_ids, since)", () => {
+  test("each turn carries memory_ids for records provenanced to it, oldest first", async () => {
+    const { client } = await owner();
+    await client.post("/api/turn", { text: "remember that trash day is Tuesday" });
+    await client.post("/api/turn", { text: "good morning" });
+
+    const list = (await (await client.get("/api/conversations")).json()) as Array<{ id: string }>;
+    const id = list[0]!.id;
+
+    const res = await client.get(`/api/conversations/${id}/turns`);
+    expect(res.status).toBe(200);
+    const turns = (await res.json()) as Array<{ userText: string; memory_ids: string[] }>;
+    expect(turns).toHaveLength(2);
+    expect(turns[0]!.userText).toContain("trash day"); // oldest first
+    expect(turns[0]!.memory_ids.length).toBe(1);
+    expect(turns[1]!.memory_ids.length).toBe(0);
+  });
+
+  test("since filters to turns strictly after the named one", async () => {
+    const { client } = await owner();
+    await client.post("/api/turn", { text: "good morning" });
+    const list = (await (await client.get("/api/conversations")).json()) as Array<{ id: string }>;
+    const id = list[0]!.id;
+    const firstTurns = (await (await client.get(`/api/conversations/${id}/turns`)).json()) as Array<{ id: string }>;
+    const firstTurnId = firstTurns[0]!.id;
+
+    await client.post("/api/turn", { text: "good afternoon" });
+
+    const since = (await (await client.get(`/api/conversations/${id}/turns?since=${firstTurnId}`)).json()) as Array<{ id: string }>;
+    expect(since).toHaveLength(1);
+    expect(since[0]!.id).not.toBe(firstTurnId);
+  });
+
+  // A code review (2026-09-05) found the original timestamp-based tie-
+  // break ("same millisecond, different id") could still re-include an
+  // earlier same-millisecond turn a client had already seen. Three
+  // turns forced to the exact same createdAt millisecond proves the
+  // fix: slicing by POSITION in a stably-sorted list (insertion order
+  // preserved for ties), not by re-comparing timestamps.
+  test("three turns sharing the identical millisecond: since the first still excludes it, includes only the later two", async () => {
+    const { actor } = await owner();
+    const conv = resolveOrCreateConversation(actor, "chat");
+    if (!conv.ok) throw new Error(conv.error);
+    const sameInstant = "2026-09-05T12:00:00.000Z";
+    const sameSafety = { ...SAFE, checked_at: sameInstant };
+    logTurn(actor, "chat", "one", { reply: { text: "r1" }, source: "model", safety: sameSafety, conversation_id: conv.value.id, turn_id: "turn-tie-1" });
+    logTurn(actor, "chat", "two", { reply: { text: "r2" }, source: "model", safety: sameSafety, conversation_id: conv.value.id, turn_id: "turn-tie-2" });
+    logTurn(actor, "chat", "three", { reply: { text: "r3" }, source: "model", safety: sameSafety, conversation_id: conv.value.id, turn_id: "turn-tie-3" });
+
+    const result = listConversationTurns(actor, conv.value.id, { since: "turn-tie-1" });
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.value.map((t) => t.id)).toEqual(["turn-tie-2", "turn-tie-3"]);
   });
 });

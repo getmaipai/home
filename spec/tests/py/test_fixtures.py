@@ -11,6 +11,7 @@ import pytest
 from _standards import load_standards_module
 from pydantic import ValidationError
 
+from gen.py.conversation_schema import Conversation
 from gen.py.entity_schema import Entity
 from gen.py.grant_schema import Grant
 from gen.py.manifest_schema import PackageManifest
@@ -63,6 +64,10 @@ def test_relationship_fixtures(kind: str):
 
 def test_grant_fixture():
     Grant.model_validate(load_fixture("grant.example.json"))
+
+
+def test_conversation_fixture():
+    Conversation.model_validate(load_fixture("conversation.example.json"))
 
 
 @pytest.mark.parametrize("kind", ["memory", "entity", "episode"])

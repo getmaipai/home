@@ -5,7 +5,7 @@ import { resetDb } from "./reset-db";
 import { __resetThrottleForTests } from "@/lib/secretThrottle";
 import { sqlite } from "@/db";
 import { remember } from "@/lib/memory";
-import { logTurn } from "@/lib/conversationHistory";
+import { logTurn, resolveOrCreateConversation } from "@/lib/conversationHistory";
 import { setValue } from "@/lib/settings";
 import { scheduleJob } from "@/lib/scheduler";
 import type { PersonRow } from "@/types";
@@ -397,6 +397,8 @@ describe("deleting a person erases what the household held about them", () => {
       source: "hub",
       importance: 0.5,
     });
+    const conversationResult = resolveOrCreateConversation(toPersonRow(person.id), "chat");
+    if (!conversationResult.ok) throw new Error(conversationResult.error);
     logTurn(toPersonRow(person.id), "chat", "hello", {
       reply: { text: "hi" },
       source: "model",
@@ -408,6 +410,8 @@ describe("deleting a person erases what the household held about them", () => {
         matched_signals: [],
         checked_at: new Date().toISOString(),
       },
+      conversation_id: conversationResult.value.id,
+      turn_id: "turn-testfixture",
     });
     setValue(toPersonRow(person.id), `person:${person.id}`, "tts.voice_id", "alba");
     scheduleJob(toPersonRow(person.id), "joke", "tell", "every:1d", {});
@@ -417,11 +421,13 @@ describe("deleting a person erases what the household held about them", () => {
     const { erased } = (await res.json()) as { erased: Record<string, number> };
     expect(erased.memories).toBeGreaterThan(0);
     expect(erased.conversations).toBeGreaterThan(0);
+    expect(erased.conversationThreads).toBeGreaterThan(0);
     expect(erased.settings).toBeGreaterThan(0);
     expect(erased.scheduledJobs).toBeGreaterThan(0);
 
     expect(countRows("memory_records", "person", person.id)).toBe(0);
     expect(countRows("conversation_turns", "person_id", person.id)).toBe(0);
+    expect(countRows("conversations", "person_id", person.id)).toBe(0);
     expect(countRows("settings_values", "scope", `person:${person.id}`)).toBe(0);
     expect(countRows("scheduled_jobs", "person_id", person.id)).toBe(0);
     expect(countRows("person_credentials", "person_id", person.id)).toBe(0);
@@ -481,6 +487,7 @@ describe("deleting a person erases what the household held about them", () => {
       source: "hub",
       importance: 0.5,
     });
+    resolveOrCreateConversation(toPersonRow(person.id), "chat");
     setValue(toPersonRow(person.id), `person:${person.id}`, "tts.voice_id", "alba");
 
     await owner.request(`/api/people/${person.id}`, { method: "DELETE" });

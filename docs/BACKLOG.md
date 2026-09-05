@@ -371,24 +371,26 @@ into a conversation with someone who knows who is talking.
 
 **Conversation and context**
 
-- [ ] **Send prior turns to the model** (S-M) - a per-person, per-surface
-      window from `conversation_turns`, newest few always kept whole, a
-      rolling summary above that, under the existing prompt budget. Copy
-      the tuned numbers from legacy `routes/chat.ts` (`trimHistory`,
-      `refreshConversationSummary`: 1200-token window, newest 4 turns
-      always kept, summary refreshed before the window drops a band, since
-      "an uncovered band is real amnesia"). Plan 4.5 names "summary" and
-      "context" in the volatile zone but never defines the window; this
-      item defines it.
-- [ ] **A speaker block in the prompt** (S) - pass the actor into
-      `buildSystemPrompt`: display name, nickname, role and age band,
-      locale (`core.locale` is declared and read by nothing), and a
-      locale-formatted local time instead of raw ISO UTC the policy then
-      asks the model to round. The cheapest large step toward
-      "personified".
-- [ ] **A household context block** (S) - who lives here (names, roles),
-      who is present when known, what packages are installed, so "ask
-      Nova to..." and "what can you do" answer from data, not guesswork.
+- [x] **Send prior turns to the model** (S-M) - shipped, Session A step 3
+      (2026-09-05): `buildConversationWindow()` in `lib/conversationHistory.ts`,
+      newest 4 turns always kept verbatim, older ones added
+      most-recent-first under a 1,200-token (chars/4) budget, exactly
+      legacy's numbers. `maybeRefreshConversationSummary()` refreshes the
+      rolling summary post-turn (never in the request path) once at
+      least 4 turns have fallen out of the window since
+      `summary_through_turn`.
+- [x] **A speaker block in the prompt** (S) - shipped, Session A step 1
+      (2026-09-05): display name, nickname, role, an age band (derived
+      from birthdate when present, role otherwise), and locale (the real
+      key is `household.locale`, not `core.locale` as this item names it)
+      with a locale-formatted local time replacing raw ISO UTC.
+- [x] **A household context block** (S) - shipped, Session A step 1
+      (2026-09-05): every active person's display name and role
+      (`lib/access.ts`'s `listActivePeople()`). Presence and "what
+      packages are installed" are not built - presence has no signal
+      source yet (robot/ambient-context, not this session), and the
+      plugins list already exists as its own separate prompt section
+      (`pluginsListLine()`, predates this item).
 - [ ] **Stable-first prompt order with a persona re-anchor** (S) - legacy
       `companionTurn.ts` put static policy first for KV reuse and
       repeated the persona reminder near the end because drift was
@@ -401,6 +403,14 @@ into a conversation with someone who knows who is talking.
       8-14 s of silence. Same test here, per section.
 - [ ] **Rate-limit `/api/turn` and `/api/llm/*` per person** (S) - named
       in `spec/llm/README.md`, tracked nowhere.
+- [ ] **Decide what an emptied conversation becomes** (S decision, found
+      by Session A step 3's own code review, 2026-09-05) -
+      `runRetention()` purges aged-out `conversation_turns` but never
+      touches the `conversations` thread record once every one of its
+      turns is gone, so it lingers forever with `turn_count: 0` and a
+      stale `updated_at`. Auto-close, auto-delete (tombstone), or a
+      household setting are all real options; the contract in
+      `docs/plans/session-a-intelligence.md` doesn't specify one.
 
 **Memory**
 

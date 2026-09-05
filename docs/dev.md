@@ -6010,3 +6010,286 @@ extra DB reads per model-routed turn (`listActivePeople()`,
 handful of people, one indexed settings lookup); adding a cache with
 real invalidation-on-write for a query costing microseconds isn't worth
 the complexity yet, revisit if it ever actually shows up in a profile.
+
+## Session A: step 3, conversations, the window, the rolling summary (2026-09-05)
+
+The single largest step so far: a real `Conversation` spec record,
+turn-window context so "and tomorrow?" has a referent, a rolling
+summary that never runs in the request path, and the full REST contract.
+
+**Spec first.** `spec/schemas/conversation.schema.json`: `id, person,
+surface, companion_id, title, status (open|closed|deleted), summary,
+summary_through_turn, source, hlc, created_at, updated_at` - exactly the
+plan's own field list. `source: hub|local` mirrors `person.schema.json`'s
+own field (a robot's conversations sync as records; its raw utterance
+log never does, 4.14). Fixture, generated TS/Py bindings, both fixture
+suites updated.
+
+**Hub schema**: a new `conversations` table plus
+`conversation_turns.conversation_id` (nullable only for the backfill's
+sake - every real write path sets it now). Migration `0010`:
+drizzle-kit generated the `CREATE TABLE`/`ADD COLUMN`, then a hand-added
+backfill (the same "drizzle-kit can't express a data migration" pattern
+migration `0007`'s skill-to-plugin rename already used) - one
+conversation per pre-existing `(person_id, surface)` pair,
+`'conv-' || lower(hex(randomblob(6)))` for the id (matches the schema's
+pattern, hex is a subset of a-z0-9), a real hlc stamped at backfill time
+(node `backfill`). `CURRENT_SCHEMA_VERSION` bumped to 10.
+
+**One open conversation per (person, surface) at a time, in practice, not
+by constraint.** `resolveOrCreateConversation()` (the implicit,
+turn-time path every real turn goes through) reuses whichever is
+already open; `createConversation()` (the explicit `POST /`, "start a
+new one") closes - never deletes - the previous open one for the same
+pair first. `companion_id` is set at creation from `persona.active_id`
+(always resolves to a real string, the registry default when nobody's
+picked one) - the contract's own words, ahead of companions existing as
+real packages (step 8).
+
+**The window** (`buildConversationWindow()`): legacy's exact numbers,
+copied per the plan's instruction, not re-tuned - newest 4 turns
+verbatim regardless of size, older ones added most-recent-first while
+the running chars/4 estimate stays under 1,200 tokens, oldest dropped
+first past that. Whatever's older than the window is represented by the
+conversation's own rolling `summary` as one line in the prompt's
+volatile zone (`buildSystemPrompt`'s new optional
+`conversationSummaryLine` parameter, capped at 600 chars - a new
+`MAX_SUMMARY_SECTION_CHARS`, same truncation-safety posture the other
+sections already have). **The reason recorded, not just the numbers**:
+legacy found 800 tokens dropped 4-turn back-references, and a stale
+summary "is real amnesia" - the refresh job below exists because of
+that second finding.
+
+**The rolling summary refresh** (`maybeRefreshConversationSummary()`):
+fires from `logTurnSafely()` post-turn, fire-and-forget, never awaited,
+never blocking or failing the turn - the same posture `summarizeBeforeDelete()`
+(4.14) already established. Runs once at least 4 turns (the identical
+`WINDOW_NEWEST_TURNS_KEPT` number, not a separate tuning - the window
+and the refresh trigger are two views of the same boundary) have fallen
+out of the window since `summary_through_turn`. Skipped entirely on the
+stub model (a canned `[stub model...]` line is worse than no summary,
+checked both before AND after the completion call, the same double-check
+`summarizeBeforeDelete()` needs for a process's very first completion
+ever).
+
+**Provenance flows one level deeper.** `turnEngine.ts`'s `prepareTurn()`
+now takes `surface` and a pre-resolved `conversation`, generating this
+turn's id up front as before (step 2) but resolving the conversation
+even earlier, in `runTurn`/`runTurnStream`, before `prepareTurn` runs at
+all - every `TurnValue` (including every immediate branch: safety
+refuse, command, plugin) now carries real `conversation_id`/`turn_id`
+fields, not just the model path. `logTurn()` no longer mints its own
+turn id or takes one as a parameter: it reads `value.turn_id`/
+`value.conversation_id` directly (both always real by the time a
+`TurnValue` exists), so the id that named a plugin's memory provenance
+(step 2) and the id of the row that actually got logged can never
+diverge. `logTurn()` also bumps the conversation's own `updated_at`, so
+`listConversations()`'s "newest first" reflects real activity.
+
+**A real persistence failure in conversation resolution must never crash
+the reply**, the identical contract `logTurn()` already held (step 2's
+own regression test, `a real logTurn DB write failure never turns a
+successful generation into a reported failure`, now exercises this
+earlier point too since conversation resolution runs before a reply is
+generated): `insertNewConversation()` wraps its own insert in a
+try/catch and returns the in-memory row anyway on failure, logged, not
+thrown. An explicit but genuinely invalid `conversation_id` (someone
+else's, or deleted) is a real 400 `invalid_input`, surfaced before
+`prepareTurn()` ever runs - a functional failure, not an infra one, so
+it isn't given this same leniency.
+
+**The full REST contract** (`routes/conversations.ts`, rewritten): `GET
+/` now lists conversation summaries (`{id, surface, companion_id, title,
+turn_count, last_turn_at, created_at}`, joined against
+`conversation_turns` in one extra query, not per-row) instead of a flat
+turn list - that behavior moved to `GET /turns` unchanged, exactly the
+contract's own migration path. `POST /`, `GET /:id` (a real 404 for
+anyone else's, deleted, or nonexistent - never distinguishing "not
+yours" from "doesn't exist"), `GET /:id/turns?since=<turn_id>` (each
+turn's `memory_ids` computed by querying `memory_records` for that exact
+turn's id as `source` - step 2's provenance rule, one batched query, not
+N+1 - rather than a stored, driftable list), `PATCH /:id` (title),
+`DELETE /:id`, `POST /batch-delete`, `POST /clear`.
+
+**DELETE is a tombstone, not a hard delete of the thread record - a
+deliberate judgment call.** `conversations` carries a real `hlc`
+specifically because it's meant to sync (4.14: "a chat begun on the
+robot appears on the phone through the hub... robot turns sync as
+conversation records"), the identical "a row that vanishes looks
+unheard-of to a later sync" reasoning step 10 will formalize for memory
+records - so `DELETE /:id` sets `status: "deleted"` rather than removing
+the row. Its own content is wiped anyway (`title`, `summary`,
+`summary_through_turn` all nulled): a summary is transcript-derived, so
+a genuinely deleted conversation shouldn't leave one sitting under the
+tombstone. The turns themselves - the real transcript - ARE a genuine
+hard delete (`DELETE FROM conversation_turns WHERE conversation_id = ?`).
+Memories the turns produced are untouched, exactly the contract's own
+words: they carry the turn id as provenance and outlive the chat.
+
+**Person deletion gap closed.** `personLifecycle.ts`'s `erasePersonData()`
+deleted `conversation_turns` for a removed person but never the new
+`conversations` table's own `person_id` rows - would have violated
+`no table is left holding rows about a deleted person`
+(`people.test.ts`'s own schema-walking test, which dynamically finds
+every `person_id`/`person`/`creator_id`/`scope` column and would have
+caught this the moment any test exercised it) the first time a deleted
+person had ever held a real conversation. Fixed: a new
+`conversationThreads` count alongside the existing `conversations` count
+(kept as-is, meaning conversation turns, since it predates threads and
+other code already reads it) in `ErasureCounts`.
+
+**Frontend note for Session B, one item URGENT** (this session does not
+touch `frontend/`, per the rules):
+1. **Urgent, a real live break, not just a typecheck failure**: a second
+   code review pass (2026-09-05) traced `frontend/src/apps/chat/
+   ChatPage.tsx:186`'s `.conversations()` call (a real, live call in the
+   shipped chat page, missed by this session's first pass - the earlier
+   claim "nothing in the shipped UI calls it" was checked with too
+   narrow a grep) into `mapRows.ts`'s `rowsToMessages()`, which reads
+   `row.userText`/`row.replyText` on every row. `GET /api/conversations`
+   now returns `ConversationSummary[]` (no such fields) as of this step;
+   the old flat turn list moved to `GET /api/conversations/turns`
+   unchanged (the contract's own stated migration path - `frontend/src/
+   lib/api.ts`'s `conversations: () => request<ConversationTurnRow[]>
+   ("/api/conversations")`, line ~214, needs to call `/turns` instead).
+   Until that one-line fix lands, the household's chat history renders
+   every message blank on load. `ConversationRow`/`ConversationSummary`/
+   `ConversationTurnWithMemoryIds` are all exported from `@/wire` already
+   for when the conversation-aware UI (the rest of the CRUD: `POST /`,
+   `GET/PATCH/DELETE /:id`, `GET /:id/turns`, `POST /batch-delete`,
+   `POST /clear`) gets built.
+2. `frontend/src/apps/chat/ChatPage.test.tsx`'s `makeRow()` helper and
+   `frontend/src/apps/chat/mapRows.test.ts`'s fixtures construct
+   `ConversationTurnRow` literals (imported for real from `@/wire`, never
+   hand-duplicated) that predate the new `conversationId` column - add
+   `conversationId: null` (or a real id) to each.
+3. `frontend/src/apps/chat/ChatPage.tsx`'s streaming-event handler
+   (~line 363, the `if (event.type === "delta") ... else if
+   ("spoken_cue") ... else if ("done") ... else { throw new
+   ApiError(event.error, ...) }` chain) needs a new `else if
+   (event.type === "turn_meta")` branch before the final `else`, which
+   should now only ever match `"error"` - the new `turn_meta` event
+   (this session's contract) is always the first line of every
+   `POST /api/turn/stream` response.
+`POST /api/turn` and `POST /api/turn/stream`'s `done` event also now
+always carry `conversation_id`/`turn_id` on the `TurnValue` - available
+whenever the conversation-aware UI needs them.
+
+**`scripts/check.sh`'s frontend section is red in this worktree because
+of exactly the three items above** - a known, expected, temporary
+cross-worktree state (Session B hasn't reached the point of consuming
+this contract yet; `origin/main` hasn't moved since both sessions
+branched, confirmed via `git fetch` before writing this), not a
+regression this session introduced into anything Session A owns. Spec
+and backend sections of `check.sh` are fully green: 613 backend tests
+(after both review passes' new regression tests), 201 spec tests, 38
+spec pytest, fixture round-trips both languages.
+Per the plan's own instruction ("a step that needs a frontend change:
+write the need into your dev.md section, keep the API additive, and
+continue"), this is not treated as blocking.
+
+Tests: 3 new in `spec/tests/{ts,py}` (the conversation fixture
+round-trips), 3 new `buildConversationWindow()` unit tests (the
+token-budget drop, no summary line when nothing's uncovered, a summary
+line when something is), 3 new `maybeRefreshConversationSummary()` tests
+(too early, stub-skipped, a real stub-shaped refresh), 1 acceptance-style
+test proving a follow-up turn's window contains the prior exchange
+("and tomorrow?"'s real mechanism), a full CRUD suite in
+`conversationHistory.test.ts` (create, close-the-old-one, get/404,
+patch, delete with turns-gone-memories-kept, batch-delete, clear,
+turns-with-memory-ids, since-filtering), and 3 existing tests updated
+for the new schema (`resetDb()`'s deletion order, `people.test.ts`'s
+erasure tests now exercising a real conversation, the moved
+`GET /api/conversations` behavior). Full backend suite green (613, after
+both review passes' fixes).
+Manually verified against the running backend too: two `POST /api/turn`
+calls with no `conversation_id` resolve to the same open conversation;
+`GET /api/conversations/:id/turns` returns both, oldest first.
+
+**Every conversation record is now spec-shaped end to end, not just at
+the schema level.** A code review (2026-09-05) found `POST /` and
+`GET /:id` returning the raw camelCase DB row directly, inconsistent
+with `lib/personShape.ts`/`lib/memoryShape.ts`'s established discipline
+of validating every response through the generated Zod schema before it
+goes out. Fixed: `toConversationRecord()`/`conversationToDbValues()`
+convert both ways, `insertNewConversation()` now validates the
+candidate against `Conversation` before writing (`remember()`'s own
+precedent), and `resolveOrCreateConversation()`/`getConversation()`/
+`updateConversationTitle()` all return the real, snake_case `Conversation`
+type rather than the internal `ConversationRow`. `turnEngine.ts` needed
+no field-access changes at all: the only field it touches (`.id`) is
+spelled identically in both shapes.
+
+**Six more real issues the same review found, all fixed here:**
+`resolveOrCreateConversation()` didn't check a given `conversation_id`'s
+own `surface` matched the turn's, so a chat-surface conversation could
+silently absorb a tv-surface turn; `updateConversationTitle()` was the
+one write path in the file that skipped spec validation (a title over
+the schema's 200-char cap was accepted, `safeParse` now refuses it with
+a clean 400); `hlc` was set once at creation and never regenerated on a
+later write (rename, close-on-new-conversation, delete, the summary
+refresh, the per-turn `updated_at` bump) - now every mutation calls
+`nextHlc()` again, matching `settings.ts`'s own established per-write
+pattern; the migration's backfill gave every newly-created conversation
+the identical `hlc` when a household had more than one `(person,
+surface)` pair predating the column - now `ROW_NUMBER() OVER (...)`
+gives each a distinct counter (verified directly against a scratch
+in-memory SQLite database before trusting it); `GET /:id/turns?since=`
+resolved the `since` turn by id alone with no check it belongs to the
+requested conversation, so a leaked or cross-conversation turn id
+supplied a valid-looking cutoff - now scoped to the conversation, plus a
+same-millisecond tiebreak (id, not just timestamp) so two turns logged
+in the same millisecond can't make the very next one vanish from a
+polling client; `conversation_turns` had no index on `conversation_id`
+despite being the primary filter for `buildConversationWindow()` and
+`maybeRefreshConversationSummary()` on every model-routed turn - a new
+`conversation_turns_conversation_id_idx` closes it.
+
+**Two findings deliberately not fixed, recorded rather than papered
+over:** `runRetention()` purges aged-out `conversation_turns` rows but
+never touches the `conversations` thread record once every one of its
+turns is gone, so an emptied conversation lingers indefinitely with
+`turn_count: 0` - a real gap, but deciding what an emptied conversation
+*should* become (auto-close? auto-delete? a household setting?) is a
+product decision this step's own contract doesn't specify, tracked as a
+new BACKLOG item rather than guessed at. A concurrent-create race on
+"one open conversation per (person, surface)" (two simultaneous requests
+with no `conversation_id` both finding none open) is real in principle
+but not exploitable in this codebase's actual runtime: `bun:sqlite`
+calls are synchronous and `resolveOrCreateConversation()`/
+`insertNewConversation()` contain no `await` between the read and the
+write, so within one Bun process (single-threaded for synchronous code)
+two requests can't actually interleave mid-function - revisit only if
+the hub ever runs multi-process.
+
+**A second review pass on the fixes above found eight more real issues,
+all fixed:** the frontend break above (traced properly this time, not
+just grepped); the `since` tie-break fix from the first pass could still
+re-include an already-seen turn when three or more turns shared the
+exact same millisecond (`r.id !== sinceId` only ever excluded the one
+named turn, not everything at-or-before it) - rewritten to slice by
+POSITION in a stably-sorted list instead of re-comparing timestamps at
+all, which resolves `since` to an exact "everything after this row",
+not an approximation; `POST /api/conversations` didn't validate
+`surface` before calling `Conversation.parse()`, so a bogus value threw
+an uncaught ZodError (an unhandled 500) instead of a clean 400 matching
+`POST /api/turn`'s own handling of the identical bad input - now
+checked against `Conversation.shape.surface.options` (the spec's own
+enum, not a hand-copied list) before any write; the `conversations`
+table itself had no index for `(person_id, surface, status)` despite
+being queried on every turn, the same gap `conversation_turns` had
+already been caught and fixed for; `logTurn()`'s insert-then-update pair
+had no transaction, unlike `lib/secret.ts`'s `recordFailedAttempt()` and
+`lib/memoryId.ts`'s `nextSeq` which already use `sqlite.transaction()`
+for exactly this "both writes commit together or not at all" reason -
+now wrapped; `conversation_id`/`turn_id` were copy-pasted into all five
+of `prepareTurn()`'s immediate-return sites - now stamped once by a
+small local `immediate()` helper; `buildConversationWindow()`/
+`maybeRefreshConversationSummary()` fetched and JS-sorted a
+conversation's ENTIRE history on every model-routed turn with no bound -
+now capped at the 200 most recent rows (`WINDOW_ROW_FETCH_LIMIT`, far
+more than the 1,200-token budget could ever actually use, so this never
+changes which turns end up in a real window); and `routes/
+conversations.ts` inlined the `{error, status}` response shape four
+times instead of the one-line `fail()` helper every sibling route file
+already has.

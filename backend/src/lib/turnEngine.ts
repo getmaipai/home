@@ -20,7 +20,7 @@ import { recall, bumpUsage, type RecallMatch } from "@/lib/memory";
 import { newConversationTurnId } from "@/lib/id";
 import { complete, startCompleteStream, type LlmMessage } from "@/lib/llm";
 import { tokenize } from "@/lib/text";
-import { logTurn } from "@/lib/conversationHistory";
+import { logTurn, resolveOrCreateConversation, buildConversationWindow, maybeRefreshConversationSummary } from "@/lib/conversationHistory";
 import { pickRefusalVariant, varyKnownConstant } from "@/lib/replyVariation";
 import { normalizeForSpeech } from "@maipai/spec/voice/ts/normalizeForSpeech.js";
 import { getPersonSettingValue, getHouseholdSettingValue } from "@/lib/settings";
@@ -35,6 +35,7 @@ import type { SafetyResult } from "@maipai/spec/gen/ts/safety-result.js";
 // dependency instead of a hand-duplicated mirror); re-exported here since
 // this is where callers already look for them.
 import type { TurnValue } from "@/wire";
+import type { Conversation } from "@maipai/spec/gen/ts/conversation.js";
 export type { TurnReply, TurnValue } from "@/wire";
 
 // 4.5 names six surfaces (chat, overlay, pod, robot, tv, phone), each
@@ -67,12 +68,20 @@ export type TurnOpResult = { ok: true; value: TurnValue } | TurnFailure;
  * already fully, correctly rendered to the household. There is nothing
  * useful left to retract at that point; the failure is real but belongs
  * in the server log, not in the household's chat thread. */
-function logTurnSafely(actor: PersonRow, surface: Surface, userText: string, value: TurnValue, turnId: string): void {
+function logTurnSafely(actor: PersonRow, surface: Surface, userText: string, value: TurnValue): void {
   try {
-    logTurn(actor, surface, userText, value, turnId);
+    logTurn(actor, surface, userText, value);
   } catch (err) {
     console.error(`[turn] logTurn failed for an otherwise-successful turn: ${(err as Error).message}`);
   }
+  // Post-turn, fire-and-forget (step 3: "it never runs in the request
+  // path"): whether this conversation's rolling summary needs a refresh.
+  // Never awaited and never allowed to affect the turn's own outcome,
+  // the same posture safety.flagged_turn's notification already takes
+  // just above prepareTurn() in this file.
+  maybeRefreshConversationSummary(value.conversation_id).catch((err: unknown) =>
+    console.error(`[turn] conversation summary refresh failed: ${(err as Error).message}`),
+  );
 }
 
 const CRISIS_RESOURCES_TEXT =
@@ -130,6 +139,10 @@ const MAX_MEMORY_SNIPPETS = 5;
 const MAX_MEMORY_SECTION_CHARS = 800;
 const MAX_PLUGINS_SECTION_CHARS = 800;
 const MAX_SKILLS_SECTION_CHARS = 1200;
+// Step 3: one line, so a generous cap is plenty; guards the same way
+// every other section does against a runaway conversation summary ever
+// dominating the prompt on its own.
+const MAX_SUMMARY_SECTION_CHARS = 600;
 // A cap on how many matching skills compose into one turn, not just a
 // character budget: even under budget, five unrelated skills all
 // clearing the threshold on a short utterance is a real sign the
@@ -273,6 +286,12 @@ export function buildSystemPrompt(
   loaded: LoadedManifest[] = loadAllManifests(),
   persona: Persona = DEFAULT_PERSONA,
   skills: LoadedSkill[] = loadAllSkills(),
+  // Step 3: the conversation's own rolling summary (buildConversationWindow(),
+  // lib/conversationHistory.ts), one line covering whatever fell out of
+  // the verbatim window - 4.5 names "summary" in the volatile zone; full
+  // stable-first re-ordering and per-section budgets are step 4's job,
+  // not this one.
+  conversationSummaryLine?: string,
 ): string {
   const now = new Date();
   const localeValue = getHouseholdSettingValue("household.locale");
@@ -297,6 +316,11 @@ export function buildSystemPrompt(
     skillsPart = skillsPart.slice(0, MAX_SKILLS_SECTION_CHARS) + "...";
   }
 
+  let summarySection = conversationSummaryLine ? `\n\n${conversationSummaryLine}` : "";
+  if (summarySection.length > MAX_SUMMARY_SECTION_CHARS) {
+    summarySection = summarySection.slice(0, MAX_SUMMARY_SECTION_CHARS) + "...";
+  }
+
   const speakerAndHousehold = speakerLine(actor, locale, now) + householdLine();
   const localTimeLine = `\n\nLocal time: ${formatLocalTime(now, locale)}`;
 
@@ -313,7 +337,8 @@ export function buildSystemPrompt(
   // budget") by including them in the truncatable body rather than
   // appending them after the slice the way the time line is.
   const registerFragment = composePersonaPrompt(persona) + " " + INFORMATION_HANDLING_POLICY;
-  let body = STABLE_SYSTEM_PREFIX + " " + registerFragment + speakerAndHousehold + pluginsSection + memorySection + skillsPart;
+  let body =
+    STABLE_SYSTEM_PREFIX + " " + registerFragment + speakerAndHousehold + pluginsSection + memorySection + summarySection + skillsPart;
   const bodyBudget = Math.max(0, PROMPT_SYSTEM_CHAR_BUDGET - localTimeLine.length);
   if (body.length > bodyBudget) body = body.slice(0, bodyBudget);
 
@@ -465,11 +490,23 @@ type PreparedTurn =
  * of anything it wrote to memory". */
 async function prepareTurn(
   actor: PersonRow,
+  surface: Surface,
   text: string,
   loaded: LoadedManifest[],
+  conversation: Conversation,
   skills: LoadedSkill[] = loadAllSkills(),
 ): Promise<PreparedTurn> {
   const turnId = newConversationTurnId();
+  // Stamps conversation_id/turn_id exactly once, rather than at each of
+  // this function's five immediate-return sites (a code review,
+  // 2026-09-05, found the two fields copy-pasted into every one of
+  // them - a future branch added here is a copy-paste-and-forget site
+  // waiting to happen).
+  const immediate = (value: Omit<TurnValue, "conversation_id" | "turn_id">): PreparedTurn => ({
+    kind: "immediate",
+    value: { ...value, conversation_id: conversation.id, turn_id: turnId },
+    turnId,
+  });
   const safety = evaluateSafety(text, actor.role as Role);
   if (safety.notify_parent) {
     // SafetyResult's own schema comment named this exact wiring as a
@@ -495,7 +532,7 @@ async function prepareTurn(
     // now-deleted REFUSAL_TEXT constant here, which looked editable but
     // silently wasn't). Any placeholder works; this one just reads
     // sensibly in a debugger or log before finalizeReply runs.
-    return { kind: "immediate", value: { reply: { text: "I can't help with that." }, source: "safety_refuse", safety }, turnId };
+    return immediate({ reply: { text: "I can't help with that." }, source: "safety_refuse", safety });
   }
   const crisisResources = safety.action === "allow_with_resources" ? CRISIS_RESOURCES_TEXT : undefined;
 
@@ -510,30 +547,22 @@ async function prepareTurn(
   if (matchedCommand) {
     const result = await runCommand(matchedCommand);
     if (result.ok) {
-      return {
-        kind: "immediate",
-        value: {
-          reply: { text: result.value.text, speech: result.value.speech },
-          source: "command",
-          command_id: matchedCommand.id,
-          safety,
-          crisis_resources: crisisResources,
-        },
-        turnId,
-      };
-    }
-    console.log(`[turn] command ${matchedCommand.id} matched but failed to run: ${result.error}`);
-    return {
-      kind: "immediate",
-      value: {
-        reply: { text: "Sorry, I couldn't do that." },
-        source: "command_error",
+      return immediate({
+        reply: { text: result.value.text, speech: result.value.speech },
+        source: "command",
         command_id: matchedCommand.id,
         safety,
         crisis_resources: crisisResources,
-      },
-      turnId,
-    };
+      });
+    }
+    console.log(`[turn] command ${matchedCommand.id} matched but failed to run: ${result.error}`);
+    return immediate({
+      reply: { text: "Sorry, I couldn't do that." },
+      source: "command_error",
+      command_id: matchedCommand.id,
+      safety,
+      crisis_resources: crisisResources,
+    });
   }
 
   const routed = route(text, actor, loaded);
@@ -555,11 +584,7 @@ async function prepareTurn(
     const result = await runPlugin(routed.id, actor, routed.args, turnId);
     if (result.ok) {
       const reply = result.value.reply ?? { text: "Done." };
-      return {
-        kind: "immediate",
-        value: { reply, source: "plugin", plugin_id: routed.id, safety, crisis_resources: crisisResources },
-        turnId,
-      };
+      return immediate({ reply, source: "plugin", plugin_id: routed.id, safety, crisis_resources: crisisResources });
     }
     // A pre-filtered deterministic match failing at runPlugin is a real, if
     // rare, gap (a role change or a bad manifest between the router's
@@ -570,17 +595,13 @@ async function prepareTurn(
     // 2026-09-04, flagged this could otherwise look indistinguishable from
     // a real success to a caller branching on `.ok` alone).
     console.log(`[turn] plugin ${routed.id} matched but failed to run: ${result.error}`);
-    return {
-      kind: "immediate",
-      value: {
-        reply: { text: "Sorry, I couldn't do that." },
-        source: "plugin_error",
-        plugin_id: routed.id,
-        safety,
-        crisis_resources: crisisResources,
-      },
-      turnId,
-    };
+    return immediate({
+      reply: { text: "Sorry, I couldn't do that." },
+      source: "plugin_error",
+      plugin_id: routed.id,
+      safety,
+      crisis_resources: crisisResources,
+    });
   }
 
   // selfOnly: true (step 2's privacy fix) - a person's own turn must
@@ -590,7 +611,13 @@ async function prepareTurn(
   // every one of recall()'s top-20 candidates.
   const memoryMatches = recall(actor, text, { selfOnly: true, bumpUsage: false });
   const persona = resolvePersona(getPersonSettingValue(actor, "persona.active_id"));
-  const systemPrompt = buildSystemPrompt(actor, text, memoryMatches, loaded, persona, skills);
+  // The follow-up-turn context (step 3): "and tomorrow?" needs the prior
+  // exchange in the messages array, not just in the system prompt's own
+  // text - buildConversationWindow() returns both the verbatim
+  // user/assistant messages AND, when older turns exist beyond them, one
+  // summary line for the system prompt's volatile zone.
+  const window = buildConversationWindow(conversation);
+  const systemPrompt = buildSystemPrompt(actor, text, memoryMatches, loaded, persona, skills, window.summaryLine);
   // Bumping the top MAX_MEMORY_SNIPPETS candidates unconditionally was
   // wrong (a code review, 2026-09-05): buildSystemPrompt's own
   // MAX_MEMORY_SECTION_CHARS truncation, or the outer PROMPT_SYSTEM_CHAR_
@@ -608,6 +635,7 @@ async function prepareTurn(
   bumpUsage(actuallyInjected);
   const messages: LlmMessage[] = [
     { role: "system", content: systemPrompt },
+    ...window.messages,
     { role: "user", content: text },
   ];
   return { kind: "model", messages, safety, crisisResources, turnId };
@@ -663,7 +691,7 @@ export async function runTurn(
   actor: PersonRow,
   surface: Surface,
   text: string,
-  opts: { thinking?: boolean } = {},
+  opts: { thinking?: boolean; conversationId?: string } = {},
 ): Promise<TurnOpResult> {
   if (!IMPLEMENTED_SURFACES.has(surface)) {
     return {
@@ -677,8 +705,19 @@ export async function runTurn(
     return { ok: false, status: 400, code: "invalid_input", error: "text is required" };
   }
 
+  // Resolved before prepareTurn() runs (step 3's contract: "conversation_id
+  // absent means the actor's open conversation for that surface, created
+  // if none"): a given but invalid/foreign id is a real 400, the same
+  // "validate first, prepareTurn assumes valid inputs" shape this
+  // function's own surface/text checks above already establish.
+  const conversationResult = resolveOrCreateConversation(actor, surface, opts.conversationId);
+  if (!conversationResult.ok) {
+    return { ok: false, status: 400, code: "invalid_input", error: conversationResult.error };
+  }
+  const conversation = conversationResult.value;
+
   const loaded = loadAllManifests(); // one catalog scan, shared below
-  const prepared = await prepareTurn(actor, text, loaded);
+  const prepared = await prepareTurn(actor, surface, text, loaded, conversation);
 
   let value: TurnValue;
   if (prepared.kind === "immediate") {
@@ -693,11 +732,13 @@ export async function runTurn(
       source: "model",
       safety: prepared.safety,
       crisis_resources: prepared.crisisResources,
+      conversation_id: conversation.id,
+      turn_id: prepared.turnId,
     };
   }
 
   value = finalizeReply(actor, value);
-  logTurnSafely(actor, surface, text, value, prepared.turnId);
+  logTurnSafely(actor, surface, text, value);
   return { ok: true, value };
 }
 
@@ -707,6 +748,12 @@ export type TurnStreamResult =
   | {
       ok: true;
       kind: "stream";
+      /** Known before a single token streams (the conversation is
+       * resolved and the turn id minted up front, step 2/3): routes/
+       * turn.ts's contract requires these as the very first NDJSON line
+       * ("turn_meta"), before any delta. */
+      conversationId: string;
+      turnId: string;
       tokens: AsyncGenerator<string, void, void>;
       /** Builds the final TurnValue once the caller has drained `tokens`
        * to completion and knows the full reply text - also logs the turn
@@ -730,7 +777,7 @@ export async function runTurnStream(
   actor: PersonRow,
   surface: Surface,
   text: string,
-  opts: { thinking?: boolean } = {},
+  opts: { thinking?: boolean; conversationId?: string } = {},
 ): Promise<TurnStreamResult> {
   if (!IMPLEMENTED_SURFACES.has(surface)) {
     return {
@@ -744,12 +791,18 @@ export async function runTurnStream(
     return { ok: false, status: 400, code: "invalid_input", error: "text is required" };
   }
 
+  const conversationResult = resolveOrCreateConversation(actor, surface, opts.conversationId);
+  if (!conversationResult.ok) {
+    return { ok: false, status: 400, code: "invalid_input", error: conversationResult.error };
+  }
+  const conversation = conversationResult.value;
+
   const loaded = loadAllManifests();
-  const prepared = await prepareTurn(actor, text, loaded);
+  const prepared = await prepareTurn(actor, surface, text, loaded, conversation);
 
   if (prepared.kind === "immediate") {
     const value = finalizeReply(actor, prepared.value);
-    logTurnSafely(actor, surface, text, value, prepared.turnId);
+    logTurnSafely(actor, surface, text, value);
     return { ok: true, kind: "immediate", value };
   }
 
@@ -766,6 +819,8 @@ export async function runTurnStream(
   return {
     ok: true,
     kind: "stream",
+    conversationId: conversation.id,
+    turnId: prepared.turnId,
     tokens: started.tokens,
     finalize: (replyText: string): TurnValue => {
       const value: TurnValue = finalizeReply(actor, {
@@ -773,8 +828,10 @@ export async function runTurnStream(
         source: "model",
         safety: prepared.safety,
         crisis_resources: prepared.crisisResources,
+        conversation_id: conversation.id,
+        turn_id: prepared.turnId,
       });
-      logTurnSafely(actor, surface, text, value, prepared.turnId);
+      logTurnSafely(actor, surface, text, value);
       return value;
     },
   };
