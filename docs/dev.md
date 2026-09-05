@@ -2759,14 +2759,21 @@ need it, not on a fixed schedule.
       rest of 4.11 (every role but `chat`, the real engine and residency
       policy, streaming/tools/JSON-schema on the chat contract); the rest
       of 4.14 (search, summarization, an audit log, robot parity); and the
-      rest of 2.5 (a multi-store registry, `hub`/`smb` targets, a size
-      cap, the restore drill, an HTTP restore route).
+      rest of 2.5 (a multi-store registry, `hub`/`smb` targets, the
+      restore drill, an HTTP restore route - the size cap landed
+      2026-09-04, see the Backups entry above).
 - [ ] The shell and kit, Chat and Companions as packages, the wizard,
       self-update, updates (2.4, blocked on a real release existing to
       update to or from) - not started.
-- [ ] README.md still needs the full org skeleton (logo, screenshot strip,
-      status) once there is a running app to screenshot; today's README is
-      a placeholder.
+- [x] ~~README.md still needs the full org skeleton~~ - stale: the real
+      README (logo, hero screenshot via `scripts/screenshot.ts`, features,
+      getting started, status, the disclaimer block, license line) landed
+      2026-09-04 (`f28145e`). This session's own features list was out of
+      date with everything shipped since (Memory, Voice, Backups); updated
+      in the same pass as this note. Still genuinely missing, not stale:
+      the three-tier doc split (`user`/`dev`/`api`) - only `dev/` exists,
+      so the README's doc link stays singular and honest about that until
+      the others do.
 
 ## Code review pass, 2026-09-04
 

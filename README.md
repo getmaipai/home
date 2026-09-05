@@ -22,6 +22,12 @@ Nothing leaves your house.
 - **Chat**: talk with your own AI, running entirely on your hardware.
 - **People**: a real household roster with PIN/password sign-in per person,
   including kid-safe profiles that need no password at all.
+- **Memory**: see what your household's AI has actually learned, and
+  archive anything you'd rather it forget.
+- **Voice**: pick from 26 built-in voices, browse a 2,000+ voice community
+  catalog, or clone a voice from your own recording.
+- **Backups**: automatic, encrypted, on a schedule, with old ones pruned
+  for you.
 - **Settings**: household preferences like conversation retention and
   language, changed live, no restart.
 
