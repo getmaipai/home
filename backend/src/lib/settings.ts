@@ -309,6 +309,21 @@ export function getPersonSettingValue(actor: PersonRow, key: string): unknown {
   return resolveStoredValue(`person:${actor.id}`, keyDef);
 }
 
+/** ANY person's own setting, with no actor gate - the `getHouseholdSettingValue`
+ * posture above, extended to `person`-scope: a real system operation acting
+ * ON a person's behalf (lib/notifications.ts resolving a notification
+ * RECIPIENT's own channel preferences and Telegram chat id before
+ * delivering something to them) isn't that person reading their own
+ * settings, so `getPersonSettingValue`'s safe-by-construction "always the
+ * caller's own id" design doesn't fit here - the caller here is the
+ * system, not the person. Never exposed through a route, same as
+ * `getHouseholdSettingValue`. */
+export function getSettingValueForPerson(personId: string, key: string): unknown {
+  const keyDef = getRegistryKey(key);
+  if (!keyDef || keyDef.scope !== "person") return undefined;
+  return resolveStoredValue(`person:${personId}`, keyDef);
+}
+
 /** Sets the signed-in actor's own `tts.voice_id` to an arbitrary value
  * the `select` selector's fixed 26-name option list would normally
  * reject - the community voice catalog (2026-09-04, lib/voiceCatalog.ts)

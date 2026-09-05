@@ -31,6 +31,8 @@ const SECTION_TITLES: Record<string, string> = {
   // the browser (2026-09-05).
   "household.ai": "AI model tuning",
   "household.integrations": "Integrations",
+  "household.notifications": "Notifications",
+  "person.notifications": "Notifications",
 };
 
 export function sectionTitle(id: string): string {

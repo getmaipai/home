@@ -49,3 +49,10 @@ export function newClonedVoiceId(): string {
 export function newCommandId(): string {
   return `cmd-${randomSuffix(10)}`;
 }
+
+// Not a spec-shaped id either (a delivered notification is hub-internal
+// for the same reason scheduledJobs/commands are - see
+// lib/notifications.ts's own header).
+export function newNotificationId(): string {
+  return `notif-${randomSuffix(10)}`;
+}

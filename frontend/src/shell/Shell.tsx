@@ -4,6 +4,7 @@ import { Avatar } from "@/kit/components/Avatar";
 import { Button } from "@/kit/components/Button";
 import { getIcon } from "@/kit/icons";
 import { cn } from "@/kit/utils";
+import { NotificationBell } from "@/shell/NotificationBell";
 import type { Roster } from "@/lib/api";
 
 interface ShellProps {
@@ -27,13 +28,16 @@ const NAV_ENTRIES = [
 
 // docs/UI.md > the shell contract: "the platform owns all chrome... a
 // package never writes its own chrome." Tonight's real minimum: a top
-// bar (wordmark, signed-in person, sign out) and a nav rail with real
-// routing between the two pages that exist. Deferred, one-line each
-// (full list in docs/dev.md): the right pane, command palette, a
-// settings/admin modal (Settings is a full page tonight, not the
-// gear-in-header sheet docs/SETTINGS.md describes), breadcrumbs, toasts,
-// the player bar, and the phone/TV per-surface chrome adaptation (bottom
-// bar, focusable rail) - nothing has been tested at those surfaces yet.
+// bar (wordmark, notification bell, signed-in person, sign out) and a
+// nav rail with real routing between the pages that exist.
+// NotificationBell (2026-09-05) closes the "toasts" item this comment
+// used to list as deferred - see docs/dev.md's notification-system
+// entry. Still deferred, one-line each (full list in docs/dev.md): the
+// right pane, command palette, a settings/admin modal (Settings is a
+// full page tonight, not the gear-in-header sheet docs/SETTINGS.md
+// describes), breadcrumbs, the player bar, and the phone/TV per-surface
+// chrome adaptation (bottom bar, focusable rail) - nothing has been
+// tested at those surfaces yet.
 export function Shell({ person, onSignOut, children }: ShellProps) {
   const LogOutIcon = getIcon("log-out");
 
@@ -43,6 +47,7 @@ export function Shell({ person, onSignOut, children }: ShellProps) {
         <img src="/brand/maipai-home-logo-light.png" alt="MaiPai Home" className="h-7 w-auto brand-logo-light" />
         <img src="/brand/maipai-home-logo-dark.png" alt="MaiPai Home" className="h-7 w-auto brand-logo-dark" />
         <div className="flex items-center gap-3">
+          <NotificationBell />
           <Avatar name={person.display_name} className="h-9 w-9 text-sm" />
           <span className="hidden text-sm sm:inline">{person.display_name}</span>
           <Button variant="ghost" size="icon" onClick={onSignOut} aria-label="Sign out">

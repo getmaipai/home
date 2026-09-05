@@ -15,6 +15,7 @@ import { evaluateSafety } from "@/lib/safety";
 import { listPackageIds, loadPackage, meetsMinRole, runPlugin } from "@/lib/plugins";
 import { loadAllSkills, type LoadedSkill } from "@/lib/skills";
 import { matchCommand, runCommand } from "@/lib/commands";
+import { trigger } from "@/lib/notifications";
 import { recall, type RecallMatch } from "@/lib/memory";
 import { complete, startCompleteStream, type LlmMessage } from "@/lib/llm";
 import { tokenize } from "@/lib/text";
@@ -366,6 +367,22 @@ async function prepareTurn(
   skills: LoadedSkill[] = loadAllSkills(),
 ): Promise<PreparedTurn> {
   const safety = evaluateSafety(text, actor.role as Role);
+  if (safety.notify_parent) {
+    // SafetyResult's own schema comment named this exact wiring as a
+    // "later hub release" gap the day the field was written: notify_parent
+    // has been computed correctly since safety.ts shipped, but nothing
+    // before lib/notifications.ts existed to deliver it - it only ever
+    // reached a console.log line. Fired regardless of `action`
+    // (allow_with_resources and refuse can both flag a minor's turn), and
+    // BEFORE the refuse branch below returns, so a refused turn still
+    // notifies. Never awaited: notifying a parent must never add latency
+    // to, or ever be able to fail, the turn itself (this function's own
+    // "never throws" contract - notifications.ts's trigger() already
+    // upholds it, this just doesn't block on it too).
+    trigger("safety.flagged_turn", { childName: actor.displayName, categories: safety.categories.join(", ") }).catch((err: unknown) =>
+      console.error(`[turn] safety.flagged_turn notification failed: ${(err as Error).message}`),
+    );
+  }
   if (safety.action === "refuse") {
     // The text here is never actually seen: finalizeReply() unconditionally
     // replaces it via pickRefusalVariant() for every `safety_refuse`

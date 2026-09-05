@@ -8,6 +8,7 @@ import { PeoplePage } from "@/apps/people/PeoplePage";
 import { MemoryPage } from "@/apps/memory/MemoryPage";
 import { PrivacyPage } from "@/apps/privacy/PrivacyPage";
 import { Progress } from "@/kit/primitives/Progress";
+import { ToastProvider } from "@/kit/primitives/Toast";
 import { api, type Roster } from "@/lib/api";
 
 // Sign-in gate -> shell -> routed pages. A router (react-router-dom)
@@ -55,19 +56,21 @@ export function App() {
   }
 
   return (
-    <BrowserRouter>
-      <Shell person={person} onSignOut={() => api.logout().finally(() => setPerson(null))}>
-        <Routes>
-          <Route path="/" element={<ChatPage person={person} />} />
-          <Route path="/people" element={<PeoplePage person={person} />} />
-          <Route path="/memory" element={<MemoryPage />} />
-          <Route path="/privacy" element={<PrivacyPage />} />
-          <Route
-            path="/settings"
-            element={<SettingsPage person={person} onPersonChange={revalidatePerson} />}
-          />
-        </Routes>
-      </Shell>
-    </BrowserRouter>
+    <ToastProvider>
+      <BrowserRouter>
+        <Shell person={person} onSignOut={() => api.logout().finally(() => setPerson(null))}>
+          <Routes>
+            <Route path="/" element={<ChatPage person={person} />} />
+            <Route path="/people" element={<PeoplePage person={person} />} />
+            <Route path="/memory" element={<MemoryPage />} />
+            <Route path="/privacy" element={<PrivacyPage />} />
+            <Route
+              path="/settings"
+              element={<SettingsPage person={person} onPersonChange={revalidatePerson} />}
+            />
+          </Routes>
+        </Shell>
+      </BrowserRouter>
+    </ToastProvider>
   );
 }

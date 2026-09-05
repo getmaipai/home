@@ -242,3 +242,15 @@ export interface CommandRow {
   action: CommandAction;
   createdAt: string;
 }
+
+// Mirrors lib/notifications.ts's NotificationDeliveryView (hand-copied,
+// same reason as CommandRow/RoutingStats above).
+export interface NotificationDeliveryView {
+  id: string;
+  typeId: string;
+  text: string;
+  channels: ("in_app" | "telegram")[];
+  createdAt: string;
+  readAt: string | null;
+  dismissedAt: string | null;
+}

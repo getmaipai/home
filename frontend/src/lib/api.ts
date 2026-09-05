@@ -20,6 +20,7 @@ import type {
   PendingRestore,
   CommandRow,
   CommandAction,
+  NotificationDeliveryView,
 } from "@maipai/home-backend/src/wire";
 import { isOwnerOrAdminRole } from "@maipai/home-backend/src/wire";
 import { readTextLines } from "@maipai/spec/streaming/ts/lineReader.js";
@@ -43,7 +44,7 @@ export type Role = Person["role"];
 // depends on @maipai/home-backend as a workspace package for this;
 // re-export the types here so the rest of the frontend imports from one
 // place.
-export type { Roster, TurnValue, TurnStreamEvent, ConversationTurnRow, ResolvedSetting, BackupInfo, HardwareInfo, ModelFit, ModelJob, EngineStatus, EngineStatsSample, ClonedVoiceInfo, RoutingStats, PrivacyConnection, PendingRestore, CommandRow, CommandAction };
+export type { Roster, TurnValue, TurnStreamEvent, ConversationTurnRow, ResolvedSetting, BackupInfo, HardwareInfo, ModelFit, ModelJob, EngineStatus, EngineStatsSample, ClonedVoiceInfo, RoutingStats, PrivacyConnection, PendingRestore, CommandRow, CommandAction, NotificationDeliveryView };
 export type { MemoryRecord };
 export { isOwnerOrAdminRole };
 // SettingsKey is spec-generated (@maipai/spec), not backend-only, so it's
@@ -299,6 +300,12 @@ export const api = {
     request<CommandRow>("/api/commands", { method: "POST", body: JSON.stringify(input) }),
   deleteCommand: (id: string) =>
     request<{ id: string }>(`/api/commands/${encodeURIComponent(id)}`, { method: "DELETE" }),
+  notifications: () => request<NotificationDeliveryView[]>("/api/notifications"),
+  notificationHistory: () => request<NotificationDeliveryView[]>("/api/notifications/history"),
+  markNotificationRead: (id: string) =>
+    request<NotificationDeliveryView>(`/api/notifications/${encodeURIComponent(id)}/read`, { method: "POST" }),
+  dismissNotification: (id: string) =>
+    request<{ id: string }>(`/api/notifications/${encodeURIComponent(id)}/dismiss`, { method: "POST" }),
   memories: () => request<MemoryRecord[]>("/api/memory"),
   archiveMemory: (id: string) =>
     request<MemoryRecord>(`/api/memory/${encodeURIComponent(id)}/archive`, { method: "POST" }),

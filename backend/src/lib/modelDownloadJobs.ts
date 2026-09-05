@@ -21,6 +21,7 @@ import { downloadUrl } from "@/lib/modelDownload";
 import { extractArchive } from "@/lib/archive";
 import { setHouseholdSettingValue } from "@/lib/settings";
 import { getChatClient, restartChatBackend, getLastPostLoadCheck } from "@/lib/llmSupervisor";
+import { trigger } from "@/lib/notifications";
 
 export type JobStatus =
   | "queued"
@@ -218,8 +219,21 @@ async function runSelectJob(modelId: string): Promise<void> {
       postLoadCheck: postLoadCheck ? JSON.stringify(postLoadCheck) : null,
       error: null,
     });
+    // A download can genuinely take minutes to hours; whoever started it
+    // may well have navigated away by the time it finishes rather than
+    // watching this same page's own progress bar the whole time - the
+    // real value of a notification here at all. `model` is in scope from
+    // the lookup above rather than re-derived from `modelId`.
+    trigger("model.download_ready", { modelName: model.label }).catch((err: unknown) =>
+      console.error(`[models] model.download_ready notification failed: ${(err as Error).message}`),
+    );
   } catch (err) {
-    upsertJob(modelId, { status: "failed", phase: "failed", error: (err as Error).message });
+    const message = (err as Error).message;
+    upsertJob(modelId, { status: "failed", phase: "failed", error: message });
+    const label = CATALOG.find((m) => m.id === modelId)?.label ?? modelId;
+    trigger("model.download_failed", { modelName: label, error: message }).catch((notifyErr: unknown) =>
+      console.error(`[models] model.download_failed notification failed: ${(notifyErr as Error).message}`),
+    );
   }
 }
 

@@ -159,6 +159,60 @@
     ]
   },
   {
+    "key": "notifications.model.download_failed.telegram",
+    "scope": "person",
+    "selector": "boolean",
+    "default": false,
+    "label": "Telegram me when a model download fails",
+    "level": "basic",
+    "secret": false,
+    "lives_in": "person.notifications",
+    "honoured_by": [
+      "home"
+    ]
+  },
+  {
+    "key": "notifications.model.download_ready.telegram",
+    "scope": "person",
+    "selector": "boolean",
+    "default": false,
+    "label": "Telegram me when a model finishes downloading",
+    "level": "basic",
+    "secret": false,
+    "lives_in": "person.notifications",
+    "honoured_by": [
+      "home"
+    ]
+  },
+  {
+    "key": "notifications.telegram.bot_token",
+    "scope": "household",
+    "selector": "text",
+    "default": "",
+    "label": "Telegram bot token",
+    "help": "A bot token from @BotFather, used to send notifications to Telegram. One bot for the whole household; each person links their own chat below.",
+    "level": "advanced",
+    "secret": true,
+    "lives_in": "household.notifications",
+    "honoured_by": [
+      "home"
+    ]
+  },
+  {
+    "key": "notifications.telegram.chat_id",
+    "scope": "person",
+    "selector": "text",
+    "default": "",
+    "label": "Your Telegram chat id",
+    "help": "Message the household bot once, then paste the chat id it replies with, to receive your notifications on Telegram.",
+    "level": "basic",
+    "secret": false,
+    "lives_in": "person.notifications",
+    "honoured_by": [
+      "home"
+    ]
+  },
+  {
     "key": "persona.active_id",
     "scope": "person",
     "selector": "select",

@@ -12,6 +12,7 @@ import { VOICE_SETTINGS_KEYS } from "../src/settings/voiceKeys.js";
 import { BACKUP_SETTINGS_KEYS } from "../src/settings/backupKeys.js";
 import { PERSONA_SETTINGS_KEYS } from "../src/settings/personaKeys.js";
 import { HOME_ASSISTANT_SETTINGS_KEYS } from "../src/settings/homeAssistantKeys.js";
+import { NOTIFICATION_SETTINGS_KEYS } from "../src/settings/notificationKeys.js";
 
 const outPath = join(import.meta.dir, "..", "..", "spec", "settings", "keys.json");
 
@@ -22,6 +23,7 @@ const sorted = [
   ...BACKUP_SETTINGS_KEYS,
   ...PERSONA_SETTINGS_KEYS,
   ...HOME_ASSISTANT_SETTINGS_KEYS,
+  ...NOTIFICATION_SETTINGS_KEYS,
 ].sort((a, b) => a.key.localeCompare(b.key));
 writeFileSync(outPath, JSON.stringify(sorted, null, 2) + "\n");
 console.log(`Wrote ${sorted.length} settings key(s) to ${outPath}`);

@@ -229,3 +229,25 @@ export const commands = sqliteTable("commands", {
   actionData: text("action_data").notNull(), // JSON, shape depends on actionKind
   createdAt: text("created_at").notNull(),
 });
+
+// The notification system (2026-09-05), scoped narrowly, the same
+// "real, hub-internal, not a spec 3.1 record type" call scheduledJobs
+// and commands above already made (see lib/notifications.ts's own
+// header for the reasoning and what's deferred - quiet hours, non-hub
+// channels, package-declared types). One row per (type, recipient): even
+// a household-wide event fans out to one row per person, since read/
+// dismiss state (getmaipai/.github/docs/NOTIFICATIONS.md: "to the person
+// on every device they are signed into, deduplicated by event id") is
+// inherently per-person, never shared.
+export const notificationDeliveries = sqliteTable("notification_deliveries", {
+  id: text("id").primaryKey(),
+  typeId: text("type_id").notNull(),
+  recipientId: text("recipient_id")
+    .notNull()
+    .references(() => people.id),
+  text: text("text").notNull(),
+  channels: text("channels").notNull(), // JSON string[] - channels actually attempted
+  createdAt: text("created_at").notNull(),
+  readAt: text("read_at"),
+  dismissedAt: text("dismissed_at"),
+});

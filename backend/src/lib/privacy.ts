@@ -17,6 +17,7 @@ import { EMBED_MODEL_URL } from "@/lib/embedAssets";
 import { WAKEWORD_ALL_ASSETS } from "@/lib/wakewordAssets";
 import { voiceCatalogUrl } from "@/lib/voiceCatalog";
 import { listPackageIds, loadPackage, type LoadedPackage } from "@/lib/plugins";
+import { telegramConfigured } from "@/lib/telegramChannel";
 import type { PackageManifest } from "@maipai/spec/gen/ts/manifest.js";
 import type { PrivacyConnection } from "@/wire";
 
@@ -112,6 +113,16 @@ export function platformConnections(): PrivacyConnection[] {
     row("platform:text-embedding-model", hostsOf([EMBED_MODEL_URL]), {
       when: "only if something asks the hub to turn text into numbers for searching. Nothing in MaiPai does this today.",
       what: DOWNLOAD_CARRIES,
+    }),
+    // Home Assistant doesn't get a row here (it's the household's own LAN
+    // device, not a third party leaving the house); Telegram genuinely
+    // does, and only appears once an adult has actually set up the bot -
+    // an unconfigured household reaches nothing, and the table should say
+    // so by omission, the same "no host, no row" rule every row above
+    // already follows.
+    row("platform:telegram", telegramConfigured() ? "api.telegram.org" : null, {
+      when: "when a notification you or your household chose to send to Telegram fires",
+      what: "the rendered notification text and your linked Telegram chat id. Nothing anyone in the house said or asked otherwise.",
     }),
   ];
   return rows.filter((r): r is PrivacyConnection => r !== null);
