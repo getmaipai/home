@@ -167,6 +167,113 @@ Priority-1 lookup landing first):**
 - [ ] The `embed` role itself (M) - referenced everywhere as the fix for
       today's keyword-overlap routing placeholder; not built.
 
+## Feature parity: ChatGPT / Gemini / Claude
+
+Jesse's ask (2026-09-05): research what ChatGPT, Gemini, and Claude actually
+ship today and add what's missing here. Real web research, not recalled
+training data (this session's own standing rule after the persona-research
+correction earlier tonight). Only genuinely new-to-this-list items get their
+own bullets below; anything that overlaps a section above is a cross-
+reference there instead, not a duplicate.
+
+- [ ] **Projects: a persistent, instructed workspace scoped above a single
+      conversation** (L) - doesn't exist in any form. ChatGPT Projects
+      (custom instructions + a shared file Library scoped to the project,
+      instructions now up to 5,000 characters as of July 2026) and Claude
+      Projects (instructions + files, auto-switching to retrieval search
+      once a project's files near the model's context limit, extending
+      effective capacity roughly 10x) are the two real references. MaiPai
+      has nothing between "one chat" and "the whole household's settings"
+      - no scoped, reusable instruction+file container a person could set
+      up once ("help with my woodworking projects," "track my training
+      plan") and return to. This is closer to a new record type + a new
+      chat surface than a skill.
+- [ ] **Canvas / Artifacts: a side panel for iterating on a document or
+      running code, not just chat text** (L) - doesn't exist. Real
+      differences worth knowing before designing this, not just "build a
+      canvas": Claude Artifacts actually execute and render results live
+      in the panel (React components, HTML, SVG - as of June 2026 you can
+      highlight part of an artifact and describe an edit in place), while
+      Gemini Canvas is edit-only - it does not execute code, you copy it
+      out to run it. Code execution itself is a separate, real capability
+      none of the three vendors bolt onto raw chat text: Gemini's code
+      execution tool runs actual Python server-side (30-second cap, learns
+      iteratively from its own output). If this gets built, "does it run
+      code or just display it" is the first real design fork, not a
+      detail - and running arbitrary code has a real sandboxing story to
+      design (Tier 1's Deno boundary is the closest existing precedent in
+      this codebase, not a ready answer).
+- [ ] **Deep Research: a multi-step, multi-source research mode that
+      returns a cited report** (L) - doesn't exist, and it's a different
+      shape than the Tier 2 note's own rejected "autonomous loop": ChatGPT
+      and Gemini call it Deep Research, Claude calls it Research; all
+      three run several minutes of multi-step web search/reading and
+      return one cited report, which is closer to "one long, bounded,
+      author-understood job with a fixed goal" than to open-ended runtime
+      tool selection - worth a design pass of its own, not lumped into the
+      Tier 2 note's already-decided "no autonomous loop" verdict without
+      checking whether this specific bounded shape is actually the same
+      risk the note was written against.
+- [ ] **A stated policy on identifying a person from a photo** (S to
+      decide, since it's a decision not code) - a real, undecided gap this
+      research surfaced, distinct from the vision/generation gaps already
+      listed. The three vendors disagree with each other: ChatGPT refuses
+      identifying anyone from an image outright ("I can't identify people
+      in images for privacy reasons"); Claude's model appears to recognize
+      public figures internally but its output is trained to refuse
+      disclosing it; Gemini will name a public figure on request, and
+      Google's separate "Personal Intelligence" feature (expanded to all
+      free US users March 2026) links Gemini directly to a user's Google
+      Photos face-recognition data. `getmaipai/.github`'s existing hard
+      rule ("no feature is built whose purpose is generating imagery of
+      identifiable real people") governs generation only - there is no
+      MaiPai stance at all on recognizing/naming a person from an uploaded
+      photo, which is a real, separate question `host.camera.still`/`host.
+      ocr.read` will eventually force regardless of which vendor's
+      posture MaiPai ends up closest to.
+
+Three more items the research turned up that are worth a one-line note
+here but are NOT new gaps - they sharpen or confirm something already
+listed above, so read them as amendments, not additions:
+
+- **Barcode/QR reading** (Jesse's own example) turns out to already have a
+  decided answer in this repo's own notes: `docs/dev.md`'s vision-review
+  section already picked `zxing-cpp` for barcodes specifically (real
+  dedicated decoders read a 1D UPC barcode far more reliably than asking
+  a vision-language model to "read" one - confirmed general capability,
+  not a barcode-specific one, in this research: all three vendors can
+  read a clean QR code as an image-understanding task, which is a
+  different and easier problem than decoding a real, imperfectly-lit 1D
+  barcode). Nothing new to add to the Vision section above; it already
+  lists `host.ocr.read`/`host.camera.still` as the real blocking gaps.
+- **Scheduled automation** (ChatGPT Tasks, Gemini Scheduled Actions, Claude
+  Scheduled Tasks) confirms the Proactive/ambient intelligence section
+  above is aimed at something real and already shipped elsewhere, not a
+  speculative idea - worth citing concretely: reporting says ChatGPT's
+  original Tasks was "a glorified reminder app" and Gemini's was
+  restricted to Google Workspace tools, while Claude's version does real
+  automation (multi-step workflows, broad connectors, cloud-persistent
+  execution independent of any device being on) - a genuine target shape
+  for the "caching/freshness layer" piece already broken out in that
+  section, not a reason to rewrite it.
+- **Full-duplex, barge-in voice conversation** (GPT-Live, Gemini Live - both
+  can listen and generate at the same time instead of waiting for a pause,
+  sub-500ms median latency reported for ChatGPT's) is the concrete target
+  shape for the Voice/robot section's "wake word past phase 1" line above,
+  not a new item - a real number to measure against once that work starts,
+  where today there is no number at all.
+- **Custom GPTs / Gemini Gems** turn out to already be close to something
+  MaiPai has, not a gap: a GPT/Gem is a closed, vendor-specific custom
+  assistant, while MaiPai's own package manifest (skill/app/companion/
+  integration, with declared permissions and routing) is structurally
+  closer to the open, portable "Skill" format multiple vendors and tools
+  now read (a SKILL.md-shaped standard, per this research, read by over
+  30 different tools as of early 2026) than to a closed GPT/Gem. The real
+  gap here isn't a new concept to design - it's the `catalog` repo
+  existing for real, already listed above as its own item.
+
+Sources consulted (this research pass, 2026-09-05): [ChatGPT Projects guide](https://www.ai-toolbox.co/chatgpt-management-and-productivity/how-to-use-chatgpt-projects-guide-2026), [ChatGPT custom instructions update](https://www.mywritingtwin.com/blog/chatgpt-projects-setup-guide), [Claude Artifacts 2026 guide](https://suprmind.ai/hub/claude/features/), [Claude Live Artifacts](https://www.eigent.ai/blog/claude-live-artifacts-guide), [Gemini Canvas](https://gemini.google/overview/canvas/), [Gemini Gems](https://geotoolbox.ai/blog/gemini-gems), [Gemini code execution docs](https://ai.google.dev/gemini-api/docs/code-execution), [Gemini/Google Photos face recognition](https://pasqualepillitteri.it/en/news/1055/google-photos-ai-scanning-gemini-recognition), [Google Personal Intelligence privacy concerns](https://vucense.com/privacy-sovereignty/surveillance-biometrics/google-gemini-personal-intelligence-photos-privacy-2026/), [ChatGPT/Claude photo-identification policy](https://github.com/openai/openai-python/discussions/2495), [Claude Scheduled Tasks vs. ChatGPT/Gemini](https://www.xda-developers.com/claude-scheduled-tasks-feature/), [voice mode comparison (GPT-Live/Gemini Live/Claude)](https://apidog.com/blog/gpt-live-vs-gemini-live/), [Claude voice moves to Opus/Sonnet/Haiku](https://www.techradar.com/computing/artificial-intelligence/claude-tipped-to-get-its-answer-to-chatgpts-advanced-voice-mode-soon-is-adding-an-ai-voice-to-a-chatbot-yet-another-tick-box-exercise), [Claude Skills vs ChatGPT GPTs vs Gemini Gems](https://www.open-claw.sh/blog/claude-skills-vs-chatgpt-gpts-vs-gemini-gems), [barcode/QR reading across vendors](https://www.dynamsoft.com/codepool/python-flet-chat-app-barcode-gemini.html).
+
 ## UI / shell
 
 - [ ] Person edit and delete (M) - no backend route exists for either,
