@@ -3483,6 +3483,19 @@ set. Full architecture: platform plan chapters 1, 3, and 4.
       than claimed solved, so whoever picks this package up next (keep
       it, find a more reliable paid alternative, or drop it) has the real
       number instead of an optimistic guess.
+    - **Update, same night**: live-testing the `define` skill through the
+      real Chat UI later found two failures in a row (both attempt and
+      retry), worse than the ~50% single-attempt rate measured earlier.
+      Checked independently of this codebase - three separate `curl`
+      attempts against `api.dictionaryapi.dev` from the shell, no
+      `host.fetch` or retry logic involved at all, all three timed out
+      with no connection whatsoever. The host is genuinely down right
+      now, not a regression in anything built tonight - the graceful
+      skill-error phrasing (two different variants seen, "That didn't
+      work - sorry" and "Couldn't get that done, sorry" - the reply-
+      variety behavior working as intended, not a bug) is exactly what a
+      real, complete outage of a free third-party API should look like to
+      the household using it.
     - A dedicated conformance fixture
       (`spec/fixtures/recipes/define-word.json`) proves the exact shipped
       recipe's own step logic against both interpreters, using a response
