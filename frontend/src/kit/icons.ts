@@ -11,6 +11,7 @@ import {
   Archive,
   CheckCircle2,
   ChevronDown,
+  ChevronLeft,
   AlertTriangle,
   Volume2,
   type LucideIcon,
@@ -33,6 +34,7 @@ const REGISTRY: Record<string, LucideIcon> = {
   archive: Archive,
   check: CheckCircle2,
   "chevron-down": ChevronDown,
+  "chevron-left": ChevronLeft,
   "alert-triangle": AlertTriangle,
   "volume-2": Volume2,
 };

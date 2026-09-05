@@ -1,7 +1,7 @@
 import { forwardRef } from "react";
 import type { ButtonHTMLAttributes } from "react";
 import { Slot } from "@radix-ui/react-slot";
-import { cn } from "@/kit/utils";
+import { cn, FOCUS_RING } from "@/kit/utils";
 
 // Hand-written to shadcn/ui's usual API (variant/size props, asChild via
 // Radix Slot) rather than pulled in through the shadcn CLI generator
@@ -43,7 +43,7 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
         className={cn(
           "inline-flex items-center justify-center gap-2 rounded-[var(--radius)] font-medium",
           "transition-opacity disabled:pointer-events-none disabled:opacity-50",
-          "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[hsl(var(--ring))] focus-visible:ring-offset-2",
+          FOCUS_RING,
           variantClasses[variant],
           sizeClasses[size],
           className,

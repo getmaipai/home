@@ -1,6 +1,6 @@
 import * as RadixSelect from "@radix-ui/react-select";
 import { Check, ChevronDown } from "lucide-react";
-import { cn } from "@/kit/utils";
+import { cn, FOCUS_RING_INSET } from "@/kit/utils";
 
 interface SelectProps {
   value: string;
@@ -23,7 +23,7 @@ export function Select({ value, onValueChange, options, getLabel = (v) => v, dis
         className={cn(
           "flex h-12 min-w-40 items-center justify-between gap-2 rounded-[var(--radius)] border",
           "border-[hsl(var(--border))] bg-[hsl(var(--card))] px-3 text-base",
-          "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[hsl(var(--ring))]",
+          FOCUS_RING_INSET,
           "disabled:pointer-events-none disabled:opacity-50",
         )}
         {...rest}

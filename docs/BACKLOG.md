@@ -339,22 +339,24 @@ Sources consulted (this research pass, 2026-09-05): [ChatGPT Projects guide](htt
       (the real precedent behind ChatGPT's Apps SDK, researched and then
       rejected here) for lower complexity, no new failure mode, and no
       new trust boundary - Jesse's own stated bar, not assumed.
-- [ ] **Build the missing kit primitives before the first full app, not
-      alongside it** (M) - `getmaipai/.github/docs/UI.md` already
+- [x] **Build the missing kit primitives before the first full app, not
+      alongside it** (M) - done 2026-09-05. `getmaipai/.github/docs/UI.md`
       decided that apps never build their own chrome (sidebar, search,
       cards): they declare typed blueprint contributions and compose
-      pages from shared kit primitives (`CardGrid`, `MediaShelf`, `List`,
-      `DetailPane`, `SplitView`...), never hand-rolled UI. Checked against
-      the real code: none of those primitives exist in `frontend/src/
-      kit/` yet (only `Page`, `Section`, `EmptyState`, `Form`, `Progress`,
-      `MessageThread`, and basic form controls do), and `Shell.tsx`'s nav
-      list is still hand-hardcoded, by its own comment, pending "the
-      moment a fifth package needs to add an entry." That moment is
-      whenever the app work above starts - building the primitives and a
-      real data-driven nav blueprint first is what forces the first app
-      into the shared vocabulary instead of risking a repeat of legacy's
-      separate `VideosRail`/`MusicRail`/`PodcastRail`/`NewsLayout` for
-      what should be one shared component.
+      pages from shared kit primitives, never hand-rolled UI. The five
+      the standard names and the kit lacked - `CardGrid`, `MediaShelf`,
+      `List`, `DetailPane`, `SplitView` - are now in
+      `frontend/src/kit/primitives/`, generic and content-agnostic, with
+      the breakpoints and density budgets owned by `kit/responsive.ts`.
+      Building them first is what forces the first app into the shared
+      vocabulary instead of risking a repeat of legacy's separate
+      `VideosRail`/`MusicRail`/`PodcastRail`/`NewsLayout` for what should
+      be one shared component. Details in `docs/dev.md`, "The five
+      missing kit primitives".
+      **Still open, the other half of this item:** a real data-driven nav
+      blueprint. `Shell.tsx`'s nav list is still hand-hardcoded, by its
+      own comment, pending "the moment a fifth package needs to add an
+      entry" - which is whenever the `app` kind work above starts.
 - [ ] **Skills as home-screen widgets - cards and rows** (L, needs its own
       design pass before any code - Jesse, 2026-09-05). The idea: a
       skill's data shown on a dashboard as a card (or, for some skills, a

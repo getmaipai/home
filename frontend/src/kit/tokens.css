@@ -10,6 +10,16 @@
 @theme {
   --font-sans:
     ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+
+  /* The kit's surfaces, pinned. docs/UI.md: phone under 640, tablet to
+   * 1024, desktop above. These happen to equal Tailwind's defaults
+   * today, which is exactly why they are written down: `sm:` and `lg:`
+   * are load-bearing across the primitives, and a later theme edit that
+   * moved them would silently move every grid, rail and split in the
+   * product. kit/responsive.ts holds the same two numbers and a test
+   * fails if the two ever disagree. */
+  --breakpoint-sm: 640px;
+  --breakpoint-lg: 1024px;
 }
 
 :root {

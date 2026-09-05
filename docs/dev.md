@@ -4882,3 +4882,98 @@ forced into the shared vocabulary because it's the only thing available
 to reach for, rather than risking the exact failure mode that produced
 legacy's separate `VideosRail`/`MusicRail`/`PodcastRail`/`NewsLayout`
 for what should have been one shared component.
+
+## The five missing kit primitives (2026-09-05)
+
+The recommendation at the end of the entry above, executed:
+`CardGrid`, `MediaShelf`, `List`, `DetailPane` and `SplitView` now exist
+in `frontend/src/kit/primitives/`, alongside the `Page`, `Section`,
+`EmptyState`, `Form`, `Progress` and `MessageThread` that were already
+there. `getmaipai/.github/docs/UI.md` names all eleven; the kit was
+missing the five that a content-heavy app actually needs, which is the
+half that decides whether the first such app composes shared primitives
+or quietly hand-rolls its own.
+
+**Built before the first app, deliberately, and with no app in mind.**
+Every one takes `items` plus a `renderItem`, the way a component library
+does, and knows nothing about videos, people, packages or media. The
+reason is the failure mode `docs/BACKLOG.md` already names: legacy shipped
+separate `VideosRail`, `MusicRail`, `PodcastRail` and `NewsLayout` for
+what should have been one component. A primitive that learns what a video
+is before any video page exists is the first step back toward four of
+them.
+
+What each one owns, and only it:
+
+- **`CardGrid`** - the grid, the card surface, and the column count.
+- **`MediaShelf`** - a horizontally scrolling rail of media tiles, at a
+  declared aspect ratio (`wide`, `square`, `poster`), with the caption
+  outside the aspect box so a title that wraps cannot crop the artwork.
+- **`List`** - one column of rows at every surface, with an optional
+  trailing control rendered as the row button's sibling rather than
+  nested inside it (a control inside a button is unreachable by keyboard
+  and invalid HTML; there is a test pinning that).
+- **`DetailPane`** - the "one thing, in full" half: header, back
+  affordance, header actions, and a body that is its own scroll container
+  so the list beside it stays put.
+- **`SplitView`** - one decision only: how a list and a detail share the
+  screen per surface. Phone shows one at a time, tablet and desktop show
+  both.
+
+**Two supporting pieces, both to avoid a second copy of something.**
+`kit/responsive.ts` is where the kit now owns the breakpoints
+`docs/UI.md` says packages never write: the surface widths, the mapping
+to Tailwind's variants stated exactly once (unprefixed is phone, `sm:` is
+tablet, `lg:` is desktop; `md:` and `xl:` are not surfaces), and the two
+named density budgets. `kit/components/Card.tsx` is the one card surface,
+shared by `CardGrid` and `MediaShelf` instead of each repeating a border,
+a radius, a hover and a focus ring.
+
+TV is deliberately absent from both. `docs/UI.md` defines the TV surface
+by input mode, not width, and nothing in the shell detects an input mode
+yet (`Shell.tsx`'s own deferral list says so). A TV media query invented
+here would be a second, wrong definition to unpick later. The tiles and
+rows are real buttons, so they already focus and scroll into view with a
+keyboard or a remote's directional pad; the rest waits for the surface.
+
+No `spec/ui/schema.json` node types were added for these. The schema's
+own description says the generic primitives arrive "when those pages are
+tackled", and adding node types with no page to render, no interpreter
+change and no fixtures would be data debt in the one file the org
+standard says never carries any. This is the React half only.
+
+**Two things the kit already had wrong, fixed while here.** The focus
+ring was copy-pasted into five components, and every copy painted a white
+halo on the dark palette: Tailwind v4 declares `--tw-ring-offset-color`
+with `@property { inherits: false; initial-value: #fff }`, so a `:root`
+override cannot reach the element and each component has to name the
+color itself. It is now one `FOCUS_RING` constant in `kit/utils.ts`,
+with the background color named, adopted by `Button`, `Input`, `Select`
+and `Switch` as well as the new components. Separately, `tokens.css` now
+pins `--breakpoint-sm` and `--breakpoint-lg` to the surfaces rather than
+relying on Tailwind's defaults happening to match, and a test fails if
+those ever disagree with `kit/responsive.ts`. The constants were
+decorative before that; the breakpoints that actually took effect were
+Tailwind's.
+
+**Verified, not assumed.** 42 new tests (`bun test`: 164 pass), a clean
+Vite build, and all five driven in a real browser at phone (390), tablet
+(800) and desktop (1440) widths through a throwaway preview harness: the
+column counts step 1/2/3, the rails scroll with the next tile peeking,
+`SplitView` swaps to the detail on phone and sits side by side above it,
+and `DetailPane`'s back button returns to the list. The harness was
+deleted afterward; the primitives have no consumer yet by design.
+
+Two of the code-review fixes were only provable that way, which is the
+argument for the browser pass rather than tests alone. A selected shelf
+tile drew no ring at all, twice for different reasons: `Card`'s
+`overflow-hidden` clipped a ring drawn on the artwork box inside it, and
+once the ring moved onto the `Card` it was still invisible, being cyan
+drawn flush against cyan artwork until it got an offset. A test asserting
+"a ring class is present" passed throughout both.
+
+Note on the typecheck: `bun run build` runs `tsc --noEmit` over the whole
+frontend, which currently fails in `apps/chat` and `apps/settings` on the
+in-flight `skill` to `plugin` rename happening in a parallel session.
+Nothing under `src/kit/` errors, and the Vite build and the full test
+suite are green. Those files are that session's to fix.
