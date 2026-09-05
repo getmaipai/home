@@ -1,0 +1,14 @@
+{
+  "id": "grant-a1b2c3",
+  "person": "person-d4e5f6",
+  "action": "use:videos",
+  "effect": "allow",
+  "valid_from": null,
+  "valid_to": "2026-09-08T00:00:00Z",
+  "granted_by_person_id": "person-a1b2c3",
+  "reason": "Trial run until Sunday.",
+  "acknowledged_at": null,
+  "created_at": "2026-09-05T12:00:00Z",
+  "updated_at": "2026-09-05T12:00:00Z",
+  "deleted_at": null
+}

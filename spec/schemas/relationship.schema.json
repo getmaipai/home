@@ -1,0 +1,165 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://getmaipai.github.io/home/spec/schemas/relationship.schema.json",
+  "title": "Relationship",
+  "description": "A typed, directed edge between two entities: who is whose parent, who owns the dog, who lives where, who works where. One mechanism for every kind of connection, so ownership, residence, employment and family are not four systems.\n\nTwo axes, deliberately not collapsed into one (Jesse, 2026-09-05, from two real examples). `valid_from`/`valid_to` answer whether the relationship holds AT ALL: a former job has valid_to set. `status` answers what KIND of true it is: an estranged daughter has valid_to null, because she is still his daughter, and status `estranged`. Fold those together and you get either an 'ex-daughter' or a former job that still reads as current.\n\nThe payoff is not the data, it is that a renderer can say 'Jesse's former job at Acme' rather than 'Jesse's job at Acme', and never says 'your boyfriend Alex' three weeks after a breakup. Free-text memory cannot reliably supply that tense today.\n\nThis is NOT an authorization edge. See grant.schema.json.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "id",
+    "type",
+    "from_id",
+    "to_id",
+    "status",
+    "source",
+    "created_at",
+    "updated_at"
+  ],
+  "properties": {
+    "id": {
+      "type": "string",
+      "pattern": "^rel-[a-z0-9]{6,}$"
+    },
+    "type": {
+      "type": "string",
+      "minLength": 1,
+      "description": "One of spec/vocab/relationship-types.json's ids. The vocabulary declares which entity kinds this type may join, whether it is terminable, and which statuses it admits; a value outside it is rejected, the same way an unknown permission or capability is."
+    },
+    "from_id": {
+      "type": "string",
+      "pattern": "^ent-[a-z0-9]{6,}$",
+      "description": "The subject. Direction matters: parent_of and child_of are different edges, both stored, so a lookup either way is an index hit rather than a scan."
+    },
+    "to_id": {
+      "type": "string",
+      "pattern": "^ent-[a-z0-9]{6,}$",
+      "description": "The object."
+    },
+    "status": {
+      "type": "string",
+      "description": "One of the statuses the vocabulary allows for this type. Never a substitute for valid_to."
+    },
+    "valid_from": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "date-time",
+      "default": null,
+      "description": "When this became true, if known. Null means 'as long as anyone has said', not 'never'."
+    },
+    "valid_to": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "date-time",
+      "default": null,
+      "description": "When this stopped being true. Null means it still holds. Only permitted on types the vocabulary marks terminable: setting it on parent_of would assert an ex-daughter. Distinct from expired_at, exactly as MemoryRecord distinguishes them: this is about the world, that is about our record of it. Whether a type may set it at all comes from the vocabulary, checked in validate.ts."
+    },
+    "expired_at": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "date-time",
+      "default": null,
+      "description": "When WE retired this record, as opposed to when the fact stopped being true. Same bitemporal split MemoryRecord already uses."
+    },
+    "source": {
+      "type": "string",
+      "enum": [
+        "stated",
+        "imported",
+        "inferred"
+      ],
+      "description": "`stated` means a person in the household said so. `inferred` means the hub worked it out from conversation and nobody has confirmed it. The difference is load-bearing: an inferred relationship is never spoken as fact, and inference is what makes this record type dangerous rather than merely useful."
+    },
+    "stated_by_person_id": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "pattern": "^person-[a-z0-9]{6,}$",
+      "default": null,
+      "description": "Who said so, when source is `stated`. Provenance for a fact about someone's family is not optional."
+    },
+    "confidence": {
+      "type": [
+        "number",
+        "null"
+      ],
+      "minimum": 0,
+      "maximum": 1,
+      "default": null,
+      "description": "Only meaningful when source is `inferred`. A stated relationship has no confidence; a person said it. Enforced in spec/records/ts/validate.ts, not by this schema (no generator preserves conditionals)."
+    },
+    "confirmed_by_person_id": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "pattern": "^person-[a-z0-9]{6,}$",
+      "default": null,
+      "description": "Who confirmed an inferred relationship. Until this is set, the relationship may be used to ask ('is Alex your partner?') but never asserted ('your partner Alex')."
+    },
+    "evidence": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      },
+      "default": [],
+      "description": "What this was inferred from: conversation turn ids, memory record ids, an import job. A machine guess about someone's family that cannot be traced back is not reviewable, and this is the field that makes a wrong one correctable."
+    },
+    "scope": {
+      "type": "string",
+      "enum": [
+        "household",
+        "person"
+      ],
+      "default": "person",
+      "description": "Who may see this edge. Defaults to `person`, not `household`, and that default is the safety decision in this whole file: a relationship inferred from one person's conversation is THEIR data. A teen mentioning a partner must not become something the household knows because the hub joined two records together. Widening to household is a person's explicit act.",
+      "$comment": "The org's per-person identity rule already forbids pooling personalization across people; this applies it to the graph."
+    },
+    "person": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "pattern": "^person-[a-z0-9]{6,}$",
+      "default": null,
+      "description": "Required when scope is person; null for household scope. Same field and rule as MemoryRecord and Entity. Enforced in validate.ts."
+    },
+    "sensitive": {
+      "type": "boolean",
+      "default": false,
+      "description": "Withheld on shared surfaces and, on the robot, unless the person is confirmed present and alone. Some relationships are sensitive by their nature regardless of who asked."
+    },
+    "note": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "maxLength": 2000,
+      "default": null
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "updated_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "deleted_at": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "date-time",
+      "default": null,
+      "description": "A tombstone, for the same sync reason Entity and Person keep one."
+    }
+  }
+}

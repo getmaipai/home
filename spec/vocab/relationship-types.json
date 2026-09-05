@@ -1,0 +1,191 @@
+{
+  "$comment": "The relationship vocabulary. A closed list, the same way spec/vocab/capabilities.json and permissions.json are closed, and for the same reason: a free-text edge type turns a household graph into a swamp within one release, and nothing downstream can render a tense or a status it has never heard of.\n\nEach type declares what it may join, whether it can end, what statuses it admits, and its inverse. Two things this file exists to prevent, both from real examples Jesse raised (2026-09-05): an 'ex-daughter' (daughter_of is not terminable, only its status changes), and the hub saying 'your boyfriend Alex' three weeks after a breakup (partner_of IS terminable, and a renderer must read valid_to before speaking).\n\nNOTE: nothing here grants access to anything. Authorization is a Grant (grant.schema.json), a separate store that is never inferred. Relationship-based access control (Google's Zanzibar and the ReBAC family) models permissions as exactly this shape, which is precisely why the two must not share a table here: these edges can be machine-inferred and wrong, and an inference bug that reached a permission resolver would be a privilege escalation. Same shape, separate stores, opposite trust.",
+  "statuses": {
+    "$comment": "Status answers 'what kind of true is this?', never 'is it still true?'. Existence over time is valid_from/valid_to on the relationship itself. A former job has valid_to set and needs no status; an estranged daughter has valid_to null and status `estranged`, because she is still his daughter.",
+    "values": [
+      { "id": "normal", "description": "No qualifier. The default." },
+      { "id": "close", "description": "Closer than the type alone implies." },
+      { "id": "strained", "description": "Difficult, but not broken off." },
+      { "id": "estranged", "description": "Broken off, while the relationship itself still exists. Only meaningful on types that cannot end." },
+      { "id": "primary", "description": "The main one, where a person holds several of the same type (a primary residence, a main job)." },
+      { "id": "secondary", "description": "One of several, not the main one." },
+      { "id": "seasonal", "description": "Recurring rather than continuous (a summer house, term-time term address)." }
+    ]
+  },
+  "types": [
+    {
+      "id": "parent_of",
+      "from": ["person"],
+      "to": ["person"],
+      "inverse": "child_of",
+      "terminable": false,
+      "statuses": ["normal", "close", "strained", "estranged"],
+      "description": "Biological or legal parenthood. Cannot end: an estranged daughter is still a daughter, so this changes status, never valid_to."
+    },
+    {
+      "id": "child_of",
+      "from": ["person"],
+      "to": ["person"],
+      "inverse": "parent_of",
+      "terminable": false,
+      "statuses": ["normal", "close", "strained", "estranged"],
+      "description": "The inverse of parent_of. Stored explicitly rather than derived, so a query in either direction is a lookup, not a scan."
+    },
+    {
+      "id": "sibling_of",
+      "from": ["person"],
+      "to": ["person"],
+      "inverse": "sibling_of",
+      "terminable": false,
+      "symmetric": true,
+      "statuses": ["normal", "close", "strained", "estranged"],
+      "description": "Symmetric: its inverse is itself."
+    },
+    {
+      "id": "partner_of",
+      "from": ["person"],
+      "to": ["person"],
+      "inverse": "partner_of",
+      "terminable": true,
+      "symmetric": true,
+      "statuses": ["normal", "close", "strained"],
+      "description": "Any romantic partnership, named without assuming its shape. Terminable: an ex-partner is a partner_of with valid_to set, which is what stops the hub referring to someone's ex in the present tense."
+    },
+    {
+      "id": "guardian_of",
+      "from": ["person"],
+      "to": ["person"],
+      "inverse": "ward_of",
+      "terminable": true,
+      "statuses": ["normal", "primary", "secondary"],
+      "description": "Responsibility for someone, which may or may not coincide with parent_of, and which does end (a child grows up)."
+    },
+    {
+      "id": "ward_of",
+      "from": ["person"],
+      "to": ["person"],
+      "inverse": "guardian_of",
+      "terminable": true,
+      "statuses": ["normal", "primary", "secondary"],
+      "description": "The inverse of guardian_of."
+    },
+    {
+      "id": "friend_of",
+      "from": ["person"],
+      "to": ["person"],
+      "inverse": "friend_of",
+      "terminable": true,
+      "symmetric": true,
+      "statuses": ["normal", "close", "strained"],
+      "description": "A stated friendship. Terminable, and deliberately not inferred by default: guessing at friendships from conversation is low value and high embarrassment."
+    },
+    {
+      "id": "owns",
+      "from": ["person", "organization"],
+      "to": ["pet", "thing", "place"],
+      "inverse": "owned_by",
+      "terminable": true,
+      "statuses": ["normal", "primary", "secondary"],
+      "description": "Ownership, as an edge rather than a system of its own. schema.org models ownership the same way, as an `owns` property alongside `knows`. Deliberately available to any entity and required by none: a place is not owned in any useful household sense, it is lived at."
+    },
+    {
+      "id": "owned_by",
+      "from": ["pet", "thing", "place"],
+      "to": ["person", "organization"],
+      "inverse": "owns",
+      "terminable": true,
+      "statuses": ["normal", "primary", "secondary"],
+      "description": "The inverse of owns."
+    },
+    {
+      "id": "cares_for",
+      "from": ["person"],
+      "to": ["pet", "person"],
+      "inverse": "cared_for_by",
+      "terminable": true,
+      "statuses": ["normal", "primary", "secondary"],
+      "description": "Day-to-day responsibility, which is often not the owner: the child who walks the dog, the adult who looks after a parent."
+    },
+    {
+      "id": "cared_for_by",
+      "from": ["pet", "person"],
+      "to": ["person"],
+      "inverse": "cares_for",
+      "terminable": true,
+      "statuses": ["normal", "primary", "secondary"],
+      "description": "The inverse of cares_for."
+    },
+    {
+      "id": "lives_at",
+      "from": ["person", "pet"],
+      "to": ["place"],
+      "inverse": "home_of",
+      "terminable": true,
+      "statuses": ["normal", "primary", "secondary", "seasonal"],
+      "description": "Where someone lives. Many-to-many with dates, which is the whole reason residence is an edge and not a `home_location` field: a person can have several homes at once, and 'primary residence since 2024' or 'weekends only' cannot be said by a single-valued property. schema.org's own long-running ambiguity between `location`, `homeLocation` and `workLocation` (issue 823) is what that shortcut costs."
+    },
+    {
+      "id": "home_of",
+      "from": ["place"],
+      "to": ["person", "pet"],
+      "inverse": "lives_at",
+      "terminable": true,
+      "statuses": ["normal", "primary", "secondary", "seasonal"],
+      "description": "The inverse of lives_at."
+    },
+    {
+      "id": "employed_by",
+      "from": ["person"],
+      "to": ["organization", "person"],
+      "inverse": "employs",
+      "terminable": true,
+      "statuses": ["normal", "primary", "secondary", "seasonal"],
+      "description": "A job. Terminable, and the reason status and validity are two fields rather than one: a former job has valid_to set, and needs no status to say it went badly."
+    },
+    {
+      "id": "employs",
+      "from": ["organization", "person"],
+      "to": ["person"],
+      "inverse": "employed_by",
+      "terminable": true,
+      "statuses": ["normal", "primary", "secondary", "seasonal"],
+      "description": "The inverse of employed_by."
+    },
+    {
+      "id": "works_at",
+      "from": ["person"],
+      "to": ["place"],
+      "inverse": "workplace_of",
+      "terminable": true,
+      "statuses": ["normal", "primary", "secondary", "seasonal"],
+      "description": "Where someone works, kept separate from who employs them: one employer can have several sites, and a person can work at a place nobody employs them at."
+    },
+    {
+      "id": "workplace_of",
+      "from": ["place"],
+      "to": ["person"],
+      "inverse": "works_at",
+      "terminable": true,
+      "statuses": ["normal", "primary", "secondary", "seasonal"],
+      "description": "The inverse of works_at."
+    },
+    {
+      "id": "attends",
+      "from": ["person"],
+      "to": ["organization", "place"],
+      "inverse": "attended_by",
+      "terminable": true,
+      "statuses": ["normal", "primary", "secondary", "seasonal"],
+      "description": "School, nursery, a club. The child equivalent of employed_by, and needed for the same reason: a school run is a routine the hub should understand without being told twice."
+    },
+    {
+      "id": "attended_by",
+      "from": ["organization", "place"],
+      "to": ["person"],
+      "inverse": "attends",
+      "terminable": true,
+      "statuses": ["normal", "primary", "secondary", "seasonal"],
+      "description": "The inverse of attends."
+    }
+  ]
+}

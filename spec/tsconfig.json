@@ -1,0 +1,19 @@
+{
+  "$comment": "Typechecks spec's hand-written TypeScript. Added 2026-09-05 with records/ts/: a code review pointed out that scripts/check.sh runs `bun test` (which transpiles without checking types) and no tsc, so a schema field rename that broke a hand-written module would surface only as a runtime throw, and only where a test happened to reach it.",
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": ["ES2022"],
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "strict": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "noUncheckedIndexedAccess": true,
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "skipLibCheck": true,
+    "noEmit": true,
+    "types": ["bun"]
+  },
+  "include": ["records", "gen/ts", "tests/ts/record-validate.test.ts", "tests/ts/relationship-vocab.test.ts"]
+}

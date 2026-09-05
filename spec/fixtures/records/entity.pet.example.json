@@ -1,0 +1,18 @@
+{
+  "id": "ent-d4e5f6",
+  "kind": "pet",
+  "name": "Rover",
+  "aliases": ["the dog"],
+  "description": "Border collie, afraid of the vacuum.",
+  "place_kind": null,
+  "parent_id": null,
+  "account_person_id": null,
+  "source": "hub",
+  "confirmed_by_person_id": "person-a1b2c3",
+  "scope": "household",
+  "person": null,
+  "sensitive": false,
+  "created_at": "2026-09-05T12:00:00Z",
+  "updated_at": "2026-09-05T12:00:00Z",
+  "deleted_at": null
+}

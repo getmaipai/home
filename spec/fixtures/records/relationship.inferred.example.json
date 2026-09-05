@@ -1,0 +1,22 @@
+{
+  "id": "rel-g7h8i9",
+  "type": "partner_of",
+  "from_id": "ent-m4n5o6",
+  "to_id": "ent-p7q8r9",
+  "status": "normal",
+  "valid_from": null,
+  "valid_to": null,
+  "expired_at": null,
+  "source": "inferred",
+  "stated_by_person_id": null,
+  "confidence": 0.62,
+  "confirmed_by_person_id": null,
+  "evidence": ["turn-2026-09-05-0042"],
+  "scope": "person",
+  "person": "person-a1b2c3",
+  "sensitive": true,
+  "note": "Unconfirmed: may be used to ask, never to assert.",
+  "created_at": "2026-09-05T12:00:00Z",
+  "updated_at": "2026-09-05T12:00:00Z",
+  "deleted_at": null
+}

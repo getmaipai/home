@@ -14,6 +14,9 @@ if [ -d spec/schemas ]; then
     exit 1
   fi
 
+  echo "== spec: typecheck"
+  (cd spec && bun install --silent && bunx tsc --noEmit)
+
   echo "== spec: bun test"
   (cd spec && bun install --silent && bun test)
 

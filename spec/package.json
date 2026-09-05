@@ -7,7 +7,8 @@
   "type": "module",
   "scripts": {
     "gen:ts": "bun run scripts/gen-ts.ts",
-    "test": "bun test"
+    "test": "bun test",
+    "lint": "tsc --noEmit"
   },
   "dependencies": {
     "he": "^1.2.0",
@@ -15,10 +16,12 @@
   },
   "devDependencies": {
     "@apidevtools/json-schema-ref-parser": "^16.0.1",
+    "@types/bun": "^1.4.1",
     "@types/he": "^1.2.3",
     "ajv": "^8.20.0",
     "ajv-formats": "^3.0.1",
     "json-schema-to-zod": "^2.6.1",
-    "prettier": "^3.9.6"
+    "prettier": "^3.9.6",
+    "typescript": "^7.0.2"
   }
 }

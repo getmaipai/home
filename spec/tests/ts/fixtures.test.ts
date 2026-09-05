@@ -12,6 +12,9 @@ import { MemoryRecord } from "../../gen/ts/memory-record.js";
 import { PackageManifest } from "../../gen/ts/manifest.js";
 import { SafetyResult } from "../../gen/ts/safety-result.js";
 import { ModelCapabilities } from "../../gen/ts/model-capabilities.js";
+import { Entity } from "../../gen/ts/entity.js";
+import { Relationship } from "../../gen/ts/relationship.js";
+import { Grant } from "../../gen/ts/grant.js";
 // ErrorEntry is standards-owned (std-v0.2.0), not generated here; the error
 // catalogue's shape is imported from the sibling .github checkout, the same
 // way spec/schemas/manifest.schema.json imports PrivacyRow by $ref.
@@ -47,6 +50,25 @@ describe("record fixtures validate against their generated Zod models", () => {
       ).not.toThrow();
     });
   }
+
+  for (const kind of ["person", "pet", "place"]) {
+    test(`entity.${kind}.example.json`, () => {
+      expect(() => Entity.parse(loadFixture(`entity.${kind}.example.json`))).not.toThrow();
+    });
+  }
+
+  // Three relationship fixtures, one per case the two-axis design exists
+  // for: a former job (valid_to set), an estranged daughter (valid_to
+  // null, status estranged), and an unconfirmed inference.
+  for (const kind of ["stated", "estranged", "inferred"]) {
+    test(`relationship.${kind}.example.json`, () => {
+      expect(() => Relationship.parse(loadFixture(`relationship.${kind}.example.json`))).not.toThrow();
+    });
+  }
+
+  test("grant.example.json", () => {
+    expect(() => Grant.parse(loadFixture("grant.example.json"))).not.toThrow();
+  });
 
   test("manifest.example.json", () => {
     expect(() =>

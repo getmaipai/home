@@ -5,10 +5,15 @@ chapter 3. This is **spec v0.1**: Person, Setting, Memory/Entity/Episode,
 the package manifest/recipe/result shapes, the settings registry, the
 capability and permissions vocabularies, UI schema v0 (Chat only), both
 recipe interpreters, and both host emulators, per the Hub v0.1 scope in
-the platform plan's roadmap (chapter 13). Everything else chapter 3
-describes (Capability grant, Content ceiling, Integration, Device, the
-link API, the LLM and voice contracts) lands with the release that needs
-it, not now.
+the platform plan's roadmap (chapter 13).
+
+Added 2026-09-05, ahead of the roadmap because the household model needed
+it (see `home/docs/dev.md`, "Entities, relationships and grants"):
+**Entity**, **Relationship**, and **Grant** (chapter 3's "Capability
+grant"), with the relationship-type and grant-action vocabularies. Entity
+and Relationship are new shapes chapter 3 does not describe; Grant is one
+it does. Still unbuilt from chapter 3: Content ceiling, Integration,
+Device, the link API, the LLM and voice contracts.
 
 The error catalogue's *shape* (`ErrorEntry`) and the privacy row shape
 (`PrivacyRow`, used by the manifest's `data_sources[]`) are owned by
@@ -28,7 +33,10 @@ see "Cross-repo schemas" below. The populated error catalogue itself
 | `settings/keys.json` | The settings registry (conforms to `schemas/settings-key.schema.json`); empty until core or a package declares a key | generated from declarations, currently empty |
 | `vocab/capabilities.json` | The capability vocabulary (3.2) | hand-written |
 | `vocab/permissions.json` | The permissions vocabulary, the install prompt's fixed enum (3.2) | hand-written |
+| `vocab/relationship-types.json` | What may relate to what, whether it can end, and which statuses it admits | hand-written |
+| `vocab/grant-actions.json` | Everything a household can allow or deny per person | hand-written |
 | `ui/schema.json`, `ui/pages/*.json` | UI schema v0 (Chat only) and the Chat page itself | hand-written; see `ui/README.md` for why this isn't codegen'd |
+| `records/ts/` | The cross-field rules for Entity, Relationship and Grant that JSON Schema conditionals cannot carry (neither generator preserves them); TS only for now, like `safety/` | hand-written |
 | `interpreters/ts/`, `interpreters/py/` | The Tier 0 recipe interpreter, one per language, kept behaviorally identical | hand-written |
 | `emulators/ts/`, `emulators/py/` | A deterministic offline stand-in for the `host.*` RPC surface (4.9), one per language | hand-written |
 | `safety/ts/`, `safety/corpus/` | The deterministic multi-signal safety classifier (4.3), TS only for now (see `safety/README.md`); the labelled corpus it's tested against | hand-written |

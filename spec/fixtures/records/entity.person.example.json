@@ -1,0 +1,18 @@
+{
+  "id": "ent-a1b2c3",
+  "kind": "person",
+  "name": "Iris",
+  "aliases": ["Grandma Iris", "Mum"],
+  "description": "Riff's mother. Visits most weekends.",
+  "place_kind": null,
+  "parent_id": null,
+  "account_person_id": null,
+  "source": "hub",
+  "confirmed_by_person_id": "person-a1b2c3",
+  "scope": "household",
+  "person": null,
+  "sensitive": false,
+  "created_at": "2026-09-05T12:00:00Z",
+  "updated_at": "2026-09-05T12:00:00Z",
+  "deleted_at": null
+}

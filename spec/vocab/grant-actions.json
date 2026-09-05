@@ -1,0 +1,100 @@
+{
+  "$comment": "The grant vocabulary: everything a household can allow or deny per person. Closed, like capabilities.json and permissions.json, so a grant can be rendered, explained and audited rather than being an opaque string.\n\nAn entry containing a `<placeholder>` is parameterized: a grant writes it out with a real target (`use:<package>` becomes `use:videos`), the same way a manifest writes `net:api.open-meteo.com` against permissions.json's `net:<host>`. Every other entry is used verbatim. (permissions.json's own comment says 'entries ending in a colon', which describes no entry in either file; the placeholder is the real convention and what the matcher implements.)\n\nRead this next to what it deliberately does NOT contain. There is no action that weakens the safety floor, no 'bypass_safety', no 'disable_filters'. The org's Safety invariants make those non-removable by anyone including the owner, so an action for them would be a lie in a list a family is meant to trust. `chat.unrestricted` and `generate.unrestricted` below are the adult-freedom unlock the standard DOES describe - unfiltered answering for an adult who has acknowledged it - and they still run under the same floor.",
+  "actions": [
+    {
+      "id": "use:<package>",
+      "parameterized": true,
+      "description": "Use one package: an app, a plugin, a skill. The workhorse: 'Billy cannot use app X' is one deny."
+    },
+    {
+      "id": "packages.use_all",
+      "parameterized": false,
+      "description": "Use any installed package. Pair with a per-package deny for 'everything except X'."
+    },
+    {
+      "id": "packages.install",
+      "parameterized": false,
+      "description": "Install a package from the catalog."
+    },
+    {
+      "id": "packages.remove",
+      "parameterized": false,
+      "description": "Remove an installed package."
+    },
+    {
+      "id": "skills.use_all",
+      "parameterized": false,
+      "description": "Let skills compose into this person's turns at all. Jesse's own example of a global switch a household might want off for one person."
+    },
+    {
+      "id": "commands.create",
+      "parameterized": false,
+      "description": "Author a command ('when I say X, do Y')."
+    },
+    {
+      "id": "integration:<id>",
+      "parameterized": true,
+      "description": "Reach one connected integration."
+    },
+    {
+      "id": "chat.unrestricted",
+      "parameterized": false,
+      "description": "Answer this adult without content filtering, above the non-removable safety floor. Requires acknowledged_at on the grant; never a default, never inherited."
+    },
+    {
+      "id": "generate.unrestricted",
+      "parameterized": false,
+      "description": "The same, for generation. Same acknowledgment rule."
+    },
+    {
+      "id": "memory.read_household",
+      "parameterized": false,
+      "description": "Read household-scoped memory. Person-scoped memory is never reachable through a grant; it belongs to its person."
+    },
+    {
+      "id": "memory.write_household",
+      "parameterized": false,
+      "description": "Write household-scoped memory."
+    },
+    {
+      "id": "people.manage",
+      "parameterized": false,
+      "description": "Create, edit and remove household profiles. What the owner/admin ladder hard-codes today."
+    },
+    {
+      "id": "people.grant",
+      "parameterized": false,
+      "description": "Grant and revoke other people's grants. Held apart from people.manage on purpose: editing a name and handing out authority are different powers, and the second is how a household is taken over."
+    },
+    {
+      "id": "settings.household",
+      "parameterized": false,
+      "description": "Change household-wide settings."
+    },
+    {
+      "id": "settings.admin",
+      "parameterized": false,
+      "description": "Reach the admin area at all. The org rule Jesse set on 2026-09-05 - regular users never see admin settings, even disabled ones - is enforced by rendering nothing without this, rather than by disabling controls."
+    },
+    {
+      "id": "devices.manage",
+      "parameterized": false,
+      "description": "Pair, rename and remove devices, pods and robots."
+    },
+    {
+      "id": "backups.run",
+      "parameterized": false,
+      "description": "Take a backup on demand."
+    },
+    {
+      "id": "backups.restore",
+      "parameterized": false,
+      "description": "Stage a restore. Replaces every person, memory and conversation in the house, which is why it is its own action and not part of backups.run."
+    },
+    {
+      "id": "relationships.manage",
+      "parameterized": false,
+      "description": "State and correct household-scoped relationships between entities."
+    }
+  ]
+}

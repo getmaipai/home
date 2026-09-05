@@ -322,6 +322,81 @@ listed above, so read them as amendments, not additions:
 
 Sources consulted (this research pass, 2026-09-05): [ChatGPT Projects guide](https://www.ai-toolbox.co/chatgpt-management-and-productivity/how-to-use-chatgpt-projects-guide-2026), [ChatGPT custom instructions update](https://www.mywritingtwin.com/blog/chatgpt-projects-setup-guide), [Claude Artifacts 2026 guide](https://suprmind.ai/hub/claude/features/), [Claude Live Artifacts](https://www.eigent.ai/blog/claude-live-artifacts-guide), [Gemini Canvas](https://gemini.google/overview/canvas/), [Gemini Gems](https://geotoolbox.ai/blog/gemini-gems), [Gemini code execution docs](https://ai.google.dev/gemini-api/docs/code-execution), [Gemini/Google Photos face recognition](https://pasqualepillitteri.it/en/news/1055/google-photos-ai-scanning-gemini-recognition), [Google Personal Intelligence privacy concerns](https://vucense.com/privacy-sovereignty/surveillance-biometrics/google-gemini-personal-intelligence-photos-privacy-2026/), [ChatGPT/Claude photo-identification policy](https://github.com/openai/openai-python/discussions/2495), [Claude Scheduled Tasks vs. ChatGPT/Gemini](https://www.xda-developers.com/claude-scheduled-tasks-feature/), [voice mode comparison (GPT-Live/Gemini Live/Claude)](https://apidog.com/blog/gpt-live-vs-gemini-live/), [Claude voice moves to Opus/Sonnet/Haiku](https://www.techradar.com/computing/artificial-intelligence/claude-tipped-to-get-its-answer-to-chatgpts-advanced-voice-mode-soon-is-adding-an-ai-voice-to-a-chatbot-yet-another-tick-box-exercise), [Claude Skills vs ChatGPT GPTs vs Gemini Gems](https://www.open-claw.sh/blog/claude-skills-vs-chatgpt-gpts-vs-gemini-gems), [barcode/QR reading across vendors](https://www.dynamsoft.com/codepool/python-flet-chat-app-barcode-gemini.html).
 
+## People, relationships and permissions
+
+The spec landed 2026-09-05 (`docs/dev.md`, "Entities, relationships and
+grants"): Entity, Relationship and Grant, with the relationship-type and
+grant-action vocabularies and the cross-field validators. None of it is
+implemented on the hub yet.
+
+- [ ] **The hub half of entities and relationships** (L) - tables,
+      migration, routes, and a UI. Held back deliberately: a parallel
+      session was mid-edit across `db/schema.ts`, the migrations and
+      `turnEngine.ts` when the spec landed, and a change this shape on
+      top of that is how two sessions lose work.
+- [ ] **Migrate authorization from roles to grants** (L) - `min_role` on
+      every package manifest, `CREATABLE_BY`/`MANAGEABLE_BY` in
+      `routes/people.ts` and `lib/personLifecycle.ts`, and every
+      `requireRole` call become grant checks. Age stops deciding access
+      entirely (see the spec's reasoning); it keeps its place in safety
+      and retention only.
+- [ ] **Resolve the unrestricted-mode age collision** (S, Jesse's call) -
+      the org's Safety invariants unlock unrestricted chat and generation
+      "per-user by an adult" and restrict child profiles by default, both
+      age-shaped; the grant model removes age from authorization
+      entirely, so nothing can check a grantee is an adult. The Grant
+      record enforces what it can (the acknowledgment is signed and must
+      be by the person it is about) and documents what it cannot. Two
+      correct rules in genuine conflict, not an oversight.
+- [ ] **Do roles keep age-flavoured names?** (S, Jesse's call) - once
+      roles are authorization-only, `adult`/`teen`/`child` either become
+      labels that seed a default grant set and mean nothing afterward, or
+      go entirely. The second is the only one where nobody can mistake a
+      label for a rule.
+- [ ] **Relationship inference** (L, and its own design pass first) -
+      the storage model is useful without it and safe on its own. Two
+      questions to answer before any code: does inference ship at all in
+      v1, and may a parent see a relationship inferred from their teen's
+      conversation? Both are Jesse's, not research questions.
+- [ ] **A speech profile per person** (M) - how to address someone
+      (complexity, pace, vocabulary), distinct from persona, which is who
+      the assistant is being. `persona.ts` already has a `complexity`
+      dimension doing half the job for the wrong owner: two people
+      sharing a companion must still be addressed differently.
+- [ ] **An `enabled` state for a person** (S) - `Person` has only
+      `deleted_at`; disabled-but-present has no representation today.
+- [ ] **Retire the free-text memory entity** (M) - `record_kind: entity`
+      keeps a name and description in one `text` field and recovers the
+      name by splitting on the first colon, which `lib/memory.ts`
+      documents as an approximation. Entity records replace it; memory
+      stays narrative.
+- [ ] **The Python half of `spec/records/ts/validate.ts`** (S) - lands
+      when the robot writes one of these records, the same split
+      `spec/safety/` takes today.
+
+## Settings
+
+- [ ] **Rebuild Settings as a real settings editor** (L) - Jesse,
+      2026-09-05, with a VS Code screenshot: a tree sidebar showing the
+      section and subsection you are in, search, scope as tabs, and each
+      setting stacked title / description / control. Researched against
+      `getmaipai/.github/docs/SETTINGS.md` and most of it is already
+      decided there rather than new: Rule 1 ("a setting lives with the
+      thing it configures, once") is violated by today's single long
+      page, and Rule 5 already specifies a generated index with
+      `@modified`/`@app:`/`@level:`/`@person` filters, which is VS Code's
+      own filter model. Genuinely new and worth adding to the standard:
+      the sidebar-as-table-of-contents, admin as its own area, and
+      "regular users never see admin settings, even disabled ones" (which
+      the grant vocabulary's `settings.admin` action now makes
+      enforceable by rendering nothing rather than disabling controls).
+- [ ] **Do NOT add a global "show advanced" toggle** - Jesse asked to
+      double-check this one, and the answer is that SETTINGS.md Rule 4
+      already forbids it deliberately: "three levels, disclosed locally,
+      never a global mode... No per-person advanced mode switch." VS Code
+      has no such toggle either; advanced-ness lives in groups and
+      filters. Recorded here so it is not re-proposed.
+
 ## UI / shell
 
 - [x] Person edit and delete (M) - done 2026-09-05. `PATCH`/`DELETE`
@@ -355,7 +430,13 @@ Sources consulted (this research pass, 2026-09-05): [ChatGPT Projects guide](htt
       hand-rolls selection mode, the count, the confirmation panel and
       the partial-success report. The second consumer (Memory, above) is
       the moment that becomes a kit primitive rather than a copy.
-- [ ] Notifications UI (L, blocked on the notification system below)
+- [x] Notifications UI (done 2026-09-05, `docs/dev.md`'s "The
+      notification system, a real working slice" entry) - `NotificationBell`
+      (shell header: pending list + toast on new arrival). Still real gaps:
+      no thirty-day history page yet (only the pending list and the
+      `GET /api/notifications/history` route it would read from), and
+      "clear all" isn't built (this item's own "batch actions" rule
+      applies once it is).
 - [ ] Package/skill catalog browsing and install (L) - blocked on the
       `catalog` repo existing for real; today only local bundled packages
       run at all.
@@ -495,8 +576,17 @@ Sources consulted (this research pass, 2026-09-05): [ChatGPT Projects guide](htt
       check, and update delivery have never been exercised for real.
 - [ ] Real i18n (L) - "language and region" is a stored preference today
       with no translation behind it.
-- [ ] The notification system (4.13) (L) - not built; several manifests
-      already declare a `notifications` field that goes nowhere.
+- [x] The notification system (4.13) (L, a real working subset done
+      2026-09-05, `docs/dev.md`'s "The notification system, a real
+      working slice" entry) - declared types, `in_app` + Telegram
+      channels, non-configurable types, `safety.flagged_turn` and
+      `model.download_ready`/`failed` wired to real events. Still open:
+      quiet hours, `passive`-level digest batching, browser push / Go /
+      TV overlay / robot speech (no such clients exist yet), a real
+      parent/guardian audience (see the Relationship/Grant work above),
+      and package-declared notification types (the manifest's
+      `notifications` field is read by nothing yet - a real, deliberately
+      deferred extension point, not forgotten).
 
 ## The other three products (status, not this repo's job to fix)
 

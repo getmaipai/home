@@ -11,10 +11,13 @@ import pytest
 from _standards import load_standards_module
 from pydantic import ValidationError
 
+from gen.py.entity_schema import Entity
+from gen.py.grant_schema import Grant
 from gen.py.manifest_schema import PackageManifest
 from gen.py.memory_record_schema import MemoryRecord
 from gen.py.model_capabilities_schema import ModelCapabilities
 from gen.py.person_schema import Person
+from gen.py.relationship_schema import Relationship
 from gen.py.safety_result_schema import SafetyResult
 from gen.py.setting_value_schema import SettingValue
 from gen.py.settings_key_schema import SettingsKey
@@ -43,6 +46,23 @@ def test_setting_value_fixture():
 
 def test_settings_key_fixture():
     SettingsKey.model_validate(load_fixture("settings-key.example.json"))
+
+
+@pytest.mark.parametrize("kind", ["person", "pet", "place"])
+def test_entity_fixtures(kind: str):
+    Entity.model_validate(load_fixture(f"entity.{kind}.example.json"))
+
+
+# Three relationship fixtures, one per case the two-axis design exists
+# for: a former job (valid_to set), an estranged daughter (valid_to null,
+# status estranged), and an unconfirmed inference.
+@pytest.mark.parametrize("kind", ["stated", "estranged", "inferred"])
+def test_relationship_fixtures(kind: str):
+    Relationship.model_validate(load_fixture(f"relationship.{kind}.example.json"))
+
+
+def test_grant_fixture():
+    Grant.model_validate(load_fixture("grant.example.json"))
 
 
 @pytest.mark.parametrize("kind", ["memory", "entity", "episode"])

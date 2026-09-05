@@ -5505,3 +5505,305 @@ a reminder that a hand-copied wire type (`wire.ts`'s own `RoutingStats`,
 duplicated from `conversationHistory.ts`'s for the reason its header
 comment states) needs every consumer's test fixtures checked, not just
 the two type definitions, when a field is added.
+
+
+## Entities, relationships and grants (2026-09-05)
+
+Jesse, across several messages: everything is an entity with a type;
+a person can have an account, which makes them a user; pets need
+ownership; people have multiple homes, multiple jobs, multiple work
+locations; relationships need status ("A is active boyfriend of B", "C
+is estranged daughter of D"); and separately, permissions need to be
+arbitrary rather than derived from a role. Then: "research this and
+figure out if what I proposed is compressible."
+
+It is compressible, and the research says his instinct was right on
+every point. This is the spec layer; the hub implementation is a
+separate slice (see the end).
+
+### Age cannot decide access
+
+The strongest correction, and it came from Jesse, not from the research:
+a household may want a twelve-year-old to reach something normally kept
+for adults, and may want an adult restricted (a grandparent with
+dementia, someone managing an addiction, a houseguest, an adult who
+wants guardrails on themselves). And there is no defensible age at which
+a feature unlocks by itself: every threshold is arbitrary, varies by
+jurisdiction, and is wrong for somebody. A feature that unlocks on a
+birthday is a feature nobody decided to grant.
+
+So `Grant` replaces role-as-gate. Age keeps its place in safety and
+retention (the minor-speaker flag, the 90-day rule for a safety-flagged
+conversation involving a teen or child), because those are protections,
+not permissions. `min_role` on package manifests and the `CREATABLE_BY`/
+`MANAGEABLE_BY` ladders are the code this makes obsolete.
+
+Nothing in the grant vocabulary weakens the safety floor, and a test
+asserts it: the org's Safety invariants make child-safety protections
+non-removable by any setting or admin including the owner, so an action
+claiming otherwise would be a lie in a list a family is meant to trust.
+
+### One edge concept, two stores
+
+Relationship-based access control (Google's Zanzibar, and the ReBAC
+family after it) models permissions as exactly the shape Jesse described
+for family relationships: a typed edge between a subject and an object.
+That is the compression - ownership, residence, employment, family and
+authorization are one idea, not five systems.
+
+They are still **two separate stores**, and this is the load-bearing
+decision in the whole design. Social edges can be machine-inferred and
+wrong. Grants are policy and are never inferred. Putting both in one
+table behind one resolver means an inference bug becomes a privilege
+escalation. Same shape, separate stores, opposite trust.
+
+### Status and validity are two axes, not one
+
+From Jesse's own two examples. A former job has **ended**: `valid_to` is
+set, and it needs no status to say so. An estranged daughter has **not
+ended**: she is still his daughter, so `valid_to` stays null and the
+status carries it. Collapse them and you can express an "ex-daughter",
+or a former job that still reads as current.
+
+So the vocabulary declares, per type, whether it is terminable and which
+statuses it admits, and `estranged` is only offered on types that cannot
+end (where a type can end, ending it is the honest record, and offering
+both invites "ex-partner, estranged" stored two ways). The payoff is not
+the data: it is that a renderer can say "Jesse's former job at Acme" and
+never says "your boyfriend Alex" three weeks after a breakup. Free-text
+memory cannot supply that tense.
+
+### Places, and why residence is an edge
+
+Home Assistant - whose selector names this repo already borrows -
+separates an **area** (a space inside a building, exactly one per
+entity) from a **zone** (a named place on a map: home, work, school).
+"Where does someone live" and "multiple work locations" are the second
+kind. Both are `kind: place` here with a `place_kind` subtype, a
+documented judgment call: a room and a house are both places you can be,
+and every relationship that points at one can point at the other.
+
+Residence and employment are edges rather than fields because a person
+has several of each. schema.org models them as `homeLocation` and
+`workLocation` properties, and its own issue 823 is a long-running
+argument about how those relate to plain `location` - which is what the
+single-valued shortcut costs. An edge carries "primary residence since
+2024" and "weekends only"; a property cannot.
+
+### Inference is the dangerous half
+
+Jesse's two examples are the two worst cases. Inferring a teen's partner
+and surfacing it to a parent could out someone; asserting an
+estrangement is the hub declaring a family rupture out loud. So:
+
+- `source` distinguishes `stated` from `inferred`, and an inferred edge
+  carries a confidence and the evidence it came from, or it cannot be
+  reviewed and a wrong one cannot be corrected.
+- An inferred edge may be used to **ask** ("is Alex your partner?"),
+  never to **assert**, until a person confirms it.
+- `scope` defaults to `person`, not `household`. A relationship inferred
+  from one person's conversation is their data, and an unconfirmed one
+  is refused household scope outright. The org's per-person identity
+  rule already forbids pooling personalization; this applies it to the
+  graph.
+
+### The thing that nearly shipped as decoration
+
+The cross-field rules were first written as JSON Schema `if`/`then`/
+`else`, which reads as enforcement. Both generators drop them silently.
+Checked rather than assumed: an entity with a pet holding a
+`place_kind`, an account, and a person-scope with no person parsed clean
+through the generated Zod **and** the generated Pydantic. Every rule was
+decorative, and a documented-but-unenforced rule is worse than an absent
+one because the description claims otherwise.
+
+No other schema in this repo uses a conditional, and MemoryRecord states
+its own scope/person rule in prose and enforces it in code. So the
+conditionals came out, the descriptions now say where each rule actually
+lives, and `spec/records/ts/validate.ts` enforces them with a test per
+rule watching it reject. TS-only for now, the same honest split
+`spec/safety/` takes.
+
+A second self-inflicted one, caught by the same tests: the grant fixture
+said `use:videos` while the vocabulary declared `use:<package>`, and the
+first draft carried a redundant `object` field beside it. Permissions
+already solved this - a manifest writes `net:api.open-meteo.com` against
+`net:<host>` - so grants match the same way and `object` is gone.
+
+### What the review caught
+
+Eleven findings, ten real. Two are worth recording beyond the fix:
+
+**Datetime ranges were compared as strings.** `valid_to < valid_from` is
+a lexicographic compare, and `format: date-time` permits a non-Z offset,
+so it failed in both directions: a range running genuinely forward was
+rejected, and one running genuinely backward passed. Verified with
+concrete timestamps rather than argued about. Same bug in the grant
+check, where it let a "screens until Sunday" grant expire before it
+started. Both now parse to instants.
+
+**An inferred relationship could be attributed to a person.** The
+`stated` branch checked `stated_by_person_id` was present; the
+`inferred` branch never checked it was absent, though the sibling guards
+for `confidence` and `evidence` were both there. The hub could copy a
+speaker's id onto its own guess and a renderer would show "Riff said
+Alex is Marlow's partner" for something nobody said - the exact
+assertion this record type exists to prevent.
+
+The rest: `validateRelationshipEndpoints` took two entities of identical
+TypeScript shape and never checked they were actually this edge's
+endpoints, so a transposed call stored a backwards edge and passed;
+`matchGrantAction` accepted the raw template `use:<package>` as a
+concrete action; `inverseRelationship()` now builds the reciprocal row
+that Relationship's own description promised was "both stored" and that
+nothing created; and `spec/` had no typecheck at all, so a schema rename
+that broke a hand-written module would have surfaced only as a runtime
+throw in whichever test happened to reach it.
+
+### One collision this design cannot resolve on its own
+
+The org's Safety invariants say unrestricted mode is unlocked "per-user
+by an adult" and that child profiles are restricted by default. Both are
+age-shaped. This model deliberately removes age from authorization, so
+nothing in a Grant can check that a grantee is an adult.
+
+What it can and now does check: the acknowledgment is signed
+(`acknowledged_by_person_id`, not just a bare timestamp) and must be the
+person the grant is about, because unrestricted mode is something an
+adult accepts for themselves rather than something another adult accepts
+on their behalf. A code review found the first version proved only that
+SOME timestamp existed.
+
+But "the grantee must be an adult" is unenforceable here, and that is a
+real collision between two correct rules rather than an oversight. It is
+recorded in the backlog as Jesse's call, not settled quietly inside a
+validator.
+
+### Not built here
+
+The hub implementation: tables, migration, routes, and the migration of
+every `min_role` and role-ladder check onto grants. Deliberately not
+started in the same pass, and not only for size: a parallel session is
+mid-edit across `backend/src/db/schema.ts`, the migrations and
+`turnEngine.ts`, and a change of this shape landing on top of that is
+how two sessions lose work. The spec is the half that can land cleanly
+now and is what the hub work will be built against.
+
+Also still open, and genuinely Jesse's calls rather than research
+questions: whether roles keep age-flavoured names at all once they are
+authorization-only, whether relationship inference ships in v1 or waits
+until the storage model is proven, and whether a parent may see a
+relationship inferred from their teen's conversation.
+
+## The notification system, a real working slice (2026-09-05)
+
+Jesse's ask, verbatim in spirit: a unified system with a pending list, a
+toast, and Telegram; Synology-style control over what sends where;
+some notifications not user-configurable; plugin access to trigger one;
+and standard modal/notification patterns, researched rather than
+invented. `getmaipai/.github/docs/NOTIFICATIONS.md` already had the real
+org design (platform plan 2.6: levels, audiences, channels, routing) -
+read first, built against, not reinvented. This is a real, working
+subset of it, not the whole thing - the same "narrower than the full
+description" discipline `lib/scheduler.ts`'s own header already
+documents for jobs.
+
+**What's real.** `lib/notificationTypes.ts` declares core notification
+types (id, level, audience, template, `configurable`, default channels) -
+a package's own declaration is a real, deferred extension point, the
+same way its settings `config[]` already is. Two channels: `in_app` (the
+pending list, always on for every type, since it's also the audit
+record) and `telegram` (a direct hub-to-Telegram connection, the
+household's own bot token, opt-in per person - a real outbound
+connection, so it earned its own row in `lib/privacy.ts`, unlike Home
+Assistant which stays off that page for being a LAN device rather than a
+third party). `NOTIFICATION_TYPES` ships two real types: `safety.
+flagged_turn` (non-configurable, `adults` audience) and `model.
+download_ready`/`model.download_failed` (configurable, same audience).
+
+**The real gap this closes, not a speculative one.** `SafetyResult`'s
+own schema comment named this the day it was written: "`notify_parent`
+... Delivery through the notification system (2.6) is a later hub
+release; this field is the fact that a caller wires up once it exists."
+`evaluateSafety()` has computed it correctly since safety.ts shipped;
+until tonight, the only place it ever went was a `console.log` line -
+`turnEngine.ts` never read it. `prepareTurn()` now fires
+`trigger("safety.flagged_turn", ...)` the moment `notify_parent` is
+true, before the refuse branch returns (a refused turn still notifies),
+never awaited on the turn's own critical path (the same "never block or
+fail the thing that triggered it" contract `logTurnSafely()` already
+established for conversation logging).
+
+**`configurable: false` means exactly that - no settings key exists for
+it at all**, not a key defaulting to "on." `settings/notificationKeys.ts`
+only declares toggles for the two configurable model-download types;
+`safety.flagged_turn` has nothing to turn off, matching CLAUDE.md's
+Safety invariants ("no admin setting... may disable or weaken" a
+child-safety protection) structurally rather than by convention. A
+person's Telegram chat id (`notifications.telegram.chat_id`, `person`
+scope) and the household's bot token (`notifications.telegram.bot_token`,
+`household` scope, `secret: true`) are the only new settings surface -
+the per-type × per-channel "matrix" Jesse asked for is the existing
+generic `SettingsRenderer` rendering these keys, not a bespoke grid
+widget: one definition, one place, the same registry every other setting
+already goes through, grouped under a new "Notifications" section
+(`groupSettings.ts`'s `SECTION_TITLES`) for free.
+
+**Audience: `adults` stands in for both "admins" and "parents of a
+child" until a real parent/guardian link exists** - `Person` has none
+today (the Relationship/Entity/Grant work above this entry is the real,
+separate effort that would eventually close this). Every adult in the
+household seeing a safety alert is a safe over-inclusion, never an
+under-inclusion; a documented gap, not a silent approximation.
+
+**Modal and notification-pattern standards: decided at the org level,
+not re-decided here.** `getmaipai/.github/docs/UI.md`
+("Toast, confirmation, sheet, and the notification center, decided",
+2026-09-05) landed while this was in progress - real research against
+Synology, Home Assistant, and Discord, closing exactly the ask Jesse
+made. Its decision: a toast is a self-dismissing courtesy echo that
+always also writes to the notification center; a confirmation stays
+`PeoplePage`'s existing inline-card pattern, standardized rather than
+replaced; a sheet/full dialog is built only the first time a real
+multi-field task needs one; the notification center is the durable,
+non-modal record every channel writes to. This build follows that
+standard rather than crossing it: `kit/primitives/Toast.tsx` (Radix
+Toast - self-dismissing, ARIA live region built in) and
+`shell/NotificationBell.tsx` (Radix Popover - non-modal, never traps
+focus) are the only two new kit primitives. A `Dialog.tsx` was built
+alongside them before that standard's commit was checked, with a plan
+to migrate `PeoplePage`'s confirmations onto it - exactly the "standardize
+away" the org doc explicitly rejects. Deleted, along with the
+`@radix-ui/react-dialog` dependency it needed, once the standard
+landed: no real caller needs a Dialog yet, and the doc is explicit that
+one gets built "the first time a real caller needs it, not
+speculatively ahead of one."
+
+**Coordination note.** A second session was concurrently building the
+commands settings UI and, using research shared between sessions, wrote
+the UI.md decision above and an org PACKAGES.md fix - both in
+`getmaipai/.github`/`catalog`, never `home`, so nothing here collided.
+`backend/src/wire.ts` and `frontend/src/lib/api.ts` were edited by both
+sessions in the same window; each added its own lines at the end of the
+same lists and verified the other's in-progress additions were left
+untouched before staging, the same byte-level care this repo's shared-
+checkout work has used all night.
+
+**What's deferred, named rather than half-built:** quiet hours (no
+schedule concept exists for any settings key yet), `passive`-level
+digest batching (every level delivers immediately today), browser push /
+Go / TV overlay / robot speech (no such clients exist to receive them
+yet - UI.md's own `tv: page`/`tv: none` notes for this exact area are
+written ahead of a TV surface that doesn't exist), and a real thirty-day
+retention job for `notification_deliveries` (rows accumulate; nothing
+prunes them yet, the same gap conversation history had before
+`runRetention()`).
+
+Schema: a new `notification_deliveries` table (one row per (type,
+recipient), never shared across recipients since read/dismiss state is
+inherently personal), schema version bumped to 9. Tests: 16 new in
+`tests/notifications.test.ts` (template rendering, household/adults
+fan-out excluding minors, per-person Telegram opt-in vs. a non-
+configurable type's forced default, ownership isolation on read/dismiss,
+and a real end-to-end `runTurn()` test proving a minor's flagged turn
+notifies every adult). Full suite green (566 backend, 201 frontend).

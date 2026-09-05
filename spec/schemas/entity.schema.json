@@ -1,0 +1,149 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://getmaipai.github.io/home/spec/schemas/entity.schema.json",
+  "title": "Entity",
+  "description": "Anything the household knows about and can refer to: a person, a pet, a place, an organization, a thing. One table, one id space, discriminated by `kind`, so a relationship can point at any two of them without a polymorphic join.\n\nAn Entity is NOT an account. A Person record (person.schema.json) is the account-bearing half of a `kind: person` entity, linked by `account_person_id`: grandma who is only ever mentioned in conversation and grandma who signs in are the same entity at different stages, which is the whole reason this shape exists.\n\nThis also replaces the free-text `record_kind: entity` memory record as the household's notion of a named thing. That record kept a name and a description in one `text` field by convention ('Name: description'), recovered by splitting on the first colon, which lib/memory.ts documents as an approximation. Memory stays narrative ('Bramble likes trains'); entities and the facts joining them live here, structured.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "id",
+    "kind",
+    "name",
+    "source",
+    "created_at",
+    "updated_at"
+  ],
+  "properties": {
+    "id": {
+      "type": "string",
+      "pattern": "^ent-[a-z0-9]{6,}$",
+      "description": "Stable id, never reused, even after deleted_at is set. Distinct from the `ent<seq>-<device6>` ids memory records use for their own entity rows; those are memory rows, these are entities."
+    },
+    "kind": {
+      "type": "string",
+      "enum": [
+        "person",
+        "pet",
+        "place",
+        "organization",
+        "thing"
+      ],
+      "description": "A closed set on purpose. A new kind is a spec change with a migration, not a free-text value a package can invent, because every relationship type declares which kinds it may join."
+    },
+    "name": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 200,
+      "description": "What the household calls this. A real field, not a parsed prefix."
+    },
+    "aliases": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 200
+      },
+      "default": [],
+      "description": "Other names the same entity answers to ('Mum', 'Grandma Iris', 'the vet'). Entity-first recall matches on these too, which is what the legacy hub's entities table indexed and the free-text memory entity could not."
+    },
+    "description": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "maxLength": 2000,
+      "default": null,
+      "description": "Free text about the entity itself. Facts that join it to another entity belong in a Relationship, not here."
+    },
+    "place_kind": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "enum": [
+        "map",
+        "area",
+        null
+      ],
+      "default": null,
+      "description": "Only meaningful when kind is `place`, required then. `map` is a place on a map (a home, a workplace, a school) - Home Assistant calls this a zone. `area` is a space inside a place (a room) - Home Assistant calls this an area. Keeping both senses in one kind with a subtype, rather than two kinds, is a documented judgment call (home/docs/dev.md): a room and a house are both places you can be, and every relationship that points at one can point at the other. Cross-field rules like this one are enforced by spec/records/ts/validate.ts and its tests, not by this schema: neither generator preserves JSON Schema conditionals, so an if/then here would look enforced and do nothing. Same convention MemoryRecord already follows for its own scope/person rule."
+    },
+    "parent_id": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "pattern": "^ent-[a-z0-9]{6,}$",
+      "default": null,
+      "description": "Physical containment only, and only for places: a room's home, a home's... nothing yet. Exactly one parent, mirroring Home Assistant's rule that an entity belongs to one area. Every other kind of belonging is a Relationship, which is many-to-many and carries time."
+    },
+    "account_person_id": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "pattern": "^person-[a-z0-9]{6,}$",
+      "default": null,
+      "description": "The Person record that signs in as this entity, when there is one. Only valid on kind: person. Absent means someone the household knows about but who has no account, which is the normal case for most people a family talks about. Enforced in validate.ts."
+    },
+    "source": {
+      "type": "string",
+      "enum": [
+        "hub",
+        "local",
+        "imported",
+        "inferred"
+      ],
+      "description": "Where this entity came from. `inferred` means the hub created it from conversation and no person has confirmed it exists; see Relationship's own confidence rules, which apply here for the same reason."
+    },
+    "confirmed_by_person_id": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "pattern": "^person-[a-z0-9]{6,}$",
+      "default": null,
+      "description": "Who confirmed this entity is real, and when that has happened. Meaningful mainly for `source: inferred`, which starts unconfirmed and is never stated as fact to anyone until this is set; an entity a person created through the UI (`source: hub`) is confirmed by the act of creating it, and records who. An earlier draft said 'null while source is inferred', which was self-contradictory - if it must stay null there is no way for a guess to ever become assertable (code review, 2026-09-05)."
+    },
+    "scope": {
+      "type": "string",
+      "enum": [
+        "household",
+        "person"
+      ],
+      "default": "household",
+      "description": "Who this entity is visible to, following memory-record.schema.json's scoping, minus its `self` value: `self` is the companion's own memory of itself, which an entity in the household's graph never is. A person mentioned only in one person's conversations is theirs, not the household's; pooling it is the failure the org's per-person identity rule exists to prevent."
+    },
+    "person": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "pattern": "^person-[a-z0-9]{6,}$",
+      "default": null,
+      "description": "Required when scope is person; null for household scope. Same field and same rule as MemoryRecord. Enforced in validate.ts."
+    },
+    "sensitive": {
+      "type": "boolean",
+      "default": false,
+      "description": "Withheld on shared surfaces and, on the robot, unless the person is confirmed present and alone. Same meaning as MemoryRecord.sensitive."
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "updated_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "deleted_at": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "date-time",
+      "default": null,
+      "description": "A tombstone, not a removal: a row that simply vanishes is indistinguishable to a robot syncing later from one it has not been told about yet."
+    }
+  }
+}
