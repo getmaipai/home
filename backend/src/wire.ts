@@ -207,3 +207,11 @@ export interface PrivacyConnection {
   optIn: boolean;
   retention: string;
 }
+
+/** A restore that is staged and waiting for the hub's next restart
+ * (lib/restoreStaging.ts). */
+export interface PendingRestore {
+  filename: string;
+  stagedAt: string;
+  stagedByPersonId: string;
+}

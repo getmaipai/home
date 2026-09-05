@@ -26,16 +26,19 @@ done; the other two items are still real, tracked work.
       affects `bot` and `catalog` too) and the planned `catalog` repo
       layout haven't been updated to match yet - a separate repo's commit,
       tracked here so it isn't forgotten.
-- [ ] **Add a real `skill` kind: plain instructions, Claude-`SKILL.md`-
-      compatible, no independent permissions** (M) - genuinely new
-      capability. Composed into context the same way `lib/persona.ts`
-      already composes text fragments; safely user-authorable with no
-      review gate since it can't touch the network or any permission
-      surface. Confirmed against ChatGPT's own current shape too, not
-      just Claude's: OpenAI's 2026 "Skill" allows code/scripts and is
-      closer to what MaiPai already calls a plugin - the pure-
-      instructions shape was picked deliberately over that broader one
-      (see `docs/dev.md`'s entry for the three reasons), not by default.
+- [x] **Add a real `skill` kind: plain instructions, Claude-`SKILL.md`-
+      compatible, no independent permissions** (M, done 2026-09-05,
+      `docs/dev.md`'s "The real skill kind, shipped" entry) - composed
+      into the chat model's system prompt when relevant (reusing the
+      plugin floor's own `exampleScore` relevance matching, never
+      executed on its own), safely user-authorable since it can't touch
+      the network or any permission surface. Ships with a real bundled
+      example (`storytime-style`) proving genuine Claude-format
+      compatibility - real YAML frontmatter, stripped before composition,
+      tested. Live-testing it found a real, honest cross-package routing
+      collision (a bedtime-story request hijacked by the `joke` plugin's
+      own keyword-overlap placeholder) - concrete evidence for the
+      already-tracked `embed` role below, not something patched here.
 - [ ] **Formalize `command` as a first-class, user-creatable primitive**
       (M) - the matching mechanism already exists (`routing.patterns` /
       `matchPattern` in `turnEngine.ts`); this is a lighter-weight

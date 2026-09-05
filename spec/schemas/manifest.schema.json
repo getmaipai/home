@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://getmaipai.github.io/home/spec/schemas/manifest.schema.json",
   "title": "PackageManifest",
-  "description": "One manifest format for every package kind (plugin, app, companion, integration, model, wakeword, voice, theme, module). See platform plan 5.1 and .github's docs/PACKAGES.md.",
+  "description": "One manifest format for every package kind (plugin, skill, app, companion, integration, model, wakeword, voice, theme, module). See platform plan 5.1 and .github's docs/PACKAGES.md.",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -23,9 +23,10 @@
     "kind": {
       "type": "string",
       "enum": [
-        "plugin", "app", "companion", "integration", "model",
+        "plugin", "skill", "app", "companion", "integration", "model",
         "wakeword", "voice", "theme", "module"
-      ]
+      ],
+      "description": "A `plugin` is a self-contained, permissioned, installable capability (its own network access, its own recipe.json). A `skill` is plain instructions (a SKILL.md body, Claude-format-compatible) - no permissions, no recipe, composed into the chat model's system prompt when relevant, never runs on its own. See home/docs/dev.md's 'Naming: skill, plugin, command, connector' entry."
     },
     "category": {
       "type": "string",

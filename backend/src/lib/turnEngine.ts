@@ -13,6 +13,7 @@
 // read docs/dev.md's turn engine section before extending this file.
 import { evaluateSafety } from "@/lib/safety";
 import { listPackageIds, loadPackage, meetsMinRole, runPlugin } from "@/lib/plugins";
+import { loadAllSkills, type LoadedSkill } from "@/lib/skills";
 import { recall, type RecallMatch } from "@/lib/memory";
 import { complete, startCompleteStream, type LlmMessage } from "@/lib/llm";
 import { tokenize } from "@/lib/text";
@@ -124,21 +125,67 @@ export const PROMPT_SYSTEM_CHAR_BUDGET = 4000;
 const MAX_MEMORY_SNIPPETS = 5;
 const MAX_MEMORY_SECTION_CHARS = 800;
 const MAX_PLUGINS_SECTION_CHARS = 800;
+const MAX_SKILLS_SECTION_CHARS = 1200;
+// A cap on how many matching skills compose into one turn, not just a
+// character budget: even under budget, five unrelated skills all
+// clearing the threshold on a short utterance is a real sign the
+// threshold (or the examples) need tightening, not a reason to hand the
+// model five instruction sets at once. Small on purpose - this is the
+// first real slice of a genuinely new primitive (docs/dev.md's "Naming"
+// entry), not tuned against real household use yet.
+const MAX_MATCHING_SKILLS = 3;
+
+// Skills compose into context by the SAME relevance mechanism plugins use
+// to route deterministically (exampleScore/EXAMPLE_MATCH_THRESHOLD,
+// below) - reused, not reinvented, since the underlying question is
+// identical ("does this utterance look like what this package's
+// routing.examples describe"). The real difference is what happens next:
+// a plugin match runs a recipe and answers the turn outright; a skill
+// match only ever ADDS its instruction body to the model's system
+// prompt - it never fires on its own, never short-circuits the turn, and
+// carries no permissions to do anything but shape phrasing. `text` here
+// is the raw utterance, the same one route() scores plugins against.
+// Shared by skillsSection() (below) and prepareTurn()'s plugin-vs-skill
+// priority check: both need the same "which skills are relevant, most
+// confident first" answer, just for different purposes (composing text
+// vs. comparing the top score against a fuzzy-matched plugin's own).
+// Uncapped and unsliced here on purpose - MAX_MATCHING_SKILLS is a
+// composition-budget concern, not part of what "relevant" means, and the
+// priority check only ever needs the single best score regardless of how
+// many would eventually compose in.
+function matchingSkills(text: string, skills: LoadedSkill[]): { skill: LoadedSkill; score: number }[] {
+  return skills
+    .map((skill) => ({ skill, score: exampleScore(text, skill.manifest.routing?.examples) }))
+    .filter((m) => m.score >= EXAMPLE_MATCH_THRESHOLD)
+    .sort((a, b) => b.score - a.score);
+}
+
+function skillsSection(text: string, skills: LoadedSkill[]): string {
+  const matching = matchingSkills(text, skills).slice(0, MAX_MATCHING_SKILLS);
+  if (matching.length === 0) return "";
+  return `\n\n${matching.map((m) => m.skill.body).join("\n\n")}`;
+}
 
 // Stable-first (4.5): persona/rules/content-policy/standing-instructions
 // and the plugins list are the same for every turn on this install, so they
 // sit first for prefix caching; the volatile zone (memory, then time)
-// comes after. 4.5 also names notes, methods, summary and context in the
-// volatile zone: notes/methods need persona/companion state (not built);
-// summary needs an LLM to distill conversation history into one (the raw
-// history now exists for real, lib/conversationHistory.ts, but nothing
-// summarizes it, 4.11's other roles); context needs the ambient-context
-// wiring the robot side already has but the hub doesn't yet: all three
-// are real gaps, not silently skipped.
+// comes after. Matching skills sit with memory in the volatile zone, not
+// with the stable prefix: unlike the plugins list (every installed
+// plugin, unconditionally, every turn), which skills compose in
+// genuinely depends on this turn's own utterance. 4.5 also names notes,
+// methods, summary and context in the volatile zone: notes/methods need
+// persona/companion state (not built); summary needs an LLM to distill
+// conversation history into one (the raw history now exists for real,
+// lib/conversationHistory.ts, but nothing summarizes it, 4.11's other
+// roles); context needs the ambient-context wiring the robot side
+// already has but the hub doesn't yet: all three are real gaps, not
+// silently skipped.
 export function buildSystemPrompt(
+  text: string,
   memoryMatches: RecallMatch[],
   loaded: LoadedManifest[] = loadAllManifests(),
   persona: Persona = DEFAULT_PERSONA,
+  skills: LoadedSkill[] = loadAllSkills(),
 ): string {
   let pluginsSection = pluginsListLine(loaded);
   if (pluginsSection.length > MAX_PLUGINS_SECTION_CHARS) {
@@ -154,6 +201,11 @@ export function buildSystemPrompt(
     }
   }
 
+  let skillsPart = skillsSection(text, skills);
+  if (skillsPart.length > MAX_SKILLS_SECTION_CHARS) {
+    skillsPart = skillsPart.slice(0, MAX_SKILLS_SECTION_CHARS) + "...";
+  }
+
   const timeLine = `\n\nCurrent time: ${new Date().toISOString()}`;
 
   // The time line is appended last (4.5: "...time last") and must never
@@ -165,7 +217,7 @@ export function buildSystemPrompt(
   // never-truncated time line, keeps every truncation boundary inside
   // prose meant to be cut, never inside the one line a caller might parse.
   const registerFragment = composePersonaPrompt(persona) + " " + INFORMATION_HANDLING_POLICY;
-  let body = STABLE_SYSTEM_PREFIX + " " + registerFragment + pluginsSection + memorySection;
+  let body = STABLE_SYSTEM_PREFIX + " " + registerFragment + pluginsSection + memorySection + skillsPart;
   const bodyBudget = Math.max(0, PROMPT_SYSTEM_CHAR_BUDGET - timeLine.length);
   if (body.length > bodyBudget) body = body.slice(0, bodyBudget);
 
@@ -250,6 +302,15 @@ function deterministicArgs(args: unknown, captured: string | null): Record<strin
 interface RoutedPlugin {
   id: string;
   args: Record<string, unknown>;
+  score: number;
+  /** True only for a real `routing.patterns` match - an unambiguous,
+   * deliberately-set-up trigger phrase, never a guess. Tracked as its own
+   * flag rather than inferred from `score === 1`, since a fuzzy
+   * `exampleScore` could in principle also reach 1.0 on total word
+   * overlap; a pattern match's "always wins, no exceptions" guarantee
+   * (2026-09-05, prepareTurn()'s skill-vs-plugin priority check) must
+   * never depend on that coincidence. */
+  viaPattern: boolean;
 }
 
 // The deterministic plugin floor (4.5). A `consequential` package (4.9's
@@ -261,7 +322,7 @@ interface RoutedPlugin {
 // deterministic order), a deliberately simple tie-break, not a claim of
 // ranking by pattern specificity.
 function route(text: string, actor: PersonRow, loaded: LoadedManifest[]): RoutedPlugin | null {
-  let best: { id: string; args: Record<string, unknown>; score: number } | null = null;
+  let best: { id: string; args: Record<string, unknown>; score: number; viaPattern: boolean } | null = null;
 
   for (const { id, manifest } of loaded) {
     if (!meetsMinRole(actor.role, manifest.min_role)) continue;
@@ -271,7 +332,7 @@ function route(text: string, actor: PersonRow, loaded: LoadedManifest[]): Routed
       if (captured === null) continue;
       const args = deterministicArgs(manifest.args, captured);
       if (!args) continue;
-      if (!best || best.score < 1) best = { id, args, score: 1 };
+      if (!best || best.score < 1) best = { id, args, score: 1, viaPattern: true };
     }
 
     if (manifest.consequential) continue; // examples alone never clear a raised bar
@@ -279,11 +340,11 @@ function route(text: string, actor: PersonRow, loaded: LoadedManifest[]): Routed
     if (score >= EXAMPLE_MATCH_THRESHOLD) {
       const args = deterministicArgs(manifest.args, null);
       if (!args) continue; // a fuzzy match has no capture to bind a required arg to
-      if (!best || best.score < score) best = { id, args, score };
+      if (!best || best.score < score) best = { id, args, score, viaPattern: false };
     }
   }
 
-  return best ? { id: best.id, args: best.args } : null;
+  return best;
 }
 
 type PreparedTurn =
@@ -297,7 +358,12 @@ type PreparedTurn =
  * or which plugin matched. Only the `kind: "model"` branch differs between
  * the two callers - runTurn() awaits complete(), runTurnStream() awaits
  * startCompleteStream() instead. */
-async function prepareTurn(actor: PersonRow, text: string, loaded: LoadedManifest[]): Promise<PreparedTurn> {
+async function prepareTurn(
+  actor: PersonRow,
+  text: string,
+  loaded: LoadedManifest[],
+  skills: LoadedSkill[] = loadAllSkills(),
+): Promise<PreparedTurn> {
   const safety = evaluateSafety(text, actor.role as Role);
   if (safety.action === "refuse") {
     // The text here is never actually seen: finalizeReply() unconditionally
@@ -312,7 +378,21 @@ async function prepareTurn(actor: PersonRow, text: string, loaded: LoadedManifes
   const crisisResources = safety.action === "allow_with_resources" ? CRISIS_RESOURCES_TEXT : undefined;
 
   const routed = route(text, actor, loaded);
-  if (routed) {
+  // A real trigger phrase always wins outright (see RoutedPlugin's own
+  // comment on why `viaPattern`, not `score === 1`, is the real signal).
+  // Only a FUZZY plugin match is subject to being outscored - found live
+  // (2026-09-05, docs/dev.md's "The real skill kind, shipped" entry):
+  // "tell me a bedtime story about a fox" hijacked by the `joke` plugin's
+  // own keyword-overlap placeholder scoring "tell me a dad joke" at
+  // exactly the match threshold, purely from the shared filler words
+  // "tell me a" - with a much more confident, genuinely relevant skill
+  // match sitting right there unused. A weak, accidental plugin match
+  // should not get to preempt a stronger, more specific skill match for
+  // the identical turn; a household member's own deliberately-authored
+  // trigger phrase always still can.
+  const routedViaFuzzyMatch = routed && !routed.viaPattern;
+  const bestSkillScore = routedViaFuzzyMatch ? (matchingSkills(text, skills)[0]?.score ?? 0) : 0;
+  if (routed && !(routedViaFuzzyMatch && bestSkillScore > routed.score)) {
     const result = await runPlugin(routed.id, actor, routed.args);
     if (result.ok) {
       const reply = result.value.reply ?? { text: "Done." };
@@ -344,7 +424,7 @@ async function prepareTurn(actor: PersonRow, text: string, loaded: LoadedManifes
 
   const memoryMatches = recall(actor, text);
   const persona = resolvePersona(getPersonSettingValue(actor, "persona.active_id"));
-  const systemPrompt = buildSystemPrompt(memoryMatches, loaded, persona);
+  const systemPrompt = buildSystemPrompt(text, memoryMatches, loaded, persona, skills);
   const messages: LlmMessage[] = [
     { role: "system", content: systemPrompt },
     { role: "user", content: text },

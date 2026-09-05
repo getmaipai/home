@@ -5097,3 +5097,117 @@ Verified with 11 backend and 11 frontend tests, and by driving the real
 page in a real browser against a real backend with a seeded demo
 household: all twelve connections rendered and read by eye, before and
 again after the review fixes.
+
+## The real `skill` kind, shipped (2026-09-05)
+
+The second of the three items from the "Naming: skill, plugin, command,
+connector" entry: a genuine `kind: "skill"` package now exists - plain
+instructions, Claude-`SKILL.md`-compatible, no permissions, no recipe.
+`lib/skills.ts` (the filename freed up by the plugin rename, a fitting
+reuse) loads one: a directory with `manifest.json` plus a `SKILL.md`
+body, distinguished from a plugin directory (which has `recipe.json`
+instead) by which file exists, not by a flag.
+
+**Composition, not execution.** A skill never runs on its own - it has no
+`Host`, no permission check, nothing a recipe interpreter could invoke.
+It only ever adds its body text to the `chat` model's system prompt when
+relevant, via `turnEngine.ts`'s `buildSystemPrompt()`, which now takes
+the turn's own utterance and scores every loaded skill's
+`routing.examples` against it with the exact same `exampleScore`/
+`EXAMPLE_MATCH_THRESHOLD` mechanism the plugin floor already uses -
+reused deliberately, since the underlying question ("does this utterance
+look like what this package's routing.examples describe") is identical
+either way. Capped at 3 matching skills per turn and a 1200-char section
+budget, the same "budget as a test" discipline `PROMPT_SYSTEM_CHAR_BUDGET`
+already established for memory and the plugins list.
+
+**Claude-format compatibility, proven, not just claimed.** The bundled
+example (`storytime-style`, bedtime-story guidance - gentle, age-
+appropriate, a clear happy ending) ships with a real YAML frontmatter
+block in its `SKILL.md` (`---\nname: ...\ndescription: ...\n---`), the
+same shape a genuine Claude skill file has. `stripFrontmatter()` removes
+it before composition - a real, tested guarantee (not an assumption)
+that a household could drop in an existing Claude skill file nearly
+as-is (just needs a sibling `manifest.json` for the platform-specific
+metadata Claude's format has no equivalent of: routing, category,
+min_role) and have it work.
+
+**Safe by construction, not by a validation rule.** A skill's manifest
+can technically declare `permissions` (the schema doesn't forbid it),
+but nothing in `lib/skills.ts` or anywhere downstream ever reads that
+field for a skill - there is no `Host` for a skill to hold in the first
+place, so a declared permission is inert dead weight, never a real
+bypass. Deliberately not enforced by an extra schema-level check that
+could itself drift from the real enforcement.
+
+**A real, honest finding from live-testing, not swept under the rug.**
+Testing the bundled skill through the actual `POST /api/turn` endpoint
+(not just unit tests) found "tell me a bedtime story about a fox" gets
+hijacked by the `joke` plugin's own deterministic floor before the turn
+ever reaches the model or skill composition at all - `exampleScore`'s
+keyword-overlap placeholder scores "tell me a bedtime story..." against
+`joke`'s own "tell me a dad joke" example at exactly the match threshold,
+purely from the shared filler words "tell me a," with zero semantic
+relation between jokes and bedtime stories. This is exactly the "pattern
+collision... will not hold past a few packages" gap the 2026-09-04 tier 2
+note already predicted, now with real, concrete evidence at just 7
+packages instead of a hypothetical sixty. Confirmed the underlying
+mechanism itself is sound: an exact routing example ("make up a story
+about a dragon") correctly falls through to the model with no collision,
+matching what `turnEngine.test.ts`'s own unit tests already proved
+directly.
+
+**Jesse's pushback, real research, and a real fix (same day).** Asked
+whether "prioritize and the higher score wins" would quietly require a
+household member to somehow manage priority - it doesn't; the comparison
+is entirely internal to `prepareTurn()`, invisible to anyone, exactly as
+automatic as the routing that already existed. But the question was
+worth researching properly rather than assuming: real academic research
+on Amazon Alexa found over 4,400 "confounding utterances" shared across
+skills at scale, with Amazon's own disambiguation algorithm never
+publicly documented - a genuinely hard, industry-wide problem, not
+something unique to this placeholder. For LLM tool-calling specifically
+(the more relevant comparison, since that's this platform's own eventual
+direction): "overlapping tools are the highest-frequency bug source," and
+the established fix is better tool descriptions, not a cleverer scoring
+formula - "the model resolves ambiguity... by reading descriptions, not
+names." That reframed the fix as two real, complementary pieces, not one:
+- `route()` now reports whether its match came from a real
+  `routing.patterns` trigger or the fuzzy `exampleScore` path
+  (`RoutedPlugin.viaPattern`), tracked as its own flag rather than
+  inferred from `score === 1` (a fuzzy score could coincidentally also
+  reach 1.0). `prepareTurn()` only fires a plugin outright on a pattern
+  match; a fuzzy match now has to beat the best-matching skill's own
+  score for the same turn, reusing `matchingSkills()` (refactored out of
+  `skillsSection()` so both call sites share one scoring pass). A
+  deliberately-authored trigger phrase always still wins, unconditionally
+  - only an accidental, low-confidence fuzzy match can lose.
+- Root-cause fix at the source, per the research: `joke`'s own
+  `routing.examples` included "tell me a joke" - already covered exactly
+  by its own pattern list, and the single shortest, most filler-word-
+  heavy example in the whole catalog (only 3 real words after stopword
+  stripping: tell/me/joke), which is precisely why 2 shared filler words
+  were enough to clear the 0.6 threshold. Replaced with "I could use a
+  good laugh right now" - a real request for humor sharing zero words
+  with the bedtime-story utterance, hand-verified against every remaining
+  example, not just the one that broke.
+
+Both landed with real regression tests: one proving the exact live-found
+collision is fixed (fails without the priority check, passes with it),
+one proving a genuine pattern match still always wins even with a
+matching skill available (the safety property this fix must never
+regress).
+
+**Not live-verified through the browser**, honestly: the frontend dev
+server wasn't running at the time and restarting it added little - the
+configured chat model is a stub that echoes the user's own text back
+regardless of system prompt content, so a browser screenshot would only
+prove the turn didn't crash, which the real `POST /api/turn` checks
+above and the full test suite already establish more directly. Verified
+instead: the 3 directly relevant backend test files (60 tests -
+`turnEngine.test.ts`, `skills.test.ts`, `plugins.test.ts`, covering
+frontmatter-stripping, the match cap, the sub-threshold case, and the
+plugin-vs-skill priority fix), the full backend suite passing alongside
+a second session's own concurrent, unrelated work in this same shared
+checkout, spec (144 + 30), and a clean frontend build - plus the real
+HTTP calls above against the actual running backend.

@@ -37,7 +37,7 @@ class Source(BaseModel):
 
 class PackageManifest(BaseModel):
     """
-    One manifest format for every package kind (plugin, app, companion, integration, model, wakeword, voice, theme, module). See platform plan 5.1 and .github's docs/PACKAGES.md.
+    One manifest format for every package kind (plugin, skill, app, companion, integration, model, wakeword, voice, theme, module). See platform plan 5.1 and .github's docs/PACKAGES.md.
     """
 
     model_config = ConfigDict(
@@ -49,6 +49,7 @@ class PackageManifest(BaseModel):
     version: constr(pattern=r'^[0-9]+\.[0-9]+\.[0-9]+$')
     kind: Literal[
         'plugin',
+        'skill',
         'app',
         'companion',
         'integration',
@@ -57,7 +58,10 @@ class PackageManifest(BaseModel):
         'voice',
         'theme',
         'module',
-    ]
+    ] = Field(
+        ...,
+        description="A `plugin` is a self-contained, permissioned, installable capability (its own network access, its own recipe.json). A `skill` is plain instructions (a SKILL.md body, Claude-format-compatible) - no permissions, no recipe, composed into the chat model's system prompt when relevant, never runs on its own. See home/docs/dev.md's 'Naming: skill, plugin, command, connector' entry.",
+    )
     category: Literal[
         'Home',
         'Family',

@@ -12,6 +12,7 @@ import { db } from "@/db";
 import { people, conversationTurns } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import type { TurnStreamEvent } from "@/wire";
+import { PackageManifest } from "@maipai/spec/gen/ts/manifest.js";
 
 beforeEach(() => {
   resetDb();
@@ -209,12 +210,12 @@ describe("buildSystemPrompt() prompt budget", () => {
       if (created.ok) matches.push({ record: created.value, score: 1 });
     }
 
-    const prompt = buildSystemPrompt(matches);
+    const prompt = buildSystemPrompt("what's the calendar rule", matches);
     expect(prompt.length).toBeLessThanOrEqual(PROMPT_SYSTEM_CHAR_BUDGET);
   });
 
   test("with no memories, the prompt is still well under budget", () => {
-    const prompt = buildSystemPrompt([]);
+    const prompt = buildSystemPrompt("hi there", []);
     expect(prompt.length).toBeLessThanOrEqual(PROMPT_SYSTEM_CHAR_BUDGET);
     expect(prompt).toContain("MaiPai");
   });
@@ -239,20 +240,118 @@ describe("buildSystemPrompt() prompt budget", () => {
     expect(created.ok).toBe(true);
     if (!created.ok) return;
 
-    const prompt = buildSystemPrompt([{ record: created.value, score: 1 }]);
+    const prompt = buildSystemPrompt("hi there", [{ record: created.value, score: 1 }]);
     expect(prompt.length).toBeLessThanOrEqual(PROMPT_SYSTEM_CHAR_BUDGET);
     const timeLineMatch = prompt.match(/\n\nCurrent time: [0-9T:.Z-]+$/);
     expect(timeLineMatch).not.toBeNull();
   });
 
   test("a persona's composed fragment replaces the default, and its own known constants are never touched by INFORMATION_HANDLING_POLICY", () => {
-    const defaultPrompt = buildSystemPrompt([]);
-    const tutorPrompt = buildSystemPrompt([], undefined, resolvePersona("tutor"));
+    const defaultPrompt = buildSystemPrompt("hi there", []);
+    const tutorPrompt = buildSystemPrompt("hi there", [], undefined, resolvePersona("tutor"));
     expect(tutorPrompt).not.toBe(defaultPrompt);
     expect(tutorPrompt).toContain("without contractions");
     // The universal information-handling rules are unaffected by persona.
     expect(tutorPrompt).toContain("hedged");
     expect(defaultPrompt).toContain("hedged");
+  });
+});
+
+describe("buildSystemPrompt() skill composition (2026-09-05, the real skill kind)", () => {
+  // Real end-to-end proof using the actual bundled storytime-style skill,
+  // not a fake - the default `skills` param really does load it.
+  test("a relevant utterance composes the real bundled skill's instructions in; an irrelevant one doesn't", () => {
+    const relevant = buildSystemPrompt("can you tell a bedtime story", []);
+    expect(relevant).toContain("bedtime story");
+    expect(relevant).toContain("happy ending");
+
+    const irrelevant = buildSystemPrompt("what's the weather like", []);
+    expect(irrelevant).not.toContain("happy ending");
+  });
+
+  // Bronze requires 5+ routing.examples (docs/PACKAGES.md), same as any
+  // other package - padded with filler examples clearly unrelated to any
+  // utterance these tests actually send, so only `matchingExample` (the
+  // one real signal) ever drives the score.
+  function fakeSkill(id: string, matchingExample: string, body: string) {
+    return {
+      manifest: PackageManifest.parse({
+        id,
+        version: "0.1.0",
+        kind: "skill",
+        category: "Family",
+        display: id,
+        description: "A fake skill for testing composition.",
+        author: "test",
+        license: "AGPL-3.0",
+        platforms: ["home"],
+        min_role: "child",
+        consequential: false,
+        offline: "full",
+        min_app: "0.1.0",
+        tier: 0,
+        routing: {
+          examples: [
+            matchingExample,
+            "zzz filler example one zzz",
+            "zzz filler example two zzz",
+            "zzz filler example three zzz",
+            "zzz filler example four zzz",
+          ],
+        },
+      }),
+      body,
+    };
+  }
+
+  test("caps how many matching skills compose into one turn", () => {
+    const skills = [
+      fakeSkill("a", "tell me a joke please", "SKILL-A-MARKER"),
+      fakeSkill("b", "tell me a joke please", "SKILL-B-MARKER"),
+      fakeSkill("c", "tell me a joke please", "SKILL-C-MARKER"),
+      fakeSkill("d", "tell me a joke please", "SKILL-D-MARKER"),
+    ];
+    const prompt = buildSystemPrompt("tell me a joke please", [], undefined, undefined, skills);
+    const matchedCount = ["SKILL-A-MARKER", "SKILL-B-MARKER", "SKILL-C-MARKER", "SKILL-D-MARKER"].filter((m) =>
+      prompt.includes(m),
+    ).length;
+    expect(matchedCount).toBeLessThanOrEqual(3);
+    expect(matchedCount).toBeGreaterThan(0);
+  });
+
+  test("a skill scoring under the match threshold never composes in", () => {
+    const skills = [fakeSkill("unrelated", "completely unrelated topic about gardening", "SKILL-MARKER-SHOULD-NOT-APPEAR")];
+    const prompt = buildSystemPrompt("what time is it", [], undefined, undefined, skills);
+    expect(prompt).not.toContain("SKILL-MARKER-SHOULD-NOT-APPEAR");
+  });
+});
+
+describe("plugin-vs-skill priority (2026-09-05, a real live-found bug)", () => {
+  // The exact scenario found live: "tell me a bedtime story about a fox"
+  // scored high enough against the bundled `joke` plugin's own "tell me a
+  // dad joke" example (pure filler-word overlap on "tell me a," nothing
+  // semantic) to fire it outright, before the turn ever reached the
+  // model or the far more relevant bundled `storytime-style` skill.
+  test("a weak, fuzzy-matched plugin no longer preempts a more confident skill match for the same turn", async () => {
+    const { actor } = await owner();
+    const result = await runTurn(actor, "chat", "tell me a bedtime story about a fox");
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.value.source).toBe("model");
+    expect(result.value.source).not.toBe("plugin");
+  });
+
+  // The other half of the same fix: a real trigger phrase (a genuine
+  // routing.patterns match, not a fuzzy example score) must still always
+  // win outright, precisely because it's deliberate and unambiguous -
+  // this must never regress into "skills can now outrank anything."
+  test("a real pattern match still always wins, even with a matching skill available", async () => {
+    const { actor } = await owner();
+    const result = await runTurn(actor, "chat", "tell me a joke");
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.value.source).toBe("plugin");
+    expect(result.value.plugin_id).toBe("joke");
   });
 });
 

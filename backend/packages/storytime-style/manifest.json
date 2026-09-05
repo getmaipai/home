@@ -1,0 +1,35 @@
+{
+  "id": "storytime-style",
+  "version": "0.1.0",
+  "kind": "skill",
+  "category": "Family",
+  "display": "Storytime style",
+  "description": "How MaiPai tells a bedtime story (2026-09-05, the first real skill kind) - gentle, age-appropriate, never scary.",
+  "author": "MaiPai",
+  "license": "AGPL-3.0",
+  "homepage": "https://github.com/getmaipai/home",
+  "routing": {
+    "examples": [
+      "tell me a bedtime story",
+      "tell a story for my kid",
+      "can you tell a story",
+      "make up a story about a dragon",
+      "tell a short story before bed"
+    ]
+  },
+  "requires": [],
+  "optional": [],
+  "platforms": ["home"],
+  "min_role": "child",
+  "consequential": false,
+  "offline": "full",
+  "config": [],
+  "notifications": [],
+  "backup": "exclude",
+  "background": false,
+  "contributes": [],
+  "pages": [],
+  "min_app": "0.1.0",
+  "tier": 0,
+  "quality_scale": "bronze"
+}

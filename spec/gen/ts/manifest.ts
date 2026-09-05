@@ -4,7 +4,7 @@
 
 import { z } from "zod";
 
-/**One manifest format for every package kind (plugin, app, companion, integration, model, wakeword, voice, theme, module). See platform plan 5.1 and .github's docs/PACKAGES.md.*/
+/**One manifest format for every package kind (plugin, skill, app, companion, integration, model, wakeword, voice, theme, module). See platform plan 5.1 and .github's docs/PACKAGES.md.*/
 export const PackageManifest = z
   .object({
     /**Unique in the catalog. No third-party name in it.*/
@@ -13,17 +13,23 @@ export const PackageManifest = z
       .regex(new RegExp("^[a-z0-9][a-z0-9_-]{0,63}$"))
       .describe("Unique in the catalog. No third-party name in it."),
     version: z.string().regex(new RegExp("^[0-9]+\\.[0-9]+\\.[0-9]+$")),
-    kind: z.enum([
-      "plugin",
-      "app",
-      "companion",
-      "integration",
-      "model",
-      "wakeword",
-      "voice",
-      "theme",
-      "module",
-    ]),
+    /**A `plugin` is a self-contained, permissioned, installable capability (its own network access, its own recipe.json). A `skill` is plain instructions (a SKILL.md body, Claude-format-compatible) - no permissions, no recipe, composed into the chat model's system prompt when relevant, never runs on its own. See home/docs/dev.md's 'Naming: skill, plugin, command, connector' entry.*/
+    kind: z
+      .enum([
+        "plugin",
+        "skill",
+        "app",
+        "companion",
+        "integration",
+        "model",
+        "wakeword",
+        "voice",
+        "theme",
+        "module",
+      ])
+      .describe(
+        "A `plugin` is a self-contained, permissioned, installable capability (its own network access, its own recipe.json). A `skill` is plain instructions (a SKILL.md body, Claude-format-compatible) - no permissions, no recipe, composed into the chat model's system prompt when relevant, never runs on its own. See home/docs/dev.md's 'Naming: skill, plugin, command, connector' entry.",
+      ),
     category: z.enum([
       "Home",
       "Family",
@@ -304,6 +310,6 @@ export const PackageManifest = z
   })
   .strict()
   .describe(
-    "One manifest format for every package kind (plugin, app, companion, integration, model, wakeword, voice, theme, module). See platform plan 5.1 and .github's docs/PACKAGES.md.",
+    "One manifest format for every package kind (plugin, skill, app, companion, integration, model, wakeword, voice, theme, module). See platform plan 5.1 and .github's docs/PACKAGES.md.",
   );
 export type PackageManifest = z.infer<typeof PackageManifest>;
