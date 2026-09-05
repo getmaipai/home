@@ -10,6 +10,7 @@ import { REFUSAL_FIRST, REFUSAL_REPEAT, REMEMBER_CONFIRM_VARIANTS } from "@/lib/
 import { db } from "@/db";
 import { people, conversationTurns } from "@/db/schema";
 import { eq } from "drizzle-orm";
+import type { TurnStreamEvent } from "@/wire";
 
 beforeEach(() => {
   resetDb();
@@ -389,7 +390,7 @@ describe("routes/turn.ts streamTurnEvents()", () => {
     };
 
     const events: Array<{ type: string; text?: string; error?: string }> = [];
-    for await (const event of streamTurnEvents(result)) events.push(event);
+    for await (const event of streamTurnEvents(result, "test-person")) events.push(event);
 
     expect(events.filter((e) => e.type === "delta").map((e) => e.text)).toEqual(["Partial ", "real ", "reply."]);
     expect(events.filter((e) => e.type === "error")).toHaveLength(1);
@@ -419,9 +420,70 @@ describe("routes/turn.ts streamTurnEvents()", () => {
     };
 
     const events: Array<{ type: string; error?: string }> = [];
-    for await (const event of streamTurnEvents(result)) events.push(event);
+    for await (const event of streamTurnEvents(result, "test-person")) events.push(event);
 
     expect(events).toEqual([{ type: "error", error: "chat model unavailable: never even started" }]);
     expect(finalizeCalls).toEqual([]);
+  });
+
+  function fakeResult(tokens: AsyncGenerator<string, void, void>): Extract<TurnStreamResult, { ok: true; kind: "stream" }> {
+    return {
+      ok: true,
+      kind: "stream",
+      tokens,
+      finalize: (replyText: string) => ({
+        reply: { text: replyText },
+        source: "model",
+        safety: { flagged: false, categories: [], action: "allow", notify_parent: false, matched_signals: [], checked_at: "2026-09-04T00:00:00.000Z" },
+      }),
+    };
+  }
+
+  test("a genuinely slow first token gets a spoken_cue before it, and only once", async () => {
+    async function* slowTokens(): AsyncGenerator<string, void, void> {
+      await new Promise((r) => setTimeout(r, 20)); // slower than the 5ms cueDelayMs below
+      yield "The ";
+      await new Promise((r) => setTimeout(r, 20)); // a second slow gap - still only one cue per turn
+      yield "answer.";
+    }
+    const events: TurnStreamEvent[] = [];
+    for await (const event of streamTurnEvents(fakeResult(slowTokens()), "test-person", 5)) events.push(event);
+
+    expect(events.filter((e) => e.type === "spoken_cue")).toHaveLength(1);
+    expect(events[0]!.type).toBe("spoken_cue"); // arrives BEFORE any delta
+    expect(events.filter((e) => e.type === "delta").map((e) => (e as { text: string }).text)).toEqual(["The ", "answer."]);
+    expect(events.some((e) => e.type === "done")).toBe(true);
+  });
+
+  test("a fast first token never gets a spoken_cue", async () => {
+    async function* fastTokens(): AsyncGenerator<string, void, void> {
+      yield "Instant reply.";
+    }
+    const events: TurnStreamEvent[] = [];
+    // The real 900ms default: a token that resolves synchronously always
+    // wins that race, so this doesn't actually wait 900ms in practice.
+    for await (const event of streamTurnEvents(fakeResult(fastTokens()), "test-person")) events.push(event);
+
+    expect(events.some((e) => e.type === "spoken_cue")).toBe(false);
+    expect(events[0]).toEqual({ type: "delta", text: "Instant reply." });
+  });
+
+  test("the spoken_cue is never logged: it isn't part of the finalized reply text", async () => {
+    async function* slowTokens(): AsyncGenerator<string, void, void> {
+      await new Promise((r) => setTimeout(r, 20));
+      yield "Real reply only.";
+    }
+    let loggedText = "";
+    const result = fakeResult(slowTokens());
+    result.finalize = (replyText: string) => {
+      loggedText = replyText;
+      return {
+        reply: { text: replyText },
+        source: "model",
+        safety: { flagged: false, categories: [], action: "allow", notify_parent: false, matched_signals: [], checked_at: "2026-09-04T00:00:00.000Z" },
+      };
+    };
+    for await (const _event of streamTurnEvents(result, "test-person", 5)) void _event;
+    expect(loggedText).toBe("Real reply only.");
   });
 });

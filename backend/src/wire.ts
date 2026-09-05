@@ -49,8 +49,20 @@ export type ConversationTurnRow = typeof conversationTurns.$inferSelect;
 // to gain from trickling in); exactly one "done" event ends the stream,
 // carrying the same TurnValue shape POST /api/turn already returns so a
 // client needs only one code path to read the final result either way.
+//
+// "spoken_cue" (2026-09-05, home-legacy.git's own researched pattern -
+// docs/internal/voice-naturalness.md, companionTurn.ts's toolAckCue):
+// fires at most once, only when the `chat` model's own time to first
+// token is genuinely slow enough that silence would read as dead air -
+// never a task announcement, never stored anywhere. It is NOT part of
+// `reply` at all and MUST NOT be folded into the displayed message text,
+// spoken alongside it, or written to conversation history: the whole
+// reason it exists is that a person says "let me check" only when
+// checking actually takes a moment, and a small model that saw its own
+// cue in its history would start opening every reply with it.
 export type TurnStreamEvent =
   | { type: "delta"; text: string }
+  | { type: "spoken_cue"; text: string }
   | { type: "done"; value: TurnValue }
   | { type: "error"; error: string };
 

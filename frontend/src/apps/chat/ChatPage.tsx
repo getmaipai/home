@@ -337,9 +337,17 @@ export function ChatPage({ person }: ChatPageProps) {
     try {
       const response = await api.streamTurn(text, thinking);
       for await (const event of readTurnStream(response)) {
-        if (!gotAnyEvent) {
+        // Not on a "spoken_cue": a code review (2026-09-05) found this
+        // used to clear the spinner on ANY first event, so exactly in
+        // the slow-first-token case the cue exists for, the spinner
+        // disappeared while the bubble was still empty (spoken_cue never
+        // touches `visible`) - dead air on screen while the cue plays out
+        // loud. The growing bubble is the real "something is happening"
+        // signal; only a "delta" (or "done", for an immediate reply with
+        // no deltas at all) counts as that.
+        if (!gotAnyEvent && event.type !== "spoken_cue") {
           gotAnyEvent = true;
-          setAwaitingFirstToken(false); // the growing bubble is the live feedback from here on
+          setAwaitingFirstToken(false);
         }
         if (event.type === "delta") {
           raw += event.text;
@@ -352,6 +360,17 @@ export function ChatPage({ person }: ChatPageProps) {
           // text - the chat bubble - completely untouched.
           for (const chunk of chunks) scheduler.enqueueSentence(normalizeForSpeech(chunk));
           spokenLength += consumed;
+        } else if (event.type === "spoken_cue") {
+          // Spoken only, never displayed and never counted against
+          // `spokenLength`: `visible`/the chat bubble and conversation
+          // history are untouched (backend/src/wire.ts's own comment on
+          // why - a small model that saw its own cue in its history
+          // would start opening every reply with it). Enqueuing it here,
+          // ahead of any real content, is the whole mechanism: the
+          // scheduler is a plain FIFO queue, so it plays first and the
+          // real reply's sentences (enqueued above as they arrive)
+          // follow right after.
+          scheduler.enqueueSentence(event.text);
         } else if (event.type === "done") {
           sawTerminalEvent = true;
           // Authoritative, not just the incrementally-built preview: a

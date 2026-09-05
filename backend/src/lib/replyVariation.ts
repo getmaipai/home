@@ -107,6 +107,28 @@ export const REMEMBER_CONFIRM_VARIANTS: readonly string[] = [
   "Noted - I'll remember that.",
 ];
 
+// ── The spoken "thinking" cue ────────────────────────────────────────────
+// Deliberately content-free continuers (routes/turn.ts's own
+// "spoken_cue" event), the same shape as home-legacy.git's
+// TOOL_ACK_CUES/REPLAN_CUES: what a person actually says while a reply is
+// taking a genuinely noticeable moment, never a task announcement
+// ("Checking that...") and never a filler word inserted into the answer
+// itself (docs/internal/voice-naturalness.md: prompted mid-utterance
+// fillers measurably lower perceived confidence - Kirkland et al. 2022).
+export const THINKING_CUE_VARIANTS: readonly string[] = [
+  "One sec.",
+  "Hmm, let me think.",
+  "Give me a second.",
+  "Let me see.",
+];
+
+/** A rotated thinking cue for this person - reuses `pickVariant` under
+ * its own dedicated key so it never shares state with any reply-text
+ * rotation above. */
+export function pickThinkingCue(personId: string): string {
+  return pickVariant(personId, "thinking_cue", THINKING_CUE_VARIANTS);
+}
+
 // Maps a still-exact match of one of the OTHER known constant reply
 // strings - turnEngine.ts's own skill-error/skill-done fallbacks, plus
 // the package layer's known constant confirmations - to its pool. Keyed

@@ -3084,6 +3084,56 @@ set. Full architecture: platform plan chapters 1, 3, and 4.
       to read back - real but currently latent, since neither shipped
       package (`recall`, `remember`) writes a genuine override today.
 
+- [x] **The delay-gated spoken "thinking" cue**, the one piece of the
+      humanistic-speech request deliberately deferred out of the previous
+      entry ("a real stream-level timer race and a frontend audio-queuing
+      change, sized like its own slice"). `backend/src/wire.ts`'s new
+      `spoken_cue` `TurnStreamEvent` fires at MOST ONCE per turn, only
+      when the `chat` model's own time to first token is genuinely slow
+      (`routes/turn.ts`'s `THINKING_CUE_DELAY_MS = 900`, the same tuned
+      threshold home-legacy.git's own `TOOL_ACK_DELAY_MS` used, cited
+      there to arXiv 2507.22352: fillers measurably help at multi-second
+      waits and hurt at sub-second ones). `streamTurnEvents()` races a
+      `Promise.race` between the token generator's own first `.next()`
+      call and a timer - calling `.next()` only once regardless of which
+      side wins, so a real token already in flight when the timer fires
+      is never skipped, just awaited a moment later once the cue itself
+      has been yielded. A rotated pool (`replyVariation.ts`'s new
+      `pickThinkingCue()`, reusing the same `pickVariant()` primitive
+      the phrase-rotation entry above added) keeps it from being the
+      identical "One sec." every single slow turn. The cue is spoken
+      (`ChatPage.tsx` enqueues it into the same live TTS scheduler ahead
+      of the real reply's own sentences, a plain FIFO queue) but never
+      displayed, never counted toward the reply's own text, and never
+      logged to conversation history - it isn't part of `TurnValue.reply`
+      at all, so there's no path for it to reach `conversationHistory.ts`
+      even by accident, the exact non-negotiable home-legacy.git's own
+      research named ("a small model that saw its own cue in its history
+      would start opening every reply with it").
+    - Real regression tests, not just the mechanism read by eye: a hand-
+      built slow `tokens` generator proves the cue arrives before any
+      delta and only once even across two slow gaps; a fast generator
+      proves no cue at all (and that a synchronously-resolving first
+      token never actually waits out the real 900ms default - `Promise.race`
+      settles the moment either side does); a third proves the cue text
+      never reaches `finalize()`'s logged text.
+    - **A code review before commit found three real issues**: the
+      frontend's "MaiPai is thinking…" spinner was dismissed on ANY first
+      stream event, including the cue itself - so exactly in the slow-
+      first-token case the feature targets, the spinner vanished while
+      the chat bubble was still empty (a `spoken_cue` never touches
+      `visible`), leaving nothing on screen while "One sec." played out
+      loud. Fixed to only clear on real content (`delta`/`done`), with a
+      regression test using a genuinely staggered fake stream (a fully
+      synchronous one drains before any assertion could observe the gap
+      in between) confirmed to fail against the pre-fix code. Second, the
+      race's own `setTimeout` was never cancelled once the real token won
+      - harmless but wasteful, left running for the rest of its 900ms on
+      every ordinary fast reply; fixed to cancel it the moment the race
+      resolves. Third: this very entry didn't exist yet when the review
+      ran - the diff had real docs, just for the wrong feature (the
+      persona research below, not this one).
+
 ## Notes for later (companion personas, added 2026-09-05)
 
 Jesse asked how companion personalities and their speech patterns should
@@ -3173,6 +3223,76 @@ combinations - a five-year-old's complexity with a jargon-tolerant
 vocabulary makes no sense together) or structured-plus-one-freeform-field
 (legacy's own shape, which worked but had the gaps above) is an open
 design question, not decided here.
+
+**Real web research (2026-09-05), not internal knowledge alone** (Jesse:
+"don't trust the previous [research] - you need to search the web") -
+every claim below is sourced, not inferred, unless marked otherwise:
+
+- **The load-bearing finding: persona held ONLY by a system prompt is
+  documented to drift, and the fix that doesn't cost quality is a
+  training-time one, not a runtime one.** Anthropic's own "persona
+  vectors" research found inference-time steering measurably degraded
+  general capability, while training-time preventative steering held it
+  - but that requires finetuning per persona, not a runtime knob
+  (arXiv:2507.21509). A separate multi-model study found personality
+  assignment "may not help maintain identity" over a long conversation,
+  and that larger models drift MORE (arXiv:2412.00804); Anthropic's own
+  documented "spiritual bliss attractor" (Claude Opus 4 self-chats
+  converging unprompted into a recognizable register) is real, measured
+  evidence that a model's own dynamics can override an assigned voice
+  given enough turns - directly relevant to a family hub used in long,
+  recurring conversations. **The synthesis this pushes toward (the
+  session's own inference, not a source describing this exact design):
+  a two-step architecture - the model decides WHAT to say as a
+  persona-independent fact, and a separate, static, precomputed
+  realization pass decides HOW to say it (word choice, sentence length,
+  address terms) - is structurally how every fast-and-non-drifting
+  precedent found below actually works,** and is the same shape
+  `NATURAL_REGISTER_POLICY` and `replyVariation.ts` already are.
+- **Pre-LLM game/NLG precedent proves the "fast, deterministic, never
+  touches content" shape is real and works.** PERSONAGE (Mairesse &
+  Walker, ACL 2007/2008) generated Big Five personality style through
+  deterministic, parametrized realization choices - verbosity, hedges,
+  tag questions, stutters, restatement, concession polarity - with zero
+  live model rewriting. Template-based NLG literature explicitly
+  recommends this split as the standard latency/fidelity tradeoff (real
+  vs. template-based NLG, dl.acm.org/doi/10.1162/0891201053630291).
+- **Established sociolinguistic frameworks give the dimension list real
+  structure, not just adjectives**: Halliday's field/tenor/mode register
+  theory; Biber's multidimensional register analysis (the "involved vs.
+  informational" axis maps onto complexity/engagement better than a
+  single "complexity" slider); Bell's audience design (an addressee vs.
+  auditor vs. overhearer distinction, directly relevant to a SHARED
+  household hub where a companion's reply may be "overheard" by someone
+  else); Giles's communication accommodation theory (convergence vs.
+  divergence); Brown & Levinson's politeness theory (positive/negative
+  face, 25 named strategies - a much richer frame for "address terms"
+  than a single field); real, cited child-directed-speech and teen-speech
+  ("adolescent peak" in nonstandard usage, discourse markers like "like"
+  serving a stance/emotional function, not just filler) research.
+- **New dimensions this surfaced that neither Jesse's list nor the
+  legacy-mining pass had named**: idiolect/verbal tics (an individual
+  signature phrase, distinct from dialect or register - "old sport"),
+  paralinguistic/text-formatting markup (asterisked actions, emphasis,
+  deliberate typos as part of "voice" on real roleplay platforms),
+  backchanneling/grounding/repair behavior (how a persona acknowledges
+  understanding or self-corrects - the actual formal name for "the
+  mother asks follow-ups" behavior is closer to "mixed-initiative
+  interaction" in dialogue-systems research than a personality trait),
+  and a real empirical study of how people actually perceive CHATBOT
+  personality specifically (Kovacevic et al., ACM IMWUT 2024, 425 raters)
+  finding it does NOT map cleanly onto human Big Five at all - people
+  weigh serviceability/functionality over classic trait adjectives for
+  an assistant-type agent specifically.
+- **Explicit, honest gaps this pass could not source**: no literature was
+  found addressing the exact "one household picks between several named
+  personas on demand" shape - everything found addresses single-persona
+  consistency, not multi-persona switching; no direct evidence (only
+  inference) that any fast technique has been demonstrated specifically
+  for register control rather than schema/JSON constraints; a couple of
+  secondary-source claims (a specific dialect example, one HCI paper's
+  exact dimension list) could not be independently verified against
+  primary sources and are flagged as lower-confidence in the full brief.
 
 ## API routes and `@hono/zod-openapi` (tracked debt)
 

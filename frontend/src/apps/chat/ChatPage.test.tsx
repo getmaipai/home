@@ -275,6 +275,27 @@ function ndjsonStream(lines: unknown[]): ReadableStream<Uint8Array> {
   });
 }
 
+/** Same shape as ndjsonStream, but enqueues `firstLines` immediately and
+ * holds `restLines` back until `release()` is called - lets a test
+ * inspect state genuinely in between the two batches, which a fully
+ * synchronous stream (everything enqueued in one `start()`) never
+ * allows: by the time any `findBy`/`waitFor` resolves against it, the
+ * whole thing has already drained. */
+function staggeredNdjsonStream(firstLines: unknown[], restLines: unknown[]): { stream: ReadableStream<Uint8Array>; release: () => void } {
+  const encoder = new TextEncoder();
+  let release = () => {};
+  const stream = new ReadableStream<Uint8Array>({
+    start(controller) {
+      for (const line of firstLines) controller.enqueue(encoder.encode(`${JSON.stringify(line)}\n`));
+      release = () => {
+        for (const line of restLines) controller.enqueue(encoder.encode(`${JSON.stringify(line)}\n`));
+        controller.close();
+      };
+    },
+  });
+  return { stream, release };
+}
+
 describe("ChatPage streaming send", () => {
   // The real end-to-end ask (2026-09-04, Jesse: "check our old project -
   // we didnt do autoplay - we streamed"): sending a message must show the
@@ -334,6 +355,140 @@ describe("ChatPage streaming send", () => {
       // Each completed sentence was spoken as its own /api/tts call, not
       // one call for the whole reply after the fact.
       await waitFor(() => expect(ttsCalls).toEqual(["First sentence.", "Second sentence."]));
+    } finally {
+      globalThis.fetch = originalFetch;
+      (globalThis as unknown as { AudioContext: unknown }).AudioContext = originalAudioContext;
+    }
+  });
+
+  // A "spoken_cue" event (backend/src/wire.ts, 2026-09-05: fires at most
+  // once when the model's own first token is genuinely slow) is spoken
+  // but never displayed and never counted as part of the reply - the
+  // whole reason it exists is to fill dead air, not to become a message.
+  test("a spoken_cue plays before the real reply and never appears in the chat bubble", async () => {
+    const originalAudioContext = (globalThis as unknown as { AudioContext?: unknown }).AudioContext;
+    (globalThis as unknown as { AudioContext: unknown }).AudioContext = FakeAudioContext;
+    const originalFetch = globalThis.fetch;
+
+    const ttsCalls: string[] = [];
+    globalThis.fetch = mock((input: RequestInfo | URL, init?: RequestInit) => {
+      const url = typeof input === "string" ? input : input.toString();
+      if (url.includes("/api/conversations")) {
+        return Promise.resolve(new Response(JSON.stringify([]), { status: 200 }));
+      }
+      if (url.includes("/api/turn/stream")) {
+        const stream = ndjsonStream([
+          { type: "spoken_cue", text: "One sec." },
+          { type: "delta", text: "The real answer." },
+          {
+            type: "done",
+            value: {
+              reply: { text: "The real answer.", speech: "The real answer." },
+              source: "model",
+              safety: { flagged: false, categories: [], action: "allow", notify_parent: false, matched_signals: [], checked_at: "2026-09-04T00:00:00.000Z" },
+            },
+          },
+        ]);
+        return Promise.resolve(new Response(stream, { status: 200, headers: { "content-type": "application/x-ndjson" } }));
+      }
+      if (url.includes("/api/tts")) {
+        const body = JSON.parse(String(init?.body ?? "{}")) as { text?: string };
+        ttsCalls.push(body.text ?? "");
+        return Promise.resolve(
+          new Response(minimalWavHeader(), { status: 200, headers: { "content-type": "audio/wav" } }),
+        );
+      }
+      return Promise.reject(new Error(`unstubbed fetch: ${url}`));
+    }) as unknown as typeof fetch;
+
+    try {
+      const { findByLabelText, findByText, queryByText } = render(<ChatPage person={makePerson()} />);
+      const input = await findByLabelText("Message");
+      await act(async () => {
+        fireEvent.change(input, { target: { value: "hi there" } });
+      });
+      const sendButton = await findByLabelText("Send");
+      await act(async () => {
+        fireEvent.click(sendButton);
+      });
+
+      await findByText("The real answer.");
+      // The cue was spoken (first, ahead of the real sentence)...
+      await waitFor(() => expect(ttsCalls).toEqual(["One sec.", "The real answer."]));
+      // ...but never rendered anywhere in the thread.
+      expect(queryByText("One sec.")).toBeNull();
+      expect(queryByText((content) => content.includes("One sec."))).toBeNull();
+    } finally {
+      globalThis.fetch = originalFetch;
+      (globalThis as unknown as { AudioContext: unknown }).AudioContext = originalAudioContext;
+    }
+  });
+
+  // A code review (2026-09-05) found the "MaiPai is thinking…" spinner
+  // was dismissed on ANY first stream event, including a spoken_cue -
+  // exactly in the slow-first-token case the cue exists for, the spinner
+  // vanished while the bubble was still empty (spoken_cue never touches
+  // `visible`), leaving nothing on screen while "One sec." played out
+  // loud. Uses staggeredNdjsonStream to genuinely inspect the state
+  // in between the cue and the real delta - a fully synchronous stream
+  // drains before any assertion could observe the gap.
+  test("the thinking spinner stays up through a spoken_cue - it only clears once real content arrives", async () => {
+    const originalAudioContext = (globalThis as unknown as { AudioContext?: unknown }).AudioContext;
+    (globalThis as unknown as { AudioContext: unknown }).AudioContext = FakeAudioContext;
+    const originalFetch = globalThis.fetch;
+
+    const { stream, release } = staggeredNdjsonStream(
+      [{ type: "spoken_cue", text: "One sec." }],
+      [
+        { type: "delta", text: "The real answer." },
+        {
+          type: "done",
+          value: {
+            reply: { text: "The real answer.", speech: "The real answer." },
+            source: "model",
+            safety: { flagged: false, categories: [], action: "allow", notify_parent: false, matched_signals: [], checked_at: "2026-09-04T00:00:00.000Z" },
+          },
+        },
+      ],
+    );
+    globalThis.fetch = mock((input: RequestInfo | URL) => {
+      const url = typeof input === "string" ? input : input.toString();
+      if (url.includes("/api/conversations")) {
+        return Promise.resolve(new Response(JSON.stringify([]), { status: 200 }));
+      }
+      if (url.includes("/api/turn/stream")) {
+        return Promise.resolve(new Response(stream, { status: 200, headers: { "content-type": "application/x-ndjson" } }));
+      }
+      if (url.includes("/api/tts")) {
+        return Promise.resolve(new Response(minimalWavHeader(), { status: 200, headers: { "content-type": "audio/wav" } }));
+      }
+      return Promise.reject(new Error(`unstubbed fetch: ${url}`));
+    }) as unknown as typeof fetch;
+
+    try {
+      const { findByLabelText, findByText, queryByText } = render(<ChatPage person={makePerson()} />);
+      const input = await findByLabelText("Message");
+      await act(async () => {
+        fireEvent.change(input, { target: { value: "hi there" } });
+      });
+      const sendButton = await findByLabelText("Send");
+      await act(async () => {
+        fireEvent.click(sendButton);
+      });
+
+      // Only the cue has arrived so far - the spinner must still be up,
+      // and the bubble still empty.
+      await findByText("MaiPai is thinking…");
+      expect(queryByText("The real answer.")).toBeNull();
+
+      await act(async () => {
+        release();
+        await new Promise((resolve) => setTimeout(resolve, 20));
+      });
+
+      // Real content arrived - the spinner is gone and the answer shows.
+      await findByText("The real answer.");
+      expect(queryByText("MaiPai is thinking…")).toBeNull();
     } finally {
       globalThis.fetch = originalFetch;
       (globalThis as unknown as { AudioContext: unknown }).AudioContext = originalAudioContext;

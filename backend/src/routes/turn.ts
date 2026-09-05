@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 import { requireAuth } from "@/middleware/auth";
 import { runTurn, runTurnStream, type Surface, type TurnStreamResult } from "@/lib/turnEngine";
+import { pickThinkingCue } from "@/lib/replyVariation";
 import type { TurnStreamEvent } from "@/wire";
 import type { AppEnv } from "@/types";
 
@@ -28,8 +29,34 @@ function ndjsonLine(event: TurnStreamEvent): Uint8Array {
   return encoder.encode(`${JSON.stringify(event)}\n`);
 }
 
-/** The real event sequence for a "stream" kind TurnStreamResult: every
- * delta as it arrives, then exactly one "done" or "error" terminal event.
+// How long the `chat` model's own time to first token can run before
+// silence starts reading as dead air rather than a fast answer arriving
+// (home-legacy.git's own tuned TOOL_ACK_DELAY_MS, arXiv 2507.22352:
+// fillers measurably help at multi-second waits and hurt at sub-second
+// ones). A real, instant reply never crosses this and so never gets a
+// cue - the same "answer when you know it, say 'let me check' only when
+// checking actually takes a moment" logic, applied to the model's own
+// generation latency instead of a tool call's.
+export const THINKING_CUE_DELAY_MS = 900;
+
+/** Returns the timer alongside the promise so the common case (the real
+ * token wins the race) can cancel it - a code review (2026-09-05) found
+ * the original version left the timeout running for the rest of its
+ * `cueDelayMs` on every ordinary, fast reply, doing nothing but holding
+ * its closure alive. */
+function delay(ms: number): { promise: Promise<"timeout">; cancel: () => void } {
+  let handle: ReturnType<typeof setTimeout>;
+  const promise = new Promise<"timeout">((resolve) => {
+    handle = setTimeout(() => resolve("timeout"), ms);
+  });
+  return { promise, cancel: () => clearTimeout(handle) };
+}
+
+/** The real event sequence for a "stream" kind TurnStreamResult: a
+ * "spoken_cue" first IF the model's own first token is genuinely slow to
+ * arrive (never more than once - only the very first token is raced, the
+ * one real latency source in this codebase today), then every delta as
+ * it arrives, then exactly one "done" or "error" terminal event.
  * Extracted from the route handler so a code review's "finalize() must
  * still run on the error path" fix can be proven directly, with a
  * hand-built failing `tokens` generator, instead of needing a genuinely
@@ -39,12 +66,26 @@ function ndjsonLine(event: TurnStreamEvent): Uint8Array {
  * all, only trusted to have the right code shape here. */
 export async function* streamTurnEvents(
   result: Extract<TurnStreamResult, { ok: true; kind: "stream" }>,
+  actorId: string,
+  cueDelayMs = THINKING_CUE_DELAY_MS,
 ): AsyncGenerator<TurnStreamEvent, void, void> {
   let fullText = "";
   try {
-    for await (const delta of result.tokens) {
-      fullText += delta;
-      yield { type: "delta", text: delta };
+    const iterator = result.tokens[Symbol.asyncIterator]();
+    // Only one `.next()` call is ever made for the first step - racing a
+    // timer against it means racing which one gets AWAITED first, never
+    // calling `.next()` a second time (which would skip a real token).
+    const firstStep = iterator.next();
+    const timer = delay(cueDelayMs);
+    const race = await Promise.race([firstStep, timer.promise]);
+    timer.cancel();
+    if (race === "timeout") yield { type: "spoken_cue", text: pickThinkingCue(actorId) };
+    let current = race === "timeout" ? await firstStep : race;
+
+    while (!current.done) {
+      fullText += current.value;
+      yield { type: "delta", text: current.value };
+      current = await iterator.next();
     }
     const value = result.finalize(fullText);
     yield { type: "done", value };
@@ -96,7 +137,7 @@ turnRoutes.post("/stream", requireAuth, async (c) => {
   const stream = new ReadableStream<Uint8Array>({
     async start(controller) {
       try {
-        for await (const event of streamTurnEvents(result)) {
+        for await (const event of streamTurnEvents(result, actor.id)) {
           controller.enqueue(ndjsonLine(event));
         }
       } finally {
