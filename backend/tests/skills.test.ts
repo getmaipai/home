@@ -57,6 +57,29 @@ describe("the bundled weather package", () => {
   });
 });
 
+// The second real skill built on host.fetch (2026-09-05). Same posture as
+// the weather package's own test: no automated test here calls the real
+// dictionaryapi.dev (bun:test stays deterministic and offline); the
+// recipe's own step logic has its own dedicated conformance fixture
+// (spec/fixtures/recipes/define-word.json). Live-verified manually
+// against the real API - including a real, live-observed transient
+// outage (two consecutive 15s timeouts, recovered less than a minute
+// later) that surfaced as the ordinary, graceful "That didn't work -
+// sorry" skill-error phrasing rather than a crash or a hang, real
+// confirmation that host.fetch's timeout and error handling work under
+// a genuine failure, not just a synthetic test one.
+describe("the bundled define package", () => {
+  test("is discoverable and its manifest + recipe validate against spec's schemas", () => {
+    expect(listPackageIds()).toContain("define");
+    const loaded = loadPackage("define");
+    expect(loaded.ok).toBe(true);
+    if (!loaded.ok) return;
+    expect(loaded.value.manifest.id).toBe("define");
+    expect(loaded.value.manifest.permissions).toContain("net:api.dictionaryapi.dev");
+    expect(loaded.value.recipe.steps.length).toBeGreaterThan(0);
+  });
+});
+
 async function owner() {
   const client = new TestClient();
   await client.post("/api/auth/setup", { displayName: "Sage", secret: "correcthorse" });

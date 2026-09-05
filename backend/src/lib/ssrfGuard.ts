@@ -22,11 +22,23 @@
 import { lookup } from "node:dns/promises";
 import { isIP } from "node:net";
 
-/** Matches node:dns/promises' own lookup() signature closely enough to
- * substitute a fake resolver in a test - the real host.fetch pipeline
- * (packageHost.ts) needs a deterministic, offline way to exercise its
- * real HTTP-calling logic against a real local test server without that
- * server's own loopback address tripping this exact guard. */
+// A real, live-verified DEAD END worth recording so a future session
+// doesn't re-chase it (2026-09-05): building the `define` skill against
+// dictionaryapi.dev hit a fetch that hung 10s+ and initially looked
+// caused by this file's own `dns.lookup()` call immediately preceding
+// Bun's `fetch()` to the same host - switching to `dns.resolve4()`
+// appeared to fix it in a first pass of testing. More rigorous testing
+// (8 real trials, alternating both resolvers) proved that theory wrong:
+// BOTH resolvers failed at the same roughly 50% rate against this exact
+// host. The real, honest finding is that dictionaryapi.dev itself is
+// measurably unreliable from this network right now, unrelated to
+// which DNS function runs first - see the `define` package's own
+// docs/dev.md entry for what that means for shipping it. `dns.lookup()`
+// is kept (not `resolve4`/`resolve6`, briefly tried and reverted): it
+// resolves the same way the OS/a browser would (respecting `/etc/hosts`
+// and other local overrides), which is the more SSRF-correct choice for
+// this specific job - checking the address the real connection will
+// actually use, not a raw DNS-only query that could disagree with it.
 export interface DnsLookup {
   (hostname: string): Promise<{ address: string; family: number }>;
 }

@@ -1,0 +1,20 @@
+{
+  "id": "define",
+  "inputs": [{ "name": "word", "selector": "text" }],
+  "steps": [
+    {
+      "op": "fetch",
+      "as": "result",
+      "url": "https://api.dictionaryapi.dev/api/v2/entries/en/{word}",
+      "method": "GET"
+    },
+    { "op": "pick", "as": "part_of_speech", "from": "result", "path": "0.meanings.0.partOfSpeech" },
+    { "op": "pick", "as": "definition", "from": "result", "path": "0.meanings.0.definitions.0.definition" },
+    {
+      "op": "format",
+      "as": "reply",
+      "text": "{word} ({part_of_speech}): {definition}",
+      "speech": "{word}: {definition}"
+    }
+  ]
+}

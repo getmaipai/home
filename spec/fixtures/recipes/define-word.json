@@ -1,0 +1,55 @@
+{
+  "description": "The real backend/packages/define/recipe.json (2026-09-05, the second real skill built on host.fetch): a single fetch+pick chain against dictionaryapi.dev, using a response shape captured from a real call.",
+  "recipe": {
+    "id": "define",
+    "inputs": [{ "name": "word", "selector": "text" }],
+    "steps": [
+      {
+        "op": "fetch",
+        "as": "result",
+        "url": "https://api.dictionaryapi.dev/api/v2/entries/en/{word}",
+        "method": "GET"
+      },
+      { "op": "pick", "as": "part_of_speech", "from": "result", "path": "0.meanings.0.partOfSpeech" },
+      { "op": "pick", "as": "definition", "from": "result", "path": "0.meanings.0.definitions.0.definition" },
+      {
+        "op": "format",
+        "as": "reply",
+        "text": "{word} ({part_of_speech}): {definition}",
+        "speech": "{word}: {definition}"
+      }
+    ]
+  },
+  "inputs": { "word": "curious" },
+  "host_setup": {
+    "fetch": {
+      "https://api.dictionaryapi.dev/api/v2/entries/en/curious": [
+        {
+          "word": "curious",
+          "phonetic": "/ˈkjɔː-/",
+          "meanings": [
+            {
+              "partOfSpeech": "adjective",
+              "definitions": [
+                {
+                  "definition": "Tending to ask questions, or to want to explore or investigate; inquisitive.",
+                  "example": "Young children are naturally curious about the world and everything in it."
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  },
+  "expected": {
+    "reply": {
+      "text": "curious (adjective): Tending to ask questions, or to want to explore or investigate; inquisitive.",
+      "speech": "curious: Tending to ask questions, or to want to explore or investigate; inquisitive."
+    },
+    "actions": [],
+    "scheduled_jobs": [],
+    "home_calls": [],
+    "memory_added": []
+  }
+}

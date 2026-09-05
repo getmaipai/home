@@ -2,7 +2,7 @@ import { describe, expect, test, beforeEach } from "bun:test";
 import { TestClient } from "./client";
 import { resetDb } from "./reset-db";
 import { __resetThrottleForTests } from "@/lib/secretThrottle";
-import { createHost, performHttpFetch } from "@/lib/packageHost";
+import { createHost, performHttpFetch, withOneRetry, type AttemptResult } from "@/lib/packageHost";
 import { __resetRateLimiterForTests } from "@/lib/rateLimiter";
 import { HostError } from "@maipai/spec/emulators/ts/host-emulator.js";
 import { PackageManifest } from "@maipai/spec/gen/ts/manifest.js";
@@ -304,6 +304,83 @@ describe("performHttpFetch (the real HTTP mechanics, no SSRF/permission/rate-lim
     // comma-joined value ("application/x-custom, application/json") -
     // exactly single, unjoined value here proves only one was ever sent.
     expect(seenContentType).toBe("application/x-custom");
+  });
+});
+
+// A real, live-verified reliability gap found building the `define`
+// skill (2026-09-05): a real public API (dictionaryapi.dev) failed
+// roughly half the time in rigorous back-to-back testing tonight - a
+// real third-party host being unreliable, not a bug in host.fetch's own
+// networking. The retry POLICY is tested here in complete isolation
+// (a fake `attempt`, a near-zero delayMs) rather than against a real
+// flaky host or a real 10-second timeout, so these stay fast and
+// deterministic while still proving the exact behavior that mattered
+// live: a genuine network failure gets one real second chance, nothing
+// else does.
+describe("withOneRetry", () => {
+  function ok(value: unknown): AttemptResult {
+    return { ok: true, value };
+  }
+  function networkFailure(): AttemptResult {
+    return { ok: false, networkFailure: true, error: new HostError("network_unreachable", "simulated network failure") };
+  }
+  function httpError(): AttemptResult {
+    return { ok: false, networkFailure: false, error: new HostError("network_unreachable", "simulated HTTP 404") };
+  }
+
+  test("a network failure followed by success recovers on the retry - the exact case dictionaryapi.dev's own flakiness needed", async () => {
+    let calls = 0;
+    const attempt = () => {
+      calls++;
+      return Promise.resolve(calls === 1 ? networkFailure() : ok("recovered"));
+    };
+    const result = await withOneRetry(attempt, true, 1);
+    expect(result).toEqual({ ok: true, value: "recovered" });
+    expect(calls).toBe(2);
+  });
+
+  test("two network failures in a row still fail, after exactly one retry - not an infinite or unbounded loop", async () => {
+    let calls = 0;
+    const attempt = () => {
+      calls++;
+      return Promise.resolve(networkFailure());
+    };
+    const result = await withOneRetry(attempt, true, 1);
+    expect(result.ok).toBe(false);
+    expect(calls).toBe(2);
+  });
+
+  test("a real HTTP error response (not a network failure) is never retried - asking again can't change a server's real answer", async () => {
+    let calls = 0;
+    const attempt = () => {
+      calls++;
+      return Promise.resolve(httpError());
+    };
+    const result = await withOneRetry(attempt, true, 1);
+    expect(result.ok).toBe(false);
+    expect(calls).toBe(1);
+  });
+
+  test("a non-idempotent method (retryable=false, the real caller's POST case) is never retried even on a genuine network failure", async () => {
+    let calls = 0;
+    const attempt = () => {
+      calls++;
+      return Promise.resolve(networkFailure());
+    };
+    const result = await withOneRetry(attempt, false, 1);
+    expect(result.ok).toBe(false);
+    expect(calls).toBe(1);
+  });
+
+  test("success on the first try never even considers a retry", async () => {
+    let calls = 0;
+    const attempt = () => {
+      calls++;
+      return Promise.resolve(ok("first try"));
+    };
+    const result = await withOneRetry(attempt, true, 1);
+    expect(result).toEqual({ ok: true, value: "first try" });
+    expect(calls).toBe(1);
   });
 });
 

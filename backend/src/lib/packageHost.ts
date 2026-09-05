@@ -100,6 +100,54 @@ async function readBodyWithLimit(response: Response, url: string): Promise<strin
   return new TextDecoder().decode(combined);
 }
 
+// A real, live-verified reliability gap found building the `define`
+// skill (2026-09-05): dictionaryapi.dev, a real public API, failed
+// (timed out) roughly half the time in rigorous back-to-back testing
+// tonight - a real third-party host, not a bug in host.fetch's own
+// networking (see ssrfGuard.ts's own comment on the dead-end chased
+// before landing on this explanation). One bounded retry, GET-only:
+// idempotent by definition, so trying again can't double-apply a write,
+// and a single real-world timeout is far more likely to be transient
+// packet loss / a bad edge node in a round-robin pool than a
+// permanently broken destination. Never retries a real HTTP response
+// (even an error one, like a genuine 404 for a word that doesn't
+// exist) - the server already answered; asking again wastes a whole
+// timeout window for an answer that won't change.
+const RETRY_DELAY_MS = 500;
+
+export interface AttemptResult {
+  ok: boolean;
+  value?: unknown;
+  error?: HostError;
+  /** True only for a genuine network-level failure (timeout, DNS, TLS,
+   * connection refused) - never for a real HTTP response, including a
+   * non-2xx one. Only this class of failure is worth retrying. */
+  networkFailure?: boolean;
+}
+
+async function attemptHttpFetch(url: string, method: string, headers: Record<string, string>, body: string | undefined): Promise<AttemptResult> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
+  try {
+    const response = await fetch(url, { method, headers, body, signal: controller.signal });
+    if (!response.ok) {
+      return { ok: false, networkFailure: false, error: new HostError("network_unreachable", `${url} returned HTTP ${response.status}`) };
+    }
+    const text = await readBodyWithLimit(response, url);
+    try {
+      return { ok: true, value: JSON.parse(text) };
+    } catch {
+      return { ok: true, value: text }; // a real API answering plain text/HTML is not a host.fetch failure
+    }
+  } catch (err) {
+    if (err instanceof HostError) return { ok: false, networkFailure: false, error: err }; // e.g. readBodyWithLimit's own size-cap error
+    const message = (err as Error).name === "AbortError" ? "timed out" : (err as Error).message;
+    return { ok: false, networkFailure: true, error: new HostError("network_unreachable", `could not reach ${url}: ${message}`) };
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 /** The real HTTP-calling mechanics, pulled out of createHost()'s fetch so
  * they're directly testable against a real local test server: permission,
  * SSRF, and rate-limit checks all happen in the caller (createHost()'s
@@ -107,31 +155,32 @@ async function readBodyWithLimit(response: Response, url: string): Promise<strin
  * real server's own loopback address (which this function has no opinion
  * about at all - guarding against reaching the household's own LAN is
  * exactly what the caller's checks are for, not this one). */
+/** The retry POLICY itself, pulled out as its own small, pure function so
+ * it's unit-testable with a fake `attempt` and a near-zero `delayMs` -
+ * no real network I/O and no real 10-second timeout to wait out just to
+ * prove "fails once then succeeds" or "a non-network failure is never
+ * retried" actually hold. Retries at most once, and only when `retryable`
+ * (the real caller passes `method === "GET"`) and the first result was a
+ * genuine network-level failure. */
+export async function withOneRetry(attempt: () => Promise<AttemptResult>, retryable: boolean, delayMs: number): Promise<AttemptResult> {
+  const first = await attempt();
+  if (first.ok || !first.networkFailure || !retryable) return first;
+  await new Promise((resolve) => setTimeout(resolve, delayMs));
+  return attempt();
+}
+
 export async function performHttpFetch(url: string, opts?: FetchOptions): Promise<unknown> {
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
+  const method = opts?.method ?? "GET";
   let body: string | undefined;
   if (opts?.body !== undefined) body = typeof opts.body === "string" ? opts.body : JSON.stringify(opts.body);
   const headers: Record<string, string> = { "user-agent": FETCH_USER_AGENT, ...opts?.headers };
   if (body !== undefined && typeof opts?.body !== "string" && !hasHeaderCaseInsensitive(headers, "content-type")) {
     headers["content-type"] = "application/json";
   }
-  try {
-    const response = await fetch(url, { method: opts?.method ?? "GET", headers, body, signal: controller.signal });
-    if (!response.ok) throw new HostError("network_unreachable", `${url} returned HTTP ${response.status}`);
-    const text = await readBodyWithLimit(response, url);
-    try {
-      return JSON.parse(text);
-    } catch {
-      return text; // a real API answering plain text/HTML is not a host.fetch failure
-    }
-  } catch (err) {
-    if (err instanceof HostError) throw err;
-    const message = (err as Error).name === "AbortError" ? "timed out" : (err as Error).message;
-    throw new HostError("network_unreachable", `could not reach ${url}: ${message}`);
-  } finally {
-    clearTimeout(timer);
-  }
+
+  const result = await withOneRetry(() => attemptHttpFetch(url, method, headers, body), method === "GET", RETRY_DELAY_MS);
+  if (result.ok) return result.value;
+  throw result.error;
 }
 
 function mapWriteFailure(status: 400 | 403 | 404, error: string): never {

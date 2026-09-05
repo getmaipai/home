@@ -1,0 +1,55 @@
+{
+  "id": "define",
+  "version": "0.1.0",
+  "kind": "skill",
+  "category": "Utilities",
+  "display": "Define",
+  "description": "Looks up a real dictionary definition for a word (2026-09-05, the second real skill built on host.fetch), via the free, no-key dictionaryapi.dev.",
+  "author": "MaiPai",
+  "license": "AGPL-3.0",
+  "homepage": "https://github.com/getmaipai/home",
+  "routing": {
+    "examples": [
+      "what does curious mean",
+      "define ambiguous",
+      "what's the definition of ephemeral",
+      "what does the word ubiquitous mean",
+      "what does gregarious mean"
+    ],
+    "patterns": ["what does * mean", "define *", "what's the definition of *"]
+  },
+  "args": {
+    "type": "object",
+    "required": ["word"],
+    "properties": {
+      "word": { "type": "string", "minLength": 1 }
+    }
+  },
+  "requires": [],
+  "optional": [],
+  "platforms": ["home"],
+  "min_role": "child",
+  "consequential": false,
+  "offline": "unavailable",
+  "config": [],
+  "data_sources": [
+    {
+      "id": "dictionaryapi-dev",
+      "destination": "dictionaryapi.dev, a free public dictionary API",
+      "when": "each time the family asks what a word means",
+      "what": "the word being looked up",
+      "who": "dictionaryapi.dev",
+      "opt_in": true,
+      "retention": "unknown, see dictionaryapi.dev's own policy"
+    }
+  ],
+  "permissions": ["net:api.dictionaryapi.dev"],
+  "notifications": [],
+  "backup": "exclude",
+  "background": false,
+  "contributes": [],
+  "pages": [],
+  "min_app": "0.1.0",
+  "tier": 0,
+  "quality_scale": "bronze"
+}

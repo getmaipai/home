@@ -3428,6 +3428,68 @@ set. Full architecture: platform plan chapters 1, 3, and 4.
       household this build has); his `persona.active_id` was restored
       to Default afterward, exactly as found.
 
+- [x] **The `define` package: the second real skill built on `host.fetch`,
+      and a real reliability lesson that improved `host.fetch` itself for
+      every skill, not just this one.** Looks up a word's real dictionary
+      definition via dictionaryapi.dev (free, no key), a single
+      `fetch`+`pick`+`pick`+`format` chain - simpler than `weather`'s own
+      two-hop geocode-then-forecast, and a useful, real family-hub
+      question ("what does X mean") neither the model's own knowledge nor
+      any other bundled skill answers with a real, sourced lookup today.
+    - **A genuinely wrong root-cause diagnosis, caught before it shipped
+      as fact.** The first live test hung 10+ seconds; the fetch
+      immediately preceding it being `ssrfGuard.ts`'s own `dns.lookup()`
+      call looked like the cause (a `dns.resolve4()` swap "fixed" it in
+      one test), and a whole comment block asserting a "confirmed,
+      reproducible" Bun runtime bug got written and nearly committed.
+      Retesting more rigorously - 8 real trials, alternating both
+      resolvers - proved that theory wrong: BOTH resolvers failed at the
+      same roughly 50% rate against this one host. The honest finding is
+      that dictionaryapi.dev itself is measurably unreliable from this
+      network right now, unrelated to which DNS function runs first.
+      `dns.lookup()` was kept (not the briefly-tried `resolve4`/`resolve6`):
+      it resolves the same way the OS/a browser would, respecting local
+      overrides like `/etc/hosts` - the more SSRF-correct choice for
+      checking the address a real connection will actually use, a real
+      reason to prefer it having nothing to do with the reliability
+      question that started this detour. Recorded in `ssrfGuard.ts`'s own
+      comment so a future session doesn't re-chase the same dead end.
+    - **The real fix, and a genuine improvement to `host.fetch` overall**:
+      `performHttpFetch` now retries exactly once, GET-only, and only for
+      a genuine network-level failure (timeout, DNS, connection refused) -
+      never for a real HTTP response (even an error one, like a real 404
+      for a word that doesn't exist), since the server already answered
+      and asking again wastes a full timeout window for an answer that
+      won't change. A single real-world timeout is far more likely to be
+      transient (packet loss, a bad edge node in a round-robin pool) than
+      a permanently broken destination. The retry policy itself
+      (`withOneRetry`) is a small, pure function pulled out specifically
+      so it's testable with a fake `attempt` and a near-zero delay - no
+      real network I/O and no real 10-second wait needed to prove "fails
+      once then recovers," "two failures in a row still fails, not an
+      infinite loop," "a real HTTP error is never retried," and "a
+      non-GET method is never retried even on a genuine network failure."
+    - **The honest number, not a claim of "fixed"**: re-tested three more
+      times after the retry landed - 2 of 3 succeeded on the first
+      attempt (fast), the third failed both attempts (20.5 seconds: two
+      full 10-second timeouts plus the retry delay) before surfacing the
+      same graceful "Couldn't get that done, sorry" skill-error phrasing.
+      The retry roughly halves the effective failure rate (independent
+      ~50% single-attempt failures compound to ~25% for two in a row) but
+      does not eliminate it - a real, live-measured characteristic of
+      this specific free, unpaid, third-party API at this specific time,
+      not necessarily permanent, and not something `host.fetch` can fully
+      fix from this side of the connection. Documented honestly rather
+      than claimed solved, so whoever picks this package up next (keep
+      it, find a more reliable paid alternative, or drop it) has the real
+      number instead of an optimistic guess.
+    - A dedicated conformance fixture
+      (`spec/fixtures/recipes/define-word.json`) proves the exact shipped
+      recipe's own step logic against both interpreters, using a response
+      shape captured from a real dictionaryapi.dev call - deterministic
+      and offline; `skills.test.ts` separately proves the package's
+      manifest and recipe are real and well-formed.
+
 ## Notes for later (companion personas, added 2026-09-05)
 
 Jesse asked how companion personalities and their speech patterns should
