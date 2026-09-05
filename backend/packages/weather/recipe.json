@@ -1,0 +1,28 @@
+{
+  "id": "weather",
+  "inputs": [{ "name": "place", "selector": "text" }],
+  "steps": [
+    {
+      "op": "fetch",
+      "as": "geo",
+      "url": "https://geocoding-api.open-meteo.com/v1/search?count=1&name={place}",
+      "method": "GET"
+    },
+    { "op": "pick", "as": "lat", "from": "geo", "path": "results.0.latitude" },
+    { "op": "pick", "as": "lon", "from": "geo", "path": "results.0.longitude" },
+    { "op": "pick", "as": "place_name", "from": "geo", "path": "results.0.name" },
+    {
+      "op": "fetch",
+      "as": "wx",
+      "url": "https://api.open-meteo.com/v1/forecast?latitude={lat}&longitude={lon}&current=temperature_2m&temperature_unit=fahrenheit",
+      "method": "GET"
+    },
+    { "op": "pick", "as": "temp", "from": "wx", "path": "current.temperature_2m" },
+    {
+      "op": "format",
+      "as": "reply",
+      "text": "It's {temp} degrees in {place_name}.",
+      "speech": "It's {temp} degrees in {place_name} right now."
+    }
+  ]
+}

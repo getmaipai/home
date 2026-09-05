@@ -2,7 +2,8 @@ import { describe, expect, test, beforeEach } from "bun:test";
 import { TestClient } from "./client";
 import { resetDb } from "./reset-db";
 import { __resetThrottleForTests } from "@/lib/secretThrottle";
-import { createHost } from "@/lib/packageHost";
+import { createHost, performHttpFetch } from "@/lib/packageHost";
+import { __resetRateLimiterForTests } from "@/lib/rateLimiter";
 import { HostError } from "@maipai/spec/emulators/ts/host-emulator.js";
 import { PackageManifest } from "@maipai/spec/gen/ts/manifest.js";
 import { db } from "@/db";
@@ -95,13 +96,214 @@ describe("packageHost fetch", () => {
   test("a malformed url raises HostError invalid_input, not a raw TypeError", async () => {
     const actor = await owner();
     const host = createHost(actor, manifest({ permissions: [] }));
+    await expect(host.fetch("not a url")).rejects.toThrow(HostError);
     try {
-      host.fetch("not a url");
-      throw new Error("should have thrown");
+      await host.fetch("not a url");
     } catch (err) {
-      expect(err).toBeInstanceOf(HostError);
       expect((err as HostError).code).toBe("invalid_input");
     }
+  });
+
+  test("an unsupported scheme (e.g. file://) is refused before any network attempt", async () => {
+    const actor = await owner();
+    const host = createHost(actor, manifest({ permissions: ["net:etc"] }));
+    try {
+      await host.fetch("file:///etc/passwd");
+      throw new Error("should have thrown");
+    } catch (err) {
+      expect((err as HostError).code).toBe("invalid_input");
+    }
+  });
+
+  test("a permission not declared in the manifest is refused before any network attempt", async () => {
+    const actor = await owner();
+    const host = createHost(actor, manifest({ permissions: [] }));
+    try {
+      await host.fetch("https://example.com/weather");
+      throw new Error("should have thrown");
+    } catch (err) {
+      expect((err as HostError).code).toBe("permission_denied");
+    }
+  });
+
+  // The real SSRF guard (lib/ssrfGuard.ts) has its own dedicated,
+  // deterministic test file; this just proves createHost() actually
+  // wires it in, using a loopback literal (no DNS needed either way).
+  test("a loopback target is refused even with the right permission declared", async () => {
+    const actor = await owner();
+    const host = createHost(actor, manifest({ permissions: ["net:127.0.0.1:9"] }));
+    try {
+      await host.fetch("http://127.0.0.1:9/");
+      throw new Error("should have thrown");
+    } catch (err) {
+      expect((err as HostError).code).toBe("invalid_input");
+      expect((err as HostError).message).toContain("private");
+    }
+  });
+
+  test("the per-host rate limit is real: enough calls in a burst eventually get rate_limited", async () => {
+    __resetRateLimiterForTests();
+    const actor = await owner();
+    // A loopback target, deliberately: it will always fail its own SSRF
+    // check, but the rate limiter runs BEFORE that (packageHost.ts's own
+    // comment on why), so the first few calls fail with invalid_input
+    // (the real SSRF block) and only calls past the burst capacity ever
+    // see rate_limited - proving the limiter's real position in the
+    // chain, not just that it exists somewhere.
+    const host = createHost(actor, manifest({ permissions: ["net:127.0.0.1:9"] }));
+    const codes: string[] = [];
+    for (let i = 0; i < 8; i++) {
+      try {
+        await host.fetch("http://127.0.0.1:9/");
+      } catch (err) {
+        codes.push((err as HostError).code);
+      }
+    }
+    expect(codes).toContain("rate_limited");
+  });
+});
+
+describe("performHttpFetch (the real HTTP mechanics, no SSRF/permission/rate-limit concern of its own)", () => {
+  test("a successful JSON response is parsed and returned", async () => {
+    const server = Bun.serve({ port: 0, fetch: () => Response.json({ tempF: 72 }) });
+    try {
+      const result = await performHttpFetch(`http://127.0.0.1:${server.port}/weather`);
+      expect(result).toEqual({ tempF: 72 });
+    } finally {
+      server.stop(true);
+    }
+  });
+
+  test("a plain-text response is returned as text, not a JSON-parse failure", async () => {
+    const server = Bun.serve({ port: 0, fetch: () => new Response("just plain text") });
+    try {
+      const result = await performHttpFetch(`http://127.0.0.1:${server.port}/`);
+      expect(result).toBe("just plain text");
+    } finally {
+      server.stop(true);
+    }
+  });
+
+  test("sends the real user-agent and any caller-supplied headers", async () => {
+    let seenUserAgent = "";
+    let seenCustom = "";
+    const server = Bun.serve({
+      port: 0,
+      fetch: (req) => {
+        seenUserAgent = req.headers.get("user-agent") ?? "";
+        seenCustom = req.headers.get("x-custom") ?? "";
+        return Response.json({ ok: true });
+      },
+    });
+    try {
+      await performHttpFetch(`http://127.0.0.1:${server.port}/`, { headers: { "x-custom": "value" } });
+      expect(seenUserAgent).toContain("MaiPai-Home");
+      expect(seenCustom).toBe("value");
+    } finally {
+      server.stop(true);
+    }
+  });
+
+  test("a non-2xx response raises HostError network_unreachable, not a silently-returned error body", async () => {
+    const server = Bun.serve({ port: 0, fetch: () => new Response("nope", { status: 503 }) });
+    try {
+      await expect(performHttpFetch(`http://127.0.0.1:${server.port}/`)).rejects.toThrow(HostError);
+    } finally {
+      server.stop(true);
+    }
+  });
+
+  test("an oversized response raises HostError rather than being silently truncated", async () => {
+    const oversized = "x".repeat(2_100_000);
+    const server = Bun.serve({ port: 0, fetch: () => new Response(oversized) });
+    try {
+      try {
+        await performHttpFetch(`http://127.0.0.1:${server.port}/`);
+        throw new Error("should have thrown");
+      } catch (err) {
+        expect(err).toBeInstanceOf(HostError);
+        expect((err as HostError).code).toBe("network_unreachable");
+      }
+    } finally {
+      server.stop(true);
+    }
+  });
+
+  test("an unreachable host raises HostError network_unreachable, never a raw fetch TypeError", async () => {
+    // Port 0 is never a real listening port to connect to.
+    await expect(performHttpFetch("http://127.0.0.1:0/")).rejects.toThrow(HostError);
+  });
+
+  // A code review (2026-09-05) found the size cap was checked AFTER
+  // response.text() had already buffered the entire body into memory,
+  // so a large or malicious response fully materialized every time
+  // regardless of the cap - the streaming rewrite reads and counts real
+  // bytes as they arrive, aborting the read itself once the limit is
+  // crossed rather than after the fact. This proves the limit is
+  // enforced in bytes, not text.length's UTF-16 code units, which would
+  // undercount a multi-byte-heavy body against a byte-named limit.
+  test("the size cap counts real bytes, not UTF-16 code units - a multi-byte-heavy body over the byte limit is still rejected", async () => {
+    // Each euro sign is 1 UTF-16 code unit but 3 UTF-8 bytes: this body's
+    // CODE UNIT count (1,000,000) is comfortably UNDER the 2,000,000-byte
+    // cap - a text.length-based check would wrongly let it through - but
+    // its real BYTE count (3,000,000) is over it.
+    const codeUnitCount = 1_000_000;
+    const oversizedInBytes = "€".repeat(codeUnitCount); // 1,000,000 code units, 3,000,000 real bytes
+    const server = Bun.serve({ port: 0, fetch: () => new Response(oversizedInBytes) });
+    try {
+      await expect(performHttpFetch(`http://127.0.0.1:${server.port}/`)).rejects.toThrow(HostError);
+    } finally {
+      server.stop(true);
+    }
+  });
+
+  test("a POST with a plain object body is sent as JSON with a content-type header", async () => {
+    let seenContentType = "";
+    let seenBody = "";
+    const server = Bun.serve({
+      port: 0,
+      fetch: async (req) => {
+        seenContentType = req.headers.get("content-type") ?? "";
+        seenBody = await req.text();
+        return Response.json({ ok: true });
+      },
+    });
+    try {
+      await performHttpFetch(`http://127.0.0.1:${server.port}/`, { method: "POST", body: { a: 1 } });
+      expect(seenContentType).toContain("application/json");
+      expect(seenBody).toBe(JSON.stringify({ a: 1 }));
+    } finally {
+      server.stop(true);
+    }
+  });
+
+  // A code review (2026-09-05) found the "does the caller already have a
+  // content-type header" check was case-sensitive, so a caller-supplied
+  // "Content-Type" (capitalized, as most real code writes it) went
+  // undetected and a second, lowercase "content-type" got appended
+  // alongside it - two content-type headers on the same request.
+  test("a caller-supplied Content-Type header (any casing) is respected, never duplicated", async () => {
+    let seenContentType = "";
+    const server = Bun.serve({
+      port: 0,
+      fetch: (req) => {
+        seenContentType = req.headers.get("content-type") ?? "";
+        return Response.json({ ok: true });
+      },
+    });
+    try {
+      await performHttpFetch(`http://127.0.0.1:${server.port}/`, {
+        method: "POST",
+        headers: { "Content-Type": "application/x-custom" },
+        body: { a: 1 },
+      });
+    } finally {
+      server.stop(true);
+    }
+    // A real Headers object folds two same-named headers into one
+    // comma-joined value ("application/x-custom, application/json") -
+    // exactly single, unjoined value here proves only one was ever sent.
+    expect(seenContentType).toBe("application/x-custom");
   });
 });
 

@@ -89,7 +89,7 @@ describe("scheduleJob / listJobs / cancelJob", () => {
     const scheduled = scheduleJob(ownerRow, "remember", "remember", "2099-01-01T00:00:00.000Z", { fact: "x" });
     if (!scheduled.ok) throw new Error("setup failed");
     db.update(scheduledJobs).set({ nextRunAt: new Date(0).toISOString() }).where(eq(scheduledJobs.id, scheduled.value.id)).run();
-    runDueJobs(runSkill);
+    await runDueJobs(runSkill);
     expect(listJobs(ownerRow).find((j) => j.id === scheduled.value.id)?.status).toBe("done");
 
     const cancelled = cancelJob(ownerRow, scheduled.value.id);
@@ -108,11 +108,11 @@ describe("ensureCoreJob", () => {
 });
 
 describe("runDueJobs", () => {
-  test("fires a due core job (memory.maintenance) for real", () => {
+  test("fires a due core job (memory.maintenance) for real", async () => {
     ensureCoreJob("memory.maintenance", "every:1d");
     // Force it due: ensureCoreJob schedules a day out by design.
     db.update(scheduledJobs).set({ nextRunAt: new Date(0).toISOString() }).run();
-    const result = runDueJobs(runSkill);
+    const result = await runDueJobs(runSkill);
     expect(result.ran).toBe(1);
     expect(result.errors).toBe(0);
     const row = db.select().from(scheduledJobs).where(eq(scheduledJobs.kind, "core")).get()!;
@@ -127,7 +127,7 @@ describe("runDueJobs", () => {
     if (!scheduled.ok) throw new Error("setup failed");
     db.update(scheduledJobs).set({ nextRunAt: new Date(0).toISOString() }).where(eq(scheduledJobs.id, scheduled.value.id)).run();
 
-    const result = runDueJobs(runSkill);
+    const result = await runDueJobs(runSkill);
     expect(result.ran).toBe(1);
     expect(result.errors).toBe(0);
 
@@ -146,7 +146,7 @@ describe("runDueJobs", () => {
     if (!scheduled.ok) throw new Error("setup failed");
     db.update(scheduledJobs).set({ nextRunAt: new Date(0).toISOString() }).where(eq(scheduledJobs.id, scheduled.value.id)).run();
 
-    const result = runDueJobs(runSkill);
+    const result = await runDueJobs(runSkill);
     expect(result.ran).toBe(0);
     expect(result.errors).toBe(1);
 
@@ -161,13 +161,13 @@ describe("runDueJobs", () => {
   // forward by however late each tick was. This pins the fixed
   // behavior: a job overdue by 3 hours reschedules to exactly one
   // interval past its ORIGINAL due time, not past the moment it fired.
-  test("a late-firing recurring job reschedules from its own due time, not from when it fired", () => {
+  test("a late-firing recurring job reschedules from its own due time, not from when it fired", async () => {
     ensureCoreJob("memory.maintenance", "every:1d");
     const originalDue = new Date("2026-09-04T06:00:00.000Z");
     db.update(scheduledJobs).set({ nextRunAt: originalDue.toISOString() }).run();
 
     const firedAt = new Date("2026-09-04T09:00:00.000Z"); // 3 hours late
-    runDueJobs(runSkill, firedAt);
+    await runDueJobs(runSkill, firedAt);
 
     const row = db.select().from(scheduledJobs).where(eq(scheduledJobs.kind, "core")).get()!;
     expect(row.nextRunAt).toBe(new Date(originalDue.getTime() + 86_400_000).toISOString());
@@ -177,9 +177,45 @@ describe("runDueJobs", () => {
     const { row: ownerRow } = await owner();
     const scheduled = scheduleJob(ownerRow, "remember", "remember", "2099-01-01T00:00:00.000Z", { fact: "future" });
     if (!scheduled.ok) throw new Error("setup failed");
-    const result = runDueJobs(runSkill);
+    const result = await runDueJobs(runSkill);
     expect(result.ran).toBe(0);
     expect(result.errors).toBe(0);
+  });
+
+  // A code review (2026-09-05, the same pass that made this function
+  // async so a job could really await host.fetch) found "no concurrent
+  // invocations" was true only by accident, back when this was
+  // synchronous: once a due job can await a slow real fetch, a second
+  // call arriving mid-run (index.ts's interval firing again, or a manual
+  // POST /scheduler/run-due) would SELECT the same still-"pending" row
+  // and fire a one-shot job twice. Proven directly with a controllable
+  // slow runSkillFn rather than trusting real timing.
+  test("two overlapping calls share the same run - a one-shot job fires exactly once, not twice", async () => {
+    const { row: ownerRow } = await owner();
+    const scheduled = scheduleJob(ownerRow, "remember", "remember", "2099-01-01T00:00:00.000Z", { fact: "the garage code is 4471" });
+    if (!scheduled.ok) throw new Error("setup failed");
+    db.update(scheduledJobs).set({ nextRunAt: new Date(0).toISOString() }).where(eq(scheduledJobs.id, scheduled.value.id)).run();
+
+    let callCount = 0;
+    const slowRunSkill = (id: string, actor: typeof ownerRow, inputs: Record<string, unknown>) => {
+      callCount++;
+      return new Promise<Awaited<ReturnType<typeof runSkill>>>((resolve) => {
+        setTimeout(() => resolve(runSkill(id, actor, inputs)), 30);
+      });
+    };
+
+    // Fired without awaiting the first, on purpose - this is the exact
+    // overlap ("the interval fires again mid-run") the fix guards against.
+    const first = runDueJobs(slowRunSkill);
+    const second = runDueJobs(slowRunSkill);
+    const [firstResult, secondResult] = await Promise.all([first, second]);
+
+    expect(callCount).toBe(1); // the skill itself only ever actually ran once
+    expect(firstResult).toEqual(secondResult); // both callers got back the exact same real result
+    expect(firstResult.ran).toBe(1);
+
+    const row = db.select().from(scheduledJobs).where(eq(scheduledJobs.id, scheduled.value.id)).get()!;
+    expect(row.status).toBe("done"); // not somehow re-queued by the second, overlapping call
   });
 });
 

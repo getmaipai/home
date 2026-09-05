@@ -16,31 +16,123 @@
 //
 // What's real: memory.recall, memory.remember, data.forget, config.get
 // (household scope only), schedule (lib/scheduler.ts, with a known gap,
-// see that call site below), log (with real redaction). Everything else
-// (fetch, home.call_service, integration.call, speak.sentence,
-// camera.still, ocr.read, files.*, action.emit, diagnostics) has no
-// backing service yet (no rate limiter, no Home Assistant link, no turn
-// engine to route actions to, no package file storage) and throws
-// `capability_missing`, checked against the permission it would need
-// first so the error is as specific as it can honestly be. `llm.complete`
-// is the same code but a different reason: the `chat` role IS real now
-// (lib/llm.ts, lib/llmSupervisor.ts, spec/llm/), but every method on this
-// interface is synchronous and runRecipe() never awaits a host call
-// (spec/interpreters/ts/recipe-interpreter.ts), while a real chat
-// completion is inherently async network I/O. Wiring this through needs
-// the interpreter itself to support async host calls (both TS and Python,
-// kept behaviorally identical), out of scope here; no recipe step calls
-// llm.complete today either (recipe.schema.json has no "llm" step), so
-// this has zero live blast radius. See spec/llm/README.md for the full
-// reasoning and docs/dev.md's Package Host section for everything else
-// that's deferred and why.
+// see that call site below), log (with real redaction), and - 2026-09-05
+// - fetch: a real outbound HTTP call, permission-gated
+// (`net:<host>`), rate-limited per destination host (lib/rateLimiter.ts,
+// the org's own "a page every few seconds, not dozens a second" budget),
+// and refused outright for a private/loopback/link-local target
+// (lib/ssrfGuard.ts - a package's generic fetch has no business landing
+// on the household's own LAN; home.call_service/integration.call are the
+// real, permissioned paths for that). This was the one thing genuinely
+// blocking every fetch-based skill until the interpreter itself could
+// await a host call at all (recipe-interpreter.ts, both languages, made
+// async the same day this landed) - `runSkill()`/`prepareTurn()` now
+// await through to here.
+//
+// Everything else (home.call_service, integration.call, speak.sentence,
+// camera.still, ocr.read, files.*, action.emit, diagnostics) still has no
+// backing service (no Home Assistant link, no turn engine action route,
+// no package file storage) and throws `capability_missing`, checked
+// against the permission it would need first so the error is as specific
+// as it can honestly be. `llm.complete` is the same code but a different
+// reason: the `chat` role IS real (lib/llm.ts, lib/llmSupervisor.ts,
+// spec/llm/), and the interpreter can now await a host call - but no
+// recipe step calls llm.complete (recipe.schema.json has no "llm" step),
+// so there is still nothing to wire this to, a real gap independent of
+// the sync/async one that's now closed. See spec/llm/README.md and
+// docs/dev.md's Package Host section for everything else deferred and why.
 import type { Host, FetchOptions, MemoryRecordLike } from "@maipai/spec/emulators/ts/host-emulator.js";
 import { HostError, redactSecrets } from "@maipai/spec/emulators/ts/host-emulator.js";
 import type { PackageManifest } from "@maipai/spec/gen/ts/manifest.js";
+import { tryConsume } from "@/lib/rateLimiter";
+import { assertNotPrivateHost, SsrfBlockedError } from "@/lib/ssrfGuard";
 import * as memory from "@/lib/memory";
 import * as settings from "@/lib/settings";
 import { scheduleJob } from "@/lib/scheduler";
 import type { PersonRow } from "@/types";
+
+// host.fetch's real network I/O settings (2026-09-05). Rate limit: "a
+// page every few seconds, not dozens a second" (.github/CLAUDE.md) - a
+// small burst allowance (a recipe's own fetch+pick+format, or one retry)
+// then a sustained ~1 request per 5 seconds per destination host. Timeout
+// and response cap are plain defensive limits, not policy: generous
+// enough for any real JSON API, small enough that one broken integration
+// can't hang a turn or exhaust memory.
+const FETCH_RATE_LIMIT = { capacity: 5, refillPerSecond: 0.2 };
+const FETCH_TIMEOUT_MS = 10_000;
+const FETCH_MAX_RESPONSE_BYTES = 2_000_000;
+const FETCH_USER_AGENT = "MaiPai-Home/1.0 (+https://github.com/getmaipai/home)";
+
+function hasHeaderCaseInsensitive(headers: Record<string, string>, name: string): boolean {
+  const lower = name.toLowerCase();
+  return Object.keys(headers).some((k) => k.toLowerCase() === lower);
+}
+
+// A code review (2026-09-05) found response.text() read the ENTIRE body
+// into memory before this ever compared it to FETCH_MAX_RESPONSE_BYTES,
+// so the cap could not do the one thing its own comment claimed
+// ("exhaust memory") - a large or malicious body fully materialized
+// every time regardless. Streamed and counted in real bytes (not
+// text.length's UTF-16 code units, which undercount multi-byte UTF-8)
+// so the read itself aborts the moment the limit is crossed, before the
+// rest of the body ever arrives.
+async function readBodyWithLimit(response: Response, url: string): Promise<string> {
+  const reader = response.body?.getReader();
+  if (!reader) return "";
+  const chunks: Uint8Array[] = [];
+  let totalBytes = 0;
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    totalBytes += value.byteLength;
+    if (totalBytes > FETCH_MAX_RESPONSE_BYTES) {
+      await reader.cancel();
+      throw new HostError("network_unreachable", `${url}'s response exceeded the ${FETCH_MAX_RESPONSE_BYTES}-byte limit`);
+    }
+    chunks.push(value);
+  }
+  const combined = new Uint8Array(totalBytes);
+  let offset = 0;
+  for (const chunk of chunks) {
+    combined.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  return new TextDecoder().decode(combined);
+}
+
+/** The real HTTP-calling mechanics, pulled out of createHost()'s fetch so
+ * they're directly testable against a real local test server: permission,
+ * SSRF, and rate-limit checks all happen in the caller (createHost()'s
+ * fetch, below) before this ever runs, and have nothing to do with a
+ * real server's own loopback address (which this function has no opinion
+ * about at all - guarding against reaching the household's own LAN is
+ * exactly what the caller's checks are for, not this one). */
+export async function performHttpFetch(url: string, opts?: FetchOptions): Promise<unknown> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
+  let body: string | undefined;
+  if (opts?.body !== undefined) body = typeof opts.body === "string" ? opts.body : JSON.stringify(opts.body);
+  const headers: Record<string, string> = { "user-agent": FETCH_USER_AGENT, ...opts?.headers };
+  if (body !== undefined && typeof opts?.body !== "string" && !hasHeaderCaseInsensitive(headers, "content-type")) {
+    headers["content-type"] = "application/json";
+  }
+  try {
+    const response = await fetch(url, { method: opts?.method ?? "GET", headers, body, signal: controller.signal });
+    if (!response.ok) throw new HostError("network_unreachable", `${url} returned HTTP ${response.status}`);
+    const text = await readBodyWithLimit(response, url);
+    try {
+      return JSON.parse(text);
+    } catch {
+      return text; // a real API answering plain text/HTML is not a host.fetch failure
+    }
+  } catch (err) {
+    if (err instanceof HostError) throw err;
+    const message = (err as Error).name === "AbortError" ? "timed out" : (err as Error).message;
+    throw new HostError("network_unreachable", `could not reach ${url}: ${message}`);
+  } finally {
+    clearTimeout(timer);
+  }
+}
 
 function mapWriteFailure(status: 400 | 403 | 404, error: string): never {
   // A permission check above only proves the manifest declared the
@@ -84,15 +176,36 @@ export function createHost(actor: PersonRow, manifest: PackageManifest, secrets:
   }
 
   return {
-    fetch(url: string, _opts?: FetchOptions): unknown {
-      let host: string;
+    async fetch(url: string, opts?: FetchOptions): Promise<unknown> {
+      let parsed: URL;
       try {
-        host = new URL(url).host;
+        parsed = new URL(url);
       } catch {
         throw new HostError("invalid_input", `not a valid url: ${url}`);
       }
-      requirePermission(`net:${host}`);
-      notImplemented("fetch");
+      if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
+        throw new HostError("invalid_input", `unsupported url scheme: ${parsed.protocol}`);
+      }
+      requirePermission(`net:${parsed.host}`);
+
+      // Rate limit BEFORE the SSRF/DNS check, not after: a package
+      // hammering host.fetch against a host that turns out to be blocked
+      // (or invalid) still costs a real DNS lookup and connection attempt
+      // per call, and the household's own hub deserves protection from
+      // that regardless of whether the target was ever going to be
+      // allowed - not just the destination service's own budget.
+      if (!tryConsume(parsed.host, FETCH_RATE_LIMIT)) {
+        throw new HostError("rate_limited", `host.fetch is rate-limited for ${parsed.host} - try again shortly`);
+      }
+
+      try {
+        await assertNotPrivateHost(parsed.hostname);
+      } catch (err) {
+        if (err instanceof SsrfBlockedError) throw new HostError("invalid_input", err.message);
+        throw new HostError("network_unreachable", `could not resolve ${parsed.hostname}`);
+      }
+
+      return performHttpFetch(url, opts);
     },
     memory: {
       recall(query: string, opts?: { scope?: string; person?: string }): MemoryRecordLike[] {

@@ -33,7 +33,7 @@ const fixtureFiles = readdirSync(FIXTURES_DIR).filter((f) => f.endsWith(".json")
 
 describe("recipe conformance", () => {
   for (const file of fixtureFiles) {
-    test(file, () => {
+    test(file, async () => {
       const fixture = JSON.parse(readFileSync(join(FIXTURES_DIR, file), "utf-8")) as ConformanceFixture;
       const recipe = Recipe.parse(fixture.recipe);
 
@@ -48,7 +48,7 @@ describe("recipe conformance", () => {
         host.seedMemory(fixture.host_setup.memory);
       }
 
-      const result = runRecipe(recipe, fixture.inputs, host);
+      const result = await runRecipe(recipe, fixture.inputs, host);
 
       expect(result.reply ?? null).toEqual(fixture.expected.reply);
       expect(result.actions).toEqual(fixture.expected.actions);

@@ -26,5 +26,5 @@ schedulerRoutes.post("/jobs/:id/cancel", requireAuth, async (c) => {
 // actually running, this just lets an owner/admin (or a test) fire it
 // on demand without waiting.
 schedulerRoutes.post("/run-due", requireRole("owner", "admin"), async (c) => {
-  return c.json(runDueJobs(runSkill));
+  return c.json(await runDueJobs(runSkill));
 });

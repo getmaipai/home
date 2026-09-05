@@ -3215,6 +3215,177 @@ set. Full architecture: platform plan chapters 1, 3, and 4.
       person's own `persona.active_id` choice reaches a real `runTurn()`
       call without a crash.
 
+- [x] **A real `host.fetch`, and the async interpreter it needed to exist
+      at all.** Jesse, 2026-09-05, handing off for the night: "keep
+      building autonomously... skills, integrations, ui, vision,
+      imaging." Skills and integrations both turned out to be blocked on
+      the same thing: `spec/interpreters/{ts,py}/recipe-interpreter`
+      called every host method synchronously, so a real `fetch` step -
+      genuine network I/O - had nowhere to await anything.
+      `packageHost.ts`'s own header comment had already named this exact
+      gap for `llm.complete` ("every method on this interface is
+      synchronous... wiring this through needs the interpreter itself to
+      support async host calls"); this closes it for real, for both
+      languages, keeping them behaviorally identical the way the
+      conformance fixtures require.
+    - **Both interpreters are now `async`** (`runRecipe`/`run_recipe`),
+      awaiting only the `fetch` step - every other step stays exactly as
+      synchronous as it always was, since none of the rest do real I/O to
+      wait on. `Host.fetch`'s own type is the one method in the interface
+      that returns a `Promise`, not "everything is async for
+      consistency." The async change rippled through every real caller in
+      one straight line: `runSkill()` -> `prepareTurn()` -> `runTurn()`/
+      `runTurnStream()`, and separately `runDueJobs()`'s injected
+      `RunSkillFn` (the scheduler's own circular-import-breaking seam).
+      Python's test suite gained its first-ever async tests
+      (`pytest-asyncio`, `asyncio_mode = "strict"` plus the org's own
+      documented `pytestmark = pytest.mark.asyncio` convention on the
+      specific functions that need it, not the whole module - most tests
+      in these files are still plain sync `def test_`).
+    - **`host.fetch` is real**: permission-gated (`net:<host>`, already
+      checked before this pass, now actually followed by a request),
+      rate-limited per destination host (`lib/rateLimiter.ts`, a plain
+      token bucket - capacity 5, ~1 sustained request per 5 seconds,
+      the org's own "a page every few seconds, not dozens a second"
+      budget from `.github/CLAUDE.md`'s "we are the user" rules), and
+      refused outright for a private, loopback, or link-local target
+      (`lib/ssrfGuard.ts`) - a package's generic fetch has no business
+      reaching the household's own LAN; `home.call_service`/
+      `integration.call` are the real, permissioned paths for that,
+      still `capability_missing` stubs, unbuilt. Real timeout (10s),
+      response size cap (2MB), a real identifying User-Agent, and a
+      JSON-with-text-fallback response parse. Order matters and is
+      deliberate: permission, then the rate limiter, then the SSRF/DNS
+      check, then the real request - a package hammering a host that
+      turns out to be blocked still costs the hub a real DNS lookup and
+      connection attempt per call, so the rate limiter protects the
+      hub's own resources first, not just the destination's.
+    - **The SSRF guard's own honest limit**: it checks the resolved
+      address before the real request, not the address the underlying
+      connection actually lands on - a DNS answer that changes in
+      between (rebinding) isn't caught. Accepted for now: every package
+      today is first-party, bundled, trusted code (no catalog, no
+      signing, no third-party upload exists yet), so the live risk is a
+      bug in our own code reaching an internal address by mistake, which
+      this catches, not a hostile package racing a DNS TTL.
+    - **Live-verified against a real public API** (Open-Meteo, no key
+      required): a real manifest declaring `net:api.open-meteo.com`
+      fetched real current weather for a real set of coordinates and got
+      real data back (temperature, WMO weather code); an undeclared host
+      and an undeclared-permission private address were both correctly
+      refused.
+    - Real regression tests, not just the mechanism read by eye:
+      `ssrfGuard.test.ts` (every private/loopback/link-local range, v4
+      and v6, both as literals and via an injected fake DNS resolver -
+      no real network needed, `assertNotPrivateHost`'s `dnsLookup`
+      parameter exists for exactly this); `rateLimiter.test.ts` (burst
+      capacity, independent per-key buckets, real-time refill, and the
+      cap never exceeded even after a long idle gap); `packageHost.test.ts`
+      (malformed url, unsupported scheme, undeclared permission, a
+      loopback target refused even WITH the right permission declared,
+      and the rate limiter's real position in the chain - proven by
+      exhausting a burst against a target that will always fail its own
+      SSRF check, showing `invalid_input` first and only `rate_limited`
+      once the burst is spent). The real HTTP mechanics (`performHttpFetch`,
+      pulled out of `createHost()`'s fetch specifically so it's testable
+      without a permission/SSRF/rate-limit concern of its own) are proven
+      against real local `Bun.serve` test servers: successful JSON parse,
+      plain-text fallback, the real user-agent and caller headers actually
+      sent, a non-2xx response raising `HostError`, an oversized response
+      raising `HostError` rather than being silently truncated, an
+      unreachable port raising `HostError` rather than a raw `fetch`
+      `TypeError`, and a POST body correctly JSON-encoded with a real
+      content-type header.
+    - **Deliberately not attempted this pass**: `home.call_service`,
+      `integration.call`, and every other still-`notImplemented` host
+      method (see `packageHost.ts`'s own updated header) - real
+      integrations (Home Assistant, anything OAuth-backed) are each their
+      own slice; this was specifically the foundational piece blocking
+      all of them the same way.
+    - **A high-effort code review before commit found six real issues**,
+      three of them genuine SSRF-guard bypasses: (1) an IPv4-mapped IPv6
+      address (`::ffff:a.b.c.d`, a real, legitimate form a DNS lookup can
+      return) sailed through as "public" because the IPv6 branch never
+      checked for it - confirmed live that `isIP("::ffff:169.254.169.254")`
+      reports family 6 in this runtime; fixed by extracting the embedded
+      IPv4 address and checking it too. (2) `new URL("http://[::1]/").hostname`
+      keeps its brackets, which `isIP()` doesn't recognize at all, so
+      every real IPv6-literal target - private or genuinely public - fell
+      through to a DNS lookup that fails with `ENOTFOUND` instead of
+      being correctly allowed or blocked; fixed by stripping the brackets
+      before the literal check. (3) `runDueJobs()`'s own "no concurrent
+      invocations" guarantee was true only by accident, back when the
+      function was synchronous - once a due job can await a real
+      `host.fetch` for up to 10 seconds, the 60-second interval firing
+      again mid-run (or a manual `POST /scheduler/run-due` landing at the
+      same time) could fire a one-shot job twice; fixed with an in-flight
+      guard so every caller shares the exact same run instead of starting
+      a duplicate pass over the same due rows. The other three: the
+      response size cap was checked only after `response.text()` had
+      already buffered the entire body (defeating the cap's own stated
+      memory-safety purpose) and counted UTF-16 code units against a
+      byte-named limit, not real bytes - fixed with a streaming,
+      byte-counted read that aborts the moment the limit is crossed; the
+      rate limiter's own bucket map had no eviction at all, unlike the
+      sibling `secretThrottle.ts` pattern in the same directory - fixed
+      with the identical cap-and-sweep shape; and a caller-supplied
+      `Content-Type` header (any casing other than exactly lowercase)
+      went undetected, appending a second, duplicate header - fixed with
+      a case-insensitive check. All six got a real regression test,
+      each confirmed to fail against the pre-fix code before the fix
+      landed for real (the IPv4-mapped/bracketed-literal cases via
+      `ssrfGuard.test.ts`'s injectable resolver, the scheduler race via a
+      controllable slow `runSkillFn` proving two overlapping calls
+      collapse into one real run, and the streaming/header fixes via
+      `packageHost.test.ts`'s real local test servers).
+
+- [x] **The `weather` package: the first real skill built on `host.fetch`.**
+      Geocodes a place name (Open-Meteo's free geocoding API, no key),
+      then forecasts its coordinates (Open-Meteo's free forecast API) -
+      two chained `fetch`+`pick` steps, proving a recipe can thread one
+      real network call's result into a second one, not just a single
+      hardcoded lookup. Deliberately temperature-only, no weather
+      CONDITION text: Open-Meteo's forecast only returns a numeric WMO
+      code, and the recipe language has no lookup/mapping step to turn
+      `3` into "overcast" - a real, accepted gap (would need either a new
+      recipe step type or a format-step enhancement, not attempted this
+      pass), matching the existing `weather-lookup.json` conformance
+      fixture's own precedent of temperature-only replies.
+    - **A real, honest failure mode for a place that doesn't geocode**:
+      the recipe language has no conditional branching (the same gap
+      `recall`'s own `NOTHING_RECALLED` constant works around at the
+      interpreter level for its one case), so an unfound place leaves
+      `{lat}`/`{lon}` literally uninterpolated in the second fetch's URL,
+      Open-Meteo answers with an error status, and `performHttpFetch`
+      maps that to a plain `HostError` - surfaced to the household as the
+      ordinary, already-varied "Sorry, I couldn't do that" skill-error
+      phrasing (`replyVariation.ts`), not a crash and not a place-not-
+      found-specific friendly message (a real, documented gap, not
+      papered over).
+    - **Live-verified for real**, not just via the fixture: `runSkill`
+      directly ("It's 57.3 degrees in Seattle."), and routed through the
+      full turn engine's deterministic skill floor from a real
+      utterance ("what's the weather in Chicago" -> `source: "skill"`,
+      `skill_id: "weather"`, "It's 75.4 degrees in Chicago.") - re-run
+      again after the code review's security fixes landed to confirm
+      they didn't break the real path (Miami, 79.6 degrees, still
+      correct).
+    - A dedicated conformance fixture
+      (`spec/fixtures/recipes/weather-geocoded.json`) proves the exact
+      shipped recipe's own step logic against both interpreters, using
+      response shapes captured from the real Open-Meteo calls above -
+      deterministic and offline, no live network dependency in the
+      automated suite itself; `skills.test.ts` separately proves the
+      package's manifest and recipe are real and well-formed.
+    - **Deliberately not attempted**: a "what's the weather" query with
+      no place named (falls through to the model, which will still
+      answer from its own general knowledge rather than real data - the
+      same hallucination gap this skill only partially closes, for the
+      "weather in a named city" phrasing specifically); a household-
+      location setting for an implicit "weather here" query (recipes
+      have no step that reads a settings value into scope at all - a
+      real, separate gap, not just missing config for this one skill).
+
 ## Notes for later (companion personas, added 2026-09-05)
 
 Jesse asked how companion personalities and their speech patterns should

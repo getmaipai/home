@@ -33,6 +33,30 @@ describe("the bundled recall package", () => {
   });
 });
 
+// The first real skill built on host.fetch (2026-09-05). No automated
+// test here calls the real Open-Meteo API (bun:test stays deterministic
+// and offline per .github/CLAUDE.md's testing standards); the recipe's
+// own step logic - geocode, pick coordinates, forecast, pick temperature,
+// format - has its own dedicated conformance fixture
+// (spec/fixtures/recipes/weather-geocoded.json) using response shapes
+// captured from a real Open-Meteo call, and the real host.fetch mechanics
+// (permission/rate-limit/SSRF gating, the actual HTTP call) are covered
+// in packageHost.test.ts. This just proves the package itself is real
+// and well-formed.
+describe("the bundled weather package", () => {
+  test("is discoverable and its manifest + recipe validate against spec's schemas", () => {
+    expect(listPackageIds()).toContain("weather");
+    const loaded = loadPackage("weather");
+    expect(loaded.ok).toBe(true);
+    if (!loaded.ok) return;
+    expect(loaded.value.manifest.id).toBe("weather");
+    expect(loaded.value.manifest.permissions).toEqual(
+      expect.arrayContaining(["net:geocoding-api.open-meteo.com", "net:api.open-meteo.com"]),
+    );
+    expect(loaded.value.recipe.steps.length).toBeGreaterThan(0);
+  });
+});
+
 async function owner() {
   const client = new TestClient();
   await client.post("/api/auth/setup", { displayName: "Sage", secret: "correcthorse" });

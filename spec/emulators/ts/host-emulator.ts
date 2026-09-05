@@ -65,7 +65,13 @@ export function redactSecrets(value: unknown, secrets: readonly string[]): unkno
 // parameter is already `Any`, pure duck typing); this is a TS-only
 // tightening, not a spec/record shape change.
 export interface Host {
-  fetch(url: string, opts?: FetchOptions): unknown;
+  /** The one host.* method that is genuinely async (2026-09-05): a real
+   * fetch is real network I/O, so runRecipe()'s `fetch` step is the only
+   * step that ever awaits anything. Every other method here stays
+   * synchronous - this interface is intentionally NOT "everything is a
+   * promise for consistency," since none of the rest do real I/O the
+   * interpreter needs to wait on. */
+  fetch(url: string, opts?: FetchOptions): Promise<unknown>;
   memory: {
     recall(query: string, opts?: { scope?: string; person?: string }): MemoryRecordLike[];
     remember(text: string, category?: string, scope?: string, person?: string | null): string;
@@ -148,7 +154,11 @@ export class HostEmulator implements Host {
 
   // --- host.* surface ---------------------------------------------------
 
-  fetch(url: string, _opts?: FetchOptions): unknown {
+  // Still no real network I/O - a canned lookup wrapped in a resolved/
+  // rejected promise, matching the real host's now-async signature so a
+  // recipe test exercises the exact same `await host.fetch(...)` shape
+  // runRecipe() actually calls in production.
+  async fetch(url: string, _opts?: FetchOptions): Promise<unknown> {
     if (!this.fetchResponses.has(url)) {
       throw new HostError("not_found", `no canned response for ${url}`);
     }

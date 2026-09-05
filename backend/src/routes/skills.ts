@@ -28,7 +28,7 @@ skillsRoutes.get("/stats", requireRole("owner", "admin"), async (c) => {
 skillsRoutes.post("/:id/run", requireAuth, async (c) => {
   const actor = c.get("person");
   const body = (await c.req.json().catch(() => ({}))) as Record<string, unknown>;
-  const result = runSkill(c.req.param("id"), actor, body);
+  const result = await runSkill(c.req.param("id"), actor, body);
   if (!result.ok) return c.json({ error: result.error }, result.status);
   return c.json(result.value);
 });

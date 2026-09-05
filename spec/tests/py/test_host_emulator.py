@@ -2,17 +2,24 @@ import pytest
 
 from emulators.py.host_emulator import HostEmulator, HostError, MemoryRecordLike
 
+# Only fetch is async (host.fetch is real network I/O once the real host
+# backs it); every other test in this file stays a plain sync `def test_`,
+# so the marker goes on these two specifically rather than the whole
+# module - .github/CLAUDE.md's own documented convention.
 
-def test_fetch_returns_seeded_response():
+
+@pytest.mark.asyncio
+async def test_fetch_returns_seeded_response():
     host = HostEmulator()
     host.set_fetch_response("https://example.com/weather", {"tempF": 72})
-    assert host.fetch("https://example.com/weather") == {"tempF": 72}
+    assert await host.fetch("https://example.com/weather") == {"tempF": 72}
 
 
-def test_fetch_raises_not_found_for_unseeded_url():
+@pytest.mark.asyncio
+async def test_fetch_raises_not_found_for_unseeded_url():
     host = HostEmulator()
     with pytest.raises(HostError):
-        host.fetch("https://example.com/nope")
+        await host.fetch("https://example.com/nope")
 
 
 def test_memory_remember_then_recall_finds_it_by_substring():

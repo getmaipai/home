@@ -227,13 +227,17 @@ class HostEmulator:
 
     # --- host.* surface ---------------------------------------------------
 
-    def fetch(
+    async def fetch(
         self,
         url: str,
         method: str = "GET",
         headers: dict | None = None,
         body: Any = None,
     ) -> Any:
+        # Still no real network I/O - a canned lookup, just async now to
+        # match the real host's signature (2026-09-05) so a test exercises
+        # the exact same `await host.fetch(...)` shape run_recipe() calls
+        # in production.
         if url not in self._fetch_responses:
             raise HostError("not_found", f"no canned response for {url}")
         return self._fetch_responses[url]

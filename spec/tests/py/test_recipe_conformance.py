@@ -19,8 +19,9 @@ FIXTURES_DIR = SPEC_DIR / "fixtures" / "recipes"
 fixture_files = sorted(FIXTURES_DIR.glob("*.json"))
 
 
+@pytest.mark.asyncio
 @pytest.mark.parametrize("fixture_path", fixture_files, ids=lambda p: p.name)
-def test_recipe_conformance(fixture_path: Path):
+async def test_recipe_conformance(fixture_path: Path):
     fixture = json.loads(fixture_path.read_text())
     recipe = Recipe.model_validate(fixture["recipe"])
 
@@ -32,7 +33,7 @@ def test_recipe_conformance(fixture_path: Path):
     for record in fixture["host_setup"].get("memory", []):
         host.seed_memory([MemoryRecordLike(**record)])
 
-    result = run_recipe(recipe, fixture["inputs"], host)
+    result = await run_recipe(recipe, fixture["inputs"], host)
 
     assert result.get("reply") == fixture["expected"]["reply"]
     assert result["actions"] == fixture["expected"]["actions"]

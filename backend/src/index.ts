@@ -28,7 +28,9 @@ ensureCoreJob("backup.run", "every:1d");
 // restarted cleans up within seconds instead of waiting up to a day for
 // the next scheduled run.
 cleanupStaleSnapshots();
-setInterval(() => runDueJobs(runSkill), 60_000);
+setInterval(() => {
+  runDueJobs(runSkill).catch((err: Error) => console.error(`[scheduler] runDueJobs failed: ${err.message}`));
+}, 60_000);
 // engineStats.ts's ring buffer, same 60s cadence as the job poll above -
 // "how busy the machine has been" (Jesse, 2026-09-04) doesn't need finer
 // granularity than that to show a real trend.

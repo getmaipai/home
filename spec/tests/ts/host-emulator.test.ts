@@ -2,15 +2,15 @@ import { describe, expect, test } from "bun:test";
 import { HostEmulator, HostError } from "../../emulators/ts/host-emulator.js";
 
 describe("HostEmulator", () => {
-  test("fetch returns a seeded response", () => {
+  test("fetch returns a seeded response", async () => {
     const host = new HostEmulator();
     host.setFetchResponse("https://example.com/weather", { tempF: 72 });
-    expect(host.fetch("https://example.com/weather")).toEqual({ tempF: 72 });
+    await expect(host.fetch("https://example.com/weather")).resolves.toEqual({ tempF: 72 });
   });
 
-  test("fetch throws not_found for an unseeded url", () => {
+  test("fetch throws not_found for an unseeded url", async () => {
     const host = new HostEmulator();
-    expect(() => host.fetch("https://example.com/nope")).toThrow(HostError);
+    await expect(host.fetch("https://example.com/nope")).rejects.toThrow(HostError);
   });
 
   test("memory.remember then memory.recall finds it by substring", () => {

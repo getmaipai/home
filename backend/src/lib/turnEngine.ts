@@ -297,7 +297,7 @@ type PreparedTurn =
  * or which skill matched. Only the `kind: "model"` branch differs between
  * the two callers - runTurn() awaits complete(), runTurnStream() awaits
  * startCompleteStream() instead. */
-function prepareTurn(actor: PersonRow, text: string, loaded: LoadedManifest[]): PreparedTurn {
+async function prepareTurn(actor: PersonRow, text: string, loaded: LoadedManifest[]): Promise<PreparedTurn> {
   const safety = evaluateSafety(text, actor.role as Role);
   if (safety.action === "refuse") {
     // The text here is never actually seen: finalizeReply() unconditionally
@@ -313,7 +313,7 @@ function prepareTurn(actor: PersonRow, text: string, loaded: LoadedManifest[]): 
 
   const routed = route(text, actor, loaded);
   if (routed) {
-    const result = runSkill(routed.id, actor, routed.args);
+    const result = await runSkill(routed.id, actor, routed.args);
     if (result.ok) {
       const reply = result.value.reply ?? { text: "Done." };
       return {
@@ -411,7 +411,7 @@ export async function runTurn(
   }
 
   const loaded = loadAllManifests(); // one catalog scan, shared below
-  const prepared = prepareTurn(actor, text, loaded);
+  const prepared = await prepareTurn(actor, text, loaded);
 
   let value: TurnValue;
   if (prepared.kind === "immediate") {
@@ -478,7 +478,7 @@ export async function runTurnStream(
   }
 
   const loaded = loadAllManifests();
-  const prepared = prepareTurn(actor, text, loaded);
+  const prepared = await prepareTurn(actor, text, loaded);
 
   if (prepared.kind === "immediate") {
     const value = finalizeReply(actor, prepared.value);

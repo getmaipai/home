@@ -60,7 +60,13 @@ function pickPath(value: unknown, path: string | undefined): unknown {
   return current;
 }
 
-export function runRecipe(recipe: Recipe, inputs: Scope, host: Host): SkillResult {
+// async (2026-09-05): the one step that needs real network I/O (`fetch`)
+// can no longer stay synchronous once host.fetch() is backed by a real
+// HTTP call instead of a canned emulator response - see
+// backend/src/lib/packageHost.ts's own header comment on why this used
+// to be out of scope. Every other step stays exactly as synchronous as
+// it always was; only the `fetch` case actually awaits anything.
+export async function runRecipe(recipe: Recipe, inputs: Scope, host: Host): Promise<SkillResult> {
   const scope: Scope = { ...inputs };
   const actions: { kind: string; payload?: unknown }[] = [];
   let reply: { text: string; speech?: string } | undefined;
@@ -69,7 +75,7 @@ export function runRecipe(recipe: Recipe, inputs: Scope, host: Host): SkillResul
     switch (step.op) {
       case "fetch": {
         const url = interpolate(step.url, scope);
-        scope[step.as] = host.fetch(url, { method: step.method, headers: step.headers, body: step.body });
+        scope[step.as] = await host.fetch(url, { method: step.method, headers: step.headers, body: step.body });
         break;
       }
       case "pick": {

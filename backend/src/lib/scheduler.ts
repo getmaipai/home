@@ -44,7 +44,7 @@ import type { PersonRow } from "@/types";
 // this file (its host.schedule needs scheduleJob below), so importing
 // skills.ts here too would close a real circular-import loop. The
 // caller (index.ts, or a test) passes its own runSkill in instead.
-type RunSkillFn = (id: string, actor: PersonRow, inputs: Record<string, unknown>) => SkillOpResult<SkillResult>;
+type RunSkillFn = (id: string, actor: PersonRow, inputs: Record<string, unknown>) => Promise<SkillOpResult<SkillResult>>;
 
 export type SchedulerOpResult<T> =
   | { ok: true; value: T }
@@ -176,15 +176,38 @@ const CORE_JOBS: Record<string, () => void> = {
   },
 };
 
-/** Fires every pending job whose nextRunAt has passed. Synchronous and
- * idempotent per call (no concurrent invocations in this single-process
- * hub); safe to call from a test directly or from index.ts's interval.
- * A recurring job's next fire is computed from its own recurrence
- * interval, not from "now", so a late tick doesn't compress the
- * schedule. A one-shot job never retries: a failure is recorded on the
- * row and it's marked done, the same "never a silent retry loop" choice
- * lib/memory.ts's forget() makes for its own one-shot erasure. */
-export function runDueJobs(runSkillFn: RunSkillFn, now: Date = new Date()): { ran: number; errors: number } {
+// A code review (2026-09-05, the same pass that made this function async
+// so a `fetch` step could really await host.fetch) found the "no
+// concurrent invocations" guarantee this function's own header comment
+// claims was true only by accident, back when the function was
+// synchronous - JS's single-threaded execution made re-entry physically
+// impossible then. Once a job can await a real host.fetch for up to
+// 10 seconds, index.ts's 60s interval firing again mid-run, or a manual
+// POST /scheduler/run-due landing while the interval is also mid-run,
+// both become real: two runs would SELECT the same still-"pending" row
+// (the status/nextRunAt UPDATE only happens after the awaited skill
+// resolves) and fire a one-shot job twice, or race a recurring job's own
+// reschedule math. This module-level in-flight guard makes every caller
+// share the SAME run instead: a second call while one is already running
+// gets back the exact same promise (and so the exact same real result)
+// rather than starting a duplicate pass over the same due rows.
+let inFlight: Promise<{ ran: number; errors: number }> | null = null;
+
+/** Fires every pending job whose nextRunAt has passed. A recurring job's
+ * next fire is computed from its own recurrence interval, not from "now",
+ * so a late tick doesn't compress the schedule. A one-shot job never
+ * retries: a failure is recorded on the row and it's marked done, the
+ * same "never a silent retry loop" choice lib/memory.ts's forget() makes
+ * for its own one-shot erasure. */
+export function runDueJobs(runSkillFn: RunSkillFn, now: Date = new Date()): Promise<{ ran: number; errors: number }> {
+  if (inFlight) return inFlight;
+  inFlight = runDueJobsUnguarded(runSkillFn, now).finally(() => {
+    inFlight = null;
+  });
+  return inFlight;
+}
+
+async function runDueJobsUnguarded(runSkillFn: RunSkillFn, now: Date): Promise<{ ran: number; errors: number }> {
   const due = db
     .select()
     .from(scheduledJobs)
@@ -204,7 +227,7 @@ export function runDueJobs(runSkillFn: RunSkillFn, now: Date = new Date()): { ra
         if (!row.personId) throw new Error(`skill job ${row.id} has no personId`);
         const actor = db.select().from(people).where(and(eq(people.id, row.personId), isNull(people.deletedAt))).get();
         if (!actor) throw new Error(`person ${row.personId} no longer exists`);
-        const result = runSkillFn(row.packageId, actor, JSON.parse(row.inputs));
+        const result = await runSkillFn(row.packageId, actor, JSON.parse(row.inputs));
         if (!result.ok) throw new Error(result.error);
       }
       ran++;

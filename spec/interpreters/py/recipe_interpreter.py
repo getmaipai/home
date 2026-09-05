@@ -53,9 +53,17 @@ def pick_path(value: Any, path: str | None) -> Any:
     return current
 
 
-def run_recipe(recipe: Any, inputs: dict[str, Any], host: Any) -> dict[str, Any]:
+async def run_recipe(recipe: Any, inputs: dict[str, Any], host: Any) -> dict[str, Any]:
     """recipe is a gen.py.recipe_schema.Recipe (or any object with a .steps
-    list of step models sharing their shape); host is a HostEmulator."""
+    list of step models sharing their shape); host is a HostEmulator.
+
+    async (2026-09-05): the one step that needs real network I/O (`fetch`)
+    can no longer stay synchronous once host.fetch() is backed by a real
+    HTTP call instead of a canned emulator response - must stay behaviorally
+    identical to recipe-interpreter.ts's own async conversion. Every other
+    step stays exactly as synchronous as it always was; only `fetch` awaits
+    anything.
+    """
     scope: dict[str, Any] = dict(inputs)
     actions: list[dict[str, Any]] = []
     reply: dict[str, str] | None = None
@@ -64,7 +72,7 @@ def run_recipe(recipe: Any, inputs: dict[str, Any], host: Any) -> dict[str, Any]
         op = step.op
         if op == "fetch":
             url = interpolate(step.url, scope)
-            scope[step.as_] = host.fetch(
+            scope[step.as_] = await host.fetch(
                 url, method=step.method, headers=step.headers, body=step.body
             )
         elif op == "pick":

@@ -76,8 +76,10 @@ export function meetsMinRole(actorRole: string, minRole: string): boolean {
 /** Runs one bundled Tier 0 package's recipe for `actor`, checking
  * min_role before the recipe ever executes (4.9: the floor role a
  * person needs to invoke this package) and mapping a raised HostError to
- * the same result shape every other route returns. */
-export function runSkill(id: string, actor: PersonRow, inputs: Record<string, unknown>): SkillOpResult<SkillResult> {
+ * the same result shape every other route returns. Async (2026-09-05):
+ * runRecipe() itself now is, since a real host.fetch is real network I/O -
+ * see recipe-interpreter.ts and packageHost.ts. */
+export async function runSkill(id: string, actor: PersonRow, inputs: Record<string, unknown>): Promise<SkillOpResult<SkillResult>> {
   const loaded = loadPackage(id);
   if (!loaded.ok) return loaded;
   const { manifest, recipe } = loaded.value;
@@ -99,7 +101,7 @@ export function runSkill(id: string, actor: PersonRow, inputs: Record<string, un
   }
   const host = createHost(actor, manifest);
   try {
-    return { ok: true, value: runRecipe(recipe, inputs, host) };
+    return { ok: true, value: await runRecipe(recipe, inputs, host) };
   } catch (err) {
     if (err instanceof HostError) {
       const status = err.code === "permission_denied" ? 403 : err.code === "not_found" ? 404 : 400;
