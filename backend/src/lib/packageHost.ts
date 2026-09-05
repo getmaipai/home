@@ -48,6 +48,7 @@ import { tryConsume } from "@/lib/rateLimiter";
 import { assertNotPrivateHost, SsrfBlockedError } from "@/lib/ssrfGuard";
 import * as memory from "@/lib/memory";
 import * as settings from "@/lib/settings";
+import { getHouseholdSettingValue } from "@/lib/settings";
 import { scheduleJob } from "@/lib/scheduler";
 import type { PersonRow } from "@/types";
 
@@ -62,6 +63,34 @@ const FETCH_RATE_LIMIT = { capacity: 5, refillPerSecond: 0.2 };
 const FETCH_TIMEOUT_MS = 10_000;
 const FETCH_MAX_RESPONSE_BYTES = 2_000_000;
 const FETCH_USER_AGENT = "MaiPai-Home/1.0 (+https://github.com/getmaipai/home)";
+
+// host.home.call_service's real settings (2026-09-05, closing the first of
+// the two gaps docs/dev.md named for it). A shorter timeout than
+// host.fetch's: this is a household's own local Home Assistant instance,
+// almost always on the same LAN, not an arbitrary internet API - a call
+// that hasn't answered in 5s is already a bad sign. One shared rate-limit
+// bucket keyed by a fixed name, not per-host like host.fetch: every
+// package talks to the SAME single configured instance, so the budget is
+// naturally per-installation already; a slightly higher burst than
+// host.fetch's because turning on three lights for a "goodnight" routine
+// is one real household action, not three independent ones.
+const HOME_ASSISTANT_RATE_LIMIT_KEY = "home_assistant";
+const HOME_ASSISTANT_RATE_LIMIT = { capacity: 10, refillPerSecond: 0.5 };
+const HOME_ASSISTANT_TIMEOUT_MS = 5_000;
+
+// The recipe schema's own comment on `home_call_service_step`
+// ("security domains are never covered by a wildcard target") named a
+// design requirement with nothing implementing it. `home:<domain>`
+// (spec/vocab/permissions.json) already makes a *wildcard* structurally
+// impossible - requirePermission does exact string matching, the same as
+// `net:<host>`, so a manifest can't declare `home:*` and match everything.
+// This list is the other half: a fixed set of domains whose services can
+// change physical access to the home (locking/unlocking, opening a garage
+// or a valve, arming/disarming an alarm), each requiring the manifest to
+// also declare `consequential: true` (4.5's routing-confidence bar) on
+// top of the ordinary `home:<domain>` permission - a package that only
+// wants `light`/`switch`/`climate` never needs to clear this bar.
+const HOME_ASSISTANT_SECURITY_DOMAINS = new Set(["lock", "alarm_control_panel", "cover", "garage_door", "valve"]);
 
 function hasHeaderCaseInsensitive(headers: Record<string, string>, name: string): boolean {
   const lower = name.toLowerCase();
@@ -183,6 +212,68 @@ export async function performHttpFetch(url: string, opts?: FetchOptions): Promis
   throw result.error;
 }
 
+/** The real HTTP call behind host.home.call_service, pulled out the same
+ * way performHttpFetch is so it's directly testable against a local
+ * `Bun.serve` test server. Deliberately no retry, unlike host.fetch's
+ * GET path: a service call is a real-world action (turning a light on,
+ * unlocking a door), so retrying a call that may have already succeeded
+ * but timed out on the response risks firing it twice - `toggle` services
+ * make that a real, visible bug (the light ends up back off), not a
+ * theoretical one. Also deliberately no SSRF guard here, unlike
+ * host.fetch: the target is `baseUrl`, a value the HOUSEHOLD configured
+ * in settings, never something a package supplies - a package can only
+ * name a domain/service/target within that fixed instance, so there's no
+ * attacker-influenced URL for a guard to check. Reaching the household's
+ * own LAN device is the entire point of this call, not a hole in it. */
+export async function callHomeAssistantService(
+  baseUrl: string,
+  accessToken: string,
+  domain: string,
+  service: string,
+  target: unknown,
+  data: unknown,
+): Promise<void> {
+  const url = `${baseUrl.replace(/\/+$/, "")}/api/services/${encodeURIComponent(domain)}/${encodeURIComponent(service)}`;
+
+  // Isolated from the network try/catch below on purpose: fetch() itself
+  // throws a plain TypeError for a genuine connection failure (the Fetch
+  // spec's own "a network error" rejection shape, which attemptHttpFetch's
+  // existing pattern deliberately doesn't discriminate on by class, only
+  // by AbortError for a timeout) - catching TypeError around the fetch
+  // call too would misclassify a real unreachable-host failure as a bad
+  // request instead. This only catches a non-serializable target/data
+  // (a BigInt, a circular reference), which would otherwise throw a raw,
+  // unmapped TypeError past this function's "every failure is a HostError"
+  // contract (found in review, 2026-09-05).
+  let body: string;
+  try {
+    body = JSON.stringify({ ...(typeof target === "object" && target ? target : {}), ...(typeof data === "object" && data ? data : {}) });
+  } catch (err) {
+    throw new HostError("invalid_input", `${domain}.${service}'s target/data couldn't be turned into a request body: ${(err as Error).message}`);
+  }
+
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), HOME_ASSISTANT_TIMEOUT_MS);
+  try {
+    const response = await fetch(url, {
+      method: "POST",
+      headers: { authorization: `Bearer ${accessToken}`, "content-type": "application/json" },
+      body,
+      signal: controller.signal,
+    });
+    await readBodyWithLimit(response, url); // drain so the connection is released even when the caller ignores the result
+    if (!response.ok) {
+      throw new HostError("network_unreachable", `Home Assistant returned HTTP ${response.status} for ${domain}.${service}`);
+    }
+  } catch (err) {
+    if (err instanceof HostError) throw err;
+    const message = (err as Error).name === "AbortError" ? "timed out" : (err as Error).message;
+    throw new HostError("network_unreachable", `could not reach Home Assistant at ${baseUrl}: ${message}`);
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 function mapWriteFailure(status: 400 | 403 | 404, error: string): never {
   // A permission check above only proves the manifest declared the
   // right permission; memory.remember/forget still apply their own
@@ -290,8 +381,38 @@ export function createHost(actor: PersonRow, manifest: PackageManifest, secrets:
       },
     },
     home: {
-      call_service(_domain: string, _service: string, _target: unknown, _data?: unknown): void {
-        notImplemented("home.call_service");
+      async call_service(rawDomain: string, service: string, target: unknown, data?: unknown): Promise<void> {
+        // Normalized once and used for every decision below (permission,
+        // the security-domain check, and the real call) - the same
+        // protection host.fetch's net:<host> gets for free from URL's own
+        // hostname lowercasing. Without this, a manifest declaring
+        // "home:Lock" and calling call_service("Lock", ...) would pass
+        // requirePermission's exact-string match but miss
+        // HOME_ASSISTANT_SECURITY_DOMAINS's lowercase-only entries,
+        // silently skipping the consequential:true requirement this check
+        // exists to enforce (found in review, 2026-09-05). Real Home
+        // Assistant domains are canonically lowercase anyway, so this
+        // costs nothing for a correctly-written package.
+        const domain = rawDomain.toLowerCase();
+        requirePermission(`home:${domain}`);
+        if (HOME_ASSISTANT_SECURITY_DOMAINS.has(domain) && manifest.consequential !== true) {
+          throw new HostError(
+            "permission_denied",
+            `${manifest.id} must declare "consequential": true to call the security domain "${domain}"`,
+          );
+        }
+
+        const baseUrl = getHouseholdSettingValue("home.base_url") as string | undefined;
+        const accessToken = getHouseholdSettingValue("home.access_token") as string | undefined;
+        if (!baseUrl || !accessToken) {
+          throw new HostError("invalid_input", "Home Assistant isn't set up yet - add its URL and access token in Settings first");
+        }
+
+        if (!tryConsume(HOME_ASSISTANT_RATE_LIMIT_KEY, HOME_ASSISTANT_RATE_LIMIT)) {
+          throw new HostError("rate_limited", "home.call_service is rate-limited - try again shortly");
+        }
+
+        await callHomeAssistantService(baseUrl, accessToken, domain, service, target, data ?? null);
       },
     },
     integration: {

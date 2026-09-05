@@ -4,6 +4,7 @@ import { resetDb } from "./reset-db";
 import { __resetThrottleForTests } from "@/lib/secretThrottle";
 import { createHost, performHttpFetch, withOneRetry, type AttemptResult } from "@/lib/packageHost";
 import { __resetRateLimiterForTests } from "@/lib/rateLimiter";
+import { setHouseholdSettingValue } from "@/lib/settings";
 import { HostError } from "@maipai/spec/emulators/ts/host-emulator.js";
 import { PackageManifest } from "@maipai/spec/gen/ts/manifest.js";
 import { db } from "@/db";
@@ -384,18 +385,148 @@ describe("withOneRetry", () => {
   });
 });
 
-describe("packageHost unimplemented methods", () => {
-  test("home.call_service throws capability_missing, honestly, not a silent no-op", async () => {
+describe("home.call_service (2026-09-05, the real Home Assistant integration)", () => {
+  test("throws permission_denied when the manifest didn't declare home:<domain>", async () => {
     const actor = await owner();
-    const host = createHost(actor, manifest());
-    expect(() => host.home.call_service("light", "turn_off", {})).toThrow(HostError);
+    const host = createHost(actor, manifest({ permissions: [] }));
+    await expect(host.home.call_service("light", "turn_off", {})).rejects.toThrow(HostError);
+  });
+
+  test("a security domain (lock) additionally requires consequential: true, even with home:lock declared", async () => {
+    const actor = await owner();
+    const host = createHost(actor, manifest({ permissions: ["home:lock"], consequential: false }));
+    let code = "";
     try {
-      host.home.call_service("light", "turn_off", {});
+      await host.home.call_service("lock", "unlock", { entity_id: "lock.front_door" });
     } catch (err) {
-      expect((err as HostError).code).toBe("capability_missing");
+      code = (err as HostError).code;
+    }
+    expect(code).toBe("permission_denied");
+  });
+
+  // A review (2026-09-05) found the security-domain check compared the
+  // called domain against HOME_ASSISTANT_SECURITY_DOMAINS's lowercase-only
+  // entries with no normalization, while requirePermission matched
+  // whatever exact casing the manifest declared - a manifest declaring
+  // "home:Lock" (non-canonical casing) and calling with matching casing
+  // could skip the consequential:true requirement entirely. Fixed by
+  // lowercasing the domain once, used for every decision.
+  test("the security-domain check isn't bypassed by non-lowercase domain casing", async () => {
+    const actor = await owner();
+    const host = createHost(actor, manifest({ permissions: ["home:lock"], consequential: false }));
+    let code = "";
+    try {
+      await host.home.call_service("Lock", "unlock", { entity_id: "lock.front_door" });
+    } catch (err) {
+      code = (err as HostError).code;
+    }
+    expect(code).toBe("permission_denied");
+  });
+
+  test("a security domain (lock) call succeeds once consequential: true is declared", async () => {
+    const server = Bun.serve({ port: 0, fetch: () => Response.json({ context: { id: "abc" } }) });
+    try {
+      const actor = await owner();
+      setHouseholdSettingValue("home.base_url", `http://127.0.0.1:${server.port}`);
+      setHouseholdSettingValue("home.access_token", "test-token");
+      const host = createHost(actor, manifest({ permissions: ["home:lock"], consequential: true }));
+      await host.home.call_service("lock", "unlock", { entity_id: "lock.front_door" });
+    } finally {
+      server.stop(true);
     }
   });
 
+  test("a non-security domain (light) never needs consequential: true", async () => {
+    const actor = await owner();
+    setHouseholdSettingValue("home.base_url", "http://127.0.0.1:1"); // deliberately unreachable
+    setHouseholdSettingValue("home.access_token", "test-token");
+    const host = createHost(actor, manifest({ permissions: ["home:light"], consequential: false }));
+    let code = "";
+    try {
+      await host.home.call_service("light", "turn_off", { entity_id: "light.kitchen" });
+    } catch (err) {
+      code = (err as HostError).code; // fails on the network, not on a bogus consequential requirement
+    }
+    expect(code).toBe("network_unreachable");
+  });
+
+  test("a clear, actionable error when Home Assistant isn't configured yet - not a confusing network error", async () => {
+    const actor = await owner();
+    setHouseholdSettingValue("home.base_url", "");
+    setHouseholdSettingValue("home.access_token", "");
+    const host = createHost(actor, manifest({ permissions: ["home:light"] }));
+    let code = "";
+    try {
+      await host.home.call_service("light", "turn_off", {});
+    } catch (err) {
+      code = (err as HostError).code;
+    }
+    expect(code).toBe("invalid_input");
+  });
+
+  test("calls the real Home Assistant REST shape: POST /api/services/<domain>/<service>, bearer token, target+data merged into the body", async () => {
+    let seenPath = "";
+    let seenAuth = "";
+    let seenBody: unknown = null;
+    const server = Bun.serve({
+      port: 0,
+      fetch: async (req) => {
+        seenPath = new URL(req.url).pathname;
+        seenAuth = req.headers.get("authorization") ?? "";
+        seenBody = await req.json();
+        return Response.json({ context: { id: "abc" } });
+      },
+    });
+    try {
+      const actor = await owner();
+      setHouseholdSettingValue("home.base_url", `http://127.0.0.1:${server.port}`);
+      setHouseholdSettingValue("home.access_token", "test-token");
+      const host = createHost(actor, manifest({ permissions: ["home:light"] }));
+      await host.home.call_service("light", "turn_on", { entity_id: "light.kitchen" }, { brightness_pct: 50 });
+      expect(seenPath).toBe("/api/services/light/turn_on");
+      expect(seenAuth).toBe("Bearer test-token");
+      expect(seenBody).toEqual({ entity_id: "light.kitchen", brightness_pct: 50 });
+    } finally {
+      server.stop(true);
+    }
+  });
+
+  test("a non-2xx response raises HostError, not a silently-swallowed failure", async () => {
+    const server = Bun.serve({ port: 0, fetch: () => new Response("not found", { status: 404 }) });
+    try {
+      const actor = await owner();
+      setHouseholdSettingValue("home.base_url", `http://127.0.0.1:${server.port}`);
+      setHouseholdSettingValue("home.access_token", "test-token");
+      const host = createHost(actor, manifest({ permissions: ["home:light"] }));
+      await expect(host.home.call_service("light", "turn_on", {})).rejects.toThrow(HostError);
+    } finally {
+      server.stop(true);
+    }
+  });
+
+  test("never retries - a service call is a real action, not an idempotent GET", async () => {
+    let calls = 0;
+    const server = Bun.serve({
+      port: 0,
+      fetch: () => {
+        calls++;
+        return new Response("boom", { status: 500 });
+      },
+    });
+    try {
+      const actor = await owner();
+      setHouseholdSettingValue("home.base_url", `http://127.0.0.1:${server.port}`);
+      setHouseholdSettingValue("home.access_token", "test-token");
+      const host = createHost(actor, manifest({ permissions: ["home:light"] }));
+      await expect(host.home.call_service("light", "turn_on", {})).rejects.toThrow(HostError);
+      expect(calls).toBe(1);
+    } finally {
+      server.stop(true);
+    }
+  });
+});
+
+describe("packageHost unimplemented methods", () => {
   test("action.emit checks permission before reporting capability_missing", async () => {
     const actor = await owner();
     const host = createHost(actor, manifest({ permissions: [] }));

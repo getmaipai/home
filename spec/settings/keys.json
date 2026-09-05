@@ -92,6 +92,34 @@
     ]
   },
   {
+    "key": "home.access_token",
+    "scope": "household",
+    "selector": "text",
+    "default": "",
+    "label": "Home Assistant access token",
+    "help": "A long-lived access token from your Home Assistant profile page, used to control your smart-home devices.",
+    "level": "advanced",
+    "secret": true,
+    "lives_in": "household.integrations",
+    "honoured_by": [
+      "home"
+    ]
+  },
+  {
+    "key": "home.base_url",
+    "scope": "household",
+    "selector": "text",
+    "default": "",
+    "label": "Home Assistant URL",
+    "help": "The address of your Home Assistant instance, e.g. http://homeassistant.local:8123.",
+    "level": "advanced",
+    "secret": false,
+    "lives_in": "household.integrations",
+    "honoured_by": [
+      "home"
+    ]
+  },
+  {
     "key": "household.conversation_retention_days",
     "scope": "household",
     "selector": "number",

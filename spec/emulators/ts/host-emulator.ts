@@ -80,7 +80,12 @@ export interface Host {
     emit(kind: string, payload?: unknown): void;
   };
   home: {
-    call_service(domain: string, service: string, target: unknown, data?: unknown): void;
+    // Async like fetch (the ONE other async member of this interface):
+    // the real host (packageHost.ts) makes a real network call to the
+    // household's own Home Assistant instance, so callers must await it -
+    // the interpreter does, same as it does for fetch (2026-09-05, the
+    // real home.call_service landing).
+    call_service(domain: string, service: string, target: unknown, data?: unknown): Promise<void>;
   };
   integration: {
     call(id: string, method: string, args?: unknown): unknown;
@@ -193,7 +198,7 @@ export class HostEmulator implements Host {
   };
 
   readonly home = {
-    call_service: (domain: string, service: string, target: unknown, data?: unknown): void => {
+    call_service: async (domain: string, service: string, target: unknown, data?: unknown): Promise<void> => {
       this.homeCallsLog.push({ domain, service, target, data });
     },
   };

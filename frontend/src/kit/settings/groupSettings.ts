@@ -30,6 +30,7 @@ const SECTION_TITLES: Record<string, string> = {
   // lives_in id the same way person.persona was before this fix, live in
   // the browser (2026-09-05).
   "household.ai": "AI model tuning",
+  "household.integrations": "Integrations",
 };
 
 export function sectionTitle(id: string): string {

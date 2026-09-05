@@ -86,7 +86,12 @@ class _HomeNamespace:
     def __init__(self, host: HostEmulator):
         self._host = host
 
-    def call_service(
+    # Async like fetch (the ONE other async member of this surface): the
+    # real host makes a real network call to the household's own Home
+    # Assistant instance, so callers must await it - the interpreter does,
+    # same as it does for fetch (2026-09-05, the real home.call_service
+    # landing).
+    async def call_service(
         self, domain: str, service: str, target: Any, data: Any = None
     ) -> None:
         self._host.home_calls_log.append(

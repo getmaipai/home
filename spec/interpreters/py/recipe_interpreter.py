@@ -57,12 +57,12 @@ async def run_recipe(recipe: Any, inputs: dict[str, Any], host: Any) -> dict[str
     """recipe is a gen.py.recipe_schema.Recipe (or any object with a .steps
     list of step models sharing their shape); host is a HostEmulator.
 
-    async (2026-09-05): the one step that needs real network I/O (`fetch`)
-    can no longer stay synchronous once host.fetch() is backed by a real
-    HTTP call instead of a canned emulator response - must stay behaviorally
-    identical to recipe-interpreter.ts's own async conversion. Every other
-    step stays exactly as synchronous as it always was; only `fetch` awaits
-    anything.
+    async (2026-09-05): the steps that need real network I/O (`fetch`, and
+    as of the same day `home.call_service`) can no longer stay synchronous
+    once they're backed by a real HTTP call instead of a canned emulator
+    response - must stay behaviorally identical to recipe-interpreter.ts's
+    own async conversion. Every other step stays exactly as synchronous as
+    it always was.
     """
     scope: dict[str, Any] = dict(inputs)
     actions: list[dict[str, Any]] = []
@@ -83,7 +83,9 @@ async def run_recipe(recipe: Any, inputs: dict[str, Any], host: Any) -> dict[str
             scope[step.as_] = {"text": text, "speech": speech}
             reply = {"text": text, "speech": speech}
         elif op == "home.call_service":
-            host.home.call_service(step.domain, step.service, step.target, step.data)
+            await host.home.call_service(
+                step.domain, step.service, step.target, step.data
+            )
         elif op == "action":
             host.action.emit(step.kind, step.payload)
             actions.append({"kind": step.kind, "payload": step.payload})

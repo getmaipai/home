@@ -60,12 +60,12 @@ function pickPath(value: unknown, path: string | undefined): unknown {
   return current;
 }
 
-// async (2026-09-05): the one step that needs real network I/O (`fetch`)
-// can no longer stay synchronous once host.fetch() is backed by a real
-// HTTP call instead of a canned emulator response - see
-// backend/src/lib/packageHost.ts's own header comment on why this used
-// to be out of scope. Every other step stays exactly as synchronous as
-// it always was; only the `fetch` case actually awaits anything.
+// async (2026-09-05): the steps that need real network I/O (`fetch`, and
+// as of the same day `home.call_service`) can no longer stay synchronous
+// once they're backed by a real HTTP call instead of a canned emulator
+// response - see backend/src/lib/packageHost.ts's own header comment on
+// why this used to be out of scope. Every other step stays exactly as
+// synchronous as it always was.
 export async function runRecipe(recipe: Recipe, inputs: Scope, host: Host): Promise<SkillResult> {
   const scope: Scope = { ...inputs };
   const actions: { kind: string; payload?: unknown }[] = [];
@@ -90,7 +90,7 @@ export async function runRecipe(recipe: Recipe, inputs: Scope, host: Host): Prom
         break;
       }
       case "home.call_service": {
-        host.home.call_service(step.domain, step.service, step.target, step.data ?? null);
+        await host.home.call_service(step.domain, step.service, step.target, step.data ?? null);
         break;
       }
       case "action": {

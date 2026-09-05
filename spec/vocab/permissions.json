@@ -8,6 +8,7 @@
     { "id": "location", "parameterized": false, "description": "Read ctx.home's location." },
     { "id": "identity:name", "parameterized": false, "description": "Read the speaker's name, not just their id and role." },
     { "id": "actions:<kind>", "parameterized": true, "description": "Emit an action of this kind via host.action.emit." },
+    { "id": "home:<domain>", "parameterized": true, "description": "Call host.home.call_service for services in this specific Home Assistant domain. Never grantable as a wildcard - a manifest must name each domain it needs, and a security domain (lock, alarm_control_panel, cover, garage_door, valve) additionally requires the manifest to declare consequential: true." },
     { "id": "integration:<id>", "parameterized": true, "description": "Call this specific integration through host.integration.call." },
     { "id": "camera:still", "parameterized": false, "description": "Call host.camera.still." },
     { "id": "ocr", "parameterized": false, "description": "Call host.ocr.read." },
