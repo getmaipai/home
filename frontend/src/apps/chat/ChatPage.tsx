@@ -10,6 +10,7 @@ import { StreamingWavPlayer } from "@/lib/streamingWavPlayer";
 import { SentenceSpeechScheduler } from "@/lib/sentenceSpeechScheduler";
 import { splitReadyChunks } from "@/lib/sentenceChunker";
 import { WakeWordToggle } from "@/apps/chat/WakeWordToggle";
+import { normalizeForSpeech } from "@maipai/spec/voice/ts/normalizeForSpeech.js";
 
 interface ChatPageProps {
   person: Roster;
@@ -133,7 +134,23 @@ export function ChatPage({ person }: ChatPageProps) {
     };
 
     try {
-      const response = await api.streamSpeech(message.text);
+      // The message's own DISPLAYED text stays exactly as shown - only
+      // what's sent to TTS is normalized (numbers, times, dates read the
+      // way a person says them; Jesse, 2026-09-04: "if you have the voice
+      // say ten O four, you still display 10:04"). Backend replies
+      // already carry a normalized `reply.speech` (turnEngine.ts's
+      // finalizeReply()), but a past message loaded from history
+      // (mapRows.ts) only ever has `.text` - `conversation_turns` never
+      // persisted a `replySpeech` column, so there is nothing stored to
+      // read back here. A known, accepted gap this recomputation doesn't
+      // close: a package's genuine speech OVERRIDE (never touched by
+      // normalizeForSpeech at all, per finalizeReply()) is lost on replay
+      // of a past message, recomputed generically instead - currently
+      // latent, since no shipped package (`recall`/`remember`) writes a
+      // real override yet. Adding a `replySpeech` column to persist it
+      // exactly is the real fix if that ever changes; not worth the
+      // schema migration for a case nothing produces today.
+      const response = await api.streamSpeech(normalizeForSpeech(message.text));
       if (requestId !== playRequestIdRef.current) {
         player.stop();
         return;
@@ -330,7 +347,10 @@ export function ChatPage({ person }: ChatPageProps) {
           setVisibleText(visible);
           const pending = visible.slice(spokenLength);
           const { chunks, consumed } = splitReadyChunks(pending, spokenLength === 0);
-          for (const chunk of chunks) scheduler.enqueueSentence(chunk);
+          // Each chunk speaks its normalized form, never the displayed
+          // one: `visible` (set just above) keeps the model's own written
+          // text - the chat bubble - completely untouched.
+          for (const chunk of chunks) scheduler.enqueueSentence(normalizeForSpeech(chunk));
           spokenLength += consumed;
         } else if (event.type === "done") {
           sawTerminalEvent = true;
@@ -341,7 +361,23 @@ export function ChatPage({ person }: ChatPageProps) {
           // non-streaming path already relied on.
           const finalText = setVisibleText(stripThinking(event.value.reply.text));
           const trailing = finalText.slice(spokenLength).trim();
-          if (trailing) scheduler.enqueueSentence(trailing);
+          if (trailing) {
+            // Nothing was spoken incrementally yet (an immediate skill/
+            // safety reply, which never emits a "delta" at all, or a
+            // short model reply that streamed as a single final flush):
+            // the backend's own reply.speech is authoritative here,
+            // including any package-authored override turnEngine.ts's
+            // finalizeReply() respects - using it instead of recomputing
+            // generically keeps that override intact (a code review,
+            // 2026-09-05, found the original version always recomputed
+            // via normalizeForSpeech() here, silently discarding any
+            // override). Once anything has already been spoken
+            // incrementally (spokenLength > 0), only the tail remains,
+            // and reply.speech - computed over the WHOLE final text - has
+            // no matching coordinate to slice a tail out of, so the
+            // per-chunk normalizer above is the only correct option left.
+            scheduler.enqueueSentence(spokenLength === 0 ? (event.value.reply.speech ?? normalizeForSpeech(trailing)) : normalizeForSpeech(trailing));
+          }
           scheduler.finish();
           // 4.3: "offer, never block" - shown alongside the reply, never
           // in place of it, and never suppressing anything else in the

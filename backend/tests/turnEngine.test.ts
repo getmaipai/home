@@ -6,6 +6,7 @@ import { __resetLlmSupervisorForTests } from "@/lib/llmSupervisor";
 import { runTurn, runTurnStream, buildSystemPrompt, matchPattern, PROMPT_SYSTEM_CHAR_BUDGET, type TurnStreamResult } from "@/lib/turnEngine";
 import { streamTurnEvents } from "@/routes/turn";
 import { remember } from "@/lib/memory";
+import { REFUSAL_FIRST, REFUSAL_REPEAT, REMEMBER_CONFIRM_VARIANTS } from "@/lib/replyVariation";
 import { db } from "@/db";
 import { people, conversationTurns } from "@/db/schema";
 import { eq } from "drizzle-orm";
@@ -34,7 +35,7 @@ describe("lib/turnEngine.ts runTurn()", () => {
     expect(result.ok).toBe(true);
     if (!result.ok) return;
     expect(result.value.source).toBe("safety_refuse");
-    expect(result.value.reply.text).toBe("I can't help with that.");
+    expect(REFUSAL_FIRST).toContain(result.value.reply.text);
     expect(result.value.safety.action).toBe("refuse");
   });
 
@@ -59,7 +60,7 @@ describe("lib/turnEngine.ts runTurn()", () => {
     if (!result.ok) return;
     expect(result.value.source).toBe("skill");
     expect(result.value.skill_id).toBe("remember");
-    expect(result.value.reply.text).toBe("Got it, I'll remember that.");
+    expect(REMEMBER_CONFIRM_VARIANTS).toContain(result.value.reply.text);
 
     const recall = await client.post("/api/memory/recall", { q: "wifi password" });
     const matches = (await recall.json()) as Array<{ record: { text: string } }>;
@@ -110,7 +111,7 @@ describe("lib/turnEngine.ts runTurn()", () => {
     expect(result.ok).toBe(true);
     if (!result.ok) return;
     expect(result.value.source).toBe("safety_refuse");
-    expect(result.value.reply.text).toBe("I can't help with that.");
+    expect(REFUSAL_FIRST).toContain(result.value.reply.text);
 
     // Confirms the failure was real, not accidentally a no-op: no row
     // exists for an id that was never in `people` to begin with.
@@ -134,7 +135,7 @@ describe("lib/turnEngine.ts runTurnStream()", () => {
     expect(result.ok).toBe(true);
     if (!result.ok || result.kind !== "immediate") return;
     expect(result.value.source).toBe("safety_refuse");
-    expect(result.value.reply.text).toBe("I can't help with that.");
+    expect(REFUSAL_FIRST).toContain(result.value.reply.text);
   });
 
   test("the deterministic skill floor also answers immediately, no model call needed", async () => {
@@ -144,7 +145,7 @@ describe("lib/turnEngine.ts runTurnStream()", () => {
     expect(result.ok).toBe(true);
     if (!result.ok || result.kind !== "immediate") return;
     expect(result.value.source).toBe("skill");
-    expect(result.value.reply.text).toBe("Got it, I'll remember that.");
+    expect(REMEMBER_CONFIRM_VARIANTS).toContain(result.value.reply.text);
   });
 
   test("ordinary conversation streams real token deltas that concatenate to the full reply", async () => {
@@ -275,7 +276,7 @@ describe("POST /api/turn", () => {
     expect(res.status).toBe(200);
     const body = (await res.json()) as { source: string; reply: { text: string } };
     expect(body.source).toBe("skill");
-    expect(body.reply.text).toBe("Got it, I'll remember that.");
+    expect(REMEMBER_CONFIRM_VARIANTS).toContain(body.reply.text);
   });
 
   test("400s for an unimplemented surface with a code the caller can branch on", async () => {

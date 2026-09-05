@@ -2947,6 +2947,233 @@ set. Full architecture: platform plan chapters 1, 3, and 4.
       the identical reason, missing here. Fixed, with a regression test
       confirmed to fail against the pre-fix code.
 
+- [x] **Humanistic speech: mechanical normalization, a default natural
+      register, and phrase rotation - built ahead of Hub v0.3's own
+      sequencing at Jesse's direct request (2026-09-05): "build the
+      entire thing properly, not partial."** Three separable pieces,
+      informed by real research (home-legacy.git's
+      `docs/internal/voice-naturalness.md`, a corpus study of real
+      recorded conversation cross-checked against the published prompts
+      of ChatGPT Advanced Voice, Claude voice mode, Sesame, Hume, and the
+      OpenAI realtime guide) rather than guessed from scratch:
+    1. **Mechanical speech normalization**, `spec/voice/ts/normalizeForSpeech.ts`:
+       numbers, times, dates, currency, percentages, common units and
+       abbreviations, and stray markdown/emoji, each read the way a
+       person actually says them - "the time is 10:04 pm" spoken as "ten
+       oh four in the evening" while the screen still shows "10:04 pm"
+       (Jesse: "if you have the voice say ten O four, you still display
+       10:04"). A deliberate deviation from this file's own earlier
+       design note, which called for Python "one implementation, and the
+       robot's speech stack is Python already": built in TypeScript
+       instead, matching the precedent this same directory's own `tts`
+       role client already set ("plain types and a plain HTTP client,
+       language-portable in spirit... the robot's own Python port is Hub
+       v0.3's job, not this pass's") - both frontend and backend import
+       the identical function (`@maipai/spec/voice/ts/normalizeForSpeech.js`),
+       one implementation, not two that could drift.
+       `backend/src/lib/turnEngine.ts`'s new `finalizeReply()` is the one
+       central point (never per recipe) that fills every reply's
+       `speech` field with it, exactly as this file's own design note
+       specified; a package "opts out by supplying its own speech
+       string" by making it genuinely differ from its text - the
+       interpreter's own default is `speech === text`, so that's the
+       signal, not a new flag. 32 unit tests plus a live pass against the
+       real, locally-running Qwen3 8B model caught one real bug before it
+       shipped: the dotted "a.m."/"p.m." forms silently lost their
+       am/pm suffix, because a trailing `\b` right after a period can
+       never match (both sides are non-word characters) - fixed to a
+       "not followed by a letter" lookahead instead, confirmed against
+       the live model afterward.
+    2. **A default natural speech register**, `turnEngine.ts`'s new
+       `NATURAL_REGISTER_POLICY`: brevity, contractions, dropping detail
+       nobody asked for, rounding, and hedging secondhand information
+       ("it's supposed to", never a flat "it will") as an explicit system
+       prompt policy, not a text rewrite - the research is clear that
+       register is a generation-time concern, not something a
+       post-processing pass can retrofit. Deliberately kept as its own
+       separable fragment, appended after the fixed persona/rules prefix
+       rather than folded into it, because a real per-companion Persona
+       record (3.1 names the type; nothing implements it yet, see "Notes
+       for later" below) will need to override or layer on top of this
+       default, not fight it. Live-verified against the real model: asked
+       for today's weather, it answered "It's supposed to be partly
+       cloudy..." - hedged, not asserted, unprompted per-turn.
+    3. **Phrase rotation for known constant replies**, the new
+       `backend/src/lib/replyVariation.ts` (Jesse: "it can't just be
+       repeating one response after another - it has to [not] repeat
+       exact phrasing in a conversation", and a reminder that this
+       applies to "multiple hard coded things... phrases from skills",
+       not just refusals). A household member who gets refused, or says
+       "remember that..." five times a day, heard the exact same sentence
+       every time; now each of turnEngine.ts's own constants (the safety
+       refusal, the skill-error apology, the no-reply "Done." fallback)
+       and two package-layer constants (`recall`'s "nothing found" and
+       `remember`'s confirmation, matched by their still-exact text since
+       neither the interpreter nor a recipe.json has any way to signal a
+       rotation pool itself) rotate through a small, hand-written pool of
+       *equivalent* phrasings - never softened, never drifted in meaning,
+       since a wrong or wishy-washy refusal variant would be worse than a
+       repeated correct one. The safety refusal alone gets a first/repeat
+       distinction (`pickRefusalVariant`): a household member's first-ever
+       refusal never uses repeat-acknowledging language ("still can't
+       help with that"), which would be a real, jarring lie on a first
+       offense; every refusal after that can. Sequential, hash-seeded
+       rotation, not random - the same person is guaranteed never to hear
+       the immediately-previous phrasing again, which a random pick alone
+       cannot promise. Deliberately NOT a general "vary any reply"
+       transform: it only touches text that exactly matches one of these
+       known constants, so a recalled fact, a weather number, or the
+       model's own freeform reply is never at risk of being mistaken for
+       one and altered.
+    - **A real, live-verified gap this did NOT close**: a refusal the
+      model chooses on its own judgment (`evaluateSafety()` didn't
+      categorically flag it, so the turn falls through to the `chat`
+      role, which then declines using its own words) is not covered by
+      `replyVariation.ts` at all - verified live by asking the same
+      borderline request three times in a row and getting nearly
+      identical model-authored declines each time. `varyKnownConstant()`
+      only rotates an EXACT match against a known fixed string; the
+      model's own freeform decline is real, if repetitive, dynamic
+      content, and pattern-matching against it would risk altering a
+      real judgment call rather than fixing a canned line. The actual
+      fix needs `turnEngine.ts`'s own already-documented gap closed first
+      ("a turn's own reasoning is still stateless... the recalled history
+      isn't fed back into the prompt as prior conversational context
+      yet") - without the model ever seeing what it already told this
+      person, no prompt instruction to "vary your phrasing" can work
+      across turns, only within one.
+    - **Deliberately not attempted this pass**: the delay-gated spoken
+      filler/acknowledgment cue home-legacy.git's own research
+      recommends (a brief "one sec" only when a reply is genuinely slow
+      to arrive, never a prompted "um" in a confident answer - the
+      research there, Kirkland et al. 2022 and others, found prompted
+      mid-utterance fillers measurably lower perceived confidence). The
+      one place in this codebase with real, user-facing multi-second
+      latency today is the `chat` model's own time to first token during
+      streaming (`runTurnStream()`); building the cue right means a real
+      stream-level timer race and a frontend audio-queuing change, sized
+      like its own slice rather than folded into this one.
+    - **A code review before commit found two real correctness bugs and
+      one real gap**: `finalizeReply()`'s rotation ran unconditionally
+      against every non-refusal `TurnValue`, including `source: "model"`
+      - a chat model reply that happened to say exactly "Done." or "I
+      don't remember anything about that." in its own words would have
+      been silently swapped for an unrelated pool phrase. Fixed by
+      scoping rotation to `skill`/`skill_error` (the only sources that
+      can actually produce one of these known constants) plus the
+      refusal's own dedicated path, never `model`. Second, a package's
+      genuine speech override was checked only for whether to skip
+      *normalizing* `speech`, while `text` still got varied regardless -
+      a future package supplying its own hand-authored spoken form for
+      text that happened to match a known constant would end up with a
+      varied `text` and a `speech` string tied to the stale, pre-variation
+      wording. Fixed by checking the override first and returning the
+      whole `TurnValue` untouched when it's present, matching what this
+      entry already claimed ("opts out of both") but the first version
+      didn't actually do. Third, a real gap: the browser frontend's live
+      streaming path recomputed `speech` from `text` itself via
+      `normalizeForSpeech()` rather than ever reading the backend's own
+      `reply.speech`, so a package's override would reach the wire
+      correctly and then be silently discarded by every client. Fixed for
+      the live case (`ChatPage.tsx`'s "done" handler now uses
+      `event.value.reply.speech` whenever nothing was already spoken
+      incrementally, which is exactly when the whole-reply speech string
+      still has a meaningful coordinate to use); left open, and
+      documented in code, for the "Listen" replay of a past message,
+      since `conversation_turns` never persisted a `replySpeech` column
+      to read back - real but currently latent, since neither shipped
+      package (`recall`, `remember`) writes a genuine override today.
+
+## Notes for later (companion personas, added 2026-09-05)
+
+Jesse asked how companion personalities and their speech patterns should
+be incorporated - a formal tutor, a five-year-old, a slang-heavy teenager,
+a nurturing grandmother, each with their own language complexity,
+formality, region/dialect, filler density, AND conversational engagement
+style (a "mother" persona asking follow-up questions and wanting to know
+more; a "teenager" persona saying "that sucks" and moving on) - then
+correctly flagged his own list as a naive starting point, not a spec, and
+asked for real research before anything gets built. This is exactly the
+already-named "Persona/style record" gap (`turnEngine.ts`'s own "Not
+built this pass" list: "3.1 lists the type; nothing implements it yet").
+Captured here, not started; the design pass itself belongs to whoever
+picks this slice up next.
+
+**Legacy prior art (real codebase archaeology, not projected)**:
+home-legacy.git had a full, shipped companion system - 25 default
+personas, a browsing UI, an admin studio, and a real prompt-assembly
+pipeline (`backend/src/lib/companionPrompt.ts`, `defaultCompanions.ts`,
+and a 304-line internal architecture review at
+`plans/companion-architecture-review.md` that is the single highest-value
+source here). The persona shape there was mostly one freeform
+`personality_prompt` paragraph plus a few structured fields: `reply_style`
+(a small brief/balanced/detailed/auto enum, each mapped to one canned
+prompt sentence - the exact pattern this session's own
+`NATURAL_REGISTER_POLICY` already uses), `tts_voice`, `speech_rate`,
+`content_dials` (profanity/sexual/violence/substances/candor - candor
+was bundled with content-safety knobs, not kept as a pure personality
+field), `backstory`, `interests`, and `persona_examples` (few-shot lines
+in the character's own voice). Concrete, reusable lessons from that
+review, not guesses:
+- Few-shot example lines, not abstract trait descriptions, were "the
+  single biggest lever for small-model voice fidelity" - directly
+  relevant since MaiPai Home's own chat/TTS model is also small and
+  local.
+- Without a stable `backstory`/`interests`, the model "invented a new
+  past every time" - consistency needs an anchor, not just a vibe.
+- Canned confirmations ("Done.", an action ack) had "zero personality -
+  every character sounds identical," precisely the default-level gap
+  `replyVariation.ts` (this session) fixes; a persona layer should
+  eventually give each companion its own confirmation pool instead of
+  the one shared generic one.
+- Three separate length/style instructions (a persona's own style, a
+  global verbosity fragment, a surface-specific line) could silently
+  contradict, with prompt *position* rather than explicit precedence
+  deciding the winner - a direct warning for combining a future
+  per-persona register with `NATURAL_REGISTER_POLICY`: needs an explicit
+  precedence order, not luck.
+- A content-safety ceiling clamping a persona's authored trait produced
+  contradictory instructions with no reconciliation line - directly
+  relevant to this org's non-removable child-safety invariants
+  (`.github/CLAUDE.md`'s Safety invariants section): any "candor" or
+  similar dial must be clamped the same way, with an explicit
+  reconciliation sentence, never a silent conflict.
+- An anti-parroting rule that banned *all* unprompted follow-ups swung
+  too far ("polite amnesia"); the fix was a narrow, explicit allowlist -
+  the calibration lesson for Jesse's "mother asks follow-ups" dimension.
+- Three surfaces (chat/voice/pod) each grew their own persona-assembly
+  copy and diverged over time. `turnEngine.ts` already has a similar
+  `Surface` enum (chat/overlay/pod/robot/tv/phone, only `chat`
+  implemented) - build persona composition as one shared function from
+  day one, not per-surface.
+
+**Dimensions named across this conversation, plus what legacy's own
+review already surfaced**: formality/register, complexity/vocabulary
+level, regional dialect, filler/disfluency density, directness/candor,
+verbosity/turn length, engagement depth (probes vs. lets go), emotional
+warmth, humor style, initiative/proactivity, a relationship-duration tone
+arc (stranger-to-familiar), time-of-day energy, address terms/
+endearments, technical jargon tolerance, and stable tastes/opinions. This
+list itself is NOT yet backed by real outside research (Jesse, 2026-09-05:
+"don't trust the previous [research] - you need to search the web") -
+what's above came from home-legacy.git's own real code plus general
+background knowledge, not verified web sources on persona/character-voice
+design. A real web research pass, checked against this list rather than
+assumed to already cover it, is the actual next step before any design
+decision, not just implementation.
+
+**The speed and accuracy constraints carry over unconditionally**: "it
+all has to be fast and accurate to the precise message the statement is
+supposed to convey." `NATURAL_REGISTER_POLICY` is the model for how:
+static prompt text swapped in per persona, zero added latency and zero
+risk of drifting meaning, never a live rewriting pass. Whether a real
+Persona record ends up as pure structured fields (each rendering to a
+canned fragment, composable and testable, but risking incoherent
+combinations - a five-year-old's complexity with a jargon-tolerant
+vocabulary makes no sense together) or structured-plus-one-freeform-field
+(legacy's own shape, which worked but had the gaps above) is an open
+design question, not decided here.
+
 ## API routes and `@hono/zod-openapi` (tracked debt)
 
 `getmaipai/CLAUDE.md` > Documentation requires every Hono route to be

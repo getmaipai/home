@@ -5,6 +5,7 @@ import { __resetThrottleForTests } from "@/lib/secretThrottle";
 import { __resetLlmSupervisorForTests } from "@/lib/llmSupervisor";
 import { runTurn } from "@/lib/turnEngine";
 import { list, exportPerson, runRetention, routingStats, summarizeBeforeDelete } from "@/lib/conversationHistory";
+import { REMEMBER_CONFIRM_VARIANTS } from "@/lib/replyVariation";
 import { db } from "@/db";
 import { people, conversationTurns, memoryRecords } from "@/db/schema";
 import { eq } from "drizzle-orm";
@@ -41,7 +42,7 @@ describe("logTurn (via runTurn)", () => {
     const rows = db.select().from(conversationTurns).where(eq(conversationTurns.personId, actor.id)).all();
     expect(rows.length).toBe(1);
     expect(rows[0]!.userText).toBe("remember that trash day is Tuesday");
-    expect(rows[0]!.replyText).toBe("Got it, I'll remember that.");
+    expect(REMEMBER_CONFIRM_VARIANTS).toContain(rows[0]!.replyText);
     expect(rows[0]!.source).toBe("skill");
     expect(rows[0]!.skillId).toBe("remember");
     expect(rows[0]!.safetyFlagged).toBe(false);

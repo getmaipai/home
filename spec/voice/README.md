@@ -57,11 +57,21 @@ response and hands it to a browser `<audio>` element - the very thing
 streaming replaces - would need to correct the header size or risk the
 decoder waiting indefinitely for audio that will never arrive.
 
-**No speech normalization.** `docs/dev.md`'s "Speech normalization lives
-in the voice sidecar" note describes a real, not-yet-built layer (numbers,
-units, dates spoken naturally) that belongs at this exact boundary. This
-pass sends the chat reply's text verbatim to Pocket TTS after
-`stripThinking()` already ran on it; the normalizer is Hub v0.3's job.
+**Speech normalization is real now (2026-09-05), built ahead of Hub
+v0.3's own sequencing at Jesse's direct request** ("build the entire
+thing properly, not partial"): `ts/normalizeForSpeech.ts` is the
+mechanical half - numbers, times, dates, currency, percentages, units,
+common abbreviations, and stray markdown/emoji, each read the way a
+person actually says them, never touching the text a household sees on
+screen (Jesse: "if you have the voice say ten O four, you still display
+10:04"). `backend/src/lib/turnEngine.ts`'s `finalizeReply()` is the one
+central point (never per recipe) that fills every reply's `speech` field
+with it; the browser frontend imports the identical function for its own
+live, sentence-by-sentence TTS streaming (`ChatPage.tsx`), so there is
+one implementation, not two that could drift. Still real, not-yet-built:
+the register question (brevity, hedging, contractions - a PROMPT concern,
+`turnEngine.ts`'s `NATURAL_REGISTER_POLICY`, not this module) and the
+robot's own Python port, still Hub v0.3's job.
 
 ## What's real vs. stubbed
 

@@ -17,6 +17,8 @@ import { recall, type RecallMatch } from "@/lib/memory";
 import { complete, startCompleteStream, type LlmMessage } from "@/lib/llm";
 import { tokenize } from "@/lib/text";
 import { logTurn } from "@/lib/conversationHistory";
+import { pickRefusalVariant, varyKnownConstant } from "@/lib/replyVariation";
+import { normalizeForSpeech } from "@maipai/spec/voice/ts/normalizeForSpeech.js";
 import type { Role } from "@/middleware/auth";
 import type { PersonRow } from "@/types";
 import type { PackageManifest } from "@maipai/spec/gen/ts/manifest.js";
@@ -66,7 +68,6 @@ function logTurnSafely(actor: PersonRow, surface: Surface, userText: string, val
   }
 }
 
-const REFUSAL_TEXT = "I can't help with that.";
 const CRISIS_RESOURCES_TEXT =
   "If you're in crisis, the 988 Suicide & Crisis Lifeline is free and available 24/7: call or text 988.";
 
@@ -74,6 +75,29 @@ const STABLE_SYSTEM_PREFIX = [
   "You are MaiPai, a private, self-hosted AI assistant for this household. Be warm, concise and honest. Nothing you say leaves this house.",
   "Requests already blocked by the household's safety rules never reach you; answer anything else helpfully and honestly.",
   "If you don't know something the household hasn't told you, say so instead of guessing.",
+].join(" ");
+
+// The one default speech register, applied for every reply until a real
+// Persona/style record exists (3.1 names the type; nothing implements it
+// yet - `docs/dev.md`'s "Not built this pass" list, below). Kept as its
+// own separable fragment for exactly that reason: a future per-companion
+// persona (a formal tutor, a five-year-old, a teenager, a nurturing
+// grandmother - Jesse, 2026-09-05) layers its own voice on TOP of or
+// INSTEAD OF this default, rather than this being tangled inextricably
+// into STABLE_SYSTEM_PREFIX. Informed by home-legacy.git's
+// docs/internal/voice-naturalness.md (a corpus study of real recorded
+// conversation, cross-checked against the published prompts of the
+// leading voice assistants): brevity, contractions, dropping detail
+// nobody asked for, rounding, hedging secondhand information, and never
+// repeating a phrase are the highest-value, most evidence-backed levers
+// that research found - not filler words (see replyVariation.ts's own
+// comment on why fillers live in phrase rotation, not the model's own
+// prompted judgment).
+export const NATURAL_REGISTER_POLICY = [
+  "Talk the way a person actually talks, not like a written page being read aloud: use contractions (it's, you're, don't), keep most replies to a sentence or two, and answer the exact question then stop - no restating it back, no \"let me know if you need anything else.\"",
+  "Skip detail nobody asked for (exact decimals, timezones, a full date when only the day matters) and round the way people round in conversation (\"about thirty\", \"low seventies\") unless they asked for the exact number or it genuinely matters, like money or an appointment time.",
+  "Talk about anything uncertain or secondhand as uncertain, never as flat fact: forecasts, predictions, and guesses get hedged (\"it's supposed to\", \"I think\", \"probably\"), not asserted outright.",
+  "Never say the same thing the same way twice: vary how you open a reply and how you phrase something you've already said earlier in the conversation.",
 ].join(" ");
 
 interface LoadedManifest {
@@ -149,7 +173,7 @@ export function buildSystemPrompt(memoryMatches: RecallMatch[], loaded: LoadedMa
   // total over budget. Truncating the body first, then appending a
   // never-truncated time line, keeps every truncation boundary inside
   // prose meant to be cut, never inside the one line a caller might parse.
-  let body = STABLE_SYSTEM_PREFIX + skillsSection + memorySection;
+  let body = STABLE_SYSTEM_PREFIX + " " + NATURAL_REGISTER_POLICY + skillsSection + memorySection;
   const bodyBudget = Math.max(0, PROMPT_SYSTEM_CHAR_BUDGET - timeLine.length);
   if (body.length > bodyBudget) body = body.slice(0, bodyBudget);
 
@@ -284,7 +308,14 @@ type PreparedTurn =
 function prepareTurn(actor: PersonRow, text: string, loaded: LoadedManifest[]): PreparedTurn {
   const safety = evaluateSafety(text, actor.role as Role);
   if (safety.action === "refuse") {
-    return { kind: "immediate", value: { reply: { text: REFUSAL_TEXT }, source: "safety_refuse", safety } };
+    // The text here is never actually seen: finalizeReply() unconditionally
+    // replaces it via pickRefusalVariant() for every `safety_refuse`
+    // source, the one source that always gets a real, varied phrasing
+    // rather than a fixed constant (a code review, 2026-09-05, found a
+    // now-deleted REFUSAL_TEXT constant here, which looked editable but
+    // silently wasn't). Any placeholder works; this one just reads
+    // sensibly in a debugger or log before finalizeReply runs.
+    return { kind: "immediate", value: { reply: { text: "I can't help with that." }, source: "safety_refuse", safety } };
   }
   const crisisResources = safety.action === "allow_with_resources" ? CRISIS_RESOURCES_TEXT : undefined;
 
@@ -328,6 +359,44 @@ function prepareTurn(actor: PersonRow, text: string, loaded: LoadedManifest[]): 
   return { kind: "model", messages, safety, crisisResources };
 }
 
+/** The one central point every TurnValue passes through before it reaches
+ * a caller or gets logged (2026-09-05, `spec/voice/README.md`'s
+ * "Speech normalization... fills reply.speech centrally, never per
+ * recipe"): varies a known constant reply so the same person doesn't hear
+ * the exact same sentence forever (replyVariation.ts), then fills
+ * reply.speech with the mechanically normalized spoken form
+ * (normalizeForSpeech.ts) - numbers, times, dates read the way a person
+ * says them, while reply.text (what's displayed) is never touched.
+ *
+ * A package that authored its OWN speech string (genuinely different
+ * from its text - the interpreter's default is `speech === text`, a real
+ * override never is) opts out of BOTH: checked first and returned
+ * completely untouched, on the theory that a package which already chose
+ * its own words for both channels has made its own call, not a partial
+ * one for text alone. A code review (2026-09-05) found the original
+ * version varied `text` even under an override, leaving a stale `speech`
+ * tied to the pre-variation wording once a real override ever exists.
+ *
+ * Rotation itself only ever runs for the two sources that can actually
+ * PRODUCE one of these known constants (`skill`/`skill_error`) plus the
+ * safety refusal's own dedicated path - never `model`. The same review
+ * found the original version called `varyKnownConstant()` unconditionally
+ * for every non-refusal source, so a model reply that happened to say
+ * "Done." or "I don't remember anything about that." in its own words
+ * got silently swapped for an unrelated pool phrase. */
+function finalizeReply(actor: PersonRow, value: TurnValue): TurnValue {
+  const { text, speech } = value.reply;
+  if (speech !== undefined && speech !== text) return value;
+
+  const variedText =
+    value.source === "safety_refuse"
+      ? pickRefusalVariant(actor.id)
+      : value.source === "skill" || value.source === "skill_error"
+        ? varyKnownConstant(actor.id, text)
+        : text;
+  return { ...value, reply: { text: variedText, speech: normalizeForSpeech(variedText) } };
+}
+
 /** Runs one conversation turn end to end: safety first, then the
  * deterministic skill floor, then the chat model as the phrasing fallback. */
 export async function runTurn(
@@ -367,6 +436,7 @@ export async function runTurn(
     };
   }
 
+  value = finalizeReply(actor, value);
   logTurnSafely(actor, surface, text, value);
   return { ok: true, value };
 }
@@ -418,8 +488,9 @@ export async function runTurnStream(
   const prepared = prepareTurn(actor, text, loaded);
 
   if (prepared.kind === "immediate") {
-    logTurnSafely(actor, surface, text, prepared.value);
-    return { ok: true, kind: "immediate", value: prepared.value };
+    const value = finalizeReply(actor, prepared.value);
+    logTurnSafely(actor, surface, text, value);
+    return { ok: true, kind: "immediate", value };
   }
 
   const started = await startCompleteStream("chat", prepared.messages, { thinking: opts.thinking });
@@ -437,12 +508,12 @@ export async function runTurnStream(
     kind: "stream",
     tokens: started.tokens,
     finalize: (replyText: string): TurnValue => {
-      const value: TurnValue = {
+      const value: TurnValue = finalizeReply(actor, {
         reply: { text: replyText },
         source: "model",
         safety: prepared.safety,
         crisis_resources: prepared.crisisResources,
-      };
+      });
       logTurnSafely(actor, surface, text, value);
       return value;
     },
