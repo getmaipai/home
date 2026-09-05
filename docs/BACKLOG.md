@@ -10,6 +10,42 @@ does.
 Rough size tags: **S** (a session or less), **M** (a real slice, days),
 **L** (a platform-level capability, needs its own design pass first).
 
+## The 2026-09-05 audit: where the gaps actually are
+
+Jesse asked for an audit of goals, plans and code against what has been
+built, with online research and a comparison against the legacy repos,
+focused on three worries: the UI, portability and integration with the
+robot, and intelligent, personified, memory- and data-driven chat. Five
+read-only passes fed the sections below (backend, frontend, plan versus
+built, legacy versus rebuild, the state of the art online); only their
+conclusions are recorded here. Four findings rank above everything else
+in this file:
+
+1. **Chat is stateless.** The model is sent the system prompt and the
+   current message only; the previous exchange is never in the prompt
+   (`turnEngine.ts` sends `[system, user]` and says so in its own
+   trailer). "And tomorrow?" has no referent. Nothing else here matters
+   as much to how the hub feels to use.
+2. **The prompt does not know who is talking.** No name, role, age band,
+   locale or local time reaches the model, and recall is unscoped, so a
+   parent's chat is fed a child's person-scoped memories. "Personified"
+   today is a style fragment with no identity behind it.
+3. **Memory is written only when someone says "remember", and recalled
+   by keyword overlap** while a real embedding engine is already running,
+   unused. There is no judge, no profile paragraph, no clock stamp on a
+   memory record, and forget is a hard DELETE that a robot replica would
+   push back on reconnect.
+4. **Every page is hand-written React and the nav is hardcoded.** The UI
+   schema in `spec/ui/` renders nothing, the five kit primitives built
+   for the first app have no schema nodes, and there is no input-mode
+   detection, so TV is undefined rather than unstyled. Neither Go nor the
+   robot's standalone shell could render any page that exists today.
+
+"Chat, memory and persona", "Portability and the link" and "Legacy: copy,
+re-examine, record" are new sections; UI / shell, Settings and
+Cross-cutting grew. Existing items were corrected where the audit found
+them wrong (the `embed` role is built and unwired, not missing).
+
 ## Naming: rename `skill` to `plugin`, add real `skill` and `command`
 
 Decided 2026-09-05 (full research and reasoning in `docs/dev.md`'s
@@ -212,8 +248,12 @@ Priority-1 lookup landing first):**
       already decided: ship `embed` (real semantic routing) first, ship
       more real skills, measure the actual fall-through rate from real
       conversation history, then decide whether to build this at all.
-- [ ] The `embed` role itself (M) - referenced everywhere as the fix for
-      today's keyword-overlap routing placeholder; not built.
+- [ ] **Wire the `embed` role into routing** (M) - corrected 2026-09-05:
+      the role itself is built and live-verified (nomic-embed-text on a
+      second llama-server, `embedSupervisor.ts`), reachable only through
+      a diagnostic route. What is missing is embedding `routing.examples`
+      once at package load and matching by similarity (Tier 1), plus
+      recall (see "Chat, memory and persona").
 
 ## Feature parity: ChatGPT / Gemini / Claude
 
@@ -322,6 +362,200 @@ listed above, so read them as amendments, not additions:
 
 Sources consulted (this research pass, 2026-09-05): [ChatGPT Projects guide](https://www.ai-toolbox.co/chatgpt-management-and-productivity/how-to-use-chatgpt-projects-guide-2026), [ChatGPT custom instructions update](https://www.mywritingtwin.com/blog/chatgpt-projects-setup-guide), [Claude Artifacts 2026 guide](https://suprmind.ai/hub/claude/features/), [Claude Live Artifacts](https://www.eigent.ai/blog/claude-live-artifacts-guide), [Gemini Canvas](https://gemini.google/overview/canvas/), [Gemini Gems](https://geotoolbox.ai/blog/gemini-gems), [Gemini code execution docs](https://ai.google.dev/gemini-api/docs/code-execution), [Gemini/Google Photos face recognition](https://pasqualepillitteri.it/en/news/1055/google-photos-ai-scanning-gemini-recognition), [Google Personal Intelligence privacy concerns](https://vucense.com/privacy-sovereignty/surveillance-biometrics/google-gemini-personal-intelligence-photos-privacy-2026/), [ChatGPT/Claude photo-identification policy](https://github.com/openai/openai-python/discussions/2495), [Claude Scheduled Tasks vs. ChatGPT/Gemini](https://www.xda-developers.com/claude-scheduled-tasks-feature/), [voice mode comparison (GPT-Live/Gemini Live/Claude)](https://apidog.com/blog/gpt-live-vs-gemini-live/), [Claude voice moves to Opus/Sonnet/Haiku](https://www.techradar.com/computing/artificial-intelligence/claude-tipped-to-get-its-answer-to-chatgpts-advanced-voice-mode-soon-is-adding-an-ai-voice-to-a-chatbot-yet-another-tick-box-exercise), [Claude Skills vs ChatGPT GPTs vs Gemini Gems](https://www.open-claw.sh/blog/claude-skills-vs-chatgpt-gpts-vs-gemini-gems), [barcode/QR reading across vendors](https://www.dynamsoft.com/codepool/python-flet-chat-app-barcode-gemini.html).
 
+## Chat, memory and persona (the intelligence gap)
+
+What "intelligent, personified, memory- and data-driven chat" needs that
+`turnEngine.ts`, `memory.ts` and `persona.ts` do not have today. Ordered
+by payoff per day of work; the first five together turn stateless Q&A
+into a conversation with someone who knows who is talking.
+
+**Conversation and context**
+
+- [ ] **Send prior turns to the model** (S-M) - a per-person, per-surface
+      window from `conversation_turns`, newest few always kept whole, a
+      rolling summary above that, under the existing prompt budget. Copy
+      the tuned numbers from legacy `routes/chat.ts` (`trimHistory`,
+      `refreshConversationSummary`: 1200-token window, newest 4 turns
+      always kept, summary refreshed before the window drops a band, since
+      "an uncovered band is real amnesia"). Plan 4.5 names "summary" and
+      "context" in the volatile zone but never defines the window; this
+      item defines it.
+- [ ] **A speaker block in the prompt** (S) - pass the actor into
+      `buildSystemPrompt`: display name, nickname, role and age band,
+      locale (`core.locale` is declared and read by nothing), and a
+      locale-formatted local time instead of raw ISO UTC the policy then
+      asks the model to round. The cheapest large step toward
+      "personified".
+- [ ] **A household context block** (S) - who lives here (names, roles),
+      who is present when known, what packages are installed, so "ask
+      Nova to..." and "what can you do" answer from data, not guesswork.
+- [ ] **Stable-first prompt order with a persona re-anchor** (S) - legacy
+      `companionTurn.ts` put static policy first for KV reuse and
+      repeated the persona reminder near the end because drift was
+      measurable in about eight turns; plan 4.5 asks for the same
+      stable-first shape. Today's order is right at the top and has no
+      re-anchor.
+- [ ] **Per-section prompt budget test** (S) - one 4,000-char cap today.
+      The bot's `test_prompt_budget.py` capped each section (rules,
+      memory, persona) after rules alone hit 68% of a prompt and produced
+      8-14 s of silence. Same test here, per section.
+- [ ] **Rate-limit `/api/turn` and `/api/llm/*` per person** (S) - named
+      in `spec/llm/README.md`, tracked nowhere.
+
+**Memory**
+
+- [ ] **Scope recall to the actor** (S, privacy bug) - `recall()` in the
+      turn passes no scope, so an owner's turn injects every child's
+      person-scoped memories. Recall with the actor's own scope plus
+      household; the parental view on the list route stays.
+- [ ] **Person-scoped `remember`, with turn provenance** (S) - the recipe
+      always writes `scope: household`, importance 0.5, `source:
+      package:remember`. First-person facts write `scope: person`; the
+      host passes the turn id so provenance is the spec's "conversation
+      turn id", not the package name.
+- [ ] **Wire `embed` into recall** (M) - the role runs (nomic-embed-text
+      on a second llama-server) and its only caller is a diagnostic
+      route. Store vectors (sqlite-vec, or a `memory_embeddings` table
+      and brute-force cosine at household scale), embed on write, score
+      on read, keyword as the fallback when the engine is down. Start
+      from legacy `memory/recall.ts`'s tuned numbers, same embedding
+      family: `0.7 cos + 0.2 importance + 0.1 recency`, floor 0.55 for
+      episodic (top-5 used to be injected even for "hi"), 0.37 for
+      durable (durables were "stored but never recalled"), entity-first
+      pass. Re-run the legacy eval probes against the real embedder
+      before trusting either number.
+- [ ] **The memory judge: extract at turn end, consolidate at idle**
+      (M-L; plan 4.4's "sleep-time judge", unbuilt) - a post-turn job on
+      the scheduler asks the chat model for durable facts and preferences
+      as a tiny, grammar-constrained list (Mem0's 2026 ADD-only shape),
+      writes `tier: episodic` with the turn id, dedups by supersede. An
+      idle-time pass (Letta's sleep-time agent) merges point facts into
+      durative ones, re-tenses time-bound facts ("going to Boston in
+      July" becomes "went in July"), demotes mis-tiered junk, and
+      retries poison rows at most three times. Copy the rules legacy
+      learned on real transcripts (`memory/judge.ts`: user-asserted
+      facts only with a source quote, possessives resolved from the
+      speaker's view, relative dates made absolute, trips stored as
+      dated past-tense state; dedupe candidates at cosine 0.5, top 5,
+      a DELETE always inserts the replacement) and the bot's extractor
+      caps (8 entities, 12 facts, example names that never recur
+      because a small model copies the example).
+- [ ] **A maintained profile block per person** (S-M; plan 4.4's
+      "profile paragraphs") - one pinned paragraph the judge rewrites
+      ("who is talking, what they like, what is going on this week"),
+      injected whole and capped in characters, with retrieval on top only
+      for specifics. ChatGPT and Claude both inject a maintained summary
+      rather than a search-result list; Letta's memory blocks are the
+      same idea.
+- [ ] **Dated memories in the prompt, and a closing reminder** (S) -
+      legacy `formatMemoriesForPrompt` wrote "as of Aug 12, 2 weeks ago"
+      on each fact and put a one-line reminder after the memory block
+      because small models drift toward the freshest tokens. Today's
+      block is bare bullets.
+- [ ] **Bi-temporal validity and a clock on every memory** (S in the
+      spec, then hub) - `valid_from`/`valid_to` alongside the existing
+      supersede, plus `hlc`. "Did this change" and "we never discussed
+      that" are the two cases assistants fail most (LongMemEval); the
+      2026 temporal-memory results say to organize by when things
+      happened, not when they were said. Spec change first, per the org
+      rule; also listed under Portability because sync needs the clock.
+- [ ] **Schedule `runMaintenance`, fix usage inflation** (S) - decay
+      exists and is only reachable by a manual route; `recall` bumps
+      `uses` on 20 matches while 5 reach the model.
+- [ ] **Memory in the chat UI** (S-M) - a "memory updated" chip when the
+      judge writes, per-message "remember this" and "forget this"
+      actions, a per-person memory page that an adult can edit for a
+      child. Every major assistant ships all three now.
+- [ ] **A household memory bench** (M) - a LongMemEval-shaped fixture
+      built on the persona roster, testing updates and abstention, run
+      against the local model in the bench tier. Legacy had router (53),
+      memory (11) and continuity (5) probes; the rebuild has unit tests
+      only.
+- [ ] **Skip the graph database** (decision, recorded) - Mem0 dropped its
+      graph store for entity linking in a flat table; Graphiti needs
+      Neo4j and a capable model. Entity columns, FTS5 and vectors on the
+      one SQLite file is the local-first answer and keeps the robot
+      replica trivial. The Entity/Relationship spec already gives the
+      structured half.
+- [ ] **Speaker resolution confidence on memory writes** (S, once voice
+      ID exists) - a fact heard at low speaker confidence is stored in a
+      quarantine scope and not injected until confirmed. The 2026
+      multi-user memory research (AFA) names this exact shared-device
+      failure, "persona confusion", and fixes it this way.
+
+**Persona and companions**
+
+- [ ] **A Companion/Persona spec record** (M) - plan 3.1 lists it,
+      `spec/schemas` has none. Identity (name, pronouns, tagline), a
+      short backstory, interests, three to five few-shot lines (legacy's
+      review: "the single biggest lever for small-model voice fidelity"),
+      a linked voice, a per-persona confirmation pool (one shared pool
+      today, so every character acks identically), and the prompt prefix
+      using the persona's `display_name` instead of "You are MaiPai".
+      Map today's four dials onto the plan's nine sliders, or record why
+      four is enough. Keep the prose card under about 150 tokens.
+- [ ] **Persona is not the same as how to address the listener** - the
+      "speech profile per person" item under People is the other half;
+      build them as two records injected in order: who I am, then who
+      you are, then memory, so style never blunts facts.
+- [ ] **Activation steering spike** (M, before any nine-slider prose) -
+      plan 5.4 and org principle 6 both say steering vectors over
+      personality prose. llama-server (the mandated engine) already
+      takes `--control-vector` and `--control-vector-scaled`, and ships a
+      `cvector-generator` that trains one from paired prompts; the 2026
+      PERSONA result reports fine-tuning-level trait scores on small
+      models by this route, with Qwen3-4B strongest among those tested.
+      Measure on the bench: does one vector hold register better than a
+      paragraph over thirty turns, and what does it cost per token.
+- [ ] **A persona consistency test** (S) - ten scripted exchanges scored
+      by string checks (address form, length, forbidden phrases) in the
+      deterministic suite, plus a model-judged version on demand.
+- [ ] **The bot's honesty guards as a post-model pass** (M) - legacy
+      `guards.py` (invention, unrelated recall, near-echo, medication
+      doses, capability claims), `_marked_repeat` ("Like I said" never
+      across conversations) and the attractor-removal rule for prompt
+      examples were each fixed against a real broken reply, with tests.
+      The hub has none of them.
+
+**Data-driven answers**
+
+- [ ] **Exposed state, the Home Assistant pattern** (M) - every package
+      declares which records and actions it exposes; the turn engine
+      builds the tool list per request (per person, device, persona),
+      capped well under the model's limit. Community measurements: about
+      thirty exposed items cost 1,300 tokens and past fifty a small model
+      forgets devices. Tier 1 (`embed` similarity over `routing.examples`)
+      is the pre-filter that keeps the offered set to a handful.
+- [ ] **Typed query tools, never text-to-SQL** (decision, recorded) -
+      each package exposes a few parameterized reads ("events between",
+      "chores for person") backed by SQL we wrote. Small models fill
+      parameters reliably and do not write safe SQL.
+- [ ] **Grammar-constrained tool calls, verified before acting** (S, with
+      Tier 2) - an unparseable call is "ask again", never a silent drop;
+      llama.cpp's lazy grammars still let malformed calls through on
+      recent Qwen builds (upstream issue 24807).
+- [ ] **The routing eval corpus as a permanent test** (M) - plan 4.5 says
+      routing accuracy "is the number that decides whether tier 2 is
+      built at all"; no corpus exists. Utterance, expected package or
+      none, expected arguments, near misses that must not fire, every
+      real miss added before it is fixed. Legacy `llm/router.ts` had
+      about twenty regex classes each annotated with a live misroute
+      ("I GOT THE JOB" routed to remember; "do you know who X is" must
+      never hit search); mine those for the first rows.
+- [ ] **Bench models for tool calling** (S) - Qwen3-4B-Instruct-2507 and
+      Gemma 4 E4B are the published sweet spots for on-device tool use
+      in 2026; measure on our own tool set, not their leaderboards.
+- [ ] **Speak MCP for local tools inside the hub** (M, decision first) -
+      one tool contract that catalog packages and Go can share, and the
+      route by which MCP Apps result panels could arrive later. Plan
+      v0.1 named an "MCP spike"; nothing was spiked.
+- [ ] **Output-side safety on streamed sentences** (S-M) - the classifier
+      header promises "again on every streamed sentence"; only the input
+      is checked. Run it per sentence in `streamTurnEvents` and cut the
+      stream on a refuse category.
+
+Sources for this section (research pass, 2026-09-05): [Mem0, state of agent memory 2026](https://mem0.ai/blog/state-of-ai-agent-memory-2026), [Letta sleep-time agents](https://docs.letta.com/guides/agents/architectures/sleeptime/), [Letta memory blocks](https://www.letta.com/blog/memory-blocks/), [Zep temporal knowledge graph](https://arxiv.org/abs/2501.13956), [LongMemEval](https://arxiv.org/abs/2410.10813), [Temporal semantic memory](https://arxiv.org/abs/2601.07468), [AFA, multi-user memory](https://arxiv.org/html/2604.25022v1), [ChatGPT memory Dreaming, secondary](https://letsdatascience.com/news/openai-upgrades-chatgpt-memory-architecture-for-fresher-pers-b26b51d5), [Open WebUI memory](https://docs.openwebui.com/features/chat-conversations/memory/), [PERSONA steering vectors, ICLR 2026](https://arxiv.org/html/2602.15669), [llama.cpp control vectors](https://github.com/jukofyork/control-vectors), [AgentFloor, small-model tool use](https://arxiv.org/abs/2605.00334), [llama.cpp tool-call grammar issue](https://github.com/ggml-org/llama.cpp/issues/24807), [Home Assistant LLM API](https://developers.home-assistant.io/docs/core/llm/), [Anthropic, context engineering](https://www.anthropic.com/engineering/effective-context-engineering-for-ai-agents), [semantic-router](https://github.com/aurelio-labs/semantic-router), [MCP Apps spec](https://blog.modelcontextprotocol.io/posts/2026-01-26-mcp-apps/).
+
 ## People, relationships and permissions
 
 The spec landed 2026-09-05 (`docs/dev.md`, "Entities, relationships and
@@ -396,6 +630,15 @@ implemented on the hub yet.
       never a global mode... No per-person advanced mode switch." VS Code
       has no such toggle either; advanced-ness lives in groups and
       filters. Recorded here so it is not re-proposed.
+
+- [ ] **Selector renderers so the custom sections can become declared
+      keys** (M; the concrete reason Settings cannot be declarative
+      today) - `SettingField` handles text, number, select and boolean,
+      and secrets are read-only. Eight of ten sections on the page are
+      custom React (voice catalog, cloned voices, PIN, commands, HF
+      token, models, backups, routing stats) against SETTINGS.md Rule 1.
+      Add `duration`, `time`, `person`, `media` and a secret-entry flow,
+      then re-declare the sections that only needed those.
 
 ## UI / shell
 
@@ -526,6 +769,161 @@ implemented on the hub yet.
       widget is the most natural place a proactively-fetched fact would
       actually surface).
 
+- [ ] **The home screen: keep the dashboard, make it a real home**
+      (decision for Jesse, then a design pass, M) - Jesse asked
+      (2026-09-05) whether legacy's home (a grid of app shortcuts with
+      favorites, search, a greeting and the weather, every app standalone
+      with a consistent back-to-home) is still the modern answer. The
+      honest read from the research and the 2026-08-25 navigation note:
+      the bones are right and current, the emphasis is dated.
+      - **Right and still current:** a consistent app shell with Back
+        that always works (plan 6.4, Apple TV and every smart display do
+        this); favorites as the family's own list, shipped with fewer
+        pins than eleven so it never becomes a menu; search on the home
+        screen; the home's row order following the pinned order (Plex's
+        one-list-two-payoffs trick, already in the 08-25 note).
+      - **Dated:** a grid of app icons as the *content* of home. That is
+        a 2010 phone home screen. Every 2026 family surface (Hearth,
+        Skylight, Echo Show, Nest Hub) leads with glanceable state (who
+        is here, today's plan, one thing worth knowing) and keeps app
+        shortcuts as a strip. Hearth's "built with the child as the
+        primary user" is the closer reference for a shared kitchen
+        screen than Skylight's parent-first calendar.
+      - **Recommendation:** home is shell-owned (plan 6.1: the platform
+        owns all chrome), composed from package contributions: a
+        greeting with who is here (from sign-in now, voice or face ID
+        later), a row of "today" cards (the "skills as home-screen
+        widgets" item above is exactly this, so the two items merge),
+        a pinned-apps strip driven by the same `pinnedIds` the sidebar
+        uses, and one prompt box that is both search and chat (type or
+        talk; finds apps, memories and answers). Each app keeps the
+        consistent header with Back; on desktop the sidebar stays the
+        one permanent navigation and auto-collapses in consumption
+        modes, on phone it is the bottom bar, on TV the focusable rail,
+        exactly as plan 6.1 already says, so "standalone app" is what
+        every surface except desktop looks like anyway.
+      - **Personal data on the shared screen only after the person is
+        confirmed** (Nest Hub's voice-matched-only toggle is the model);
+        until then home shows household-level cards only.
+- [ ] **Unified search: one palette over everything** (M; Jesse,
+      2026-09-05: "we need a unified search, I think we had that in the
+      old app") - legacy did: a Spotlight palette (app entries and
+      offline libraries client-side) over one `/api/search` endpoint
+      that fanned out across twelve content types (bookmarks, news,
+      companions, devices, saved videos, podcasts, clips, notes, books,
+      music, chat) with FTS5, each provider independent and best-effort
+      (a throwing provider contributes nothing rather than failing the
+      search), six hits per provider, the last token prefix-matched so
+      partial words match as you type, results grouped by type and
+      navigating to a route on select. Nothing like it exists in the
+      rebuild; `SearchBox` per page and "the shell palette for
+      everything" are already the rule in plan 6.4 and UI.md. Build it
+      as the shell's command palette (Cmd/Ctrl+K, and the Search row
+      on every surface, since this audience will not learn a shortcut):
+      core providers for apps, people, memories, conversations, settings
+      keys and commands (the VS Code model the Settings rebuild already
+      cites), a `search` blueprint so any package contributes a provider
+      over its own tables, the web-search skill as the fall-through, and
+      "ask MaiPai" as the last row so search and the chat prompt are one
+      box. This is the same prompt box the home-screen item above
+      describes; build it once. Legacy's web-search ladder
+      (`webSearch.ts`: a local SearXNG metasearch sidecar first, keyless
+      scrapers only as fallback) feeds the Priority-1 web search skill,
+      with one caveat for that item: the local metasearch sidecar fits
+      the "we are the user" rule, scraping Google from the hub's address
+      does not.
+- [ ] **Input-mode detection in the kit** (M, everything TV depends on
+      it) - one `useSurface()` hook from `pointer: coarse`, `hover:
+      none`, keyboard-only and remote/gamepad, so TV becomes a real
+      surface instead of an undefined one. Legacy's `use-coarse-pointer`
+      existed because Tailwind `hover:` made video controls unreachable
+      on touch for months; its TV pages each hand-rolled `{row, col}`
+      focus, the lesson being one spatial-navigation hook in the kit,
+      never per page.
+- [ ] **Two render profiles per component, near and far** (M, after the
+      hook) - focus scale, the tvOS type scale, no free text entry on
+      far, as schema-level rules per plan 6.4's "TV in one rule", so no
+      package does TV work.
+- [ ] **Phone chrome per UI.md** (M) - a five-entry bottom bar with More,
+      replacing the 64 px icon-only rail that ships under 640 today (the
+      08-25 note already warned icon-only nav raises cognitive load for
+      occasional users; it is the phone default now).
+- [ ] **A profile switcher in the header** (S) - sign-out is the only way
+      to change person, which on a shared tablet or TV is the primary
+      gesture. Sign-in already has the picker; reuse it with the PIN
+      prompt.
+- [ ] **The UiNode renderer, and the schema catching up to the kit**
+      (M-L; sharpens the `app` item above) - `spec/ui/schema.json` has
+      six node kinds and renders nothing; CardGrid, MediaShelf, List,
+      DetailPane and SplitView have no nodes, and Form, EmptyState and
+      Progress already drift from theirs. Add the five nodes now with a
+      test that each React primitive's props are a superset of its node,
+      then make Chat the first page rendered from JSON (bindings plus the
+      five actions). **A re-decision is needed on the `app` item:** the
+      dev-record's "same process, same origin, React route subtree"
+      verdict contradicts plan 6.2 (pages are schema data; custom React
+      only as a `platforms: [web]` federated bundle), cannot be installed
+      from a catalog without a rebuild, cannot be served by the robot's
+      standalone shell, and cannot render on Go. That is the single
+      largest principle-7 risk in the codebase. Shape the schema like
+      A2UI and json-render (a flat node list against a catalog of
+      allowed components, data model separate from layout, incremental
+      patches): the design that both LLM generation and native renderers
+      have converged on. Do not adopt MCP Apps for Go; it is iframe-bound.
+- [ ] **Chat surface, the missing basics** (M total) - markdown via a
+      maintained renderer (react-markdown plus rehype-sanitize; bubbles
+      are `whitespace-pre-wrap` today so a list shows raw asterisks); a
+      multi-line Textarea composer; stop generating (no abort exists,
+      Send is just disabled); copy and regenerate; suggested prompts on
+      the empty state; timestamps and day dividers; `aria-live` on the
+      streaming bubble (a screen reader hears nothing during a reply);
+      a resume cursor on the stream (legacy's `since=` auto-resume was
+      added after a truncated reply was reported as success); the
+      "demo only" wake banner reworded for a family, not a developer.
+- [ ] **Conversations as records** (M, spec first) - one endless thread
+      per person today with no boundaries, titles, search or delete. A
+      `Conversation` shape in `spec/`, new chat, a list, delete and
+      clear-all (the batch rule's named consumer), and a companion axis
+      per conversation, which plan 4.14 leaves unspecified.
+- [ ] **Push-to-talk in the composer** (M) - `mic-capture.ts` exists for
+      wake word only and there is no STT route. Legacy `sttSession.ts`
+      carried the tuned numbers (Silero 0.5/0.35 hysteresis, 0.32 s
+      pre-roll, decode kicked at the voiced-to-silence edge and reused,
+      saving 0.6-0.8 s; ort-web WASM because ort-node segfaults under
+      Bun); copy them.
+- [ ] **Kit gaps found by the audit** (S each) - `AsyncState` (loading,
+      error with retry, empty) to replace the triad copy-pasted across
+      five pages; Checkbox (People uses a raw input), Textarea, Tabs
+      with a URL-bound active tab, Chip/Toggle (Chat hand-rolls two);
+      MemoryPage onto `List`; Shell and NotificationBell tests.
+- [ ] **The kit ESLint config UI.md mandates** (S) - `lint` is `tsc`
+      only; nothing bans raw colours, `lucide-react` imports outside the
+      icon registry (one already leaks), or inline layout in apps.
+      Legacy's `check-design-contract.mjs` had waivers and a ratchet
+      baseline; the mechanism belongs in `@maipai/standards`.
+- [ ] **A real PWA** (S-M) - manifest only today: no service worker, no
+      offline page, one oversized icon. Copy the rules legacy's `sw.js`
+      v5 learned: navigations network-first with an offline page (a
+      cached index once pinned old hashes for several reloads), full
+      passthrough on Firefox (local network access), reload exactly once
+      on `controllerchange`; plus `lazyRetry` (stale-chunk reload once
+      per session, hit right after an update) and an error boundary,
+      neither of which exists.
+- [ ] **Reduced motion, type floor, theme colour** (S) - no
+      `prefers-reduced-motion` handling anywhere; `text-[10px]` and
+      `text-xs` below the 16 px phone floor in the bell and thread; the
+      `theme-color` meta is hardcoded dark. Add an appearance setting
+      (light, dark, system) per person, the first step toward plan
+      decision 13's per-person generated themes.
+- [ ] **A screenshot matrix in the pipeline** (M; sharpens the tracked
+      "wire the measurable half" note) - every page at every surface,
+      light and dark, with overflow and target checks, per UI.md; today
+      one hero shot at one size.
+- [ ] **Health and Repairs pages, the updates projection, self-update
+      with stage, swap, health check and rollback** (L) - plan v0.1
+      scope, absent here entirely; "cut a first release" below cannot be
+      exercised end to end without them.
+
 ## Proactive / ambient intelligence
 
 - [ ] **Cache skill lookups proactively, and surface them unprompted when
@@ -540,6 +938,10 @@ implemented on the hub yet.
       this is "run certain lookups on a schedule and keep the last result
       somewhere," which is mostly new plumbing on top of infrastructure
       that's already built, not a new subsystem.
+      Sharpened 2026-09-05: plan 4.10 already declares the manifest
+      fields for this (`cache: {key_template, ttl_s, stale_ok_s,
+      max_bytes}` and `warm: {schedule, keys}`, `warm_on`), so this is
+      implementing a declared shape, not designing one.
     - **Matching a cached fact to what a specific person actually cares
       about** (M-L) - needs a real answer to "how does the hub know
       someone likes video games" at all. `memory.ts`'s existing recall
@@ -561,6 +963,103 @@ implemented on the hub yet.
       closer to the persona work's "engagement depth" dimension
       (`docs/dev.md`, companion personas note) than to notifications.
       Worth deciding together with that note rather than separately.
+
+## Portability and the link (hub <-> robot)
+
+Plan chapter 7 (pairing, one oplog with HLCs, merge policies, the
+never-sync allowlist, adoption) and principle 3 (every record is the
+spec shape with id, provenance and clock stamp from first boot, so
+pairing is a transfer, never a translation). The audit checked the code
+built so far against that promise. `bot` itself is docs-only and blocked
+on a spec tag that was never cut.
+
+**Fixes (data debt already accruing)**
+
+- [ ] **Forget and person-delete must write tombstone ops, not bare
+      DELETEs** (S-M) - `memory.forget()` is a bulk DELETE and person
+      deletion cascades hard deletes of memories, settings and jobs.
+      Plan 7.3: delete is a tombstone "kept in the log so a restore
+      cannot resurrect it; forget on either side is one op." A robot
+      that synced before the forget would push those memories back on
+      reconnect. The most direct principle-3 violation in the code.
+- [ ] **A clock stamp on every spec record** (S spec, M hub) - only
+      `SettingValue` carries `hlc`. Person, MemoryRecord, Entity,
+      Relationship and Grant have `source` but no clock (plan 3.1 gives
+      the grant one; the schema dropped it). Without it 7.3's "same id is
+      a no-op unless newer" cannot be evaluated. `lib/hlc.ts` exists and
+      is untested; test it while wiring it.
+- [ ] **A spec-or-local verdict for each hub-internal table** (M) -
+      `conversation_turns`, `scheduled_jobs`, `commands`,
+      `notification_deliveries`, `cloned_voices`, `model_download_jobs`
+      each say "promote when the robot needs it". Plan 4.14 syncs robot
+      turns as conversation records, 4.7 runs timers on both nodes, and a
+      household's "when I say X" command must work on a standalone robot
+      (principle 2). Promote turns, jobs and commands now; record why
+      the other three stay local.
+- [ ] **Cut `spec-v0.1.0`** (S, Jesse's call: it is a release) - the bot
+      repo pins a tag that does not exist. One tag unblocks Robot v0.1.
+- [ ] **Mark `weather`, `define`, `joke`, `trivia` `platforms: ["home",
+      "bot"]`** (S) - nothing in them is hub-specific; the robot needs
+      weather offline-capable per plan 5.4.
+
+**The link itself**
+
+- [ ] **A Device record and `spec/link/`, spec-first** (M) - the
+      envelope (`v, id, t, in_reply_to, ts_hlc, body, final`), the op
+      shape (`opId, entity, entityId, upsert|delete|supersede, hlc, node,
+      spec version, payload, prev`), link states, and the never-sync
+      allowlist with its grep test, all in `spec/` before any transport.
+      `deviceId.ts` is a plain-file stand-in; settings' device scope
+      validates against nothing.
+- [ ] **Sync engine decision** (design pass, L) - the research verdict:
+      single-writer replicators (Litestream, LiteFS) are out; server-side
+      engines (PowerSync, ElectricSQL, Turso Sync) need a database that
+      is not SQLite; cr-sqlite gives column-level LWW from any language
+      but calls itself not production-ready and loads a native extension
+      into both runtimes. Recommendation: own a change-log table in the
+      spec applied with column-level last-writer-wins by HLC, one
+      algorithm in TS and Python with one fixture set, hub-authoritative
+      as a policy (hub site id wins ties), memory as append-plus-
+      invalidate so it never needs LWW on prose. Spike cr-sqlite first
+      to validate the change-log design against a known implementation.
+- [ ] **Copy the legacy link plumbing that was fixed on real reconnects**
+      (S-M) - `deviceToken.ts` (365-day, sha256 stored, 20 per user),
+      `hubIdentity.ts` (instance id minted once) and `hubEndpoints.ts`
+      (an address book that must match the instance id before posting
+      credentials: "a laptop on a cafe network gets a 200 from a
+      stranger's box"), the bot's `pairing.py` (token 0o600, atomic,
+      corrupt means "not paired", never a crash), `OfflineQueue` (max
+      500, dedupe by key in place, drop oldest), duplicate-session
+      eviction with `destroy()` on the old socket, a bounded writer,
+      EADDRINUSE treated as down. Legacy had no HLC or merge; only the
+      transport lessons transfer.
+- [ ] **One pairing flow, with a rate limit** (M, verdict) - legacy grew
+      three code flows (6-char pod, claim-by-hardware-id, 5-minute TV
+      Quick Connect) and `/pair` had no limiter. Plan 7.1 is one flow;
+      decide whether Quick Connect for TV is the same flow or a second.
+- [ ] **Verdict: robot fallback order** (Jesse's call) - the legacy bot's
+      `FallbackLanguageModel` is local-first; the plan is hub-as-brain
+      with a sub-second connect timeout and no hedging. Decide before
+      the robot's dialogue loop is rebuilt.
+- [ ] **Python ports of the shared floor** (M, required for Robot v0.1)
+      - the safety classifier, `normalizeForSpeech` and
+      `records/ts/validate.ts` are TS-only; plan 4.3 says the floor runs
+      on the robot even when the hub answers. Same corpus, both
+      languages, kept identical like the recipe interpreters.
+- [ ] **An export bundle** (M) - JSON, one file per record type,
+      provenance kept; the fallback pairing path and the per-person
+      export the spec already promises. Watch the W3C agent-memory
+      interop group and the Agent Memory Protocol rather than adopting
+      either; nothing is used widely enough to depend on.
+- [ ] **Speak Wyoming and expose an OpenAI-compatible chat endpoint** (M)
+      - Home Assistant satellites, Willow boxes and OVOS personas can
+      then use the hub as their brain; the robot becomes one more
+      Wyoming client. Hardware breadth for free, and it fits plan 8's
+      ESPHome/HA posture. Legacy's Wyoming socket ran unauthenticated as
+      admin; not that.
+- [ ] **Round-trip fixtures across both repos** (S, once the link exists)
+      - a record written on the robot and synced to the hub is byte-
+      identical to one written on the hub; the robot never translates.
 
 ## Voice / robot
 
@@ -588,11 +1087,171 @@ implemented on the hub yet.
       `notifications` field is read by nothing yet - a real, deliberately
       deferred extension point, not forgotten).
 
+- [ ] **Doc drift the audit found** (S, but some of it is Jesse's call) -
+      `.github/CLAUDE.md` says the rebuild follows `home/spec/design/`,
+      which does not exist; the plan lives at
+      `~/.claude/plans/purring-chasing-noodle.md`, outside every repo and
+      unversioned. `.github/STACK.md` and the global `CLAUDE.md` point at
+      a `home/agents.md` that does not exist either. Committing the plan
+      into `home/spec/design/` needs a PII pass first (it names Jesse's
+      machines) and is his call. Also stale: `spec/llm/README.md`
+      ("non-streaming only") and `spec/ui/README.md` ("single-shot JSON")
+      since streaming landed 2026-09-04; plan 5.1/5.6 still say `skill`
+      for what is now `plugin`; "tier" means both routing tiers 0/1/2
+      (plan 4.5) and package tiers 0/1 (plan 5.2), often in adjacent
+      sentences, and one ladder should be renamed.
+- [ ] **Roles versus grants is a wider conflict than the one item under
+      People** (S decision) - the Grant spec removes age and role from
+      authorization while `Person.role` stays required, `min_role` is on
+      every manifest, and ENGINEERING.md, UI.md's kid presets and plan
+      4.2/4.3/5.7 are all age-shaped. Safety still needs an age band
+      either way: derive it from birthdate and put `age_range` in the
+      turn context (S), then decide the rest once.
+- [ ] **Content ceiling record and dials** (M) - `spec/README.md` lists
+      it unbuilt; the safety classifier reads the band through a role
+      proxy. Never mentioned here until now.
+- [ ] **`@hono/zod-openapi` conversion** (M) - org rule: "any route you
+      touch gets converted"; zero of 17 route files comply and dev.md
+      tracks it as debt with no backlog line.
+- [ ] **Rate-limit the remaining raw fetches** (S) - Telegram (fired per
+      notification, no bucket) and the HF voice catalog bypass
+      `tryConsume`; only `host.fetch` and Home Assistant go through it.
+- [ ] **A generic wall, budget and probe layer before any media package**
+      (M) - `rateLimiter.ts` is a non-blocking bucket only. Legacy's
+      `quiet.ts`/`accessMonitor.ts`/`sessionKeeper.ts` trio encodes the
+      2026-08-28 YouTube wall: a per-service wall remembered 24 h, daily
+      caps split household 1500 / background 400 so background exhausts
+      first, one probe per 6 h with the result persisted (the old probe
+      ran five clients every 30 min and kept the wall up five days), a
+      failure-quiet after three failures, one writer per cookie jar.
+      Build it once, generically, before the first integration needs it.
+- [ ] **The hub's Python runtime question in STACK.md** (S decision) -
+      STACK.md gives the hub no Python, yet `tts` needs `uvx` at runtime;
+      flagged in `spec/voice/README.md`, decided nowhere.
+- [ ] **Identity and trust pieces plan v0.1 scopes and this file did not
+      track** (M each) - passkeys, an approval queue, Quick Connect for
+      TV sign-in, a household CA with `maipai.local` mDNS and a trust
+      step (wake word phase 1 already needs a secure context on the
+      LAN), hub-key signing of the bundled default set, the emergency
+      kit and hub/SMB backup targets, a restore drill in the release
+      skill, and the `user/` docs tier (only `dev/` exists).
+- [ ] **Tests the audit found missing** (S) - `hlc.ts` seed and compare,
+      `personLifecycle`, `access`, and one test proving a specific
+      recalled memory text actually lands in the prompt for a matching
+      query (memory tests stop at `recall`; prompt tests use synthetic
+      matches).
+- [ ] **Copy the legacy runtime guards** (S-M) - a download stall
+      watchdog (a 7 GB checkpoint sat at "28 s left" for 21 min), 6-
+      attempt backoff, negative caches that store only genuine misses
+      (313 poisoned rows once purged), max resident models with an
+      orphan sweep (orphaned runners forced every load to CPU: a 90 s
+      "hi"), a boot watchdog capped at three reloads, and a crash-boot
+      hold that refuses heavy compute for 30 minutes after a dirty boot
+      (three power-offs in one night). Check `llmSupervisor.ts`,
+      `modelDownload.ts` and `telegramChannel.ts` for equivalents first;
+      the audit did not read them for that.
+
+## Legacy: copy, re-examine, record
+
+The rebuild is about 23k lines of app code against legacy's 413k
+(172 route files, 168 pages, 60 chat tools, 22 releases). Per principle
+8 nothing carries over by existing; per the org's "copy from legacy"
+allowance, hard-won logic does. The chat, memory, link, voice, limiter
+and UI copy items are filed in their own sections above; this section
+holds what is left: features needing a verdict, and lessons that would
+otherwise be lost with the mirror.
+
+- [ ] **Verdicts for the features absent from both this file and the
+      rebuild** (L, one line each, recorded here before anything is
+      built) - MaiPai TV linear channels; Music Studio, karaoke and
+      stems; Podcasts (with generated shows, gpodder, snips); Books,
+      readers, OPDS and KOSync; Bookmarks, Reader and Clipper;
+      Reference (Kiwix ZIM); the coding agent and sandbox; Remote (SSH,
+      VNC, RDP); Notes and voice memos; Photo Frame; Cameras (Frigate);
+      the Routines engine; Drop (file relay); Home Inventory; Maps
+      (offline MapLibre plus GraphHopper); Recipes, Medical, Reverse
+      Lookup, On This Day, Holidays, Moon, Local Events, Speed Test;
+      File Converter; Spotlight search, Writing Tools, Watch and Listen
+      Together, Cast; in-app docs; the Display/HUD pod pages; the DNS
+      filter; family audio guardrails; storage locations; monitoring;
+      uninstall; consent records; MCP in and out; remote engine pairing;
+      SABnzbd/aria2; ESPHome flashing; the Electron desktop (HUD,
+      hotkey, tray, dictation); Atom Echo and Tab5 firmware; the tvOS
+      Top Shelf endpoint. Plus roughly 35 of legacy's 60 chat tools with
+      no package and no line here (datetime, holidays, moonphase,
+      onthisday, showtimes, recipes, medical, maps, forget,
+      recall_conversations, request_media, set_status, sleep,
+      service_status, machineStatus, others), and the bot's 83 skill
+      classes in 55 modules (bot `dev.md` says "roughly 90").
+- [ ] **The wake-word training and calibration pipeline** (L; bot
+      `dev.md` already plans the port, the code is where the fixed
+      pipeline lives) - `train_wakeword.py` plus `wakewordTrainer.ts`:
+      event-replay calibration (per-window counting picked thresholds
+      that measured 40-140 false accepts per hour live), gates of at
+      most one false accept per hour and recall of at least 0.85 on
+      held-out real audio, the possessive near-miss bucket, harvested
+      false triggers. The trained manifest v2 reached 0.00 FA/hr and 85%
+      recall over 34 minutes of real audio and still fires on "hey my
+      pie".
+- [ ] **The bot's voice loop numbers** (M, when the voice loop is
+      rebuilt) - 0.3 s pre-roll with retry from the onset byte, 6 s wake
+      patience, detector reset on every sleep (the robot re-woke
+      itself); Smart Turn v3.2 endpointing (threshold 0.5, 0.2 s probe
+      every 0.25 s, 1.2 s ceiling, 12 s max, 120 ms per probe budget);
+      barge-in (0.6 s confirm, stop phrases bypass, backchannels never
+      stop, duck 0.35 without AEC and 0.75 with, 0.25 s playout slices
+      because blocking writes left the mic unwatched, 0.7 s re-arm
+      grace, self-echo at 0.8 overlap, interrupted text clipped from
+      history); output leveling to a target RMS and a sink drain sized
+      from device latency plus 0.15 s (the last second of every line
+      used to be lost); the browser's barge-in thresholds
+      (`useHandsFree.ts`: 700 ms arm, RMS 0.04 plus probability 0.60
+      over 12 frames). The hub's `sentenceSpeechScheduler.stop()` exists
+      and nothing calls it.
+- [ ] **The bot's four bench harnesses** (L) - honesty (105 questions,
+      raw versus guarded), interaction (424 cases), latency (refuses to
+      run on a busy machine), conversation (34 real broken replies),
+      rebuilt against the turn engine. The plan's "bench on demand" tier
+      has no benches.
+- [ ] **Lessons to record in the right doc, so they survive the mirror**
+      (S) - in org `CLAUDE.md`: cache only genuine misses, never a
+      transient failure; never throw synchronously inside a socket
+      callback (the 7/29 three-hour outage); the age-gate inversion
+      (resolving a stream through an adult account removes a platform's
+      own 18+ refusal for a kid profile: gate the stream route, not the
+      search), which belongs with the safety invariants; a green tick is
+      never inferred from the absence of bad news (`check.sh | tail`
+      once shipped a lint failure by reporting tail's exit code). In
+      `home/docs/dev.md`: the laptop power path caused the hub's hard
+      power-offs (GPU clock cap re-asserted hourly, charge cap 28%); the
+      Windows self-update rules (Defender holds `dist/` handles past
+      3 s, untracked files are not dirty, an unresolvable upstream never
+      reads "up to date"); VRAM hygiene (Vulkan ignores
+      `CUDA_VISIBLE_DEVICES`; a context-size mismatch between warm-up
+      and the real call costs a 930 ms reload per turn); the
+      chat-latency "do not change without re-testing" list (warm-up
+      prefix equals chat prefix, background LLM work must yield: the
+      August 15-second regression); the HTTP/1.1 six-connection cap
+      shared across tabs (SSE once starved `/api/health`); 16 px inputs
+      or iOS zooms, never `maximum-scale=1`. In `bot/docs/dev.md`: the
+      bodies of legacy `hardware.md` (pin map, I2C and USB budget,
+      PCA9685 versus the mux) and `design-decisions.md` (58 dated
+      sections), which the fresh repo cites by path and does not
+      contain; the driver quirks (ST7789 at 16 MHz, 40 MHz draws
+      nothing; the PCA9685 driver never clears ALLCALL; the Pi 5 cannot
+      drive WS2812, hence the Pico; 22.05 kHz crashed Piper on the
+      array); "instruments lie" (history primed with a clock answer,
+      lifetime CPU from `ps`, repeated-prompt benches hiding prompt
+      evaluation).
+
 ## The other three products (status, not this repo's job to fix)
 
 - **`bot`** (robot companion) - only docs ported from the legacy
   pre-rebuild code onto the fresh repo; the hardware-bench work referenced
-  elsewhere was on the *old* codebase, not this platform.
+  elsewhere was on the *old* codebase, not this platform. Blocked on the
+  `spec-v0.1.0` tag (see "Portability and the link"), and its `dev.md`
+  cites legacy `hardware.md` and `design-decisions.md` by path without
+  containing them (see "Legacy: copy, re-examine, record").
 - **`catalog`** (public package store) - repo scaffolding only
   (LICENSE/NOTICE/README, standards pin).
 - **`go`** (Apple TV/iPhone client) - marketing copy only, no real app yet.
