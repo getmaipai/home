@@ -4,7 +4,7 @@ import { groupSettings, sectionTitle, type SettingsGroup } from "@/kit/settings/
 import { SettingField } from "@/kit/settings/SettingField";
 import { Progress } from "@/kit/primitives/Progress";
 import { Section } from "@/kit/primitives/Section";
-import { Button } from "@/kit/components/Button";
+import { Button } from "@/kit/ui/button";
 
 interface SettingsRendererProps {
   scope: "household" | "person" | "device";
@@ -112,7 +112,7 @@ export function SettingsRenderer({ scope, scopeValue }: SettingsRendererProps) {
   if (error && registry === null) {
     return (
       <div className="flex flex-1 flex-col items-center justify-center gap-3 p-8 text-center">
-        <p className="text-base text-[hsl(var(--destructive))]">{error}</p>
+        <p className="text-base text-[var(--destructive)]">{error}</p>
         <Button variant="secondary" onClick={load}>
           Try again
         </Button>
@@ -147,16 +147,16 @@ export function SettingsRenderer({ scope, scopeValue }: SettingsRendererProps) {
   return (
     <div className="flex flex-col gap-6 p-4">
       {error ? (
-        <div className="rounded-[var(--radius)] bg-[hsl(var(--muted))] px-3 py-2 text-base text-[hsl(var(--destructive))]">
+        <div className="rounded-[var(--radius)] bg-[var(--muted)] px-3 py-2 text-base text-[var(--destructive)]">
           {error}
         </div>
       ) : null}
       {groups.length === 0 ? (
-        <p className="text-base text-[hsl(var(--muted-foreground))]">No settings yet.</p>
+        <p className="text-base text-[var(--muted-foreground)]">No settings yet.</p>
       ) : (
         groups.map((group) => (
           <Section key={group.id} heading={sectionTitle(group.id)}>
-            <div className="divide-y divide-[hsl(var(--border))]">
+            <div className="divide-y divide-[var(--border)]">
               {group.basic.map((s) => (
                 <SettingField
                   key={s.def.key}
@@ -169,15 +169,16 @@ export function SettingsRenderer({ scope, scopeValue }: SettingsRendererProps) {
             </div>
             {group.advanced.length > 0 ? (
               group.foldAdvanced && !advancedOpen[group.id] ? (
-                <button
+                <Button
                   type="button"
+                  variant="link"
                   onClick={() => setAdvancedOpen((prev) => ({ ...prev, [group.id]: true }))}
-                  className="min-h-12 w-fit text-base text-[hsl(var(--muted-foreground))] hover:underline"
+                  className="h-auto min-h-12 w-fit text-muted-foreground"
                 >
                   Show {group.advanced.length} advanced settings
-                </button>
+                </Button>
               ) : (
-                <div className="divide-y divide-[hsl(var(--border))] border-t border-[hsl(var(--border))] pt-1">
+                <div className="divide-y divide-[var(--border)] border-t border-[var(--border)] pt-1">
                   {group.advanced.map((s) => (
                     <SettingField
                       key={s.def.key}

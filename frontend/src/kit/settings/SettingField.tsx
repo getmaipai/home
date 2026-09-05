@@ -1,8 +1,9 @@
 import { useEffect, useState, type ReactNode } from "react";
 import type { MergedSetting } from "@/kit/settings/groupSettings";
-import { Input } from "@/kit/components/Input";
-import { Select } from "@/kit/components/Select";
-import { Switch } from "@/kit/components/Switch";
+import { Input } from "@/kit/ui/input";
+import { Select } from "@/kit/primitives/Select";
+import { Switch } from "@/kit/ui/switch";
+import { Button } from "@/kit/ui/button";
 
 // Every `select`-selector registry value is a raw machine token today
 // ("auto", "quantized", "vera") - a code review on tts.voice_id
@@ -91,7 +92,7 @@ export function SettingField({ setting, onChange, onReset, disabled }: SettingFi
     // row, not an editable control, since setting a secret needs its own
     // flow (a paste-and-confirm dialog) that no key exercises yet.
     control = (
-      <span className="text-base text-[hsl(var(--muted-foreground))]">
+      <span className="text-base text-[var(--muted-foreground)]">
         {resolved.isSet ? "Set" : "Not set"}
       </span>
     );
@@ -139,7 +140,7 @@ export function SettingField({ setting, onChange, onReset, disabled }: SettingFi
     );
   } else {
     control = (
-      <span className="text-base text-[hsl(var(--muted-foreground))]">
+      <span className="text-base text-[var(--muted-foreground)]">
         Not supported in this hub version yet.
       </span>
     );
@@ -155,16 +156,11 @@ export function SettingField({ setting, onChange, onReset, disabled }: SettingFi
     <div className="flex flex-col items-start gap-2 py-3 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
       <div className="flex min-w-0 flex-col gap-0.5">
         <span className="text-base">{def.label}</span>
-        {def.help ? <span className="text-base text-[hsl(var(--muted-foreground))]">{def.help}</span> : null}
+        {def.help ? <span className="text-base text-[var(--muted-foreground)]">{def.help}</span> : null}
         {canReset ? (
-          <button
-            type="button"
-            onClick={onReset}
-            disabled={disabled}
-            className="mt-1 min-h-12 w-fit text-base text-[hsl(var(--primary))] hover:underline disabled:opacity-50"
-          >
+          <Button type="button" variant="link" onClick={onReset} disabled={disabled} className="mt-1 h-auto min-h-12 w-fit">
             Reset to default
-          </button>
+          </Button>
         ) : null}
       </div>
       <div className="w-full min-w-0 sm:w-auto sm:shrink-0 sm:pt-1">{control}</div>

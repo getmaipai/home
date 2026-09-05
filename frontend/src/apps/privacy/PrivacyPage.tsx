@@ -3,7 +3,7 @@ import { Page } from "@/kit/primitives/Page";
 import { Section } from "@/kit/primitives/Section";
 import { List } from "@/kit/primitives/List";
 import { Progress } from "@/kit/primitives/Progress";
-import { Button } from "@/kit/components/Button";
+import { Button } from "@/kit/ui/button";
 import { getIcon } from "@/kit/icons";
 import { api, ApiError, type PrivacyConnection } from "@/lib/api";
 
@@ -57,7 +57,7 @@ export function PrivacyPage() {
     return (
       <Page title="Privacy">
         <div className="flex flex-1 flex-col items-center justify-center gap-3 p-8 text-center">
-          <p className="text-base text-[hsl(var(--destructive))]">{error}</p>
+          <p className="text-base text-[var(--destructive)]">{error}</p>
           <Button variant="secondary" onClick={load}>
             Try again
           </Button>
@@ -101,19 +101,19 @@ export function PrivacyPage() {
             renderItem={(row) => (
               <div className="flex min-w-0 flex-col gap-1 py-1">
                 <span className="text-base font-medium">{row.destination}</span>
-                <p className="text-base text-[hsl(var(--muted-foreground))]">
-                  <span className="text-[hsl(var(--foreground))]">When:</span> {row.when}
+                <p className="text-base text-[var(--muted-foreground)]">
+                  <span className="text-[var(--foreground)]">When:</span> {row.when}
                 </p>
-                <p className="text-base text-[hsl(var(--muted-foreground))]">
-                  <span className="text-[hsl(var(--foreground))]">What it sends:</span> {row.what}
+                <p className="text-base text-[var(--muted-foreground)]">
+                  <span className="text-[var(--foreground)]">What it sends:</span> {row.what}
                 </p>
-                <p className="text-base text-[hsl(var(--muted-foreground))]">
-                  <span className="text-[hsl(var(--foreground))]">Who gets it:</span> {row.who}
+                <p className="text-base text-[var(--muted-foreground)]">
+                  <span className="text-[var(--foreground)]">Who gets it:</span> {row.who}
                 </p>
-                <p className="text-base text-[hsl(var(--muted-foreground))]">
-                  <span className="text-[hsl(var(--foreground))]">How long they keep it:</span> {row.retention}
+                <p className="text-base text-[var(--muted-foreground)]">
+                  <span className="text-[var(--foreground)]">How long they keep it:</span> {row.retention}
                 </p>
-                <p className="text-base text-[hsl(var(--muted-foreground))]">
+                <p className="text-base text-[var(--muted-foreground)]">
                   {/* Just the name, no noun. "The Weather skill" would
                       now be wrong (a `skill` is a different package kind
                       since the 2026-09-05 rename) and "plugin" is jargon
@@ -136,8 +136,8 @@ export function PrivacyPage() {
 
         {data.offlinePlugins.length > 0 ? (
           <Section heading="Never leaves your house">
-            <div className="flex items-start gap-3 rounded-[var(--radius)] border border-[hsl(var(--border))] p-3">
-              <LockIcon className="mt-0.5 h-5 w-5 shrink-0 text-[hsl(var(--muted-foreground))]" aria-hidden />
+            <div className="flex items-start gap-3 rounded-[var(--radius)] border border-[var(--border)] p-3">
+              <LockIcon className="mt-0.5 h-5 w-5 shrink-0 text-[var(--muted-foreground)]" aria-hidden />
               <p className="text-base">
                 {joinNames(data.offlinePlugins)} work entirely on this computer and connect to nothing at all.
                 So does everything MaiPai remembers, every conversation, and every profile in your household.

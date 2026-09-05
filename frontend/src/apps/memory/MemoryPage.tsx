@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Page } from "@/kit/primitives/Page";
 import { EmptyState } from "@/kit/primitives/EmptyState";
 import { Progress } from "@/kit/primitives/Progress";
-import { Button } from "@/kit/components/Button";
+import { Button } from "@/kit/ui/button";
 import { getIcon } from "@/kit/icons";
 import { api, ApiError, type MemoryRecord } from "@/lib/api";
 import { CATEGORY_LABELS, scopeLabel } from "@/apps/memory/memoryLabels";
@@ -55,7 +55,7 @@ export function MemoryPage() {
     return (
       <Page title="Memory">
         <div className="flex flex-1 flex-col items-center justify-center gap-3 p-8 text-center">
-          <p className="text-base text-[hsl(var(--destructive))]">{error}</p>
+          <p className="text-base text-[var(--destructive)]">{error}</p>
           <Button variant="secondary" onClick={load}>
             Try again
           </Button>
@@ -80,7 +80,7 @@ export function MemoryPage() {
     <Page title="Memory">
       <div className="flex flex-1 flex-col gap-3 overflow-y-auto p-4">
         {error ? (
-          <div className="rounded-[var(--radius)] bg-[hsl(var(--muted))] px-3 py-2 text-sm text-[hsl(var(--destructive))]">
+          <div className="rounded-[var(--radius)] bg-[var(--muted)] px-3 py-2 text-sm text-[var(--destructive)]">
             {error}
           </div>
         ) : null}
@@ -90,11 +90,11 @@ export function MemoryPage() {
           memories.map((m) => (
             <div
               key={m.id}
-              className="flex items-start justify-between gap-4 rounded-[var(--radius)] border border-[hsl(var(--border))] p-3"
+              className="flex items-start justify-between gap-4 rounded-[var(--radius)] border border-[var(--border)] p-3"
             >
               <div className="flex flex-col gap-1">
                 <span className="text-base">{m.text}</span>
-                <span className="text-sm text-[hsl(var(--muted-foreground))]">
+                <span className="text-sm text-[var(--muted-foreground)]">
                   {scopeLabel(m, nameById)} · {CATEGORY_LABELS[m.category]}
                   {m.pinned ? " · Pinned" : ""}
                 </span>

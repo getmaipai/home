@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { Button } from "@/kit/ui/button";
 import { startMicCapture, type MicCaptureHandle } from "@/lib/voice/mic-capture";
 import { WakeWordLoop } from "@/lib/voice/wake-word-loop";
 import { onWakeDetected, type WakeDetectedEvent } from "@/lib/voice/wake-word-events";
@@ -104,23 +105,20 @@ export function WakeWordToggle({ onWakeDetected: onWake }: WakeWordToggleProps) 
 
   return (
     <div className="flex flex-col items-end gap-1">
-      <button
+      <Button
         type="button"
+        variant={enabled ? "default" : "secondary"}
         onClick={() => (enabled ? stop() : start())}
         aria-pressed={enabled}
-        className={`min-h-12 rounded-full px-4 py-1 text-base transition-colors ${
-          enabled
-            ? "bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))]"
-            : "bg-[hsl(var(--muted))] text-[hsl(var(--muted-foreground))]"
-        }`}
+        className="rounded-full"
       >
         {status === "listening"
           ? 'Wake word: listening for "hey jarvis"'
           : status === "starting"
             ? "Wake word: starting…"
             : "Wake word (experimental)"}
-      </button>
-      {error ? <span className="text-base text-[hsl(var(--destructive))]">{error}</span> : null}
+      </Button>
+      {error ? <span className="text-base text-destructive">{error}</span> : null}
     </div>
   );
 }

@@ -18,6 +18,7 @@ import {
   Lock,
   X,
   Bell,
+  Inbox,
   type LucideIcon,
 } from "lucide-react";
 
@@ -45,6 +46,7 @@ const REGISTRY: Record<string, LucideIcon> = {
   lock: Lock,
   x: X,
   bell: Bell,
+  inbox: Inbox,
 };
 
 export function getIcon(name: string): LucideIcon {

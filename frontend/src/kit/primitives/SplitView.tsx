@@ -40,7 +40,7 @@ export function SplitView({ list, detail, detailOpen = false, listLabel, detailL
         className={cn(
           "flex min-h-0 min-w-0 flex-col overflow-y-auto",
           FOCUS_RING,
-          "w-full sm:w-2/5 sm:border-r sm:border-[hsl(var(--border))] lg:w-1/3",
+          "w-full sm:w-2/5 sm:border-r sm:border-[var(--border)] lg:w-1/3",
           detailOpen && "max-sm:hidden",
         )}
       >

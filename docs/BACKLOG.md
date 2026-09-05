@@ -672,10 +672,14 @@ implemented on the hub yet.
       want of a confirmation pattern; `PeoplePage.tsx` now has one worth
       lifting into the kit). Conversation history and notifications
       inherit the same rule when they get surfaces.
-- [ ] **The kit owns the batch-selection pattern** (S) - `PeoplePage.tsx`
-      hand-rolls selection mode, the count, the confirmation panel and
-      the partial-success report. The second consumer (Memory, above) is
-      the moment that becomes a kit primitive rather than a copy.
+- [x] **The kit owns the batch-selection pattern** (S) - done 2026-09-05.
+      `kit/primitives/BatchBar.tsx` (the count, the caller's own batch
+      actions, Done) and `SelectModeToggle`; `PeoplePage.tsx` now consumes
+      it instead of hand-rolling the row. Still page-specific: entering
+      select mode's exact wording and the destructive confirmation panel
+      (their copy differs per list). Memory is still the pattern's second
+      real consumer, once its own batch actions land (below). See
+      `docs/dev.md`, "Session B: step 1".
 - [x] Notifications UI (done 2026-09-05, `docs/dev.md`'s "The
       notification system, a real working slice" entry) - `NotificationBell`
       (shell header: pending list + toast on new arrival). Still real gaps:
@@ -894,16 +898,28 @@ implemented on the hub yet.
       pre-roll, decode kicked at the voiced-to-silence edge and reused,
       saving 0.6-0.8 s; ort-web WASM because ort-node segfaults under
       Bun); copy them.
-- [ ] **Kit gaps found by the audit** (S each) - `AsyncState` (loading,
-      error with retry, empty) to replace the triad copy-pasted across
-      five pages; Checkbox (People uses a raw input), Textarea, Tabs
-      with a URL-bound active tab, Chip/Toggle (Chat hand-rolls two);
-      MemoryPage onto `List`; Shell and NotificationBell tests.
-- [ ] **The kit ESLint config UI.md mandates** (S) - `lint` is `tsc`
-      only; nothing bans raw colours, `lucide-react` imports outside the
-      icon registry (one already leaks), or inline layout in apps.
-      Legacy's `check-design-contract.mjs` had waivers and a ratchet
-      baseline; the mechanism belongs in `@maipai/standards`.
+- [x] **Kit gaps found by the audit, partial** (S each) - done 2026-09-05:
+      `AsyncState` (loading, error with retry, empty - built, not yet
+      wired into the five pages that hand-roll the triad; that's step 3's
+      data-layer job) and Checkbox (`PeoplePage.tsx`'s select-mode row now
+      uses `kit/ui/checkbox.tsx` instead of a raw `<input>`). See
+      `docs/dev.md`, "Session B: step 1". **Still open:** Textarea, Tabs
+      with a URL-bound active tab, a real Chip/Toggle (Chat's two pill
+      toggles now use `Button` with a variant, which fixed the raw-
+      element and focus-ring lint findings but isn't a dedicated Chip
+      component); MemoryPage onto `List`; Shell and NotificationBell
+      tests.
+- [x] **The kit ESLint config UI.md mandates** (S) - done 2026-09-05.
+      `frontend/eslint.config.js`: `typescript-eslint`, `react-hooks`
+      (rules-of-hooks/exhaustive-deps only, not the full v7 React
+      Compiler set - recorded why in dev.md), `jsx-a11y`, and
+      `eslint-plugin-better-tailwindcss`'s three correctness rules
+      (no-unknown-classes, no-conflicting-classes, no-restricted-classes
+      banning hex/rgb arbitrary values). Bans `lucide-react` outside
+      `kit/icons.ts`, raw `<button>`/`<input>` in `src/apps`, and (a
+      hand-written rule, no plugin covers it) a `hover:` variant with no
+      paired `focus` on a native element. `bun run lint` runs it;
+      `scripts/check.sh` calls it. See `docs/dev.md`.
 - [ ] **A real PWA** (S-M) - manifest only today: no service worker, no
       offline page, one oversized icon. Copy the rules legacy's `sw.js`
       v5 learned: navigations network-first with an offline page (a

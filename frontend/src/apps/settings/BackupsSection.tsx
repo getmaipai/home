@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { Section } from "@/kit/primitives/Section";
 import { Progress } from "@/kit/primitives/Progress";
-import { Button } from "@/kit/components/Button";
+import { Button } from "@/kit/ui/button";
 import { api, ApiError, type BackupInfo, type PendingRestore, type Roster } from "@/lib/api";
 import { formatBytes } from "@/apps/settings/formatBytes";
 
@@ -109,12 +109,12 @@ export function BackupsSection({ person }: BackupsSectionProps) {
 
   return (
     <Section heading="Backups">
-      {error ? <p className="text-base text-[hsl(var(--destructive))]">{error}</p> : null}
+      {error ? <p className="text-base text-[var(--destructive)]">{error}</p> : null}
 
       {pending ? (
-        <div className="flex flex-col gap-2 rounded-[var(--radius)] border border-[hsl(var(--primary))] p-3">
+        <div className="flex flex-col gap-2 rounded-[var(--radius)] border border-[var(--primary)] p-3">
           <p className="text-base font-medium">Ready to restore</p>
-          <p className="text-base text-[hsl(var(--muted-foreground))]">
+          <p className="text-base text-[var(--muted-foreground)]">
             {/* The backup's own date, not `stagedAt`. Naming a backup by
                 the minute someone pressed the button tells a parent
                 nothing about which point in time they are going back to,
@@ -140,14 +140,14 @@ export function BackupsSection({ person }: BackupsSectionProps) {
       {backups === null ? (
         <Progress mode="spinner" label="Loading backups" />
       ) : backups.length === 0 ? (
-        <p className="text-base text-[hsl(var(--muted-foreground))]">No backups yet.</p>
+        <p className="text-base text-[var(--muted-foreground)]">No backups yet.</p>
       ) : (
-        <div className="flex flex-col divide-y divide-[hsl(var(--border))]">
+        <div className="flex flex-col divide-y divide-[var(--border)]">
           {backups.map((b) =>
             confirming === b.filename ? (
               <div key={b.filename} className="flex flex-col gap-2 py-3">
                 <p className="text-base font-medium">Restore the backup from {whenText(b.createdAt)}?</p>
-                <p className="text-base text-[hsl(var(--muted-foreground))]">
+                <p className="text-base text-[var(--muted-foreground)]">
                   Everyone in your household, everything MaiPai remembers, and every conversation will go back to
                   how they were then. Anything added since will be gone. This takes effect the next time MaiPai
                   Home starts.
@@ -169,7 +169,7 @@ export function BackupsSection({ person }: BackupsSectionProps) {
               <div key={b.filename} className="flex items-center justify-between gap-3 py-2 text-base">
                 <span>{whenText(b.createdAt)}</span>
                 <div className="flex items-center gap-3">
-                  <span className="text-[hsl(var(--muted-foreground))]">{formatBytes(b.bytes)}</span>
+                  <span className="text-[var(--muted-foreground)]">{formatBytes(b.bytes)}</span>
                   {canRestore && !pending ? (
                     <Button
                       variant="ghost"

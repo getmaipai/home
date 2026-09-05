@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import * as RadixPopover from "@radix-ui/react-popover";
-import { Button } from "@/kit/components/Button";
+import { Button } from "@/kit/ui/button";
 import { getIcon } from "@/kit/icons";
 import { useToast } from "@/kit/primitives/Toast";
 import { api, type NotificationDeliveryView } from "@/lib/api";
@@ -76,7 +76,7 @@ export function NotificationBell() {
         <Button variant="ghost" size="icon" aria-label={`Notifications${items.length > 0 ? ` (${items.length} pending)` : ""}`} className="relative">
           <BellIcon className="h-5 w-5" aria-hidden />
           {items.length > 0 ? (
-            <span className="absolute right-1 top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-[hsl(var(--destructive))] px-1 text-[10px] text-[hsl(var(--destructive-foreground))]">
+            <span className="absolute right-1 top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-[var(--destructive)] px-1 text-[10px] text-[var(--destructive-foreground)]">
               {items.length}
             </span>
           ) : null}
@@ -86,12 +86,12 @@ export function NotificationBell() {
         <RadixPopover.Content
           align="end"
           sideOffset={8}
-          className="z-40 w-80 max-w-[calc(100vw-2rem)] rounded-[var(--radius)] border border-[hsl(var(--border))] bg-[hsl(var(--card))] p-2 text-[hsl(var(--card-foreground))] shadow-lg"
+          className="z-40 w-80 max-w-[calc(100vw-2rem)] rounded-[var(--radius)] border border-[var(--border)] bg-[var(--card)] p-2 text-[var(--card-foreground)] shadow-lg"
         >
           {items.length === 0 ? (
-            <p className="px-2 py-3 text-base text-[hsl(var(--muted-foreground))]">Nothing pending.</p>
+            <p className="px-2 py-3 text-base text-[var(--muted-foreground)]">Nothing pending.</p>
           ) : (
-            <div className="flex flex-col divide-y divide-[hsl(var(--border))]">
+            <div className="flex flex-col divide-y divide-[var(--border)]">
               {items.map((n) => (
                 <div key={n.id} className="flex items-start justify-between gap-2 py-2 px-2">
                   <p className="text-base">{n.text}</p>
@@ -102,7 +102,7 @@ export function NotificationBell() {
                   <Button
                     variant="ghost"
                     onClick={() => handleDismiss(n.id)}
-                    className="shrink-0 px-3 text-sm text-[hsl(var(--muted-foreground))]"
+                    className="shrink-0 px-3 text-sm text-[var(--muted-foreground)]"
                   >
                     Dismiss
                   </Button>

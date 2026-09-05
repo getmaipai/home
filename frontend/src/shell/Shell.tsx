@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import { NavLink } from "react-router-dom";
-import { Avatar } from "@/kit/components/Avatar";
-import { Button } from "@/kit/components/Button";
+import { Avatar } from "@/kit/primitives/Avatar";
+import { Button } from "@/kit/ui/button";
 import { getIcon } from "@/kit/icons";
 import { cn } from "@/kit/utils";
 import { NotificationBell } from "@/shell/NotificationBell";
@@ -43,7 +43,7 @@ export function Shell({ person, onSignOut, children }: ShellProps) {
 
   return (
     <div className="flex h-screen flex-col">
-      <header className="flex h-16 shrink-0 items-center justify-between border-b border-[hsl(var(--border))] px-4">
+      <header className="flex h-16 shrink-0 items-center justify-between border-b border-[var(--border)] px-4">
         <img src="/brand/maipai-home-logo-light.png" alt="MaiPai Home" className="h-7 w-auto brand-logo-light" />
         <img src="/brand/maipai-home-logo-dark.png" alt="MaiPai Home" className="h-7 w-auto brand-logo-dark" />
         <div className="flex items-center gap-3">
@@ -56,7 +56,7 @@ export function Shell({ person, onSignOut, children }: ShellProps) {
         </div>
       </header>
       <div className="flex min-h-0 flex-1">
-        <nav className="flex w-16 shrink-0 flex-col items-center gap-1 border-r border-[hsl(var(--border))] py-3 sm:w-48 sm:items-stretch sm:px-2">
+        <nav className="flex w-16 shrink-0 flex-col items-center gap-1 border-r border-[var(--border)] py-3 sm:w-48 sm:items-stretch sm:px-2">
           {NAV_ENTRIES.map((entry) => {
             const Icon = getIcon(entry.icon);
             return (
@@ -73,7 +73,7 @@ export function Shell({ person, onSignOut, children }: ShellProps) {
                 className={({ isActive }) =>
                   cn(
                     "flex min-h-12 items-center gap-3 rounded-[var(--radius)] px-3 py-2 sm:justify-start",
-                    isActive ? "bg-[hsl(var(--muted))]" : "hover:bg-[hsl(var(--muted))]",
+                    isActive ? "bg-[var(--muted)]" : "hover:bg-[var(--muted)]",
                   )
                 }
               >

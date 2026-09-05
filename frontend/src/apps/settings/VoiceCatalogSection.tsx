@@ -1,8 +1,8 @@
 import { useMemo, useState } from "react";
 import { api, ApiError } from "@/lib/api";
 import { Section } from "@/kit/primitives/Section";
-import { Input } from "@/kit/components/Input";
-import { Button } from "@/kit/components/Button";
+import { Input } from "@/kit/ui/input";
+import { Button } from "@/kit/ui/button";
 import { Progress } from "@/kit/primitives/Progress";
 import { titleCaseOption } from "@/kit/settings/SettingField";
 
@@ -79,12 +79,12 @@ export function VoiceCatalogSection({ personId }: VoiceCatalogSectionProps) {
   return (
     <Section heading="More voices">
       {!expanded ? (
-        <button type="button" onClick={expand} className="min-h-12 w-fit text-base text-[hsl(var(--primary))] hover:underline">
+        <Button type="button" variant="link" onClick={expand} className="h-auto min-h-12 w-fit">
           Browse the full community voice catalog (2,000+ voices)
-        </button>
+        </Button>
       ) : loadError ? (
         <div className="flex flex-col items-start gap-2">
-          <p className="text-base text-[hsl(var(--destructive))]">{loadError}</p>
+          <p className="text-base text-[var(--destructive)]">{loadError}</p>
           <Button variant="secondary" onClick={expand}>
             Try again
           </Button>
@@ -94,7 +94,7 @@ export function VoiceCatalogSection({ personId }: VoiceCatalogSectionProps) {
       ) : (
         <div className="flex flex-col gap-2">
           {currentIsCatalogVoice ? (
-            <p className="text-base text-[hsl(var(--muted-foreground))]">
+            <p className="text-base text-[var(--muted-foreground)]">
               Currently using a catalog voice: {currentCatalogLabel}
             </p>
           ) : null}
@@ -105,18 +105,18 @@ export function VoiceCatalogSection({ personId }: VoiceCatalogSectionProps) {
             aria-label="Search the voice catalog"
             className="w-full"
           />
-          {selectError ? <p className="text-base text-[hsl(var(--destructive))]">{selectError}</p> : null}
+          {selectError ? <p className="text-base text-[var(--destructive)]">{selectError}</p> : null}
           {search.trim().length > 0 && search.trim().length < MIN_SEARCH_LENGTH ? (
-            <p className="text-base text-[hsl(var(--muted-foreground))]">Keep typing to search.</p>
+            <p className="text-base text-[var(--muted-foreground)]">Keep typing to search.</p>
           ) : search.trim().length >= MIN_SEARCH_LENGTH && matches.length === 0 ? (
-            <p className="text-base text-[hsl(var(--muted-foreground))]">No voices match "{search}".</p>
+            <p className="text-base text-[var(--muted-foreground)]">No voices match "{search}".</p>
           ) : (
-            <ul className="flex flex-col divide-y divide-[hsl(var(--border))]">
+            <ul className="flex flex-col divide-y divide-[var(--border)]">
               {matches.map((entry) => (
                 <li key={entry.path} className="flex items-center justify-between gap-3 py-2">
                   <div className="flex flex-col">
                     <span className="text-base">{entry.path.split("/").pop()}</span>
-                    <span className="text-base text-[hsl(var(--muted-foreground))]">{titleCaseOption(entry.collection)}</span>
+                    <span className="text-base text-[var(--muted-foreground)]">{titleCaseOption(entry.collection)}</span>
                   </div>
                   <Button
                     variant="secondary"

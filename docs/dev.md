@@ -5871,3 +5871,196 @@ and written up (step 5), never installed as a dependency.
 **Nothing wrong at install time.** Every row still matches what the plan
 recorded; no fallback substitutions needed. Step 1 starts the actual
 `shadcn init` and first `bun add` calls.
+
+## Session B: step 1, the kit on shadcn, and the lint (2026-09-05)
+
+`shadcn init -t vite -b radix -p nova` (the Lucide/Geist preset, since
+Lucide is already the icon rule) against `frontend/`, generated
+components repointed to `frontend/src/kit/ui/` via `components.json`'s
+aliases (`ui`, `components`, `lib`, `hooks` all under `@/kit/*`, `utils`
+at `@/kit/utils` so generated files import the kit's existing `cn`
+instead of pulling in a second one from the `cn` npm package). 24
+components added: button, input, textarea, select, switch, checkbox,
+avatar, card, badge, skeleton, tabs, dialog, alert-dialog, sheet,
+tooltip, dropdown-menu, command, sidebar, form, sonner, scroll-area,
+separator, progress (sidebar isn't wired into the shell yet - that's
+step 2 - but the file needs to exist before `command`'s dialog wrapper
+resolves).
+
+**The token format changed, on purpose, everywhere at once.** The CLI's
+Tailwind v4 output stores a full CSS color function per variable
+(`--primary: oklch(...)`) that a generated component's `bg-primary`
+utility reads directly; the repo's existing tokens were bare HSL triples
+(`--primary: 189 94% 40%`) meant to be wrapped as `hsl(var(--primary))`
+at every call site, the Tailwind v3 convention. Tailwind v4's `@theme
+inline` does no such wrapping, so the two conventions cannot coexist:
+`tokens.css` now stores `hsl(189 94% 40%)` (same brand hue, cyan, same
+light/dark values) as a complete value, and every one of the ~30 existing
+`hsl(var(--x))` call sites across `apps/`, `shell/` and `kit/` became
+`var(--x)` (a scripted, mechanical sed pass, verified by a full rebuild
+and the existing 201-test suite staying green before any further change
+landed). Dark mode moved from a `[data-theme="dark"]` attribute to a
+`.dark` class (matching `@custom-variant dark (&:is(.dark *))`, which
+every generated component's `dark:` variant already assumes) with a
+`prefers-color-scheme` fallback guarded by `:not(.light)` - nothing
+toggles either yet (that's the appearance setting, step 2), so this is
+the mechanism landing ahead of its first real caller, the same posture
+the five missing primitives took with TV.
+
+**`kit/components/*` is gone.** `Button`, `Input`, `Switch` were direct,
+API-compatible swaps (their own comments already said as much) - deleted,
+every import repointed to `kit/ui/*`. `Card`, `Avatar`, `Select` were not:
+shadcn's generated `Card` is a padded header/content/footer container
+with no "the whole thing is one button" mode, its `Avatar` has no
+name-to-initial logic, and its `Select` has no flat `options: string[]`
+API. Each became a pattern component in `kit/primitives/` instead -
+`Card` reuses the token utilities (`bg-card`, `border-border`) rather
+than shadcn's `Card` div directly, `Avatar` wraps `AvatarFallback` with
+the initials logic, `Select` wraps the compound `SelectTrigger`/
+`SelectContent`/`SelectItem` pieces behind the same props every call site
+already used. Three consumers total needed touching for `Select` (six
+call sites), two for `Card`, four for `Avatar` - small enough that no
+call site's own logic changed, only its import.
+
+**Toast and Progress, rebuilt as the plan named them.** `Toast.tsx` now
+wraps `kit/ui/sonner.tsx` (Sonner) instead of a hand-rolled
+`@radix-ui/react-toast` provider - `useToast().push(text)` is unchanged,
+so neither of its two call sites moved. `Progress.tsx`'s determinate mode
+renders `kit/ui/progress.tsx` (Radix's Progress, generated); spinner mode
+keeps the icon-plus-`animate-spin` idiom, since no library ships a
+"spinner" component and Sonner's own loading toast uses the identical
+pattern. `Form.tsx` was already built on `kit/ui/input.tsx`/`button.tsx`
+tonight's earlier commit put there; no further change needed for step 1's
+scope.
+
+**The accessibility floor got re-applied to every generated form
+control**, because the CLI's own defaults undershoot it: default Button
+height is 32px (`h-8`) against the kit's 48px floor, Input/Textarea/
+Select all demote to `md:text-sm` (14px) on desktop against the 16px
+floor. Fixed centrally in the five touched `kit/ui/*` files rather than
+per call site - `default`/`lg`/`icon` sizes now clear 48px directly;
+`xs`/`sm`/`icon-xs`/`icon-sm` stay visually compact (desktop/mouse-only,
+matching the Button's own pre-existing "never the only way to reach an
+action" rule) but get the same transparent-pseudo-element 48px hit area
+the accessibility audit already established for Switch and the
+select-mode checkbox - now built into Switch and Checkbox's own generated
+files too, not just Button's.
+
+**`kit/icons.ts` gained `Inbox`** (`AsyncState`'s default empty icon;
+nothing had claimed it yet).
+
+**The two missing primitives, both with tests.** `AsyncState` (loading
+skeleton via `kit/ui/skeleton.tsx`, error with retry, empty via the
+existing `EmptyState`) - its error branch shows `ApiError.message`
+directly rather than looking up `spec/errors/errors.json` itself: the
+backend already resolves a failure's catalogue `ui_message` into that
+field before the frontend ever sees it, and `spec/errors/` isn't a file
+this session owns. `BatchBar`/`SelectModeToggle` (the count, the caller's
+own action buttons, Done) - `PeoplePage.tsx`'s hand-rolled select-mode
+bar is now built on it (the plan's own instruction: "lift it from
+PeoplePage.tsx"), the first real consumer; Memory becomes the second
+when its own batch actions land (`docs/BACKLOG.md`). 20 new tests across
+both.
+
+**The ESLint flat config**, scoped deliberately narrower than "install
+the recommended preset" in two places, both recorded rather than silently
+decided: `eslint-plugin-react-hooks@7`'s "recommended" is the full React
+Compiler rule set (`static-components`, `set-state-in-effect`,
+`immutability`...), which flagged 23 findings against this codebase's
+existing hand-written data-fetching (a `useEffect` calling `setState`) -
+exactly the shape step 3's TanStack Query migration replaces on its own
+schedule. Only `rules-of-hooks` (error) and `exhaustive-deps` (warn) are
+enabled; the rest is worth adopting once step 3 lands, not ahead of it.
+Same reasoning for `eslint-plugin-better-tailwindcss`: only the three
+correctness rules the plan names (`no-unknown-classes`,
+`no-conflicting-classes`, `no-restricted-classes`) - its "recommended"
+also pulls in stylistic auto-formatting rules that would rewrite every
+className's order and line-wrapping as a side effect of adding a lint,
+a much bigger diff than this step asked for.
+
+One rule is hand-written, not a plugin option: `local/hover-needs-focus`
+(docs/UI.md: a hover-only control is unreachable by keyboard, touch, or a
+TV remote) reads a JSX `className` literal or template string for
+`hover:` without any `focus`, skipping capitalized (component) tags since
+the kit's own components already pair their internal hover and focus
+states centrally. Best-effort by construction, same limitation
+`no-restricted-classes` has: a class string built by concatenating two
+`cn()` calls is invisible to either.
+
+**What the lint actually found**, fixed rather than suppressed except
+where noted: two raw `<button>`s in Chat (`ChatPage.tsx`'s "Think
+longer" pill, `WakeWordToggle.tsx`'s own pill) and two in Settings
+(`ModelsSection.tsx`'s disclosure, `VoiceCatalogSection.tsx`'s "Browse
+the catalog" link) became `Button` with a matching variant; one raw
+`<input type="checkbox">` in `PeoplePage.tsx`'s select mode became
+`kit/ui/checkbox.tsx`'s `Checkbox` (closing `docs/BACKLOG.md`'s own
+"People uses a raw input" gap in the same pass). **A real rules-of-hooks
+bug**, not a style nit: `ModelsSection.tsx`'s `ChatModelCard` called
+`useDownloadRate` after two early returns (`fits === null`, then an empty
+filtered list) - on those renders the hook silently never ran, which
+`tsc`-only linting could never catch since hook ordering isn't a type
+error. Moved the hook (and the `activeJobOf` call it depends on) above
+both returns; no behavior change since `job` (unlike `fits`) is always
+available. `SignIn.tsx`'s PIN-prompt `autoFocus` and `DetailPane.tsx`'s
+keyboard-scroll `tabIndex={0}` are both real, already-justified
+exceptions (a single-purpose screen, WCAG 2.1.1's keyboard-scrollable-
+region requirement) - scoped `eslint-disable` comments, not rule changes.
+`kit/ui/input-group.tsx`'s click-to-focus convenience handler
+(jsx-a11y's `click-events-have-key-events`) is vendored shadcn code, not
+authored here - `src/kit/ui/**` is exempted from that specific pair of
+rules rather than hand-patched, the same posture as the icon-import
+exemption. Two brand-logo classes (real CSS, not Tailwind utilities)
+needed `no-unknown-classes`'s own `ignore` list. Three pre-existing
+`exhaustive-deps` warnings (not errors - `check.sh` doesn't fail on them)
+are left as found, each already carrying its own reasoning comment about
+why the "missing" dependency is deliberate; re-litigating three
+concurrency guards to satisfy a warning wasn't this step's job.
+
+**Verified against the running app, not just the test suite**: a
+throwaway Playwright harness (deleted after use, the same posture the
+five-primitives entry took) drove Chat, People, Memory, Privacy and
+Settings at phone (390) and desktop (1280), light and dark, plus the
+People select-mode bar with a real selection, the Settings advanced-
+settings disclosure expanded, and the signed-out profile picker -
+screenshots opened and read, not assumed. `scripts/check.sh` green
+(backend 567, frontend 221, the new `bun run lint` step, the build,
+`@maipai/standards` core).
+
+**Dependency accounting.** Added: `shadcn` (dev), `radix-ui`,
+`class-variance-authority`, `cmdk`, `sonner`, `tw-animate-css` (all MIT).
+Removed: the four individual `@radix-ui/react-{avatar,select,slot,switch}`
+packages (superseded by the consolidated `radix-ui` import the generated
+components use) and the `cn`/`@fontsource-variable/geist` packages a
+default `shadcn add` pulled in that this repo doesn't need (its own `cn`
+already existed; the Nova preset's Geist font would have changed the
+product's look, which this step's own acceptance bar rules out). NOTICE
+updated for everything now bundled into the shipped frontend.
+
+**Code review pass (medium effort, multi-agent), findings and what came
+of each.** Two flagged as app-breaking - Switch and Checkbox's checked
+state supposedly never painting, since Radix emits `data-state="checked"`
+and the classes read `data-checked:` - turned out to be false positives
+on live verification: `shadcn/tailwind.css` (imported by `tokens.css`)
+declares `@custom-variant data-checked { &:where([data-state="checked"]),
+&:where([data-checked]...) }`, so `data-checked:` already matches Radix's
+real attribute. Checked directly in a real browser rather than taking
+either the finding or this rebuttal on faith: a toggled Switch's
+`getComputedStyle().backgroundColor` is `rgb(44, 208, 237)`, exactly
+`--primary`'s `#2cd0ed`, both before and after this paragraph was written.
+The five real findings, fixed: `Avatar`'s initials silently ignored every
+caller's text size (`kit/ui/avatar.tsx`'s generated `AvatarFallback`
+hardcodes its own `text-sm`, so nothing the caller passed the root ever
+reached it - `text-[length:inherit]` on the fallback is the actual fix,
+verified live: the sign-in picker's avatar now measures 20px, the header's
+14px, matching their respective `text-xl`/`text-sm` callers); Sonner's
+toast duration silently dropped from the deleted provider's explicit 6s to
+Sonner's ~4s default (restored); two more raw `<button>`s outside the
+lint's `src/apps` scope (`SettingField.tsx`'s "Reset to default",
+`SettingsRenderer.tsx`'s "Show N advanced settings") became `Button`;
+`PeoplePage.tsx`'s select-mode checkbox had a redundant 48px-hit-area
+wrapper div around a `Checkbox` that already provides its own. One
+finding was a real observation but not a bug to fix: the destructive
+confirmation staying an inline card rather than the suggested
+`AlertDialog` is docs/UI.md's own explicit, deliberate decision
+("PeoplePage's existing Remove pattern... is the model, not an exception
+to standardize away"), recorded the same night this session started.

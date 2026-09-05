@@ -50,9 +50,12 @@ if [ -d frontend/src ]; then
   echo "== frontend: bun test"
   (cd frontend && bun test)
 
-  # build's own script is "tsc --noEmit && vite build" (frontend/package.json):
-  # one step covers both the typecheck and the real compile, so there is no
-  # separate typecheck line here the way backend has one.
+  # "lint" is "tsc --noEmit && eslint ." (frontend/package.json), so this
+  # also covers the typecheck; build's own script re-runs tsc as part of
+  # the real compile, which is fine, it's fast and idempotent.
+  echo "== frontend: lint"
+  (cd frontend && bun run lint)
+
   echo "== frontend: build (includes typecheck)"
   (cd frontend && bun run build >/dev/null)
 fi

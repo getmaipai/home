@@ -22,10 +22,19 @@ interface CardProps {
 // their items with it rather than each repeating a border, a radius, a
 // hover and a focus ring (org standard 1: a second copy of anything is
 // wrong even when it is faster). Callers pass content, never chrome.
+//
+// A pattern component, not `kit/ui/card.tsx` directly: shadcn's generated
+// Card is a padded header/content/footer container built for structured
+// layouts, and CardGrid/MediaShelf's contract is the opposite (content-
+// agnostic, no assumed padding, the whole surface optionally one button).
+// This reuses the kit's card tokens (`bg-card`, `text-card-foreground`,
+// `border-border`) rather than reimplementing them, which is the sense in
+// which it is "rebuilt on the generated components" (docs/plans/
+// session-b-ui.md step 1) even though it does not render `Card` itself.
 export function Card({ children, onSelect, label, selected, className }: CardProps) {
   const surface = cn(
-    "overflow-hidden rounded-[var(--radius)] border bg-[hsl(var(--card))] text-left text-[hsl(var(--card-foreground))]",
-    selected ? "border-[hsl(var(--primary))]" : "border-[hsl(var(--border))]",
+    "overflow-hidden rounded-lg border bg-card text-left text-card-foreground",
+    selected ? "border-primary" : "border-border",
   );
 
   if (!onSelect) {

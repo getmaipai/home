@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { Card } from "@/kit/components/Card";
+import { Card } from "@/kit/primitives/Card";
 import { EmptyState } from "@/kit/primitives/EmptyState";
 import { Section } from "@/kit/primitives/Section";
 import { SHELF_ITEM_WIDTH, type Density } from "@/kit/responsive";
@@ -109,13 +109,12 @@ export function MediaShelf<T>({
                 // inside it, or Card's own `overflow-hidden` clips it
                 // away entirely; and it needs the offset, because a cyan
                 // ring drawn flush against cyan artwork is invisible.
-                isSelected?.(item) &&
-                  "ring-2 ring-[hsl(var(--primary))] ring-offset-2 ring-offset-[hsl(var(--background))]",
+                isSelected?.(item) && "ring-2 ring-primary ring-offset-2 ring-offset-background",
               )}
             >
               <div
                 className={cn(
-                  "w-full overflow-hidden rounded-[var(--radius)] bg-[hsl(var(--muted))]",
+                  "w-full overflow-hidden rounded-[var(--radius)] bg-[var(--muted)]",
                   ASPECT_CLASSES[aspect],
                 )}
               >
@@ -128,7 +127,7 @@ export function MediaShelf<T>({
               // that holds its own control (a channel link, an overflow
               // menu) would be keyboard-unreachable nested in one. Same
               // rule List.renderAction follows.
-              <div className="px-1 text-sm text-[hsl(var(--foreground))]">{renderCaption(item)}</div>
+              <div className="px-1 text-sm text-[var(--foreground)]">{renderCaption(item)}</div>
             ) : null}
           </li>
         ))}

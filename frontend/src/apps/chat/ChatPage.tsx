@@ -3,7 +3,7 @@ import { Page } from "@/kit/primitives/Page";
 import { MessageThread, type ThreadMessage } from "@/kit/primitives/MessageThread";
 import { Form } from "@/kit/primitives/Form";
 import { Progress } from "@/kit/primitives/Progress";
-import { Button } from "@/kit/components/Button";
+import { Button } from "@/kit/ui/button";
 import { api, readTurnStream, ApiError, type Roster } from "@/lib/api";
 import { rowsToMessages } from "@/apps/chat/mapRows";
 import { StreamingWavPlayer } from "@/lib/streamingWavPlayer";
@@ -470,7 +470,7 @@ export function ChatPage({ person }: ChatPageProps) {
     <Page title="Chat">
       {messages === null && loadError ? (
         <div className="flex flex-1 flex-col items-center justify-center gap-3 p-8 text-center">
-          <p className="text-base text-[hsl(var(--destructive))]">
+          <p className="text-base text-[var(--destructive)]">
             Could not load your conversation. The hub might be unreachable.
           </p>
           <Button variant="secondary" onClick={loadHistory}>
@@ -497,7 +497,7 @@ export function ChatPage({ person }: ChatPageProps) {
         </div>
       ) : null}
       {banner ? (
-        <div className="mx-4 mb-2 rounded-[var(--radius)] bg-[hsl(var(--muted))] px-3 py-2 text-base">{banner}</div>
+        <div className="mx-4 mb-2 rounded-[var(--radius)] bg-[var(--muted)] px-3 py-2 text-base">{banner}</div>
       ) : null}
       <div className="flex flex-wrap items-center justify-end gap-2 px-4 pb-1">
         {/* Phase 1 of the wake-word plan (docs/dev.md, 2026-09-04):
@@ -513,18 +513,15 @@ export function ChatPage({ person }: ChatPageProps) {
             setBanner(`Wake word heard: "${event.modelId}" (demo only - MaiPai isn't listening for real commands yet)`)
           }
         />
-        <button
+        <Button
           type="button"
+          variant={thinking ? "default" : "secondary"}
           onClick={() => setThinking((v) => !v)}
           aria-pressed={thinking}
-          className={`min-h-12 rounded-full px-4 py-1 text-base transition-colors ${
-            thinking
-              ? "bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))]"
-              : "bg-[hsl(var(--muted))] text-[hsl(var(--muted-foreground))]"
-          }`}
+          className="rounded-full"
         >
           {thinking ? "Thinking on for next message" : "Think longer"}
-        </button>
+        </Button>
       </div>
       <Form
         fields={[{ name: "message", selector: "text", placeholder: "Message" }]}

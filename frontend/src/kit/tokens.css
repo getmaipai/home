@@ -4,8 +4,22 @@
  * scale, not yet run through a real theme generator (4.11-adjacent
  * "themes are a small declared object... full token set generated from
  * it" is real future scope, deferred: this is one hand-picked default,
- * not the generator). */
+ * not the generator).
+ *
+ * Values are full CSS color functions (`hsl(...)`), not bare component
+ * triples: Tailwind v4's CSS-first `@theme inline` maps `--color-primary`
+ * straight to `var(--primary)` with no wrapping step (unlike v3's JS
+ * config, which used to do `hsl(var(--primary) / <alpha-value>)` for
+ * you), so the variable itself has to already be a valid color. Every
+ * call site reads `var(--x)` directly (in Tailwind's `[var(--x)]`
+ * arbitrary-value form or, on shadcn's generated components, the plain
+ * `bg-primary`/`text-foreground` utilities `@theme inline` below wires
+ * up), never `hsl(var(--x))`. */
 @import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+
+@custom-variant dark (&:is(.dark *));
 
 @theme {
   --font-sans:
@@ -23,55 +37,148 @@
 }
 
 :root {
-  --background: 0 0% 100%;
-  --foreground: 240 10% 4%;
-  --card: 0 0% 100%;
-  --card-foreground: 240 10% 4%;
-  --border: 240 6% 90%;
-  --muted: 240 5% 96%;
-  --muted-foreground: 240 4% 46%;
-  --primary: 189 94% 40%; /* cyan, MaiPai Home's accent */
-  --primary-foreground: 0 0% 100%;
-  --destructive: 0 72% 51%;
-  --destructive-foreground: 0 0% 100%;
-  --ring: 189 94% 40%;
+  --background: hsl(0 0% 100%);
+  --foreground: hsl(240 10% 4%);
+  --card: hsl(0 0% 100%);
+  --card-foreground: hsl(240 10% 4%);
+  --popover: hsl(0 0% 100%);
+  --popover-foreground: hsl(240 10% 4%);
+  --border: hsl(240 6% 90%);
+  --input: hsl(240 6% 90%);
+  --muted: hsl(240 5% 96%);
+  --muted-foreground: hsl(240 4% 46%);
+  --secondary: hsl(240 5% 96%);
+  --secondary-foreground: hsl(240 10% 4%);
+  --accent: hsl(240 5% 96%);
+  --accent-foreground: hsl(240 10% 4%);
+  --primary: hsl(189 94% 40%); /* cyan, MaiPai Home's accent */
+  --primary-foreground: hsl(0 0% 100%);
+  --destructive: hsl(0 72% 51%);
+  --destructive-foreground: hsl(0 0% 100%);
+  --ring: hsl(189 94% 40%);
   --radius: 0.75rem;
+  --sidebar: hsl(0 0% 100%);
+  --sidebar-foreground: hsl(240 10% 4%);
+  --sidebar-primary: hsl(189 94% 40%);
+  --sidebar-primary-foreground: hsl(0 0% 100%);
+  --sidebar-accent: hsl(240 5% 96%);
+  --sidebar-accent-foreground: hsl(240 10% 4%);
+  --sidebar-border: hsl(240 6% 90%);
+  --sidebar-ring: hsl(189 94% 40%);
+  --chart-1: hsl(189 94% 40%);
+  --chart-2: hsl(240 4% 46%);
+  --chart-3: hsl(240 6% 70%);
+  --chart-4: hsl(240 6% 30%);
+  --chart-5: hsl(240 10% 4%);
 }
 
 @media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) {
-    --background: 240 10% 6%;
-    --foreground: 0 0% 96%;
-    --card: 240 8% 9%;
-    --card-foreground: 0 0% 96%;
-    --border: 240 6% 18%;
-    --muted: 240 6% 14%;
-    --muted-foreground: 240 5% 65%;
-    --primary: 189 84% 55%;
-    --primary-foreground: 240 10% 6%;
-    --ring: 189 84% 55%;
+  :root:not(.light) {
+    --background: hsl(240 10% 6%);
+    --foreground: hsl(0 0% 96%);
+    --card: hsl(240 8% 9%);
+    --card-foreground: hsl(0 0% 96%);
+    --popover: hsl(240 8% 9%);
+    --popover-foreground: hsl(0 0% 96%);
+    --border: hsl(240 6% 18%);
+    --input: hsl(240 6% 18%);
+    --muted: hsl(240 6% 14%);
+    --muted-foreground: hsl(240 5% 65%);
+    --secondary: hsl(240 6% 14%);
+    --secondary-foreground: hsl(0 0% 96%);
+    --accent: hsl(240 6% 14%);
+    --accent-foreground: hsl(0 0% 96%);
+    --primary: hsl(189 84% 55%);
+    --primary-foreground: hsl(240 10% 6%);
+    --ring: hsl(189 84% 55%);
+    --sidebar: hsl(240 8% 9%);
+    --sidebar-foreground: hsl(0 0% 96%);
+    --sidebar-primary: hsl(189 84% 55%);
+    --sidebar-primary-foreground: hsl(240 10% 6%);
+    --sidebar-accent: hsl(240 6% 14%);
+    --sidebar-accent-foreground: hsl(0 0% 96%);
+    --sidebar-border: hsl(240 6% 18%);
+    --sidebar-ring: hsl(189 84% 55%);
   }
 }
 
-:root[data-theme="dark"] {
-  --background: 240 10% 6%;
-  --foreground: 0 0% 96%;
-  --card: 240 8% 9%;
-  --card-foreground: 0 0% 96%;
-  --border: 240 6% 18%;
-  --muted: 240 6% 14%;
-  --muted-foreground: 240 5% 65%;
-  --primary: 189 84% 55%;
-  --primary-foreground: 240 10% 6%;
-  --ring: 189 84% 55%;
+.dark {
+  --background: hsl(240 10% 6%);
+  --foreground: hsl(0 0% 96%);
+  --card: hsl(240 8% 9%);
+  --card-foreground: hsl(0 0% 96%);
+  --popover: hsl(240 8% 9%);
+  --popover-foreground: hsl(0 0% 96%);
+  --border: hsl(240 6% 18%);
+  --input: hsl(240 6% 18%);
+  --muted: hsl(240 6% 14%);
+  --muted-foreground: hsl(240 5% 65%);
+  --secondary: hsl(240 6% 14%);
+  --secondary-foreground: hsl(0 0% 96%);
+  --accent: hsl(240 6% 14%);
+  --accent-foreground: hsl(0 0% 96%);
+  --primary: hsl(189 84% 55%);
+  --primary-foreground: hsl(240 10% 6%);
+  --ring: hsl(189 84% 55%);
+  --sidebar: hsl(240 8% 9%);
+  --sidebar-foreground: hsl(0 0% 96%);
+  --sidebar-primary: hsl(189 84% 55%);
+  --sidebar-primary-foreground: hsl(240 10% 6%);
+  --sidebar-accent: hsl(240 6% 14%);
+  --sidebar-accent-foreground: hsl(0 0% 96%);
+  --sidebar-border: hsl(240 6% 18%);
+  --sidebar-ring: hsl(189 84% 55%);
 }
 
-body {
-  background: hsl(var(--background));
-  color: hsl(var(--foreground));
-  font-family: var(--font-sans);
-  margin: 0;
-  min-height: 100vh;
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+  html {
+    @apply font-sans;
+  }
 }
 
 /* 16px body text is the kit's hard floor on phone/desktop (docs/UI.md);
@@ -80,20 +187,30 @@ html {
   font-size: 16px;
 }
 
+body {
+  margin: 0;
+  min-height: 100vh;
+}
+
 /* Plain media-query swap for the two logo PNGs (brand/README.md: light
- * background needs the dark-glyph variant and vice versa) rather than
- * configuring Tailwind's `dark:` variant to also honor the manual
- * `data-theme` override above - no manual light/dark toggle exists in the
- * UI yet (deferred, see docs/dev.md), so there is nothing for a
- * `data-theme`-aware variant to key off yet. Revisit once one exists. */
+ * background needs the dark-glyph variant and vice versa). Keyed off the
+ * same `.dark` class the theme tokens above use (docs/dev.md: "the
+ * appearance setting" wires `ui.appearance` to this class), falling back
+ * to the system preference when no explicit choice has been made. */
 .brand-logo-dark {
   display: none;
 }
 @media (prefers-color-scheme: dark) {
-  .brand-logo-light {
+  :root:not(.light) .brand-logo-light {
     display: none;
   }
-  .brand-logo-dark {
+  :root:not(.light) .brand-logo-dark {
     display: inline;
   }
+}
+.dark .brand-logo-light {
+  display: none;
+}
+.dark .brand-logo-dark {
+  display: inline;
 }

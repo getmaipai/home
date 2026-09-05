@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { EmptyState } from "@/kit/primitives/EmptyState";
-import { Avatar } from "@/kit/components/Avatar";
+import { Avatar } from "@/kit/primitives/Avatar";
 import { getIcon } from "@/kit/icons";
 import { cn } from "@/kit/utils";
 
@@ -80,16 +80,16 @@ export function MessageThread({ messages, emptyState, onPlay, loadingId, playing
               className={cn(
                 "max-w-[75%] whitespace-pre-wrap rounded-[var(--radius)] px-4 py-2 text-base",
                 m.failed
-                  ? "border border-[hsl(var(--destructive))] bg-[hsl(var(--muted))] text-[hsl(var(--foreground))] opacity-70"
+                  ? "border border-[var(--destructive)] bg-[var(--muted)] text-[var(--foreground)] opacity-70"
                   : m.isSelf
-                    ? "bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))]"
-                    : "bg-[hsl(var(--muted))] text-[hsl(var(--foreground))]",
+                    ? "bg-[var(--primary)] text-[var(--primary-foreground)]"
+                    : "bg-[var(--muted)] text-[var(--foreground)]",
               )}
             >
               {m.text}
             </div>
             {m.failed ? (
-              <span className="text-xs text-[hsl(var(--destructive))]">Not sent. Try again.</span>
+              <span className="text-xs text-[var(--destructive)]">Not sent. Try again.</span>
             ) : null}
             {onPlay && !m.isSelf ? (
               <button
@@ -97,7 +97,7 @@ export function MessageThread({ messages, emptyState, onPlay, loadingId, playing
                 onClick={() => onPlay(m)}
                 disabled={loadingId === m.id || playingId === m.id}
                 aria-label={loadingId === m.id ? "Loading" : playingId === m.id ? "Playing" : "Listen"}
-                className="flex items-center gap-1 text-xs text-[hsl(var(--muted-foreground))] hover:text-[hsl(var(--foreground))] disabled:opacity-60"
+                className="flex items-center gap-1 text-xs text-[var(--muted-foreground)] hover:text-[var(--foreground)] disabled:opacity-60"
               >
                 {loadingId === m.id ? (
                   <LoaderIcon className="h-3.5 w-3.5 animate-spin" aria-hidden />

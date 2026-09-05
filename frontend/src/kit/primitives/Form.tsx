@@ -1,6 +1,6 @@
 import { useState, type FormEvent } from "react";
-import { Input } from "@/kit/components/Input";
-import { Button } from "@/kit/components/Button";
+import { Input } from "@/kit/ui/input";
+import { Button } from "@/kit/ui/button";
 import { getIcon } from "@/kit/icons";
 
 // The same `selector` vocabulary recipe.schema.json's inputs[] and
@@ -51,7 +51,7 @@ export function Form({ fields, submitIcon, submitLabel, disabled, onSubmit }: Fo
   }
 
   return (
-    <form onSubmit={handleSubmit} className="flex gap-2 border-t border-[hsl(var(--border))] p-3">
+    <form onSubmit={handleSubmit} className="flex gap-2 border-t border-[var(--border)] p-3">
       {fields.map((field) => {
         if (field.selector !== "text") {
           // Not built tonight; see the FieldSelector doc comment above.

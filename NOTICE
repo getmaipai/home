@@ -7,10 +7,13 @@ below cover components bundled into the shipped frontend
 server-side only and not redistributed as part of a build artifact.
 
 - React, React DOM (MIT) - https://react.dev
-- Radix UI: react-slot, react-avatar (MIT) - https://www.radix-ui.com
+- Radix UI: react-popover, and the consolidated `radix-ui` package (MIT) - https://www.radix-ui.com
 - lucide-react (ISC) - https://lucide.dev
 - clsx (MIT) - https://github.com/lukeed/clsx
 - tailwind-merge (MIT) - https://github.com/dcastil/tailwind-merge
+- shadcn (MIT) - https://ui.shadcn.com (the component generator; also class-variance-authority, MIT, and tw-animate-css, MIT, which its generated components depend on)
+- cmdk (MIT) - https://cmdk.paco.me (the command palette primitive behind kit/ui/command.tsx)
+- sonner (MIT) - https://sonner.emilkowal.ski (the kit's one toast primitive, kit/ui/sonner.tsx)
 
 When another component lands, its attribution goes here, per
 docs/PACKAGES.md in getmaipai/.github.

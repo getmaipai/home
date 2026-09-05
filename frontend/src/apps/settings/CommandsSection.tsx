@@ -1,9 +1,9 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { api, ApiError, isOwnerOrAdminRole, type Roster, type CommandRow, type CommandAction } from "@/lib/api";
 import { Section } from "@/kit/primitives/Section";
-import { Input } from "@/kit/components/Input";
-import { Button } from "@/kit/components/Button";
-import { Select } from "@/kit/components/Select";
+import { Input } from "@/kit/ui/input";
+import { Button } from "@/kit/ui/button";
+import { Select } from "@/kit/primitives/Select";
 import { ROLE_LABELS, ROLE_LADDER, meetsMinRole } from "@/apps/people/roles";
 
 interface CommandsSectionProps {
@@ -101,13 +101,13 @@ export function CommandsSection({ person }: CommandsSectionProps) {
 
   return (
     <Section heading="Commands">
-      <p className="text-base text-[hsl(var(--muted-foreground))]">
+      <p className="text-base text-[var(--muted-foreground)]">
         Teach MaiPai a phrase of your own - "when I say X, do Y." A command always fires on an exact phrase, never a
         guess.
       </p>
       {loadError ? (
         <div className="flex flex-col items-start gap-2">
-          <p className="text-base text-[hsl(var(--destructive))]">{loadError}</p>
+          <p className="text-base text-[var(--destructive)]">{loadError}</p>
           <Button variant="secondary" onClick={load}>
             Try again
           </Button>
@@ -178,22 +178,22 @@ export function CommandsSection({ person }: CommandsSectionProps) {
                   />
                 </>
               )}
-              {createError ? <p className="text-base text-[hsl(var(--destructive))]">{createError}</p> : null}
+              {createError ? <p className="text-base text-[var(--destructive)]">{createError}</p> : null}
               <Button type="submit" disabled={creating} className="w-fit">
                 {creating ? "Creating…" : "Create command"}
               </Button>
             </form>
           ) : null}
-          {actionError ? <p className="text-base text-[hsl(var(--destructive))]">{actionError}</p> : null}
+          {actionError ? <p className="text-base text-[var(--destructive)]">{actionError}</p> : null}
           {commands === null ? null : commands.length === 0 ? (
-            <p className="text-base text-[hsl(var(--muted-foreground))]">No commands yet.</p>
+            <p className="text-base text-[var(--muted-foreground)]">No commands yet.</p>
           ) : (
-            <ul className="flex flex-col divide-y divide-[hsl(var(--border))]">
+            <ul className="flex flex-col divide-y divide-[var(--border)]">
               {commands.map((c) => (
                 <li key={c.id} className="flex items-center justify-between gap-3 py-2">
                   <div className="flex flex-col">
                     <span className="text-base">"{c.trigger}"</span>
-                    <span className="text-base text-[hsl(var(--muted-foreground))]">
+                    <span className="text-base text-[var(--muted-foreground)]">
                       {summarize(c.action)} - {ROLE_LABELS[c.minRole as keyof typeof ROLE_LABELS] ?? c.minRole} or higher
                     </span>
                   </div>
