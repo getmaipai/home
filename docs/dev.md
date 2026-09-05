@@ -4118,6 +4118,12 @@ Hub v0.2 ("media and the store"), Hub v0.3 ("voice, devices, the link"),
 then Robot v0.1 once spec v0.1 exists, then Go once three default packages
 have schema pages.
 
+For the scannable "what's actually missing right now" list (skills,
+integrations, vision, generation, tool calling, UI, the other three
+products), see [`docs/BACKLOG.md`](BACKLOG.md) - added 2026-09-05, after
+Jesse asked for everything missing enumerated in one place rather than
+scattered across this file's narrative.
+
 ## Notes for later
 
 Not actionable yet; captured here so the reason for a choice isn't lost
