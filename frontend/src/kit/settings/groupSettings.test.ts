@@ -92,6 +92,19 @@ describe("sectionTitle", () => {
     expect(sectionTitle("household.system")).toBe("System");
   });
 
+  // Found live in the browser (2026-09-05): persona.active_id's own
+  // section rendered as the raw "person.persona" lives_in id, because a
+  // new core-declared key's own section was never added to this map -
+  // the exact gap the "unknown section ids fall back to the raw id" test
+  // below correctly expects for a genuinely unmapped THIRD-PARTY package
+  // section, but which is a real bug for one of OUR OWN keys. Caught the
+  // sibling household.ai (aiKeys.ts's chat.* override keys) in the same
+  // broken state while fixing this one.
+  test("every core-declared lives_in id used by a real settings key has a real section title, not the raw id", () => {
+    expect(sectionTitle("person.persona")).toBe("Personality");
+    expect(sectionTitle("household.ai")).not.toBe("household.ai");
+  });
+
   test("unknown section ids fall back to the raw id", () => {
     expect(sectionTitle("some.new.package")).toBe("some.new.package");
   });

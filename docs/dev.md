@@ -3386,6 +3386,48 @@ set. Full architecture: platform plan chapters 1, 3, and 4.
       have no step that reads a settings value into scope at all - a
       real, separate gap, not just missing config for this one skill).
 
+- [x] **A real settings-layout bug, found by actually checking the
+      Persona slice's own UI in a live browser** rather than trusting
+      the settings registry's generic-renderer mechanism worked just
+      because the pattern matched `tts.voice_id`'s. Two real, separate
+      problems, both live-verified fixed afterward:
+    - **Every `lives_in` section needs its own entry in
+      `groupSettings.ts`'s `SECTION_TITLES` map, or it renders its raw
+      id as the heading.** `person.persona`'s own section showed the
+      literal string "person.persona" instead of a real title - a plain
+      oversight (unlike a third-party package's genuinely-unmapped
+      section, which the map's own fallback is correctly *for*).
+      Checking for siblings in the same broken state caught a second,
+      pre-existing one from an earlier slice: `household.ai` (the
+      chat-model override keys) had never had a title either. Both
+      fixed, with a regression test.
+    - **The real bug, and a much bigger one**: `SettingsRenderer.tsx`'s
+      own content wrapper carried `flex-1 overflow-y-auto`, making it an
+      independently-scrolling region - harmless with exactly one
+      instance on a page, but `SettingsPage.tsx` renders TWO (household
+      scope, then person scope) as plain flex-col siblings, so the two
+      `flex-1` boxes split one page's available height between them.
+      With enough real settings now declared (this session alone added
+      `household.ai`'s own visible section and `person.persona`), the
+      person-scope instance's box collapsed to about 32 pixels tall -
+      confirmed live via `getBoundingClientRect()` and
+      `elementFromPoint()` that "Personality" and "Speaking voice" were
+      real, correctly-populated, hit-testable DOM content the whole
+      time, just clipped to a sliver and scrollable only within that
+      tiny box, never the actual page. Fixed by dropping `flex-1
+      overflow-y-auto` entirely: this component was never meant to
+      scroll itself, since the real page-level container it renders
+      inside already does. Verified live in the browser afterward (a
+      full page reload, not just the dev server's hot-reload) that every
+      section - System, AI model tuning, Personality, Voice, and
+      everything after - renders in full, and that setting Personality
+      to a real, non-default persona (Tutor) through the actual UI
+      produced a genuinely more formal, follow-up-asking reply in Chat,
+      the complete browser-to-model round trip working for real.
+      Jesse's own account was used for this check (the only real
+      household this build has); his `persona.active_id` was restored
+      to Default afterward, exactly as found.
+
 ## Notes for later (companion personas, added 2026-09-05)
 
 Jesse asked how companion personalities and their speech patterns should

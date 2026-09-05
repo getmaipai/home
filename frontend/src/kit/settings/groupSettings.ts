@@ -22,6 +22,14 @@ export interface SettingsGroup {
 const SECTION_TITLES: Record<string, string> = {
   "household.system": "System",
   "person.voice": "Voice",
+  "person.persona": "Personality",
+  // Not the same as ModelsSection.tsx's own "AI models" heading
+  // (hardware/download management, a different component entirely) -
+  // this is aiKeys.ts's own chat.* override keys (model, context size,
+  // flash attention, KV cache precision), already found showing its raw
+  // lives_in id the same way person.persona was before this fix, live in
+  // the browser (2026-09-05).
+  "household.ai": "AI model tuning",
 };
 
 export function sectionTitle(id: string): string {

@@ -130,8 +130,22 @@ export function SettingsRenderer({ scope, scopeValue }: SettingsRendererProps) {
 
   const groups: SettingsGroup[] = groupSettings(registry, values, scope);
 
+  // Found live in the browser (2026-09-05, while checking that the new
+  // persona.active_id setting actually renders): `flex-1 overflow-y-auto`
+  // here turns this component into its own independently-scrolling
+  // region - harmless with exactly one instance on a page, but
+  // SettingsPage.tsx renders TWO (household scope, then person scope) as
+  // plain flex-col siblings, so the two `flex-1` boxes split the SAME
+  // available height between them. With enough real settings (this
+  // session added a fourth household.ai key's own section AND the new
+  // person.persona one), the person-scope instance's box collapsed to
+  // ~32px - its content didn't disappear, it was real and hit-testable,
+  // just clipped to a sliver and scrollable only within that tiny box,
+  // never the page. This component doesn't need to scroll itself at
+  // all: the actual page-level container SettingsPage.tsx renders it
+  // inside already provides the real scrolling.
   return (
-    <div className="flex flex-1 flex-col gap-6 overflow-y-auto p-4">
+    <div className="flex flex-col gap-6 p-4">
       {error ? (
         <div className="rounded-[var(--radius)] bg-[hsl(var(--muted))] px-3 py-2 text-sm text-[hsl(var(--destructive))]">
           {error}
