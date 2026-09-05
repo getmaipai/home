@@ -5393,3 +5393,115 @@ kind of finding it had reported many of a minute earlier.
 implied: colour contrast against the real palette in both themes, a
 screen-reader read-through, keyboard traps, reduced-motion, and TV
 (which has no input-mode detection to test against yet).
+
+## The `command` primitive, shipped (2026-09-05)
+
+The third item from "Naming: skill, plugin, command, connector": "when I
+say X, do Y," authored by a household member at runtime through a real
+settings flow rather than a filesystem package a developer ships and
+reviews.
+
+**The matching mechanism is not new.** A command's trigger is matched
+exactly (case-insensitive, trimmed, no wildcard) via `turnEngine.ts`'s
+own `matchPattern` - the identical function a plugin's own zero-wildcard
+`routing.patterns` entry already uses. What's genuinely new is a
+lighter-weight AUTHORING path: no `manifest.json`, no `recipe.json`, no
+five-example bronze-tier bar, just a trigger phrase and one of two fixed
+action shapes (`reply` - a canned text/speech response - or
+`home_call_service` - the same Home Assistant call a plugin's
+`home.call_service` permission already reaches, minus the manifest
+machinery). `lib/packageHost.ts` was refactored first to extract
+`isHomeAssistantSecurityDomain()` and `homeCallService()` as their own
+exported functions, so `lib/commands.ts` reuses the exact same
+settings-lookup, rate-limit, and HTTP-call logic a plugin's own
+`home.call_service` path uses rather than a second copy of it.
+
+**A command isn't a spec 3.1 record type**, the same call
+`scheduledJobs` already made for the identical reason (`lib/scheduler.ts`'s
+own header comment) - real, substantial, household-facing functionality
+that doesn't need to sync to the robot in this slice. Promote it to
+`spec/` the moment that changes, not before.
+
+**Checked first, ahead of the plugin floor.** `prepareTurn()` now runs
+`matchCommand()` before `route()`'s plugin check: a household's own
+deliberately-authored trigger phrase is a stronger signal than a
+plugin's fuzzy `routing.examples` match, the same "a real trigger always
+wins" posture the plugin-vs-skill priority fix (the entry above this
+one) already established for `routing.patterns`. `TurnValue.source`
+gained `"command"` / `"command_error"`, `command_id` alongside the
+existing `plugin_id`, and `finalizeReply()`'s known-constant phrase
+rotation (previously gated on `"plugin"`/`"plugin_error"` only) now
+covers these two as well - a `home_call_service` command's own success
+text is literally `"Done."`, the same pool entry a plugin's own
+`home.call_service` reply already hits.
+
+**Security-domain gating happens at creation time, once - not
+re-derived on every trigger.** A command touching a security domain
+(lock, alarm, cover, garage door, valve) needs both a more trusted
+creator (owner or admin, not just any adult - `isOwnerOrAdmin`) and a
+`min_role` floor no looser than `adult` for whoever can later speak the
+phrase, so a household member setting this up can't accidentally leave
+a door-unlock command a child's voice could fire. This is the command
+primitive's own equivalent of a plugin's `consequential: true`
+requirement for the same domains, adapted to authoring time since a
+command has no manifest or `consequential` flag to declare. Creating
+any command at all still needs `adult` or higher (`MIN_ROLE_TO_CREATE`),
+separate from and independent of the `min_role` that only gates who can
+later trigger an already-created one. Trigger uniqueness (case-
+insensitive, trimmed equality) is enforced the same way, at the lib
+layer rather than a DB constraint, since SQLite's own `UNIQUE` can't
+express that normalization directly.
+
+New routes: `GET/POST /api/commands`, `DELETE /api/commands/:id`
+(`routes/commands.ts`, mirroring `routes/scheduler.ts`'s shape) -
+household-wide listing (any signed-in person, the same visibility
+`GET /api/plugins` already has), creation gated by `MIN_ROLE_TO_CREATE`
+plus the security-domain checks above, deletion by the creator or an
+owner/admin.
+
+Schema: a new `commands` table (`db/schema.ts`, migration
+`0008_blushing_apocalypse.sql`) plus `conversation_turns.command_id`,
+`CURRENT_SCHEMA_VERSION` bumped to 8. 23 new tests in
+`tests/commands.test.ts` (creation floors, security-domain gating in
+both directions, trigger-uniqueness, list/delete authorization,
+`matchCommand`/`runCommand` including a real Home Assistant call
+against a local test server) plus the `finalizeReply()` and
+`reset-db.ts` updates the schema change required; full suite green
+(547 backend, 196 frontend) alongside a second session's own
+concurrent, unrelated work in this same shared checkout.
+
+Not built in this slice, left as real gaps rather than papered over: no
+UI for authoring a command yet (only the HTTP surface), and a command's
+`reply` action has no capture-and-substitute mechanism (`route()`'s own
+wildcard-args binding for a plugin) - a household-authored trigger is
+matched exactly, never with a wildcard, so this doesn't apply yet but
+would need real design if a future command wanted one.
+
+**A code review before committing found three real bugs, all fixed
+before this landed.** `routingStats()` had no `switch` case at all for
+`"command"`/`"command_error"` - a command turn silently vanished from
+every bucket while still counting toward `total`, understating the
+routable denominator and making `fallthroughRate` read higher than
+reality the moment any command ever fired; fixed with real `command`/
+`commandError`/`byCommand` fields (mirroring `plugin`/`pluginError`/
+`byPlugin` exactly) plus a regression test that fires a real command
+turn and checks the rate, not just the raw counts. `createCommand()`
+never rejected a trigger containing `"*"`, so a stray asterisk would
+silently turn an "exact match only, never a guess" trigger into a real
+wildcard capture the moment `matchCommand()` reused `matchPattern()` -
+fixed by rejecting it outright at creation time. `runCommand()` sent a
+`home_call_service` command's domain to the real Home Assistant HTTP
+call exactly as typed, never lowercased like `createHost()`'s own
+`call_service` already does - a command created with domain `"Lock"`
+would pass creation-time security gating (which lowercases internally)
+and then 404 on every real trigger; fixed by lowercasing before the
+call. `frontend/src/apps/settings/RoutingStatsSection.test.tsx`'s three
+existing fixtures were missing the new `RoutingStats` fields entirely,
+which crashed the component's render on `stats.byCommand.length` and
+cascaded into ~26 unrelated frontend test failures across other files
+in the same `bun test` process (shared happy-dom/jsdom global state,
+not real regressions in those files) until the fixtures were updated -
+a reminder that a hand-copied wire type (`wire.ts`'s own `RoutingStats`,
+duplicated from `conversationHistory.ts`'s for the reason its header
+comment states) needs every consumer's test fixtures checked, not just
+the two type definitions, when a field is added.

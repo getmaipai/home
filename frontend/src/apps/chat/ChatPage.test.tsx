@@ -30,6 +30,7 @@ function makeRow(id: string, replyText: string): ConversationTurnRow {
     replyText,
     source: "model",
     pluginId: null,
+    commandId: null,
     safetyFlagged: false,
     safetyAction: "allow",
     minorSpeaker: false,

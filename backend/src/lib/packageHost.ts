@@ -92,6 +92,15 @@ const HOME_ASSISTANT_TIMEOUT_MS = 5_000;
 // wants `light`/`switch`/`climate` never needs to clear this bar.
 const HOME_ASSISTANT_SECURITY_DOMAINS = new Set(["lock", "alarm_control_panel", "cover", "garage_door", "valve"]);
 
+/** Lowercased once here too, for the same reason createHost()'s own
+ * call_service does it - the only caller outside this file
+ * (lib/commands.ts, 2026-09-05: a household-authored command touching
+ * a security domain needs the identical check at creation time, not a
+ * second hand-copied domain list that could drift from this one). */
+export function isHomeAssistantSecurityDomain(domain: string): boolean {
+  return HOME_ASSISTANT_SECURITY_DOMAINS.has(domain.toLowerCase());
+}
+
 function hasHeaderCaseInsensitive(headers: Record<string, string>, name: string): boolean {
   const lower = name.toLowerCase();
   return Object.keys(headers).some((k) => k.toLowerCase() === lower);
@@ -274,6 +283,26 @@ export async function callHomeAssistantService(
   }
 }
 
+/** The settings lookup, rate limit, and real call shared by every real
+ * caller of Home Assistant - createHost()'s own call_service (permission
+ * and consequential already checked by then) and lib/commands.ts's
+ * household-authored home_call_service commands (authorized differently -
+ * at creation time, by requiring the creator be owner/admin for a
+ * security domain - but needing the identical settings/rate-limit/call
+ * plumbing once authorized). Pulled out specifically so that plumbing
+ * lives in exactly one place, not two independently-maintained copies. */
+export async function homeCallService(domain: string, service: string, target: unknown, data: unknown): Promise<void> {
+  const baseUrl = getHouseholdSettingValue("home.base_url") as string | undefined;
+  const accessToken = getHouseholdSettingValue("home.access_token") as string | undefined;
+  if (!baseUrl || !accessToken) {
+    throw new HostError("invalid_input", "Home Assistant isn't set up yet - add its URL and access token in Settings first");
+  }
+  if (!tryConsume(HOME_ASSISTANT_RATE_LIMIT_KEY, HOME_ASSISTANT_RATE_LIMIT)) {
+    throw new HostError("rate_limited", "home.call_service is rate-limited - try again shortly");
+  }
+  await callHomeAssistantService(baseUrl, accessToken, domain, service, target, data);
+}
+
 function mapWriteFailure(status: 400 | 403 | 404, error: string): never {
   // A permission check above only proves the manifest declared the
   // right permission; memory.remember/forget still apply their own
@@ -388,31 +417,20 @@ export function createHost(actor: PersonRow, manifest: PackageManifest, secrets:
         // hostname lowercasing. Without this, a manifest declaring
         // "home:Lock" and calling call_service("Lock", ...) would pass
         // requirePermission's exact-string match but miss
-        // HOME_ASSISTANT_SECURITY_DOMAINS's lowercase-only entries,
-        // silently skipping the consequential:true requirement this check
-        // exists to enforce (found in review, 2026-09-05). Real Home
-        // Assistant domains are canonically lowercase anyway, so this
-        // costs nothing for a correctly-written package.
+        // isHomeAssistantSecurityDomain's lowercase-only check, silently
+        // skipping the consequential:true requirement this check exists
+        // to enforce (found in review, 2026-09-05). Real Home Assistant
+        // domains are canonically lowercase anyway, so this costs nothing
+        // for a correctly-written package.
         const domain = rawDomain.toLowerCase();
         requirePermission(`home:${domain}`);
-        if (HOME_ASSISTANT_SECURITY_DOMAINS.has(domain) && manifest.consequential !== true) {
+        if (isHomeAssistantSecurityDomain(domain) && manifest.consequential !== true) {
           throw new HostError(
             "permission_denied",
             `${manifest.id} must declare "consequential": true to call the security domain "${domain}"`,
           );
         }
-
-        const baseUrl = getHouseholdSettingValue("home.base_url") as string | undefined;
-        const accessToken = getHouseholdSettingValue("home.access_token") as string | undefined;
-        if (!baseUrl || !accessToken) {
-          throw new HostError("invalid_input", "Home Assistant isn't set up yet - add its URL and access token in Settings first");
-        }
-
-        if (!tryConsume(HOME_ASSISTANT_RATE_LIMIT_KEY, HOME_ASSISTANT_RATE_LIMIT)) {
-          throw new HostError("rate_limited", "home.call_service is rate-limited - try again shortly");
-        }
-
-        await callHomeAssistantService(baseUrl, accessToken, domain, service, target, data ?? null);
+        await homeCallService(domain, service, target, data ?? null);
       },
     },
     integration: {

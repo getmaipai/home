@@ -21,6 +21,8 @@ describe("RoutingStatsSection", () => {
       total: 3,
       plugin: 2,
       pluginError: 0,
+      command: 0,
+      commandError: 0,
       model: 1,
       safetyRefuse: 0,
       fallthroughRate: 1 / 3,
@@ -28,6 +30,7 @@ describe("RoutingStatsSection", () => {
         { pluginId: "remember", count: 1 },
         { pluginId: "recall", count: 1 },
       ],
+      byCommand: [],
     });
     try {
       const { findByText } = render(<RoutingStatsSection />);
@@ -45,10 +48,13 @@ describe("RoutingStatsSection", () => {
       total: 1,
       plugin: 0,
       pluginError: 0,
+      command: 0,
+      commandError: 0,
       model: 0,
       safetyRefuse: 1,
       fallthroughRate: null,
       byPlugin: [],
+      byCommand: [],
     });
     try {
       const { findByText, queryByText } = render(<RoutingStatsSection />);
@@ -66,10 +72,13 @@ describe("RoutingStatsSection", () => {
       total: 0,
       plugin: 0,
       pluginError: 0,
+      command: 0,
+      commandError: 0,
       model: 0,
       safetyRefuse: 0,
       fallthroughRate: null,
       byPlugin: [],
+      byCommand: [],
     });
     try {
       const { findByText } = render(<RoutingStatsSection />);

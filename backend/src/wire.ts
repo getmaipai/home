@@ -30,8 +30,9 @@ export interface TurnReply {
 
 export interface TurnValue {
   reply: TurnReply;
-  source: "safety_refuse" | "plugin" | "plugin_error" | "model";
+  source: "safety_refuse" | "plugin" | "plugin_error" | "command" | "command_error" | "model";
   plugin_id?: string;
+  command_id?: string;
   safety: SafetyResult;
   /** 4.3: "offer, never block." Set only on allow_with_resources, kept
    * separate from `reply` so a surface can present it alongside the
@@ -160,10 +161,13 @@ export interface RoutingStats {
   total: number;
   plugin: number;
   pluginError: number;
+  command: number;
+  commandError: number;
   model: number;
   safetyRefuse: number;
   fallthroughRate: number | null;
   byPlugin: { pluginId: string; count: number }[];
+  byCommand: { commandId: string; count: number }[];
 }
 
 // The role-string half of lib/access.ts's isOwnerOrAdmin(actor: PersonRow):

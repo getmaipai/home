@@ -44,13 +44,23 @@ export function RoutingStatsSection() {
             <span className="text-[hsl(var(--muted-foreground))]">{stats.plugin}</span>
           </div>
           <div className="flex items-center justify-between text-base">
+            <span>Matched a command</span>
+            <span className="text-[hsl(var(--muted-foreground))]">{stats.command}</span>
+          </div>
+          <div className="flex items-center justify-between text-base">
             <span>Answered by the model</span>
             <span className="text-[hsl(var(--muted-foreground))]">{stats.model}</span>
           </div>
           {stats.pluginError > 0 ? (
             <div className="flex items-center justify-between text-base">
-              <span>Matched but failed to run</span>
+              <span>Matched a plugin but failed to run</span>
               <span className="text-[hsl(var(--muted-foreground))]">{stats.pluginError}</span>
+            </div>
+          ) : null}
+          {stats.commandError > 0 ? (
+            <div className="flex items-center justify-between text-base">
+              <span>Matched a command but failed to run</span>
+              <span className="text-[hsl(var(--muted-foreground))]">{stats.commandError}</span>
             </div>
           ) : null}
           {stats.byPlugin.length > 0 ? (
@@ -58,6 +68,16 @@ export function RoutingStatsSection() {
               {stats.byPlugin.map((s) => (
                 <div key={s.pluginId} className="flex items-center justify-between py-2 text-base">
                   <span>{s.pluginId}</span>
+                  <span className="text-[hsl(var(--muted-foreground))]">{s.count}</span>
+                </div>
+              ))}
+            </div>
+          ) : null}
+          {stats.byCommand.length > 0 ? (
+            <div className="flex flex-col divide-y divide-[hsl(var(--border))]">
+              {stats.byCommand.map((s) => (
+                <div key={s.commandId} className="flex items-center justify-between py-2 text-base">
+                  <span>{s.commandId}</span>
                   <span className="text-[hsl(var(--muted-foreground))]">{s.count}</span>
                 </div>
               ))}

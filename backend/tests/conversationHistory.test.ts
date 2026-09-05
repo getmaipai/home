@@ -5,6 +5,7 @@ import { __resetThrottleForTests } from "@/lib/secretThrottle";
 import { __resetLlmSupervisorForTests } from "@/lib/llmSupervisor";
 import { runTurn } from "@/lib/turnEngine";
 import { list, exportPerson, runRetention, routingStats, summarizeBeforeDelete } from "@/lib/conversationHistory";
+import { createCommand } from "@/lib/commands";
 import { REMEMBER_CONFIRM_VARIANTS } from "@/lib/replyVariation";
 import { db } from "@/db";
 import { people, conversationTurns, memoryRecords } from "@/db/schema";
@@ -110,10 +111,13 @@ describe("routingStats()", () => {
       total: 0,
       plugin: 0,
       pluginError: 0,
+      command: 0,
+      commandError: 0,
       model: 0,
       safetyRefuse: 0,
       fallthroughRate: null,
       byPlugin: [],
+      byCommand: [],
     });
   });
 
@@ -123,6 +127,27 @@ describe("routingStats()", () => {
     const stats = routingStats();
     expect(stats.safetyRefuse).toBe(1);
     expect(stats.fallthroughRate).toBeNull();
+  });
+
+  // A code review (2026-09-05) found the original version of this
+  // function had no case at all for "command"/"command_error" - a
+  // command turn silently vanished from every bucket while still
+  // counting toward `total`, understating the routable denominator and
+  // making fallthroughRate read higher than reality.
+  test("counts command turns too, not silently dropping them from routable while still counting them in total", async () => {
+    const { actor } = await owner();
+    createCommand(actor, "movie night", "child", { kind: "reply", text: "Starting movie night mode." });
+    await runTurn(actor, "chat", "movie night"); // command
+    await runTurn(actor, "chat", "hi there"); // model
+
+    const stats = routingStats();
+    expect(stats.total).toBe(2);
+    expect(stats.command).toBe(1);
+    expect(stats.model).toBe(1);
+    // 1 model / (1 command + 1 model) = 1/2, not 1/1 (which is what a
+    // dropped command turn would silently produce).
+    expect(stats.fallthroughRate).toBeCloseTo(1 / 2);
+    expect(stats.byCommand).toEqual([{ commandId: expect.stringContaining("cmd-"), count: 1 }]);
   });
 });
 

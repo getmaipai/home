@@ -42,3 +42,10 @@ export function newConversationTurnId(): string {
 export function newClonedVoiceId(): string {
   return `voice-${randomSuffix(16)}`;
 }
+
+// Not a spec-shaped id either (commands aren't a spec 3.1 record type,
+// see lib/commands.ts's own header for why - the same call scheduledJobs
+// already made).
+export function newCommandId(): string {
+  return `cmd-${randomSuffix(10)}`;
+}

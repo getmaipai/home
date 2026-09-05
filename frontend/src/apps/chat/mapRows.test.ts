@@ -11,6 +11,7 @@ function row(overrides: Partial<ConversationTurnRow> = {}): ConversationTurnRow 
     replyText: "hi there",
     source: "model",
     pluginId: null,
+    commandId: null,
     safetyFlagged: false,
     safetyAction: "allow",
     minorSpeaker: false,

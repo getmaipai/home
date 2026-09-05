@@ -39,14 +39,24 @@ done; the other two items are still real, tracked work.
       collision (a bedtime-story request hijacked by the `joke` plugin's
       own keyword-overlap placeholder) - concrete evidence for the
       already-tracked `embed` role below, not something patched here.
-- [ ] **Formalize `command` as a first-class, user-creatable primitive**
-      (M) - the matching mechanism already exists (`routing.patterns` /
-      `matchPattern` in `turnEngine.ts`); this is a lighter-weight
-      authoring path so a household can define "when I say X, do Y"
-      without writing a full plugin, not new routing logic.
+- [x] **Formalize `command` as a first-class, user-creatable primitive**
+      (M, done 2026-09-05, `docs/dev.md`'s "The `command` primitive,
+      shipped" entry) - reuses `matchPattern` (`turnEngine.ts`) exactly
+      as-is, checked before the plugin floor since a household's own
+      trigger always wins. Two action shapes (`reply`,
+      `home_call_service`, the latter reusing plugin's own
+      `home.call_service` plumbing via a new shared `packageHost.ts`
+      export). Security-domain commands (lock/alarm/cover/garage/valve)
+      require an owner/admin creator and a `min_role` floor of `adult`,
+      checked once at creation rather than re-derived per trigger. HTTP
+      surface only so far - no authoring UI yet, tracked below.
 - [x] **No new "connector" concept needed** - `integration` (an
       existing manifest kind) already is one. Nothing to build here;
       recorded so the question doesn't get re-asked.
+- [ ] **A settings UI for authoring commands** (S-M) - `lib/commands.ts`
+      and its `/api/commands` routes are done and tested; there's no
+      household-facing "when I say X, do Y" builder yet, only the raw
+      HTTP surface.
 
 ## Skill standards (definition of done)
 

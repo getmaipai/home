@@ -14,6 +14,7 @@
 import { evaluateSafety } from "@/lib/safety";
 import { listPackageIds, loadPackage, meetsMinRole, runPlugin } from "@/lib/plugins";
 import { loadAllSkills, type LoadedSkill } from "@/lib/skills";
+import { matchCommand, runCommand } from "@/lib/commands";
 import { recall, type RecallMatch } from "@/lib/memory";
 import { complete, startCompleteStream, type LlmMessage } from "@/lib/llm";
 import { tokenize } from "@/lib/text";
@@ -377,6 +378,41 @@ async function prepareTurn(
   }
   const crisisResources = safety.action === "allow_with_resources" ? CRISIS_RESOURCES_TEXT : undefined;
 
+  // Checked before the plugin floor: a command is household-authored,
+  // deliberate, and exact-match-only (never fuzzy) - the identical "a
+  // real trigger always wins" property a plugin's own pattern match has,
+  // just for a phrase the household chose for itself rather than one a
+  // bundled package shipped with. A household member customizing "tell
+  // me a joke" with their own command is exactly that: a deliberate
+  // override, not a collision to prevent.
+  const matchedCommand = matchCommand(text, actor);
+  if (matchedCommand) {
+    const result = await runCommand(matchedCommand);
+    if (result.ok) {
+      return {
+        kind: "immediate",
+        value: {
+          reply: { text: result.value.text, speech: result.value.speech },
+          source: "command",
+          command_id: matchedCommand.id,
+          safety,
+          crisis_resources: crisisResources,
+        },
+      };
+    }
+    console.log(`[turn] command ${matchedCommand.id} matched but failed to run: ${result.error}`);
+    return {
+      kind: "immediate",
+      value: {
+        reply: { text: "Sorry, I couldn't do that." },
+        source: "command_error",
+        command_id: matchedCommand.id,
+        safety,
+        crisis_resources: crisisResources,
+      },
+    };
+  }
+
   const routed = route(text, actor, loaded);
   // A real trigger phrase always wins outright (see RoutedPlugin's own
   // comment on why `viaPattern`, not `score === 1`, is the real signal).
@@ -450,13 +486,16 @@ async function prepareTurn(
  * version varied `text` even under an override, leaving a stale `speech`
  * tied to the pre-variation wording once a real override ever exists.
  *
- * Rotation itself only ever runs for the two sources that can actually
- * PRODUCE one of these known constants (`plugin`/`plugin_error`) plus the
- * safety refusal's own dedicated path - never `model`. The same review
- * found the original version called `varyKnownConstant()` unconditionally
- * for every non-refusal source, so a model reply that happened to say
- * "Done." or "I don't remember anything about that." in its own words
- * got silently swapped for an unrelated pool phrase. */
+ * Rotation itself only ever runs for the sources that can actually
+ * PRODUCE one of these known constants (`plugin`/`plugin_error`, and now
+ * `command`/`command_error` - a `home_call_service` command's own success
+ * text is literally "Done.", the exact same pool entry a plugin's own
+ * home.call_service reply already hits) plus the safety refusal's own
+ * dedicated path - never `model`. The same review found the original
+ * version called `varyKnownConstant()` unconditionally for every
+ * non-refusal source, so a model reply that happened to say "Done." or
+ * "I don't remember anything about that." in its own words got silently
+ * swapped for an unrelated pool phrase. */
 function finalizeReply(actor: PersonRow, value: TurnValue): TurnValue {
   const { text, speech } = value.reply;
   if (speech !== undefined && speech !== text) return value;
@@ -464,7 +503,10 @@ function finalizeReply(actor: PersonRow, value: TurnValue): TurnValue {
   const variedText =
     value.source === "safety_refuse"
       ? pickRefusalVariant(actor.id)
-      : value.source === "plugin" || value.source === "plugin_error"
+      : value.source === "plugin" ||
+          value.source === "plugin_error" ||
+          value.source === "command" ||
+          value.source === "command_error"
         ? varyKnownConstant(actor.id, text)
         : text;
   return { ...value, reply: { text: variedText, speech: normalizeForSpeech(variedText) } };

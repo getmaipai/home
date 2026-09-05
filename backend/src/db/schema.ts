@@ -130,8 +130,9 @@ export const conversationTurns = sqliteTable("conversation_turns", {
   surface: text("surface").notNull(),
   userText: text("user_text").notNull(),
   replyText: text("reply_text").notNull(),
-  source: text("source").notNull(), // "safety_refuse" | "plugin" | "plugin_error" | "model"
+  source: text("source").notNull(), // "safety_refuse" | "plugin" | "plugin_error" | "command" | "command_error" | "model"
   pluginId: text("plugin_id"),
+  commandId: text("command_id"),
   safetyFlagged: integer("safety_flagged", { mode: "boolean" }).notNull().default(false),
   safetyAction: text("safety_action").notNull(), // "allow" | "allow_with_resources" | "refuse"
   // Captured at write time, not re-derived by joining to `people` later:
@@ -204,4 +205,27 @@ export const scheduledJobs = sqliteTable("scheduled_jobs", {
   createdAt: text("created_at").notNull(),
   lastRunAt: text("last_run_at"),
   lastError: text("last_error"),
+});
+
+// The `command` primitive (2026-09-05, the third "Naming: skill, plugin,
+// command, connector" item): "when I say X, do Y," authored by a
+// household at runtime, not a filesystem package - see lib/commands.ts's
+// own header for why this lives here rather than as a spec 3.1 record
+// type, the same call scheduledJobs above already made for the identical
+// reason. `trigger` is matched exactly (case-insensitive, trimmed, no
+// wildcard - lib/turnEngine.ts's own matchPattern with no `*`), never
+// fuzzy: a command is a deliberate, household-authored phrase, not a
+// guess. Unique per household (enforced at the lib layer, not a DB
+// constraint, since "unique" here means case-insensitive/trimmed
+// equality, which SQLite's own UNIQUE can't express directly).
+export const commands = sqliteTable("commands", {
+  id: text("id").primaryKey(),
+  creatorId: text("creator_id")
+    .notNull()
+    .references(() => people.id),
+  trigger: text("trigger").notNull(),
+  minRole: text("min_role").notNull(),
+  actionKind: text("action_kind").notNull(), // "reply" | "home_call_service"
+  actionData: text("action_data").notNull(), // JSON, shape depends on actionKind
+  createdAt: text("created_at").notNull(),
 });

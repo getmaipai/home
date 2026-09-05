@@ -72,6 +72,7 @@ export function logTurn(actor: PersonRow, surface: Surface, userText: string, va
     replyText: value.reply.text,
     source: value.source,
     pluginId: value.plugin_id ?? null,
+    commandId: value.command_id ?? null,
     safetyFlagged: value.safety.flagged,
     safetyAction: value.safety.action,
     minorSpeaker: isMinorRole(actor.role as Role),
@@ -285,22 +286,37 @@ export interface RoutingStats {
   total: number;
   plugin: number;
   pluginError: number;
+  /** A command primitive fires before the plugin floor even runs
+   * (turnEngine.ts's prepareTurn(), "checked before the plugin floor"),
+   * but for this metric's purposes it's the same kind of thing plugin/
+   * pluginError are: a deterministic match that never reached the model.
+   * A code review (2026-09-05) found the original version of this
+   * function had no case for "command"/"command_error" at all, so a
+   * command turn silently vanished from every bucket while still
+   * counting toward `total` - undercounting the routable denominator and
+   * making `fallthroughRate` read higher than reality the moment any
+   * command ever fired. */
+  command: number;
+  commandError: number;
   model: number;
   safetyRefuse: number;
-  /** model / (plugin + pluginError + model) - the exact number 4.5's own
-   * plan names as the decision input ("count fall-throughs... and decide
-   * on tier 2 from the eval number"). `safety_refuse` never reaches
-   * routing at all (prepareTurn() checks safety before the deterministic
-   * floor even runs), so it's excluded from both sides of this ratio -
-   * counting it would understate the real fall-through rate against
-   * everything routing actually had a chance to match. Null with zero
-   * routable turns, never a division by zero silently reading as 0%. */
+  /** model / (plugin + pluginError + command + commandError + model) -
+   * the exact number 4.5's own plan names as the decision input ("count
+   * fall-throughs... and decide on tier 2 from the eval number").
+   * `safety_refuse` never reaches routing at all (prepareTurn() checks
+   * safety before the deterministic floor even runs), so it's excluded
+   * from both sides of this ratio - counting it would understate the
+   * real fall-through rate against everything routing actually had a
+   * chance to match. Null with zero routable turns, never a division by
+   * zero silently reading as 0%. */
   fallthroughRate: number | null;
   /** Which plugins are actually firing, most first - the plan's own "add
    * a row before it is fixed" eval-set idea needs to know not just THAT
    * routing falls through, but which utterances it should have matched
    * and didn't; this is the "did match" half of that picture. */
   byPlugin: { pluginId: string; count: number }[];
+  /** The same "did match" picture as byPlugin, for commands. */
+  byCommand: { commandId: string; count: number }[];
 }
 
 /** Household-wide, not per-person (unlike list()/exportPerson() above):
@@ -310,13 +326,19 @@ export interface RoutingStats {
  * requireRole("owner", "admin"), not an actor param here, matching
  * lib/hardware.ts's detectHardware() precedent for the identical shape. */
 export function routingStats(): RoutingStats {
-  const rows = db.select({ source: conversationTurns.source, pluginId: conversationTurns.pluginId }).from(conversationTurns).all();
+  const rows = db
+    .select({ source: conversationTurns.source, pluginId: conversationTurns.pluginId, commandId: conversationTurns.commandId })
+    .from(conversationTurns)
+    .all();
 
   let plugin = 0;
   let pluginError = 0;
+  let command = 0;
+  let commandError = 0;
   let model = 0;
   let safetyRefuse = 0;
   const pluginCounts = new Map<string, number>();
+  const commandCounts = new Map<string, number>();
 
   for (const row of rows) {
     switch (row.source) {
@@ -327,6 +349,13 @@ export function routingStats(): RoutingStats {
       case "plugin_error":
         pluginError++;
         break;
+      case "command":
+        command++;
+        if (row.commandId) commandCounts.set(row.commandId, (commandCounts.get(row.commandId) ?? 0) + 1);
+        break;
+      case "command_error":
+        commandError++;
+        break;
       case "model":
         model++;
         break;
@@ -336,18 +365,24 @@ export function routingStats(): RoutingStats {
     }
   }
 
-  const routable = plugin + pluginError + model;
+  const routable = plugin + pluginError + command + commandError + model;
   const byPlugin = [...pluginCounts.entries()]
     .map(([pluginId, count]) => ({ pluginId, count }))
+    .sort((a, b) => b.count - a.count);
+  const byCommand = [...commandCounts.entries()]
+    .map(([commandId, count]) => ({ commandId, count }))
     .sort((a, b) => b.count - a.count);
 
   return {
     total: rows.length,
     plugin,
     pluginError,
+    command,
+    commandError,
     model,
     safetyRefuse,
     fallthroughRate: routable > 0 ? model / routable : null,
     byPlugin,
+    byCommand,
   };
 }
