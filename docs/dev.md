@@ -6293,3 +6293,65 @@ changes which turns end up in a real window); and `routes/
 conversations.ts` inlined the `{error, status}` response shape four
 times instead of the one-line `fail()` helper every sibling route file
 already has.
+
+## Session A: step 4, prompt order and budgets (2026-09-05)
+
+Real stable-first prompt assembly and independent per-section budgets,
+replacing step 1-3's "get the blocks in" minimum.
+
+**Stable prefix, in order**: identity (now names the selected persona's
+`display_name`, not a hardcoded "MaiPai" - `DEFAULT_PERSONA.display_name`
+IS "MaiPai", so every household that never touches `persona.active_id`
+sees byte-identical text to before), the persona's own voice fragment
+("companion"), `INFORMATION_HANDLING_POLICY` ("rules"), the plugins list
+("standing skills" in 4.5's own loose sense - every installed package,
+unconditionally, every turn). **Volatile zone, in order**: household,
+speaker, memory (dated), a companion re-anchor, the conversation
+summary, this turn's own matched skills (utterance-dependent, so it can
+never be stable no matter what 4.5 calls it - not explicitly named in
+4.5's own "household, speaker, memory, summary, time last" list, so it
+sits where composed instructions already sit), local time last, never
+truncated (unchanged from step 1's protection).
+
+**The companion re-anchor** (`companionReanchorLine()`): one line
+("Remember: you are Buddy.") right after the memory block, unconditional
+- not gated on whether anything actually matched, since the plan names a
+POSITION, not a precondition, and legacy measured real drift after about
+eight turns regardless of whether memory happened to fire that turn.
+Companions-as-packages don't exist yet (step 8), so this repeats the
+same `display_name` the stable identity line already used; already the
+right shape for a real companion package's own name later.
+
+**Memory lines are dated**: `formatShortDate()`/`daysAgoLabel()` render
+"(as of Sep 2, 8 days ago)" off `record.created_at` (when the fact was
+first asserted, not `last_used_at` - "as of" asks when it became true).
+The block ends with one fixed reminder line, `MEMORY_TRUST_REMINDER`
+("Prefer these facts over guessing when they're relevant.") - both
+ported from legacy's `formatMemoriesForPrompt`/the BACKLOG's own
+"dated memories... small models drift toward the freshest tokens"
+finding.
+
+**Every capped section now has a real, exact cap** (`capSection()`,
+extracted from five inline copies of the same "slice then append '...'"
+logic): the ellipsis now counts INSIDE the cap - a genuine, if small,
+correctness fix a code review caught mid-step (every existing section
+had been allowed to run 3 chars past its own declared budget for the
+ellipsis alone). Two new sections got their own cap for the first time,
+per the plan's own instruction and the bot's `test_prompt_budget.py`
+precedent it copies: `MAX_RULES_SECTION_CHARS` and
+`MAX_COMPANION_SECTION_CHARS`, both 800 (the real catalog's longest
+persona fragment runs ~645 chars; `INFORMATION_HANDLING_POLICY` is 617 -
+both sized from real content with headroom, matching
+`MAX_MEMORY_SECTION_CHARS`/`MAX_PLUGINS_SECTION_CHARS`'s own 800, not
+picked arbitrarily and then found too small).
+
+Tests: `capSection()` unit tests (under-cap unchanged, over-cap sliced
+to exactly the cap with a real ellipsis inside it, a cap too small for
+an ellipsis at all), an order-assertion test walking all eight section
+markers through a real prompt (`indexOf` each, assert stable-prefix
+order then volatile-zone order end to end in one test rather than
+several partial ones), identity naming the selected persona (default
+and non-default), the re-anchor firing unconditionally, the dated
+memory suffix and trust reminder together, and real-content budget
+checks for every persona's fragment plus the rules policy. Full backend
+suite green (621).

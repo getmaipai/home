@@ -87,8 +87,19 @@ function logTurnSafely(actor: PersonRow, surface: Surface, userText: string, val
 const CRISIS_RESOURCES_TEXT =
   "If you're in crisis, the 988 Suicide & Crisis Lifeline is free and available 24/7: call or text 988.";
 
-const STABLE_SYSTEM_PREFIX = [
-  "You are MaiPai, a private, self-hosted AI assistant for this household. Be warm, concise and honest. Nothing you say leaves this house.",
+// Step 4: "identity and companion" are the first thing in the stable
+// prefix, and the identity line itself now names the selected persona's
+// display_name rather than a hardcoded "MaiPai" - a real gap the
+// original version had (a household that picked "Buddy" still heard the
+// model call itself MaiPai every turn). DEFAULT_PERSONA.display_name is
+// literally "MaiPai", so this produces byte-identical text to the old
+// constant for every household that never touches persona.active_id.
+function identityLine(persona: Persona): string {
+  return `You are ${persona.display_name}, a private, self-hosted AI assistant for this household.`;
+}
+
+const STABLE_SYSTEM_SUFFIX = [
+  "Be warm, concise and honest. Nothing you say leaves this house.",
   "Requests already blocked by the household's safety rules never reach you; answer anything else helpfully and honestly.",
   "If you don't know something the household hasn't told you, say so instead of guessing.",
 ].join(" ");
@@ -97,7 +108,7 @@ const STABLE_SYSTEM_PREFIX = [
 // 2026-09-05): what used to be a single fixed NATURAL_REGISTER_POLICY
 // constant is the "default" entry in `PERSONAS`, composed through the
 // exact same mechanism every other persona uses, rather than a special
-// case. Kept separate from STABLE_SYSTEM_PREFIX for the same reason it
+// case. Kept separate from STABLE_SYSTEM_SUFFIX for the same reason it
 // always was: a persona's own fragment can change per person turn to
 // turn while the identity/safety-posture prefix above it can't.
 
@@ -143,6 +154,29 @@ const MAX_SKILLS_SECTION_CHARS = 1200;
 // every other section does against a runaway conversation summary ever
 // dominating the prompt on its own.
 const MAX_SUMMARY_SECTION_CHARS = 600;
+// Step 4's own two: "rules" (INFORMATION_HANDLING_POLICY, currently 617
+// chars) and "companion" (composePersonaPrompt()'s output, which
+// genuinely varies per persona) each get their own cap too - the bot's
+// test_prompt_budget.py precedent this step copies found rules alone
+// once hit 68% of a prompt with no independent section cap to stop it.
+const MAX_RULES_SECTION_CHARS = 800;
+// The real catalog's longest fragment (composePersonaPrompt("pal")) runs
+// about 645 chars; 800 gives headroom without letting a future dial or
+// catalog entry balloon unnoticed, matching MAX_MEMORY_SECTION_CHARS/
+// MAX_PLUGINS_SECTION_CHARS's own 800.
+const MAX_COMPANION_SECTION_CHARS = 800;
+
+/** Shared by every capped section below (a code review pass on this
+ * step found the same "slice then append '...'" logic repeated inline
+ * five times, each one actually allowing the result to run 3 chars past
+ * its own declared cap for the ellipsis) - one place, and the ellipsis
+ * now counts INSIDE maxChars, so "each section has a cap" is a real,
+ * exact guarantee a test can assert on directly, not an approximation. */
+export function capSection(text: string, maxChars: number): string {
+  if (text.length <= maxChars) return text;
+  if (maxChars <= 3) return text.slice(0, maxChars);
+  return text.slice(0, maxChars - 3) + "...";
+}
 // A cap on how many matching skills compose into one turn, not just a
 // character budget: even under budget, five unrelated skills all
 // clearing the threshold on a short utterance is a real sign the
@@ -261,24 +295,53 @@ function householdLine(): string {
   return `\n\nWho lives here:\n${lines.join("\n")}`;
 }
 
-// Stable-first (4.5): persona/rules/content-policy/standing-instructions
-// and the plugins list are the same for every turn on this install, so they
-// sit first for prefix caching; the volatile zone (speaker, household,
-// memory, then time) comes after. Matching skills sit with memory in the
-// volatile zone, not with the stable prefix: unlike the plugins list
-// (every installed plugin, unconditionally, every turn), which skills
-// compose in genuinely depends on this turn's own utterance. 4.5 also
-// names notes, methods, summary and context in the volatile zone:
-// notes/methods need persona/companion state (not built); summary needs
-// an LLM to distill conversation history into one (the raw history now
-// exists for real, lib/conversationHistory.ts, but nothing summarizes it,
-// 4.11's other roles); context needs the ambient-context wiring the robot
-// side already has but the hub doesn't yet: all three are real gaps, not
-// silently skipped. Full stable-first re-ordering with a persona
-// re-anchor and per-section budgets is step 4's job, not this one -
-// today's order (persona/policy, speaker/household, plugins, memory,
-// skills, time) is step 1's minimum: get the actor and the blocks in,
-// keep the overall budget honest.
+// Step 4: "as of <date>, <n> days ago" on each memory line - legacy's
+// own `formatMemoriesForPrompt`, ported because small models measurably
+// drift toward the freshest tokens otherwise (docs/dev.md's BACKLOG
+// entry on this). `record.created_at` (when the fact was first
+// asserted), not `last_used_at` (when it was last recalled) - "as of"
+// asks when the fact became true, not when it was last useful.
+function formatShortDate(iso: string, locale: string): string {
+  return new Intl.DateTimeFormat(locale, { month: "short", day: "numeric" }).format(new Date(iso));
+}
+
+function daysAgoLabel(iso: string, now: Date): string {
+  const days = Math.max(0, Math.floor((now.getTime() - new Date(iso).getTime()) / 86_400_000));
+  return `${days} day${days === 1 ? "" : "s"} ago`;
+}
+
+function memoryBulletLine(match: RecallMatch, locale: string, now: Date): string {
+  return `- ${match.record.text} (as of ${formatShortDate(match.record.created_at, locale)}, ${daysAgoLabel(match.record.created_at, now)})`;
+}
+
+const MEMORY_TRUST_REMINDER = "Prefer these facts over guessing when they're relevant.";
+
+// Step 4: "re-anchor the companion's one-line identity after the memory
+// block" - legacy measured real drift (losing the persona's voice)
+// after about eight turns with no repeat of who's speaking. Companions-
+// as-packages don't exist yet (step 8), so this repeats the same
+// display_name the stable identityLine() above already used - a real,
+// if small, anchor today, and already the right shape for a companion
+// package's own name once one exists.
+function companionReanchorLine(persona: Persona): string {
+  return `\n\nRemember: you are ${persona.display_name}.`;
+}
+
+// Stable-first (4.5, made real in step 4): identity and companion
+// (identityLine + the persona's own voice fragment), information policy
+// (INFORMATION_HANDLING_POLICY), then standing skills (the plugins
+// list - every installed package, unconditionally, every turn, "skills"
+// in 4.5's own loose sense of the word) all sit first for prefix
+// caching. The volatile zone after it, in order: household, speaker,
+// memory (with the dated suffix and trust reminder above), a companion
+// re-anchor, the conversation summary, then this turn's own matched
+// skills (utterance-dependent, so it can't be stable no matter what 4.5
+// calls it), and finally local time - never truncated, per the
+// existing "time last" protection below. 4.5 also names notes, methods
+// and context in the volatile zone: notes/methods need persona/
+// companion state beyond what step 8 will add; context needs the
+// ambient-context wiring the robot side already has but the hub
+// doesn't yet - both real gaps, not silently skipped.
 export function buildSystemPrompt(
   actor: PersonRow,
   text: string,
@@ -288,40 +351,38 @@ export function buildSystemPrompt(
   skills: LoadedSkill[] = loadAllSkills(),
   // Step 3: the conversation's own rolling summary (buildConversationWindow(),
   // lib/conversationHistory.ts), one line covering whatever fell out of
-  // the verbatim window - 4.5 names "summary" in the volatile zone; full
-  // stable-first re-ordering and per-section budgets are step 4's job,
-  // not this one.
+  // the verbatim window.
   conversationSummaryLine?: string,
 ): string {
   const now = new Date();
   const localeValue = getHouseholdSettingValue("household.locale");
   const locale = typeof localeValue === "string" ? localeValue : "en-US";
 
-  let pluginsSection = pluginsListLine(loaded);
-  if (pluginsSection.length > MAX_PLUGINS_SECTION_CHARS) {
-    pluginsSection = pluginsSection.slice(0, MAX_PLUGINS_SECTION_CHARS) + "...";
-  }
+  // ── Stable prefix (step 4: "identity and companion, information
+  // policy, standing skills") ──
+  const companionSection = capSection(composePersonaPrompt(persona), MAX_COMPANION_SECTION_CHARS);
+  const rulesSection = capSection(INFORMATION_HANDLING_POLICY, MAX_RULES_SECTION_CHARS);
+  const pluginsSection = capSection(pluginsListLine(loaded), MAX_PLUGINS_SECTION_CHARS);
+  const stablePrefix = `${identityLine(persona)} ${STABLE_SYSTEM_SUFFIX} ${companionSection} ${rulesSection}${pluginsSection}`;
 
+  // ── Volatile zone (step 4: "household, speaker, memory, summary, time
+  // last"; matched skills sit here too - utterance-dependent, so never
+  // stable no matter what 4.5 calls it) ──
   let memorySection = "";
   if (memoryMatches.length > 0) {
-    const lines = memoryMatches.slice(0, MAX_MEMORY_SNIPPETS).map((m) => `- ${m.record.text}`);
-    memorySection = `\n\nWhat you already know about this household:\n${lines.join("\n")}`;
-    if (memorySection.length > MAX_MEMORY_SECTION_CHARS) {
-      memorySection = memorySection.slice(0, MAX_MEMORY_SECTION_CHARS) + "...";
-    }
+    const lines = memoryMatches.slice(0, MAX_MEMORY_SNIPPETS).map((m) => memoryBulletLine(m, locale, now));
+    memorySection = `\n\nWhat you already know about this household:\n${lines.join("\n")}\n${MEMORY_TRUST_REMINDER}`;
+    memorySection = capSection(memorySection, MAX_MEMORY_SECTION_CHARS);
   }
+  // Unconditional, not gated on whether any memory actually matched:
+  // drift accumulates with turn count, not with whether this particular
+  // turn happened to recall something (the plan's own "after the memory
+  // block" names a POSITION, not a precondition).
+  const reanchorSection = companionReanchorLine(persona);
+  const summarySection = capSection(conversationSummaryLine ? `\n\n${conversationSummaryLine}` : "", MAX_SUMMARY_SECTION_CHARS);
+  const skillsPart = capSection(skillsSection(text, skills), MAX_SKILLS_SECTION_CHARS);
+  const volatileZone = householdLine() + speakerLine(actor, locale, now) + memorySection + reanchorSection + summarySection + skillsPart;
 
-  let skillsPart = skillsSection(text, skills);
-  if (skillsPart.length > MAX_SKILLS_SECTION_CHARS) {
-    skillsPart = skillsPart.slice(0, MAX_SKILLS_SECTION_CHARS) + "...";
-  }
-
-  let summarySection = conversationSummaryLine ? `\n\n${conversationSummaryLine}` : "";
-  if (summarySection.length > MAX_SUMMARY_SECTION_CHARS) {
-    summarySection = summarySection.slice(0, MAX_SUMMARY_SECTION_CHARS) + "...";
-  }
-
-  const speakerAndHousehold = speakerLine(actor, locale, now) + householdLine();
   const localTimeLine = `\n\nLocal time: ${formatLocalTime(now, locale)}`;
 
   // The time line is appended last (4.5: "...time last") and must never
@@ -331,14 +392,12 @@ export function buildSystemPrompt(
   // bullet) off mid-word once enough packages or memories pushed the
   // total over budget. Truncating the body first, then appending a
   // never-truncated time line, keeps every truncation boundary inside
-  // prose meant to be cut, never inside the one line a caller might parse.
-  // The same protection now covers the speaker/household blocks too (step
-  // 1: "if it cannot [keep the budget], the blocks shrink, not the
-  // budget") by including them in the truncatable body rather than
-  // appending them after the slice the way the time line is.
-  const registerFragment = composePersonaPrompt(persona) + " " + INFORMATION_HANDLING_POLICY;
-  let body =
-    STABLE_SYSTEM_PREFIX + " " + registerFragment + speakerAndHousehold + pluginsSection + memorySection + summarySection + skillsPart;
+  // prose meant to be cut, never inside the one line a caller might parse
+  // (step 1's "the blocks shrink, not the budget", extended to every
+  // section here since each already has its own independent cap above -
+  // this outer slice is the last-resort safety net for the sum of them
+  // all still somehow exceeding the whole-prompt budget).
+  let body = stablePrefix + volatileZone;
   const bodyBudget = Math.max(0, PROMPT_SYSTEM_CHAR_BUDGET - localTimeLine.length);
   if (body.length > bodyBudget) body = body.slice(0, bodyBudget);
 

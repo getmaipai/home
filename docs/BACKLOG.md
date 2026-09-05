@@ -391,16 +391,17 @@ into a conversation with someone who knows who is talking.
       source yet (robot/ambient-context, not this session), and the
       plugins list already exists as its own separate prompt section
       (`pluginsListLine()`, predates this item).
-- [ ] **Stable-first prompt order with a persona re-anchor** (S) - legacy
-      `companionTurn.ts` put static policy first for KV reuse and
-      repeated the persona reminder near the end because drift was
-      measurable in about eight turns; plan 4.5 asks for the same
-      stable-first shape. Today's order is right at the top and has no
-      re-anchor.
-- [ ] **Per-section prompt budget test** (S) - one 4,000-char cap today.
-      The bot's `test_prompt_budget.py` capped each section (rules,
-      memory, persona) after rules alone hit 68% of a prompt and produced
-      8-14 s of silence. Same test here, per section.
+- [x] **Stable-first prompt order with a persona re-anchor** (S) -
+      shipped, Session A step 4 (2026-09-05): identity/companion/rules/
+      standing-skills stable, household/speaker/memory/re-anchor/summary/
+      matched-skills/time volatile; `companionReanchorLine()` repeats the
+      persona's `display_name` right after the memory block,
+      unconditionally.
+- [x] **Per-section prompt budget test** (S) - shipped, Session A step 4
+      (2026-09-05): every section (rules, companion, memory, plugins,
+      skills, summary) has its own real cap via a shared `capSection()`
+      (the ellipsis now counts inside the cap - a genuine off-by-3 bug
+      the old per-section inline copies all had, fixed in the same pass).
 - [ ] **Rate-limit `/api/turn` and `/api/llm/*` per person** (S) - named
       in `spec/llm/README.md`, tracked nowhere.
 - [ ] **Decide what an emptied conversation becomes** (S decision, found
@@ -461,11 +462,12 @@ into a conversation with someone who knows who is talking.
       for specifics. ChatGPT and Claude both inject a maintained summary
       rather than a search-result list; Letta's memory blocks are the
       same idea.
-- [ ] **Dated memories in the prompt, and a closing reminder** (S) -
-      legacy `formatMemoriesForPrompt` wrote "as of Aug 12, 2 weeks ago"
-      on each fact and put a one-line reminder after the memory block
-      because small models drift toward the freshest tokens. Today's
-      block is bare bullets.
+- [x] **Dated memories in the prompt, and a closing reminder** (S) -
+      shipped, Session A step 4 (2026-09-05): each bullet carries "(as of
+      Sep 2, 8 days ago)" off `created_at`; the block ends with one fixed
+      trust-these-facts reminder. Absolute day count, not legacy's "N
+      weeks ago" rounding - the plan's own text asked for "<n> days ago"
+      literally.
 - [ ] **Use the bi-temporal fields, and add a clock to every memory**
       (S in the spec, then hub) - the record already has `valid_from`/
       `valid_to` next to supersede, and `memory.ts` writes null to both;

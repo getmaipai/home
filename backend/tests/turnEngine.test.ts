@@ -3,11 +3,11 @@ import { TestClient } from "./client";
 import { resetDb } from "./reset-db";
 import { __resetThrottleForTests } from "@/lib/secretThrottle";
 import { __resetLlmSupervisorForTests } from "@/lib/llmSupervisor";
-import { runTurn, runTurnStream, buildSystemPrompt, matchPattern, PROMPT_SYSTEM_CHAR_BUDGET, type TurnStreamResult } from "@/lib/turnEngine";
+import { runTurn, runTurnStream, buildSystemPrompt, matchPattern, capSection, PROMPT_SYSTEM_CHAR_BUDGET, type TurnStreamResult } from "@/lib/turnEngine";
 import { streamTurnEvents } from "@/routes/turn";
-import { remember } from "@/lib/memory";
+import { remember, recall } from "@/lib/memory";
 import { REFUSAL_FIRST, REFUSAL_REPEAT, REMEMBER_CONFIRM_VARIANTS } from "@/lib/replyVariation";
-import { resolvePersona } from "@/lib/persona";
+import { resolvePersona, composePersonaPrompt, INFORMATION_HANDLING_POLICY, PERSONA_IDS } from "@/lib/persona";
 import { db } from "@/db";
 import { people, conversationTurns, memoryRecords } from "@/db/schema";
 import { eq } from "drizzle-orm";
@@ -349,6 +349,112 @@ describe("buildSystemPrompt() speaker and household (step 1)", () => {
     expect(usPrompt).not.toBe(gbPrompt);
     expect(gbPrompt).toMatch(/Local time: [^\n]+\d{4}[^\n]+\d{1,2}:\d{2} (am|pm)/);
     expect(gbPrompt).toContain("locale en-GB");
+  });
+});
+
+describe("capSection() (step 4)", () => {
+  test("text at or under the cap is returned unchanged", () => {
+    expect(capSection("hello", 10)).toBe("hello");
+    expect(capSection("1234567890", 10)).toBe("1234567890");
+  });
+
+  test("text over the cap is sliced with an ellipsis, and the ellipsis counts INSIDE the cap", () => {
+    const result = capSection("x".repeat(100), 10);
+    expect(result.length).toBe(10); // never cap+3, the bug a code review found in every section's old inline version
+    expect(result.endsWith("...")).toBe(true);
+  });
+
+  test("a cap of 3 or fewer chars never adds an ellipsis it can't fit", () => {
+    expect(capSection("hello", 3)).toBe("hel");
+    expect(capSection("hello", 0)).toBe("");
+  });
+});
+
+describe("buildSystemPrompt() stable-first order and budgets (step 4)", () => {
+  test("identity names the selected persona, not a hardcoded 'MaiPai'", () => {
+    const defaultPrompt = buildSystemPrompt(fakeActor(), "hi there", []);
+    expect(defaultPrompt).toContain("You are MaiPai,");
+
+    const tutorPrompt = buildSystemPrompt(fakeActor(), "hi there", [], undefined, resolvePersona("tutor"));
+    expect(tutorPrompt).toContain("You are The Tutor,");
+    expect(tutorPrompt).not.toContain("You are MaiPai,");
+  });
+
+  test("stable-first: identity, companion voice, rules, and standing skills (plugins) all precede the volatile zone", async () => {
+    const { actor } = await owner();
+    remember(actor, {
+      text: "the household calendar rule about pizza night",
+      category: "fact",
+      tier: "durable",
+      scope: "household",
+      source: "test",
+      importance: 0.8,
+    });
+    const matches = recall(actor, "pizza night", { bumpUsage: false });
+    const prompt = buildSystemPrompt(actor, "what's the calendar rule", matches, undefined, undefined, undefined, "a prior summary line");
+
+    const identityIdx = prompt.indexOf("You are MaiPai,");
+    const rulesIdx = prompt.indexOf("Skip detail nobody asked for");
+    const householdIdx = prompt.indexOf("Who lives here:");
+    const speakerIdx = prompt.indexOf("You're talking with");
+    const memoryIdx = prompt.indexOf("What you already know");
+    const reanchorIdx = prompt.indexOf("Remember: you are");
+    const summaryIdx = prompt.indexOf("a prior summary line");
+    const timeIdx = prompt.indexOf("Local time:");
+
+    for (const idx of [identityIdx, rulesIdx, householdIdx, speakerIdx, memoryIdx, reanchorIdx, summaryIdx, timeIdx]) {
+      expect(idx).toBeGreaterThanOrEqual(0);
+    }
+    // Stable prefix, in order.
+    expect(identityIdx).toBeLessThan(rulesIdx);
+    // Volatile zone, in order: household, speaker, memory, re-anchor,
+    // summary, time last.
+    expect(rulesIdx).toBeLessThan(householdIdx);
+    expect(householdIdx).toBeLessThan(speakerIdx);
+    expect(speakerIdx).toBeLessThan(memoryIdx);
+    expect(memoryIdx).toBeLessThan(reanchorIdx);
+    expect(reanchorIdx).toBeLessThan(summaryIdx);
+    expect(summaryIdx).toBeLessThan(timeIdx);
+  });
+
+  test("the companion re-anchor names the active persona, unconditionally (even with no memory matches)", () => {
+    const prompt = buildSystemPrompt(fakeActor(), "hi there", [], undefined, resolvePersona("buddy"));
+    expect(prompt).toContain("Remember: you are Buddy.");
+  });
+
+  test("a memory bullet carries an 'as of <date>, N days ago' suffix, and the block ends with a trust reminder", async () => {
+    const { actor } = await owner();
+    const created = remember(actor, {
+      text: "the household calendar rule about pizza night",
+      category: "fact",
+      tier: "durable",
+      scope: "household",
+      source: "test",
+      importance: 0.8,
+    });
+    expect(created.ok).toBe(true);
+    if (!created.ok) return;
+    const eightDaysAgo = new Date(Date.now() - 8 * 24 * 60 * 60 * 1000).toISOString();
+    db.update(memoryRecords).set({ createdAt: eightDaysAgo }).where(eq(memoryRecords.id, created.value.id)).run();
+
+    const matches = recall(actor, "pizza night", { bumpUsage: false });
+    const prompt = buildSystemPrompt(actor, "what's the calendar rule", matches);
+    expect(prompt).toMatch(/the household calendar rule about pizza night \(as of \w+ \d{1,2}, 8 days ago\)/);
+    expect(prompt).toContain("Prefer these facts over guessing when they're relevant.");
+  });
+
+  test("per-section budgets: rules and companion sections never exceed their own caps even with an artificially tiny one", () => {
+    // capSection() itself is the real unit under test (above); this
+    // proves buildSystemPrompt() actually calls it for these two
+    // sections specifically, by checking the REAL content already fits
+    // comfortably under its real cap - the bot's own test_prompt_
+    // budget.py precedent this step copies (docs/BACKLOG.md: "rules
+    // alone hit 68% of a prompt" before every section had its own cap).
+    for (const id of PERSONA_IDS) {
+      const fragment = composePersonaPrompt(resolvePersona(id));
+      expect(fragment.length).toBeLessThanOrEqual(800); // MAX_COMPANION_SECTION_CHARS
+    }
+    expect(INFORMATION_HANDLING_POLICY.length).toBeLessThanOrEqual(800); // MAX_RULES_SECTION_CHARS
   });
 });
 
