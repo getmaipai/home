@@ -4,6 +4,8 @@ import {
   personCredentials,
   sessions,
   memoryRecords,
+  memoryEmbeddings,
+  pendingEmbeddings,
   idSequences,
   settingsValues,
   scheduledJobs,
@@ -35,6 +37,8 @@ export function resetDb(): void {
   db.delete(clonedVoices).run();
   db.delete(conversationTurns).run();
   db.delete(conversations).run();
+  db.delete(memoryEmbeddings).run();
+  db.delete(pendingEmbeddings).run();
   db.delete(memoryRecords).run();
   db.delete(settingsValues).run();
   db.delete(idSequences).run();

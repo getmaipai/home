@@ -4,10 +4,21 @@ import { TestClient } from "./client";
 import { resetDb } from "./reset-db";
 import { __resetThrottleForTests } from "@/lib/secretThrottle";
 import { eq } from "drizzle-orm";
-import { db } from "@/db";
-import { memoryRecords, people } from "@/db/schema";
-import { recall, remember, bumpUsage } from "@/lib/memory";
+import { db, sqlite } from "@/db";
+import { memoryRecords, memoryEmbeddings, pendingEmbeddings, people } from "@/db/schema";
+import { recall, remember, bumpUsage, drainPendingEmbeddings } from "@/lib/memory";
 import type { PersonRow } from "@/types";
+
+// Test-only mirror of memory.ts's own (unexported) vectorToBuffer: lets
+// these tests inject a known vector directly into memory_embeddings
+// without going through a real embed() call, so recall()'s cosine
+// scoring can be exercised with hand-picked, easy-to-reason-about
+// numbers instead of the stub embedder's bag-of-words output.
+function injectVector(memoryId: string, vector: number[]): void {
+  db.insert(memoryEmbeddings)
+    .values({ memoryId, space: "test", dims: vector.length, vector: Buffer.from(new Float32Array(vector).buffer), hlc: "test-hlc" })
+    .run();
+}
 
 beforeEach(() => {
   resetDb();
@@ -717,5 +728,133 @@ describe("recall() bumpUsage option (step 2: usage bumps only what reached the p
     recall(ownerRow, "the calendar rule about game night");
     const after = db.select().from(memoryRecords).where(eq(memoryRecords.id, created.value.id)).get()!;
     expect(after.uses).toBe(1);
+  });
+});
+
+describe("recall() cosine scoring (step 5: real embeddings)", () => {
+  test("a paraphrase with a matching vector recalls; a keyword-sharing decoy with a non-matching vector does not", async () => {
+    const { ownerRow } = await ownerAndChildRows();
+    // Deliberately no shared words with the query: proves the vector,
+    // not keyword overlap, is what surfaces this record.
+    const target = remember(ownerRow, {
+      text: "the spare key lives in the lockbox by the garage",
+      category: "fact",
+      tier: "durable",
+      scope: "household",
+      source: "test",
+      importance: 0.5,
+    });
+    // Deliberately shares "house"/"key" with the query: proves keyword
+    // overlap alone is no longer enough once a query vector is given -
+    // its own vector must clear the tier's cosine floor too.
+    const decoy = remember(ownerRow, {
+      text: "the house key code for the front door alarm is 4517",
+      category: "fact",
+      tier: "durable",
+      scope: "household",
+      source: "test",
+      importance: 0.5,
+    });
+    if (!target.ok || !decoy.ok) throw new Error("setup failed");
+
+    injectVector(target.value.id, [1, 0, 0, 0]);
+    injectVector(decoy.value.id, [0, 1, 0, 0]);
+
+    const matches = recall(ownerRow, "where do we keep the spare house key", { queryVector: new Float32Array([1, 0, 0, 0]) });
+    const ids = matches.map((m) => m.record.id);
+    expect(ids).toContain(target.value.id);
+    expect(ids).not.toContain(decoy.value.id);
+  });
+
+  // A code review (2026-09-05) found that a pinned or entity-matched
+  // record bypasses the cosine FLOOR (line above) but was still dropped
+  // by the trailing `if (score > 0)` gate once its own weighted score
+  // (0.7*cosine + 0.2*importance + 0.1*recency) went negative - real,
+  // since unlike keyword overlap, cosine can be negative. This record's
+  // vector is the exact opposite of the query's and its importance is 0,
+  // so its score is guaranteed negative; "pinned" is the only reason it
+  // should ever surface, and it must, all the way to the final list.
+  test("a pinned record with a genuinely negative cosine score still surfaces (score > 0 must not undo the floor bypass)", async () => {
+    const { ownerRow } = await ownerAndChildRows();
+    const pinned = remember(ownerRow, {
+      text: "a fact nothing in this query resembles at all",
+      category: "fact",
+      tier: "durable",
+      scope: "household",
+      source: "test",
+      importance: 0,
+      pinned: true,
+    });
+    if (!pinned.ok) throw new Error("setup failed");
+    injectVector(pinned.value.id, [-1, 0, 0, 0]);
+
+    const matches = recall(ownerRow, "completely unrelated question", { queryVector: new Float32Array([1, 0, 0, 0]) });
+    expect(matches.map((m) => m.record.id)).toContain(pinned.value.id);
+  });
+
+  test("falls back to keyword overlap when no query vector is available (embed backend down)", async () => {
+    const { ownerRow } = await ownerAndChildRows();
+    const created = remember(ownerRow, {
+      text: "the recycling goes out on Tuesday",
+      category: "fact",
+      tier: "durable",
+      scope: "household",
+      source: "test",
+      importance: 0.5,
+    });
+    if (!created.ok) throw new Error("setup failed");
+
+    // No queryVector passed at all - the exact shape a caller gets when
+    // embedQueryForRecall() itself returned undefined.
+    const matches = recall(ownerRow, "recycling Tuesday", { bumpUsage: false });
+    expect(matches.map((m) => m.record.id)).toContain(created.value.id);
+  });
+});
+
+describe("drainPendingEmbeddings (step 5: the retry job)", () => {
+  test("embeds a queued record and clears it from the pending queue", async () => {
+    const { ownerRow } = await ownerAndChildRows();
+    const created = remember(ownerRow, {
+      text: "the garage door code is 7734",
+      category: "fact",
+      tier: "durable",
+      scope: "household",
+      source: "test",
+      importance: 0.5,
+    });
+    if (!created.ok) throw new Error("setup failed");
+    // Simulate an earlier failed embed-on-write: no vector row yet, but
+    // queued for retry.
+    db.insert(pendingEmbeddings).values({ memoryId: created.value.id, queuedAt: new Date().toISOString() }).onConflictDoNothing().run();
+
+    const result = await drainPendingEmbeddings();
+    expect(result.embedded).toBeGreaterThanOrEqual(1);
+    expect(result.stillPending).toBe(0);
+
+    const pendingRow = db.select().from(pendingEmbeddings).where(eq(pendingEmbeddings.memoryId, created.value.id)).get();
+    expect(pendingRow).toBeUndefined();
+    const vectorRow = db.select().from(memoryEmbeddings).where(eq(memoryEmbeddings.memoryId, created.value.id)).get();
+    expect(vectorRow).toBeTruthy();
+  });
+
+  test("drops a queued id whose record no longer exists, without throwing", async () => {
+    // pending_embeddings.memory_id carries a real FK to memory_records,
+    // so an orphaned row can only exist via the exact fire-and-forget
+    // race storeEmbedding()/queueForEmbedding()'s own comments describe
+    // (a background embed call landing after the record it's about was
+    // already deleted); PRAGMA off for one insert reproduces that
+    // orphaned state without needing to win a real race.
+    sqlite.exec("PRAGMA foreign_keys = OFF");
+    try {
+      db.insert(pendingEmbeddings).values({ memoryId: "mem1-doesnotexist", queuedAt: new Date().toISOString() }).run();
+    } finally {
+      sqlite.exec("PRAGMA foreign_keys = ON");
+    }
+
+    const result = await drainPendingEmbeddings();
+    expect(result.stillPending).toBe(0);
+
+    const pendingRow = db.select().from(pendingEmbeddings).where(eq(pendingEmbeddings.memoryId, "mem1-doesnotexist")).get();
+    expect(pendingRow).toBeUndefined();
   });
 });

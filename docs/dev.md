@@ -6355,3 +6355,151 @@ and non-default), the re-anchor firing unconditionally, the dated
 memory suffix and trust reminder together, and real-content budget
 checks for every persona's fragment plus the rules policy. Full backend
 suite green (621).
+
+## Session A: step 5, embedding recall and scheduled maintenance (2026-09-05)
+
+Real vectors, replacing the keyword-overlap placeholder every recall
+score has used since 4.4 shipped.
+
+**`memory_embeddings`** (migration 0011): `memory_id` (PK, FK to
+`memory_records.id`), `space` (the embedding model name), `dims`,
+`vector` (a raw Float32 blob, brute-force cosine in JS at household
+scale, no sqlite-vec or ANN index this scale needs yet), `hlc`.
+**`pending_embeddings`**: `memory_id` (PK, same FK), `queued_at` - one
+row per record still waiting on a retry, not a log of every attempt.
+Both tables get their rows cleared (via a subquery on `memory_records`)
+before the parent row itself, inside the same transaction, everywhere a
+memory record can disappear: `forget()`'s existing transaction and
+`personLifecycle.ts`'s `erasePersonData()`.
+
+**Embed on write, queue on failure**: `remember()` fires
+`embedMemoryRecordSafely(id, text)` unawaited right after the insert -
+never on the request's own critical path, matching `logTurnSafely()`'s
+existing "never turns a successful write into a reported failure"
+contract. Success stores the vector; any failure (backend down, a
+malformed response) queues the id in `pending_embeddings` instead.
+`drainPendingEmbeddings()` is the retry: re-embeds every queued id,
+drops rows whose record is gone by the time it gets to them, and is now
+wired as a real recurring core job, `memory.embedding_retry`
+(`every:1m`, `backend/src/index.ts`) - the plan's own "a core job
+retries every minute". This is the first core job whose handler is
+genuinely async (`drainPendingEmbeddings()` awaits a real `embed()`
+call): `scheduler.ts`'s `CORE_JOBS` map and its runner now type and
+`await` a handler as `void | Promise<void>` instead of strictly `void`,
+a small, backward-compatible widening (the three pre-existing handlers
+are still synchronous and are unaffected by an `await` on a plain
+`void` return).
+
+**`recall()`'s real scoring**: entity-first pass unchanged, then per
+candidate - if a query vector and a stored vector both exist, real
+cosine similarity, `0.7 cos + 0.2 importance + 0.1 recency` (legacy's
+tuned weights, ported verbatim, same embedding family), floored at 0.55
+episodic / 0.37 durable (a candidate below its tier's floor is excluded
+outright, not down-weighted, unless pinned or an entity match - both
+already-existing overrides that don't need cosine's blessing). No
+stored vector yet (still queued) or no query vector at all (embed
+backend down) falls back to keyword overlap for that record, unfloored
+- the exact placeholder behavior this step replaces, kept as the real
+fallback it always was. `recall()` itself stays synchronous: it takes a
+pre-computed `queryVector` rather than awaiting `embed()` itself, so the
+only new async surface is `embedQueryForRecall()` (exported, best-effort,
+returns `undefined` on any failure) and its two real callers -
+`turnEngine.ts`'s `prepareTurn()` and `packageHost.ts`'s
+`Host.memory.recall` (made async for exactly this; the deterministic
+emulator's own `Host.memory.recall` return type just widened to
+`T | Promise<T>` so `await` on its plain, non-Promise return stays a
+documented no-op - the emulator and its own tests needed zero changes).
+
+**Judgment call: the stub embedder had to become real bag-of-words, not
+a whole-string hash.** The original stub (`spec/llm/ts/stubServer.ts`)
+seeded one PRNG vector per whole input string, so any two different
+strings landed near-orthogonal regardless of shared vocabulary - fine
+as a placeholder, but once a real cosine floor is wired into `recall()`
+it means a record that keyword-matches a query PERFECTLY could still get
+floored out by pure noise. Rewrote it to sum one deterministic
+per-word vector per word in the text (classic bag-of-words), so two
+texts that share vocabulary now genuinely land closer in cosine terms
+than two that share none - a real, if crude, lexical-similarity signal,
+enough for a stub-backed test to meaningfully exercise "shares words ->
+higher cosine" without a real model. This is a test-infrastructure fix,
+not a product change, but it was load-bearing: every recall test that
+exercises the floor depends on it.
+
+**Review-caught bug: a fire-and-forget promise could itself throw and
+cascade.** `embedMemoryRecordSafely()`'s own catch block called
+`queueForEmbedding()`, which could itself throw (an FK violation when
+the record it's about was already deleted by a fast-following test's
+`resetDb()`) - an unhandled rejection from inside a catch block, which
+corrupted unrelated, later tests (47 cascading failures traced back to
+this one root cause). Fixed by giving `storeEmbedding()` and
+`queueForEmbedding()` each their own internal try/catch that logs and
+swallows rather than ever propagating - the same "never let a
+background write's failure become someone else's problem" discipline
+`logTurnSafely()` already modeled, just not yet extended to a catch
+block calling a second fallible function.
+
+**A second review pass found two more real issues, both fixed:** the
+pinned/entity-match cosine-floor bypass was undone a few lines later by
+the trailing `if (score > 0)` gate - real cosine similarity can be
+negative (unlike keyword overlap, which never is), so a pinned or
+entity-matched record with a genuinely negative weighted score
+(`0.7*cosine + 0.2*importance + 0.1*recency`) got past the floor check
+only to be silently dropped by the same gate that correctly filters out
+zero-overlap keyword fallback candidates. Fixed with an explicit
+`forceInclude = row.pinned || isEntityMatch` carried through to both the
+floor check and the final push, with a regression test (a pinned,
+zero-importance durable record whose injected vector is the exact
+opposite of the query's, guaranteeing a negative score) proving it
+still surfaces. Separately, `drainPendingEmbeddings()` was awaiting
+`embed()` once per queued row instead of once for the whole batch, even
+though `embed()` already accepts an array - the same "one batched
+query, not one per row" discipline `recall()`'s own vector fetch
+already uses. Fixed to build one array of live rows first (dropping
+orphaned ids as before) and make a single batched `embed()` call.
+
+**The eval probes**: legacy's 11 memory-recall probes
+(`backend/scripts/eval/memory-eval.ts` in the legacy mirror) ported to
+`backend/scripts/bench/memory-eval.ts` - a bench, not part of
+`scripts/check.sh` (the org testing standard's "small deterministic
+suite on every commit, large model-driven bench on demand" split),
+legacy names (JT/Artie/Marge) replaced with roster names (Marlow,
+Rover, Juniper), legacy's per-user `entities` table replaced with the
+current schema's `record_kind: "entity"` memory records, legacy's
+`recallMemories`/`formatMemoriesForPrompt` pair replaced with this
+codebase's real `recall()` + `buildSystemPrompt()` (the actual
+production prompt-building function, not a parallel formatter written
+for the bench). Run once against this worktree's own dev database
+(`data-a`, cleaned up after itself): **7/11 passed, stub embed
+backend.** All 4 failures are the true paraphrase cases (a household
+member's question shares zero words with the stored fact: "what should
+I cook for dinner tonight?" for a "dislikes cilantro" record, "should I
+go for a run this weekend?" for a "half-marathon" goal, and similarly
+for the vegetarian preference and the Yankees game) - exactly what a
+bag-of-words stub cannot fake, since it has no real semantic
+understanding, only shared vocabulary. Entity, pinned, and
+specificity-control cases all passed. **This is not yet a measurement
+of the real embedder**: no chat model is downloaded in this dev data
+dir, so `getEmbedBackendKind()` resolved to `stub`, never `spawned`.
+The plan's own words ("record that they must be re-measured on the
+bench before v0.1") stand: these numbers are the stub's honest floor,
+not the real nomic-embed-text-v1.5 model's, and BACKLOG.md's item is
+updated to say so rather than closed as verified.
+
+Tests: a paraphrase with a directly-injected matching vector recalls
+and a keyword-sharing decoy with a non-matching vector does not (proves
+the floor is vector-driven, not keyword overlap, now that both are in
+play); falls back to keyword overlap when no query vector is available
+(embed backend down); `drainPendingEmbeddings()` embeds a queued record
+and clears it from the pending queue, and drops an orphaned queued id
+without throwing (reproduced via a temporary `PRAGMA foreign_keys=OFF`
+insert, since the FK makes a genuinely orphaned row otherwise
+impossible to set up - this exercises the exact race
+`storeEmbedding()`/`queueForEmbedding()`'s own comments describe, not a
+scenario that can occur through normal writes); the new
+`memory.embedding_retry` core job fires for real through
+`runDueJobs()` and the pending row is actually gone by the time the
+assertion runs, proving the scheduler's new `await handler()` really
+waits for an async core job rather than firing and moving on; a pinned,
+zero-importance, negative-cosine record still surfaces (the
+`score > 0` regression above). Full backend suite green (627), `bunx
+tsc --noEmit` clean.

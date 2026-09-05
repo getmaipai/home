@@ -1,4 +1,4 @@
-import { sqliteTable, text, integer, real, primaryKey, index } from "drizzle-orm/sqlite-core";
+import { sqliteTable, text, integer, real, blob, primaryKey, index } from "drizzle-orm/sqlite-core";
 
 // Mirrors spec/schemas/person.schema.json (spec/gen/ts/person.ts is the
 // validated shape; this is its storage). `role` and `source` are the
@@ -83,6 +83,39 @@ export const memoryRecords = sqliteTable("memory_records", {
   expiredAt: text("expired_at"),
   supersededBy: text("superseded_by"),
   embeddingSpace: text("embedding_space"),
+});
+
+// Step 5's real vector store: never a spec-shaped record itself (the
+// spec's own memory-record.schema.json comment already says why -
+// "embeddings themselves never sync, embedding_space only names the
+// space" - so this is hub-internal, the same "recognized but not spec-
+// synced" posture conversation_turns/scheduled_jobs already have.
+// `space` names the embedding model (`llm.ts`'s `embed()` reports the
+// real one at call time, "nomic-embed-text-v1.5" today, "stub-embed" in
+// tests - never hardcoded here); `vector` is a raw Float32 buffer (4
+// bytes per dim, `dims` says how many), brute-force cosine in JS at
+// household scale per the plan's own words, not sqlite-vec or any ANN
+// index this scale doesn't need yet.
+export const memoryEmbeddings = sqliteTable("memory_embeddings", {
+  memoryId: text("memory_id")
+    .primaryKey()
+    .references(() => memoryRecords.id),
+  space: text("space").notNull(),
+  dims: integer("dims").notNull(),
+  vector: blob("vector", { mode: "buffer" }).notNull(),
+  hlc: text("hlc").notNull(),
+});
+
+// The retry queue for a record written while the embed backend was down
+// (step 5: "queue the id in a pending_embeddings list, a core job
+// retries every minute"). One row per memory record still waiting, not
+// a log of every attempt - a record that successfully embeds is simply
+// removed.
+export const pendingEmbeddings = sqliteTable("pending_embeddings", {
+  memoryId: text("memory_id")
+    .primaryKey()
+    .references(() => memoryRecords.id),
+  queuedAt: text("queued_at").notNull(),
 });
 
 // Mirrors spec/schemas/setting-value.schema.json (4.6): one row per

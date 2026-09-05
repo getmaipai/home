@@ -51,7 +51,7 @@ describe("packageHost memory.remember", () => {
     const id = host.memory.remember("the wifi password is on the fridge", "fact", "household");
     expect(typeof id).toBe("string");
 
-    const listed = createHost(actor, manifest({ permissions: ["memory:read"] })).memory.recall("wifi password");
+    const listed = await createHost(actor, manifest({ permissions: ["memory:read"] })).memory.recall("wifi password");
     expect(listed.some((r) => r.text.includes("wifi password"))).toBe(true);
   });
 

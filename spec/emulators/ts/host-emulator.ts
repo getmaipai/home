@@ -73,7 +73,16 @@ export interface Host {
    * interpreter needs to wait on. */
   fetch(url: string, opts?: FetchOptions): Promise<unknown>;
   memory: {
-    recall(query: string, opts?: { scope?: string; person?: string }): MemoryRecordLike[];
+    // Widened to allow a Promise (step 5, session-a-intelligence.md):
+    // the real host (packageHost.ts) now embeds the query text before
+    // scoring, real I/O the interpreter has to await - but this
+    // emulator's own deterministic substring match has nothing to await,
+    // so it stays a plain synchronous return rather than an
+    // unconditional Promise wrapper. `await`ing a non-Promise value is
+    // itself a no-op in JS, so the interpreter's one `await` line (below)
+    // works correctly against either implementation with no emulator or
+    // conformance-fixture changes needed.
+    recall(query: string, opts?: { scope?: string; person?: string }): MemoryRecordLike[] | Promise<MemoryRecordLike[]>;
     remember(text: string, category?: string, scope?: string, person?: string | null): string;
   };
   action: {

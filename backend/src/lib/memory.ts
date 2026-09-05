@@ -8,13 +8,15 @@
 // What's built here and what's deferred is documented in
 // docs/dev.md and repeated at the point it matters below; read that
 // before extending this file.
-import { eq, and, lt, isNull } from "drizzle-orm";
+import { eq, and, lt, isNull, inArray } from "drizzle-orm";
 import { db, sqlite } from "@/db";
-import { memoryRecords, people } from "@/db/schema";
+import { memoryRecords, memoryEmbeddings, pendingEmbeddings, people } from "@/db/schema";
 import { newMemoryRecordId } from "@/lib/memoryId";
 import { toMemoryRecord } from "@/lib/memoryShape";
 import { isOwnerOrAdmin, rolesById, canAccessPerson } from "@/lib/access";
 import { tokenize } from "@/lib/text";
+import { embed } from "@/lib/llm";
+import { nextHlc } from "@/lib/hlc";
 import { MemoryRecord } from "@maipai/spec/gen/ts/memory-record.js";
 import type { PersonRow, MemoryRecordRow } from "@/types";
 
@@ -167,7 +169,130 @@ export function remember(actor: PersonRow, input: RememberInput): MemoryOpResult
     })
     .run();
 
+  // Step 5: embed on write, fire-and-forget - a real embed() call is
+  // real I/O (network or local inference), and remember() itself must
+  // never wait on it or fail because of it. A backend that's down
+  // queues the id for the retry job below instead of losing the vector
+  // forever.
+  void embedMemoryRecordSafely(parsed.data.id, parsed.data.text);
+
   return { ok: true, value: parsed.data };
+}
+
+// ==== Step 5: the vector store ====
+
+const EMBEDDING_DIMENSION_BYTES = 4; // Float32
+
+function vectorToBuffer(vector: readonly number[]): Buffer {
+  return Buffer.from(new Float32Array(vector).buffer);
+}
+
+function bufferToVector(buffer: Buffer): Float32Array {
+  // Copy into a fresh, aligned ArrayBuffer: bun:sqlite's own Buffer can
+  // start at a non-4-byte-aligned offset into a shared backing store,
+  // which a raw Float32Array view over it would silently misread.
+  const aligned = new Uint8Array(buffer.length);
+  aligned.set(buffer);
+  return new Float32Array(aligned.buffer, 0, buffer.length / EMBEDDING_DIMENSION_BYTES);
+}
+
+/** Best-effort: embeds one record's text and stores the vector, or
+ * queues the id for retry when the embed backend is unavailable. Never
+ * throws, and never lets an UNHANDLED rejection escape this fire-and-
+ * forget call either - the one contract every post-write side effect in
+ * this codebase holds (logTurn()'s own "never turns a successful
+ * generation into a reported failure", extended here to "never turns a
+ * successful remember() into one either"). This runs unawaited
+ * (`remember()`'s own `void embedMemoryRecordSafely(...)`), so by the
+ * time it resolves the record it's about could already be gone (forgot,
+ * a fast-following test's own reset) - storeEmbedding()/
+ * queueForEmbedding() each catch that themselves rather than letting a
+ * second, later exception from INSIDE this function's own catch block
+ * turn into the unhandled rejection this whole function exists to
+ * prevent. */
+export async function embedMemoryRecordSafely(memoryId: string, text: string): Promise<void> {
+  try {
+    const result = await embed([text]);
+    if (!result.ok) {
+      queueForEmbedding(memoryId);
+      return;
+    }
+    storeEmbedding(memoryId, result.value.model, result.value.vectors[0]!);
+  } catch (err) {
+    console.error(`[memory] embed-on-write failed for ${memoryId}, queued for retry: ${(err as Error).message}`);
+    queueForEmbedding(memoryId);
+  }
+}
+
+function storeEmbedding(memoryId: string, space: string, vector: readonly number[]): void {
+  try {
+    const row = { memoryId, space, dims: vector.length, vector: vectorToBuffer(vector), hlc: nextHlc() };
+    db.insert(memoryEmbeddings)
+      .values(row)
+      .onConflictDoUpdate({ target: memoryEmbeddings.memoryId, set: row })
+      .run();
+    db.update(memoryRecords).set({ embeddingSpace: space }).where(eq(memoryRecords.id, memoryId)).run();
+    db.delete(pendingEmbeddings).where(eq(pendingEmbeddings.memoryId, memoryId)).run();
+  } catch (err) {
+    // The record itself is gone by now (forgot, or a test's resetDb()
+    // ran before this fire-and-forget callback got to run) - nothing
+    // left to attach a vector to, not a real failure.
+    console.error(`[memory] could not store embedding for ${memoryId} (likely already gone): ${(err as Error).message}`);
+  }
+}
+
+function queueForEmbedding(memoryId: string): void {
+  try {
+    db.insert(pendingEmbeddings)
+      .values({ memoryId, queuedAt: new Date().toISOString() })
+      .onConflictDoNothing()
+      .run();
+  } catch (err) {
+    console.error(`[memory] could not queue ${memoryId} for embedding retry (likely already gone): ${(err as Error).message}`);
+  }
+}
+
+/** The retry job (step 5: "a core job retries every minute"). One
+ * batched `embed()` call for every still-live row, not one round trip
+ * per row (a code review, 2026-09-05, found this awaiting `embed()`
+ * one row at a time even though it already accepts an array - the same
+ * "one batched query, not one per row" discipline recall()'s own vector
+ * fetch already applies): a failure or an outage takes the whole batch
+ * down together, so every row simply stays queued for the next tick,
+ * the same "never retried forever, never blocks the rest" outcome the
+ * per-row version had. A record that's been superseded/archived/
+ * forgotten since being queued (or one whose text somehow no longer
+ * exists) is dropped rather than retried forever, checked before the
+ * batch is built so its text never has to round-trip to the embedder
+ * at all. */
+export async function drainPendingEmbeddings(): Promise<{ embedded: number; stillPending: number }> {
+  const pending = db.select().from(pendingEmbeddings).all();
+  const live: { id: string; text: string }[] = [];
+  for (const row of pending) {
+    const record = db.select().from(memoryRecords).where(eq(memoryRecords.id, row.memoryId)).get();
+    if (!record) {
+      db.delete(pendingEmbeddings).where(eq(pendingEmbeddings.memoryId, row.memoryId)).run();
+      continue;
+    }
+    live.push({ id: record.id, text: record.text });
+  }
+
+  let embedded = 0;
+  if (live.length > 0) {
+    try {
+      const result = await embed(live.map((r) => r.text));
+      if (result.ok) {
+        live.forEach((r, i) => {
+          storeEmbedding(r.id, result.value.model, result.value.vectors[i]!);
+          embedded++;
+        });
+      } // else: still down; every row stays queued for the next tick
+    } catch (err) {
+      console.error(`[memory] pending-embedding retry batch failed: ${(err as Error).message}`);
+    }
+  }
+  const stillPending = db.select().from(pendingEmbeddings).all().length;
+  return { embedded, stillPending };
 }
 
 export interface ListOptions {
@@ -199,13 +324,16 @@ export interface RecallMatch {
   score: number;
 }
 
-// "Entity-first recall then scored vectors" (4.4). The "scored vectors"
-// half needs an embedder (4.11, not built); this is the deterministic
-// half: entity-first (does the query mention a known entity's name? if
-// so, records mentioning that entity are boosted) then a keyword-overlap
-// score as the fallback ranking, documented in docs/dev.md as a
-// placeholder for real embedding-based scoring, not a claim of semantic
-// search.
+// "Entity-first recall then scored vectors" (4.4), real as of step 5:
+// entity-first (does the query mention a known entity's name? if so,
+// records mentioning that entity are boosted, and bypass the cosine
+// floor below the same way a pinned record does) then real cosine
+// similarity over each candidate's stored embedding (memory_embeddings,
+// `embedMemoryRecordSafely()` above) when both a query vector and a
+// stored one exist. Keyword overlap is now only the fallback for a
+// record with no vector yet (queued, embed backend down) or a caller
+// with no query vector to score against - the placeholder every score
+// used to be, before this step.
 //
 // The spec's entity shape has one free-text `text` field, not a separate
 // `name`/`aliases` pair (unlike the legacy hub's entities table, which
@@ -232,6 +360,76 @@ export interface RecallOptions extends ListOptions {
    * recall()'s own top-20 cutoff (step 2: "uses/last_used_at bump only
    * on records that reached the prompt"). */
   bumpUsage?: boolean;
+  /** The query's own embedding (step 5), pre-computed by the caller:
+   * recall() itself stays synchronous (pure scoring given a vector it's
+   * handed is CPU work, not I/O), so any caller that can afford the
+   * async embed() round trip (turnEngine.ts's prepareTurn, already
+   * async; packageHost.ts's Host.memory.recall, made async for exactly
+   * this) computes it first. Omitted (or when the embed backend is
+   * down) falls back to keyword overlap for every candidate - the exact
+   * placeholder behavior this step replaces, kept as the real fallback
+   * it always was. */
+  queryVector?: Float32Array;
+}
+
+// Legacy's tuned values (ported verbatim, session-a-intelligence.md step
+// 5's own instruction - "record that they must be re-measured on the
+// bench before v0.1"; see docs/dev.md's bench-script entry for the
+// pointer): 0.7/0.2/0.1 weights, floors of 0.55 for episodic and 0.37
+// for durable, a hyperbolic recency decay (0.05/day) that durable
+// records skip entirely (recency 1.0, unchanging - a durable fact's
+// value doesn't fade with age the way an episodic aside's does). The
+// spec's third tier, "observation", has no legacy counterpart; treated
+// as episodic here, the same judgment call runMaintenance()'s own decay
+// logic already made for the identical reason.
+const COSINE_WEIGHT = 0.7;
+const IMPORTANCE_WEIGHT = 0.2;
+const RECENCY_WEIGHT = 0.1;
+const RECENCY_DECAY_PER_DAY = 0.05;
+const EPISODIC_MIN_COSINE = 0.55;
+const DURABLE_MIN_COSINE = 0.37;
+
+function minCosineForTier(tier: string): number {
+  return tier === "durable" ? DURABLE_MIN_COSINE : EPISODIC_MIN_COSINE;
+}
+
+function recencyScore(tier: string, createdAt: string, nowMs: number): number {
+  if (tier === "durable") return 1.0;
+  const ageDays = Math.max(0, (nowMs - new Date(createdAt).getTime()) / 86_400_000);
+  return 1 / (1 + ageDays * RECENCY_DECAY_PER_DAY);
+}
+
+function cosineSimilarity(a: Float32Array, b: Float32Array): number {
+  if (a.length !== b.length) return 0; // a dimension mismatch (a model change mid-household) is "no match," not a crash
+  let dot = 0;
+  let normA = 0;
+  let normB = 0;
+  for (let i = 0; i < a.length; i++) {
+    dot += a[i]! * b[i]!;
+    normA += a[i]! * a[i]!;
+    normB += b[i]! * b[i]!;
+  }
+  if (normA === 0 || normB === 0) return 0;
+  return dot / (Math.sqrt(normA) * Math.sqrt(normB));
+}
+
+/** Best-effort query embedding for recall() callers (step 5): embeds
+ * `query` and returns the vector, or `undefined` on ANY failure (no
+ * embed backend, a down one, a malformed response) - recall() itself
+ * already treats a missing queryVector as "fall back to keyword
+ * overlap," so a caller never needs its own try/catch around this.
+ * Shared by turnEngine.ts's prepareTurn() and packageHost.ts's
+ * Host.memory.recall, the two real async callers. Legacy applies no
+ * query/passage instruction prefix (confirmed against the mirror), so
+ * neither does this - the raw text, same as what's embedded on write. */
+export async function embedQueryForRecall(query: string): Promise<Float32Array | undefined> {
+  try {
+    const result = await embed([query]);
+    if (!result.ok) return undefined;
+    return new Float32Array(result.value.vectors[0]!);
+  } catch {
+    return undefined;
+  }
 }
 
 /** Shared by recall()'s default behavior and turnEngine.ts's own
@@ -263,16 +461,64 @@ export function recall(actor: PersonRow, query: string, opts: RecallOptions = {}
     .map((r) => entityNameWords(r.text))
     .filter((nameWords) => nameWords.size > 0 && [...nameWords].every((w) => queryWords.has(w)));
 
+  // One batched query for every candidate's stored vector, not one per
+  // row (household scale is "hundreds of rows" per the plan's own
+  // words, brute-force cosine in JS, but still one round trip).
+  const vectorRows =
+    rows.length > 0
+      ? db
+          .select()
+          .from(memoryEmbeddings)
+          .where(inArray(memoryEmbeddings.memoryId, rows.map((r) => r.id)))
+          .all()
+      : [];
+  const vectorsByMemoryId = new Map(vectorRows.map((v) => [v.memoryId, bufferToVector(v.vector)]));
+  const nowMs = Date.now();
+
   const scored: RecallMatch[] = [];
   for (const row of rows) {
     const words = tokenize(row.text);
-    const overlap = [...queryWords].filter((w) => words.has(w)).length;
-    const union = new Set([...queryWords, ...words]).size || 1;
-    let score = overlap / union;
-    if (matchedEntityNameWords.some((nameWords) => [...nameWords].every((w) => words.has(w)))) {
-      score += 0.5;
+    const isEntityMatch = matchedEntityNameWords.some((nameWords) => [...nameWords].every((w) => words.has(w)));
+    const storedVector = vectorsByMemoryId.get(row.id);
+
+    // Pinned and entity-matched candidates are deterministic overrides
+    // that always surface, regardless of what cosine or keyword scoring
+    // comes back with (pinned: the household said "always surface
+    // this"; entity match: "keep the entity-name boost" - the plan's
+    // own words for the exact same treatment this file already gave it
+    // before any vector existed). Real cosine similarity can be
+    // negative (unlike keyword overlap, which is always >= 0), so a
+    // code review (2026-09-05) found that the plain `score > 0` filter
+    // below could silently drop one of these overrides anyway when its
+    // cosine came back negative enough to pull the whole weighted score
+    // under zero - forceInclude keeps the override real all the way to
+    // the final push, not just past the floor check.
+    const forceInclude = row.pinned || isEntityMatch;
+
+    let score: number;
+    if (opts.queryVector && storedVector) {
+      const cosine = cosineSimilarity(opts.queryVector, storedVector);
+      // The floor excludes outright, it doesn't down-weight (legacy's
+      // real behavior, confirmed against the mirror rather than
+      // assumed): a candidate below its tier's floor never enters the
+      // ranking at all, UNLESS it's pinned or an entity match.
+      if (!forceInclude && cosine < minCosineForTier(row.tier)) continue;
+      const recency = recencyScore(row.tier, row.createdAt, nowMs);
+      score = COSINE_WEIGHT * cosine + IMPORTANCE_WEIGHT * row.importance + RECENCY_WEIGHT * recency;
+    } else {
+      // Keyword fallback: no query vector (embed backend down) or no
+      // stored vector yet for this record (just written, still queued
+      // in pending_embeddings) - the exact placeholder this step's
+      // predecessor used for every record, now only for the ones that
+      // genuinely have no vector to score against. Floors don't apply
+      // here: they're a vector-quality gate with nothing to gate
+      // without one.
+      const overlap = [...queryWords].filter((w) => words.has(w)).length;
+      const union = new Set([...queryWords, ...words]).size || 1;
+      score = overlap / union;
     }
-    if (score > 0) scored.push({ record: toMemoryRecord(row), score });
+    if (isEntityMatch) score += 0.5;
+    if (forceInclude || score > 0) scored.push({ record: toMemoryRecord(row), score });
   }
 
   scored.sort((a, b) => b.score - a.score);
@@ -391,11 +637,29 @@ export function forget(actor: PersonRow, personId: string): MemoryOpResult<{ del
   // runtime, so the typed changes count needs the same raw-sqlite escape
   // hatch lib/secret.ts's recordFailedAttempt and lib/memoryId.ts's
   // nextSeq already use.
-  const result = sqlite
-    .query("DELETE FROM memory_records WHERE scope = 'person' AND person = ?")
-    .run(personId);
+  //
+  // Step 5: memory_embeddings/pending_embeddings both carry a real FK to
+  // memory_records.id, so their rows for this person's records have to
+  // go first (or the memory_records delete itself fails under
+  // foreign_keys=ON) - both cleared inside the same transaction as the
+  // main delete so a crash midway can't leave one half done.
+  const result = forgetTransaction(personId);
   return { ok: true, value: { deleted: result.changes } };
 }
+
+const forgetTransaction = sqlite.transaction((personId: string) => {
+  sqlite
+    .query(
+      "DELETE FROM memory_embeddings WHERE memory_id IN (SELECT id FROM memory_records WHERE scope = 'person' AND person = ?)",
+    )
+    .run(personId);
+  sqlite
+    .query(
+      "DELETE FROM pending_embeddings WHERE memory_id IN (SELECT id FROM memory_records WHERE scope = 'person' AND person = ?)",
+    )
+    .run(personId);
+  return sqlite.query("DELETE FROM memory_records WHERE scope = 'person' AND person = ?").run(personId);
+});
 
 /** Per-person export (4.14): every scope=person record about them,
  * whatever its status, so the archive is complete. */
@@ -516,9 +780,11 @@ export function runMaintenance(): { archived: number } {
 }
 
 // Not built this pass, deliberately (see docs/dev.md):
-// - Real "scored vectors" recall: needs the embed role (4.11).
 // - The sleep-time judge itself (deciding WHAT to remember from a
 //   conversation): needs an LLM (4.11) and the turn engine (4.5).
 // - Profile paragraphs: LLM-synthesized summaries, same dependency.
 // - Mood and unfinished-business reads (the robot's reflect jobs):
 //   robot-specific, Robot v0.1.
+// - runMaintenance() scheduling (step 5's own "runMaintenance runs daily
+//   via ensureCoreJob"): the function itself is unchanged by step 5 -
+//   see lib/scheduler.ts for the new core job registration.

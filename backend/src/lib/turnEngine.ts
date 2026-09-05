@@ -16,7 +16,7 @@ import { listPackageIds, loadPackage, meetsMinRole, runPlugin } from "@/lib/plug
 import { loadAllSkills, type LoadedSkill } from "@/lib/skills";
 import { matchCommand, runCommand } from "@/lib/commands";
 import { trigger } from "@/lib/notifications";
-import { recall, bumpUsage, type RecallMatch } from "@/lib/memory";
+import { recall, bumpUsage, embedQueryForRecall, type RecallMatch } from "@/lib/memory";
 import { newConversationTurnId } from "@/lib/id";
 import { complete, startCompleteStream, type LlmMessage } from "@/lib/llm";
 import { tokenize } from "@/lib/text";
@@ -667,8 +667,13 @@ async function prepareTurn(
   // never surface another person's person-scope memories into the
   // model's context, regardless of role. Usage is bumped separately
   // below, only on the subset that actually reached the prompt, not on
-  // every one of recall()'s top-20 candidates.
-  const memoryMatches = recall(actor, text, { selfOnly: true, bumpUsage: false });
+  // every one of recall()'s top-20 candidates. The query is embedded
+  // here (step 5), before the sync recall() call, so real cosine
+  // scoring runs whenever the embed backend is up; embedQueryForRecall()
+  // degrades to undefined on any failure, which recall() already treats
+  // as "fall back to keyword overlap" - no separate handling needed here.
+  const queryVector = await embedQueryForRecall(text);
+  const memoryMatches = recall(actor, text, { selfOnly: true, bumpUsage: false, queryVector });
   const persona = resolvePersona(getPersonSettingValue(actor, "persona.active_id"));
   // The follow-up-turn context (step 3): "and tomorrow?" needs the prior
   // exchange in the messages array, not just in the system prompt's own

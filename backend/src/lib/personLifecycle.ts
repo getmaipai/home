@@ -178,6 +178,21 @@ export function erasePersonData(personId: string): ErasureCounts {
   // Raw sqlite for the counts: Drizzle's bun-sqlite typing declares
   // .run() as void though it returns {changes} at runtime, the same
   // escape hatch memory.ts's forget() documents.
+  //
+  // Step 5: memory_embeddings/pending_embeddings carry a real FK to
+  // memory_records.id, so their rows for this person's records are
+  // cleared first - the same cascade memory.ts's forget() needs for the
+  // identical reason.
+  sqlite
+    .query(
+      "DELETE FROM memory_embeddings WHERE memory_id IN (SELECT id FROM memory_records WHERE scope = 'person' AND person = ?)",
+    )
+    .run(personId);
+  sqlite
+    .query(
+      "DELETE FROM pending_embeddings WHERE memory_id IN (SELECT id FROM memory_records WHERE scope = 'person' AND person = ?)",
+    )
+    .run(personId);
   const memories = sqlite
     .query("DELETE FROM memory_records WHERE scope = 'person' AND person = ?")
     .run(personId).changes;

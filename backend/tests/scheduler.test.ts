@@ -5,8 +5,9 @@ import { __resetThrottleForTests } from "@/lib/secretThrottle";
 import { parseWhen, scheduleJob, ensureCoreJob, listJobs, cancelJob, runDueJobs } from "@/lib/scheduler";
 import { runPlugin } from "@/lib/plugins";
 import { db } from "@/db";
-import { people, scheduledJobs } from "@/db/schema";
+import { people, scheduledJobs, pendingEmbeddings, memoryEmbeddings } from "@/db/schema";
 import { eq } from "drizzle-orm";
+import { remember } from "@/lib/memory";
 
 beforeEach(() => {
   resetDb();
@@ -127,6 +128,42 @@ describe("runDueJobs", () => {
     expect(row.recurring).toBe(true);
     expect(row.status).toBe("pending"); // recurring: stays pending, reschedules forward
     expect(new Date(row.nextRunAt).getTime()).toBeGreaterThan(Date.now());
+  });
+
+  // Step 5 (session-a-intelligence.md): memory.embedding_retry is the
+  // first core job whose own handler is genuinely async
+  // (drainPendingEmbeddings awaits a real embed() call). This proves
+  // runDueJobsUnguarded's `await handler()` actually waits for it,
+  // rather than firing it and moving on: if it didn't, `ran` would still
+  // report 1 but the pending row would still be sitting there un-drained
+  // when this assertion runs immediately after.
+  test("fires the async core job (memory.embedding_retry) for real and waits for it to finish", async () => {
+    const { row: ownerRow } = await owner();
+    const created = remember(ownerRow, {
+      text: "the wifi password is on the fridge",
+      category: "fact",
+      tier: "durable",
+      scope: "household",
+      source: "test",
+      importance: 0.5,
+    });
+    if (!created.ok) throw new Error("setup failed");
+    // remember()'s own fire-and-forget embed hasn't run yet (it's still
+    // a pending microtask); queue it explicitly so this test doesn't
+    // race that background call.
+    db.insert(pendingEmbeddings).values({ memoryId: created.value.id, queuedAt: new Date().toISOString() }).onConflictDoNothing().run();
+
+    ensureCoreJob("memory.embedding_retry", "every:1m");
+    db.update(scheduledJobs).set({ nextRunAt: new Date(0).toISOString() }).where(eq(scheduledJobs.job, "memory.embedding_retry")).run();
+
+    const result = await runDueJobs(runPlugin);
+    expect(result.ran).toBe(1);
+    expect(result.errors).toBe(0);
+
+    const stillPending = db.select().from(pendingEmbeddings).where(eq(pendingEmbeddings.memoryId, created.value.id)).all();
+    expect(stillPending.length).toBe(0);
+    const stored = db.select().from(memoryEmbeddings).where(eq(memoryEmbeddings.memoryId, created.value.id)).get();
+    expect(stored).toBeTruthy();
   });
 
   test("fires a due plugin job and marks a one-shot job done", async () => {

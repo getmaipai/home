@@ -434,15 +434,23 @@ export function createHost(actor: PersonRow, manifest: PackageManifest, secrets:
       return performHttpFetch(url, opts);
     },
     memory: {
-      recall(query: string, opts?: { scope?: string; person?: string }): MemoryRecordLike[] {
+      // Async as of step 5 (session-a-intelligence.md): a real embed()
+      // call is real I/O, so this package-facing recall now genuinely
+      // has something to await, the same justification host.fetch/
+      // home.call_service already carry in this interface. Host.memory.
+      // recall's own interface type stays widened to allow either shape
+      // (spec/emulators/ts/host-emulator.ts's own comment) so the
+      // deterministic test emulator doesn't need to change at all.
+      async recall(query: string, opts?: { scope?: string; person?: string }): Promise<MemoryRecordLike[]> {
         requirePermission("memory:read");
         const listOpts: memory.ListOptions = {};
         if (opts?.scope === "household" || opts?.scope === "person" || opts?.scope === "self") {
           listOpts.scope = opts.scope;
         }
         if (opts?.person) listOpts.person = opts.person;
+        const queryVector = await memory.embedQueryForRecall(query);
         return memory
-          .recall(actor, query, listOpts)
+          .recall(actor, query, { ...listOpts, queryVector })
           .map(({ record }) => ({ id: record.id, text: record.text, category: record.category, scope: record.scope, person: record.person }));
       },
       remember(text: string, category?: string, scope?: string, person?: string | null): string {

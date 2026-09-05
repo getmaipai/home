@@ -428,17 +428,20 @@ into a conversation with someone who knows who is talking.
       the real turn id end to end (`turnEngine.ts` generates it once,
       up front, and hands it to `createHost()` and to the turn's own
       `conversation_turns` row).
-- [ ] **Wire `embed` into recall** (M) - the role runs (nomic-embed-text
-      on a second llama-server) and its only caller is a diagnostic
-      route. Store vectors (sqlite-vec, or a `memory_embeddings` table
-      and brute-force cosine at household scale), embed on write, score
-      on read, keyword as the fallback when the engine is down. Start
-      from legacy `memory/recall.ts`'s tuned numbers, same embedding
-      family: `0.7 cos + 0.2 importance + 0.1 recency`, floor 0.55 for
-      episodic (top-5 used to be injected even for "hi"), 0.37 for
-      durable (durables were "stored but never recalled"), entity-first
-      pass. Re-run the legacy eval probes against the real embedder
-      before trusting either number.
+- [x] **Wire `embed` into recall** (M) - shipped, Session A step 5
+      (2026-09-05): `memory_embeddings`/`pending_embeddings` tables,
+      embed on write with a `pending_embeddings` retry queue drained by
+      a real `every:1m` core job, `recall()` scores real cosine
+      (`0.7 cos + 0.2 importance + 0.1 recency`, floors 0.55
+      episodic / 0.37 durable, legacy's tuned numbers ported verbatim),
+      keyword overlap as the fallback when no vector exists either
+      side, entity-first pass kept. **Still open**: the legacy eval
+      probes are ported and passing 7/11 (`backend/scripts/bench/
+      memory-eval.ts`), but only against the stub embed backend - the 4
+      failures are the true paraphrase cases a stub can't fake. Re-run
+      against a real downloaded chat model (unlocks the real
+      nomic-embed-text-v1.5 spawn) before trusting either the floors or
+      the weights for v0.1; see docs/dev.md's step 5 entry.
 - [ ] **The memory judge: extract at turn end, consolidate at idle**
       (M-L; plan 4.4's "sleep-time judge", unbuilt) - a post-turn job on
       the scheduler asks the chat model for durable facts and preferences

@@ -86,20 +86,44 @@ function hashString(text: string): number {
   return h >>> 0;
 }
 
-function stubEmbedding(text: string): number[] {
-  let seed = hashString(text) || 1;
+function vectorFromSeed(seed: number, dims: number): number[] {
+  let s = seed || 1;
   const vector: number[] = [];
-  for (let i = 0; i < EMBEDDING_DIMENSIONS; i++) {
+  for (let i = 0; i < dims; i++) {
     // mulberry32, a small deterministic PRNG - good enough for "stable,
     // distinct-per-input" without pulling in a real hashing/RNG library
     // for a canned test double.
-    seed |= 0;
-    seed = (seed + 0x6d2b79f5) | 0;
-    let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
+    s |= 0;
+    s = (s + 0x6d2b79f5) | 0;
+    let t = Math.imul(s ^ (s >>> 15), 1 | s);
     t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
     vector.push((((t ^ (t >>> 14)) >>> 0) / 4294967296) * 2 - 1);
   }
   return vector;
+}
+
+// Bag-of-words, not a single whole-string hash (session-a-intelligence.md
+// step 5, found live: the original whole-string version made every two
+// DIFFERENT texts land near-orthogonal regardless of shared vocabulary -
+// real for genuinely unrelated text, but it also meant an embedding
+// backend now genuinely wired into recall()'s cosine floor (step 5)
+// would wrongly floor out a memory whose text keyword-overlaps a query
+// perfectly, just because the stub's noise happened to land below the
+// floor for that pair. Summing each shared word's own deterministic
+// vector means two texts that share vocabulary land closer together in
+// cosine terms and two that share none stay near-orthogonal - a real,
+// if crude, lexical-similarity signal (classic bag-of-words averaging,
+// not a shortcut invented for this test double), enough to let a stub-
+// backed test meaningfully exercise "shares words -> higher cosine"
+// without needing a real model.
+function stubEmbedding(text: string): number[] {
+  const words = text.toLowerCase().match(/[a-z0-9]+/g) ?? [text];
+  const sum = new Array<number>(EMBEDDING_DIMENSIONS).fill(0);
+  for (const word of words) {
+    const wordVector = vectorFromSeed(hashString(word), EMBEDDING_DIMENSIONS);
+    for (let i = 0; i < EMBEDDING_DIMENSIONS; i++) sum[i]! += wordVector[i]!;
+  }
+  return sum;
 }
 
 function handleEmbeddings(request: EmbeddingRequest): EmbeddingResponse {
