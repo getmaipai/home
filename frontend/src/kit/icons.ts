@@ -14,6 +14,8 @@ import {
   ChevronLeft,
   AlertTriangle,
   Volume2,
+  ShieldCheck,
+  Lock,
   type LucideIcon,
 } from "lucide-react";
 
@@ -37,6 +39,8 @@ const REGISTRY: Record<string, LucideIcon> = {
   "chevron-left": ChevronLeft,
   "alert-triangle": AlertTriangle,
   "volume-2": Volume2,
+  "shield-check": ShieldCheck,
+  lock: Lock,
 };
 
 export function getIcon(name: string): LucideIcon {

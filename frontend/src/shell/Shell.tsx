@@ -21,6 +21,7 @@ const NAV_ENTRIES = [
   { to: "/", icon: "message-circle", label: "Chat" },
   { to: "/people", icon: "users", label: "People" },
   { to: "/memory", icon: "brain", label: "Memory" },
+  { to: "/privacy", icon: "shield-check", label: "Privacy" },
   { to: "/settings", icon: "settings", label: "Settings" },
 ] as const;
 

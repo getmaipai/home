@@ -17,6 +17,7 @@ import { conversationsRoutes } from "@/routes/conversations";
 import { backupsRoutes } from "@/routes/backups";
 import { hostRoutes } from "@/routes/host";
 import { voiceRoutes } from "@/routes/voice";
+import { privacyRoutes } from "@/routes/privacy";
 import type { AppEnv } from "@/types";
 
 export const app = new Hono<AppEnv>();
@@ -37,6 +38,7 @@ app.route("/api/conversations", conversationsRoutes);
 app.route("/api/backups", backupsRoutes);
 app.route("/api/host", hostRoutes);
 app.route("/api/voice", voiceRoutes);
+app.route("/api/privacy", privacyRoutes);
 
 // Serving the built frontend from this same process (docs/dev.md, the
 // shell/kit/Chat slice): a self-hosted single-process hub, no reverse

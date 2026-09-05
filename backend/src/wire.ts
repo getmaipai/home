@@ -177,3 +177,33 @@ export interface RoutingStats {
 export function isOwnerOrAdminRole(role: string): boolean {
   return role === "owner" || role === "admin";
 }
+
+/** One row of the "what leaves the house" table
+ * (getmaipai/.github/CLAUDE.md > Privacy architecture: "every product
+ * keeps a user-tier privacy page with the what-leaves-the-house table:
+ * each outbound connection, when it happens, what it carries, and who
+ * receives it").
+ *
+ * The four PrivacyRow fields from `@maipai/standards` (destination,
+ * when, what, who) plus opt_in and retention, flattened with the name of
+ * whatever declares the connection. A package manifest's `data_sources[]`
+ * entries are already exactly PrivacyRow; `source` is what lets one
+ * table hold those alongside the hub's own connections without the page
+ * having to know the difference. */
+export interface PrivacyConnection {
+  /** Unique across the whole table: "<source id>:<row id>". */
+  id: string;
+  /** Who in the product opens this connection: a plugin's display name,
+   * or the hub itself. */
+  source: string;
+  sourceKind: "platform" | "plugin";
+  destination: string;
+  when: string;
+  what: string;
+  who: string;
+  /** False only for connections the hub makes on its own without anyone
+   * turning anything on. Every one of those is still a download the
+   * family started; nothing here is a background phone-home. */
+  optIn: boolean;
+  retention: string;
+}

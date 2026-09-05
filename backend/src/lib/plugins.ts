@@ -52,21 +52,27 @@ export function listPackageIds(): string[] {
 }
 
 export function loadPackage(id: string): PluginOpResult<LoadedPackage> {
-  let manifestRaw: string, recipeRaw: string;
+  let manifestJson: unknown, recipeJson: unknown;
   try {
-    manifestRaw = readFileSync(join(PACKAGES_DIR, id, "manifest.json"), "utf-8");
-    recipeRaw = readFileSync(join(PACKAGES_DIR, id, "recipe.json"), "utf-8");
+    manifestJson = JSON.parse(readFileSync(join(PACKAGES_DIR, id, "manifest.json"), "utf-8"));
+    recipeJson = JSON.parse(readFileSync(join(PACKAGES_DIR, id, "recipe.json"), "utf-8"));
   } catch {
+    // The JSON.parse calls are inside the try on purpose. A code review
+    // (2026-09-05) found them outside it, so a truncated or half-written
+    // manifest (an interrupted install, a bad copy) threw straight out of
+    // every caller instead of being reported as an unloadable package -
+    // which took GET /api/privacy, whose whole job is to be readable, down
+    // with a 500.
     return { ok: false, status: 404, error: `no bundled package ${id}` };
   }
-  const manifestParsed = PackageManifest.safeParse(JSON.parse(manifestRaw));
+  const manifestParsed = PackageManifest.safeParse(manifestJson);
   if (!manifestParsed.success) {
     return { ok: false, status: 400, error: `package ${id}'s manifest failed validation: ${manifestParsed.error.message}` };
   }
   if (manifestParsed.data.tier !== 0) {
     return { ok: false, status: 400, error: `package ${id} is tier ${manifestParsed.data.tier}, only tier 0 runs today` };
   }
-  const recipeParsed = Recipe.safeParse(JSON.parse(recipeRaw));
+  const recipeParsed = Recipe.safeParse(recipeJson);
   if (!recipeParsed.success) {
     return { ok: false, status: 400, error: `package ${id}'s recipe failed validation: ${recipeParsed.error.message}` };
   }

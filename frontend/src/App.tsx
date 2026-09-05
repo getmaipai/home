@@ -6,6 +6,7 @@ import { ChatPage } from "@/apps/chat/ChatPage";
 import { SettingsPage } from "@/apps/settings/SettingsPage";
 import { PeoplePage } from "@/apps/people/PeoplePage";
 import { MemoryPage } from "@/apps/memory/MemoryPage";
+import { PrivacyPage } from "@/apps/privacy/PrivacyPage";
 import { Progress } from "@/kit/primitives/Progress";
 import { api, type Roster } from "@/lib/api";
 
@@ -60,6 +61,7 @@ export function App() {
           <Route path="/" element={<ChatPage person={person} />} />
           <Route path="/people" element={<PeoplePage person={person} />} />
           <Route path="/memory" element={<MemoryPage />} />
+          <Route path="/privacy" element={<PrivacyPage />} />
           <Route
             path="/settings"
             element={<SettingsPage person={person} onPersonChange={revalidatePerson} />}

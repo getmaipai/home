@@ -22,7 +22,7 @@ import { singleflight } from "@/lib/singleflight";
 // default," and pagination (fetchFullCatalog()'s `Link`-header following)
 // is real logic worth exercising against a real HTTP server, not just
 // unit-tested in isolation.
-function hfTreeUrl(): string {
+export function voiceCatalogUrl(): string {
   return process.env.MAIPAI_VOICE_CATALOG_URL ?? "https://huggingface.co/api/models/kyutai/tts-voices/tree/main?recursive=true";
 }
 
@@ -61,7 +61,7 @@ async function fetchOnePage(url: string): Promise<{ entries: HfTreeEntry[]; next
 
 async function fetchFullCatalog(): Promise<VoiceCatalogEntry[]> {
   const result: VoiceCatalogEntry[] = [];
-  let url: string | null = hfTreeUrl();
+  let url: string | null = voiceCatalogUrl();
   // A hard page cap, not just trusting HF to eventually stop: an
   // unexpected pagination loop (a `next` link that never terminates)
   // would otherwise hang this fetch forever rather than failing loudly.
