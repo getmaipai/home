@@ -316,8 +316,12 @@ Sources consulted (this research pass, 2026-09-05): [ChatGPT Projects guide](htt
       as a deliberate scope cut, not an oversight - still needs doing.
 - [ ] Backup restore, end to end (S) - `restoreBackup()` is real and
       tested; there's no HTTP route calling it and no UI.
-- [ ] A privacy page ("what leaves the house") (M) - a required org
-      standard (every product keeps one); never built for this repo.
+- [x] A privacy page ("what leaves the house") (M) - done 2026-09-05.
+      `GET /api/privacy` aggregates every bundled package's
+      `data_sources[]` plus the hub's own downloads (models, engine,
+      wake word, TTS program, TTS model, voice files, embeddings);
+      `/privacy` renders it in dad-test language. See `docs/dev.md`,
+      "The privacy page".
 - [ ] Notifications UI (L, blocked on the notification system below)
 - [ ] Package/skill catalog browsing and install (L) - blocked on the
       `catalog` repo existing for real; today only local bundled packages

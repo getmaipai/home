@@ -5031,3 +5031,69 @@ never in scope.
 `command` primitive, and updating the org-wide `getmaipai/.github/docs/
 PACKAGES.md` standard to match (affects `bot` and `catalog` too, a
 separate repo's commit).
+
+
+## The privacy page (2026-09-05)
+
+The org standard has always required one ("every product keeps a
+user-tier privacy page with the what-leaves-the-house table: each
+outbound connection, when it happens, what it carries, and who receives
+it"). This repo never had one, so MaiPai's central promise was a claim
+with nothing in the product that let a family check it.
+
+**The table is built, never written.** `GET /api/privacy` assembles it
+from each bundled package's `data_sources[]` (already PrivacyRow-shaped
+in the manifest, so it is read rather than restated) plus the hub's own
+downloads, declared once in `lib/privacy.ts`. Each hub row takes its
+destination from the URL the downloader actually uses - `CATALOG`,
+`ENGINE_BINARIES`, `WAKEWORD_ALL_ASSETS`, `voiceCatalogUrl()` - so a row
+can never name a service different from the one the code connects to.
+A hand-maintained copy of that list would have been wrong within a
+release. A test enforces the other half: a package holding a `net:`
+permission that declares no `data_sources` fails the suite, so a future
+plugin cannot quietly go missing from the family's page.
+
+Readable by any signed-in household member, deliberately, not owner and
+admin only. A promise only an admin can check is not a promise to the
+family, and nothing on the page is personal data: it is the same
+information the manifests already declare in the open.
+
+**What the code review caught is the part worth recording.** The page
+tells every family "if it is not on this list, it does not happen", and
+the speaking voice was not on the list. Turning it on runs `uvx
+pocket-tts serve` (`ttsSupervisor.ts`), which installs a package from
+PyPI and downloads a voice checkpoint from Hugging Face - and passes the
+household's own `voice.hf_token` as `HF_TOKEN` if they saved one, so a
+credential leaves the house. Three rows were missing, including that
+one. The lesson generalizes past this page: an outbound connection made
+by a spawned child process is still an outbound connection, and it is
+exactly the kind that no amount of grepping our own `fetch` calls will
+find. Adding or changing an outbound endpoint updates this page in the
+same commit (the org's docs-with-the-change rule applied to privacy) -
+and "outbound" includes what a subprocess does on our behalf.
+
+The same pass found two claims the page could not support. The
+embedding-model row said the download happens "the first time the hub
+needs to search what it remembers", but recall is a deterministic
+entity and keyword scorer with no embedder anywhere near it
+(`memory.ts`); the row now says the honest thing, that nothing in MaiPai
+triggers it today. And every hub row rendered "only if you turn it on",
+pointing families at a toggle that does not exist for a model download;
+the opt-in line is now shown only for package rows, where a manifest
+really declares it.
+
+Two smaller fixes, same root cause of claiming more than is known.
+"Never leaves your house" now requires a package to hold no `net:`
+permission rather than merely to have declared no data sources, because
+`data_sources` is optional in the schema: a package that reaches the
+network and forgot to declare where would otherwise have been vouched
+for by name, which is worse than an omission. And `loadPackage`'s
+`JSON.parse` moved inside its own try block, where it always belonged -
+outside it, a half-written manifest threw past every caller and took the
+whole privacy page down with a 500 instead of reporting one unloadable
+package.
+
+Verified with 11 backend and 11 frontend tests, and by driving the real
+page in a real browser against a real backend with a seeded demo
+household: all twelve connections rendered and read by eye, before and
+again after the review fixes.
