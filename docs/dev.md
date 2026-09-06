@@ -300,8 +300,17 @@ set. Full architecture: platform plan chapters 1, 3, and 4.
       regression after a restart (no RTC, NTP not yet synced, a manual
       clock change) could generate an hlc smaller than one already
       stored and permanently refuse further writes to that key with a
-      misleading error; fixed with `seedHlc()`, called once at
-      `lib/settings.ts`'s module load from every hlc already on disk.
+      misleading error; fixed with `seedHlc()`. Originally called once at
+      `lib/settings.ts`'s module load from every hlc already on disk;
+      COR-6 (a 2026-09-06 code review) found that only ever seeded from
+      `settings_values`, leaving `memory_records`, `conversations`,
+      `conversation_turns`, `people`, `issues`, and the rest of every
+      other hlc-bearing table free to regress after a restart. Widened to
+      `lib/hlc.ts`'s own `seedHlcFromDatabase()`, called once at boot
+      (`index.ts`, before anything can write) across every table in its
+      `HLC_BEARING_TABLES` list - `lib/settings.ts`'s own module-load call
+      stays too, redundant with the wider one but harmless (`seedHlc()` is
+      idempotent).
       `lib/access.ts`'s extraction had settings call the batch
       `rolesById()` (a full table scan) to resolve a single person's
       role; added a targeted `getPersonRole()` and made `canAccessPerson`
