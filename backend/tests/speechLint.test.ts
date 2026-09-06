@@ -43,6 +43,7 @@ describe("speech lint (placeholder for C's real one)", () => {
   for (const id of packageIds) {
     const recipePath = join(PACKAGES_DIR, id, "recipe.json");
     const skillPath = join(PACKAGES_DIR, id, "SKILL.md");
+    const manifestPath = join(PACKAGES_DIR, id, "manifest.json");
 
     if (existsSync(recipePath)) {
       test(`${id}/recipe.json's format templates are clean`, () => {
@@ -57,6 +58,25 @@ describe("speech lint (placeholder for C's real one)", () => {
       test(`${id}/SKILL.md's body is clean`, () => {
         const body = readFileSync(skillPath, "utf-8");
         expect(violations(body), `${id}/SKILL.md`).toEqual([]);
+      });
+    }
+
+    // A Tier 1 package (session-d-packages-and-store.md step 5) has no
+    // recipe.json to hold a format step's text/speech - manifest.json's
+    // own fallback_reply is the one piece of this app's own spoken/
+    // displayed text every such package declares statically. A found-
+    // by-review gap (2026-09-06): this file only ever checked recipe.json
+    // and SKILL.md, so knowledge's own fallback_reply shipped unchecked.
+    if (existsSync(manifestPath)) {
+      test(`${id}/manifest.json's fallback_reply is clean`, () => {
+        const manifest = JSON.parse(readFileSync(manifestPath, "utf-8")) as {
+          fallback_reply?: { text?: string; speech?: string };
+        };
+        for (const text of [manifest.fallback_reply?.text, manifest.fallback_reply?.speech].filter(
+          (t): t is string => typeof t === "string",
+        )) {
+          expect(violations(text), `"${text}" in ${id}/manifest.json's fallback_reply`).toEqual([]);
+        }
       });
     }
   }

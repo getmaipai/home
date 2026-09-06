@@ -434,6 +434,14 @@ export const PackageManifest = z
         "Bounds handle(). Defaults per 4.9: 4000 on the robot, 8000 on the hub.",
       )
       .optional(),
+    /**A Tier 1 package's own answer when its Deno process crashes or times out (session-d-packages-and-store.md step 5) - required practically, not just structurally, for a Tier 1 package to clear bronze, since a crash with nothing to say is a dead end for whoever asked.*/
+    fallback_reply: z
+      .object({ text: z.string().min(1), speech: z.string().min(1).optional() })
+      .strict()
+      .describe(
+        "A Tier 1 package's own answer when its Deno process crashes or times out (session-d-packages-and-store.md step 5) - required practically, not just structurally, for a Tier 1 package to clear bronze, since a crash with nothing to say is a dead end for whoever asked.",
+      )
+      .optional(),
     /**0: declarative (a recipe or prompt body). 1: Deno code.*/
     tier: z
       .union([z.literal(0), z.literal(1)])

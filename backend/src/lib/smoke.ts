@@ -32,9 +32,10 @@ import { join } from "node:path";
 import { eq } from "drizzle-orm";
 import { db } from "@/db";
 import { packageStatus } from "@/db/schema";
-import { listPackageIds, loadPackage, PACKAGES_DIR } from "@/lib/plugins";
+import { listPackageIds, loadPackage } from "@/lib/plugins";
 import { loadSkill } from "@/lib/skills";
 import { raiseIssue, resolveIssue } from "@/lib/issues";
+import { PACKAGES_DIR } from "@/lib/paths";
 import { HostEmulator } from "@maipai/spec/emulators/ts/host-emulator.js";
 import { runRecipe } from "@maipai/spec/interpreters/ts/recipe-interpreter.js";
 
@@ -141,6 +142,40 @@ async function runRecipeFixtureSmoke(id: string, fixturePath: string): Promise<S
   }
 }
 
+// A Tier 1 package's own `deno test`, run under the identical read
+// permission its real sandbox gets (session-d-packages-and-store.md
+// step 5, lib/denoHost.ts) - a package that writes tests only against
+// its own pure logic (never the MCP round-trip itself, which needs the
+// hub's real host.fetch bridge a bare `deno test` has no access to)
+// never needs `--allow-write` or `--allow-net` here either. `--cached-
+// only` matches denoHost.ts's own real spawn: a smoke check proves the
+// package still works OFFLINE, against whatever's already cached, the
+// same "deterministic and offline" standard every other smoke kind
+// already holds to (`--no-remote` looked like the same guarantee but is
+// actually stricter - it refuses a cached remote module too, not just a
+// network fetch, which broke on this package's own jsr: import; a real
+// finding while wiring this up). `--no-check`: `deno run` (denoHost.ts's
+// own real spawn) never type-checks by default, only `deno test`/
+// `deno check` do - matching that instead of holding smoke to a
+// stricter bar production doesn't clear either, and sidesteps a real
+// Deno resolver limitation with versioned npm subpath specifiers
+// (`npm:@modelcontextprotocol/sdk@1.30.0/server/mcp.js`) that only
+// affects the type-checking pass, not execution.
+async function runDenoTestSmoke(id: string): Promise<SmokeResult> {
+  const dir = join(PACKAGES_DIR, id);
+  const proc = Bun.spawn(["deno", "test", "--no-check", `--allow-read=${dir}`, "--cached-only", dir], {
+    stdout: "pipe",
+    stderr: "pipe",
+  });
+  const [stdout, stderr, exitCode] = await Promise.all([
+    new Response(proc.stdout).text(),
+    new Response(proc.stderr).text(),
+    proc.exited,
+  ]);
+  if (exitCode === 0) return { ok: true, message: "deno test passed" };
+  return { ok: false, message: `deno test failed (exit ${exitCode}): ${(stderr || stdout).slice(0, 500)}` };
+}
+
 /** Runs one package's declared smoke check and records the result
  * (packageStatus row, plus raiseIssue/resolveIssue). Never throws: an
  * unrecognized or missing smoke declaration is itself a smoke failure,
@@ -181,7 +216,7 @@ export async function runSmoke(id: string): Promise<SmokeResult> {
   }
 
   if (smoke.kind === "deno_test") {
-    return recordResult(id, { ok: false, message: "deno_test smoke isn't implemented until the Tier 1 host (session-d step 5)" });
+    return recordResult(id, await runDenoTestSmoke(id));
   }
 
   return recordResult(id, { ok: false, message: `unrecognized smoke.kind: ${smoke.kind}` });

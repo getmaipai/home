@@ -1523,10 +1523,20 @@ that owns it.
 
 **Packages**
 
-- [ ] **The Tier 1 host under Deno, and the MCP spike** (M-L, D) - Hub
-      v0.1 scope ("the Deno process host and the MCP spike"); not a line
-      of it exists, so no code package can run. The knowledge lookup is
-      the first Tier 1 package, proving the sandbox.
+- [x] **The Tier 1 host under Deno, and the MCP spike** - shipped,
+      session-d-packages-and-store.md step 5 (2026-09-06):
+      `lib/denoHost.ts` (lazy-started, `--allow-read`/`--allow-write`
+      scoped to exactly the package's source and data dirs, no env, no
+      net), MCP over stdio via the official SDK (`Client`/`McpServer`,
+      both directions of the `Protocol` base class's `request()`/
+      `setRequestHandler()` used for real - `vscode-jsonrpc`'s recorded
+      fallback was never needed), `host/fetch` proven end to end through
+      `packageHost.ts`'s own cache/rate-limit/SSRF path. Three-strikes
+      fault handling with a real Repairs issue, idle-kill, a graceful-
+      exit hook. `knowledge` (Wikipedia's public REST summary API) is
+      the first Tier 1 package, verified live against a running dev
+      server. `deno_test` smoke (step 1's own reserved, unbuilt kind) is
+      real now too.
 - [ ] **The store host on the hub** (M-L, D) - plan 4.10: install from
       the signed index, verify twice, unpack per version, smoke before
       enable, per-package channel, rollback, the permission prompt, the

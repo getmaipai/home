@@ -612,3 +612,154 @@ real consumers of `compute`; step 9's `lights` package (and any future
 "is X on" style package) is the first real consumer of
 `integration.call`; C consumes `ask` from the turn engine side, per the
 wave-2 contract.
+
+## Step 5: the Tier 1 host under Deno, and the MCP spike
+
+`lib/denoHost.ts`: one warm Deno process per Tier 1 package, lazy-
+started on that package's first real call (nothing spawns at boot).
+`--allow-read=<sourceDir>,<dataDir>` and `--allow-write=<dataDir>` only
+(no env, no subprocess, no net) - `sourceDir` is the package's own
+checked-in `backend/packages/<id>/`, `dataDir` a new
+`tier1PackageDataDir()` under `data/packages/<id>/` (`lib/paths.ts`) for
+whatever `node:sqlite` state the package keeps, foreshadowing step 6's
+real install layout (`data/packages/<id>/<version>/`) without needing
+that step's versioning yet. `PACKAGES_DIR` moved from `lib/plugins.ts`
+to `lib/paths.ts` so this file can read it without a `plugins.ts` <->
+`denoHost.ts` import cycle (`runPlugin()` now calls into `denoHost.ts`
+for a Tier 1 package the same way it always called `runRecipe()` for a
+Tier 0 one).
+
+**RPC is MCP over stdio, the official TypeScript SDK** (`@modelcontext
+protocol/sdk`, MIT): the package is the MCP server (`McpServer`,
+`handle` registered as its one tool), the hub is the client. `host.*`
+methods are genuinely server-to-client requests - proven with a real,
+throwaway spike script before writing any production code (a package-
+side tool handler calling `extra.sendRequest({method:"host/fetch",...})`,
+answered by the hub's own `client.setRequestHandler()`), confirmed
+working over real stdio with the sandbox's exact real permission flags
+before this file existed at all. `host/fetch` is the one method this
+spike proves end to end (this step's own acceptance test): it reuses
+`packageHost.ts`'s `createHost(actor, manifest).fetch()` verbatim, so a
+Tier 1 package's fetch gets the identical permission/rate-limit/SSRF/
+cache treatment (step 3) a Tier 0 recipe's already does - one
+definition, one place, never a second copy of that logic for the
+sandboxed case. `vscode-jsonrpc` (the plan's own recorded fallback) was
+never needed - the SDK's bidirectional `Protocol` base class (both
+`Client` and `Server` can `request()` the other side and
+`setRequestHandler()` for a custom method) made the whole thing work on
+the first real attempt.
+
+**Faults**: a crash (the process closes on its own, not via this file's
+own `killProcess()`) or a `callTool()` timeout (the manifest's own
+`timeout_ms`, defaulting to 8000, passed straight to the SDK's own
+per-request `timeout` option) counts a strike and answers with the
+manifest's new `fallback_reply` field (`{ text, speech? }`, spec first)
+instead of an error. A timed-out process is killed, never left running
+stuck - the next call starts fresh. Three strikes disables the package
+for the rest of this boot (in-memory, reset on restart - a session
+fault, not `lib/smoke.ts`'s own persistent `package_status` verdict) and
+raises a Repairs item through F's real `lib/issues.ts`. An idle process
+(ten minutes, `IDLE_TIMEOUT_MS`) is closed by a sweep started once at
+boot; a graceful-exit hook (mirroring `lib/sidecars.ts`'s own
+`registerGracefulExit()`, not reusing that registry directly - a fixed,
+named, health-polled sidecar and an open-ended set of per-package
+Tier 1 processes with their own lazy-start/idle-kill/fault lifecycle are
+a real mismatch to force into one abstraction) kills every live sandbox
+process on hub shutdown so none leaks past a restart.
+
+**`knowledge`, the first Tier 1 package** (the plan's own choice: "the
+sandbox is proven by something the family uses"): a general-knowledge
+answer via Wikipedia's free public REST summary API, `host.fetch`'d
+from inside the sandbox. Offline Wikipedia through a local Kiwix ZIM is
+the plan's own "when present" path; no ZIM ships this wave (a real,
+multi-hundred-megabyte asset with no household-facing way to add one
+yet), so this package always takes the "otherwise" branch. Declares
+`cache`/`warm` (step 3) like any Tier 0 fetch-based package would - the
+cache lives on the hub side (`packageCache.ts`), entirely transparent
+to the sandboxed process, which never knows or cares whether its
+`host/fetch` request was served from cache or a live call.
+
+**A real Deno resolver limitation, found wiring up `deno test` for
+`lib/smoke.ts`'s own `deno_test` smoke kind** (until now recorded as an
+explicit failure, "not implemented until step 5" - real now,
+`runDenoTestSmoke()`): `deno check`/`deno test` fail to resolve a
+versioned npm subpath specifier
+(`npm:@modelcontextprotocol/sdk@1.30.0/server/mcp.js`) during their
+type-checking pass, even fully cached, even though `deno run` (this
+file's own real spawn) resolves and runs the identical import fine -
+`deno run` never type-checks by default, only `deno check`/`deno test`
+do. Fixed with `--no-check` on the smoke run specifically: matching
+what production already does (untyped execution) rather than holding
+smoke to a stricter bar `denoHost.ts`'s own real spawn doesn't clear
+either. Also found live: `--no-remote` (originally added to the smoke
+run and the real spawn "to be extra safe") is stricter than the actual
+goal - it refuses a cached remote module outright, not just a live
+network fetch, and broke on `knowledge`'s own `jsr:@std/assert` test
+dependency; `--cached-only` alone is the real "no live network, cached
+is fine" guarantee, so `--no-remote` was dropped from both.
+
+**`bun test`'s own default file discovery picked up
+`knowledge/handler_test.ts`** (a real Deno-native test file, `jsr:`/
+`npm:` imports bun was never meant to resolve) the moment it existed,
+failing `scripts/check.sh`'s `bun test` step on an import error, not a
+real test failure - found live, the first time a Tier 1 package's own
+test file existed anywhere in the tree. Fixed with `root = "tests"` in
+`backend/bunfig.toml`, scoping bun's own discovery to where every one
+of *its* test files already lives; a Tier 1 package's own `deno test`
+stays `lib/smoke.ts`'s gate, never bun's.
+
+A code review before this landed caught three real gaps, all fixed:
+`callTier1Handle()` had no lock around starting a not-yet-running
+process - two concurrent calls for the same cold package (two family
+members asking at once, a client retry) each saw nothing in `processes`
+and each spawned their own real `deno run` child; whichever finished
+connecting last won the map slot, orphaning the other - unreachable to
+`startIdleSweep()` or `registerDenoHostGracefulExit()` (both only ever
+walk `processes`), a permanently leaked process per race. Fixed with a
+`startingProcesses` map so every concurrent caller for the same id
+awaits the identical in-flight start. `speechLint.test.ts`'s placeholder
+only ever checked `recipe.json`/`SKILL.md`, so a Tier 1 package's own
+spoken text - `manifest.json`'s new `fallback_reply` - shipped
+completely unchecked; now covered for every bundled package that
+declares one. `lib/skills.ts` had its own independently-declared copy
+of `PACKAGES_DIR`, surviving the exact "one definition, one place"
+consolidation this step's own `lib/paths.ts` move claimed to make -
+fixed to import the real one.
+
+Tests: `backend/tests/denoHost.test.ts` (7 cases - a full round trip
+against the real Deno sandbox from a cache-seeded response, no live
+network needed (`__setTestFetchDelayMsForTests`, a test-only seam that
+delays every `host/fetch` request equally, standing in for "the package
+is slow to answer" without needing a real slow service); two concurrent
+calls for the same cold package sharing one real process, not two
+(`pgrep -f`, counting the actual live child); a timeout faulting to
+`fallback_reply`; three strikes disabling the package and raising a
+real Repairs issue, and staying disabled on a 4th call even once the
+delay is lifted; three real, live `deno run` invocations against
+disposable temp directories - never a bundled package, so the bronze-
+completeness suite can never mistake them for one - proving Deno's own
+permission model directly: reading outside the allowed directory
+fails, a direct `fetch()` bypass fails with no `--allow-net` anywhere,
+and reading/writing inside the allowed directory succeeds),
+`backend/packages/knowledge/handler_test.ts` (3 cases, `deno test`:
+formats a real Wikipedia summary shape, a disambiguation page reads as
+not-found rather than a wrong answer, no extract at all reads the
+same). `spec/tests/ts/package-bronze.test.ts` picked up `knowledge`
+automatically and it clears bronze. `scripts/check.sh` fully green,
+all 812 backend tests passing.
+
+**Verified for real**, against a running dev server, real Wikipedia
+calls: `POST /api/plugins/knowledge/run` for "Seattle" through the real
+sandboxed process answered with a real, correctly-formatted summary; a
+second call for the same topic answered in 12ms (cache hit, no live
+fetch); a fresh topic ("Marie Curie") answered correctly on its own
+first real call; no leaked `deno` process after killing the hub.
+
+What's left for whom: step 6's install flow is what actually versions
+and signs a Tier 1 package (today's `backend/packages/knowledge/` is
+bundled, the same as every Tier 0 package); step 7-9's own Tier 1 or
+Tier 0 packages can declare `exposes.queries[]` (already schema-real
+since step 2) for C's Tier 2 router once C wires that side; a second
+Tier 1 package would be the first real test of whether `host/fetch`'s
+one-method RPC surface needs a second method (`host/memory.recall`,
+etc.) added the identical way.

@@ -19,9 +19,11 @@ import { Recipe } from "@maipai/spec/gen/ts/recipe.js";
 import { runRecipe, type PluginResult } from "@maipai/spec/interpreters/ts/recipe-interpreter.js";
 import { HostError } from "@maipai/spec/emulators/ts/host-emulator.js";
 import { createHost } from "@/lib/packageHost";
+import { callTier1Handle } from "@/lib/denoHost";
 import { registerPackageNotificationTypes } from "@/lib/notificationTypes";
 import { parseWhen } from "@/lib/scheduler";
 import { listActivePeople } from "@/lib/access";
+import { PACKAGES_DIR } from "@/lib/paths";
 import { ROLE_LADDER, type Role } from "@/middleware/auth";
 import type { PersonRow } from "@/types";
 
@@ -31,8 +33,6 @@ import type { PersonRow } from "@/types";
 // $ref into spec's own dialect), and codegen leaves it typed `z.any()`
 // since it can't be known at generation time.
 const ajv = new Ajv2020({ strict: false });
-
-export const PACKAGES_DIR = join(import.meta.dir, "..", "..", "packages");
 
 export interface LoadedPackage {
   manifest: PackageManifest;
@@ -102,7 +102,7 @@ export function loadPackage(id: string): PluginOpResult<LoadedPackage> {
     return { ok: false, status: 400, error: `package ${id}'s manifest failed validation: ${manifestParsed.error.message}` };
   }
   if (manifestParsed.data.tier !== 0) {
-    return { ok: false, status: 400, error: `package ${id} is tier ${manifestParsed.data.tier}, only tier 0 runs today` };
+    return { ok: false, status: 400, error: `package ${id} is tier ${manifestParsed.data.tier}, not a Tier 0 recipe package - use runPlugin(), not loadPackage(), for a Tier 1 one` };
   }
   const recipeParsed = Recipe.safeParse(recipeJson);
   if (!recipeParsed.success) {
@@ -146,31 +146,58 @@ export function meetsMinRole(actorRole: string, minRole: string): boolean {
  * `POST /api/plugins/:id/run`, a scheduled job): there's no turn to
  * attribute to, so memory.remember() falls back to the package id, same
  * as before this existed. */
-export async function runPlugin(
-  id: string,
-  actor: PersonRow,
-  inputs: Record<string, unknown>,
-  turnId?: string,
-): Promise<PluginOpResult<PluginResult>> {
-  const loaded = loadPackage(id);
-  if (!loaded.ok) return loaded;
-  const { manifest, recipe } = loaded.value;
-  if (!meetsMinRole(actor.role, manifest.min_role)) {
-    return { ok: false, status: 403, error: `${id} needs role ${manifest.min_role} or higher` };
-  }
+function validateArgs(id: string, manifest: PackageManifest, inputs: Record<string, unknown>): string | null {
   // errors.json's invalid_input is exactly this: "The call's arguments
   // failed validation against the manifest's args schema." Without this,
   // a missing required input (e.g. remember's `fact`) reached the
   // interpreter, left its `{fact}` placeholder un-interpolated, and got
   // written to the real memory store as literal text with a 200 back —
   // found by review before this ever shipped.
-  if (manifest.args) {
-    const validate = ajv.compile(manifest.args as object);
-    if (!validate(inputs)) {
-      const detail = ajv.errorsText(validate.errors, { separator: "; " });
-      return { ok: false, status: 400, error: `${id}'s inputs failed validation: ${detail}` };
-    }
+  if (!manifest.args) return null;
+  const validate = ajv.compile(manifest.args as object);
+  if (validate(inputs)) return null;
+  return ajv.errorsText(validate.errors, { separator: "; " });
+}
+
+/** Runs a bundled package - Tier 0's own recipe, or (session-d-packages-
+ * and-store.md step 5) Tier 1's Deno sandbox - for `actor`, checking
+ * min_role first (4.9: the floor role a person needs to invoke this
+ * package) and mapping a raised HostError to the same result shape every
+ * other route returns. Tier branches after the manifest loads since the
+ * two tiers need genuinely different loading (Tier 0 also reads and
+ * validates recipe.json; Tier 1 has none) - `loadManifestOnly()` is the
+ * one read both share.
+ *
+ * `turnId`, when this run is happening inside a conversation turn
+ * (turnEngine.ts's prepareTurn(), the only real caller that has one), is
+ * handed straight to createHost() so anything the recipe remembers is
+ * attributed to that turn (step 2's provenance rule) rather than the
+ * package id. Omitted for every other caller (a direct
+ * `POST /api/plugins/:id/run`, a scheduled job): there's no turn to
+ * attribute to, so memory.remember() falls back to the package id, same
+ * as before this existed. */
+export async function runPlugin(
+  id: string,
+  actor: PersonRow,
+  inputs: Record<string, unknown>,
+  turnId?: string,
+): Promise<PluginOpResult<PluginResult>> {
+  const manifestResult = loadManifestOnly(id);
+  if (!manifestResult.ok) return manifestResult;
+  const manifest = manifestResult.value;
+  if (!meetsMinRole(actor.role, manifest.min_role)) {
+    return { ok: false, status: 403, error: `${id} needs role ${manifest.min_role} or higher` };
   }
+  const argsError = validateArgs(id, manifest, inputs);
+  if (argsError) return { ok: false, status: 400, error: `${id}'s inputs failed validation: ${argsError}` };
+
+  if (manifest.tier === 1) {
+    return { ok: true, value: await callTier1Handle(id, manifest, actor, inputs) };
+  }
+
+  const loaded = loadPackage(id);
+  if (!loaded.ok) return loaded;
+  const { recipe } = loaded.value;
   const host = createHost(actor, manifest, [], turnId);
   try {
     return { ok: true, value: await runRecipe(recipe, inputs, host) };

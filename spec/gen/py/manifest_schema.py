@@ -143,6 +143,18 @@ class Contributes(BaseModel):
     )
 
 
+class FallbackReply(BaseModel):
+    """
+    A Tier 1 package's own answer when its Deno process crashes or times out (session-d-packages-and-store.md step 5) - required practically, not just structurally, for a Tier 1 package to clear bronze, since a crash with nothing to say is a dead end for whoever asked.
+    """
+
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    text: constr(min_length=1)
+    speech: constr(min_length=1) | None = None
+
+
 class Smoke(BaseModel):
     """
     The smoke test entry, run at install, update, and on a schedule (lib/smoke.ts). `kind: "static"` (loads only), `"recipe_fixture"` + `fixture` (a Tier 0 plugin's own recipe run against a fixture-seeded HostEmulator), or `"deno_test"` (Tier 1, session-d step 5).
@@ -316,6 +328,10 @@ class PackageManifest(BaseModel):
     timeout_ms: conint(ge=1) | None = Field(
         None,
         description='Bounds handle(). Defaults per 4.9: 4000 on the robot, 8000 on the hub.',
+    )
+    fallback_reply: FallbackReply | None = Field(
+        None,
+        description="A Tier 1 package's own answer when its Deno process crashes or times out (session-d-packages-and-store.md step 5) - required practically, not just structurally, for a Tier 1 package to clear bronze, since a crash with nothing to say is a dead end for whoever asked.",
     )
     tier: Literal[0, 1] = Field(
         ..., description='0: declarative (a recipe or prompt body). 1: Deno code.'

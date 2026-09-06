@@ -280,6 +280,16 @@
       "minimum": 1,
       "description": "Bounds handle(). Defaults per 4.9: 4000 on the robot, 8000 on the hub."
     },
+    "fallback_reply": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["text"],
+      "properties": {
+        "text": { "type": "string", "minLength": 1 },
+        "speech": { "type": "string", "minLength": 1 }
+      },
+      "description": "A Tier 1 package's own answer when its Deno process crashes or times out (session-d-packages-and-store.md step 5) - required practically, not just structurally, for a Tier 1 package to clear bronze, since a crash with nothing to say is a dead end for whoever asked."
+    },
     "tier": {
       "type": "integer",
       "enum": [0, 1],

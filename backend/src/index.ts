@@ -7,6 +7,7 @@ import { startAllSidecars, registerGracefulExit } from "@/lib/sidecars";
 import { initCrashBootHold } from "@/lib/dirtyBoot";
 import { sweepOrphanEngineProcesses } from "@/lib/llmSupervisor";
 import { runAllSmokeTests } from "@/lib/smoke";
+import { startIdleSweep, registerDenoHostGracefulExit } from "@/lib/denoHost";
 
 const port = Number(process.env.PORT ?? 8787);
 
@@ -70,6 +71,7 @@ cleanupStaleSnapshots();
 // this boots an empty registry today - proving the wiring rather than
 // waiting for a first caller to also have to remember it.
 registerGracefulExit();
+registerDenoHostGracefulExit();
 // A code review (2026-09-06) found these three fire-and-forget (the
 // original comments here promised "before anything real spawns" and "no
 // real engine spawn happens before the first request arrives" without
@@ -87,6 +89,10 @@ registerGracefulExit();
 await sweepOrphanEngineProcesses();
 await initCrashBootHold();
 void startAllSidecars();
+// Step 5: idle Tier 1 sandbox processes get closed after ten minutes -
+// nothing is running yet at boot (every Deno process starts lazily, on
+// a package's first real call), so this just arms the sweep.
+startIdleSweep();
 setInterval(() => {
   runDueJobs(runPlugin, new Date(), {
     "packages.smoke": async () => {
