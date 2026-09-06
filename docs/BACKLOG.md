@@ -682,6 +682,34 @@ grants"): Entity, Relationship and Grant, with the relationship-type and
 grant-action vocabularies and the cross-field validators. None of it is
 implemented on the hub yet.
 
+**Session E's step 6 (2026-09-06) confirmed this section is still
+accurate, and checked directly with F rather than assuming silence means
+"not started" (the same coordination this session already did with D for
+the store in step 3).** Zero backend exists for `/api/entities`,
+`/api/relationships`, `/api/grants`, `GET /api/people/:id/permissions`,
+or `/api/approvals` - F confirmed (2026-09-06) these are genuinely not
+started, grouped as F's own step 7 ("bigger than step 6"), with steps
+8-12 still ahead of it in F's own order. Content ceilings are **not
+F's record at all** - F named them as C's (session C, per wave-2's
+ownership split), and neither has a spec schema yet (the platform plan
+describes the ceiling in prose only: dials `none | limited | open`,
+band-defaulted with a non-movable safety floor). Time allowances/
+schedules are F's (this file's own earlier "M, F backend, E controls
+page" note, confirmed still accurate) and also not started, also with
+no spec schema. **Devices and sessions with revoke are the one real
+exception**: F's own step 6 (passkeys, device tokens, Quick Connect,
+sessions, optional TOTP - `GET/DELETE /api/devices`,
+`GET/DELETE /api/auth/sessions`) is done, code-reviewed, and merging to
+`main` imminently as of this note - the frontend half of "sessions and
+devices with revoke" is real, buildable work once that lands, unlike
+everything else this step named. `AdminGatedPage.tsx`'s existing role-
+based gate (already reused for Repairs, Backups, AI models, and the
+person-pickers on Conversations/Memory) is confirmed the right mechanism
+for a parent's controls page whenever the rest of this lands -
+`settings.admin`'s own grant-action wording in
+`spec/vocab/grant-actions.json` is a stated future state (line 744 of
+this file's earlier note), not something to build against today.
+
 - [ ] **The hub half of entities and relationships** (L) - tables,
       migration, routes, and a UI. Held back deliberately: a parallel
       session was mid-edit across `db/schema.ts`, the migrations and

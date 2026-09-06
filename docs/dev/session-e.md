@@ -844,3 +844,38 @@ renders those separately, stayed as they were - a different shape, not
 a fifth copy of this one). Re-verified after every fix: `bun test`
 (frontend, 416 passing), `tsc --noEmit` clean, `lint` clean,
 `scripts/check.sh` green, `bun run a11y` unchanged. This closes Step 5.
+
+## Step 6: people, relationships, grants and parental controls
+
+**Investigated first, found the largest gap of any step this session,
+and checked with F directly rather than guess from silence** (the same
+move made with D for the store in step 3). Zero backend exists for
+`/api/entities`, `/api/relationships`, `/api/grants`,
+`GET /api/people/:id/permissions`, or `/api/approvals` - F confirmed
+these are genuinely not started, grouped as F's own step 7 (bigger than
+F's step 6), with steps 8-12 still ahead of it. Entity/Relationship/Grant
+at least have real, frozen spec shapes (`spec/schemas/{entity,grant,
+relationship}.schema.json`, generated TS types, `spec/vocab/
+{relationship-types,grant-actions}.json`); content ceilings and time
+allowances have **no spec schema at all**, prose only in the platform
+plan - and content ceilings turned out not to be F's record to begin
+with (F named them as session C's, per wave-2's ownership split, a fact
+this session had no way to know without asking).
+
+**The one real exception, found by asking**: F's own step 6 (passkeys,
+device tokens, Quick Connect, sessions, optional TOTP -
+`GET/DELETE /api/devices`, `GET/DELETE /api/auth/sessions`) is done,
+code-reviewed twice, and merging to `main` imminently as of this
+session's own step 6 start. "Sessions and devices with revoke" is real,
+buildable work once that lands - the only piece of this step's own text
+that is. Waiting for F's merge ping before building it, rather than
+building against a branch that hasn't landed on `main` yet.
+
+Recorded in full in `docs/BACKLOG.md`'s "People, relationships and
+permissions" section, which was already accurate and detailed (session
+E's own note there extends rather than rewrites it) - including the
+precedent for whenever the rest of this does land: `AdminGatedPage.tsx`,
+already reused four times this session (Repairs, Backups, AI models, and
+the person-pickers on Conversations/Memory), is the right gate to keep
+using; the grant vocabulary's `settings.admin` action is a documented
+future state, not something to build against today.
