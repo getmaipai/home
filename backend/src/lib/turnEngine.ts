@@ -1487,7 +1487,14 @@ export async function runTurnStream(
   actor: PersonRow,
   surface: Surface,
   text: string,
-  opts: { thinking?: boolean; conversationId?: string } = {},
+  // COR-7 (code review, 2026-09-06): `signal`, when given, threads
+  // through to startCompleteStream()/chatCompleteStream() - a
+  // disconnected client's own routes/turn.ts ReadableStream.cancel()
+  // fires it, so the underlying llama-server generation actually stops
+  // instead of running to completion for a connection nobody is reading
+  // from anymore, tying up the engine's one generation slot the whole
+  // time.
+  opts: { thinking?: boolean; conversationId?: string; signal?: AbortSignal } = {},
 ): Promise<TurnStreamResult> {
   const invalid = validateTurnInput(surface, text);
   if (invalid) return invalid;
@@ -1507,7 +1514,7 @@ export async function runTurnStream(
     return { ok: true, kind: "immediate", value };
   }
 
-  const started = await startCompleteStream("chat", prepared.messages, { thinking: opts.thinking });
+  const started = await startCompleteStream("chat", prepared.messages, { thinking: opts.thinking }, opts.signal);
   if (!started.ok) {
     // Collapsed to "unavailable", the same as runTurn()'s own handling of
     // complete()'s failure: llm.ts's own "unsupported_role"/"invalid_input"

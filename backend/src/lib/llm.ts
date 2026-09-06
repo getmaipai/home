@@ -263,10 +263,20 @@ export type LlmStreamStartResult =
  * (turnEngine.ts's runTurnStream) has already committed to a streaming
  * response. A mid-stream failure surfaces there as a thrown error from
  * the generator, not a return value. */
+/** `signal` (COR-7, code review, 2026-09-06) lets a caller abort
+ * generation from outside - turnEngine.ts's runTurnStream() threads
+ * through the AbortController routes/turn.ts's ReadableStream.cancel()
+ * fires when an HTTP client disconnects mid-stream, so that stops
+ * occupying the shared chat engine slot instead of running to
+ * completion for nobody. A separate parameter, not folded into
+ * LlmCompleteOptions: that type's fields all end up spread straight into
+ * the request body sent to llama-server (`...rest` below), and a signal
+ * has no business there. */
 export async function startCompleteStream(
   role: LlmRole,
   messages: LlmMessage[],
   opts: LlmCompleteOptions = {},
+  signal?: AbortSignal,
 ): Promise<LlmStreamStartResult> {
   const invalid = validate(role, messages);
   if (invalid) return invalid;
@@ -281,12 +291,15 @@ export async function startCompleteStream(
   const { thinking, ...rest } = opts;
   async function* tokens(): AsyncGenerator<string, void, void> {
     try {
-      for await (const delta of client!.chatCompleteStream({
-        model: "chat",
-        messages,
-        ...rest,
-        chat_template_kwargs: { enable_thinking: !!thinking },
-      })) {
+      for await (const delta of client!.chatCompleteStream(
+        {
+          model: "chat",
+          messages,
+          ...rest,
+          chat_template_kwargs: { enable_thinking: !!thinking },
+        },
+        signal,
+      )) {
         yield delta;
       }
     } catch (err) {

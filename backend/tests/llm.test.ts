@@ -200,6 +200,67 @@ describe("lib/llm.ts startCompleteStream()", () => {
     expect(started.ok).toBe(false);
     if (!started.ok) expect(started.code).toBe("invalid_input");
   });
+
+  // COR-7 (code review, 2026-09-06): a disconnected client used to leave
+  // generation running with nothing reading it, tying up the engine's
+  // one generation slot for a response nobody would ever see. This
+  // proves the actual plumbing (startCompleteStream's own `signal`
+  // param, spec/llm/ts/client.ts's chatCompleteStream()) reaches all the
+  // way to the real connection: a real local server, not the canned
+  // stub, so it can observe its own request's AbortSignal actually
+  // firing once the caller aborts.
+  test("aborting the given signal stops the generator and reaches the real underlying connection", async () => {
+    let sawAbort = false;
+    const server = Bun.serve({
+      port: 0,
+      fetch(req) {
+        req.signal.addEventListener("abort", () => {
+          sawAbort = true;
+        });
+        const encoder = new TextEncoder();
+        const body = new ReadableStream<Uint8Array>({
+          async start(controller) {
+            controller.enqueue(
+              encoder.encode(
+                `data: ${JSON.stringify({ id: "x", model: "chat", choices: [{ index: 0, delta: { content: "hello" }, finish_reason: null }] })}\n\n`,
+              ),
+            );
+            // Long enough that the test's own abort() always lands
+            // first - never actually waited out.
+            await new Promise((resolve) => setTimeout(resolve, 10_000));
+            controller.enqueue(encoder.encode("data: [DONE]\n\n"));
+            controller.close();
+          },
+        });
+        return new Response(body, { headers: { "content-type": "text/event-stream" } });
+      },
+    });
+    process.env.MAIPAI_LLAMA_SERVER_URL = `http://127.0.0.1:${server.port}`;
+    try {
+      const controller = new AbortController();
+      const started = await startCompleteStream("chat", [{ role: "user", content: "hi" }], {}, controller.signal);
+      expect(started.ok).toBe(true);
+      if (!started.ok) return;
+
+      const deltas: string[] = [];
+      const drain = async () => {
+        for await (const delta of started.tokens) {
+          deltas.push(delta);
+          controller.abort();
+        }
+      };
+      await expect(drain()).rejects.toThrow();
+      expect(deltas).toEqual(["hello"]);
+
+      // The abort event is dispatched synchronously by the runtime, but
+      // give it one tick to actually reach the server's own request
+      // object before asserting on it.
+      await new Promise((resolve) => setTimeout(resolve, 50));
+      expect(sawAbort).toBe(true);
+    } finally {
+      server.stop(true);
+    }
+  }, 15_000);
 });
 
 // A review (2026-09-06) found the first version of clampMaxTokens()
