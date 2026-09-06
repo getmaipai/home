@@ -353,7 +353,10 @@ describe("createChatModelAdapter streaming", () => {
       // Draining the generator to completion is exactly "text generation
       // finished" - speech (a separate TTS fetch, then playback) hasn't
       // necessarily caught up yet, which is the entire gap this exists to
-      // cover.
+      // cover. eslint's no-unused-vars only ignores a leading-underscore
+      // NAME on function args (argsIgnorePattern), not a for-of binding,
+      // hence the inline disable for this one intentionally-discarded value.
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
       for await (const _ of runAdapter(adapter, options)) {
         /* drain */
       }
