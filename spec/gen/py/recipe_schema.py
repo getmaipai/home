@@ -167,6 +167,69 @@ class ScheduleStep(BaseModel):
     )
 
 
+class IntegrationCallStep(BaseModel):
+    """
+    Goes through host.integration.call - a typed read or action against a household-configured third-party integration beyond Home Assistant's own dedicated home.call_service step (session-d-packages-and-store.md step 4).
+    """
+
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    op: Literal['integration.call']
+    as_: str = Field(
+        ...,
+        alias='as',
+        description="Binds the result into the recipe's variable scope under this name.",
+    )
+    id: str = Field(
+        ...,
+        description='The integration id, e.g. "home_assistant". Requires the manifest to declare integration:<id>.',
+    )
+    method: str = Field(
+        ...,
+        description='An id-specific method name, e.g. Home Assistant\'s "get_state" or "call_service".',
+    )
+    args: dict[str, Any] | None = Field(
+        None,
+        description="Every string value, at any depth, may reference input/variable names in {braces} - unlike fetch's own body, which is passed through as-is.",
+    )
+
+
+class ComputeStep(BaseModel):
+    """
+    A restricted math/unit expression evaluator (session-d-packages-and-store.md step 4) - no network call, no host access, real numbers and unit conversion only. Backs math/convert without either package needing its own fetch-based service.
+    """
+
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    op: Literal['compute']
+    as_: str = Field(..., alias='as')
+    expression: str = Field(
+        ...,
+        description='A math/unit-conversion expression, e.g. "12 miles to km" or "{amount} * 1.08". {variable} references are substituted before evaluation, the same interpolation every other step\'s text fields use.',
+    )
+
+
+class AskStep(BaseModel):
+    """
+    Sets the result's ask field (result.schema.json, 4.5) so a recipe that can't disambiguate on its own ("which Springfield") can ask a deterministic follow-up instead of guessing or failing outright. Always the recipe's last step: nothing after an ask step can run in the same pass, since there is nothing left to compute until the follow-up answer arrives on a later turn.
+    """
+
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    op: Literal['ask']
+    prompt: str = Field(
+        ...,
+        description='A template with {variable} interpolation, spoken/shown as the follow-up question.',
+    )
+    expects: str | None = Field(
+        None,
+        description="What kind of answer the next utterance should satisfy, e.g. a variable name the recipe would otherwise have asked for. Free text, matched by the turn engine (wave-2.md's C-to-D contract), not this interpreter.",
+    )
+
+
 class Recipe(BaseModel):
     """
     A Tier 0 declarative package body, interpreted natively by the TS and Python interpreters in spec/interpreters/. See platform plan 5.2. A recipe is a named set of inputs plus a list of steps; each step is one of the primitives below.
@@ -189,4 +252,7 @@ class Recipe(BaseModel):
         | RememberStep
         | RecallStep
         | ScheduleStep
+        | IntegrationCallStep
+        | ComputeStep
+        | AskStep
     ] = Field(..., min_length=1)

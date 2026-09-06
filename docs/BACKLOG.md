@@ -103,23 +103,29 @@ already defines a real bar for every package (skills included); checked
 against what the 6 bundled skills actually have today, none of them
 clear it in full:
 
-- [ ] **A real `quality_scale.yaml` per package** (S per package) - today
-      `quality_scale` is one string field inside `manifest.json`, not the
-      separate file with bronze/silver/gold criteria the standard
-      describes (tests green, five-plus routing examples, a privacy row
-      per data source, stated offline behavior, a smoke test, README and
-      changelog present, lint clean). The routing-examples and privacy-row
-      and offline-behavior parts are genuinely met already; the smoke test
-      and the file itself are not.
-- [ ] **A `smoke` entry per package** (S-M per package, M to design the
-      mechanism once) - "runs where the package will live, at install, at
-      every update, and on a schedule; a failure leaves it installed but
-      disabled with a Repairs item." No smoke-test mechanism or Repairs
-      concept exists anywhere in this codebase yet - this is real
-      infrastructure, not just a per-package checkbox.
-- [ ] **A user-tier `README.md` and `CHANGELOG.md` per package** (S per
-      package) - the "store card" a household or the catalog's browse UI
-      would show; none of the 6 bundled packages has either today.
+- [x] **A real `quality_scale.yaml` per package** (S per package) -
+      session-d-packages-and-store.md step 1, 2026-09-06: done for the 5
+      packages D owns (define, joke, trivia, weather, storytime-style),
+      each stating bronze/silver/gold against docs/PACKAGES.md's real
+      criteria, checked by `spec/tests/ts/package-bronze.test.ts`.
+      `remember`/`recall` are C's (session-d's ownership map); still
+      open for those two.
+- [x] **A `smoke` entry per package** (S-M per package, M to design the
+      mechanism once) - session-d step 1, 2026-09-06: the mechanism is
+      built (`lib/smoke.ts`: a `recipe_fixture` check against a
+      `HostEmulator`-run recipe for a Tier 0 plugin, a `static` load
+      check for a `skill`, `deno_test` reserved for Tier 1/step 5),
+      wired to a daily core job and a boot-time pass (standing in for
+      "at install" until the store's real install flow exists, step 6),
+      and a failure disables the package and raises an issue
+      (`lib/issues.ts`, a local stub until F's real one merges). Declared
+      for D's 5 packages; `remember`/`recall` still need their own
+      (C's). A package with no `smoke` entry is treated as "not yet
+      bronze," never disabled - this session's infrastructure must not
+      reach across ownership lines to break a package it doesn't own.
+- [x] **A user-tier `README.md` and `CHANGELOG.md` per package** (S per
+      package) - session-d step 1, 2026-09-06: done for D's 5 packages;
+      `remember`/`recall` still open (C's).
 - [ ] **Real i18n for skills** (L) - genuinely undecided, not just
       unbuilt: no `getmaipai/.github` standard mentions i18n at all today,
       so this needs a design decision before any code. At minimum:
@@ -727,6 +733,18 @@ implemented on the hub yet.
       token, models, backups, routing stats) against SETTINGS.md Rule 1.
       Add `duration`, `time`, `person`, `media` and a secret-entry flow,
       then re-declare the sections that only needed those.
+
+- [ ] **A household-location setting** (S-M) - found live, session-d-
+      packages-and-store.md step 3, 2026-09-06: no settings key, no
+      first-run prompt, no places picker exists anywhere for "where does
+      this household live." `weather`'s own `warm.keys` had to hardcode a
+      placeholder place (Seattle) instead of the household's real one for
+      exactly this reason, and step 0's own verdict queue separately
+      dropped `localNews.ts`/`localEvents.ts` on the identical gap. Once
+      this exists (`household.home_place` or similar, `coreKeys.ts`), any
+      package's `warm.keys` can resolve it directly with no further
+      cache/warm changes - the mechanism doesn't care what the value is,
+      only that a real one exists to resolve against.
 
 ## UI / shell
 
@@ -1505,10 +1523,20 @@ that owns it.
 
 **Packages**
 
-- [ ] **The Tier 1 host under Deno, and the MCP spike** (M-L, D) - Hub
-      v0.1 scope ("the Deno process host and the MCP spike"); not a line
-      of it exists, so no code package can run. The knowledge lookup is
-      the first Tier 1 package, proving the sandbox.
+- [x] **The Tier 1 host under Deno, and the MCP spike** - shipped,
+      session-d-packages-and-store.md step 5 (2026-09-06):
+      `lib/denoHost.ts` (lazy-started, `--allow-read`/`--allow-write`
+      scoped to exactly the package's source and data dirs, no env, no
+      net), MCP over stdio via the official SDK (`Client`/`McpServer`,
+      both directions of the `Protocol` base class's `request()`/
+      `setRequestHandler()` used for real - `vscode-jsonrpc`'s recorded
+      fallback was never needed), `host/fetch` proven end to end through
+      `packageHost.ts`'s own cache/rate-limit/SSRF path. Three-strikes
+      fault handling with a real Repairs issue, idle-kill, a graceful-
+      exit hook. `knowledge` (Wikipedia's public REST summary API) is
+      the first Tier 1 package, verified live against a running dev
+      server. `deno_test` smoke (step 1's own reserved, unbuilt kind) is
+      real now too.
 - [ ] **The store host on the hub** (M-L, D) - plan 4.10: install from
       the signed index, verify twice, unpack per version, smoke before
       enable, per-package channel, rollback, the permission prompt, the

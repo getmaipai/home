@@ -116,6 +116,56 @@ export const NOTIFICATION_TYPES: readonly NotificationType[] = [
   },
 ] as const;
 
+// session-d-packages-and-store.md step 2: a package's own manifest
+// `notifications[]` (spec/schemas/manifest.schema.json) carries the same
+// fields as NotificationType above, so a package can declare a real,
+// dispatchable type without this file knowing about the package at all -
+// the one addition wave-2.md's contract asks D to make here, nothing else
+// in this file touched. Keyed by id in a separate map rather than pushed
+// into NOTIFICATION_TYPES itself, since that array is a `const` literal of
+// core's own hand-written types; getNotificationType() below checks both.
+const packageNotificationTypes = new Map<string, NotificationType>();
+
+/** A manifest's own `notifications[]` entry (spec/gen/ts/manifest.ts):
+ * same fields as NotificationType, snake_cased per the spec's own
+ * convention (every other manifest field is: `min_role`, `data_sources`,
+ * ...), NOT the same type as NotificationType itself - a code review
+ * (2026-09-06) caught the first version of this file importing
+ * NotificationType for the manifest side too, which type-checked as
+ * `any` at the real call site (`lib/plugins.ts`'s manifest is generated
+ * from JSON Schema, `default_channels`) and would have thrown inside
+ * `trigger()` the moment any package populated this for real -
+ * `type.defaultChannels` reading `undefined` off an object that only
+ * ever had `default_channels`. */
+interface ManifestNotificationType {
+  id: string;
+  level: NotificationLevel;
+  audience: NotificationAudience;
+  template: string;
+  configurable: boolean;
+  default_channels: readonly NotificationChannel[];
+}
+
+/** Registers every entry in a package's manifest `notifications[]` id-first
+ * so re-loading the same package (a smoke re-run, a hot install) never
+ * duplicates or drops one. Silently skips an id already claimed by a core
+ * type or a different package - two packages (or a package and core)
+ * colliding on the same id is a manifest bug the id's own namespacing
+ * (`spec/schemas/manifest.schema.json`'s "e.g. weather.severe_alert")
+ * exists to prevent, not something a package's own load path should ever
+ * paper over by silently overwriting the other's registration. */
+export function registerPackageNotificationTypes(manifest: {
+  id: string;
+  notifications?: readonly ManifestNotificationType[];
+}): void {
+  for (const declared of manifest.notifications ?? []) {
+    if (NOTIFICATION_TYPES.some((t) => t.id === declared.id)) continue;
+    if (packageNotificationTypes.has(declared.id)) continue;
+    const { default_channels, ...rest } = declared;
+    packageNotificationTypes.set(declared.id, { ...rest, defaultChannels: default_channels });
+  }
+}
+
 export function getNotificationType(id: string): NotificationType | undefined {
-  return NOTIFICATION_TYPES.find((t) => t.id === id);
+  return NOTIFICATION_TYPES.find((t) => t.id === id) ?? packageNotificationTypes.get(id);
 }

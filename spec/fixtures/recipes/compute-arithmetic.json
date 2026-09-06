@@ -1,0 +1,20 @@
+{
+  "description": "compute + format: plain arithmetic, the math package's own shape - no unit, just a restricted expression evaluator.",
+  "recipe": {
+    "id": "compute-arithmetic",
+    "inputs": [{ "name": "expression", "selector": "text" }],
+    "steps": [
+      { "op": "compute", "as": "result", "expression": "{expression}" },
+      { "op": "format", "as": "reply", "text": "{result}", "speech": "{result}" }
+    ]
+  },
+  "inputs": { "expression": "(2 + 3) * 4" },
+  "host_setup": {},
+  "expected": {
+    "reply": { "text": "20", "speech": "20" },
+    "actions": [],
+    "scheduled_jobs": [],
+    "home_calls": [],
+    "memory_added": []
+  }
+}

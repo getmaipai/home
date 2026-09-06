@@ -4,6 +4,7 @@ import { resetDb } from "./reset-db";
 import { __resetThrottleForTests } from "@/lib/secretThrottle";
 import { createHost, performHttpFetch, withOneRetry, type AttemptResult } from "@/lib/packageHost";
 import { __resetRateLimiterForTests } from "@/lib/rateLimiter";
+import { cachedFetch, __resetPackageCacheForTests, __clearPackageCacheDirForTests } from "@/lib/packageCache";
 import { setHouseholdSettingValue } from "@/lib/settings";
 import { HostError } from "@maipai/spec/emulators/ts/host-emulator.js";
 import { PackageManifest } from "@maipai/spec/gen/ts/manifest.js";
@@ -221,6 +222,45 @@ describe("packageHost fetch", () => {
       }
     }
     expect(codes).toContain("rate_limited");
+  });
+});
+
+describe("packageHost fetch, cache-aware (session-d-packages-and-store.md step 3)", () => {
+  test("a cache hit for a declared cache policy skips rate-limit and SSRF entirely", async () => {
+    __resetRateLimiterForTests();
+    __resetPackageCacheForTests();
+    __clearPackageCacheDirForTests("test-pkg");
+    const actor = await owner();
+    const cacheManifest = manifest({ permissions: ["net:127.0.0.1:9"], cache: { ttl_s: 60 } });
+    // Pre-seeds the exact (package id, url) cachedFetch() would key on,
+    // bypassing the network entirely - proving createHost()'s fetch()
+    // really threads manifest.id/manifest.cache into cachedFetch() the
+    // same way a real warm run's first successful fetch would populate
+    // it, WITHOUT this test needing a live server. 127.0.0.1:9 is a
+    // target that would fail both the rate limiter (after enough calls)
+    // and the SSRF guard on a real attempt - if either fired here, this
+    // test would fail with the wrong error instead of returning the
+    // cached value, proving the cache really sits in front of both.
+    await cachedFetch(cacheManifest.id, cacheManifest.cache, "http://127.0.0.1:9/cached", undefined, async () => ({
+      ok: true,
+    }));
+    const host = createHost(actor, cacheManifest);
+    const result = await host.fetch("http://127.0.0.1:9/cached");
+    expect(result).toEqual({ ok: true });
+  });
+
+  test("no cache policy declared: the manifest's own permission/SSRF/rate-limit path is unaffected", async () => {
+    __resetRateLimiterForTests();
+    __resetPackageCacheForTests();
+    const actor = await owner();
+    const host = createHost(actor, manifest({ permissions: ["net:127.0.0.1:9"] }));
+    try {
+      await host.fetch("http://127.0.0.1:9/uncached");
+      throw new Error("should have thrown");
+    } catch (err) {
+      expect((err as HostError).code).toBe("invalid_input");
+      expect((err as HostError).message).toContain("private");
+    }
   });
 });
 
@@ -583,6 +623,106 @@ describe("home.call_service (2026-09-05, the real Home Assistant integration)", 
     } finally {
       server.stop(true);
     }
+  });
+});
+
+describe("integration.call (session-d-packages-and-store.md step 4)", () => {
+  test("throws permission_denied when the manifest didn't declare integration:<id>", async () => {
+    const actor = await owner();
+    const host = createHost(actor, manifest({ permissions: [] }));
+    await expect(host.integration.call("home_assistant", "get_state", { entity_id: "light.porch" })).rejects.toThrow(
+      HostError,
+    );
+  });
+
+  test("home_assistant get_state: a real GET to /api/states/<entity_id>, parsed as JSON", async () => {
+    let seenPath = "";
+    let seenAuth = "";
+    const server = Bun.serve({
+      port: 0,
+      fetch: (req) => {
+        seenPath = new URL(req.url).pathname;
+        seenAuth = req.headers.get("authorization") ?? "";
+        return Response.json({ entity_id: "light.porch", state: "on" });
+      },
+    });
+    try {
+      const actor = await owner();
+      setHouseholdSettingValue("home.base_url", `http://127.0.0.1:${server.port}`);
+      setHouseholdSettingValue("home.access_token", "test-token");
+      const host = createHost(actor, manifest({ permissions: ["integration:home_assistant"] }));
+      const result = await host.integration.call("home_assistant", "get_state", { entity_id: "light.porch" });
+      expect(seenPath).toBe("/api/states/light.porch");
+      expect(seenAuth).toBe("Bearer test-token");
+      expect(result).toEqual({ entity_id: "light.porch", state: "on" });
+    } finally {
+      server.stop(true);
+    }
+  });
+
+  test("home_assistant get_state without entity_id raises invalid_input before any network attempt", async () => {
+    const actor = await owner();
+    const host = createHost(actor, manifest({ permissions: ["integration:home_assistant"] }));
+    try {
+      await host.integration.call("home_assistant", "get_state", {});
+      throw new Error("should have thrown");
+    } catch (err) {
+      expect((err as HostError).code).toBe("invalid_input");
+    }
+  });
+
+  test("home_assistant get_state isn't set up yet: invalid_input, the same message home.call_service gives", async () => {
+    const actor = await owner();
+    const host = createHost(actor, manifest({ permissions: ["integration:home_assistant"] }));
+    try {
+      await host.integration.call("home_assistant", "get_state", { entity_id: "light.porch" });
+      throw new Error("should have thrown");
+    } catch (err) {
+      expect((err as HostError).code).toBe("invalid_input");
+      expect((err as HostError).message).toContain("isn't set up yet");
+    }
+  });
+
+  test("a 404 from Home Assistant maps to not_found", async () => {
+    const server = Bun.serve({ port: 0, fetch: () => new Response("not found", { status: 404 }) });
+    try {
+      const actor = await owner();
+      setHouseholdSettingValue("home.base_url", `http://127.0.0.1:${server.port}`);
+      setHouseholdSettingValue("home.access_token", "test-token");
+      const host = createHost(actor, manifest({ permissions: ["integration:home_assistant"] }));
+      try {
+        await host.integration.call("home_assistant", "get_state", { entity_id: "light.nonexistent" });
+        throw new Error("should have thrown");
+      } catch (err) {
+        expect((err as HostError).code).toBe("not_found");
+      }
+    } finally {
+      server.stop(true);
+    }
+  });
+
+  test("an id/method this host doesn't implement yet still reports capability_missing", async () => {
+    const actor = await owner();
+    const host = createHost(actor, manifest({ permissions: ["integration:spotify"] }));
+    try {
+      await host.integration.call("spotify", "now_playing", {});
+      throw new Error("should have thrown");
+    } catch (err) {
+      expect((err as HostError).code).toBe("capability_missing");
+    }
+  });
+});
+
+describe("host.diagnostics (session-d-packages-and-store.md step 4)", () => {
+  test("returns the package's own id, version, tier and declared permissions - real, not capability_missing", async () => {
+    const actor = await owner();
+    const host = createHost(actor, manifest({ permissions: ["memory:write"], version: "0.2.0" }));
+    expect(host.diagnostics()).toEqual({
+      id: "test-pkg",
+      version: "0.2.0",
+      tier: 0,
+      permissions: ["memory:write"],
+    });
   });
 });
 

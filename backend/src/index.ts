@@ -1,11 +1,13 @@
 import { app } from "@/app";
 import { ensureCoreJob, runDueJobs } from "@/lib/scheduler";
-import { runPlugin } from "@/lib/plugins";
+import { runPlugin, registerAllPackageNotificationTypes, runDueWarmJobs } from "@/lib/plugins";
 import { cleanupStaleSnapshots } from "@/lib/backup";
 import { sampleEngineStats } from "@/lib/engineStats";
 import { startAllSidecars, registerGracefulExit } from "@/lib/sidecars";
 import { initCrashBootHold } from "@/lib/dirtyBoot";
 import { sweepOrphanEngineProcesses } from "@/lib/llmSupervisor";
+import { runAllSmokeTests } from "@/lib/smoke";
+import { startIdleSweep, registerDenoHostGracefulExit } from "@/lib/denoHost";
 
 const port = Number(process.env.PORT ?? 8787);
 
@@ -39,6 +41,24 @@ ensureCoreJob("memory.consolidate", "every:7d");
 // comment), so this is a relative daily interval from whenever the job
 // first seeds, not a real nightly-window guarantee.
 ensureCoreJob("backup.run", "every:1d");
+// docs/PACKAGES.md's bronze bar: smoke "at install, at every update, and
+// on a schedule" (lib/smoke.ts). No install/update flow exists yet
+// (session-d step 6 builds the store), so a boot-time pass below stands
+// in for "at install" until then; this daily job is the real "on a
+// schedule" half.
+ensureCoreJob("packages.smoke", "every:1d");
+// Step 3: the poll cadence for lib/plugins.ts's runDueWarmJobs(), not a
+// per-package interval - every:15m is the finest grain a package's own
+// warm.schedule could ever need to be checked against without adding a
+// scheduled_jobs row per package (lib/plugins.ts's own comment on why).
+ensureCoreJob("packages.warm", "every:15m");
+// Step 2: every bundled package's own declared notification types become
+// real, dispatchable ones in F's registry before the first turn or
+// scheduled job could ever try to trigger() one.
+registerAllPackageNotificationTypes();
+void runAllSmokeTests().then(({ ran, failed }) => {
+  if (failed > 0) console.error(`[smoke] ${failed}/${ran} bundled package(s) failed their smoke test at boot`);
+});
 // A crash between VACUUM INTO and encryption (backup.ts) can leave an
 // unencrypted snapshot on disk; swept here too, not just at the top of
 // every runBackup() call, so a process that crashed mid-backup and then
@@ -51,6 +71,7 @@ cleanupStaleSnapshots();
 // this boots an empty registry today - proving the wiring rather than
 // waiting for a first caller to also have to remember it.
 registerGracefulExit();
+registerDenoHostGracefulExit();
 // A code review (2026-09-06) found these three fire-and-forget (the
 // original comments here promised "before anything real spawns" and "no
 // real engine spawn happens before the first request arrives" without
@@ -68,8 +89,19 @@ registerGracefulExit();
 await sweepOrphanEngineProcesses();
 await initCrashBootHold();
 void startAllSidecars();
+// Step 5: idle Tier 1 sandbox processes get closed after ten minutes -
+// nothing is running yet at boot (every Deno process starts lazily, on
+// a package's first real call), so this just arms the sweep.
+startIdleSweep();
 setInterval(() => {
-  runDueJobs(runPlugin).catch((err: Error) => console.error(`[scheduler] runDueJobs failed: ${err.message}`));
+  runDueJobs(runPlugin, new Date(), {
+    "packages.smoke": async () => {
+      await runAllSmokeTests();
+    },
+    "packages.warm": async () => {
+      await runDueWarmJobs();
+    },
+  }).catch((err: Error) => console.error(`[scheduler] runDueJobs failed: ${err.message}`));
 }, 60_000);
 // engineStats.ts's ring buffer, same 60s cadence as the job poll above -
 // "how busy the machine has been" (Jesse, 2026-09-04) doesn't need finer

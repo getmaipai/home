@@ -1,0 +1,35 @@
+{
+  "description": "Smoke fixture for the bundled define package, the same response shape captured from a real dictionaryapi.dev call in spec/fixtures/recipes/define-word.json.",
+  "inputs": { "word": "curious" },
+  "host_setup": {
+    "fetch": {
+      "https://api.dictionaryapi.dev/api/v2/entries/en/curious": [
+        {
+          "word": "curious",
+          "phonetic": "/ˈkjɔː-/",
+          "meanings": [
+            {
+              "partOfSpeech": "adjective",
+              "definitions": [
+                {
+                  "definition": "Tending to ask questions, or to want to explore or investigate; inquisitive.",
+                  "example": "Young children are naturally curious about the world and everything in it."
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  },
+  "expected": {
+    "reply": {
+      "text": "curious (adjective): Tending to ask questions, or to want to explore or investigate; inquisitive.",
+      "speech": "curious: Tending to ask questions, or to want to explore or investigate; inquisitive."
+    },
+    "actions": [],
+    "scheduled_jobs": [],
+    "home_calls": [],
+    "memory_added": []
+  }
+}

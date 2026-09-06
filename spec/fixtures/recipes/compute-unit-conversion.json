@@ -1,0 +1,20 @@
+{
+  "description": "compute + format: a restricted math/unit evaluator, no network call (session-d-packages-and-store.md step 4) - the `convert` package's own shape.",
+  "recipe": {
+    "id": "compute-unit-conversion",
+    "inputs": [{ "name": "amount", "selector": "text" }],
+    "steps": [
+      { "op": "compute", "as": "converted", "expression": "{amount} miles to km" },
+      { "op": "format", "as": "reply", "text": "That's {converted}.", "speech": "That's {converted}." }
+    ]
+  },
+  "inputs": { "amount": "12" },
+  "host_setup": {},
+  "expected": {
+    "reply": { "text": "That's 19.3121 km.", "speech": "That's 19.3121 km." },
+    "actions": [],
+    "scheduled_jobs": [],
+    "home_calls": [],
+    "memory_added": []
+  }
+}

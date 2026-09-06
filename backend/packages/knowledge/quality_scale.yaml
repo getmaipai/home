@@ -1,0 +1,36 @@
+# Bronze/silver/gold criteria per getmaipai/.github's docs/PACKAGES.md.
+# `met: true` on every bronze line is the publish gate; `scripts.sh`'s
+# bronze check (spec/tests/ts/package-bronze.test.ts) reads this file,
+# not just the manifest's own `quality_scale` string.
+package: knowledge
+scale: bronze
+bronze:
+  tests_green:
+    met: true
+    note: "deno test (handler.test.ts) passes; run through lib/smoke.ts's real deno_test smoke kind, the same way spec's own conformance fixtures cover Tier 0"
+  routing_examples:
+    met: true
+    note: 5 examples in manifest.json's routing.examples
+  privacy_row_per_data_source:
+    met: true
+    note: one data_sources[] row for wikipedia
+  offline_behavior_stated:
+    met: true
+    note: "offline: unavailable - still accurate: a cold cache (a topic never asked before) needs the network; no Kiwix ZIM ships this wave to answer without it at all"
+  smoke_test:
+    met: true
+    note: "smoke: { kind: deno_test }, handler.test.ts, run through lib/smoke.ts's runDenoTestSmoke()"
+  readme_and_changelog:
+    met: true
+  lint_clean:
+    met: true
+    note: "scripts/check.sh's tsc/test/standards passes with this package present; handler.ts/handler.test.ts are Deno-native TypeScript, outside backend's own tsconfig include (spec/spec doesn't reach into backend/packages either) - deno test itself is this package's own lint/typecheck gate"
+silver:
+  diagnostics_and_reauth:
+    met: false
+    note: no auth to diagnose (a keyless public API); nothing to add for silver yet
+gold:
+  real_service_verified:
+    met: true
+    date: "2026-09-06"
+    note: built and manually verified end to end against real Wikipedia responses and a real running dev server the same day (docs/dev/session-d.md's step 5 entry)

@@ -6,10 +6,12 @@
 import { decode } from "he";
 import type { Recipe } from "../../gen/ts/recipe.js";
 import type { Host } from "../../emulators/ts/host-emulator.js";
+import { evaluateExpression, ComputeError } from "./compute.js";
 
 export interface PluginResult {
   reply?: { text: string; speech?: string };
   actions: { kind: string; payload?: unknown }[];
+  ask?: { prompt: string; expects?: string };
 }
 
 type Scope = Record<string, unknown>;
@@ -32,7 +34,10 @@ type RecipeStep =
   | { op: "action"; kind: string; payload?: Record<string, unknown> }
   | { op: "remember"; text: string; category?: string; scope?: string }
   | { op: "recall"; as: string; query: string; scope?: string; limit?: number }
-  | { op: "schedule"; when: string; job?: string };
+  | { op: "schedule"; when: string; job?: string }
+  | { op: "integration.call"; as: string; id: string; method: string; args?: Record<string, unknown> }
+  | { op: "compute"; as: string; expression: string }
+  | { op: "ask"; prompt: string; expects?: string };
 
 // No conditional step exists in this declarative language to branch a
 // reply on "did recall find anything" - a `format` step only ever
@@ -63,6 +68,23 @@ function interpolate(template: string, scope: Scope): string {
   });
 }
 
+// Recurses through an object/array, interpolating every string it finds -
+// `integration.call`'s `args` is the one step field that needs this: a
+// recipe reading Home Assistant state for "the porch light" has to pass
+// the real entity id, not a literal "{entity_id}" (found writing this
+// step's own conformance fixture). `fetch`'s `body` deliberately stays
+// uninterpolated (no bundled package has ever needed one to vary), so
+// this is scoped to `integration.call` only, not a general change to
+// every step's object-shaped field.
+function interpolateDeep(value: unknown, scope: Scope): unknown {
+  if (typeof value === "string") return interpolate(value, scope);
+  if (Array.isArray(value)) return value.map((v) => interpolateDeep(v, scope));
+  if (value && typeof value === "object") {
+    return Object.fromEntries(Object.entries(value).map(([k, v]) => [k, interpolateDeep(v, scope)]));
+  }
+  return value;
+}
+
 function pickPath(value: unknown, path: string | undefined): unknown {
   if (!path) return value;
   let current: unknown = value;
@@ -84,6 +106,7 @@ export async function runRecipe(recipe: Recipe, inputs: Scope, host: Host): Prom
   const scope: Scope = { ...inputs };
   const actions: { kind: string; payload?: unknown }[] = [];
   let reply: { text: string; speech?: string } | undefined;
+  let ask: { prompt: string; expects?: string } | undefined;
 
   for (const step of recipe.steps as RecipeStep[]) {
     switch (step.op) {
@@ -134,6 +157,30 @@ export async function runRecipe(recipe: Recipe, inputs: Scope, host: Host): Prom
         host.schedule(when, step.job ?? recipe.id);
         break;
       }
+      case "integration.call": {
+        const args = step.args ? (interpolateDeep(step.args, scope) as Record<string, unknown>) : undefined;
+        scope[step.as] = await host.integration.call(step.id, step.method, args);
+        break;
+      }
+      case "compute": {
+        const expression = interpolate(step.expression, scope);
+        try {
+          scope[step.as] = evaluateExpression(expression);
+        } catch (err) {
+          if (err instanceof ComputeError) throw new Error(err.message);
+          throw err;
+        }
+        break;
+      }
+      case "ask": {
+        // Always the recipe's last meaningful step (the schema's own
+        // description): nothing after it can depend on an answer that
+        // hasn't arrived yet. Interpolated the same as any other prompt
+        // text, so a recipe can ask "which {thing}" using whatever
+        // ambiguity it just found.
+        ask = { prompt: interpolate(step.prompt, scope), expects: step.expects };
+        break;
+      }
       default: {
         const exhaustive: never = step;
         throw new Error(`unhandled recipe step: ${JSON.stringify(exhaustive)}`);
@@ -141,5 +188,5 @@ export async function runRecipe(recipe: Recipe, inputs: Scope, host: Host): Prom
     }
   }
 
-  return { reply, actions };
+  return { reply, actions, ...(ask ? { ask } : {}) };
 }

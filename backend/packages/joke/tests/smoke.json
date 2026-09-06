@@ -1,0 +1,23 @@
+{
+  "description": "Smoke fixture for the bundled joke package, the same response shape captured from a real icanhazdadjoke.com call in spec/fixtures/recipes/joke.json.",
+  "inputs": {},
+  "host_setup": {
+    "fetch": {
+      "https://icanhazdadjoke.com/": {
+        "id": "vcNJRnrcNCd",
+        "joke": "How does Darth Vader like his toast? On the dark side.",
+        "status": 200
+      }
+    }
+  },
+  "expected": {
+    "reply": {
+      "text": "How does Darth Vader like his toast? On the dark side.",
+      "speech": "How does Darth Vader like his toast? On the dark side."
+    },
+    "actions": [],
+    "scheduled_jobs": [],
+    "home_calls": [],
+    "memory_added": []
+  }
+}

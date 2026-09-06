@@ -18,6 +18,7 @@
   "dependencies": {
     "@hono/zod-openapi": "^1.6.3",
     "@maipai/spec": "workspace:*",
+    "@modelcontextprotocol/sdk": "^1.30.0",
     "@scalar/hono-api-reference": "^0.12.0",
     "ajv": "^8.20.0",
     "drizzle-orm": "^0.44.6",

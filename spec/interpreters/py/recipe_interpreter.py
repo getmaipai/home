@@ -11,6 +11,8 @@ import html
 import re
 from typing import Any
 
+from .compute import ComputeError, evaluate_expression
+
 INTERP_RE = re.compile(r"\{([a-zA-Z_][a-zA-Z0-9_]*)\}")
 
 # No conditional step exists in this declarative language to branch a
@@ -38,6 +40,20 @@ def interpolate(template: str, scope: dict[str, Any]) -> str:
         return html.unescape(str(scope[name]))
 
     return INTERP_RE.sub(repl, template)
+
+
+def interpolate_deep(value: Any, scope: dict[str, Any]) -> Any:
+    """Recurses through an object/array interpolating every string -
+    integration.call's own `args` needs this (recipe-interpreter.ts's own
+    interpolateDeep() docstring has the full reasoning); must stay
+    behaviorally identical to that one."""
+    if isinstance(value, str):
+        return interpolate(value, scope)
+    if isinstance(value, list):
+        return [interpolate_deep(v, scope) for v in value]
+    if isinstance(value, dict):
+        return {k: interpolate_deep(v, scope) for k, v in value.items()}
+    return value
 
 
 def pick_path(value: Any, path: str | None) -> Any:
@@ -74,6 +90,7 @@ async def run_recipe(recipe: Any, inputs: dict[str, Any], host: Any) -> dict[str
     scope: dict[str, Any] = dict(inputs)
     actions: list[dict[str, Any]] = []
     reply: dict[str, str] | None = None
+    ask: dict[str, Any] | None = None
 
     for step in recipe.steps:
         op = step.op
@@ -109,10 +126,26 @@ async def run_recipe(recipe: Any, inputs: dict[str, Any], host: Any) -> dict[str
         elif op == "schedule":
             when = interpolate(step.when, scope)
             host.schedule(when, step.job or recipe.id)
+        elif op == "integration.call":
+            args = interpolate_deep(step.args, scope) if step.args else None
+            scope[step.as_] = await host.integration.call(step.id, step.method, args)
+        elif op == "compute":
+            expression = interpolate(step.expression, scope)
+            try:
+                scope[step.as_] = evaluate_expression(expression)
+            except ComputeError as err:
+                raise ValueError(str(err)) from err
+        elif op == "ask":
+            # Always the recipe's last meaningful step (the schema's own
+            # description): nothing after it can depend on an answer that
+            # hasn't arrived yet.
+            ask = {"prompt": interpolate(step.prompt, scope), "expects": step.expects}
         else:
             raise ValueError(f"unhandled recipe step: {step!r}")
 
     result: dict[str, Any] = {"actions": actions}
     if reply is not None:
         result["reply"] = reply
+    if ask is not None:
+        result["ask"] = ask
     return result

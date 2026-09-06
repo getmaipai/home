@@ -19,6 +19,11 @@ import { Recipe } from "@maipai/spec/gen/ts/recipe.js";
 import { runRecipe, type PluginResult } from "@maipai/spec/interpreters/ts/recipe-interpreter.js";
 import { HostError } from "@maipai/spec/emulators/ts/host-emulator.js";
 import { createHost } from "@/lib/packageHost";
+import { callTier1Handle } from "@/lib/denoHost";
+import { registerPackageNotificationTypes } from "@/lib/notificationTypes";
+import { parseWhen } from "@/lib/scheduler";
+import { listActivePeople } from "@/lib/access";
+import { PACKAGES_DIR } from "@/lib/paths";
 import { ROLE_LADDER, type Role } from "@/middleware/auth";
 import type { PersonRow } from "@/types";
 
@@ -28,8 +33,6 @@ import type { PersonRow } from "@/types";
 // $ref into spec's own dialect), and codegen leaves it typed `z.any()`
 // since it can't be known at generation time.
 const ajv = new Ajv2020({ strict: false });
-
-const PACKAGES_DIR = join(import.meta.dir, "..", "..", "packages");
 
 export interface LoadedPackage {
   manifest: PackageManifest;
@@ -99,13 +102,26 @@ export function loadPackage(id: string): PluginOpResult<LoadedPackage> {
     return { ok: false, status: 400, error: `package ${id}'s manifest failed validation: ${manifestParsed.error.message}` };
   }
   if (manifestParsed.data.tier !== 0) {
-    return { ok: false, status: 400, error: `package ${id} is tier ${manifestParsed.data.tier}, only tier 0 runs today` };
+    return { ok: false, status: 400, error: `package ${id} is tier ${manifestParsed.data.tier}, not a Tier 0 recipe package - use runPlugin(), not loadPackage(), for a Tier 1 one` };
   }
   const recipeParsed = Recipe.safeParse(recipeJson);
   if (!recipeParsed.success) {
     return { ok: false, status: 400, error: `package ${id}'s recipe failed validation: ${recipeParsed.error.message}` };
   }
   return { ok: true, value: { manifest: manifestParsed.data, recipe: recipeParsed.data } };
+}
+
+/** Called once at boot (index.ts): every bundled package's own manifest
+ * `notifications[]` becomes a real dispatchable type in F's shared
+ * registry (lib/notificationTypes.ts). A package with no manifest yet
+ * (an interrupted install) is skipped rather than failing the whole
+ * pass, the same "one bad package can't take down boot" posture
+ * lib/smoke.ts's own runAllSmokeTests() already has. */
+export function registerAllPackageNotificationTypes(): void {
+  for (const id of listPackageIds()) {
+    const loaded = loadManifestOnly(id);
+    if (loaded.ok) registerPackageNotificationTypes(loaded.value);
+  }
 }
 
 export function meetsMinRole(actorRole: string, minRole: string): boolean {
@@ -130,31 +146,58 @@ export function meetsMinRole(actorRole: string, minRole: string): boolean {
  * `POST /api/plugins/:id/run`, a scheduled job): there's no turn to
  * attribute to, so memory.remember() falls back to the package id, same
  * as before this existed. */
-export async function runPlugin(
-  id: string,
-  actor: PersonRow,
-  inputs: Record<string, unknown>,
-  turnId?: string,
-): Promise<PluginOpResult<PluginResult>> {
-  const loaded = loadPackage(id);
-  if (!loaded.ok) return loaded;
-  const { manifest, recipe } = loaded.value;
-  if (!meetsMinRole(actor.role, manifest.min_role)) {
-    return { ok: false, status: 403, error: `${id} needs role ${manifest.min_role} or higher` };
-  }
+function validateArgs(id: string, manifest: PackageManifest, inputs: Record<string, unknown>): string | null {
   // errors.json's invalid_input is exactly this: "The call's arguments
   // failed validation against the manifest's args schema." Without this,
   // a missing required input (e.g. remember's `fact`) reached the
   // interpreter, left its `{fact}` placeholder un-interpolated, and got
   // written to the real memory store as literal text with a 200 back —
   // found by review before this ever shipped.
-  if (manifest.args) {
-    const validate = ajv.compile(manifest.args as object);
-    if (!validate(inputs)) {
-      const detail = ajv.errorsText(validate.errors, { separator: "; " });
-      return { ok: false, status: 400, error: `${id}'s inputs failed validation: ${detail}` };
-    }
+  if (!manifest.args) return null;
+  const validate = ajv.compile(manifest.args as object);
+  if (validate(inputs)) return null;
+  return ajv.errorsText(validate.errors, { separator: "; " });
+}
+
+/** Runs a bundled package - Tier 0's own recipe, or (session-d-packages-
+ * and-store.md step 5) Tier 1's Deno sandbox - for `actor`, checking
+ * min_role first (4.9: the floor role a person needs to invoke this
+ * package) and mapping a raised HostError to the same result shape every
+ * other route returns. Tier branches after the manifest loads since the
+ * two tiers need genuinely different loading (Tier 0 also reads and
+ * validates recipe.json; Tier 1 has none) - `loadManifestOnly()` is the
+ * one read both share.
+ *
+ * `turnId`, when this run is happening inside a conversation turn
+ * (turnEngine.ts's prepareTurn(), the only real caller that has one), is
+ * handed straight to createHost() so anything the recipe remembers is
+ * attributed to that turn (step 2's provenance rule) rather than the
+ * package id. Omitted for every other caller (a direct
+ * `POST /api/plugins/:id/run`, a scheduled job): there's no turn to
+ * attribute to, so memory.remember() falls back to the package id, same
+ * as before this existed. */
+export async function runPlugin(
+  id: string,
+  actor: PersonRow,
+  inputs: Record<string, unknown>,
+  turnId?: string,
+): Promise<PluginOpResult<PluginResult>> {
+  const manifestResult = loadManifestOnly(id);
+  if (!manifestResult.ok) return manifestResult;
+  const manifest = manifestResult.value;
+  if (!meetsMinRole(actor.role, manifest.min_role)) {
+    return { ok: false, status: 403, error: `${id} needs role ${manifest.min_role} or higher` };
   }
+  const argsError = validateArgs(id, manifest, inputs);
+  if (argsError) return { ok: false, status: 400, error: `${id}'s inputs failed validation: ${argsError}` };
+
+  if (manifest.tier === 1) {
+    return { ok: true, value: await callTier1Handle(id, manifest, actor, inputs) };
+  }
+
+  const loaded = loadPackage(id);
+  if (!loaded.ok) return loaded;
+  const { recipe } = loaded.value;
   const host = createHost(actor, manifest, [], turnId);
   try {
     return { ok: true, value: await runRecipe(recipe, inputs, host) };
@@ -165,4 +208,94 @@ export async function runPlugin(
     }
     throw err;
   }
+}
+
+// --- Warming (session-d-packages-and-store.md step 3) ---------------
+//
+// A package's own `manifest.warm.schedule`/`warm.keys` (spec/schemas/
+// manifest.schema.json) pre-populates lib/packageCache.ts's cache before
+// anyone asks, by simply running the recipe with realistic inputs the
+// ordinary way: `host.fetch` (already cache-aware, packageHost.ts) does
+// the actual caching, so warming needs no cache-specific code of its own
+// here - it only needs an actor to run the recipe as, and a clock to
+// decide when a package is next due.
+//
+// The "last warmed" clock is in-memory, not a DB column: a restart
+// resetting it just means a package might warm sooner than its ideal
+// schedule once after a reboot, never a correctness problem, and the
+// same operational-not-synced posture lib/engineStats.ts's ring buffer
+// already has for data that only matters while the process is running.
+const lastWarmedAt = new Map<string, number>();
+
+/** The household's own owner (falling back to any active adult, then any
+ * active person) runs a warm pass - warming is a trusted background
+ * operation, not a chat request from someone, so there is no real
+ * "actor" to attribute it to; picking the highest-privileged real person
+ * guarantees `meetsMinRole()` never blocks a warm run that a live chat
+ * request from that same household would also be allowed to make. `null`
+ * on a fresh install with no household set up yet - nothing to warm as,
+ * so warming is skipped entirely rather than inventing a synthetic
+ * person no spec record backs. */
+function warmActor(): PersonRow | null {
+  const people = listActivePeople();
+  if (people.length === 0) return null;
+  // ROLE_LADDER (imported above for meetsMinRole()) is already ordered
+  // highest-privileged first - reusing it here instead of a second,
+  // independently-maintained literal means a future role change updates
+  // both call sites at once, not just the one someone remembered to.
+  people.sort((a, b) => ROLE_LADDER.indexOf(a.role as Role) - ROLE_LADDER.indexOf(b.role as Role));
+  return people[0]!;
+}
+
+/** Runs one package's own `warm.keys` (each a recipe input object) so its
+ * cache holds a fresh answer before anyone asks. Takes the manifest
+ * already loaded by the caller (runDueWarmJobs() below) rather than
+ * re-reading and re-validating manifest.json a second time for the same
+ * tick. Never throws: a warm failure (the third-party service is down, a
+ * bad key, a role check runPlugin() itself enforces) is exactly the
+ * situation warming exists to protect a live request from, so it is
+ * logged and skipped, not surfaced as this function's own failure -
+ * `runPlugin()` reports a failure as a returned `{ ok: false }`, not a
+ * throw, so both paths are checked. */
+export async function warmPackage(id: string, manifest: PackageManifest): Promise<void> {
+  const keys = manifest.warm?.keys ?? [];
+  if (keys.length === 0) return;
+  const actor = warmActor();
+  if (!actor) return;
+  for (const key of keys) {
+    try {
+      const result = await runPlugin(id, actor, key as Record<string, unknown>);
+      if (!result.ok) {
+        console.error(`[warm] ${id} failed to warm key ${JSON.stringify(key)}: ${result.error}`);
+      }
+    } catch (err) {
+      console.error(`[warm] ${id} failed to warm key ${JSON.stringify(key)}: ${(err as Error).message}`);
+    }
+  }
+}
+
+/** The body of the `packages.warm` core job (index.ts): every bundled
+ * package declaring `warm.schedule` gets warmed once its own interval has
+ * elapsed since it was last warmed (or immediately, the first time this
+ * ever runs for it) - independent per-package intervals over one shared
+ * poll, the same shape lib/scheduler.ts's own recurring-job model already
+ * uses, without needing a scheduled_jobs row per package. */
+export async function runDueWarmJobs(): Promise<void> {
+  const now = Date.now();
+  for (const id of listPackageIds()) {
+    const manifestResult = loadManifestOnly(id);
+    if (!manifestResult.ok) continue;
+    const schedule = manifestResult.value.warm?.schedule;
+    if (!schedule) continue;
+    const parsed = parseWhen(schedule, new Date(now));
+    if (!parsed?.intervalMs) continue;
+    const last = lastWarmedAt.get(id);
+    if (last !== undefined && now - last < parsed.intervalMs) continue;
+    await warmPackage(id, manifestResult.value);
+    lastWarmedAt.set(id, now);
+  }
+}
+
+export function __resetWarmStateForTests(): void {
+  lastWarmedAt.clear();
 }
