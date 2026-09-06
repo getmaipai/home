@@ -626,6 +626,106 @@ describe("home.call_service (2026-09-05, the real Home Assistant integration)", 
   });
 });
 
+describe("integration.call (session-d-packages-and-store.md step 4)", () => {
+  test("throws permission_denied when the manifest didn't declare integration:<id>", async () => {
+    const actor = await owner();
+    const host = createHost(actor, manifest({ permissions: [] }));
+    await expect(host.integration.call("home_assistant", "get_state", { entity_id: "light.porch" })).rejects.toThrow(
+      HostError,
+    );
+  });
+
+  test("home_assistant get_state: a real GET to /api/states/<entity_id>, parsed as JSON", async () => {
+    let seenPath = "";
+    let seenAuth = "";
+    const server = Bun.serve({
+      port: 0,
+      fetch: (req) => {
+        seenPath = new URL(req.url).pathname;
+        seenAuth = req.headers.get("authorization") ?? "";
+        return Response.json({ entity_id: "light.porch", state: "on" });
+      },
+    });
+    try {
+      const actor = await owner();
+      setHouseholdSettingValue("home.base_url", `http://127.0.0.1:${server.port}`);
+      setHouseholdSettingValue("home.access_token", "test-token");
+      const host = createHost(actor, manifest({ permissions: ["integration:home_assistant"] }));
+      const result = await host.integration.call("home_assistant", "get_state", { entity_id: "light.porch" });
+      expect(seenPath).toBe("/api/states/light.porch");
+      expect(seenAuth).toBe("Bearer test-token");
+      expect(result).toEqual({ entity_id: "light.porch", state: "on" });
+    } finally {
+      server.stop(true);
+    }
+  });
+
+  test("home_assistant get_state without entity_id raises invalid_input before any network attempt", async () => {
+    const actor = await owner();
+    const host = createHost(actor, manifest({ permissions: ["integration:home_assistant"] }));
+    try {
+      await host.integration.call("home_assistant", "get_state", {});
+      throw new Error("should have thrown");
+    } catch (err) {
+      expect((err as HostError).code).toBe("invalid_input");
+    }
+  });
+
+  test("home_assistant get_state isn't set up yet: invalid_input, the same message home.call_service gives", async () => {
+    const actor = await owner();
+    const host = createHost(actor, manifest({ permissions: ["integration:home_assistant"] }));
+    try {
+      await host.integration.call("home_assistant", "get_state", { entity_id: "light.porch" });
+      throw new Error("should have thrown");
+    } catch (err) {
+      expect((err as HostError).code).toBe("invalid_input");
+      expect((err as HostError).message).toContain("isn't set up yet");
+    }
+  });
+
+  test("a 404 from Home Assistant maps to not_found", async () => {
+    const server = Bun.serve({ port: 0, fetch: () => new Response("not found", { status: 404 }) });
+    try {
+      const actor = await owner();
+      setHouseholdSettingValue("home.base_url", `http://127.0.0.1:${server.port}`);
+      setHouseholdSettingValue("home.access_token", "test-token");
+      const host = createHost(actor, manifest({ permissions: ["integration:home_assistant"] }));
+      try {
+        await host.integration.call("home_assistant", "get_state", { entity_id: "light.nonexistent" });
+        throw new Error("should have thrown");
+      } catch (err) {
+        expect((err as HostError).code).toBe("not_found");
+      }
+    } finally {
+      server.stop(true);
+    }
+  });
+
+  test("an id/method this host doesn't implement yet still reports capability_missing", async () => {
+    const actor = await owner();
+    const host = createHost(actor, manifest({ permissions: ["integration:spotify"] }));
+    try {
+      await host.integration.call("spotify", "now_playing", {});
+      throw new Error("should have thrown");
+    } catch (err) {
+      expect((err as HostError).code).toBe("capability_missing");
+    }
+  });
+});
+
+describe("host.diagnostics (session-d-packages-and-store.md step 4)", () => {
+  test("returns the package's own id, version, tier and declared permissions - real, not capability_missing", async () => {
+    const actor = await owner();
+    const host = createHost(actor, manifest({ permissions: ["memory:write"], version: "0.2.0" }));
+    expect(host.diagnostics()).toEqual({
+      id: "test-pkg",
+      version: "0.2.0",
+      tier: 0,
+      permissions: ["memory:write"],
+    });
+  });
+});
+
 describe("packageHost unimplemented methods", () => {
   test("action.emit checks permission before reporting capability_missing", async () => {
     const actor = await owner();

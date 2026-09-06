@@ -44,7 +44,10 @@
         { "$ref": "#/$defs/action_step" },
         { "$ref": "#/$defs/remember_step" },
         { "$ref": "#/$defs/recall_step" },
-        { "$ref": "#/$defs/schedule_step" }
+        { "$ref": "#/$defs/schedule_step" },
+        { "$ref": "#/$defs/integration_call_step" },
+        { "$ref": "#/$defs/compute_step" },
+        { "$ref": "#/$defs/ask_step" }
       ]
     },
     "fetch_step": {
@@ -148,6 +151,44 @@
         "job": { "type": "string", "description": "The job id this schedules, resolved by host.schedule." }
       },
       "description": "Calls host.schedule."
+    },
+    "integration_call_step": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["op", "as", "id", "method"],
+      "properties": {
+        "op": { "const": "integration.call" },
+        "as": { "type": "string", "description": "Binds the result into the recipe's variable scope under this name." },
+        "id": { "type": "string", "description": "The integration id, e.g. \"home_assistant\". Requires the manifest to declare integration:<id>." },
+        "method": { "type": "string", "description": "An id-specific method name, e.g. Home Assistant's \"get_state\" or \"call_service\"." },
+        "args": { "type": "object", "additionalProperties": true, "description": "Every string value, at any depth, may reference input/variable names in {braces} - unlike fetch's own body, which is passed through as-is." }
+      },
+      "description": "Goes through host.integration.call - a typed read or action against a household-configured third-party integration beyond Home Assistant's own dedicated home.call_service step (session-d-packages-and-store.md step 4)."
+    },
+    "compute_step": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["op", "as", "expression"],
+      "properties": {
+        "op": { "const": "compute" },
+        "as": { "type": "string" },
+        "expression": {
+          "type": "string",
+          "description": "A math/unit-conversion expression, e.g. \"12 miles to km\" or \"{amount} * 1.08\". {variable} references are substituted before evaluation, the same interpolation every other step's text fields use."
+        }
+      },
+      "description": "A restricted math/unit expression evaluator (session-d-packages-and-store.md step 4) - no network call, no host access, real numbers and unit conversion only. Backs math/convert without either package needing its own fetch-based service."
+    },
+    "ask_step": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["op", "prompt"],
+      "properties": {
+        "op": { "const": "ask" },
+        "prompt": { "type": "string", "description": "A template with {variable} interpolation, spoken/shown as the follow-up question." },
+        "expects": { "type": "string", "description": "What kind of answer the next utterance should satisfy, e.g. a variable name the recipe would otherwise have asked for. Free text, matched by the turn engine (wave-2.md's C-to-D contract), not this interpreter." }
+      },
+      "description": "Sets the result's ask field (result.schema.json, 4.5) so a recipe that can't disambiguate on its own (\"which Springfield\") can ask a deterministic follow-up instead of guessing or failing outright. Always the recipe's last step: nothing after an ask step can run in the same pass, since there is nothing left to compute until the follow-up answer arrives on a later turn."
     }
   }
 }

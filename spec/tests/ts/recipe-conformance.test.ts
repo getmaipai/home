@@ -26,6 +26,7 @@ interface ConformanceFixture {
     scheduled_jobs: { when: string; job: string }[];
     home_calls: { domain: string; service: string; target: unknown; data: unknown }[];
     memory_added: { text: string; category?: string; scope?: string }[];
+    ask?: { prompt: string; expects?: string } | null;
   };
 }
 
@@ -52,6 +53,7 @@ describe("recipe conformance", () => {
 
       expect(result.reply ?? null).toEqual(fixture.expected.reply);
       expect(result.actions).toEqual(fixture.expected.actions);
+      expect(result.ask ?? null).toEqual(fixture.expected.ask ?? null);
       expect(host.scheduledJobs.map(({ when, job }) => ({ when, job }))).toEqual(
         fixture.expected.scheduled_jobs,
       );

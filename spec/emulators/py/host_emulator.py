@@ -103,7 +103,15 @@ class _IntegrationNamespace:
     def __init__(self, host: HostEmulator):
         self._host = host
 
-    def call(self, integration_id: str, method: str, args: Any = None) -> Any:
+    # Async like fetch/call_service (session-d-packages-and-store.md step
+    # 4): the real host makes a real network call for Home Assistant's
+    # own get_state, so callers must await it - a code review (2026-09-06)
+    # caught the interpreter's own integration.call case not awaiting
+    # this, which happened to pass only because this emulator was
+    # synchronous; kept in sync now so a real async Python host (the bot,
+    # built for parity per org standards) can't silently regress this the
+    # day it lands.
+    async def call(self, integration_id: str, method: str, args: Any = None) -> Any:
         key = f"{integration_id}:{method}"
         if key not in self._host._fetch_responses:
             raise HostError("not_found", f"no canned integration response for {key}")

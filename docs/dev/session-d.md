@@ -498,3 +498,117 @@ own "at install" stand-in's actual replacement, and could reasonably
 trigger an immediate warm too, once it exists; step 9's widgets read
 straight from whatever `runPlugin` already populated via this cache,
 no separate widget-specific cache path needed.
+
+## Step 4: recipes reach further
+
+Spec first (`spec/schemas/recipe.schema.json`, regenerated), three new
+recipe steps and one `packageHost.ts` read path:
+
+- **`integration.call`**: `{ as, id, method, args? }`, goes through
+  `host.integration.call` - a typed read or action against a household-
+  configured third-party integration beyond `home.call_service`'s own
+  dedicated, domain-gated write path. Home Assistant's `get_state`
+  (`GET /api/states/<entity_id>`) is the first real method behind it,
+  reusing `home.base_url`/`home.access_token` settings and the shared
+  Home Assistant rate limiter (`requireHomeAssistantSettings()`, pulled
+  out of `homeCallService` so both callers share one settings-lookup-
+  and-rate-limit path instead of two). Every other `id`/`method` still
+  reports `capability_missing`, checked against `integration:<id>`
+  first - this is one real method, not a registry pattern built ahead
+  of a second consumer. `args`' string values (at any depth) are
+  `{variable}`-interpolated before the call, unlike `fetch`'s own
+  `body` - found writing this step's own conformance fixture: a recipe
+  reading "the porch light" needs the real entity id, not a literal
+  `"{entity_id}"`, the way no bundled package's `fetch` body has ever
+  needed to vary.
+- **`compute`**: `{ as, expression }`, a restricted math/unit evaluator,
+  no network call, no host access - backs `math`/`convert` (step 7)
+  without either package needing its own fetch-based service for plain
+  arithmetic or a unit table. TS: `mathjs` (Apache-2.0, license checked
+  before adding) via `create(all, {})` with `import`/`createUnit`
+  explicitly disabled - mathjs's own security docs name both as unsafe
+  against untrusted expression strings, and a `{variable}` interpolated
+  into an expression before evaluation is exactly that class of input
+  even though the expression template itself is household-authored.
+  Python: no single maintained package does both halves the way mathjs
+  does, so `pint` (BSD, unit conversion) plus `simpleeval` (MIT,
+  restricted arithmetic - the same "no attribute/name access, no
+  import" posture as mathjs's disabled functions) - `pint`'s own string
+  parser refuses an offset unit like fahrenheit/celsius ambiguously
+  (`OffsetUnitCalculusError`), so the Python side parses the numeric
+  value and unit name apart with a regex rather than a single string
+  parse. Both sides round to 6 significant digits (unit conversion
+  routinely produces a long repeating decimal - `37.77777777777783` for
+  100°F to °C - unreadable in a chat reply or spoken aloud) and were
+  checked byte-for-byte identical against the same expressions by hand
+  before writing the conformance fixtures.
+- **`ask`**: `{ prompt, expects? }`, sets the result's existing `ask`
+  field (`result.schema.json`, already shaped `{ prompt, expects }`
+  from Wave 1, unbuilt until now) so a recipe that can't disambiguate on
+  its own ("which Springfield") can ask a deterministic follow-up
+  instead of guessing or failing outright - wave-2.md's D-to-C
+  contract: "C stores it on the conversation and matches the next
+  utterance against it before the floor." Always the recipe's last
+  step; the conformance harness (both languages) now asserts `ask`
+  alongside `reply`/`actions`, defaulting to `null` for every existing
+  fixture that doesn't set one.
+
+**The host.\* audit** (plan 4.9's own list, against what a Tier 0 recipe
+can actually reach): `host.log`, `host.config.get` and `host.data.forget`
+were already real, just never audited as such - no recipe step had ever
+called them, and the plan's own phrasing ("implement the missing
+methods that a Tier 0 recipe can reach") reads as "close the gap for
+whichever METHODS are still missing," not "add a step for everything a
+method exists for." `host.diagnostics()` was the one method genuinely
+still `capability_missing`; now real (a package's own id/version/tier/
+declared-permissions snapshot - not a live health check per permission,
+which is F's Health/Repairs surface's job, not this method's). No new
+recipe step calls it, since no bundled package or plan text asks a
+recipe to self-report its own diagnostics today; the method itself
+being real is what the audit asked for. `files.*`, `speak.sentence`,
+`camera.still`, `ocr.read`, `action.emit` and `llm.complete` stay
+`capability_missing` - none is reachable from any of the 8 (now 11)
+recipe steps that exist, so none was in this audit's scope.
+
+Tests: `spec/tests/ts/recipe-conformance.test.ts` +
+`spec/tests/py/test_recipe_conformance.py` (4 new fixtures:
+`compute-arithmetic`, `compute-unit-conversion`,
+`integration-call-home-assistant`, `ask-disambiguate`, plus `ask`
+asserted on every existing fixture), `backend/tests/packageHost.test.ts`
+(7 new cases: permission-denied before any network attempt,
+`get_state`'s real GET with the right path/auth, a missing `entity_id`
+caught before the network, "isn't set up yet" reusing
+`home.call_service`'s own message, a 404 mapping to `not_found`, an
+unimplemented id/method staying `capability_missing`, `diagnostics()`'s
+real shape). `bun test`/`uv run pytest` both green in `spec/`,
+`bunx tsc --noEmit` clean in both `spec/` and `backend/` (a real cross-
+tsconfig quirk found here: `mathjs`'s own generated `.d.ts` infers `all`
+as possibly `undefined` under backend's bundler-resolution tsconfig but
+not spec's, despite identical `strict`/`skipLibCheck` settings - a cast
+at the one call site, not a tsconfig change, since spec's own
+`tsc --noEmit` doesn't even include `interpreters/` in its `include`
+array, a separate pre-existing gap not in this step's scope to fix).
+
+A code review before this landed caught five real gaps, all fixed:
+the Python interpreter's `integration.call` case never awaited
+`host.integration.call` (unlike the TS side, and unlike this same
+file's own `fetch`/`home.call_service` handling of real I/O) - it only
+passed because the emulator's own `call()` was synchronous; now the
+emulator is `async def` too (matching `call_service`'s own precedent),
+awaited for real. `getHomeAssistantState`'s doc comment claimed a retry
+`withOneRetry` never actually ran; now it genuinely reuses
+`attemptHttpFetch`/`withOneRetry` (a new optional `timeoutMs` parameter
+and a `status` field on `AttemptResult` so the 404-to-`not_found`
+remap still works) instead of a second hand-rolled fetch/timeout/abort
+sequence. A comment on `Host.integration.call`'s TS interface claimed a
+type-system effect ("widened to allow a Promise") that a union with
+`unknown` can't actually have - fixed to state what's really true
+instead. `compute.py`'s quantity regex rejected scientific notation
+("1e3 meters to km") that `compute.ts`'s own mathjs grammar already
+accepts on any number literal - fixed.
+
+What's left for whom: step 7's `math`/`convert` packages are the first
+real consumers of `compute`; step 9's `lights` package (and any future
+"is X on" style package) is the first real consumer of
+`integration.call`; C consumes `ask` from the turn engine side, per the
+wave-2 contract.

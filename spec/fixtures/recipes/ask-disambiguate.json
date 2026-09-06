@@ -1,0 +1,26 @@
+{
+  "description": "fetch + pick + ask: a lookup that can't disambiguate on its own asks a deterministic follow-up (session-d-packages-and-store.md step 4, wave-2.md's D-to-C ask contract) instead of guessing or failing outright.",
+  "recipe": {
+    "id": "ask-disambiguate",
+    "inputs": [{ "name": "place", "selector": "text" }],
+    "steps": [
+      { "op": "fetch", "as": "matches", "url": "https://geocoding-api.example.com/v1/search?name={place}" },
+      { "op": "pick", "as": "count", "from": "matches", "path": "count" },
+      { "op": "ask", "prompt": "Which {place} do you mean?", "expects": "place" }
+    ]
+  },
+  "inputs": { "place": "Springfield" },
+  "host_setup": {
+    "fetch": {
+      "https://geocoding-api.example.com/v1/search?name=Springfield": { "count": 34 }
+    }
+  },
+  "expected": {
+    "reply": null,
+    "actions": [],
+    "scheduled_jobs": [],
+    "home_calls": [],
+    "memory_added": [],
+    "ask": { "prompt": "Which Springfield do you mean?", "expects": "place" }
+  }
+}

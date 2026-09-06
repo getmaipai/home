@@ -97,6 +97,18 @@ export interface Host {
     call_service(domain: string, service: string, target: unknown, data?: unknown): Promise<void>;
   };
   integration: {
+    // Already covers a Promise, unlike memory.recall's own interface
+    // comment on the identical situation - `unknown | Promise<unknown>`
+    // collapses to plain `unknown` (a code review, 2026-09-06, caught an
+    // earlier version of this comment claiming a type-system effect that
+    // didn't happen), so no signature change was needed here at all: the
+    // real host (packageHost.ts, session-d step 4) makes a real network
+    // call for Home Assistant's own integration methods, real I/O the
+    // interpreter has to await, while this emulator's own canned-response
+    // lookup has nothing to await and returns synchronously - `unknown`
+    // already accepts either, and `await`ing a non-Promise value is a
+    // no-op in JS, so the interpreter's one `await` line works correctly
+    // against both implementations.
     call(id: string, method: string, args?: unknown): unknown;
   };
   speak: {

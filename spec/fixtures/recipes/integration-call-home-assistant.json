@@ -1,0 +1,25 @@
+{
+  "description": "integration.call + pick + format: a typed read against a household integration (session-d-packages-and-store.md step 4) - Home Assistant's own get_state, the first integration reachable from a recipe.",
+  "recipe": {
+    "id": "integration-call-home-assistant",
+    "inputs": [{ "name": "entity_id", "selector": "text" }],
+    "steps": [
+      { "op": "integration.call", "as": "state", "id": "home_assistant", "method": "get_state", "args": { "entity_id": "{entity_id}" } },
+      { "op": "pick", "as": "value", "from": "state", "path": "state" },
+      { "op": "format", "as": "reply", "text": "The porch light is {value}.", "speech": "The porch light is {value}." }
+    ]
+  },
+  "inputs": { "entity_id": "light.porch" },
+  "host_setup": {
+    "fetch": {
+      "home_assistant:get_state": { "entity_id": "light.porch", "state": "on" }
+    }
+  },
+  "expected": {
+    "reply": { "text": "The porch light is on.", "speech": "The porch light is on." },
+    "actions": [],
+    "scheduled_jobs": [],
+    "home_calls": [],
+    "memory_added": []
+  }
+}

@@ -12,6 +12,7 @@
   },
   "dependencies": {
     "he": "^1.2.0",
+    "mathjs": "^15.2.0",
     "zod": "^4.0.0"
   },
   "devDependencies": {
