@@ -1449,8 +1449,31 @@ otherwise be lost with the mirror.
       from device latency plus 0.15 s (the last second of every line
       used to be lost); the browser's barge-in thresholds
       (`useHandsFree.ts`: 700 ms arm, RMS 0.04 plus probability 0.60
-      over 12 frames). The hub's `sentenceSpeechScheduler.stop()` exists
-      and nothing calls it.
+      over 12 frames, legacy-only - `useHandsFree.ts` itself doesn't
+      exist in this repo, only in the read-only `home-legacy.git`
+      mirror). **Correction (session E step 4, 2026-09-06): the claim
+      "`sentenceSpeechScheduler.stop()` exists and nothing calls it" was
+      already stale** - `chatModelAdapter.ts` was calling it on every new
+      turn since session B step 4 (stopping an earlier reply's speech
+      when a new one starts). That's a different case from real barge-in
+      though, which step 4 adds for real: `sttDictationAdapter.ts` calls
+      it the moment the server's own VAD reports `speaking: true` while a
+      reply is still playing, wired through the new push-to-talk mic
+      button (`frontend/src/lib/voice/sttDictationAdapter.ts`,
+      `sttSocket.ts`, `sttContract.ts` - a real `DictationAdapter`
+      against C's frozen `WS /api/stt/stream` contract, C's route not
+      shipped yet so pressing the mic fails fast and honestly rather than
+      faking a transcript). **Still not built, left for whoever tackles
+      the fuller hands-free loop**: wake-word detection auto-starting a
+      dictation session (today the wake-word toggle only shows a
+      reworded banner, deliberately not tied to the real mic button yet -
+      compounding two still-partial features felt like a worse
+      interaction than either alone); the re-listen-after-reply loop; and
+      re-tuning the legacy RMS/probability thresholds for THIS browser
+      pipeline (mic-capture.ts, a different capture path than the legacy
+      hub's), which needs real held-out speech to validate against per
+      this org's own training-data standards, not numbers copied in
+      blind.
 - [ ] **The bot's four bench harnesses** (L) - honesty (105 questions,
       raw versus guarded), interaction (424 cases), latency (refuses to
       run on a busy machine), conversation (34 real broken replies),

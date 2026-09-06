@@ -571,3 +571,120 @@ machine-load flake, not a regression from this diff), and
 `/settings/repairs` added to `scripts/screenshot.ts`'s route list and
 re-verified through the full `bun run a11y` matrix (clean except the
 same two pre-existing, already-deferred findings named above).
+
+## Step 4: push-to-talk
+
+**Investigated before writing anything, and it changed the whole shape
+of this step.** The plan's own words ("the composer's microphone
+button... a mock socket that replays a fixture") read like a hand-built
+button beside the composer. Reading `thread.aui.tsx` first instead found
+something different: `@assistant-ui/react`'s own `Thread` already
+renders a fully styled Dictate/StopDictation/DictationTranscript UI
+(`thread.aui.tsx`'s `ComposerAction`), invisible only because
+`thread.capabilities.dictation` was never true - no `DictationAdapter`
+was ever configured. Reading `@assistant-ui/core`'s actual compiled
+source (not just its `.d.ts` types, which don't show the runtime
+behavior) confirmed two things the plan's wording doesn't say: an
+`onSpeechEnd` never auto-submits anything (it only stops the dictation
+UI - a final transcript reaching the composer text box and a message
+actually SENDING are two separate steps assistant-ui deliberately keeps
+apart), and a `DictationAdapter.Session` has no reference to the
+composer runtime at all to call `send()` itself. The real, documented
+way to reach it from outside a primitive's own click handler is
+`@assistant-ui/store`'s `useAui()` (`const aui = useAui(); aui.composer
+.send()`) - a small component (`SttAutoSend`, `ChatPage.tsx`) mounted
+inside `AssistantRuntimeProvider` is what actually calls it, woken by a
+plain `EventTarget` the adapter dispatches on.
+
+**What's built**: a real `DictationAdapter`
+(`frontend/src/lib/voice/sttDictationAdapter.ts`) against C's frozen
+`WS /api/stt/stream` contract (`sttContract.ts`'s message shapes,
+`sttSocket.ts`'s `createSttSocket`/`createMockSttSocket`), reusing
+`mic-capture.ts` unchanged for the 16 kHz PCM frames. Registered as
+`adapters.dictation` in `ChatPage.tsx`'s `useLocalRuntime` call - the
+existing stock mic button is now real, not a new one built beside it.
+Partials populate the composer live via assistant-ui's own `onSpeech`
+handling (nothing built here for that half); a `final` message both
+populates the composer AND fires `SttAutoSend`'s `aui.composer.send()`,
+which is "the final sends" the plan's text asks for. Real barge-in:
+`sttDictationAdapter.ts` calls `sentenceSpeechScheduler.stop()` the
+moment the server's own VAD reports `speaking: true` while an earlier
+reply is still playing - genuinely new, and a correction to a stale
+`docs/BACKLOG.md` line that claimed `stop()` had no caller at all (it
+already had one, from session B step 4, for a related but different
+case: stopping an old reply when a NEW turn starts, not live VAD-
+triggered barge-in mid-playback).
+
+**The real vs. mock socket decision, made deliberately**: C's route
+doesn't exist yet (confirmed with a fresh grep, not assumed), so
+`ChatPage.tsx` wires the REAL `createSttSocket`, not a fixture-replaying
+mock - pressing the mic button today fails fast and honestly (the
+adapter's own `onError` path ends the session cleanly) rather than
+faking a transcript nobody actually said. The plan's own "a mock socket
+that replays a fixture" is what `sttSocket.test.ts`/
+`sttDictationAdapter.test.ts` actually use, deterministically, matching
+the "no fake data" rule this session has followed since Steps 2 and 3
+(widgets' graceful-404, never faked widget content; Repairs built only
+against a real route).
+
+**Deliberately scoped down, both recorded in `docs/BACKLOG.md`'s "bot's
+voice loop numbers" entry**: the full hands-free wake-listen-reply-
+re-listen state machine (`lib/voice/` has zero existing orchestration
+scaffolding for it, confirmed by reading every file there first) is
+left for a dedicated pass, not attempted here as a rushed add-on; wake-
+word detection auto-starting a dictation session was considered and
+explicitly NOT wired - compounding two still-partial features (a demo-
+only wake word, a push-to-talk button that fails until C ships) felt
+like worse UX than either alone, not better. The legacy RMS/probability
+thresholds (`useHandsFree.ts`: 700 ms arm, 0.04 RMS, 0.60 probability
+over 12 frames) don't exist in this repo at all (legacy-mirror only) and
+apply to a different capture pipeline besides - re-tuning them needs
+real held-out speech to validate against, the same standard this org
+holds wake-word training to, not numbers copied in blind.
+
+Verified: `bun test` (frontend, 392 passing - `sttSocket.test.ts` (3
+cases: fixture replay order, `close()` cancels pending steps, `sendAudio`
+is a documented no-op) and `sttDictationAdapter.test.ts` (7 cases:
+denied-microphone error path, `ready`/`onSpeechStart`, partial vs. final
+forwarding plus `onFinalReady`, `no_speech` ending cleanly with no send,
+VAD-triggered barge-in firing `stop()`, VAD `speaking: false` never
+firing it, and `stop()` itself) new, all existing Chat tests unaffected),
+`bunx tsc --noEmit` clean, `lint` clean (same two pre-existing warnings),
+`scripts/check.sh` green end to end, and the full `bun run a11y` matrix
+re-run clean except the same two pre-existing, already-deferred findings
+- Chat's own violation count unchanged from before this step, confirming
+the now-visible mic button introduced no new one.
+
+A code review before commit ran eight finder angles and caught a real,
+verified bug plus six smaller ones. The real one: `onFinalReady()` fired
+before this session's own `finish("stopped", ...)`, and
+`aui.composer.send()` (what `onFinalReady()` reaches) calls
+`session.cancel()` synchronously and reentrantly before returning -
+verified directly against the installed `@assistant-ui/core` source, not
+assumed. Every successful push-to-talk turn's session therefore reported
+its own end reason as "cancelled" instead of "stopped" (the transcript
+itself still sent correctly, since it commits to the composer before the
+reentrant call). Fixed by finishing the session before calling
+`onFinalReady()`, with a regression test that reproduces the real
+reentrant call (`onFinalReady: () => sessionRef.current?.cancel()`).
+Also fixed: mic capture (and the browser's own permission prompt) now
+only starts once the server's `ready` message arrives, not in parallel
+with the socket connecting - starting it unconditionally could show a
+household member a mic-permission dialog for a session already doomed
+to fail; a missing `close` listener on the real socket, so a clean
+server-initiated close (no preceding `error` event, which is spec-
+compliant) left the adapter believing it was still listening forever;
+`sendAudio` shipping `frame.buffer` (the whole backing ArrayBuffer)
+instead of `frame`'s own `byteOffset`/`byteLength` range, correct only
+by coincidence for `mic-capture.ts`'s always-offset-0 frames; an
+exclamation point in the reworded wake-word banner, against this org's
+own writing-style ban; an `EventTarget`/`CustomEvent` pair doing more
+work than a single callback needed (a plain ref instead); the frozen
+`SttHelloMessage` type declared but never actually used to type the
+real hello payload; and three duplicated Set-based callback-subscription
+blocks collapsed into one small generic helper. Each with either a new
+test or a corrected existing one (the denied-microphone test needed its
+own `ready` emitted first, once mic capture stopped starting
+unconditionally). Re-verified after every fix: `bun test` (frontend, 396
+passing), `tsc --noEmit` clean, `lint` clean, `scripts/check.sh` green,
+`bun run a11y` unchanged.

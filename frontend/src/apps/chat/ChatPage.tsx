@@ -1,6 +1,6 @@
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type MutableRefObject } from "react";
 import { useLocation } from "react-router-dom";
-import { AssistantRuntimeProvider, useLocalRuntime, useRemoteThreadListRuntime } from "@assistant-ui/react";
+import { AssistantRuntimeProvider, useAui, useLocalRuntime, useRemoteThreadListRuntime } from "@assistant-ui/react";
 import { Page } from "@/kit/primitives/Page";
 import { Button } from "@/kit/ui/button";
 import { Thread } from "@/kit/assistant-ui/thread.aui";
@@ -10,9 +10,33 @@ import { getIcon } from "@/kit/icons";
 import { createChatModelAdapter } from "@/apps/chat/chatModelAdapter";
 import { createChatThreadListAdapter } from "@/apps/chat/chatThreadListAdapter";
 import { createChatSuggestionAdapter } from "@/apps/chat/chatSuggestionAdapter";
+import { createSttDictationAdapter } from "@/lib/voice/sttDictationAdapter";
+import { createSttSocket } from "@/lib/voice/sttSocket";
 import { ChatActorContext } from "@/apps/chat/chatMemoryActions";
 import type { Roster } from "@/lib/api";
 import type { SentenceSpeechScheduler } from "@/lib/sentenceSpeechScheduler";
+
+// `DictationAdapter.Session` has no reference to the composer runtime
+// (sttDictationAdapter.ts's own comment) - `useAui()` is only valid
+// inside `AssistantRuntimeProvider`'s own subtree, which the adapter
+// (created before that provider even renders) never is, so this small
+// component is the one place that actually calls `aui.composer.send()`,
+// the documented way (`@assistant-ui/store`'s own `useAui()` doc
+// example) to submit from outside a primitive's own click handler. A
+// plain ref, not an EventTarget/CustomEvent pair (a code review,
+// 2026-09-06, found that more machinery than one callback needs): this
+// component sets the ref to a real sender once mounted, and
+// `onFinalReady` (sttDictationAdapter.ts's dep) just calls it.
+function SttAutoSend({ sendRef }: { sendRef: MutableRefObject<(() => void) | null> }) {
+  const aui = useAui();
+  useEffect(() => {
+    sendRef.current = () => aui.composer.send();
+    return () => {
+      sendRef.current = null;
+    };
+  }, [sendRef, aui]);
+  return null;
+}
 
 const BrainIcon = getIcon("brain");
 
@@ -76,6 +100,27 @@ export function ChatPage({ person }: ChatPageProps) {
     [],
   );
   const suggestionAdapter = useMemo(() => createChatSuggestionAdapter(initialText), [initialText]);
+  // Set by `SttAutoSend` once it mounts inside `AssistantRuntimeProvider`
+  // (below); `onFinalReady` below just calls whatever's there.
+  const sttAutoSendRef = useRef<(() => void) | null>(null);
+  const dictationAdapter = useMemo(
+    () =>
+      createSttDictationAdapter({
+        // The real `WS /api/stt/stream` (createSttSocket, sttSocket.ts),
+        // not a fixture-replaying mock: C's route doesn't exist yet
+        // (confirmed 2026-09-06), so pressing the mic button today fails
+        // fast and honestly (the adapter's own onError path) rather than
+        // faking a transcript nothing the household actually said -
+        // the same "a failed card is a quiet gap, never fake data" rule
+        // Steps 2/3's widgets and Repairs already followed. The mock
+        // fixture the plan names is what sttDictationAdapter.test.ts
+        // exercises instead, deterministically.
+        createSocket: createSttSocket,
+        turnSchedulerRef,
+        onFinalReady: () => sttAutoSendRef.current?.(),
+      }),
+    [],
+  );
   const threadListAdapter = useMemo(() => createChatThreadListAdapter(person.display_name), [person.display_name]);
 
   // A named, `use`-prefixed function, not an inline arrow: `useRemoteThreadListRuntime`
@@ -84,7 +129,7 @@ export function ChatPage({ person }: ChatPageProps) {
   // themselves - naming it this way is what lets react-hooks/rules-of-hooks
   // recognize that instead of flagging a bare arrow function calling a hook.
   function useChatRuntimeHook() {
-    return useLocalRuntime(chatModelAdapter, { adapters: { suggestion: suggestionAdapter } });
+    return useLocalRuntime(chatModelAdapter, { adapters: { suggestion: suggestionAdapter, dictation: dictationAdapter } });
   }
 
   const runtime = useRemoteThreadListRuntime({
@@ -95,6 +140,7 @@ export function ChatPage({ person }: ChatPageProps) {
   return (
     <ChatActorContext.Provider value={person.id}>
       <AssistantRuntimeProvider runtime={runtime}>
+        <SttAutoSend sendRef={sttAutoSendRef} />
         <Page title="Chat">
           {banner ? (
             <div className="mx-4 mb-2 rounded-[var(--radius)] bg-[var(--muted)] px-3 py-2 text-base">{banner}</div>
@@ -120,14 +166,15 @@ export function ChatPage({ person }: ChatPageProps) {
                     {/* Phase 1 of the wake-word plan (docs/dev.md, 2026-09-04):
                         "infrastructure proof, no custom model yet" - fires on
                         openWakeWord's stock "hey jarvis" phrase, not a MaiPai-trained
-                        one. No auto-send/auto-listen wiring yet: STT doesn't exist
-                        anywhere in this codebase, so a real detection only shows a
-                        banner proving the mechanism. */}
+                        one. Still no auto-listen wiring (BACKLOG.md's hands-free
+                        item): a real detection only shows a banner proving the
+                        mechanism. Reworded for a family, step 4: the earlier
+                        text ("infrastructure proof", "demo only") read like an
+                        engineering note, not something a parent watching over a
+                        kid's shoulder should have to parse. */}
                     <WakeWordToggle
-                      onWakeDetected={(event) =>
-                        setBanner(
-                          `Wake word heard: "${event.modelId}" (demo only - MaiPai isn't listening for real commands yet)`,
-                        )
+                      onWakeDetected={() =>
+                        setBanner("MaiPai heard its wake word. It can't act on it yet - that's coming soon.")
                       }
                     />
                     <Button
