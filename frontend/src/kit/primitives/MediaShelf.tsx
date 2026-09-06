@@ -4,6 +4,7 @@ import { EmptyState } from "@/kit/primitives/EmptyState";
 import { Section } from "@/kit/primitives/Section";
 import { SHELF_ITEM_WIDTH, type Density } from "@/kit/responsive";
 import { cn, FOCUS_RING } from "@/kit/utils";
+import { useSurface } from "@/kit/useSurface";
 
 /** The aspect ratios the kit will draw a media tile at. A closed set,
  * not a free string: docs/UI.md requires images and video to be fluid
@@ -45,11 +46,13 @@ interface MediaShelfProps<T> {
 // horizontally scrolling rail of media tiles, content-agnostic, sized by
 // the kit's density budget (@/kit/responsive) rather than by its caller.
 //
-// Not built here: TV. docs/UI.md's TV surface is a focusable rail with
-// no hover, keyed off input mode, and nothing in the shell detects an
-// input mode yet. The tiles are real buttons, so they already focus and
-// scroll into view with a keyboard or a remote's directional pad; the
-// TV-specific presentation waits for the surface to exist.
+// The far surface's remote-arrow-key reachability (step 7, "every node
+// renders its far profile") lives entirely in Card.tsx now, not here:
+// every tile below is a Card, so it inherits Card's own `useFocusable`
+// registration and focus ring for free the moment Card added them - a
+// tile drawn any other way would be invisible to Norigin's spatial map
+// (a plain, unregistered DOM button is not, however focusable it looks
+// to a keyboard).
 export function MediaShelf<T>({
   items,
   getKey,
@@ -65,6 +68,7 @@ export function MediaShelf<T>({
   emptyState,
 }: MediaShelfProps<T>) {
   const name = label ?? heading;
+  const { far } = useSurface();
 
   if (items.length === 0 && emptyState) {
     return (
@@ -98,6 +102,7 @@ export function MediaShelf<T>({
               onSelect={onSelect ? () => onSelect(item) : undefined}
               label={getLabel?.(item)}
               selected={isSelected?.(item)}
+              far={far}
               className={cn(
                 "border-0 bg-transparent",
                 // The tile's own selected state. Card draws selection as

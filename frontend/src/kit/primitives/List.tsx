@@ -1,6 +1,8 @@
 import type { ReactNode } from "react";
+import { useFocusable } from "@noriginmedia/norigin-spatial-navigation";
 import { EmptyState } from "@/kit/primitives/EmptyState";
 import { cn, FOCUS_RING } from "@/kit/utils";
+import { useSurface } from "@/kit/useSurface";
 
 interface ListProps<T> {
   items: readonly T[];
@@ -26,6 +28,45 @@ interface ListProps<T> {
   dividers?: boolean;
 }
 
+/** The far surface's row button (step 7, "every node renders its far
+ * profile") - same reasoning as Card.tsx's `TvCardButton`: a plain `<li>`
+ * button is invisible to Norigin's spatial map, so a list of rows is
+ * otherwise unreachable by the TV remote at all. One instance per row
+ * (each row is its own `useFocusable` registration), split out from the
+ * plain button the same way Shell.tsx's `NavItem`/`TvNavItem` are -
+ * `focused` drives the ring, not `:focus-visible` (`shouldFocusDOMNode`
+ * is false, tvNav.ts). */
+function TvListRowButton({
+  content,
+  ariaLabel,
+  selected,
+  onActivate,
+}: {
+  content: ReactNode;
+  ariaLabel?: string;
+  selected: boolean;
+  onActivate: () => void;
+}) {
+  const { ref, focused } = useFocusable<HTMLButtonElement>({ onEnterPress: onActivate });
+  return (
+    <button
+      ref={ref}
+      type="button"
+      onClick={onActivate}
+      aria-label={ariaLabel}
+      aria-current={selected ? "true" : undefined}
+      className={cn(
+        "flex min-h-12 min-w-0 flex-1 items-center rounded-[var(--radius)] text-left",
+        "hover:bg-[var(--muted)]",
+        focused && "ring-2 ring-ring",
+        selected && "bg-[var(--muted)]",
+      )}
+    >
+      {content}
+    </button>
+  );
+}
+
 // docs/UI.md names List as one of the kit's generic primitives. The
 // vertical counterpart to CardGrid, with the same content-agnostic
 // shape: items plus a renderer, no knowledge of what is in them. One
@@ -44,6 +85,8 @@ export function List<T>({
   emptyState,
   dividers = true,
 }: ListProps<T>) {
+  const { far } = useSurface();
+
   if (items.length === 0 && emptyState) {
     return <EmptyState icon={emptyState.icon} text={emptyState.text} />;
   }
@@ -64,22 +107,31 @@ export function List<T>({
         return (
           <li key={getKey(item)} className="flex min-w-0 items-center gap-1">
             {onSelect ? (
-              <button
-                type="button"
-                onClick={() => onSelect(item)}
-                aria-label={getLabel?.(item)}
-                aria-current={selected ? "true" : undefined}
-                // 48px minimum target, visible focus ring: docs/UI.md's
-                // floor, WCAG 2.2 AA 2.5.5 and 2.4.13.
-                className={cn(
-                  "flex min-h-12 min-w-0 flex-1 items-center rounded-[var(--radius)] text-left",
-                  "hover:bg-[var(--muted)]",
-                  FOCUS_RING,
-                  selected && "bg-[var(--muted)]",
-                )}
-              >
-                {content}
-              </button>
+              far ? (
+                <TvListRowButton
+                  content={content}
+                  ariaLabel={getLabel?.(item)}
+                  selected={selected}
+                  onActivate={() => onSelect(item)}
+                />
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => onSelect(item)}
+                  aria-label={getLabel?.(item)}
+                  aria-current={selected ? "true" : undefined}
+                  // 48px minimum target, visible focus ring: docs/UI.md's
+                  // floor, WCAG 2.2 AA 2.5.5 and 2.4.13.
+                  className={cn(
+                    "flex min-h-12 min-w-0 flex-1 items-center rounded-[var(--radius)] text-left",
+                    "hover:bg-[var(--muted)]",
+                    FOCUS_RING,
+                    selected && "bg-[var(--muted)]",
+                  )}
+                >
+                  {content}
+                </button>
+              )
             ) : (
               <div className="flex min-h-12 min-w-0 flex-1 items-center">{content}</div>
             )}

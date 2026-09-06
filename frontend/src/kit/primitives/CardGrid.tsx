@@ -3,6 +3,7 @@ import { Card } from "@/kit/primitives/Card";
 import { EmptyState } from "@/kit/primitives/EmptyState";
 import { GRID_COLUMNS, type Density } from "@/kit/responsive";
 import { cn } from "@/kit/utils";
+import { useSurface } from "@/kit/useSurface";
 
 interface CardGridProps<T> {
   items: readonly T[];
@@ -47,6 +48,8 @@ export function CardGrid<T>({
   label,
   emptyState,
 }: CardGridProps<T>) {
+  const { far } = useSurface();
+
   if (items.length === 0 && emptyState) {
     return <EmptyState icon={emptyState.icon} text={emptyState.text} />;
   }
@@ -60,6 +63,7 @@ export function CardGrid<T>({
             label={getLabel?.(item)}
             selected={isSelected?.(item)}
             className="h-full"
+            far={far}
           >
             {renderItem(item)}
           </Card>

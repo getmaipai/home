@@ -1146,8 +1146,37 @@ this file's earlier note), not something to build against today.
       real household has enough people, notifications, or conversations
       to make them scroll. Full `bun run a11y` matrix confirms zero
       instances of this rule remain.
-- [ ] A screen-reader read-through of each page, keyboard-trap testing,
-      reduced motion verification, and the TV surface (session-e-ui-and-
+- [x] **Keyboard-trap testing and reduced motion verification, done
+      against the home route** (session E step 7, 2026-09-06) - both
+      real, automated, in `scripts/screenshot.ts`'s `bun run a11y`, not a
+      manual read-through: `checkReducedMotion` opens two Playwright
+      contexts, one per `reducedMotion` preference, and confirms
+      `ProfileSwitcher.tsx`'s own header trigger button's computed
+      `transition-duration` (Tailwind's `transition-all`, real and non-
+      zero by default) is genuinely non-zero under the normal preference
+      and collapses to ~0 under `"reduce"` - checked both ways, since
+      only checking the reduced side would also pass if the CSS rule
+      were deleted (an element with no transition at all also computes
+      near-zero); `checkKeyboardTrap` tabs 40 times and compares the
+      first half's distinct focus targets against the whole run - a
+      fixed size floor ("at least N elements") would let a real trap
+      cycling among N-or-more real elements (a dialog with a close
+      button, a few fields, submit) pass undetected, so this checks
+      instead whether the second half ever finds an element the first
+      half hadn't already seen, which catches a cycle of any size, not
+      just a small one. Both verified against a real, deliberately-
+      broken CSS rule / a real, deliberately-added cycling trap to
+      confirm they actually fail when the thing they check for is
+      genuinely broken, not just checked for a clean pass. **Scope
+      note**: both run once, against `/`, not the full per-route matrix
+      - `bun run a11y`'s own design goal is staying fast enough for every
+      commit (its header comment), and a keyboard trap or a missing
+      reduced-motion override is architectural (the global CSS rule, the
+      shell's own focus order) rather than per-route, so one real page is
+      real signal without paying N times the cost. A trap or a motion
+      regression confined to one specific page's own markup would not be
+      caught by this - genuinely open, not implied "done" by this entry.
+- [ ] A screen-reader read-through of each page (session-e-ui-and-
       docs.md's own step 7) - the rest of this step's own scope, still
       open as of this note.
 - [ ] Onboarding beyond the one-time initial household setup (M)
@@ -1333,16 +1362,38 @@ this file's earlier note), not something to build against today.
       for `far` (arrow keys alone are indistinguishable from a keyboard's
       - the real signal legacy's own table row named). See `docs/dev.md`,
       "Session B: step 2".
-- [x] **Two render profiles per component, near and far, partial** (M) -
-      done 2026-09-05 for the shell's own nav: the Sidebar renders as a
-      real focusable TV rail via `@noriginmedia/norigin-spatial-
-      navigation`'s `useFocusable` when `useSurface().far` is true (arrow
-      keys move focus, Enter navigates - verified live against a
-      simulated webOS user agent), and a `.surface-far` class bumps the
-      type scale. **Still open:** this is the shell's chrome only: no
-      schema-level "TV in one rule" exists yet for a package's own pages
-      (plan 6.4), and no free-text-entry-on-far rule is enforced anywhere
-      (nothing on `far` takes free text yet to enforce it against).
+- [x] **Two render profiles per component, near and far** (M) - done
+      2026-09-05 for the shell's own nav: the Sidebar renders as a real
+      focusable TV rail via `@noriginmedia/norigin-spatial-navigation`'s
+      `useFocusable` when `useSurface().far` is true (arrow keys move
+      focus, Enter navigates - verified live against a simulated webOS
+      user agent), and a `.surface-far` class bumps the type scale.
+      **Extended 2026-09-06 (session E step 7) below the shell**:
+      `Card.tsx` and `List.tsx`'s `onSelect` row both gained the same
+      `useFocusable` treatment, split into their own `TvCardButton`/
+      `TvListRowButton` components (Shell.tsx's own `NavItem`/`TvNavItem`
+      pattern - the hook can't be called conditionally, and needs
+      `ensureTvNavInit()` to have already run, which every route
+      guarantees by rendering under `Shell` first); `focused` drives a
+      `ring-2 ring-ring` ring, matching the nav rail's own visual
+      language. `CardGrid`, `MediaShelf`, and `WidgetCard` all inherit
+      this for free through `Card`. Verified live the same way the nav
+      rail was: a real Playwright context with a TV user agent, two apps
+      pinned through the real settings route so Home's `PinnedAppsStrip`
+      renders real cards, then real `ArrowDown`/`ArrowRight` presses -
+      confirmed Norigin moved real focus onto a card (`data-focused`,
+      the ring class, both present in the live DOM). **Still open:**
+      `FormNodeView`'s text/number `<Input>` fields have no far branch -
+      deliberately deferred, not silently skipped: no `spec/ui/pages/
+      *.json` page declares a `form` node today (`NodeRenderer`'s
+      generic form/`on_select` paths are exercised only by the schema-
+      conformance test, never a real page), and the real fix (real DOM
+      `.focus()` on far, since a software keyboard needs actual focus to
+      attach to, not just Norigin's own `focused` flag) needs a real TV
+      browser to confirm the platform's own on-screen keyboard actually
+      appears - not something a Chromium-headless matrix can verify.
+      Build it once a schema page ships a real `form` node, verified on
+      real hardware then.
 - [x] **Phone chrome per UI.md** (M) - done 2026-09-05. `shell/PhoneNav.tsx`:
       a five-entry bottom bar (today's five real pages fit exactly, so
       "More" has no content yet; the mechanism exists for a sixth),

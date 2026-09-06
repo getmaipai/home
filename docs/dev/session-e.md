@@ -937,3 +937,166 @@ clean, `scripts/check.sh` green end to end, and the full `bun run a11y`
 matrix re-run showing the fix took effect exactly as computed, with only
 the new Chat timestamp finding and the pre-existing, already-recorded
 `scrollable-region-focusable` on Privacy remaining.
+
+## Step 7 (part 2): devices/sessions, `scrollable-region-focusable`, and the far profile
+
+**F's real devices/sessions merged** (`GET`/`DELETE /api/devices`,
+`GET`/`DELETE /api/auth/sessions`, commit `943c96d`) while step 7 was in
+flight. Built `DevicesSection.tsx`/`DevicesPage.tsx` against it: two
+`Section`s under a new Settings > Devices & sessions page, scoped to the
+caller's own profile (`devices.ts`'s own comment: "not a household-wide
+admin view"), so it sits as a plain Profile page, not behind
+`AdminGatedContent`. `DeviceInfo`/`SessionInfo` hand-typed in `lib/api.ts`
+to match the backend's inline `@hono/zod-openapi` schemas exactly (no
+`@/wire` export exists for either route yet). A code review caught the
+per-row revoke confirm using the kit's batch-oriented `DestructiveConfirm`
+instead of the established per-row inline swap (`ConversationsPage.tsx`'s
+own pattern) - `DestructiveConfirm`'s own header comment says as much
+("deliberately NOT the per-row inline confirms... a genuinely different
+shape") - fixed by rebuilding both lists' `renderItem`/`renderAction` to
+swap in place, matching precedent.
+
+**F's real `GET /api/health` landed with `requireAuth`** (replacing the
+old open liveness stub, part of the same merge), which broke
+`scripts/screenshot.ts`'s own `waitForHealth()`: it expected an
+unauthenticated 200 and looped for the full 15s timeout against a
+genuinely healthy backend every single run. Fixed to treat any response -
+the 401 included - as proof the process is up and routing; verified this
+is safe by reading `backend/src/app.ts` (`export const app = apiRouter()`
+is a synchronous top-level const, built and fully wired before
+`index.ts`'s `Bun.serve()` ever binds the port) - there is no partial-
+boot window where a response could come back before the router is
+complete.
+
+**Re-running the full `bun run a11y` matrix** with that fix working again
+surfaced `scrollable-region-focusable` failing on Setup and Home too, not
+just the already-known Privacy instance. Grepped every `overflow-{x,y}-
+auto` container in `frontend/src` rather than patching only the three the
+matrix caught, and found the same gap - a scrollable region with no
+keyboard access - in eleven files total; only `DetailPane.tsx` and
+`SplitView.tsx` already had `tabIndex={0}` + `FOCUS_RING`. Applied their
+exact pattern everywhere. A first pass missed `WidgetRow.tsx`'s
+horizontal item strip and `ChatPage.tsx`'s thread-list sidebar - a code
+review caught both (neither overflows with today's seed data, which is
+exactly why the BACKLOG entry's first draft, then a comprehensiveness
+claim, was wrong) - fixed and folded into the same entry.
+
+**Broadened axe's scan tags** (`withTags(["wcag2a", "wcag2aa", "wcag21a",
+"wcag21aa", "wcag22aa", "best-practice"])` rather than axe-core's own bare
+default run, which drifts silently across `@axe-core/playwright` version
+bumps): zero new violations surfaced, confirming the matrix's existing
+coverage already matched what the broader tag set checks for.
+
+**Added two real automated checks `scripts/screenshot.ts` never had**:
+`checkReducedMotion` opens two contexts, one per `reducedMotion`
+preference, and measures the same element in both -
+`ProfileSwitcher.tsx`'s own header trigger button (`kit/ui/button.tsx`
+puts `transition-all` on every `Button`, a real, non-zero Tailwind
+duration by default, and this one is always mounted on a signed-in
+route regardless of that route's own body - only its Popover content is
+conditional) - asserting a genuinely non-zero duration under the normal
+preference and a near-zero one once `reducedMotion: "reduce"` is
+requested. A first version selected `document.querySelector("button")`,
+the DOM's first button, with a comment claiming it was "the header's
+Sign out button" - a code review caught that it wasn't (Shell.tsx renders
+the Sidebar, and its Search row's button, before the header), and that
+the check only worked because tokens.css's reduced-motion rule is a
+global `*` selector, not because the claimed element was the one
+measured; fixed by selecting the real element the comment claims,
+`button[aria-label*="switch profile or sign out"]`. Checking only the
+reduced side was tried first and rejected before that: `document.body`'s
+own transition-duration computes near-zero regardless of whether the CSS
+rule exists at all (nothing declares a transition on it directly), so a
+check that measured only that would pass just as cleanly if
+`tokens.css`'s whole `@media (prefers-reduced-motion: reduce)` block were
+deleted - proven by actually deleting it and re-running the check, which
+is also how the real value's shape was discovered (Chromium serializes
+the computed duration in canonical seconds, `1e-05s`, never the `0.01ms`
+tokens.css authors it as - parsed as a float against a threshold rather
+than string-matched, so a browser's own reformatting can't break it).
+
+`checkKeyboardTrap` tabs 40 times from a real page and compares the
+first half's distinct focus targets against the whole run. A first
+version asserted a fixed floor ("at least 5 distinct elements") - a code
+review caught that this can't detect a real trap cycling among 5 or more
+elements (a dialog with a close button, a few fields, and submit is a
+very plausible real shape), since such a trap clears a floor like that
+well within the press budget while focus still never escapes it. Fixed
+to compare halves instead: if the second half of the presses finds zero
+elements the first half hadn't already seen, focus is cycling among a
+fixed set regardless of that set's size, which a real page with real
+content never does (it keeps discovering new focusable elements as more
+Tabs are pressed). Both checks run once, against `/`, not the full
+per-route matrix - noted precisely as a scope limit in `docs/BACKLOG.md`,
+not implied away by a "done" checkbox - since a keyboard trap or a
+missing motion override is architectural (the global CSS rule, the
+shell's own focus order), so one real page is real signal without paying
+N times the cost against `bun run a11y`'s own "fast enough for every
+commit" design goal. Both pass clean against the real app today, and
+both were confirmed to actually fail - a deliberately broken CSS rule for
+the motion check, a deliberately added cycling trap for the keyboard
+check - before being trusted as real checks.
+
+**The far profile ("every node renders its far profile", plan 6.4/step
+7) was genuinely greenfield below the shell** - confirmed by a fork's
+investigation: `useSurface.ts` and the shell's own nav rail (`Shell.tsx`'s
+`NavItem`/`TvNavItem` split, `tvNav.ts`) were real and working, but
+nothing in `NodeRenderer.tsx` or the kit's own interactive primitives
+(`Card.tsx`, `List.tsx`) had ever called `useSurface()` - a plain DOM
+button is invisible to Norigin's spatial map (it only tracks nodes that
+registered via `useFocusable`), so a household member on the TV surface
+could move the remote into the nav rail and nowhere else; every card grid
+and list item was arrow-key-unreachable. Fixed at the two shared
+primitives that cover the most ground, not one page at a time:
+`Card.tsx` (used by `CardGrid`, `MediaShelf`, and `WidgetCard`, so all
+three inherit the fix for free) and `List.tsx`'s `onSelect` row both
+gained a TV variant
+(`TvCardButton`/`TvListRowButton`) that calls `useFocusable`, split into
+its own component the same way `Shell.tsx`'s `NavItem`/`TvNavItem` are
+(the library's hook can't be called conditionally, and is only safe once
+`ensureTvNavInit()` has run, which every route already guarantees by
+rendering under `Shell` first). The ring is driven by Norigin's own
+`focused` boolean (`ring-2 ring-ring`), not `:focus-visible` -
+`shouldFocusDOMNode` is false, matching the nav rail's own established
+visual language exactly rather than inventing a second one.
+
+**Verified live, not just by reading the diff**: no unit test in this
+codebase has ever exercised real Norigin spatial-focus movement (jsdom's
+zero-size layout makes directional matching unreliable to assert against;
+even `tvNav.test.ts` only spies on `pause`/`resume`, never simulates an
+arrow key) - `Shell.tsx`'s own nav rail was "verified live against a
+simulated webOS user agent" per its BACKLOG entry, not by a bun:test.
+Followed the same methodology: a real Playwright Chromium context with a
+TV user agent, a household with two pinned apps (seeded through the real
+`PUT /api/settings` route, not a fixture) so Home's `PinnedAppsStrip`
+renders real `CardGrid` cards, then real `ArrowDown`/`ArrowRight` key
+presses. Confirmed Norigin moved real, verifiable focus onto the "People"
+card (`data-focused="true"`, the `ring-2 ring-ring` class present in the
+live DOM) - the one-off verification script is not committed (it lived
+under the session's scratchpad, its job was proving the mechanism, not
+becoming a permanent test).
+
+**Left deliberately unbuilt, and documented rather than silently
+skipped**: `FormNodeView`'s text/number `<Input>` fields have no far
+branch. Checked first whether this is live: no `spec/ui/pages/*.json`
+page declares a `form` node today (the same is true of `list`'s
+`on_select` - NodeRenderer's generic form/on_select paths are exercised
+only by the schema-conformance test, `catalog.test.ts`, never by a real
+page in the running app). Building a TV-keyboard mechanism for
+currently-unreachable code, and one that fundamentally cannot be verified
+in this environment (Chromium headless never shows a real webOS/Tizen
+on-screen keyboard, however the DOM focus is driven - a real device is
+required to confirm the platform's own keyboard actually appears once an
+`<input>` gets real focus) would be building and claiming "done" on
+something neither reachable nor checkable today. The concrete next step,
+recorded in `docs/BACKLOG.md`: give the field the same `useFocusable`-
+plus-real-`.focus()`-call treatment (this one, unlike Card/List, needs
+`shouldFocusDOMNode`-equivalent real DOM focus so the platform's own
+keyboard has something to attach to), verified on real TV hardware once
+a schema page actually ships a `form` node.
+
+Verified: `bun test` (435 passing), `bunx tsc --noEmit` clean, `lint`
+clean, `scripts/check.sh` green end to end, and `bun run a11y` clean
+except the one already-known, already-diagnosed Chat timestamp contrast
+finding. Two commits: devices/sessions, then the accessibility/tooling
+fixes (code review ran on both together before either was made).

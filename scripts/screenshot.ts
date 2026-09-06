@@ -192,7 +192,15 @@ async function visitRoute(context: BrowserContext, route: RouteSpec, viewport: V
       () => document.documentElement.scrollWidth > document.documentElement.clientWidth + 1,
     );
 
-    const axe = await new AxeBuilder({ page }).analyze();
+    // Explicit tags, not axe's own bare default run (session E step 7):
+    // axe-core's default excludes newer WCAG 2.1/2.2 success criteria
+    // unless a version ships them pre-enabled, which drifts silently
+    // across @axe-core/playwright bumps. Naming every tag this app is
+    // actually held to - WCAG 2.2 AA plus axe's own best-practice set -
+    // means an upgrade can only add coverage, never quietly drop it.
+    const axe = await new AxeBuilder({ page })
+      .withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa", "best-practice"])
+      .analyze();
     const violations = axe.violations.map((v) => `${v.id} (${v.impact ?? "unknown"}): ${v.nodes.length} node(s) - ${v.help}`);
 
     if (saveScreenshot) {
@@ -219,6 +227,110 @@ async function captureHero(browser: Browser, sessionValue: string): Promise<void
     mkdirSync(join(ROOT, "docs", "assets"), { recursive: true });
     await page.screenshot({ path: HERO_PATH });
     console.log(`Wrote ${HERO_PATH}`);
+  } finally {
+    await context.close();
+  }
+}
+
+/** Reads the header's profile-switcher trigger's own computed
+ * transition-duration (`ProfileSwitcher.tsx`'s own `Button`, a real,
+ * always-mounted element on every signed-in route regardless of that
+ * route's own body - its Popover content, unlike the trigger itself, is
+ * the part that only mounts when opened) under the given `reducedMotion`
+ * preference. `kit/ui/button.tsx` puts `transition-all` on every Button,
+ * a real, non-zero-by-default Tailwind duration - a code review
+ * (2026-09-06) found an earlier version selecting the DOM's first
+ * `<button>` by a bare `querySelector("button")`, which today happens to
+ * land on the sidebar's Search row (Shell.tsx renders the Sidebar before
+ * the header) rather than any header button at all - it worked only
+ * because tokens.css's reduced-motion rule is a global `*` selector, not
+ * because the comment's claimed element was the one actually measured. A
+ * specific, stable selector removes that gap between what the check says
+ * and what it does. */
+async function buttonTransitionDuration(browser: Browser, sessionValue: string, reducedMotion: "reduce" | "no-preference"): Promise<number> {
+  const context = await browser.newContext({ viewport: { width: 1440, height: 900 }, reducedMotion });
+  await context.addCookies([{ name: "session", value: sessionValue, url: BASE_URL }]);
+  try {
+    const page = await context.newPage();
+    await page.goto(`${BASE_URL}/`);
+    await page.getByRole("heading", { level: 1 }).first().waitFor({ timeout: 15000 });
+    const trigger = page.locator('button[aria-label*="switch profile or sign out"]');
+    await trigger.waitFor({ timeout: 15000 });
+    const duration = await trigger.evaluate((el) => parseFloat(getComputedStyle(el).transitionDuration));
+    return duration;
+  } finally {
+    await context.close();
+  }
+}
+
+/** Step 7's "reduced motion verified" - a real browser, not a read of
+ * tokens.css's own `@media (prefers-reduced-motion: reduce)` rule.
+ * `reducedMotion` is a Playwright context option (BrowserContext matches
+ * the OS-level preference this app's CSS is written against). Checks
+ * both directions on the same kind of element (a header Button, which
+ * `kit/ui/button.tsx` always puts `transition-all` on): a real, non-zero
+ * duration under the normal preference, and a near-zero one once reduced
+ * motion is requested - measuring only the "reduced" side would also
+ * pass if the whole CSS rule were deleted, since an element that never
+ * had a transition at all also computes to a tiny duration. */
+async function checkReducedMotion(browser: Browser, sessionValue: string): Promise<string[]> {
+  const [normal, reduced] = await Promise.all([
+    buttonTransitionDuration(browser, sessionValue, "no-preference"),
+    buttonTransitionDuration(browser, sessionValue, "reduce"),
+  ]);
+  const failures: string[] = [];
+  if (!(normal > 0.01)) {
+    failures.push(`a header button's own transition-duration under the normal motion preference computed to ${normal}s, expected a real, non-zero duration (this check can't tell reduced-motion apart from "there was never a transition to reduce")`);
+  }
+  if (!(reduced <= 0.001)) {
+    failures.push(`prefers-reduced-motion: reduce still left a header button's transition-duration at ${reduced}s, expected ~0`);
+  }
+  return failures;
+}
+
+/** Step 7's "basic keyboard-trap check": Tab a real number of times from
+ * a real page and compare the distinct elements focus visited in the
+ * first half of the presses against the full run. A fixed size floor
+ * (say, "at least 5 distinct elements") cannot tell a real trap apart
+ * from a real page: a modal cycling among 5-9 real focusable elements
+ * (a close button, a few fields, submit) would clear a floor like that
+ * well within the press budget while still never letting focus escape -
+ * exactly the failure this check exists to catch. Comparing halves
+ * instead catches a cycle of any size: if the second half of the presses
+ * finds zero elements the first half hadn't already seen, focus is
+ * cycling among a fixed set - not merely "small" - since a real page
+ * with real content keeps discovering new focusable elements as more
+ * Tabs are pressed. Not exhaustive (a trap deep inside a rarely-reached
+ * subtree could still slip past a check that only visits one page), but
+ * real: driven by actual `Tab` keypresses against a real DOM, not a
+ * static analysis of the markup. */
+async function checkKeyboardTrap(browser: Browser, sessionValue: string): Promise<string[]> {
+  const context = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+  await context.addCookies([{ name: "session", value: sessionValue, url: BASE_URL }]);
+  try {
+    const page = await context.newPage();
+    await page.goto(`${BASE_URL}/`);
+    await page.getByRole("heading", { level: 1 }).first().waitFor({ timeout: 15000 });
+    const TAB_PRESSES = 40;
+    const visited: string[] = [];
+    for (let i = 0; i < TAB_PRESSES; i++) {
+      await page.keyboard.press("Tab");
+      const id = await page.evaluate(() => {
+        const el = document.activeElement;
+        if (!el || el === document.body) return "(body)";
+        return `${el.tagName}#${el.id}.${el.className}:${(el.textContent ?? "").slice(0, 20)}`;
+      });
+      visited.push(id);
+    }
+    const half = Math.floor(TAB_PRESSES / 2);
+    const firstHalf = new Set(visited.slice(0, half));
+    const whole = new Set(visited);
+    if (whole.size === firstHalf.size) {
+      return [
+        `keyboard trap suspected: the second half of ${TAB_PRESSES} Tab presses found no focus target the first half hadn't already seen (focus is cycling among the same ${whole.size} element(s))`,
+      ];
+    }
+    return [];
   } finally {
     await context.close();
   }
@@ -299,18 +411,31 @@ async function main() {
       }
     }
 
+    console.log("checking prefers-reduced-motion...");
+    const reducedMotionFailures = await checkReducedMotion(browser, sessionValue);
+    console.log("checking for keyboard traps...");
+    const keyboardTrapFailures = await checkKeyboardTrap(browser, sessionValue);
+
     const failures = results.filter((r) => r.violations.length > 0 || r.overflow);
-    if (failures.length > 0) {
+    if (failures.length > 0 || reducedMotionFailures.length > 0 || keyboardTrapFailures.length > 0) {
       console.error(`\n${failures.length} page(s) failed the accessibility/overflow check:\n`);
       for (const f of failures) {
         console.error(`- ${f.route} @ ${f.viewport}/${f.theme}`);
         if (f.overflow) console.error(`    horizontal overflow (scrollWidth > clientWidth)`);
         for (const v of f.violations) console.error(`    ${v}`);
       }
+      if (reducedMotionFailures.length > 0) {
+        console.error(`\nreduced motion:`);
+        for (const f of reducedMotionFailures) console.error(`    ${f}`);
+      }
+      if (keyboardTrapFailures.length > 0) {
+        console.error(`\nkeyboard trap:`);
+        for (const f of keyboardTrapFailures) console.error(`    ${f}`);
+      }
       throw new Error("accessibility or overflow check failed");
     }
 
-    console.log(`\n${results.length} page(s) checked, 0 violations, 0 overflow.`);
+    console.log(`\n${results.length} page(s) checked, 0 violations, 0 overflow, reduced motion and keyboard-trap checks passed.`);
     if (!a11yOnly) console.log(`Screenshots written to ${SCREENS_DIR}`);
   } finally {
     await browser?.close();
