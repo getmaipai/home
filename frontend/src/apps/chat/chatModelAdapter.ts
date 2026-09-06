@@ -11,7 +11,15 @@ import { messageText } from "@/apps/chat/chatMessageText";
 // question doesn't dump a paragraph of raw reasoning into the thread - a
 // household member who wants to see it can still ask.
 export function stripThinking(text: string): string {
-  const stripped = text.replace(/<think>[\s\S]*?<\/think>\s*/g, "").trim();
+  const closedStripped = text.replace(/<think>[\s\S]*?<\/think>\s*/g, "");
+  // Issue #20: a reply can end (stream truncated, hit a token limit, a
+  // backend crash) while still inside an UNCLOSED think block - the
+  // regex above requires a matching `</think>` and finds none, so
+  // closedStripped still has a bare `<think>` with raw reasoning after
+  // it. Treat that the same as a closed block: drop everything from the
+  // last `<think>` onward rather than showing it verbatim.
+  const openIdx = closedStripped.lastIndexOf("<think>");
+  const stripped = (openIdx === -1 ? closedStripped : closedStripped.slice(0, openIdx)).trim();
   // A code review (2026-09-04) found the earlier `|| text` fallback here
   // defeated the whole point when a reply was reasoning-only (no final
   // answer after the </think> tag): stripped becomes "", which is
