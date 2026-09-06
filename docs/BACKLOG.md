@@ -870,26 +870,48 @@ this file's earlier note), not something to build against today.
       already fast, and getting the full matrix's correctness right
       (the service-worker race it already found once) took priority
       over its wall-clock time.
-- [ ] **The rest of accessibility** (M) - colour contrast ratios against
-      the real token palette in both themes, a screen-reader read-through
-      of each page, keyboard-trap testing, reduced-motion, and the TV
-      surface (session-e-ui-and-docs.md's own step 7). Two violations
-      already confirmed, exact numbers so step 7 doesn't have to
-      re-discover them: the screenshot/a11y matrix's first runs
-      (2026-09-06) found white text on `--primary` (`#ffffff` on
-      `#06a9c6`) at 2.8:1, under WCAG AA's 4.5:1 floor for normal text -
-      not just Home as first measured, but every route with a default-
-      variant `Button` (`kit/ui/button.tsx`'s `bg-primary` variant) or an
-      active sidebar nav item on screen at desktop width (confirmed on
-      Home, Chat, People, Memory, Privacy, Settings and its four
-      sub-pages once the matrix ran the full route list) - a token-level
-      fix (a darker `--primary`, checked against both themes), not a
-      per-component one. Also `scrollable-region-focusable` on Privacy
-      (a scrollable region with no keyboard access) - pre-existing,
-      unrelated to this session's own changes. Left for step 7 rather
-      than patched here: the contrast one is a real design decision (what
-      shade stays "on brand" while clearing 4.5:1), not a one-line hack
-      to make the matrix pass.
+- [x] **`--primary` contrast, done** (session E step 7, 2026-09-06) -
+      white text on `--primary` (`#ffffff` on the original `#06a9c6`,
+      `hsl(189 94% 40%)`) measured at 2.8:1, under WCAG AA's 4.5:1 floor
+      for normal text, on every route with a default-variant `Button` or
+      an active sidebar nav item (Home, Chat, People, Memory, Privacy,
+      Settings and its sub-pages). Fixed at the token level (same hue
+      and saturation, darkened to `hsl(189 94% 29%)`, `frontend/src/kit/
+      tokens.css`) - measures ~5:1 now, checked against both light and
+      dark themes (dark theme's own pairing was already ~10:1 and
+      untouched). `--ring`/`--sidebar-ring` follow `--primary` to the
+      same value rather than diverging (their own 3:1 non-text
+      requirement was never the violation and stays clear). Re-running
+      the full `bun run a11y` matrix confirms every one of these
+      instances is gone.
+- [ ] **A second, narrower contrast finding, found while verifying the
+      fix above** (session E step 7, 2026-09-06) - `chat @ desktop/
+      light` still shows 6 `color-contrast` nodes, all the same root
+      cause: a `<time>` element (a message's timestamp,
+      `class="text-base text-muted-foreground"`) measured at 3.66:1,
+      still under 4.5:1. Not the `--primary` fix's territory at all -
+      this text uses `--muted-foreground`, and the computed color axe
+      reported (`#85858d`) doesn't match this repo's own
+      `--muted-foreground` (`hsl(240 4% 46%)`, which computes to a
+      visibly darker `#70707a`) when checked by hand - something in
+      `@assistant-ui/react`'s own message-timestamp rendering (no
+      `<time>` element is authored anywhere in `kit/assistant-ui/
+      thread.aui.tsx`; it comes from the library's own internals) is
+      resolving `text-muted-foreground` to a different, lighter value
+      than the rest of this app gets from the same class - a real
+      styling-integration gap between assistant-ui's own theme
+      resolution and this kit's tokens in that specific scoped context,
+      not a token value to darken further. Needs a live browser's
+      computed-styles inspection to root-cause properly (which CSS rule
+      is actually winning), not more token math - left for whoever picks
+      this up next; the number is real and verified, not guessed at.
+- [ ] `scrollable-region-focusable` on Privacy (a scrollable region with
+      no keyboard access) - pre-existing, unrelated to this session's own
+      changes, still open.
+- [ ] A screen-reader read-through of each page, keyboard-trap testing,
+      reduced motion verification, and the TV surface (session-e-ui-and-
+      docs.md's own step 7) - the rest of this step's own scope, still
+      open as of this note.
 - [ ] Onboarding beyond the one-time initial household setup (M)
 - [x] Accessibility audit (M) - done 2026-09-05, driven against the
       running app at phone and desktop, not read off the source: 142

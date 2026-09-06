@@ -879,3 +879,61 @@ already reused four times this session (Repairs, Backups, AI models, and
 the person-pickers on Conversations/Memory), is the right gate to keep
 using; the grant vocabulary's `settings.admin` action is a documented
 future state, not something to build against today.
+
+## Step 7 (part 1): the `--primary` contrast fix
+
+**Investigated first, again, and found no cross-session blockers at
+all** - unlike step 6, this step is entirely session E's own territory
+(`frontend/kit`, accessibility). Confirmed `useSurface.ts` (phone/tablet/
+desktop/far detection, real and complete) and Norigin spatial-nav
+(`tvNav.ts`'s `pauseTvNavForOverlay`, already reference-counted for two
+overlays at once) are both real and working at the shell level; the
+genuinely open pieces are a per-node "far profile" for schema/kit
+primitives (nothing reads `useSurface()` below the shell today), the
+already-quantified `--primary` contrast gap, and real automated checks
+for reduced motion and keyboard traps beyond axe's default scan.
+
+**Fixed the `--primary` contrast gap first**, since it was already fully
+quantified by this session's own earlier steps with nothing left to
+discover: computed the actual WCAG contrast ratio by hand (white on the
+original `hsl(189 94% 40%)` measures 2.8:1, matching the matrix's own
+finding exactly - confirms the calculation approach), then solved for
+the darkest-yet-still-as-bright-as-possible lightness at the same hue/
+saturation that clears 4.5:1 with real margin: `hsl(189 94% 29%)`,
+measuring ~5:1. Dark theme's own pairing (a near-black foreground on a
+brighter, 55%-lightness cyan) was independently verified at ~10:1 and
+left untouched. `--ring`/`--sidebar-ring` follow to the same value
+rather than diverging from `--primary` (their own WCAG 1.4.11 non-text
+3:1 requirement was never the violation and stays comfortably clear at
+this lightness). This is a technical, reversible fix made without live
+design feedback (BACKLOG.md's own words: "a real design decision, what
+shade stays on brand"), not a claim that this is the final word on the
+exact shade - a one-line CSS variable Jesse can retune if he wants a
+different exact tone, chosen to satisfy the WCAG requirement rather than
+block on it indefinitely.
+
+Re-running the full `bun run a11y` matrix confirmed every one of the
+~15 previously-cited `--primary`-driven instances is gone (Home, Chat,
+People, Memory, Privacy, Settings and its sub-pages all clean of it now)
+- and surfaced a second, narrower, genuinely different finding in the
+same pass: `chat @ desktop/light` still shows 6 `color-contrast` nodes,
+all a message timestamp `<time>` element at 3.66:1. Diagnosed with a
+temporary debug print of axe's own violation JSON (reverted after,
+`scripts/screenshot.ts` is unchanged in the final diff) rather than
+guessing: this is `--muted-foreground` text, but the color axe measured
+in the browser (`#85858d`) doesn't match this repo's own
+`--muted-foreground` token computed by hand (`hsl(240 4% 46%)` should be
+a visibly darker `#70707a`) - something in `@assistant-ui/react`'s own
+internals (no `<time>` element is authored anywhere in `thread.aui.tsx`)
+resolves the same Tailwind class to a different color than the rest of
+this app gets. Recorded precisely in `docs/BACKLOG.md` rather than
+chased further with the remaining budget - it needs a live browser's
+computed-styles inspection to find which CSS rule is actually winning,
+not more token arithmetic.
+
+Verified: `bun test` (frontend, 416 passing, no change expected or found
+- this is a pure CSS token edit), `bunx tsc --noEmit` clean, `lint`
+clean, `scripts/check.sh` green end to end, and the full `bun run a11y`
+matrix re-run showing the fix took effect exactly as computed, with only
+the new Chat timestamp finding and the pre-existing, already-recorded
+`scrollable-region-focusable` on Privacy remaining.
