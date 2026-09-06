@@ -4,11 +4,13 @@ import type { Person } from "@maipai/spec/gen/ts/person.js";
 import type { MemoryRecord } from "@maipai/spec/gen/ts/memory-record.js";
 import type { PackageManifest } from "@maipai/spec/gen/ts/manifest.js";
 import type { Issue } from "@maipai/spec/gen/ts/issue.js";
+import type { Conversation } from "@maipai/spec/gen/ts/conversation.js";
 import type {
   Roster,
   TurnValue,
   TurnStreamEvent,
   ConversationTurnRow,
+  ConversationSummary,
   ResolvedSetting,
   BackupInfo,
   HardwareInfo,
@@ -46,10 +48,11 @@ export type Role = Person["role"];
 // depends on @maipai/home-backend as a workspace package for this;
 // re-export the types here so the rest of the frontend imports from one
 // place.
-export type { Roster, TurnValue, TurnStreamEvent, ConversationTurnRow, ResolvedSetting, BackupInfo, HardwareInfo, ModelFit, ModelJob, EngineStatus, EngineStatsSample, ClonedVoiceInfo, RoutingStats, PrivacyConnection, PendingRestore, CommandRow, CommandAction, NotificationDeliveryView };
+export type { Roster, TurnValue, TurnStreamEvent, ConversationTurnRow, ConversationSummary, ResolvedSetting, BackupInfo, HardwareInfo, ModelFit, ModelJob, EngineStatus, EngineStatsSample, ClonedVoiceInfo, RoutingStats, PrivacyConnection, PendingRestore, CommandRow, CommandAction, NotificationDeliveryView };
 export type { MemoryRecord };
 export type { PackageManifest };
 export type { Issue };
+export type { Conversation };
 export { isOwnerOrAdminRole };
 // SettingsKey is spec-generated (@maipai/spec), not backend-only, so it's
 // imported directly rather than through @/wire.
@@ -261,7 +264,31 @@ export const api = {
     }),
   me: () => request<Roster>("/api/auth/me"),
   logout: () => request<{ success: true }>("/api/auth/logout", { method: "POST" }),
-  conversations: () => request<ConversationTurnRow[]>("/api/conversations"),
+  // GET /api/conversations/turns, not the bare /api/conversations - a
+  // real, LIVE bug fixed here (backend/src/routes/conversations.ts's own
+  // comment already named it): session A step 3 repointed GET
+  // /api/conversations itself to the new ConversationSummary[] listing
+  // shape and moved the old flat-turn-list behavior to /turns, but this
+  // call (and chatHistoryAdapter.ts's own ConversationTurnRow-shaped
+  // read of it) was never updated - every Chat page load was fetching
+  // the wrong shape and rendering undefined user/assistant text.
+  conversations: () => request<ConversationTurnRow[]>("/api/conversations/turns"),
+  // GET /api/conversations' real, current shape (the thread list) -
+  // `person` for the parental view (an owner/admin listing a child's own
+  // threads; the route's own list() enforces that access check server-
+  // side and returns an empty list for anyone it denies, never a 403).
+  conversationList: (person?: string) =>
+    request<ConversationSummary[]>(`/api/conversations${person ? `?person=${encodeURIComponent(person)}` : ""}`),
+  renameConversation: (id: string, title: string | null) =>
+    request<Conversation>(`/api/conversations/${encodeURIComponent(id)}`, {
+      method: "PATCH",
+      body: JSON.stringify({ title }),
+    }),
+  deleteConversation: (id: string) =>
+    request<{ ok: true }>(`/api/conversations/${encodeURIComponent(id)}`, { method: "DELETE" }),
+  batchDeleteConversations: (ids: string[]) =>
+    request<{ deleted: number }>("/api/conversations/batch-delete", { method: "POST", body: JSON.stringify({ ids }) }),
+  clearConversations: () => request<{ deleted: number }>("/api/conversations/clear", { method: "POST" }),
   settingsRegistry: () => request<SettingsKey[]>("/api/settings/registry"),
   settingsValues: (scope: string) =>
     request<ResolvedSetting[]>(`/api/settings?scope=${encodeURIComponent(scope)}`),

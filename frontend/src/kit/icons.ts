@@ -29,6 +29,7 @@ import {
   Mic,
   LayoutGrid,
   Grid2x2,
+  History,
   type LucideIcon,
 } from "lucide-react";
 
@@ -67,6 +68,7 @@ const REGISTRY: Record<string, LucideIcon> = {
   mic: Mic,
   "layout-grid": LayoutGrid,
   "grid-2x2": Grid2x2,
+  history: History,
 };
 
 export function getIcon(name: string): LucideIcon {

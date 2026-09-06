@@ -20,6 +20,7 @@ export interface NavEntry {
 export const NAV_ENTRIES: readonly NavEntry[] = [
   { to: "/", icon: "home", label: "Home" },
   { to: "/chat", icon: "message-circle", label: "Chat" },
+  { to: "/conversations", icon: "history", label: "Conversations" },
   { to: "/people", icon: "users", label: "People" },
   { to: "/memory", icon: "brain", label: "Memory" },
   { to: "/privacy", icon: "shield-check", label: "Privacy" },

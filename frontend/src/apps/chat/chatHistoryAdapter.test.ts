@@ -46,11 +46,20 @@ describe("rowsToThreadMessages", () => {
 });
 
 describe("createChatHistoryAdapter", () => {
-  test("load() builds an ExportedMessageRepository from GET /api/conversations", async () => {
+  test("load() builds an ExportedMessageRepository from GET /api/conversations/turns", async () => {
+    // Asserts the real path, not just "any fetch resolves" - a code
+    // review-adjacent finding (session E step 5, 2026-09-06): the
+    // previous version of this mock matched every URL unconditionally,
+    // which is exactly why a real, live bug (this call still hitting the
+    // bare /api/conversations after that route's own shape changed
+    // out from under it, backend/src/routes/conversations.ts's own
+    // comment) went uncaught by this suite.
     const originalFetch = globalThis.fetch;
-    globalThis.fetch = mock(() =>
-      Promise.resolve(new Response(JSON.stringify([makeRow("row-1", "a reply")]), { status: 200 })),
-    ) as unknown as typeof fetch;
+    globalThis.fetch = mock((input: RequestInfo | URL) => {
+      const url = typeof input === "string" ? input : input.toString();
+      if (!url.endsWith("/api/conversations/turns")) throw new Error(`unexpected fetch: ${url}`);
+      return Promise.resolve(new Response(JSON.stringify([makeRow("row-1", "a reply")]), { status: 200 }));
+    }) as unknown as typeof fetch;
     try {
       const adapter = createChatHistoryAdapter("Nova");
       const repo = await adapter.load();

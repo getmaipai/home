@@ -1077,19 +1077,52 @@ implemented on the hub yet.
       the empty state; timestamps and day dividers; `aria-live` on the
       streaming bubble (a screen reader hears nothing during a reply);
       a resume cursor on the stream (legacy's `since=` auto-resume was
-      added after a truncated reply was reported as success); the
-      "demo only" wake banner reworded for a family, not a developer.
-- [ ] **Conversations as records** (M, spec first) - one endless thread
-      per person today with no boundaries, titles, search or delete. A
-      `Conversation` shape in `spec/`, new chat, a list, delete and
-      clear-all (the batch rule's named consumer), and a companion axis
-      per conversation, which plan 4.14 leaves unspecified.
-- [ ] **Push-to-talk in the composer** (M) - `mic-capture.ts` exists for
-      wake word only and there is no STT route. Legacy `sttSession.ts`
-      carried the tuned numbers (Silero 0.5/0.35 hysteresis, 0.32 s
-      pre-roll, decode kicked at the voiced-to-silence edge and reused,
-      saving 0.6-0.8 s; ort-web WASM because ort-node segfaults under
-      Bun); copy them.
+      added after a truncated reply was reported as success). **Done**:
+      the "demo only" wake banner is reworded for a family (session E
+      step 4, 2026-09-06).
+- [x] **Conversations as records** (M, spec first) - done, session A step
+      3 (backend: a real `Conversation` shape, `GET /api/conversations`
+      as a real thread list, rename/delete/batch-delete/clear-all) plus
+      session E step 5 (2026-09-06: the frontend page,
+      `frontend/src/apps/conversations/ConversationsPage.tsx`, and a
+      real, live bug this step found and fixed along the way -
+      `chatHistoryAdapter.ts`'s own history load was still calling the
+      bare `/api/conversations`, which session A's step 3 had already
+      repointed to the new thread-list shape, so every Chat page load
+      was fetching the wrong shape and silently rendering `undefined`
+      user/assistant text; the fix pointed it at the real
+      `/api/conversations/turns` instead. The companion axis per
+      conversation plan 4.14 leaves unspecified is still open.
+- [x] **Push-to-talk in the composer** (M) - done, session E step 4
+      (2026-09-06): a real `DictationAdapter`
+      (`frontend/src/lib/voice/sttDictationAdapter.ts`) against a real
+      `WS /api/stt/stream` client, wired into assistant-ui's own stock
+      mic button. Uses the server's own VAD for barge-in, not the named
+      legacy Silero numbers specifically (0.5/0.35 hysteresis, 0.32 s
+      pre-roll) - those stay recorded below for whoever tunes the
+      server-side VAD itself, since this session's own barge-in just
+      forwards whatever the server decides rather than running local
+      detection.
+- [ ] **A real bug this session found, not caused by it, and not fixed
+      here** (session E step 5, 2026-09-06): Home's `WeatherCard`
+      (`runFixedTurn.ts`) calls the exact same `POST /api/turn/stream`
+      route Chat itself uses for a fixed "What's the weather like
+      today?" utterance, and the turn engine persists every turn it
+      handles regardless of caller (`chatHistoryAdapter.ts`'s own
+      comment: "the backend already persists every turn server-side...
+      independent of anything this adapter does"). That means every time
+      a household member's Home page runs its own weather check, a
+      visible "What's the weather like today?" turn silently appears in
+      their REAL Chat history - previously invisible only because the
+      bug above broke history loading entirely. Confirmed live: the
+      screenshot matrix's own repeated Home visits (across viewports/
+      themes, one shared session) left several duplicate weather turns
+      sitting in Chat's thread once the load bug was fixed, visible in
+      `chat-desktop-light.png`. Not this session's file to fix
+      (`turnEngine.ts`, session A's/D's territory) - needs either a
+      background/non-conversational turn kind the engine excludes from
+      history, or a `surface` this route can pass that widgets use
+      instead of `"chat"`.
 - [x] **Kit gaps found by the audit, partial** (S each) - done 2026-09-05:
       `AsyncState` (loading, error with retry, empty - built, not yet
       wired into the five pages that hand-roll the triad; that's step 3's

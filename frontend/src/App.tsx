@@ -6,6 +6,7 @@ import { SignIn } from "@/shell/SignIn";
 import { Shell } from "@/shell/Shell";
 import { SetupWizard } from "@/apps/setup/SetupWizard";
 import { ChatPage } from "@/apps/chat/ChatPage";
+import { ConversationsPage } from "@/apps/conversations/ConversationsPage";
 import { HomePage } from "@/apps/home/HomePage";
 import { SearchPage } from "@/apps/search/SearchPage";
 import { SettingsPage } from "@/apps/settings/SettingsPage";
@@ -90,6 +91,7 @@ export function App() {
                       <Routes>
                         <Route path="/" element={<HomePage person={person} />} />
                         <Route path="/chat" element={<ChatPage person={person} />} />
+                        <Route path="/conversations" element={<ConversationsPage person={person} />} />
                         <Route path="/search" element={<SearchPage />} />
                         <Route path="/people" element={<PeoplePage person={person} />} />
                         <Route path="/memory" element={<MemoryPage />} />

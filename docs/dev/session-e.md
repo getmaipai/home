@@ -688,3 +688,82 @@ own `ready` emitted first, once mic capture stopped starting
 unconditionally). Re-verified after every fix: `bun test` (frontend, 396
 passing), `tsc --noEmit` clean, `lint` clean, `scripts/check.sh` green,
 `bun run a11y` unchanged.
+
+## Step 5 (part 1): conversations - a live bug, and the real page
+
+**Investigated before writing anything, again, and found a real, live bug
+in already-shipped code**, not just a gap: session A's step 3 repointed
+`GET /api/conversations` from the old flat-turn-list shape to a new
+`ConversationSummary[]` thread listing, moved the old behavior to
+`GET /api/conversations/turns`, and left a comment in
+`backend/src/routes/conversations.ts` naming exactly this - "this is a
+REAL, LIVE break for the shipped chat UI... until Session B repoints that
+one call." `chatHistoryAdapter.ts` (this session's own file, under
+session B's original name before Wave 2 renamed sessions) was still
+calling the bare path and reading `ConversationTurnRow` fields
+(`userText`/`replyText`) off a response that no longer has them. Every
+Chat page load was silently rendering `undefined` text. Fixed by
+repointing `api.conversations()` to `/api/conversations/turns`. The test
+that should have caught this (`chatHistoryAdapter.test.ts`) had a fetch
+mock that matched every URL unconditionally - exactly why a real,
+already-landed break went uncaught for as long as it did; tightened to
+assert the real path.
+
+**Ships the real Conversations page** this bug fix was found while
+building
+(`frontend/src/apps/conversations/ConversationsPage.tsx`): list, rename
+(inline, since a schema `row_action` has no field for a text input), per-
+row delete, batch-delete and clear-all, all against session A's already-
+real backend contract. Hand-written rather than a schema `list` node, the
+same reasoning as Repairs (step 3) and People before it: an editable
+title needs a real input, not a generic action. New nav entry
+("Conversations", top-level, not nested under Settings - a household
+member's own history is exactly as personal as Memory or Privacy, both
+already top-level).
+
+**The parental view (plan 4.14) is partially real, partially honestly
+deferred.** "A parent may see a child's conversations... nothing of an
+adult's" is already enforced server-side by `canAccessPerson()` (every
+conversation route reuses it) - an owner/admin's person-picker on this
+page, selecting a child, gets the real list; selecting an adult gets
+correctly nothing. Plan 4.14's middle tier - a teen gets a summary and
+safety flags, not the full transcript - has **no backend support at all**:
+`canAccessPerson()` only special-cases `"child"`, so a teen today reads
+exactly like an adult (empty), not the partial view the plan wants.
+Recorded in `docs/BACKLOG.md` as its own gap rather than built against
+nothing real, the same call made for Store/Health/Updates in step 3.
+
+**A second real bug found live, not fixed here (not this session's
+file)**: re-running the full `bun run a11y`/`screenshots` matrix after
+the fix above showed Chat's own color-contrast violation count jump from
+1 node (every prior run, every prior step) to 7, reproducibly. Read the
+actual screenshot rather than guessing why (`docs/STYLE.md`'s own rule):
+`chat-desktop-light.png` showed several duplicate "What's the weather
+like today?" turns in the thread, each with its own stub reply. Root
+cause: `HomePage.tsx`'s `WeatherCard` calls `runFixedTurn()`, which posts
+to the exact same `POST /api/turn/stream` route Chat itself uses - and
+the turn engine persists every turn it handles regardless of caller
+(`chatHistoryAdapter.ts`'s own comment already said this: "the backend
+already persists every turn server-side... independent of anything this
+adapter does"). The screenshot matrix's own repeated Home visits (every
+viewport/theme, one shared session/data-dir) left several real duplicate
+weather turns sitting in the household's actual Chat history, previously
+invisible only because the load bug above broke history rendering
+entirely. This was always happening in the real running app, for every
+real household, on every real Home page load - not a screenshot-matrix
+artifact. Recorded in `docs/BACKLOG.md`; not fixed here since the actual
+fix (a background/non-conversational turn kind, or a `surface` widgets
+use instead of `"chat"`) lives in `turnEngine.ts`, outside this session's
+ownership.
+
+Verified: `bun test` (frontend, 404 passing - `ConversationsPage.test.tsx`
+new with 8 cases: list display, empty state, rename, delete-with-confirm,
+batch-delete, clear-all, the person picker appearing for an owner and
+switching to read-only, and staying hidden entirely for a non-admin),
+`bunx tsc --noEmit` clean, `lint` clean (one real `jsx-a11y/no-autofocus`
+error caught and fixed - the rename input doesn't autofocus, matching
+`PeoplePage.tsx`'s own precedent), `scripts/check.sh` green end to end,
+`/conversations` added to `scripts/screenshot.ts`'s route list. The full
+`bun run a11y` matrix is clean of any NEW violation type; Chat's own
+count is confirmed to vary run-to-run for the reason above, not from
+anything this step's own diff touches.

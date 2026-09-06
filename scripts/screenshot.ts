@@ -56,6 +56,7 @@ const ROUTES: RouteSpec[] = [
   { slug: "setup", path: "/setup" },
   { slug: "home", path: "/" },
   { slug: "chat", path: "/chat" },
+  { slug: "conversations", path: "/conversations" },
   { slug: "search", path: "/search" },
   { slug: "people", path: "/people" },
   { slug: "memory", path: "/memory" },
