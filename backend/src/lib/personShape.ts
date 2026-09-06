@@ -21,6 +21,9 @@ export function toPerson(row: PersonRow): Person {
     updated_at: row.updatedAt,
     deleted_at: row.deletedAt,
     hlc: row.hlc,
+    enabled: row.enabled,
+    guest_expires_at: row.guestExpiresAt,
+    memorialized_at: row.memorializedAt,
   });
 }
 
@@ -68,5 +71,22 @@ export function personToDbValues(person: Person) {
     updatedAt: person.updated_at,
     deletedAt: person.deleted_at,
     hlc: person.hlc,
+    enabled: person.enabled,
+    guestExpiresAt: person.guest_expires_at,
+    memorializedAt: person.memorialized_at,
   };
+}
+
+/** Step 7: guest_expires_at is only meaningful on a guest profile - the
+ * same "checked here, not by an unsupported JSON Schema conditional"
+ * convention person.schema.json's own field description names. Called
+ * wherever a candidate sets or edits it (routes/people.ts), not folded
+ * into parsePersonCandidate()'s return type: every existing caller treats
+ * that as a plain Zod SafeParseReturnType, and this is the one Person
+ * field with a cross-field rule so far. */
+export function guestExpiryProblem(role: string, guestExpiresAt: string | null): string | null {
+  if (guestExpiresAt !== null && role !== "guest") {
+    return "guest_expires_at is only meaningful on a guest profile";
+  }
+  return null;
 }

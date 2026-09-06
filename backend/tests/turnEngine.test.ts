@@ -35,6 +35,9 @@ function fakeActor(overrides: Partial<PersonRow> = {}): PersonRow {
     updatedAt: "2026-01-01T00:00:00.000Z",
     deletedAt: null,
     hlc: "1700000000000:0:testfix",
+    enabled: true,
+    guestExpiresAt: null,
+    memorializedAt: null,
     ...overrides,
   };
 }

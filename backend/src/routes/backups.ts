@@ -1,6 +1,6 @@
 import { createRoute, z } from "@hono/zod-openapi";
 import { apiRouter, errorResponses, idParamSchema } from "@/lib/openapi";
-import { requireRole } from "@/middleware/auth";
+import { requireRoleOrGrant } from "@/middleware/auth";
 import { listBackups, runBackup, pruneBackups, stageRestore, pendingRestore, cancelPendingRestore } from "@/lib/backup";
 import { RestoreRefused } from "@/lib/restoreStaging";
 
@@ -16,7 +16,7 @@ const listRoute = createRoute({
   path: "/",
   tags: ["Backups"],
   summary: "List available backup files",
-  middleware: [requireRole("owner", "admin")] as const,
+  middleware: [requireRoleOrGrant(["owner", "admin"], "backups.run")] as const,
   responses: {
     200: { content: { "application/json": { schema: z.array(BackupInfoSchema) } }, description: "Every backup on disk." },
     ...errorResponses({ 403: "Not owner/admin" }),
@@ -29,7 +29,7 @@ const runRoute = createRoute({
   path: "/run",
   tags: ["Backups"],
   summary: "Run a backup now",
-  middleware: [requireRole("owner", "admin")] as const,
+  middleware: [requireRoleOrGrant(["owner", "admin"], "backups.run")] as const,
   responses: {
     200: { content: { "application/json": { schema: BackupInfoSchema } }, description: "The new backup." },
     ...errorResponses({ 403: "Not owner/admin" }),
@@ -55,7 +55,7 @@ const pendingRoute = createRoute({
   path: "/restore/pending",
   tags: ["Backups"],
   summary: "The restore staged for the next boot, if any",
-  middleware: [requireRole("owner", "admin")] as const,
+  middleware: [requireRoleOrGrant(["owner", "admin"], "backups.restore")] as const,
   responses: {
     200: { content: { "application/json": { schema: z.object({ pending: PendingRestoreSchema.nullable() }) } }, description: "Null if nothing is staged." },
     ...errorResponses({ 403: "Not owner/admin" }),
@@ -68,7 +68,7 @@ const cancelRoute = createRoute({
   path: "/restore/cancel",
   tags: ["Backups"],
   summary: "Cancel a staged restore",
-  middleware: [requireRole("owner")] as const,
+  middleware: [requireRoleOrGrant(["owner"], "backups.restore")] as const,
   responses: {
     200: { content: { "application/json": { schema: z.object({ cancelled: z.boolean() }) } }, description: "Whether there was anything to cancel." },
     ...errorResponses({ 403: "Owner only" }),
@@ -81,7 +81,7 @@ const restoreRoute = createRoute({
   path: "/{filename}/restore",
   tags: ["Backups"],
   summary: "Stage a backup file to restore at the next boot",
-  middleware: [requireRole("owner")] as const,
+  middleware: [requireRoleOrGrant(["owner"], "backups.restore")] as const,
   request: { params: idParamSchema("filename") },
   responses: {
     200: { content: { "application/json": { schema: z.object({ pending: PendingRestoreSchema }) } }, description: "Staged for the next boot." },

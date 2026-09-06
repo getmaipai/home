@@ -899,3 +899,212 @@ the actual secret `beginEnrollment()` minted (parsing the returned
 would actually scan produces codes this hub actually accepts, and that
 the anti-replay fix genuinely rejects a reused code rather than merely
 asserting a mocked function was called correctly.
+
+## Step 7: entities, relationships, grants, approvals
+
+**Entity, Relationship and Grant, at last built on the hub.** The spec
+landed 2026-09-05; this is the tables, the migration (0018), and the
+routes, with every cross-field rule from `spec/records/ts/validate.ts`
+enforced at the write boundary (`lib/entities.ts`'s `validateEntity()`,
+`lib/relationships.ts`'s `validateRelationship()` +
+`validateRelationshipEndpoints()`, `lib/grants.ts`'s `validateGrant()`) -
+none of it trusts the schema alone to catch a place with no
+`place_kind`, an inferred relationship naming a `stated_by_person_id`,
+or an unacknowledged `chat.unrestricted` grant. `lib/{entities,
+relationships,grants}.ts` each follow the same read/write shape
+`lib/entities.ts`'s own `toEntity()`/`toRow()` pair established first:
+a generated Zod model is the only thing ever inserted or returned, JSON
+columns (`aliases`, `evidence`) round-trip through `JSON.parse`/
+`JSON.stringify` at that one boundary, and nothing downstream ever
+touches a raw Drizzle row.
+
+**Person/household scoping, not owner/admin-only.** Entities and
+relationships default to `scope: "household"` and `"person"`
+respectively (the schema's own defaults), and every list/get route
+filters accordingly: a person-scoped row is invisible to anyone but its
+own person and owner/admin, the same reach `GET /api/people` already
+grants them over the roster. A household-scoped row is visible to
+everyone signed in - the shared "who/what the family knows about," not
+a management surface.
+
+**The stored inverse is real, not just documented.** `spec/schemas/
+relationship.schema.json`'s own promise ("`parent_of` and `child_of` are
+different edges, both stored, so a lookup either way is an index hit")
+only holds if something actually writes the second row -
+`inverseRelationship()` (spec/records/ts/validate.ts, already built
+before this step) is that something; `lib/relationships.ts`'s
+`createRelationship()` calls it right after inserting the primary edge,
+`updateRelationship()`/`deleteRelationship()` find and mutate the
+reciprocal row alongside the one a caller named directly, so a status
+change or an end date can never leave the two edges disagreeing about
+whose relationship it even is. A symmetric type (`partner_of`,
+`sibling_of`, `friend_of`) stores exactly one row - `inverseRelationship()`
+returns `null` for those on purpose, and both write paths respect it.
+
+**Grant is its own store, on purpose, despite the identical shape to
+Relationship** - `relationship-types.json`'s own comment already says
+why ("same shape, separate stores, opposite trust": a Relationship can
+be `inferred` and wrong; a Grant is never machine-inferred, only ever
+written by a person with the authority to grant). This wave's writer is
+always a real person (`granted_by_person_id`), never an inference
+pipeline - the spec leaves room for one later, this hub never produces
+one.
+
+**`GET /api/people/:id/permissions`: the effective, resolved grant
+set.** `lib/permissions.ts`'s `effectivePermissions()` answers "denies
+win" the standard ABAC way: for any one action a person has more than
+one active grant on, an explicit deny always resolves it regardless of
+how many allows also apply or which was written first. It deliberately
+does *not* try to model cross-action prefix specificity (a deny of
+`use:videos` "beating" a broader allow of `packages.use_all`) - that
+composition belongs to whichever consumer reads a person's resolved set
+for a real decision (the package host, once it exists), not to a spec-
+agnostic resolver guessing at semantics it doesn't own.
+`safety_stop` needs no special-case code at all: `grant-actions.json`'s
+own comment already states there is no action in the vocabulary that
+weakens the non-removable safety floor, and `validateGrant()`/
+`matchGrantAction()` refuse anything outside that closed list - the
+"undeniable" guarantee is structural, not enforced by a check that could
+itself have a bug.
+
+**Grants are added *beside* roles this wave, additively -
+`requireRoleOrGrant()` (`middleware/auth.ts`).** Plain OR with the
+existing role check: an active ALLOW grant on the named action opens a
+route for someone outside its usual `roles` list, and never narrows what
+an owner/admin's role already allows - "nothing a family can do today
+stops working" by construction, not by care. Wired to the 5 route groups
+with a real, already-defined grant action to check today:
+`people.manage`/`people.grant` (`routes/people.ts`, the new
+`routes/grants.ts`), `backups.run`/`backups.restore`
+(`routes/backups.ts` - `list`/`run` map to the former, `pending`/
+`cancel`/`restore` to the latter, matching the existing owner-only step
+up for restore itself), `relationships.manage` (the new
+`routes/relationships.ts`). The other ~17 `requireRole` call sites
+(`host.ts`, `plugins.ts`, `scheduler.ts`, `repairs.ts`, `memory.ts`'s
+`maintenance/run`, `totp.ts`) have no matching `grant-actions.json` entry
+today and were deliberately left on plain `requireRole()` - see
+`docs/BACKLOG.md`'s People/relationships/permissions section for exactly
+why, including why `totp.ts` specifically probably never should convert
+(eligibility for TOTP is a hard role policy, not a grantable action).
+
+**The approval queue ("Ask to Install, Ask to Browse").** `lib/
+approvals.ts` + `routes/approvals.ts`: anyone signed in can ask for
+something they don't have the grant to just do (`POST /api/approvals`,
+always for themselves - never on someone else's behalf, since the whole
+point is that *they* lack the authority), any adult decides
+(`GET /api/approvals`, `POST /:id/{approve,deny}` - `requireRole("owner",
+"admin", "adult")`, not owner/admin-only: this is a parenting action, not
+a household-management one). A decision is final and the row is kept
+forever in whichever state it landed in ("resolved but visible," the
+same shape this org's own GitHub issues already use) - re-deciding an
+already-decided request is refused with 400 rather than letting a second
+adult silently overturn the first one's call. `kind` is a small closed
+list (`install_package`, `browse_url` today), the same reasoning
+`grant-actions.json` and `relationship-types.json` give their own closed
+vocabularies: a free-text kind would let any client invent a request
+type nothing downstream knows how to render or act on. The
+`approvals.requested` notification (added to `lib/notificationTypes.ts`,
+audience `adults`) fires on every ask.
+
+**Person gains `enabled`, guest expiry, memorialise, and the age-band
+change** (`spec/schemas/person.schema.json`): three new fields, all with
+Zod defaults so an existing person round-trips unchanged.
+`lib/personLifecycle.ts` gained `memorializePerson()` (revokes every
+credential, passkey, device token, session and TOTP secret; leaves
+memories and conversations untouched - explicitly not a delete),
+`disableExpiredGuests()` (a daily core job flipping `enabled: false` on
+any `role: guest` whose `guest_expires_at` has passed), and
+`ageBandForBirthdate()`/`applyAgeBandChanges()` (a second daily core
+job moving anyone currently `child`/`teen` with a birthdate on file to
+their now-correct band, notifying adults via the new
+`person.band_changed` type - owner/admin/guest are never age-derived,
+and someone with no birthdate on file is never touched).
+
+**`enabled: false` was wired into the database and the PATCH route
+before it was wired into anything that actually checks it - caught
+while writing this step's own tests, before it shipped.** A disabled
+person's PIN, passkey, device token, and Quick Connect approval all kept
+working, and an already-signed-in disabled person's session cookie
+would have kept authenticating for up to 7 more days. Fixed at every
+sign-in boundary: `middleware/auth.ts`'s `resolveSession()` (the query
+itself now excludes `enabled: false`, same as it already excluded a
+deleted person), `routes/auth.ts`'s `/select` and `/verify-secret`,
+`routes/passkeys.ts`'s `authenticate/options` and `authenticate/verify`,
+`routes/deviceAuth.ts`'s `/redeem`, `routes/quickConnect.ts`'s `/poll`
+(the approver could have been disabled in the 5-minute window between
+approving and a device actually collecting the approval - treated as an
+expired Quick Connect request, not a 401, so as not to mint a device
+token for a profile that can no longer sign in anywhere), and
+`routes/totp.ts`'s `/challenge`. `routes/people.ts`'s PATCH route now
+also calls `invalidateSessionCacheForPerson()` whenever `enabled`
+actually changes value, closing the 10-second session-cache window the
+same way a role change already did.
+
+**Time allowances per category, backend half only** (`settings/
+allowanceKeys.ts` + `lib/allowance.ts`): one person-scoped
+`allowance.<category>.daily_minutes` setting per `manifest.schema.json`
+category, default 0 (no limit configured - adding this to an existing
+house changes nothing until a parent sets a real number). Deliberately
+does not attempt "and schedules" (a time-of-day window): the settings
+system has no key using the `time` selector yet and nothing in the
+frontend renders one, and a JSON blob doesn't fit the settings
+standard's one-atomic-value-per-key shape - landing an untested selector
+to satisfy the letter of the plan text would be exactly the kind of
+half-finished feature this org's own standards warn against. Also out of
+scope here on purpose: actually computing `ctx.allowance` needs live
+per-day usage bookkeeping, which is the package host's own session
+tracking (`packageHost.ts`, D's file per this repo's `CLAUDE.md`'s
+"Files you own") - `dailyMinutesAllowed()` is exactly the "you write it"
+half of "D reads `ctx.allowance`; you write it," a real, working,
+independently useful piece even before D's ctx-builder exists to
+consume it.
+
+**The two Jesse's-call backlog items stay open, deliberately.** The
+unrestricted-mode age collision (the org's Safety invariants are
+age-shaped; the grant model removes age from authorization entirely) and
+whether roles keep age-flavoured names once grants exist beside them are
+both left for Jesse, per the plan's own text and `docs/BACKLOG.md`'s
+People/relationships/permissions section. Nothing in this step's code
+tries to resolve either: grants were added *beside* roles rather than
+replacing them, so the collision is not created worse by this landing,
+just not yet answered. Relationship inference likewise stays unbuilt -
+the storage model (this step) is useful and safe without it, and the two
+scoping questions in the backlog (does inference ship in v1, may a
+parent see one inferred from their teen's conversation) are still
+Jesse's, not research questions this session could answer on its own.
+
+**A code review (2026-09-06) found three issues, all fixed:**
+
+1. **`erasePersonData()`/`deletePerson()` never touched the four new
+   tables at all**, despite the function's own claim to erase
+   "everything the household holds about one person" - a deleted
+   person's own person-scoped entities and relationship statements, and
+   every grant or approval for them, all survived a delete fully
+   readable by owner/admin. Fixed with FK-safe ordering: any relationship
+   touching one of the person's own entities is deleted first (matched
+   by entity id, since the stored inverse row shares the same two
+   entities either way), then the entities themselves, then their
+   grants, then their approvals. Deliberately left alone: a grant's
+   `granted_by_person_id`/`acknowledged_by_person_id` and a
+   relationship's `confirmed_by_person_id`/`stated_by_person_id` - these
+   reference a `people.id` row that still exists (a person is only ever
+   tombstoned, never hard-deleted), so they record who did something
+   rather than holding data that belongs to the deleted person.
+   `ErasureCounts` gained `entities`/`relationships`/`grants`/`approvals`
+   fields so a family can see the size of this too, and the existing
+   schema-walking regression test (`people.test.ts`'s "no table is left
+   holding rows about a deleted person") now actually creates a row in
+   each of the four tables first, since it was passing trivially without
+   ever exercising them.
+2. **`decideApproval()` never checked the deciding adult wasn't the
+   requester** - any adult (the decide routes are `requireRole("owner",
+   "admin", "adult")`, not owner/admin-only) could file a request and
+   immediately approve or deny their own. Fixed with an explicit
+   `row.personId === actor.id` refusal (403), before the
+   already-decided check.
+3. **`isActive()`, the grant validity-window check, was duplicated
+   verbatim in both `lib/grants.ts` and `lib/permissions.ts`.** Kept in
+   `lib/grants.ts` as the exported `isGrantActive()`, imported by
+   `lib/permissions.ts` rather than redefined - a future change to
+   validity semantics now has one place to land instead of two that can
+   silently drift apart.

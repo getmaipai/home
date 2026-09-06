@@ -5,12 +5,13 @@ import { people, personCredentials } from "@/db/schema";
 import { hashSecret } from "@/lib/secret";
 import { newPersonId } from "@/lib/id";
 import { nextHlc } from "@/lib/hlc";
-import { requireAuth, requireRole, ROLE_LADDER, invalidateSessionCacheForPerson, type Role } from "@/middleware/auth";
-import { toRoster, parsePersonCandidate, personToDbValues } from "@/lib/personShape";
+import { requireAuth, requireRoleOrGrant, ROLE_LADDER, invalidateSessionCacheForPerson, type Role } from "@/middleware/auth";
+import { toRoster, parsePersonCandidate, personToDbValues, guestExpiryProblem } from "@/lib/personShape";
 import { listActivePeople } from "@/lib/access";
 import { validateDisplayName, validateSecret } from "@/lib/validation";
-import { canManage, checkRoleChange, deletePerson, deletePeople, type PersonEdit } from "@/lib/personLifecycle";
+import { canManage, checkRoleChange, deletePerson, deletePeople, memorializePerson, type PersonEdit } from "@/lib/personLifecycle";
 import { requiresCredential } from "@/lib/personAuthMethods";
+import { effectivePermissions } from "@/lib/permissions";
 import { apiRouter, errorResponses, idParamSchema } from "@/lib/openapi";
 import { Person } from "@maipai/spec/gen/ts/person.js";
 
@@ -58,7 +59,7 @@ const createRoute_ = createRoute({
   path: "/",
   tags: ["People"],
   summary: "Create a new household profile",
-  middleware: [requireRole("owner", "admin")] as const,
+  middleware: [requireRoleOrGrant(["owner", "admin"], "people.manage")] as const,
   request: {
     body: {
       content: {
@@ -71,6 +72,7 @@ const createRoute_ = createRoute({
             avatarSeed: z.string().optional(),
             secret: z.string().optional(),
             localOnly: z.boolean().optional(),
+            guestExpiresAt: z.string().nullable().optional(),
           }),
         },
       },
@@ -111,6 +113,10 @@ peopleRoutes.openapi(createRoute_, async (c) => {
     secret = validated.value;
   }
 
+  const guestExpiresAt = body.guestExpiresAt ?? null;
+  const guestProblem = guestExpiryProblem(role, guestExpiresAt);
+  if (guestProblem) return c.json({ error: guestProblem }, 400);
+
   const now = new Date().toISOString();
   const id = newPersonId();
 
@@ -133,6 +139,9 @@ peopleRoutes.openapi(createRoute_, async (c) => {
     updated_at: now,
     deleted_at: null,
     hlc: nextHlc(),
+    enabled: true,
+    guest_expires_at: guestExpiresAt,
+    memorialized_at: null,
   });
   if (!candidate.success) {
     return c.json({ error: candidate.error.issues.map((i) => i.message).join("; ") }, 400);
@@ -172,6 +181,8 @@ const patchRoute = createRoute({
             role: z.string().optional(),
             avatarSeed: z.string().optional(),
             localOnly: z.boolean().optional(),
+            enabled: z.boolean().optional(),
+            guestExpiresAt: z.string().nullable().optional(),
           }),
         },
       },
@@ -179,7 +190,7 @@ const patchRoute = createRoute({
   },
   responses: {
     200: { content: { "application/json": { schema: RosterSchema } }, description: "Updated." },
-    ...errorResponses({ 400: "Invalid role/displayName/birthdate", 401: "Not signed in", 403: "Not allowed to edit this person", 404: "No such person" }),
+    ...errorResponses({ 400: "Invalid role/displayName/birthdate/guestExpiresAt", 401: "Not signed in", 403: "Not allowed to edit this person", 404: "No such person" }),
   },
 });
 peopleRoutes.openapi(patchRoute, async (c) => {
@@ -214,6 +225,17 @@ peopleRoutes.openapi(patchRoute, async (c) => {
     displayName = validated.value;
   }
 
+  // Disabling yourself has the same "locks the household out" shape
+  // deleting or demoting your own profile already refuses - blocked for
+  // the same reason.
+  if (body.enabled === false && actor.id === id) {
+    return c.json({ error: "you cannot disable your own profile" }, 403);
+  }
+
+  const guestExpiresAt = body.guestExpiresAt !== undefined ? body.guestExpiresAt : target.guestExpiresAt;
+  const guestProblem = guestExpiryProblem(nextRole, guestExpiresAt);
+  if (guestProblem) return c.json({ error: guestProblem }, 400);
+
   const now = new Date().toISOString();
   // Validated as a whole spec Person before the write, the same reason
   // POST does it: an invalid birthdate written straight to SQLite
@@ -232,6 +254,15 @@ peopleRoutes.openapi(patchRoute, async (c) => {
     updated_at: now,
     deleted_at: null,
     hlc: nextHlc(),
+    // enabled/guestExpiresAt carried forward explicitly - both have Zod
+    // defaults (true / null), so leaving them out of this object would
+    // silently RESET them on every edit that doesn't touch them, not
+    // preserve the existing value. memorialized_at is never settable
+    // here at all: only lib/personLifecycle.ts's memorializePerson()
+    // (POST /api/people/:id/memorialize) may set it.
+    enabled: body.enabled ?? target.enabled,
+    guest_expires_at: guestExpiresAt,
+    memorialized_at: target.memorializedAt,
   });
   if (!candidate.success) {
     return c.json({ error: candidate.error.issues.map((i) => i.message).join("; ") }, 400);
@@ -241,7 +272,14 @@ peopleRoutes.openapi(patchRoute, async (c) => {
   // A cached session carries the whole PersonRow, role included, so a
   // demotion would not take effect until the cache expired: the other
   // case auth.ts's invalidateSessionCacheForPerson was written for.
-  if (nextRole !== target.role) invalidateSessionCacheForPerson(id);
+  // Step 7: a flip to enabled: false needs the exact same treatment -
+  // resolveSession()'s query excludes disabled people, but the 10s cache
+  // in front of it doesn't re-run that query, so without this an
+  // already-cached session would keep authenticating a disabled person
+  // for up to 10 more seconds after the admin who disabled them believes
+  // it already took effect.
+  const candidateEnabled = candidate.data.enabled;
+  if (nextRole !== target.role || candidateEnabled !== target.enabled) invalidateSessionCacheForPerson(id);
   const { birthdate: _birthdate, ...roster } = candidate.data;
   return c.json(roster, 200);
 });
@@ -256,7 +294,7 @@ const batchDeleteRoute = createRoute({
   path: "/batch-delete",
   tags: ["People"],
   summary: "Delete several people at once",
-  middleware: [requireRole("owner", "admin")] as const,
+  middleware: [requireRoleOrGrant(["owner", "admin"], "people.manage")] as const,
   request: {
     body: { content: { "application/json": { schema: z.object({ ids: z.array(z.string()) }) } } },
   },
@@ -286,7 +324,7 @@ const deleteRoute = createRoute({
   path: "/{id}",
   tags: ["People"],
   summary: "Delete a person and erase what the household holds about them",
-  middleware: [requireRole("owner", "admin")] as const,
+  middleware: [requireRoleOrGrant(["owner", "admin"], "people.manage")] as const,
   request: { params: idParamSchema("id") },
   responses: {
     200: {
@@ -301,6 +339,10 @@ const deleteRoute = createRoute({
               clonedVoices: z.number(),
               scheduledJobs: z.number(),
               sessions: z.number(),
+              entities: z.number(),
+              relationships: z.number(),
+              grants: z.number(),
+              approvals: z.number(),
             }),
           }),
         },
@@ -323,4 +365,62 @@ peopleRoutes.openapi(deleteRoute, (c) => {
   // destroys a person's history, and a family deserves to see the size
   // of it.
   return c.json({ erased: result.value }, 200);
+});
+
+// Step 7: BACKLOG.md's "memorialise (read-only profile, PIN cleared,
+// sessions revoked, export offered)". A dedicated action, not a PATCH
+// field: this has real, irreversible side effects (every credential and
+// session is revoked), which a generic field-by-field edit endpoint
+// should never trigger as a side effect of setting one flag. "Export
+// offered" is a client-side prompt after this succeeds, not something
+// this route does itself.
+const memorializeRoute = createRoute({
+  method: "post",
+  path: "/{id}/memorialize",
+  tags: ["People"],
+  summary: "Memorialise a profile: read-only, every credential and session revoked",
+  middleware: [requireRoleOrGrant(["owner", "admin"], "people.manage")] as const,
+  request: { params: idParamSchema("id") },
+  responses: {
+    200: { content: { "application/json": { schema: z.object({ id: z.string() }) } }, description: "Memorialised." },
+    ...errorResponses({ 403: "You cannot memorialize your own profile, or you cannot manage this role", 404: "No such person" }),
+  },
+});
+peopleRoutes.openapi(memorializeRoute, (c) => {
+  const actor = c.get("person");
+  const result = memorializePerson(actor, c.req.valid("param").id);
+  if (!result.ok) return c.json({ error: result.error }, result.status as 403 | 404);
+  return c.json(result.value, 200);
+});
+
+// Step 7: the effective grant set (denies win) - lib/permissions.ts's own
+// header has the full reasoning, including why "safety_stop undeniable"
+// needs no special case here. Self, or owner/admin/anyone who can manage
+// this person (canManage already covers "self" too) - the same reach
+// PATCH already has, since a grant is exactly the kind of thing about a
+// person that editing their profile already requires being able to see.
+const permissionsRoute = createRoute({
+  method: "get",
+  path: "/{id}/permissions",
+  tags: ["People"],
+  summary: "This person's effective, resolved grant set",
+  middleware: [requireAuth] as const,
+  request: { params: idParamSchema("id") },
+  responses: {
+    200: {
+      content: { "application/json": { schema: z.array(z.object({ action: z.string(), effect: z.enum(["allow", "deny"]) })) } },
+      description: "One entry per action this person has at least one active grant on.",
+    },
+    ...errorResponses({ 401: "Not signed in", 403: "Not allowed to see this person's permissions", 404: "No such person" }),
+  },
+});
+peopleRoutes.openapi(permissionsRoute, (c) => {
+  const actor = c.get("person");
+  const { id } = c.req.valid("param");
+  const target = db.select().from(people).where(and(eq(people.id, id), isNull(people.deletedAt))).get();
+  if (!target) return c.json({ error: "no such person" }, 404);
+  if (!canManage(actor, target)) {
+    return c.json({ error: `${actor.role} cannot see a ${target.role} profile's permissions` }, 403);
+  }
+  return c.json(effectivePermissions(id), 200);
 });

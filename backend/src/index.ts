@@ -114,6 +114,11 @@ setInterval(() => void sampleEngineStats(), 60_000);
 // cheap (a single file read and a date comparison) when nothing's close
 // to expiring, which is every day but the last 30 of a year.
 ensureCoreJob("householdCa.check_leaf_expiry", "every:1d");
+// Step 7: guest expiry and the age-band birthday sweep - see
+// lib/scheduler.ts's own CORE_JOBS entries for why daily is enough for
+// both.
+ensureCoreJob("people.disable_expired_guests", "every:1d");
+ensureCoreJob("people.apply_age_band_changes", "every:1d");
 
 // A code review (2026-09-06) found the "Renew now" Repairs fix silently
 // broken across a restart: registerRenewFixHandler() was only ever

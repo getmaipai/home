@@ -2,12 +2,15 @@
 // three routes exactly). lib/quickConnect.ts's own header has the full
 // flow and why `code`/`poll_token` are two different secrets.
 import { createRoute, z } from "@hono/zod-openapi";
+import { eq, and, isNull } from "drizzle-orm";
 import { apiRouter, errorResponses } from "@/lib/openapi";
 import { requireAuth } from "@/middleware/auth";
 import { issueSession } from "@/lib/session";
 import { issueDeviceToken } from "@/lib/deviceTokens";
 import { createQuickConnect, approveQuickConnect, consumeQuickConnect, isQuickConnectPending } from "@/lib/quickConnect";
 import { isTotpEnabled, verifyTotp } from "@/lib/totp";
+import { db } from "@/db";
+import { people } from "@/db/schema";
 
 export const quickConnectRoutes = apiRouter();
 
@@ -83,6 +86,15 @@ quickConnectRoutes.openapi(pollRoute, (c) => {
   // this ever became consumable. This just redeems that already-2FA'd
   // approval.
   if (approved) {
+    // Step 7: the approver could have been disabled (or deleted) in the
+    // window between /approve and this poll picking the approval up -
+    // the 5-minute Quick Connect TTL is long enough for that to matter,
+    // unlike the near-instant device-redeem path. Treat it as expired
+    // rather than minting a session and a fresh year-long device token
+    // for a profile that should no longer be able to sign in anywhere.
+    const person = db.select({ enabled: people.enabled }).from(people).where(and(eq(people.id, approved.personId), isNull(people.deletedAt))).get();
+    if (!person || !person.enabled) return c.json({ status: "expired" as const }, 200);
+
     issueSession(c, approved.personId);
     const { token, expiresAt } = issueDeviceToken(approved.personId, approved.kind, approved.label);
     return c.json({ status: "approved" as const, device_token: token, expires_at: expiresAt }, 200);

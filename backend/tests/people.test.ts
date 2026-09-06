@@ -547,7 +547,7 @@ describe("deleting a person erases what the household held about them", () => {
   test("no table is left holding rows about a deleted person", async () => {
     const owner = await ownerSession();
     const person = await addPerson(owner, "Bramble", "teen", "theirpin1");
-    await sessionFor(person.id, "theirpin1");
+    const personClient = await sessionFor(person.id, "theirpin1");
     remember(toPersonRow(person.id), {
       text: "Bramble likes trains",
       category: "preference",
@@ -559,6 +559,23 @@ describe("deleting a person erases what the household held about them", () => {
     });
     resolveOrCreateConversation(toPersonRow(person.id), "chat");
     setValue(toPersonRow(person.id), `person:${person.id}`, "tts.voice_id", "alba");
+
+    // Step 7: a code review (2026-09-06) found entities/relationships/
+    // grants/approvals entirely unexercised by this test - it never
+    // created a row in any of them, so the per-column loop below passed
+    // trivially even before erasePersonData() was fixed to actually
+    // clear them.
+    const ownEntity = (await (await personClient.post("/api/entities", { kind: "person", name: "Bramble's pen pal", scope: "person" })).json()) as { id: string };
+    const otherEntity = (await (await owner.post("/api/entities", { kind: "pet", name: "Bruno" })).json()) as { id: string };
+    // requireRoleOrGrant(["owner","admin"], "relationships.manage") gates
+    // writes - a teen has neither, so this is the owner stating it on
+    // Bramble's behalf (explicit `person`), not Bramble's own client.
+    const relRes = await owner.post("/api/relationships", { type: "owns", from_id: ownEntity.id, to_id: otherEntity.id, scope: "person", person: person.id });
+    expect(relRes.status).toBe(201);
+    const grantRes = await owner.post("/api/grants", { person: person.id, action: "backups.run", effect: "allow" });
+    expect(grantRes.status).toBe(201);
+    const approvalRes = await personClient.post("/api/approvals", { kind: "browse_url", details: {} });
+    expect(approvalRes.status).toBe(201);
 
     await owner.request(`/api/people/${person.id}`, { method: "DELETE" });
 
@@ -692,5 +709,95 @@ describe("POST /api/people/batch-delete", () => {
     const childClient = await sessionFor(child.id);
 
     expect((await childClient.post("/api/people/batch-delete", { ids: [other.id] })).status).toBe(403);
+  });
+});
+
+// Step 7: enabled, guest expiry, memorialise.
+describe("enabled and guest expiry", () => {
+  test("an admin can disable a profile, and re-enable it", async () => {
+    const owner = await ownerSession();
+    const adult = await addPerson(owner, "Marlow", "adult");
+
+    const disableRes = await owner.request(`/api/people/${adult.id}`, { method: "PATCH", body: { enabled: false } });
+    expect(disableRes.status).toBe(200);
+    expect(((await disableRes.json()) as { enabled: boolean }).enabled).toBe(false);
+
+    const enableRes = await owner.request(`/api/people/${adult.id}`, { method: "PATCH", body: { enabled: true } });
+    expect(((await enableRes.json()) as { enabled: boolean }).enabled).toBe(true);
+  });
+
+  test("a disabled person cannot sign in even with the right PIN", async () => {
+    const owner = await ownerSession();
+    const adult = await addPerson(owner, "Marlow", "adult", "theirpin1");
+    await owner.request(`/api/people/${adult.id}`, { method: "PATCH", body: { enabled: false } });
+
+    const client = new TestClient();
+    const res = await client.post("/api/auth/verify-secret", { personId: adult.id, secret: "theirpin1" });
+    // Same "Profile not found" a deleted person gets, not a wrong-secret
+    // 401 - a disabled profile shouldn't leak that the secret was right.
+    expect(res.status).toBe(404);
+  });
+
+  test("refuses to disable your own profile", async () => {
+    const owner = await ownerSession();
+    const ownerId = ((await (await owner.get("/api/auth/me")).json()) as { id: string }).id;
+    const res = await owner.request(`/api/people/${ownerId}`, { method: "PATCH", body: { enabled: false } });
+    expect(res.status).toBe(403);
+  });
+
+  test("guest_expires_at is only settable on a guest profile", async () => {
+    const owner = await ownerSession();
+    const created = await owner.post("/api/people", {
+      displayName: "Bramble",
+      role: "adult",
+      guestExpiresAt: "2026-12-31T00:00:00.000Z",
+    });
+    expect(created.status).toBe(400);
+  });
+
+  test("a guest set to expire in the past cannot sign in", async () => {
+    const owner = await ownerSession();
+    const past = new Date(Date.now() - 1000).toISOString();
+    const created = await owner.post("/api/people", { displayName: "Guest", role: "guest", guestExpiresAt: past });
+    expect(created.status).toBe(201);
+    const guest = (await created.json()) as { id: string };
+
+    const { disableExpiredGuests } = await import("@/lib/personLifecycle");
+    disableExpiredGuests();
+
+    const client = new TestClient();
+    const res = await client.post("/api/auth/select", { personId: guest.id });
+    expect(res.status).toBe(404); // disabled (by disableExpiredGuests()) - same "Profile not found" a deleted person gets
+  });
+});
+
+describe("POST /api/people/:id/memorialize", () => {
+  test("revokes the target's credentials and marks them memorialised", async () => {
+    const owner = await ownerSession();
+    const adult = await addPerson(owner, "Marlow", "adult", "theirpin1");
+
+    const res = await owner.request(`/api/people/${adult.id}/memorialize`, { method: "POST" });
+    expect(res.status).toBe(200);
+
+    const client = new TestClient();
+    const signInRes = await client.post("/api/auth/verify-secret", { personId: adult.id, secret: "theirpin1" });
+    expect(signInRes.status).toBe(400); // "No PIN or password set" - the credential is gone
+  });
+
+  test("requires owner/admin", async () => {
+    const owner = await ownerSession();
+    const adult1 = await addPerson(owner, "Marlow", "adult", "pin11111");
+    const adult2 = await addPerson(owner, "Nadia", "adult", "pin22222");
+    const adult1Client = await sessionFor(adult1.id, "pin11111");
+
+    const res = await adult1Client.request(`/api/people/${adult2.id}/memorialize`, { method: "POST" });
+    expect(res.status).toBe(403);
+  });
+
+  test("refuses to memorialize your own profile", async () => {
+    const owner = await ownerSession();
+    const ownerId = ((await (await owner.get("/api/auth/me")).json()) as { id: string }).id;
+    const res = await owner.request(`/api/people/${ownerId}/memorialize`, { method: "POST" });
+    expect(res.status).toBe(403);
   });
 });

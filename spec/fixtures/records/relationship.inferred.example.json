@@ -11,12 +11,15 @@
   "stated_by_person_id": null,
   "confidence": 0.62,
   "confirmed_by_person_id": null,
-  "evidence": ["turn-2026-09-05-0042"],
+  "evidence": [
+    "turn-2026-09-05-0042"
+  ],
   "scope": "person",
   "person": "person-a1b2c3",
   "sensitive": true,
   "note": "Unconfirmed: may be used to ask, never to assert.",
   "created_at": "2026-09-05T12:00:00Z",
   "updated_at": "2026-09-05T12:00:00Z",
-  "deleted_at": null
+  "deleted_at": null,
+  "hlc": "1757073600000:0:a1b2c3"
 }

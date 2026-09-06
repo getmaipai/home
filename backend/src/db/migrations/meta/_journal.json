@@ -127,6 +127,13 @@
       "when": 1788688360064,
       "tag": "0017_wonderful_vengeance",
       "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "6",
+      "when": 1788696754973,
+      "tag": "0018_pale_shockwave",
+      "breakpoints": true
     }
   ]
 }

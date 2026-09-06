@@ -341,10 +341,11 @@ alongside the first sourced skill, not before it.
       invent: "pets need ownership" is one of Jesse's own original
       points in `docs/dev.md`'s "Entities, relationships and grants" -
       a pet is a `kind: entity` record and "owns"/"belongs to" is exactly
-      the Relationship edge that spec already defines, so this is a
-      recognition-and-UI problem sitting on top of hub work that's
-      already spec'd but not yet built ("The hub half of entities and
-      relationships," People/relationships section above), not a new
+      the Relationship edge that spec already defines. That storage is
+      real now (Session F step 7, 2026-09-06: `POST /api/entities`
+      `kind: pet`, `POST /api/relationships` `type: owns` - its stored
+      inverse, `owned_by`, comes free), so this is purely a recognition-
+      and-UI problem sitting on top of already-built hub work, not a new
       data model to design from scratch.
 
 ## Generation (image, video)
@@ -798,20 +799,52 @@ Sources for this section (research pass, 2026-09-05): [Mem0, state of agent memo
 
 The spec landed 2026-09-05 (`docs/dev.md`, "Entities, relationships and
 grants"): Entity, Relationship and Grant, with the relationship-type and
-grant-action vocabularies and the cross-field validators. None of it is
-implemented on the hub yet.
+grant-action vocabularies and the cross-field validators. The hub half
+landed with Session F step 7, 2026-09-06 - see below for what did and
+didn't ship, and `docs/dev/session-f.md`'s step 7 write-up for the full
+detail.
 
-- [ ] **The hub half of entities and relationships** (L) - tables,
-      migration, routes, and a UI. Held back deliberately: a parallel
-      session was mid-edit across `db/schema.ts`, the migrations and
-      `turnEngine.ts` when the spec landed, and a change this shape on
-      top of that is how two sessions lose work.
-- [ ] **Migrate authorization from roles to grants** (L) - `min_role` on
-      every package manifest, `CREATABLE_BY`/`MANAGEABLE_BY` in
-      `routes/people.ts` and `lib/personLifecycle.ts`, and every
-      `requireRole` call become grant checks. Age stops deciding access
-      entirely (see the spec's reasoning); it keeps its place in safety
-      and retention only.
+- [x] **The hub half of entities and relationships** (Session F step 7,
+      2026-09-06) - tables and migration (`entities`, `relationships`,
+      `grants`, plus the hub-internal `approvals` queue), every cross-
+      field rule from `spec/records/ts/validate.ts` enforced at the
+      write boundary (`lib/entities.ts`, `lib/relationships.ts`,
+      `lib/grants.ts`), and `GET/POST/PATCH/DELETE` routes for all
+      three plus `GET /api/people/:id/permissions` (the effective,
+      resolved grant set - denies win over allows on the same action;
+      `safety_stop` needs no special case since no grant action for it
+      exists in the closed vocabulary to begin with) and the approval
+      queue (`GET/POST /api/approvals`, `POST /:id/{approve,deny}`, its
+      own `approvals.requested` notification to every adult). No UI yet
+      - that's E's kit work on top of this.
+- [x] **Migrate authorization from roles to grants, additively** (Session
+      F step 7, 2026-09-06) - narrower than the original framing: grants
+      were added *beside* roles this wave, not as a full replacement.
+      `requireRoleOrGrant()` (`middleware/auth.ts`) lets an active ALLOW
+      grant open a gate for someone outside the usual `roles` list, as a
+      pure OR - it never narrows what an owner/admin's role already
+      allows, so nothing a family could do before this landed stopped
+      working. Wired to the 5 route groups with a real, already-defined
+      grant action to check (`people.manage`/`people.grant` on
+      `routes/people.ts` and `routes/grants.ts`, `backups.run`/
+      `backups.restore` on `routes/backups.ts`, `relationships.manage`
+      on the new `routes/relationships.ts`). The other ~17 `requireRole`
+      call sites (`host.ts`, `plugins.ts`, `scheduler.ts`, `repairs.ts`,
+      `memory.ts`'s `maintenance/run`, `totp.ts`) have no matching
+      `grant-actions.json` entry today and were deliberately left on
+      plain `requireRole()` rather than mechanically converted for zero
+      behavioral gain - each needs a real vocabulary entry (a spec
+      change) before it can gain a grant check, and `totp.ts` specifically
+      should probably never gain one: which roles may even HAVE TOTP is
+      a hard policy (plan 4.1: "optional TOTP for owner and admin only"),
+      not an action a household should be able to grant its way around.
+- [ ] **`min_role` on every package manifest becomes a grant check too**
+      (L) - a manifest's declared minimum role is D's package-host
+      territory (`packageHost.ts`), not touched by Session F step 7.
+      Once `use:<package>` grants are actually consulted anywhere (see
+      `ctx.allowance`/package gating below), a manifest's `min_role`
+      should become the *default* grant a package's install seeds,
+      overridable per person the same way `packages.use_all` already is.
 - [ ] **Resolve the unrestricted-mode age collision** (S, Jesse's call) -
       the org's Safety invariants unlock unrestricted chat and generation
       "per-user by an adult" and restrict child profiles by default, both
@@ -835,9 +868,11 @@ implemented on the hub yet.
       the assistant is being. `persona.ts` already has a `complexity`
       dimension doing half the job for the wrong owner: two people
       sharing a companion must still be addressed differently.
-- [ ] **An `enabled` state for a person** (S) - `Person` has only
-      `deleted_at`; disabled-but-present has no representation today.
-- [ ] **Retire the free-text memory entity** (M) - `record_kind: entity`
+- [x] **An `enabled` state for a person** (Session F step 7, 2026-09-06)
+      - see "Lifecycle events" above.
+- [ ] **Retire the free-text memory entity** (M, C) - now unblocked: the
+      real `entities` table landed with Session F step 7, 2026-09-06.
+      `record_kind: entity`
       keeps a name and description in one `text` field and recovers the
       name by splitting on the first colon, which `lib/memory.ts`
       documents as an approximation. Entity records replace it; memory
@@ -1519,16 +1554,21 @@ on a spec tag that was never cut.
       unknown personId, and `auth.ts`'s own conversion to
       `@hono/zod-openapi` (deferred past the first pass since it wasn't
       new code, then required once this diff rewrote most of the file).
+- [x] **The approval queue** (Session F step 7, 2026-09-06) - see the
+      People/relationships/permissions section below.
 - [ ] **Identity and trust pieces plan v0.1 scopes and this file did not
-      track, still open** (M each) - an approval queue, hub-key signing
-      of the bundled default set, the emergency kit and hub/SMB backup
-      targets, a restore drill in the release skill, and the `user/`
-      docs tier (only `dev/` exists).
-- [ ] **Tests the audit found missing** (S) - `hlc.ts` seed and compare,
-      `personLifecycle`, `access`, and one test proving a specific
-      recalled memory text actually lands in the prompt for a matching
-      query (memory tests stop at `recall`; prompt tests use synthetic
-      matches).
+      track, still open** (M each) - hub-key signing of the bundled
+      default set, the emergency kit and hub/SMB backup targets, a
+      restore drill in the release skill, and the `user/` docs tier
+      (only `dev/` exists).
+- [ ] **Tests the audit found missing** (S) - `access`, and one test
+      proving a specific recalled memory text actually lands in the
+      prompt for a matching query (memory tests stop at `recall`; prompt
+      tests use synthetic matches). `hlc.ts` seed and compare landed
+      earlier (this line was never checked off); `personLifecycle`
+      landed with Session F step 7, 2026-09-06
+      (`memorializePerson`/`disableExpiredGuests`/`ageBandForBirthdate`/
+      `applyAgeBandChanges`).
 - [x] **Copy the legacy runtime guards, most of them** (Session F step 3,
       2026-09-06) - checked `llmSupervisor.ts`/`modelDownload.ts`/
       `telegramChannel.ts` for equivalents first, per this item's own
@@ -1697,16 +1737,37 @@ that owns it.
       picker, PIN or passkey; birthdate in, band out, presets shown to
       the parent with what they will see; a guest with an expiry and no
       memory (plan 12, 7.4).
-- [ ] **Lifecycle events** (S-M, F) - `enabled` on Person, guest expiry
-      removal, memorialise (read-only profile, PIN cleared, sessions
-      revoked, export offered), the band change on a birthday with a
-      passive notification to parents (plan 7.4). None exist.
+- [x] **Lifecycle events** (Session F step 7, 2026-09-06) - `enabled`
+      on Person (enforced at every sign-in boundary: `/select`,
+      `/verify-secret`, passkey authenticate, device-token redeem, Quick
+      Connect's poll, TOTP challenge, plus the 10s session cache), guest
+      expiry removal (`disableExpiredGuests()`, a daily core job),
+      memorialise (`POST /api/people/:id/memorialize` - every credential
+      and session revoked, memories and conversations untouched, "export
+      offered" left to the client), the band change on a birthday
+      (`applyAgeBandChanges()`, a daily core job, `person.band_changed`
+      passive notification to adults). See the People/relationships/
+      permissions section below.
 - [x] **Sessions per device with revoke, optional TOTP for owner and
       admin** (Session F step 6, 2026-09-06) - see the entry above under
       "Identity and trust pieces".
-- [ ] **Time allowances and schedules per category** (M, F backend, E
-      controls page) - plan 4.2 names them as household settings enforced
-      in the turn engine and package host; nothing exists.
+- [x] **Time allowances per category** (Session F step 7, 2026-09-06,
+      backend half only) - `settings/allowanceKeys.ts` +
+      `lib/allowance.ts::dailyMinutesAllowed()`, one person-scoped daily-
+      minutes setting per manifest category, default 0 (no limit
+      configured). Deliberately daily-minutes only, not "and schedules":
+      a time-of-day window needs either the settings system's untested
+      `time` selector (nothing renders one yet) or a JSON blob the
+      settings standard's one-atomic-value-per-key shape does not
+      support - landing an untested selector to satisfy the letter of
+      the plan text would be its own half-finished feature. Also not
+      done: actually enforcing this in `ctx.allowance` - that needs live
+      per-day usage bookkeeping, which belongs to the package host's own
+      session tracking (D's file, out of this session's scope per this
+      repo's own `CLAUDE.md`); D reads the configured limit from
+      `dailyMinutesAllowed()` and combines it with elapsed usage to
+      produce `ctx.allowance`. E's controls page still needs building on
+      top of this.
 
 **Health, updates, storage, install**
 
