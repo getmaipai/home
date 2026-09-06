@@ -17,7 +17,7 @@ import { listPackageIds, loadPackage, meetsMinRole, runPlugin } from "@/lib/plug
 import { ensureRoutingEmbeddings, embedUtterance, scoreByEmbedding, pickTier1WinnerAmong } from "@/lib/routing";
 import { loadAllSkills, type LoadedSkill } from "@/lib/skills";
 import { matchCommand, runCommand } from "@/lib/commands";
-import { trigger } from "@/lib/notifications";
+import { notifyIfFlagged } from "@/lib/notifications";
 import { recall, bumpUsage, getProfileParagraph, type RecallMatch } from "@/lib/memory";
 import { newConversationTurnId } from "@/lib/id";
 import { complete, startCompleteStream, type LlmMessage, type ToolSpec, type ToolCall } from "@/lib/llm";
@@ -171,6 +171,17 @@ function pluginsListLine(loaded: LoadedManifest[]): string {
 // something concrete to assert: the assembled system prompt never grows
 // unbounded just because a household has a lot of memories or packages.
 export const PROMPT_SYSTEM_CHAR_BUDGET = 4000;
+// Code review, 2026-09-06 (SEC-5): nothing bounded an incoming turn's raw
+// text before it reached the safety classifier's regex families, the
+// tokenizer and the model request - a household member could send tens
+// of megabytes and stall the whole event loop (the classifier and the
+// request body itself have no other size limit upstream of here).
+// Generous for a real conversational turn (voice transcripts and typed
+// chat both run a few sentences to a couple of paragraphs, never this
+// long) while completely closing that DoS - the same shape as
+// lib/tts.ts's own MAX_TEXT_LENGTH for the identical reason on the
+// output side.
+export const MAX_TURN_TEXT_LENGTH = 8_000;
 const MAX_MEMORY_SNIPPETS = 5;
 const MAX_MEMORY_SECTION_CHARS = 800;
 const MAX_PLUGINS_SECTION_CHARS = 800;
@@ -815,22 +826,15 @@ async function prepareTurn(
     turnId,
   });
   const safety = evaluateSafety(text, speakerAgeBand(actor, new Date()));
-  if (safety.notify_parent) {
-    // SafetyResult's own schema comment named this exact wiring as a
-    // "later hub release" gap the day the field was written: notify_parent
-    // has been computed correctly since safety.ts shipped, but nothing
-    // before lib/notifications.ts existed to deliver it - it only ever
-    // reached a console.log line. Fired regardless of `action`
-    // (allow_with_resources and refuse can both flag a minor's turn), and
-    // BEFORE the refuse branch below returns, so a refused turn still
-    // notifies. Never awaited: notifying a parent must never add latency
-    // to, or ever be able to fail, the turn itself (this function's own
-    // "never throws" contract - notifications.ts's trigger() already
-    // upholds it, this just doesn't block on it too).
-    trigger("safety.flagged_turn", { childName: actor.displayName, categories: safety.categories.join(", ") }).catch((err: unknown) =>
-      console.error(`[turn] safety.flagged_turn notification failed: ${(err as Error).message}`),
-    );
-  }
+  // SafetyResult's own schema comment named this exact wiring as a
+  // "later hub release" gap the day the field was written: notify_parent
+  // has been computed correctly since safety.ts shipped, but nothing
+  // before lib/notifications.ts existed to deliver it - it only ever
+  // reached a console.log line. Fired regardless of `action`
+  // (allow_with_resources and refuse can both flag a minor's turn), and
+  // BEFORE the refuse branch below returns, so a refused turn still
+  // notifies.
+  notifyIfFlagged(actor, safety, "[turn]");
   if (safety.action === "refuse") {
     // The text here is never actually seen: finalizeReply() unconditionally
     // replaces it via pickRefusalVariant() for every `safety_refuse`
@@ -1209,6 +1213,9 @@ export async function runTurn(
   if (typeof text !== "string" || text.trim().length === 0) {
     return { ok: false, status: 400, code: "invalid_input", error: "text is required" };
   }
+  if (text.length > MAX_TURN_TEXT_LENGTH) {
+    return { ok: false, status: 400, code: "invalid_input", error: `text must be ${MAX_TURN_TEXT_LENGTH} characters or fewer` };
+  }
 
   // Resolved before prepareTurn() runs (step 3's contract: "conversation_id
   // absent means the actor's open conversation for that surface, created
@@ -1245,11 +1252,7 @@ export async function runTurn(
     // Never weakens the INPUT check above (prepareTurn()'s own
     // evaluateSafety() call) - purely additive.
     const outputSafety = evaluateSafety(completion.value.text, speakerAgeBand(actor, new Date()));
-    if (outputSafety.notify_parent) {
-      trigger("safety.flagged_turn", { childName: actor.displayName, categories: outputSafety.categories.join(", ") }).catch((err: unknown) =>
-        console.error(`[turn] safety.flagged_turn notification failed: ${(err as Error).message}`),
-      );
-    }
+    notifyIfFlagged(actor, outputSafety, "[turn]");
     value =
       outputSafety.action === "refuse"
         ? {
@@ -1392,11 +1395,7 @@ export async function* gateOutputSafety(
 
   const checkAndNotify = (chunk: string): SafetyResult => {
     const safety = evaluateSafety(chunk, band);
-    if (safety.notify_parent) {
-      trigger("safety.flagged_turn", { childName: actor.displayName, categories: safety.categories.join(", ") }).catch((err: unknown) =>
-        console.error(`[turn] safety.flagged_turn notification failed: ${(err as Error).message}`),
-      );
-    }
+    notifyIfFlagged(actor, safety, "[turn]");
     if (safety.flagged) lastFlagged = safety;
     return safety;
   };
@@ -1494,6 +1493,9 @@ export async function runTurnStream(
   }
   if (typeof text !== "string" || text.trim().length === 0) {
     return { ok: false, status: 400, code: "invalid_input", error: "text is required" };
+  }
+  if (text.length > MAX_TURN_TEXT_LENGTH) {
+    return { ok: false, status: 400, code: "invalid_input", error: `text must be ${MAX_TURN_TEXT_LENGTH} characters or fewer` };
   }
 
   const conversationResult = resolveOrCreateConversation(actor, surface, opts.conversationId);

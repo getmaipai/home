@@ -3,7 +3,18 @@ import { TestClient } from "./client";
 import { resetDb } from "./reset-db";
 import { __resetThrottleForTests } from "@/lib/secretThrottle";
 import { __resetLlmSupervisorForTests } from "@/lib/llmSupervisor";
-import { runTurn, runTurnStream, gateOutputSafety, StreamSafetyRefusal, buildSystemPrompt, matchPattern, capSection, PROMPT_SYSTEM_CHAR_BUDGET, type TurnStreamResult } from "@/lib/turnEngine";
+import {
+  runTurn,
+  runTurnStream,
+  gateOutputSafety,
+  StreamSafetyRefusal,
+  buildSystemPrompt,
+  matchPattern,
+  capSection,
+  PROMPT_SYSTEM_CHAR_BUDGET,
+  MAX_TURN_TEXT_LENGTH,
+  type TurnStreamResult,
+} from "@/lib/turnEngine";
 import { streamTurnEvents } from "@/routes/turn";
 import { PERSON_TURN_BUDGET } from "@/lib/llm";
 import { __resetRateLimiterForTests } from "@/lib/rateLimiter";
@@ -71,6 +82,20 @@ describe("lib/turnEngine.ts runTurn()", () => {
     expect(result.value.source).toBe("safety_refuse");
     expect(REFUSAL_FIRST).toContain(result.value.reply.text);
     expect(result.value.safety.action).toBe("refuse");
+  });
+
+  // SEC-5 (code review, 2026-09-06): nothing bounded an incoming turn's
+  // text before it reached the safety classifier and the model - a
+  // household member could send tens of megabytes and stall the event
+  // loop.
+  test("rejects text over MAX_TURN_TEXT_LENGTH before it reaches the safety classifier or the model", async () => {
+    const { actor } = await owner();
+
+    const result = await runTurn(actor, "chat", "a".repeat(MAX_TURN_TEXT_LENGTH + 1));
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.code).toBe("invalid_input");
+    expect(result.status).toBe(400);
   });
 
   test("safety allow_with_resources: crisis resources ride alongside the real reply, never blocking it", async () => {
@@ -200,6 +225,16 @@ describe("lib/turnEngine.ts runTurnStream()", () => {
     if (!result.ok || result.kind !== "immediate") return;
     expect(result.value.source).toBe("safety_refuse");
     expect(REFUSAL_FIRST).toContain(result.value.reply.text);
+  });
+
+  test("rejects text over MAX_TURN_TEXT_LENGTH before it reaches the safety classifier or the model (SEC-5)", async () => {
+    const { actor } = await owner();
+
+    const result = await runTurnStream(actor, "chat", "a".repeat(MAX_TURN_TEXT_LENGTH + 1));
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.code).toBe("invalid_input");
+    expect(result.status).toBe(400);
   });
 
   test("the deterministic plugin floor also answers immediately, no model call needed", async () => {
@@ -963,6 +998,14 @@ describe("POST /api/turn", () => {
     const client = new TestClient();
     const res = await client.post("/api/turn", { text: "hi" });
     expect(res.status).toBe(401);
+  });
+
+  // SEC-5 (code review, 2026-09-06): an oversized body is now rejected at
+  // the edge (bodyLimit), before it's even JSON-parsed.
+  test("an oversized request body is rejected before it's even parsed", async () => {
+    const { client } = await owner();
+    const res = await client.post("/api/turn", { text: "x".repeat(100_000) });
+    expect(res.status).toBe(413);
   });
 
   test("defaults surface to chat and returns a real reply", async () => {

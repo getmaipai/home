@@ -31,6 +31,7 @@
 // own history do the rest; a real, named simplification, not silently
 // dropped context (documented here and in docs/dev/session-c.md).
 import { Hono } from "hono";
+import { bodyLimit } from "hono/body-limit";
 import { requireApiToken } from "@/middleware/auth";
 import { runTurn, runTurnStream, type Surface } from "@/lib/turnEngine";
 import { personWithinTurnBudget } from "@/lib/llm";
@@ -61,7 +62,12 @@ function chunkId(): string {
   return `chatcmpl-${Date.now().toString(36)}${chunkCounter}`;
 }
 
-openaiRoutes.post("/v1/chat/completions", requireApiToken, async (c) => {
+// bodyLimit (SEC-5, 2026-09-06): this route has the same unbounded-body
+// exposure routes/turn.ts had - an external client's full messages
+// history can be large, so this is more generous than turn.ts's own
+// limit, but runTurn()/runTurnStream()'s MAX_TURN_TEXT_LENGTH still caps
+// the extracted last-user-message text underneath this.
+openaiRoutes.post("/v1/chat/completions", requireApiToken, bodyLimit({ maxSize: 256 * 1024 }), async (c) => {
   const actor = c.get("person");
   if (!personWithinTurnBudget(actor.id)) {
     return c.json(RATE_LIMIT_RESPONSE, 429);

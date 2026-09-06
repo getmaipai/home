@@ -1,4 +1,5 @@
 import { Hono } from "hono";
+import { bodyLimit } from "hono/body-limit";
 import { requireAuth } from "@/middleware/auth";
 import { runTurn, runTurnStream, StreamSafetyRefusal, type Surface, type TurnStreamResult } from "@/lib/turnEngine";
 import { pickThinkingCue } from "@/lib/replyVariation";
@@ -16,7 +17,14 @@ const RATE_LIMIT_RESPONSE = { error: "Too many requests too quickly.", code: "tu
 // caller those two routes' comments named as "ahead of the turn engine";
 // they stay useful in their own right (diagnostics, direct model/safety
 // checks) now that this one exists.
-turnRoutes.post("/", requireAuth, async (c) => {
+// bodyLimit (SEC-5, 2026-09-06) rejects an oversized request as its bytes
+// arrive, before JSON.parse or runTurn()'s own MAX_TURN_TEXT_LENGTH check
+// ever run - a margin over that cap for the surrounding JSON and other
+// fields, the same "reject at the edge, then validate the content"
+// pairing lib/turnEngine.ts's own length check backs up.
+const TURN_BODY_LIMIT = 64 * 1024;
+
+turnRoutes.post("/", requireAuth, bodyLimit({ maxSize: TURN_BODY_LIMIT }), async (c) => {
   const actor = c.get("person");
   if (!personWithinTurnBudget(actor.id)) {
     return c.json(RATE_LIMIT_RESPONSE, 429);
@@ -151,7 +159,7 @@ export async function* streamTurnEvents(
 // body, no `text/event-stream` framing to parse on the way back out for a
 // wire shape this simple - see wire.ts's TurnStreamEvent for the three
 // event kinds. Same auth posture as POST /api/turn above.
-turnRoutes.post("/stream", requireAuth, async (c) => {
+turnRoutes.post("/stream", requireAuth, bodyLimit({ maxSize: TURN_BODY_LIMIT }), async (c) => {
   const actor = c.get("person");
   if (!personWithinTurnBudget(actor.id)) {
     return c.json(RATE_LIMIT_RESPONSE, 429);
