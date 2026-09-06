@@ -1,5 +1,6 @@
 import { useState, type FormEvent, type ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
+import { Trans } from "@lingui/react";
 import { useQuery } from "@tanstack/react-query";
 import { Page } from "@/kit/primitives/Page";
 import { cn, FOCUS_RING } from "@/kit/utils";
@@ -181,7 +182,9 @@ export function HomePage({ person }: HomePageProps) {
         </form>
 
         <div>
-          <h3 className="mb-2 text-sm font-medium text-muted-foreground">Today</h3>
+          <h3 className="mb-2 text-sm font-medium text-muted-foreground">
+            <Trans id="Today" message="Today" />
+          </h3>
           <div className="grid gap-3 sm:grid-cols-2">
             <WeatherCard />
             <RecentMemoriesCard />

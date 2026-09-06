@@ -2,6 +2,7 @@ import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
 import { VitePWA } from "vite-plugin-pwa";
+import { lingui } from "@lingui/vite-plugin";
 import { fileURLToPath } from "node:url";
 
 // The backend has no CORS and a Strict-SameSite session cookie (see
@@ -14,6 +15,28 @@ export default defineConfig({
   plugins: [
     react(),
     tailwindcss(),
+    // Session E step 8, i18n scaffolding: `.po` catalog compile-on-
+    // import (no separate `lingui compile` step). Lingui's documented
+    // Vite+React setup (lingui.dev/tutorials/setup-vite) also wires the
+    // `<Trans>`/`t` MACRO transform through `@vitejs/plugin-react`'s own
+    // `babel.plugins` option - that option no longer exists on the
+    // version installed here (`@vitejs/plugin-react@6.1.1` moved its own
+    // JSX transform to `oxc-transform-react` and dropped Babel
+    // entirely, confirmed by reading its own `Options` type, which has
+    // no `babel` property at all). Passing it anyway silently did
+    // nothing: macros compiled to nothing, and every `<Trans>`/`t` call
+    // fell through to the macro package's own runtime guard, which
+    // throws ("executed outside the context of compilation") the moment
+    // React actually renders one - found live, not from a lint error,
+    // since nothing caught the silently-ignored option. Session E's own
+    // strings use Lingui's plain runtime API instead (`<Trans id=
+    // message=>` from `@lingui/react`, `i18n._()` from `@/i18n`), which
+    // needs no Babel pass at all - `lingui extract` finds both forms
+    // equally well (its own `js-lingui-explicit-id` marker in the
+    // generated `.po` files). Re-enabling macros later needs either a
+    // real Babel-based React plugin variant or `@lingui/swc-plugin`,
+    // neither installed now.
+    lingui(),
     // docs/UI.md > Responsive layout, PWA, tabs, icons: "an app-shell
     // service worker that caches only shell and kit, never household
     // data; an offline page." `manifest: false` because index.html already

@@ -1,5 +1,6 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { NavLink, useLocation, useNavigate } from "react-router-dom";
+import { Trans, useLingui } from "@lingui/react";
 import { useFocusable } from "@noriginmedia/norigin-spatial-navigation";
 import {
   SidebarProvider,
@@ -131,12 +132,28 @@ function PinToggle({ person }: { person: Roster }) {
   );
 }
 
-function searchNavContent(onActivate: () => void) {
+// `tooltip` is passed in, computed by the caller via `useLingui()`
+// (`SidebarMenuButton`'s `tooltip` prop takes a plain string, not JSX,
+// so it can't use the `<Trans>` component the visible label below it
+// does) - a code review (2026-09-06) found an earlier version calling
+// the bare `i18n._()` singleton directly here, which computes once at
+// whatever render this function happened to run on and never updates
+// again: unlike `<Trans>`, which subscribes to `I18nProvider`'s own
+// context and re-renders on `activateLocale()`, a plain function call
+// has nothing to resubscribe it. Invisible today only because en-US and
+// en-GB happen to share this exact string.
+function searchNavContent(onActivate: () => void, tooltip: string) {
   const SearchIcon = getIcon("search");
   return (
-    <SidebarMenuButton tooltip="Search" onClick={onActivate}>
+    <SidebarMenuButton tooltip={tooltip} onClick={onActivate}>
       <SearchIcon aria-hidden />
-      <span>Search</span>
+      <span>
+        {/* `id`/`message` are hand-written, not macro-derived (vite.config.ts's
+            own comment explains why macros aren't used here) - the two have
+            to be kept equal by hand; a catalog entry that drifts from this
+            wouldn't fail any build or lint, only show a stale translation. */}
+        <Trans id="Search" message="Search" />
+      </span>
     </SidebarMenuButton>
   );
 }
@@ -148,7 +165,8 @@ function searchNavContent(onActivate: () => void) {
  * `TvNavItem` are split below (rules of hooks: `useFocusable` can't be
  * called conditionally, and only after `ensureTvNavInit()` has run). */
 function SearchNavItem({ onOpen }: { onOpen: () => void }) {
-  return <SidebarMenuItem>{searchNavContent(onOpen)}</SidebarMenuItem>;
+  const { i18n } = useLingui();
+  return <SidebarMenuItem>{searchNavContent(onOpen, i18n._("Search"))}</SidebarMenuItem>;
 }
 
 /** `far` has no free text entry beyond the remote's keyboard (step 6), so
@@ -159,6 +177,7 @@ function SearchNavItem({ onOpen }: { onOpen: () => void }) {
  * initial remote focus. */
 function TvSearchNavItem() {
   const navigate = useNavigate();
+  const { i18n } = useLingui();
   const { ref, focused } = useFocusable<HTMLDivElement>({
     onEnterPress: () => navigate("/search"),
     forceFocus: true,
@@ -166,7 +185,7 @@ function TvSearchNavItem() {
   return (
     <SidebarMenuItem>
       <div ref={ref} className={cn(focused && "rounded-md ring-2 ring-ring")}>
-        {searchNavContent(() => navigate("/search"))}
+        {searchNavContent(() => navigate("/search"), i18n._("Search"))}
       </div>
     </SidebarMenuItem>
   );

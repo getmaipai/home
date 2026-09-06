@@ -1,9 +1,12 @@
 import { useEffect, useState } from "react";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { I18nProvider } from "@lingui/react";
+import { i18n } from "@/i18n";
 import { createQueryClient } from "@/lib/queryClient";
 import { SignIn } from "@/shell/SignIn";
 import { Shell } from "@/shell/Shell";
+import { useHouseholdLocale } from "@/shell/useHouseholdLocale";
 import { SetupWizard } from "@/apps/setup/SetupWizard";
 import { ChatPage } from "@/apps/chat/ChatPage";
 import { ConversationsPage } from "@/apps/conversations/ConversationsPage";
@@ -62,6 +65,8 @@ export function App() {
     loadPerson();
   }, []);
 
+  useHouseholdLocale(person != null);
+
   // The router now wraps every state (loading, signed out, mid-setup,
   // signed in), not just the authenticated tree: `/setup` needs to be a
   // real, addressable, reloadable route (platform plan 6.4's Wizard
@@ -70,62 +75,64 @@ export function App() {
   // component with no path of its own the way the old inline first-run
   // form had).
   return (
-    <QueryClientProvider client={queryClient}>
-      <ToastProvider>
-        <TooltipProvider>
-          <BrowserRouter>
-            <Routes>
-              <Route path="/setup" element={<SetupWizard onDone={loadPerson} />} />
-              <Route
-                path="/*"
-                element={
-                  person === undefined ? (
-                    <div className="flex h-screen items-center justify-center">
-                      <Progress mode="spinner" label="Loading MaiPai Home" />
-                    </div>
-                  ) : person === null ? (
-                    <SignIn onSignedIn={loadPerson} />
-                  ) : (
-                    <Shell
-                      person={person}
-                      onSignOut={() => api.logout().finally(() => setPerson(null))}
-                      onPersonChange={revalidatePerson}
-                    >
-                      <Routes>
-                        <Route path="/" element={<HomePage person={person} />} />
-                        <Route path="/chat" element={<ChatPage person={person} />} />
-                        <Route path="/conversations" element={<ConversationsPage person={person} />} />
-                        <Route path="/notifications" element={<NotificationsPage />} />
-                        <Route path="/search" element={<SearchPage />} />
-                        <Route path="/people" element={<PeoplePage />} />
-                        <Route path="/memory" element={<MemoryPage person={person} />} />
-                        <Route path="/privacy" element={<PrivacyPage />} />
-                        <Route
-                          path="/settings"
-                          element={<SettingsPage person={person} onPersonChange={revalidatePerson} />}
-                        >
-                          {/* Nested (2026-09-06), not sibling routes: navigating to
-                              one of these used to unmount SettingsPage entirely,
-                              taking the tree rail/Household-Me switcher/search box
-                              down with it. SettingsPage renders these through its
-                              own <Outlet/>, so its chrome stays put. */}
-                          <Route path="users" element={<UsersPage person={person} />} />
-                          <Route path="models" element={<ModelsPage person={person} />} />
-                          <Route path="backups" element={<BackupsPage person={person} />} />
-                          <Route path="voices" element={<VoicesPage person={person} />} />
-                          <Route path="commands" element={<CommandsPage person={person} />} />
-                          <Route path="devices" element={<DevicesPage />} />
-                          <Route path="repairs" element={<RepairsPage person={person} />} />
-                        </Route>
-                      </Routes>
-                    </Shell>
-                  )
-                }
-              />
-            </Routes>
-          </BrowserRouter>
-        </TooltipProvider>
-      </ToastProvider>
-    </QueryClientProvider>
+    <I18nProvider i18n={i18n}>
+      <QueryClientProvider client={queryClient}>
+        <ToastProvider>
+          <TooltipProvider>
+            <BrowserRouter>
+              <Routes>
+                <Route path="/setup" element={<SetupWizard onDone={loadPerson} />} />
+                <Route
+                  path="/*"
+                  element={
+                    person === undefined ? (
+                      <div className="flex h-screen items-center justify-center">
+                        <Progress mode="spinner" label="Loading MaiPai Home" />
+                      </div>
+                    ) : person === null ? (
+                      <SignIn onSignedIn={loadPerson} />
+                    ) : (
+                      <Shell
+                        person={person}
+                        onSignOut={() => api.logout().finally(() => setPerson(null))}
+                        onPersonChange={revalidatePerson}
+                      >
+                        <Routes>
+                          <Route path="/" element={<HomePage person={person} />} />
+                          <Route path="/chat" element={<ChatPage person={person} />} />
+                          <Route path="/conversations" element={<ConversationsPage person={person} />} />
+                          <Route path="/notifications" element={<NotificationsPage />} />
+                          <Route path="/search" element={<SearchPage />} />
+                          <Route path="/people" element={<PeoplePage />} />
+                          <Route path="/memory" element={<MemoryPage person={person} />} />
+                          <Route path="/privacy" element={<PrivacyPage />} />
+                          <Route
+                            path="/settings"
+                            element={<SettingsPage person={person} onPersonChange={revalidatePerson} />}
+                          >
+                            {/* Nested (2026-09-06), not sibling routes: navigating to
+                                one of these used to unmount SettingsPage entirely,
+                                taking the tree rail/Household-Me switcher/search box
+                                down with it. SettingsPage renders these through its
+                                own <Outlet/>, so its chrome stays put. */}
+                            <Route path="users" element={<UsersPage person={person} />} />
+                            <Route path="models" element={<ModelsPage person={person} />} />
+                            <Route path="backups" element={<BackupsPage person={person} />} />
+                            <Route path="voices" element={<VoicesPage person={person} />} />
+                            <Route path="commands" element={<CommandsPage person={person} />} />
+                            <Route path="devices" element={<DevicesPage />} />
+                            <Route path="repairs" element={<RepairsPage person={person} />} />
+                          </Route>
+                        </Routes>
+                      </Shell>
+                    )
+                  }
+                />
+              </Routes>
+            </BrowserRouter>
+          </TooltipProvider>
+        </ToastProvider>
+      </QueryClientProvider>
+    </I18nProvider>
   );
 }

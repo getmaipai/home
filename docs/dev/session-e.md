@@ -1158,3 +1158,95 @@ read through the wizard for real; not done here.
 Verified: `bunx tsc --noEmit` clean, `bun test` (435 passing, both fixes
 are markup-only). Ran the code-review skill on this diff before
 committing, per the org's own gate.
+
+## Step 8: i18n scaffolding, and a real toolchain dead end
+
+**The plan's own step 8 says dispatch the design-resolver agent "with
+the standards and plan 6.7."** Checked first whether that document is
+even reachable: `docs/dev.md`'s own header says this repo was "seeded
+2026-09-03 from the platform plan (`purring-chasing-noodle.md`)" - a
+filesystem search across every getmaipai repo on this machine (`home`,
+`home-c`, `home-d`, `home-f`, `bot`, `catalog`, `.github`) found no such
+file anywhere. It was a one-time seed artifact, never committed. Rather
+than block on a document that does not exist, dispatched the
+design-resolver against what IS real: `getmaipai/.github/docs/
+ENGINEERING.md`'s actual "Language and locale" rule ("UI strings live in
+a per-package message catalog; English is required") and the real,
+already-existing `household.locale` setting (`backend/src/settings/
+coreKeys.ts`), which was declared back in step B's own settings-registry
+work specifically to prove the registry end to end, with a comment
+already naming this exact gap: "nothing reads it yet... that's shell/kit
+work, chapter 6, not started."
+
+**Decision** (full reasoning in `docs/BACKLOG.md`'s new entry): Lingui
+(`@lingui/core`/`react`/`cli`/`vite-plugin`, all `6.6.0`), `.po` catalogs
+under `frontend/src/locales/<locale>/messages.po`, loaded eagerly and
+activated from `household.locale` once settings load. Verified every
+version pin against the real npm registry before installing rather than
+trusting the agent's own report of them - found one already wrong
+(`@lingui/macro` doesn't exist as a real package in this major version;
+the agent's own reasoning named it, but its actual exports live in
+`@lingui/react/macro`/`@lingui/core/macro` instead) before it ever
+reached code.
+
+**A real toolchain incompatibility broke the build silently, and it
+took real digging to find.** Lingui's own documented Vite+React setup
+wires its macro transform through `@vitejs/plugin-react`'s `babel.
+plugins` option. Wired it exactly as documented, wrapped `Shell.tsx`'s
+"Search" nav row and `HomePage.tsx`'s "Today" heading in `<Trans>`/`t`
+macros, ran `lingui extract` (worked, produced real `.po` catalogs), and
+built. The build succeeded, `bunx tsc --noEmit` was clean, and the first
+several `bun run a11y` runs looked clean too - because their output was
+piped through `tail -20`/`tail -60` while debugging something else
+entirely (the far-surface work), which truncated away the actual
+per-route failures underneath and left only a misleadingly clean-looking
+tail. What actually gave it away: the production bundle's size had
+dropped from ~1.4 MB to 324 KB with no code-splitting to explain it -
+grepping the built file directly for "Chat", "Settings", "Household",
+words that appear constantly across this app, found every single one
+missing, despite the bundle containing real React runtime code
+(`createElement`, `useState`). A direct Playwright check (a one-off
+script, not committed) confirmed it: 0 headings, an empty body, and a
+real `pageerror` reading "The macro you imported from '@lingui/react/
+macro' is being executed outside the context of compilation... you
+don't [have] configured correctly one of babel-plugin-macros /
+@lingui/swc-plugin / babel-plugin-lingui-macro." Read `@vitejs/plugin-
+react@6.1.1`'s own shipped `Options` type directly: no `babel` property
+exists on it at all. The version installed in this repo dropped Babel
+entirely for its own JSX transform (`oxc-transform-react` now); the
+option Lingui's docs show is accepted syntactically (nothing type-checks
+against an object literal's exact shape here) and does nothing at
+runtime. A downgrade to a Babel-supporting `@babel/core` version (7.x,
+matching what `@lingui/cli` itself uses) made no difference either -
+confirmed the option itself is dead, not a version mismatch inside it.
+
+**Fixed by dropping the macro layer and using Lingui's plain runtime API
+directly**: `<Trans id="Search" message="Search" />` from the real
+`@lingui/react` (not `/macro`), `i18n._("Search")` from `@/i18n`'s own
+exported singleton for the one non-JSX (tooltip) case. This needs no
+Babel pass at all - `.po` catalog loading (`@lingui/vite-plugin`,
+compile-on-import) was never the broken half. `lingui extract` finds
+plain `id`/`message` `<Trans>` usage exactly as well as macro usage
+(marked `js-lingui-explicit-id` in the generated catalogs, confirmed by
+re-running extraction and reading the output). Removed the now-unused
+`@lingui/babel-plugin-lingui-macro` and `@babel/core` from
+`package.json` rather than leaving dead dependencies behind. Rebuilt:
+bundle size back to ~1.4 MB, and a direct page check showed real content
+("Search", "Today", every nav label) with zero console errors.
+
+**Verified for real, not just "it builds"**: a full, untruncated
+`bun run a11y` run (previous ones piped through `tail` are exactly what
+hid the original bug, so this one wrote to a plain file instead) showing
+all 34 route visits passing with only the one already-known, already-
+diagnosed Chat contrast finding remaining - no keyboard-trap or
+reduced-motion regressions, no macro-runtime errors. Also fixed, found
+during the same investigation: `checkReducedMotion` opened its two
+`buttonTransitionDuration` contexts concurrently via `Promise.all`,
+which hit real, reproducible resource contention right after the main
+matrix loop had already opened and closed 34 contexts sequentially (the
+second of the two concurrent loads timed out waiting for its own `h1`,
+twice in a row, on an otherwise-unrelated run) - made sequential,
+matching how every other check in this file already visits pages one at
+a time. `bun test` (437 passing), `bunx tsc --noEmit` clean, `lint`
+clean, `scripts/check.sh` green end to end. Ran the code-review skill on
+the full diff before committing.

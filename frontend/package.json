@@ -16,6 +16,8 @@
   "dependencies": {
     "@assistant-ui/react": "0.15.18",
     "@assistant-ui/react-markdown": "^0.14.14",
+    "@lingui/core": "6.6.0",
+    "@lingui/react": "6.6.0",
     "@maipai/home-backend": "workspace:*",
     "@maipai/spec": "workspace:*",
     "@noriginmedia/norigin-spatial-navigation": "3.3.0",
@@ -42,6 +44,8 @@
   },
   "devDependencies": {
     "@happy-dom/global-registrator": "^20.14.0",
+    "@lingui/cli": "6.6.0",
+    "@lingui/vite-plugin": "6.6.0",
     "@tailwindcss/vite": "^4.3.3",
     "@testing-library/dom": "^10.4.1",
     "@testing-library/jest-dom": "^7.0.1",

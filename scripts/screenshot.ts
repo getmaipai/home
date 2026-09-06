@@ -274,10 +274,16 @@ async function buttonTransitionDuration(browser: Browser, sessionValue: string, 
  * pass if the whole CSS rule were deleted, since an element that never
  * had a transition at all also computes to a tiny duration. */
 async function checkReducedMotion(browser: Browser, sessionValue: string): Promise<string[]> {
-  const [normal, reduced] = await Promise.all([
-    buttonTransitionDuration(browser, sessionValue, "no-preference"),
-    buttonTransitionDuration(browser, sessionValue, "reduce"),
-  ]);
+  // Sequential, not `Promise.all`: two fresh contexts loading the same
+  // route at once, right after the main matrix loop has already opened
+  // and closed dozens of them one at a time, hit real, reproducible
+  // resource contention under load (found live - the second of the two
+  // concurrent page loads timed out waiting for its own `h1`, twice in a
+  // row, while every one of the 34 sequential route visits in the loop
+  // above it never did). One at a time matches how every other check in
+  // this file already visits pages.
+  const normal = await buttonTransitionDuration(browser, sessionValue, "no-preference");
+  const reduced = await buttonTransitionDuration(browser, sessionValue, "reduce");
   const failures: string[] = [];
   if (!(normal > 0.01)) {
     failures.push(`a header button's own transition-duration under the normal motion preference computed to ${normal}s, expected a real, non-zero duration (this check can't tell reduced-motion apart from "there was never a transition to reduce")`);
@@ -289,21 +295,37 @@ async function checkReducedMotion(browser: Browser, sessionValue: string): Promi
 }
 
 /** Step 7's "basic keyboard-trap check": Tab a real number of times from
- * a real page and compare the distinct elements focus visited in the
- * first half of the presses against the full run. A fixed size floor
- * (say, "at least 5 distinct elements") cannot tell a real trap apart
- * from a real page: a modal cycling among 5-9 real focusable elements
- * (a close button, a few fields, submit) would clear a floor like that
- * well within the press budget while still never letting focus escape -
- * exactly the failure this check exists to catch. Comparing halves
- * instead catches a cycle of any size: if the second half of the presses
- * finds zero elements the first half hadn't already seen, focus is
- * cycling among a fixed set - not merely "small" - since a real page
- * with real content keeps discovering new focusable elements as more
- * Tabs are pressed. Not exhaustive (a trap deep inside a rarely-reached
- * subtree could still slip past a check that only visits one page), but
- * real: driven by actual `Tab` keypresses against a real DOM, not a
- * static analysis of the markup. */
+ * a real page and look for a short, exactly-repeating cycle in the
+ * sequence focus actually visited. A fixed size floor ("at least N
+ * distinct elements") cannot tell a real trap apart from a real page: a
+ * modal cycling among 5-9 real focusable elements (a close button, a few
+ * fields, submit) would clear a floor like that well within the press
+ * budget while never letting focus escape. A first version compared the
+ * first half of the presses against the whole run instead, on the
+ * reasoning that a real page keeps discovering new elements as more
+ * Tabs are pressed - found live, running the full (not the fast a11y-
+ * only) matrix, to be its own false positive: a real page with fewer
+ * focusable elements than half the press budget reaches the end of its
+ * own Tab order and wraps back to the first element (standard browser
+ * behavior), which that comparison could not tell apart from a genuine
+ * trap. Looking for a short repeating cycle (period 1 to 4, seen at
+ * least 3 times in a row) is the one signal that is real regardless of
+ * how many focusable elements the page actually has, as long as the
+ * period checked stays smaller than the page's own real element count
+ * (the nav rail alone puts a floor of roughly a dozen on every signed-in
+ * route, so `MAX_PERIOD` below is picked to stay comfortably under
+ * that): a page's natural end-of-document wrap has a period equal to
+ * its whole focusable-element count, essentially never a period this
+ * small by coincidence, while a real trap is exactly a short cycle
+ * repeating. `MAX_PERIOD` was originally 4 - a code review (2026-09-06)
+ * caught that a modal cycling among 5-9 real elements (this function's
+ * own motivating example: a close button, a few fields, submit) has a
+ * period the loop never even tested, so it would report a real trap as
+ * trap-free; raised to 10, still safely under the nav rail's own floor.
+ * Not exhaustive (a trap deep inside a rarely-reached subtree could
+ * still slip past a check that only visits one page), but real: driven
+ * by actual `Tab` keypresses against a real DOM, not a static analysis
+ * of the markup. */
 async function checkKeyboardTrap(browser: Browser, sessionValue: string): Promise<string[]> {
   const context = await browser.newContext({ viewport: { width: 1440, height: 900 } });
   await context.addCookies([{ name: "session", value: sessionValue, url: BASE_URL }]);
@@ -311,24 +333,39 @@ async function checkKeyboardTrap(browser: Browser, sessionValue: string): Promis
     const page = await context.newPage();
     await page.goto(`${BASE_URL}/`);
     await page.getByRole("heading", { level: 1 }).first().waitFor({ timeout: 15000 });
-    const TAB_PRESSES = 40;
+    const MAX_TAB_PRESSES = 60;
+    const MAX_PERIOD = 10;
+    const REPEATS_REQUIRED = 3;
     const visited: string[] = [];
-    for (let i = 0; i < TAB_PRESSES; i++) {
+    for (let i = 0; i < MAX_TAB_PRESSES; i++) {
       await page.keyboard.press("Tab");
       const id = await page.evaluate(() => {
         const el = document.activeElement;
         if (!el || el === document.body) return "(body)";
-        return `${el.tagName}#${el.id}.${el.className}:${(el.textContent ?? "").slice(0, 20)}`;
+        // `el.className` is a plain string on an HTMLElement but an
+        // `SVGAnimatedString` object on an SVG element (an icon button
+        // built from an inline `<svg>`), which would stringify to the
+        // useless literal "[object SVGAnimatedString]" - a code review
+        // (2026-09-06) caught this collapsing every such element to the
+        // same fingerprint. `getAttribute("class")` reads the raw
+        // attribute on either element type uniformly.
+        const cls = el.getAttribute("class") ?? "";
+        return `${el.tagName}#${el.id}.${cls}:${(el.textContent ?? "").slice(0, 20)}`;
       });
       visited.push(id);
-    }
-    const half = Math.floor(TAB_PRESSES / 2);
-    const firstHalf = new Set(visited.slice(0, half));
-    const whole = new Set(visited);
-    if (whole.size === firstHalf.size) {
-      return [
-        `keyboard trap suspected: the second half of ${TAB_PRESSES} Tab presses found no focus target the first half hadn't already seen (focus is cycling among the same ${whole.size} element(s))`,
-      ];
+
+      for (let period = 1; period <= MAX_PERIOD; period++) {
+        const windowLen = period * REPEATS_REQUIRED;
+        if (visited.length < windowLen) continue;
+        const tail = visited.slice(-windowLen);
+        const cycle = tail.slice(0, period);
+        const repeats = Array.from({ length: REPEATS_REQUIRED }, (_, k) => tail.slice(k * period, (k + 1) * period));
+        if (repeats.every((chunk) => chunk.every((v, j) => v === cycle[j]))) {
+          return [
+            `keyboard trap suspected: focus repeated the same ${period}-element cycle ${REPEATS_REQUIRED} times in a row after ${visited.length} Tab presses (${cycle.join(" -> ")})`,
+          ];
+        }
+      }
     }
     return [];
   } finally {

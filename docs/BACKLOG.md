@@ -136,6 +136,91 @@ clear it in full:
       anything beyond English to route at all - not a small addition
       once the `embed` role and Tier 2 both eventually depend on
       matching against those same examples.
+- [x] **i18n scaffolding for the shell, kit, and core pages, done**
+      (session E step 8, 2026-09-06) - a narrower, more tractable slice
+      of the item above (package/skill strings stay that item's own
+      problem). Decided by the design-resolver agent against
+      `getmaipai/.github/docs/ENGINEERING.md`'s real "Language and
+      locale" rule ("UI strings live in a per-package message catalog;
+      English is required") and the real, already-existing
+      `household.locale` setting (`backend/src/settings/coreKeys.ts`,
+      `range.options: ["en-US", "en-GB"]`) - the resolved
+      `purring-chasing-noodle.md` ("plan 6.7") seed document is
+      confirmed gone from every getmaipai repo, so the decision is
+      grounded in what is actually real and checked in, not a document
+      that no longer exists anywhere.
+
+      **Library: Lingui** (`@lingui/core`, `@lingui/react`,
+      `@lingui/cli`, `@lingui/vite-plugin`, all `6.6.0`), catalogs as
+      `.po` files under `frontend/src/locales/<locale>/messages.po`,
+      loaded eagerly (two small catalogs, no lazy-loading complexity
+      worth adding yet) and activated from `household.locale` once
+      settings load (`App.tsx`, `frontend/src/i18n.ts`) - the pre-auth
+      SignIn screen has no household to read a preference from yet, so
+      it stays on the source locale (`en-US`) by design, not a gap.
+
+      **The macro transform (`<Trans>`/`t` from `@lingui/react/macro`/
+      `@lingui/core/macro`) does not work in this repo and is not
+      used** - a real toolchain incompatibility found live, not a design
+      choice: Lingui's own documented Vite+React setup wires the macro
+      through `@vitejs/plugin-react`'s `babel.plugins` option, but the
+      version installed here (`@vitejs/plugin-react@6.1.1`) dropped
+      Babel entirely for its own JSX transform (`oxc-transform-react`
+      now) and its `Options` type has no `babel` property at all -
+      passing it anyway silently did nothing. Every macro call then fell
+      through to the macro package's own runtime guard, which throws
+      ("executed outside the context of compilation") the instant React
+      renders one - this broke the ENTIRE app (a blank page, 0 headings,
+      a real `pageerror`) since the affected component was `Shell.tsx`'s
+      nav rail, present on every signed-in route. Not caught by
+      `bunx tsc --noEmit` (no type error - the option is accepted,
+      just silently ignored) or by the first several `bun run a11y`
+      passes (their own output was piped through `tail -N`, which
+      truncated away the actual per-route failures and left only a
+      misleadingly clean-looking tail); caught by grepping the built
+      bundle directly for known UI strings ("Chat", "Settings",
+      "Household") and finding every single one absent despite the
+      bundle containing real React runtime code, then confirmed with a
+      direct Playwright check showing the exact runtime error. Fixed by
+      dropping macros and using Lingui's plain runtime API instead -
+      `<Trans id="..." message="..." />` from the real `@lingui/react`
+      (not `/macro`) for JSX, `i18n._("...")` from `@/i18n` for the one
+      non-JSX (tooltip) case - which needs no Babel pass at all;
+      `lingui extract` finds both forms equally well (marked
+      `js-lingui-explicit-id` in the generated catalogs). Re-enabling
+      macros later needs either a Babel-based React plugin variant or
+      `@lingui/swc-plugin`, neither installed now.
+
+      **Extracted a small, real, working slice**, not a full sweep:
+      `Shell.tsx`'s "Search" nav row and `HomePage.tsx`'s "Today"
+      heading, both real, both loadable in both catalogs, proving the
+      whole pipeline (extraction, catalog loading, `household.locale`
+      selection) end to end. A full sweep of every hardcoded string in
+      `frontend/src` is tracked below as its own item - doing it in the
+      same step as standing up the whole system for the first time would
+      conflate "does the plumbing work" with "is every string moved."
+      **Deferred, documented, not built**: the far surface's type scale
+      per script (`.surface-far` in `tokens.css` stays Latin-only,
+      commented as such) - `household.locale`'s own option list is
+      Latin-script-only today, so there is no non-Latin locale to verify
+      a script-specific scale against, and this org's testing standard
+      ("verified means exercised for real") rules out building something
+      unverifiable.
+- [ ] **Full i18n string extraction across the shell, kit, and apps**
+      (M-L) - the sweep the item above deliberately deferred. Every
+      hardcoded user-facing string in `frontend/src` (a first grep
+      pass for this decision found strings scattered across
+      `DevicesSection.tsx`, `UsersSection.tsx`, `VoicesPage.tsx`,
+      `ChangeSecretSection.tsx`, `VoiceCatalogSection.tsx`,
+      `NotificationBell.tsx`, `SignIn.tsx`, and more) needs the same
+      `<Trans id= message=>`/`i18n._()` treatment as `Shell.tsx`'s
+      "Search" and `HomePage.tsx`'s "Today" already have, then a real
+      `en-GB` translation pass (today's two catalog entries happen to
+      read identically in both dialects, which won't stay true once the
+      sweep covers dates, units, and genuinely different vocabulary).
+- [ ] **The far surface's type scale per script** (S, blocked on a
+      non-Latin `household.locale` option existing) - see the deferral
+      note above.
 
 Default packages are held to the same bar as community ones per
 `PACKAGES.md` - the release skill is meant to refuse shipping a default
