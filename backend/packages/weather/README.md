@@ -16,8 +16,9 @@ Nothing to set up. Works as soon as it's installed.
 ## What it uses
 
 Weather looks up the place and its temperature through Open-Meteo, a free
-weather service, each time you ask. See the household's Privacy page for
-the full "what leaves the house" row.
+weather service. A recent answer for the same place is remembered for a
+little while so asking again right away doesn't need a new lookup. See
+the household's Privacy page for the full "what leaves the house" row.
 
 ## Offline
 

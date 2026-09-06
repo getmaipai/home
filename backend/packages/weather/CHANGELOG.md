@@ -8,3 +8,6 @@ All notable changes to the Weather package, in [Keep a Changelog](https://keepac
 
 - Current temperature for a named place, via Open-Meteo's free geocoding
   and forecast APIs.
+- A cached, warmed answer for a recent place: `cache`/`warm` in the
+  manifest, backed by the hub's package cache (session-d-packages-and-
+  store.md step 3).

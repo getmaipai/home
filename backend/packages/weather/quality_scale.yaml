@@ -16,7 +16,7 @@ bronze:
     note: one data_sources[] row for open-meteo, covering both the geocoding and forecast calls
   offline_behavior_stated:
     met: true
-    note: "offline: unavailable - a live geocode+forecast call every time, no cached fallback yet (see lib/packageCache.ts, step 3)"
+    note: "offline: unavailable - still stated accurately: a cold cache (a new place, or the cache never seen this exact request before) still needs the network. A warm or ttl_s-fresh answer is served with no fetch (lib/packageCache.ts, step 3), but that's a fast path, not offline capability."
   smoke_test:
     met: true
     note: tests/smoke.json, run through lib/smoke.ts
@@ -33,4 +33,4 @@ gold:
   real_service_verified:
     met: true
     date: "2026-09-05"
-    note: built and manually verified against real Open-Meteo responses the same day (packageHost.ts's own header comment)
+    note: built and manually verified against real Open-Meteo responses the same day (packageHost.ts's own header comment); the cache/warm path re-verified live 2026-09-06 (step 3) - a warm run populates the cache from a real fetch, a following live call answers in under 35ms with no second fetch

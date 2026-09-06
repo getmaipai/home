@@ -1,6 +1,6 @@
 import { app } from "@/app";
 import { ensureCoreJob, runDueJobs } from "@/lib/scheduler";
-import { runPlugin, registerAllPackageNotificationTypes } from "@/lib/plugins";
+import { runPlugin, registerAllPackageNotificationTypes, runDueWarmJobs } from "@/lib/plugins";
 import { cleanupStaleSnapshots } from "@/lib/backup";
 import { sampleEngineStats } from "@/lib/engineStats";
 import { startAllSidecars, registerGracefulExit } from "@/lib/sidecars";
@@ -46,6 +46,11 @@ ensureCoreJob("backup.run", "every:1d");
 // in for "at install" until then; this daily job is the real "on a
 // schedule" half.
 ensureCoreJob("packages.smoke", "every:1d");
+// Step 3: the poll cadence for lib/plugins.ts's runDueWarmJobs(), not a
+// per-package interval - every:15m is the finest grain a package's own
+// warm.schedule could ever need to be checked against without adding a
+// scheduled_jobs row per package (lib/plugins.ts's own comment on why).
+ensureCoreJob("packages.warm", "every:15m");
 // Step 2: every bundled package's own declared notification types become
 // real, dispatchable ones in F's registry before the first turn or
 // scheduled job could ever try to trigger() one.
@@ -86,6 +91,9 @@ setInterval(() => {
   runDueJobs(runPlugin, new Date(), {
     "packages.smoke": async () => {
       await runAllSmokeTests();
+    },
+    "packages.warm": async () => {
+      await runDueWarmJobs();
     },
   }).catch((err: Error) => console.error(`[scheduler] runDueJobs failed: ${err.message}`));
 }, 60_000);

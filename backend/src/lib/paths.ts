@@ -37,6 +37,13 @@ export const enginesDir = resolve(dataDir, "engines");
 // legacy-specific.
 export const wakewordDir = resolve(dataDir, "voice", "wakewords");
 
+// A package's own cached fetch responses (session-d-packages-and-store.md
+// step 3, `lib/packageCache.ts`): one subdirectory per package id under
+// here, never a spec-shaped record and never synced or backed up - a cache
+// entry is, by definition, reconstructible from the third-party service it
+// came from.
+export const cacheDir = resolve(dataDir, "cache");
+
 // A household member's own uploaded voice-cloning sample (2026-09-04):
 // real, irreplaceable family data (unlike wakewordDir's re-downloadable
 // base models), but still not synced/backed up yet - lib/backup.ts's

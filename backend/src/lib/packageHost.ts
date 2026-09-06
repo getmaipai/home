@@ -50,6 +50,7 @@ import * as memory from "@/lib/memory";
 import * as settings from "@/lib/settings";
 import { getHouseholdSettingValue } from "@/lib/settings";
 import { scheduleJob } from "@/lib/scheduler";
+import { cachedFetch } from "@/lib/packageCache";
 import type { PersonRow } from "@/types";
 
 // host.fetch's real network I/O settings (2026-09-05). Rate limit: "a
@@ -414,24 +415,32 @@ export function createHost(actor: PersonRow, manifest: PackageManifest, secrets:
       }
       requirePermission(`net:${parsed.host}`);
 
-      // Rate limit BEFORE the SSRF/DNS check, not after: a package
-      // hammering host.fetch against a host that turns out to be blocked
-      // (or invalid) still costs a real DNS lookup and connection attempt
-      // per call, and the household's own hub deserves protection from
-      // that regardless of whether the target was ever going to be
-      // allowed - not just the destination service's own budget.
-      if (!tryConsume(parsed.host, FETCH_RATE_LIMIT)) {
-        throw new HostError("rate_limited", `host.fetch is rate-limited for ${parsed.host} - try again shortly`);
-      }
+      // The cache sits in front of the rate limiter and the SSRF check on
+      // purpose (session-d-packages-and-store.md step 3): a cache hit is
+      // not a network call at all, so it should cost neither a rate-limit
+      // token nor a DNS lookup - only a real doFetch() (below) reaches
+      // either. A package with no `cache` declared skips straight
+      // through, unaffected.
+      return cachedFetch(manifest.id, manifest.cache, url, opts, async () => {
+        // Rate limit BEFORE the SSRF/DNS check, not after: a package
+        // hammering host.fetch against a host that turns out to be blocked
+        // (or invalid) still costs a real DNS lookup and connection attempt
+        // per call, and the household's own hub deserves protection from
+        // that regardless of whether the target was ever going to be
+        // allowed - not just the destination service's own budget.
+        if (!tryConsume(parsed.host, FETCH_RATE_LIMIT)) {
+          throw new HostError("rate_limited", `host.fetch is rate-limited for ${parsed.host} - try again shortly`);
+        }
 
-      try {
-        await assertNotPrivateHost(parsed.hostname);
-      } catch (err) {
-        if (err instanceof SsrfBlockedError) throw new HostError("invalid_input", err.message);
-        throw new HostError("network_unreachable", `could not resolve ${parsed.hostname}`);
-      }
+        try {
+          await assertNotPrivateHost(parsed.hostname);
+        } catch (err) {
+          if (err instanceof SsrfBlockedError) throw new HostError("invalid_input", err.message);
+          throw new HostError("network_unreachable", `could not resolve ${parsed.hostname}`);
+        }
 
-      return performHttpFetch(url, opts);
+        return performHttpFetch(url, opts);
+      });
     },
     memory: {
       // Async as of step 5 (session-a-intelligence.md): a real embed()

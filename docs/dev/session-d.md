@@ -345,3 +345,156 @@ What's left for whom: C populates `exposes.queries[]` on the packages
 it routes to as a Tier 2 tool; step 3 is the first real reader of
 `cache`/`warm`/`warm_on`; step 9 is the first real writer of
 `contributes.widgets[]`.
+
+## Step 3: the package cache and warming
+
+`backend/src/lib/packageCache.ts`, one cache per household under
+`data/cache/<package>/` (a new `cacheDir` export in `lib/paths.ts`,
+same pattern as `modelsDir`/`enginesDir`). Opt-in: a package with no
+`cache` field in its manifest is never cached, `host.fetch` calls
+straight through exactly as before this step.
+
+**Keying, a real decision, not the manifest's `key_template` literally.**
+The schema's own `cache.key_template` (step 2) is a human-readable
+naming convention for a package author ("one entry per distinct call"),
+but `host.fetch` only ever sees the already-interpolated URL, never the
+recipe's own input names (`place`, etc.) that a `{arg}` template would
+need resolved against. The actual on-disk key is `sha256(method + "\n" +
+url + "\n" + JSON.stringify(body))` - exactly the same "one entry per
+distinct call" property, with no second templating engine needed. This
+turns out to be the reason the acceptance test below works for free: a
+warm run (synthetic inputs) and a live turn that resolve to the
+identical URL land on the identical cache entry, no coordination
+required. Only `GET` is ever cached - a `POST` through `host.fetch` is
+presumed to have a side effect on the third-party service, so caching
+one risks serving a stale result for what looks like a fresh action.
+
+**Policy, read from the manifest at request time**: `ttl_s` (fresh,
+served with no fetch), `stale_ok_s` (stale-while-revalidate: serves the
+old value immediately, kicks a background refetch), `max_bytes` (an
+oversized response is never written, not truncated). Sits in front of
+the rate limiter and the SSRF check in `packageHost.ts`'s `fetch()`, on
+purpose: a cache hit is not a network call, so it should cost neither a
+rate-limit token nor a DNS lookup - only a real miss (or an expired
+entry) ever reaches either.
+
+**Eviction**: one shared budget across every package's cache combined
+(`min(512 MB, 5% of free disk)`, `node:fs`'s own `statfsSync` - no
+`df` shell-out, no third-party package, the native capability the
+runtime already has, per the org's "prebuilt over hand-built"
+principle), oldest-`mtime`-first. LRU rides the filesystem's own mtime
+(bumped on every hit) instead of a separate index this module would
+have to keep consistent with the files themselves. Deliberately global,
+not per-package: the budget is a shared household resource, the same
+way disk itself is - one package's own history shouldn't protect its
+cold entries from a different package's legitimate growth.
+`getCacheStats()` (entry count, size, oldest/newest, hits/misses per
+package, from a directory scan plus in-memory hit/miss counters) is
+exported for F's `GET /api/storage` to read; not wired into a route by
+this session, per the ownership map.
+
+**Warming** lives in `lib/plugins.ts`, not `packageCache.ts`: a
+package's `warm.schedule`/`warm.keys` just runs the recipe with
+realistic inputs the ordinary way (`runPlugin`), and the already-wired
+cache-aware `host.fetch` does the actual caching - warming needed no
+cache-specific code of its own. `runDueWarmJobs()` (the body of a new
+`packages.warm` core job, `every:15m`, `index.ts`) checks every bundled
+package's own `warm.schedule` against an in-memory `lastWarmedAt` clock
+(not a DB column - a restart resetting it means a package might warm
+sooner than its ideal schedule once after a reboot, never a correctness
+problem, the same operational-not-synced posture `lib/engineStats.ts`'s
+ring buffer already has) and warms whichever are due, each on its own
+independent interval over one shared poll rather than a
+`scheduled_jobs` row per package. The actor a warm run executes as is
+the household's own owner (falling back down the role ladder, `null` -
+warming skipped entirely - on a fresh install with no household set up
+yet): warming is a trusted background operation with no real chat
+requester to attribute to, and the highest-privileged real person
+guarantees `meetsMinRole()` never blocks a warm run a live request from
+that same household would also be allowed to make.
+
+**`weather` is the first real package to declare `cache`/`warm`**:
+`ttl_s: 1800`, `stale_ok_s: 3600`, `warm.schedule: "every:1h"`,
+`warm.keys: [{ "place": "Seattle" }]`. That last value is an honest
+placeholder, not the acceptance criterion's literal "household's own
+home place" - no household-location setting exists anywhere in this
+codebase yet (`grep` confirms it; `warm_on`'s own step-2 example,
+`household.home_place`, was itself speculative). Adding one is a real
+feature (a settings key, a first-run prompt, a places picker) outside
+this step's scope; filed below as a gap for whichever session picks up
+household location. The mechanism itself doesn't care what the key is -
+the moment that setting exists, `warm.keys` becomes
+`[{ "place": "<the household's real setting>" }]` and works exactly the
+same way.
+
+**Verified for real** (org standard: "verified also means exercised for
+real"), against a running dev server on `data/cache`'s real
+`data/`-relative path, real Open-Meteo calls (4 total across two
+sessions, well inside a free public API's tolerance for manual
+verification): `POST /api/plugins/weather/run` for Seattle, a fresh
+`data/cache/weather/` with two entries (the geocode and forecast calls,
+each its own cache entry) on the first call, the second call answering
+in 17ms (a live network round trip to Open-Meteo takes noticeably
+longer) with `getCacheStats()` showing the hit. Separately, calling
+`warmPackage("weather")` directly against a bare fresh install
+populated the cache from a real fetch with no prior live call, and a
+following `POST /api/plugins/weather/run` answered in 31ms - the exact
+acceptance test this step names.
+
+A code review before this landed caught three real gaps, all fixed:
+`cacheKey()` hashed only method + url + body, ignoring headers
+entirely - harmless for today's four fetch-based packages (none vary a
+header per call) but a future package whose recipe set e.g.
+`Accept-Language` per input would have silently served one input's
+cached answer to another's; now headers are sorted by name and folded
+into the hash, so order never matters but content always does.
+`warmPackage()`'s own docstring promised a warm failure is "logged and
+skipped, not surfaced as this function's own failure," but `runPlugin()`
+reports most real failures (rate-limited, SSRF-blocked, a bad
+`warm.keys` entry failing args validation) as a returned `{ ok: false
+}`, never a throw - the `try`/`catch` around it caught nothing, so the
+one promise this function makes was silently broken from the start;
+now both the `ok: false` and thrown-error paths log. `warmActor()` had
+its own hand-written role-priority array duplicating `ROLE_LADDER`
+(already imported for `meetsMinRole()`); now it reuses the same one, so
+a future role change can't update one call site and silently miss the
+other. Also deduplicated `evictIfOverBudget()`'s and `getCacheStats()`'s
+own independent reimplementations of the same cacheDir directory walk
+into one `walkAllEntries()` (review: "two already drifting in shape").
+`warmPackage()` also now takes its manifest from the caller
+(`runDueWarmJobs()`, which already loaded it) instead of reading and
+re-validating `manifest.json` a second time for the same tick.
+
+Tests: `backend/tests/packageCache.test.ts` (12 cases: pass-through
+with no cache policy, a miss then a hit, independent keys per URL, a
+POST never cached, an expired-with-no-stale-window miss, stale-while-
+revalidate serving immediately then refreshing in the background, an
+over-`max_bytes` entry never written, two header cases (a different
+header value is a different entry; the same headers in a different key
+order are the same entry), hits/misses in `getCacheStats()`, eviction
+firing under a pinned test budget and not firing under a real one),
+two new cases in `backend/tests/packageHost.test.ts` (a cache hit skips
+rate-limit and SSRF entirely - proven by seeding the cache for a
+target, `127.0.0.1:9`, that would fail both checks on a real attempt;
+no-cache-declared is unaffected), two new cases in
+`backend/tests/plugins.test.ts` (a `runPlugin` validation failure - a
+warm key missing weather's own required `place`, never touching the
+network - is logged, not swallowed; no `warm` field declared is a
+clean no-op). `getCacheStats()`'s own eviction-test budget override is
+process-wide module state (`__setTestCacheBudgetBytes`), reset in both
+`beforeEach` and `afterEach` so a tight test budget can never leak into
+a different test file's own cache-writing tests later in the same
+`bun test` run.
+
+**Not automated, by the same standard every fetch-based package's own
+tests already apply** (no live model or third-party call in the
+per-commit suite): the full warm-then-cache-hit path against the real
+Open-Meteo API above is manually verified, not asserted in
+`bun test`.
+
+What's left for whom: a real household-location setting (gap, above,
+unowned this wave); step 6's store install flow is `packages.smoke`'s
+own "at install" stand-in's actual replacement, and could reasonably
+trigger an immediate warm too, once it exists; step 9's widgets read
+straight from whatever `runPlugin` already populated via this cache,
+no separate widget-specific cache path needed.

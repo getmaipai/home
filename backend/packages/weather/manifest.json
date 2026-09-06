@@ -45,6 +45,8 @@
   ],
   "permissions": ["net:geocoding-api.open-meteo.com", "net:api.open-meteo.com"],
   "notifications": [],
+  "cache": { "key_template": "weather:{place}", "ttl_s": 1800, "stale_ok_s": 3600, "max_bytes": 4096 },
+  "warm": { "schedule": "every:1h", "keys": [{ "place": "Seattle" }] },
   "backup": "exclude",
   "background": false,
   "contributes": {},

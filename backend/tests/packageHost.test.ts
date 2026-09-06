@@ -4,6 +4,7 @@ import { resetDb } from "./reset-db";
 import { __resetThrottleForTests } from "@/lib/secretThrottle";
 import { createHost, performHttpFetch, withOneRetry, type AttemptResult } from "@/lib/packageHost";
 import { __resetRateLimiterForTests } from "@/lib/rateLimiter";
+import { cachedFetch, __resetPackageCacheForTests, __clearPackageCacheDirForTests } from "@/lib/packageCache";
 import { setHouseholdSettingValue } from "@/lib/settings";
 import { HostError } from "@maipai/spec/emulators/ts/host-emulator.js";
 import { PackageManifest } from "@maipai/spec/gen/ts/manifest.js";
@@ -221,6 +222,45 @@ describe("packageHost fetch", () => {
       }
     }
     expect(codes).toContain("rate_limited");
+  });
+});
+
+describe("packageHost fetch, cache-aware (session-d-packages-and-store.md step 3)", () => {
+  test("a cache hit for a declared cache policy skips rate-limit and SSRF entirely", async () => {
+    __resetRateLimiterForTests();
+    __resetPackageCacheForTests();
+    __clearPackageCacheDirForTests("test-pkg");
+    const actor = await owner();
+    const cacheManifest = manifest({ permissions: ["net:127.0.0.1:9"], cache: { ttl_s: 60 } });
+    // Pre-seeds the exact (package id, url) cachedFetch() would key on,
+    // bypassing the network entirely - proving createHost()'s fetch()
+    // really threads manifest.id/manifest.cache into cachedFetch() the
+    // same way a real warm run's first successful fetch would populate
+    // it, WITHOUT this test needing a live server. 127.0.0.1:9 is a
+    // target that would fail both the rate limiter (after enough calls)
+    // and the SSRF guard on a real attempt - if either fired here, this
+    // test would fail with the wrong error instead of returning the
+    // cached value, proving the cache really sits in front of both.
+    await cachedFetch(cacheManifest.id, cacheManifest.cache, "http://127.0.0.1:9/cached", undefined, async () => ({
+      ok: true,
+    }));
+    const host = createHost(actor, cacheManifest);
+    const result = await host.fetch("http://127.0.0.1:9/cached");
+    expect(result).toEqual({ ok: true });
+  });
+
+  test("no cache policy declared: the manifest's own permission/SSRF/rate-limit path is unaffected", async () => {
+    __resetRateLimiterForTests();
+    __resetPackageCacheForTests();
+    const actor = await owner();
+    const host = createHost(actor, manifest({ permissions: ["net:127.0.0.1:9"] }));
+    try {
+      await host.fetch("http://127.0.0.1:9/uncached");
+      throw new Error("should have thrown");
+    } catch (err) {
+      expect((err as HostError).code).toBe("invalid_input");
+      expect((err as HostError).message).toContain("private");
+    }
   });
 });
 

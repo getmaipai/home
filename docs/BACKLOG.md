@@ -734,6 +734,18 @@ implemented on the hub yet.
       Add `duration`, `time`, `person`, `media` and a secret-entry flow,
       then re-declare the sections that only needed those.
 
+- [ ] **A household-location setting** (S-M) - found live, session-d-
+      packages-and-store.md step 3, 2026-09-06: no settings key, no
+      first-run prompt, no places picker exists anywhere for "where does
+      this household live." `weather`'s own `warm.keys` had to hardcode a
+      placeholder place (Seattle) instead of the household's real one for
+      exactly this reason, and step 0's own verdict queue separately
+      dropped `localNews.ts`/`localEvents.ts` on the identical gap. Once
+      this exists (`household.home_place` or similar, `coreKeys.ts`), any
+      package's `warm.keys` can resolve it directly with no further
+      cache/warm changes - the mechanism doesn't care what the value is,
+      only that a real one exists to resolve against.
+
 ## UI / shell
 
 - [x] Person edit and delete (M) - done 2026-09-05. `PATCH`/`DELETE`

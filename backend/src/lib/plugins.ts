@@ -20,6 +20,8 @@ import { runRecipe, type PluginResult } from "@maipai/spec/interpreters/ts/recip
 import { HostError } from "@maipai/spec/emulators/ts/host-emulator.js";
 import { createHost } from "@/lib/packageHost";
 import { registerPackageNotificationTypes } from "@/lib/notificationTypes";
+import { parseWhen } from "@/lib/scheduler";
+import { listActivePeople } from "@/lib/access";
 import { ROLE_LADDER, type Role } from "@/middleware/auth";
 import type { PersonRow } from "@/types";
 
@@ -179,4 +181,94 @@ export async function runPlugin(
     }
     throw err;
   }
+}
+
+// --- Warming (session-d-packages-and-store.md step 3) ---------------
+//
+// A package's own `manifest.warm.schedule`/`warm.keys` (spec/schemas/
+// manifest.schema.json) pre-populates lib/packageCache.ts's cache before
+// anyone asks, by simply running the recipe with realistic inputs the
+// ordinary way: `host.fetch` (already cache-aware, packageHost.ts) does
+// the actual caching, so warming needs no cache-specific code of its own
+// here - it only needs an actor to run the recipe as, and a clock to
+// decide when a package is next due.
+//
+// The "last warmed" clock is in-memory, not a DB column: a restart
+// resetting it just means a package might warm sooner than its ideal
+// schedule once after a reboot, never a correctness problem, and the
+// same operational-not-synced posture lib/engineStats.ts's ring buffer
+// already has for data that only matters while the process is running.
+const lastWarmedAt = new Map<string, number>();
+
+/** The household's own owner (falling back to any active adult, then any
+ * active person) runs a warm pass - warming is a trusted background
+ * operation, not a chat request from someone, so there is no real
+ * "actor" to attribute it to; picking the highest-privileged real person
+ * guarantees `meetsMinRole()` never blocks a warm run that a live chat
+ * request from that same household would also be allowed to make. `null`
+ * on a fresh install with no household set up yet - nothing to warm as,
+ * so warming is skipped entirely rather than inventing a synthetic
+ * person no spec record backs. */
+function warmActor(): PersonRow | null {
+  const people = listActivePeople();
+  if (people.length === 0) return null;
+  // ROLE_LADDER (imported above for meetsMinRole()) is already ordered
+  // highest-privileged first - reusing it here instead of a second,
+  // independently-maintained literal means a future role change updates
+  // both call sites at once, not just the one someone remembered to.
+  people.sort((a, b) => ROLE_LADDER.indexOf(a.role as Role) - ROLE_LADDER.indexOf(b.role as Role));
+  return people[0]!;
+}
+
+/** Runs one package's own `warm.keys` (each a recipe input object) so its
+ * cache holds a fresh answer before anyone asks. Takes the manifest
+ * already loaded by the caller (runDueWarmJobs() below) rather than
+ * re-reading and re-validating manifest.json a second time for the same
+ * tick. Never throws: a warm failure (the third-party service is down, a
+ * bad key, a role check runPlugin() itself enforces) is exactly the
+ * situation warming exists to protect a live request from, so it is
+ * logged and skipped, not surfaced as this function's own failure -
+ * `runPlugin()` reports a failure as a returned `{ ok: false }`, not a
+ * throw, so both paths are checked. */
+export async function warmPackage(id: string, manifest: PackageManifest): Promise<void> {
+  const keys = manifest.warm?.keys ?? [];
+  if (keys.length === 0) return;
+  const actor = warmActor();
+  if (!actor) return;
+  for (const key of keys) {
+    try {
+      const result = await runPlugin(id, actor, key as Record<string, unknown>);
+      if (!result.ok) {
+        console.error(`[warm] ${id} failed to warm key ${JSON.stringify(key)}: ${result.error}`);
+      }
+    } catch (err) {
+      console.error(`[warm] ${id} failed to warm key ${JSON.stringify(key)}: ${(err as Error).message}`);
+    }
+  }
+}
+
+/** The body of the `packages.warm` core job (index.ts): every bundled
+ * package declaring `warm.schedule` gets warmed once its own interval has
+ * elapsed since it was last warmed (or immediately, the first time this
+ * ever runs for it) - independent per-package intervals over one shared
+ * poll, the same shape lib/scheduler.ts's own recurring-job model already
+ * uses, without needing a scheduled_jobs row per package. */
+export async function runDueWarmJobs(): Promise<void> {
+  const now = Date.now();
+  for (const id of listPackageIds()) {
+    const manifestResult = loadManifestOnly(id);
+    if (!manifestResult.ok) continue;
+    const schedule = manifestResult.value.warm?.schedule;
+    if (!schedule) continue;
+    const parsed = parseWhen(schedule, new Date(now));
+    if (!parsed?.intervalMs) continue;
+    const last = lastWarmedAt.get(id);
+    if (last !== undefined && now - last < parsed.intervalMs) continue;
+    await warmPackage(id, manifestResult.value);
+    lastWarmedAt.set(id, now);
+  }
+}
+
+export function __resetWarmStateForTests(): void {
+  lastWarmedAt.clear();
 }
