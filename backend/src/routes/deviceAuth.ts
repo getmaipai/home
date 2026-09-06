@@ -22,9 +22,12 @@
 // revocable (DELETE /api/devices/:id), not why redemption should ask for
 // a code no background process could ever supply.
 import { createRoute, z } from "@hono/zod-openapi";
+import { eq, and, isNull } from "drizzle-orm";
 import { apiRouter, errorResponses } from "@/lib/openapi";
 import { issueSession } from "@/lib/session";
 import { redeemDeviceToken } from "@/lib/deviceTokens";
+import { db } from "@/db";
+import { people } from "@/db/schema";
 
 export const deviceAuthRoutes = apiRouter();
 
@@ -38,7 +41,7 @@ const redeemRoute = createRoute({
   },
   responses: {
     200: { content: { "application/json": { schema: z.object({ success: z.literal(true) }) } }, description: "A session cookie is now set for this origin." },
-    ...errorResponses({ 401: "Unknown or expired device token" }),
+    ...errorResponses({ 401: "Unknown or expired device token, or the profile is disabled" }),
   },
 });
 deviceAuthRoutes.openapi(redeemRoute, (c) => {
@@ -46,6 +49,17 @@ deviceAuthRoutes.openapi(redeemRoute, (c) => {
   const seenUrl = c.req.header("origin") ?? null;
   const redeemed = redeemDeviceToken(token, seenUrl);
   if (!redeemed) return c.json({ error: "Unknown or expired device token" }, 401);
+
+  // Step 7: a valid, unexpired device token belonging to a now-disabled
+  // or deleted person must not still work - the token surviving
+  // memorializePerson()/deletePerson() (both revoke it directly) is not
+  // the only way this state could arise: PATCH /api/people/:id can flip
+  // enabled to false without touching this person's device tokens at
+  // all, and this check is what makes that flip actually take effect
+  // here too.
+  const person = db.select({ enabled: people.enabled }).from(people).where(and(eq(people.id, redeemed.personId), isNull(people.deletedAt))).get();
+  if (!person || !person.enabled) return c.json({ error: "Unknown or expired device token" }, 401);
+
   issueSession(c, redeemed.personId);
   return c.json({ success: true as const }, 200);
 });

@@ -4,12 +4,15 @@
 // BACKLOG.md - a small, self-contained addition on top of the required
 // surface, gated to the two roles the plan actually asks for.
 import { createRoute, z } from "@hono/zod-openapi";
+import { eq, and, isNull } from "drizzle-orm";
 import { apiRouter, errorResponses } from "@/lib/openapi";
 import { requireRole } from "@/middleware/auth";
 import { beginEnrollment, verifyEnrollment, verifyTotp, isTotpEnabled, disableTotp } from "@/lib/totp";
 import { issueSession } from "@/lib/session";
 import { getClientIp, throttleCheck, throttleFail, throttleReset } from "@/lib/secretThrottle";
 import { recordFailedAttempt, clearFailedAttempts, ensureCredentialRowExists, currentLockout, LOCKOUT_THRESHOLD } from "@/lib/credentialLockout";
+import { db } from "@/db";
+import { people } from "@/db/schema";
 
 export const totpRoutes = apiRouter();
 
@@ -41,6 +44,15 @@ const challengeRoute = createRoute({
 });
 totpRoutes.openapi(challengeRoute, (c) => {
   const { personId, token } = c.req.valid("json");
+
+  // Step 7: this route only ever runs after a PIN/password or passkey
+  // ceremony already returned totpRequired: true, but it is reachable on
+  // its own (see the header above) and issues a session directly on
+  // success - a disabled or deleted person must not be able to finish
+  // signing in here even if they somehow still hold a valid TOTP secret.
+  const person = db.select({ enabled: people.enabled }).from(people).where(and(eq(people.id, personId), isNull(people.deletedAt))).get();
+  if (!person || !person.enabled) return c.json({ error: "That code didn't match." }, 401);
+
   const ip = getClientIp(c);
   const throttled = throttleCheck(ip);
   if (throttled.blocked) return c.json({ error: "Too many attempts", retryAfter: throttled.retryAfter }, 429);

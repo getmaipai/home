@@ -83,4 +83,26 @@ export const NOTIFICATION_SETTINGS_KEYS: SettingsKey[] = [
     lives_in: "person.notifications",
     honoured_by: ["home"],
   }),
+  // Session F, step 7: lib/notificationTypes.ts's "person.band_changed".
+  SettingsKey.parse({
+    key: "notifications.person.band_changed.telegram",
+    scope: "person",
+    selector: "boolean",
+    default: false,
+    label: "Telegram me when a child or teen's profile band updates on a birthday",
+    level: "basic",
+    lives_in: "person.notifications",
+    honoured_by: ["home"],
+  }),
+  // Session F, step 7: lib/notificationTypes.ts's "approvals.requested".
+  SettingsKey.parse({
+    key: "notifications.approvals.requested.telegram",
+    scope: "person",
+    selector: "boolean",
+    default: false,
+    label: "Telegram me when someone is asking for approval",
+    level: "basic",
+    lives_in: "person.notifications",
+    honoured_by: ["home"],
+  }),
 ];

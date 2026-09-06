@@ -114,6 +114,31 @@ export const NOTIFICATION_TYPES: readonly NotificationType[] = [
     configurable: true,
     defaultChannels: ["in_app"],
   },
+  // Step 7 (session-f-platform-and-trust.md): "the band change on a
+  // birthday with its passive notification" - lib/personLifecycle.ts's
+  // scheduled sweep fires this once a child/teen's age crosses 13 or 18.
+  // `passive`, not `time_sensitive`: nothing needs a parent's action,
+  // it's a record of something that happened on its own.
+  {
+    id: "person.band_changed",
+    level: "passive",
+    audience: "adults",
+    template: "{displayName} is now old enough to be a {newRole} - their profile band updated automatically.",
+    configurable: true,
+    defaultChannels: ["in_app"],
+  },
+  // Step 7: the approval queue (plan's "Ask to Install, Ask to Browse").
+  // `time_sensitive`, not `passive`: a child or teen is waiting on this
+  // decision, unlike person.band_changed above which reports something
+  // already done.
+  {
+    id: "approvals.requested",
+    level: "time_sensitive",
+    audience: "adults",
+    template: "{displayName} is asking: {summary}",
+    configurable: true,
+    defaultChannels: ["in_app"],
+  },
 ] as const;
 
 // session-d-packages-and-store.md step 2: a package's own manifest

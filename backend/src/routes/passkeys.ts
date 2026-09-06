@@ -10,7 +10,7 @@ import { apiRouter, errorResponses } from "@/lib/openapi";
 import { requireAuth } from "@/middleware/auth";
 import { db } from "@/db";
 import { people } from "@/db/schema";
-import { eq } from "drizzle-orm";
+import { eq, and, isNull } from "drizzle-orm";
 import { issueSession } from "@/lib/session";
 import { getClientIp, throttleCheck, throttleFail, throttleReset } from "@/lib/secretThrottle";
 import { tryConsume } from "@/lib/rateLimiter";
@@ -140,8 +140,8 @@ passkeysRoutes.openapi(authOptionsRoute, async (c) => {
     return c.json({ error: "Too many requests. Wait a moment and try again." }, 429);
   }
 
-  const person = db.select({ id: people.id }).from(people).where(eq(people.id, personId)).get();
-  if (!person) return c.json({ error: "No such profile" }, 404);
+  const person = db.select({ id: people.id, enabled: people.enabled }).from(people).where(and(eq(people.id, personId), isNull(people.deletedAt))).get();
+  if (!person || !person.enabled) return c.json({ error: "No such profile" }, 404);
   const options = await authenticationOptions(personId);
   return c.json(options, 200);
 });
@@ -171,8 +171,8 @@ passkeysRoutes.openapi(authVerifyRoute, async (c) => {
   // references people.id (FK enforced), so a probe with a nonexistent
   // personId threw an unhandled SqliteError (a 500) instead of the
   // intended 401/404. Checked first, before any lockout bookkeeping.
-  const person = db.select({ id: people.id }).from(people).where(eq(people.id, personId)).get();
-  if (!person) return c.json({ error: "No such profile" }, 404);
+  const person = db.select({ id: people.id, enabled: people.enabled }).from(people).where(and(eq(people.id, personId), isNull(people.deletedAt))).get();
+  if (!person || !person.enabled) return c.json({ error: "No such profile" }, 404);
 
   // The same shared lockout (lib/credentialLockout.ts) and per-IP
   // throttle a PIN/password ceremony uses (4.1: "rate limits and

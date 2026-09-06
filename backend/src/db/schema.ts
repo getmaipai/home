@@ -23,6 +23,14 @@ export const people = sqliteTable("people", {
   // lib/hlc.ts on every write (create, profile edit, role change, delete)
   // the same way memory_records/conversations already do.
   hlc: text("hlc").notNull(),
+  // Step 7: disabled-but-present, distinct from deletedAt (a tombstone).
+  enabled: integer("enabled", { mode: "boolean" }).notNull().default(true),
+  // Step 7: meaningful only for role "guest" (lib/personShape.ts enforces
+  // this, the same convention person.schema.json's own conditionals use).
+  guestExpiresAt: text("guest_expires_at"),
+  // Step 7: set once, never cleared - lib/personLifecycle.ts's
+  // memorializePerson() is the only writer.
+  memorializedAt: text("memorialized_at"),
 });
 
 // A person's sign-in secret (PIN or password, same hashing either way, see
@@ -558,4 +566,103 @@ export const totpSecrets = sqliteTable("totp_secrets", {
   lastUsedStep: integer("last_used_step"),
   createdAt: text("created_at").notNull(),
   updatedAt: text("updated_at").notNull(),
+});
+
+// --- Session F, step 7: entities, relationships, grants, approvals ---
+//
+// Mirrors spec/schemas/entity.schema.json. aliases is JSON text (sqlite
+// has no array column); lib/entities.ts is the only place that
+// (de)serializes it.
+export const entities = sqliteTable("entities", {
+  id: text("id").primaryKey(),
+  kind: text("kind").notNull(), // "person" | "pet" | "place" | "organization" | "thing"
+  name: text("name").notNull(),
+  aliases: text("aliases").notNull().default("[]"), // JSON string[]
+  description: text("description"),
+  placeKind: text("place_kind"), // "map" | "area" | null
+  parentId: text("parent_id"),
+  accountPersonId: text("account_person_id").references(() => people.id),
+  source: text("source").notNull(), // "hub" | "local" | "imported" | "inferred"
+  confirmedByPersonId: text("confirmed_by_person_id").references(() => people.id),
+  scope: text("scope").notNull().default("household"), // "household" | "person"
+  person: text("person").references(() => people.id),
+  sensitive: integer("sensitive", { mode: "boolean" }).notNull().default(false),
+  createdAt: text("created_at").notNull(),
+  updatedAt: text("updated_at").notNull(),
+  deletedAt: text("deleted_at"),
+  hlc: text("hlc").notNull(),
+});
+
+// Mirrors spec/schemas/relationship.schema.json. evidence is JSON text,
+// same reason entities.aliases is.
+export const relationships = sqliteTable("relationships", {
+  id: text("id").primaryKey(),
+  type: text("type").notNull(),
+  fromId: text("from_id")
+    .notNull()
+    .references(() => entities.id),
+  toId: text("to_id")
+    .notNull()
+    .references(() => entities.id),
+  status: text("status").notNull(),
+  validFrom: text("valid_from"),
+  validTo: text("valid_to"),
+  expiredAt: text("expired_at"),
+  source: text("source").notNull(), // "stated" | "imported" | "inferred"
+  statedByPersonId: text("stated_by_person_id").references(() => people.id),
+  confidence: real("confidence"),
+  confirmedByPersonId: text("confirmed_by_person_id").references(() => people.id),
+  evidence: text("evidence").notNull().default("[]"), // JSON string[]
+  scope: text("scope").notNull().default("person"), // "household" | "person"
+  person: text("person").references(() => people.id),
+  sensitive: integer("sensitive", { mode: "boolean" }).notNull().default(false),
+  note: text("note"),
+  createdAt: text("created_at").notNull(),
+  updatedAt: text("updated_at").notNull(),
+  deletedAt: text("deleted_at"),
+  hlc: text("hlc").notNull(),
+});
+
+// Mirrors spec/schemas/grant.schema.json. Deliberately its own table, not
+// a shared "edges" table with relationships - the schema's own header
+// explains why: a Grant is never inferred, and mixing this store with
+// one that can be is how an inference bug becomes a privilege
+// escalation.
+export const grants = sqliteTable("grants", {
+  id: text("id").primaryKey(),
+  person: text("person")
+    .notNull()
+    .references(() => people.id),
+  action: text("action").notNull(),
+  effect: text("effect").notNull(), // "allow" | "deny"
+  validFrom: text("valid_from"),
+  validTo: text("valid_to"),
+  grantedByPersonId: text("granted_by_person_id")
+    .notNull()
+    .references(() => people.id),
+  reason: text("reason"),
+  acknowledgedAt: text("acknowledged_at"),
+  acknowledgedByPersonId: text("acknowledged_by_person_id").references(() => people.id),
+  createdAt: text("created_at").notNull(),
+  updatedAt: text("updated_at").notNull(),
+  deletedAt: text("deleted_at"),
+  hlc: text("hlc").notNull(),
+});
+
+// Hub-internal (not a spec 3.1 record type, the same reason scheduledJobs/
+// commands/notificationDeliveries above aren't): the approval queue
+// (plan's "Ask to Install, Ask to Browse"). One row per request; a
+// parent's decision is final and the row keeps its own history rather
+// than being deleted, the same "resolved but visible" shape issues use.
+export const approvals = sqliteTable("approvals", {
+  id: text("id").primaryKey(),
+  kind: text("kind").notNull(), // "install_package" | "browse_url" | ...
+  personId: text("person_id")
+    .notNull()
+    .references(() => people.id),
+  details: text("details").notNull().default("{}"), // JSON, kind-specific
+  status: text("status").notNull().default("pending"), // "pending" | "approved" | "denied"
+  decidedByPersonId: text("decided_by_person_id").references(() => people.id),
+  decidedAt: text("decided_at"),
+  createdAt: text("created_at").notNull(),
 });

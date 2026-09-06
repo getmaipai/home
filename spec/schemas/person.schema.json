@@ -47,6 +47,23 @@
       "default": false,
       "description": "Keeps this person off the overlay network entirely (4.2, 4.12)."
     },
+    "enabled": {
+      "type": "boolean",
+      "default": true,
+      "description": "Step 6/7: disabled-but-present (BACKLOG.md: 'Person has only deleted_at, disabled-but-present has no representation today'). A disabled person keeps their record, their history and their place in every relationship/grant, but cannot sign in - distinct from deleted_at, which is a tombstone for a record that should stop existing at all. Owner/admin enforce this at the auth boundary; a household pauses someone (a long trip, a temporary restriction) without erasing them."
+    },
+    "guest_expires_at": {
+      "type": ["string", "null"],
+      "format": "date-time",
+      "default": null,
+      "description": "Meaningful only when role is guest (enforced in lib/personShape.ts's candidate parser, the same convention scope/person conditionals use elsewhere in this spec, since no generator here preserves JSON Schema conditionals). Past this timestamp a guest profile stops signing in on its own, the same way `enabled: false` does, without a household member having to remember to remove it."
+    },
+    "memorialized_at": {
+      "type": ["string", "null"],
+      "format": "date-time",
+      "default": null,
+      "description": "Set once, never cleared: a read-only profile (BACKLOG.md's 'memorialise (read-only profile, PIN cleared, sessions revoked, export offered)'). The action that sets this also clears personCredentials, passkeys and every device token/session for the person - lib/personLifecycle.ts's memorializePerson(), not this field alone."
+    },
     "created_at": { "type": "string", "format": "date-time" },
     "updated_at": { "type": "string", "format": "date-time" },
     "deleted_at": {

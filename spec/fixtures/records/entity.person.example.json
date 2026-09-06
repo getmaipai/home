@@ -2,7 +2,10 @@
   "id": "ent-a1b2c3",
   "kind": "person",
   "name": "Iris",
-  "aliases": ["Grandma Iris", "Mum"],
+  "aliases": [
+    "Grandma Iris",
+    "Mum"
+  ],
   "description": "Riff's mother. Visits most weekends.",
   "place_kind": null,
   "parent_id": null,
@@ -14,5 +17,6 @@
   "sensitive": false,
   "created_at": "2026-09-05T12:00:00Z",
   "updated_at": "2026-09-05T12:00:00Z",
-  "deleted_at": null
+  "deleted_at": null,
+  "hlc": "1757073600000:0:a1b2c3"
 }

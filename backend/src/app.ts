@@ -30,6 +30,10 @@ import { quickConnectRoutes } from "@/routes/quickConnect";
 import { passkeysRoutes } from "@/routes/passkeys";
 import { authSessionsRoutes } from "@/routes/authSessions";
 import { totpRoutes } from "@/routes/totp";
+import { entitiesRoutes } from "@/routes/entities";
+import { relationshipsRoutes } from "@/routes/relationships";
+import { grantsRoutes } from "@/routes/grants";
+import { approvalsRoutes } from "@/routes/approvals";
 import { requireAuth } from "@/middleware/auth";
 import { listSidecars } from "@/lib/sidecars";
 
@@ -119,6 +123,10 @@ app.route("/api/auth/quick-connect", quickConnectRoutes);
 app.route("/api/auth/passkeys", passkeysRoutes);
 app.route("/api/auth/sessions", authSessionsRoutes);
 app.route("/api/auth/totp", totpRoutes);
+app.route("/api/entities", entitiesRoutes);
+app.route("/api/relationships", relationshipsRoutes);
+app.route("/api/grants", grantsRoutes);
+app.route("/api/approvals", approvalsRoutes);
 
 // Serving the built frontend from this same process (docs/dev.md, the
 // shell/kit/Chat slice): a self-hosted single-process hub, no reverse
