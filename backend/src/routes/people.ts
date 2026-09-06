@@ -9,7 +9,8 @@ import { requireAuth, requireRole, ROLE_LADDER, invalidateSessionCacheForPerson,
 import { toRoster, parsePersonCandidate, personToDbValues } from "@/lib/personShape";
 import { listActivePeople } from "@/lib/access";
 import { validateDisplayName, validateSecret } from "@/lib/validation";
-import { canManage, checkRoleChange, deletePerson, deletePeople, hasSecret, type PersonEdit } from "@/lib/personLifecycle";
+import { canManage, checkRoleChange, deletePerson, deletePeople, type PersonEdit } from "@/lib/personLifecycle";
+import { requiresCredential } from "@/lib/personAuthMethods";
 import { apiRouter, errorResponses, idParamSchema } from "@/lib/openapi";
 import { Person } from "@maipai/spec/gen/ts/person.js";
 
@@ -201,7 +202,7 @@ peopleRoutes.openapi(patchRoute, async (c) => {
   // changes a name AND an illegal role changes neither.
   let nextRole = target.role;
   if (body.role !== undefined && body.role !== target.role) {
-    const check = checkRoleChange(actor, target, body.role, hasSecret(id));
+    const check = checkRoleChange(actor, target, body.role, requiresCredential(id));
     if (!check.ok) return c.json({ error: check.error }, check.status);
     nextRole = check.value;
   }

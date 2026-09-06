@@ -124,19 +124,30 @@ export function checkRoleChange(
   // routes/people.ts: "a PIN-free owner or admin profile is a one-request
   // takeover for anyone who can reach the API." Promotion has to honour
   // that too, or the rule is only enforced on the path that happens to
-  // create the account.
+  // create the account. Step 6: "the owner with a passkey or password"
+  // - a passkey is an equally strong credential here, so the caller
+  // passes requiresCredential(id) (lib/personAuthMethods.ts: PIN/
+  // password OR any registered passkey), not the narrower hasSecret()
+  // below.
   if ((nextRole === "owner" || nextRole === "admin") && !targetHasSecret) {
     return {
       ok: false,
       status: 400,
-      error: `a ${nextRole} needs a PIN or password before they can be given that role`,
+      error: `a ${nextRole} needs a PIN, password, or passkey before they can be given that role`,
     };
   }
   return { ok: true, value: nextRole as Role };
 }
 
+// A code review (2026-09-06) found this returning true for a row that
+// merely EXISTS, not one with a real secretHash - step 6 made secretHash
+// nullable (a passkey-only person's row holds only their shared lockout
+// counter, lib/credentialLockout.ts), so a passkey-only person read as
+// "has a PIN/password" here, which routes/people.ts's role-promotion
+// guard trusted as proof of a strong credential.
 export function hasSecret(personId: string): boolean {
-  return db.select().from(personCredentials).where(eq(personCredentials.personId, personId)).get() !== undefined;
+  const row = db.select({ secretHash: personCredentials.secretHash }).from(personCredentials).where(eq(personCredentials.personId, personId)).get();
+  return row?.secretHash != null;
 }
 
 export interface ErasureCounts {

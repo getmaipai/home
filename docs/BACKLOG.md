@@ -1381,8 +1381,13 @@ on a spec tag that was never cut.
       transport lessons transfer.
 - [ ] **One pairing flow, with a rate limit** (M, verdict) - legacy grew
       three code flows (6-char pod, claim-by-hardware-id, 5-minute TV
-      Quick Connect) and `/pair` had no limiter. Plan 7.1 is one flow;
-      decide whether Quick Connect for TV is the same flow or a second.
+      Quick Connect) and `/pair` had no limiter. Plan 7.1 is one flow for
+      a ROBOT/pod pairing into the household (Wave 3, still deferred -
+      touches every record table). Decided for the human sign-in half
+      (Session F step 6, 2026-09-06): Quick Connect for TV sign-in is
+      its own separate flow, not this one - `lib/quickConnect.ts`, rate
+      limited from the start (`code + poll_token`, 5-minute expiry).
+      This item now covers only the robot/pod pairing flow.
 - [ ] **Verdict: robot fallback order** (Jesse's call) - the legacy bot's
       `FallbackLanguageModel` is local-first; the plan is hub-as-brain
       with a sub-second connect timeout and no hedging. Decide before
@@ -1493,12 +1498,32 @@ on a spec tag that was never cut.
       installing the cert, rendering the QR) are not this - the fields
       may need revisiting against the real platform plan text, and the
       UI is E's kit work.
+- [x] **Passkeys, device tokens, Quick Connect, sessions, optional
+      TOTP** (Session F step 6, 2026-09-06) - `lib/passkeys.ts`
+      (`@simplewebauthn/server`, self-service registration on an
+      already-signed-in profile, shared lockout with PIN/password),
+      `lib/deviceTokens.ts` + `lib/devices.ts` (365-day tokens, 20 per
+      person, oldest-evicted, `spec/schemas/device.schema.json` laid for
+      the link), `lib/quickConnect.ts` (code + a separate poll_token, 5-
+      minute expiry, rate limited, TOTP re-confirmed at approval when
+      the approver has it on), `GET/DELETE /api/auth/sessions`
+      (per-device, revoke), `lib/totp.ts` (`otpauth`, owner/admin only,
+      anti-replay via a last-used-step counter, its own shared lockout).
+      Two review passes on this diff, both fixed: the first found seven
+      issues on first pass (see docs/dev/session-f.md); the second found
+      TOTP bypassable via Quick Connect's poll and a stolen device
+      token's redeem (fixed by gating the approval step instead - a
+      redeemed token stays silent by design, the standard "remembered
+      device" shape), a stale `hasSecret()` letting a passkey-only
+      person be promoted to admin/owner, a 500 instead of 401 on an
+      unknown personId, and `auth.ts`'s own conversion to
+      `@hono/zod-openapi` (deferred past the first pass since it wasn't
+      new code, then required once this diff rewrote most of the file).
 - [ ] **Identity and trust pieces plan v0.1 scopes and this file did not
-      track, still open** (M each) - passkeys, an approval queue, Quick
-      Connect for TV sign-in, hub-key signing of the bundled default
-      set, the emergency kit and hub/SMB backup targets, a restore
-      drill in the release skill, and the `user/` docs tier (only
-      `dev/` exists).
+      track, still open** (M each) - an approval queue, hub-key signing
+      of the bundled default set, the emergency kit and hub/SMB backup
+      targets, a restore drill in the release skill, and the `user/`
+      docs tier (only `dev/` exists).
 - [ ] **Tests the audit found missing** (S) - `hlc.ts` seed and compare,
       `personLifecycle`, `access`, and one test proving a specific
       recalled memory text actually lands in the prompt for a matching
@@ -1676,8 +1701,9 @@ that owns it.
       removal, memorialise (read-only profile, PIN cleared, sessions
       revoked, export offered), the band change on a birthday with a
       passive notification to parents (plan 7.4). None exist.
-- [ ] **Sessions per device with revoke, optional TOTP for owner and
-      admin** (S-M, F) - plan 4.1; the identity slice deferred both.
+- [x] **Sessions per device with revoke, optional TOTP for owner and
+      admin** (Session F step 6, 2026-09-06) - see the entry above under
+      "Identity and trust pieces".
 - [ ] **Time allowances and schedules per category** (M, F backend, E
       controls page) - plan 4.2 names them as household settings enforced
       in the turn engine and package host; nothing exists.
@@ -1720,10 +1746,11 @@ that owns it.
       - the PWA exists after Wave 1, so the "no such clients yet" note
       above no longer holds; legacy `push.ts` (VAPID keys generated once,
       never a manual step) is the reference.
-- [ ] **A `Device` record** (S spec, F) - plan 7.1's device kind, name,
-      area, capabilities, token, watermarks; needed by device tokens and
-      Quick Connect now and by the link later. `deviceId.ts` is a plain
-      file stand-in.
+- [x] **A `Device` record** (Session F step 6, 2026-09-06) -
+      `spec/schemas/device.schema.json`; see the entry above under
+      "Identity and trust pieces". `lib/deviceId.ts` remains a separate,
+      unrelated thing (the memory/entity/episode id suffix, its own
+      header explains).
 
 **Packages**
 

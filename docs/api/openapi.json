@@ -86,6 +86,713 @@
         }
       }
     },
+    "/api/auth/profiles": {
+      "get": {
+        "tags": [
+          "Auth"
+        ],
+        "summary": "The household's profile picker",
+        "responses": {
+          "200": {
+            "description": "Every non-deleted person, no secret hash, no birthdate.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "string",
+                        "pattern": "^person-[a-z0-9]{6,}$",
+                        "description": "Stable id, never reused, even after deletedAt is set."
+                      },
+                      "display_name": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 80
+                      },
+                      "nickname": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "maxLength": 80,
+                            "description": "What a companion calls this person, if different from display_name."
+                          },
+                          {
+                            "nullable": true,
+                            "description": "What a companion calls this person, if different from display_name."
+                          },
+                          {
+                            "nullable": true
+                          }
+                        ],
+                        "description": "What a companion calls this person, if different from display_name."
+                      },
+                      "role": {
+                        "type": "string",
+                        "enum": [
+                          "owner",
+                          "admin",
+                          "adult",
+                          "teen",
+                          "child",
+                          "guest"
+                        ],
+                        "description": "The role ladder (4.2). Two minor bands (teen 13-17, child under 13) so there is no thirteen-year cliff."
+                      },
+                      "avatar_seed": {
+                        "type": "string",
+                        "minLength": 1,
+                        "description": "Deterministic seed for a generated avatar; never a photo of a real person by default."
+                      },
+                      "source": {
+                        "type": "string",
+                        "enum": [
+                          "hub",
+                          "local"
+                        ],
+                        "description": "hub: authoritative on the hub, replicated to robots. local: a robot-only guest, never synced to the hub (4.2's local_only concept for a whole person)."
+                      },
+                      "local_only": {
+                        "type": "boolean",
+                        "default": false,
+                        "description": "Keeps this person off the overlay network entirely (4.2, 4.12)."
+                      },
+                      "created_at": {
+                        "type": "string",
+                        "format": "date-time"
+                      },
+                      "updated_at": {
+                        "type": "string",
+                        "format": "date-time"
+                      },
+                      "deleted_at": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "format": "date-time"
+                          },
+                          {
+                            "nullable": true
+                          }
+                        ],
+                        "default": null
+                      },
+                      "hlc": {
+                        "type": "string",
+                        "pattern": "^[0-9]+:[0-9]+:[a-z0-9]{6,}$",
+                        "description": "Hybrid logical clock: wall_ms:counter:node (7.3)."
+                      },
+                      "hasSecret": {
+                        "type": "boolean"
+                      },
+                      "hasPasskeys": {
+                        "type": "boolean"
+                      }
+                    },
+                    "required": [
+                      "id",
+                      "display_name",
+                      "role",
+                      "avatar_seed",
+                      "source",
+                      "created_at",
+                      "updated_at",
+                      "hlc",
+                      "hasSecret",
+                      "hasPasskeys"
+                    ],
+                    "additionalProperties": false
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/auth/setup": {
+      "post": {
+        "tags": [
+          "Auth"
+        ],
+        "summary": "First-run: create the household owner",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "displayName": {
+                    "type": "string"
+                  },
+                  "secret": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "displayName",
+                  "secret"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "The owner, signed in.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "person": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                          "pattern": "^person-[a-z0-9]{6,}$",
+                          "description": "Stable id, never reused, even after deletedAt is set."
+                        },
+                        "display_name": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 80
+                        },
+                        "nickname": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "maxLength": 80,
+                              "description": "What a companion calls this person, if different from display_name."
+                            },
+                            {
+                              "nullable": true,
+                              "description": "What a companion calls this person, if different from display_name."
+                            },
+                            {
+                              "nullable": true
+                            }
+                          ],
+                          "description": "What a companion calls this person, if different from display_name."
+                        },
+                        "birthdate": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "format": "date",
+                              "description": "Core only. Never present in any shape a package's ctx exposes; packages see age_range on Person derived from this."
+                            },
+                            {
+                              "nullable": true,
+                              "description": "Core only. Never present in any shape a package's ctx exposes; packages see age_range on Person derived from this."
+                            },
+                            {
+                              "nullable": true
+                            }
+                          ],
+                          "description": "Core only. Never present in any shape a package's ctx exposes; packages see age_range on Person derived from this."
+                        },
+                        "role": {
+                          "type": "string",
+                          "enum": [
+                            "owner",
+                            "admin",
+                            "adult",
+                            "teen",
+                            "child",
+                            "guest"
+                          ],
+                          "description": "The role ladder (4.2). Two minor bands (teen 13-17, child under 13) so there is no thirteen-year cliff."
+                        },
+                        "avatar_seed": {
+                          "type": "string",
+                          "minLength": 1,
+                          "description": "Deterministic seed for a generated avatar; never a photo of a real person by default."
+                        },
+                        "source": {
+                          "type": "string",
+                          "enum": [
+                            "hub",
+                            "local"
+                          ],
+                          "description": "hub: authoritative on the hub, replicated to robots. local: a robot-only guest, never synced to the hub (4.2's local_only concept for a whole person)."
+                        },
+                        "local_only": {
+                          "type": "boolean",
+                          "default": false,
+                          "description": "Keeps this person off the overlay network entirely (4.2, 4.12)."
+                        },
+                        "created_at": {
+                          "type": "string",
+                          "format": "date-time"
+                        },
+                        "updated_at": {
+                          "type": "string",
+                          "format": "date-time"
+                        },
+                        "deleted_at": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "format": "date-time"
+                            },
+                            {
+                              "nullable": true
+                            }
+                          ],
+                          "default": null
+                        },
+                        "hlc": {
+                          "type": "string",
+                          "pattern": "^[0-9]+:[0-9]+:[a-z0-9]{6,}$",
+                          "description": "Hybrid logical clock: wall_ms:counter:node (7.3)."
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "display_name",
+                        "role",
+                        "avatar_seed",
+                        "source",
+                        "created_at",
+                        "updated_at",
+                        "hlc"
+                      ],
+                      "additionalProperties": false,
+                      "description": "A household member or guest. Core holds the birthdate; packages only ever see age_range, derived server-side and never stored on the record a package can read. See platform plan 3.1 and 4.2."
+                    }
+                  },
+                  "required": [
+                    "person"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid display name or secret",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Setup already completed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/auth/select": {
+      "post": {
+        "tags": [
+          "Auth"
+        ],
+        "summary": "Sign in to a credential-free profile with a bare tap",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "personId": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "personId"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Signed in.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    }
+                  },
+                  "required": [
+                    "success"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "This profile needs its PIN, password, or passkey",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Profile not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/auth/verify-secret": {
+      "post": {
+        "tags": [
+          "Auth"
+        ],
+        "summary": "Sign in with a PIN or password",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "personId": {
+                    "type": "string"
+                  },
+                  "secret": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "personId",
+                  "secret"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "totpRequired: true means no session cookie yet - POST /api/auth/totp/challenge finishes signing in.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "totpRequired": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "totpRequired"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "No PIN or password set for this profile",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Invalid PIN or password",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Profile not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many attempts",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/auth/me": {
+      "get": {
+        "tags": [
+          "Auth"
+        ],
+        "summary": "My own profile",
+        "responses": {
+          "200": {
+            "description": "The signed-in person.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "pattern": "^person-[a-z0-9]{6,}$",
+                      "description": "Stable id, never reused, even after deletedAt is set."
+                    },
+                    "display_name": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 80
+                    },
+                    "nickname": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "maxLength": 80,
+                          "description": "What a companion calls this person, if different from display_name."
+                        },
+                        {
+                          "nullable": true,
+                          "description": "What a companion calls this person, if different from display_name."
+                        },
+                        {
+                          "nullable": true
+                        }
+                      ],
+                      "description": "What a companion calls this person, if different from display_name."
+                    },
+                    "role": {
+                      "type": "string",
+                      "enum": [
+                        "owner",
+                        "admin",
+                        "adult",
+                        "teen",
+                        "child",
+                        "guest"
+                      ],
+                      "description": "The role ladder (4.2). Two minor bands (teen 13-17, child under 13) so there is no thirteen-year cliff."
+                    },
+                    "avatar_seed": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "Deterministic seed for a generated avatar; never a photo of a real person by default."
+                    },
+                    "source": {
+                      "type": "string",
+                      "enum": [
+                        "hub",
+                        "local"
+                      ],
+                      "description": "hub: authoritative on the hub, replicated to robots. local: a robot-only guest, never synced to the hub (4.2's local_only concept for a whole person)."
+                    },
+                    "local_only": {
+                      "type": "boolean",
+                      "default": false,
+                      "description": "Keeps this person off the overlay network entirely (4.2, 4.12)."
+                    },
+                    "created_at": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "updated_at": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "deleted_at": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "format": "date-time"
+                        },
+                        {
+                          "nullable": true
+                        }
+                      ],
+                      "default": null
+                    },
+                    "hlc": {
+                      "type": "string",
+                      "pattern": "^[0-9]+:[0-9]+:[a-z0-9]{6,}$",
+                      "description": "Hybrid logical clock: wall_ms:counter:node (7.3)."
+                    },
+                    "hasSecret": {
+                      "type": "boolean"
+                    },
+                    "hasPasskeys": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "display_name",
+                    "role",
+                    "avatar_seed",
+                    "source",
+                    "created_at",
+                    "updated_at",
+                    "hlc",
+                    "hasSecret",
+                    "hasPasskeys"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/auth/change-secret": {
+      "post": {
+        "tags": [
+          "Auth"
+        ],
+        "summary": "Change (or first set) my own PIN or password",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "currentSecret": {
+                    "type": "string"
+                  },
+                  "newSecret": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "newSecret"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Changed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    }
+                  },
+                  "required": [
+                    "success"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid secret, or currentSecret is required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Current PIN or password is incorrect",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many attempts",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/auth/logout": {
+      "post": {
+        "tags": [
+          "Auth"
+        ],
+        "summary": "Sign out this session",
+        "responses": {
+          "200": {
+            "description": "Signed out.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    }
+                  },
+                  "required": [
+                    "success"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/people": {
       "get": {
         "tags": [
@@ -2394,6 +3101,1065 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/devices": {
+      "get": {
+        "tags": [
+          "Devices"
+        ],
+        "summary": "Devices paired to my own profile",
+        "responses": {
+          "200": {
+            "description": "Every device with a live or once-live token paired to me.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "string"
+                      },
+                      "kind": {
+                        "type": "string",
+                        "enum": [
+                          "robot",
+                          "pod",
+                          "tv",
+                          "phone",
+                          "desktop",
+                          "browser"
+                        ]
+                      },
+                      "name": {
+                        "type": "string"
+                      },
+                      "area": {
+                        "type": "string",
+                        "nullable": true
+                      },
+                      "lastSeenAt": {
+                        "type": "string",
+                        "nullable": true
+                      },
+                      "createdAt": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "id",
+                      "kind",
+                      "name",
+                      "area",
+                      "lastSeenAt",
+                      "createdAt"
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/devices/{id}": {
+      "delete": {
+        "tags": [
+          "Devices"
+        ],
+        "summary": "Revoke a device - deletes it and every token pointing at it",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "device-a1b2c3"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Revoked.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    }
+                  },
+                  "required": [
+                    "success"
+                  ]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such device (or it isn't mine)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/auth/devices/redeem": {
+      "post": {
+        "tags": [
+          "Devices"
+        ],
+        "summary": "Trade a device token for a session cookie on this address",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "token": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "required": [
+                  "token"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "A session cookie is now set for this origin.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    }
+                  },
+                  "required": [
+                    "success"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unknown or expired device token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/auth/quick-connect/code": {
+      "post": {
+        "tags": [
+          "Quick Connect"
+        ],
+        "summary": "Start a Quick Connect sign-in - show the code, then poll with poll_token",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "label": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 60,
+                    "description": "\"Living room TV\" - shown on the approving phone."
+                  },
+                  "kind": {
+                    "type": "string",
+                    "enum": [
+                      "robot",
+                      "pod",
+                      "tv",
+                      "phone",
+                      "desktop",
+                      "browser"
+                    ],
+                    "default": "tv"
+                  }
+                },
+                "required": [
+                  "label"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "A pending Quick Connect request, good for 5 minutes.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "description": "6 characters, no 0/O/1/I - read aloud and typed on an approving phone."
+                    },
+                    "poll_token": {
+                      "type": "string",
+                      "description": "Known only to this device - present it back to /poll, never shown alongside the code."
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "poll_token"
+                  ]
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many Quick Connect requests right now",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/auth/quick-connect/poll": {
+      "get": {
+        "tags": [
+          "Quick Connect"
+        ],
+        "summary": "Poll a Quick Connect request - mints a session and device token once approved",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            },
+            "required": true,
+            "name": "poll_token",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "\"pending\" while waiting, \"approved\" exactly once (a session cookie is also set for this address), \"expired\" for an unknown or timed-out poll_token.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "status": {
+                          "type": "string",
+                          "enum": [
+                            "pending"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "status"
+                      ]
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "status": {
+                          "type": "string",
+                          "enum": [
+                            "approved"
+                          ]
+                        },
+                        "device_token": {
+                          "type": "string"
+                        },
+                        "expires_at": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "status",
+                        "device_token",
+                        "expires_at"
+                      ]
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "status": {
+                          "type": "string",
+                          "enum": [
+                            "expired"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "status"
+                      ]
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/auth/quick-connect/approve": {
+      "post": {
+        "tags": [
+          "Quick Connect"
+        ],
+        "summary": "Approve a Quick Connect code as the signed-in person",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "code": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "totpToken": {
+                    "type": "string",
+                    "minLength": 6,
+                    "maxLength": 6,
+                    "description": "Required only when the approver has TOTP enabled."
+                  }
+                },
+                "required": [
+                  "code"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Approved.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    }
+                  },
+                  "required": [
+                    "success"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Unknown, expired, or already-approved code",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "A current TOTP code is required to approve a new device",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/auth/passkeys/register/options": {
+      "post": {
+        "tags": [
+          "Passkeys"
+        ],
+        "summary": "Options for registering a new passkey to my own profile",
+        "responses": {
+          "200": {
+            "description": "Pass straight to navigator.credentials.create().",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "nullable": true
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/auth/passkeys/register/verify": {
+      "post": {
+        "tags": [
+          "Passkeys"
+        ],
+        "summary": "Verify a registration ceremony and save the new passkey",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "response": {
+                    "type": "object",
+                    "additionalProperties": {
+                      "nullable": true
+                    }
+                  },
+                  "name": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 60
+                  }
+                },
+                "required": [
+                  "response",
+                  "name"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Saved.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    }
+                  },
+                  "required": [
+                    "success"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The registration ceremony could not be verified",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/auth/passkeys": {
+      "get": {
+        "tags": [
+          "Passkeys"
+        ],
+        "summary": "My own registered passkeys",
+        "responses": {
+          "200": {
+            "description": "Never the public key or any WebAuthn internals - just what a person needs to recognize and revoke one.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "string"
+                      },
+                      "name": {
+                        "type": "string"
+                      },
+                      "createdAt": {
+                        "type": "string"
+                      },
+                      "lastUsedAt": {
+                        "type": "string",
+                        "nullable": true
+                      }
+                    },
+                    "required": [
+                      "id",
+                      "name",
+                      "createdAt",
+                      "lastUsedAt"
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/auth/passkeys/{id}": {
+      "delete": {
+        "tags": [
+          "Passkeys"
+        ],
+        "summary": "Remove a passkey from my own profile",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Removed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    }
+                  },
+                  "required": [
+                    "success"
+                  ]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such passkey (or it isn't mine)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/auth/passkeys/authenticate/options": {
+      "post": {
+        "tags": [
+          "Passkeys"
+        ],
+        "summary": "Options for signing in with a passkey",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "personId": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "personId"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Pass straight to navigator.credentials.get().",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "nullable": true
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such profile",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many attempts",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/auth/passkeys/authenticate/verify": {
+      "post": {
+        "tags": [
+          "Passkeys"
+        ],
+        "summary": "Verify a passkey sign-in",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "personId": {
+                    "type": "string"
+                  },
+                  "response": {
+                    "type": "object",
+                    "additionalProperties": {
+                      "nullable": true
+                    }
+                  }
+                },
+                "required": [
+                  "personId",
+                  "response"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "A session cookie is set unless totpRequired is true, in which case POST /api/auth/totp/challenge finishes signing in.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "totpRequired": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "totpRequired"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Could not verify this passkey",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such profile",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many attempts",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/auth/sessions": {
+      "get": {
+        "tags": [
+          "Sessions"
+        ],
+        "summary": "My own active browser sessions",
+        "responses": {
+          "200": {
+            "description": "Every non-expired session for my profile.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "string"
+                      },
+                      "userAgent": {
+                        "type": "string",
+                        "nullable": true
+                      },
+                      "createdAt": {
+                        "type": "string"
+                      },
+                      "expiresAt": {
+                        "type": "string"
+                      },
+                      "isCurrent": {
+                        "type": "boolean"
+                      }
+                    },
+                    "required": [
+                      "id",
+                      "userAgent",
+                      "createdAt",
+                      "expiresAt",
+                      "isCurrent"
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/auth/sessions/{id}": {
+      "delete": {
+        "tags": [
+          "Sessions"
+        ],
+        "summary": "Revoke one of my own sessions - signs that device out immediately",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Revoked.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    }
+                  },
+                  "required": [
+                    "success"
+                  ]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such session (or it isn't mine)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/auth/totp/challenge": {
+      "post": {
+        "tags": [
+          "TOTP"
+        ],
+        "summary": "Finish signing in with a TOTP code",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "personId": {
+                    "type": "string"
+                  },
+                  "token": {
+                    "type": "string",
+                    "minLength": 6,
+                    "maxLength": 6
+                  }
+                },
+                "required": [
+                  "personId",
+                  "token"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "A session cookie is now set.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    }
+                  },
+                  "required": [
+                    "success"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Wrong code",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many attempts",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/auth/totp/enroll": {
+      "post": {
+        "tags": [
+          "TOTP"
+        ],
+        "summary": "Start (or restart) TOTP enrollment - owner/admin only",
+        "responses": {
+          "200": {
+            "description": "An otpauth:// URI - render as a QR code. Not usable to sign in until POST /verify confirms a real generated code.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "uri": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "uri"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/auth/totp/verify": {
+      "post": {
+        "tags": [
+          "TOTP"
+        ],
+        "summary": "Confirm enrollment with a real generated code",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "token": {
+                    "type": "string",
+                    "minLength": 6,
+                    "maxLength": 6
+                  }
+                },
+                "required": [
+                  "token"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "TOTP is now required at sign-in.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    }
+                  },
+                  "required": [
+                    "success"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Wrong code, or no enrollment in progress",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/auth/totp": {
+      "get": {
+        "tags": [
+          "TOTP"
+        ],
+        "summary": "Whether TOTP is enabled for my own profile",
+        "responses": {
+          "200": {
+            "description": "True only once enrollment has been confirmed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "enabled": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "enabled"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/auth/totp/disable": {
+      "post": {
+        "tags": [
+          "TOTP"
+        ],
+        "summary": "Turn off TOTP for my own profile",
+        "responses": {
+          "200": {
+            "description": "TOTP is no longer required at sign-in.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    }
+                  },
+                  "required": [
+                    "success"
+                  ]
                 }
               }
             }
