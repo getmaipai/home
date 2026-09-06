@@ -107,8 +107,13 @@ async function waitForHealth(timeoutMs = 15000): Promise<void> {
   const start = Date.now();
   while (Date.now() - start < timeoutMs) {
     try {
-      const res = await fetch(`${BASE_URL}/api/health`);
-      if (res.ok) return;
+      // /api/health now requires auth (it reports real sidecar status, not
+      // a liveness stub). This probe only wants to know the process is up
+      // and accepting connections, so any response - including the 401 an
+      // unauthenticated request gets - is proof of that; only a connection
+      // failure (backend not listening yet) means keep waiting.
+      await fetch(`${BASE_URL}/api/health`);
+      return;
     } catch {
       // Backend not listening yet; keep polling.
     }

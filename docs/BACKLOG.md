@@ -1118,9 +1118,34 @@ this file's earlier note), not something to build against today.
       computed-styles inspection to root-cause properly (which CSS rule
       is actually winning), not more token math - left for whoever picks
       this up next; the number is real and verified, not guessed at.
-- [ ] `scrollable-region-focusable` on Privacy (a scrollable region with
-      no keyboard access) - pre-existing, unrelated to this session's own
-      changes, still open.
+- [x] **`scrollable-region-focusable`, done** (session E step 6/7,
+      2026-09-06) - re-running the full `bun run a11y` matrix after
+      merging main (F's real `GET /api/health` landed with
+      `requireAuth`, which needed `scripts/screenshot.ts`'s own
+      `waitForHealth()` fixed to treat any response, not just a 200, as
+      proof the backend is up - it is a liveness probe, not an
+      authenticated health check) surfaced this rule failing on Setup,
+      Home, and Privacy: a scrollable `overflow-y-auto`/`overflow-x-auto`
+      region with no keyboard access. Privacy was already known (noted
+      here as "pre-existing, unrelated"); Setup and Home were not.
+      Grepped every `overflow-{x,y}-auto` container in `frontend/src` and
+      found the same gap repeated across eleven files (`Wizard.tsx`,
+      `SchemaPage.tsx` - covering every Settings sub-page that renders
+      through it - `HomePage.tsx` (both its page body and the "Who is
+      here" avatar strip), `SettingsPage.tsx`, `PrivacyPage.tsx`,
+      `MemoryPage.tsx`, `ConversationsPage.tsx`, `NotificationsPage.tsx`,
+      `PeoplePage.tsx`, `SearchPage.tsx`, `WidgetRow.tsx`'s horizontal
+      item strip, and `ChatPage.tsx`'s thread-list sidebar) - only
+      `DetailPane.tsx` and `SplitView.tsx` already had the fix. Applied
+      `DetailPane.tsx`'s own
+      established pattern (`tabIndex={0}` + `FOCUS_RING` + the same
+      `eslint-disable-next-line jsx-a11y/no-noninteractive-tabindex`
+      comment) everywhere rather than only the three routes the matrix
+      happened to catch: the other six pages don't overflow with today's
+      demo data, but the same latent bug would resurface the moment a
+      real household has enough people, notifications, or conversations
+      to make them scroll. Full `bun run a11y` matrix confirms zero
+      instances of this rule remain.
 - [ ] A screen-reader read-through of each page, keyboard-trap testing,
       reduced motion verification, and the TV surface (session-e-ui-and-
       docs.md's own step 7) - the rest of this step's own scope, still

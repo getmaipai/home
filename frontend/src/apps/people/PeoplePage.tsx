@@ -6,6 +6,7 @@ import { AsyncState } from "@/kit/primitives/AsyncState";
 import { Avatar } from "@/kit/primitives/Avatar";
 import { api, type PersonRosterEntry } from "@/lib/api";
 import { ROLE_LABELS } from "@/apps/people/roles";
+import { cn, FOCUS_RING } from "@/kit/utils";
 
 // Jesse, 2026-09-06: "the edit part is for USERS, not people" - adding,
 // editing, and removing accounts moved to Settings -> Household -> Users
@@ -33,7 +34,8 @@ export function PeoplePage() {
 
   return (
     <Page title="People">
-      <div className="flex flex-1 flex-col gap-6 overflow-y-auto p-4">
+      {/* eslint-disable-next-line jsx-a11y/no-noninteractive-tabindex -- a keyboard-scrollable region, not a widget (DetailPane.tsx's own precedent). */}
+      <div tabIndex={0} className={cn("flex flex-1 flex-col gap-6 overflow-y-auto p-4", FOCUS_RING)}>
         <AsyncState
           data={rosterQuery.data}
           error={rosterQuery.isError}

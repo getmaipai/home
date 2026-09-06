@@ -1,6 +1,7 @@
 import { Card } from "@/kit/primitives/Card";
 import { Skeleton } from "@/kit/ui/skeleton";
 import { getIcon } from "@/kit/icons";
+import { cn, FOCUS_RING } from "@/kit/utils";
 import type { WidgetItem } from "@/lib/api";
 
 interface WidgetRowProps {
@@ -39,7 +40,8 @@ export function WidgetRow({ title, items, isLoading }: WidgetRowProps) {
       ) : !items || items.length === 0 ? (
         <span className="text-sm text-muted-foreground">Nothing here yet.</span>
       ) : (
-        <ul className="flex min-w-0 flex-1 items-center gap-4 overflow-x-auto">
+        // eslint-disable-next-line jsx-a11y/no-noninteractive-tabindex -- a keyboard-scrollable region, not a widget (DetailPane.tsx's own precedent).
+        <ul tabIndex={0} className={cn("flex min-w-0 flex-1 items-center gap-4 overflow-x-auto", FOCUS_RING)}>
           {items.map((item, i) => (
             <RowItem key={i} item={item} />
           ))}

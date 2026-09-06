@@ -4,7 +4,7 @@ import { Page } from "@/kit/primitives/Page";
 import { SettingsRenderer } from "@/kit/settings/SettingsRenderer";
 import { Input } from "@/kit/ui/input";
 import { Button } from "@/kit/ui/button";
-import { cn } from "@/kit/utils";
+import { cn, FOCUS_RING } from "@/kit/utils";
 import { ChangeSecretSection } from "@/apps/settings/ChangeSecretSection";
 import { HuggingFaceTokenSection } from "@/apps/settings/HuggingFaceTokenSection";
 import { RoutingStatsSection } from "@/apps/settings/RoutingStatsSection";
@@ -63,6 +63,7 @@ const PERSON_TREE: TreeEntry[] = [
   { id: "voices-page-link", label: "Voices", to: "/settings/voices" },
   { id: "section-change-secret", label: "PIN / password" },
   { id: "commands-page-link", label: "Commands", to: "/settings/commands" },
+  { id: "devices-page-link", label: "Devices & sessions", to: "/settings/devices" },
 ];
 
 // A code review (2026-09-06) found `tab` deriving from `?tab=` alone once
@@ -309,7 +310,8 @@ export function SettingsPage({ person, onPersonChange }: SettingsPageProps) {
               placeholder={isDefaultRoute ? "Search settings" : "Search (not available here)"}
               aria-label="Search settings"
             />
-            <div ref={scrollRef} className="flex min-h-0 flex-1 flex-col gap-6 overflow-y-auto">
+            {/* eslint-disable-next-line jsx-a11y/no-noninteractive-tabindex -- a keyboard-scrollable region, not a widget (DetailPane.tsx's own precedent). */}
+            <div ref={scrollRef} tabIndex={0} className={cn("flex min-h-0 flex-1 flex-col gap-6 overflow-y-auto", FOCUS_RING)}>
               {!isDefaultRoute ? (
                 // Models/Backups/Voices/Commands (App.tsx's nested routes) -
                 // rendered right here so the rail/tab switcher/search above

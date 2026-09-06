@@ -6,6 +6,7 @@ import { Input } from "@/kit/ui/input";
 import { Button } from "@/kit/ui/button";
 import { getIcon } from "@/kit/icons";
 import { runSearchProviders, type SearchResultItem } from "@/shell/search/providers";
+import { cn, FOCUS_RING } from "@/kit/utils";
 
 // `far`'s own destination for the "Search" nav row and Cmd/Ctrl+K (step
 // 6: "on far the palette is a page with no free text entry beyond the
@@ -56,7 +57,8 @@ export function SearchPage() {
           placeholder="Search, or ask MaiPai..."
           aria-label="Search"
         />
-        <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto">
+        {/* eslint-disable-next-line jsx-a11y/no-noninteractive-tabindex -- a keyboard-scrollable region, not a widget (DetailPane.tsx's own precedent). */}
+        <div tabIndex={0} className={cn("flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto", FOCUS_RING)}>
           {(groups ?? []).map((group) => (
             <section key={group.heading} aria-label={group.heading}>
               <h2 className="mb-1 text-xs font-medium text-muted-foreground">{group.heading}</h2>

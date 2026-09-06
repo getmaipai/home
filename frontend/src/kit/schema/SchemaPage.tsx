@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 import { Page } from "@/kit/primitives/Page";
 import { NodeRenderer } from "@/kit/schema/NodeRenderer";
 import { PageNodeSchema } from "@/kit/schema/types";
+import { cn, FOCUS_RING } from "@/kit/utils";
 
 /** Renders a `spec/ui/pages/*.json` document (imported as a plain JSON
  * module - Vite resolves `.json` imports at build time, no fetch, no
@@ -22,7 +23,8 @@ export function SchemaPage({ page, beforeBody }: { page: unknown; beforeBody?: R
   const parsed = PageNodeSchema.parse(page);
   return (
     <Page title={parsed.title}>
-      <div className="flex min-w-0 flex-1 flex-col gap-6 overflow-y-auto p-4">
+      {/* eslint-disable-next-line jsx-a11y/no-noninteractive-tabindex -- a keyboard-scrollable region, not a widget (DetailPane.tsx's own precedent). */}
+      <div tabIndex={0} className={cn("flex min-w-0 flex-1 flex-col gap-6 overflow-y-auto p-4", FOCUS_RING)}>
         {beforeBody}
         <NodeRenderer node={parsed} />
       </div>

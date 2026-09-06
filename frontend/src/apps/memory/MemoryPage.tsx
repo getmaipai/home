@@ -10,6 +10,7 @@ import { Select } from "@/kit/primitives/Select";
 import { DestructiveConfirm } from "@/kit/primitives/DestructiveConfirm";
 import { Button } from "@/kit/ui/button";
 import { api, ApiError, isOwnerOrAdminRole, type MemoryRecord, type PersonRosterEntry, type Roster } from "@/lib/api";
+import { cn, FOCUS_RING } from "@/kit/utils";
 import memoryPage from "../../../../spec/ui/pages/memory.json";
 
 interface MemoryPageProps {
@@ -196,7 +197,8 @@ export function MemoryPage({ person }: MemoryPageProps) {
   if (viewingPerson) {
     return (
       <Page title="Memory">
-        <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto p-4">
+        {/* eslint-disable-next-line jsx-a11y/no-noninteractive-tabindex -- a keyboard-scrollable region, not a widget (DetailPane.tsx's own precedent). */}
+        <div tabIndex={0} className={cn("flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto p-4", FOCUS_RING)}>
           {personPicker}
           <OtherPersonMemories personId={viewingPerson.id} personName={viewingPerson.display_name} />
         </div>

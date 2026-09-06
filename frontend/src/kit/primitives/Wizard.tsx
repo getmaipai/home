@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import { Button } from "@/kit/ui/button";
 import { getIcon } from "@/kit/icons";
-import { cn } from "@/kit/utils";
+import { cn, FOCUS_RING } from "@/kit/utils";
 
 const CheckIcon = getIcon("check");
 
@@ -108,7 +108,11 @@ export function Wizard({
         })}
       </ol>
 
-      <div className="min-h-0 flex-1 overflow-y-auto">
+      {/* A tab stop for the same reason DetailPane's/SplitView's scrolling
+          body has one: Safari won't focus a scrollable region on its own,
+          and axe's scrollable-region-focusable rule catches it. */}
+      {/* eslint-disable-next-line jsx-a11y/no-noninteractive-tabindex -- a keyboard-scrollable region, not a widget (DetailPane.tsx's own precedent). */}
+      <div tabIndex={0} className={cn("min-h-0 flex-1 overflow-y-auto", FOCUS_RING)}>
         <h1 className="mb-4 text-2xl font-bold">{steps[currentIndex]?.title}</h1>
         {children}
       </div>

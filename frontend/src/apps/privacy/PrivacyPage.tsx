@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { Page } from "@/kit/primitives/Page";
 import { Section } from "@/kit/primitives/Section";
+import { cn, FOCUS_RING } from "@/kit/utils";
 import { List } from "@/kit/primitives/List";
 import { AsyncState } from "@/kit/primitives/AsyncState";
 import { getIcon } from "@/kit/icons";
@@ -42,7 +43,8 @@ export function PrivacyPage() {
 
   return (
     <Page title="Privacy">
-      <div className="flex flex-1 flex-col gap-6 overflow-y-auto p-4">
+      {/* eslint-disable-next-line jsx-a11y/no-noninteractive-tabindex -- a keyboard-scrollable region, not a widget (DetailPane.tsx's own precedent). */}
+      <div tabIndex={0} className={cn("flex flex-1 flex-col gap-6 overflow-y-auto p-4", FOCUS_RING)}>
         <div className="flex flex-col gap-2">
           <p className="text-base">
             Everything you say to MaiPai, everything it remembers, and everyone in your household stays on this

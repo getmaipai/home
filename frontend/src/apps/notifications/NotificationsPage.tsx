@@ -8,6 +8,7 @@ import { Badge } from "@/kit/ui/badge";
 import { Button } from "@/kit/ui/button";
 import { NOTIFICATIONS_QUERY_KEY, NOTIFICATIONS_HISTORY_QUERY_KEY } from "@/shell/NotificationBell";
 import { api, ApiError, type NotificationDeliveryView } from "@/lib/api";
+import { cn, FOCUS_RING } from "@/kit/utils";
 
 const THIRTY_DAYS_MS = 30 * 24 * 60 * 60 * 1000;
 
@@ -76,7 +77,8 @@ export function NotificationsPage() {
 
   return (
     <Page title="Notifications">
-      <div className="flex flex-1 flex-col gap-4 overflow-y-auto p-4">
+      {/* eslint-disable-next-line jsx-a11y/no-noninteractive-tabindex -- a keyboard-scrollable region, not a widget (DetailPane.tsx's own precedent). */}
+      <div tabIndex={0} className={cn("flex flex-1 flex-col gap-4 overflow-y-auto p-4", FOCUS_RING)}>
         {actionError ? <p className="text-base text-destructive">{actionError}</p> : null}
 
         <AsyncState

@@ -2,6 +2,7 @@ import { useState, type FormEvent, type ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { Page } from "@/kit/primitives/Page";
+import { cn, FOCUS_RING } from "@/kit/utils";
 import { Card } from "@/kit/primitives/Card";
 import { CardGrid } from "@/kit/primitives/CardGrid";
 import { Avatar } from "@/kit/primitives/Avatar";
@@ -105,7 +106,8 @@ function WhoIsHere({ selfId }: { selfId: string }) {
   const people = query.data ?? [];
   if (people.length === 0) return null;
   return (
-    <div className="flex items-center gap-2 overflow-x-auto">
+    // eslint-disable-next-line jsx-a11y/no-noninteractive-tabindex -- a keyboard-scrollable region, not a widget (DetailPane.tsx's own precedent).
+    <div tabIndex={0} className={cn("flex items-center gap-2 overflow-x-auto", FOCUS_RING)}>
       {people.map((p) => (
         <div key={p.id} className="flex shrink-0 flex-col items-center gap-1">
           <Avatar name={p.display_name} className="h-10 w-10 text-sm" />
@@ -159,7 +161,8 @@ export function HomePage({ person }: HomePageProps) {
   // case), which had no visible identity at all before this step.
   return (
     <Page title="Home" hideTitle>
-      <div className="flex min-h-0 flex-1 flex-col gap-6 overflow-y-auto p-4">
+      {/* eslint-disable-next-line jsx-a11y/no-noninteractive-tabindex -- a keyboard-scrollable region, not a widget (DetailPane.tsx's own precedent). */}
+      <div tabIndex={0} className={cn("flex min-h-0 flex-1 flex-col gap-6 overflow-y-auto p-4", FOCUS_RING)}>
         <div>
           <h2 className="text-2xl font-semibold">{greetingFor(new Date(), person.display_name)}</h2>
         </div>

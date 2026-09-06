@@ -13,6 +13,7 @@ import { createChatSuggestionAdapter } from "@/apps/chat/chatSuggestionAdapter";
 import { createSttDictationAdapter } from "@/lib/voice/sttDictationAdapter";
 import { createSttSocket } from "@/lib/voice/sttSocket";
 import { ChatActorContext } from "@/apps/chat/chatMemoryActions";
+import { cn, FOCUS_RING } from "@/kit/utils";
 import type { Roster } from "@/lib/api";
 import type { SentenceSpeechScheduler } from "@/lib/sentenceSpeechScheduler";
 
@@ -161,7 +162,11 @@ export function ChatPage({ person }: ChatPageProps) {
                 A's per-thread routes land (chatThreadListAdapter.ts) -
                 hidden below lg since there is, today, nothing to switch
                 between. */}
-            <aside className="hidden w-64 shrink-0 overflow-y-auto border-e border-border p-2 lg:block">
+            <aside
+              // eslint-disable-next-line jsx-a11y/no-noninteractive-tabindex -- a keyboard-scrollable region, not a widget (DetailPane.tsx's own precedent).
+              tabIndex={0}
+              className={cn("hidden w-64 shrink-0 overflow-y-auto border-e border-border p-2 lg:block", FOCUS_RING)}
+            >
               <ThreadList />
             </aside>
             <div className="min-w-0 flex-1">
