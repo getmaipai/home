@@ -187,3 +187,188 @@ Full backend + frontend + spec suites green (705 backend, 339
 frontend), `bunx tsc --noEmit` clean in both `backend/` and
 `frontend/`, `bun run lint` clean (two pre-existing warnings, neither
 touched by this step), `scripts/check.sh` green end to end.
+
+## Step 1: the first-run wizard
+
+`/setup`, shell-less (App.tsx's router now wraps every state - loading,
+signed out, mid-setup, signed in - not just the authenticated tree, so
+`/setup` is a real, reloadable route rather than a conditionally-
+rendered component with no URL of its own the way the old inline
+first-run form had). `kit/primitives/Wizard.tsx` is the reusable pattern
+(platform plan 6.4): a horizontal strip of numbered steps, not a
+two-pane sidebar - works identically at phone and desktop with no
+separate responsive case. **Rendered as a task list, not a progress
+rail**, resolving a real tension between the session plan's own
+shorthand ("a wizard node (steps, progress rail...)") and the more
+authoritative platform-plan pattern table ("a progress rail only at
+three to seven steps... over seven, a task list"): the setup wizard's
+9 steps are exactly the case a task list is for, so the pattern table
+wins. A completed step's number is clickable to jump back and change an
+earlier answer (SelectField-style "resume/change" per plan 6.4); a step
+past the current one is named but locked.
+
+**What's real versus placeholder, and why, named plainly rather than
+silently faked:**
+
+- Household name, owner profile (`POST /api/auth/setup`), hardware
+  detection and the model set that fits (`GET /api/host/hardware`,
+  `GET /api/host/models`, `POST /api/host/models/:id/select` - all
+  already real, built by Session F), and backups (`GET/POST /api/
+  backups`) are genuinely real: the owner account this step creates is
+  the one the household signs in with afterward, hardware detection
+  shows this machine's actual specs, model selection actually starts a
+  model, a backup actually runs.
+- `GET /api/setup/state`/`POST /api/setup/:step` (`wave-2.md`'s F-to-E
+  contract) does not exist yet, so which step a household has reached
+  is tracked in `sessionStorage` (`RESUME_KEY`) instead - a placeholder
+  for the real, per-household, server-side version, swapped in once F
+  ships it.
+- The AI-outputs disclaimer and one-time unrestricted-mode
+  acknowledgment (a hard org safety invariant) has no backend field to
+  persist to at all - Person/settings changes are backend/spec work
+  outside this session's frontend-only ownership. The UI enforces
+  "shown once, checkbox required to continue" for real, but only
+  per-browser (`sessionStorage`, `ACKNOWLEDGED_KEY`); nothing
+  server-side gates unrestricted mode on it yet. Recorded here and in
+  `docs/BACKLOG.md` rather than left to be discovered as a silent gap:
+  this step is real UI, not yet a real safety gate.
+- Trust-this-hub (household CA + QR), the default package set, and
+  Tailscale have no backend at all yet (no passkeys/CA routes from F, no
+  store from D) - each renders honest "not built yet" copy with a
+  named, working Skip ("Skip - not built yet"), never a fake success
+  state. Continue is disabled on these steps; only Skip advances.
+- The emergency kit step is informational only for the same reason (it
+  depends on backups being configured, which is the very next step);
+  once backups are wired to a household's real encryption key, this
+  becomes the real printable page.
+- Household name and language/timezone are collected but not persisted
+  anywhere (no `household.name` or locale setting key exists yet -
+  Session F's `coreKeys.ts`) - carried only in the wizard's own local
+  state for the "done" screen's greeting.
+
+**Two real bugs found only by walking the actual flow in a real
+browser against a real backend** (unit tests, which mock `fetch`, could
+not have caught either - both are service-worker-level, not app-level):
+
+- `installReloadOnceOnNewServiceWorker` (`pwaBoot.ts`, step 0) reloaded
+  on a page's very first service-worker activation, not only a real
+  mid-session update - exactly the bug a code review had already named
+  and this session had already fixed in step 0, restated here because
+  walking the wizard's own resume-after-reload step is what would have
+  caught it independently if the review hadn't.
+- `vite.config.ts`'s `navigateFallback: "/offline.html"` (step 0) turned
+  out to serve the offline page for **every** navigation to a URL not
+  already precached, unconditionally, regardless of whether the network
+  was actually reachable - workbox's `navigateFallback` is its generic
+  SPA-shell mechanism, not an offline-only one. Reloading on `/setup`
+  (never a precached asset) served "Can't reach MaiPai right now" with
+  the backend fully healthy the entire time; every deep route would have
+  hit this on reload, not just this one. Fixed to `navigateFallback:
+  "index.html"` (the real shell, itself precached and served from Cache
+  Storage - so this always succeeds even genuinely offline). A
+  tried-and-discarded custom `runtimeCaching` NetworkOnly-plus-fallback
+  rule sat here briefly; found dead by reading the generated `sw.js`,
+  not by assumption - `precacheAndRoute` registers its own implicit
+  `NavigationRoute` ahead of any explicit `registerRoute` call, so a
+  custom navigation rule added after it never runs. A genuinely
+  unreachable hub is therefore the app's own job to detect once the
+  shell has loaded (a failed API call), not a service-worker one.
+
+**A third, real accessibility bug found once `/setup` was added to the
+screenshot/a11y matrix's own route list** (per its own "a route added
+later without an entry here is a real gap" rule): the wizard is
+shell-less, so it has no `SidebarInset`-provided `<main>` the way every
+authenticated route gets for free - `landmark-one-main`/`region` both
+failed, since nothing on the page sat inside any landmark. Fixed by
+rendering `Wizard`'s own root as `<main>`.
+
+`Wizard.tsx` (7 tests) and `SetupWizard.tsx` (9 tests) cover: step order,
+Back without losing what was already entered, the owner step's real API
+call and its failure path, the acknowledgment gate (blocks Continue
+until checked, sets the once-only flag), resume mid-wizard after a
+simulated reload (seeding `sessionStorage` directly, since a real reload
+is what the two bugs above needed a live browser to catch instead), the
+hardware step's real data loading and model-pick gate, a not-yet-built
+step's Skip button, and the done step calling back out. `SignIn.tsx`
+gained one more test (redirects to `/setup` instead of its own inline
+first-run form) and one behavior change: the single-step "name + PIN"
+form profiles.length === 0 used to render is gone, replaced by the real
+wizard.
+
+Verified live, not just unit-tested: a fresh household walked through
+household -> owner -> acknowledgment -> hardware (real detection, real
+model list, real selection) against a real backend, with a mid-wizard
+reload proving resume - the same walk that found both service-worker
+bugs above. Screenshots looked at before writing any of this up.
+`bun run screenshots` (the full phone/tablet/desktop/far x light/dark
+matrix with saved images) has still not been run this session; the
+verification above used a smaller, purpose-built script instead
+(deleted after use, not committed - a throwaway debugging aid, not a
+second screenshot pipeline).
+
+Full backend (705) + frontend (359) suites green, `bunx tsc --noEmit`
+clean, `bun run lint` clean (same two pre-existing warnings),
+`scripts/check.sh` green end to end, the full `bun run a11y` matrix
+clean except the two pre-existing, already-deferred findings named in
+`docs/BACKLOG.md` (the `--primary` contrast ratio, `scrollable-region-
+focusable` on Privacy).
+
+**Left for a later step, named:** the family-member join flow (QR from
+the admin's screen, profile picker, PIN or passkey), the kid-profile
+birthdate-to-band preset flow, and the guest-profile-with-expiry flow -
+none of plan 12's other three first-run flows are built yet, only the
+admin's own initial setup. `docs/user/` pages for the wizard are step
+9's job, spread across every step per that step's own text; not written
+yet.
+
+**A second review pass on the same diff found eight more, all fixed
+before this step closed:**
+
+- Finishing the wizard set state but never navigated - `onDone()` fired
+  and cleared its own `sessionStorage` keys, but the browser stayed on
+  `/setup` with nothing left to render there. Fixed: `navigate("/", {
+  replace: true })` after `onDone()`.
+- `/setup` had no gate: any signed-in household could browse back to it
+  and re-run first-run setup over an already-configured household. Fixed
+  by checking `api.profiles()` on mount and redirecting to `/` unless the
+  visit is a genuine resume (a `RESUME_KEY` already in `sessionStorage`) -
+  the two cases plan 6.4's own text distinguishes ("resume after reload"
+  is not "reachable unconditionally").
+- The hardware step had no Skip: a household whose machine fit nothing in
+  the default model set had no way past it. Fixed with a conditional
+  Skip ("Skip - choose a model later") that only appears when nothing in
+  `modelFits` actually fits.
+- `goTo()` restored the resumed step index from `sessionStorage` but not
+  `completedCount`, so jumping back to review a finished step and
+  reloading mid-review re-locked every step after it. Fixed by persisting
+  `completedCount` under its own key alongside the step index.
+- `Wizard`'s jump-to-step button disabled only on `!isDone`, so a click
+  during an in-flight request (`busy`) could mutate state out from under
+  the pending call. Fixed: `disabled={!isDone || busy}`.
+- `selectModel()` marked a model "Selected" as soon as the start-job
+  `POST` resolved, before the job ever reached `ready` - the same
+  premature-success shape `ModelsSection.tsx` had already solved. Fixed
+  by polling `modelSelectStatus()` and only marking the model selected on
+  `status === "ready"` (surfacing `"failed"` as an error instead).
+- The hardware-summary sentence duplicated `ModelsSection.tsx`'s
+  `describeHardware()` almost verbatim. Fixed by exporting and reusing
+  the one implementation instead of a second copy.
+- A test fixture used Jesse's real surname ("The Torres household")
+  instead of a persona-roster name - a PII rule violation caught before
+  it reached `main`. Fixed to "The Bramble household".
+
+Chasing the last of these down through the test suite surfaced one more
+bug, in the test helper rather than the product: the shared `stubFetch`
+matches request paths by `url.includes(path)` in the order its object
+literal was written, and `/api/host/models` is a literal string prefix
+of both `/api/host/models/selection` and `/api/host/models/small-chat/
+select` - listing the short path first made both longer, more specific
+requests resolve against the wrong stub. Confirmed with a throwaway
+isolated test proving the product code was already correct; fixed by
+listing the specific paths before the generic one in both affected
+tests. Full suite re-verified after every fix: backend + frontend green,
+`tsc --noEmit` clean, `lint` clean, `scripts/check.sh` green end to end,
+and the full `bun run a11y` matrix re-run clean except the same two
+pre-existing, already-deferred findings (`/setup` now shows the same
+`--primary` contrast gap as every other `bg-primary` surface, already
+covered by the existing BACKLOG.md entry - not a new finding).

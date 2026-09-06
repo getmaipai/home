@@ -804,18 +804,23 @@ implemented on the hub yet.
 - [ ] **The rest of accessibility** (M) - colour contrast ratios against
       the real token palette in both themes, a screen-reader read-through
       of each page, keyboard-trap testing, reduced-motion, and the TV
-      surface (session-e-ui-and-docs.md's own step 7). One violation
+      surface (session-e-ui-and-docs.md's own step 7). Two violations
       already confirmed, exact numbers so step 7 doesn't have to
-      re-discover it: the new screenshot/a11y matrix's first run
+      re-discover them: the screenshot/a11y matrix's first runs
       (2026-09-06) found white text on `--primary` (`#ffffff` on
       `#06a9c6`) at 2.8:1, under WCAG AA's 4.5:1 floor for normal text -
-      hits the active sidebar nav item's label and every default-variant
-      `Button` (`kit/ui/button.tsx`'s `bg-primary` variant), so this is a
-      token-level fix (a darker `--primary`, checked against both
-      themes), not a per-component one. Left for step 7 rather than
-      patched here: it is a real design decision (what shade stays "on
-      brand" while clearing 4.5:1), not a one-line hack to make the
-      matrix pass.
+      not just Home as first measured, but every route with a default-
+      variant `Button` (`kit/ui/button.tsx`'s `bg-primary` variant) or an
+      active sidebar nav item on screen at desktop width (confirmed on
+      Home, Chat, People, Memory, Privacy, Settings and its four
+      sub-pages once the matrix ran the full route list) - a token-level
+      fix (a darker `--primary`, checked against both themes), not a
+      per-component one. Also `scrollable-region-focusable` on Privacy
+      (a scrollable region with no keyboard access) - pre-existing,
+      unrelated to this session's own changes. Left for step 7 rather
+      than patched here: the contrast one is a real design decision (what
+      shade stays "on brand" while clearing 4.5:1), not a one-line hack
+      to make the matrix pass.
 - [ ] Onboarding beyond the one-time initial household setup (M)
 - [x] Accessibility audit (M) - done 2026-09-05, driven against the
       running app at phone and desktop, not read off the source: 142

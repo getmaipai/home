@@ -1,5 +1,6 @@
 import { describe, expect, test, mock, afterEach } from "bun:test";
 import { render, cleanup, fireEvent, act, waitFor } from "@testing-library/react";
+import { MemoryRouter, Routes, Route } from "react-router-dom";
 import { SignIn } from "@/shell/SignIn";
 import type { Roster } from "@/lib/api";
 
@@ -57,6 +58,25 @@ async function selectJesse(rendered: ReturnType<typeof render>) {
     fireEvent.click(jesse);
   });
 }
+
+describe("SignIn first-run", () => {
+  test("an empty household redirects to the setup wizard, not its own inline form", async () => {
+    const restore = stubFetch({ "/api/auth/profiles": [] });
+    try {
+      const rendered = render(
+        <MemoryRouter initialEntries={["/"]}>
+          <Routes>
+            <Route path="/setup" element={<div>the setup wizard</div>} />
+            <Route path="/*" element={<SignIn onSignedIn={() => {}} />} />
+          </Routes>
+        </MemoryRouter>,
+      );
+      await rendered.findByText("the setup wizard");
+    } finally {
+      restore();
+    }
+  });
+});
 
 describe("SignIn auto-submit", () => {
   test("a 4-digit numeric PIN submits itself with no separate tap", async () => {

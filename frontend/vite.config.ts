@@ -23,14 +23,37 @@ export default defineConfig({
     // `globPatterns` precache build output only (JS/CSS/fonts/icons), so
     // no `/api` response is ever added without a runtimeCaching rule this
     // config deliberately never adds - household data never enters the
-    // cache. `navigateFallback` serves the offline page for any
-    // navigation that can't reach the network, `navigateFallbackDenylist`
-    // keeps that from swallowing a genuine API 404/500.
+    // cache.
     VitePWA({
       registerType: "autoUpdate",
       manifest: false,
       workbox: {
-        navigateFallback: "/offline.html",
+        // `navigateFallback` set to the real SPA shell, not offline.html:
+        // that option serves its target for EVERY navigation not already
+        // precached, unconditionally, regardless of whether the network
+        // is reachable - it's workbox's generic "SPA shell" mechanism
+        // (the standard fix for a client-side route the server never
+        // heard of), not an offline-only one. Found live (2026-09-06,
+        // Session E step 1's own wizard verification, pointed at
+        // offline.html at the time): reloading on `/setup` served the
+        // offline page even with the backend fully healthy, because
+        // `/setup` simply isn't a precached URL - every deep route would
+        // have hit this on reload, not just this one. `index.html` is
+        // itself precached and served from Cache Storage, so this always
+        // succeeds even genuinely offline: there is no SW-level "network
+        // down" moment left to catch. A tried-and-abandoned custom
+        // `runtimeCaching` NetworkOnly-with-offline-fallback rule sat
+        // here briefly, matching on `request.mode === "navigate"` - dead
+        // code found by inspecting the generated sw.js, not by belief:
+        // `precacheAndRoute` registers its own implicit NavigationRoute
+        // for `index.html` ahead of any explicit `registerRoute` call, so
+        // that rule never actually ran. Detecting a genuinely unreachable
+        // hub is therefore the app's own job once the shell has loaded
+        // (a failed API call), not a service-worker one; offline.html
+        // stays as a real, reachable, precached page for the one case
+        // that IS a SW-level concern - opening the PWA before it has ever
+        // successfully installed a service worker at all.
+        navigateFallback: "index.html",
         navigateFallbackDenylist: [/^\/api\//],
         // The onnxruntime-web runtime (copy-ort.mjs's public/ort/ files,
         // ~40 MB, plus its own bundled JS loader emitted as a hashed

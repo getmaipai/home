@@ -136,7 +136,12 @@ export function ModelsSection() {
   );
 }
 
-function describeHardware(hw: HardwareInfo): string {
+// Exported for SetupWizard.tsx's hardware step: the same machine, the
+// same sentence - a code review (2026-09-06) found the wizard had
+// hand-built its own, differently-worded description of this computer
+// rather than reusing this one, so Settings > AI models and the wizard
+// described the same hardware inconsistently.
+export function describeHardware(hw: HardwareInfo): string {
   if (hw.isAppleSilicon) return `This computer: Apple Silicon, ${hw.unifiedMemoryGb} GB memory.`;
   if (hw.cudaDevices.length > 0) {
     const cards = hw.cudaDevices.map((d) => `${d.name} (${formatBytes(d.vramBytes)})`).join(", ");

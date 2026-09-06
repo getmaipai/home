@@ -53,6 +53,7 @@ interface RouteSpec {
 // is the one universal "the shell actually rendered, not an error
 // boundary" signal every route shares.
 const ROUTES: RouteSpec[] = [
+  { slug: "setup", path: "/setup" },
   { slug: "home", path: "/" },
   { slug: "chat", path: "/chat" },
   { slug: "search", path: "/search" },

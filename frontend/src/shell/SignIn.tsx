@@ -1,4 +1,5 @@
 import { useEffect, useState, type FormEvent } from "react";
+import { Navigate } from "react-router-dom";
 import { api, ApiError, type Roster } from "@/lib/api";
 import { Button } from "@/kit/ui/button";
 import { Input } from "@/kit/ui/input";
@@ -19,8 +20,6 @@ export function SignIn({ onSignedIn }: SignInProps) {
   const [profiles, setProfiles] = useState<Roster[] | null>(null);
   const [selected, setSelected] = useState<Roster | null>(null);
   const [secret, setSecret] = useState("");
-  const [displayName, setDisplayName] = useState("");
-  const [newSecret, setNewSecret] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -53,20 +52,6 @@ export function SignIn({ onSignedIn }: SignInProps) {
         <Progress mode="spinner" label="Loading household" />
       </div>
     );
-  }
-
-  async function handleSetup(e: FormEvent) {
-    e.preventDefault();
-    setBusy(true);
-    setError(null);
-    try {
-      await api.setup(displayName, newSecret);
-      onSignedIn();
-    } catch (e) {
-      setError(e instanceof ApiError ? e.message : "Setup failed");
-    } finally {
-      setBusy(false);
-    }
   }
 
   async function handleSecretSubmit(e?: FormEvent) {
@@ -106,28 +91,15 @@ export function SignIn({ onSignedIn }: SignInProps) {
     }
   }
 
+  // A fresh install has nobody signed in and nobody to sign in as: the
+  // wizard (`/setup`, docs/plans/session-e-ui-and-docs.md step 1) owns
+  // first-run entirely now - this used to render its own single-step
+  // "name + PIN" form here, replaced by the real multi-step flow plan
+  // 12 describes (language/locale, the owner's profile, the AI-outputs
+  // disclaimer, hardware, trust, packages, remote access, the emergency
+  // kit, backups, done).
   if (profiles.length === 0) {
-    return (
-      <div className="flex h-screen items-center justify-center p-6">
-        <form onSubmit={handleSetup} className="flex w-full max-w-sm flex-col gap-4">
-          <img src="/brand/maipai-home-logo-light.png" alt="MaiPai Home" className="mx-auto h-10 w-auto brand-logo-light" />
-          <img src="/brand/maipai-home-logo-dark.png" alt="MaiPai Home" className="mx-auto h-10 w-auto brand-logo-dark" />
-          <h1 className="text-center text-lg font-semibold">Welcome. Let's set up your household.</h1>
-          <Input placeholder="Your name" value={displayName} onChange={(e) => setDisplayName(e.target.value)} required />
-          <Input
-            type="password"
-            placeholder="Choose a PIN or password"
-            value={newSecret}
-            onChange={(e) => setNewSecret(e.target.value)}
-            required
-          />
-          {error ? <p className="text-sm text-[var(--destructive)]">{error}</p> : null}
-          <Button type="submit" disabled={busy}>
-            {busy ? "Setting up…" : "Get started"}
-          </Button>
-        </form>
-      </div>
-    );
+    return <Navigate to="/setup" replace />;
   }
 
   if (selected) {

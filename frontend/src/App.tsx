@@ -4,6 +4,7 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { createQueryClient } from "@/lib/queryClient";
 import { SignIn } from "@/shell/SignIn";
 import { Shell } from "@/shell/Shell";
+import { SetupWizard } from "@/apps/setup/SetupWizard";
 import { ChatPage } from "@/apps/chat/ChatPage";
 import { HomePage } from "@/apps/home/HomePage";
 import { SearchPage } from "@/apps/search/SearchPage";
@@ -56,45 +57,56 @@ export function App() {
     loadPerson();
   }, []);
 
-  if (person === undefined) {
-    return (
-      <div className="flex h-screen items-center justify-center">
-        <Progress mode="spinner" label="Loading MaiPai Home" />
-      </div>
-    );
-  }
-
-  if (person === null) {
-    return <SignIn onSignedIn={loadPerson} />;
-  }
-
+  // The router now wraps every state (loading, signed out, mid-setup,
+  // signed in), not just the authenticated tree: `/setup` needs to be a
+  // real, addressable, reloadable route (platform plan 6.4's Wizard
+  // pattern - "resume after reload" - and the join-flow QR a phone scans
+  // both need a real URL to land on, not a conditionally-rendered
+  // component with no path of its own the way the old inline first-run
+  // form had).
   return (
     <QueryClientProvider client={queryClient}>
       <ToastProvider>
         <TooltipProvider>
           <BrowserRouter>
-            <Shell
-              person={person}
-              onSignOut={() => api.logout().finally(() => setPerson(null))}
-              onPersonChange={revalidatePerson}
-            >
-              <Routes>
-                <Route path="/" element={<HomePage person={person} />} />
-                <Route path="/chat" element={<ChatPage person={person} />} />
-                <Route path="/search" element={<SearchPage />} />
-                <Route path="/people" element={<PeoplePage person={person} />} />
-                <Route path="/memory" element={<MemoryPage />} />
-                <Route path="/privacy" element={<PrivacyPage />} />
-                <Route
-                  path="/settings"
-                  element={<SettingsPage person={person} onPersonChange={revalidatePerson} />}
-                />
-                <Route path="/settings/models" element={<ModelsPage person={person} />} />
-                <Route path="/settings/backups" element={<BackupsPage person={person} />} />
-                <Route path="/settings/voices" element={<VoicesPage person={person} />} />
-                <Route path="/settings/commands" element={<CommandsPage person={person} />} />
-              </Routes>
-            </Shell>
+            <Routes>
+              <Route path="/setup" element={<SetupWizard onDone={loadPerson} />} />
+              <Route
+                path="/*"
+                element={
+                  person === undefined ? (
+                    <div className="flex h-screen items-center justify-center">
+                      <Progress mode="spinner" label="Loading MaiPai Home" />
+                    </div>
+                  ) : person === null ? (
+                    <SignIn onSignedIn={loadPerson} />
+                  ) : (
+                    <Shell
+                      person={person}
+                      onSignOut={() => api.logout().finally(() => setPerson(null))}
+                      onPersonChange={revalidatePerson}
+                    >
+                      <Routes>
+                        <Route path="/" element={<HomePage person={person} />} />
+                        <Route path="/chat" element={<ChatPage person={person} />} />
+                        <Route path="/search" element={<SearchPage />} />
+                        <Route path="/people" element={<PeoplePage person={person} />} />
+                        <Route path="/memory" element={<MemoryPage />} />
+                        <Route path="/privacy" element={<PrivacyPage />} />
+                        <Route
+                          path="/settings"
+                          element={<SettingsPage person={person} onPersonChange={revalidatePerson} />}
+                        />
+                        <Route path="/settings/models" element={<ModelsPage person={person} />} />
+                        <Route path="/settings/backups" element={<BackupsPage person={person} />} />
+                        <Route path="/settings/voices" element={<VoicesPage person={person} />} />
+                        <Route path="/settings/commands" element={<CommandsPage person={person} />} />
+                      </Routes>
+                    </Shell>
+                  )
+                }
+              />
+            </Routes>
           </BrowserRouter>
         </TooltipProvider>
       </ToastProvider>
