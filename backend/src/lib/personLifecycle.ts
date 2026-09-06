@@ -28,7 +28,6 @@ import { db, sqlite } from "@/db";
 import {
   people,
   personCredentials,
-  sessions,
   conversationTurns,
   settingsValues,
   clonedVoices,
@@ -320,8 +319,13 @@ export function erasePersonData(personId: string): ErasureCounts {
   // row would keep their id around in a table this function exists to
   // clear out.
   const jobs = sqlite.query("DELETE FROM scheduled_jobs WHERE person_id = ?").run(personId).changes;
-  const sessionRows = sqlite.query("DELETE FROM sessions WHERE person_id = ?").run(personId).changes;
-  sqlite.query("DELETE FROM person_credentials WHERE person_id = ?").run(personId);
+  // Issue #37: this used to hand-roll only the sessions/person_credentials
+  // half of what a deleted person's access needs erasing, leaving
+  // passkeys, paired devices, device tokens and the TOTP secret behind -
+  // memorializePerson() already had the real, complete revoke below.
+  // Reused here instead of a second copy so a future new credential type
+  // only needs adding once.
+  const { sessions: sessionRows } = revokeAllCredentialsAndSessions(personId);
 
   // Step 7: a code review (2026-09-06) found entities/relationships/
   // grants/approvals entirely untouched here despite this function's own
@@ -355,14 +359,10 @@ export function erasePersonData(personId: string): ErasureCounts {
   const entityRows = sqlite.query("DELETE FROM entities WHERE person = ?").run(personId).changes;
   const grantRows = sqlite.query("DELETE FROM grants WHERE person = ?").run(personId).changes;
   const approvalRows = sqlite.query("DELETE FROM approvals WHERE person_id = ?").run(personId).changes;
-  // Deleting the session rows is not enough on its own: resolveSession
-  // keeps a 10-second in-memory cache, so a deleted person went on
-  // making authenticated requests until it expired. auth.ts has had
-  // invalidateSessionCacheForPerson ready since 2026-09-04 with the note
-  // "no caller yet... kept ready for when a delete-person or role-change
-  // route lands"; this is that caller. Found by the test that asserts a
-  // deleted person's session stops working, not by reading the code.
-  invalidateSessionCacheForPerson(personId);
+  // Session-cache invalidation (resolveSession's 10-second in-memory
+  // cache, auth.ts) already happened above inside
+  // revokeAllCredentialsAndSessions() - a deleted person's session stops
+  // working immediately, not just once the row is gone from the table.
 
   return {
     memories,
@@ -457,11 +457,15 @@ export function deletePeople(actor: PersonRow, ids: string[]): BatchDeleteOutcom
 // --- Step 7: enabled, guest expiry, memorialise, the band change ---
 
 /** Every sign-in credential and live session for one person, gone at
- * once - the shared shape memorializePerson() below and a future
- * "revoke everything" admin action would both need. Never touches
- * memories, conversations or settings: unlike deletePerson()'s erasure,
- * this is about ending ACCESS, not history. */
-function revokeAllCredentialsAndSessions(personId: string): void {
+ * once - the shared shape memorializePerson() and deletePerson()'s own
+ * erasePersonData() (issue #37: it used to hand-roll only the sessions/
+ * person_credentials half of this) both need. Never touches memories,
+ * conversations or settings: unlike deletePerson()'s erasure, this is
+ * about ending ACCESS, not history. Returns the session count deletePerson
+ * reports in its own ErasureCounts - raw sqlite for that one, the same
+ * .run().changes escape hatch this file already uses elsewhere, since
+ * Drizzle's bun-sqlite .run() types its result void. */
+function revokeAllCredentialsAndSessions(personId: string): { sessions: number } {
   db.delete(personCredentials).where(eq(personCredentials.personId, personId)).run();
   db.delete(passkeyCredentials).where(eq(passkeyCredentials.personId, personId)).run();
   const ownDevices = db.select({ id: devices.id }).from(devices).where(eq(devices.personId, personId)).all();
@@ -474,10 +478,31 @@ function revokeAllCredentialsAndSessions(personId: string): void {
     deleteReceivedBackupsForDevice(device.id);
   }
   db.delete(devices).where(eq(devices.personId, personId)).run();
-  db.delete(sessions).where(eq(sessions.personId, personId)).run();
+  const sessionRows = sqlite.query("DELETE FROM sessions WHERE person_id = ?").run(personId).changes;
   db.delete(totpSecrets).where(eq(totpSecrets.personId, personId)).run();
   invalidateSessionCacheForPerson(personId);
+  return { sessions: sessionRows };
 }
+
+// Issue #49 (follow-up from COR-5's review of deletePerson()):
+// revokeAllCredentialsAndSessions()'s seven delete statements plus the
+// trailing `people` UPDATE used to run outside any transaction. A crash
+// or thrown error between the two (deleteReceivedBackupsForDevice()
+// throwing partway through the per-device loop, say) left a person with
+// every credential and session gone but memorializedAt still null - an
+// inconsistent half-memorialized state, the same class of bug COR-5
+// closed for deletePerson(). Same sqlite.transaction() pattern as
+// commitPersonUpdate() above: only the write portion is wrapped, after
+// memorializePerson()'s own read-only checks have already run.
+const commitMemorialize = sqlite.transaction((personId: string, alreadyMemorialized: boolean): void => {
+  revokeAllCredentialsAndSessions(personId);
+  if (!alreadyMemorialized) {
+    db.update(people)
+      .set({ memorializedAt: new Date().toISOString(), updatedAt: new Date().toISOString(), hlc: nextHlc() })
+      .where(eq(people.id, personId))
+      .run();
+  }
+});
 
 /** BACKLOG.md: "memorialise (read-only profile, PIN cleared, sessions
  * revoked, export offered)". Distinct from deletePerson(): a
@@ -497,13 +522,7 @@ export function memorializePerson(actor: PersonRow, personId: string): PersonOpR
     return { ok: false, status: 403, error: `${actor.role} cannot memorialize a ${target.role} profile` };
   }
 
-  revokeAllCredentialsAndSessions(personId);
-  if (!target.memorializedAt) {
-    db.update(people)
-      .set({ memorializedAt: new Date().toISOString(), updatedAt: new Date().toISOString(), hlc: nextHlc() })
-      .where(eq(people.id, personId))
-      .run();
-  }
+  commitMemorialize(personId, target.memorializedAt != null);
   return { ok: true, value: { id: personId } };
 }
 

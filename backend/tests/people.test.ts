@@ -3,7 +3,8 @@ import { Person } from "@maipai/spec/gen/ts/person.js";
 import { TestClient } from "./client";
 import { resetDb } from "./reset-db";
 import { __resetThrottleForTests } from "@/lib/secretThrottle";
-import { sqlite } from "@/db";
+import { sqlite, db } from "@/db";
+import { passkeyCredentials, devices, deviceTokens, totpSecrets } from "@/db/schema";
 import { remember } from "@/lib/memory";
 import { logTurn, resolveOrCreateConversation } from "@/lib/conversationHistory";
 import { setValue } from "@/lib/settings";
@@ -673,6 +674,25 @@ describe("deleting a person erases what the household held about them", () => {
     expect(grantRes.status).toBe(201);
     const approvalRes = await personClient.post("/api/approvals", { kind: "browse_url", details: {} });
     expect(approvalRes.status).toBe(201);
+
+    // Issue #37: passkeys, paired devices, device tokens and the TOTP
+    // secret were entirely unexercised by this test too - the same
+    // trivial-pass gap the comment above already calls out for
+    // entities/relationships/grants/approvals, just never closed for
+    // these four tables. No HTTP route exercises WebAuthn registration or
+    // TOTP setup in tests, so these are inserted directly, the same way
+    // personLifecycle.test.ts's own memorializePerson() tests already do.
+    const now = new Date().toISOString();
+    db.insert(passkeyCredentials)
+      .values({ id: "cred-erasure-test", personId: person.id, publicKey: "x", counter: 0, transports: "[]", deviceType: "singleDevice", backedUp: false, name: "Bramble's iPhone", createdAt: now })
+      .run();
+    db.insert(devices)
+      .values({ id: "device-erasure-test", kind: "phone", name: "Bramble's iPhone", personId: person.id, createdAt: now, updatedAt: now, hlc: now })
+      .run();
+    db.insert(deviceTokens)
+      .values({ id: "token-erasure-test", deviceId: "device-erasure-test", personId: person.id, tokenHash: "hash", expiresAt: now, createdAt: now })
+      .run();
+    db.insert(totpSecrets).values({ personId: person.id, secretEncrypted: "enc", enabled: true, createdAt: now, updatedAt: now }).run();
 
     await owner.request(`/api/people/${person.id}`, { method: "DELETE" });
 
