@@ -1098,7 +1098,7 @@ parsing them apart first - unlike `currency`'s own small parser, that
 split is exactly the fuzzy natural-language task a model suits and
 deterministic parsing doesn't.
 
-**`websearch` and the `searxng` integration** (`home-d@<pending>`): the
+**`websearch` and the `searxng` integration** (`home-d@ff8585e`): the
 plan calls for "SearXNG as a sidecar through F's `sidecars.ts`" - real
 research (not assumption) into a bundled, cross-platform, zero-dependency
 SearXNG the way `llama-server` is downloaded and pinned per-platform
