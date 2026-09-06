@@ -30,7 +30,9 @@
   "notifications": [],
   "backup": "exclude",
   "background": false,
-  "contributes": {},
+  "contributes": {
+    "widgets": [{ "id": "shopping", "title": "Shopping List", "size": "card", "refresh_s": 60, "inputs": {} }]
+  },
   "pages": [],
   "min_app": "0.1.0",
   "tier": 0,

@@ -164,7 +164,12 @@ class _RemindersNamespace:
     def set(self, text: str) -> dict[str, str]:
         job_id = self._host._gen_id("job")
         self._host.scheduled_jobs.append(
-            {"when": "[emulator: no real time parsing]", "job": "reminders.fire", "id": job_id, "inputs": {"task": text}}
+            {
+                "when": "[emulator: no real time parsing]",
+                "job": "reminders.fire",
+                "id": job_id,
+                "inputs": {"task": text},
+            }
         )
         return {"task": text, "when_text": "[emulator: no real time parsing]"}
 
@@ -176,7 +181,12 @@ class _TimersNamespace:
     def set(self, text: str) -> dict[str, str]:
         job_id = self._host._gen_id("job")
         self._host.scheduled_jobs.append(
-            {"when": "[emulator: no real duration parsing]", "job": "timers.fire", "id": job_id, "inputs": {"label": text}}
+            {
+                "when": "[emulator: no real duration parsing]",
+                "job": "timers.fire",
+                "id": job_id,
+                "inputs": {"label": text},
+            }
         )
         return {"label": text, "when_text": "[emulator: no real duration parsing]"}
 
@@ -289,7 +299,9 @@ class HostEmulator:
 
     def seed_shopping_list(self, items: list[dict[str, Any]]) -> None:
         for item in items:
-            self._shopping_list.append({"text": item["text"], "done": item.get("done", False)})
+            self._shopping_list.append(
+                {"text": item["text"], "done": item.get("done", False)}
+            )
 
     def register_secret(self, value: str) -> None:
         """A value registered here is replaced with [redacted] anywhere log() would emit it."""
@@ -336,14 +348,18 @@ class HostEmulator:
             )
         )
 
-    def schedule(self, when: str, job: str, inputs: dict[str, Any] | None = None) -> str:
+    def schedule(
+        self, when: str, job: str, inputs: dict[str, Any] | None = None
+    ) -> str:
         # inputs (session-d-packages-and-store.md step 8) closes a real,
         # previously-documented gap: the real host used to always pass
         # {} here, so a job re-firing this package lost its own input
         # scope entirely. Must stay behaviorally identical to
         # host-emulator.ts's own twin case.
         job_id = self._gen_id("job")
-        self.scheduled_jobs.append({"when": when, "job": job, "id": job_id, "inputs": inputs or {}})
+        self.scheduled_jobs.append(
+            {"when": when, "job": job, "id": job_id, "inputs": inputs or {}}
+        )
         return job_id
 
     def diagnostics(self) -> dict[str, Any]:

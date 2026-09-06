@@ -1309,3 +1309,108 @@ to the one shared shopping list with no per-person attribution kept
 beyond what `source`/creation timestamps already carry - a real "who
 added this" feature, if wanted, is `lib/lists.ts` schema work, not
 something this step's own scope needed to build speculatively.
+
+## Step 9: home control packages, and widgets (`home-d@PLACEHOLDER`)
+
+Two unrelated halves of the plan's own step 9 text, done in one pass:
+`lights-on`, `lights-off`, `lock-doors` (the plan's own `consequential:
+true` example, proving the confirm path from the package side) and the
+D-to-E widgets contract (`docs/plans/wave-2.md`: `contributes.widgets[]`,
+`GET /api/widgets`, `GET /api/widgets/:package/:id/data`).
+
+**A real, previously-unenforced safety gap, found building `lock-doors`
+and fixed at the engine level, not just documented.** `turnEngine.ts`'s
+`route()` checked a package's own `consequential` flag only on the
+fuzzy/Tier 2 path (`canFire`); the literal `routing.patterns` match
+above it had no such check, so a `consequential: true` package that
+ALSO declared a pattern would have fired immediately on a match,
+bypassing the household's confirmation entirely. `lock-doors` itself
+declares no patterns (by design), so this step's own package was never
+exposed - but the gap was real and would have bitten the next
+consequential package someone wrote without knowing this. Fixed by
+wrapping `route()`'s pattern-match loop in `if (!manifest.consequential)`;
+`spec/schemas/manifest.schema.json`'s own `consequential` field
+description now states the invariant outright; a new bronze-completeness
+check (`spec/tests/ts/package-bronze.test.ts`) refuses a manifest that
+declares both at authoring time; `backend/tests/turnEngine.test.ts` adds
+a direct regression test against the real bundled `lock-doors` package,
+not a synthetic stand-in.
+
+**A second gap, found by the code review pass on this diff, fixed the
+same way**: `lock-doors` shipped with `min_role: "child"`, but
+`consequential`'s own confirm step re-runs `runPlugin` as the *same*
+actor who said "yes" - it is not a second, higher-privileged check.
+Left at `child`, a child could ask to lock the door, confirm their own
+prompt, and `meetsMinRole(actor.role, "child")` would trivially pass
+with no adult ever in the loop. Raised to `teen`; `lock-doors/CHANGELOG.md`
+carries the reasoning for the next person who touches this package's
+`min_role` and wonders why it isn't `child` like its siblings.
+
+**`home_call_service_step` gained `target`/`data` interpolation**
+(`{room}`-style, the same convention `integration_call_step`'s own
+`args` already uses) so `lights-on`/`lights-off` can resolve
+`target: {area: "{room}"}` from the room a household member actually
+said, rather than every home-control package needing a fixed target
+like `lock-doors`'s `lock.front_door`. Verified this doesn't weaken the
+security-domain confirmation gate: `packageHost.ts`'s own check
+(`isHomeAssistantSecurityDomain(domain) && manifest.consequential !== true`)
+reads only the recipe's literal `domain` and the manifest's fixed
+`consequential` flag, never `target`'s shape - a new conformance
+fixture (`lights-on-dynamic-target.json`) proves both interpreters
+interpolate `target` identically, not just that recipes still validate.
+
+**Widgets: no new per-package data-shaping mechanism invented.**
+`lib/widgets.ts`'s `getWidgetData()` calls the exact same
+`runPlugin(packageId, actor, widget.inputs)` a live chat turn or
+`warmPackage()`'s own warm tick already calls, and wraps the reply's
+own already-tested, human-readable `text` into one `WidgetItem` - the
+package cache (`lib/packageCache.ts`) underneath `host.fetch` is what
+makes this "served from the cache" rather than a live fetch per widget
+load, exactly per the frozen contract's own wording, with no second,
+widget-specific cache-peeking path to keep in sync with the first.
+`min_role` gates both `listWidgets()` and `getWidgetData()` the same
+way `runPlugin()` itself already gates a live run. `routes/widgets.ts`
+follows `routes/lists.ts`'s own createRoute/openapi shape.
+
+`weather`, `news`, `list-view`, `almanac-date` each gained one
+`contributes.widgets` entry (current-weather card, headlines row,
+shopping-list card, today's-date card), matching the plan's own naming
+adjusted for step 7's almanac split and step 8's lists split. **A real
+process mistake, caught by `bundledPackages.test.ts` before it reached
+a commit**: `weather` is one of the six packages step 6 already moved
+to `catalog` as canonical source (`home`'s own copy under
+`backend/packages/` is a checked-in mirror, hash-pinned in
+`bundled-provenance.json`) - a first pass hand-edited `home`'s mirrored
+copy directly, exactly the anti-pattern `hashPackageDir()` exists to
+catch, and the provenance test failed immediately. Fixed properly: the
+`contributes.widgets` entry was added to `weather`'s actual canonical
+manifest in the sibling `catalog` checkout instead (`catalog@12479aa`,
+passing catalog's own lint+scorecard and full `check.sh` before that
+commit), then `scripts/refresh-bundled-packages.ts` pulled the real
+copy and regenerated the hash - `news`, `list-view`, `almanac-date`
+have no catalog counterpart yet, so their manifests were edited
+directly in `home`, correctly.
+
+**`GET /api/plugins` needed no changes for the widgets or pages
+contract**: it already spreads `...manifest` for every bundled package
+(`routes/plugins.ts`), so `contributes.widgets` and the top-level
+`pages` array both already ride along for E's own nav registry to read
+- the plan's own "GET /api/plugins already lists packages; add the
+pages array, E reads it" turned out to already be true, not a gap this
+step needed to close.
+
+Step 9 is complete. `backend/tests/turnEngine.test.ts` (the
+`consequential` bypass regression, against the real `lock-doors`
+package), `backend/tests/plugins.test.ts` (manifest validation plus
+real Bun.serve end-to-end runs of all three home-control packages
+against a stand-in Home Assistant server), `spec/tests/ts/package-bronze.test.ts`
+(the new authoring-time check), and `backend/tests/widgets.test.ts`
+(role-gated listing and data-fetching against the four real bundled
+packages, including their actual reply text - `list-view`'s own empty-
+list reply, not a canned fixture) all pass, alongside the full spec and
+backend suites and `scripts/check.sh` end to end. Known gap, the same
+shape `warm.keys` already carried before this step touched it: a
+widget's own `inputs` (like `weather`'s `{place: "Seattle"}`) are still
+literal manifest placeholders, not resolved against real household
+settings - a real per-household weather widget is settings-resolution
+work this step's own "prove the contract" scope didn't need.

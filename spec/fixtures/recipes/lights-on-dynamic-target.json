@@ -1,0 +1,20 @@
+{
+  "description": "home.call_service + format: target/data now interpolate (session-d-packages-and-store.md step 9, the lights package's own dynamic-room case) - proves a captured room name reaches home.call_service's own target, not just a literal one like goodnight-routine.json's.",
+  "recipe": {
+    "id": "lights-on-dynamic-target",
+    "inputs": [{ "name": "room", "selector": "text" }],
+    "steps": [
+      { "op": "home.call_service", "domain": "light", "service": "turn_on", "target": { "area": "{room}" } },
+      { "op": "format", "as": "reply", "text": "Turning on the {room} light.", "speech": "Turning on the {room} light." }
+    ]
+  },
+  "inputs": { "room": "living room" },
+  "host_setup": {},
+  "expected": {
+    "reply": { "text": "Turning on the living room light.", "speech": "Turning on the living room light." },
+    "actions": [],
+    "scheduled_jobs": [],
+    "home_calls": [{ "domain": "light", "service": "turn_on", "target": { "area": "living room" }, "data": null }],
+    "memory_added": []
+  }
+}

@@ -8193,6 +8193,185 @@
         }
       }
     },
+    "/api/widgets": {
+      "get": {
+        "tags": [
+          "Widgets"
+        ],
+        "summary": "Every widget my own role clears, across every bundled or installed package",
+        "responses": {
+          "200": {
+            "description": "Found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "package": {
+                        "type": "string"
+                      },
+                      "id": {
+                        "type": "string"
+                      },
+                      "title": {
+                        "type": "string"
+                      },
+                      "size": {
+                        "type": "string",
+                        "enum": [
+                          "card",
+                          "row"
+                        ]
+                      },
+                      "refresh_s": {
+                        "type": "integer"
+                      }
+                    },
+                    "required": [
+                      "package",
+                      "id",
+                      "title",
+                      "size",
+                      "refresh_s"
+                    ]
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/widgets/{package}/{id}/data": {
+      "get": {
+        "tags": [
+          "Widgets"
+        ],
+        "summary": "One widget's own current data - runs its package's own recipe with its declared inputs, the same way a warm tick already does",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "weather"
+            },
+            "required": true,
+            "name": "package",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "example": "current"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "as_of": {
+                      "type": "string"
+                    },
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "title": {
+                            "type": "string"
+                          },
+                          "subtitle": {
+                            "type": "string"
+                          },
+                          "value": {
+                            "type": "string"
+                          },
+                          "icon": {
+                            "type": "string"
+                          },
+                          "href": {
+                            "type": "string"
+                          },
+                          "image": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "title"
+                        ]
+                      }
+                    }
+                  },
+                  "required": [
+                    "as_of",
+                    "items"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The widget's own recipe failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Role too low",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such package or widget",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/relationships": {
       "get": {
         "tags": [

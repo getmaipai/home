@@ -99,10 +99,10 @@
         "op": { "const": "home.call_service" },
         "domain": { "type": "string" },
         "service": { "type": "string" },
-        "target": { "type": "object", "additionalProperties": true },
-        "data": { "type": "object", "additionalProperties": true }
+        "target": { "type": "object", "additionalProperties": true, "description": "Every string value, at any depth, may reference input/variable names in {braces} (session-d-packages-and-store.md step 9) - the same interpolate-before-send convention integration_call_step's own `args` already uses. Interpolation has no bearing on the security-domain confirmation gate below: that is enforced on `domain` plus the manifest's own `consequential` flag, never on whether `target` happens to be static or dynamic." },
+        "data": { "type": "object", "additionalProperties": true, "description": "Same {braces} interpolation as `target`." }
       },
-      "description": "Goes through host.home.call_service; security domains are never covered by a wildcard target (4.2)."
+      "description": "Goes through host.home.call_service; a security domain (lock, alarm_control_panel, and similar) requires the manifest's own consequential: true regardless of whether target is a literal or an interpolated value - packageHost.ts's own domain check has no awareness of target's shape at all (4.2)."
     },
     "action_step": {
       "type": "object",

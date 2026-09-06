@@ -1,0 +1,8 @@
+{
+  "id": "lock-doors",
+  "inputs": [],
+  "steps": [
+    { "op": "home.call_service", "domain": "lock", "service": "lock", "target": { "entity_id": "lock.front_door" } },
+    { "op": "format", "as": "reply", "text": "Locking the front door.", "speech": "Locking the front door." }
+  ]
+}

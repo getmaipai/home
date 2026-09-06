@@ -201,6 +201,33 @@ describe("the bundled step-8 packages (lists, reminders, timers)", () => {
   }
 });
 
+describe("the bundled step-9 packages (lights, lock)", () => {
+  const cases: [string, string[]][] = [
+    ["lights-on", ["home:light"]],
+    ["lights-off", ["home:light"]],
+    ["lock-doors", ["home:lock"]],
+  ];
+  for (const [id, permissions] of cases) {
+    test(`${id} is discoverable and its manifest + recipe validate against spec's schemas`, () => {
+      expect(listPackageIds()).toContain(id);
+      const loaded = loadPackage(id);
+      expect(loaded.ok).toBe(true);
+      if (!loaded.ok) return;
+      expect(loaded.value.manifest.id).toBe(id);
+      expect(loaded.value.manifest.permissions).toEqual(permissions);
+      expect(loaded.value.recipe.steps.length).toBeGreaterThan(0);
+    });
+  }
+
+  test("lock-doors declares consequential: true and no routing.patterns", () => {
+    const loaded = loadPackage("lock-doors");
+    expect(loaded.ok).toBe(true);
+    if (!loaded.ok) return;
+    expect(loaded.value.manifest.consequential).toBe(true);
+    expect(loaded.value.manifest.routing?.patterns ?? []).toEqual([]);
+  });
+});
+
 async function owner() {
   const client = new TestClient();
   await client.post("/api/auth/setup", { displayName: "Sage", secret: "correcthorse" });
@@ -485,6 +512,67 @@ describe("POST /api/plugins/timer/run", () => {
     const client = await owner();
     const res = await client.post("/api/plugins/timer/run", { expression: "a while" });
     expect(res.status).toBe(400);
+  });
+});
+
+describe("POST /api/plugins/lights-on and lights-off/run", () => {
+  test("runs the recipe end to end: a real POST to Home Assistant's own REST shape", async () => {
+    let seenPath = "";
+    let seenBody: unknown = null;
+    const server = Bun.serve({
+      port: 0,
+      fetch: async (req) => {
+        seenPath = new URL(req.url).pathname;
+        seenBody = await req.json();
+        return Response.json({ context: { id: "abc" } });
+      },
+    });
+    try {
+      setHouseholdSettingValue("home.base_url", `http://127.0.0.1:${server.port}`);
+      setHouseholdSettingValue("home.access_token", "test-token");
+      const client = await owner();
+      const res = await client.post("/api/plugins/lights-on/run", { room: "living room" });
+      expect(res.status).toBe(200);
+      const body = (await res.json()) as { reply?: { text: string } };
+      expect(body.reply?.text).toBe("Turning on the living room light.");
+      expect(seenPath).toBe("/api/services/light/turn_on");
+      expect(seenBody).toEqual({ area: "living room" });
+    } finally {
+      server.stop(true);
+    }
+  });
+
+  test("400s with a clear message when Home Assistant isn't set up yet", async () => {
+    const client = await owner();
+    const res = await client.post("/api/plugins/lights-off/run", { room: "kitchen" });
+    expect(res.status).toBe(400);
+    const body = (await res.json()) as { error?: string };
+    expect(body.error).toContain("isn't set up yet");
+  });
+});
+
+describe("POST /api/plugins/lock-doors/run", () => {
+  test("runs the recipe end to end: a real POST to Home Assistant's own lock.lock service", async () => {
+    let seenPath = "";
+    const server = Bun.serve({
+      port: 0,
+      fetch: async (req) => {
+        seenPath = new URL(req.url).pathname;
+        return Response.json({ context: { id: "abc" } });
+      },
+    });
+    try {
+      setHouseholdSettingValue("home.base_url", `http://127.0.0.1:${server.port}`);
+      setHouseholdSettingValue("home.access_token", "test-token");
+      const client = await owner();
+      const res = await client.post("/api/plugins/lock-doors/run", {});
+      expect(res.status).toBe(200);
+      const body = (await res.json()) as { reply?: { text: string } };
+      expect(body.reply?.text).toBe("Locking the front door.");
+      expect(seenPath).toBe("/api/services/lock/lock");
+    } finally {
+      server.stop(true);
+    }
   });
 });
 

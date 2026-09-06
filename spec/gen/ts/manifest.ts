@@ -116,11 +116,11 @@ export const PackageManifest = z
     min_role: z
       .enum(["owner", "admin", "adult", "teen", "child", "guest"])
       .describe("The floor role a person needs to invoke this package."),
-    /**Raises the routing bar (4.5): a consequential plugin needs more confidence before it fires.*/
+    /**Raises the routing bar (4.5): a consequential plugin needs more confidence before it fires - the model must propose it, gated on the household's own confirmation, never a deterministic auto-fire. A consequential package must never also declare `routing.patterns`: turnEngine.ts's route() only enforces the raised bar on the fuzzy/Tier 2 path, so a literal pattern match would fire it immediately, bypassing confirmation entirely (a real gap found and fixed, session-d-packages-and-store.md step 9 - route() itself now also refuses to treat a consequential manifest's own patterns as live, so a manifest bug here can no longer be the only thing standing between a security domain and skipping confirmation, but the manifest still shouldn't declare one).*/
     consequential: z
       .boolean()
       .describe(
-        "Raises the routing bar (4.5): a consequential plugin needs more confidence before it fires.",
+        "Raises the routing bar (4.5): a consequential plugin needs more confidence before it fires - the model must propose it, gated on the household's own confirmation, never a deterministic auto-fire. A consequential package must never also declare `routing.patterns`: turnEngine.ts's route() only enforces the raised bar on the fuzzy/Tier 2 path, so a literal pattern match would fire it immediately, bypassing confirmation entirely (a real gap found and fixed, session-d-packages-and-store.md step 9 - route() itself now also refuses to treat a consequential manifest's own patterns as live, so a manifest bug here can no longer be the only thing standing between a security domain and skipping confirmation, but the manifest still shouldn't declare one).",
       ),
     /**Stated offline behavior, required at bronze.*/
     offline: z

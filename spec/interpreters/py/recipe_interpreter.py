@@ -114,9 +114,12 @@ async def run_recipe(recipe: Any, inputs: dict[str, Any], host: Any) -> dict[str
             scope[step.as_] = {"text": text, "speech": speech}
             reply = {"text": text, "speech": speech}
         elif op == "home.call_service":
-            await host.home.call_service(
-                step.domain, step.service, step.target, step.data
-            )
+            # target/data interpolation (session-d-packages-and-store.md
+            # step 9). Must stay behaviorally identical to
+            # recipe-interpreter.ts's own twin case.
+            target = interpolate_deep(step.target, scope)
+            data = interpolate_deep(step.data, scope) if step.data else step.data
+            await host.home.call_service(step.domain, step.service, target, data)
         elif op == "action":
             host.action.emit(step.kind, step.payload)
             actions.append({"kind": step.kind, "payload": step.payload})

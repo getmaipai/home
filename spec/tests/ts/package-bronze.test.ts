@@ -107,6 +107,19 @@ describe("every bundled package clears bronze", () => {
         expect(["full", "degraded", "unavailable"]).toContain(manifest.offline);
       });
 
+      // A real gap found and fixed building `lock-doors` (session-d-
+      // packages-and-store.md step 9): turnEngine.ts's route() now also
+      // refuses to treat a consequential manifest's own routing.patterns
+      // as live (the confirm gate can't depend on a manifest bug alone),
+      // but a package declaring one here would still be dead weight at
+      // best and a confusing trap for a future editor at worst - caught
+      // at authoring time, not just defended against at runtime.
+      test("a consequential package never declares routing.patterns (would bypass the confirm gate)", () => {
+        if (manifest.consequential) {
+          expect(manifest.routing?.patterns ?? []).toEqual([]);
+        }
+      });
+
       test("has a privacy row for every net: permission", () => {
         const declaresNet = (manifest.permissions ?? []).some((p) => p.startsWith("net:"));
         if (declaresNet) {

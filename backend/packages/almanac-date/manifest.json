@@ -30,7 +30,9 @@
   "notifications": [],
   "backup": "exclude",
   "background": false,
-  "contributes": {},
+  "contributes": {
+    "widgets": [{ "id": "today", "title": "Today", "size": "card", "refresh_s": 3600, "inputs": {} }]
+  },
   "pages": [],
   "min_app": "0.1.0",
   "timeout_ms": 8000,

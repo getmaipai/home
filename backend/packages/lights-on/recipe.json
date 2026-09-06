@@ -1,0 +1,8 @@
+{
+  "id": "lights-on",
+  "inputs": [{ "name": "room", "selector": "text" }],
+  "steps": [
+    { "op": "home.call_service", "domain": "light", "service": "turn_on", "target": { "area": "{room}" } },
+    { "op": "format", "as": "reply", "text": "Turning on the {room} light.", "speech": "Turning on the {room} light." }
+  ]
+}

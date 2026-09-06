@@ -41,7 +41,8 @@ async def test_recipe_conformance(fixture_path: Path):
     assert result["actions"] == fixture["expected"]["actions"]
     assert result.get("ask") == fixture["expected"].get("ask")
     assert [
-        {"when": j["when"], "job": j["job"], "inputs": j["inputs"]} for j in host.scheduled_jobs
+        {"when": j["when"], "job": j["job"], "inputs": j["inputs"]}
+        for j in host.scheduled_jobs
     ] == fixture["expected"]["scheduled_jobs"]
     assert host.home_calls_log == fixture["expected"]["home_calls"]
     assert [

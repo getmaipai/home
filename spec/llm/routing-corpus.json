@@ -106,5 +106,9 @@
   { "utterance": "remind me tomorrow at noon to walk the dog", "expect": "remind", "must_not": [] },
 
   { "utterance": "set a timer for ten minutes", "expect": "timer", "must_not": [] },
-  { "utterance": "set a timer for an hour", "expect": "timer", "must_not": [] }
+  { "utterance": "set a timer for an hour", "expect": "timer", "must_not": [] },
+
+  { "utterance": "turn on the living room light", "expect": "lights-on", "must_not": [] },
+  { "utterance": "turn off the kitchen light", "expect": "lights-off", "must_not": [] },
+  { "utterance": "lock the front door", "expect": null, "must_not": ["lock-doors"], "note": "lock-doors is consequential: true and declares no routing.patterns by design - it must never win route()'s own deterministic Tier 1 floor (backend/tests/turnEngine.test.ts has the direct route()-level proof, including that it still appears as a real Tier 2 candidate); this corpus format has no way to assert 'a real ranked candidate, just never the winner', so this row only pins the winner side." }
 ]

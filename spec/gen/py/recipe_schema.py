@@ -78,7 +78,7 @@ class FormatStep(BaseModel):
 
 class HomeCallServiceStep(BaseModel):
     """
-    Goes through host.home.call_service; security domains are never covered by a wildcard target (4.2).
+    Goes through host.home.call_service; a security domain (lock, alarm_control_panel, and similar) requires the manifest's own consequential: true regardless of whether target is a literal or an interpolated value - packageHost.ts's own domain check has no awareness of target's shape at all (4.2).
     """
 
     model_config = ConfigDict(
@@ -87,8 +87,13 @@ class HomeCallServiceStep(BaseModel):
     op: Literal['home.call_service']
     domain: str
     service: str
-    target: dict[str, Any]
-    data: dict[str, Any] | None = None
+    target: dict[str, Any] = Field(
+        ...,
+        description="Every string value, at any depth, may reference input/variable names in {braces} (session-d-packages-and-store.md step 9) - the same interpolate-before-send convention integration_call_step's own `args` already uses. Interpolation has no bearing on the security-domain confirmation gate below: that is enforced on `domain` plus the manifest's own `consequential` flag, never on whether `target` happens to be static or dynamic.",
+    )
+    data: dict[str, Any] | None = Field(
+        None, description='Same {braces} interpolation as `target`.'
+    )
 
 
 class ActionStep(BaseModel):
@@ -268,7 +273,7 @@ class ListViewStep(BaseModel):
 
 class RemindStep(BaseModel):
     """
-    Calls host.reminders.set (permission reminders:write, session-d-packages-and-store.md step 8's own remind package) - schedules a core-kind job (session-d-packages-and-store.md step 8's own scheduler entry), never a replay of this recipe: firing later re-runs nothing, it raises the declared reminders.due notification directly.
+    Calls host.reminders.set (permission reminders:write, session-d-packages-and-store.md step 8's own remind package) - schedules a core-kind job (session-d-packages-and-store.md step 8's own scheduler entry), never a replay of this recipe: firing later re-runs nothing, it raises the declared remind.due notification directly.
     """
 
     model_config = ConfigDict(
@@ -288,7 +293,7 @@ class RemindStep(BaseModel):
 
 class TimerStep(BaseModel):
     """
-    Calls host.timers.set (permission timers:write, session-d-packages-and-store.md step 8's own timer package) - schedules a core-kind job the same way remind_step does; firing later raises the declared timers.done notification directly, never a recipe replay.
+    Calls host.timers.set (permission timers:write, session-d-packages-and-store.md step 8's own timer package) - schedules a core-kind job the same way remind_step does; firing later raises the declared timer.done notification directly, never a recipe replay.
     """
 
     model_config = ConfigDict(

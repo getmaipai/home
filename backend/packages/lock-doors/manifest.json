@@ -1,0 +1,42 @@
+{
+  "id": "lock-doors",
+  "version": "0.1.0",
+  "kind": "plugin",
+  "category": "Home",
+  "display": "Lock the Front Door",
+  "description": "Locks the front door through the household's own Home Assistant instance (2026-09-06, step 9) - a security domain, so this always asks for confirmation first.",
+  "author": "MaiPai",
+  "license": "AGPL-3.0",
+  "homepage": "https://github.com/getmaipai/home",
+  "routing": {
+    "examples": [
+      "lock the front door",
+      "lock the door",
+      "lock up the house",
+      "make sure the front door is locked",
+      "can you lock the front door"
+    ]
+  },
+  "requires": [],
+  "optional": [],
+  "platforms": ["home"],
+  "min_role": "teen",
+  "consequential": true,
+  "offline": "unavailable",
+  "config": [],
+  "data_sources": [],
+  "permissions": ["home:lock"],
+  "notifications": [],
+  "fallback_reply": {
+    "text": "Sorry, I'm having trouble reaching your locks right now.",
+    "speech": "Sorry, I'm having trouble reaching your locks right now."
+  },
+  "backup": "exclude",
+  "background": false,
+  "contributes": {},
+  "pages": [],
+  "min_app": "0.1.0",
+  "tier": 0,
+  "quality_scale": "bronze",
+  "smoke": { "kind": "recipe_fixture", "fixture": "tests/smoke.json" }
+}

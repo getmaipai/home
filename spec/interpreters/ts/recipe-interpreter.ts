@@ -132,7 +132,16 @@ export async function runRecipe(recipe: Recipe, inputs: Scope, host: Host): Prom
         break;
       }
       case "home.call_service": {
-        await host.home.call_service(step.domain, step.service, step.target, step.data ?? null);
+        // target/data interpolation (session-d-packages-and-store.md
+        // step 9, the lights package's own dynamic-room case): every
+        // string value, at any depth, may reference {variable} names,
+        // the same interpolate-before-send convention integration.call's
+        // own `args` already uses. Has no bearing on the security-domain
+        // confirmation gate (packageHost.ts) - that checks `domain` and
+        // the manifest's own `consequential` flag only.
+        const target = interpolateDeep(step.target, scope) as Record<string, unknown>;
+        const data = step.data ? (interpolateDeep(step.data, scope) as Record<string, unknown>) : null;
+        await host.home.call_service(step.domain, step.service, target, data);
         break;
       }
       case "action": {

@@ -612,15 +612,30 @@ export async function route(text: string, actor: PersonRow, loaded: LoadedManife
   for (const { id, manifest } of loaded) {
     if (!meetsMinRole(actor.role, manifest.min_role)) continue;
 
-    for (const pattern of manifest.routing?.patterns ?? []) {
-      const captured = matchPattern(text, pattern);
-      if (captured === null) continue;
-      const args = deterministicArgs(manifest.args, captured);
-      if (!args) continue;
-      // A literal pattern match always wins, immediately - no ranking to
-      // report - regardless of which tier this package is (see this
-      // function's own header comment above).
-      return { winner: { id, args, score: 1, viaPattern: true, viaEmbedding: true }, ranked: [] };
+    // A real gap found building `lock-doors` (session-d-packages-and-
+    // store.md step 9): `manifest.consequential` was never checked here
+    // at all, only inside `canFire` below - a consequential package that
+    // ALSO declared a literal `routing.patterns` entry would fire
+    // immediately on that pattern match, bypassing the confirm gate
+    // `canFire`/Tier 2's own proposal-and-confirm flow exist specifically
+    // to enforce. Skipping a consequential manifest's own patterns here
+    // (never a "no patterns declared" package, since a manifest bug
+    // shouldn't be the only thing between a security domain and skipping
+    // confirmation) means it can only ever be discovered through the
+    // fuzzy/Tier 2 path below, which already refuses to let it WIN
+    // outright (`canFire`) - the model may still propose it, gated on
+    // confirmation, same as before.
+    if (!manifest.consequential) {
+      for (const pattern of manifest.routing?.patterns ?? []) {
+        const captured = matchPattern(text, pattern);
+        if (captured === null) continue;
+        const args = deterministicArgs(manifest.args, captured);
+        if (!args) continue;
+        // A literal pattern match always wins, immediately - no ranking
+        // to report - regardless of which tier this package is (see
+        // this function's own header comment above).
+        return { winner: { id, args, score: 1, viaPattern: true, viaEmbedding: true }, ranked: [] };
+      }
     }
 
     eligible.push({ id, manifest });
