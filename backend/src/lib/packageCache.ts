@@ -106,7 +106,19 @@ function writeEntry(packageId: string, key: string, entry: CacheEntryFile, maxBy
   if (Buffer.byteLength(serialized, "utf-8") > maxBytes) return; // per-entry ceiling: never cached, not truncated
   const dir = packageDir(packageId);
   ensureDataDir(dir);
-  writeFileSync(entryPath(packageId, key), serialized, "utf-8");
+  const path = entryPath(packageId, key);
+  // PERF-5 (code review, 2026-09-06): evictIfOverBudget() below used to
+  // walk and stat every entry in the cache on every single write just to
+  // find out whether it was even OVER budget - a running total (bumped
+  // here by exactly what this write actually changed on disk, an
+  // overwrite included) makes that check O(1) in the common case
+  // (comfortably under budget), reserving the real walk for when
+  // eviction might actually have to happen.
+  const previousSize = runningTotalBytes !== null && existsSync(path) ? statSync(path).size : 0;
+  writeFileSync(path, serialized, "utf-8");
+  if (runningTotalBytes !== null) {
+    runningTotalBytes += Buffer.byteLength(serialized, "utf-8") - previousSize;
+  }
   evictIfOverBudget();
 }
 
@@ -189,6 +201,12 @@ function walkAllEntries(): DiskEntry[] {
   return entries;
 }
 
+// PERF-5: null means "unknown, needs a real walk to establish" - true at
+// boot (nothing written yet this process) and after either test-only
+// reset below, since both can change what's on disk without going
+// through writeEntry()'s own bookkeeping.
+let runningTotalBytes: number | null = null;
+
 /** LRU eviction over the combined cache, run after every write: oldest
  * `mtime` first (see touch() above) until the total is back under budget.
  * Deliberately global rather than per-package - one household package
@@ -197,9 +215,23 @@ function walkAllEntries(): DiskEntry[] {
  * is a shared household resource, same as disk itself. */
 function evictIfOverBudget(): void {
   const budget = totalBudgetBytes();
-  const entries = walkAllEntries();
+  // A review, 2026-09-06, found the first version walked the directory
+  // TWICE in the already-over-budget-and-unestablished case: once here
+  // just to seed runningTotalBytes, then again a few lines down to build
+  // the eviction list - discarding the first walk's own result right
+  // after computing it, in exactly the case (a large, over-budget cache)
+  // where that walk is most expensive. One walk now, reused for both.
+  let entries: DiskEntry[] | null = runningTotalBytes === null ? walkAllEntries() : null;
+  if (runningTotalBytes === null) {
+    runningTotalBytes = entries!.reduce((sum, e) => sum + e.size, 0);
+  }
+  if (runningTotalBytes <= budget) return;
+
+  // Over budget - only NOW does this walk the real directory (if it
+  // didn't already, just above), since eviction genuinely needs the full
+  // oldest-first list regardless.
+  entries ??= walkAllEntries();
   let total = entries.reduce((sum, e) => sum + e.size, 0);
-  if (total <= budget) return;
   const oldestFirst = [...entries].sort((a, b) => a.mtimeMs - b.mtimeMs);
   for (const entry of oldestFirst) {
     if (total <= budget) break;
@@ -211,6 +243,7 @@ function evictIfOverBudget(): void {
       // and was cleaned up some other way) - not an error, just move on.
     }
   }
+  runningTotalBytes = total;
 }
 
 interface HitStats {
@@ -325,6 +358,7 @@ export function getCacheStats(): CacheStats[] {
 export function __resetPackageCacheForTests(): void {
   stats.clear();
   testBudgetBytes = null;
+  runningTotalBytes = null;
 }
 
 /** Wipes one package's on-disk cache directory - a test's own cleanup,
@@ -332,4 +366,5 @@ export function __resetPackageCacheForTests(): void {
  * across every test file in a `bun test` run, not per-file. */
 export function __clearPackageCacheDirForTests(packageId: string): void {
   rmSync(packageDir(packageId), { recursive: true, force: true });
+  runningTotalBytes = null; // deletes outside writeEntry()'s own bookkeeping
 }

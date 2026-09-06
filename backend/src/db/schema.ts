@@ -155,7 +155,15 @@ export const memoryRecords = sqliteTable("memory_records", {
   // recall/list/similarByVector query); this column exists specifically
   // for exportPerson() to skip tombstones without a second status value.
   deletedAt: text("deleted_at"),
-});
+}, (table) => [index("memory_records_status_scope_person_idx").on(table.status, table.scope, table.person)]);
+// PERF-4 (code review, 2026-09-06): recall() and similarByVector() both
+// filter on status (always) plus scope/person (often) before ever
+// touching a vector - without this, every recall was a full table scan
+// regardless of how selective those filters were. No index bump to
+// CURRENT_SCHEMA_VERSION (schema-version.ts): that comment scopes the
+// bump to an added/removed/renamed table or column, which changes what
+// a rollback could read incorrectly - a new index changes neither, and
+// an older build opening a database that already has it is unaffected.
 
 // Step 5's real vector store: never a spec-shaped record itself (the
 // spec's own memory-record.schema.json comment already says why -

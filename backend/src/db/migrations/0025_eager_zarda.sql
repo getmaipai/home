@@ -1,0 +1,1 @@
+CREATE INDEX `memory_records_status_scope_person_idx` ON `memory_records` (`status`,`scope`,`person`);

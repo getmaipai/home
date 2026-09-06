@@ -176,6 +176,13 @@
       "when": 1788714679532,
       "tag": "0024_abnormal_monster_badoon",
       "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "6",
+      "when": 1788725578358,
+      "tag": "0025_eager_zarda",
+      "breakpoints": true
     }
   ]
 }

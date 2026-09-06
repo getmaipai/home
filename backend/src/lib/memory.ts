@@ -479,9 +479,24 @@ function bumpMatchUsage(matches: RecallMatch[]): void {
   }
 }
 
+// PERF-4 (code review, 2026-09-06): scope/person used to be filtered in
+// JS after loading every active row - pushed into the query itself now
+// (memory_records_status_scope_person_idx, db/schema.ts, covers exactly
+// this trio) so a caller asking for one person's own memories never
+// pulls every OTHER household member's rows off disk just to discard
+// them a moment later. Shared by recall() and similarByVector() below (a
+// review found the first version of this fix copy-pasted the same three
+// lines into both).
+function activeStatusScopePersonWhere(opts: ListOptions) {
+  const conditions = [eq(memoryRecords.status, "active")];
+  if (opts.scope) conditions.push(eq(memoryRecords.scope, opts.scope));
+  if (opts.person) conditions.push(eq(memoryRecords.person, opts.person));
+  return and(...conditions);
+}
+
 export function recall(actor: PersonRow, query: string, opts: RecallOptions = {}): RecallMatch[] {
   const roleOf = rolesById();
-  let rows = db.select().from(memoryRecords).where(eq(memoryRecords.status, "active")).all();
+  let rows = db.select().from(memoryRecords).where(activeStatusScopePersonWhere(opts)).all();
   // Never the profile paragraph: turnEngine.ts's buildSystemPrompt()
   // already injects it unconditionally via getProfileParagraph(), "not
   // a recall() candidate... never something that competes with other
@@ -492,8 +507,6 @@ export function recall(actor: PersonRow, query: string, opts: RecallOptions = {}
   // the read-side twin of the dedupe-candidate bug similarByVector()
   // below has the identical fix for.
   rows = rows.filter((r) => r.source !== PROFILE_SOURCE);
-  if (opts.scope) rows = rows.filter((r) => r.scope === opts.scope);
-  if (opts.person) rows = rows.filter((r) => r.person === opts.person);
   rows = rows.filter((r) => canRead(actor, r, roleOf, opts.selfOnly));
 
   const queryWords = tokenize(query);
@@ -613,7 +626,7 @@ export function similarByVector(
   candidateRecordKind: "memory" | "entity" = "memory",
 ): SimilarMatch[] {
   const roleOf = rolesById();
-  let rows = db.select().from(memoryRecords).where(eq(memoryRecords.status, "active")).all();
+  let rows = db.select().from(memoryRecords).where(activeStatusScopePersonWhere(opts)).all();
   // A plain fact ("Rover: a family friend" vs. free-text prose) must
   // never dedupe against an existing entity record - a code review
   // (2026-09-05) found that without this exclusion, a fact whose
@@ -642,8 +655,6 @@ export function similarByVector(
   // never by the extractor" invariant step 7 exists to hold, broken by
   // the one lookup that wasn't taught about it.
   rows = rows.filter((r) => r.source !== PROFILE_SOURCE);
-  if (opts.scope) rows = rows.filter((r) => r.scope === opts.scope);
-  if (opts.person) rows = rows.filter((r) => r.person === opts.person);
   rows = rows.filter((r) => canRead(actor, r, roleOf, opts.selfOnly));
 
   const vectorRows =

@@ -936,6 +936,50 @@ describe("recall() selfOnly (step 2 privacy fix)", () => {
     expect(results.some((m) => m.record.scope === "person" && m.record.person === ownerRow.id)).toBe(true);
     expect(results.some((m) => m.record.scope === "household")).toBe(true);
   });
+
+  // PERF-4 (code review, 2026-09-06): opts.scope/opts.person are now
+  // pushed into the SQL query itself (memory_records_status_scope_person_idx,
+  // db/schema.ts) instead of filtered in JS after loading every active
+  // row - proving the explicit-filter path still returns exactly the
+  // right rows, not silently over- or under-selecting now that the
+  // filter moved.
+  test("opts.scope and opts.person filter correctly now that they're pushed into the query", async () => {
+    const { ownerRow, childId } = await ownerAndChildRows();
+    remember(ownerRow, {
+      text: "the household wifi password note",
+      category: "fact",
+      tier: "durable",
+      scope: "household",
+      source: "test",
+      importance: 0.8,
+    });
+    remember(ownerRow, {
+      text: "the owner's own private allergy note",
+      category: "identity",
+      tier: "durable",
+      scope: "person",
+      person: ownerRow.id,
+      source: "test",
+      importance: 0.8,
+    });
+    remember(ownerRow, {
+      text: "the child's own private allergy note",
+      category: "identity",
+      tier: "durable",
+      scope: "person",
+      person: childId,
+      source: "test",
+      importance: 0.8,
+    });
+
+    const householdOnly = recall(ownerRow, "note", { scope: "household", bumpUsage: false });
+    expect(householdOnly.every((m) => m.record.scope === "household")).toBe(true);
+    expect(householdOnly.some((m) => m.record.text.includes("wifi password"))).toBe(true);
+
+    const childOnly = recall(ownerRow, "note", { scope: "person", person: childId, bumpUsage: false });
+    expect(childOnly.every((m) => m.record.person === childId)).toBe(true);
+    expect(childOnly.some((m) => m.record.text.includes("owner's own"))).toBe(false);
+  });
 });
 
 describe("recall() bumpUsage option (step 2: usage bumps only what reached the prompt)", () => {
