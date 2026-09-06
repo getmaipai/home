@@ -49,6 +49,19 @@ export interface DnsLookup {
 // loopback case in one of its two checks) rather than reusing the
 // already-hardened version here - the same "one definition, one place"
 // bug class this file's own header already calls out for host.fetch.
+// Exported separately from isPrivateOrLoopbackIpv4 below (2026-09-06):
+// lib/hubEndpoints.ts's guessEndpointKind() needs to test THIS range on
+// its own, for the opposite reason isPrivateOrLoopbackIpv4 treats it as
+// private - a legitimate way a CLIENT reaches the hub, "overlay", not
+// something to refuse. A review found the first version of this fix left
+// hubEndpoints.ts with its own independently-typed regex for the exact
+// same range rather than sharing this one - the same "one definition,
+// one place" bug class this file's own header already calls out for
+// host.fetch.
+export function isCgnatIpv4(a: number, b: number): boolean {
+  return a === 100 && b >= 64 && b <= 127; // 100.64.0.0/10
+}
+
 export function isPrivateOrLoopbackIpv4(ip: string): boolean {
   const parts = ip.split(".").map(Number);
   const [a, b] = parts;
@@ -58,6 +71,12 @@ export function isPrivateOrLoopbackIpv4(ip: string): boolean {
   if (a === 192 && b === 168) return true; // 192.168.0.0/16
   if (a === 169 && b === 254) return true; // 169.254.0.0/16 link-local
   if (a === 0) return true; // 0.0.0.0/8
+  // 100.64.0.0/10 (CGNAT/Tailscale) - a code review, 2026-09-06, found
+  // nothing here treated it as private at all, so a package's host.fetch
+  // could reach the hub's own tailnet address, or another device's,
+  // straight through this guard - the same class of address the hub's
+  // own admin page or another device's control panel would answer on.
+  if (isCgnatIpv4(a!, b!)) return true;
   return false;
 }
 
