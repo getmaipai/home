@@ -1446,3 +1446,152 @@ this pass didn't have, so the identical fix was reverted there rather
 than pushed through - a fix any other session hitting the same rebase
 conflict can apply in seconds from this exact diff, or one this
 session's own final merge (step 11) carries to `main` regardless.
+
+## Step 10: import from the legacy hub
+
+`lib/legacyImport.ts` and owner-only `POST /api/memory/import/legacy`
+(`routes/memory.ts`, converted to `@hono/zod-openapi` for this one new
+route rather than a full-file rewrite - the existing plain-Hono routes in
+that file keep working unchanged, since `apiRouter()`'s `OpenAPIHono`
+extends `Hono`). Reads a legacy `app.db` directly with `bun:sqlite`
+(read-only, never through legacy's own drizzle instance, which isn't
+loaded here), confirmed column-by-column against `home-legacy.git`'s own
+`backend/src/db/schema.ts` rather than assumed from its docs page.
+
+**People, matched by display name, never auto-created for a minor.** A
+legacy user's `first_name + last_name` is looked up case-insensitively
+against the household's existing roster; a match imports everything
+under that EXISTING person's id. No match: `lib/ageBand.ts`'s own
+birthdate-based band computation (the same one the safety layer and the
+prompt already share) decides whether to create a profile at all - adult
+only. A legacy `role: admin` user is imported as hub role `"adult"`, not
+promoted to `"admin"` or `"owner"`: the route this bypasses
+(`routes/people.ts`) requires a secret for either of those, which a
+background import never collects, and creating an admin profile with no
+way to sign in would just be a silently locked-out account. Promoting an
+imported profile to admin is left to the owner's own People settings
+after review. A child or teen is never created; the dry-run result names
+them explicitly (`outcome: "skipped_needs_parent_pick"`) for a parent to
+act on later, and a later re-run of the same database picks them up the
+moment a matching profile exists.
+
+**Memories, scoped by legacy's own `user_id`/`character_id` split.**
+`user_id` set (a "user-global" or "character-instance" row - the new hub
+has no per-companion memory concept to preserve that second distinction
+with) imports as `scope: "person"` under the matched/created person.
+`user_id` null ("character-global," a companion's own knowledge with no
+person attached at all) imports as `scope: "household"`, the plan's only
+other named target - there's nowhere else for it to go. Only `status:
+'active'` legacy rows import (superseded/archived facts have no
+successor chain worth reconstructing). A legacy category that's entity-
+shaped (`person`/`place`/`thing`) is kinded `record_kind: "entity"` via
+`categoryToRecordKind()`, exported from `lib/memoryJudge.ts` for exactly
+this reuse rather than a second copy of the same three-line map - one
+definition, now used by both the judge's own extractor and this
+importer. Every record's `source` is `import:legacy:memory:<legacy id>`,
+which doubles as the idempotency check (a second run of the same
+database finds the existing row by source and skips it, no separate
+tracking table). No legacy embedding vector is reused: `remember()`'s
+own fire-and-forget embed-on-write computes a fresh one against whatever
+this hub is actually running today, matching the plan's own "embedded on
+write."
+
+**Conversations and turns, paired from legacy's one-row-per-message
+shape.** Legacy's `messages` table is one row per role; the hub's
+`conversation_turns` is one row per completed exchange. Adjacent
+user-then-assistant messages pair into one turn; a user message with no
+following reply (the chat was cut off, or its reply was an inactive
+discarded regenerate branch, excluded by the `active = 1` filter itself)
+becomes its own turn with a fixed `"[no reply recorded]"` sentinel
+(`ORPHANED_REPLY_TEXT`) rather than being dropped - real history, just
+half of it missing, the same "a tombstone keeps what it can, not
+nothing" reasoning `memory.ts`'s own `TOMBSTONE_TEXT` already uses.
+`system`-role messages don't fit either half of this shape and are
+counted, not paired. Every imported conversation lands `status:
+"closed"` - a finished archive, never reopened as the person's live
+"chat" thread (which would otherwise collide with
+`resolveOrCreateConversation()`'s own "most recently active open
+conversation for this surface" pick the next time they actually talk to
+the hub). A turn's `source` is the literal string `"import"`, deliberately
+outside `routingStats()`'s own six known buckets - correct, since an
+imported turn was never actually routed by this hub's router, it's
+historical transcript from a different system. `judgeStatus: "done"` for
+the identical reason: these turns' real memories are already imported
+directly above, so the per-turn extraction job must never re-run its own
+guesswork over years of history (moot in practice too - the judge only
+ever considers `source: "model"` turns, which `"import"` already isn't).
+Both the conversation id and each turn's id are deterministic hashes of
+the legacy row they came from (`sha256("legacy-conversation:<id>")`/
+`sha256("legacy-message:<anchor id>")`, truncated), which is what makes a
+second run's own existence check a real idempotency guarantee rather
+than a coincidence, with no separate legacy-id column needed on either
+table.
+
+**Real safety gate, not a comment.** A real (`dry_run: false`) import
+throws before opening the legacy file at all if `lib/backup.ts`'s own
+`listBackups()` comes back empty - the plan's "the route refuses without
+one," checked with the exact same function `routes/backups.ts` already
+uses to list what's on disk, not a re-implemented count. A dry run always
+runs regardless (nothing to protect against yet), and reports the exact
+same counts a real run would produce, computed from the identical
+decision logic - minted ids for a "would-create" person are counted the
+same way a real one is, just never written.
+
+**A real, considered, and deliberately deferred scope narrowing from
+what the parent session's own delegation described.** Legacy's separate
+`entities` table (a catalog of named people/places/things, distinct from
+the `memories` table) was initially planned for this step too, mapped
+onto `record_kind: "entity"` memory records the same way the `memories`
+table's own entity-shaped categories now are. Checked against the
+running codebase before writing any of it: F's own `lib/entities.ts` (a
+REAL, validated entities table, `spec/schemas/entity.schema.json`'s
+`source` enum already carrying an `"imported"` value for exactly this
+case) shipped in F's step 7, after `memoryJudge.ts`'s own header comment
+("this store has no entities table") was written and before this step
+started. Importing into the memory-record placeholder shape now, when a
+real, better-fitting table already exists, would be building on the
+interim convention `memoryJudge.ts` itself only keeps "until [F's real
+entities table] lands" - it already has. But `createEntity()` always
+writes `source: "hub"` with no override and has no idempotency support
+of its own, and `lib/entities.ts` is F's owned file
+(`docs/plans/wave-2.md`'s ownership map) - adding either isn't a change
+this session makes to another session's file mid-wave. Left as a real,
+named gap for F's own backlog (a bulk-import path on `entities.ts` with
+a real `source: "imported"` override and its own idempotency check),
+not silently built against the wrong table just because the parent's own
+delegation, written before this check, assumed the memory-record
+placeholder was still the only option. Legacy's `memory_episodes` table
+is left out for a simpler reason: the plan's own words for this step
+name only people, memories, and conversations - episodes were never
+actually asked for, only assumed worth adding without the plan asking.
+Both gaps are recorded in `docs/BACKLOG.md`'s own entry for this step,
+not just here.
+
+**Test: a real, minimal legacy-shaped sqlite database**
+(`tests/legacyImport.test.ts`), built with `bun:sqlite` directly against
+the real legacy column names (not a mock of the reader), seeded from the
+persona roster: an adult who already matches an existing hub profile
+(imports under the EXISTING id), an adult with no match (created, legacy
+role `admin` on purpose - proves this never auto-promotes), a child with
+no match (skipped, named in the dry-run result), a normal four-message
+conversation (pairs into two turns, its one inactive discarded-regenerate
+message never surfaces), a conversation with a trailing orphaned user
+message (one turn with the sentinel reply), an incognito conversation
+(never imported at all, not even counted as skipped - excluded by the
+query itself), memories across person/household scope and a plain vs.
+entity-shaped category, an archived legacy memory (never imported), and
+a second full run of the same database proving idempotency: zero new
+people, memories, conversations, or turns, every count landing in
+"already present" instead. Five tests, all real writes checked directly
+against the database (not just the HTTP response shape): a missing file
+throws; a real import with no backup on file throws; a dry run reports
+correct counts with zero writes; a real import writes the correct rows
+with the correct scope/kind/role/status on each; the idempotent re-run.
+
+**Left for Jesse, exactly as the plan names it**: the real run, on the
+real hub, against his actual legacy `app.db`, after a real backup. The
+route's own `db_path` field takes an absolute path on the same machine
+(matching "the real run is Jesse's, on the hub," a same-host migration
+tool, not an upload endpoint) - point it at wherever the legacy file
+already sits, dry run first to see the counts and which family members
+need a manual profile pick, then run for real.

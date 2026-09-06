@@ -2016,10 +2016,28 @@ that owns it.
       whisper.cpp sidecar. Live acceptance verified against the pinned
       Moonshine tiny-en model and its own test fixture: exact transcript
       match.
-- [ ] **Import from the legacy hub** (M, C) - Hub v0.2 scope: people,
-      memories and conversations from the legacy data directory into
-      spec-shaped records with provenance, run once, dry run first,
-      backup required. Without it the family starts from zero.
+- [x] **Import from the legacy hub** (M, C) - shipped, Session C step 10
+      (2026-09-06): `lib/legacyImport.ts` + owner-only `POST /api/memory/
+      import/legacy`, reads a legacy `app.db` directly, matches people by
+      display name (never auto-creating a child or teen without a
+      parent's own pick), imports `memories` (person/household scope,
+      `source: import:legacy:memory:<id>`, embedded fresh on write, an
+      entity-shaped category correctly kinded `record_kind: "entity"`
+      via the same `categoryToRecordKind()` the judge uses), and pairs
+      legacy `messages` into `conversations`/`conversation_turns` per
+      person. Idempotent by construction (deterministic ids and a
+      source-lookup, not a separate tracking table) rather than a literal
+      once-only lock, so a household can re-run it after picking a
+      profile for a previously-skipped child. A real (non-dry-run) run
+      refuses without a backup on file first. **Real, deferred gap**:
+      legacy's separate `entities` table now has a better home in F's
+      own `lib/entities.ts` (`source: "imported"` already exists there
+      for exactly this), but `createEntity()` has no override for it and
+      no idempotency support, and it's F's owned file - left for F to add
+      a bulk-import path to, not mechanically converted mid-wave. Legacy
+      `memory_episodes` isn't imported either; the plan's own words for
+      this step name only people/memories/conversations. See
+      docs/dev/session-c.md's step 10 entry.
 - [x] **Routing embeddings persisted per package** (S, C, with Tier 1) -
       shipped 2026-09-06, Session C step 1: `routing_embeddings`, keyed
       by `(package_id, example_hash, space)` so an unchanged example is a

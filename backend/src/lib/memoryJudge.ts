@@ -96,7 +96,12 @@ const CATEGORY_VALUES = [
   "fact",
   "state",
 ] as const;
-type Category = (typeof CATEGORY_VALUES)[number];
+// Exported alongside categoryToRecordKind (step 10) for the same reason:
+// lib/legacyImport.ts validates a legacy `memories.category` value
+// against this exact list rather than re-declaring it, since the legacy
+// enum and this one are the identical 11 values (confirmed against
+// home-legacy.git's own schema.ts).
+export type Category = (typeof CATEGORY_VALUES)[number];
 
 // Durable vs episodic is derived from category here, not asked of the
 // model (the plan's own schema for step 6 has no `tier` field at all -
@@ -127,7 +132,12 @@ function categoryToTier(category: Category): "durable" | "episodic" {
 // "the schema is tiny on purpose" instinct from step 6 argues against
 // growing it without a concrete need proven first), not silently
 // dropped.
-function categoryToRecordKind(category: Category): "memory" | "entity" {
+// Exported (step 10, session-c-brain-and-voice.md) so lib/legacyImport.ts
+// can kind a legacy `memories` row the identical way a judge-extracted
+// fact of the same category already is - one definition, reused by both
+// writers of a memory_records row, rather than a second copy of this
+// three-line map living in the importer.
+export function categoryToRecordKind(category: Category): "memory" | "entity" {
   const entityShaped: Category[] = ["person", "place", "thing"];
   return entityShaped.includes(category) ? "entity" : "memory";
 }
@@ -211,7 +221,7 @@ interface ExtractedFact {
   valid_to: string | null;
 }
 
-function isCategory(value: unknown): value is Category {
+export function isCategory(value: unknown): value is Category {
   return typeof value === "string" && (CATEGORY_VALUES as readonly string[]).includes(value);
 }
 
