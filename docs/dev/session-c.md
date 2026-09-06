@@ -1595,3 +1595,62 @@ route's own `db_path` field takes an absolute path on the same machine
 tool, not an upload endpoint) - point it at wherever the legacy file
 already sits, dry run first to see the counts and which family members
 need a manual profile pick, then run for real.
+
+## Step 11: wrap up
+
+All eleven steps of `docs/plans/session-c-brain-and-voice.md` are shipped,
+in order, each verified and committed on its own before the next began:
+routing (1), grammar-constrained tool calls (2), the conversation guards
+(3), the persona floor (4), speech to text (5), spoken numbers (6), the
+content ceiling and age band (7), the hub as a brain for other clients
+(8), the memory bench and entity records (9), and the legacy import (10).
+
+`docs/BACKLOG.md` carries a checked-off entry with real numbers or a named
+gap for every one of them; nothing in this session's own scope is left
+unchecked or checked without evidence. Two items are genuinely
+cross-session, not this session's to close alone, and are recorded as
+such rather than force-closed: the routing corpus's accuracy number
+depends on a real llama-server this session's own environment did not
+always have on hand for every bench run (step 1, step 2's tool-calling
+corpus), and the legacy import's own entities/episodes narrowing (step
+10) is a named gap on F's backlog, not this one's, since it touches a
+table F owns.
+
+The rebase discipline held for all eleven steps: every commit landed on
+`main`'s current tip, never behind it, through the same stash-rebase-
+regenerate-migration cycle used repeatedly across steps 7 through 10 as
+Sessions D and F advanced `main` underneath this branch in parallel. The
+one incident worth naming again here: step 9's rebase surfaced a real
+pre-existing TypeScript break on `main` itself (a step 7 merge from
+another session had added three fields to `Person` without updating a
+dozen hand-built frontend test fixtures). This session fixed it in its
+own worktree, where it had to for its own `check.sh` to pass, and
+attempted the identical fix directly on `main`'s own separate checkout to
+unblock the other sessions sooner. That attempt was denied by this
+session's own auto-mode guard rather than pushed through by working
+around it; the edit was reverted from `main`'s checkout and the finding
+was written up here instead (step 9's entry) so it stayed visible without
+this session taking an action outside its own assigned worktree.
+
+`scripts/check.sh` is green on the final state: full spec, backend, and
+frontend suites pass, along with the `@maipai/standards` core (gitleaks,
+the PII wordlist, prose lint, the licence check). The known pre-existing
+flake classes named since step 0 (an occasional single-test timing flake
+under full-suite load, and three TTS-related tests) recurred at least
+once each across eleven steps' worth of runs and never once represented
+an actual regression, confirmed each time by an immediate rerun.
+
+**Left for other sessions, named rather than silently absorbed:**
+Session F's `lib/entities.ts` gaining a real bulk-import path with a
+`source: "imported"` override and its own idempotency check (step 10);
+the wider roles-vs-grants design question the content ceiling's
+`hasUnrestrictedGrant()` stub is waiting on (step 7); and the routing and
+tool-calling corpora's real numbers on hardware that has a live
+llama-server the whole time (steps 1 and 2). None of these block Session
+C's own plan; all are named in `docs/BACKLOG.md`'s own entries.
+
+Merged into `main` and the `home-c` worktree deleted at the end of this
+step, per the plan's own closing line. Not pushed: pushing is Jesse's
+call, per `getmaipai/.github/CLAUDE.md`'s own git workflow rule ("push at
+natural boundaries... or when Jesse says ship"), not an automatic
+consequence of a local merge landing clean.
