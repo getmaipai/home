@@ -320,6 +320,7 @@ describe("SettingsPage tree - navigable entries", () => {
   // to react to the location change - so its own tab state keeps
   // reading the current, now tab-less URL and falls back to Household).
   test.each([
+    ["Users", "/settings/users", "household"],
     ["Backups", "/settings/backups", "household"],
     ["Voices", "/settings/voices", "me"],
     ["Commands", "/settings/commands", "me"],

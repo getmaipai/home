@@ -37,6 +37,12 @@ const HOUSEHOLD_TREE: TreeEntry[] = [
   { id: "settings-household.integrations", label: "Integrations" },
   { id: "settings-household.notifications", label: "Notifications" },
   { id: "section-hf-token", label: "Hugging Face token" },
+  // Jesse, 2026-09-06: "people should be under settings | household
+  // since it's an admin thing" - roster management (add/edit/remove an
+  // account) moved here from the standalone /people page, which is now
+  // a plain, everyone-readable directory with none of this
+  // (PeoplePage.tsx, UsersSection.tsx).
+  { id: "users-page-link", label: "Users", to: "/settings/users" },
   { id: "models-page-link", label: "AI models", to: "/settings/models" },
   { id: "backups-page-link", label: "Backups", to: "/settings/backups" },
   { id: "section-routing", label: "Plugin routing" },
