@@ -557,14 +557,16 @@ into a conversation with someone who knows who is talking.
       the old per-section inline copies all had, fixed in the same pass).
 - [ ] **Rate-limit `/api/turn` and `/api/llm/*` per person** (S) - named
       in `spec/llm/README.md`, tracked nowhere.
-- [ ] **Decide what an emptied conversation becomes** (S decision, found
-      by Session A step 3's own code review, 2026-09-05) -
-      `runRetention()` purges aged-out `conversation_turns` but never
-      touches the `conversations` thread record once every one of its
-      turns is gone, so it lingers forever with `turn_count: 0` and a
-      stale `updated_at`. Auto-close, auto-delete (tombstone), or a
-      household setting are all real options; the contract in
-      `docs/plans/session-a-intelligence.md` doesn't specify one.
+- [x] **Decide what an emptied conversation becomes** (S decision, found
+      by Session A step 3's own code review, 2026-09-05) - decided and
+      shipped, Session C step 9 (2026-09-06): auto-close, tombstoned by
+      retention. `runRetention()` now closes (`status: "closed"`, the
+      same value a household member's own "start a new conversation"
+      already writes) any conversation its own delete emptied out to
+      zero remaining turns, gated on `status = 'open'` so an already-
+      closed or already-deleted thread is never touched. Three tests:
+      an emptied conversation closes, a surviving-turn one stays open,
+      a deleted one is never reopened.
 
 **Memory**
 
@@ -624,9 +626,12 @@ into a conversation with someone who knows who is talking.
       records into one new one" primitive this store doesn't have yet)
       or "re-tense expired states" (nothing consumes `valid_to` yet -
       real bi-temporal reads are step 10's own job). Entity-record
-      creation and procedural/Notes routing are also real, deferred gaps:
-      the plan's own step 6 schema has no `entities` or `kind` field, so
-      neither was built. Bench (`backend/scripts/bench/judge-eval.ts`,
+      creation was a real, deferred gap here; closed by Session C step 9
+      (2026-09-06, see the memory bench entry below) - the extraction
+      schema's own "person"/"place"/"thing" categories now write
+      `record_kind: "entity"`. Procedural/Notes routing remains deferred:
+      the plan's own step 6 schema still has no `kind` field for it.
+      Bench (`backend/scripts/bench/judge-eval.ts`,
       LongMemEval-shaped): run against the stub chat backend, extraction
       never produces valid JSON (the stub only echoes text), so 0 facts
       were ever written - the honest result is abstention trivially
@@ -677,11 +682,18 @@ into a conversation with someone who knows who is talking.
       judge writes, per-message "remember this" and "forget this"
       actions, a per-person memory page that an adult can edit for a
       child. Every major assistant ships all three now.
-- [ ] **A household memory bench** (M) - a LongMemEval-shaped fixture
-      built on the persona roster, testing updates and abstention, run
-      against the local model in the bench tier. Legacy had router (53),
-      memory (11) and continuity (5) probes; the rebuild has unit tests
-      only.
+- [x] **A household memory bench** (M) - shipped, Session C step 9
+      (2026-09-06): `backend/scripts/bench/memory/{fixture,run}.ts`, the
+      four LongMemEval categories `scripts/bench/memory-eval.ts` (session-a
+      step 5) doesn't cover - knowledge updates, abstention, temporal
+      reasoning, multi-session recall - driving real `runTurn()` calls,
+      not just `recall()`/`buildSystemPrompt()` lookups. Run for real
+      against this dev machine's Qwen3 8B + nomic-embed-text: abstention
+      2/2, multi-session 1/2, knowledge-update 0/2, temporal 0/1 - the
+      low numbers are the SAME already-tracked "short utterances free-
+      associate onto the plugins list" bug step 4 first found (confirmed
+      via `route()` returning null for every failing probe), not a new
+      memory-store problem; see docs/dev/session-c.md's step 9 entry.
 - [ ] **Skip the graph database** (decision, recorded) - Mem0 dropped its
       graph store for entity linking in a flat table; Graphiti needs
       Neo4j and a capable model. Entity columns, FTS5 and vectors on the

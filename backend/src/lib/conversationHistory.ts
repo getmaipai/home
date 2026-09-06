@@ -243,7 +243,19 @@ export function resolveOrCreateConversation(
     // conversation_id from this actor's own "chat" conversation passed
     // for a "tv" turn, silently attaching a tv-surface turn under a
     // chat-surface conversation and desyncing the two.
-    if (!row || row.personId !== actor.id || row.status === "deleted" || row.surface !== surface) {
+    //
+    // A second code review (2026-09-06, Session C step 9's own
+    // auto-close work) found this only ever rejected "deleted," not
+    // "closed" - so a client holding a stale conversationId for a
+    // thread runRetention() had already auto-closed (every one of its
+    // turns aged out) could still attach a brand new turn to it here,
+    // growing turn_count on a conversation whose own status claims
+    // there's nothing left in it, forever. "Closed" is meant as a real
+    // terminal state the same way "deleted" already is - a client
+    // resuming with a closed conversation's own id falls through to
+    // starting a fresh conversation instead, exactly like it already
+    // does for a deleted one.
+    if (!row || row.personId !== actor.id || row.status !== "open" || row.surface !== surface) {
       return { ok: false, status: 400, error: `conversation not found: ${conversationId}` };
     }
     return { ok: true, value: toConversationRecord(row) };
@@ -873,6 +885,12 @@ export function runRetention(): { deleted: number } {
     console.log(`[conversationHistory] retention summarization batch failed: ${err.message}`),
   );
 
+  // Read before deleting: the set of conversations this run's own delete
+  // could empty out, so the auto-close pass below only ever has to check
+  // conversations retention actually touched, not every open one in the
+  // household.
+  const affectedConversationIds = [...new Set(expiring.map((t) => t.conversationId).filter((id): id is string => id !== null))];
+
   // Raw sqlite for a real affected-row count, not db.delete().run(): the
   // same escape hatch lib/memory.ts's forget() uses (Drizzle's bun-sqlite
   // .run() types its result void even though it returns {changes} at
@@ -884,6 +902,33 @@ export function runRetention(): { deleted: number } {
   const flaggedMinor = sqlite
     .query("DELETE FROM conversation_turns WHERE safety_flagged = 1 AND minor_speaker = 1 AND created_at < ?")
     .run(flaggedMinorCutoff);
+
+  // Session C step 9 (session-c-brain-and-voice.md): "decide and
+  // implement what an emptied conversation becomes" - the backlog's open
+  // decision from session-a-intelligence.md step 3's own code review,
+  // which found runRetention() purged every turn but left the parent
+  // `conversations` thread row behind forever, `turn_count: 0` and a
+  // stale `updated_at`. Decided: auto-close, tombstoned by retention -
+  // the same `status: "closed"` a household member's own "start a new
+  // conversation" action already uses (createConversation(), above),
+  // not a hard delete: the thread's title/summary are real content a
+  // household might still want to see even once its raw turns have
+  // aged out, the same reason forget() tombstones a memory record
+  // rather than deleting it. Checked per conversation (not a blind
+  // UPDATE ... WHERE turn_count = 0, since `conversations` has no such
+  // column) and gated on `status = 'open'` so this never reopens or
+  // touches an already-deleted/already-closed thread.
+  for (const conversationId of affectedConversationIds) {
+    const remaining = sqlite
+      .query("SELECT COUNT(*) as n FROM conversation_turns WHERE conversation_id = ?")
+      .get(conversationId) as { n: number };
+    if (remaining.n === 0) {
+      db.update(conversations)
+        .set({ status: "closed", updatedAt: new Date().toISOString(), hlc: nextHlc() })
+        .where(and(eq(conversations.id, conversationId), eq(conversations.status, "open")))
+        .run();
+    }
+  }
 
   return { deleted: normal.changes + flaggedMinor.changes };
 }

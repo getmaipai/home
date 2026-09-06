@@ -1283,3 +1283,166 @@ declaration stays default-free, since every real `INSERT` always supplies
 confirming it now succeeds. The same pass also removed an unused
 `float32ToPcm16()` in `wyomingServer.ts`, dead code left over from an
 earlier draft of the synthesize path.
+
+## Step 9: the memory bench and the judge's entity records
+
+**The judge writes Entity records, for real.** `lib/memoryJudge.ts`'s
+extraction path never actually wrote `record_kind: "entity"` despite the
+plan's own step 9 text assuming it already did ("the judge writes Entity
+records... until [F's table] lands, the judge writes `record_kind:
+entity` memory records as today") - checked directly (`grep`, then
+read), the judge's own header comment already documented this as a
+real, deferred gap, not something already shipped. Fixed: a new
+`categoryToRecordKind()` maps the extractor's existing "person"/"place"/
+"thing" categories (unchanged, already in `CATEGORY_VALUES` since step 6
+of session-a-intelligence.md) onto `record_kind: "entity"` instead of
+plain "memory" - the "one-line change" the plan's own text names, now
+real, with two tests proving both directions (an entity-shaped category
+writes as `entity`; every other category still writes as `memory`). A
+real, narrower gap left open, not closed here: an entity record's own
+recall boost (`memory.ts`'s `entityNameWords()`) expects `text` shaped
+"Name: description," but the extraction schema has no separate name
+field to build that from - a judge-written entity record is correctly
+KINDED today, just not yet formatted to benefit from that specific
+boost. Widening the schema to ask for a name too is real, deferred work;
+this step's own "the schema is tiny on purpose" instinct (already
+established at step 6) argues against growing it without a fixture
+actually proving the boost matters in practice first.
+
+**"Decide and implement what an emptied conversation becomes"** - the
+backlog's open decision from session-a-intelligence.md's own step 3 code
+review. Decided: auto-close, tombstoned by retention, using the
+identical `status: "closed"` a household member's own "start a new
+conversation" action already writes (`createConversation()`), not a hard
+delete - a closed thread's title/summary are real content worth keeping
+around even once its raw turns have aged out of the retention window,
+the same reasoning `forget()` tombstones a memory record instead of
+deleting it outright. `runRetention()` now tracks which conversations its
+own delete could have emptied, checks each one's real remaining turn
+count afterward, and closes any that hit zero - gated on `status =
+'open'` so an already-deleted or already-closed thread is never touched.
+Three tests: a conversation that empties out gets closed; one with a
+surviving turn stays open; an already-deleted conversation is never
+reopened or relabeled by the auto-close pass.
+
+**The LongMemEval-shaped household bench**
+(`backend/scripts/bench/memory/{fixture,run}.ts`), covering the four
+ability categories `session-a-intelligence.md`'s own existing memory
+bench (`scripts/bench/memory-eval.ts`, session-a step 5) doesn't touch
+at all: knowledge updates, abstention, temporal reasoning, multi-session
+recall. That existing bench checks `recall()`/`buildSystemPrompt()`
+directly, never a generated reply - meaningless for three of these four
+categories, since "does the reply use the CURRENT value" and "does the
+reply order two events correctly" are both facts about generation, not
+about what got recalled. This one drives real `runTurn()` calls and
+grades the actual reply by substring, the same style
+`scripts/bench/conversation.ts` already established, with the one
+real, named limitation stated in the bench's own header: substring
+grading can't tell "the reply asserted a stale value as still-true"
+apart from "the reply correctly mentioned it historically while
+answering with the current one" - a genuinely harder judgment deferred
+to an LLM-judge pass (`lib/personaJudge.ts`'s own pattern) if these
+numbers turn out to matter enough to refine.
+
+Run for real, twice - once against the in-process stub (uninformative by
+construction, matching every other bench's own documented stub caveat),
+once against this dev machine's already-running real Qwen3 8B chat
+model and real nomic-embed-text embedder (ports 8788/8794, spawned by an
+earlier session, still live - reused rather than spawning duplicates).
+Real numbers: abstention 2/2 (the model correctly declines to invent a
+birthday or a workplace that was never stated); multi-session 1/2 (a
+fact seeded as if from an earlier, separate conversation - "Rover is
+allergic to peanuts" - correctly surfaces in a fresh turn); knowledge-
+update 0/2 and temporal 0/1, NOT because the underlying recall/update
+mechanism failed (`supersede()`'s own dedupe path is heavily tested
+elsewhere - `tests/memoryJudge.test.ts`), but because the short,
+ambiguous probe questions ("what shift does Marlow work these days",
+"what's the name of Marlow's dog") repeatedly triggered the SAME real,
+already-tracked finding this session's own step 4 first surfaced:
+short, ambiguous utterances free-associating onto the household's
+plugins list (`docs/BACKLOG.md`'s "Short, ambiguous utterances free-
+associate onto the plugins list" entry) - confirmed directly via
+`route()`, which returned `null` (no deterministic match) for every one
+of these questions, proving the misfire is the MODEL itself, not the
+Tier 0/1 floor. A genuinely correct real-model reply
+("The roof was replaced first, back in March") also caught a real bug
+in this bench's OWN first-cut grading (the temporal check required both
+event names present in order, failing a concise, correct answer that
+never repeated the loser's name) - fixed, with the corrected semantics
+recorded in `fixture.ts`'s own field comment.
+
+**The honest takeaway, recorded rather than smoothed over**: this
+bench's low knowledge-update/temporal numbers are a real, useful data
+point about the SAME plugins-list free-association bug already on the
+backlog, not a new problem this step introduces or a sign the memory
+store itself is broken - re-running this bench once that bug is fixed
+is the natural way to confirm the fix actually helps recall-dependent
+answers, not just the narrower repro step 4 originally found it with.
+
+**A code review found three real issues, all fixed.** The most
+consequential: routing an extracted fact to `record_kind: "entity"`
+(this step's own headline change) turned out to make it permanently
+un-dedupable, not just correctly kinded - `memory.ts`'s own
+`similarByVector()` unconditionally excluded every entity record from
+ANY dedupe candidate pool (a real, deliberate protection from an earlier
+review, 2026-09-05: a plain fact must never SUPERSEDE onto an existing
+entity and corrupt it), which also meant an entity-shaped fact could
+never dedupe against an EXISTING entity of the same kind either - a
+household mentioning "Riff is our dog" twice in two different
+conversations would silently accumulate a second, third, Nth permanent
+duplicate entity record instead of updating the one it already has.
+Fixed by giving `similarByVector()` a `candidateRecordKind` parameter
+(the NEW fact's own kind, passed by its one real caller,
+`memoryJudge.ts`): the entity exclusion now only ever applies when the
+candidate being compared is a PLAIN fact, narrowing it to exactly the
+case the original review needed protected, while letting an entity fact
+dedupe normally against an existing entity. Two new tests: entity-to-
+entity candidates are surfaced (the fix), plain-fact-to-entity ones
+still aren't (the original protection, still holding); an end-to-end
+`judgeTurn()` test proves a second mention of the same entity
+SUPERSEDEs into one active record rather than accumulating.
+
+Second: the retention auto-close fix above only closed the door in ONE
+direction - `resolveOrCreateConversation()`'s explicit-conversationId
+branch still only ever rejected `status === "deleted"`, never the new
+`"closed"` state, so a client holding a stale id for an auto-closed
+thread could still attach a fresh turn to it, silently growing
+`turn_count` on a conversation whose own status claims there's nothing
+left in it, forever. Fixed to reject any status other than `"open"` in
+that branch (matching the comment already there for the surface check),
+proven with a test: `runTurn()` with a closed conversation's own id now
+fails outright (400, "conversation not found," the identical response a
+deleted one already gets) rather than silently reopening or growing it.
+
+Third, in the bench's own grading, not the product code: the abstention
+cases' `mustNotInvent` check was a plain, case-sensitive `.includes()` -
+"May" (a literal month name in the fixture) is a real substring of
+"Maybe," so a correctly-abstaining reply that happened to start a
+sentence with "Maybe" would have been scored as having invented a
+birthday month it never said. Fixed to word-boundary, case-insensitive
+matching, the identical class of substring bug this session's own
+`guards.ts` and `normalizeForSpeech.ts` work already found and fixed
+more than once elsewhere - verified directly against the exact "Maybe"
+false-positive, a real invented-month true-positive, and a punctuated
+phrase ("St. Mary's") to confirm the boundary logic still works with
+non-word characters inside the matched phrase.
+
+**A pre-existing break on `main` itself, found while rebasing onto it,
+fixed here but not on `main` directly.** This step's own rebase onto
+`main`'s latest tip (F's step 7: entities, relationships, grants,
+approvals) surfaced 12 real frontend typecheck failures across 11 test
+files - each a hand-built `Roster`/`PersonRosterEntry` fixture object
+missing the three new fields (`enabled`, `guest_expires_at`,
+`memorialized_at`) that landed with F's own step 7. Confirmed this is
+`main`'s own pre-existing state, not something this rebase introduced,
+by running `bunx tsc --noEmit` directly in the real `home` (main)
+worktree - 12 identical errors there too. Fixed in THIS worktree (all 11
+fixtures now carry the three fields; `bunx tsc --noEmit` and the full
+frontend test suite are clean) since it blocks this step's own
+`scripts/check.sh` run. Deliberately NOT also committed to `main`
+directly: an edit outside this session's own worktree was flagged by
+this session's own auto-mode guard as needing explicit authorization
+this pass didn't have, so the identical fix was reverted there rather
+than pushed through - a fix any other session hitting the same rebase
+conflict can apply in seconds from this exact diff, or one this
+session's own final merge (step 11) carries to `main` regardless.

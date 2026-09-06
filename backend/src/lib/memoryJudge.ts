@@ -110,6 +110,28 @@ function categoryToTier(category: Category): "durable" | "episodic" {
   return durable.includes(category) ? "durable" : "episodic";
 }
 
+// Session C step 9 (session-c-brain-and-voice.md): "the judge writes
+// Entity records... until [F's real entities table] lands, the judge
+// writes record_kind: entity memory records... and the switch is a
+// one-line change" - this is that one line, mapping the extractor's own
+// "person"/"place"/"thing" categories (the entity-shaped ones,
+// unchanged since this step's extraction schema already had them) onto
+// record_kind "entity" instead of the plain "memory" every other
+// category still gets. A real, if narrower, gap not closed here: an
+// entity record's own recall boost (memory.ts's entityNameWords()) reads
+// the record's `text` as "Name: description," but this extraction
+// schema has no separate name field to build that shape from - a
+// judge-written entity record here is real and correctly KINDED, just
+// not yet formatted for that specific boost to fire on it. Widening the
+// schema to ask for a name too is real, deferred work (the plan's own
+// "the schema is tiny on purpose" instinct from step 6 argues against
+// growing it without a concrete need proven first), not silently
+// dropped.
+function categoryToRecordKind(category: Category): "memory" | "entity" {
+  const entityShaped: Category[] = ["person", "place", "thing"];
+  return entityShaped.includes(category) ? "entity" : "memory";
+}
+
 const EXTRACTION_SCHEMA = {
   name: "memory_extraction",
   schema: {
@@ -353,7 +375,14 @@ export async function judgeTurn(turn: ConversationTurnRow): Promise<JudgeTurnRes
   for (const fact of facts) {
     const embedded = await embed([fact.text]);
     const vector = embedded.ok ? new Float32Array(embedded.value.vectors[0]!) : undefined;
-    const candidates = vector ? similarByVector(speaker, vector, fact.scope === "person" ? { scope: "person", person: speaker.id } : { scope: "household" }) : [];
+    const candidates = vector
+      ? similarByVector(
+          speaker,
+          vector,
+          fact.scope === "person" ? { scope: "person", person: speaker.id } : { scope: "household" },
+          categoryToRecordKind(fact.category),
+        )
+      : [];
     const decision = await decideDedupe(fact.text, candidates);
 
     if (decision.action === "SUPERSEDE" && decision.id) {
@@ -391,6 +420,7 @@ export async function judgeTurn(turn: ConversationTurnRow): Promise<JudgeTurnRes
     } else {
       const result = remember(speaker, {
         text: fact.text,
+        record_kind: categoryToRecordKind(fact.category),
         category: fact.category,
         tier: categoryToTier(fact.category),
         scope: fact.scope,

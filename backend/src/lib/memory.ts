@@ -606,19 +606,33 @@ export interface SimilarMatch {
  * a target with none yet is definitionally not a match for anything).
  * Never touches uses/last_used_at: being a dedupe candidate isn't "used"
  * the way an actual recall answer is. */
-export function similarByVector(actor: PersonRow, vector: Float32Array, opts: ListOptions = {}): SimilarMatch[] {
+export function similarByVector(
+  actor: PersonRow,
+  vector: Float32Array,
+  opts: ListOptions = {},
+  candidateRecordKind: "memory" | "entity" = "memory",
+): SimilarMatch[] {
   const roleOf = rolesById();
   let rows = db.select().from(memoryRecords).where(eq(memoryRecords.status, "active")).all();
-  // Never an entity record: "Rover: a family friend" and a plain fact
-  // are different KINDS of content (entityNameWords()'s own "Name:
-  // description" convention vs. free-text prose), so comparing one
-  // against the other for dedupe makes no sense - and a code review
-  // (2026-09-05) found that without this filter, a fact whose embedding
-  // happened to cross DEDUPE_MIN_COSINE against an existing entity
-  // record could get SUPERSEDEd onto it, corrupting the household's
-  // actual entity registry with plain-fact text that recall()'s own
-  // entity-match boost would then silently stop recognizing.
-  rows = rows.filter((r) => r.recordKind !== "entity");
+  // A plain fact ("Rover: a family friend" vs. free-text prose) must
+  // never dedupe against an existing entity record - a code review
+  // (2026-09-05) found that without this exclusion, a fact whose
+  // embedding happened to cross DEDUPE_MIN_COSINE against an existing
+  // entity record could get SUPERSEDEd onto it, corrupting the
+  // household's actual entity registry with plain-fact text that
+  // recall()'s own entity-match boost would then silently stop
+  // recognizing. Session C step 9 found the fix for THAT bug had
+  // created a new one in the other direction: excluding EVERY entity
+  // record unconditionally also blocked an entity-shaped fact from ever
+  // deduping against an EXISTING entity of the same kind, so a household
+  // mentioning "Riff is our dog" twice in two different conversations
+  // got two permanent, un-mergeable entity records instead of one -
+  // `candidateRecordKind` (the NEW fact's own kind, passed by the one
+  // real caller, memoryJudge.ts) narrows the exclusion to exactly the
+  // case the original review actually needed: an entity record is only
+  // ever excluded from a PLAIN fact's own candidate pool, never from
+  // another entity fact's.
+  if (candidateRecordKind !== "entity") rows = rows.filter((r) => r.recordKind !== "entity");
   // Never the profile paragraph either: a post-hoc review (2026-09-05)
   // found this filter only excluded entity records, not source ===
   // PROFILE_SOURCE, so the judge's own dedupe pass could select a
