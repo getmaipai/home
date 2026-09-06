@@ -76,5 +76,8 @@
   { "utterance": "convert 100 fahrenheit to celsius", "expect": "convert", "must_not": [] },
 
   { "utterance": "what's the news", "expect": "news", "must_not": [] },
-  { "utterance": "read me the headlines", "expect": "news", "must_not": [] }
+  { "utterance": "read me the headlines", "expect": "news", "must_not": [] },
+
+  { "utterance": "what's the score", "expect": "sports", "must_not": [] },
+  { "utterance": "how are the games going", "expect": "sports", "must_not": [] }
 ]
