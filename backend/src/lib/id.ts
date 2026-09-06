@@ -68,3 +68,10 @@ export function newNotificationId(): string {
 export function newIssueId(): string {
   return `issue-${randomSuffix(10)}`;
 }
+
+// Not a spec-shaped id either (a managed hub-endpoint row is hub-
+// internal, the same reason db/schema.ts's hubEndpoints table comment
+// gives).
+export function newEndpointId(): string {
+  return `endpoint-${randomSuffix(10)}`;
+}

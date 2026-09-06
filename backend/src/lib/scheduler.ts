@@ -36,6 +36,7 @@ import { runMaintenance, drainPendingEmbeddings } from "@/lib/memory";
 import { runJudgeBatch, runConsolidation } from "@/lib/memoryJudge";
 import { runRetention } from "@/lib/conversationHistory";
 import { runBackup, pruneBackups } from "@/lib/backup";
+import { checkLeafExpiry } from "@/lib/householdCa";
 import type { PluginOpResult } from "@/lib/plugins";
 import type { PluginResult } from "@maipai/spec/interpreters/ts/recipe-interpreter.js";
 import type { PersonRow } from "@/types";
@@ -206,6 +207,12 @@ const CORE_JOBS: Record<string, CoreJobHandler> = {
   },
   "memory.consolidate": async () => {
     await runConsolidation();
+  },
+  // Session F (platform and trust), step 5: lib/householdCa.ts's own
+  // "rotation as a Repairs item" - a real Repairs warning well before the
+  // hub's own TLS leaf certificate actually expires.
+  "householdCa.check_leaf_expiry": async () => {
+    await checkLeafExpiry();
   },
 };
 

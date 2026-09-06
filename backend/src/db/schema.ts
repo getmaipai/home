@@ -419,3 +419,37 @@ export const packageStatus = sqliteTable("package_status", {
   smokeOk: integer("smoke_ok", { mode: "boolean" }),
   smokeMessage: text("smoke_message"),
 });
+
+// Session F, step 5 (trust on the LAN). Who this hub is, independent of
+// how you reached it - lib/hubIdentity.ts's own header has the reasoning
+// (a client must be able to tell "the hub, via this LAN IP" from "some
+// other machine that happens to answer on this address"). A single row
+// (id is always the literal string "hub"), not the household settings
+// store: `instance_id` must never be user-editable through a generic PUT
+// /api/settings the way a household's own preferences are - rotating it
+// would sign out every device that has it cached, and nothing about
+// identity belongs in a registry meant for "the household's own
+// preferences." Hub-internal, like scheduledJobs/commands/
+// notificationDeliveries above, not a spec 3.1 record type.
+export const hubIdentity = sqliteTable("hub_identity", {
+  id: text("id").primaryKey(),
+  instanceId: text("instance_id").notNull(),
+  name: text("name").notNull(),
+  createdAt: text("created_at").notNull(),
+});
+
+// Session F, step 5. lib/hubEndpoints.ts's admin-managed address book
+// rows (Admin -> Server -> Addresses, ported from the archived legacy
+// hub) - detected LAN/Tailscale addresses are computed at read time, not
+// stored; only rows an admin typed in live here. Hub-internal, the same
+// reasoning hubIdentity above gives.
+export const hubEndpoints = sqliteTable("hub_endpoints", {
+  id: text("id").primaryKey(),
+  name: text("name").notNull(),
+  url: text("url").notNull(),
+  kind: text("kind").notNull(), // "lan" | "overlay" | "public"
+  priority: integer("priority").notNull(),
+  enabled: integer("enabled", { mode: "boolean" }).notNull().default(true),
+  createdAt: text("created_at").notNull(),
+  updatedAt: text("updated_at").notNull(),
+});

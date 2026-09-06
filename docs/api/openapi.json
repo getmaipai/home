@@ -2323,6 +2323,83 @@
           }
         }
       }
+    },
+    "/api/setup/ca": {
+      "get": {
+        "tags": [
+          "Setup"
+        ],
+        "summary": "The household CA certificate to install and trust",
+        "responses": {
+          "200": {
+            "description": "The CA certificate (minted on first call) plus a per-platform install hint.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "certificate": {
+                      "type": "string",
+                      "description": "PEM-encoded CA certificate. Never a private key."
+                    },
+                    "hubName": {
+                      "type": "string"
+                    },
+                    "installHint": {
+                      "type": "object",
+                      "properties": {
+                        "darwin": {
+                          "type": "string"
+                        },
+                        "windows": {
+                          "type": "string"
+                        },
+                        "ios": {
+                          "type": "string"
+                        },
+                        "android": {
+                          "type": "string"
+                        },
+                        "linux": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "darwin",
+                        "windows",
+                        "ios",
+                        "android",
+                        "linux"
+                      ]
+                    },
+                    "qrPayload": {
+                      "type": "string",
+                      "nullable": true,
+                      "description": "What a QR code for another device on the LAN should encode - this same endpoint's URL, so scanning it fetches the certificate directly. Rendering the actual QR image is a frontend concern (E's kit); this only supplies the data to encode. Null when no reachable address was detected (no LAN interface up) - there's nothing a QR code from a second device could reach."
+                    }
+                  },
+                  "required": [
+                    "certificate",
+                    "hubName",
+                    "installHint",
+                    "qrPayload"
+                  ]
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests from this address",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   }
 }

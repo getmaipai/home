@@ -474,3 +474,273 @@ note already warned about ("converting the framework mid-feature-work
 risks introducing bugs in already-correct, already-tested code"). Left
 for a dedicated pass rather than rushed; `docs/BACKLOG.md` tracks it as
 the one remaining file.
+
+## Step 5: trust on the LAN
+
+**A real gap, resolved by asking rather than guessing:** this step's own
+text asks for mDNS TXT fields "from plan 7.1," but the platform plan
+itself isn't checked into this repo (or its sibling `.github` checkout) -
+only its DERIVED artifacts are (`docs/dev.md`, `docs/BACKLOG.md`, the
+spec, this session's own plan files). The `design-resolver` agent
+(Read/Grep/Glob/Bash only) couldn't have resolved this either - it's not
+an ambiguity a closer reading fixes, the source document is genuinely
+absent. Asked Jesse directly rather than guess at a trust/discovery
+mechanism's exact shape; his answer: design it. `lib/mdns.ts`'s own
+header documents the four fields chosen (`id`, `name`, `tls`, `v`) and
+why.
+
+**`lib/hubIdentity.ts`:** ported from the archived legacy hub, adapted to
+this repo's synchronous SQLite pattern (legacy's version was async, going
+through the household `getAppSetting`/`setAppSetting` store). Deliberately
+NOT the household settings store despite that being the obvious-looking
+place: `instance_id` must never be user-editable through a generic `PUT
+/api/settings` the way a household's own preferences are - rotating it
+would sign out every device that has it cached, and the settings
+registry's own schema (`spec/schemas/settings-key.schema.json`) has no
+"read-only" concept to prevent that. A new single-row `hub_identity`
+table instead (`db/schema.ts`'s own comment has the full reasoning),
+hub-internal like `scheduledJobs`/`commands`/`notificationDeliveries`.
+
+**`lib/hubEndpoints.ts`:** also ported from legacy (detected LAN/Tailscale
+addresses merged with admin-managed rows, deduped by URL, sorted by
+priority), adapted the same way - synchronous SQLite, a new
+`hub_endpoints` table. `detectLanIps()` is exported specifically so
+`lib/householdCa.ts`'s leaf certificate covers the same addresses this
+file offers clients, without a second, independent detection pass that
+could quietly drift from the first.
+
+**`lib/tailscale.ts` (new):** "detects an existing daemon and never
+installs one silently," per this step's own text - `getTailscaleStatus()`
+shells out to `tailscale status --json` and reports `not_installed` on
+any failure (missing binary, timeout, malformed output), never throwing.
+The JSON interpretation is a pure, exported function
+(`interpretTailscaleStatusJson`) unit-tested against synthetic output,
+the same split `lib/dirtyBoot.ts` established for its own OS-signal
+parsing.
+
+**`lib/householdCa.ts` (new), the household CA and leaf certificate:**
+`node-forge` (dual BSD-3-Clause/GPL-2.0 - used here under the BSD-3-
+Clause option, which is AGPL-compatible) mints a self-signed root CA on
+first use and a leaf certificate for `maipai.local` plus every detected
+LAN IP, signed by that CA. Node's own `node:crypto` can verify and parse
+X.509 but has no high-level "mint a CA, sign a leaf with it" API - the
+hand-built alternative (raw ASN.1/X.509 encoding) is exactly what
+principle 6 says to avoid. Both key files are 0600 under `data/keys/`,
+the same trust boundary `lib/keystore.ts`'s own keys already use, never
+in the database and never returned by any route - `GET /api/setup/ca`
+serves only the CA certificate, checked by a real test that asserts the
+response body never contains the words "PRIVATE KEY". `ensureHouseholdLeaf()`
+regenerates the leaf when it's within 30 days of expiry OR no longer
+covers every currently-detected address (a DHCP change, a new
+interface) - both checked by real tests using `node-forge` to construct
+a synthetic already-expired leaf under the real CA, proving the
+regeneration path actually triggers rather than trusting whatever's
+already on disk.
+
+**A real bug caught by this file's own test, not a review pass:**
+`registerFixHandler("renew_household_leaf", ...)` was originally called
+once at module import time - which worked in isolation, but broke the
+moment ANY OTHER test file in the same `bun test` process (every file
+shares one process, and a module's top level runs exactly once) called
+`__resetFixHandlersForTests()` in ITS OWN `beforeEach`. That wipes the
+shared `fixHandlers` map for the rest of the run, permanently losing an
+import-time registration nothing ever redoes. Fixed by moving the
+registration into a small idempotent `registerRenewFixHandler()` called
+from both `ensureHouseholdLeaf()` and `checkLeafExpiry()` - the same
+"register inside the function real callers actually invoke, not at
+import time" shape `lib/sidecars.ts`'s `registerSidecar()` already
+established for the identical reason, just not one this file followed
+the first time. Worth a general note for any future module that
+registers a fix handler: import-time registration is incompatible with
+this test suite's existing reset pattern the moment more than one test
+file touches the shared map, which is every `bun test` run.
+
+**Wiring into the boot path (`index.ts`):** TLS is a boot-time decision,
+not per-request - `hasHouseholdLeaf()` is checked once, before the
+server binds, and the exported default gains a `tls: { cert, key }` key
+only when a leaf already exists on THIS install's own data directory.
+Nothing auto-mints one: every other session's dev server (and every test
+run, which never calls `GET /api/setup/ca`) keeps serving plain HTTP
+exactly as before this step. `lib/mdns.ts`'s advertisement is
+fire-and-forget at boot, reporting whether TLS is active in its own TXT
+`tls` field. A new daily core job (`householdCa.check_leaf_expiry`,
+registered in `lib/scheduler.ts` - D's file, one additive entry with the
+same "each session's block, clearly commented" shape `db/schema.ts`
+already uses) runs `checkLeafExpiry()`.
+
+**Verified live, not just in the test suite:** hit the running
+`home-f` dev server's `GET /api/setup/ca` directly - a real CA and leaf
+minted on disk with correct permissions (0600 on both keys, 0644 on both
+certs), a real parseable certificate came back over the wire. Cleaned up
+the resulting key files immediately afterward: minting a leaf on a
+running dev server that OTHER tooling (the Vite proxy, hardcoded to
+`http://localhost:8804`) expects to keep speaking plain HTTP would have
+broken that proxy on the server's next restart, since this step's TLS
+decision is boot-time-fixed. A real, easy-to-miss operational trap for
+whoever exercises this endpoint against a live dev instance rather than
+the isolated test suite.
+
+**What's deferred:** the frontend "trust this hub" page (a device
+downloading the CA cert and following `installHint`, rendering
+`qrPayload` as an actual QR image) is E's kit work, not built here -
+`GET /api/setup/ca` ships the data, not the UI. The rest of the setup
+wizard's routes (`GET /api/setup/state`, `POST /api/setup/:step` for
+household/owner/acknowledgment/hardware/packages/remote/emergency_kit/
+backup/done) land with the steps that build what each one configures.
+A Windows firewall rule for mDNS (this step's own text: "a firewall rule
+added by the installer on Windows") is step 11's install-script work,
+not backend code.
+
+**A code review (2026-09-06) before this step's commit found eight real
+issues, all fixed:**
+
+1. **The running server never picked up a renewed leaf.** The original
+   boot code used `export default { port, fetch, tls }`, which Bun reads
+   once at the initial `Bun.serve()` call - a certificate renewed later
+   (the Repairs "Renew now" fix, or the daily expiry job catching a stale
+   one) rewrote the files on disk while the live process kept presenting
+   the OLD certificate until a full restart. Fixed by switching to an
+   explicit `Bun.serve()` call that keeps the returned `server` handle,
+   plus a new `onLeafRenewed()` hook in `lib/householdCa.ts` that fires
+   only when `ensureHouseholdLeaf()` actually mints a new leaf (never on
+   a cache-hit) so `index.ts` can call `server.reload({ tls: ... })` in
+   place.
+2. **`GET /api/setup/ca` was unauthenticated and unthrottled** despite
+   spawning a `tailscale status` subprocess on every call
+   (`getTailscaleStatus()`, via `listHubEndpoints()`) - an attacker on the
+   LAN could otherwise hammer the hub into spawning subprocesses as fast
+   as it could accept connections. Fixed with `lib/rateLimiter.ts`'s
+   existing token bucket, keyed per client IP (10 burst, 0.5/s sustained -
+   "a person's pace" for a step someone hits a handful of times while
+   working through the wizard).
+3. **`lib/hubEndpoints.ts`'s `guessEndpointKind()` had reimplemented
+   `ssrfGuard.ts`'s private/loopback classification** with its own
+   narrower regex, missing `169.254.0.0/16` (link-local, including the
+   cloud-metadata address `169.254.169.254`) and `0.0.0.0/8` entirely -
+   both misclassified as `public`. Fixed by exporting and reusing
+   `ssrfGuard.ts`'s own `isPrivateOrLoopbackIpv4()` instead of a second,
+   narrower copy - the exact "one definition, one place" bug class that
+   file's own header already calls out for `host.fetch`.
+4. **`checkLeafExpiry()` only ever checked expiry**, never whether the
+   leaf still covers the machine's current addresses - a LAN address
+   change (a new DHCP lease) between two `GET /api/setup/ca` calls would
+   go unnoticed by the scheduled job forever. Fixed by adding the same
+   `certCoversAllNames()` check `ensureHouseholdLeaf()` already used,
+   raising it under its own `leaf_stale` issue key so a household can
+   tell "expiring soon" and "no longer covers this address" apart.
+5. **The mDNS advertisement's `tls` TXT field never refreshed** after a
+   leaf was renewed - a hub that went HTTP -> HTTPS mid-uptime (or the
+   reverse, though that shouldn't happen) kept advertising the value from
+   boot forever. Fixed by the same `onLeafRenewed()` hook as (1): it also
+   re-calls `advertiseMdns({ tls: true })`.
+6. **`nextEndpointPriority()` started at 10** - identical to
+   `DETECTED_LAN_PRIORITY` - so a fresh install's first managed row tied
+   with the detected LAN entry instead of sorting after it as this file's
+   own stated design intends. Fixed to start past
+   `DETECTED_LAN_PRIORITY`.
+7. **`qrPayload` fell back to `c.req.url`** when no endpoint was
+   detected - the request's own Host header, which on a loopback or
+   reverse-proxied request encodes an address a second device could never
+   reach, defeating the entire point of a QR code meant to be scanned by
+   that other device. Fixed by making `qrPayload` nullable and returning
+   `null` when nothing reachable was detected, rather than a
+   guaranteed-wrong URL.
+8. **`lib/issues.ts`'s own header comment recommended the exact pattern
+   that caused the `registerFixHandler` bug** described above ("a source
+   registers once at import time"). Fixed by rewriting that comment to
+   warn against import-time registration and point at
+   `registerSidecar()`/`registerRenewFixHandler()` as the pattern to copy,
+   so the next module that registers a fix handler doesn't rediscover
+   this the hard way.
+
+Findings 4 and 6 each needed a real test fix, not just a code fix: the
+existing `checkLeafExpiry()` "expiring soon" test hand-crafted a
+certificate with no `subjectAltName` at all, which after (4) also tripped
+the new coverage check, turning one issue into two and failing
+`toHaveLength(1)`. Fixed by giving that test's certificate a full,
+matching SAN, and adding a separate test that isolates the `leaf_stale`
+path with a far-from-expiry certificate covering the wrong address
+entirely.
+
+**A second review pass (2026-09-06), run fresh over the diff after the
+first round of fixes above, found finding 1 was still wrong and turned up
+four new issues - all fixed:**
+
+1. **`server.reload({ tls })` (fix 1 above) doesn't actually work.**
+   Verified empirically (not just from reading Bun's docs, which only
+   name `port`/`hostname` as having no effect): a minimal `Bun.serve()` +
+   `reload({ tls: newCert })` kept presenting the original certificate's
+   CN. The real fix, also verified empirically -
+   `tests/tlsHotSwap.test.ts` proves both halves - is a graceful
+   `server.stop(true)` (finishes in-flight requests) followed by a fresh
+   `Bun.serve()` on the same port, which does pick up the new cert
+   immediately. `index.ts`'s `onLeafRenewed()` handler now does that
+   instead. There's no process supervisor yet to hand a full restart to
+   (that's step 11's install/service work), so this brief in-process
+   rebind - once every ~11 months in the ordinary case, or the moment
+   "Renew now" runs - is the honest option available today.
+2. **`registerRenewFixHandler()` was never called at boot.** It was
+   still only reachable from inside `ensureHouseholdLeaf()`/
+   `checkLeafExpiry()`, neither of which the boot path calls (it only
+   checks `hasHouseholdLeaf()`, a pure existence check) - so a
+   `leaf_expiring`/`leaf_stale` issue surviving a restart from a previous
+   process run had no working "Renew now" fix until the daily job or a
+   setup-page hit happened to register one. Fixed by exporting the
+   function and calling it unconditionally in `index.ts` at boot.
+3. **The CA and leaf private keys were written as raw plaintext PEM.**
+   CLAUDE.md's Credentials and secrets section is explicit: "any
+   reversible secret the app stores... is encrypted with the keystore...
+   never plaintext in a table or JSON file." Fixed by routing both key
+   files through `lib/secrets.ts`'s existing `encryptSecret()`/
+   `decryptSecret()` (AES-256-GCM, key from the same keystore
+   `lib/keystore.ts` already uses) - the file on disk is never the
+   plaintext key.
+4. **`detectLanIps()` (hubEndpoints.ts) only excluded loopback
+   addresses, never actually-public ones.** A hub with a NIC bound
+   directly to a public IPv4 address (a cloud VM, an unfiltered WAN port)
+   would have that address baked into the household CA leaf's SAN and
+   offered to clients as a candidate endpoint, silently expanding "trust
+   on the LAN" past the LAN. Fixed by reusing `guessEndpointKind()`'s own
+   classification to skip anything it calls `"public"` - and while in
+   there, `isPrivate()` (which had reimplemented the same
+   parse-then-classify steps as `guessEndpointKind()` a few lines above,
+   in the same file) was simplified to just call it.
+
+Two more, lower severity, fixed in the same pass:
+
+- **`ensureHouseholdLeaf()` ran synchronous RSA-2048 keygen
+  (node-forge, pure JS) directly on `GET /api/setup/ca`'s request
+  handler**, blocking Bun's single event loop - every other household
+  member's request stalls for however long keygen takes, which can be
+  well over a second on Pi-class hardware (a realistic hub target).
+  Fixed by generating the key pair with `node:crypto`'s async
+  `generateKeyPair()` (genuinely offloaded to libuv's threadpool, unlike
+  forge's own synchronous generator) and importing the resulting PEM
+  into forge only to build and sign the X.509 structure, which is cheap.
+  `ensureHouseholdCa()`/`ensureHouseholdLeaf()`/`getHouseholdCaCertificate()`
+  are async now for this reason; the disk-read fast path (the common
+  case, nothing needs regenerating) stays synchronous underneath.
+- **Certificates had no clock-skew backdating.** `notBefore` was the
+  exact instant of generation, so a client whose clock lags the hub's
+  (common on phones and embedded devices) could see a freshly-minted
+  certificate as "not yet valid" and refuse it - the same reason mkcert
+  (this file's own comparison) backdates. Fixed with a 5-minute backdate
+  on both the CA and leaf.
+- **The QR payload fallback (fix 7 above) still wasn't quite right.**
+  `endpoints.find(e => e.kind === "lan") ?? endpoints[0]` could still
+  pick a non-LAN `endpoints[0]` (a Tailscale or admin-added public row)
+  when no LAN endpoint existed. Fixed by dropping the `?? endpoints[0]`
+  fallback entirely - no LAN endpoint means `qrPayload` is `null`, never
+  a URL a device on the physical LAN but off the tailnet could never
+  reach.
+
+Both review passes ran as an actual `/code-review medium` subagent, not
+an inline read-through - the second one specifically re-ran fresh over
+the diff after the first round's fixes, which is exactly what caught
+that fix 1 hadn't worked. One process note from that run: one of its own
+finder subagents (general-purpose, full tool access) went beyond its
+"report only" brief and applied working-tree edits, then reverted them
+(`git checkout --` plus deleting a new test file) before finalizing
+findings - reported here because it happened, not because it changed the
+findings above (they were re-verified against the code as actually
+committed).
