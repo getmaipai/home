@@ -6948,3 +6948,60 @@ verified live in the browser at every step rather than trusted from
 the diff alone - the switch/checkbox "fix" earlier this session (see
 the prior entry) was exactly the kind of change that looks obviously
 correct and was not.
+
+## Session B step 7: Models/Backups/Voices/Commands become their own routes (2026-09-06)
+
+The plan's own words: "sections that are real management surfaces
+rather than settings (models, backups, voices, commands) become their
+own schema pages linked from the tree." Checked `kit/schema`'s actual
+interpreter capability before committing to that literally, rather
+than assuming it: `FormNode` (`kit/schema/types.ts`) is a flat field
+list with no conditional visibility between fields - `CommandsSection`'s
+own create form branches its entire second half by action kind (reply
+vs. a Home Assistant service call), which a schema form can't express.
+Its selector enum mirrors the settings registry's own
+(number/select/text/boolean/duration/time/entity/area/person/media) -
+nothing for a local file, which both `BackupsSection`'s restore flow
+and `ClonedVoicesSection`'s upload need. `ProgressNode` binds one value,
+not a live per-item download job the way `ModelsSection` needs.
+Converting these honestly would mean designing and building several
+new interpreter primitives nothing else in the app needs yet - the
+same "stays hand-written" verdict `docs/dev.md`'s A2UI entry already
+recorded for People, Privacy and Settings itself, not a new one invented
+for this.
+
+Built the part that's actually achievable: each section moved off the
+single long Settings scroll onto its own route (`/settings/models`,
+`/backups`, `/voices`, `/commands`), still reachable from the tree
+sidebar, but a real navigation instead of a scroll anchor
+(`TreeEntry.to`, checked first in the tree's onClick). Voice catalog
+and cloned voices combine into one "Voices" page - step 7 names them
+as a single item, "voices," not two. Each new page gates its own
+access (`AdminGatedPage.tsx`, shared by Models and Backups - both
+already required `canManageBackups` inline; Voices and Commands need
+no gate, matching their existing visibility) rather than trusting a
+caller to remember an inline `? : null`, since nothing else stands
+between a direct navigation and a route.
+
+A code review on this diff caught two real issues before they shipped.
+First: the same pass's own copy fix on `ClonedVoicesSection` ("Requires
+a Hugging Face token, set in Settings > Hugging Face token") pointed a
+non-admin at a destination gated to owner/admin only, while uploading a
+cloned voice itself carries no such gate - a non-admin reading that
+instruction would go looking for a section they can never reach.
+Reworded to state the requirement without asserting a specific path:
+"which an owner or admin can set in Settings." Second: `ModelsPage.tsx`
+and `BackupsPage.tsx` first shipped with the exact same gate + fallback
+block duplicated verbatim - pulled into `AdminGatedPage.tsx` instead,
+matching the org's "one definition, one implementation" standard.
+
+Tests: 6 new/updated (`ModelsPage.test.tsx`, `BackupsPage.test.tsx` -
+each proving the gate and its absence; `SettingsPage.test.tsx` gained
+a navigable-tree-entry test per moved section, not just the first one
+a reviewer caught missing coverage on - each in its own render, since
+`to` navigation resets the URL's query string and would otherwise wipe
+the `?tab=me` a chained sequence needs for Voices/Commands). Verified
+live for all four routes plus the main Settings page afterward
+(nothing left behind: no `section-models`/`section-backups`/
+`section-voice-catalog`/`section-cloned-voices`/`section-commands` id
+still exists in the DOM on the main page).
