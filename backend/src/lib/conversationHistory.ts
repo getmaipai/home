@@ -109,6 +109,10 @@ export function logTurn(actor: PersonRow, surface: Surface, userText: string, va
     safetyAction: value.safety.action,
     minorSpeaker: isMinorRole(actor.role as Role),
     createdAt: value.safety.checked_at,
+    // Every new turn starts unjudged (step 6's own poison-guard state,
+    // lib/memoryJudge.ts) - never anything but null/0 at insert time.
+    judgeStatus: null,
+    judgeAttempts: 0,
   };
   insertTurnAndBumpConversation(row, value.conversation_id);
   return row;

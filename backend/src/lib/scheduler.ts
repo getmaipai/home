@@ -33,6 +33,7 @@ import { scheduledJobs, people } from "@/db/schema";
 import { newJobId } from "@/lib/id";
 import { isOwnerOrAdmin } from "@/lib/access";
 import { runMaintenance, drainPendingEmbeddings } from "@/lib/memory";
+import { runJudgeBatch, runConsolidation } from "@/lib/memoryJudge";
 import { runRetention } from "@/lib/conversationHistory";
 import { runBackup, pruneBackups } from "@/lib/backup";
 import type { PluginOpResult } from "@/lib/plugins";
@@ -181,6 +182,18 @@ const CORE_JOBS: Record<string, () => void | Promise<void>> = {
   },
   "memory.embedding_retry": async () => {
     await drainPendingEmbeddings();
+  },
+  // Step 6: the memory judge's own batch tick and the weekly consolidate
+  // sweep (lib/memoryJudge.ts). Both real LLM-touching core jobs, unlike
+  // the pure-code entries above - a slow or down chat model just means
+  // this tick's batch takes longer or a turn's own attempt counter ticks
+  // up, never a stuck scheduler (runDueJobsUnguarded's own in-flight
+  // guard already serializes overlapping ticks).
+  "memory.judge": async () => {
+    await runJudgeBatch();
+  },
+  "memory.consolidate": async () => {
+    await runConsolidation();
   },
 };
 

@@ -216,12 +216,30 @@ export const conversationTurns = sqliteTable(
     // memory-record scoping already uses.
     minorSpeaker: integer("minor_speaker", { mode: "boolean" }).notNull().default(false),
     createdAt: text("created_at").notNull(),
+    // The memory judge's own poison guard (step 6, session-a-
+    // intelligence.md): null means "not judged yet" (every pre-existing
+    // row, and every new one until the core job reaches it), "done" and
+    // "failed" are terminal - a turn is judged at most once, ever, never
+    // re-queued by a later run. judgeAttempts counts extraction failures
+    // only (a dedupe-round failure never counts, lib/memoryJudge.ts's own
+    // header explains why); it hits judge_attempts_max and flips to
+    // "failed" rather than retrying forever on a turn the model can't
+    // seem to parse.
+    judgeStatus: text("judge_status"),
+    judgeAttempts: integer("judge_attempts").notNull().default(0),
   },
   // buildConversationWindow() and maybeRefreshConversationSummary() (step 3)
   // both filter by conversation_id on every model-routed turn - the
   // hottest path in the app (a code review, 2026-09-05, flagged the
   // missing index: a full table scan on every turn as history grows).
-  (table) => [index("conversation_turns_conversation_id_idx").on(table.conversationId)],
+  (table) => [
+    index("conversation_turns_conversation_id_idx").on(table.conversationId),
+    // The judge's own core job scans for `source = 'model' AND
+    // judge_status IS NULL` every tick (lib/memoryJudge.ts) - without
+    // this, that scan is a full table scan of every turn the household
+    // has ever had, not just the still-unjudged ones.
+    index("conversation_turns_judge_status_idx").on(table.source, table.judgeStatus),
+  ],
 );
 
 // The model-provisioning download-job queue (4.11's deferred "download

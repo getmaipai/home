@@ -166,6 +166,22 @@ describe("runDueJobs", () => {
     expect(stored).toBeTruthy();
   });
 
+  // Step 6's own two core jobs (lib/memoryJudge.ts): a real wiring test,
+  // not a behavioral one (memoryJudge.test.ts already covers what each
+  // job actually does) - this just proves the CORE_JOBS map's own keys
+  // match what index.ts registers via ensureCoreJob, the exact kind of
+  // typo a code review wouldn't necessarily catch by reading either file
+  // alone.
+  test("fires memory.judge and memory.consolidate for real (no matching turns/records - both complete as real no-ops)", async () => {
+    ensureCoreJob("memory.judge", "every:1m");
+    ensureCoreJob("memory.consolidate", "every:7d");
+    db.update(scheduledJobs).set({ nextRunAt: new Date(0).toISOString() }).run();
+
+    const result = await runDueJobs(runPlugin);
+    expect(result.ran).toBe(2);
+    expect(result.errors).toBe(0);
+  });
+
   test("fires a due plugin job and marks a one-shot job done", async () => {
     const { row: ownerRow, client } = await owner();
     const scheduled = scheduleJob(ownerRow, "remember", "remember", "2099-01-01T00:00:00.000Z", { fact: "the garage code is 4471" });

@@ -84,6 +84,21 @@ export interface RememberInput {
   pinned?: boolean;
   sensitive?: boolean;
   embedding_space?: string | null;
+  /** When the fact became/stopped being true (step 6, session-a-
+   * intelligence.md: "trips and states stored as dated `state` with
+   * `valid_to` when known"). Both spec fields have existed on
+   * MemoryRecord since it shipped, but remember() always wrote null for
+   * both until the judge needed to write a real one. */
+  valid_from?: string | null;
+  valid_to?: string | null;
+  /** Skips remember()'s own embed() round trip when the caller already
+   * has a real vector for this EXACT text (lib/memoryJudge.ts's judge:
+   * it already embeds a candidate fact once for its own dedupe search,
+   * before deciding whether to remember() it - a code review, 2026-09-05,
+   * found remember() was blindly re-embedding the identical text a
+   * second time). Only safe when the vector was computed for precisely
+   * the text being stored. */
+  precomputed_embedding?: { space: string; vector: readonly number[] };
 }
 
 export function remember(actor: PersonRow, input: RememberInput): MemoryOpResult<MemoryRecord> {
@@ -129,8 +144,8 @@ export function remember(actor: PersonRow, input: RememberInput): MemoryOpResult
     uses: 0,
     created_at: now,
     last_used_at: now,
-    valid_from: null,
-    valid_to: null,
+    valid_from: input.valid_from ?? null,
+    valid_to: input.valid_to ?? null,
     expired_at: null,
     superseded_by: null,
     embedding_space: input.embedding_space ?? null,
@@ -173,8 +188,15 @@ export function remember(actor: PersonRow, input: RememberInput): MemoryOpResult
   // real I/O (network or local inference), and remember() itself must
   // never wait on it or fail because of it. A backend that's down
   // queues the id for the retry job below instead of losing the vector
-  // forever.
-  void embedMemoryRecordSafely(parsed.data.id, parsed.data.text);
+  // forever. A caller that already has a real vector for this exact
+  // text (input.precomputed_embedding) skips the round trip entirely -
+  // storeEmbedding() itself is synchronous DB work, not I/O, so this
+  // branch completes before remember() returns rather than racing it.
+  if (input.precomputed_embedding) {
+    storeEmbedding(parsed.data.id, input.precomputed_embedding.space, input.precomputed_embedding.vector);
+  } else {
+    void embedMemoryRecordSafely(parsed.data.id, parsed.data.text);
+  }
 
   return { ok: true, value: parsed.data };
 }
@@ -541,6 +563,67 @@ export function bumpUsage(matches: RecallMatch[]): void {
   bumpMatchUsage(matches);
 }
 
+/** Dedupe's own cosine floor (step 6, session-a-intelligence.md: "compare
+ * with the actor's readable records at cosine 0.5, look at the top 5"),
+ * separate from recall()'s tier floors above: dedupe asks a completely
+ * different question ("is this the same fact as something already
+ * stored," any tier, any category) than recall does ("is this worth
+ * putting in front of the model right now"), so it gets its own
+ * threshold rather than reusing EPISODIC_MIN_COSINE/DURABLE_MIN_COSINE. */
+const DEDUPE_MIN_COSINE = 0.5;
+const DEDUPE_TOP_N = 5;
+
+export interface SimilarMatch {
+  record: MemoryRecord;
+  cosine: number;
+}
+
+/** The memory judge's own lookup (lib/memoryJudge.ts): plain top-N cosine
+ * similarity over every ACTIVE record the actor can read, no keyword
+ * fallback and no entity/pinned override - unlike recall(), a candidate
+ * with no stored vector yet simply can't be compared and is skipped
+ * (a judge run always has a real vector for the fact it just embedded;
+ * a target with none yet is definitionally not a match for anything).
+ * Never touches uses/last_used_at: being a dedupe candidate isn't "used"
+ * the way an actual recall answer is. */
+export function similarByVector(actor: PersonRow, vector: Float32Array, opts: ListOptions = {}): SimilarMatch[] {
+  const roleOf = rolesById();
+  let rows = db.select().from(memoryRecords).where(eq(memoryRecords.status, "active")).all();
+  // Never an entity record: "Rover: a family friend" and a plain fact
+  // are different KINDS of content (entityNameWords()'s own "Name:
+  // description" convention vs. free-text prose), so comparing one
+  // against the other for dedupe makes no sense - and a code review
+  // (2026-09-05) found that without this filter, a fact whose embedding
+  // happened to cross DEDUPE_MIN_COSINE against an existing entity
+  // record could get SUPERSEDEd onto it, corrupting the household's
+  // actual entity registry with plain-fact text that recall()'s own
+  // entity-match boost would then silently stop recognizing.
+  rows = rows.filter((r) => r.recordKind !== "entity");
+  if (opts.scope) rows = rows.filter((r) => r.scope === opts.scope);
+  if (opts.person) rows = rows.filter((r) => r.person === opts.person);
+  rows = rows.filter((r) => canRead(actor, r, roleOf, opts.selfOnly));
+
+  const vectorRows =
+    rows.length > 0
+      ? db
+          .select()
+          .from(memoryEmbeddings)
+          .where(inArray(memoryEmbeddings.memoryId, rows.map((r) => r.id)))
+          .all()
+      : [];
+  const vectorsByMemoryId = new Map(vectorRows.map((v) => [v.memoryId, bufferToVector(v.vector)]));
+
+  const scored: SimilarMatch[] = [];
+  for (const row of rows) {
+    const stored = vectorsByMemoryId.get(row.id);
+    if (!stored) continue;
+    const cosine = cosineSimilarity(vector, stored);
+    if (cosine >= DEDUPE_MIN_COSINE) scored.push({ record: toMemoryRecord(row), cosine });
+  }
+  scored.sort((a, b) => b.cosine - a.cosine);
+  return scored.slice(0, DEDUPE_TOP_N);
+}
+
 function getWritable(actor: PersonRow, id: string): MemoryOpResult<MemoryRecordRow> {
   const row = db.select().from(memoryRecords).where(eq(memoryRecords.id, id)).get();
   if (!row) return { ok: false, status: 404, error: "memory record not found" };
@@ -571,6 +654,23 @@ export interface SupersedeInput {
   pinned?: boolean;
   sensitive?: boolean;
   source: string;
+  /** The NEW record's own dated bounds (e.g. a dated state/trip fact
+   * that happened to dedupe-match an existing similar record) - distinct
+   * from SupersedeOptions.closeValidTo below, which is about the OLD
+   * record. Omitted (the default) means the new record gets null for
+   * both, same as a bare remember(). */
+  valid_from?: string | null;
+  valid_to?: string | null;
+}
+
+export interface SupersedeOptions {
+  /** Set when the OLD record is being retired because the fact it stated
+   * is now false (a contradiction), not merely refined - the memory
+   * judge's own distinction (step 6, session-a-intelligence.md: "a
+   * contradiction supersedes and closes valid_to on the old record"),
+   * distinct from expired_at (when we retired the row, stamped
+   * unconditionally below) which records when it STOPPED BEING TRUE. */
+  closeValidTo?: string;
 }
 
 /** Replace an active record with a new one carrying forward its scope and
@@ -580,6 +680,7 @@ export function supersede(
   actor: PersonRow,
   oldId: string,
   input: SupersedeInput,
+  opts: SupersedeOptions = {},
 ): MemoryOpResult<{ old: MemoryRecord; created: MemoryRecord }> {
   const found = getWritable(actor, oldId);
   if (!found.ok) return found;
@@ -600,12 +701,19 @@ export function supersede(
     pinned: input.pinned ?? old.pinned,
     sensitive: input.sensitive ?? old.sensitive,
     embedding_space: old.embeddingSpace,
+    valid_from: input.valid_from ?? null,
+    valid_to: input.valid_to ?? null,
   });
   if (!created.ok) return created;
 
   const now = new Date().toISOString();
   db.update(memoryRecords)
-    .set({ status: "superseded", expiredAt: now, supersededBy: created.value.id })
+    .set({
+      status: "superseded",
+      expiredAt: now,
+      supersededBy: created.value.id,
+      ...(opts.closeValidTo ? { validTo: opts.closeValidTo } : {}),
+    })
     .where(eq(memoryRecords.id, oldId))
     .run();
   const updatedOld = db.select().from(memoryRecords).where(eq(memoryRecords.id, oldId)).get()!;
@@ -779,12 +887,105 @@ export function runMaintenance(): { archived: number } {
   return { archived };
 }
 
+// ==== Step 6: primitives for lib/memoryJudge.ts's consolidate pass ====
+//
+// Both of these are unconditional system sweeps, no actor - the same
+// shape runMaintenance() above already has, and for the identical
+// reason: a weekly consolidation pass isn't any one person's write
+// request, it's household-wide lifecycle management. The LLM-touching
+// orchestration (grouping candidates, calling the model to decide a
+// contradiction) lives in lib/memoryJudge.ts, not here - this file stays
+// the "dumb, mechanical" half of memory lifecycle, matching the
+// judge/store split runMaintenance()'s own trailer already documents.
+
+/** Batched vector lookup with no actor/canRead filtering - the caller
+ * already has the ids it wants (from its own already-authorized query)
+ * and just needs their vectors, the same access similarByVector() above
+ * already grants indirectly through recall-shaped calls. */
+export function vectorsFor(ids: string[]): Map<string, Float32Array> {
+  if (ids.length === 0) return new Map();
+  const rows = db.select().from(memoryEmbeddings).where(inArray(memoryEmbeddings.memoryId, ids)).all();
+  return new Map(rows.map((r) => [r.memoryId, bufferToVector(r.vector)]));
+}
+
+export { cosineSimilarity };
+
+/** Retires an ACTIVE record in favor of one that already exists (unlike
+ * supersede(), which always creates a brand-new record) - consolidate's
+ * own contradiction pass: the newer of two contradicting durable facts
+ * is already a fully valid record, so the older one just needs to point
+ * at it, not spawn a third row saying the same thing again. `closeValidTo`
+ * mirrors supersede()'s own SupersedeOptions for the identical reason:
+ * a contradiction means the old fact stopped being true, not merely that
+ * we stopped caring about it. */
+/** Returns whether the row was actually retired: false when `oldId` is
+ * no longer `active` by the time this runs (already superseded earlier
+ * in the same sweep, or forgotten/archived through a concurrent request
+ * this background job doesn't otherwise coordinate with) - a code
+ * review (2026-09-05) found the original version wrote unconditionally
+ * by id alone, unlike supersede() above (which requires `active` before
+ * proceeding), so a record already retired could be silently overwritten
+ * a second time. Raw sqlite, not db.update().run(): the same
+ * typed-changes-count escape hatch lib/memoryId.ts's nextSeq and this
+ * file's own forgetTransaction already use, needed here so the caller
+ * (lib/memoryJudge.ts's runConsolidation) can tell a real retirement
+ * from a no-op and stop scanning that record's pairs either way. */
+export function supersedeInFavorOfExisting(oldId: string, existingId: string, closeValidTo?: string): boolean {
+  const now = new Date().toISOString();
+  const result = closeValidTo
+    ? sqlite
+        .query("UPDATE memory_records SET status = 'superseded', expired_at = ?, superseded_by = ?, valid_to = ? WHERE id = ? AND status = 'active'")
+        .run(now, existingId, closeValidTo, oldId)
+    : sqlite
+        .query("UPDATE memory_records SET status = 'superseded', expired_at = ?, superseded_by = ? WHERE id = ? AND status = 'active'")
+        .run(now, existingId, oldId);
+  return result.changes > 0;
+}
+
+// A durable record that has sat unpinned and unused since before this
+// many days ago is "mis-tiered junk" (BACKLOG.md's own phrase for the
+// gap this closes): durable memories are permanently exempt from
+// runMaintenance()'s decay above, so a wrongly-durable fact the judge
+// over-graded was otherwise immortal no matter how irrelevant it turned
+// out to be. Demoting it to episodic is not a deletion - it just lets
+// the existing decay path above finally see it and, if it stays unused,
+// eventually archive it the normal way.
+const NEVER_RECALLED_DEMOTE_DAYS = 30;
+
+/** Demotes every unpinned, never-recalled (uses = 0) durable record
+ * older than NEVER_RECALLED_DEMOTE_DAYS to episodic. Returns the count
+ * demoted, the same "what did this sweep actually do" shape
+ * runMaintenance() returns. */
+export function demoteNeverRecalledDurables(now: Date = new Date()): number {
+  const cutoff = new Date(now.getTime() - NEVER_RECALLED_DEMOTE_DAYS * 86_400_000).toISOString();
+  const stale = db
+    .select({ id: memoryRecords.id })
+    .from(memoryRecords)
+    .where(
+      and(
+        eq(memoryRecords.status, "active"),
+        eq(memoryRecords.pinned, false),
+        eq(memoryRecords.tier, "durable"),
+        eq(memoryRecords.uses, 0),
+        lt(memoryRecords.createdAt, cutoff),
+      ),
+    )
+    .all();
+  for (const row of stale) {
+    db.update(memoryRecords).set({ tier: "episodic" }).where(eq(memoryRecords.id, row.id)).run();
+  }
+  return stale.length;
+}
+
 // Not built this pass, deliberately (see docs/dev.md):
-// - The sleep-time judge itself (deciding WHAT to remember from a
-//   conversation): needs an LLM (4.11) and the turn engine (4.5).
-// - Profile paragraphs: LLM-synthesized summaries, same dependency.
+// - Profile paragraphs: LLM-synthesized summaries (step 7).
 // - Mood and unfinished-business reads (the robot's reflect jobs):
 //   robot-specific, Robot v0.1.
 // - runMaintenance() scheduling (step 5's own "runMaintenance runs daily
 //   via ensureCoreJob"): the function itself is unchanged by step 5 -
 //   see lib/scheduler.ts for the new core job registration.
+// - The sleep-time judge itself (step 6, deciding WHAT to remember from a
+//   conversation) now lives in lib/memoryJudge.ts, not here - this file
+//   only exports the primitives it needs (remember/supersede/
+//   similarByVector), the same "core store, judge as a caller" split
+//   4.4's own header names.

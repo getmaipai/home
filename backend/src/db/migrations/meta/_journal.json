@@ -85,6 +85,13 @@
       "when": 1788648824090,
       "tag": "0011_short_the_renegades",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "6",
+      "when": 1788652354524,
+      "tag": "0012_spicy_tattoo",
+      "breakpoints": true
     }
   ]
 }

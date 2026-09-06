@@ -6503,3 +6503,231 @@ waits for an async core job rather than firing and moving on; a pinned,
 zero-importance, negative-cosine record still surfaces (the
 `score > 0` regression above). Full backend suite green (627), `bunx
 tsc --noEmit` clean.
+
+## Session A: step 6, the memory judge (2026-09-05)
+
+The sleep-time judge (platform plan 4.4), the piece every earlier step's
+"Not built this pass" trailer has pointed at since `remember()` first
+shipped: a real core job that decides what a conversation was worth
+remembering, not just what a household member explicitly asked to save.
+
+**`response_format`/`json_schema` support**, added to `ChatCompletionRequest`
+(spec/llm/ts/types.ts), `LlmCompleteOptions` (lib/llm.ts), and
+`stubServer.ts`'s new `scriptedChatReply` test hook. `client.ts` needed
+zero changes - it already spreads the whole request object through, so
+adding the field to the type was the entire client-side change. This is
+the mechanism that lets a small model reliably return parseable JSON
+instead of a paragraph with a JSON object somewhere inside it, the exact
+gap legacy's `structuredCall()` covered a different way (Ollama's own
+`format` field) for a different backend.
+
+**One post-turn core job, `memory.judge` (every:1m)**, not legacy's idle
+sweep over a whole unprocessed conversation span: the plan's own words
+("a post-turn core job... for every source: model turn") plus this
+platform's turn-centric architecture (conversationHistory.ts didn't
+exist when legacy's design was written) made per-turn the right shape
+here - one turn either judges cleanly or it doesn't, and a whole session
+can never get stuck because one message in the middle was malformed.
+`lib/memoryJudge.ts` is the new file; `lib/memory.ts` stays the "dumb,
+mechanical" store (its own trailer comment now says so explicitly) with
+three new small primitives the judge needs: `similarByVector()` (plain
+top-N cosine over every active record the actor can read, no keyword
+fallback or entity/pinned override - dedupe asks a different question
+than recall does), `vectorsFor()` and `cosineSimilarity` (exported for
+consolidate's own pairwise scan), `supersedeInFavorOfExisting()` (retire
+an old record in favor of one that already exists, unlike `supersede()`
+which always creates a new one), and `demoteNeverRecalledDurables()`.
+`remember()`/`supersede()` also gained real `valid_from`/`valid_to`
+support - both fields have existed on the spec shape since `remember()`
+shipped, every write just forced them to null until the judge needed to
+write a real one.
+
+**Judgment call: possessives resolve to the speaker's real name, not
+"the user".** Legacy assumed one user per account, so its extraction
+prompt could write "the user's wife" and have it read correctly forever
+after by the one person it was ever shown to. This platform has multiple
+NAMED people per household reading the same household-scope facts (and
+even the same person-scope facts, via the parental view) - "the user's
+wife" is genuinely ambiguous the moment a second named person can read
+it. The extraction prompt interpolates the real speaker name
+(`buildExtractionPrompt(speakerName, ...)`) and asks every possessive
+resolved to it directly ("Willow is Marlow's wife", never "Willow is the
+user's wife") - a real adaptation this platform's architecture requires,
+not a porting detail.
+
+**Dedupe collapses legacy's four actions (ADD/UPDATE/DELETE/NO_CHANGE)
+into two** (ADD/SUPERSEDE), because this store's lifecycle only exposes
+two write shapes to begin with - a bare `remember()` or a `supersede()`
+that retires one record and creates its replacement. UPDATE and DELETE
+both become SUPERSEDE; the one bit legacy's separate DELETE case carried
+that a plain merge doesn't is `contradiction` (a boolean the dedupe call
+itself returns), which closes `valid_to` on the old record when true. A
+dedupe-round failure of any kind defaults to ADD and never counts against
+the poison guard - legacy's own catch block already made this call
+("decision = ADD"), and it's the right one here too: a failure to decide
+"is this the same fact" safely resolves to "keep both," never to losing
+the turn's whole extraction over it.
+
+**The poison guard is tracked persistently, not retried in a tight
+loop.** Two new columns on `conversation_turns` - `judge_status`
+(null/"done"/"failed") and `judge_attempts` - mean a transient outage
+(the embed backend restarting, llama-server mid-reload) gets up to three
+separate one-minute-apart tries before a turn is given up on, the same
+"queue and retry on the job's own cadence" shape `pending_embeddings`
+(step 5) already established, rather than a busy-retry loop within one
+call. Only an extraction failure counts against the 3-attempt budget;
+memory_ids provenance needed no new column at all - `remember(...,
+source: turn.id)` from inside the judge is exactly the join key
+`listConversationTurns()` (step 3) already reads memory_ids from, so
+this "just worked" the moment the judge started setting `source`
+correctly.
+
+**One `memory.updated` notification per run that wrote something** -
+the notification registry (`lib/notifications.ts`/`notificationTypes.ts`)
+already existed (built ahead of Session A, currently used for
+safety-flagged-turn and model-download alerts); this added one new
+`NotificationType` entry, not the system itself. `passive` level,
+`person` audience (the extraction came from THIS person's own turn),
+`configurable: true` - unlike the safety notification, there's no
+invariant here requiring it stay on.
+
+**Consolidate is scoped down from the plan's own three-part description**
+("merge point facts into durative ones, re-tense expired states, demote
+durable records that have never been recalled") to the two parts cleanly
+buildable on what this store exposes today - real, documented gaps, not
+silently dropped:
+- Near-duplicate MERGE (legacy's own `consolidate.ts`, `MERGE_COSINE =
+  0.86`) needs a "retire two old records into one brand-new merged one"
+  primitive `supersede()` doesn't have (it always replaces exactly one).
+  Building that cleanly is real work, not a quick add, and doing it as a
+  layering shortcut straight into `memoryRecords` from `memoryJudge.ts`
+  would be worse than not building it yet.
+- "Re-tense expired states" has no real action to take without
+  something that actually reads `valid_to` - nothing does yet, and
+  states already hard-expire via `runMaintenance()`'s own
+  `STATE_EXPIRY_DAYS`. Real bi-temporal consumption is step 10's job
+  ("tombstones and clock stamps on the records you own"), not this
+  one's to anticipate.
+
+What shipped: contradiction detection (ported from legacy's own
+`CONTRA_COSINE_MIN`/`MAX` pass, `[0.55, 0.86)` - related but not a
+near-duplicate) and demoting never-recalled durable records
+(`uses = 0`, unpinned, 30+ days old, BACKLOG.md's own "mis-tiered junk
+is immortal" finding) - both real, both testable without inventing a
+new store primitive, both actor-less system sweeps matching
+`runMaintenance()`'s own shape (a weekly household-wide pass isn't any
+one person's write request).
+
+**Real, deferred gaps, not silently missing**: entity-record creation
+(the plan's own step 6 schema has no `entities` field, unlike legacy's
+separate extraction pass) and procedural/Notes routing (legacy's `kind:
+"procedural"` - this platform has no Notes app yet). A fact's own text
+still names people/things explicitly (the extraction prompt's
+specificity rule), so entity-match boosting in `recall()` still works
+for any entity record that exists some other way; the judge just
+doesn't create those records itself yet.
+
+**The bench** (`backend/scripts/bench/judge-eval.ts`, session-
+a-intelligence.md's own ask: "a household fixture on the persona
+roster, LongMemEval-shaped, testing a knowledge update and an
+abstention"): a two-session fixture (Iris) - an initial job fact, then a
+real knowledge update (a new job, days later) that should supersede the
+old one, plus an abstention probe (a fact never stated, e.g. a favorite
+color) that must recall nothing. Run for real against this worktree's
+own dev database: **1/2 passed, stub chat backend.** The stub's canned
+reply (`[stub model: ...] <echo>`) is not valid extraction JSON at all,
+so `runJudgeBatch()` extracted 0 facts from every turn - the honest
+result is abstention trivially passing (nothing was ever written, so
+nothing can be hallucinated) and the knowledge-update case failing
+outright (nothing to update, since nothing was ever remembered in the
+first place). Unlike step 5's recall scoring, which worked to some
+degree even against the crude bag-of-words stub, the judge's own
+extraction needs an actual reasoning model to do anything at all -
+there is no partial credit available from a stub here. This bench is
+real and wired correctly; it simply has nothing to measure yet without
+a real chat model configured. Needs a re-run once one is, before
+trusting the judge's real-world extraction/dedupe quality for v0.1.
+
+**A code review found and fixed six real bugs, all before commit:**
+- `runConsolidation()`'s inner pairwise loop kept comparing an
+  already-superseded outer-loop record `a` against further candidates
+  (only `b` was ever re-checked against the `superseded` set) - a second
+  contradiction match could supersede the same old record twice,
+  overwriting its `supersededBy` and orphaning whichever record it was
+  first pointed at. Fixed by breaking the inner loop the moment `a`
+  itself is the one retired.
+- `supersedeInFavorOfExisting()` wrote unconditionally by id, unlike
+  `supersede()` (which requires `status = "active"` first) - a genuine
+  gap given the bug above, and a real (if narrow) one on its own if a
+  record is forgotten through the API in the gap between consolidate's
+  read and its write. Now guards `status = 'active'` in the same UPDATE
+  and returns whether it actually changed anything, which is also what
+  made the loop fix above possible to get right.
+- A dedupe SUPERSEDE decision flagged as a contradiction was closing the
+  OLD record's `valid_to` with the NEW fact's own `valid_to` (a trip's
+  end date, say) instead of with when the contradiction was actually
+  learned (this turn's own timestamp) - two genuinely different
+  timestamps conflated. Fixed to always use `turn.createdAt`; a new test
+  asserts the two independently (the old record gets the turn's
+  timestamp, the new record keeps its own real `valid_to`).
+- The speaker lookup (`db.select().from(people).where(eq(people.id,
+  turn.personId))`) omitted `isNull(deletedAt)`, unlike every other
+  place a person id becomes a write target in this codebase - a
+  soft-deleted person's own past turn could still get new memories
+  attributed to them. Fixed to match `remember()`'s own check.
+- `similarByVector()` had no `record_kind` filter, so an entity record
+  ("Rover: a family friend") was a valid dedupe candidate for a plain
+  fact - a SUPERSEDE match against one would have tombstoned the
+  household's own entity record and replaced it with plain-fact text,
+  silently breaking `recall()`'s entity-match boost for that name with
+  no error anywhere. Fixed to exclude `record_kind: "entity"` rows.
+- The extraction prompt gave the model no format guidance for
+  `valid_from`/`valid_to` at all (an example literally said `"<the 20th,
+  resolved to an absolute date>"`), while `remember()`'s own Zod gate
+  requires a full `datetime({offset: true})` string - a plausible model
+  output like a bare `"2026-09-20"` would fail validation and silently
+  drop the WHOLE fact, with no logging anywhere to notice. Fixed three
+  ways: the prompt now shows a real computed ISO-8601-with-offset
+  example, `normalizeFact()` validates the format itself and degrades a
+  malformed date to `null` rather than let it kill the fact, and a
+  `console.error` now logs any `remember()`/`supersede()` failure that
+  does still occur (never counted against the poison guard - only
+  extraction failures are, per this file's own header - just no longer
+  silent).
+
+**One efficiency finding was worth fixing, one wasn't (yet):** the judge
+was calling `embed()` twice per new fact - once for its own dedupe
+search, then a second, redundant time inside `remember()`'s existing
+fire-and-forget embed-on-write. Fixed for the ADD path (`remember()`
+gained an optional `precomputed_embedding`, safe there because the ADD
+path always stores `fact.text` verbatim, exactly what was embedded).
+Left as-is for the SUPERSEDE path: `decision.mergedText` can differ from
+`fact.text`, so reusing the dedupe-search vector there would risk a
+real vector/text mismatch bug for the sake of the same optimization - a
+documented, deliberate gap, not an oversight. A stray off-roster example
+name ("Carina," not on the persona roster) the same review caught was
+also fixed throughout (code comments, tests, this entry) to "Willow."
+
+Tests (`backend/tests/memoryJudge.test.ts`, all against a scripted stub
+via `stubServer.ts`'s new `scriptedChatReply` hook, distinguished by
+each request's own `response_format.json_schema.name`): a scripted
+extraction reply produces the expected record with correct provenance
+(`source` = the turn's own id); the possessive rule (a fact naming the
+real speaker, not "the user"); the question/discard rule (an empty
+extraction is a valid, non-failing answer - nothing written, no
+notification, turn marked done); the relative-date rule (a scripted
+`valid_to` lands on the record); the notification (exactly one
+`memory.updated` for the speaker); dedupe by supersede (the old record
+retired, the new one created, `valid_to` closed on a contradiction, and
+the dedupe prompt genuinely receiving the real candidate id);
+`similarByVector()`'s own cosine floor; the poison guard (three failed
+attempts mark `judge_failed`, fewer leave it retryable, a dedupe failure
+never counts against the budget); `runJudgeBatch()` processing every
+unjudged turn oldest-first and skipping already-judged ones;
+`runConsolidation()`'s contradiction-supersede and never-recalled
+demotion, including that a pinned record is never demoted. A new
+`scheduler.test.ts` case fires both `memory.judge` and
+`memory.consolidate` for real through `runDueJobs()` as a pure wiring
+check (a real no-op run, since memoryJudge.test.ts already covers what
+each job actually does). Full backend suite green (641), `bunx tsc
+--noEmit` clean.

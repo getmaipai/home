@@ -35,6 +35,26 @@ export interface ChatCompletionRequest {
    * (one JSON body vs. SSE lines), so which one a caller gets can never
    * be ambiguous. */
   stream?: boolean;
+  /** OpenAI's structured-output param (session-a-intelligence.md step 6:
+   * "Add response_format/json_schema support... if it is not there -
+   * llama-server supports it"): `json_schema` grammar-constrains every
+   * token llama-server samples to a valid instance of the given schema,
+   * the mechanism the memory judge (lib/memoryJudge.ts) depends on for a
+   * small model to reliably return parseable, correctly-shaped JSON.
+   * `json_object` is the looser "valid JSON, any shape" variant, kept
+   * for completeness though nothing in this codebase uses it yet. Client
+   * passthrough only (client.ts already spreads the whole request) - no
+   * client code changes needed to add this. */
+  response_format?: { type: "json_object" } | JsonSchemaResponseFormat;
+}
+
+export interface JsonSchemaResponseFormat {
+  type: "json_schema";
+  json_schema: {
+    name: string;
+    schema: Record<string, unknown>;
+    strict?: boolean;
+  };
 }
 
 export interface ChatCompletionChoice {

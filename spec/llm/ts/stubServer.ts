@@ -135,9 +135,23 @@ function handleEmbeddings(request: EmbeddingRequest): EmbeddingResponse {
   };
 }
 
+export interface StubLlmServerOptions {
+  /** Session-a-intelligence.md step 6: the memory judge's tests need a
+   * SPECIFIC canned JSON reply per test case (a possessive resolved a
+   * certain way, a particular dedupe decision), not the generic
+   * echo-the-user's-message reply every other test relies on. Returning
+   * a value here overrides the default reply for exactly that request
+   * (a string is sent verbatim as the message content, anything else is
+   * JSON.stringify'd first, matching what a real json_schema-constrained
+   * llama-server reply looks like on the wire); returning `undefined`
+   * (or omitting this option) falls through to the existing default -
+   * every current call site is unaffected. */
+  scriptedChatReply?: (request: ChatCompletionRequest) => unknown;
+}
+
 /** port 0 lets the OS assign a free port, avoiding a fixed-port clash
  * when tests and a dev server both start a stub. */
-export function startStubLlmServer(port = 0): StubLlmServerHandle {
+export function startStubLlmServer(port = 0, opts: StubLlmServerOptions = {}): StubLlmServerHandle {
   const server = Bun.serve({
     port,
     fetch: async (req) => {
@@ -157,6 +171,18 @@ export function startStubLlmServer(port = 0): StubLlmServerHandle {
           return new Response(streamChatCompletion(body), {
             headers: { "content-type": "text/event-stream" },
           });
+        }
+        if (opts.scriptedChatReply) {
+          const scripted = opts.scriptedChatReply(body);
+          if (scripted !== undefined) {
+            const content = typeof scripted === "string" ? scripted : JSON.stringify(scripted);
+            return Response.json({
+              id: `stub-${Date.now()}`,
+              model: body.model || "stub-chat",
+              choices: [{ index: 0, message: { role: "assistant", content }, finish_reason: "stop" }],
+              usage: { prompt_tokens: 0, completion_tokens: 0, total_tokens: 0 },
+            });
+          }
         }
         return Response.json(handleChatCompletion(body));
       }

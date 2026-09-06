@@ -442,22 +442,44 @@ into a conversation with someone who knows who is talking.
       against a real downloaded chat model (unlocks the real
       nomic-embed-text-v1.5 spawn) before trusting either the floors or
       the weights for v0.1; see docs/dev.md's step 5 entry.
-- [ ] **The memory judge: extract at turn end, consolidate at idle**
-      (M-L; plan 4.4's "sleep-time judge", unbuilt) - a post-turn job on
-      the scheduler asks the chat model for durable facts and preferences
-      as a tiny, grammar-constrained list (Mem0's 2026 ADD-only shape),
-      writes `tier: episodic` with the turn id, dedups by supersede. An
-      idle-time pass (Letta's sleep-time agent) merges point facts into
-      durative ones, re-tenses time-bound facts ("going to Boston in
-      July" becomes "went in July"), demotes mis-tiered junk, and
-      retries poison rows at most three times. Copy the rules legacy
-      learned on real transcripts (`memory/judge.ts`: user-asserted
-      facts only with a source quote, possessives resolved from the
-      speaker's view, relative dates made absolute, trips stored as
-      dated past-tense state; dedupe candidates at cosine 0.5, top 5,
-      a DELETE always inserts the replacement) and the bot's extractor
-      caps (8 entities, 12 facts, example names that never recur
-      because a small model copies the example).
+- [x] **The memory judge: extract at turn end, consolidate at idle** -
+      shipped, Session A step 6 (2026-09-05): `lib/memoryJudge.ts`, a
+      real `memory.judge` core job (every:1m) per `source: model` turn -
+      one grammar-constrained (`response_format`/`json_schema`, added to
+      `LlmCompleteOptions` and the wire types this pass) extraction call,
+      tier derived from category in code (not asked of the model - "the
+      schema is tiny on purpose"), dedupe against the speaker's own
+      readable records at cosine 0.5/top 5 (`similarByVector()`), a match
+      always supersedes rather than inserts, a contradiction closes
+      `valid_to` on the old record. Poison guard (3 attempts, tracked
+      persistently across ticks via new `judge_status`/`judge_attempts`
+      columns, then `judge_failed`) and one `memory.updated` notification
+      per run that wrote something (the notification registry already
+      existed - this added one entry, not the system itself). Legacy's
+      rules ported (source rule, time rule, discard rules) with one real
+      adaptation: possessives resolve to the SPEAKER'S REAL NAME, not a
+      generic "the user" - this platform has multiple named people per
+      household reading the same facts, unlike legacy's one-account
+      assumption, so "the user's wife" would be ambiguous the moment a
+      second person can read it. `memory_ids` provenance needed no new
+      column: `remember(..., source: turn.id)` is exactly what
+      `listConversationTurns()` already joins on (step 3). Consolidate is
+      scoped to what's cleanly buildable on existing primitives -
+      contradiction detection (ported from legacy's own consolidate.ts)
+      and demoting never-recalled durable records (`uses = 0`, 30+ days
+      old) - not the near-duplicate MERGE pass (needs a "retire two old
+      records into one new one" primitive this store doesn't have yet)
+      or "re-tense expired states" (nothing consumes `valid_to` yet -
+      real bi-temporal reads are step 10's own job). Entity-record
+      creation and procedural/Notes routing are also real, deferred gaps:
+      the plan's own step 6 schema has no `entities` or `kind` field, so
+      neither was built. Bench (`backend/scripts/bench/judge-eval.ts`,
+      LongMemEval-shaped): run against the stub chat backend, extraction
+      never produces valid JSON (the stub only echoes text), so 0 facts
+      were ever written - the honest result is abstention trivially
+      passing (nothing to hallucinate) and the knowledge-update case
+      failing (nothing to update). Needs a real chat model before this
+      bench means anything; see docs/dev.md's step 6 entry.
 - [ ] **A maintained profile block per person** (S-M; plan 4.4's
       "profile paragraphs") - one pinned paragraph the judge rewrites
       ("who is talking, what they like, what is going on this week"),
@@ -472,14 +494,19 @@ into a conversation with someone who knows who is talking.
       weeks ago" rounding - the plan's own text asked for "<n> days ago"
       literally.
 - [ ] **Use the bi-temporal fields, and add a clock to every memory**
-      (S in the spec, then hub) - the record already has `valid_from`/
-      `valid_to` next to supersede, and `memory.ts` writes null to both;
-      nothing reads them. The judge sets them (a trip has an end), recall
-      prefers currently-valid facts, and `hlc` is added to the shape.
-      "Did this change" and "we never discussed that" are the two cases
-      assistants fail most (LongMemEval); the 2026 temporal-memory
-      results say to organize by when things happened, not when they
-      were said. Spec change first, per the org rule; also listed under
+      (S in the spec, then hub) - partially shipped, Session A step 6
+      (2026-09-05): `remember()`/`supersede()` now accept and write real
+      `valid_from`/`valid_to` (the judge sets `valid_to` on a dated state
+      and closes it on a contradiction), where every write used to force
+      both to null. **Still open**: nothing READS `valid_to` yet - recall
+      doesn't prefer currently-valid facts over expired ones, and `hlc`
+      still isn't on the memory-record shape at all. "Did this change"
+      and "we never discussed that" are the two cases assistants fail
+      most (LongMemEval); the 2026 temporal-memory results say to
+      organize by when things happened, not when they were said. Real
+      consumption of `valid_to` and the `hlc` stamp are step 10's own job
+      ("tombstones and clock stamps on the records you own"). Spec change
+      first, per the org rule, for the `hlc` half; also listed under
       Portability because sync needs the clock.
 - [ ] **Schedule `runMaintenance`** (S) - decay exists and is only
       reachable by a manual route; step 5 wires it to the scheduler.
