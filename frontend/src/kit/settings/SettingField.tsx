@@ -48,6 +48,19 @@ export function localeDisplayName(value: string): string {
   return titleCaseOption(value);
 }
 
+// A code review (2026-09-06) on the write-only secret flow below found
+// it made `voice.hf_token` writable a SECOND way: that key already has
+// its own dedicated section (`HuggingFaceTokenSection.tsx`) because
+// saving it has to restart the already-running pocket-tts process, which
+// the generic PUT this flow calls has no hook for - a household member
+// using this row instead of the dedicated one would see "Set" succeed
+// while voice cloning silently keeps failing. Every other secret key has
+// no such conflict, so this stays a narrow, named exception (the same
+// shape as `household.locale`'s own key-specific check below) rather
+// than a broader "does this key have a dedicated section" mechanism
+// nothing else needs yet.
+const SECRETS_WITH_DEDICATED_FLOWS = new Set(["voice.hf_token"]);
+
 interface SettingFieldProps {
   setting: MergedSetting;
   /** Resolves true if the write landed, false if the backend rejected it
@@ -61,16 +74,45 @@ interface SettingFieldProps {
 
 // One row: label, help text, the control for this key's selector, and a
 // reset action when the value has been changed from its default. Only
-// text/number/select/boolean actually render a control - docs/UI.md's
-// selector vocabulary also names duration/time/entity/area/person/media,
-// none of which have a real registry key yet (nor, for entity/area, any
-// Home Assistant integration to pick from); typed by SettingsKey's own
-// schema but not built, the same "typed, most unimplemented" posture
-// llm.ts's IMPLEMENTED_ROLES already uses.
+// text/number/select/boolean/secret actually render a control -
+// docs/UI.md's selector vocabulary also names duration/time/entity/area/
+// person/media, none of which have a real registry key yet (nor, for
+// entity/area, any Home Assistant integration to pick from); typed by
+// SettingsKey's own schema but not built, the same "typed, most
+// unimplemented" posture llm.ts's IMPLEMENTED_ROLES already uses.
 export function SettingField({ setting, onChange, onReset, disabled }: SettingFieldProps) {
   const { def, resolved } = setting;
   const [draft, setDraft] = useState<string>(String(resolved.value ?? ""));
   const canReset = resolved.source === "user";
+
+  // Session B step 7: the generic write-only secret flow. Found live
+  // (2026-09-06) that `notifications.telegram.bot_token` - a plain
+  // `secret: true` registry key with no dedicated backend route the way
+  // `voice.hf_token` needed one for (restarting a running process) - had
+  // no way to be set at all: the secret branch below only ever rendered
+  // a static "Set"/"Not set" status, so Telegram notifications could
+  // never actually be configured through the running app. `editing`
+  // reveals a masked input; the value is never read back from the
+  // server (CLAUDE.md > Credentials: "never logged, never returned"),
+  // so there is no "previous value" to restore on a rejected write - the
+  // typed draft just stays in the input for another try, unlike the
+  // number/text paths above which revert to `resolved.value`. Clearing a
+  // secret reuses the existing "Reset to default" action already below
+  // (every secret key's own default is `""`), not a second control.
+  const [secretEditing, setSecretEditing] = useState(false);
+  const [secretDraft, setSecretDraft] = useState("");
+  const [secretSaving, setSecretSaving] = useState(false);
+
+  async function commitSecret() {
+    if (!secretDraft) return;
+    setSecretSaving(true);
+    const ok = await onChange(secretDraft);
+    setSecretSaving(false);
+    if (ok) {
+      setSecretDraft("");
+      setSecretEditing(false);
+    }
+  }
 
   // Live-tested bug: `draft` only ever synced on mount, so a reset or a
   // reload that changed `resolved.value` from outside this component
@@ -111,16 +153,56 @@ export function SettingField({ setting, onChange, onReset, disabled }: SettingFi
   }
 
   let control: ReactNode;
-  if (resolved.secret) {
+  if (resolved.secret && SECRETS_WITH_DEDICATED_FLOWS.has(def.key)) {
+    // This key's real write path is its own dedicated section, not this
+    // generic one - see SECRETS_WITH_DEDICATED_FLOWS above. A static
+    // status row, matching what every secret rendered before the write
+    // flow below existed.
+    control = (
+      <span className="text-base text-[var(--muted-foreground)]">{resolved.isSet ? "Set" : "Not set"}</span>
+    );
+  } else if (resolved.secret) {
     // CLAUDE.md > Credentials and secrets: never render a secret's real
     // value. resolveForResponse() on the backend already enforces this in
-    // the response (value: null, isSet instead); this is a static status
-    // row, not an editable control, since setting a secret needs its own
-    // flow (a paste-and-confirm dialog) that no key exercises yet.
-    control = (
-      <span className="text-base text-[var(--muted-foreground)]">
-        {resolved.isSet ? "Set" : "Not set"}
-      </span>
+    // the response (value: null, isSet instead) - `secretEditing` only
+    // ever holds a fresh value someone just typed, never the stored one.
+    control = secretEditing ? (
+      <div className="flex flex-col gap-2">
+        <Input
+          type="password"
+          className="w-64"
+          placeholder="Paste the new value"
+          value={secretDraft}
+          disabled={secretSaving}
+          onChange={(e) => setSecretDraft(e.target.value)}
+          aria-label={def.label}
+          autoComplete="off"
+        />
+        <div className="flex gap-2">
+          <Button type="button" size="sm" disabled={secretSaving || !secretDraft} onClick={commitSecret}>
+            {secretSaving ? "Saving…" : "Save"}
+          </Button>
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            disabled={secretSaving}
+            onClick={() => {
+              setSecretDraft("");
+              setSecretEditing(false);
+            }}
+          >
+            Cancel
+          </Button>
+        </div>
+      </div>
+    ) : (
+      <div className="flex items-center gap-3">
+        <span className="text-base text-[var(--muted-foreground)]">{resolved.isSet ? "Set" : "Not set"}</span>
+        <Button type="button" size="sm" variant="outline" disabled={disabled} onClick={() => setSecretEditing(true)}>
+          {resolved.isSet ? "Change" : "Set"}
+        </Button>
+      </div>
     );
   } else if (def.selector === "boolean") {
     control = (
