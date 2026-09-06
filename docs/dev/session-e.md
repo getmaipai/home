@@ -4,6 +4,64 @@ Work order: `docs/plans/session-e-ui-and-docs.md`, under
 `docs/plans/wave-2.md`. Worktree `../home-e`, branch
 `session-e-ui-and-docs`, `MAIPAI_DATA_DIR=data-e PORT=8803`.
 
+## Wrap-up: what is left, for whoever picks this up next
+
+All ten of this session's own steps (0 through 9) are done and merged
+into this branch. `docs/BACKLOG.md` has the full detail on each item
+below, checked off or still open as marked there; this is the one-place
+summary the platform plan's own wrap-up step asks for.
+
+**Real, deliberately deferred gaps, each documented precisely at the
+point it was found:**
+
+- `WeatherCard`'s Home widget shares `POST /api/turn/stream` with real
+  Chat, so every Home visit silently adds a weather exchange to the
+  household's actual Chat history (found live via a screenshot, step 5).
+  Not Session E's ownership - belongs to `turnEngine.ts`.
+- `FormNodeView`'s text/number inputs have no far-surface (TV) profile
+  (step 7) - deferred because no schema page ships a `form` node today
+  (dead code, exercised only by the schema-conformance test), and the
+  real fix needs a real TV browser to verify a software keyboard
+  actually appears.
+- A second, narrower Chat color-contrast finding: a message timestamp's
+  `<time>` element resolves `--muted-foreground` to a different, lighter
+  value than the rest of the app gets from the same class, inside
+  `@assistant-ui/react`'s own internals (step 7). Needs a live browser's
+  computed-styles inspection to find which CSS rule is winning, not more
+  token arithmetic. The one item `bun run a11y` still reports on every
+  clean run.
+- The screen-reader read-through (step 7) never actually captured
+  `/setup`'s real wizard steps - seeding the demo household for that
+  pass completes setup first, so every visit redirected to Home. Needs a
+  second, unseeded backend run.
+- The far surface's type scale per script (step 7/8) - `.surface-far`
+  stays Latin-only; `household.locale` has no non-Latin option to verify
+  a script-specific scale against yet.
+- Full i18n string extraction across the shell, kit, and apps (step 8) -
+  only `Shell.tsx`'s "Search" and `HomePage.tsx`'s "Today" are extracted
+  today, proving the pipeline end to end. Everything else is still a
+  hardcoded English string.
+- User docs for "the store" and "update" (step 9) - neither feature
+  exists yet to document.
+
+**Versions pinned this session, for anyone auditing dependencies
+later:** `@lingui/core`/`react`/`cli`/`vite-plugin`, all `6.6.0`;
+`@noriginmedia/norigin-spatial-navigation@3.3.0` (already pinned before
+this session, reused for the far-surface work in step 7).
+
+**Nothing found this session needs flagging to the org's own
+`docs/UI.md`** - every kit pattern this session added (`Card`/`List`'s
+far-surface split, `DestructiveConfirm`, the `tabIndex`+`FOCUS_RING`
+scrollable-region convention) extends patterns `UI.md` already
+documents (the shell contract, the kit's "one way to do each thing"
+rule) rather than needing a new org-wide rule of its own.
+
+Two commits close this out: the final `docs/BACKLOG.md`/`session-e.md`
+polish above, then the merge into `main`. `scripts/check.sh` green, the
+full a11y matrix clean except the one documented Chat contrast finding,
+and a final code review across the whole branch's diff, all before
+merging - see the commit history for exactly what each covered.
+
 ## Step 0: setup and B's leftovers
 
 **Wave 1 had not merged when this session started.** `wave-2.md` assumes

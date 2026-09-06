@@ -8554,3 +8554,13 @@ live for all four routes plus the main Settings page afterward
 (nothing left behind: no `section-models`/`section-backups`/
 `section-voice-catalog`/`section-cloned-voices`/`section-commands` id
 still exists in the DOM on the main page).
+
+## Session E: the UI, the wizard, and the user docs (2026-09-06)
+
+Wave 2's UI session, `docs/plans/session-e-ui-and-docs.md` - the first-
+run wizard, Home's real cards, the store's Health/Repairs/Updates/
+Storage pages, push-to-talk, memory and conversation history with a
+parental view, devices and sessions with revoke, the TV/far surface and
+the rest of accessibility, i18n scaffolding with Lingui, and nine
+tier-1 user docs. Full step-by-step record, decisions, and what's left:
+`docs/dev/session-e.md`.
