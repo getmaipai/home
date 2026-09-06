@@ -4129,6 +4129,113 @@
         }
       }
     },
+    "/api/setup/hardware": {
+      "post": {
+        "tags": [
+          "Setup"
+        ],
+        "summary": "Detected hardware and whether a chat model fits it",
+        "responses": {
+          "200": {
+            "description": "Real detected hardware plus whether any implemented chat-role model fits it.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "platform": {
+                      "type": "string"
+                    },
+                    "arch": {
+                      "type": "string"
+                    },
+                    "totalRamGb": {
+                      "type": "number"
+                    },
+                    "cpuCount": {
+                      "type": "number"
+                    },
+                    "isAppleSilicon": {
+                      "type": "boolean"
+                    },
+                    "cudaDevices": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "name": {
+                            "type": "string"
+                          },
+                          "vramGb": {
+                            "type": "number"
+                          }
+                        },
+                        "required": [
+                          "name",
+                          "vramGb"
+                        ]
+                      }
+                    },
+                    "chatFit": {
+                      "type": "object",
+                      "properties": {
+                        "determined": {
+                          "type": "boolean"
+                        },
+                        "meetsMinimum": {
+                          "type": "boolean",
+                          "nullable": true
+                        },
+                        "bestFit": {
+                          "type": "object",
+                          "nullable": true,
+                          "properties": {
+                            "id": {
+                              "type": "string"
+                            },
+                            "label": {
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "id",
+                            "label"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "determined",
+                        "meetsMinimum",
+                        "bestFit"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "platform",
+                    "arch",
+                    "totalRamGb",
+                    "cpuCount",
+                    "isAppleSilicon",
+                    "cudaDevices",
+                    "chatFit"
+                  ]
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests from this address",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/devices": {
       "get": {
         "tags": [

@@ -18,7 +18,7 @@ echo "MaiPai Home uninstaller"
 echo "Repo root: $ROOT"
 echo
 
-# --- Service (step 11's installer names these exact units once it lands) ---
+# --- Service (the exact names/locations scripts/install.sh registers) ---
 SERVICE_NAME="maipai-home"
 removed_service=false
 
@@ -33,11 +33,15 @@ if command -v systemctl >/dev/null 2>&1 && systemctl list-unit-files 2>/dev/null
 fi
 
 if command -v launchctl >/dev/null 2>&1; then
-  PLIST="$HOME/Library/LaunchAgents/com.maipai.home.plist"
+  # A LaunchDaemon (system domain), not a LaunchAgent - install.sh
+  # registers it that way deliberately, so the hub keeps running with no
+  # one logged in, the same reason systemd's unit above targets
+  # multi-user.target rather than a per-user session.
+  PLIST="/Library/LaunchDaemons/com.maipai.home.plist"
   if [ -f "$PLIST" ]; then
-    echo "== Found a launchd agent: $PLIST"
-    launchctl unload "$PLIST" 2>/dev/null || true
-    rm -f "$PLIST"
+    echo "== Found a launchd daemon: $PLIST"
+    sudo launchctl bootout system "$PLIST" 2>/dev/null || true
+    sudo rm -f "$PLIST"
     echo "   Removed."
     removed_service=true
   fi
@@ -45,7 +49,7 @@ fi
 
 if ! $removed_service; then
   echo "== No registered service found (systemd/launchd) - nothing to unregister."
-  echo "   If you installed a Windows service, remove it from Services first."
+  echo "   On Windows, run: winsw.exe uninstall \"<install dir>\\maipai-home-service.xml\" from an elevated prompt."
 fi
 echo
 

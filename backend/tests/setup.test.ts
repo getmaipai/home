@@ -5,12 +5,14 @@ import { resetDb } from "./reset-db";
 import { __resetFixHandlersForTests } from "@/lib/issues";
 import { __resetHouseholdCaForTests } from "@/lib/householdCa";
 import { __resetRateLimiterForTests } from "@/lib/rateLimiter";
+import { __resetHardwareCacheForTests } from "@/lib/hardware";
 
 beforeEach(() => {
   resetDb();
   __resetFixHandlersForTests();
   __resetHouseholdCaForTests();
   __resetRateLimiterForTests();
+  __resetHardwareCacheForTests();
 });
 
 describe("GET /api/setup/ca", () => {
@@ -62,5 +64,52 @@ describe("GET /api/setup/ca", () => {
     await client.get("/api/setup/ca");
     const { hasHouseholdLeaf } = await import("@/lib/householdCa");
     expect(hasHouseholdLeaf()).toBe(true);
+  });
+});
+
+describe("POST /api/setup/hardware", () => {
+  test("is public - no session required", async () => {
+    const client = new TestClient();
+    const res = await client.post("/api/setup/hardware", {});
+    expect(res.status).toBe(200);
+  });
+
+  test("returns real detected hardware and a chat-fit verdict", async () => {
+    const client = new TestClient();
+    const res = await client.post("/api/setup/hardware", {});
+    const body = (await res.json()) as {
+      platform: string;
+      totalRamGb: number;
+      cpuCount: number;
+      isAppleSilicon: boolean;
+      cudaDevices: Array<{ name: string; vramGb: number }>;
+      chatFit: { determined: boolean; meetsMinimum: boolean | null; bestFit: { id: string; label: string } | null };
+    };
+    expect(body.platform.length).toBeGreaterThan(0);
+    expect(body.totalRamGb).toBeGreaterThan(0);
+    expect(body.cpuCount).toBeGreaterThan(0);
+    expect(Array.isArray(body.cudaDevices)).toBe(true);
+    // On a box with no CUDA and not Apple Silicon, chat-fit is honestly
+    // "not determined", never a false pass or fail off an empty budget.
+    if (!body.isAppleSilicon && body.cudaDevices.length === 0) {
+      expect(body.chatFit.determined).toBe(false);
+      expect(body.chatFit.meetsMinimum).toBeNull();
+      expect(body.chatFit.bestFit).toBeNull();
+    } else {
+      expect(body.chatFit.determined).toBe(true);
+    }
+  });
+
+  test("throttles a caller that exceeds the per-address budget", async () => {
+    const client = new TestClient();
+    let sawTooMany = false;
+    for (let i = 0; i < 15; i++) {
+      const res = await client.post("/api/setup/hardware", {});
+      if (res.status === 429) {
+        sawTooMany = true;
+        break;
+      }
+    }
+    expect(sawTooMany).toBe(true);
   });
 });
