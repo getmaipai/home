@@ -917,13 +917,43 @@ bundled copy; `runPlugin("weather", ...)` - the exact same call a real
 Seattle" through the real recipe, the real host, and a real live
 Open-Meteo call, all served from the just-installed copy.
 
-What's left for whom: `routes/store.ts` (a thin HTTP surface over
-install/rollback/uninstall/setChannel, the two-call permission-prompt
-flow's UI-facing half) and the public CI workflow YAML for `catalog`
-(tag- and PR-triggered, running `bun run check`) are this step's own
-remaining pieces, next. The daily `catalog.check` core job and the full
-auto-update/notify flow (comparing an installed version against the
-index on a schedule, not just at an explicit install call) are real,
-deferred scope - `fetchVerifiedIndex()` is already exported standalone
-for exactly that future caller to build on, but the scheduled job
-itself, and the notification it would raise, don't exist yet.
+**`routes/store.ts`** closes out this step's own remaining pieces:
+`@hono/zod-openapi`, owner/admin only (`routes/repairs.ts`'s own gate),
+`GET/POST /api/store/installs/{id}` plus `/rollback`, `/uninstall`, and
+`/channel` - the two-call permission-prompt flow's UI-facing half (a
+409 with `requiresConfirmation` when an update adds permissions, until
+re-sent with `confirmed: true`). A medium-effort review before this
+landed caught two more real gaps: every `StoreResult` failure collapsed
+to 400 at the route layer, even "no active install for this id" (`routes/
+repairs.ts`'s own convention says 404) - fixed by giving `StoreResult`
+a real `status` field, the same shape `lib/commands.ts`'s
+`CommandOpResult` already carries. And install/uninstall/rollback had
+no coordination with a Tier 1 package's own live sandbox process -
+`lib/denoHost.ts` resolves and pins `sourceDir` once, at spawn time,
+and never re-reads it, so a live process would keep running against
+files a mutation had just deleted or replaced. Fixed with a new
+`killLiveProcessForInstallChange()` call after each mutation (a no-op
+for a package with no live process, the common case), so the next real
+call always respawns fresh against whatever `lib/packageResolve.ts`
+resolves to now.
+
+**`catalog`'s public CI workflow** (`.github/workflows/check.yml`,
+`getmaipai/catalog@2d1d37c`) closes out `catalog`'s own remaining piece:
+tag- and PR-triggered (never on every push - the org's own security
+standard, and the one carve-out for a public repo), checks out the
+pinned `std-v0.2.0` standards ref as a sibling directory (the identical
+layout `scripts/check.sh` already expects locally) and installs
+gitleaks explicitly (`check-core.sh`'s own gitleaks step only warns,
+never fails, when the binary isn't on PATH), then runs the same
+`scripts/check.sh` a contributor runs before opening a PR.
+
+Step 6 is complete. What's left for whom: the daily `catalog.check`
+core job and the full auto-update/notify flow (comparing an installed
+version against the index on a schedule, not just at an explicit
+install call) are real, deferred scope - `fetchVerifiedIndex()` is
+already exported standalone for exactly that future caller to build
+on, but the scheduled job itself, and the notification it would raise,
+don't exist yet. The fuller CI feature set docs/PACKAGES.md eventually
+wants (a permission-diff PR comment, a vendoring scan, screenshot
+generation with vision review, the CLA check) is likewise deferred - a
+maintainer-review-plus-CLA merge gate is manual until then.
