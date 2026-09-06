@@ -5,7 +5,7 @@ import { __resetThrottleForTests } from "@/lib/secretThrottle";
 import { __resetLlmSupervisorForTests } from "@/lib/llmSupervisor";
 import { runTurn, runTurnStream, buildSystemPrompt, matchPattern, capSection, PROMPT_SYSTEM_CHAR_BUDGET, type TurnStreamResult } from "@/lib/turnEngine";
 import { streamTurnEvents } from "@/routes/turn";
-import { remember, recall } from "@/lib/memory";
+import { remember, recall, PROFILE_SOURCE } from "@/lib/memory";
 import { REFUSAL_FIRST, REFUSAL_REPEAT, REMEMBER_CONFIRM_VARIANTS } from "@/lib/replyVariation";
 import { resolvePersona, composePersonaPrompt, INFORMATION_HANDLING_POLICY, PERSONA_IDS } from "@/lib/persona";
 import { db } from "@/db";
@@ -280,6 +280,95 @@ describe("buildSystemPrompt() prompt budget", () => {
     // The universal information-handling rules are unaffected by persona.
     expect(tutorPrompt).toContain("hedged");
     expect(defaultPrompt).toContain("hedged");
+  });
+});
+
+describe("buildSystemPrompt() the profile paragraph (step 7)", () => {
+  test("is injected first, before any recalled item, inside the memory block", async () => {
+    const { actor } = await owner();
+    const profile = remember(actor, {
+      text: "Marlow is a night-shift paramedic who loves hiking.",
+      category: "identity",
+      tier: "durable",
+      scope: "person",
+      person: actor.id,
+      source: PROFILE_SOURCE,
+      importance: 0.9,
+      pinned: true,
+    });
+    const recalled = remember(actor, {
+      text: "the trash goes out on Tuesday",
+      category: "fact",
+      tier: "durable",
+      scope: "household",
+      source: "test",
+      importance: 0.5,
+    });
+    if (!profile.ok || !recalled.ok) throw new Error("setup failed");
+
+    const prompt = buildSystemPrompt(actor, "hi", [{ record: recalled.value, score: 1 }]);
+    const profileIdx = prompt.indexOf("night-shift paramedic");
+    const bulletIdx = prompt.indexOf("trash goes out");
+    expect(profileIdx).toBeGreaterThan(-1);
+    expect(bulletIdx).toBeGreaterThan(-1);
+    expect(profileIdx).toBeLessThan(bulletIdx);
+  });
+
+  test("appears even when nothing else was recalled this turn", async () => {
+    const { actor } = await owner();
+    const profile = remember(actor, {
+      text: "Marlow is training for a half-marathon.",
+      category: "identity",
+      tier: "durable",
+      scope: "person",
+      person: actor.id,
+      source: PROFILE_SOURCE,
+      importance: 0.9,
+      pinned: true,
+    });
+    if (!profile.ok) throw new Error("setup failed");
+
+    const prompt = buildSystemPrompt(actor, "hi", []);
+    expect(prompt).toContain("half-marathon");
+  });
+
+  test("shares the memory section's own cap, not a separate budget of its own", async () => {
+    const { actor } = await owner();
+    // The plan's own 600-char cap on the profile record itself still
+    // leaves room for it to combine with several bullets past
+    // MAX_MEMORY_SECTION_CHARS - this proves the SHARED cap still holds,
+    // not just that no single field is individually too long.
+    const profile = remember(actor, {
+      text: "M".repeat(600),
+      category: "identity",
+      tier: "durable",
+      scope: "person",
+      person: actor.id,
+      source: PROFILE_SOURCE,
+      importance: 0.9,
+      pinned: true,
+    });
+    if (!profile.ok) throw new Error("setup failed");
+    const matches = [];
+    for (let i = 0; i < 10; i++) {
+      const created = remember(actor, {
+        text: `a long recalled fact number ${i} `.repeat(10),
+        category: "fact",
+        tier: "durable",
+        scope: "household",
+        source: "test",
+        importance: 0.5,
+      });
+      if (created.ok) matches.push({ record: created.value, score: 1 });
+    }
+
+    const prompt = buildSystemPrompt(actor, "hi", matches);
+    // The memory block's own section is what's capped - the whole prompt
+    // has other content too, so this checks the block itself rather than
+    // total prompt length (already covered by the budget describe above).
+    const blockStart = prompt.indexOf("What you already know about this household:");
+    const blockEnd = prompt.indexOf("\n\nRemember: you are");
+    expect(blockEnd - blockStart).toBeLessThanOrEqual(800); // MAX_MEMORY_SECTION_CHARS
   });
 });
 

@@ -5,11 +5,11 @@ import { __resetThrottleForTests } from "@/lib/secretThrottle";
 import { __resetLlmSupervisorForTests } from "@/lib/llmSupervisor";
 import { resolveOrCreateConversation, logTurn } from "@/lib/conversationHistory";
 import { judgeTurn, runJudgeBatch, runConsolidation } from "@/lib/memoryJudge";
-import { remember, similarByVector } from "@/lib/memory";
+import { remember, similarByVector, PROFILE_SOURCE } from "@/lib/memory";
 import { listPending } from "@/lib/notifications";
 import { db } from "@/db";
 import { people, conversationTurns, memoryRecords } from "@/db/schema";
-import { eq } from "drizzle-orm";
+import { eq, and } from "drizzle-orm";
 import type { ChatCompletionRequest } from "@maipai/spec/llm/ts/types.js";
 import type { TurnValue } from "@/wire";
 import type { PersonRow } from "@/types";
@@ -374,6 +374,54 @@ describe("runConsolidation()", () => {
     expect(newRow.status).toBe("active"); // the survivor is untouched, not a third new record
   });
 
+  // A code review (2026-09-05) found the contradiction pass's own
+  // durable-records query had no exclusion for the profile paragraph
+  // (also category:"identity", tier:"durable", scope:"person" - the
+  // exact same bucket as a person's own real identity facts), so it
+  // could be swept into a contradiction check against a real fact and
+  // superseded (or supersede one), breaking "written and rewritten only
+  // by rewriteProfileParagraph()'s own logic."
+  test("never sweeps the profile paragraph itself into the contradiction check, even at a matching cosine", async () => {
+    const { actor } = await owner();
+    const profile = remember(actor, {
+      text: "Marlow is a paramedic who loves hiking.",
+      category: "identity",
+      tier: "durable",
+      scope: "person",
+      person: actor.id,
+      source: PROFILE_SOURCE,
+      importance: 0.9,
+      pinned: true,
+    });
+    const realFact = remember(actor, {
+      text: "Marlow lives in Boston",
+      category: "identity",
+      tier: "durable",
+      scope: "person",
+      person: actor.id,
+      source: "test",
+      importance: 0.8,
+    });
+    if (!profile.ok || !realFact.ok) throw new Error("setup failed");
+    const { sqlite } = await import("@/db");
+    sqlite
+      .query("INSERT INTO memory_embeddings (memory_id, space, dims, vector, hlc) VALUES (?, 'test', 4, ?, 'test-hlc')")
+      .run(profile.value.id, Buffer.from(new Float32Array([1, 1, 0, 0]).buffer));
+    sqlite
+      .query("INSERT INTO memory_embeddings (memory_id, space, dims, vector, hlc) VALUES (?, 'test', 4, ?, 'test-hlc')")
+      .run(realFact.value.id, Buffer.from(new Float32Array([1, 0, 0, 0]).buffer));
+
+    // Would force a supersede on EITHER side if the pair were ever
+    // checked at all - proving they never are is the point.
+    const result = await withScriptedJudge(() => ({ contradicts: true }), () => runConsolidation());
+
+    expect(result.contradictionsSuperseded).toBe(0);
+    const profileRow = db.select().from(memoryRecords).where(eq(memoryRecords.id, profile.value.id)).get()!;
+    const factRow = db.select().from(memoryRecords).where(eq(memoryRecords.id, realFact.value.id)).get()!;
+    expect(profileRow.status).toBe("active");
+    expect(factRow.status).toBe("active");
+  });
+
   test("demotes a never-recalled durable record older than the staleness window to episodic", async () => {
     const { actor } = await owner();
     const stale = remember(actor, {
@@ -418,5 +466,100 @@ describe("runConsolidation()", () => {
 
     const row = db.select().from(memoryRecords).where(eq(memoryRecords.id, pinned.value.id)).get()!;
     expect(row.tier).toBe("durable");
+  });
+});
+
+describe("runConsolidation() - the profile paragraph (step 7)", () => {
+  function personFact(actor: PersonRow, text: string) {
+    const created = remember(actor, {
+      text,
+      category: "preference",
+      tier: "durable",
+      scope: "person",
+      person: actor.id,
+      source: "test",
+      importance: 0.7,
+    });
+    if (!created.ok) throw new Error("setup failed");
+    return created.value;
+  }
+
+  test("writes a fresh, pinned identity record from the person's own facts", async () => {
+    const { actor } = await owner();
+    personFact(actor, "Marlow works as a paramedic");
+    personFact(actor, "Marlow loves hiking");
+
+    await withScriptedJudge(
+      (schemaName) => (schemaName === "profile_paragraph" ? { text: "Marlow is a paramedic who loves hiking." } : { contradicts: false }),
+      () => runConsolidation(),
+    );
+
+    const profile = db.select().from(memoryRecords).where(eq(memoryRecords.source, PROFILE_SOURCE)).get();
+    expect(profile).toBeTruthy();
+    expect(profile!.text).toBe("Marlow is a paramedic who loves hiking.");
+    expect(profile!.category).toBe("identity");
+    expect(profile!.tier).toBe("durable");
+    expect(profile!.pinned).toBe(true);
+    expect(profile!.scope).toBe("person");
+    expect(profile!.person).toBe(actor.id);
+  });
+
+  test("a rewrite supersedes the old row rather than adding a second profile", async () => {
+    const { actor } = await owner();
+    personFact(actor, "Marlow works as a paramedic");
+
+    await withScriptedJudge((schemaName) => (schemaName === "profile_paragraph" ? { text: "First version." } : { contradicts: false }), () => runConsolidation());
+    const first = db.select().from(memoryRecords).where(eq(memoryRecords.source, PROFILE_SOURCE)).get()!;
+
+    personFact(actor, "Marlow started training for a marathon");
+    await withScriptedJudge((schemaName) => (schemaName === "profile_paragraph" ? { text: "Second version." } : { contradicts: false }), () => runConsolidation());
+
+    const oldRow = db.select().from(memoryRecords).where(eq(memoryRecords.id, first.id)).get()!;
+    expect(oldRow.status).toBe("superseded");
+    const activeProfiles = db.select().from(memoryRecords).where(and(eq(memoryRecords.source, PROFILE_SOURCE), eq(memoryRecords.status, "active"))).all();
+    expect(activeProfiles.length).toBe(1);
+    expect(activeProfiles[0]!.text).toBe("Second version.");
+    expect(oldRow.supersededBy).toBe(activeProfiles[0]!.id);
+  });
+
+  test("the profile's own prior text is never fed back in as an input fact", async () => {
+    const { actor } = await owner();
+    personFact(actor, "Marlow works as a paramedic");
+    await withScriptedJudge((schemaName) => (schemaName === "profile_paragraph" ? { text: "Marlow is a paramedic." } : { contradicts: false }), () => runConsolidation());
+
+    await withScriptedJudge(
+      (schemaName, request) => {
+        if (schemaName !== "profile_paragraph") return { contradicts: false };
+        const systemMsg = request.messages[0]!.content;
+        expect(systemMsg).not.toContain("Marlow is a paramedic."); // the profile's own prior text
+        expect(systemMsg).toContain("Marlow works as a paramedic"); // the real underlying fact, still there
+        return { text: "Marlow is a paramedic, still." };
+      },
+      () => runConsolidation(),
+    );
+  });
+
+  test("caps the stored text at 600 characters even when the model runs long", async () => {
+    const { actor } = await owner();
+    personFact(actor, "Marlow works as a paramedic");
+
+    await withScriptedJudge((schemaName) => (schemaName === "profile_paragraph" ? { text: "x".repeat(900) } : { contradicts: false }), () => runConsolidation());
+
+    const profile = db.select().from(memoryRecords).where(eq(memoryRecords.source, PROFILE_SOURCE)).get()!;
+    expect(profile.text.length).toBe(600);
+    // Truncated, not just cut off mid-thought with no indication at all
+    // (a code review, 2026-09-05, found the original slice() gave no
+    // sign a paragraph had been cut).
+    expect(profile.text.endsWith("...")).toBe(true);
+  });
+
+  test("a person with no eligible facts gets no profile at all", async () => {
+    const { actor } = await owner();
+    void actor; // no personFact() calls - nothing eligible
+
+    const result = await runConsolidation();
+
+    expect(result.profilesRewritten).toBe(0);
+    expect(db.select().from(memoryRecords).where(eq(memoryRecords.source, PROFILE_SOURCE)).all().length).toBe(0);
   });
 });

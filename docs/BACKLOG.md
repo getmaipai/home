@@ -480,13 +480,18 @@ into a conversation with someone who knows who is talking.
       passing (nothing to hallucinate) and the knowledge-update case
       failing (nothing to update). Needs a real chat model before this
       bench means anything; see docs/dev.md's step 6 entry.
-- [ ] **A maintained profile block per person** (S-M; plan 4.4's
-      "profile paragraphs") - one pinned paragraph the judge rewrites
-      ("who is talking, what they like, what is going on this week"),
-      injected whole and capped in characters, with retrieval on top only
-      for specifics. ChatGPT and Claude both inject a maintained summary
-      rather than a search-result list; Letta's memory blocks are the
-      same idea.
+- [x] **A maintained profile block per person** - shipped, Session A
+      step 7 (2026-09-05): one pinned, person-scoped `category: identity`
+      record per person (`lib/memory.ts`'s `PROFILE_SOURCE` marks it,
+      `getProfileParagraph()` is the read side), written and rewritten
+      ONLY by `memory.consolidate` (the weekly job, never the per-turn
+      judge) from that person's own facts via a small chat call, capped
+      in code at 600 chars regardless of what the model returns.
+      Injected whole at the top of `buildSystemPrompt()`'s memory block,
+      before any recalled item, sharing that section's existing budget
+      rather than a separate cap of its own. ChatGPT and Claude both
+      inject a maintained summary rather than a search-result list;
+      Letta's memory blocks are the same idea.
 - [x] **Dated memories in the prompt, and a closing reminder** (S) -
       shipped, Session A step 4 (2026-09-05): each bullet carries "(as of
       Sep 2, 8 days ago)" off `created_at`; the block ends with one fixed

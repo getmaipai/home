@@ -977,8 +977,33 @@ export function demoteNeverRecalledDurables(now: Date = new Date()): number {
   return stale.length;
 }
 
+// ==== Step 7: the profile paragraph ====
+//
+// "One pinned, person-scoped record per person... written and rewritten
+// only by the consolidate job... never by the extractor directly"
+// (session-a-intelligence.md). Exported from here, not lib/memoryJudge.ts
+// (which does the actual writing, in its own runConsolidation() pass),
+// so turnEngine.ts's read side and memoryJudge.ts's write side agree on
+// exactly one definition of "which record IS the profile" without a
+// circular import between the two files - this constant is the shape of
+// the store, not a judge-specific concern.
+export const PROFILE_SOURCE = "memory.consolidate:profile";
+
+/** turnEngine.ts's own read side (buildSystemPrompt(): "injected whole
+ * at the top of the memory block before recalled items"). A targeted
+ * lookup by (person, source), not a recall() candidate: the profile
+ * paragraph is unconditional context about who's speaking, not
+ * something that competes with other facts for a cosine-scored slot. */
+export function getProfileParagraph(actor: PersonRow): MemoryRecord | undefined {
+  const row = db
+    .select()
+    .from(memoryRecords)
+    .where(and(eq(memoryRecords.person, actor.id), eq(memoryRecords.source, PROFILE_SOURCE), eq(memoryRecords.status, "active")))
+    .get();
+  return row ? toMemoryRecord(row) : undefined;
+}
+
 // Not built this pass, deliberately (see docs/dev.md):
-// - Profile paragraphs: LLM-synthesized summaries (step 7).
 // - Mood and unfinished-business reads (the robot's reflect jobs):
 //   robot-specific, Robot v0.1.
 // - runMaintenance() scheduling (step 5's own "runMaintenance runs daily

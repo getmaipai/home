@@ -6731,3 +6731,93 @@ demotion, including that a pinned record is never demoted. A new
 check (a real no-op run, since memoryJudge.test.ts already covers what
 each job actually does). Full backend suite green (641), `bunx tsc
 --noEmit` clean.
+
+## Session A: step 7, the profile paragraph (2026-09-05)
+
+One maintained paragraph per person, the ChatGPT/Claude/Letta pattern
+the BACKLOG's own research pass named: a maintained summary injected
+whole beats a search-result list for "who is this and what's going on
+with them," with recall staying on top for specifics.
+
+**Exactly one record per person, found by `source`, not a new field.**
+`lib/memory.ts` exports `PROFILE_SOURCE` ("memory.consolidate:profile")
+and `getProfileParagraph(actor)`, a targeted lookup by
+`(person, source, status=active)` - not a `recall()` candidate, since
+the profile is unconditional context about who's speaking, never
+something that competes with other facts for a cosine-scored slot.
+Marking the row by `source` rather than adding a new column or
+`record_kind` keeps the plan's own shape (`category: identity, tier:
+durable, pinned: true`) exactly as specified, with the one bit of
+bookkeeping this feature actually needs riding on a field the record
+already has for provenance.
+
+**Written and rewritten only by `memory.consolidate`, per the plan's own
+words - never by the judge.** `lib/memoryJudge.ts`'s `runConsolidation()`
+gained a third pass, after contradiction-detection and never-recalled
+demotion: for every person with at least one eligible fact (active,
+`scope: person`, not itself a prior profile), gather their own records
+via `list()` (reusing its existing pinned/importance/recency ordering
+rather than inventing a second one), feed up to 20 to a small
+grammar-constrained chat call, and `supersede()` the existing profile
+row or `remember()` a fresh one. The prior profile text is explicitly
+excluded from its own regeneration's input (filtered by `source`) -
+feeding synthesized prose back into the next round's "facts" would
+compound and drift over successive rewrites, a real failure mode a test
+now guards against directly (asserting the prompt sent to the model
+never contains the old paragraph, only the real underlying facts).
+
+**The 600-char cap is enforced in code, not just asked of the model**:
+`text.trim().slice(0, PROFILE_MAX_CHARS)` after the chat call returns,
+regardless of what the model actually produced - the same "never trust
+the model to police its own instructions" discipline
+`normalizeFact()`'s date-format check (step 6) already established.
+
+**Injected at the top of the memory block, sharing its budget.**
+`buildSystemPrompt()`'s memory section now looks up the profile
+unconditionally (independent of whether `recall()` matched anything
+this turn - a person's own identity summary is always relevant, the
+same "position, not precondition" reasoning the companion re-anchor
+already uses) and places its text first, before the recalled bullets,
+inside the SAME `capSection(..., MAX_MEMORY_SECTION_CHARS)` call - no
+separate cap of its own. Placing it first also means it survives
+truncation preferentially: `capSection` slices from the end, so a
+long profile plus many bullets loses bullets before it ever touches the
+profile paragraph itself.
+
+**A code review found and fixed three real bugs before commit:**
+- The contradiction-detection pass's own durable-records query had no
+  exclusion for the profile paragraph itself - it's `category:
+  "identity"`, `tier: "durable"`, `scope: "person"`, the exact same
+  bucket as a person's own real identity facts, so it could be swept
+  into a contradiction check against a real fact and superseded (or
+  supersede one), breaking "written and rewritten only by
+  `rewriteProfileParagraph()`'s own logic" the moment consolidate's two
+  passes touched the same record. Fixed by excluding `source:
+  PROFILE_SOURCE` from that query outright, with a new regression test
+  proving a profile and a real fact at a matching cosine are never even
+  checked against each other.
+- The 600-char truncation was a bare `slice()` with no indication
+  anything was cut - a paragraph that ran long would just stop mid-word
+  with nothing to say it had been trimmed. Fixed to the same "ellipsis
+  counts INSIDE the cap" contract `capSection()` established in step 4
+  (inlined here rather than importing across files for three lines of
+  string slicing).
+- The profile-candidate query had no ordering, so once a household has
+  more eligible people than `MAX_PROFILE_REWRITES_PER_RUN` (20), which
+  ones get skipped each week was arbitrary rather than fair - low real-
+  world stakes at household scale, but cheap to fix properly: candidates
+  now sort least-recently-profiled first (never-profiled sorts before
+  all of them), one extra query rather than a join.
+
+Tests: the profile is injected before any recalled bullet, and still
+appears on a turn that recalled nothing else at all; the shared memory-
+section cap holds with a 600-char profile plus ten long bullets;
+`runConsolidation()` writes a fresh pinned identity record from a
+person's own facts; a second run supersedes the first rather than
+adding a second active profile; the old profile's own text never
+reaches the next rewrite's own prompt; the 600-char cap holds even
+when the model returns 900, now asserting the ellipsis too; a person
+with zero eligible facts gets no profile and costs zero model calls;
+the profile paragraph is never itself a contradiction-check candidate,
+even at a matching cosine against a real fact. Full backend suite
+green (650), `bunx tsc --noEmit` clean.

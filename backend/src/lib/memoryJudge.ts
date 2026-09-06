@@ -55,7 +55,7 @@
 // round failure never does (it just defaults to ADD, matching legacy's
 // own catch block) - dedupe deciding "keep both" safely is never wrong
 // enough to burn a turn's whole budget over.
-import { eq, and, isNull, asc } from "drizzle-orm";
+import { eq, and, isNull, isNotNull, ne, asc } from "drizzle-orm";
 import { db } from "@/db";
 import { conversationTurns, people, memoryRecords } from "@/db/schema";
 import { complete, embed, type LlmMessage } from "@/lib/llm";
@@ -67,10 +67,13 @@ import {
   cosineSimilarity,
   demoteNeverRecalledDurables,
   supersedeInFavorOfExisting,
+  list,
+  PROFILE_SOURCE,
   type SimilarMatch,
 } from "@/lib/memory";
 import { trigger } from "@/lib/notifications";
 import type { ConversationTurnRow } from "@/wire";
+import type { PersonRow } from "@/types";
 
 const MAX_JUDGE_ATTEMPTS = 3;
 const MAX_FACTS_PER_TURN = 12;
@@ -502,9 +505,99 @@ async function checkContradiction(older: string, newer: string): Promise<boolean
   }
 }
 
+// ==== Step 7: the profile paragraph (written only here, per the plan's
+// own "never by the extractor directly") ====
+
+const PROFILE_MAX_CHARS = 600; // the plan's own cap, enforced in code, not just asked of the model
+const MAX_PROFILE_INPUT_FACTS = 20; // bounds prompt size regardless of how many facts a long-lived household member accumulates
+const MAX_PROFILE_REWRITES_PER_RUN = 20; // one consolidate tick amortizes over a household this large before the next weekly run picks up the rest
+
+const PROFILE_SCHEMA = {
+  name: "profile_paragraph",
+  schema: { type: "object", properties: { text: { type: "string" } }, required: ["text"] },
+} as const;
+
+/** Synthesizes and writes/rewrites one person's profile paragraph from
+ * their own active person-scope facts (never household-shared ones - a
+ * profile is inherently personal). Returns whether it actually wrote
+ * something; a person with no eligible facts yet, or a model call that
+ * fails, is a real, silent no-op - there's nothing this run could say
+ * about them that wouldn't be invented. */
+async function rewriteProfileParagraph(personRow: PersonRow): Promise<boolean> {
+  // list()'s own ordering (pinned, then importance, then recency) already
+  // picks the most representative facts first - reusing it here is the
+  // same "don't re-invent a second ranking" the rest of this file already
+  // leans on. The profile's own prior record is excluded by source, and
+  // record_kind is restricted to plain facts: an entity record's "Name:
+  // description" text isn't a fact ABOUT this person.
+  const facts = list(personRow, { scope: "person", person: personRow.id })
+    .filter((r) => r.source !== PROFILE_SOURCE && r.record_kind === "memory")
+    .slice(0, MAX_PROFILE_INPUT_FACTS);
+  if (facts.length === 0) return false;
+
+  const factLines = facts.map((f) => `- ${f.text}`).join("\n");
+  const prompt = `Write a single plain-prose paragraph (at most ${PROFILE_MAX_CHARS} characters) summarizing who ${personRow.displayName} is, what they like, and what's going on with them this week, based ONLY on the facts below - never invent anything not listed, and never mention a fact that isn't there. No bullet points or headings, third person, plain prose.\n\nKnown facts about ${personRow.displayName}:\n${factLines}`;
+
+  let text: string;
+  try {
+    const result = await complete(
+      "chat",
+      [
+        { role: "system", content: prompt },
+        { role: "user", content: "Write the paragraph now." },
+      ],
+      { temperature: 0.3, response_format: { type: "json_schema", json_schema: PROFILE_SCHEMA } },
+    );
+    if (!result.ok) return false;
+    const parsed = JSON.parse(result.value.text) as { text?: unknown };
+    if (typeof parsed.text !== "string" || !parsed.text.trim()) return false;
+    const raw = parsed.text.trim();
+    // A code review (2026-09-05) found a bare slice() could cut mid-word
+    // or mid-sentence with no indication anything was truncated - the
+    // household would read a paragraph that just stops. Same "the
+    // ellipsis counts INSIDE the cap" contract capSection() already
+    // established for prompt sections (step 4), applied here since a
+    // reused import across these two files isn't warranted for three
+    // lines of string slicing.
+    text = raw.length > PROFILE_MAX_CHARS ? raw.slice(0, PROFILE_MAX_CHARS - 3) + "..." : raw;
+  } catch {
+    return false;
+  }
+
+  const existing = db
+    .select()
+    .from(memoryRecords)
+    .where(and(eq(memoryRecords.person, personRow.id), eq(memoryRecords.source, PROFILE_SOURCE), eq(memoryRecords.status, "active")))
+    .get();
+
+  if (existing) {
+    const result = supersede(personRow, existing.id, {
+      text,
+      category: "identity",
+      tier: "durable",
+      pinned: true,
+      importance: 0.9,
+      source: PROFILE_SOURCE,
+    });
+    return result.ok;
+  }
+  const result = remember(personRow, {
+    text,
+    category: "identity",
+    tier: "durable",
+    scope: "person",
+    person: personRow.id,
+    source: PROFILE_SOURCE,
+    importance: 0.9,
+    pinned: true,
+  });
+  return result.ok;
+}
+
 export interface ConsolidateResult {
   contradictionsSuperseded: number;
   demoted: number;
+  profilesRewritten: number;
 }
 
 /** Groups active durable records by (scope, person, category) and checks
@@ -518,10 +611,20 @@ export async function runConsolidation(): Promise<ConsolidateResult> {
   // see every person's durable records, including scope=person ones no
   // single actor could browse together, the same reason runMaintenance()
   // above queries memoryRecords directly instead of going through list().
+  // Never the profile paragraph itself: it's category:"identity",
+  // tier:"durable", scope:"person" - the exact same bucket as a
+  // person's own real identity facts - so without this exclusion a
+  // code review (2026-09-05) found it could land in the SAME
+  // contradiction-check group as those facts. A real fact superseded
+  // "in favor of" a synthesized paragraph (or the profile row itself
+  // marked superseded outside rewriteProfileParagraph()'s own
+  // supersede-or-remember logic, silently breaking "written and
+  // rewritten only by this pass") is a genuine correctness risk, not
+  // just noise.
   const durable = db
     .select()
     .from(memoryRecords)
-    .where(and(eq(memoryRecords.status, "active"), eq(memoryRecords.tier, "durable")))
+    .where(and(eq(memoryRecords.status, "active"), eq(memoryRecords.tier, "durable"), ne(memoryRecords.source, PROFILE_SOURCE)))
     .all();
 
   const byGroup = new Map<string, typeof durable>();
@@ -576,5 +679,51 @@ export async function runConsolidation(): Promise<ConsolidateResult> {
 
   const demoted = demoteNeverRecalledDurables();
 
-  return { contradictionsSuperseded, demoted };
+  // Every distinct person with at least one eligible fact gets their
+  // profile paragraph rewritten this run, bounded the same way the
+  // passes above are. A person with zero eligible facts is never a
+  // candidate at all (the WHERE clause below), so a fresh household
+  // member with nothing said yet costs nothing here.
+  const profileCandidates = db
+    .selectDistinct({ person: memoryRecords.person })
+    .from(memoryRecords)
+    .where(
+      and(
+        eq(memoryRecords.status, "active"),
+        eq(memoryRecords.scope, "person"),
+        isNotNull(memoryRecords.person),
+        ne(memoryRecords.source, PROFILE_SOURCE),
+      ),
+    )
+    .all();
+
+  // Least-recently-profiled first (never-profiled sorts first of all,
+  // via the empty-string default): a code review (2026-09-05) found the
+  // un-ordered query above left MAX_PROFILE_REWRITES_PER_RUN's own
+  // cutoff arbitrary once a household has more eligible people than
+  // that - not just non-deterministic, but potentially starving the
+  // same people every single week if SQLite's own row order happens to
+  // stay stable. This costs one extra query, not a join, and turns
+  // "arbitrary" into "fair rotation."
+  const existingProfiles = db
+    .select({ person: memoryRecords.person, createdAt: memoryRecords.createdAt })
+    .from(memoryRecords)
+    .where(and(eq(memoryRecords.source, PROFILE_SOURCE), eq(memoryRecords.status, "active")))
+    .all();
+  const profiledAt = new Map(existingProfiles.map((p) => [p.person, p.createdAt]));
+  const orderedCandidates = [...profileCandidates].sort((a, b) => {
+    const aTime = (a.person && profiledAt.get(a.person)) || "";
+    const bTime = (b.person && profiledAt.get(b.person)) || "";
+    return aTime.localeCompare(bTime);
+  });
+
+  let profilesRewritten = 0;
+  for (const row of orderedCandidates.slice(0, MAX_PROFILE_REWRITES_PER_RUN)) {
+    if (!row.person) continue;
+    const personRow = db.select().from(people).where(and(eq(people.id, row.person), isNull(people.deletedAt))).get();
+    if (!personRow) continue; // soft-deleted since - nothing to profile
+    if (await rewriteProfileParagraph(personRow)) profilesRewritten++;
+  }
+
+  return { contradictionsSuperseded, demoted, profilesRewritten };
 }

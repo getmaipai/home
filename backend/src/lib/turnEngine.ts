@@ -16,7 +16,7 @@ import { listPackageIds, loadPackage, meetsMinRole, runPlugin } from "@/lib/plug
 import { loadAllSkills, type LoadedSkill } from "@/lib/skills";
 import { matchCommand, runCommand } from "@/lib/commands";
 import { trigger } from "@/lib/notifications";
-import { recall, bumpUsage, embedQueryForRecall, type RecallMatch } from "@/lib/memory";
+import { recall, bumpUsage, embedQueryForRecall, getProfileParagraph, type RecallMatch } from "@/lib/memory";
 import { newConversationTurnId } from "@/lib/id";
 import { complete, startCompleteStream, type LlmMessage } from "@/lib/llm";
 import { tokenize } from "@/lib/text";
@@ -368,10 +368,19 @@ export function buildSystemPrompt(
   // ── Volatile zone (step 4: "household, speaker, memory, summary, time
   // last"; matched skills sit here too - utterance-dependent, so never
   // stable no matter what 4.5 calls it) ──
+  // Step 7: the profile paragraph - "injected whole at the top of the
+  // memory block before recalled items, counted inside the memory
+  // section budget" (session-a-intelligence.md), not a separate cap of
+  // its own. Unconditional lookup (a targeted query, not a recall()
+  // candidate): whether it exists at all is the only gate, never whether
+  // this turn happened to recall something else too.
+  const profile = getProfileParagraph(actor);
   let memorySection = "";
-  if (memoryMatches.length > 0) {
+  if (profile || memoryMatches.length > 0) {
+    const profileLine = profile ? `${profile.text}\n` : "";
     const lines = memoryMatches.slice(0, MAX_MEMORY_SNIPPETS).map((m) => memoryBulletLine(m, locale, now));
-    memorySection = `\n\nWhat you already know about this household:\n${lines.join("\n")}\n${MEMORY_TRUST_REMINDER}`;
+    const bulletsBlock = lines.length > 0 ? `${lines.join("\n")}\n` : "";
+    memorySection = `\n\nWhat you already know about this household:\n${profileLine}${bulletsBlock}${MEMORY_TRUST_REMINDER}`;
     memorySection = capSection(memorySection, MAX_MEMORY_SECTION_CHARS);
   }
   // Unconditional, not gated on whether any memory actually matched:
