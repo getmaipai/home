@@ -129,9 +129,33 @@ class Widget(BaseModel):
     )
 
 
+class Page(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    id: constr(min_length=1) = Field(
+        ...,
+        description='Derives this page\'s own route: `/apps/<package id>/<page id>`, or bare `/apps/<package id>` when this is exactly "index".',
+    )
+    icon: str | None = None
+    label: constr(min_length=1, max_length=40)
+    nav: bool = Field(
+        ...,
+        description="Whether this page gets its own entry in the shell's nav registry (frontend/src/shell/nav.ts), vs. being reachable only from elsewhere (e.g. a widget's own link).",
+    )
+    kind: Literal['schema', 'web'] = Field(
+        ...,
+        description='"schema": spec/ui/schema.json document, rendered by the shared shell. "web" (this package\'s manifest must also list "web" under platforms): an escape hatch, unimplemented for all of Wave 2 - the loader refuses it outright, since a page a native Go/SwiftUI client can\'t render would break the platform\'s own "one UI schema, every client" promise.',
+    )
+    module: constr(min_length=1) = Field(
+        ...,
+        description='The schema document id (kind: "schema") this page renders, served from GET /api/plugins/:id/pages/:pageId.',
+    )
+
+
 class Contributes(BaseModel):
     """
-    Shell blueprints (6.1): nav entries, pages, right-pane panels, settings sections, commands, quick actions, player hooks, admin sections. `additionalProperties: true` since most of 6.1's own blueprint kinds have no bundled package using them yet (Wave 1's `contributes: []` was a placeholder no package had populated); `widgets` below is the one sub-field session-d-packages-and-store.md step 2 fixes a real shape for, since step 9 ships packages that populate it.
+    Shell blueprints (6.1), keyed by blueprint kind: nav entries, pages, right-pane panels, settings sections, commands, quick actions, player hooks, admin sections. `additionalProperties: true` since most of 6.1's own blueprint kinds have no bundled package using them yet (Wave 1's `contributes: []` was a placeholder no package had populated); `widgets` and `pages` below are the two sub-fields session-d-packages-and-store.md steps 2/10 fix a real shape for. `pages` replaces a redundant top-level `pages: string[]` field (Session E flagged it 2026-09-06 as incompatible with this object shape and confirmed nothing in backend/src or frontend/src read it) - a package declaring a page uses `contributes.pages[]` now, never a second, competing field.
     """
 
     model_config = ConfigDict(
@@ -140,6 +164,10 @@ class Contributes(BaseModel):
     widgets: list[Widget] | None = Field(
         None,
         description="wave-2.md's D-to-E contract: `GET /api/widgets` and `GET /api/widgets/:package/:id/data` list and serve these.",
+    )
+    pages: list[Page] | None = Field(
+        None,
+        description="6.2's own package-declared pages. E's PackageScopeContext and nav-registry merge (frontend/src/shell/nav.ts) are the real consumer; no package populates this yet.",
     )
 
 
@@ -302,10 +330,7 @@ class PackageManifest(BaseModel):
     background: bool | None = False
     contributes: Contributes | None = Field(
         None,
-        description="Shell blueprints (6.1): nav entries, pages, right-pane panels, settings sections, commands, quick actions, player hooks, admin sections. `additionalProperties: true` since most of 6.1's own blueprint kinds have no bundled package using them yet (Wave 1's `contributes: []` was a placeholder no package had populated); `widgets` below is the one sub-field session-d-packages-and-store.md step 2 fixes a real shape for, since step 9 ships packages that populate it.",
-    )
-    pages: list[str] | None = Field(
-        None, description='Ids of UI schema page documents this package ships (6.2).'
+        description="Shell blueprints (6.1), keyed by blueprint kind: nav entries, pages, right-pane panels, settings sections, commands, quick actions, player hooks, admin sections. `additionalProperties: true` since most of 6.1's own blueprint kinds have no bundled package using them yet (Wave 1's `contributes: []` was a placeholder no package had populated); `widgets` and `pages` below are the two sub-fields session-d-packages-and-store.md steps 2/10 fix a real shape for. `pages` replaces a redundant top-level `pages: string[]` field (Session E flagged it 2026-09-06 as incompatible with this object shape and confirmed nothing in backend/src or frontend/src read it) - a package declaring a page uses `contributes.pages[]` now, never a second, competing field.",
     )
     setup: dict[str, Any] | None = Field(
         None,

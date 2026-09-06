@@ -12,6 +12,21 @@ describe("assertNotPrivateHost", () => {
     await expect(assertNotPrivateHost("93.184.216.34")).resolves.toBeUndefined();
   });
 
+  // SEC-3 (code review, 2026-09-06): 100.64.0.0/10 is the CGNAT range
+  // Tailscale hands its own overlay addresses out from - the hub's own
+  // tailnet address (lib/hubEndpoints.ts) lives here, and this file had
+  // no idea the range was private at all.
+  test("blocks the 100.64.0.0/10 CGNAT/Tailscale range", async () => {
+    for (const ip of ["100.64.0.1", "100.100.1.1", "100.127.255.255"]) {
+      await expect(assertNotPrivateHost(ip)).rejects.toThrow(SsrfBlockedError);
+    }
+  });
+
+  test("100.63.x and 100.128.x are just outside 100.64.0.0/10 and are not blocked", async () => {
+    await expect(assertNotPrivateHost("100.63.255.255")).resolves.toBeUndefined();
+    await expect(assertNotPrivateHost("100.128.0.0")).resolves.toBeUndefined();
+  });
+
   test("172.15.x and 172.32.x are outside the 172.16.0.0/12 private range and are not blocked", async () => {
     await expect(assertNotPrivateHost("172.15.0.1")).resolves.toBeUndefined();
     await expect(assertNotPrivateHost("172.32.0.1")).resolves.toBeUndefined();

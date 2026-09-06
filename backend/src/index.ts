@@ -5,11 +5,15 @@ import { cleanupStaleSnapshots } from "@/lib/backup";
 import { sampleEngineStats } from "@/lib/engineStats";
 import { startAllSidecars, registerGracefulExit } from "@/lib/sidecars";
 import { initCrashBootHold } from "@/lib/dirtyBoot";
-import { sweepOrphanEngineProcesses } from "@/lib/llmSupervisor";
+import { sweepOrphanEngineProcesses, getChatClient } from "@/lib/llmSupervisor";
+import { getEmbedClient } from "@/lib/embedSupervisor";
+import { getTtsClient } from "@/lib/ttsSupervisor";
 import { runAllSmokeTests } from "@/lib/smoke";
 import { startIdleSweep, registerDenoHostGracefulExit } from "@/lib/denoHost";
 import { hasHouseholdLeaf, getHouseholdLeafForServer, checkLeafExpiry, onLeafRenewed, registerRenewFixHandler } from "@/lib/householdCa";
 import { advertiseMdns } from "@/lib/mdns";
+import { rebindWithRetry } from "@/lib/serverRebind";
+import { raiseIssue } from "@/lib/issues";
 import { startWyomingServer } from "@/lib/wyomingServer";
 import { websocket } from "hono/bun";
 
@@ -45,6 +49,17 @@ ensureCoreJob("memory.consolidate", "every:7d");
 // comment), so this is a relative daily interval from whenever the job
 // first seeds, not a real nightly-window guarantee.
 ensureCoreJob("backup.run", "every:1d");
+// Step 9: the disk-full policy's own "then a Repairs item" half - see
+// lib/storage.ts's own header for why "caches first" needs no job at
+// all here (already automatic in lib/packageCache.ts). Every 1h, not
+// daily: unlike a backup, running low on disk is not something a
+// household should ever wait most of a day to hear about.
+ensureCoreJob("storage.check_disk_full", "every:1h");
+// Step 10: "one check a day" against GitHub's own public release API -
+// see lib/updates.ts's own header for the full scope (app only; the
+// plan's packages/models/sidecars projection halves are deferred, no
+// catalog or per-model version tracking exists yet to check against).
+ensureCoreJob("updates.check", "every:1d");
 // docs/PACKAGES.md's bronze bar: smoke "at install, at every update, and
 // on a schedule" (lib/smoke.ts). No install/update flow exists yet
 // (session-d step 6 builds the store), so a boot-time pass below stands
@@ -93,6 +108,24 @@ registerDenoHostGracefulExit();
 await sweepOrphanEngineProcesses();
 await initCrashBootHold();
 void startAllSidecars();
+// A latency review (2026-09-06) found none of the three engines were
+// ever touched at boot: every getChatClient()/getEmbedClient()/
+// getTtsClient() call spawns lazily on FIRST USE, so a household's very
+// first message after a restart pays the chat spawn (up to a 60 s health
+// timeout), the embed spawn (60 s) and the Pocket TTS spawn (up to 180 s)
+// in series, on that one "hi." Fire-and-forget, not top-level-awaited
+// (unlike sweepOrphanEngineProcesses()/initCrashBootHold() above, which
+// gate what can spawn next): the point is to have the real engines
+// already warm behind the stub/nothing by the time a real turn arrives,
+// never to make every boot wait up to ~5 minutes for the slowest of the
+// three. A start failure here (no model selected yet, a broken
+// selection, engine files still downloading) is exactly the same
+// failure the first real request would have hit anyway - logged, not
+// fatal to boot, and the next real caller still gets the same clear
+// error getChatClient()/getEmbedClient()/getTtsClient() always throw.
+void getChatClient().catch((err: unknown) => console.error(`[boot] chat engine warm-up: ${(err as Error).message}`));
+void getEmbedClient().catch((err: unknown) => console.error(`[boot] embed engine warm-up: ${(err as Error).message}`));
+void getTtsClient().catch((err: unknown) => console.error(`[boot] TTS engine warm-up: ${(err as Error).message}`));
 // Step 5: idle Tier 1 sandbox processes get closed after ten minutes -
 // nothing is running yet at boot (every Deno process starts lazily, on
 // a package's first real call), so this just arms the sweep.
@@ -190,10 +223,36 @@ void advertiseMdns({ port, tls: initialTls !== null });
 // the running process never actually picked up, and an mDNS
 // advertisement stuck claiming `tls: 0` (or `1`) forever after the state
 // that produced it changed.
+// COR-3 (code review, 2026-09-06): the rebind used to run with no
+// try/catch, synchronously inside ensureHouseholdLeaf()'s own listener
+// loop - a bind failure (port briefly held, EADDRINUSE, or a bad PEM)
+// threw straight out of whichever caller awaited ensureHouseholdLeaf()
+// (GET /api/setup/ca, unauthenticated), leaving the hub with no listener
+// at all. rebindWithRetry() (lib/serverRebind.ts) retries a few times
+// (the port the just-stopped server held usually frees up within one or
+// two hundred ms) before this raises a Repairs issue instead - honest
+// about the fact that a genuinely bad certificate still leaves the hub
+// down until a manual restart (no process supervisor exists yet to hand
+// a real restart to, this file's own header above already names that
+// gap), but no longer a silent, uncaught exception either.
 onLeafRenewed((leaf) => {
   server.stop(true);
-  server = Bun.serve({ port, fetch: app.fetch, websocket, tls: { cert: leaf.certPem, key: leaf.keyPem } });
-  void advertiseMdns({ port, tls: true });
+  void rebindWithRetry(() => Bun.serve({ port, fetch: app.fetch, websocket, tls: { cert: leaf.certPem, key: leaf.keyPem } }))
+    .then(({ server: newServer }) => {
+      server = newServer;
+      void advertiseMdns({ port, tls: true });
+    })
+    .catch((err: unknown) => {
+      const message = (err as Error).message;
+      console.error(`[index] TLS rebind after leaf renewal failed after retries, the hub has no listener: ${message}`);
+      void raiseIssue({
+        source: "householdCa",
+        key: "tls_rebind_failed",
+        severity: "error",
+        title: "The hub's web server failed to restart after renewing its certificate",
+        detail: message,
+      });
+    });
 });
 
 // The Wyoming satellite server (session-c-brain-and-voice.md step 8): a

@@ -16,6 +16,7 @@ import { createHash } from "node:crypto";
 import { createReadStream, createWriteStream, existsSync, statSync, unlinkSync } from "node:fs";
 import { mkdirSync, renameSync } from "node:fs";
 import { dirname } from "node:path";
+import { withTimeout } from "@/lib/withTimeout";
 
 export interface DownloadProgress {
   completedBytes: number;
@@ -96,21 +97,10 @@ async function downloadOnce(
 
   try {
     while (true) {
-      let step: Awaited<ReturnType<typeof reader.read>>;
-      let idleTimer: ReturnType<typeof setTimeout> | undefined;
-      try {
-        step = await Promise.race([
-          reader.read(),
-          new Promise<never>((_, reject) => {
-            idleTimer = setTimeout(
-              () => reject(new Error(`stalled: no data for ${STREAM_IDLE_TIMEOUT_MS / 1000}s`)),
-              STREAM_IDLE_TIMEOUT_MS,
-            );
-          }),
-        ]);
-      } finally {
-        if (idleTimer) clearTimeout(idleTimer);
-      }
+      // withTimeout (lib/withTimeout.ts): a code review (2026-09-06)
+      // found this hand-rolled race-plus-clear-the-timer shape copied in
+      // two other places (routes/host.ts, scheduler.ts's per-job budget).
+      const step = await withTimeout(reader.read(), STREAM_IDLE_TIMEOUT_MS, () => new Error(`stalled: no data for ${STREAM_IDLE_TIMEOUT_MS / 1000}s`));
       if (step.done) break;
       completedBytes += step.value.byteLength;
       await new Promise<void>((resolve, reject) =>

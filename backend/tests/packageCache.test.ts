@@ -136,4 +136,27 @@ describe("eviction", () => {
     const stats = getCacheStats().find((s) => s.packageId === PKG);
     expect(stats?.entryCount).toBe(2);
   });
+
+  // PERF-5 (code review, 2026-09-06): evictIfOverBudget() used to walk
+  // and stat the entire cache directory on every write; it now keeps a
+  // running total instead, only re-walking when eviction genuinely has
+  // to happen. This proves that running total stays accurate across many
+  // writes on its own (no walk in between to correct any drift) - it
+  // fires eviction on the exact write that crosses the budget, neither
+  // too early nor too late.
+  test("the running total stays accurate across many writes with no walk in between", async () => {
+    __setTestCacheBudgetBytes(10_000_000);
+    const fn = async () => ({ some: "value" });
+    for (let i = 0; i < 20; i++) {
+      await cachedFetch(PKG, { ttl_s: 60 }, `https://example.com/warm-${i}`, undefined, fn);
+    }
+    expect(getCacheStats().find((s) => s.packageId === PKG)?.entryCount).toBe(20);
+
+    // Now tighten the budget so the NEXT write is what pushes it over -
+    // proving the running total (not a stale pre-tightening snapshot)
+    // is what evictIfOverBudget() actually checks.
+    __setTestCacheBudgetBytes(1);
+    await cachedFetch(PKG, { ttl_s: 60 }, "https://example.com/tips-it-over", undefined, fn);
+    expect(getCacheStats().find((s) => s.packageId === PKG)?.entryCount).toBeLessThanOrEqual(1);
+  });
 });

@@ -414,6 +414,29 @@ describe("setChannel", () => {
   });
 });
 
+describe("SEC-2-class guard: every store operation rejects a malformed/traversal id before touching disk", () => {
+  const traversalId = "../../data/keys";
+
+  test("install rejects it", async () => {
+    const result = await install({ id: traversalId, targetPath: "x", source: { kind: "dir", dir: indexDir }, trust: trust() });
+    expect(result.ok).toBe(false);
+  });
+
+  test("rollback rejects it", async () => {
+    const result = await rollback(traversalId);
+    expect(result.ok).toBe(false);
+  });
+
+  test("uninstall rejects it", async () => {
+    const result = await uninstall(traversalId);
+    expect(result.ok).toBe(false);
+  });
+
+  test("setChannel rejects it", () => {
+    expect(setChannel(traversalId, "beta").ok).toBe(false);
+  });
+});
+
 describe("the /api/store routes", () => {
   test("every route requires owner/admin, not just any signed-in person", async () => {
     const { client } = await owner();

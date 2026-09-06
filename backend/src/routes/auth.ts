@@ -12,7 +12,7 @@ import { getCookie, deleteCookie } from "hono/cookie";
 import { eq, isNull } from "drizzle-orm";
 import { Person } from "@maipai/spec/gen/ts/person.js";
 import { apiRouter, errorResponses } from "@/lib/openapi";
-import { db } from "@/db";
+import { db, sqlite } from "@/db";
 import { people, personCredentials, passkeyCredentials, sessions } from "@/db/schema";
 import { requiresCredential, getAuthMethods } from "@/lib/personAuthMethods";
 import { isTotpEnabled } from "@/lib/totp";
@@ -136,6 +136,26 @@ const setupRoute = createRoute({
     ...errorResponses({ 400: "Invalid display name or secret", 409: "Setup already completed" }),
   },
 });
+// COR-4 (code review, 2026-09-06): check-then-insert with a real await
+// (hashSecret's own argon2id work) in between - two concurrent first-run
+// POSTs could both pass the "anyone exists" check before either had
+// written a row, minting two owners. hashSecret() runs OUTSIDE any
+// transaction (sqlite.transaction()'s own callback must be synchronous -
+// bun:sqlite, like better-sqlite3, has no async transaction API); the
+// existence check is then RE-RUN inside the transaction, atomically with
+// both inserts, so a second concurrent caller that raced past the
+// route's own first check still finds a real owner already committed by
+// the time its own transaction runs.
+const insertOwnerIfNoneExists = sqlite.transaction(
+  (personValues: ReturnType<typeof personToDbValues>, credentialValues: typeof personCredentials.$inferInsert): boolean => {
+    const anyone = db.select({ id: people.id }).from(people).limit(1).get();
+    if (anyone) return false;
+    db.insert(people).values(personValues).run();
+    db.insert(personCredentials).values(credentialValues).run();
+    return true;
+  },
+);
+
 auth.openapi(setupRoute, async (c) => {
   const anyone = db.select({ id: people.id }).from(people).limit(1).get();
   if (anyone) return c.json({ error: "Setup already completed" }, 409);
@@ -171,16 +191,17 @@ auth.openapi(setupRoute, async (c) => {
     return c.json({ error: candidate.error.issues.map((i) => i.message).join("; ") }, 400);
   }
 
-  db.insert(people).values(personToDbValues(candidate.data)).run();
-  db.insert(personCredentials)
-    .values({
-      personId: id,
-      secretHash: await hashSecret(secret.value),
-      failedAttempts: 0,
-      createdAt: now,
-      updatedAt: now,
-    })
-    .run();
+  // hashSecret() (argon2id) happens before the transaction, not inside
+  // it - see insertOwnerIfNoneExists's own header for why.
+  const secretHash = await hashSecret(secret.value);
+  const created = insertOwnerIfNoneExists(personToDbValues(candidate.data), {
+    personId: id,
+    secretHash,
+    failedAttempts: 0,
+    createdAt: now,
+    updatedAt: now,
+  });
+  if (!created) return c.json({ error: "Setup already completed" }, 409);
 
   issueSession(c, id);
   return c.json({ person: candidate.data }, 201);

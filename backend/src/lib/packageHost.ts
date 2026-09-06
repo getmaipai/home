@@ -198,30 +198,83 @@ export interface AttemptResult {
   status?: number;
 }
 
+// SEC-3 (code review, 2026-09-06): fetch's default redirect: "follow"
+// meant the SSRF/permission check the caller ran against the ORIGINAL
+// url (createHost()'s fetch, below) said nothing about wherever a 3xx
+// response then pointed - a package with `net:api.example.com` could
+// fetch a url whose redirect landed on the household's own LAN or the
+// hub's own tailnet address, and the response would come straight back.
+// `redirect: "manual"` plus this loop re-runs `validateHop` (the same
+// assertNotPrivateHost + requirePermission check the caller did on the
+// original url) against every hop's own target before ever following it.
+const MAX_FETCH_REDIRECTS = 5;
+
+/** 301/302 historically downgrade a non-GET/HEAD request to GET on
+ * redirect (what every browser and fetch's own "follow" mode does,
+ * despite the HTTP spec technically allowing either); 303 always does,
+ * regardless of the original method; 307/308 always preserve the
+ * original method and body. Same table `fetch`'s built-in follow
+ * behavior already used before this switched to manual redirects. */
+function redirectedMethod(status: number, method: string): string {
+  if (status === 303) return "GET";
+  if ((status === 301 || status === 302) && method !== "GET" && method !== "HEAD") return "GET";
+  return method;
+}
+
 async function attemptHttpFetch(
   url: string,
   method: string,
   headers: Record<string, string>,
   body: string | undefined,
   timeoutMs: number = FETCH_TIMEOUT_MS,
+  validateHop?: (hopUrl: string) => Promise<void>,
 ): Promise<AttemptResult> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
-    const response = await fetch(url, { method, headers, body, signal: controller.signal });
-    if (!response.ok) {
-      return {
-        ok: false,
-        networkFailure: false,
-        status: response.status,
-        error: new HostError("network_unreachable", `${url} returned HTTP ${response.status}`),
-      };
-    }
-    const text = await readBodyWithLimit(response, url);
-    try {
-      return { ok: true, value: JSON.parse(text) };
-    } catch {
-      return { ok: true, value: text }; // a real API answering plain text/HTML is not a host.fetch failure
+    let currentUrl = url;
+    let currentMethod = method;
+    let currentBody = body;
+    for (let hop = 0; ; hop++) {
+      const response = await fetch(currentUrl, { method: currentMethod, headers, body: currentBody, signal: controller.signal, redirect: "manual" });
+      const location = response.status >= 300 && response.status < 400 ? response.headers.get("location") : null;
+      if (location) {
+        if (hop >= MAX_FETCH_REDIRECTS) {
+          return { ok: false, networkFailure: false, error: new HostError("network_unreachable", `${url} redirected more than ${MAX_FETCH_REDIRECTS} times`) };
+        }
+        let nextUrl: string;
+        try {
+          nextUrl = new URL(location, currentUrl).toString();
+        } catch {
+          return { ok: false, networkFailure: false, error: new HostError("network_unreachable", `${currentUrl} redirected to an invalid url`) };
+        }
+        if (validateHop) {
+          try {
+            await validateHop(nextUrl);
+          } catch (err) {
+            if (err instanceof HostError) return { ok: false, networkFailure: false, error: err };
+            throw err;
+          }
+        }
+        currentMethod = redirectedMethod(response.status, currentMethod);
+        if (currentMethod === "GET") currentBody = undefined;
+        currentUrl = nextUrl;
+        continue;
+      }
+      if (!response.ok) {
+        return {
+          ok: false,
+          networkFailure: false,
+          status: response.status,
+          error: new HostError("network_unreachable", `${url} returned HTTP ${response.status}`),
+        };
+      }
+      const text = await readBodyWithLimit(response, currentUrl);
+      try {
+        return { ok: true, value: JSON.parse(text) };
+      } catch {
+        return { ok: true, value: text }; // a real API answering plain text/HTML is not a host.fetch failure
+      }
     }
   } catch (err) {
     if (err instanceof HostError) return { ok: false, networkFailure: false, error: err }; // e.g. readBodyWithLimit's own size-cap error
@@ -238,7 +291,10 @@ async function attemptHttpFetch(
  * fetch, below) before this ever runs, and have nothing to do with a
  * real server's own loopback address (which this function has no opinion
  * about at all - guarding against reaching the household's own LAN is
- * exactly what the caller's checks are for, not this one). */
+ * exactly what the caller's checks are for, not this one, other than
+ * re-running that exact same check, via `validateHop`, against a
+ * redirect's own target - see attemptHttpFetch()'s own header for why
+ * that specific piece can't live in the caller alone). */
 /** The retry POLICY itself, pulled out as its own small, pure function so
  * it's unit-testable with a fake `attempt` and a near-zero `delayMs` -
  * no real network I/O and no real 10-second timeout to wait out just to
@@ -253,7 +309,14 @@ export async function withOneRetry(attempt: () => Promise<AttemptResult>, retrya
   return attempt();
 }
 
-export async function performHttpFetch(url: string, opts?: FetchOptions): Promise<unknown> {
+/** `validateHop`, when given, is called with each redirect's own target
+ * url before it's followed - the caller's real callers (createHost()'s
+ * fetch) pass the exact SSRF + `net:<host>` permission check they ran
+ * against the original url, so it can never mean less for hop 2 than
+ * hop 1 did. Omitted by every direct test of this function's own HTTP
+ * mechanics (packageHost.test.ts's own header on that describe block) -
+ * those exercise a real local server with no SSRF concern of its own. */
+export async function performHttpFetch(url: string, opts?: FetchOptions, validateHop?: (hopUrl: string) => Promise<void>): Promise<unknown> {
   const method = opts?.method ?? "GET";
   let body: string | undefined;
   if (opts?.body !== undefined) body = typeof opts.body === "string" ? opts.body : JSON.stringify(opts.body);
@@ -262,7 +325,11 @@ export async function performHttpFetch(url: string, opts?: FetchOptions): Promis
     headers["content-type"] = "application/json";
   }
 
-  const result = await withOneRetry(() => attemptHttpFetch(url, method, headers, body), method === "GET", RETRY_DELAY_MS);
+  const result = await withOneRetry(
+    () => attemptHttpFetch(url, method, headers, body, FETCH_TIMEOUT_MS, validateHop),
+    method === "GET",
+    RETRY_DELAY_MS,
+  );
   if (result.ok) return result.value;
   throw result.error;
 }
@@ -608,6 +675,33 @@ export function createHost(actor: PersonRow, manifest: PackageManifest, secrets:
       }
       requirePermission(`net:${parsed.host}`);
 
+      // SEC-3 (code review, 2026-09-06): the exact same two checks this
+      // function just ran against the ORIGINAL url, re-run against every
+      // redirect hop's own target by attemptHttpFetch()'s loop - a
+      // package declaring `net:api.example.com` gets no more than that
+      // one host, permission-wise, even through a redirect, and a
+      // redirect landing on the household's LAN or the hub's own tailnet
+      // address is refused the same way the original url would have
+      // been.
+      const validateHop = async (hopUrl: string): Promise<void> => {
+        let hopParsed: URL;
+        try {
+          hopParsed = new URL(hopUrl);
+        } catch {
+          throw new HostError("invalid_input", `redirected to an invalid url: ${hopUrl}`);
+        }
+        if (hopParsed.protocol !== "http:" && hopParsed.protocol !== "https:") {
+          throw new HostError("invalid_input", `redirected to an unsupported url scheme: ${hopParsed.protocol}`);
+        }
+        requirePermission(`net:${hopParsed.host}`);
+        try {
+          await assertNotPrivateHost(hopParsed.hostname);
+        } catch (err) {
+          if (err instanceof SsrfBlockedError) throw new HostError("invalid_input", err.message);
+          throw new HostError("network_unreachable", `could not resolve ${hopParsed.hostname}`);
+        }
+      };
+
       // The cache sits in front of the rate limiter and the SSRF check on
       // purpose (session-d-packages-and-store.md step 3): a cache hit is
       // not a network call at all, so it should cost neither a rate-limit
@@ -632,7 +726,7 @@ export function createHost(actor: PersonRow, manifest: PackageManifest, secrets:
           throw new HostError("network_unreachable", `could not resolve ${parsed.hostname}`);
         }
 
-        return performHttpFetch(url, opts);
+        return performHttpFetch(url, opts, validateHop);
       });
     },
     memory: {

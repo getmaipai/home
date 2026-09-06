@@ -94,18 +94,46 @@ function ensureKeysDir(): void {
 
 // ── Windows DPAPI (CurrentUser) via PowerShell ──────────────────────────
 
+// SEC-7 (code review, 2026-09-06): the key material used to be
+// interpolated straight into the `-Command` string, visible in Task
+// Manager and PowerShell transcript logging for the duration of the
+// call - exactly what CLAUDE.md > Credentials and secrets forbids
+// ("never pass a secret on a command line or in a process list; use a
+// file with restricted permissions or the environment of a child
+// process"). The script text itself is now fixed (no interpolation at
+// all) and read from stdin (`-Command -` is documented powershell.exe
+// behavior: "If the value of Command is '-', the command text is read
+// from standard input"); the actual value crosses the process boundary
+// only through the CHILD's own environment, which neither Task Manager's
+// command-line column nor PowerShell transcript logging (which records
+// the command TEXT, not env values) ever shows. Split into a pure
+// builder plus the real execFileSync call so the builder itself is
+// directly unit-testable without invoking PowerShell at all
+// (tests/keystore.test.ts).
+const DPAPI_PROTECT_SCRIPT =
+  "Add-Type -AssemblyName System.Security; " +
+  "$b=[System.Text.Encoding]::UTF8.GetBytes($env:MAIPAI_KEYSTORE_VALUE); " +
+  "$e=[System.Security.Cryptography.ProtectedData]::Protect($b,$null,'CurrentUser'); " +
+  "[Convert]::ToBase64String($e)";
+
+const DPAPI_UNPROTECT_SCRIPT =
+  "Add-Type -AssemblyName System.Security; " +
+  "$e=[Convert]::FromBase64String($env:MAIPAI_KEYSTORE_VALUE); " +
+  "$d=[System.Security.Cryptography.ProtectedData]::Unprotect($e,$null,'CurrentUser'); " +
+  "[System.Text.Encoding]::UTF8.GetString($d)";
+
+export function dpapiProtectInvocation(hex: string): { args: string[]; input: string; env: Record<string, string> } {
+  return { args: ["-NoProfile", "-NonInteractive", "-Command", "-"], input: DPAPI_PROTECT_SCRIPT, env: { MAIPAI_KEYSTORE_VALUE: hex } };
+}
+
+export function dpapiUnprotectInvocation(blob: string): { args: string[]; input: string; env: Record<string, string> } {
+  return { args: ["-NoProfile", "-NonInteractive", "-Command", "-"], input: DPAPI_UNPROTECT_SCRIPT, env: { MAIPAI_KEYSTORE_VALUE: blob.slice(DPAPI_PREFIX.length) } };
+}
+
 function dpapiProtect(hex: string): string | null {
   try {
-    const ps =
-      "Add-Type -AssemblyName System.Security; " +
-      `$b=[System.Text.Encoding]::UTF8.GetBytes('${hex}'); ` +
-      "$e=[System.Security.Cryptography.ProtectedData]::Protect($b,$null,'CurrentUser'); " +
-      "[Convert]::ToBase64String($e)";
-    const out = execFileSync(
-      "powershell",
-      ["-NoProfile", "-NonInteractive", "-Command", ps],
-      { timeout: 8000 },
-    );
+    const { args, input, env } = dpapiProtectInvocation(hex);
+    const out = execFileSync("powershell", args, { timeout: 8000, input, env: { ...process.env, ...env } });
     return DPAPI_PREFIX + out.toString().trim();
   } catch {
     return null;
@@ -114,17 +142,8 @@ function dpapiProtect(hex: string): string | null {
 
 function dpapiUnprotect(blob: string): string | null {
   try {
-    const b64 = blob.slice(DPAPI_PREFIX.length);
-    const ps =
-      "Add-Type -AssemblyName System.Security; " +
-      `$e=[Convert]::FromBase64String('${b64}'); ` +
-      "$d=[System.Security.Cryptography.ProtectedData]::Unprotect($e,$null,'CurrentUser'); " +
-      "[System.Text.Encoding]::UTF8.GetString($d)";
-    const out = execFileSync(
-      "powershell",
-      ["-NoProfile", "-NonInteractive", "-Command", ps],
-      { timeout: 8000 },
-    );
+    const { args, input, env } = dpapiUnprotectInvocation(blob);
+    const out = execFileSync("powershell", args, { timeout: 8000, input, env: { ...process.env, ...env } });
     return out.toString().trim();
   } catch {
     return null;
@@ -158,22 +177,26 @@ function keychainRead(name: string): string | null {
   }
 }
 
+// SEC-7 (code review, 2026-09-06): `-w hex` as an argv element put the
+// key material in `ps`/Activity Monitor's command-line column for the
+// duration of the call. `security -i` reads the identical command
+// syntax from stdin instead (Apple's own documented way to keep
+// sensitive `security` invocations out of the process list) - the
+// command line macOS actually records for the child is just
+// `security -i`, no argument ever carries the secret. Pure builder
+// (`keychainWriteCommand`), same reason as the DPAPI ones above: directly
+// unit-testable without touching the real keychain. Safe to join with
+// plain spaces (no shell involved, and quoting either would need):
+// KEYCHAIN_ACCOUNT is a fixed constant and keychainService()'s `name` is
+// always one of this file's own fixed internal key names, never
+// arbitrary or user-supplied text that could contain a space.
+export function keychainWriteCommand(name: string, hex: string): string {
+  return `add-generic-password -U -a ${KEYCHAIN_ACCOUNT} -s ${keychainService(name)} -w ${hex}\n`;
+}
+
 function keychainWrite(name: string, hex: string): boolean {
   try {
-    execFileSync(
-      "security",
-      [
-        "add-generic-password",
-        "-U",
-        "-a",
-        KEYCHAIN_ACCOUNT,
-        "-s",
-        keychainService(name),
-        "-w",
-        hex,
-      ],
-      { timeout: 5000, stdio: "ignore" },
-    );
+    execFileSync("security", ["-i"], { timeout: 5000, input: keychainWriteCommand(name, hex), stdio: ["pipe", "ignore", "ignore"] });
     return true;
   } catch {
     return false;

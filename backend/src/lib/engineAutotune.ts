@@ -93,6 +93,14 @@ export function resolveLaunchFlags(
  * llmSupervisor.ts's spawn call and any future "show me the exact command"
  * debug view build the identical argv from the identical flags. */
 export function launchFlagsToArgs(flags: LaunchFlags): string[] {
+  // Never above the actual context size: `chat.context_size_override`
+  // (settings/aiKeys.ts, range 0 to 131072) lets a household pick
+  // anything down to a genuinely tiny context to conserve memory, and
+  // llama-server rejects (or misbehaves on) a ubatch larger than -c
+  // itself - a code review (2026-09-06) caught the first cut of this
+  // hardcoding 1024 unconditionally, which would have broken the spawn
+  // for any household running a context override below that.
+  const ubatchSize = Math.min(1024, flags.contextSize);
   const args = [
     "-c",
     String(flags.contextSize),
@@ -113,6 +121,23 @@ export function launchFlagsToArgs(flags: LaunchFlags): string[] {
     // member can turn reasoning on for one message without restarting.
     "--reasoning",
     "off",
+    // A latency review (2026-09-06): `-ub` (prefill/ubatch size) defaults
+    // to 512, and raising it toward 1024 measured ~21% higher prefill
+    // throughput in one GPU-bound llama.cpp benchmark for no extra VRAM
+    // (it's compute batching, not a KV allocation) - a real, close-to-free
+    // win on the exact hot path (prompt prefill) this household's turn
+    // latency depends on most. `--no-webui` turns off llama-server's own
+    // bundled HTML UI: this process is only ever reached through
+    // llm.ts/embed's own client, never a browser, so serving it is a
+    // needless attack surface for zero benefit. `--metrics` exposes
+    // Prometheus-format counters at `/metrics` (`requests_deferred`,
+    // `kv_cache_usage_ratio`) - the harness a follow-up latency pass needs
+    // to see slot queueing has nothing to scrape without this flag
+    // present from the process's first launch.
+    "-ub",
+    String(ubatchSize),
+    "--no-webui",
+    "--metrics",
   ];
   if (flags.kvCacheQuantized) args.push("-ctk", "q8_0", "-ctv", "q8_0");
   return args;

@@ -166,15 +166,29 @@
     {
       "idx": 23,
       "version": "6",
-      "when": 1788712222008,
-      "tag": "0023_powerful_black_queen",
+      "when": 1788710921080,
+      "tag": "0023_purple_mandrill",
       "breakpoints": true
     },
     {
       "idx": 24,
       "version": "6",
-      "when": 1788723602923,
-      "tag": "0024_lucky_talon",
+      "when": 1788714679532,
+      "tag": "0024_abnormal_monster_badoon",
+      "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "6",
+      "when": 1788725578358,
+      "tag": "0025_eager_zarda",
+      "breakpoints": true
+    },
+    {
+      "idx": 26,
+      "version": "6",
+      "when": 1788730620275,
+      "tag": "0026_wandering_shen",
       "breakpoints": true
     }
   ]

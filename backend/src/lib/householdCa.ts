@@ -42,6 +42,7 @@ import { dataDir } from "@/lib/paths";
 import { detectLanIps } from "@/lib/hubEndpoints";
 import { raiseIssue, resolveIssue, registerFixHandler } from "@/lib/issues";
 import { encryptSecret, decryptSecret } from "@/lib/secrets";
+import { singleflight } from "@/lib/singleflight";
 
 const generateRsaKeyPair = promisify(generateKeyPairCb);
 
@@ -223,7 +224,19 @@ function currentAltNames(): string[] {
  * header for why. Async because minting genuinely generates a fresh
  * RSA-2048 key (see generateRsaKeyPairForge()'s own comment); the
  * disk-read fast path below stays synchronous. */
-export async function ensureHouseholdCa(): Promise<CertAndKey> {
+// COR-3 (code review, 2026-09-06): check-then-generate with a real
+// `await` in between and no lock around it - two concurrent first-run
+// callers (two devices opening the trust page at once; the rate limiter
+// allows a burst per IP, and these are two different IPs) both see no CA
+// on disk and both generate one. Whichever's writeCertFile() runs second
+// overwrites the first's CA on disk, so a leaf already signed by the
+// FIRST caller's CA no longer chains to the CA now on disk - wrong until
+// the next address change or the certificate's own ~335-day expiry.
+// singleflight() (already used by wakewordAssets.ts/voiceCatalog.ts for
+// the identical "share the one in-flight attempt" shape) makes every
+// concurrent caller await the SAME generate-and-write, rather than
+// racing to do it twice.
+const singleflightEnsureHouseholdCa = singleflight(async (): Promise<CertAndKey> => {
   if (existsSync(CA_CERT_PATH) && existsSync(CA_KEY_PATH)) {
     return { certPem: readFileSync(CA_CERT_PATH, "utf-8"), keyPem: readKeyFile(CA_KEY_PATH) };
   }
@@ -231,6 +244,10 @@ export async function ensureHouseholdCa(): Promise<CertAndKey> {
   writeCertFile(CA_CERT_PATH, ca.certPem);
   writeKeyFile(CA_KEY_PATH, ca.keyPem);
   return ca;
+});
+
+export function ensureHouseholdCa(): Promise<CertAndKey> {
+  return singleflightEnsureHouseholdCa();
 }
 
 function certExpiresWithinDays(certPem: string, days: number): boolean {
@@ -244,6 +261,26 @@ function certCoversAllNames(certPem: string, names: string[]): boolean {
   const sanExt = cert.getExtension("subjectAltName") as { altNames?: Array<{ type: number; ip?: string; value?: string }> } | null;
   const covered = new Set((sanExt?.altNames ?? []).map((a) => a.ip ?? a.value));
   return names.every((name) => covered.has(name));
+}
+
+// COR-3 (code review, 2026-09-06): stillGood below never checked that
+// the leaf on disk actually chains to the CA currently on disk - only
+// its own expiry and address coverage. The exact damage a first-run race
+// (two concurrent callers each minting a CA, whichever's writeCertFile()
+// ran second silently replacing the other's) would leave behind: a leaf
+// signed by CA A, a CA file now holding CA B, both individually valid
+// PEMs, so every OTHER check here passes while the served chain is
+// actually broken. verifyCertificateChain() throws (not returns false)
+// on a genuine mismatch - node-forge's own documented behavior, not an
+// exception this code expects to be exceptional.
+function leafChainsToCa(leafCertPem: string, caCertPem: string): boolean {
+  try {
+    const leaf = forge.pki.certificateFromPem(leafCertPem);
+    const ca = forge.pki.certificateFromPem(caCertPem);
+    return forge.pki.verifyCertificateChain(forge.pki.createCaStore([ca]), [leaf]);
+  } catch {
+    return false;
+  }
 }
 
 // Idempotent (Map.set on the same key just overwrites), so calling this
@@ -278,14 +315,23 @@ export function registerRenewFixHandler(): void {
  * ensureHouseholdCa() is - actually minting a fresh leaf generates a
  * real RSA-2048 key off the main thread; the disk-read fast path (the
  * common case, "nothing changed") stays synchronous underneath. */
-export async function ensureHouseholdLeaf(): Promise<CertAndKey> {
+// COR-3: the identical check-then-generate race ensureHouseholdCa() has,
+// singleflight()-guarded the same way (two concurrent callers - the TLS-
+// serving boot path and someone hitting GET /api/setup/ca at the same
+// moment on a fresh install - must share one mint, not race to write two
+// leaves and two "leaf renewed" listener firings for what should be a
+// single event).
+const singleflightEnsureHouseholdLeaf = singleflight(async (): Promise<CertAndKey> => {
   registerRenewFixHandler();
   const ca = await ensureHouseholdCa();
   const altNames = currentAltNames();
 
   if (existsSync(LEAF_CERT_PATH) && existsSync(LEAF_KEY_PATH)) {
     const existingCertPem = readFileSync(LEAF_CERT_PATH, "utf-8");
-    const stillGood = !certExpiresWithinDays(existingCertPem, LEAF_EXPIRY_WARNING_DAYS) && certCoversAllNames(existingCertPem, altNames);
+    const stillGood =
+      !certExpiresWithinDays(existingCertPem, LEAF_EXPIRY_WARNING_DAYS) &&
+      certCoversAllNames(existingCertPem, altNames) &&
+      leafChainsToCa(existingCertPem, ca.certPem);
     if (stillGood) {
       resolveIssue("householdCa", "leaf_expiring");
       resolveIssue("householdCa", "leaf_stale");
@@ -300,6 +346,10 @@ export async function ensureHouseholdLeaf(): Promise<CertAndKey> {
   resolveIssue("householdCa", "leaf_stale");
   for (const listener of leafRenewedListeners) listener(leaf);
   return leaf;
+});
+
+export function ensureHouseholdLeaf(): Promise<CertAndKey> {
+  return singleflightEnsureHouseholdLeaf();
 }
 
 /** Real-only-when-warranted: called on a schedule (not on every request)
@@ -366,6 +416,8 @@ export async function getHouseholdCaCertificate(): Promise<string> {
  * directory uses - here that state lives on disk, not in a module-level
  * variable, so the reset is a file removal instead of clearing a cache. */
 export function __resetHouseholdCaForTests(): void {
+  singleflightEnsureHouseholdCa.__resetForTests();
+  singleflightEnsureHouseholdLeaf.__resetForTests();
   for (const path of [CA_CERT_PATH, CA_KEY_PATH, LEAF_CERT_PATH, LEAF_KEY_PATH]) {
     try {
       rmSync(path);

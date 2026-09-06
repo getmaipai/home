@@ -127,3 +127,9 @@ export function newListId(): string {
 export function newListItemId(): string {
   return `item-${randomSuffix(10)}`;
 }
+
+// Not a spec-shaped id (nas_mounts is hub-internal, declaration only -
+// see db/schema.ts's own comment).
+export function newNasMountId(): string {
+  return `nasmount-${randomSuffix(10)}`;
+}

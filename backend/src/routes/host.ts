@@ -6,6 +6,7 @@ import { getJob, startSelectJob } from "@/lib/modelDownloadJobs";
 import { getHouseholdSettingValue } from "@/lib/settings";
 import { getChatClient, getEngineStatus, restartChatBackend, stopChatBackend } from "@/lib/llmSupervisor";
 import { getEngineStatsSamples } from "@/lib/engineStats";
+import { withTimeout } from "@/lib/withTimeout";
 import { ModelCapabilities } from "@maipai/spec/gen/ts/model-capabilities.js";
 import type { AppEnv } from "@/types";
 
@@ -93,27 +94,16 @@ const RESTART_TIMEOUT_MS = 90_000;
 
 hostRoutes.post("/engine/restart", requireRole("owner", "admin"), async (c) => {
   await restartChatBackend();
-  // A code review (2026-09-04) found the timer here was never cleared
-  // once the race settled, keeping a live setTimeout handle (and the
-  // event loop) alive for up to 90s after a fast, successful restart -
-  // harmless (its callback just rejects an already-settled race), but a
-  // real handle leak on every single restart call. Cleared in `finally`
-  // regardless of which side of the race won.
-  let timeoutHandle: ReturnType<typeof setTimeout> | undefined;
+  // withTimeout (lib/withTimeout.ts) owns the race-plus-clear-the-timer
+  // shape now - a code review (2026-09-06) found this hand-rolled copy
+  // was one of three in the codebase (scheduler.ts's per-job budget,
+  // modelDownload.ts's per-chunk stall detector, this one), the same
+  // "timer never cleared" bug class a 2026-09-04 review already found
+  // and fixed once, here specifically.
   try {
-    await Promise.race([
-      getChatClient(),
-      new Promise<never>((_, reject) => {
-        timeoutHandle = setTimeout(
-          () => reject(new Error(`timed out waiting for the chat engine after ${RESTART_TIMEOUT_MS / 1000}s`)),
-          RESTART_TIMEOUT_MS,
-        );
-      }),
-    ]);
+    await withTimeout(getChatClient(), RESTART_TIMEOUT_MS, () => new Error(`timed out waiting for the chat engine after ${RESTART_TIMEOUT_MS / 1000}s`));
   } catch (err) {
     return c.json({ error: (err as Error).message }, 503);
-  } finally {
-    clearTimeout(timeoutHandle);
   }
   return c.json(getEngineStatus());
 });

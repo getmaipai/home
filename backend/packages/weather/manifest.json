@@ -52,7 +52,6 @@
   "contributes": {
     "widgets": [{ "id": "current", "title": "Weather", "size": "card", "refresh_s": 1800, "inputs": { "place": "Seattle" } }]
   },
-  "pages": [],
   "min_app": "0.1.0",
   "tier": 0,
   "quality_scale": "bronze",

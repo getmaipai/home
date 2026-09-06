@@ -26,7 +26,7 @@ import type { PackageManifest } from "@maipai/spec/gen/ts/manifest.js";
 import type { PluginResult } from "@maipai/spec/interpreters/ts/recipe-interpreter.js";
 import { createHost } from "@/lib/packageHost";
 import { raiseIssue, resolveIssue } from "@/lib/issues";
-import { tier1PackageDataDir, ensureDataDir } from "@/lib/paths";
+import { tier1PackageDataDir, ensureDataDir, isValidPackageId } from "@/lib/paths";
 import { resolvePackageDir } from "@/lib/packageResolve";
 import type { PersonRow } from "@/types";
 
@@ -45,6 +45,19 @@ interface SandboxProcess {
    * false means the process died on its own, which is what actually
    * counts as a crash for strike-counting purposes below. */
   closingDeliberately: boolean;
+  /** SEC-6 (code review, 2026-09-06): the actor of whichever
+   * callTier1Handle() invocation currently holds `turnLock` below - the
+   * `host/fetch` request handler reads THIS, not a value captured once
+   * at process start, so a caller who happens to warm the process is
+   * never the one every later caller's host.* calls run as. */
+  currentActor: PersonRow;
+  /** A one-at-a-time queue for this package's `handle` calls (SEC-6):
+   * one stdio MCP connection, one in-flight household caller, so
+   * `currentActor` above is never ambiguous while a `host/fetch` request
+   * from the package's own in-flight `handle` call is being answered.
+   * Chained, never reset - each caller awaits the previous link before
+   * setting `currentActor` and running its own turn. */
+  turnLock: Promise<void>;
 }
 
 const processes = new Map<string, SandboxProcess>();
@@ -119,6 +132,15 @@ async function startProcess(id: string, manifest: PackageManifest, actor: Person
 
   const client = new Client({ name: "maipai-hub", version: "0.1.0" });
 
+  const entry: SandboxProcess = {
+    client,
+    transport,
+    lastUsedAt: Date.now(),
+    closingDeliberately: false,
+    currentActor: actor,
+    turnLock: Promise.resolve(),
+  };
+
   // The one host.* method this spike proves end to end (session-d step
   // 5's own acceptance test): a Tier 1 package's fetch, through the
   // exact same permission/rate-limit/SSRF/cache path a Tier 0 recipe's
@@ -127,15 +149,21 @@ async function startProcess(id: string, manifest: PackageManifest, actor: Person
   // (that's C's wiring once it exists), so any memory.remember() a
   // future host.* bridge adds would fall back to the package id, same
   // as an untied Tier 0 run does today.
+  //
+  // Reads entry.currentActor (SEC-6), not the `actor` this function was
+  // started with: callTier1Handle()'s turnLock guarantees exactly one
+  // caller's `handle` invocation - and so exactly one actor - is ever in
+  // flight for this process at a time, so this is never stale or
+  // ambiguous the way a value captured once here at process-start would
+  // be for every later caller.
   client.setRequestHandler(HostFetchRequestSchema, async (req) => {
     const delay = testFetchDelayMs;
     if (delay !== null) await new Promise((resolve) => setTimeout(resolve, delay));
-    const host = createHost(actor, manifest);
+    const host = createHost(entry.currentActor, manifest);
     const value = await host.fetch(req.params.url, req.params.opts);
     return { value };
   });
 
-  const entry: SandboxProcess = { client, transport, lastUsedAt: Date.now(), closingDeliberately: false };
   client.onclose = () => {
     processes.delete(id);
     if (!entry.closingDeliberately) {
@@ -170,6 +198,22 @@ async function killProcess(id: string): Promise<void> {
  * between household use, not mid-conversation), and safe for a Tier 0
  * package (nothing here to kill). */
 export async function killLiveProcessForInstallChange(id: string): Promise<void> {
+  await killProcess(id);
+}
+
+/** callTier1Handle()'s own fault path needs this, not killProcess(id)
+ * directly (a review, 2026-09-06, found a real race SEC-6's turnLock
+ * introduced): a queued caller B shares the SAME `entry` object A held
+ * when A's call faulted and killed it. If a THIRD caller for the same id
+ * managed to start a brand-new, healthy process in the window between
+ * A's kill and B resuming, `processes.get(id)` now names that new
+ * process, not the one B was actually holding - killProcess(id) would
+ * tear it down too, misattributing A's fault to a process that never
+ * erred. Only kills when the map still names `expected`, the exact
+ * process this caller's own turn was for; otherwise a no-op, since
+ * whoever replaced it already owns its lifecycle. */
+async function killProcessIfCurrent(id: string, expected: SandboxProcess): Promise<void> {
+  if (processes.get(id) !== expected) return;
   await killProcess(id);
 }
 
@@ -221,6 +265,7 @@ export async function callTier1Handle(
   actor: PersonRow,
   inputs: Record<string, unknown>,
 ): Promise<PluginResult> {
+  if (!isValidPackageId(id)) return fallbackResult(manifest);
   if (disabledUntilReboot.has(id)) return fallbackResult(manifest);
 
   let entry = processes.get(id);
@@ -240,6 +285,21 @@ export async function callTier1Handle(
   }
   entry.lastUsedAt = Date.now();
 
+  // SEC-6: wait for whichever earlier caller currently holds the turn
+  // lock, then take it ourselves - this is what makes `entry.currentActor`
+  // (read by the host/fetch handler above) always the actor this exact
+  // `handle` call belongs to, never a stale or concurrent one. Released
+  // in `finally` no matter how this call ends (a clean reply, a fault, a
+  // killed process) so a fault can never wedge every later caller behind
+  // a lock nothing will ever release.
+  const previousTurn = entry.turnLock;
+  let releaseTurn: () => void;
+  entry.turnLock = new Promise<void>((resolve) => {
+    releaseTurn = resolve;
+  });
+  await previousTurn;
+  entry.currentActor = actor;
+
   const timeoutMs = manifest.timeout_ms ?? DEFAULT_HANDLE_TIMEOUT_MS;
   try {
     const result = await entry.client.callTool({ name: "handle", arguments: inputs }, undefined, { timeout: timeoutMs });
@@ -253,8 +313,12 @@ export async function callTier1Handle(
     // A timeout or a transport failure both leave the process in an
     // unknown state - killed here (not left running) so a stuck process
     // never lingers past its own fault; the next call starts fresh.
-    await killProcess(id);
+    // killProcessIfCurrent, not killProcess(id) directly - see its own
+    // header for the race this avoids.
+    await killProcessIfCurrent(id, entry);
     return recordFault(id, manifest, (err as Error).message);
+  } finally {
+    releaseTurn!();
   }
 }
 
@@ -326,6 +390,14 @@ let testFetchDelayMs: number | null = null;
 
 export function __setTestFetchDelayMsForTests(ms: number | null): void {
   testFetchDelayMs = ms;
+}
+
+/** SEC-6's own regression test needs to observe which actor's turn a
+ * running process currently holds - not otherwise visible from the
+ * outside, since host.fetch itself doesn't branch on actor yet (this
+ * file's own header comment on that gap). */
+export function __testCurrentActorId(id: string): string | undefined {
+  return processes.get(id)?.currentActor.id;
 }
 
 export function __resetDenoHostForTests(): void {

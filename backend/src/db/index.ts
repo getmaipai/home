@@ -7,6 +7,7 @@ import { fileURLToPath } from "node:url";
 import { dataDir } from "@/lib/paths";
 import { checkSchemaVersion, stampSchemaVersion } from "@/db/schema-version";
 import { applyPendingRestore } from "@/lib/restoreStaging";
+import { applyPendingFactoryReset } from "@/lib/factoryReset";
 import * as schema from "@/db/schema";
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -21,6 +22,18 @@ if (!existsSync(dataDir)) mkdirSync(dataDir, { recursive: true, mode: 0o700 });
 const applied = applyPendingRestore();
 if (applied) {
   console.log(`[restore] applied backup ${applied.filename} staged at ${applied.stagedAt}`);
+}
+
+// Step 9: a staged factory reset applies the same way, at the same
+// moment - see lib/factoryReset.ts's own header for why. Checked after
+// a pending restore, not before: were both somehow staged at once (they
+// shouldn't be - routes/storage.ts's stageFactoryReset route is a
+// separate action from restoring), applying the restore first and then
+// wiping it via the reset is the safer order, since the reset's own
+// backup was taken after the restore was staged.
+const resetApplied = applyPendingFactoryReset();
+if (resetApplied) {
+  console.log(`[factory-reset] applied - staged at ${resetApplied.stagedAt}, backed up to ${resetApplied.backupFilename} first`);
 }
 
 const dbPath = join(dataDir, "hub.db");

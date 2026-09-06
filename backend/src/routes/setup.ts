@@ -1,9 +1,10 @@
-// The setup wizard's API surface. Session F step 5 ships only the "trust
-// this hub" piece (`GET /api/setup/ca`); the rest of the wizard's steps
-// (household, owner, acknowledgment, hardware, packages, remote,
-// emergency_kit, backup, done - the wave-2 contract's full
-// `GET /api/setup/state`/`POST /api/setup/:step`) land with later steps
-// that build the things each step actually configures.
+// The setup wizard's API surface. Session F step 5 shipped the "trust
+// this hub" piece (`GET /api/setup/ca`); step 11 adds `POST /api/setup/
+// hardware` (install.sh's own minimums check, and the wizard's hardware
+// step's data source). The rest (household, owner, acknowledgment,
+// packages, remote, emergency_kit, backup, done - the wave-2 contract's
+// full `GET /api/setup/state`/`POST /api/setup/:step`) still land with
+// later steps that build the things each one actually configures.
 import { createRoute, z } from "@hono/zod-openapi";
 import { apiRouter, errorResponses } from "@/lib/openapi";
 import { getHouseholdCaCertificate, ensureHouseholdLeaf } from "@/lib/householdCa";
@@ -11,6 +12,8 @@ import { getHubName } from "@/lib/hubIdentity";
 import { listHubEndpoints } from "@/lib/hubEndpoints";
 import { tryConsume } from "@/lib/rateLimiter";
 import { getClientIp } from "@/lib/secretThrottle";
+import { detectHardware } from "@/lib/hardware";
+import { recommend } from "@/lib/modelCatalog";
 
 // A person on the household's own LAN hits this a handful of times while
 // working through the trust step, never dozens of times a second - the
@@ -98,6 +101,75 @@ setupRoutes.openapi(caRoute, async (c) => {
         linux: "Copy it into your distribution's CA trust store (e.g. /usr/local/share/ca-certificates/) and update it.",
       },
       qrPayload,
+    },
+    200,
+  );
+});
+
+// Same "a person's pace" reasoning as the CA route above: unauthenticated
+// (setup happens before a household exists) but bounded, since detecting
+// CUDA devices spawns an nvidia-smi subprocess.
+const SETUP_HARDWARE_RATE_LIMIT = { capacity: 10, refillPerSecond: 0.5 };
+
+const hardwareRoute = createRoute({
+  method: "post",
+  path: "/hardware",
+  tags: ["Setup"],
+  summary: "Detected hardware and whether a chat model fits it",
+  responses: {
+    200: {
+      content: {
+        "application/json": {
+          schema: z.object({
+            platform: z.string(),
+            arch: z.string(),
+            totalRamGb: z.number(),
+            cpuCount: z.number(),
+            isAppleSilicon: z.boolean(),
+            cudaDevices: z.array(z.object({ name: z.string(), vramGb: z.number() })),
+            chatFit: z.object({
+              // false on a CPU-only, non-Apple-Silicon box: hardware.ts's
+              // primaryBudgetBytes() has no chat-inference sizing model for
+              // that case yet (returns 0, "no automatic recommendation
+              // possible" by its own doc comment) - reporting a confident
+              // pass/fail off a budget of 0 would be a false "meets
+              // minimums" or a false "doesn't", neither of which is true;
+              // "not determined" is the honest answer until CPU inference
+              // is sized.
+              determined: z.boolean(),
+              meetsMinimum: z.boolean().nullable(),
+              bestFit: z.object({ id: z.string(), label: z.string() }).nullable(),
+            }),
+          }),
+        },
+      },
+      description: "Real detected hardware plus whether any implemented chat-role model fits it.",
+    },
+    ...errorResponses({ 429: "Too many requests from this address" }),
+  },
+});
+setupRoutes.openapi(hardwareRoute, async (c) => {
+  const ip = getClientIp(c);
+  if (!tryConsume(`setup-hardware:${ip}`, SETUP_HARDWARE_RATE_LIMIT)) {
+    return c.json({ error: "Too many requests. Wait a moment and try again." }, 429);
+  }
+  const hw = await detectHardware();
+  const fits = recommend("chat", hw);
+  const determined = hw.isAppleSilicon || hw.cudaDevices.length > 0;
+  const best = fits.find((f) => f.model.implemented && f.fits) ?? null;
+  return c.json(
+    {
+      platform: hw.platform,
+      arch: hw.arch,
+      totalRamGb: hw.totalRamGb,
+      cpuCount: hw.cpuCount,
+      isAppleSilicon: hw.isAppleSilicon,
+      cudaDevices: hw.cudaDevices.map((d) => ({ name: d.name, vramGb: Math.round(d.vramBytes / 1_073_741_824) })),
+      chatFit: {
+        determined,
+        meetsMinimum: determined ? best !== null : null,
+        bestFit: best ? { id: best.model.id, label: best.model.label } : null,
+      },
     },
     200,
   );

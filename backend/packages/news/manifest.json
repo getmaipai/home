@@ -48,7 +48,6 @@
   "contributes": {
     "widgets": [{ "id": "headlines", "title": "News", "size": "row", "refresh_s": 900, "inputs": {} }]
   },
-  "pages": [],
   "min_app": "0.1.0",
   "timeout_ms": 8000,
   "tier": 1,

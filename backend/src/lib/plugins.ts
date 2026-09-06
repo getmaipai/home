@@ -24,7 +24,7 @@ import { callTier1Handle } from "@/lib/denoHost";
 import { registerPackageNotificationTypes } from "@/lib/notificationTypes";
 import { parseWhen } from "@/lib/scheduler";
 import { listActivePeople } from "@/lib/access";
-import { PACKAGES_DIR } from "@/lib/paths";
+import { PACKAGES_DIR, statMtimeMs, isValidPackageId } from "@/lib/paths";
 import { resolvePackageDir, listInstalledPackageIds } from "@/lib/packageResolve";
 import { ROLE_LADDER, type Role } from "@/middleware/auth";
 import type { PersonRow } from "@/types";
@@ -62,6 +62,26 @@ export function listPackageIds(): string[] {
   return [...new Set([...bundled, ...listInstalledPackageIds()])];
 }
 
+// mtime-keyed caches for loadManifestOnly()/loadPackage() (a latency
+// review, 2026-09-06: every one of turnEngine.ts's loadAllManifests()
+// calls re-read and re-Zod-validated every bundled package's manifest,
+// twelve packages' worth every single turn, none of it ever changing
+// between household messages). Keyed by file mtime rather than a plain
+// "load once at boot" cache, so an installed or edited package (the
+// catalog install flow, a developer editing manifest.json by hand) is
+// picked up on its very next read - the same "unchanged reads for free,
+// a real change re-reads" contract lib/settings.ts's own cache (below)
+// uses. `statMtimeMs()` (lib/paths.ts) on two small files per package is
+// orders of magnitude cheaper than the read + JSON.parse + Zod safeParse
+// it replaces.
+const manifestCache = new Map<string, { mtimeMs: number; manifest: PackageManifest }>();
+const packageCache = new Map<string, { manifestMtimeMs: number; recipeMtimeMs: number; value: LoadedPackage }>();
+
+export function __resetPackageCachesForTests(): void {
+  manifestCache.clear();
+  packageCache.clear();
+}
+
 /** Reads and validates just manifest.json, for lib/persona.ts's own
  * companion-catalog loader (step 8, session-a-intelligence.md): a
  * `kind: "companion"` package has no recipe.json at all (it composes
@@ -78,9 +98,34 @@ export function listPackageIds(): string[] {
  * instead. loadPackage() keeps its original read-both-then-validate
  * shape untouched below. */
 export function loadManifestOnly(id: string): PluginOpResult<PackageManifest> {
+  if (!isValidPackageId(id)) {
+    return { ok: false, status: 400, error: `${id} is not a valid package id` };
+  }
+  const manifestPath = join(resolvePackageDir(id), "manifest.json");
+  const mtimeMs = statMtimeMs(manifestPath);
+  if (mtimeMs === null) {
+    manifestCache.delete(id);
+    return { ok: false, status: 404, error: `no bundled package ${id}` };
+  }
+  const cached = manifestCache.get(id);
+  if (cached && cached.mtimeMs === mtimeMs) return { ok: true, value: cached.manifest };
+  // packageCache (loadPackage()'s own cache, below) already holds this
+  // exact manifest, at this exact mtime, when a Tier 0 turn calls
+  // loadAllManifests() (which uses loadPackage()) and then runPlugin()
+  // calls this function moments later for the SAME package - a code
+  // review (2026-09-06) found that re-parsed manifest.json from scratch
+  // a second time in the same turn instead of reusing what packageCache
+  // had just read. Populates manifestCache too, so a third call in the
+  // same turn hits the cheaper map directly.
+  const cachedPackage = packageCache.get(id);
+  if (cachedPackage && cachedPackage.manifestMtimeMs === mtimeMs) {
+    manifestCache.set(id, { mtimeMs, manifest: cachedPackage.value.manifest });
+    return { ok: true, value: cachedPackage.value.manifest };
+  }
+
   let manifestJson: unknown;
   try {
-    manifestJson = JSON.parse(readFileSync(join(resolvePackageDir(id), "manifest.json"), "utf-8"));
+    manifestJson = JSON.parse(readFileSync(manifestPath, "utf-8"));
   } catch {
     return { ok: false, status: 404, error: `no such package ${id}` };
   }
@@ -88,14 +133,32 @@ export function loadManifestOnly(id: string): PluginOpResult<PackageManifest> {
   if (!manifestParsed.success) {
     return { ok: false, status: 400, error: `package ${id}'s manifest failed validation: ${manifestParsed.error.message}` };
   }
+  manifestCache.set(id, { mtimeMs, manifest: manifestParsed.data });
   return { ok: true, value: manifestParsed.data };
 }
 
 export function loadPackage(id: string): PluginOpResult<LoadedPackage> {
+  if (!isValidPackageId(id)) {
+    return { ok: false, status: 400, error: `${id} is not a valid package id` };
+  }
+  const packageDir = resolvePackageDir(id);
+  const manifestPath = join(packageDir, "manifest.json");
+  const recipePath = join(packageDir, "recipe.json");
+  const manifestMtimeMs = statMtimeMs(manifestPath);
+  const recipeMtimeMs = statMtimeMs(recipePath);
+  if (manifestMtimeMs === null || recipeMtimeMs === null) {
+    packageCache.delete(id);
+    return { ok: false, status: 404, error: `no bundled package ${id}` };
+  }
+  const cached = packageCache.get(id);
+  if (cached && cached.manifestMtimeMs === manifestMtimeMs && cached.recipeMtimeMs === recipeMtimeMs) {
+    return { ok: true, value: cached.value };
+  }
+
   let manifestJson: unknown, recipeJson: unknown;
   try {
-    manifestJson = JSON.parse(readFileSync(join(resolvePackageDir(id), "manifest.json"), "utf-8"));
-    recipeJson = JSON.parse(readFileSync(join(resolvePackageDir(id), "recipe.json"), "utf-8"));
+    manifestJson = JSON.parse(readFileSync(manifestPath, "utf-8"));
+    recipeJson = JSON.parse(readFileSync(recipePath, "utf-8"));
   } catch {
     // The JSON.parse calls are inside the try on purpose. A code review
     // (2026-09-05) found them outside it, so a truncated or half-written
@@ -116,7 +179,9 @@ export function loadPackage(id: string): PluginOpResult<LoadedPackage> {
   if (!recipeParsed.success) {
     return { ok: false, status: 400, error: `package ${id}'s recipe failed validation: ${recipeParsed.error.message}` };
   }
-  return { ok: true, value: { manifest: manifestParsed.data, recipe: recipeParsed.data } };
+  const value: LoadedPackage = { manifest: manifestParsed.data, recipe: recipeParsed.data };
+  packageCache.set(id, { manifestMtimeMs, recipeMtimeMs, value });
+  return { ok: true, value };
 }
 
 /** Called once at boot (index.ts): every bundled package's own manifest

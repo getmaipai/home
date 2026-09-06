@@ -5,6 +5,7 @@ import { __resetThrottleForTests } from "@/lib/secretThrottle";
 import { createHost, performHttpFetch, withOneRetry, formatSearxngResults, type AttemptResult } from "@/lib/packageHost";
 import { __resetRateLimiterForTests } from "@/lib/rateLimiter";
 import { cachedFetch, __resetPackageCacheForTests, __clearPackageCacheDirForTests } from "@/lib/packageCache";
+import { assertNotPrivateHost } from "@/lib/ssrfGuard";
 import { setHouseholdSettingValue } from "@/lib/settings";
 import { HostError } from "@maipai/spec/emulators/ts/host-emulator.js";
 import { PackageManifest } from "@maipai/spec/gen/ts/manifest.js";
@@ -407,6 +408,81 @@ describe("performHttpFetch (the real HTTP mechanics, no SSRF/permission/rate-lim
     // comma-joined value ("application/x-custom, application/json") -
     // exactly single, unjoined value here proves only one was ever sent.
     expect(seenContentType).toBe("application/x-custom");
+  });
+
+  // SEC-3 (code review, 2026-09-06): fetch's default redirect: "follow"
+  // meant a redirect's own target never passed through the caller's SSRF/
+  // permission check at all - only the original url did. Switched to
+  // redirect: "manual" plus a manual loop that calls `validateHop` (the
+  // caller's own check, real createHost() callers pass
+  // assertNotPrivateHost + requirePermission) against every hop's target
+  // before following it.
+  describe("redirects (SEC-3)", () => {
+    test("a redirect is still followed end to end when nothing blocks it", async () => {
+      const target = Bun.serve({ port: 0, fetch: () => Response.json({ ok: true }) });
+      const origin = Bun.serve({
+        port: 0,
+        fetch: () => new Response(null, { status: 302, headers: { Location: `http://127.0.0.1:${target.port}/` } }),
+      });
+      try {
+        const result = await performHttpFetch(`http://127.0.0.1:${origin.port}/start`);
+        expect(result).toEqual({ ok: true });
+      } finally {
+        origin.stop(true);
+        target.stop(true);
+      }
+    });
+
+    test("validateHop is called with the redirect's OWN target url, not the original", async () => {
+      const target = Bun.serve({ port: 0, fetch: () => Response.json({ ok: true }) });
+      const origin = Bun.serve({
+        port: 0,
+        fetch: () => new Response(null, { status: 302, headers: { Location: `http://127.0.0.1:${target.port}/secret` } }),
+      });
+      const seenHops: string[] = [];
+      try {
+        await performHttpFetch(`http://127.0.0.1:${origin.port}/start`, undefined, async (hopUrl) => {
+          seenHops.push(hopUrl);
+        });
+        expect(seenHops).toEqual([`http://127.0.0.1:${target.port}/secret`]);
+      } finally {
+        origin.stop(true);
+        target.stop(true);
+      }
+    });
+
+    test("a redirect landing on a private/loopback target is refused, never followed", async () => {
+      const origin = Bun.serve({
+        port: 0,
+        fetch: () => new Response(null, { status: 302, headers: { Location: "http://127.0.0.1:9/secret" } }),
+      });
+      const validateHop = async (hopUrl: string): Promise<void> => {
+        await assertNotPrivateHost(new URL(hopUrl).hostname).catch((err) => {
+          throw new HostError("invalid_input", (err as Error).message);
+        });
+      };
+      try {
+        await expect(performHttpFetch(`http://127.0.0.1:${origin.port}/start`, undefined, validateHop)).rejects.toThrow(HostError);
+      } finally {
+        origin.stop(true);
+      }
+    });
+
+    test("more than the redirect cap is refused, not followed forever", async () => {
+      const origin = Bun.serve({
+        port: 0,
+        fetch: (req) => {
+          const url = new URL(req.url);
+          const hop = Number(url.pathname.slice(1)) || 0;
+          return new Response(null, { status: 302, headers: { Location: `/${hop + 1}` } });
+        },
+      });
+      try {
+        await expect(performHttpFetch(`http://127.0.0.1:${origin.port}/0`)).rejects.toThrow(HostError);
+      } finally {
+        origin.stop(true);
+      }
+    });
   });
 });
 

@@ -54,6 +54,27 @@ describe("setup (first-run owner creation)", () => {
     const res = await client.post("/api/auth/setup", { displayName: "Sage", secret: "abc" });
     expect(res.status).toBe(400);
   });
+
+  // COR-4 (code review, 2026-09-06): check-then-insert with a real await
+  // (hashSecret's own argon2id work) in between used to let two
+  // concurrent first-run POSTs both pass the "anyone exists" check
+  // before either had written a row, minting two owners. Fired without
+  // awaiting the first, on purpose - this is the exact overlap the fix
+  // guards against.
+  test("two concurrent setup calls yield exactly one owner, never two", async () => {
+    const clientA = new TestClient();
+    const clientB = new TestClient();
+    const [resA, resB] = await Promise.all([
+      clientA.post("/api/auth/setup", { displayName: "Sage", secret: "correcthorse" }),
+      clientB.post("/api/auth/setup", { displayName: "Nova", secret: "whatever123" }),
+    ]);
+    const statuses = [resA.status, resB.status].sort();
+    expect(statuses).toEqual([201, 409]);
+
+    const rows = db.select().from(people).all();
+    expect(rows.length).toBe(1);
+    expect(rows[0]!.role).toBe("owner");
+  });
 });
 
 describe("profiles picker", () => {

@@ -57,6 +57,26 @@ export interface CommandRow {
   createdAt: string;
 }
 
+// Whole-table cache for matchCommand()/listCommands() (a latency review,
+// 2026-09-06: matchCommand() runs `SELECT * FROM commands` synchronously
+// on every single turn, most of which match nothing). Household commands
+// are small and change only through createCommand()/deleteCommand()
+// below, both of which invalidate it; `null` means "not loaded yet or
+// just invalidated," never "the household has zero commands" (an empty
+// household still gets `[]` cached, same as any other value).
+let commandsCache: CommandRow[] | null = null;
+
+export function __resetCommandsCacheForTests(): void {
+  commandsCache = null;
+}
+
+function loadAllCommands(): CommandRow[] {
+  if (commandsCache === null) {
+    commandsCache = db.select().from(commands).all().map(toCommandRow);
+  }
+  return commandsCache;
+}
+
 function toCommandRow(row: typeof commands.$inferSelect): CommandRow {
   return {
     id: row.id,
@@ -158,6 +178,7 @@ export function createCommand(
     createdAt: new Date().toISOString(),
   };
   db.insert(commands).values(row).run();
+  commandsCache = null;
   return { ok: true, value: toCommandRow(row) };
 }
 
@@ -166,7 +187,7 @@ export function createCommand(
  * something every household member benefits from seeing exists, not
  * private state scoped to whoever created it. */
 export function listCommands(): CommandRow[] {
-  return db.select().from(commands).all().map(toCommandRow);
+  return [...loadAllCommands()];
 }
 
 /** The creator, or an owner/admin cleaning up after someone else - never
@@ -179,6 +200,7 @@ export function deleteCommand(actor: PersonRow, id: string): CommandOpResult<{ i
     return { ok: false, status: 403, error: "only the creator or an owner/admin can delete this command" };
   }
   db.delete(commands).where(eq(commands.id, id)).run();
+  commandsCache = null;
   return { ok: true, value: { id } };
 }
 
@@ -190,10 +212,19 @@ export function deleteCommand(actor: PersonRow, id: string): CommandOpResult<{ i
  * command's floor; the first match wins on ties, an acceptable
  * simplicity given trigger uniqueness is already enforced at creation. */
 export function matchCommand(text: string, actor: PersonRow): CommandRow | null {
-  for (const row of db.select().from(commands).all()) {
+  for (const row of loadAllCommands()) {
     if (!meetsMinRole(actor.role, row.minRole)) continue;
     if (matchPattern(text, row.trigger) === null) continue;
-    return toCommandRow(row);
+    // A shallow copy, not the cached row itself (a code review,
+    // 2026-09-06): commandsCache is shared across every call until the
+    // next create/delete invalidates it, so handing out the live
+    // reference would let a future caller that mutates its own result
+    // (normalizing a field before responding, say) silently corrupt
+    // every other household member's next command match/list until
+    // then. `action` is never mutated by any real caller either, but a
+    // shallow copy is cheap insurance for a small object, not worth
+    // re-litigating every time a new caller is added.
+    return { ...row };
   }
   return null;
 }

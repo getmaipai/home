@@ -4,7 +4,7 @@ import { resetDb } from "./reset-db";
 import { __resetThrottleForTests } from "@/lib/secretThrottle";
 import { __resetLlmSupervisorForTests } from "@/lib/llmSupervisor";
 import { setHouseholdSettingValue } from "@/lib/settings";
-import { listPackageIds, loadPackage, registerAllPackageNotificationTypes, warmPackage } from "@/lib/plugins";
+import { listPackageIds, loadPackage, loadManifestOnly, registerAllPackageNotificationTypes, warmPackage } from "@/lib/plugins";
 import { db } from "@/db";
 import { scheduledJobs } from "@/db/schema";
 import { eq } from "drizzle-orm";
@@ -228,6 +228,18 @@ describe("the bundled step-9 packages (lights, lock)", () => {
   });
 });
 
+describe("SEC-2: PACKAGES_DIR readers reject a malformed/traversal id before any join()", () => {
+  test("loadManifestOnly rejects it", () => {
+    const result = loadManifestOnly("../../data/packages/weather");
+    expect(result.ok).toBe(false);
+  });
+
+  test("loadPackage rejects it", () => {
+    const result = loadPackage("../../data/packages/weather");
+    expect(result.ok).toBe(false);
+  });
+});
+
 async function owner() {
   const client = new TestClient();
   await client.post("/api/auth/setup", { displayName: "Sage", secret: "correcthorse" });
@@ -281,6 +293,18 @@ describe("POST /api/plugins/remember/run", () => {
     const res = await client.post("/api/plugins/does-not-exist/run", { fact: "x" });
     expect(res.status).toBe(404);
   });
+
+  // SEC-2 (code review, 2026-09-06): Hono matches `/:id/run` on the raw,
+  // un-decoded path and only percent-decodes the param afterward, so a
+  // `%2F`-encoded id used to reach `join(PACKAGES_DIR, id, ...)` as a
+  // real `../../` traversal. app.request() (what TestClient wraps) does
+  // the identical raw-path routing a real HTTP request would.
+  test("a path-traversal id is rejected without ever touching the filesystem, not treated as a 404", async () => {
+    const client = await owner();
+    const res = await client.post("/api/plugins/..%2F..%2Fdata%2Fpackages%2Fweather/run", { fact: "x" });
+    expect(res.status).toBe(400);
+  });
+
 
   // A review (2026-09-04) found that a missing required input reached
   // the interpreter, left its `{fact}` placeholder un-interpolated, and

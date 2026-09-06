@@ -53,7 +53,6 @@
   "backup": "exclude",
   "background": false,
   "contributes": {},
-  "pages": [],
   "min_app": "0.1.0",
   "timeout_ms": 8000,
   "tier": 1,

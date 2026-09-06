@@ -141,6 +141,27 @@ export async function trigger(typeId: string, vars: Record<string, string> = {},
   }
 }
 
+/** Fires `safety.flagged_turn` for one evaluateSafety() result, fire-and-
+ * forget - the exact same three-line shape turnEngine.ts's prepareTurn(),
+ * runTurn()'s output check, and gateOutputSafety() each wrote out by hand
+ * (a code review, 2026-09-06, found a fourth copy of it landing in
+ * routes/llm.ts the same day). `logPrefix` keeps each caller's own
+ * console.error label (`[turn]`, `[llm]`) rather than forcing one on all
+ * of them. Never awaited by the caller: notifying a parent must never add
+ * latency to, or be able to fail, whatever triggered it - trigger() itself
+ * already never throws; this only adds the same guarantee for a promise
+ * rejection. */
+export function notifyIfFlagged(
+  actor: Pick<PersonRow, "displayName">,
+  safety: { notify_parent: boolean; categories: string[] },
+  logPrefix: string,
+): void {
+  if (!safety.notify_parent) return;
+  trigger("safety.flagged_turn", { childName: actor.displayName, categories: safety.categories.join(", ") }).catch((err: unknown) =>
+    console.error(`${logPrefix} safety.flagged_turn notification failed: ${(err as Error).message}`),
+  );
+}
+
 export interface NotificationDeliveryView {
   id: string;
   typeId: string;

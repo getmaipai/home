@@ -45,6 +45,7 @@ import {
 import { clonedVoicesDir } from "@/lib/paths";
 import { nextHlc } from "@/lib/hlc";
 import { TOMBSTONE_TEXT } from "@/lib/memory";
+import { invalidateScopeCache } from "@/lib/settings";
 import { deleteReceivedBackupsForDevice } from "@/lib/receivedBackups";
 import { ROLE_LADDER, invalidateSessionCacheForPerson, type Role } from "@/middleware/auth";
 import { trigger } from "@/lib/notifications";
@@ -255,6 +256,12 @@ export function erasePersonData(personId: string): ErasureCounts {
   // ("person:<id>"), so they are matched by that, not by a person_id
   // column this table does not have.
   const settings = sqlite.query("DELETE FROM settings_values WHERE scope = ?").run(`person:${personId}`).changes;
+  // A raw DELETE, not writeValue()/resetValue() - settings.ts's own
+  // resolveStoredValue() cache (a latency review, 2026-09-06) is only
+  // ever invalidated by those, so it needs telling directly here or a
+  // just-erased person's settings could keep serving their last cached
+  // value for the rest of this process's life.
+  invalidateScopeCache(`person:${personId}`);
   const clonedVoiceRows = sqlite.query("DELETE FROM cloned_voices WHERE creator_id = ?").run(personId).changes;
   // Deleted outright rather than marked cancelled: a job belonging to
   // somebody who no longer exists has nobody to run for, and a cancelled

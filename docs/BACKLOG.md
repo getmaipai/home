@@ -1238,9 +1238,19 @@ future session now that F's hub half exists.
       `bun run a11y` is a fast two-combo subset meant for `scripts/
       check.sh`.
 - [ ] **Wire `bun run a11y` into `scripts/check.sh`** (S, Session F -
-      that file's owner per `wave-2.md`'s shared-file protocol) - the
-      script exists and is fast (two combos, no screenshots saved); it
-      just isn't called from the gate yet.
+      that file's owner per `wave-2.md`'s shared-file protocol) - tried
+      in step 11 (2026-09-06) and backed out: it immediately fails on
+      the still-open "second, narrower contrast finding" above
+      (`chat @ desktop/light`, 6 nodes) every time, a real pre-existing
+      bug outside `frontend/`'s scope for this session to fix. Wiring it
+      in now would block every commit repo-wide over that one page,
+      the same "don't gate on content/code this session doesn't own"
+      call already made for the reading-level lint. Add the two lines
+      back to check.sh's frontend section once that finding is fixed:
+      ```
+      echo "== a11y: axe-core scan"
+      bun run a11y
+      ```
 - [ ] **Parallelize `scripts/screenshot.ts`'s full matrix** (S) - a code
       review (2026-09-06) noted the 4 viewport x 2 theme x 11 route
       matrix runs fully sequentially against one browser (up to 88
@@ -1448,19 +1458,18 @@ future session now that F's hub half exists.
       `"web"`) with the loader rejecting it outright for all of Wave 2 -
       a manifest field, never a sibling node kind, since a node
       SwiftUI/Go can't render would hollow out `catalog.test.ts`'s own
-      agreement test. **Blocks on D**: `manifest.schema.json`'s
-      `contributes` is currently an untyped array plus a redundant
-      top-level `pages: string[]` - incompatible with the already-frozen
-      wave-2.md `contributes.widgets[]` object shape. Recommended fix
-      (flagged to D 2026-09-06, D's file to change): `contributes`
-      becomes an object keyed by blueprint kind (`pages[]`, `widgets[]`,
-      ...), the redundant top-level `pages` dropped - confirmed safe,
-      nothing in `backend/src`/`frontend/src` reads either field today.
-      E's own share (`PackageScopeContext`, the nav registry merge,
-      `PackagePage.tsx`) waits on D's `contributes.pages` and the new
-      pages route landing - nothing to prove it against yet
-      (`lists`, D's own first page, is step 8 of D's plan, not started
-      as of 2026-09-06).
+      agreement test. **The schema blocker on D is cleared** (Session D
+      step 10, 2026-09-06): `manifest.schema.json`'s `contributes` is now
+      an object keyed by blueprint kind, with `pages[]` typed exactly as
+      recommended above (`{id, icon, label, nav, kind: "schema"|"web",
+      module}`) alongside `widgets[]`; the redundant top-level
+      `pages: string[]` is gone, and every bundled manifest's own empty
+      `"pages": []` was dropped with it. **Still open for E**: the
+      `GET /api/plugins/:id/pages/:pageId` route itself, `PackageScopeContext`,
+      the nav-registry merge, and `PackagePage.tsx` - no package
+      populates `contributes.pages` yet (D's own `lists` didn't end up
+      needing a dedicated page this wave, so there's still nothing real
+      to prove the consuming side against).
 - [x] **Build the missing kit primitives before the first full app, not
       alongside it** (M) - done 2026-09-05. `getmaipai/.github/docs/UI.md`
       decided that apps never build their own chrome (sidebar, search,
@@ -1481,13 +1490,30 @@ future session now that F's hub half exists.
       field); core's five pages register there by hand until a package's
       manifest `contributes.pages` can feed a sixth entry in without
       editing this file. See `docs/dev.md`, "Session B: step 2".
+- [x] **The data contract half, superseded and shipped** (Session D
+      step 9, 2026-09-06): `docs/plans/wave-2.md`'s own frozen D-to-E
+      contract answered the open design questions below for real -
+      `contributes.widgets[]` (`{id, title, size: "card"|"row",
+      refresh_s, inputs?}`) is the manifest hook, `GET /api/widgets`
+      lists what a role can see, `GET /api/widgets/:package/:id/data`
+      returns `{as_of, items}` by calling the exact same `runPlugin()` a
+      live chat turn or a warm tick already calls and wrapping its
+      `reply.text` as one item - no new "structured widget data" shape
+      invented, no live fetch outside the existing package cache.
+      `weather`, `news`, `list-view`, `almanac-date` are the first four
+      real widgets. **Still open, and still Jesse's design pass, not
+      decided by this contract**: the visual card/row system itself
+      (size, density, the size slider), which packages actually surface
+      on the dashboard vs. staying chat-only, and the legacy prior art
+      below - all E's/the dashboard's own build, once picked up.
 - [ ] **Skills as home-screen widgets - cards and rows** (L, needs its own
       design pass before any code - Jesse, 2026-09-05). The idea: a
       skill's data shown on a dashboard as a card (or, for some skills, a
       horizontal row of cards) instead of only being reachable by asking
-      for it in chat. Nothing here is decided yet - the card/row system
-      itself, which skills opt in, how a manifest declares it - this is
-      a real gap, not a small addition.
+      for it in chat. The manifest hook and the data route are real now
+      (see the item above); the card/row system itself - which packages
+      opt in, size/density, refresh cadence on the actual dashboard - is
+      still undecided.
       **Real prior art from the legacy app**, kept as reference for the
       design pass, not as something to port (the org's "copy from legacy"
       allowance is for hard-won logic, never UI or feature scope - so this
@@ -1511,14 +1537,13 @@ future session now that F's hub half exists.
         the "slider to dynamically adjust card size" Jesse referenced -
         real, working code in the legacy app, a good reference point for
         a fresh implementation, not a drop-in port.
-      **What a real design pass needs to decide, not guessed at here**:
-      whether a manifest's existing `contributes`/`pages` field is the
-      right hook for "this package offers a widget," how a lookup skill's
-      recipe output (today just `reply.text`/`speech`) maps to structured
-      widget data, whether cards refresh live or only on demand, and how
-      this interacts with the proactive/caching idea noted below (a
-      widget is the most natural place a proactively-fetched fact would
-      actually surface).
+      **What a real design pass still needs to decide** (the manifest
+      hook, the data route, and the reply-text-as-widget-item mapping
+      are answered now - see the item above): the actual visual card/row
+      system on the dashboard, which packages surface there by default
+      vs. opt-in, and how this interacts with the proactive/caching idea
+      noted below (a widget is the most natural place a proactively-
+      fetched fact would actually surface).
 
 - [ ] **The home screen: keep the dashboard, make it a real home**
       (decision for Jesse, then a design pass, M) - Jesse asked
@@ -1979,9 +2004,14 @@ on a spec tag that was never cut.
       E's file to add them to), `passive`-level digest batching, browser
       push / Go / TV overlay / robot speech (no such clients exist yet),
       a real parent/guardian audience (see the Relationship/Grant work
-      above), and package-declared notification types (the manifest's
-      `notifications` field is read by nothing yet - a real, deliberately
-      deferred extension point, not forgotten).
+      above). Package-declared notification types shipped in Session D
+      step 8 (2026-09-06): `registerAllPackageNotificationTypes()`
+      (`lib/plugins.ts`) reads every bundled package's own manifest
+      `notifications[]` and registers each through F's own
+      `registerPackageNotificationTypes()` (`lib/notificationTypes.ts`)
+      at boot, proven end to end (not just wired) by the `remind`/`timer`
+      packages' real `remind.due`/`timer.done` notifications
+      (`backend/tests/scheduler.test.ts`).
 
 - [ ] **Doc drift the audit found** (S, but some of it is Jesse's call) -
       `.github/CLAUDE.md` says the rebuild follows `home/spec/design/`,
@@ -2410,23 +2440,193 @@ that owns it.
       backup mode and exclude patterns. Today `llmSupervisor.ts`,
       `embedSupervisor.ts` and `ttsSupervisor.ts` are three copies of the
       same shape.
-- [ ] **Storage: layout, quotas, disk-full policy, NAS mounts** (M, F) -
-      plan 4.15's `data/` layout, per-person quotas, caches-first
-      eviction then a Repairs item, media libraries as declared mount
-      points; a Storage page (E). Only "storage locations" appears above,
-      as a legacy feature awaiting a verdict.
-- [ ] **Uninstall, factory reset, hub migration, two hubs** (S-M, F) -
-      plan 4.15; none exist. Migration keeps the instance id and CA so
-      pinned clients survive; two hubs are two instance ids and a client
-      remembers its choice.
-- [ ] **Redacted diagnostics with a `TO_REDACT` list in the spec** (S,
-      F) - plan 4.13; a test that no secret, address or family name
-      survives the download.
-- [ ] **Service install and the one-line installer** (M, F) - a Windows
-      service, launchd, systemd, the GPU power ordering legacy `run.ps1`
-      learned, port-conflict detection; `install.sh`/`install.ps1`
-      checking out the latest tag, never `main` (legacy had both under
-      `docs/public/`).
+- [x] **Storage: sizes, quotas, disk-full policy, NAS mounts, factory
+      reset, diagnostics** (Session F step 9, 2026-09-06) -
+      `GET /api/storage` (bytes per area - database/models/engines/voice/
+      cache/backups, plus D's `getCacheStats()` per package, plus real
+      free/total disk via `statfsSync`). "Caches first" needed no new
+      code: `lib/packageCache.ts` (D's file) already evicts its own
+      oldest entries against real free disk space on every write; this
+      step's own job (`storage.check_disk_full`, hourly) is the "then a
+      Repairs item" half for when free space is STILL critical after
+      caches have done everything they can, since real household data
+      cannot shrink itself the way a cache can. Per-person quotas:
+      `checkPersonQuota()` checks the one per-person upload with a
+      tracked byte count today (cloned voices), default unlimited - the
+      mechanism is built, `routes/voice.ts` (C's file) still needs to
+      call it before a new upload, the same "mechanism here, wiring
+      there" cross-session split step 7's `ctx.allowance` uses. NAS
+      mounts: `GET/POST/DELETE /api/storage/nas-mounts`, declaration
+      only (a real, already-mounted directory path + scan-path strings)
+      - no media-library scanner exists yet to walk them, so nothing
+      reads `scanPaths` today. Factory reset: `POST /api/storage/
+      factory-reset` (owner-only, no grant widening), typed confirmation
+      (`"DELETE EVERYTHING"`), a real backup taken first and refused
+      whole if that backup fails, staged and applied at the next boot -
+      the identical safety shape `lib/restoreStaging.ts` already
+      established for restore (the live database is renamed aside, never
+      deleted outright, so a mistaken reset is still recoverable by
+      hand). Diagnostics: `GET /api/storage/diagnostics`, built
+      structurally (every field deliberately chosen, never a fuller dump
+      filtered after the fact) per `spec/diagnostics/to-redact.json`'s
+      own categories - never a display name/nickname/birthdate, never a
+      hub endpoint's address or the hub's own (admin-typable) display
+      name, never a person-scoped settings value, never a settings value
+      the registry marks `secret: true`. `data/` layout formalization
+      (plan 4.15's `db/` subdirectory) was NOT done: `hub.db` stays at
+      `dataDir`'s own root rather than moving under a new `db/` folder -
+      a real migration of the live database's own path is a materially
+      riskier change than this step's other pieces, and nothing found a
+      concrete reason it's needed yet. Hub migration and two-hubs support
+      also NOT done (genuinely separate scope from a single hub's own
+      storage/reset/diagnostics story). No UI yet for any of this - a
+      Storage page is E's kit work on top of these routes.
+      **A real bug fixed in already-merged code while building this**:
+      `lib/restoreStaging.ts`'s `applyPendingRestore()` (step 5) could
+      split a database from its own WAL/SHM journal across a crash mid-
+      rename - found while giving `lib/factoryReset.ts`'s copy of the
+      identical shape the same treatment, and it took two review passes
+      to get fully right (see `docs/dev/session-f.md`'s step 9 write-up).
+      Both files now share one fixed implementation
+      (`moveDbSet`/`dbSetExists`/`partialMoveInProgress`).
+- [x] **The updates projection, app half only** (Session F step 10,
+      2026-09-06) - `GET/POST /api/updates` (`GET` reads the cached last
+      check; `POST /check`, owner/admin, forces a fresh one), a real GET
+      against GitHub's own public release API for `getmaipai/home`,
+      cached in a new `app_update_state` table so a route never blocks on
+      a live network call, a daily core job (`updates.check`), a
+      `passive`-level `updates.available` notification when
+      `isNewerVersion()` (real numeric semver comparison, not a string
+      one - `"0.9.0" < "0.10.0"` fails lexicographically) says the
+      release found is genuinely newer than the installed version.
+      `lib/privacy.ts` gained the matching row in the same commit (org
+      standard: an outbound endpoint's privacy-page row lands with the
+      code that adds it) - this is the ONE periodic, not household-
+      triggered outbound call this hub makes, and it reaches GitHub's own
+      public API, never a MaiPai-operated server.
+      **Deliberately not built, and why:**
+      - **Packages, models, sidecars** (the plan's other three
+        projection halves) - nothing real to check against yet. No
+        package catalog is live (`getmaipai/catalog` doesn't consume
+        anything yet), `lib/modelCatalog.ts` (D's/F's shared catalog) is
+        a static hand-maintained list with no version-comparison concept
+        of its own, and sidecars are "pinned with the app" (they follow
+        whatever the app's own release settles on, not tracked
+        separately). Building a projection for data with no real
+        "latest" to compare against would be speculative code with
+        nothing to verify it against.
+      - **`lib/selfUpdate.ts`** (verify, back up, stage into
+        `releases/<version>`, dry-run migrations, swap, restart, health-
+        check-or-roll-back) - genuinely blocked on step 11 (no service
+        exists yet to restart under, and no release has EVER been cut
+        for this project - `CHANGELOG.md`'s own header still says so),
+        and on cross-cutting "never during a conversation/generation/
+        download/playback" hooks into `turnEngine.ts`/`packageHost.ts`/
+        voice playback - all other sessions' files, not F's to wire.
+        Attempting this now would be unverifiable by construction
+        (nothing real to restart, nothing real to roll back to).
+      - **`installedVersion()`** currently reads a placeholder
+        (`package.json`'s own `0.1.0`, or a global override tests set) -
+        there is no real "what version is this build" stamping mechanism
+        yet either, since that is properly the release skill's job
+        (a separate, org-level repo) once a release is actually cut.
+      No UI yet - the "MaiPai Home {version} is available" surface is
+      E's kit work on top of `GET /api/updates`.
+- [ ] **Hub migration, two hubs** (S-M, F) - plan 4.15; none exist.
+      Migration keeps the instance id and CA so pinned clients survive;
+      two hubs are two instance ids and a client remembers its choice.
+- [x] **Service install and the one-line installer** (Session F step 11,
+      2026-09-06) - `scripts/install.sh` (macOS + Linux) and `scripts/
+      install.ps1` (Windows): fetch the latest GitHub release tag (never
+      `main`), install Bun system-wide, build the app, register a real
+      background service (systemd on Linux, a launchd LaunchDaemon on
+      macOS - not a LaunchAgent, since the hub has to run with no one
+      logged in - and a Windows service via WinSW, pinned to v2.12.0 and
+      checksum-verified before use), and start it. Both detect a port
+      already in use and pick the next free one, and are idempotent
+      (re-running upgrades in place via `rsync --delete`/`robocopy /MIR`,
+      excluding `data/`/`backups/`/`received-backups/`). `scripts/
+      uninstall.sh` (step 9) had drifted from this - it looked for a
+      LaunchAgent - fixed to match, plus a Windows removal hint.
+      A new `POST /api/setup/hardware` (the plan itself assumed this
+      already existed from an earlier step; it didn't) gives both
+      scripts something real to check hardware minimums against, reusing
+      `lib/hardware.ts`/`lib/modelCatalog.ts` read-only.
+      **The legacy `run.ps1`'s GPU power-ordering lesson was deliberately
+      NOT carried forward**: its own comments record that the brownouts
+      it guarded against were traced to a failing laptop battery (since
+      replaced), and the power-cap workaround was already disabled by
+      default in the last legacy version before this repo's fresh start.
+      Reimplementing a mitigation for a hardware fault that turned out to
+      have a hardware fix would be exactly the "carrying forward feature
+      scope, not hard-won logic" the org's own rebuild standard warns
+      against.
+      **Real system-service registration was not exercised end to end**
+      (no machine here to safely register a real systemd/launchd/Windows
+      service on) - `install.sh` is shellcheck-clean, `install.ps1`
+      parses cleanly under PowerShell's own AST parser, and every
+      non-destructive function (port detection, the WinSW XML config
+      generation, the "no release published yet" path) was function-
+      tested directly. Manual check, once `v0.1.0` is cut: run the
+      installer on a real target machine of each OS, confirm the service
+      survives a reboot with no one logged in, confirm `uninstall.sh`
+      cleanly removes it.
+      **The performance-budget bench (first token, page open, cold
+      start, measured against the archived legacy numbers) was NOT
+      built** - Jesse's own explicit scoping choice, not a guess: it
+      needs a real GPU and a downloaded, warm model to produce numbers
+      worth recording, neither of which exists in a dev sandbox, and a
+      fabricated number would be worse than no number. Left for whenever
+      real bench hardware is available.
+      **The docs site** (`docs/site/`, Astro Starlight, reading `docs/
+      user/`, `docs/dev/`, and the generated `docs/api/openapi.json` via
+      `starlight-openapi`) shipped as part of this same step - see
+      `docs/dev/session-f.md`'s step 11 writeup for the full detail
+      (the sync-script bridge, the two real bugs a real build caught,
+      why it stayed a standalone project rather than a root workspace
+      member).
+      **`scripts/check.sh` gained one of the plan's four named
+      additions outright**: a check that the sibling `.github` checkout's
+      own `standards/gen/ts`/`gen/py` output exists before spec codegen
+      runs (`docs/api`'s drift check already existed from an earlier
+      step). **The other two exist as real, working tools but are
+      deliberately NOT wired in as gates**: E's a11y matrix (`bun run
+      a11y`, already built) was tried and backed out - it immediately
+      and reproducibly fails on the already-tracked "second, narrower
+      contrast finding" above, not anything new; a reading-level lint on
+      `docs/user/` (`scripts/reading-level.ts`, real Flesch-Kincaid
+      scoring, built this step) finds 7 of 9 pages over grade 8. Both
+      would block every commit repo-wide over content/code this session
+      doesn't own - see the two entries above/below for exactly what's
+      blocking each and the one-line check.sh addition to make once
+      they're clear.
+      **The release ceremony itself (a security review pass, the
+      clean-clone build, the changelog, the tag, and `spec-v0.1.0`'s own
+      tag prep) was NOT attempted** - Jesse's own explicit call, matching
+      the org standard that cutting a release is always his word in the
+      moment, not a session's to schedule.
+- [ ] **The reading-level lint, wired as a check.sh gate** (S, F/E) -
+      `scripts/reading-level.ts` exists and is correct (Flesch-Kincaid
+      Grade Level against docs/STYLE.md's grade 6-8 target), but wiring
+      it into check.sh now would block every commit repo-wide over
+      content this session doesn't own the prose of: 7 of 9 docs/user/
+      pages currently exceed grade 8 (memory.md highest at 14.4). Filed
+      as `getmaipai/home#42` with the exact scores and the one-line
+      check.sh addition to add once Session E has simplified the flagged
+      pages.
+- [ ] **The performance-budget bench** (S, F) - first token, page open,
+      cold start, measured against the archived legacy numbers (200 to
+      900 ms first token warm) and recorded; a regression is a Repairs
+      item on the bench machine only. Needs real bench hardware (a GPU,
+      a downloaded warm model) this dev sandbox doesn't have - Jesse's
+      own explicit call to defer it, not a scope guess.
+- [ ] **The release ceremony for v0.1.0** (M, F, only when Jesse says so)
+      - a security review pass, the clean-clone build, the restore
+      drill, the changelog, the tag; `spec-v0.1.0`'s own tag prep (the
+      spec README's pin line, the fixtures green in both languages) so
+      it unblocks the `bot` repo. Cutting it is Jesse's word in the
+      moment; everything up to the tag should be ready to go once he
+      gives it.
 - [ ] **The Windows self-update rules as tests** (S, F, with self-update)
       - Defender holds `dist/` handles past 3 s; untracked files are not
       dirty; an unresolvable upstream never reads "up to date". Listed
@@ -2435,7 +2635,74 @@ that owns it.
       budgets and plan 4.11 says the archived latency numbers gate the
       first release (legacy `chat-latency.md`: 200 to 900 ms warm first
       token after six fixes, each documented); no bench measures first
-      token, page open or cold start here.
+      token, page open or cold start here. A full voice-turn latency
+      audit (2026-09-06, GitHub issue #36, full report in the private
+      review folder outside this repo) traced one turn end to end
+      (~2.8 s estimated warm speech-end-to-first-audio on the target
+      laptop) and found the real fix order below; this item is still
+      the measurement half none of it has landed yet - a `TurnTrace`
+      threaded through `routes/turn.ts`/`turnEngine.ts`, llama-server's
+      own `timings`/`/metrics` parsed per turn, a `turn_timings` table,
+      and `backend/scripts/bench/latency.ts` replaying scripted turns
+      against the real engine. Landed from that same review without
+      waiting on the harness (mechanical, no model-quality risk): one
+      embed call per turn instead of two (`turnEngine.ts`'s `route()`/
+      `recall()` shared `utteranceVector`), gating the Tier 2 grammar
+      call to an ambiguous score band (`TIER2_AMBIGUOUS_FLOOR`) instead
+      of every routable turn, mtime-cached package/skill manifests and
+      an in-process settings/commands cache (all previously re-read from
+      disk or SQLite every turn), warming the chat/embed/TTS engines at
+      boot instead of on a household's first message, and idle-gating
+      the memory judge's per-minute tick so it skips a batch while a
+      real turn is active instead of contending for the shared chat
+      slot. Still open, each needing the harness above (or, for the STT
+      items, a wired frontend client) to land safely rather than guessed
+      at blind:
+      - **Multi-slot separation for the chat engine** (`-np 2` +
+        `id_slot` per role so the judge/summary refresh never contend
+        with a live turn at the process level, not just the idle-gate
+        above) - real risk found by the review itself: llama-server
+        splits `-c` across slots, so this needs `autotuneContextSize`'s
+        own math re-derived for `np=2` and `/props` checked on the
+        pinned build before it ships, not assumed.
+      - **Reorder the prompt for the prefix cache** - move memory
+        bullets, summary, matched skills and the time line (currently
+        before the conversation history) to after it, so the cache hit
+        covers the whole history instead of just the stable prefix.
+        Same content, different position, but needs the persona/
+        routing/conversation bench re-run before landing (a small model
+        measurably drifts on prompt shape changes, `docs/dev.md`'s own
+        BACKLOG entry on this).
+      - **Shorten the first spoken chunk and fix the thinking-cue
+        timer** - `routes/turn.ts`'s 900 ms cue races the GATED
+        generator (first-sentence time), not the raw token stream
+        (first-token time), so it fires on most ordinary ~8B-model
+        turns; `sentenceChunker.ts`'s first-chunk gate (90 chars) is
+        also on the high side.
+      - **Stream the first TTS sentence** instead of buffering it whole
+        before playback (`sentenceSpeechScheduler.ts` already has the
+        incremental PCM path via `streamingWavPlayer.ts`, just not
+        wired into the turn path) and **pre-render fixed phrases**
+        (thinking cues, refusals, confirmations) per voice so they play
+        with no `/api/tts` round trip.
+      - **Streaming STT** (sherpa-onnx streaming Zipformer or Moonshine
+        v2) to replace the fixed 0.8 s silence timeout with Silero
+        (~0.2 s) plus Smart Turn v3.1, and speculative prefill on
+        speech onset - lower priority than the rest: no frontend client
+        exists yet for `WS /api/stt/stream` in either tree, so none of
+        this is reachable from a real conversation today.
+      - **The memory judge on its own small model** (a second
+        llama-server/router-mode process, ~1 GB) so its extraction/
+        dedupe calls stop sharing the 8B chat model's VRAM and slot
+        entirely, not just its scheduling.
+      - **Barge-in** (`vad speaking:true` stops the scheduler, aborts
+        the stream, truncates the logged reply to what actually played)
+        - a correctness requirement for hands-free voice, not a latency
+        win, but blocked on the same missing STT frontend client above.
+      - **Pod/robot transport** - one WebSocket carrying turn events and
+        PCM16 audio chunks, replacing the NDJSON-over-HTTP shape that's
+        fine for today's one browser client but wrong once a pod or the
+        robot is a real caller.
 - [ ] **Web push as a notification channel** (S-M, F backend, E opt-in)
       - the PWA exists after Wave 1, so the "no such clients yet" note
       above no longer holds; legacy `push.ts` (VAPID keys generated once,
@@ -2462,16 +2729,38 @@ that owns it.
       the first Tier 1 package, verified live against a running dev
       server. `deno_test` smoke (step 1's own reserved, unbuilt kind) is
       real now too.
-- [ ] **The store host on the hub** (M-L, D) - plan 4.10: install from
-      the signed index, verify twice, unpack per version, smoke before
-      enable, per-package channel, rollback, the permission prompt, the
-      tamper suite. The item above ("catalog browsing and install")
-      covers only the page.
-- [ ] **The catalog tooling and the signed index** (M, D) - lint, pack,
-      sign, index, scorecard, the `check` CLI, TUF-shaped root, targets
-      and timestamp, the second signer, the public CI; the catalog repo
-      has none of it. The bundled default set moves there and `home`
-      keeps a signed copy.
+- [x] **The store host on the hub** (M-L, D) - shipped, Session D step 6
+      (2026-09-06): `lib/store.ts` (install/rollback/uninstall/
+      setChannel, all against a real TUF-shaped signed index via
+      `lib/storeIndex.ts`), unpack per version under
+      `data/packages/<id>/versions/<version>/`, smoke-before-enable
+      (`lib/smoke.ts`'s `runSmoke()`, real bronze gate), per-package
+      channel, rollback (the prior version's files are kept, never
+      deleted, until a newer install replaces them), `routes/store.ts`'s
+      full REST surface. `lib/packageResolve.ts`'s `resolvePackageDir()`
+      is the one place "bundled copy vs. installed override" is decided,
+      so a store install actually takes effect everywhere a package's
+      files are read from - `lib/plugins.ts`, `lib/denoHost.ts`,
+      `lib/skills.ts`, `lib/smoke.ts` all resolve through it. The
+      permission prompt and the tamper suite (bad hash, untrusted
+      signer, rollback-to-older-index) are real tests in
+      `backend/tests/store.test.ts` and `spec/tests/ts/storeIndex.test.ts`,
+      not just described.
+- [x] **The catalog tooling and the signed index** (M, D) - shipped,
+      Session D step 6 (2026-09-06): the `catalog` repo's `tools/` (lint
+      against the mirrored spec schema, pack, sign, `build-index`, the
+      scorecard, the `check` CLI running all of it against every
+      package), a TUF-shaped root/targets/timestamp with a second
+      signer, the public CI (tag- and PR-triggered, minutes are free on
+      a public repo). The bundled default set (`define`, `joke`,
+      `knowledge`, `trivia`, `weather`, `storytime-style`) moved to
+      `catalog` as canonical source; `home` keeps a checked-in,
+      hash-pinned copy (`backend/packages/bundled-provenance.json`,
+      `scripts/refresh-bundled-packages.ts`) refreshed from there rather
+      than hand-edited - proven the hard way in Session D step 9, when a
+      hand-edit to `home`'s own mirrored `weather` manifest was caught
+      immediately by `bundledPackages.test.ts`'s hash check and had to
+      be redone in `catalog` (`catalog@12479aa`) instead.
 - [ ] **`ask` continuation, `confirm`, `end_conversation` from a result**
       (S-M, D produces, C consumes) - `result.schema.json` has them;
       `runRecipe` never sets `ask`, and the turn engine reads none of
@@ -2479,20 +2768,41 @@ that owns it.
 - [ ] **Consequential packages need a confirmation at run time** (S, C)
       - `consequential: true` exists in the manifest and raises nothing;
       the security-domain check happens at command creation only.
-- [ ] **A `compute` recipe step** (S, D, both interpreters) - math and
-      unit conversion need no network; a safe expression library beats a
-      model doing arithmetic.
-- [ ] **Audit `host.*` against plan 4.9** (S, D) - `host.log`,
-      `host.config.get`, `host.data.forget`, `host.diagnostics` and the
-      emulator twins are missing or unverified.
-- [ ] **Package-declared notification types** (S, D and F) - the
-      manifest's `notifications[]` is read by nothing (noted above under
-      the notification system, now assigned).
-- [ ] **Almanac: date, time, holidays, moon phase, on-this-day as one
-      package** (S, D) - legacy shipped five tools for this.
-- [ ] **The speech lint on every package `speech` string** (S, C
-      defines, D runs) - `PACKAGES.md` requires it; nothing checks
-      `speech` templates for the housemate test's mechanical half.
+- [x] **A `compute` recipe step** (S, D, both interpreters) - shipped,
+      Session D step 7 (2026-09-06): `compute_step` in both the TS and
+      Python interpreters, a restricted `mathjs`/equivalent expression
+      evaluator (no network, no arbitrary code), backing the bundled
+      `math` and `convert` packages.
+- [ ] **Audit `host.*` against plan 4.9** (S, D) - not reached this wave.
+      `host.log`, `host.config.get`, `host.data.forget`,
+      `host.diagnostics` and the emulator twins are still missing or
+      unverified; Session D step 5-9's own package work only ever needed
+      `host.fetch`, `host.home.call_service`, `host.lists.*`,
+      `host.reminders.set`, `host.timers.set`, and `host.integration.call`
+      for real, so this audit was never forced and stayed unbuilt.
+      Genuinely open for a future session.
+- [x] **Package-declared notification types** (S, D and F) - see the
+      notification-system entry above (Cross-cutting): shipped in
+      Session D step 8.
+- [x] **Almanac: date, time, holidays, moon phase, on-this-day as one
+      package** (S, D) - shipped, Session D step 7 (2026-09-06): split
+      into five packages (`almanac-date`, `almanac-time`,
+      `almanac-holiday`, `almanac-moon`, `almanac-onthisday`) rather than
+      one, since `turnEngine.ts`'s `deterministicArgs()` can only ever
+      bind one required arg per package and each of the five is its own
+      zero-arg question - "one package" would have needed either a
+      required arg none of them actually take or five near-duplicate
+      routing patterns racing each other. `chrono-node` carries the
+      date-parsing half forward as genuinely reusable hard-won logic
+      from legacy's own `datetime.ts`/`time.ts`.
+- [x] **The speech lint on every package `speech` string** (S, C
+      defines, D runs) - already true by construction: C's
+      `lintSpeechTemplate()` is wired into
+      `spec/tests/ts/package-bronze.test.ts`, which sweeps every bundled
+      package including D's own (it found and fixed a real false
+      positive against D's `trivia` package before that package landed -
+      see docs/dev/session-c.md's step 6 entry). Nothing further for D
+      to build; the universal bronze sweep is D's own "runs" half.
 
 **Intelligence and voice**
 

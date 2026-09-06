@@ -155,7 +155,15 @@ export const memoryRecords = sqliteTable("memory_records", {
   // recall/list/similarByVector query); this column exists specifically
   // for exportPerson() to skip tombstones without a second status value.
   deletedAt: text("deleted_at"),
-});
+}, (table) => [index("memory_records_status_scope_person_idx").on(table.status, table.scope, table.person)]);
+// PERF-4 (code review, 2026-09-06): recall() and similarByVector() both
+// filter on status (always) plus scope/person (often) before ever
+// touching a vector - without this, every recall was a full table scan
+// regardless of how selective those filters were. No index bump to
+// CURRENT_SCHEMA_VERSION (schema-version.ts): that comment scopes the
+// bump to an added/removed/renamed table or column, which changes what
+// a rollback could read incorrectly - a new index changes neither, and
+// an older build opening a database that already has it is unaffected.
 
 // Step 5's real vector store: never a spec-shaped record itself (the
 // spec's own memory-record.schema.json comment already says why -
@@ -846,4 +854,43 @@ export const lists = sqliteTable("lists", {
   updatedAt: text("updated_at").notNull(),
   deletedAt: text("deleted_at"),
   hlc: text("hlc").notNull(),
+});
+
+// Step 9: "NAS mounts declared with scan paths" (plan 4.15). Declaration
+// only, matching backup_targets' own "admin mounts the share at the OS
+// level" posture - this is not an SMB client either, just a record of
+// where an admin says a media library lives, for whatever media-library
+// scanner eventually reads it (none exists yet - no media app/package
+// has landed to consume this, so `scanPaths` is stored and returned
+// as-is, never walked or indexed by anything in this repo today).
+export const nasMounts = sqliteTable("nas_mounts", {
+  id: text("id").primaryKey(),
+  label: text("label").notNull(),
+  path: text("path").notNull(),
+  scanPaths: text("scan_paths").notNull().default("[]"), // JSON string[], relative to `path`
+  createdAt: text("created_at").notNull(),
+  updatedAt: text("updated_at").notNull(),
+});
+
+// Step 10: the app half of "the updates projection" (plan 4.15/2.4) -
+// the one daily check's own last result, cached so a route doesn't have
+// to hit GitHub's API on every page load. Single row (id is always the
+// literal "app"). Hub-internal, the same reasoning hubIdentity/
+// backupHealth above give - this is a cache of a third party's own
+// answer, never a spec-shaped household record.
+export const appUpdateState = sqliteTable("app_update_state", {
+  id: text("id").primaryKey(),
+  checkedAt: text("checked_at").notNull(),
+  latestVersion: text("latest_version"),
+  latestUrl: text("latest_url"),
+  latestSummary: text("latest_summary"),
+  error: text("error"),
+  // The version `updates.available` was last fired for - a code review
+  // (2026-09-06) found the daily updates.check job re-firing the
+  // identical notification forever for the same still-unapplied release
+  // (nothing here ever changes `installedVersion()`, since self-update
+  // isn't built), the same "notify once per genuine transition, not
+  // once per check" discipline lib/issues.ts's raiseIssue() already
+  // applies to Repairs items.
+  notifiedVersion: text("notified_version"),
 });

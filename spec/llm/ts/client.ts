@@ -23,8 +23,41 @@ export class LlmClientError extends Error {
   }
 }
 
+// COR-2 (code review, 2026-09-06): neither chatComplete() nor embed() had
+// any timeout - a wedged llama-server (the post-load memory drift this
+// codebase already measures can produce exactly that under a too-large
+// context override) meant these calls waited forever. The scheduler's
+// own runDueJobsUnguarded() awaits both directly (memory.judge,
+// memory.consolidate); with no timeout here, one wedged model tick could
+// never time out on its own, silently wedging the scheduler's per-tick
+// in-flight guard right along with it, so this fix belongs at the same
+// altitude as the SSRF/permission checks: the shared client every real
+// caller goes through, not something each caller re-adds for itself.
+// Generous defaults, not tuned to a measured worst case (chat replies
+// can legitimately run tens of seconds on a slow model; embedding is
+// small and fast, so it gets a tighter budget) - overridable per client
+// instance for a test that needs to prove the timeout actually fires
+// without waiting out the real default.
+const DEFAULT_CHAT_TIMEOUT_MS = 120_000;
+const DEFAULT_EMBED_TIMEOUT_MS = 30_000;
+
+export interface LlamaServerClientOptions {
+  chatTimeoutMs?: number;
+  embedTimeoutMs?: number;
+}
+
+function timeoutError(baseUrl: string, path: string, timeoutMs: number, err: unknown): LlmClientError {
+  if (err instanceof Error && err.name === "TimeoutError") {
+    return new LlmClientError(`${path} on ${baseUrl} timed out after ${timeoutMs}ms`, err);
+  }
+  return new LlmClientError(`could not reach ${baseUrl}`, err);
+}
+
 export class LlamaServerClient {
-  constructor(private readonly baseUrl: string) {}
+  constructor(
+    private readonly baseUrl: string,
+    private readonly opts: LlamaServerClientOptions = {},
+  ) {}
 
   /** True only on a reachable server reporting ready ("ok"); loading,
    * unreachable, and any non-200 all fold to false, since a caller only
@@ -53,15 +86,17 @@ export class LlamaServerClient {
    * is never sent, and a response carrying it would need SSE handling
    * this client doesn't have yet. */
   async chatComplete(request: ChatCompletionRequest): Promise<ChatCompletionResponse> {
+    const timeoutMs = this.opts.chatTimeoutMs ?? DEFAULT_CHAT_TIMEOUT_MS;
     let res: Response;
     try {
       res = await fetch(`${this.baseUrl}/v1/chat/completions`, {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ ...request, stream: false }),
+        signal: AbortSignal.timeout(timeoutMs),
       });
     } catch (err) {
-      throw new LlmClientError(`could not reach ${this.baseUrl}`, err);
+      throw timeoutError(this.baseUrl, "POST /v1/chat/completions", timeoutMs, err);
     }
     if (!res.ok) {
       throw new LlmClientError(`POST /v1/chat/completions returned ${res.status}`);
@@ -73,15 +108,17 @@ export class LlamaServerClient {
    * `--embedding` answers this same OpenAI-compatible path. Works
    * unmodified against stubServer.ts's canned embeddings too. */
   async embed(request: EmbeddingRequest): Promise<EmbeddingResponse> {
+    const timeoutMs = this.opts.embedTimeoutMs ?? DEFAULT_EMBED_TIMEOUT_MS;
     let res: Response;
     try {
       res = await fetch(`${this.baseUrl}/v1/embeddings`, {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify(request),
+        signal: AbortSignal.timeout(timeoutMs),
       });
     } catch (err) {
-      throw new LlmClientError(`could not reach ${this.baseUrl}`, err);
+      throw timeoutError(this.baseUrl, "POST /v1/embeddings", timeoutMs, err);
     }
     if (!res.ok) {
       throw new LlmClientError(`POST /v1/embeddings returned ${res.status}`);
@@ -96,20 +133,51 @@ export class LlamaServerClient {
    * with no JSON to parse. Works unmodified against stubServer.ts's
    * canned streaming reply too - both speak the identical line shape. */
   async *chatCompleteStream(request: ChatCompletionRequest): AsyncGenerator<string, void, void> {
+    // A review, 2026-09-06, found this was the one method on this client
+    // still missing a timeout after chatComplete()/embed() got theirs -
+    // the exact "wedged llama-server" failure mode is just as reachable
+    // through a live, streamed chat turn as through a background job. A
+    // SECOND review pass then caught that a flat AbortSignal.timeout()
+    // (chatComplete()/embed()'s own shape, a fixed deadline from request
+    // start) is the wrong model here: verified empirically that it
+    // aborts an in-progress body read too, not just the connect/headers
+    // phase, so a real reply whose tokens keep arriving past the
+    // deadline - not stalled, just long - would be killed identically to
+    // a genuinely wedged server. This is an IDLE timeout instead (the
+    // same shape lib/modelDownload.ts's own per-chunk stall detector
+    // uses, applied here via a real AbortController rather than a bare
+    // promise race, so an idle-out actually cancels the underlying
+    // connection instead of merely abandoning it): armed before the
+    // request even starts (bounds time-to-first-byte too) and re-armed
+    // on every line actually received, so only a stream that goes
+    // genuinely silent for `timeoutMs` ever fires it.
+    const timeoutMs = this.opts.chatTimeoutMs ?? DEFAULT_CHAT_TIMEOUT_MS;
+    const controller = new AbortController();
+    let idleTimer: ReturnType<typeof setTimeout> | undefined;
+    const armIdleTimer = (): void => {
+      clearTimeout(idleTimer);
+      idleTimer = setTimeout(() => controller.abort(), timeoutMs);
+    };
+    armIdleTimer();
+
     let res: Response;
     try {
       res = await fetch(`${this.baseUrl}/v1/chat/completions`, {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ ...request, stream: true }),
+        signal: controller.signal,
       });
     } catch (err) {
-      throw new LlmClientError(`could not reach ${this.baseUrl}`, err);
+      clearTimeout(idleTimer);
+      throw timeoutError(this.baseUrl, "POST /v1/chat/completions (stream)", timeoutMs, err);
     }
     if (!res.ok) {
+      clearTimeout(idleTimer);
       throw new LlmClientError(`POST /v1/chat/completions returned ${res.status}`);
     }
     if (!res.body) {
+      clearTimeout(idleTimer);
       throw new LlmClientError(`POST /v1/chat/completions returned no response body`);
     }
 
@@ -123,6 +191,7 @@ export class LlamaServerClient {
     const reader = res.body.getReader();
     try {
       for await (const line of readTextLines(reader)) {
+        armIdleTimer(); // real activity - push the deadline back out
         if (!line.startsWith("data:")) continue;
         const data = line.slice("data:".length).trim();
         if (data === "[DONE]") {
@@ -157,6 +226,8 @@ export class LlamaServerClient {
       }
     } catch (err) {
       throw new LlmClientError(`stream from ${this.baseUrl} broke`, err);
+    } finally {
+      clearTimeout(idleTimer);
     }
   }
 }

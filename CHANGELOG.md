@@ -7,6 +7,17 @@ checklist (`docs/dev.md`); no release has been cut yet.
 
 ## [Unreleased]
 
+### Security
+- A 2026-09-06 code review found `POST /api/llm/chat` and `POST /api/llm/embed`
+  gave any signed-in person, including a child, raw model access with none
+  of the turn engine's child-safety layer applied. Both routes now require
+  owner or admin (`requireRole` instead of `requireAuth`) and are documented
+  as owner/admin diagnostics only, not a household chat surface - `POST
+  /api/turn` is that surface. This narrows who can call an existing route;
+  no caller in this codebase used either route directly, and no release has
+  shipped yet, but noting it here per the org's API-compatibility rule since
+  it is a real behavior change for anyone who was.
+
 ### Added
 - Backups (platform plan 2.5, split), the tenth slice of hub core:
   `backend/src/lib/backup.ts`'s `runBackup()` takes a real, consistent

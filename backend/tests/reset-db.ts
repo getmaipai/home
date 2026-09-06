@@ -1,4 +1,9 @@
 import { db } from "@/db";
+import { __resetSettingsCacheForTests } from "@/lib/settings";
+import { __resetCommandsCacheForTests } from "@/lib/commands";
+import { __resetTurnActivityForTests } from "@/lib/turnActivity";
+import { __resetPackageCachesForTests } from "@/lib/plugins";
+import { __resetSkillCacheForTests } from "@/lib/skills";
 import {
   people,
   personCredentials,
@@ -34,6 +39,8 @@ import {
   backupHealth,
   backupTargets,
   receivedBackups,
+  nasMounts,
+  appUpdateState,
 } from "@/db/schema";
 
 // All test files in one `bun test` run share the same imported `@/db`
@@ -58,6 +65,8 @@ export function resetDb(): void {
   db.delete(receivedBackups).run();
   db.delete(backupHealth).run();
   db.delete(backupTargets).run();
+  db.delete(nasMounts).run();
+  db.delete(appUpdateState).run();
   db.delete(deviceTokens).run();
   db.delete(devices).run();
   db.delete(passkeyCredentials).run();
@@ -72,6 +81,7 @@ export function resetDb(): void {
   db.delete(packageStatus).run();
   db.delete(notificationDeliveries).run();
   db.delete(commands).run();
+  __resetCommandsCacheForTests();
   db.delete(scheduledJobs).run();
   db.delete(clonedVoices).run();
   db.delete(conversationTurns).run();
@@ -80,6 +90,28 @@ export function resetDb(): void {
   db.delete(pendingEmbeddings).run();
   db.delete(memoryRecords).run();
   db.delete(settingsValues).run();
+  // lib/settings.ts's own resolveStoredValue() cache (added in a latency
+  // pass, 2026-09-06): the same "cleared here too" fix idSequences got
+  // below, and for the identical reason - a value cached by one test file
+  // would otherwise survive this table wipe and leak into the next one,
+  // since every test file in one `bun test` run shares the same imported
+  // settings.ts module instance.
+  __resetSettingsCacheForTests();
+  // lib/turnActivity.ts's own "a turn ran recently" flag (also added in
+  // that pass): the memory judge's runJudgeBatch() skips its whole batch
+  // while this says a turn is active, and it's real wall-clock state, not
+  // DB-backed - a turnEngine.test.ts/tier2.test.ts run moments before a
+  // memoryJudge.test.ts one in the same process would otherwise cause a
+  // real, order-dependent test failure, not just stale data.
+  __resetTurnActivityForTests();
+  // lib/plugins.ts's/lib/skills.ts's own mtime-keyed manifest/recipe/skill
+  // caches (same pass): no test writes a bundled package's files today,
+  // but they're cleared here too on the same "don't rely on that staying
+  // true" reasoning as the two resets above (a code review, 2026-09-06,
+  // flagged the asymmetry - these two caches were the only ones of the
+  // five this pass added that reset-db.ts didn't already clear).
+  __resetPackageCachesForTests();
+  __resetSkillCacheForTests();
   db.delete(idSequences).run();
   db.delete(sessions).run();
   db.delete(personApiTokens).run();

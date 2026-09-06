@@ -111,6 +111,12 @@ export default defineConfig({
     },
   },
   server: {
+    // Vite 6+ rejects requests whose Host header isn't localhost/an IP,
+    // to stop DNS-rebinding attacks. Reaching this dev server by a
+    // machine name (a Tailscale MagicDNS name, for instance) needs its
+    // own opt-in, so it stays a runtime env var rather than a name
+    // hardcoded into the repo.
+    allowedHosts: process.env.VITE_ALLOWED_HOSTS?.split(",").map((h) => h.trim()) ?? undefined,
     proxy: {
       "/api": {
         // Overridable so a parallel session's worktree (docs/plans/

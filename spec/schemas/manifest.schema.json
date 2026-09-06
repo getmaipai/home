@@ -218,7 +218,7 @@
     "contributes": {
       "type": "object",
       "additionalProperties": true,
-      "description": "Shell blueprints (6.1): nav entries, pages, right-pane panels, settings sections, commands, quick actions, player hooks, admin sections. `additionalProperties: true` since most of 6.1's own blueprint kinds have no bundled package using them yet (Wave 1's `contributes: []` was a placeholder no package had populated); `widgets` below is the one sub-field session-d-packages-and-store.md step 2 fixes a real shape for, since step 9 ships packages that populate it.",
+      "description": "Shell blueprints (6.1), keyed by blueprint kind: nav entries, pages, right-pane panels, settings sections, commands, quick actions, player hooks, admin sections. `additionalProperties: true` since most of 6.1's own blueprint kinds have no bundled package using them yet (Wave 1's `contributes: []` was a placeholder no package had populated); `widgets` and `pages` below are the two sub-fields session-d-packages-and-store.md steps 2/10 fix a real shape for. `pages` replaces a redundant top-level `pages: string[]` field (Session E flagged it 2026-09-06 as incompatible with this object shape and confirmed nothing in backend/src or frontend/src read it) - a package declaring a page uses `contributes.pages[]` now, never a second, competing field.",
       "properties": {
         "widgets": {
           "type": "array",
@@ -243,13 +243,40 @@
             }
           },
           "description": "wave-2.md's D-to-E contract: `GET /api/widgets` and `GET /api/widgets/:package/:id/data` list and serve these."
+        },
+        "pages": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["id", "label", "nav", "kind", "module"],
+            "properties": {
+              "id": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Derives this page's own route: `/apps/<package id>/<page id>`, or bare `/apps/<package id>` when this is exactly \"index\"."
+              },
+              "icon": { "type": "string" },
+              "label": { "type": "string", "minLength": 1, "maxLength": 40 },
+              "nav": {
+                "type": "boolean",
+                "description": "Whether this page gets its own entry in the shell's nav registry (frontend/src/shell/nav.ts), vs. being reachable only from elsewhere (e.g. a widget's own link)."
+              },
+              "kind": {
+                "type": "string",
+                "enum": ["schema", "web"],
+                "description": "\"schema\": spec/ui/schema.json document, rendered by the shared shell. \"web\" (this package's manifest must also list \"web\" under platforms): an escape hatch, unimplemented for all of Wave 2 - the loader refuses it outright, since a page a native Go/SwiftUI client can't render would break the platform's own \"one UI schema, every client\" promise."
+              },
+              "module": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The schema document id (kind: \"schema\") this page renders, served from GET /api/plugins/:id/pages/:pageId."
+              }
+            }
+          },
+          "description": "6.2's own package-declared pages. E's PackageScopeContext and nav-registry merge (frontend/src/shell/nav.ts) are the real consumer; no package populates this yet."
         }
       }
-    },
-    "pages": {
-      "type": "array",
-      "items": { "type": "string" },
-      "description": "Ids of UI schema page documents this package ships (6.2)."
     },
     "setup": {
       "type": "object",

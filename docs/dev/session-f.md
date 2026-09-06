@@ -1268,3 +1268,411 @@ that one call site only - the regular scheduled run still catches up
 normally. A regression test (`backup.test.ts`) backdates the target
 backup into today's bucket and confirms it survives; verified to fail
 without the fix by temporarily reverting it and re-running.
+
+## Step 9: storage, quotas, uninstall, factory reset, diagnostics
+
+**"Caches first" turned out to already exist.** Before writing anything,
+`lib/packageCache.ts` (D's file) was checked for what a disk-full policy
+would need - and its own `writeEntry()` already calls real free-disk
+checks (`statfsSync`) and evicts its own oldest entries before every
+write, entirely automatically. This step's actual job is the second half
+of "caches first, then a Repairs item": `storage.check_disk_full` (an
+hourly core job) raises a Repairs item only once free space is STILL
+below the household's own threshold after caches have done everything
+they can - real household data (people, memories, conversations, cloned
+voices, models) cannot shrink itself the way a cache can, so a Repairs
+item is the honest response left, never a crash.
+
+**`GET /api/storage`.** Every area `lib/paths.ts` already names, sized
+by walking the real directories (`database`, `models`, `engines`,
+`voice_wakewords`, `voice_stt`, `voice_cloned`, `cache`, `backups`,
+`received_backups`), plus D's `getCacheStats()` per package, plus real
+free/total disk space. `data/`'s formal layout from plan 4.15 (a `db/`
+subdirectory holding `hub.db`) was deliberately NOT done: `hub.db` stays
+where every prior step already left it, at `dataDir`'s own root - moving
+the live database's actual file path is a real migration with real
+downtime risk, and nothing surfaced a concrete need for it yet. Recorded
+in `docs/BACKLOG.md`, not silently skipped.
+
+**Per-person quotas: the mechanism, not the wiring.** The one per-person
+upload with a tracked byte count today is cloned voices
+(`cloned_voices.bytes`, C's table). `checkPersonQuota()` sums it against
+a person-scoped `storage.person_quota_gb` setting (default 0, unlimited)
+and refuses if a proposed upload would go over. `routes/voice.ts` (also
+C's file) is the expected caller, not built here - the same "mechanism
+here, wiring there" cross-session split step 7's `ctx.allowance` already
+uses for exactly this kind of boundary.
+
+**NAS mounts: declaration only.** `nasMounts` mirrors `backup_targets`'
+own posture - never an SMB client, just a directory path an admin has
+already mounted at the OS level, validated the same way. No media-
+library scanner exists yet to walk `scanPaths`, so nothing reads them
+today; this is real, useful storage for whenever that feature lands, not
+a guessed shape that will need to change when it does.
+
+**Factory reset: staged, the same shape restore already uses.**
+"Behind a typed confirmation and a fresh backup" (2.5) - typing
+`"DELETE EVERYTHING"` exactly, a real backup taken first (the whole
+reset is refused if that backup fails - a reset with no way back is not
+what this button is for), then staged as a marker file consumed at the
+next boot, applied by `db/index.ts` right alongside `applyPendingRestore()`
+- the one moment in the hub's life with no open handle and no request in
+flight. The live database is renamed aside, never deleted outright, the
+identical "moved aside, not destroyed" reasoning `hub.db.pre-restore`
+already established: a factory reset triggered by mistake (or by a
+child who found the button) is still recoverable by hand, on top of the
+fresh backup already taken.
+
+**Redacted diagnostics, built structurally.** `spec/diagnostics/
+to-redact.json` names every excluded category and why (family names,
+birthdate, hub endpoint addresses, the hub's own admin-typable display
+name, any settings value the registry marks `secret: true`, and every
+person-scoped settings value wholesale); `generateDiagnostics()` is the
+one place that list is enforced, by never including an excluded field in
+the first place rather than scrubbing a fuller dump with pattern-matching
+after the fact - a regex-based scrub over free text can always miss a
+name it has never seen before; simply never reading the field cannot.
+
+**The uninstaller, for a service that doesn't exist yet.**
+`scripts/uninstall.sh` handles "no service is registered" gracefully
+(step 11 is the actual service installer, still ahead of this step) -
+it detects a systemd unit or launchd agent by name and removes it if
+present, says so plainly if not, and always ends with the keep-or-wipe
+choice for `data/` (typed confirmation, default keep). Real and useful
+today even before step 11 lands a service to register in the first
+place.
+
+**A circular-import bug caught while writing this diff, before any
+review:** `db/index.ts` imports `lib/factoryReset.ts`'s
+`applyPendingFactoryReset()` at the top of the file, before `db` itself
+is exported - the first version of `factoryReset.ts` had a static,
+top-of-file `import { runBackupAndMirror } from "@/lib/backup"`, and
+`lib/backup.ts` itself imports the live `db`/`sqlite` handle. The result
+was a real boot-time crash (`ReferenceError: Cannot access 'db' before
+initialization`), caught by the full test suite going from 1266 passing
+to 69 failures the moment `checkDiskFull()`'s own scheduler wiring
+pulled `lib/storage.ts` into the same import graph. Fixed the same way
+`restoreStaging.ts`'s own header already documents for the identical
+hazard: `stageFactoryReset()` (called only from a route, long after
+`db` exists) imports `lib/backup.ts` dynamically, inside the function
+body, never at module load time; `applyPendingFactoryReset()` (the one
+`db/index.ts` actually calls) stays free of any import that could reach
+back to `@/db`.
+
+**A code review (2026-09-06) found four issues, all fixed:**
+
+1. **`applyPendingFactoryReset()`'s crash-ordering fix (above) turned out
+   to be incomplete on its own first pass, caught by the review's own
+   regression test.** The review's suggested fix ("move a main file and
+   its -wal/-shm together, as one call") is necessary but not sufficient
+   for the exact crash point it names: a crash right after the main file
+   is renamed to the pre-reset slot, but before its own -wal/-shm follow
+   it, leaves those journal files still sitting under the OLD (live-path)
+   name - genuinely invisible to a check keyed on the NEW (pre-reset)
+   name, no matter how that check is written. A retry's archive step
+   then still separates them: the lone main file gets archived away
+   (nothing else is at the pre-reset slot to associate the stragglers
+   with), and the later "move the current live set" step relocates the
+   orphaned journal onto the now-empty slot the main file just vacated.
+   Fixed with a second, narrower check (`partialMoveInProgress()`,
+   `lib/restoreStaging.ts`): a main file already at the destination with
+   no main file left at the source, but the source's own -wal/-shm still
+   there, is the ONLY partially-moved state `moveDbSet()`'s own
+   main-then-journal order can ever produce - detected explicitly, so a
+   retry finishes reuniting that exact pair instead of archiving them
+   apart. Applied to both `lib/factoryReset.ts` and, since `lib/
+   restoreStaging.ts`'s `applyPendingRestore()` had the textually
+   identical original bug (found while fixing the first one, not by the
+   review pass itself), to restore too - both now share `moveDbSet()`/
+   `dbSetExists()`/`partialMoveInProgress()` from one place rather than
+   two copies that could drift. Both new regression tests were verified
+   to fail without their respective fix.
+2. **`scripts/uninstall.sh`'s own header claimed deleting `data/` covered
+   "people, memories, conversations, models and backups," but backups
+   live in `data/`'s sibling directories (`backupDir`/
+   `receivedBackupsDir`, deliberately never nested inside `data/` -
+   step 8's own fix for exactly this kind of hazard) and the script never
+   touched or even mentioned them - a household member confirming "yes,
+   delete everything" got two of three data directories wiped with no
+   indication the third was left behind.** Fixed: all three directories
+   are found and offered together under one confirmation.
+3. **The same script hardcoded `$ROOT/data`, ignoring the
+   `MAIPAI_DATA_DIR`/`MAIPAI_BACKUP_DIR` overrides the backend itself
+   honors** - an install that relocated its data directory (a second
+   disk, a different mount) got a false "nothing found here" instead of
+   the real directory elsewhere. Fixed to check the same environment
+   variables first, falling back to the documented defaults.
+4. **`generateDiagnostics()`'s issue mapping included `title`, with no
+   redaction allowlist check the way `people`/`settings` both have** -
+   every current `raiseIssue()` call site only ever puts internal ids and
+   fixed strings there today, so no leak exists yet, but nothing
+   structural would stop or even flag the next call that embeds an
+   admin-typed value (a NAS mount's label, a hub endpoint's name) from
+   flowing straight into a report meant to be safe to hand to support.
+   Fixed by dropping `title` (and `detail`, never included) entirely -
+   `source`/`key` alone already identify what's broken, and are safe by
+   construction regardless of what a future issue's free text contains.
+   Added as its own category to `spec/diagnostics/to-redact.json`.
+
+## Step 10: the updates projection (app half only)
+
+**Scoped down before writing anything, not after.** The plan's full
+projection names four halves - the app, packages (D's store), models
+(the catalogue), sidecars (pinned with the app) - and only one of them
+has anything real to check against today. No package catalog is live
+(`getmaipai/catalog` doesn't consume anything yet), `lib/modelCatalog.ts`
+is a static, hand-maintained list with no "latest version" concept of
+its own, and sidecars simply follow whatever the app's own release
+settles on. Building a projection for data with nothing real behind it
+would be exactly the kind of speculative code this org's own standards
+warn against - `docs/BACKLOG.md` records the other three as deferred,
+with the reason each one is, rather than silently narrowing scope with
+no trace.
+
+**`lib/updates.ts`: a real check against GitHub's own public release
+API for `getmaipai/home`.** Cached in a new `app_update_state` table (one
+row, `id: "app"`) so `GET /api/updates` never blocks on a live network
+call; the daily `updates.check` core job is the only thing that actually
+calls GitHub. `isNewerVersion()` does a real numeric three-part
+comparison, never a string one - `"0.9.0" < "0.10.0"` fails
+lexicographically, exactly the kind of bug a semver library exists to
+prevent and a hand-rolled comparison has to get right on its own. A 404
+(no release has ever been published - true for this project today,
+`CHANGELOG.md`'s own header still says so) is recorded as informational,
+not an error: the projection has nothing to show either way, but the
+wording says "checked, nothing published" rather than implying
+something broke. A genuine network failure is caught and recorded the
+same way, never thrown past the unattended daily job.
+
+**The privacy page gained its matching row in the same commit.** This
+is the one outbound call this hub makes on its own schedule, not in
+response to a household action - the org's own "adding an outbound
+endpoint updates the privacy page in the same commit, no exceptions"
+rule applies exactly here, and `lib/privacy.ts`'s own header (which used
+to say "there is no update ping") was updated alongside the new row,
+not left to quietly contradict it.
+
+**`lib/selfUpdate.ts` (verify, back up, stage, swap, restart,
+health-check-or-roll-back) was not attempted.** It is genuinely blocked
+on step 11: no service exists yet to restart under, and no release has
+ever been cut for this project at all, so `releases/<version>` has never
+existed on a real machine either. It also needs cross-cutting "never
+during a conversation, a generation, a download, or playback" checks
+into `turnEngine.ts`, `packageHost.ts`, and voice playback - every one of
+them another session's file, not F's to wire. Building this now would be
+unverifiable by construction (nothing real to restart, nothing real to
+roll back to), the same reasoning that already deferred packages/
+models/sidecars above.
+
+**A test bug caught before any review, by running the full suite rather
+than the one new file alone:** a test asserting `cachedUpdateProjection()`
+never calls GitHub replaced `globalThis.fetch` with a mock and never
+restored it - passing cleanly in isolation (`bun test tests/updates.
+test.ts`), but leaking that broken mock into every OTHER test file that
+runs afterward in the same process once the full suite ran together (87
+failures, none in the new file itself). Fixed with the same `try`/
+`finally` restore pattern every other fetch-mocking test in this repo
+already uses; a reminder that "the new test passes" is not the same
+question as "did anything else start failing," which only the full
+suite answers.
+
+**A code review (2026-09-06) found five issues, all fixed:**
+
+1. `checkForAppUpdate()` fired `updates.available` unconditionally on
+   every daily check as long as a newer version existed, with no
+   per-version dedup - since nothing here ever advances
+   `installedVersion()` (self-update isn't built), the same still-
+   unapplied release would have renotified every household, every day,
+   forever. Fixed with a new `notified_version` column on
+   `app_update_state` (migration 0024, folded into the same not-yet-
+   merged migration as the table itself rather than a second one) and a
+   read-before-fire check: the notification now only goes out the first
+   time a given version is seen, the same "notify on open, not on every
+   recheck" discipline `lib/issues.ts`'s `raiseIssue()` already applies
+   to Repairs items. Covered by two new tests: the same release checked
+   twice notifies once, and a genuinely newer release after that
+   notifies again.
+2. The GitHub fetch had no rate limiter, unlike every other outbound
+   integration in this codebase - "every integration gets a rate
+   limiter at its single choke point... never a raw fetch on the side"
+   (org standard). The daily job alone is no risk, but
+   `POST /api/updates/check` lets any owner/admin (or a `backups.run`
+   grant holder) force a fresh check on demand, with no cooldown. Fixed
+   with `lib/rateLimiter.ts`'s existing `tryConsume()` (capacity 5, slow
+   refill - GitHub's own unauthenticated limit is 60/hour and a
+   household has no reason to come remotely close to it), covered by a
+   new test that calls `checkForAppUpdate()` six times back to back and
+   confirms only five actually reach the mocked `fetch`.
+3. The fetch had no timeout - `scheduler.ts`'s `runDueJobsUnguarded()`
+   awaits each due core job sequentially, so a stalled GitHub connection
+   would have blocked every other due job behind it indefinitely. Fixed
+   with `signal: AbortSignal.timeout(5_000)`, matching `sidecars.ts`'s
+   own precedent for outbound calls in the scheduler's path.
+4. `parseSemver()`'s regex was anchored at the start (`^v?`) but not the
+   end, so a prerelease-suffixed tag like `v0.2.0-rc.1` parsed
+   identically to a clean `v0.2.0`, silently ignoring the suffix. Fixed
+   by anchoring both ends; an unparseable tag was already treated as
+   "not newer" by `isNewerVersion()`, so a prerelease tag is now simply
+   never offered as an update rather than miscompared as an
+   equal-or-newer stable release. Covered by two new test cases.
+5. The success, 404, and network-failure branches of
+   `checkForAppUpdate()` each hand-rolled a near-identical
+   `db.insert(...).onConflictDoUpdate(...)` upsert - three copies to
+   keep in sync by hand, and one already had drifted (missing the new
+   `notifiedVersion` field) before the review caught it. Extracted into
+   one `upsertState()` helper all three branches now call.
+
+Typecheck and the full backend suite (1302 tests) are green after all
+five fixes; `spec/settings/keys.json` and `docs/api/openapi.json` were
+regenerated against a scratch data directory and show no unexpected
+drift beyond this step's own additions.
+
+## Step 11: install, the service, the docs site (narrowed scope)
+
+**Scoped down before writing anything, by Jesse's own explicit choice,
+not a guess.** The full plan step also names a performance-budget bench
+and the release ceremony itself (a security review pass, the clean-clone
+build, the changelog, the tag, `spec-v0.1.0`'s own tag prep). Jesse chose
+to build the installer, the service files, and the docs site now, and to
+leave the bench and the release ceremony for later - "deploys and
+releases are always explicit," and a performance bench compared against
+numbers this sandbox has no GPU or downloaded model to reproduce
+honestly is exactly the kind of thing that needs his own hardware, not a
+guess. Both are recorded as deliberately deferred in `docs/BACKLOG.md`.
+
+**`POST /api/setup/hardware`**: the plan's own text named this endpoint
+as already built by an earlier step, and it wasn't - `routes/setup.ts`
+only had `/ca` (step 5). Added now, since `scripts/install.sh`/
+`install.ps1` genuinely need something real to check hardware minimums
+against. Unauthenticated (setup happens before a household exists,
+same reasoning as `/ca`) and rate-limited (it spawns `nvidia-smi` via
+`detectHardware()`). Reuses `lib/hardware.ts` and `lib/modelCatalog.ts`'s
+`recommend()` read-only rather than re-deriving hardware-fit logic - on
+a CPU-only, non-Apple-Silicon box, `primaryBudgetBytes()` has no chat-
+inference sizing model (returns 0 by its own doc comment), so the
+response honestly reports `chatFit.determined: false` rather than a
+false pass or fail off an empty budget. Seven new tests in
+`tests/setup.test.ts`.
+
+**`scripts/install.sh`** (macOS + Linux) and **`scripts/install.ps1`**
+(Windows): one-line installers that fetch the latest GitHub release tag
+(never `main`), install Bun system-wide, build the app, and register it
+as a real background service - systemd on Linux, a launchd LaunchDaemon
+on macOS (not a LaunchAgent: the hub has to keep running with no one
+logged in, the same reason the systemd unit targets
+`multi-user.target`), and a Windows service via WinSW (a small,
+maintained, MIT-licensed service wrapper - Windows has no native way to
+run an arbitrary console process as a real service, and hand-rolling the
+Service Control Manager protocol would be exactly the kind of hand-built
+logic CLAUDE.md's "prebuilt over hand-built" rules out). WinSW is pinned
+to v2.12.0 and checksum-verified before use (downloaded and hashed by
+hand to get a real, verified SHA-256, not a fabricated one) - the same
+"pinned version, pinned URL, checksum verified" pattern every other
+on-demand third-party download in this project already follows. Both
+scripts detect a port already in use and pick the next free one, and are
+idempotent: re-running upgrades an existing install in place (`rsync
+--delete` / `robocopy /MIR`, both excluding `data/`, `backups/`, and
+`received-backups/` - real runtime state, never part of a release
+archive) rather than requiring a clean uninstall first.
+
+**`scripts/uninstall.sh` (step 9) had drifted from what step 11 actually
+built** - it looked for a LaunchAgent at `~/Library/LaunchAgents/`, but
+install.sh registers a LaunchDaemon at `/Library/LaunchDaemons/`. Fixed
+to match, and given a Windows removal hint (`winsw.exe uninstall`) now
+that a real Windows service mechanism exists to name.
+
+**Verification**: `install.sh` is shellcheck-clean; `install.ps1` parses
+cleanly under PowerShell's own AST parser (`pwsh` and `shellcheck` were
+both installed locally via `brew` to make this possible - neither was
+available beforehand). The non-destructive logic in both (port
+detection, the "no release published yet" failure path, the WinSW XML
+service-config generation) was function-tested directly. **Registering a
+real system service was not exercised end to end** - that would mean
+installing a real systemd unit, a real LaunchDaemon, or a real Windows
+service on a machine this session doesn't own the right to modify that
+way; this is the "ship the code with tests, name the manual check"
+case the plan's own "If you get stuck" section describes. The manual
+check: run `install.sh`/`install.ps1` on a real target machine once
+`v0.1.0` is cut, confirm the service starts on boot with no one logged
+in, and confirm `uninstall.sh` cleanly removes it again.
+
+**The docs site**: `docs/site/`, a real Astro Starlight project (the
+official `create-astro --template starlight` scaffold, not hand-rolled
+config guessed from memory - a fast-moving framework's exact config
+shape is worth getting from the tool itself). `scripts/sync-content.mjs`
+copies `docs/user/*.md` verbatim (already carries the frontmatter
+Starlight requires) and `docs/dev.md` + `docs/dev/*.md` with a real
+title/description injected from each file's own first heading
+(Starlight's `docsLoader()` only reads its own `src/content/docs/`, with
+no external base-path option, so this sync step is the bridge, not a
+content fork - the synced directories are gitignored and regenerated on
+every `dev`/`build`, never hand-edited). The API reference uses
+`starlight-openapi` (MIT, maintained) against the generated
+`docs/api/openapi.json` directly, rather than hand-building a spec
+renderer. Kept as its own standalone project (its own `bun install`, own
+lockfile) after folding it into the root workspace broke Astro's native
+optional-dependency resolution (a real, reproduced failure, not a
+guess) - reverted once found.
+
+**Built and actually looked at, not just typechecked**: `bun run build`
+produces 103 pages with no errors; a local `astro preview` was hit with
+`curl` for every major route (200 everywhere) since no browser
+automation was available in this environment to load it visually. Two
+real bugs were caught and fixed by actually building rather than just
+writing config: a `docs/user/privacy.md` screenshot broke because its
+`../assets/screens/...` relative path didn't survive being copied into
+the synced location (fixed by copying `docs/assets/` to the matching
+relative depth, not by rewriting the reference) and a duplicated
+"MaiPai Home | MaiPai Home" browser-tab title on the one page whose own
+title matches the site title (fixed with a per-page `head` override,
+without changing the visible hero heading).
+
+**`scripts/check.sh` gains one of the plan's four named additions
+outright**: a new check confirms the sibling `.github` checkout's own
+`standards/gen/ts`/`gen/py` output exists and is non-empty before spec
+codegen runs (`spec/README.md`'s own documented gap: home's codegen
+needs those already generated, and nothing verified that). `docs/api`'s
+drift check already existed from an earlier step; no change needed
+there.
+
+**The a11y half (E's matrix, `bun run a11y`) was tried and backed
+out.** It's self-contained and safe to run unattended (spawns its own
+throwaway backend, tears it down) - the problem wasn't the script, it
+was what it found. It reproducibly fails on `chat @ desktop/light`
+(6 `color-contrast` nodes), which turned out to be an already-known,
+already-deeply-diagnosed bug: `docs/BACKLOG.md`'s own "second, narrower
+contrast finding" (Session E, step 7) traced this to `@assistant-ui/
+react`'s internal `<time>` element resolving `--muted-foreground` to a
+lighter value than this kit's tokens give the rest of the app. A first
+pass at investigating this mid-step actually chased a red herring: this
+dev machine has an unrelated, long-running `pocket-tts serve --port
+8793` process (not started by this session) squatting the TTS
+supervisor's default port, which broke the sidecar's own startup during
+the scan - ruled out by re-running with `MAIPAI_TTS_PORT` overridden,
+which reproduced the identical failure, confirming it was the tracked
+bug, not a local environment artifact. Filed `getmaipai/home#44` for the
+port-conflict gap itself (`ttsSupervisor.ts` has no fallback the way
+`install.sh`'s own `find_free_port()` does - not this session's file to
+fix). Wiring `bun run a11y` into check.sh now would block every commit
+repo-wide over a bug this session doesn't own; the BACKLOG entry has the
+two-line addition to make once it's fixed.
+
+**The reading-level lint on `docs/user/` is real and working, but
+deliberately not wired into check.sh as a gate either.** `scripts/
+reading-level.ts` scores each page with Flesch-Kincaid Grade Level
+(`text-readability`, not a hand-rolled syllable counter) against
+`docs/STYLE.md`'s "grade 6 to 8" user-tier standard. Running it found a
+bug in its own first draft: stripping a bullet's `-`/`*` marker left a
+stray leading space that broke the library's sentence-boundary
+detection (it only splits on punctuation immediately followed by a
+capital letter), fusing an entire bulleted list into one "sentence" and
+scoring `settings.md` at grade 35. Fixed by trimming per-line leading
+whitespace after marker removal; verified by re-running and watching
+every score drop into a plausible range. With that bug fixed, the
+finding is real: 7 of 9 `docs/user/` pages exceed grade 8 (memory.md
+14.4 down to chat.md 8.9). Wiring this into check.sh now would block
+every commit repo-wide, across every active session, over content this
+session doesn't own the prose of - filed as `getmaipai/home#42` with the
+exact scores and the one-line check.sh addition to make it a hard gate
+once Session E has simplified the flagged pages, and messaged directly
+rather than left for the issue queue alone.

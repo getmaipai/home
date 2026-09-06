@@ -37,6 +37,10 @@ import { runBackupAndMirror } from "@/lib/backup";
 import { checkLeafExpiry } from "@/lib/householdCa";
 import { disableExpiredGuests, applyAgeBandChanges } from "@/lib/personLifecycle";
 import { trigger } from "@/lib/notifications";
+import { checkDiskFull } from "@/lib/storage";
+import { checkForAppUpdate } from "@/lib/updates";
+import { raiseIssue, resolveIssue } from "@/lib/issues";
+import { withTimeout } from "@/lib/withTimeout";
 import type { PluginOpResult } from "@/lib/plugins";
 import type { PluginResult } from "@maipai/spec/interpreters/ts/recipe-interpreter.js";
 import type { PersonRow } from "@/types";
@@ -233,6 +237,12 @@ const CORE_JOBS: Record<string, CoreJobHandler> = {
   "backup.run": async () => {
     await runBackupAndMirror();
   },
+  "storage.check_disk_full": () => {
+    checkDiskFull();
+  },
+  "updates.check": async () => {
+    await checkForAppUpdate();
+  },
   "memory.embedding_retry": async () => {
     await drainPendingEmbeddings();
   },
@@ -303,6 +313,40 @@ const CORE_JOBS: Record<string, CoreJobHandler> = {
 // rather than starting a duplicate pass over the same due rows.
 let inFlight: Promise<{ ran: number; errors: number }> | null = null;
 
+// COR-2 (code review, 2026-09-06): one hung job (a wedged llama-server a
+// memory.judge/memory.consolidate tick awaited with no timeout of its
+// own - now fixed at the LLM client itself, spec/llm/ts/client.ts, but
+// this is the generic backstop for anything else that can hang: a stuck
+// plugin, a future core job) used to wedge this file's own single
+// `inFlight` promise forever - every OTHER due job (backup.run,
+// conversation.retention, householdCa.check_leaf_expiry, every plugin
+// job) silently never ran again until the process restarted, with
+// nothing anywhere raising a Repairs issue for it. A per-job timeout
+// can't truly cancel a stuck promise (nothing here owns an
+// AbortController for an arbitrary CoreJobHandler), but it does let the
+// LOOP move on to the next due job instead of waiting on this one
+// forever - the actual bug this closes.
+//
+// Generous on purpose, not a tight leash: a background review of the
+// first version of this fix (120_000ms, the same magnitude as
+// chatComplete's own per-call timeout) found memory.judge alone can
+// legitimately issue up to MAX_TURNS_PER_RUN (10, lib/memoryJudge.ts)
+// turns' worth of sequential LLM calls in one tick, and
+// runAllSmokeTests's packages.smoke job runs every bundled package's
+// deno_test check (each up to 60s, lib/smoke.ts) one after another -
+// either could genuinely, healthily exceed a 120s outer budget with
+// nothing actually hung, firing a false timeout and a spurious Repairs
+// issue. 20 minutes comfortably covers both real worst cases while still
+// bounding a truly wedged job to well under "forever."
+const JOB_TIMEOUT_MS = 1_200_000;
+const ISSUE_SOURCE = "scheduler";
+
+class JobTimeoutError extends Error {}
+
+function withJobTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
+  return withTimeout(promise, ms, () => new JobTimeoutError(`${label} exceeded its ${ms}ms budget`));
+}
+
 /** Fires every pending job whose nextRunAt has passed. A recurring job's
  * next fire is computed from its own recurrence interval, not from "now",
  * so a late tick doesn't compress the schedule. A one-shot job never
@@ -313,9 +357,10 @@ export function runDueJobs(
   runPluginFn: RunPluginFn,
   now: Date = new Date(),
   extraCoreJobs: Record<string, CoreJobHandler> = {},
+  jobTimeoutMs: number = JOB_TIMEOUT_MS,
 ): Promise<{ ran: number; errors: number }> {
   if (inFlight) return inFlight;
-  inFlight = runDueJobsUnguarded(runPluginFn, now, extraCoreJobs).finally(() => {
+  inFlight = runDueJobsUnguarded(runPluginFn, now, extraCoreJobs, jobTimeoutMs).finally(() => {
     inFlight = null;
   });
   return inFlight;
@@ -325,6 +370,7 @@ async function runDueJobsUnguarded(
   runPluginFn: RunPluginFn,
   now: Date,
   extraCoreJobs: Record<string, CoreJobHandler>,
+  jobTimeoutMs: number,
 ): Promise<{ ran: number; errors: number }> {
   const due = db
     .select()
@@ -335,23 +381,38 @@ async function runDueJobsUnguarded(
   let ran = 0;
   let errors = 0;
   for (const row of due) {
+    // core jobs are unique by name; a plugin job's own `job` label isn't
+    // guaranteed unique ACROSS packages, so it's qualified by packageId
+    // too - the same key shape lib/denoHost.ts's own Repairs issues use
+    // (source "packages.deno", key <package id>).
+    const issueKey = row.kind === "core" ? row.job : `${row.packageId}:${row.job}`;
     let error: string | null = null;
     try {
       if (row.kind === "core") {
         const handler = CORE_JOBS[row.job] ?? extraCoreJobs[row.job];
         if (!handler) throw new Error(`no core job registered for ${row.job}`);
-        await handler(row);
+        await withJobTimeout(Promise.resolve(handler(row)), jobTimeoutMs, row.job);
       } else {
         if (!row.personId) throw new Error(`plugin job ${row.id} has no personId`);
         const actor = db.select().from(people).where(and(eq(people.id, row.personId), isNull(people.deletedAt))).get();
         if (!actor) throw new Error(`person ${row.personId} no longer exists`);
-        const result = await runPluginFn(row.packageId, actor, JSON.parse(row.inputs));
+        const result = await withJobTimeout(runPluginFn(row.packageId, actor, JSON.parse(row.inputs)), jobTimeoutMs, issueKey);
         if (!result.ok) throw new Error(result.error);
       }
       ran++;
+      resolveIssue(ISSUE_SOURCE, issueKey);
     } catch (err) {
       errors++;
       error = err instanceof Error ? err.message : String(err);
+      if (err instanceof JobTimeoutError) {
+        void raiseIssue({
+          source: ISSUE_SOURCE,
+          key: issueKey,
+          severity: "error",
+          title: `${issueKey} exceeded its scheduled time budget`,
+          detail: error,
+        });
+      }
     }
 
     if (row.recurring) {

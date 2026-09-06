@@ -15,7 +15,8 @@ import {
 } from "@/lib/memory";
 import { runLegacyImport, LegacyImportError } from "@/lib/legacyImport";
 import { apiRouter, errorResponses } from "@/lib/openapi";
-import type { AppEnv } from "@/types";
+import { isOwnerOrAdmin } from "@/lib/access";
+import type { AppEnv, PersonRow } from "@/types";
 
 // apiRouter()'s OpenAPIHono extends Hono, so every plain `.post()`/`.get()`
 // route below (unconverted, pre-dating getmaipai/.github/CLAUDE.md's
@@ -30,6 +31,73 @@ function fail(c: Context<AppEnv>, result: Extract<MemoryOpResult<unknown>, { ok:
   return c.json({ error: result.error }, result.status);
 }
 
+// SEC-4 (code review, 2026-09-06): remember(actor, body) used to trust
+// EVERY field of the request body - `pinned` (rides in every household
+// member's system prompt forever, and runMaintenance() never archives a
+// pinned row), `source` (provenance is supposed to be the system's own
+// record of where a fact came from, not caller-chosen), `record_kind`,
+// `embedding_space`, and `precomputed_embedding` (a client-supplied
+// vector of any size/shape, stored with no validation). This route's own
+// Zod body only accepts the fields a real household member's own
+// remember() call needs; source, record_kind: "entity"/"episode", and
+// pinned each get a real, server-controlled value below instead.
+const MAX_MEMORY_TEXT_LENGTH = 2_000;
+
+const RememberBodySchema = z.object({
+  text: z.string().min(1).max(MAX_MEMORY_TEXT_LENGTH),
+  category: z.string(),
+  tier: z.string(),
+  scope: z.string(),
+  person: z.string().nullish(),
+  importance: z.number().min(0).max(1),
+  sensitive: z.boolean().optional(),
+  pinned: z.boolean().optional(),
+  record_kind: z.enum(["memory", "entity", "episode"]).optional(),
+  valid_from: z.string().nullish(),
+  valid_to: z.string().nullish(),
+});
+
+// Derived from RememberBodySchema (a review, 2026-09-06, found the first
+// version of this hand-copied six of its field validators): supersede
+// doesn't take scope/person/record_kind (the old record's own values
+// carry over), and every field but `text` is optional (an omitted one
+// keeps the old record's value - lib/memory.ts's supersede() own `??
+// old.<field>` fallbacks).
+const SupersedeBodySchema = RememberBodySchema.pick({
+  text: true,
+  category: true,
+  tier: true,
+  importance: true,
+  sensitive: true,
+  pinned: true,
+  valid_from: true,
+  valid_to: true,
+}).partial({ category: true, tier: true, importance: true, sensitive: true, pinned: true });
+
+/** `pinned` (rides in every household member's prompt, permanently) and
+ * a non-default `record_kind` (an entity/episode row, not an ordinary
+ * fact) are owner/admin-only, regardless of what the body asked for -
+ * the same "privileged field, silently downgraded rather than a 403"
+ * shape lib/settings.ts's own secret-value redaction takes, since a
+ * child's remember()/supersede() call is still a perfectly normal
+ * request, just never one of these two things. A blocked `true` becomes
+ * `undefined`, NOT `false` (a review, 2026-09-06, found the first version
+ * of this returned a hard `false`): supersede()'s own
+ * `input.pinned ?? old.pinned` treats a defined `false` as "unpin this",
+ * a real, unrequested state change to an already-pinned record, not
+ * merely a blocked escalation - `undefined` falls through to
+ * `old.pinned` and leaves the record's existing state alone, the same as
+ * never mentioning `pinned` at all. */
+function sanitizedPinned(actor: PersonRow, requested: boolean | undefined): boolean | undefined {
+  if (requested === true && !isOwnerOrAdmin(actor)) return undefined;
+  return requested;
+}
+
+function sanitizedRecordKind(actor: PersonRow, requested: "memory" | "entity" | "episode" | undefined): "memory" | "entity" | "episode" | undefined {
+  if (!requested || requested === "memory") return requested;
+  return isOwnerOrAdmin(actor) ? requested : "memory";
+}
+
 function parseListOptions(query: URLSearchParams): ListOptions {
   const opts: ListOptions = {};
   const scope = query.get("scope");
@@ -41,9 +109,25 @@ function parseListOptions(query: URLSearchParams): ListOptions {
 
 memoryRoutes.post("/", requireAuth, async (c) => {
   const actor = c.get("person");
-  const body = await c.req.json().catch(() => null);
-  if (!body || typeof body !== "object") return c.json({ error: "a JSON body is required" }, 400);
-  const result = remember(actor, body as Parameters<typeof remember>[1]);
+  const rawBody = await c.req.json().catch(() => null);
+  const parsed = RememberBodySchema.safeParse(rawBody);
+  if (!parsed.success) return c.json({ error: parsed.error.issues.map((i) => i.message).join("; ") }, 400);
+  const body = parsed.data;
+  const result = remember(actor, {
+    text: body.text,
+    category: body.category,
+    tier: body.tier,
+    scope: body.scope,
+    person: body.person ?? undefined,
+    importance: body.importance,
+    sensitive: body.sensitive,
+    valid_from: body.valid_from,
+    valid_to: body.valid_to,
+    // Never from the client - see this file's own header on why.
+    source: `api:${actor.id}`,
+    pinned: sanitizedPinned(actor, body.pinned),
+    record_kind: sanitizedRecordKind(actor, body.record_kind),
+  });
   if (!result.ok) return fail(c, result);
   return c.json(result.value, 201);
 });
@@ -108,9 +192,22 @@ memoryRoutes.post("/:id/archive", requireAuth, async (c) => {
 
 memoryRoutes.post("/:id/supersede", requireAuth, async (c) => {
   const actor = c.get("person");
-  const body = await c.req.json().catch(() => null);
-  if (!body || typeof body !== "object") return c.json({ error: "a JSON body is required" }, 400);
-  const result = supersede(actor, c.req.param("id"), body as Parameters<typeof supersede>[2]);
+  const rawBody = await c.req.json().catch(() => null);
+  const parsed = SupersedeBodySchema.safeParse(rawBody);
+  if (!parsed.success) return c.json({ error: parsed.error.issues.map((i) => i.message).join("; ") }, 400);
+  const body = parsed.data;
+  const result = supersede(actor, c.req.param("id"), {
+    text: body.text,
+    category: body.category,
+    tier: body.tier,
+    importance: body.importance,
+    sensitive: body.sensitive,
+    valid_from: body.valid_from,
+    valid_to: body.valid_to,
+    // Never from the client, same as POST / above.
+    source: `api:${actor.id}`,
+    pinned: sanitizedPinned(actor, body.pinned),
+  });
   if (!result.ok) return fail(c, result);
   return c.json(result.value);
 });

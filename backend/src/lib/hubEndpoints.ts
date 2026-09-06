@@ -17,7 +17,7 @@ import { db } from "@/db";
 import { hubEndpoints } from "@/db/schema";
 import { getTailscaleStatus } from "@/lib/tailscale";
 import { newEndpointId } from "@/lib/id";
-import { isPrivateOrLoopbackIpv4 } from "@/lib/ssrfGuard";
+import { isPrivateOrLoopbackIpv4, isCgnatIpv4 } from "@/lib/ssrfGuard";
 
 export type EndpointKind = "lan" | "overlay" | "public";
 export type EndpointSource = "detected" | "managed";
@@ -69,6 +69,20 @@ export function guessEndpointKind(url: string): EndpointKind {
   }
   if (host.endsWith(".ts.net")) return "overlay";
   if (host.endsWith(".local") || host === "localhost") return "lan";
+  // Checked BEFORE the private/loopback check below (code review,
+  // 2026-09-06): ssrfGuard.ts's own isPrivateOrLoopbackIpv4() now also
+  // treats 100.64.0.0/10 as private, for the OPPOSITE reason this file
+  // cares about it (SEC-3: refusing a package's host.fetch from landing
+  // on the hub's own tailnet address). Here it means the opposite thing -
+  // a legitimate way a CLIENT reaches the hub, "overlay" - so this has to
+  // win before the private-range check would otherwise catch it as "lan".
+  // Shares ssrfGuard.ts's own isCgnatIpv4() range check rather than a
+  // second, independently-typed regex for the identical range (a review,
+  // 2026-09-06, found the first version of this fix left one here).
+  if (isIP(host) === 4) {
+    const [a, b] = host.split(".").map(Number);
+    if (isCgnatIpv4(a!, b!)) return "overlay"; // CGNAT range Tailscale uses
+  }
   // Reuses ssrfGuard.ts's own hardened private/loopback/link-local check
   // (10.x, 172.16-31.x, 192.168.x, 127.x, 169.254.x link-local, 0.x) - a
   // code review (2026-09-06) found this file had its own narrower regex
@@ -76,7 +90,6 @@ export function guessEndpointKind(url: string): EndpointKind {
   // address 169.254.169.254) and 0.0.0.0/8 entirely, misclassifying both
   // as "public".
   if (isIP(host) === 4 && isPrivateOrLoopbackIpv4(host)) return "lan";
-  if (/^100\.(6[4-9]|[7-9]\d|1[01]\d|12[0-7])\./.test(host)) return "overlay"; // CGNAT range Tailscale uses
   if (host.includes(".")) return "public";
   return "lan";
 }

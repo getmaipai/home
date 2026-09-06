@@ -1,32 +1,32 @@
 {
   "define": {
-    "sha256": "d81a20ddee6f9c02bcbbfc06172c204ca3704462051d8a582c792457dd35ef36",
-    "source_commit": "12479aa3527f6b74d89b9b1bcbe366b7c7fe5c0e",
+    "sha256": "ee955e3b31fcba39805024fcd713e9d825ab8f980e80b7ef65a6fa3906306f1d",
+    "source_commit": "0fd7be0b0eba0df67ae622212a9205baef2bd841",
     "catalog_path": "plugins/utilities/define"
   },
   "joke": {
-    "sha256": "6e3542468be66f22626a4cc3ec04b09f7197d601964735671461cc07c6b10bee",
-    "source_commit": "12479aa3527f6b74d89b9b1bcbe366b7c7fe5c0e",
+    "sha256": "7ed1efa8c51a353fcaa7611b95ffdabe1bdc4c4cd357ec17cd44b19dcd9dc042",
+    "source_commit": "0fd7be0b0eba0df67ae622212a9205baef2bd841",
     "catalog_path": "plugins/fun/joke"
   },
   "knowledge": {
-    "sha256": "eef0c4b47a8b1d2f9ef7568e740c07b73ee5b91427be747e3b5ba714a3d51ac0",
-    "source_commit": "12479aa3527f6b74d89b9b1bcbe366b7c7fe5c0e",
+    "sha256": "539528cbafe8aba118b8137b0b3387a38317f88c937affcbc7a32fe0e4a4f60b",
+    "source_commit": "0fd7be0b0eba0df67ae622212a9205baef2bd841",
     "catalog_path": "plugins/info/knowledge"
   },
   "storytime-style": {
-    "sha256": "a873213ebacfad8309ee3920cc82b5e334ba8b9d45e86eec8b660195482252bd",
-    "source_commit": "12479aa3527f6b74d89b9b1bcbe366b7c7fe5c0e",
+    "sha256": "a6f390fbefa068646a8617c46237bbe91c6825c1d27c64bd0c98a83b43d0b3be",
+    "source_commit": "0fd7be0b0eba0df67ae622212a9205baef2bd841",
     "catalog_path": "skills/family/storytime-style"
   },
   "trivia": {
-    "sha256": "db679a4b09f038b22b9e30adf7c421a5a944e74a801de14a613d5b4d57500eab",
-    "source_commit": "12479aa3527f6b74d89b9b1bcbe366b7c7fe5c0e",
+    "sha256": "7dd8e6ea6b47190f3798a5b67e96d1a92e7dda49a9c91a0b0eb086ca73c9f729",
+    "source_commit": "0fd7be0b0eba0df67ae622212a9205baef2bd841",
     "catalog_path": "plugins/fun/trivia"
   },
   "weather": {
-    "sha256": "4908310338949b27e30c533b61aba344567e5a66d7d15fb338991b6ebc7d0994",
-    "source_commit": "12479aa3527f6b74d89b9b1bcbe366b7c7fe5c0e",
+    "sha256": "9265d8a3e03da7d81d125b1f7099fa456ffd36e190bcd5c7c76d83bd66982f48",
+    "source_commit": "0fd7be0b0eba0df67ae622212a9205baef2bd841",
     "catalog_path": "plugins/utilities/weather"
   }
 }

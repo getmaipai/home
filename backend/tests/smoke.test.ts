@@ -1,6 +1,9 @@
-import { describe, expect, test, beforeEach } from "bun:test";
+import { describe, expect, test, beforeEach, afterEach } from "bun:test";
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { resetDb } from "./reset-db";
-import { runSmoke, getPackageStatus, allPackageStatuses, runAllSmokeTests } from "@/lib/smoke";
+import { runSmoke, runDenoTestSmoke, getPackageStatus, allPackageStatuses, runAllSmokeTests } from "@/lib/smoke";
 import { listIssues } from "@/lib/issues";
 
 beforeEach(() => {
@@ -28,6 +31,18 @@ describe("runSmoke, static kind", () => {
     const result = await runSmoke("storytime-style");
     expect(result.ok).toBe(true);
     expect(getPackageStatus("storytime-style").status).toBe("enabled");
+  });
+});
+
+// SEC-2 (code review, 2026-09-06): POST /:id/smoke used to pass the raw
+// route param straight to join(PACKAGES_DIR, id, ...) with no shape
+// check, so an owner/admin could point a real `deno test`/recipe-fixture
+// run at any directory a traversal id resolved to.
+describe("runSmoke rejects a malformed/traversal id", () => {
+  test("fails without reading anything off disk for that id", async () => {
+    const result = await runSmoke("../../data/packages/weather");
+    expect(result.ok).toBe(false);
+    expect(result.message).toContain("not a valid package id");
   });
 });
 
@@ -90,4 +105,47 @@ describe("runAllSmokeTests", () => {
     expect(ran).toBeGreaterThanOrEqual(7); // define, joke, trivia, weather, storytime-style, remember, recall at minimum
     expect(failed).toBe(0);
   });
+});
+
+// COR-2 (code review, 2026-09-06): runDenoTestSmoke had no timeout at
+// all - a Tier 1 package's own deno_test hanging used to hang whichever
+// caller awaited it (boot, the daily packages.smoke core job) forever.
+// A real disposable temp directory, never a bundled package under
+// PACKAGES_DIR - the same posture denoHost.test.ts's own real-spawn
+// permission tests take, for the identical reason (its own header
+// explains why: never mistaken for one of the bronze-completeness
+// suite's own bundled packages).
+describe("runDenoTestSmoke timeout (COR-2)", () => {
+  let tempDir: string;
+
+  beforeEach(() => {
+    tempDir = mkdtempSync(join(tmpdir(), "maipai-smoke-denotest-"));
+  });
+
+  afterEach(() => {
+    rmSync(tempDir, { recursive: true, force: true });
+  });
+
+  test("a hanging deno test is killed and reported as a timeout, not left running forever", async () => {
+    // A real, long timer, not an eternally-unresolved bare Promise: Deno's
+    // own sanitizers fail an unresolved-with-nothing-pending promise
+    // almost instantly on their own ("Promise resolution is still
+    // pending but the event loop has already resolved") - not the kind
+    // of hang this fix is for. A live timer keeps the event loop
+    // genuinely busy, the same shape a real stuck test (an infinite
+    // loop, a network call that never answers) would have.
+    writeFileSync(
+      join(tempDir, "hangs.test.ts"),
+      `Deno.test("hangs", () => new Promise((resolve) => setTimeout(resolve, 30_000)));`,
+    );
+    const result = await runDenoTestSmoke(tempDir, 200);
+    expect(result.ok).toBe(false);
+    expect(result.message).toContain("timed out");
+  }, 15_000);
+
+  test("a fast-passing deno test is unaffected by the timeout", async () => {
+    writeFileSync(join(tempDir, "passes.test.ts"), `Deno.test("passes", () => {});`);
+    const result = await runDenoTestSmoke(tempDir, 30_000);
+    expect(result.ok).toBe(true);
+  }, 15_000);
 });

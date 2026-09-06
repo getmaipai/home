@@ -1,5 +1,5 @@
 import { describe, expect, test, beforeEach } from "bun:test";
-import { writeFileSync, mkdirSync } from "node:fs";
+import { writeFileSync, mkdirSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import forge from "node-forge";
 import { resetDb } from "./reset-db";
@@ -106,6 +106,29 @@ describe("ensureHouseholdLeaf()", () => {
     expect(cert.validity.notAfter.getTime()).toBeGreaterThan(Date.now());
   });
 
+  // COR-3 (code review, 2026-09-06): stillGood used to check only expiry
+  // and address coverage, never whether the leaf actually chains to the
+  // CA currently on disk - exactly the damage a first-run race (two
+  // concurrent ensureHouseholdCa() callers, whichever's write ran second
+  // silently replacing the first's CA file) leaves behind: a leaf still
+  // individually valid, signed by a CA that's no longer the one on disk.
+  test("regenerates when the on-disk leaf doesn't chain to the CA currently on disk", async () => {
+    const firstLeaf = await ensureHouseholdLeaf();
+
+    // Simulate exactly that damage: the CA file gets replaced while the
+    // leaf - signed under the OLD CA - is left untouched.
+    const keysDir = join(dataDir, "keys");
+    rmSync(join(keysDir, "household-ca-cert.pem"));
+    rmSync(join(keysDir, "household-ca-key.pem"));
+
+    const secondLeaf = await ensureHouseholdLeaf();
+    expect(secondLeaf.certPem).not.toBe(firstLeaf.certPem);
+    const newCa = await ensureHouseholdCa();
+    const caCert = forge.pki.certificateFromPem(newCa.certPem);
+    const leafCert = forge.pki.certificateFromPem(secondLeaf.certPem);
+    expect(caCert.verify(leafCert)).toBe(true);
+  });
+
   test("fires onLeafRenewed() when it actually regenerates, never when it returns the cached leaf", async () => {
     let calls = 0;
     onLeafRenewed(() => {
@@ -115,6 +138,33 @@ describe("ensureHouseholdLeaf()", () => {
     expect(calls).toBe(1);
     await ensureHouseholdLeaf(); // nothing changed - the cached leaf is still good
     expect(calls).toBe(1);
+  });
+
+  // COR-3 (code review, 2026-09-06): two concurrent first-run callers
+  // (two devices opening the trust page at once) each used to see no CA/
+  // leaf on disk and each mint their own - whichever's write ran second
+  // silently overwrote the first's, and fired onLeafRenewed() twice for
+  // what should be a single event. singleflight() makes every concurrent
+  // caller share the SAME mint.
+  test("two concurrent ensureHouseholdCa() calls on an empty keys dir produce exactly one CA", async () => {
+    const [first, second] = await Promise.all([ensureHouseholdCa(), ensureHouseholdCa()]);
+    expect(second.certPem).toBe(first.certPem);
+    expect(second.keyPem).toBe(first.keyPem);
+  });
+
+  test("two concurrent ensureHouseholdLeaf() calls on an empty keys dir produce one CA and a leaf that verifies against it, firing onLeafRenewed() exactly once", async () => {
+    let calls = 0;
+    onLeafRenewed(() => {
+      calls++;
+    });
+    const [first, second] = await Promise.all([ensureHouseholdLeaf(), ensureHouseholdLeaf()]);
+    expect(second.certPem).toBe(first.certPem);
+    expect(calls).toBe(1);
+
+    const ca = await ensureHouseholdCa();
+    const caCert = forge.pki.certificateFromPem(ca.certPem);
+    const leafCert = forge.pki.certificateFromPem(first.certPem);
+    expect(caCert.verify(leafCert)).toBe(true);
   });
 });
 

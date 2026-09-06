@@ -73,6 +73,7 @@ import {
 } from "@/lib/memory";
 import { trigger } from "@/lib/notifications";
 import { nextHlc } from "@/lib/hlc";
+import { turnActiveWithin } from "@/lib/turnActivity";
 import type { ConversationTurnRow } from "@/wire";
 import type { PersonRow } from "@/types";
 
@@ -470,10 +471,25 @@ export interface JudgeBatchResult {
   factsWritten: number;
 }
 
+// A latency review (2026-09-06) found this tick sharing the household's
+// one chat engine slot with live turns with no coordination at all: every
+// extraction/dedupe call here evicts the household's own conversation
+// prefix from llama-server's cache and queues right in front of whatever
+// real turn comes next, "very likely the largest latency variance source
+// in family use." Skipping a tick that lands mid-conversation costs
+// nothing real - scheduler.ts's own runDueJobs() computes the NEXT fire
+// from the job's recurrence interval, not from when this tick actually
+// ran, so a skipped batch simply gets picked up a minute later, same as
+// any other late tick; MAX_TURNS_PER_RUN's own oldest-first ordering
+// already handles a backlog from several skipped ticks in a row.
+const JUDGE_IDLE_WINDOW_MS = 20_000;
+
 /** The core job's own entry point (scheduler.ts's "memory.judge",
  * every:1m): picks up to MAX_TURNS_PER_RUN still-unjudged model turns,
  * oldest first, and judges each in turn. */
 export async function runJudgeBatch(): Promise<JudgeBatchResult> {
+  if (turnActiveWithin(JUDGE_IDLE_WINDOW_MS)) return { processed: 0, factsWritten: 0 };
+
   const pending = db
     .select()
     .from(conversationTurns)
@@ -694,6 +710,20 @@ export async function runConsolidation(): Promise<ConsolidateResult> {
         if (!vb) continue;
         const cos = cosineSimilarity(va, vb);
         if (cos < CONTRA_COSINE_MIN || cos >= CONTRA_COSINE_MAX) continue;
+        // A code review (2026-09-06) found this LLM call had no idle
+        // gate at all, unlike runJudgeBatch()'s own turnActiveWithin()
+        // check right above - the identical shared-chat-slot contention
+        // that check exists to prevent, just reachable through the
+        // weekly consolidate job instead of the per-minute judge one.
+        // Skipped (not counted against contraChecks - no LLM call was
+        // actually spent) rather than the whole run gated at the top:
+        // this is a once-a-week job, and scheduler.ts computes its NEXT
+        // fire from the recurrence interval, not from when this run
+        // finished, so gating the whole function could silently drop an
+        // entire week's contradiction pass instead of just this one
+        // pair; an undetected contradiction waits for the next weekly
+        // run either way, never a correctness problem.
+        if (turnActiveWithin(JUDGE_IDLE_WINDOW_MS)) continue;
         contraChecks++;
         const older = a.createdAt <= b.createdAt ? a : b;
         const newer = older.id === a.id ? b : a;

@@ -8575,3 +8575,143 @@ real detail lives in each session's own `docs/dev/session-<letter>.md`.
   view, devices and sessions with revoke, the TV/far surface and the
   rest of accessibility, i18n scaffolding with Lingui, and nine tier-1
   user docs. Merged 2026-09-06.
+- **Session F** (`docs/plans/session-f-platform-and-trust.md`, `docs/dev/
+  session-f.md`): the platform and trust layer - entities/relationships/
+  grants/approvals, passkeys and device pairing, backups to somewhere
+  else with the emergency kit and restore drill, storage/quotas/factory
+  reset/redacted diagnostics, the updates projection, and the installer/
+  service files (systemd, launchd, a Windows service via WinSW) plus a
+  real Astro Starlight docs site. The performance-budget bench and the
+  release ceremony itself are deliberately deferred (docs/BACKLOG.md;
+  cutting a release is always Jesse's word in the moment). Merged
+  2026-09-06.
+- **Session D** (`docs/plans/session-d-packages-and-store.md`, `docs/dev/
+  session-d.md`): packages, the store, and the catalog - the Tier 1 host
+  under Deno with real MCP, the store host (verify, install, smoke,
+  rollback, channels) and the catalog's own supply-chain tooling (lint,
+  pack, sign, index, scorecard, a public CI), the almanac/math/convert/
+  news/sports/currency/translate/music/websearch/knowledge lookups,
+  lists/reminders/timers over a new scheduler core-job kind, home
+  control packages (lights, a locked-door consequential example) and the
+  D-to-E widgets contract. Two real safety gaps found and fixed at the
+  source along the way: a consequential package's own literal routing
+  pattern could bypass the confirmation gate entirely, and a
+  consequential package's `min_role` alone (not the confirm step) is the
+  real gate on who can trigger a security-domain action. Merged
+  2026-09-06.
+
+## A resource governor for the chat engine (2026-09-06)
+
+Jesse asked whether the hub has a "resource governor": on the pre-rebuild
+project, a locally-running model process made his machine unresponsive to
+the point of a shutdown, and he wanted protection on both his Mac (Apple
+Silicon, unified memory, no eGPU) and Windows machines (an RTX 2070 Super
+built-in plus an always-docked RTX 3070 eGPU), designed for the harder,
+more common case: the hub sharing a machine with everything else he runs,
+not only a dedicated homelab box.
+
+Three rounds of research first, per his explicit ask to research before
+designing: an internal audit of what this repo already had, external
+research into OS-level containment on macOS and Windows, and a check of
+whether Ollama, LM Studio, koboldcpp, text-generation-webui, Jan.ai, or
+llama.cpp itself had already solved this. None had - every one of them
+estimates memory need before loading a model and hopes, and all of them
+have open, unresolved GitHub issues of hosts freezing or crashing. Neither
+macOS nor Windows offers a clean, native-code-free hard memory/CPU cap on a
+spawned child process either: `ulimit -v`/`RLIMIT_AS` doesn't bound RSS on
+either OS, launchd's `ResourceLimits` are advisory and don't apply to a
+plain spawned child anyway, Apple's real memory-pressure APIs are
+ObjC/Swift-only with no JS binding, and Windows' real mechanism (Job
+Objects) has no maintained npm wrapper - using it would mean a native
+addon or a shelled-out helper. So this ships as **poll-and-kill, not an
+OS-level hard cap** - the same realistic, portable approach the whole
+industry uses, not a compromise unique to this project.
+
+The codebase already had most of the pieces, just not wired into a live
+loop: `enginePostLoadCheck.ts`'s `measureProcessMemoryBytes(pid, hasCuda)`
+(VRAM via `nvidia-smi` when CUDA - already the right multi-GPU/eGPU-correct
+number, since it's PID-scoped rather than device-indexed - or RSS via `ps`
+otherwise, the honest signal on Apple Silicon's unified memory), already
+called once per real spawn; `engineStats.ts` already polling the same
+function every 60s for a future stats UI, proof the measurement path works
+in production; and `llmSupervisor.ts`'s `getEngineStatus()`/
+`restartChatBackend()`, already the right primitives to watch and act on a
+backend, no `sidecars.ts` registry involvement needed (a first design draft
+assumed llama-server was a `sidecars.ts` registrant reusing its private
+`handleDown()` - a design-review pass against the actual code caught that
+it isn't; `llmSupervisor.ts` manages its own lifecycle entirely, and the
+correct reuse targets are `restartChatBackend()` and `issues.ts`'s
+`raiseIssue()`/`resolveIssue()` directly, both already exported).
+
+**`backend/src/lib/resourceGovernor.ts`** runs two independent triggers per
+watched backend, because the actual reported incident (the machine froze)
+is a system-memory problem, not only a process problem - a ceiling based
+purely on "this process grew past its own baseline" can't see "the rest of
+the shared machine is also under pressure":
+
+- **Trigger A, system memory headroom** (both spawn tiers that produce a
+  real pid): on Windows/Linux, raw `os.freemem()`/`os.totalmem()` - Windows'
+  `GlobalMemoryStatusEx` already counts the reclaimable standby list as
+  available, so this is a sound signal there with no extra work. **Not** on
+  macOS: it deliberately keeps free pages near zero by using spare RAM for
+  file cache/compression, so raw freemem reads low under completely healthy
+  operation and would trip this trigger constantly. Uses `memory_pressure
+  -Q` instead (a standard macOS CLI, not a private API - confirmed real
+  output on this machine: `System-wide memory free percentage: NN%`), with
+  `vm_stat`'s free+speculative pages as a fallback. Trips when available
+  memory drops below `max(10% of total, 1 GiB)`, sustained for 2 polls.
+- **Trigger B, process usage vs. its own baseline** (tier 3 only, the
+  household's selected model, where a real baseline exists): reuses
+  `measureProcessMemoryBytes` directly - already the right per-platform,
+  multi-GPU/eGPU-correct signal by construction, no new VRAM-reading code
+  needed. Ceiling is the real measured post-load footprint (preferred over
+  the pure `weightsBytes()+kvCacheBytes()` formula estimate, which
+  `enginePostLoadCheck.ts`'s own doc comment notes can drift) times 1.3,
+  with an absolute 500MB minimum overage before it counts as a breach at
+  all - a tiny model's ordinary sample noise can cross 30% without being
+  remotely dangerous. Sustained for 3 polls.
+
+Either trigger raises a `source: "resource-governor"` Repairs issue with
+the real numbers in its detail text, then calls the existing
+`restartChatBackend()` - no forced immediate respawn, the next chat message
+lazily respawns via the existing `getChatClient()` path, same as every
+other stop/restart flow already in this codebase. A fresh, healthy tier-3
+spawn's post-load check resolves the issue, symmetric with how
+`sidecars.ts` resolves its own crash issues on a healthy restart. The
+race the design-review pass specifically asked about - a manual restart or
+model swap landing mid-breach-accumulation - is handled by re-checking
+`getEngineStatus().pid` against the watched pid on every tick, before ever
+acting: no generation counter, no new exported `llmSupervisor.ts` state,
+just the one check that actually matters, which lets a stale governor
+self-retire within one poll interval instead of ever racing a live one.
+Verified with a real spawned test fixture (`tests/fixtures/
+fakeLlamaServer.ts`, a real process with a real `/health` endpoint,
+inflated with a real, fully-touched allocation) rather than a mocked
+measurement, per this repo's own testing convention - the fixture's first
+version returned a plain-text `/health` body, which `LlamaServerClient
+.health()` (it requires a JSON `{status:"ok"}`) silently read as
+unhealthy forever; caught by the test actually hanging rather than passing
+green against the wrong thing.
+
+**Explicitly out of scope, stated rather than silently dropped:** no
+Windows Job Objects or macOS native hard cap (poll-and-kill already
+prevents the runaway-growth failure mode a hard cap would guard - only
+value-add would be defending against the poll loop itself wedging, real
+but lower-priority future work, filed as an issue); no multi-GPU
+tensor-split placement change (`hardware.ts` still places on the single
+biggest card - a utilization concern, different from crash safety); no fix
+for `measureProcessMemoryBytes`'s non-CUDA-Windows gap (its `ps` fallback
+doesn't exist on Windows at all, so a non-CUDA Windows box - AMD/Intel GPU
+or CPU-only - gets trigger A protection but not trigger B; Jesse's own
+Windows machine is NVIDIA-only, so this doesn't affect him today); no fix
+for `engineStats.ts`'s pre-existing `measureCpuPercent` Windows gap (found
+during this work - it unconditionally shells `ps`, silently null on every
+Windows box today - but CPU spin alone doesn't freeze/crash a machine the
+way memory exhaustion does, so it's off the crash-prevention critical
+path). The last three are filed as follow-up issues, not silently skipped.
+
+No user-facing "reserve X%" setting was added or considered: this respects
+the standing decision above (Session A's model-selection wizard entry) that
+rejected a static allocation slider - the constants here are an internal
+crash-prevention safety margin, a different concern from that
+resource-allocation UX decision, not a reopening of it.

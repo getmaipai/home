@@ -11,7 +11,8 @@
   },
   "devDependencies": {
     "@axe-core/playwright": "^4.13.0",
-    "playwright": "^1.48.0"
+    "playwright": "^1.48.0",
+    "text-readability": "^1.1.1"
   },
   "workspaces": [
     "spec",

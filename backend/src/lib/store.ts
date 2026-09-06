@@ -14,7 +14,7 @@ import { eq } from "drizzle-orm";
 import * as tar from "tar";
 import { db } from "@/db";
 import { packageInstalls, storeIndexState } from "@/db/schema";
-import { dataDir, installedPackageVersionDir, installStagingDir } from "@/lib/paths";
+import { dataDir, installedPackageVersionDir, installStagingDir, isValidPackageId } from "@/lib/paths";
 import { getActiveInstall } from "@/lib/packageResolve";
 import { runSmoke } from "@/lib/smoke";
 import { killLiveProcessForInstallChange } from "@/lib/denoHost";
@@ -169,6 +169,16 @@ export type InstallResult =
  * read the pre-install state before either wrote it, corrupting
  * `previousVersion` and risking a half-extracted staging directory. */
 export async function install(opts: InstallOptions): Promise<InstallResult> {
+  // SEC-2-class guard (found by a code review pass over this merge,
+  // 2026-09-06): `opts.id` is `routes/store.ts`'s own raw `:id` route
+  // param, un-decoded and unchecked the same way SEC-2 found for
+  // `PACKAGES_DIR` readers elsewhere - it flows straight into
+  // `installStagingDir()`/`installedPackageVersionDir()` below, which
+  // build real filesystem paths and, worse, `rmSync` them. Checked here
+  // rather than only at the route layer, matching lib/plugins.ts's,
+  // lib/skills.ts's, lib/smoke.ts's, and lib/denoHost.ts's own posture:
+  // the lib function that actually builds the path is what validates it.
+  if (!isValidPackageId(opts.id)) return { ok: false, error: `${opts.id} is not a valid package id` };
   return withPackageLock(opts.id, () => installLocked(opts));
 }
 
@@ -316,6 +326,7 @@ async function readTarball(source: IndexSource, targetPath: string): Promise<Buf
  * for the same id could read a `previousVersion` that the install is
  * about to overwrite. */
 export async function rollback(id: string): Promise<StoreResult<{ version: string }>> {
+  if (!isValidPackageId(id)) return { ok: false, error: `${id} is not a valid package id`, status: 400 };
   return withPackageLock(id, async () => {
     const active = getActiveInstall(id);
     if (!active) return { ok: false, error: `${id} has no active store install to roll back`, status: 404 };
@@ -351,6 +362,7 @@ export async function rollback(id: string): Promise<StoreResult<{ version: strin
  * copy keeps running right afterward. Serialized per package id like
  * install()/rollback() above. */
 export async function uninstall(id: string): Promise<StoreResult<true>> {
+  if (!isValidPackageId(id)) return { ok: false, error: `${id} is not a valid package id`, status: 400 };
   return withPackageLock(id, async () => {
     const active = getActiveInstall(id);
     if (!active) return { ok: false, error: `${id} has no active store install to remove`, status: 404 };
@@ -366,6 +378,7 @@ export async function uninstall(id: string): Promise<StoreResult<true>> {
 }
 
 export function setChannel(id: string, channel: "stable" | "beta"): StoreResult<true> {
+  if (!isValidPackageId(id)) return { ok: false, error: `${id} is not a valid package id`, status: 400 };
   const active = getActiveInstall(id);
   if (!active) return { ok: false, error: `${id} has no active store install to set a channel on`, status: 404 };
   db.update(packageInstalls).set({ channel }).where(eq(packageInstalls.packageId, id)).run();

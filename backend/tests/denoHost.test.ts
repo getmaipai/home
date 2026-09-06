@@ -13,6 +13,7 @@ import {
   buildDenoRunArgs,
   __resetDenoHostForTests,
   __setTestFetchDelayMsForTests,
+  __testCurrentActorId,
 } from "@/lib/denoHost";
 import { cachedFetch, __resetPackageCacheForTests, __clearPackageCacheDirForTests } from "@/lib/packageCache";
 import { listIssues } from "@/lib/issues";
@@ -34,6 +35,20 @@ async function owner() {
   await client.post("/api/auth/setup", { displayName: "Sage", secret: "correcthorse" });
   const row = db.select().from(people).where(eq(people.displayName, "Sage")).get()!;
   return row;
+}
+
+async function ownerAndChildRows() {
+  const client = new TestClient();
+  await client.post("/api/auth/setup", { displayName: "Sage", secret: "correcthorse" });
+  const ownerRow = db.select().from(people).where(eq(people.displayName, "Sage")).get()!;
+  const created = await client.post("/api/people", { displayName: "Bramble", role: "child" });
+  const childId = ((await created.json()) as { id: string }).id;
+  const childRow = db.select().from(people).where(eq(people.id, childId)).get()!;
+  return { ownerRow, childRow };
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 function knowledgeManifest() {
@@ -83,6 +98,43 @@ describe("callTier1Handle (session-d-packages-and-store.md step 5)", () => {
     const psOutput = await new Response(Bun.spawn(["pgrep", "-f", "knowledge/handler.ts"], { stdout: "pipe" }).stdout).text();
     const pids = psOutput.split("\n").filter((line) => line.trim().length > 0);
     expect(pids.length).toBe(1);
+  }, 15_000);
+
+  // SEC-6 (code review, 2026-09-06): the host/fetch handler used to close
+  // over whichever actor happened to be the FIRST caller to start this
+  // package's process, and every later caller's host.* calls (a future
+  // memory/config bridge, this file's own header names it) would have
+  // silently run as that first actor forever. Fixed with a per-process
+  // turn lock: one caller's actor is "current" at a time, and a second
+  // caller queues behind the first rather than racing it.
+  test("two concurrent callers with different actors never see each other's actor mid-flight", async () => {
+    const manifest = knowledgeManifest();
+    await cachedFetch("knowledge", manifest.cache, WIKIPEDIA_SEATTLE_URL, undefined, async () => ({
+      title: "Seattle",
+      extract: "Seattle is a seaport city on the West Coast of the United States.",
+      type: "standard",
+    }));
+    const { ownerRow, childRow } = await ownerAndChildRows();
+
+    // Warms the real Deno process first, outside the timed part of this
+    // test - a cold `deno run` spawn + MCP connect can itself take longer
+    // than the delay below, which would make the timing assertions below
+    // meaningless.
+    await callTier1Handle("knowledge", manifest, ownerRow, { topic: "Seattle" });
+
+    __setTestFetchDelayMsForTests(300);
+    const first = callTier1Handle("knowledge", manifest, ownerRow, { topic: "Seattle" });
+    await sleep(50); // let the owner's call actually start and take the lock
+    expect(__testCurrentActorId("knowledge")).toBe(ownerRow.id);
+
+    const second = callTier1Handle("knowledge", manifest, childRow, { topic: "Seattle" });
+    await sleep(50); // still well inside the owner's 300ms delay
+    expect(__testCurrentActorId("knowledge")).toBe(ownerRow.id); // NOT clobbered by the queued second call
+
+    const [firstResult, secondResult] = await Promise.all([first, second]);
+    expect(firstResult.reply?.text).toContain("Seattle");
+    expect(secondResult.reply?.text).toContain("Seattle");
+    expect(__testCurrentActorId("knowledge")).toBe(childRow.id);
   }, 15_000);
 
   test("a slow handle() past timeout_ms faults and answers with the manifest's own fallback_reply", async () => {

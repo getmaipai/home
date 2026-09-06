@@ -52,10 +52,13 @@ const DOWNLOAD_CARRIES =
 
 const THIRD_PARTY_RETENTION = "we do not know and cannot control it; see that service's own policy";
 
-/** The hub's own outbound connections. Every one is a download the
- * household asked for by turning something on or pressing a button;
- * there is no update ping, no analytics, and no connection MaiPai makes
- * to anything of ours (the org's zero-phone-home rule). */
+/** The hub's own outbound connections. Every one but the update check
+ * below is a download the household asked for by turning something on
+ * or pressing a button; there is no analytics and no connection MaiPai
+ * makes to anything of ours (the org's zero-phone-home rule). The
+ * update check (step 10) is the one periodic, not household-triggered
+ * call, and it reaches GitHub's own public release API for this
+ * open-source project - never a MaiPai-operated server. */
 export function platformConnections(): PrivacyConnection[] {
   // Catalog entries marked `implemented: false` are recorded decisions
   // with no pinned download at all; nothing can fetch them, so nothing
@@ -134,6 +137,16 @@ export function platformConnections(): PrivacyConnection[] {
     row("platform:telegram", telegramConfigured() ? "api.telegram.org" : null, {
       when: "when a notification you or your household chose to send to Telegram fires",
       what: "the rendered notification text and your linked Telegram chat id. Nothing anyone in the house said or asked otherwise.",
+    }),
+    // Step 10: the one periodic (not household-triggered) outbound call
+    // this hub makes on its own, per this file's own header - checking
+    // for a new MaiPai Home release, listed here in the same commit that
+    // added it (org standard: "adding an outbound endpoint updates the
+    // privacy page, no exceptions"). GitHub's public API, never a
+    // MaiPai-operated server.
+    row("platform:update-check", "api.github.com", {
+      when: "automatically, at most once a day",
+      what: "a request for this project's latest release information, and your home's internet address. Nothing anyone in the house said, asked, or saved.",
     }),
   ];
   return rows.filter((r): r is PrivacyConnection => r !== null);
