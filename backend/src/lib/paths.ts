@@ -28,6 +28,20 @@ export const dataDir =
 export const backupDir =
   process.env.MAIPAI_BACKUP_DIR ?? resolve(dataDir, "..", "backups");
 
+// Step 8: "hub as the interface a robot will use" - a paired device's own
+// already-encrypted backup archive, pushed here for cold storage. A
+// sibling of backupDir, never a subdirectory INSIDE it: lib/backup.ts's
+// listBackups()/pruneBackups() (and, found the hard way, more than one
+// test file's own cleanup helper) assume backupDir's contents are a flat
+// list of this household's own `.db.enc` files - nesting a directory in
+// there broke a plain, non-recursive `rmSync` a sibling test file
+// already relied on. A received archive is also real, foreign `.db.enc`
+// content this hub cannot decrypt (it doesn't hold the sender's own
+// backup key) - one bug away from being swept into this household's own
+// retention/prune math if it ever sat in the same flat directory, quite
+// apart from the directory-vs-file cleanup hazard.
+export const receivedBackupsDir = resolve(backupDir, "..", "received-backups");
+
 // Downloaded GGUF weights and llama-server engine binaries (4.11's
 // deferred download-job queue): both real household data in the sense
 // that a household chose and paid bandwidth/disk for them, but neither is

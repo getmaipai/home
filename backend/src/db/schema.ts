@@ -742,3 +742,52 @@ export const routingEmbeddings = sqliteTable(
   },
   (table) => [primaryKey({ columns: [table.packageId, table.exampleHash, table.space] })],
 );
+
+// Session F, step 8. One row per backup target ("2.5: a failure raises
+// a Repairs item and two in a row notify admins"): tracked per target
+// (id is the literal "local", "smb", or "hub") because a failing NAS
+// mount must not mask - or get masked by - the local target still
+// working fine, and vice versa. Hub-internal, the same reasoning
+// hubIdentity/scheduledJobs above give.
+export const backupHealth = sqliteTable("backup_health", {
+  id: text("id").primaryKey(),
+  consecutiveFailures: integer("consecutive_failures").notNull().default(0),
+  lastFailureAt: text("last_failure_at"),
+  lastFailureMessage: text("last_failure_message"),
+  lastSuccessAt: text("last_success_at"),
+});
+
+// Session F, step 8. A configured `smb` target (a NAS share the admin
+// has already mounted at the OS level - this hub is not an SMB client,
+// it just copies encrypted archives into a directory someone else's
+// mount already made available, the same "declared with scan paths"
+// shape plan 4.15's NAS mounts use). Only one row per kind exists in
+// practice today (id is the literal kind), but a table rather than a
+// household setting: `path` is a filesystem detail an admin sets once
+// for the whole house, not a per-person preference, and a future
+// multi-NAS household needs more than one row without a shape change.
+export const backupTargets = sqliteTable("backup_targets", {
+  id: text("id").primaryKey(), // "smb" today; "local" and "hub" need no config row
+  path: text("path").notNull(),
+  enabled: integer("enabled", { mode: "boolean" }).notNull().default(true),
+  createdAt: text("created_at").notNull(),
+  updatedAt: text("updated_at").notNull(),
+});
+
+// Session F, step 8: "hub as the interface a robot will use" - a paired
+// device pushes ITS OWN already-encrypted backup archive here; this hub
+// never has the robot's own backup key, so it is cold storage only,
+// never restorable or decryptable from this side. One row per received
+// archive (not just files on disk) so GET /api/backups?target=hub can
+// list them per device without re-deriving createdAt/bytes from
+// filesystem stat calls scattered across every paired device's own
+// subdirectory.
+export const receivedBackups = sqliteTable("received_backups", {
+  id: text("id").primaryKey(),
+  deviceId: text("device_id")
+    .notNull()
+    .references(() => devices.id),
+  filename: text("filename").notNull(),
+  bytes: integer("bytes").notNull(),
+  createdAt: text("created_at").notNull(),
+});

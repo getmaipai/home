@@ -456,6 +456,32 @@ describe("the restore routes", () => {
     expect(((await gone.json()) as { pending: unknown }).pending).toBeNull();
   });
 
+  // Step 8: "before every update and restore" (2.5) added a fresh backup
+  // right before staging one - a code review (2026-09-06, caught by this
+  // exact scenario) found the fresh backup's own pruneBackups() call
+  // could evict the OLDER backup an admin was in the middle of
+  // restoring, if its retention bucket (same day here) was already
+  // spent by the brand new one. Backdating the target backup's mtime
+  // into an earlier bucket reproduces it: without the `prune: false`
+  // fix, staging it deletes it out from under itself before it's ever
+  // read.
+  test("restoring an earlier-today backup never prunes that same backup away first", async () => {
+    const client = await owner();
+    const older = runBackup();
+    // Same calendar day as the fresh safety backup the restore route is
+    // about to take, which is exactly the collision: the daily
+    // retention tier keeps only one backup per day, and listBackups()
+    // orders newest-first, so the brand new safety backup would claim
+    // today's slot and evict this one if it runs before this route's
+    // own restore read - unless the pre-restore backup skips pruning.
+    const earlierToday = new Date(Date.now() - 2 * 60 * 60 * 1000);
+    utimesSync(join(backupDir, older.filename), earlierToday, earlierToday);
+
+    const staged = await client.post(`/api/backups/${older.filename}/restore`, {});
+    expect(staged.status).toBe(200);
+    expect(existsSync(join(backupDir, older.filename))).toBe(true);
+  });
+
   // The filename comes from the URL, so it is checked against the real
   // list rather than joined onto a path.
   test("refuses a filename that is not a real backup, including a traversal attempt", async () => {

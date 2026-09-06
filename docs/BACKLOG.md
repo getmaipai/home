@@ -2091,11 +2091,12 @@ on a spec tag that was never cut.
       new code, then required once this diff rewrote most of the file).
 - [x] **The approval queue** (Session F step 7, 2026-09-06) - see the
       People/relationships/permissions section below.
+- [x] **The emergency kit, hub/smb backup targets, and the restore
+      drill** (Session F step 8, 2026-09-06) - see "Backups to somewhere
+      else" below.
 - [ ] **Identity and trust pieces plan v0.1 scopes and this file did not
       track, still open** (M each) - hub-key signing of the bundled
-      default set, the emergency kit and hub/SMB backup targets, a
-      restore drill in the release skill, and the `user/` docs tier
-      (only `dev/` exists).
+      default set, and the `user/` docs tier (only `dev/` exists).
 - [ ] **Tests the audit found missing** (S) - `access`, and one test
       proving a specific recalled memory text actually lands in the
       prompt for a matching query (memory tests stop at `recall`; prompt
@@ -2332,6 +2333,74 @@ that owns it.
       `dailyMinutesAllowed()` and combines it with elapsed usage to
       produce `ctx.allowance`. E's controls page still needs building on
       top of this.
+- [x] **Backups to somewhere else, the emergency kit, the restore
+      drill** (Session F step 8, 2026-09-06) - `local` retention/size cap
+      already existed (2026-09-04); this landed the rest of 2.5:
+      - **Health tracking and escalation**: "a failure raises a Repairs
+        item and two in a row notify admins" - tracked per target
+        (`backup_health` table) so `local` and `smb` never mask each
+        other's streak. A single failure sits on the Repairs list at
+        severity `warning` (never auto-notifies, per Issue's own schema
+        comment); the second consecutive failure escalates to `error`
+        and fires `backups.target_failing` by hand (`raiseIssue()`'s own
+        "new open error" gate does not catch a severity change on an
+        already-open row).
+      - **The `smb` target**: never an in-process SMB client - the admin
+        mounts their NAS share at the OS level (`PUT /api/backups/
+        targets/smb`, a plain directory path, validated it exists before
+        `enabled: true`), and every kept local backup is mirrored there
+        (`GET /api/backups/targets` for both targets' health).
+      - **The `hub` target**: `POST/GET/DELETE /api/backups/received` -
+        a paired device pushes its OWN already-encrypted archive here
+        (`received_backups` table, per-device subdirectory,
+        `receivedBackupsDir` deliberately a SIBLING of the household's
+        own `backupDir`, never nested in it - a code review, 2026-09-06,
+        caught the nested version breaking a sibling test file's own
+        non-recursive cleanup, and it's also one bug away from a foreign
+        `.db.enc` file being swept into this household's own retention
+        math). Cold storage only - this hub never holds the sender's own
+        backup key.
+      - **The emergency kit**: `GET /api/backups/emergency-kit` (the
+        backup key, `backupCrypto.ts`'s own header had been waiting for
+        this exact route since 2026-09-04; plus hub name/instance id),
+        owner-only with no grant widening (unlike every other backups
+        route), safe to call more than once - "shown once" describes a
+        wizard step (E's, not built here), not a hard one-time API lock.
+      - **Partial restore of one person's data**: `POST /api/backups/
+        {filename}/restore-person/{personId}` - memories, conversation
+        history and settings only, never credentials/sessions/passkeys/
+        grants/role (live security state an old backup must never
+        resurrect). `ATTACH DATABASE` against the decrypted backup,
+        explicit column lists read fresh from `PRAGMA table_info()`
+        rather than hand-typed (so a schema drift fails loudly per table
+        instead of silently). Embeddings are never restored (memory-
+        record's own "embeddings never sync" rule) - every restored
+        memory is re-queued in `pending_embeddings` so the already-
+        scheduled `memory.embedding_retry` core job re-embeds it for
+        real, reusing existing infra rather than inventing a second embed
+        path. `INSERT OR IGNORE` throughout: safe to run twice on the
+        same backup.
+      - **"Before every update and restore"**: wired for restore (a
+        fresh, prune-skipped safety backup right before `stageRestore()`
+        - a code review, 2026-09-06, caught the FIRST version's own
+        `pruneBackups()` call evicting the very backup an admin was
+        restoring FROM, if its retention bucket was already spent by the
+        brand-new safety backup; regression test in `backup.test.ts`).
+        Not wired for update - no update system exists yet (step 10);
+        documented here rather than faked.
+      - **The restore drill**: `backend/scripts/restore-drill.ts` +
+        top-level `scripts/restore-drill.sh` - decrypts the latest real
+        backup into a throwaway data directory, boots a real hub against
+        it, confirms `GET /api/auth/profiles` (the public sign-in picker)
+        answers with real people. Deliberately stops short of a full PIN/
+        password ceremony (needs a real secret this script has no
+        business knowing); verified by hand against a real backup before
+        landing. The release skill itself lives in the separate
+        `getmaipai/.github` repo, out of this session's scope - this
+        script is the contract it calls, matching `scripts/check.sh`'s
+        own "thin wrapper, real logic in backend/" shape.
+      No UI yet for any of this - Storage page and wizard steps are E's
+      kit work on top of these routes.
 
 **Health, updates, storage, install**
 

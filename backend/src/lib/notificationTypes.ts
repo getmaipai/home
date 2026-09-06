@@ -139,6 +139,21 @@ export const NOTIFICATION_TYPES: readonly NotificationType[] = [
     configurable: true,
     defaultChannels: ["in_app"],
   },
+  // Step 8: "a failure raises a Repairs item and two in a row notify
+  // admins" (2.5). A single failure only sits on the Repairs list
+  // (lib/backup.ts raises it at severity "warning", which - per Issue's
+  // own schema comment - never auto-fires repairs.new); this is the
+  // explicit escalation lib/backup.ts triggers by hand once the same
+  // target has failed twice in a row, since raiseIssue()'s own "new open
+  // error" gate does not fire on a severity change to an already-open row.
+  {
+    id: "backups.target_failing",
+    level: "time_sensitive",
+    audience: "adults",
+    template: "Backups to {target} have failed {count} times in a row: {message}",
+    configurable: true,
+    defaultChannels: ["in_app"],
+  },
 ] as const;
 
 // session-d-packages-and-store.md step 2: a package's own manifest

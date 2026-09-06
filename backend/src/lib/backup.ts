@@ -18,13 +18,18 @@
 // multi-store declaration registry has nothing real to register yet, the
 // same "don't front-load speculative infra" call settings.ts's registry
 // made before a second key existed to prove it needed generality.
-import { existsSync, unlinkSync, readdirSync, statSync } from "node:fs";
+import { existsSync, unlinkSync, readdirSync, statSync, copyFileSync } from "node:fs";
 import { join } from "node:path";
+import { eq } from "drizzle-orm";
 import { backupDir, ensureDataDir } from "@/lib/paths";
 import { randomSuffix } from "@/lib/id";
 import { getHouseholdSettingValue } from "@/lib/settings";
-import { sqlite } from "@/db";
+import { db, sqlite } from "@/db";
+import { backupHealth } from "@/db/schema";
 import { encryptFile, decryptFile } from "@/lib/backupCrypto";
+import { raiseIssue, resolveIssue } from "@/lib/issues";
+import { trigger } from "@/lib/notifications";
+import { getSmbTarget } from "@/lib/backupTargets";
 
 const FILE_SUFFIX = ".db.enc";
 const SNAPSHOT_PREFIX = ".snapshot-";
@@ -239,6 +244,126 @@ export function pruneBackups(): { deleted: number } {
     }
   }
   return { deleted };
+}
+
+// Step 8: "a failure raises a Repairs item and two in a row notify
+// admins" (2.5), tracked per target (`local`/`smb`) so one failing
+// target's streak is never masked by, or masks, the other's. A single
+// failure is raised at severity "warning" - per Issue's own schema
+// comment, only "error" auto-fires the repairs.new notification, and a
+// lone miss shouldn't page anyone. raiseIssue()'s own "new open error"
+// gate does not fire on a severity change to an already-open row (it
+// checks whether the row was previously absent or resolved, not whether
+// its severity just changed), so the explicit escalation on the second
+// consecutive failure is triggered by hand here, not left to raiseIssue.
+export interface BackupTargetHealth {
+  consecutiveFailures: number;
+  lastFailureAt: string | null;
+  lastFailureMessage: string | null;
+  lastSuccessAt: string | null;
+}
+
+/** Null for a target that has never run yet - "healthy, just untried"
+ * and "healthy, proven" are different things a Storage/Backups page
+ * should be able to tell apart. */
+export function getBackupHealth(target: string): BackupTargetHealth | null {
+  const row = db.select().from(backupHealth).where(eq(backupHealth.id, target)).get();
+  if (!row) return null;
+  return {
+    consecutiveFailures: row.consecutiveFailures,
+    lastFailureAt: row.lastFailureAt,
+    lastFailureMessage: row.lastFailureMessage,
+    lastSuccessAt: row.lastSuccessAt,
+  };
+}
+
+function recordBackupSuccess(target: string): void {
+  const now = new Date().toISOString();
+  db.insert(backupHealth)
+    .values({ id: target, consecutiveFailures: 0, lastFailureAt: null, lastFailureMessage: null, lastSuccessAt: now })
+    .onConflictDoUpdate({ target: backupHealth.id, set: { consecutiveFailures: 0, lastSuccessAt: now } })
+    .run();
+  resolveIssue("backup", target);
+}
+
+async function recordBackupFailure(target: string, message: string): Promise<void> {
+  const now = new Date().toISOString();
+  const existing = db.select().from(backupHealth).where(eq(backupHealth.id, target)).get();
+  const consecutiveFailures = (existing?.consecutiveFailures ?? 0) + 1;
+  db.insert(backupHealth)
+    .values({ id: target, consecutiveFailures, lastFailureAt: now, lastFailureMessage: message, lastSuccessAt: existing?.lastSuccessAt ?? null })
+    .onConflictDoUpdate({ target: backupHealth.id, set: { consecutiveFailures, lastFailureAt: now, lastFailureMessage: message } })
+    .run();
+  await raiseIssue({
+    source: "backup",
+    key: target,
+    severity: consecutiveFailures >= 2 ? "error" : "warning",
+    title: `Backups to ${target} are failing`,
+    detail: message,
+  });
+  if (consecutiveFailures >= 2) {
+    await trigger("backups.target_failing", { target, count: String(consecutiveFailures), message });
+  }
+}
+
+/** Mirrors newly-kept backups onto the configured `smb` target and
+ * removes copies there that local retention no longer keeps - the
+ * target that decides WHAT survives is always `local` (this hub is
+ * never an SMB client and cannot run its own retention math against a
+ * share it can only read/write as a plain directory); `smb` just
+ * mirrors that decision. A mirror failure never throws past this
+ * function: a missing/unmounted share is exactly the kind of thing
+ * recordBackupFailure()'s Repairs item and (after a second miss)
+ * notification exist to surface, not something that should also fail
+ * the local backup that already succeeded. */
+function mirrorToSmbTarget(): void {
+  const target = getSmbTarget();
+  if (!target || !target.enabled) return;
+  try {
+    const kept = new Set(listBackups().map((b) => b.filename));
+    for (const filename of kept) {
+      const destPath = join(target.path, filename);
+      if (!existsSync(destPath)) copyFileSync(join(backupDir, filename), destPath);
+    }
+    for (const f of readdirSync(target.path)) {
+      if (f.endsWith(FILE_SUFFIX) && !kept.has(f)) unlinkSync(join(target.path, f));
+    }
+    recordBackupSuccess("smb");
+  } catch (err) {
+    void recordBackupFailure("smb", err instanceof Error ? err.message : String(err));
+  }
+}
+
+/** The one entry point both the scheduled daily job and the manual "run
+ * now" route call: a real local backup, retention, and (if configured) a
+ * best-effort mirror to the `smb` target, with health tracking on both.
+ * A `local` failure is fatal (thrown, same as runBackup() alone always
+ * was) since there is no backup at all to mirror or retain in that case;
+ * an `smb` failure never is, per mirrorToSmbTarget()'s own reasoning.
+ *
+ * `prune: false` is for the "before every update and restore" extra
+ * backup point (routes/backups.ts's restoreRoute): pruneBackups()'s own
+ * retention math is about THIS backup's own age relative to the ones
+ * already kept, with no idea that one of those existing files is the
+ * very backup an admin is about to restore FROM - a fresh backup taken
+ * in the same tick as an older one already occupying that day's/week's/
+ * month's retention slot can otherwise evict the older one before
+ * stageRestore() ever gets to read it (caught by a test doing exactly
+ * that). Skipping prune here only defers it, since the next real
+ * scheduled run still catches up normally. */
+export async function runBackupAndMirror(opts: { prune?: boolean } = {}): Promise<BackupInfo> {
+  const prune = opts.prune ?? true;
+  let info: BackupInfo;
+  try {
+    info = runBackup();
+  } catch (err) {
+    await recordBackupFailure("local", err instanceof Error ? err.message : String(err));
+    throw err;
+  }
+  recordBackupSuccess("local");
+  if (prune) pruneBackups();
+  mirrorToSmbTarget();
+  return info;
 }
 
 // Restore lives in lib/restoreStaging.ts (it must not import the live
