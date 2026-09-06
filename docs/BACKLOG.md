@@ -145,6 +145,26 @@ set with anything below bronze, which today it structurally can't check
 ## Skills (Tier 0 catalog)
 
 Bundled today: `remember`, `recall`, `weather`, `define`, `joke`, `trivia`.
+All six are `kind: "plugin"` recipes (backend/packages/<name>/recipe.json),
+not `kind: "skill"`s in this repo's own architectural sense (a `SKILL.md`
+composed into the system prompt) - `storytime-style` is the only real one
+of those today. "Bundled skills" in this doc is the colloquial, family-
+facing sense, not the manifest kind.
+
+- [ ] **Fix trivia: it reveals the question and the answer in the same
+      reply** (blocked - see "Plugin/recipe `ask`-continuation" under
+      Advanced tool calling below) - Jesse noticed (2026-09-06) that
+      asking for a trivia question immediately gets both, which isn't
+      really trivia. Root cause confirmed in `backend/packages/trivia/
+      recipe.json`: its one `format` step interpolates `{question}` AND
+      `{answer}` into a single output in one shot - there's no LLM
+      authoring this reply and no instruction to fix, since the whole
+      recipe is deterministic fetch -> pick -> format. Needs the
+      `ask`-continuation primitive below before it can be rewritten as a
+      real ask-then-reveal flow (`recipe.json` splitting into an `ask`
+      step for the question and a resumed step that compares the user's
+      answer) - not fixable by editing this recipe alone.
+
 Everything else a family would reach for is missing, prioritized on one
 rule Jesse set (2026-09-05): **a lookup (read a fact, return it) beats a
 control/playback action (make something happen in the world) whenever
@@ -323,6 +343,39 @@ alongside the first sourced skill, not before it.
       a diagnostic route. What is missing is embedding `routing.examples`
       once at package load and matching by similarity (Tier 1), plus
       recall (see "Chat, memory and persona").
+- [ ] **Plugin/recipe `ask`-continuation: let any plugin pause for a
+      real answer, not just reply in one shot** (L) - surfaced fixing
+      trivia (Skills above), and Jesse's own framing once he saw the
+      cause (2026-09-06): this needs to be a capability every plugin can
+      use, not a trivia-specific hack. It's a distinct gap from Tier 2
+      tool calling above - not about the model choosing which plugin to
+      call, but about a plugin that's already running needing to pause
+      mid-recipe, show something, and resume once the person answers.
+      Half-built already: `PluginResult.ask` is a real field in
+      `result.schema.json`, and both interpreters (`spec/interpreters/
+      ts/recipe-interpreter.ts` and its Python twin) support an
+      `"op": "ask"` recipe step - proven by the conformance fixture
+      `spec/fixtures/recipes/ask-disambiguate.json` - but nothing wires
+      it to anything real: `turnEngine.ts`'s plugin branch only ever
+      reads `result.value.reply`, silently falling back to "Done." if a
+      recipe ever produced `ask` instead; no bundled package uses the
+      `ask` op; and there is no cross-turn state anywhere remembering
+      "this conversation is mid-recipe, paused at step N, waiting on an
+      answer that binds to `expects`." `turnEngine.ts`'s own header
+      comment (~line 1142) already names this gap, though it's gone
+      slightly stale - it says the interpreter has no ask-producing step
+      at all, which the fixture disproves, but its actual conclusion
+      ("nothing routes a follow-up deterministically today") still
+      holds. Real design work before code: where paused-recipe state
+      lives and how a follow-up turn gets routed back into resuming the
+      right pause instead of hitting the normal router again, a timeout/
+      abandon story (the person never answers, or asks something
+      unrelated instead), and whether `ask` should offer real UI (tap a
+      multiple-choice option, not just type free text) given `spec/ui`'s
+      schema-driven pages already exist elsewhere in this app. Once this
+      lands, trivia's `recipe.json` is the first real caller: split into
+      an `ask` step for the question and a resumed step that compares
+      the answer, instead of today's one `format` step revealing both.
 
 ## Feature parity: ChatGPT / Gemini / Claude
 
