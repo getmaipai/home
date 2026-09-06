@@ -40,6 +40,8 @@ function record(overrides: Partial<MemoryRecord> = {}): MemoryRecord {
     expired_at: null,
     superseded_by: null,
     embedding_space: null,
+    hlc: "1788000000000:0:test",
+    deleted_at: null,
     ...overrides,
   };
 }

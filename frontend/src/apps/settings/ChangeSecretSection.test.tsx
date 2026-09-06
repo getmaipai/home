@@ -17,6 +17,7 @@ function makePerson(hasSecret: boolean): Roster {
     created_at: "2026-09-04T00:00:00.000Z",
     updated_at: "2026-09-04T00:00:00.000Z",
     deleted_at: null,
+    hlc: "1788000000000:0:test",
     hasSecret,
   };
 }

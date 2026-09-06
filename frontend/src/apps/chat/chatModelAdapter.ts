@@ -166,6 +166,16 @@ export function createChatModelAdapter(deps: ChatModelAdapterDeps): ChatModelAda
       try {
         const response = await api.streamTurn(text, deps.consumeThinking(), abortSignal);
         for await (const event of readTurnStream(response)) {
+          if (event.type === "turn_meta") {
+            // The contract's first line on every turn (routes/turn.ts).
+            // Not consumed yet (chatActionBar.tsx's "Remember this" still
+            // waits on a real turnId in message metadata for a live
+            // reply, a documented gap for a later step); still a normal,
+            // non-terminal event, so it must not fall into the generic
+            // "else = error" branch below, which every turn would hit
+            // otherwise.
+            continue;
+          }
           if (event.type === "delta") {
             raw += event.text;
             resolveRaw();
