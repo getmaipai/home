@@ -23,7 +23,8 @@
 //      is chosen, and every test run) - start the in-process stub
 //      server. Real code path, canned deterministic vectors.
 import { detectHardware } from "@/lib/hardware";
-import { engineBinaryPath, freePort } from "@/lib/llmSupervisor";
+import { engineBinaryPath } from "@/lib/llmSupervisor";
+import { spawnAndWaitHealthy } from "@/lib/sidecars";
 import { embedModelPath, ensureEmbedModel } from "@/lib/embedAssets";
 import { LlamaServerClient } from "@maipai/spec/llm/ts/client.js";
 import { startStubLlmServer } from "@maipai/spec/llm/ts/stubServer.js";
@@ -46,43 +47,23 @@ let startingPromise: Promise<EmbedBackend> | null = null;
 // reasoning; applied here from the start rather than re-discovered later.
 let generation = 0;
 
-async function waitForHealth(client: LlamaServerClient, timeoutMs: number, proc: Bun.Subprocess): Promise<void> {
-  const deadline = Date.now() + timeoutMs;
-  while (Date.now() < deadline) {
-    if (await client.health()) return;
-    if (proc.exitCode !== null) {
-      throw new Error(`llama-server (embed) exited early (code ${proc.exitCode}) before becoming healthy`);
-    }
-    await new Promise((resolve) => setTimeout(resolve, 300));
-  }
-  throw new Error(`llama-server (embed) did not become healthy within ${timeoutMs}ms`);
-}
-
+// Session F, step 2: the spawn+freePort+health-wait shape this module
+// used to hand-roll (a near-duplicate of llmSupervisor.ts's own, per that
+// file's 2026-09-04 comment on why this needed its own freePort() call)
+// now goes through lib/sidecars.ts's spawnAndWaitHealthy() - one
+// implementation of "spawn, poll health, fail fast on early exit" for
+// every process-shaped supervisor in this codebase.
 async function spawnEmbedServer(binPath: string): Promise<EmbedBackend> {
   const port = Number(process.env.MAIPAI_EMBED_PORT ?? 8794);
-  // A code review (2026-09-04) found this fixed-port spawn skipped the
-  // exact `freePort()` call llmSupervisor.ts's own spawnLlamaServer makes
-  // for the identical reason: a `bun --hot` reload wipes this module's
-  // tracking (embedBackend/startingPromise) without killing whatever it
-  // already spawned, so a leftover process stays bound to this port -
-  // the next spawn attempt then either fails to bind or, worse, polls
-  // the orphaned process as if it were the new one. Freeing the port
-  // first is what makes "restart" (once embed has one) actually mean
-  // restart, the real live incident llmSupervisor.ts's own comment
-  // documents.
-  await freePort(port);
   await ensureEmbedModel();
-  const proc = Bun.spawn(
-    [binPath, "--model", embedModelPath(), "--embedding", "--port", String(port), "--host", "127.0.0.1"],
-    { stdout: "inherit", stderr: "inherit" },
-  );
   const client = new LlamaServerClient(`http://127.0.0.1:${port}`);
-  try {
-    await waitForHealth(client, 60_000, proc);
-  } catch (err) {
-    proc.kill();
-    throw err;
-  }
+  const proc = await spawnAndWaitHealthy({
+    command: [binPath, "--model", embedModelPath(), "--embedding", "--port", String(port), "--host", "127.0.0.1"],
+    port,
+    healthCheck: () => client.health(),
+    timeoutMs: 60_000,
+    label: "llama-server (embed)",
+  });
   return { client, stop: () => proc.kill(), kind: "spawned", startedAt: new Date().toISOString() };
 }
 

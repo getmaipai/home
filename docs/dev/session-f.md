@@ -83,3 +83,92 @@ the backup/storage/engine work in later steps) - step 1 ships the
 mechanism and the route surface, proven by its own tests, not a wired-up
 Health page. `GET /api/health`'s placeholder (`{ status: "ok" }`) is
 untouched; step 2 replaces it with the real sidecar-reporting version.
+
+## Step 2: the sidecar contract
+
+Merged alone, second, per the wave-2 contract ("F to C and D... F ships
+this in its step 2, merged alone the same way" as step 1).
+
+**Shipped:** `lib/sidecars.ts` - `registerSidecar`/`getSidecar` (the
+contract's own signature: `{ id, command, args→command[], cwd, port,
+healthUrl, startupOrder, backupMode, excludePatterns }`), `listSidecars`
+for `GET /api/health`, `startSidecar`/`stopSidecar`/`startAllSidecars`/
+`stopAllSidecars` (ascending/descending `startupOrder`), a bounded log
+ring, health-poll-driven crash detection with backoff restart, and
+`registerGracefulExit()` wired once at boot (`index.ts`) so a hub exit
+kills every sidecar's child process first - the actual fix for the class
+of bug `freePort()` (moved here from `llmSupervisor.ts`, same file) only
+ever mitigated after the fact. `GET /api/health` now returns `{ sidecars:
+[...] }` for real, `requireAuth` (informational, not gated to owner/admin
+the way Repairs' remedial actions are). 16 new tests (`tests/
+sidecars.test.ts`), all against real spawned `bun -e` processes and real
+HTTP health checks, no mocked process layer - matching this repo's
+existing "prove the real mechanism" standard for `freePort()`'s own
+tests, which moved here with it.
+
+**A crashed sidecar is real Repairs content from day one:** `startSidecar`
+and the health loop call `lib/issues.ts`'s `raiseIssue`/`resolveIssue`
+directly (source `sidecar:<id>`, key `crashed`), and `registerSidecar`
+wires a `restart_sidecar:<id>` fix handler through
+`registerFixHandler` - so a household clicking "Fix" on a crashed sidecar
+in Repairs genuinely restarts it, not a mechanism waiting for a first
+real registrant. No real sidecar registers yet (D's SearXNG and C's voice
+programs are the first, per the wave-2 contract), so `startAllSidecars()`
+at boot runs over an empty registry today - proven by the tests, not by a
+bundled example.
+
+**A real bug caught while writing the tests, not by review:** the first
+version's default health check for a sidecar declared with no `healthUrl`
+was `async () => true` - always true, checked on the very first loop
+tick, microseconds after `Bun.spawn` returns. A command about to fail
+immediately (a bad binary, a script that exits on bad input) would still
+report "running" before the OS had even scheduled it, because
+`spawnAndWaitHealthy`'s own "fail fast on early exit" check
+(`proc.exitCode !== null`) and the always-true health check both ran in
+the same tick, before the process had any chance to actually exit. Fixed
+with `minUptimeMs` (default 0, 500ms for the no-`healthUrl` case): the
+loop now requires the process to have stayed alive for that long,
+re-checking `exitCode` on every 300ms tick along the way, before trusting
+a health check that carries no real signal of its own. Callers with a
+genuine health check (`client.health()`, a sidecar's own `healthUrl`)
+are unaffected - a check that only passes once the server is actually
+serving requests already proves aliveness, `minUptimeMs` stays 0 for
+them.
+
+**`llmSupervisor.ts` and `embedSupervisor.ts`, "same behaviour, one
+implementation":** both hand-rolled a near-identical
+freePort-then-spawn-then-poll-health sequence (the plan's own step 2 text
+names this exact duplication). The mechanics - `freePort()` and the
+spawn-and-poll loop, now `spawnAndWaitHealthy()` - moved to
+`lib/sidecars.ts` and both files call it; the role-specific behaviour
+(the tiered URL/override/selection/stub fallback, the household model
+selection, the post-load check, the `generation`-guarded restart race)
+stayed exactly where it was, since none of that is shared across the two
+files.
+
+**A genuine mismatch with the two lazy engine supervisors, resolved
+rather than papered over:** the contract's `registerSidecar` is
+declarative (`command`, `port`, `startupOrder` all known upfront, started
+eagerly at boot). `llmSupervisor.ts`/`embedSupervisor.ts` are the
+opposite on purpose: which command to run is chosen per-role from
+multiple tiers (a URL override, a household's own model selection, a
+stub) resolved lazily on first use, not at boot - forcing them through
+the declarative registry would mean either registering a placeholder
+config that gets rewritten before every start (defeating the point of a
+declared config) or teaching the registry to accept a command resolved
+at start-time instead of registration-time (a bigger, riskier change for
+two callers whose lazy/tiered shape the plan doesn't ask to change).
+Resolved by keeping the registry for eagerly-started, statically-declared
+sidecars, and only sharing the low-level spawn/health/freePort mechanics
+with the two lazy supervisors - the "one implementation" the plan asks
+for is real, just at the mechanics layer, not the registry layer. A
+judgment call made without asking (resolvable from the two files'
+existing, literal code duplication), recorded here per the org's
+"record the verdict" practice.
+
+**What's deferred, named:** no restart cap (a sidecar that keeps crashing
+retries forever at the backoff ceiling rather than giving up after N
+attempts) - real, but not yet a problem with zero real registrants; a gap
+to close before D's or C's first sidecar ships, not before this step
+merges. The `backupMode`/`excludePatterns` fields are declared and typed
+but read by nothing yet - step 8's backup work is the real consumer.
