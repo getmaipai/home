@@ -309,6 +309,19 @@ alongside the first sourced skill, not before it.
 - [ ] A recipe step (or Tier 1 path) that can actually reach
       `host.integration.call` (M) - the host method exists; nothing can
       invoke it today.
+- [ ] **Find people and things** (L, Jesse's ask, 2026-09-06) - two
+      distinct halves. (1) Live location, ideally via iCloud/Find My -
+      real per-account OAuth/auth plumbing (same shape as Calendar/Email
+      above: privacy-sensitive, needs its own consent design, and Find
+      My specifically has no public API Apple supports, only reverse-
+      engineered ones - a real feasibility/ToS check before committing to
+      this path, not just an integration to wire up). (2) A static
+      location entry with no integration at all - "remember my passport
+      is in the safe" - which is a pure lookup already buildable on top
+      of the existing `remember`/`recall` skills (Skills, above) with no
+      new plumbing; ship this half first regardless of what happens with
+      (1), by the same lookup-before-integration rule the Skills section
+      already states.
 
 ## Vision
 
@@ -318,6 +331,21 @@ alongside the first sourced skill, not before it.
 - [ ] `host.ocr.read` (M) - RapidOCR already decided as the library
       (`docs/dev.md`); needs wiring, a recipe step, and a real image input
       path (upload? robot capture?) before it's reachable at all.
+- [ ] **Pet recognition: name a pet, mark its owner, recognize it again**
+      (L, Jesse's ask, 2026-09-06) - "facial"/body recognition from an
+      image plus, ideally, bark/vocalization recognition from audio.
+      Blocked on the same missing image-input path as `host.camera.still`
+      above (no pipeline exists to get a photo INTO the hub at all yet),
+      and bark/sound recognition is a real second model, not a
+      by-product of the vision half. Ownership is not new scope to
+      invent: "pets need ownership" is one of Jesse's own original
+      points in `docs/dev.md`'s "Entities, relationships and grants" -
+      a pet is a `kind: entity` record and "owns"/"belongs to" is exactly
+      the Relationship edge that spec already defines, so this is a
+      recognition-and-UI problem sitting on top of hub work that's
+      already spec'd but not yet built ("The hub half of entities and
+      relationships," People/relationships section above), not a new
+      data model to design from scratch.
 
 ## Generation (image, video)
 
@@ -817,6 +845,39 @@ implemented on the hub yet.
 - [ ] **The Python half of `spec/records/ts/validate.ts`** (S) - lands
       when the robot writes one of these records, the same split
       `spec/safety/` takes today.
+- [ ] **Does the People directory grow beyond account holders?** (open
+      question, Jesse's call, 2026-09-06) - `/people` was split from
+      account management on 2026-09-06 (roster add/edit/remove moved to
+      Settings -> Household -> Users, `UsersSection.tsx`) and today only
+      ever lists people with a real account (`GET /api/people`). Jesse's
+      own framing when asking for the split: "anyone with a user account
+      should be able to browse people that are users - open question if
+      we let users browse all people" - naming a non-account entity
+      (an ex-partner, a delivery driver, a lunch lady) as his own example
+      of what a broader "people" concept could include. This is exactly
+      the Entity/Person-vs-User split "The hub half of entities and
+      relationships" (above) would introduce - PeoplePage.tsx cannot
+      answer this on its own since there is no Entity storage yet. When
+      that work starts, this needs a real design pass before code, not
+      just "show everything": the spec's own "Inference is the dangerous
+      half" section is exactly this risk (a household member browsing an
+      entry for someone else's relationship, an inferred connection
+      nobody confirmed) - same shape as the already-recorded open
+      question above ("may a parent see a relationship inferred from
+      their teen's conversation") but for browsing rather than
+      inference specifically.
+- [ ] **A self-service way to change your own display name** (S) - a
+      real, deliberate regression from the 2026-09-06 People/Users split:
+      the old PeoplePage.tsx let anyone edit their own row (`canManagePerson`
+      allows `actorId === target.id` regardless of role), which was the
+      only way a non-admin could rename themselves. That Edit button
+      moved to Settings -> Household -> Users with the rest of roster
+      management, which is admin-gated - a non-admin has no path to
+      renaming themselves at all today. Needs its own home (Settings ->
+      Me is the obvious candidate, alongside Appearance/Personality/
+      Voice) since `display_name` is a `Person` field, not a settings-
+      registry key, so it doesn't fit `SettingsRenderer`'s generic
+      schema without its own small hand-built section.
 
 ## Settings
 
@@ -881,6 +942,24 @@ implemented on the hub yet.
       wake word, TTS program, TTS model, voice files, embeddings);
       `/privacy` renders it in dad-test language. See `docs/dev.md`,
       "The privacy page".
+- [ ] **A generic "share" mechanism in the UI schema/manifest system**
+      (L, Jesse's ask, 2026-09-06) - the actual ask was sharing specific
+      creations (images, videos, music playlists, video playlists,
+      AI-generated podcasts), but Jesse's own follow-up reframed the
+      shape: this should be "a mechanism in our app template/schema...
+      ability to share," not a bespoke share button built per content
+      type. Matches platform principle 1 (one definition, one place) -
+      the right home is likely `spec/ui/schema.json` (a `share` action
+      alongside the existing action union - see `EmptyState.tsx`'s
+      comment on `navigate`/`call`/`play`/`confirm`/`ask`) or a manifest-
+      level capability a package declares once and the generic renderer
+      honors everywhere, rather than each of images/videos/playlists/
+      podcasts growing its own share affordance independently. Needs a
+      design pass on what "share" even means for a private, self-hosted,
+      no-phone-home hub before any code (share TO whom - another
+      household member only, or an exported file/link off the hub
+      entirely; the org's privacy architecture rules govern the second
+      case directly) - not just wiring up a button.
 - [ ] **Batch select and clear-all everywhere else** (M) - the org rule
       landed 2026-09-05 (`getmaipai/.github/docs/UI.md` > Batch actions,
       Jesse: "every section should provide easy batch and or delete all
