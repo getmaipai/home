@@ -56,6 +56,35 @@ export type { SettingsKey };
 // that want it by name without reaching into @maipai/spec directly.
 export type { SafetyResult };
 
+// Frozen from wave-2.md's "D to E: the store, widgets, lists" contract
+// (2026-09-06). GET /api/widgets and GET /api/widgets/:package/:id/data
+// don't exist on the backend yet (confirmed with session D: genuinely
+// not started as of this writing) - hand-typed here rather than
+// imported from @maipai/home-backend/src/wire (this file's own stated
+// convention, above) because there is nothing there yet to import. A
+// deliberate, temporary exception, not a second definition competing
+// with a real one: swap this block for a @/wire import the moment D's
+// route lands, so nothing here can drift from the real shape by hand.
+export interface WidgetDescriptor {
+  package: string;
+  id: string;
+  title: string;
+  size: "card" | "row";
+  refresh_s: number;
+}
+export interface WidgetItem {
+  title: string;
+  subtitle?: string;
+  value?: string;
+  icon?: string;
+  href?: string;
+  image?: string;
+}
+export interface WidgetData {
+  as_of: string;
+  items: WidgetItem[];
+}
+
 export class ApiError extends Error {
   constructor(
     message: string,
@@ -325,6 +354,26 @@ export const api = {
     request<NotificationDeliveryView>(`/api/notifications/${encodeURIComponent(id)}/read`, { method: "POST" }),
   dismissNotification: (id: string) =>
     request<{ id: string }>(`/api/notifications/${encodeURIComponent(id)}/dismiss`, { method: "POST" }),
+  // A 404 here means "the widgets route isn't built yet" (D's step 9,
+  // not started), which reads identically to a household with no
+  // widget-contributing packages installed - also true for a while
+  // after the route lands - so it resolves to an empty list rather than
+  // the caller's own error state. HomePage.tsx's own rule: "a failed
+  // card is a quiet gap in Today, never a red error banner." Any other
+  // status still throws: this only swallows "doesn't exist," never a
+  // real failure once the route does exist.
+  widgets: () =>
+    request<WidgetDescriptor[]>("/api/widgets").catch((e: unknown) => {
+      if (e instanceof ApiError && e.status === 404) return [];
+      throw e;
+    }),
+  widgetData: (pkg: string, id: string) =>
+    request<WidgetData>(`/api/widgets/${encodeURIComponent(pkg)}/${encodeURIComponent(id)}/data`).catch(
+      (e: unknown) => {
+        if (e instanceof ApiError && e.status === 404) return { as_of: new Date().toISOString(), items: [] };
+        throw e;
+      },
+    ),
   memories: () => request<MemoryRecord[]>("/api/memory"),
   archiveMemory: (id: string) =>
     request<MemoryRecord>(`/api/memory/${encodeURIComponent(id)}/archive`, { method: "POST" }),

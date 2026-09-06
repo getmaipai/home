@@ -16,7 +16,9 @@
     { "$ref": "#/$defs/card_grid" },
     { "$ref": "#/$defs/media_shelf" },
     { "$ref": "#/$defs/detail_pane" },
-    { "$ref": "#/$defs/split_view" }
+    { "$ref": "#/$defs/split_view" },
+    { "$ref": "#/$defs/widget_card" },
+    { "$ref": "#/$defs/widget_row" }
   ],
   "$defs": {
     "binding": {
@@ -310,11 +312,31 @@
         "detail": { "$ref": "#/$defs/detail_pane" }
       }
     },
+    "widget_card": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "bind"],
+      "description": "Renders the actor's `size: \"card\"` widgets (D to E's `contributes.widgets[]` contract, docs/plans/wave-2.md) in a grid sized by the kit's card-size slider (frontend/src/kit/primitives/CardSizeSlider.tsx, 180-560px, per app per device). Not a `card_grid` bound straight to display rows: `bind` resolves to the widget list only (`GET /api/widgets`); each widget's own display data (`GET /api/widgets/:package/:id/data`) is a second, per-widget fetch the interpreter makes on that widget's own `refresh_s`, since the list route and the data route are two different calls by design (the list is cheap and shared, the data is per-package and cached server-side).",
+      "properties": {
+        "type": { "const": "widget_card" },
+        "bind": { "$ref": "#/$defs/binding" }
+      }
+    },
+    "widget_row": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "bind"],
+      "description": "The `size: \"row\"` counterpart to `widget_card`: same binding and per-widget data fetch, a slim horizontal row instead of a sized grid tile - no card-size slider applies (a row's height is fixed; only a grid of cards has a size to pick).",
+      "properties": {
+        "type": { "const": "widget_row" },
+        "bind": { "$ref": "#/$defs/binding" }
+      }
+    },
     "nav_entry": {
       "type": "object",
       "additionalProperties": false,
       "required": ["to", "icon", "label"],
-      "description": "One row in the shell's nav (docs/plans/session-b-ui.md step 2, frontend/src/shell/nav.ts). Not part of the root `oneOf` above: a nav entry is never a page-body node a page's `body`/`children` array renders - it describes the shell's own chrome, the same distinction `page` (a route) already draws from `section`/`form` (page content). A package's manifest `contributes.pages` field will emit this shape once packages exist; core's own pages declare it by hand in nav.ts today.",
+      "description": "One row in the shell's nav (docs/plans/session-b-ui.md step 2, frontend/src/shell/nav.ts). Not part of the root `oneOf` above: a nav entry is never a page-body node a page's `body`/`children` array renders - it describes the shell's own chrome, the same distinction `page` (a route) already draws from `section`/`form` (page content). A package's manifest `contributes.pages[]` entry emits this shape minus `to` (design-resolver, 2026-09-06, docs/BACKLOG.md's `app`-kind item): `icon` and `label` carry over as-is, and the shell derives `to` from the package and page ids (`/apps/<package id>/<page id>`) rather than trusting a package to name its own route. Core's own pages still declare this shape by hand in nav.ts today.",
       "properties": {
         "to": { "type": "string", "minLength": 1, "description": "A route path, matching a `page.id`'s route." },
         "icon": { "type": "string", "description": "A lucide icon name (docs/UI.md > Icons)." },

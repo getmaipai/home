@@ -372,3 +372,120 @@ and the full `bun run a11y` matrix re-run clean except the same two
 pre-existing, already-deferred findings (`/setup` now shows the same
 `--primary` contrast gap as every other `bg-primary` surface, already
 covered by the existing BACKLOG.md entry - not a new finding).
+
+## Step 2: Home with real cards, and the `app`-kind decision
+
+**The `app`-kind re-decision came first**, since it gated part of this
+step's own scope (`contributes.pages`, D's `lists` as the first package
+page). Dispatched a design-resolver pass (the dedicated agent type isn't
+registered in this session, so a general-purpose agent ran with the same
+brief) rather than ask Jesse, per `getmaipai/.github/CLAUDE.md`'s own
+instruction to resolve design ambiguity before escalating. Full decision
+recorded in `docs/BACKLOG.md`'s `app`-kind item; the short version: no new
+UI-schema node kind at all. A package page is just a `page` document
+through the *existing* SchemaPage/NodeRenderer path (`spec/ui/pages/
+memory.json` already runs through it) - that identity is the proof
+"the app kind is data," stronger than any new node could be. Concretely:
+`contributes.pages[]` entries (`{id, icon, label, nav, kind, module}`,
+no `to` - the route is derived), served at a new
+`GET /api/plugins/:id/pages/:pageId`, data via the existing `binding`
+mechanism plus a required package-scope guard on `useBinding` (not yet
+built - nothing to scope against until D's route exists), no real-time
+patch protocol needed for v1 (`binding.stream` is the named landing spot
+if that's ever wanted). The `platforms: [web]` escape hatch is a manifest
+field (`contributes.pages[].kind: "web"`), never a sibling node kind, and
+stays rejected for all of Wave 2. Also fixed in the same pass: the stale
+`nav_entry` comment in `spec/ui/schema.json` (it described a shape that
+no longer matches), and the "UiNode renderer" BACKLOG item, which had
+gone stale after session-b-ui.md's step 5 without being checked off.
+
+**A blocking conflict was found and handed to D, not fixed here**:
+`manifest.schema.json`'s `contributes` is an untyped array plus a
+redundant top-level `pages: string[]`, incompatible with the
+already-frozen wave-2.md `contributes.widgets[]` object shape. Confirmed
+safe to change (nothing in `backend/src`/`frontend/src` reads either
+field today) but it's D's file. Flagged 2026-09-06; D's own
+`contributes.pages` + the new pages route + a real page in `lists` (D's
+step 8, not started) are what the rest of this decision - the nav
+registry merge, `PackageScopeContext`, `PackagePage.tsx` - waits on.
+Nothing to prove those against yet, so none of it is built this step.
+
+**What is built, real, and proven**: `widget_card` and `widget_row`, the
+two new schema node kinds this step's own brief called for
+(`spec/ui/schema.json`, `kit/schema/types.ts`, `kit/schema/NodeRenderer.tsx`
+- the same three-file pattern every prior node kind followed, confirmed by
+`catalog.test.ts`'s own agreement test still passing with zero changes to
+it). Each binds once to `GET /api/widgets` (D's now-merged
+`contributes.widgets[]` contract, confirmed with D directly rather than
+assumed) and, per matching widget, makes its own second fetch to
+`GET /api/widgets/:package/:id/data` on that widget's own `refresh_s`
+(`useBinding` gained an opt-in `refetchIntervalMs` for this; every other
+caller is unaffected). Neither backend route exists yet (D's step 9,
+confirmed not started) - `api.widgets()`/`api.widgetData()` catch a 404
+specifically (not any other status) and resolve to "nothing yet" rather
+than an error, the same "a failed card is a quiet gap in Today, never a
+red error banner" rule `HomePage.tsx` already stated for its own two
+cards. `WidgetCard`/`WidgetRow` (new kit primitives) draw the fixed
+`{title, subtitle?, value?, icon?, href?, image?}` item shape the D-to-E
+contract specifies; nothing page-authored controls their layout, matching
+every other content-agnostic primitive in the kit.
+
+**The card-size slider** (`kit/primitives/CardSizeSlider.tsx`): one CSS
+variable (`--maipai-card-size`) a card-size-aware grid reads via
+`cardSizeGridTemplateColumns()`, set on whichever container an app wraps
+its own grids in via `cardSizeStyle(size)`. Local to the browser
+(`localStorage`, keyed `maipai:card-size:<appId>`), not a synced setting:
+`docs/SETTINGS.md` has no "per device" scope, and the right density is a
+property of the screen someone is looking at (a phone vs. a wall
+display), not something to carry between devices - the Photos/Plex
+toolbar-zoom pattern this control is named after in the session brief.
+Wired into Home now (`appId: "home"`) alongside the new widget_card grid;
+any future card-size-aware grid reuses the same hook and variable rather
+than inventing its own.
+
+Built via the shadcn CLI (`bunx shadcn add slider`), per the org's
+"prebuilt over hand-built" standard - not hand-rolled. The generated
+component needed two real fixes, both found live rather than assumed
+correct: the CLI's own generated import (`import { cn } from "cn"`)
+resolved to an unrelated real npm package of that name and got
+auto-installed as a new dependency, purely from a stale codegen template
+not knowing this repo's `@/kit/utils` alias - reverted (`package.json`,
+`bun.lock`) and pointed at the real alias. Second, and only caught by
+running the full `bun run a11y` matrix (not the unit tests, which
+render in isolation with axe never in the loop): Radix's Slider puts
+`role="slider"` on the Thumb, not the Root, so the `aria-label` shadcn's
+template spreads onto the Root never reached the actual ARIA slider
+element at all - `aria-input-field-name` failed on both `home` and, more
+confusingly, `setup` too, until reading the matrix's own seeding logic
+explained why (`/setup` seeds an owner and then visits `/setup` directly;
+Step 1's own gate immediately redirects an already-set-up household to
+`/`, so `setup`'s reported violations are really Home's, one further
+confirmation the redirect gate works as designed, not a second bug).
+Fixed by forwarding `aria-label` to the Thumb explicitly in
+`kit/ui/slider.tsx`, with a comment for the next component this CLI
+generates.
+
+**Deferred, not built this step, both documented in `docs/BACKLOG.md`
+with the exact reason**: the first real package page (D's `lists`,
+step 8, and the pages route above, both unstarted) - nothing to prove
+`contributes.pages` against yet; and "lists and a running timer, as
+their own page and a card" - the backend side is entirely unbuilt for
+both (no `list.schema.json` despite being referenced, no
+`host.schedule`-backed timer recipe or manifest entry), confirmed with D
+directly rather than assumed. The frozen `/api/lists` contract shape is
+recorded in BACKLOG.md for whoever builds it: a real `list` schema node
+bound to `GET /api/lists` is enough for the list itself, no new node
+kind needed, and a per-list detail view would be the first real use of
+`split_view`/`detail_pane` since they were added for catalog
+completeness.
+
+Verified: `bun test` (frontend, 373 passing, widget_card/widget_row and
+the card-size slider each with dedicated tests plus a schema conformance
+case in `spec/tests/ts/ui-schema.test.ts`), `bunx tsc --noEmit` clean,
+`lint` clean (same two pre-existing warnings), `scripts/check.sh` green
+end to end, and the full `bun run a11y` matrix re-run clean except the
+same two pre-existing, already-deferred findings named in Step 1's own
+entry above (color contrast, `scrollable-region-focusable` on Privacy) -
+confirmed by running the full matrix twice, once before and once after
+the slider's aria-label fix, not assumed from the two-combo quick check
+alone.

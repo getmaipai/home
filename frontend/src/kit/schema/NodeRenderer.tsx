@@ -1,10 +1,15 @@
 import { createContext, useContext, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { api } from "@/lib/api";
+import { cardSizeGridTemplateColumns } from "@/kit/primitives/CardSizeSlider";
 import { Section } from "@/kit/primitives/Section";
 import { List } from "@/kit/primitives/List";
 import { CardGrid } from "@/kit/primitives/CardGrid";
 import { MediaShelf } from "@/kit/primitives/MediaShelf";
 import { DetailPane } from "@/kit/primitives/DetailPane";
 import { SplitView } from "@/kit/primitives/SplitView";
+import { WidgetCard } from "@/kit/primitives/WidgetCard";
+import { WidgetRow } from "@/kit/primitives/WidgetRow";
 import { EmptyState } from "@/kit/primitives/EmptyState";
 import { Progress } from "@/kit/primitives/Progress";
 import { AsyncState } from "@/kit/primitives/AsyncState";
@@ -29,7 +34,10 @@ import type {
   FormNode,
   EmptyStateNode,
   ProgressNode,
+  WidgetCardNode,
+  WidgetRowNode,
 } from "@/kit/schema/types";
+import type { WidgetDescriptor } from "@/lib/api";
 
 type Row = Record<string, unknown>;
 
@@ -287,6 +295,127 @@ function MediaShelfNodeView({ node }: { node: MediaShelfNode }) {
   );
 }
 
+// The widgets list (`GET /api/widgets`, D to E's contract) rather than
+// `useBinding(node.bind)` on purpose: `api.widgets()` swallows a 404 as
+// "no widgets yet" (the route genuinely doesn't exist until D ships it,
+// docs/BACKLOG.md's `app`-kind item), which the generic binding
+// interpreter has no reason to do for every other page's bindings. A
+// deliberately DIFFERENT query key from `useBinding`'s own
+// `["schema-binding", path]` convention, not the same one: the two
+// hooks would otherwise cache under an identical key with different
+// `queryFn`s (one throws on 404, one swallows it), and whichever query
+// populated the cache first would silently decide the other's behavior
+// for any page that ever binds a generic node to this same path
+// (a code review, 2026-09-06, caught this before anything used it).
+function useWidgetList(node: { bind: { path: string } }) {
+  return useQuery({
+    queryKey: ["widget-list", node.bind.path],
+    queryFn: () => api.widgets(),
+  });
+}
+
+// One widget's own data (`GET /api/widgets/:package/:id/data`), on its
+// own `refresh_s` poll - a second, per-widget-instance fetch the schema
+// itself has no field for (spec/ui/schema.json's widget_card/widget_row
+// comment), since the list route and the data route are two different
+// calls by design. `refresh_s: 0` means "fetch once, never poll," not
+// "poll every 0ms" - TanStack Query only disables polling on `false`,
+// not a numeric zero (a code review, 2026-09-06, caught this before any
+// package could plausibly ship it).
+// A pure function, exported for a direct test: TanStack Query only
+// disables polling on the literal `false`, not a numeric `0` (a code
+// review, 2026-09-06, caught `refresh_s: 0` scheduling an immediate,
+// repeating timer instead of "fetch once, never poll").
+export function widgetRefetchInterval(refreshS: number): number | false {
+  return refreshS > 0 ? refreshS * 1000 : false;
+}
+
+function useWidgetData(widget: WidgetDescriptor) {
+  return useQuery({
+    queryKey: ["widget-data", widget.package, widget.id],
+    queryFn: () => api.widgetData(widget.package, widget.id),
+    refetchInterval: widgetRefetchInterval(widget.refresh_s),
+  });
+}
+
+// Shared by WidgetCardNodeView/WidgetRowNodeView below: identical
+// fetch-filter-render shape (a code review, 2026-09-06, found the two
+// near-duplicated by hand), differing only in which `size` they keep and
+// how they lay out what's left.
+function WidgetsNodeView({
+  node,
+  size,
+  errorMessage,
+  renderWidgets,
+}: {
+  node: { bind: { path: string } };
+  size: "card" | "row";
+  errorMessage: string;
+  renderWidgets: (widgets: WidgetDescriptor[]) => React.ReactElement;
+}) {
+  const list = useWidgetList(node);
+  return (
+    <AsyncState
+      data={list.data}
+      error={list.isError}
+      isFetching={list.isFetching}
+      onRetry={() => list.refetch()}
+      errorMessage={errorMessage}
+      isEmpty={(widgets) => widgets.filter((w) => w.size === size).length === 0}
+      emptyIcon="sparkles"
+      emptyText="Nothing here yet."
+    >
+      {(widgets) => renderWidgets(widgets.filter((w) => w.size === size))}
+    </AsyncState>
+  );
+}
+
+function WidgetCardNodeView({ node }: { node: WidgetCardNode }) {
+  return (
+    <WidgetsNodeView
+      node={node}
+      size="card"
+      errorMessage="Could not load today's cards."
+      renderWidgets={(widgets) => (
+        <ul className="grid list-none gap-3 p-0" style={{ gridTemplateColumns: cardSizeGridTemplateColumns() }}>
+          {widgets.map((widget) => (
+            <li key={`${widget.package}/${widget.id}`} className="min-w-0">
+              <WidgetCardInstance widget={widget} />
+            </li>
+          ))}
+        </ul>
+      )}
+    />
+  );
+}
+
+function WidgetCardInstance({ widget }: { widget: WidgetDescriptor }) {
+  const data = useWidgetData(widget);
+  return <WidgetCard title={widget.title} items={data.data?.items} isLoading={data.isLoading} />;
+}
+
+function WidgetRowNodeView({ node }: { node: WidgetRowNode }) {
+  return (
+    <WidgetsNodeView
+      node={node}
+      size="row"
+      errorMessage="Could not load today's rows."
+      renderWidgets={(widgets) => (
+        <div className="flex flex-col gap-2">
+          {widgets.map((widget) => (
+            <WidgetRowInstance key={`${widget.package}/${widget.id}`} widget={widget} />
+          ))}
+        </div>
+      )}
+    />
+  );
+}
+
+function WidgetRowInstance({ widget }: { widget: WidgetDescriptor }) {
+  const data = useWidgetData(widget);
+  return <WidgetRow title={widget.title} items={data.data?.items} isLoading={data.isLoading} />;
+}
+
 function DetailPaneNodeView({ node, state }: { node: DetailPaneNode; state: Row }) {
   return (
     <DetailPane title={node.title} subtitle={node.subtitle}>
@@ -401,6 +530,10 @@ export function NodeRenderer({ node, state = {} }: { node: UiNode; state?: Row }
       return <DetailPaneNodeView node={node} state={state} />;
     case "split_view":
       return <SplitViewNodeView node={node} state={state} />;
+    case "widget_card":
+      return <WidgetCardNodeView node={node} />;
+    case "widget_row":
+      return <WidgetRowNodeView node={node} />;
     case "form":
       return <FormNodeView node={node} />;
     case "empty_state":

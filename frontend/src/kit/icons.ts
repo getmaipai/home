@@ -27,6 +27,8 @@ import {
   Search,
   Sparkles,
   Mic,
+  LayoutGrid,
+  Grid2x2,
   type LucideIcon,
 } from "lucide-react";
 
@@ -63,6 +65,8 @@ const REGISTRY: Record<string, LucideIcon> = {
   search: Search,
   sparkles: Sparkles,
   mic: Mic,
+  "layout-grid": LayoutGrid,
+  "grid-2x2": Grid2x2,
 };
 
 export function getIcon(name: string): LucideIcon {

@@ -167,6 +167,18 @@ export interface SplitViewNode {
   detail: DetailPaneNode;
 }
 
+export const WidgetCardNodeSchema = z.object({
+  type: z.literal("widget_card"),
+  bind: BindingSchema,
+});
+export type WidgetCardNode = z.infer<typeof WidgetCardNodeSchema>;
+
+export const WidgetRowNodeSchema = z.object({
+  type: z.literal("widget_row"),
+  bind: BindingSchema,
+});
+export type WidgetRowNode = z.infer<typeof WidgetRowNodeSchema>;
+
 export const SectionNodeSchema: z.ZodType<SectionNode> = z.lazy(() =>
   z.object({
     type: z.literal("section"),
@@ -209,7 +221,9 @@ export type UiNode =
   | CardGridNode
   | MediaShelfNode
   | DetailPaneNode
-  | SplitViewNode;
+  | SplitViewNode
+  | WidgetCardNode
+  | WidgetRowNode;
 
 export const UiNodeSchema: z.ZodType<UiNode> = z.lazy(() =>
   z.union([
@@ -225,6 +239,8 @@ export const UiNodeSchema: z.ZodType<UiNode> = z.lazy(() =>
     MediaShelfNodeSchema,
     DetailPaneNodeSchema,
     SplitViewNodeSchema,
+    WidgetCardNodeSchema,
+    WidgetRowNodeSchema,
   ]),
 );
 
@@ -243,4 +259,6 @@ export const NODE_TYPES = [
   "media_shelf",
   "detail_pane",
   "split_view",
+  "widget_card",
+  "widget_row",
 ] as const;

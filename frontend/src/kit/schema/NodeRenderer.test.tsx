@@ -2,8 +2,9 @@ import { describe, expect, test, mock, afterEach } from "bun:test";
 import { cleanup, fireEvent, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { renderWithQueryClient } from "../../../tests/renderWithQueryClient";
-import { NodeRenderer } from "@/kit/schema/NodeRenderer";
-import type { ListNode, SectionNode } from "@/kit/schema/types";
+import { NodeRenderer, widgetRefetchInterval } from "@/kit/schema/NodeRenderer";
+import type { ListNode, SectionNode, WidgetCardNode, WidgetRowNode } from "@/kit/schema/types";
+import type { WidgetDescriptor, WidgetData } from "@/lib/api";
 
 afterEach(cleanup);
 
@@ -376,5 +377,106 @@ describe("NodeRenderer > section", () => {
   test("renders nothing when the condition is false", () => {
     const { queryByText } = renderNode(sectionNode, { canManage: false });
     expect(queryByText("Visible content")).toBeNull();
+  });
+});
+
+// The data-route regex is checked BEFORE the bare list check on purpose:
+// "/api/widgets" is a literal string prefix of "/api/widgets/pkg/id/data",
+// and matching substring-first (rather than most-specific-first) bit a
+// different test file already this session (SetupWizard.test.tsx's
+// stubFetch reorder fix) - this stub avoids the whole bug class instead
+// of relying on key order.
+function stubWidgets(widgets: WidgetDescriptor[], dataByWidget: Record<string, WidgetData>): () => void {
+  const original = globalThis.fetch;
+  globalThis.fetch = mock((input: RequestInfo | URL) => {
+    const url = typeof input === "string" ? input : input.toString();
+    const dataMatch = url.match(/\/api\/widgets\/([^/]+)\/([^/]+)\/data$/);
+    if (dataMatch) {
+      const [, pkg, id] = dataMatch;
+      const data = dataByWidget[`${pkg}/${id}`];
+      if (!data) return Promise.resolve(new Response(JSON.stringify({ error: "not found" }), { status: 404 }));
+      return Promise.resolve(new Response(JSON.stringify(data), { status: 200 }));
+    }
+    if (url.endsWith("/api/widgets")) {
+      return Promise.resolve(new Response(JSON.stringify(widgets), { status: 200 }));
+    }
+    throw new Error(`unstubbed fetch: ${url}`);
+  }) as unknown as typeof fetch;
+  return () => (globalThis.fetch = original);
+}
+
+const widgetCardNode: WidgetCardNode = { type: "widget_card", bind: { source: "route", path: "/api/widgets", stream: false } };
+const widgetRowNode: WidgetRowNode = { type: "widget_row", bind: { source: "route", path: "/api/widgets", stream: false } };
+
+describe("widgetRefetchInterval", () => {
+  test("a positive refresh_s converts to milliseconds", () => {
+    expect(widgetRefetchInterval(60)).toBe(60000);
+  });
+
+  test("refresh_s: 0 disables polling rather than scheduling an immediate, repeating fetch", () => {
+    expect(widgetRefetchInterval(0)).toBe(false);
+  });
+});
+
+describe("NodeRenderer > widget_card", () => {
+  test("renders a card-size widget's title and its own data", async () => {
+    const restore = stubWidgets(
+      [{ package: "weather", id: "today", title: "Weather", size: "card", refresh_s: 1800 }],
+      { "weather/today": { as_of: "2026-09-06T12:00:00Z", items: [{ title: "Sunny", value: "72°" }] } },
+    );
+    try {
+      const { findByText } = renderNode(widgetCardNode);
+      await findByText("Weather");
+      await findByText("Sunny");
+      await findByText("72°");
+    } finally {
+      restore();
+    }
+  });
+
+  test("ignores a row-size widget entirely", async () => {
+    const restore = stubWidgets(
+      [{ package: "clock", id: "time", title: "Clock", size: "row", refresh_s: 60 }],
+      { "clock/time": { as_of: "2026-09-06T12:00:00Z", items: [{ title: "12:00" }] } },
+    );
+    try {
+      const { findByText, queryByText } = renderNode(widgetCardNode);
+      await findByText("Nothing here yet.");
+      expect(queryByText("Clock")).toBeNull();
+    } finally {
+      restore();
+    }
+  });
+
+  test("a widgets route that isn't built yet (404) reads as no widgets, not an error", async () => {
+    const original = globalThis.fetch;
+    globalThis.fetch = mock(() => Promise.resolve(new Response(JSON.stringify({ error: "not found" }), { status: 404 }))) as unknown as typeof fetch;
+    try {
+      const { findByText, queryByText } = renderNode(widgetCardNode);
+      await findByText("Nothing here yet.");
+      expect(queryByText("Something went wrong.")).toBeNull();
+    } finally {
+      globalThis.fetch = original;
+    }
+  });
+});
+
+describe("NodeRenderer > widget_row", () => {
+  test("renders a row-size widget's title and items, ignoring a card-size one", async () => {
+    const restore = stubWidgets(
+      [
+        { package: "clock", id: "time", title: "Clock", size: "row", refresh_s: 60 },
+        { package: "weather", id: "today", title: "Weather", size: "card", refresh_s: 1800 },
+      ],
+      { "clock/time": { as_of: "2026-09-06T12:00:00Z", items: [{ title: "12:00 PM" }] } },
+    );
+    try {
+      const { findByText, queryByText } = renderNode(widgetRowNode);
+      await findByText("Clock");
+      await findByText("12:00 PM");
+      expect(queryByText("Weather")).toBeNull();
+    } finally {
+      restore();
+    }
   });
 });

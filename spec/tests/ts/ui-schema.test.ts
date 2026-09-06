@@ -111,4 +111,16 @@ describe("UI schema", () => {
       }),
     ).toBe(true);
   });
+
+  test("widget_card and widget_row validate a minimal bind and reject an unbound one", () => {
+    expect(validate({ type: "widget_card", bind: { source: "route", path: "/api/widgets" } })).toBe(true);
+    expect(validate({ type: "widget_row", bind: { source: "route", path: "/api/widgets" } })).toBe(true);
+    expect(validate({ type: "widget_card" })).toBe(false);
+    expect(validate({ type: "widget_row" })).toBe(false);
+    // Neither carries item_key_field/item_label_field the way list/
+    // card_grid do - a widget's display shape (title/subtitle/value/
+    // icon/href/image) is fixed by the D-to-E contract, not authored
+    // per page, so an authored field here is a mistake, not a variant.
+    expect(validate({ type: "widget_card", bind: { source: "route", path: "/api/widgets" }, item_key_field: "id" })).toBe(false);
+  });
 });

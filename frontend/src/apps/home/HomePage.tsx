@@ -8,11 +8,21 @@ import { Avatar } from "@/kit/primitives/Avatar";
 import { Input } from "@/kit/ui/input";
 import { Button } from "@/kit/ui/button";
 import { getIcon } from "@/kit/icons";
+import { CardSizeSlider, useCardSize, cardSizeStyle } from "@/kit/primitives/CardSizeSlider";
+import { NodeRenderer } from "@/kit/schema/NodeRenderer";
+import type { WidgetCardNode } from "@/kit/schema/types";
 import { api, type Roster, type PersonRosterEntry } from "@/lib/api";
 import { greetingFor } from "@/apps/home/greeting";
 import { runFixedTurn } from "@/apps/home/runFixedTurn";
 import { usePinnedApps } from "@/shell/usePinnedApps";
 import { NAV_ENTRIES } from "@/shell/nav";
+
+// The one widget_card instance Home mounts (docs/plans/session-e-ui-and-
+// docs.md step 2). Home is still hand-written React, not a JSON page, so
+// this is mounted directly rather than through a page document's `body` -
+// the same way ExternallyMountedNodeView's two cases are reached by
+// their own page components, not through a page render.
+const PACKAGE_WIDGET_CARDS: WidgetCardNode = { type: "widget_card", bind: { source: "route", path: "/api/widgets", stream: false } };
 
 interface HomePageProps {
   person: Roster;
@@ -134,6 +144,7 @@ function PinnedAppsStrip({ person }: { person: Roster }) {
 export function HomePage({ person }: HomePageProps) {
   const navigate = useNavigate();
   const [prompt, setPrompt] = useState("");
+  const [cardSize, setCardSize] = useCardSize("home");
 
   function submitPrompt(e: FormEvent) {
     e.preventDefault();
@@ -172,6 +183,14 @@ export function HomePage({ person }: HomePageProps) {
             <WeatherCard />
             <RecentMemoriesCard />
           </div>
+        </div>
+
+        <div style={cardSizeStyle(cardSize)}>
+          <div className="mb-2 flex items-center justify-between">
+            <h3 className="text-sm font-medium text-muted-foreground">Your packages</h3>
+            <CardSizeSlider size={cardSize} onChange={setCardSize} />
+          </div>
+          <NodeRenderer node={PACKAGE_WIDGET_CARDS} />
         </div>
 
         <div>

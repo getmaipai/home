@@ -174,9 +174,29 @@ frequently a hard prerequisite, not just a preference.
 device or service to control):**
 
 - [ ] Reminders / timers (S-M) - `host.schedule` already exists; this is
-      mostly a recipe + manifest away.
+      mostly a recipe + manifest away. Session E's step 2 (2026-09-06)
+      scoped "a running timer, as its own page and a card" here and found
+      nothing to build against yet: no recipe, no manifest entry, no
+      `host.schedule` caller for a timer specifically. Left for whoever
+      lands the recipe; the frontend side is a small `list`/`card_grid`-
+      shaped page once there's a route.
 - [ ] Shopping / todo lists (M) - needs a new record type (a list, with
-      items), so a small spec addition, not just a recipe.
+      items), so a small spec addition, not just a recipe. Session E's
+      step 2 (2026-09-06) scoped "lists, as their own page and a card"
+      here too and confirmed the backend side is genuinely unbuilt
+      (D, step 8, not started): no `spec/schemas/list.schema.json` despite
+      being referenced from `manifest.schema.json`, none of
+      `GET/POST /api/lists`, `PATCH/DELETE /api/lists/:id`,
+      `POST /api/lists/:id/items`, `PATCH/DELETE /api/lists/:id/items/:itemId`,
+      `POST /api/lists/:id/clear` exist. The frozen shape (D to E,
+      docs/plans/wave-2.md) is `{ id, person, scope, kind: "shopping" |
+      "todo" | "custom", title, items: [{ id, text, done, due_at?,
+      created_at }], hlc }` - once it lands, the frontend page is a real
+      `list` schema node (bind `GET /api/lists`, `row_action` toggling
+      `done` via a `PATCH`, `batch` for clear-all) the same way Memory's
+      page was built, no new node kind needed; a per-list detail view
+      (its own items) is a `split_view`/`detail_pane` pair, the first real
+      use of either since they were added for catalog completeness.
 
 **Priority 3 - control / playback (drives a real external device or
 service; lower priority by the rule above, and often blocked on its own
@@ -830,16 +850,50 @@ implemented on the hub yet.
 - [ ] Any UI for calendar, email, camera/vision, or generation (blocked on
       each of those existing first)
 - [ ] **The `app` kind: full, multi-page apps (Videos/Weather/Podcasts-
-      style), decided architecture, not built** (L; full reasoning in
-      `docs/dev.md`'s "Naming" entry, 2026-09-05). Decided: same process,
-      same origin, no iframe, no remote hosting - an `app` package is its
-      own directory (mirroring `backend/packages/<id>/`) exporting its
-      own nested route subtree, mounted into the one frontend the same
-      way the legacy hub nested Videos'/Podcasts' many pages under one
-      layout route. Picked explicitly over an iframe/postMessage model
-      (the real precedent behind ChatGPT's Apps SDK, researched and then
-      rejected here) for lower complexity, no new failure mode, and no
-      new trust boundary - Jesse's own stated bar, not assumed.
+      style), re-decided 2026-09-06, not yet built.** The 2026-09-05
+      "own nested route subtree" verdict is superseded: it contradicted
+      plan 6.2 (pages are schema data; custom React only as a
+      `platforms: [web]` federated bundle), couldn't install from a
+      catalog without a rebuild, and couldn't be served by the robot's
+      standalone shell or Go's native renderer. A `design-resolver` pass
+      (session E, 2026-09-06) found the fix needs zero new node kinds:
+      an `app` package's page is just a `page` document through the
+      *existing* SchemaPage/NodeRenderer path (the same one
+      `spec/ui/pages/memory.json` already runs through) - that identity
+      is the proof "the app kind is data," not a new node could ever be.
+      Concretely: `contributes.pages[]` entries `{id, icon, label, nav,
+      kind: "schema" | "web", module}` (D's manifest file), no `to`
+      field - the route is derived (`/apps/<package id>/<page id>`,
+      `id: "index"` derives the bare `/apps/<package id>`), served at a
+      new `GET /api/plugins/:id/pages/:pageId`. Data stays the existing
+      `binding` mechanism with one required addition: `useBinding` needs
+      package-scoped path resolution and a same-package guard (reject a
+      package page's binding that reaches outside its own route
+      namespace) via a `PackageScopeContext`, since today's bare
+      `request(binding.path)` would let a package page read e.g.
+      `/api/people` verbatim. No incremental-patch protocol is needed for
+      v1 - poll via the query layer's normal cadence like every other
+      page (widgets' own `refresh_s` is the only real refresh case that
+      exists today); `binding.stream` (declared, unimplemented) is the
+      named landing spot if real-time patches are ever wanted later. The
+      `platforms: [web]` escape hatch is `contributes.pages[].kind:
+      "web"` (valid only when the manifest's own `platforms` includes
+      `"web"`) with the loader rejecting it outright for all of Wave 2 -
+      a manifest field, never a sibling node kind, since a node
+      SwiftUI/Go can't render would hollow out `catalog.test.ts`'s own
+      agreement test. **Blocks on D**: `manifest.schema.json`'s
+      `contributes` is currently an untyped array plus a redundant
+      top-level `pages: string[]` - incompatible with the already-frozen
+      wave-2.md `contributes.widgets[]` object shape. Recommended fix
+      (flagged to D 2026-09-06, D's file to change): `contributes`
+      becomes an object keyed by blueprint kind (`pages[]`, `widgets[]`,
+      ...), the redundant top-level `pages` dropped - confirmed safe,
+      nothing in `backend/src`/`frontend/src` reads either field today.
+      E's own share (`PackageScopeContext`, the nav registry merge,
+      `PackagePage.tsx`) waits on D's `contributes.pages` and the new
+      pages route landing - nothing to prove it against yet
+      (`lists`, D's own first page, is step 8 of D's plan, not started
+      as of 2026-09-06).
 - [x] **Build the missing kit primitives before the first full app, not
       alongside it** (M) - done 2026-09-05. `getmaipai/.github/docs/UI.md`
       decided that apps never build their own chrome (sidebar, search,
@@ -994,24 +1048,17 @@ implemented on the hub yet.
       duplication: the PIN auto-submit-on-4-digits behavior is copied
       from `SignIn.tsx` in small form rather than extracted into a shared
       hook under this session's time budget - a real follow-up.
-- [ ] **The UiNode renderer, and the schema catching up to the kit**
-      (M-L; sharpens the `app` item above) - `spec/ui/schema.json` has
-      six node kinds and renders nothing; CardGrid, MediaShelf, List,
-      DetailPane and SplitView have no nodes, and Form, EmptyState and
-      Progress already drift from theirs. Add the five nodes now with a
-      test that each React primitive's props are a superset of its node,
-      then make Chat the first page rendered from JSON (bindings plus the
-      five actions). **A re-decision is needed on the `app` item:** the
-      dev-record's "same process, same origin, React route subtree"
-      verdict contradicts plan 6.2 (pages are schema data; custom React
-      only as a `platforms: [web]` federated bundle), cannot be installed
-      from a catalog without a rebuild, cannot be served by the robot's
-      standalone shell, and cannot render on Go. That is the single
-      largest principle-7 risk in the codebase. Shape the schema like
-      A2UI and json-render (a flat node list against a catalog of
-      allowed components, data model separate from layout, incremental
-      patches): the design that both LLM generation and native renderers
-      have converged on. Do not adopt MCP Apps for Go; it is iframe-bound.
+- [x] The UiNode renderer, and the schema catching up to the kit (M-L) -
+      done, session-b-ui.md step 5 (2026-09-05): `spec/ui/schema.json`
+      now carries twelve node kinds (`list`, `card_grid`, `media_shelf`,
+      `detail_pane`, `split_view` added alongside v0's set), each with a
+      real `NodeRenderer.tsx` case, and `spec/ui/pages/memory.json` runs
+      live through it. "Make Chat the first page rendered from JSON" was
+      deliberately reversed instead (reasons in `spec/ui/README.md`), a
+      closed decision, not outstanding work. This item's stale text
+      (six kinds, nothing rendered) is corrected here rather than left to
+      mislead the next reader; the `app`-kind re-decision it named is its
+      own item above, resolved 2026-09-06.
 - [ ] **Chat surface, the missing basics** (M total) - markdown via a
       maintained renderer (react-markdown plus rehype-sanitize; bubbles
       are `whitespace-pre-wrap` today so a list shows raw asterisks); a
