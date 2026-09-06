@@ -234,6 +234,53 @@ describe("PATCH /api/people/:id", () => {
     expect(body.nickname).toBe("Bee");
   });
 
+  // SEC-8 (code review, 2026-09-06): canManage() lets anyone edit their
+  // own profile with no ladder check at all, which used to cover
+  // birthdate too - a child could set their own birthdate to any adult
+  // year and read as "age band adult" in their own prompt (lib/ageBand.ts
+  // speakerAgeBand()). Birthdate and localOnly are safety-adjacent, not
+  // cosmetic, so self-edits of either now need the same ladder as editing
+  // someone else.
+  test("a child cannot change their own birthdate or localOnly", async () => {
+    const ownerClient = await ownerSession();
+    const child = await addPerson(ownerClient, "Bramble", "child");
+    const childClient = await sessionFor(child.id);
+
+    const birthdateRes = await childClient.request(`/api/people/${child.id}`, {
+      method: "PATCH",
+      body: { birthdate: "1990-01-01" },
+    });
+    expect(birthdateRes.status).toBe(403);
+
+    const localOnlyRes = await childClient.request(`/api/people/${child.id}`, {
+      method: "PATCH",
+      body: { localOnly: true },
+    });
+    expect(localOnlyRes.status).toBe(403);
+
+    // Name/nickname in the SAME request as the refused field still goes
+    // nowhere, same "whole request refused together" rule as a rejected
+    // role change above.
+    const combined = await childClient.request(`/api/people/${child.id}`, {
+      method: "PATCH",
+      body: { displayName: "Renamed", birthdate: "1990-01-01" },
+    });
+    expect(combined.status).toBe(403);
+    const roster = (await (await ownerClient.get("/api/people")).json()) as Array<{ id: string; display_name: string }>;
+    expect(roster.find((p) => p.id === child.id)?.display_name).toBe("Bramble");
+  });
+
+  test("an owner or admin editing their own profile may still change their own birthdate and localOnly", async () => {
+    const ownerClient = await ownerSession();
+    const ownerId = ((await (await ownerClient.get("/api/auth/me")).json()) as { id: string }).id;
+
+    const res = await ownerClient.request(`/api/people/${ownerId}`, {
+      method: "PATCH",
+      body: { birthdate: "1980-01-01", localOnly: true },
+    });
+    expect(res.status).toBe(200);
+  });
+
   test("a child cannot edit somebody else's profile", async () => {
     const ownerClient = await ownerSession();
     const child = await addPerson(ownerClient, "Bramble", "child");

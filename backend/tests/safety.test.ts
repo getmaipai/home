@@ -124,7 +124,19 @@ describe("POST /api/safety/check", () => {
     expect(body.notify_parent).toBe(true);
   });
 
-  test("conversely, an adult's own real birthdate on a stale 'teen' role never triggers the minor context", async () => {
+  // SEC-8 (code review, 2026-09-06) reversed this test's own premise:
+  // "a birthdate on file must win over role" turned out to be a real
+  // safety hole read the other direction - routes/people.ts used to let
+  // anyone edit their OWN birthdate with no ladder check, so a "teen" or
+  // "child" role was never a reliable floor for anything if a birthdate
+  // could simply overrule it into "adult". Birthdate self-edits now need
+  // owner/admin, but lib/ageBand.ts's speakerAgeBand() no longer trusts
+  // the direction that mattered even as defense in depth: role is a
+  // FLOOR, so an account's "teen" role still gets the minor context here
+  // no matter what its birthdate says - only the OTHER direction (a
+  // birthdate that's YOUNGER than role, the test above) is still allowed
+  // to make the band stricter.
+  test("a 'teen' role still triggers the minor context even when the birthdate on file says adult", async () => {
     const owner = new TestClient();
     await owner.post("/api/auth/setup", { displayName: "Sage", secret: "correcthorse" });
     const thirtyYearsAgo = new Date();
@@ -134,24 +146,18 @@ describe("POST /api/safety/check", () => {
       role: "teen",
       birthdate: thirtyYearsAgo.toISOString().slice(0, 10),
     });
-    const adult = (await created.json()) as { id: string };
+    const teenLabeled = (await created.json()) as { id: string };
 
-    const adultClient = new TestClient();
-    await adultClient.post("/api/auth/select", { personId: adult.id });
+    const client = new TestClient();
+    await client.post("/api/auth/select", { personId: teenLabeled.id });
 
-    const res = await adultClient.post("/api/safety/check", {
+    const res = await client.post("/api/safety/check", {
       text: "This is our secret, don't tell your parents",
     });
     const body = (await res.json()) as Record<string, unknown>;
-    // The grooming detector only fires against a minor speaker by design
-    // (spec/safety/corpus/corpus.json's own
-    // "grooming.negative.adult_speaker_same_text" case) - a real adult by
-    // birthdate never flags here at all, whatever their stale "teen" role
-    // label says. Proves the same fix from the other direction: if role
-    // still won this check, this account's leftover "teen" label would
-    // have flagged it.
-    expect(body.flagged).toBe(false);
-    expect(body.notify_parent).toBe(false);
+    expect(body.flagged).toBe(true);
+    expect(body.categories).toEqual(["grooming"]);
+    expect(body.notify_parent).toBe(true);
   });
 
   test("returns allow for benign text", async () => {

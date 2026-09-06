@@ -209,6 +209,25 @@ peopleRoutes.openapi(patchRoute, async (c) => {
 
   const body = c.req.valid("json") as PersonEdit;
 
+  // canManage() lets everyone edit their OWN profile (name, nickname,
+  // avatar) with no ladder check at all - birthdate and localOnly are
+  // safety-adjacent, not cosmetic, so a self-edit of either still needs
+  // the ladder. A code review (2026-09-06, SEC-8) found a child free to
+  // set their own birthdate to any adult year, which speakerAgeBand()
+  // (lib/ageBand.ts) used to read straight into "age band adult" for
+  // that same person's own turns - the classifier itself still gates on
+  // role, but the prompt's tone/content calibration and evaluateSafety()'s
+  // leniency both used to loosen on request. Owner/admin editing
+  // themselves is unaffected: they already sit at the top of the ladder.
+  if (actor.id === id && actor.role !== "owner" && actor.role !== "admin") {
+    if (body.birthdate !== undefined) {
+      return c.json({ error: "birthdate can only be changed by an owner or admin" }, 403);
+    }
+    if (body.localOnly !== undefined) {
+      return c.json({ error: "localOnly can only be changed by an owner or admin" }, 403);
+    }
+  }
+
   // The role is checked before anything is written, so a request that
   // changes a name AND an illegal role changes neither.
   let nextRole = target.role;
