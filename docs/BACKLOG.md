@@ -2898,13 +2898,14 @@ it stays visible on the dashboard, not just in the tracker.
       handling (moved off the main thread, or chunked/async I/O).
       Exit check: a test that starts a backup and confirms an unrelated
       request completes without waiting on it.
-- [ ] **`memorializePerson()` isn't atomic** (S, `getmaipai/home#49`) -
-      the same multi-statement-with-no-transaction shape `deletePerson()`
-      had before this review's COR-5 fix (`personLifecycle.ts`), just
-      not yet applied here. Mirror COR-5's fix exactly: wrap in
-      `sqlite.transaction()`. Exit check: `tests/people.test.ts` gets a
-      concurrent-memorialize regression test matching COR-5's own
-      "two owners deleting each other" test shape.
+- [x] **`memorializePerson()` isn't atomic** (S, done 2026-09-06,
+      `getmaipai/home#49`) - had the same multi-statement-with-no-
+      transaction shape `deletePerson()` had before COR-5's fix
+      (`personLifecycle.ts`). Fixed by wrapping the write portion in a
+      named `sqlite.transaction()`, the same pattern `commitPersonUpdate()`
+      and `deletePerson()` already use. Same commit also closed
+      `getmaipai/home#37` (`deletePerson()` left passkeys, devices, device
+      tokens and the TOTP secret behind).
 
 ## How to use this file
 
