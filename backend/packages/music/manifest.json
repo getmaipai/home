@@ -1,0 +1,62 @@
+{
+  "id": "music",
+  "version": "0.1.0",
+  "kind": "plugin",
+  "category": "Info",
+  "display": "Music Lookup",
+  "description": "Looks up a music artist (2026-09-06, step 7), via MusicBrainz's own public search API - no API key. Artists only for now, not songs or albums; movie/TV lookup is a separate, not-yet-built package.",
+  "author": "MaiPai",
+  "license": "AGPL-3.0",
+  "homepage": "https://github.com/getmaipai/home",
+  "routing": {
+    "examples": [
+      "who is the artist Radiohead",
+      "look up the artist Radiohead",
+      "look up the artist Adele",
+      "who is the singer Prince",
+      "who is the singer Adele"
+    ],
+    "patterns": ["who is the artist *", "look up the artist *", "who is the singer *"]
+  },
+  "args": {
+    "type": "object",
+    "required": ["query"],
+    "properties": {
+      "query": { "type": "string", "minLength": 1 }
+    }
+  },
+  "requires": [],
+  "optional": [],
+  "platforms": ["home"],
+  "min_role": "child",
+  "consequential": false,
+  "offline": "unavailable",
+  "config": [],
+  "data_sources": [
+    {
+      "id": "musicbrainz",
+      "destination": "MusicBrainz's own public search API",
+      "when": "the household asks about a music artist",
+      "what": "the artist's name as typed, nothing personal",
+      "who": "the MetaBrainz Foundation",
+      "opt_in": true,
+      "retention": "unknown, see MusicBrainz's own policy"
+    }
+  ],
+  "permissions": ["net:musicbrainz.org"],
+  "notifications": [],
+  "cache": { "key_template": "music:artist:{query}", "ttl_s": 86400, "stale_ok_s": 604800, "max_bytes": 50000 },
+  "fallback_reply": {
+    "text": "Sorry, I'm having trouble looking that up right now.",
+    "speech": "Sorry, I'm having trouble looking that up right now."
+  },
+  "backup": "exclude",
+  "background": false,
+  "contributes": {},
+  "pages": [],
+  "min_app": "0.1.0",
+  "timeout_ms": 8000,
+  "tier": 1,
+  "quality_scale": "bronze",
+  "smoke": { "kind": "deno_test" }
+}

@@ -83,5 +83,9 @@
 
   { "utterance": "exchange 100 dollars to euros", "expect": "currency", "must_not": [] },
   { "utterance": "exchange 50 usd for gbp", "expect": "currency", "must_not": [] },
-  { "utterance": "convert 5 dollars to euros", "expect": "convert", "must_not": ["currency"], "note": "a real, documented limitation: convert already owns the literal 'convert *' pattern, so this phrasing routes to convert (then fails at runtime: dollars/euros aren't mathjs units), never to currency - currency answers to 'exchange' instead. This guards the routing decision itself against a future change that silently sends this phrasing to currency without also updating the README/CHANGELOG that describe the boundary." }
+  { "utterance": "convert 5 dollars to euros", "expect": "convert", "must_not": ["currency"], "note": "a real, documented limitation: convert already owns the literal 'convert *' pattern, so this phrasing routes to convert (then fails at runtime: dollars/euros aren't mathjs units), never to currency - currency answers to 'exchange' instead. This guards the routing decision itself against a future change that silently sends this phrasing to currency without also updating the README/CHANGELOG that describe the boundary." },
+
+  { "utterance": "who is the artist Radiohead", "expect": "music", "must_not": [] },
+  { "utterance": "look up the artist Radiohead", "expect": "music", "must_not": [] },
+  { "utterance": "tell me about the band Radiohead", "expect": "knowledge", "must_not": ["music"], "note": "a real, documented collision: knowledge's own 'tell me about *' pattern sorts before music's own patterns (loadAllManifests() is id-sorted, k before m) and a literal pattern match wins immediately - music dropped this phrasing from its own routing.patterns entirely since it could never actually fire behind knowledge's." }
 ]
