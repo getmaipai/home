@@ -1,6 +1,6 @@
 import { describe, expect, test, mock, afterEach } from "bun:test";
 import { cleanup, waitFor, fireEvent } from "@testing-library/react";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter, useLocation } from "react-router-dom";
 import { SettingsPage } from "@/apps/settings/SettingsPage";
 import { renderWithQueryClient } from "../../../tests/renderWithQueryClient";
 import type { Roster, SettingsKey, ResolvedSetting } from "@/lib/api";
@@ -227,6 +227,147 @@ describe("SettingsPage renders the signed-in person's own voice settings", () =>
     } finally {
       globalThis.fetch = originalFetch;
       globalThis.IntersectionObserver = originalIO;
+    }
+  });
+});
+
+function LocationProbe() {
+  return <span data-testid="location-probe">{useLocation().pathname}</span>;
+}
+
+// Session B step 7: "real management surfaces rather than settings
+// (models, backups, voices, commands) become their own [pages] linked
+// from the tree." A tree entry with `to` set has to navigate away, not
+// scroll a section into view on this same page - the two other entry
+// kinds (`section-hf-token`'s inline anchor, a plain registry-group
+// anchor) both call `scrollIntoView` instead, so a regression here would
+// silently turn "AI models" back into a dead scroll target with no
+// section left on the page to scroll to.
+describe("SettingsPage tree - navigable entries", () => {
+  test("clicking a tree entry with `to` navigates instead of scrolling", async () => {
+    const person = makePerson("owner");
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = mock((input: RequestInfo | URL) => {
+      const url = typeof input === "string" ? input : input.toString();
+      if (url.includes("/api/settings/registry")) {
+        return Promise.resolve(new Response(JSON.stringify(REGISTRY), { status: 200 }));
+      }
+      if (url.includes("/api/settings?scope=")) {
+        // groupSettings.ts skips any registry key with no matching
+        // resolved entry (rather than fabricating one from the
+        // default) - an empty array here would render "No settings
+        // yet." instead of the real household group.
+        return Promise.resolve(
+          new Response(JSON.stringify([resolved("household.locale", "en-US", "Language and region")]), {
+            status: 200,
+          }),
+        );
+      }
+      // RoutingStatsSection (still inline on this page - only models/
+      // backups/voices/commands moved to their own routes) fetches this
+      // regardless of tab; an unstubbed rejection here broke the whole
+      // render, not just this one section, when this test was written.
+      if (url.includes("/api/plugins/stats")) {
+        return Promise.resolve(
+          new Response(
+            JSON.stringify({
+              total: 0,
+              plugin: 0,
+              pluginError: 0,
+              command: 0,
+              commandError: 0,
+              model: 0,
+              safetyRefuse: 0,
+              fallthroughRate: 0,
+              byPlugin: [],
+              byCommand: [],
+            }),
+            { status: 200 },
+          ),
+        );
+      }
+      return Promise.reject(new Error(`unstubbed fetch: ${url}`));
+    }) as unknown as typeof fetch;
+
+    try {
+      const { findByText, findByRole, getByTestId } = renderWithQueryClient(
+        <MemoryRouter initialEntries={["/settings"]}>
+          <SettingsPage person={person} onPersonChange={() => {}} />
+          <LocationProbe />
+        </MemoryRouter>,
+      );
+      await findByText("Language and region");
+      fireEvent.click(await findByRole("button", { name: "AI models" }));
+      expect(getByTestId("location-probe")).toHaveTextContent("/settings/models");
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+  });
+
+  // A code review (2026-09-06) found the test above only covering "AI
+  // models" left the other three moved sections untested - a typo in
+  // any one `to` path would still pass. Separate renders, not one
+  // continuous sequence of clicks: `to` navigation changes the URL with
+  // no `tab` query param, which would otherwise wipe the `?tab=me`
+  // switch a chained test needs for Voices/Commands (SettingsPage stays
+  // mounted across these navigations here - no `<Routes>` in this test
+  // to react to the location change - so its own tab state keeps
+  // reading the current, now tab-less URL and falls back to Household).
+  test.each([
+    ["Backups", "/settings/backups", "household"],
+    ["Voices", "/settings/voices", "me"],
+    ["Commands", "/settings/commands", "me"],
+  ] as const)("clicking \"%s\" in the tree navigates to %s", async (label, path, tab) => {
+    const person = makePerson("owner");
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = mock((input: RequestInfo | URL) => {
+      const url = typeof input === "string" ? input : input.toString();
+      if (url.includes("/api/settings/registry")) {
+        return Promise.resolve(new Response(JSON.stringify(REGISTRY), { status: 200 }));
+      }
+      if (url.includes("/api/settings?scope=")) {
+        return Promise.resolve(
+          new Response(JSON.stringify([resolved("household.locale", "en-US", "Language and region")]), {
+            status: 200,
+          }),
+        );
+      }
+      if (url.includes("/api/plugins/stats")) {
+        return Promise.resolve(
+          new Response(
+            JSON.stringify({
+              total: 0,
+              plugin: 0,
+              pluginError: 0,
+              command: 0,
+              commandError: 0,
+              model: 0,
+              safetyRefuse: 0,
+              fallthroughRate: 0,
+              byPlugin: [],
+              byCommand: [],
+            }),
+            { status: 200 },
+          ),
+        );
+      }
+      return Promise.reject(new Error(`unstubbed fetch: ${url}`));
+    }) as unknown as typeof fetch;
+
+    try {
+      const { findByRole, getByTestId } = renderWithQueryClient(
+        <MemoryRouter initialEntries={[tab === "me" ? "/settings?tab=me" : "/settings"]}>
+          <SettingsPage person={person} onPersonChange={() => {}} />
+          <LocationProbe />
+        </MemoryRouter>,
+      );
+      // `findByRole` itself waits/retries - no separate content gate
+      // needed, and "Language and region" (household-only) would never
+      // appear on the Me tab anyway.
+      fireEvent.click(await findByRole("button", { name: label }));
+      expect(getByTestId("location-probe")).toHaveTextContent(path);
+    } finally {
+      globalThis.fetch = originalFetch;
     }
   });
 });

@@ -8,6 +8,10 @@ import { ChatPage } from "@/apps/chat/ChatPage";
 import { HomePage } from "@/apps/home/HomePage";
 import { SearchPage } from "@/apps/search/SearchPage";
 import { SettingsPage } from "@/apps/settings/SettingsPage";
+import { ModelsPage } from "@/apps/settings/ModelsPage";
+import { BackupsPage } from "@/apps/settings/BackupsPage";
+import { VoicesPage } from "@/apps/settings/VoicesPage";
+import { CommandsPage } from "@/apps/settings/CommandsPage";
 import { PeoplePage } from "@/apps/people/PeoplePage";
 import { MemoryPage } from "@/apps/memory/MemoryPage";
 import { PrivacyPage } from "@/apps/privacy/PrivacyPage";
@@ -85,6 +89,10 @@ export function App() {
                   path="/settings"
                   element={<SettingsPage person={person} onPersonChange={revalidatePerson} />}
                 />
+                <Route path="/settings/models" element={<ModelsPage person={person} />} />
+                <Route path="/settings/backups" element={<BackupsPage person={person} />} />
+                <Route path="/settings/voices" element={<VoicesPage person={person} />} />
+                <Route path="/settings/commands" element={<CommandsPage person={person} />} />
               </Routes>
             </Shell>
           </BrowserRouter>

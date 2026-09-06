@@ -97,7 +97,7 @@ export function ClonedVoicesSection({ person }: ClonedVoicesSectionProps) {
     <Section heading="Cloned voices">
       <p className="text-base text-[var(--muted-foreground)]">
         Upload a real audio recording of a voice - your own, or anyone in the household who's consented - and use it
-        for text-to-speech. Requires a Hugging Face token above.
+        for text-to-speech. Requires a Hugging Face token, which an owner or admin can set in Settings.
       </p>
       {loadError ? (
         <div className="flex flex-col items-start gap-2">

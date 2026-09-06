@@ -1,18 +1,13 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { useSearchParams } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { Page } from "@/kit/primitives/Page";
 import { SettingsRenderer } from "@/kit/settings/SettingsRenderer";
 import { Input } from "@/kit/ui/input";
 import { Button } from "@/kit/ui/button";
 import { cn } from "@/kit/utils";
-import { BackupsSection } from "@/apps/settings/BackupsSection";
-import { ModelsSection } from "@/apps/settings/ModelsSection";
 import { ChangeSecretSection } from "@/apps/settings/ChangeSecretSection";
-import { VoiceCatalogSection } from "@/apps/settings/VoiceCatalogSection";
-import { ClonedVoicesSection } from "@/apps/settings/ClonedVoicesSection";
 import { HuggingFaceTokenSection } from "@/apps/settings/HuggingFaceTokenSection";
 import { RoutingStatsSection } from "@/apps/settings/RoutingStatsSection";
-import { CommandsSection } from "@/apps/settings/CommandsSection";
 import { isOwnerOrAdminRole, type Roster } from "@/lib/api";
 
 interface SettingsPageProps {
@@ -29,6 +24,11 @@ interface SettingsPageProps {
 interface TreeEntry {
   id: string;
   label: string;
+  /** Session B step 7: a real management surface (its own route, its
+   * own page - ModelsPage.tsx and friends) rather than a scroll anchor
+   * on this page. Set, this entry navigates instead of scrolling and is
+   * never a scrollspy target (nothing on THIS page has its id). */
+  to?: string;
 }
 
 const HOUSEHOLD_TREE: TreeEntry[] = [
@@ -37,8 +37,8 @@ const HOUSEHOLD_TREE: TreeEntry[] = [
   { id: "settings-household.integrations", label: "Integrations" },
   { id: "settings-household.notifications", label: "Notifications" },
   { id: "section-hf-token", label: "Hugging Face token" },
-  { id: "section-models", label: "AI models" },
-  { id: "section-backups", label: "Backups" },
+  { id: "models-page-link", label: "AI models", to: "/settings/models" },
+  { id: "backups-page-link", label: "Backups", to: "/settings/backups" },
   { id: "section-routing", label: "Plugin routing" },
 ];
 
@@ -53,10 +53,9 @@ const PERSON_TREE: TreeEntry[] = [
   // reintroducing a smaller version of the duplicate-heading confusion
   // this whole tree/tabs round was built to fix.
   { id: "settings-person.notifications", label: "My notifications" },
-  { id: "section-voice-catalog", label: "Voice catalog" },
-  { id: "section-cloned-voices", label: "Cloned voices" },
+  { id: "voices-page-link", label: "Voices", to: "/settings/voices" },
   { id: "section-change-secret", label: "PIN / password" },
-  { id: "section-commands", label: "Commands" },
+  { id: "commands-page-link", label: "Commands", to: "/settings/commands" },
 ];
 
 function scrollToSection(id: string) {
@@ -94,6 +93,7 @@ export function SettingsPage({ person, onPersonChange }: SettingsPageProps) {
   // hand-copy of "owner or admin" (a code review, 2026-09-04, found
   // exactly that here).
   const canManageBackups = isOwnerOrAdminRole(person.role);
+  const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const [search, setSearch] = useState("");
   // Household-scope settings are readable by anyone signed in but
@@ -217,7 +217,7 @@ export function SettingsPage({ person, onPersonChange }: SettingsPageProps) {
                 type="button"
                 variant="ghost"
                 size="sm"
-                onClick={() => scrollToSection(entry.id)}
+                onClick={() => (entry.to ? navigate(entry.to) : scrollToSection(entry.id))}
                 className={cn(
                   "h-auto justify-start rounded-md px-2 py-1.5 text-left font-normal",
                   activeId === entry.id ? "bg-muted font-medium text-foreground" : "text-muted-foreground",
@@ -242,21 +242,12 @@ export function SettingsPage({ person, onPersonChange }: SettingsPageProps) {
                   <ExtraSections hidden={!!search.trim()}>
                     {/* voice.hf_token is a household-scope key: writing it
                         already requires owner/admin (lib/settings.ts's
-                        assertCanAccessScope), same gate as backups/models
-                        below. */}
+                        assertCanAccessScope), same gate ModelsPage.tsx/
+                        BackupsPage.tsx apply on their own dedicated
+                        routes now (Session B step 7). */}
                     {canManageBackups ? (
                       <div id="section-hf-token">
                         <HuggingFaceTokenSection />
-                      </div>
-                    ) : null}
-                    {canManageBackups ? (
-                      <div id="section-models">
-                        <ModelsSection />
-                      </div>
-                    ) : null}
-                    {canManageBackups ? (
-                      <div id="section-backups">
-                        <BackupsSection person={person} />
                       </div>
                     ) : null}
                     {canManageBackups ? (
@@ -270,27 +261,8 @@ export function SettingsPage({ person, onPersonChange }: SettingsPageProps) {
                 <>
                   <SettingsRenderer scope="person" scopeValue={`person:${person.id}`} filter={search} />
                   <ExtraSections hidden={!!search.trim()}>
-                    <div id="section-voice-catalog">
-                      <VoiceCatalogSection personId={person.id} />
-                    </div>
-                    {/* Not gated to owner/admin: selecting a voice (cloned
-                        or catalog) is a person-scope choice any signed-in
-                        person already makes for themselves via
-                        tts.voice_id. Upload and delete carry their own,
-                        narrower checks (routes/voice.ts). */}
-                    <div id="section-cloned-voices">
-                      <ClonedVoicesSection person={person} />
-                    </div>
                     <div id="section-change-secret">
                       <ChangeSecretSection person={person} onChanged={onPersonChange} />
-                    </div>
-                    {/* Household-wide list, visible to anyone signed in
-                        (the same GET /api/plugins visibility); create/
-                        delete carry their own, narrower checks
-                        (lib/commands.ts), rendered inside the section
-                        itself rather than gating the whole thing here. */}
-                    <div id="section-commands">
-                      <CommandsSection person={person} />
                     </div>
                   </ExtraSections>
                 </>
