@@ -6866,3 +6866,85 @@ card styling modeled on well-designed native mobile apps Jesse pointed
 to directly, kept out of this file and out of commit messages by name
 per his standing rule against naming other products in our own code and
 history.
+
+## Session B: global tokens, chat toolbar relocation, secret write flow (2026-09-06)
+
+Three pieces, all from direct live feedback on the running app.
+
+**Global tokens.** `--radius` (`tokens.css`) bumped from shadcn's own
+0.75rem default to 1rem - every card, button, input, and popover reads
+rounder as one token change. `Page.tsx`'s title went from `text-2xl
+font-semibold` to `text-3xl font-bold`; `Section.tsx`'s heading matched
+it (`text-base font-semibold` -> `text-lg font-bold`), both modeled on
+well-designed native mobile apps Jesse pointed to directly (kept out of
+this file and every commit by name, per his standing rule against
+naming other products in our own history). Verified across every page
+(Home, Chat, People, Privacy, Memory, Settings, the command palette) -
+consistent everywhere without further per-page fixes needed.
+
+**Chat's toolbar, twice corrected.** The wake-word and "think longer"
+toggles were full-size (48px) solid-gray pills in their own row above
+the page title - Jesse: "looks ugly and probably not modern style."
+Rebuilt as compact `size="sm"` icon chips (mic, brain), `outline`
+variant when off instead of a heavy solid fill. Still wrong: "its
+placement / location is also odd" - floating above the whole message
+history reads as page chrome, not what it actually is, a pair of
+per-turn behavior toggles that affect the next message someone sends.
+The vendored `Thread` component (`thread.aui.tsx`) owns its own
+composer with no extension point, so it gained one:
+`composerToolbar?: ReactNode`, rendered directly above `<Composer>`
+inside `ThreadPrimitive.ViewportFooter`. `ChatPage.tsx` now passes the
+two toggles through that prop instead of rendering them as page header
+content. Same pass fixed the thread-list column's own missing padding
+(`New Thread`/search/rows sat flush against the column edge with no
+breathing room, unlike the rest of the app's consistent `p-4`) - a
+plain `p-2` on the `<aside>` wrapper.
+
+**The generic settings editor's write-only secret flow.** Checking
+`notifications.telegram.bot_token` live found it had no way to be set
+at all: a plain `secret: true` registry key with no dedicated backend
+route the way `voice.hf_token` needed one for (restarting pocket-tts
+after a save), so `SettingField.tsx`'s secret branch - a static
+"Set"/"Not set" status, unchanged since the key was declared - was a
+dead end. A household literally could not configure Telegram
+notifications through the running app. Added the paste-and-confirm
+flow the code's own comment had named as the real fix a session ago: a
+"Set"/"Change" button reveals a masked input plus Save/Cancel; the
+value is never read back from the server (`resolveForResponse` on the
+backend already enforces that), so a rejected save just leaves the
+typed draft in place for another try rather than reverting to a
+"previous value" that was never sent to the client to begin with.
+Clearing a secret reuses the field's existing "Reset to default"
+action (every secret key's own default is `""`) rather than a second
+control. Verified live end to end against the real Telegram key: Set,
+shows Set/Change, Reset to default clears it back to Not set, no test
+artifact left in the household's data.
+
+A code review on this diff caught a real regression before it shipped:
+the new flow made `voice.hf_token` writable a SECOND way, through the
+same generic row `HuggingFaceTokenSection.tsx` was built specifically
+to bypass (the generic PUT this flow calls has no hook to restart
+pocket-tts, so a save through the wrong row would succeed while voice
+cloning silently kept failing). Confirmed live - the "AI model tuning"
+section's folded advanced settings really did include a second, fully
+working "Hugging Face token" row once the generic secret flow went in,
+right next to the correct dedicated section further down the same
+page. Fixed by excluding that one key by name
+(`SECRETS_WITH_DEDICATED_FLOWS`) rather than inventing a general "does
+this key have a dedicated section" mechanism nothing else needs yet -
+the same narrow, key-specific shape `household.locale`'s own display
+fix already uses in this file. A regression test pins it: rendering
+`voice.hf_token` through `SettingField` directly must show only the
+static status, never a Set/Change control. The same review also
+flagged the new password input missing `autoComplete`, letting a
+browser's own password manager offer to save an API token outside the
+app's encrypted keystore - added `autoComplete="off"` (the dedicated
+HF token input has the identical, older gap, out of scope for this
+diff to touch).
+
+Tests: 19 in `SettingField.test.tsx` (5 new for the write flow, 1 for
+the `voice.hf_token` exclusion). Full `check.sh` green throughout,
+verified live in the browser at every step rather than trusted from
+the diff alone - the switch/checkbox "fix" earlier this session (see
+the prior entry) was exactly the kind of change that looks obviously
+correct and was not.
