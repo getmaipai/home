@@ -70,6 +70,16 @@ export interface EngineStatus {
 let chatBackend: ChatBackend | null = null;
 let startingPromise: Promise<ChatBackend> | null = null;
 let lastPostLoadCheck: (PostLoadCheckResult & { modelId: string }) | null = null;
+// COR-1 (code review, 2026-09-06): embedSupervisor.ts's identical shape
+// already carried this generation guard "from the start" (its own
+// comment cites the 2026-09-04 review that found and fixed the race here
+// first) - this module never got the same fix. Bumped by every
+// stopChatBackend()/restartChatBackend() call; getChatClient()'s own
+// in-flight spawn checks it before ever assigning to `chatBackend`, so a
+// stop/restart that lands mid-spawn can't have that spawn silently
+// resurrect the very state it just cleared. See getChatClient()'s own
+// comment for the exact race this closes.
+let generation = 0;
 // Set only by stopChatBackend() (an explicit "pause/stop" action, engine
 // control's other real ask alongside "see if it's running... restart");
 // distinct from chatBackend being merely null (not started YET, which
@@ -272,13 +282,41 @@ export async function getChatClient(): Promise<LlamaServerClient> {
   }
   if (chatBackend) return chatBackend.client;
   if (!startingPromise) {
+    const myGeneration = generation;
     startingPromise = startChatBackend()
-      .then((backend) => {
+      .then(async (backend): Promise<ChatBackend> => {
+        if (myGeneration !== generation) {
+          // A stop/restart landed while this spawn was still starting
+          // (COR-1): a real, 20-60s window on an actual model. Assigning
+          // to `chatBackend` here regardless would resurrect exactly the
+          // state stopChatBackend()/restartChatBackend() just cleared - a
+          // live, GPU-resident process the admin explicitly stopped (or
+          // superseded with a restart), with getEngineStatus() reporting
+          // "stopped" the whole time because it checks `manuallyStopped`
+          // first, never `chatBackend` itself. Stopped instead, and the
+          // ORIGINAL caller (already committed to awaiting this exact
+          // promise) recurses into getChatClient() so it transparently
+          // lands on whatever the CURRENT generation resolves to - the
+          // same embedSupervisor.ts fix, applied here.
+          //
+          // Unlike embedSupervisor's own spawn, tier 3 here
+          // (trySpawnFromSelection) has already run a real side effect by
+          // this point - lastPostLoadCheck, read by the Household -> AI
+          // models status page - for whichever backend this generation
+          // check just discarded (a background review of this fix caught
+          // it: porting the guard didn't account for a side effect
+          // embedSupervisor's own spawn never had). Nulled rather than
+          // left stale; the recursive getChatClient() call below sets a
+          // fresh one if the new generation also reaches tier 3.
+          if (backend.kind === "selection") lastPostLoadCheck = null;
+          backend.stop();
+          return { ...backend, client: await getChatClient() };
+        }
         chatBackend = backend;
         return backend;
       })
       .catch((err) => {
-        startingPromise = null;
+        if (myGeneration === generation) startingPromise = null;
         throw err;
       });
   }
@@ -293,6 +331,7 @@ export async function getChatClient(): Promise<LlamaServerClient> {
  * select job's own "loading"/"testing" phases exercise the new spawn. */
 export async function restartChatBackend(): Promise<void> {
   manuallyStopped = false;
+  generation++;
   chatBackend?.stop();
   chatBackend = null;
   startingPromise = null;
@@ -305,6 +344,7 @@ export async function restartChatBackend(): Promise<void> {
  * running (a stopped stub, or nothing started yet). */
 export function stopChatBackend(): void {
   manuallyStopped = true;
+  generation++;
   chatBackend?.stop();
   chatBackend = null;
   startingPromise = null;
@@ -336,6 +376,7 @@ export function getLastPostLoadCheck(): (PostLoadCheckResult & { modelId: string
  * server) and clear the cached client, the same reset-between-test-files
  * shape as resetDb()/__clearSessionCacheForTests. */
 export function __resetLlmSupervisorForTests(): void {
+  generation++;
   chatBackend?.stop();
   chatBackend = null;
   startingPromise = null;

@@ -1,5 +1,5 @@
 import { describe, expect, test, afterEach } from "bun:test";
-import { getChatClient, sweepOrphanEngineProcesses, __resetLlmSupervisorForTests } from "@/lib/llmSupervisor";
+import { getChatClient, restartChatBackend, stopChatBackend, getEngineStatus, sweepOrphanEngineProcesses, __resetLlmSupervisorForTests } from "@/lib/llmSupervisor";
 import { enginesDir } from "@/lib/paths";
 import { setHouseholdSettingValue } from "@/lib/settings";
 import { __setCrashBootHoldForTests } from "@/lib/dirtyBoot";
@@ -63,6 +63,38 @@ describe("llmSupervisor getChatClient()", () => {
     __setCrashBootHoldForTests(Date.now() + 60_000);
     const client = await getChatClient();
     expect(await client.health()).toBe(true);
+  });
+
+  // COR-1 (code review, 2026-09-06): embedSupervisor.ts's identical
+  // getEmbedClient() already had this generation guard; getChatClient()
+  // didn't. restartChatBackend()/stopChatBackend() have no `await` inside,
+  // so calling one between starting and awaiting getChatClient() runs
+  // synchronously, strictly before the in-flight spawn's own `.then()`
+  // (always a microtask) can fire - the same deterministic
+  // microtask-ordering trick embedSupervisor.test.ts's own equivalent
+  // race test uses.
+  test("a caller mid-flight when a restart lands still gets back a real, live client, not a stale one", async () => {
+    const clientPromise = getChatClient();
+    void restartChatBackend();
+    const client = await clientPromise;
+    expect(await client.health()).toBe(true);
+  });
+
+  // The bug this reproduces: stopChatBackend() landing mid-spawn used to
+  // let that spawn's own .then() unconditionally set `chatBackend`
+  // afterward, resurrecting a live, GPU-resident process the admin just
+  // stopped - and getEngineStatus() would report "stopped" the whole
+  // time (it checks `manuallyStopped` first, never `chatBackend` itself),
+  // so nothing showed the leak. The ORIGINAL caller now learns the engine
+  // is stopped instead of silently receiving a client to that resurrected
+  // process, and getEngineStatus().kind stays "stopped" - not just
+  // reported as such while a real process quietly keeps running
+  // underneath.
+  test("a caller mid-flight when a stop lands gets told the engine is stopped, not a resurrected client", async () => {
+    const clientPromise = getChatClient();
+    stopChatBackend();
+    await expect(clientPromise).rejects.toThrow(/stopped/);
+    expect(getEngineStatus().kind).toBe("stopped");
   });
 });
 
