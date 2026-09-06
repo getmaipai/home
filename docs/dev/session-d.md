@@ -1310,7 +1310,7 @@ beyond what `source`/creation timestamps already carry - a real "who
 added this" feature, if wanted, is `lib/lists.ts` schema work, not
 something this step's own scope needed to build speculatively.
 
-## Step 9: home control packages, and widgets (`home-d@PLACEHOLDER`)
+## Step 9: home control packages, and widgets (`home-d@f7473f2`)
 
 Two unrelated halves of the plan's own step 9 text, done in one pass:
 `lights-on`, `lights-off`, `lock-doors` (the plan's own `consequential:
