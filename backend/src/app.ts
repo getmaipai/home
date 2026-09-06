@@ -23,6 +23,7 @@ import { hostRoutes } from "@/routes/host";
 import { voiceRoutes } from "@/routes/voice";
 import { privacyRoutes } from "@/routes/privacy";
 import { repairsRoutes } from "@/routes/repairs";
+import { setupRoutes } from "@/routes/setup";
 import { requireAuth } from "@/middleware/auth";
 import { listSidecars } from "@/lib/sidecars";
 
@@ -105,6 +106,7 @@ app.route("/api/host", hostRoutes);
 app.route("/api/voice", voiceRoutes);
 app.route("/api/privacy", privacyRoutes);
 app.route("/api/repairs", repairsRoutes);
+app.route("/api/setup", setupRoutes);
 
 // Serving the built frontend from this same process (docs/dev.md, the
 // shell/kit/Chat slice): a self-hosted single-process hub, no reverse

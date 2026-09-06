@@ -177,8 +177,20 @@ function getRow(id: string): IssueRow | undefined {
 // A source registers the handler behind its own `fix.action` id (the
 // schema's own comment: "an opaque id the owning source recognises...
 // never a shell command or arbitrary code"). Module-level, like
-// notificationTypes.ts's registry - a source registers once at import
-// time, not per-request.
+// notificationTypes.ts's registry.
+//
+// Never call registerFixHandler() at a module's top level (import time).
+// Every test file's beforeEach shares this one process-wide map (Bun only
+// evaluates a module once) and __resetFixHandlersForTests() wipes it
+// completely - an import-time registration is gone the instant ANY OTHER
+// test file resets it, permanently, for the rest of that `bun test` run,
+// with nothing pointing at why fixIssue() suddenly can't find a handler
+// that plainly exists in the source. This registry caught exactly that
+// bug (2026-09-06, lib/householdCa.ts). Instead, wrap the registration in
+// its own idempotent function (Map.set on the same key is a no-op re-add)
+// and call it from every real entry point that needs the handler present
+// - sidecars.ts's registerSidecar() and householdCa.ts's
+// registerRenewFixHandler() are the two existing examples to copy.
 const fixHandlers = new Map<string, () => Promise<void> | void>();
 
 export function registerFixHandler(action: string, handler: () => Promise<void> | void): void {

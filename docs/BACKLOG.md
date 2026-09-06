@@ -1288,13 +1288,22 @@ on a spec tag that was never cut.
 - [ ] **The hub's Python runtime question in STACK.md** (S decision) -
       STACK.md gives the hub no Python, yet `tts` needs `uvx` at runtime;
       flagged in `spec/voice/README.md`, decided nowhere.
+- [x] **A household CA with `maipai.local` mDNS and a trust step**
+      (Session F step 5, 2026-09-06) - `lib/householdCa.ts` (a real,
+      node-forge-minted CA and leaf, boot-time-conditional TLS),
+      `lib/mdns.ts` (`_maipai._tcp.local`, TXT fields designed for this
+      step since plan 7.1 wasn't available in this checkout - Jesse's
+      call, see docs/dev/session-f.md), `GET /api/setup/ca`. The
+      TXT field list and the trust-step UI (a device downloading and
+      installing the cert, rendering the QR) are not this - the fields
+      may need revisiting against the real platform plan text, and the
+      UI is E's kit work.
 - [ ] **Identity and trust pieces plan v0.1 scopes and this file did not
-      track** (M each) - passkeys, an approval queue, Quick Connect for
-      TV sign-in, a household CA with `maipai.local` mDNS and a trust
-      step (wake word phase 1 already needs a secure context on the
-      LAN), hub-key signing of the bundled default set, the emergency
-      kit and hub/SMB backup targets, a restore drill in the release
-      skill, and the `user/` docs tier (only `dev/` exists).
+      track, still open** (M each) - passkeys, an approval queue, Quick
+      Connect for TV sign-in, hub-key signing of the bundled default
+      set, the emergency kit and hub/SMB backup targets, a restore
+      drill in the release skill, and the `user/` docs tier (only
+      `dev/` exists).
 - [ ] **Tests the audit found missing** (S) - `hlc.ts` seed and compare,
       `personLifecycle`, `access`, and one test proving a specific
       recalled memory text actually lands in the prompt for a matching
