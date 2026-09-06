@@ -1,0 +1,62 @@
+{
+  "id": "currency",
+  "version": "0.1.0",
+  "kind": "plugin",
+  "category": "Utilities",
+  "display": "Currency",
+  "description": "Converts between currencies (2026-09-06, step 7), via api.frankfurter.dev's free ECB-based exchange rates - no API key. Say \"exchange\", not \"convert\" (convert is physical units).",
+  "author": "MaiPai",
+  "license": "AGPL-3.0",
+  "homepage": "https://github.com/getmaipai/home",
+  "routing": {
+    "examples": [
+      "exchange 100 dollars to euros",
+      "exchange 50 usd for gbp",
+      "exchange 20 euros to dollars",
+      "exchange 10 pounds to yen",
+      "exchange 5 dollars for euros"
+    ],
+    "patterns": ["exchange *"]
+  },
+  "args": {
+    "type": "object",
+    "required": ["expression"],
+    "properties": {
+      "expression": { "type": "string", "minLength": 1 }
+    }
+  },
+  "requires": [],
+  "optional": [],
+  "platforms": ["home"],
+  "min_role": "child",
+  "consequential": false,
+  "offline": "unavailable",
+  "config": [],
+  "data_sources": [
+    {
+      "id": "frankfurter",
+      "destination": "api.frankfurter.dev's free public exchange-rate API",
+      "when": "the household asks to convert an amount between currencies",
+      "what": "the two currency codes and the amount, nothing personal",
+      "who": "Frankfurter (European Central Bank reference rates)",
+      "opt_in": true,
+      "retention": "unknown, see Frankfurter's own policy"
+    }
+  ],
+  "permissions": ["net:api.frankfurter.dev"],
+  "notifications": [],
+  "cache": { "key_template": "currency:{expression}", "ttl_s": 3600, "stale_ok_s": 86400, "max_bytes": 5000 },
+  "fallback_reply": {
+    "text": "Sorry, I'm having trouble looking that up right now.",
+    "speech": "Sorry, I'm having trouble looking that up right now."
+  },
+  "backup": "exclude",
+  "background": false,
+  "contributes": {},
+  "pages": [],
+  "min_app": "0.1.0",
+  "timeout_ms": 8000,
+  "tier": 1,
+  "quality_scale": "bronze",
+  "smoke": { "kind": "deno_test" }
+}

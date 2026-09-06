@@ -11,7 +11,7 @@ Ask MaiPai to convert between units: length, weight, temperature, volume.
 
 Say the number, the unit, then "to" or "in", then the unit you want.
 Currency isn't a unit table, so "convert 5 dollars to euros" won't work -
-that needs its own package with live exchange rates, not built yet.
+say "exchange 5 dollars to euros" instead (the currency package).
 
 ## What it needs
 

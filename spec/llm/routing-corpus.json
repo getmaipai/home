@@ -79,5 +79,9 @@
   { "utterance": "read me the headlines", "expect": "news", "must_not": [] },
 
   { "utterance": "what's the score", "expect": "sports", "must_not": [] },
-  { "utterance": "how are the games going", "expect": "sports", "must_not": [] }
+  { "utterance": "how are the games going", "expect": "sports", "must_not": [] },
+
+  { "utterance": "exchange 100 dollars to euros", "expect": "currency", "must_not": [] },
+  { "utterance": "exchange 50 usd for gbp", "expect": "currency", "must_not": [] },
+  { "utterance": "convert 5 dollars to euros", "expect": "convert", "must_not": ["currency"], "note": "a real, documented limitation: convert already owns the literal 'convert *' pattern, so this phrasing routes to convert (then fails at runtime: dollars/euros aren't mathjs units), never to currency - currency answers to 'exchange' instead. This guards the routing decision itself against a future change that silently sends this phrasing to currency without also updating the README/CHANGELOG that describe the boundary." }
 ]
