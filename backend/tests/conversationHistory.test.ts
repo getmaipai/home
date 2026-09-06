@@ -121,10 +121,13 @@ describe("routingStats()", () => {
     // 1 model / (2 plugin + 0 pluginError + 1 model) = 1/3, NOT 1/4 -
     // the exact detail a review would need to double-check.
     expect(stats.fallthroughRate).toBeCloseTo(1 / 3);
+    // Both fire via a real routing.patterns match ("remember that *",
+    // "what do you remember about *"), Session C step 1's Tier 0 - never
+    // affected by embeddings, so this stays deterministic.
     expect(stats.byPlugin).toEqual(
       expect.arrayContaining([
-        { pluginId: "remember", count: 1 },
-        { pluginId: "recall", count: 1 },
+        { pluginId: "remember", count: 1, tier: { pattern: 1, embedding: 0, keyword: 0 }, avgScore: 1 },
+        { pluginId: "recall", count: 1, tier: { pattern: 1, embedding: 0, keyword: 0 }, avgScore: 1 },
       ]),
     );
   });
@@ -369,6 +372,98 @@ describe("runRetention()", () => {
     await runTurn(actor, "chat", "good morning");
     const result = runRetention();
     expect(result.deleted).toBe(0);
+  });
+
+  // Session C step 9 (session-c-brain-and-voice.md): "decide and
+  // implement what an emptied conversation becomes" - a code review on
+  // session-a-intelligence.md's own step 3 found runRetention() purged
+  // every turn but left the parent conversation row behind forever,
+  // `turn_count: 0`, `status: "open"`, a stale `updated_at`. Decided:
+  // auto-close, tombstoned by retention.
+  test("a conversation emptied out by retention is auto-closed, not left open forever", async () => {
+    const { actor } = await owner();
+    const turnResult = await runTurn(actor, "chat", "good morning");
+    expect(turnResult.ok).toBe(true);
+    if (!turnResult.ok) return;
+    const conversationId = turnResult.value.conversation_id;
+    expect(db.select().from(conversations).where(eq(conversations.id, conversationId)).get()!.status).toBe("open");
+
+    const staleDate = new Date(Date.now() - 100 * 24 * 60 * 60 * 1000).toISOString();
+    db.update(conversationTurns).set({ createdAt: staleDate }).where(eq(conversationTurns.personId, actor.id)).run();
+    runRetention();
+
+    const row = db.select().from(conversations).where(eq(conversations.id, conversationId)).get();
+    expect(row).toBeDefined();
+    expect(row!.status).toBe("closed");
+  });
+
+  test("a conversation that still has a surviving turn after retention is left open", async () => {
+    const { actor } = await owner();
+    const first = await runTurn(actor, "chat", "good morning");
+    expect(first.ok).toBe(true);
+    if (!first.ok) return;
+    const conversationId = first.value.conversation_id;
+
+    // A stale turn in the same conversation, plus a fresh one that
+    // survives - the conversation itself must stay open since it isn't
+    // actually empty afterward.
+    const staleDate = new Date(Date.now() - 100 * 24 * 60 * 60 * 1000).toISOString();
+    db.update(conversationTurns).set({ createdAt: staleDate }).where(eq(conversationTurns.id, first.value.turn_id)).run();
+    await runTurn(actor, "chat", "good afternoon", { conversationId });
+
+    runRetention();
+
+    expect(db.select().from(conversations).where(eq(conversations.id, conversationId)).get()!.status).toBe("open");
+  });
+
+  test("an already-deleted conversation is never reopened or relabeled by retention's auto-close", async () => {
+    const { actor, client } = await owner();
+    const turnResult = await runTurn(actor, "chat", "good morning");
+    expect(turnResult.ok).toBe(true);
+    if (!turnResult.ok) return;
+    const conversationId = turnResult.value.conversation_id;
+    const del = await client.request(`/api/conversations/${conversationId}`, { method: "DELETE" });
+    expect(del.status).toBe(200);
+
+    const staleDate = new Date(Date.now() - 100 * 24 * 60 * 60 * 1000).toISOString();
+    db.update(conversationTurns).set({ createdAt: staleDate }).where(eq(conversationTurns.personId, actor.id)).run();
+    runRetention();
+
+    expect(db.select().from(conversations).where(eq(conversations.id, conversationId)).get()!.status).toBe("deleted");
+  });
+
+  // A code review (2026-09-06) found the auto-close fix above created a
+  // real gap: resolveOrCreateConversation() only ever rejected an
+  // explicitly-passed conversationId for status "deleted," not the new
+  // "closed" state - so a client holding a stale id for a thread
+  // retention had already closed could still attach a fresh turn to it,
+  // silently growing turn_count on a conversation whose own status
+  // claims there's nothing left in it, forever.
+  test("a closed conversation can never be resumed by its own stale conversationId", async () => {
+    const { actor } = await owner();
+    const first = await runTurn(actor, "chat", "good morning");
+    expect(first.ok).toBe(true);
+    if (!first.ok) return;
+    const closedId = first.value.conversation_id;
+
+    const staleDate = new Date(Date.now() - 100 * 24 * 60 * 60 * 1000).toISOString();
+    db.update(conversationTurns).set({ createdAt: staleDate }).where(eq(conversationTurns.personId, actor.id)).run();
+    runRetention();
+    expect(db.select().from(conversations).where(eq(conversations.id, closedId)).get()!.status).toBe("closed");
+
+    // A client still holding the closed conversation's own id tries to
+    // attach a new turn to it directly - rejected outright (the same
+    // "conversation not found" a deleted one already gets), exactly
+    // like resolveOrCreateConversation()'s own explicit-id branch treats
+    // every other invalid id: runTurn() has no silent fallback to a
+    // fresh conversation, by design (turnEngine.ts's own surface-check
+    // precedent).
+    const resumed = await runTurn(actor, "chat", "hi again", { conversationId: closedId });
+    expect(resumed.ok).toBe(false);
+    if (resumed.ok) return;
+    expect(resumed.status).toBe(400);
+    expect(db.select().from(conversations).where(eq(conversations.id, closedId)).get()!.status).toBe("closed"); // never reopened
+    expect(db.select().from(conversationTurns).where(eq(conversationTurns.conversationId, closedId)).all().length).toBe(0); // no new turn attached
   });
 
   // The floor: a safety-flagged minor turn survives even past a shortened

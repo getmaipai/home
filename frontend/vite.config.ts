@@ -89,6 +89,19 @@ export default defineConfig({
         // direction of doing too much rather than too little. The normal
         // HTTP cache still serves it once fetched.
         globIgnores: ["**/*.wasm", "ort/**", "**/ort.bundle.min-*.js"],
+        // Workbox's own default ceiling (2 MiB) started refusing to
+        // precache the main shell chunk once Wave 2's other sessions
+        // merged in (Session E step 10's wrap-up merge, 2026-09-06): it
+        // crossed 2 MiB from real app growth (entities/relationships/
+        // grants, STT, the memory bench's own types, this step's own
+        // Lingui addition), not from anything wrong with the build. The
+        // shell chunk is exactly what this app-shell service worker
+        // exists to cache in full (this file's own header comment); a
+        // real code-splitting pass to shrink it is separate, tracked
+        // work (docs/BACKLOG.md, "Real code-splitting for the frontend
+        // shell chunk"), not something to paper over by silently
+        // excluding the shell from precache.
+        maximumFileSizeToCacheInBytes: 5 * 1024 * 1024,
       },
     }),
   ],

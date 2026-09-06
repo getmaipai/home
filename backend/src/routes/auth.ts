@@ -204,7 +204,7 @@ auth.openapi(selectRoute, (c) => {
   const { personId } = c.req.valid("json");
 
   const person = db.select().from(people).where(eq(people.id, personId)).get();
-  if (!person || person.deletedAt) return c.json({ error: "Profile not found" }, 404);
+  if (!person || person.deletedAt || !person.enabled) return c.json({ error: "Profile not found" }, 404);
 
   // Step 6: a passkey-only profile must be refused a bare-tap sign-in
   // exactly like a PIN/password one - requiresCredential() checks both
@@ -247,7 +247,7 @@ auth.openapi(verifySecretRoute, async (c) => {
   // deletedAt yet (delete-person is deferred, see docs/dev.md), but the
   // check is added now so the invariant already holds when one lands.
   const person = db.select().from(people).where(eq(people.id, personId)).get();
-  if (!person || person.deletedAt) return c.json({ error: "Profile not found" }, 404);
+  if (!person || person.deletedAt || !person.enabled) return c.json({ error: "Profile not found" }, 404);
 
   const record = db
     .select()

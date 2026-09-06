@@ -1,5 +1,131 @@
 [
   {
+    "key": "allowance.family.daily_minutes",
+    "scope": "person",
+    "selector": "number",
+    "default": 0,
+    "label": "Daily Family minutes",
+    "help": "How many minutes of Family packages this person may use per day. 0 means no limit.",
+    "level": "basic",
+    "secret": false,
+    "lives_in": "person.allowance",
+    "honoured_by": [
+      "home"
+    ]
+  },
+  {
+    "key": "allowance.fun.daily_minutes",
+    "scope": "person",
+    "selector": "number",
+    "default": 0,
+    "label": "Daily Fun minutes",
+    "help": "How many minutes of Fun packages this person may use per day. 0 means no limit.",
+    "level": "basic",
+    "secret": false,
+    "lives_in": "person.allowance",
+    "honoured_by": [
+      "home"
+    ]
+  },
+  {
+    "key": "allowance.health.daily_minutes",
+    "scope": "person",
+    "selector": "number",
+    "default": 0,
+    "label": "Daily Health minutes",
+    "help": "How many minutes of Health packages this person may use per day. 0 means no limit.",
+    "level": "basic",
+    "secret": false,
+    "lives_in": "person.allowance",
+    "honoured_by": [
+      "home"
+    ]
+  },
+  {
+    "key": "allowance.home.daily_minutes",
+    "scope": "person",
+    "selector": "number",
+    "default": 0,
+    "label": "Daily Home minutes",
+    "help": "How many minutes of Home packages this person may use per day. 0 means no limit.",
+    "level": "basic",
+    "secret": false,
+    "lives_in": "person.allowance",
+    "honoured_by": [
+      "home"
+    ]
+  },
+  {
+    "key": "allowance.info.daily_minutes",
+    "scope": "person",
+    "selector": "number",
+    "default": 0,
+    "label": "Daily Info minutes",
+    "help": "How many minutes of Info packages this person may use per day. 0 means no limit.",
+    "level": "basic",
+    "secret": false,
+    "lives_in": "person.allowance",
+    "honoured_by": [
+      "home"
+    ]
+  },
+  {
+    "key": "allowance.learning.daily_minutes",
+    "scope": "person",
+    "selector": "number",
+    "default": 0,
+    "label": "Daily Learning minutes",
+    "help": "How many minutes of Learning packages this person may use per day. 0 means no limit.",
+    "level": "basic",
+    "secret": false,
+    "lives_in": "person.allowance",
+    "honoured_by": [
+      "home"
+    ]
+  },
+  {
+    "key": "allowance.media.daily_minutes",
+    "scope": "person",
+    "selector": "number",
+    "default": 0,
+    "label": "Daily Media minutes",
+    "help": "How many minutes of Media packages this person may use per day. 0 means no limit.",
+    "level": "basic",
+    "secret": false,
+    "lives_in": "person.allowance",
+    "honoured_by": [
+      "home"
+    ]
+  },
+  {
+    "key": "allowance.robot_body.daily_minutes",
+    "scope": "person",
+    "selector": "number",
+    "default": 0,
+    "label": "Daily Robot body minutes",
+    "help": "How many minutes of Robot body packages this person may use per day. 0 means no limit.",
+    "level": "basic",
+    "secret": false,
+    "lives_in": "person.allowance",
+    "honoured_by": [
+      "home"
+    ]
+  },
+  {
+    "key": "allowance.utilities.daily_minutes",
+    "scope": "person",
+    "selector": "number",
+    "default": 0,
+    "label": "Daily Utilities minutes",
+    "help": "How many minutes of Utilities packages this person may use per day. 0 means no limit.",
+    "level": "basic",
+    "secret": false,
+    "lives_in": "person.allowance",
+    "honoured_by": [
+      "home"
+    ]
+  },
+  {
     "key": "backup.max_total_gb",
     "scope": "household",
     "selector": "number",
@@ -159,6 +285,19 @@
     ]
   },
   {
+    "key": "notifications.approvals.requested.telegram",
+    "scope": "person",
+    "selector": "boolean",
+    "default": false,
+    "label": "Telegram me when someone is asking for approval",
+    "level": "basic",
+    "secret": false,
+    "lives_in": "person.notifications",
+    "honoured_by": [
+      "home"
+    ]
+  },
+  {
     "key": "notifications.model.download_failed.telegram",
     "scope": "person",
     "selector": "boolean",
@@ -177,6 +316,19 @@
     "selector": "boolean",
     "default": false,
     "label": "Telegram me when a model finishes downloading",
+    "level": "basic",
+    "secret": false,
+    "lives_in": "person.notifications",
+    "honoured_by": [
+      "home"
+    ]
+  },
+  {
+    "key": "notifications.person.band_changed.telegram",
+    "scope": "person",
+    "selector": "boolean",
+    "default": false,
+    "label": "Telegram me when a child or teen's profile band updates on a birthday",
     "level": "basic",
     "secret": false,
     "lives_in": "person.notifications",

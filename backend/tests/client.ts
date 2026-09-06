@@ -46,7 +46,29 @@ export class TestClient {
     return res;
   }
 
+  // For a raw binary body (stt.test.ts's WAV upload): the plain
+  // request() above always JSON-encodes `body`, the same reason
+  // postForm() exists for FormData - a real Uint8Array body needs its
+  // own bypass too, with a caller-supplied content-type since there's no
+  // single right default the way JSON has one.
+  async postBytes(path: string, bytes: Uint8Array, contentType: string): Promise<Response> {
+    const headers: Record<string, string> = { "content-type": contentType };
+    if (this.cookie) headers["cookie"] = this.cookie;
+    const res = await app.request(path, { method: "POST", headers, body: bytes });
+    const setCookie = res.headers.get("set-cookie");
+    if (setCookie) this.cookie = setCookie.split(";")[0]!;
+    return res;
+  }
+
   clearCookie(): void {
     this.cookie = null;
+  }
+
+  // For a real WebSocket client (stt.test.ts): app.request() can't drive
+  // a WS upgrade at all, so those tests need the raw session cookie to
+  // hand to a real `new WebSocket(url, { headers })` call instead of
+  // going through this class's own request() at all.
+  getCookie(): string | null {
+    return this.cookie;
   }
 }

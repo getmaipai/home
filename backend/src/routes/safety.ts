@@ -1,6 +1,7 @@
 import { Hono } from "hono";
-import { requireAuth, type Role } from "@/middleware/auth";
+import { requireAuth } from "@/middleware/auth";
 import { evaluateSafety } from "@/lib/safety";
+import { speakerAgeBand } from "@/lib/ageBand";
 import type { AppEnv } from "@/types";
 
 export const safetyRoutes = new Hono<AppEnv>();
@@ -17,6 +18,6 @@ safetyRoutes.post("/check", requireAuth, async (c) => {
   if (!body.text || typeof body.text !== "string") {
     return c.json({ error: "text is required" }, 400);
   }
-  const result = evaluateSafety(body.text, person.role as Role);
+  const result = evaluateSafety(body.text, speakerAgeBand(person, new Date()));
   return c.json(result);
 });

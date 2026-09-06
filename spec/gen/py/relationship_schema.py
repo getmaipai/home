@@ -87,3 +87,7 @@ class Relationship(BaseModel):
         None,
         description='A tombstone, for the same sync reason Entity and Person keep one.',
     )
+    hlc: constr(pattern=r'^[0-9]+:[0-9]+:[a-z0-9]{6,}$') = Field(
+        ...,
+        description='Hybrid logical clock: wall_ms:counter:node (7.3), the same shape every other synced record type uses. Missing from this schema until now (a gap found while landing the hub half, session-f-platform-and-trust.md step 7) - genuinely inconsistent with wave-2.md\'s own "HLC on every table" goal and with grant.schema.json, its sibling record introduced the same day, which already carries one.',
+    )

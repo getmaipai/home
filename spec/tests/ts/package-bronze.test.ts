@@ -25,8 +25,28 @@ import { describe, expect, test } from "bun:test";
 import { readFileSync, readdirSync, existsSync } from "node:fs";
 import { join } from "node:path";
 import { PackageManifest } from "../../gen/ts/manifest.js";
+import { lintSpeechTemplate } from "../../voice/ts/normalizeForSpeech.js";
 
 const PACKAGES_DIR = join(import.meta.dir, "..", "..", "..", "backend", "packages");
+
+// Session C step 6 (session-c-brain-and-voice.md): "the speech lint on
+// every package `speech` string" (docs/PACKAGES.md's own definition-of-
+// done line) - walks recipe.json's own tree collecting every string value
+// under a key literally named "speech", wherever it appears, rather than
+// assuming today's flat `{op, as, text, speech}` step shape is the only
+// one a future step type will ever use.
+function collectSpeechStrings(node: unknown, out: string[]): void {
+  if (Array.isArray(node)) {
+    for (const item of node) collectSpeechStrings(item, out);
+    return;
+  }
+  if (node && typeof node === "object") {
+    for (const [key, value] of Object.entries(node)) {
+      if (key === "speech" && typeof value === "string") out.push(value);
+      else collectSpeechStrings(value, out);
+    }
+  }
+}
 
 // remember/recall are C's packages (session-d-packages-and-store.md's
 // ownership map carves them out explicitly: "backend/packages/{remember,
@@ -96,6 +116,16 @@ describe("every bundled package clears bronze", () => {
 
       test("declares a smoke entry", () => {
         expect(manifest.smoke).toBeDefined();
+      });
+
+      test("every speech string passes the speech lint", () => {
+        const recipePath = join(dir, "recipe.json");
+        if (!existsSync(recipePath)) return; // a declarative kind with no recipe of its own (a skill, say)
+        const speechStrings: string[] = [];
+        collectSpeechStrings(JSON.parse(readFileSync(recipePath, "utf-8")), speechStrings);
+        for (const speech of speechStrings) {
+          expect(lintSpeechTemplate(speech), `${id}'s recipe.json speech field ${JSON.stringify(speech)}`).toEqual([]);
+        }
       });
 
       test("has a README.md", () => {

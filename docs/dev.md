@@ -8555,12 +8555,23 @@ live for all four routes plus the main Settings page afterward
 `section-voice-catalog`/`section-cloned-voices`/`section-commands` id
 still exists in the DOM on the main page).
 
-## Session E: the UI, the wizard, and the user docs (2026-09-06)
+## Wave 2
 
-Wave 2's UI session, `docs/plans/session-e-ui-and-docs.md` - the first-
-run wizard, Home's real cards, the store's Health/Repairs/Updates/
-Storage pages, push-to-talk, memory and conversation history with a
-parental view, devices and sessions with revoke, the TV/far surface and
-the rest of accessibility, i18n scaffolding with Lingui, and nine
-tier-1 user docs. Full step-by-step record, decisions, and what's left:
-`docs/dev/session-e.md`.
+Four parallel sessions, each its own worktree and branch off
+`docs/plans/wave-2.md`, rebasing onto `main` before every commit and
+merging in at its own step 11. One line per session here at wrap-up; the
+real detail lives in each session's own `docs/dev/session-<letter>.md`.
+
+- **Session C** (`docs/plans/session-c-brain-and-voice.md`, `docs/dev/
+  session-c.md`): the brain and the voice loop - Tier 1/2 routing,
+  conversation guards, the persona floor, speech to text, spoken-number
+  normalization, the content ceiling and age band, the hub as a brain for
+  other clients (OpenAI-compatible + Wyoming), the memory bench and the
+  judge's entity records, and the legacy hub import. Merged 2026-09-06.
+- **Session E** (`docs/plans/session-e-ui-and-docs.md`, `docs/dev/
+  session-e.md`): the UI, the wizard, and the user docs - the first-run
+  wizard, Home's real cards, the store's Health/Repairs/Updates/Storage
+  pages, push-to-talk, memory and conversation history with a parental
+  view, devices and sessions with revoke, the TV/far surface and the
+  rest of accessibility, i18n scaffolding with Lingui, and nine tier-1
+  user docs. Merged 2026-09-06.

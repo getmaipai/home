@@ -37,6 +37,7 @@ import { runJudgeBatch, runConsolidation } from "@/lib/memoryJudge";
 import { runRetention } from "@/lib/conversationHistory";
 import { runBackup, pruneBackups } from "@/lib/backup";
 import { checkLeafExpiry } from "@/lib/householdCa";
+import { disableExpiredGuests, applyAgeBandChanges } from "@/lib/personLifecycle";
 import type { PluginOpResult } from "@/lib/plugins";
 import type { PluginResult } from "@maipai/spec/interpreters/ts/recipe-interpreter.js";
 import type { PersonRow } from "@/types";
@@ -213,6 +214,21 @@ const CORE_JOBS: Record<string, CoreJobHandler> = {
   // hub's own TLS leaf certificate actually expires.
   "householdCa.check_leaf_expiry": async () => {
     await checkLeafExpiry();
+  },
+  // Step 7: person.schema.json's own "past this timestamp a guest
+  // profile stops signing in on its own" - daily is plenty, the same
+  // cadence householdCa's own 30-day warning window uses for a much
+  // tighter check.
+  "people.disable_expired_guests": () => {
+    disableExpiredGuests();
+  },
+  // Step 7: BACKLOG.md's "the band change on a birthday with its passive
+  // notification" - daily, not per-minute: a birthday only needs to be
+  // noticed once it has actually happened, and every run is idempotent
+  // (applyAgeBandChanges only moves someone whose CURRENT role no longer
+  // matches their age).
+  "people.apply_age_band_changes": async () => {
+    await applyAgeBandChanges();
   },
 };
 

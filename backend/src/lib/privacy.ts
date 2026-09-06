@@ -15,6 +15,7 @@ import { CATALOG } from "@/lib/modelCatalog";
 import { ENGINE_BINARIES } from "@/lib/engineCatalog";
 import { EMBED_MODEL_URL } from "@/lib/embedAssets";
 import { WAKEWORD_ALL_ASSETS } from "@/lib/wakewordAssets";
+import { SILERO_VAD_ASSET, MOONSHINE_ARCHIVE } from "@/lib/sttAssets";
 import { voiceCatalogUrl } from "@/lib/voiceCatalog";
 import { listPackageIds, loadPackage, type LoadedPackage } from "@/lib/plugins";
 import { telegramConfigured } from "@/lib/telegramChannel";
@@ -65,6 +66,7 @@ export function platformConnections(): PrivacyConnection[] {
   );
   const wakewordHosts = hostsOf(WAKEWORD_ALL_ASSETS.map((a) => a.url));
   const voiceHost = hostsOf([voiceCatalogUrl()]);
+  const sttHosts = hostsOf([SILERO_VAD_ASSET.url, MOONSHINE_ARCHIVE.url]);
 
   const rows: (PrivacyConnection | null)[] = [
     row("platform:language-models", modelHosts, {
@@ -82,6 +84,15 @@ export function platformConnections(): PrivacyConnection[] {
     row("platform:voice-list", voiceHost, {
       when: "when an adult opens the list of voices to pick one",
       what: "a request for the list of available voices, and your home's internet address. No recording, and no voice of anyone in the house.",
+    }),
+    // Session C step 5 (2026-09-06): speech-to-text's own two one-time
+    // downloads (the utterance-detection model and the transcription
+    // model) - found missing here by the same code review that already
+    // caught the tts-program/tts-model/tts-voice-files gap below, so it
+    // gets its own row rather than repeating that omission.
+    row("platform:stt-models", sttHosts, {
+      when: "the first time someone uses speech to text (push-to-talk)",
+      what: DOWNLOAD_CARRIES,
     }),
     // The three rows below are the ones a code review (2026-09-05) found
     // missing while this page told every family "if it is not on this
@@ -213,8 +224,37 @@ export function offlinePluginNames(manifests = loadedManifests()): string[] {
 
 /** The whole table: the hub's own connections first, then each
  * package's. */
+// Session C step 8 (session-c-brain-and-voice.md): "listed on the
+// privacy page as inbound only." Every row elsewhere in this file is
+// OUTBOUND - the hub reaching a third party - so `PrivacyConnection`'s
+// own fields (`destination`, `who` - a host the hub connects TO) don't
+// literally fit a connection running the other direction: nothing
+// leaves the house here, something reaches IN. Deliberately still a row
+// on this same table rather than a separate page or mechanism, since
+// "can anything reach into my house, and how" is exactly the question
+// this page exists to answer honestly - `destination`/`who` are
+// repurposed to describe the CALLER, not a host the hub reaches out to,
+// with the reversal spelled out in `what` so nobody reads it as an
+// outbound row by mistake.
+function inboundConnections(): PrivacyConnection[] {
+  return [
+    {
+      id: "platform:inbound-api",
+      source: "MaiPai Home",
+      sourceKind: "platform",
+      destination: "your own network only - nothing leaves the house for this row",
+      when: "only if an adult generates an API token in Settings and gives it to another app or device",
+      what:
+        "the reverse of every other row here: an app or device you configured (Home Assistant's own Assist pipeline, a script, a voice satellite) can send text or audio to the hub over your LAN and get a reply back, using the OpenAI-compatible chat API or the Wyoming voice-satellite protocol. Nothing is reachable without a token an adult generated and handed out; revoking it in Settings ends access immediately.",
+      who: "whichever app or device holds the token an adult generated",
+      optIn: true,
+      retention: "no separate record kept beyond the normal conversation history any chat turn already creates",
+    },
+  ];
+}
+
 export function privacyConnections(manifests = loadedManifests()): PrivacyConnection[] {
-  return [...platformConnections(), ...pluginConnections(manifests)];
+  return [...platformConnections(), ...inboundConnections(), ...pluginConnections(manifests)];
 }
 
 /** Both halves of the page from one pass over the packages. */

@@ -5,7 +5,9 @@ import { eq, gt, and, isNull } from "drizzle-orm";
 import { db } from "@/db";
 import { sessions, people } from "@/db/schema";
 import { hashSessionToken } from "@/lib/session";
+import { resolveApiToken } from "@/lib/apiToken";
 import { TRUST_PROXY } from "@/lib/trustProxy";
+import { personIsGranted } from "@/lib/grants";
 import { Person } from "@maipai/spec/gen/ts/person.js";
 import type { AppEnv, PersonRow } from "@/types";
 
@@ -52,6 +54,12 @@ export function invalidateSessionCacheForPerson(personId: string): void {
 // is fixed now so the invariant holds the moment one does. The 10s cache
 // TTL still bounds how fast a DB-side deletion propagates to an
 // already-cached session, the same staleness window profile edits have.
+//
+// Step 7: `enabled: false` excluded the same way - "disabled-but-present"
+// is meaningless if a disabled person's existing session keeps working
+// for up to 7 more days. Every route that flips enabled to false also
+// calls invalidateSessionCacheForPerson() so the 10s cache above isn't
+// the only thing standing between a disable and it taking effect.
 export function resolveSession(token: string): PersonRow | null {
   const tokenHash = hashSessionToken(token);
 
@@ -77,7 +85,7 @@ export function resolveSession(token: string): PersonRow | null {
   const person = db
     .select()
     .from(people)
-    .where(and(eq(people.id, session.personId), isNull(people.deletedAt)))
+    .where(and(eq(people.id, session.personId), isNull(people.deletedAt), eq(people.enabled, true)))
     .get();
 
   if (person) {
@@ -179,3 +187,52 @@ export function requireRole(...roles: Role[]) {
     await next();
   });
 }
+
+/** Step 7: "grants are added beside roles this wave: every requireRole
+ * call gains a grant check that passes when either allows, so nothing a
+ * family can do today stops working" (session-f-platform-and-trust.md,
+ * step 7). Purely additive - an active ALLOW grant on `action` opens the
+ * gate for someone outside `roles`, the same OR every one of these
+ * routes already extends to owner over admin-only actions elsewhere.
+ * It never narrows what `roles` already allows: a grant's deny is a
+ * finer-grained concept that belongs to lib/permissions.ts's
+ * effectivePermissions(), not to knocking an owner/admin off their own
+ * management routes. `action` is a real grant-actions.json entry only
+ * where one exists today (people.manage, people.grant, backups.run,
+ * backups.restore, relationships.manage) - call sites with no natural
+ * action yet (host.ts, plugins.ts, scheduler.ts, repairs.ts, memory.ts's
+ * maintenance/run, totp.ts) stay on requireRole() above, documented in
+ * docs/dev/session-f.md as needing a vocabulary entry before they can
+ * gain one, not silently mechanically converted for no behavioral gain. */
+export function requireRoleOrGrant(roles: Role[], action: string) {
+  return createMiddleware<AppEnv>(async (c, next) => {
+    const result = authenticate(c);
+    if (result instanceof Response) return result;
+    if (!roles.includes(result.role as Role) && !personIsGranted(result.id, action)) {
+      return c.json({ error: "Forbidden" }, 403);
+    }
+    c.set("person", result);
+    await next();
+  });
+}
+
+// Session C step 8 (session-c-brain-and-voice.md): a SEPARATE gate from
+// requireAuth/requireRole above on purpose - those authenticate a
+// browser's own cookie session (CSRF-checked, SameSite=Strict); this
+// authenticates an external client (an OpenAI-compatible caller, a
+// Wyoming satellite) presenting a bearer API token, a completely
+// different credential with no cookie or CSRF concept at all. Deliberately
+// does not fall back to a cookie session if no token is present - an
+// inbound API surface should never silently also accept "whatever browser
+// session happens to be attached to this request," which isn't a
+// coherent concept for a satellite or a script calling in anyway.
+export const requireApiToken = createMiddleware<AppEnv>(async (c, next) => {
+  const authHeader = c.req.header("authorization");
+  const token = authHeader?.startsWith("Bearer ") ? authHeader.slice("Bearer ".length) : undefined;
+  if (!token) return c.json({ error: "Unauthorized" }, 401);
+
+  const person = resolveApiToken(token);
+  if (!person) return c.json({ error: "Unauthorized" }, 401);
+  c.set("person", person);
+  await next();
+});

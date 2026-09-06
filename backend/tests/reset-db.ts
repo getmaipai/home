@@ -3,6 +3,7 @@ import {
   people,
   personCredentials,
   sessions,
+  personApiTokens,
   memoryRecords,
   memoryEmbeddings,
   pendingEmbeddings,
@@ -22,6 +23,11 @@ import {
   devices,
   passkeyCredentials,
   totpSecrets,
+  relationships,
+  entities,
+  grants,
+  approvals,
+  routingEmbeddings,
 } from "@/db/schema";
 
 // All test files in one `bun test` run share the same imported `@/db`
@@ -39,12 +45,17 @@ import {
 // specific id (e.g. the first record created is "mem1-...") won't have a
 // hidden dependency on what ran before it in the same process.
 export function resetDb(): void {
+  db.delete(approvals).run();
+  db.delete(grants).run();
+  db.delete(relationships).run();
+  db.delete(entities).run();
   db.delete(deviceTokens).run();
   db.delete(devices).run();
   db.delete(passkeyCredentials).run();
   db.delete(totpSecrets).run();
   db.delete(hubEndpoints).run();
   db.delete(hubIdentity).run();
+  db.delete(routingEmbeddings).run();
   db.delete(issues).run();
   db.delete(packageStatus).run();
   db.delete(notificationDeliveries).run();
@@ -59,6 +70,7 @@ export function resetDb(): void {
   db.delete(settingsValues).run();
   db.delete(idSequences).run();
   db.delete(sessions).run();
+  db.delete(personApiTokens).run();
   db.delete(personCredentials).run();
   db.delete(people).run();
 }

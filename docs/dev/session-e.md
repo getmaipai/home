@@ -43,6 +43,8 @@ point it was found:**
   hardcoded English string.
 - User docs for "the store" and "update" (step 9) - neither feature
   exists yet to document.
+- Real code-splitting for the frontend shell chunk (found at this
+  merge, below) - `docs/BACKLOG.md`'s own new item has the detail.
 
 **Versions pinned this session, for anyone auditing dependencies
 later:** `@lingui/core`/`react`/`cli`/`vite-plugin`, all `6.6.0`;
@@ -56,11 +58,48 @@ scrollable-region convention) extends patterns `UI.md` already
 documents (the shell contract, the kit's "one way to do each thing"
 rule) rather than needing a new org-wide rule of its own.
 
+**Merging into `main` (the final wrap-up step) surfaced real work of its
+own.** Local `main` (shared across every worktree of this repo) had
+moved far ahead of `origin/main` by the time this session reached
+step 10 - Sessions C and F's own full bodies of work (the brain and
+voice loop; entities, relationships, grants, and approvals; devices,
+sessions, passkeys) were already merged there locally, unpushed. F's
+own step 7 landed `enabled`/`guest_expires_at`/`memorialized_at` on
+`Person` after F had already flagged, cross-session, that this session's
+own frontend fixtures would need the same three fields added once it
+did - most of the files F named (`ChatPage`, `PeoplePage`,
+`BackupsPage`, `BackupsSection`, `ChangeSecretSection`, `ModelsPage`,
+`SettingsPage`, `UsersPage`, `VoicesPage`, `ProfileSwitcher`, `SignIn`
+tests) merged clean automatically - git's own three-way merge combined
+F's field additions with this session's unrelated edits to the same
+files without conflict. Two more needed a hand fix: `ConversationsPage.
+test.tsx` and `MemoryPage.test.tsx`, both built in this session's own
+step 5, after F's list was written and so never on it - caught by
+`bunx tsc --noEmit` failing after the merge, not missed silently.
+`docs/BACKLOG.md` and `docs/dev.md` each had one real content conflict
+(this session's own now-stale "F confirmed not started" note for
+entities/relationships/grants, superseded by F actually shipping them
+since; and this session's own ad-hoc `dev.md` header competing with a
+real `## Wave 2` index Session C's own wrap-up had meanwhile added) -
+resolved by hand, keeping whichever side was actually still true rather
+than a mechanical ours/theirs pick.
+
+The merged build then failed for a new, real reason: the frontend's
+main shell chunk crossed the PWA plugin's default 2 MiB precache
+ceiling (real growth from everything Wave 2 merged in, this session's
+own Lingui addition included), not a broken build - raised
+`workbox.maximumFileSizeToCacheInBytes` to 5 MiB in `vite.config.ts`,
+with a real code-splitting pass tracked as its own follow-up
+(`docs/BACKLOG.md`) rather than silently excluding the shell from the
+one cache it exists to populate.
+
 Two commits close this out: the final `docs/BACKLOG.md`/`session-e.md`
-polish above, then the merge into `main`. `scripts/check.sh` green, the
-full a11y matrix clean except the one documented Chat contrast finding,
-and a final code review across the whole branch's diff, all before
-merging - see the commit history for exactly what each covered.
+polish, then the merge into `main` covering everything above.
+`scripts/check.sh` green (backend: 1233 passing; frontend: 439
+passing), the full a11y matrix clean except the one documented Chat
+contrast finding, and a final code review across the whole branch's
+diff, all before merging - see the commit history for exactly what each
+covered.
 
 ## Step 0: setup and B's leftovers
 

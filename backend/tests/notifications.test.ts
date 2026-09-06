@@ -72,6 +72,35 @@ describe("trigger()", () => {
     expect(listPending(adult).length).toBe(1);
   });
 
+  // Session C step 7 (session-c-brain-and-voice.md): a code review found
+  // resolveRecipients()'s own "adults" filter used to share the same
+  // role proxy evaluateSafety() used before that step - the two agreed
+  // by construction. Once evaluateSafety() switched to the real
+  // birthdate-derived band, a role-only audience filter here could
+  // diverge from it: a minor mislabeled with an "adult" role would be
+  // excluded from evaluateSafety()'s own minor protections but still
+  // counted as an eligible "adults" recipient - for this exact
+  // notification type, a minor receiving their own (or a sibling's)
+  // flagged-turn notification, the precise leak notify_parent exists to
+  // prevent. Proves the fix: a real 15-year-old with a stale "adult"
+  // role label never receives this notification.
+  test("a minor with a stale 'adult' role label is never counted as an eligible \"adults\" recipient", async () => {
+    const { client: ownerClient, row: ownerRow } = await owner();
+    const fifteenYearsAgo = new Date();
+    fifteenYearsAgo.setFullYear(fifteenYearsAgo.getFullYear() - 15);
+    const created = await ownerClient.post("/api/people", {
+      displayName: "Marlow",
+      role: "adult",
+      birthdate: fifteenYearsAgo.toISOString().slice(0, 10),
+    });
+    const { id } = (await created.json()) as { id: string };
+    const teenRow = db.select().from(people).where(eq(people.id, id)).get()! as PersonRow;
+
+    await trigger("safety.flagged_turn", { childName: "Marlow", categories: "self_harm" });
+    expect(listPending(ownerRow).length).toBe(1);
+    expect(listPending(teenRow).length).toBe(0);
+  });
+
   test("in_app always delivers even with no Telegram configured", async () => {
     const { row } = await owner();
     await trigger("model.download_ready", { modelName: "Test Model" });

@@ -21,6 +21,7 @@ import { conversationsRoutes } from "@/routes/conversations";
 import { backupsRoutes } from "@/routes/backups";
 import { hostRoutes } from "@/routes/host";
 import { voiceRoutes } from "@/routes/voice";
+import { sttRoutes, sttStatusRoutes } from "@/routes/stt";
 import { privacyRoutes } from "@/routes/privacy";
 import { repairsRoutes } from "@/routes/repairs";
 import { setupRoutes } from "@/routes/setup";
@@ -30,6 +31,11 @@ import { quickConnectRoutes } from "@/routes/quickConnect";
 import { passkeysRoutes } from "@/routes/passkeys";
 import { authSessionsRoutes } from "@/routes/authSessions";
 import { totpRoutes } from "@/routes/totp";
+import { entitiesRoutes } from "@/routes/entities";
+import { relationshipsRoutes } from "@/routes/relationships";
+import { grantsRoutes } from "@/routes/grants";
+import { approvalsRoutes } from "@/routes/approvals";
+import { openaiRoutes } from "@/routes/openai";
 import { requireAuth } from "@/middleware/auth";
 import { listSidecars } from "@/lib/sidecars";
 
@@ -110,6 +116,8 @@ app.route("/api/conversations", conversationsRoutes);
 app.route("/api/backups", backupsRoutes);
 app.route("/api/host", hostRoutes);
 app.route("/api/voice", voiceRoutes);
+app.route("/api/voice", sttStatusRoutes);
+app.route("/api/stt", sttRoutes);
 app.route("/api/privacy", privacyRoutes);
 app.route("/api/repairs", repairsRoutes);
 app.route("/api/setup", setupRoutes);
@@ -119,6 +127,14 @@ app.route("/api/auth/quick-connect", quickConnectRoutes);
 app.route("/api/auth/passkeys", passkeysRoutes);
 app.route("/api/auth/sessions", authSessionsRoutes);
 app.route("/api/auth/totp", totpRoutes);
+app.route("/api/entities", entitiesRoutes);
+app.route("/api/relationships", relationshipsRoutes);
+app.route("/api/grants", grantsRoutes);
+app.route("/api/approvals", approvalsRoutes);
+// Root-mounted, not under /api: OpenAI's own wire contract names this
+// exact path (session-c-brain-and-voice.md step 8), which a client
+// integrating against it expects verbatim.
+app.route("/", openaiRoutes);
 
 // Serving the built frontend from this same process (docs/dev.md, the
 // shell/kit/Chat slice): a self-hosted single-process hub, no reverse

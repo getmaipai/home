@@ -87,3 +87,27 @@ export function newDeviceId(): string {
 export function newDeviceTokenId(): string {
   return `devtok-${randomSuffix(10)}`;
 }
+
+/** Matches spec/schemas/entity.schema.json's `^ent-[a-z0-9]{6,}$`.
+ * Distinct from the `ent<seq>-<device6>` ids memory records mint for
+ * their own entity-mention rows (lib/memoryId.ts) - those are memory
+ * rows, these are step 7's structured Entity records. */
+export function newEntityId(): string {
+  return `ent-${randomSuffix(10)}`;
+}
+
+/** Matches spec/schemas/relationship.schema.json's `^rel-[a-z0-9]{6,}$`. */
+export function newRelationshipId(): string {
+  return `rel-${randomSuffix(10)}`;
+}
+
+/** Matches spec/schemas/grant.schema.json's `^grant-[a-z0-9]{6,}$`. */
+export function newGrantId(): string {
+  return `grant-${randomSuffix(10)}`;
+}
+
+// Not a spec-shaped id (the approval queue is hub-internal, the same
+// reason scheduledJobs/commands/issues are).
+export function newApprovalId(): string {
+  return `approval-${randomSuffix(10)}`;
+}

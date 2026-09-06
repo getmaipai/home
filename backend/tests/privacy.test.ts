@@ -88,6 +88,17 @@ describe("the hub's own connections", () => {
     expect(byId.get("platform:text-embedding-model")?.destination).toContain("huggingface.co");
   });
 
+  // A code review (2026-09-06, Session C step 5) found the STT feature's
+  // two model downloads (Silero VAD, the Moonshine archive) missing from
+  // this page - the same "if it is not on this list, it does not
+  // happen" gap the tts-* rows below were already added to close once.
+  test("speech-to-text's model downloads are listed", () => {
+    const byId = new Map(platformConnections().map((r) => [r.id, r]));
+    const row = byId.get("platform:stt-models");
+    expect(row?.destination).toContain("github.com");
+    expect(row?.destination).toContain("raw.githubusercontent.com");
+  });
+
   // A code review (2026-09-05) found the whole speaking-voice path
   // missing from a page that tells families "if it is not on this list,
   // it does not happen": `uvx pocket-tts serve` installs from PyPI and
@@ -101,6 +112,20 @@ describe("the hub's own connections", () => {
     const model = byId.get("platform:tts-model");
     expect(model?.destination).toContain("huggingface.co");
     expect(model?.what).toContain("Hugging Face access token");
+  });
+
+  // Session C step 8 (session-c-brain-and-voice.md): "listed on the
+  // privacy page as inbound only" - the one row on this whole page that
+  // describes a connection running the opposite direction from every
+  // other row (something reaching INTO the hub, not the hub reaching
+  // out), so it gets its own test that it says so plainly rather than
+  // reading like an outbound row by accident.
+  test("the inbound API/Wyoming row is present and honestly describes the reversed direction", () => {
+    const row = privacyConnections().find((r) => r.id === "platform:inbound-api");
+    expect(row).toBeDefined();
+    expect(row!.destination.toLowerCase()).toContain("nothing leaves the house");
+    expect(row!.what).toContain("token");
+    expect(row!.what.toLowerCase()).toMatch(/inbound|reverse|reaches in|send text or audio to the hub/);
   });
 
   test("none of them carries anything the family said or saved", () => {

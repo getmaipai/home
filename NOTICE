@@ -2,9 +2,13 @@ MaiPai Home
 Third-Party Licenses and Attributions
 
 This is a fresh repo (the platform rebuild, see docs/dev.md). Attributions
-below cover components bundled into the shipped frontend
-(frontend/src/kit, the shell, the Chat package); backend dependencies are
-server-side only and not redistributed as part of a build artifact.
+below started as frontend-bundled components only
+(frontend/src/kit, the shell, the Chat package) - the note that used to
+live here ("backend dependencies are server-side only and not
+redistributed") undersold docs/PACKAGES.md's own rule, which asks for
+every third-party component regardless of where it runs. Backend/spec
+entries below are added as each session's own new dependency lands, not
+a retroactive audit of every backend package already in bun.lock/uv.lock.
 
 - React, React DOM (MIT) - https://react.dev
 - Radix UI: react-popover, and the consolidated `radix-ui` package (MIT) - https://www.radix-ui.com
@@ -14,6 +18,10 @@ server-side only and not redistributed as part of a build artifact.
 - shadcn (MIT) - https://ui.shadcn.com (the component generator; also class-variance-authority, MIT, and tw-animate-css, MIT, which its generated components depend on)
 - cmdk (MIT) - https://cmdk.paco.me (the command palette primitive behind kit/ui/command.tsx)
 - sonner (MIT) - https://sonner.emilkowal.ski (the kit's one toast primitive, kit/ui/sonner.tsx)
+- sherpa-onnx-node (Apache-2.0) - https://github.com/k2-fsa/sherpa-onnx (the hub's speech-to-text engine, `backend/src/lib/stt.ts`; ships a downloaded Moonshine tiny-en model, its own license bundled at data/voice/stt/sherpa-onnx-moonshine-tiny-en-int8/LICENSE, never vendored into this repo)
+- onnxruntime-web (MIT) - https://github.com/microsoft/onnxruntime (runs the downloaded Silero VAD model, `backend/src/lib/sileroVad.ts`)
+- to-words (MIT) - https://github.com/mastermunj/to-words (spoken number-to-words, `spec/voice/ts/normalizeForSpeech.ts`)
+- num2words (LGPL-2.1) - https://github.com/savoirfairelinux/num2words (the Python twin, `spec/voice/py/normalize_for_speech.py`; an LGPL dependency per the org's own third-party-code rule, never vendored)
 
 When another component lands, its attribution goes here, per
 docs/PACKAGES.md in getmaipai/.github.

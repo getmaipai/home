@@ -77,6 +77,51 @@ export const Person = z
         "Keeps this person off the overlay network entirely (4.2, 4.12).",
       )
       .default(false),
+    /**Step 6/7: disabled-but-present (BACKLOG.md: 'Person has only deleted_at, disabled-but-present has no representation today'). A disabled person keeps their record, their history and their place in every relationship/grant, but cannot sign in - distinct from deleted_at, which is a tombstone for a record that should stop existing at all. Owner/admin enforce this at the auth boundary; a household pauses someone (a long trip, a temporary restriction) without erasing them.*/
+    enabled: z
+      .boolean()
+      .describe(
+        "Step 6/7: disabled-but-present (BACKLOG.md: 'Person has only deleted_at, disabled-but-present has no representation today'). A disabled person keeps their record, their history and their place in every relationship/grant, but cannot sign in - distinct from deleted_at, which is a tombstone for a record that should stop existing at all. Owner/admin enforce this at the auth boundary; a household pauses someone (a long trip, a temporary restriction) without erasing them.",
+      )
+      .default(true),
+    /**Meaningful only when role is guest (enforced in lib/personShape.ts's candidate parser, the same convention scope/person conditionals use elsewhere in this spec, since no generator here preserves JSON Schema conditionals). Past this timestamp a guest profile stops signing in on its own, the same way `enabled: false` does, without a household member having to remember to remove it.*/
+    guest_expires_at: z
+      .union([
+        z
+          .string()
+          .datetime({ offset: true })
+          .describe(
+            "Meaningful only when role is guest (enforced in lib/personShape.ts's candidate parser, the same convention scope/person conditionals use elsewhere in this spec, since no generator here preserves JSON Schema conditionals). Past this timestamp a guest profile stops signing in on its own, the same way `enabled: false` does, without a household member having to remember to remove it.",
+          ),
+        z
+          .null()
+          .describe(
+            "Meaningful only when role is guest (enforced in lib/personShape.ts's candidate parser, the same convention scope/person conditionals use elsewhere in this spec, since no generator here preserves JSON Schema conditionals). Past this timestamp a guest profile stops signing in on its own, the same way `enabled: false` does, without a household member having to remember to remove it.",
+          ),
+      ])
+      .describe(
+        "Meaningful only when role is guest (enforced in lib/personShape.ts's candidate parser, the same convention scope/person conditionals use elsewhere in this spec, since no generator here preserves JSON Schema conditionals). Past this timestamp a guest profile stops signing in on its own, the same way `enabled: false` does, without a household member having to remember to remove it.",
+      )
+      .default(null),
+    /**Set once, never cleared: a read-only profile (BACKLOG.md's 'memorialise (read-only profile, PIN cleared, sessions revoked, export offered)'). The action that sets this also clears personCredentials, passkeys and every device token/session for the person - lib/personLifecycle.ts's memorializePerson(), not this field alone.*/
+    memorialized_at: z
+      .union([
+        z
+          .string()
+          .datetime({ offset: true })
+          .describe(
+            "Set once, never cleared: a read-only profile (BACKLOG.md's 'memorialise (read-only profile, PIN cleared, sessions revoked, export offered)'). The action that sets this also clears personCredentials, passkeys and every device token/session for the person - lib/personLifecycle.ts's memorializePerson(), not this field alone.",
+          ),
+        z
+          .null()
+          .describe(
+            "Set once, never cleared: a read-only profile (BACKLOG.md's 'memorialise (read-only profile, PIN cleared, sessions revoked, export offered)'). The action that sets this also clears personCredentials, passkeys and every device token/session for the person - lib/personLifecycle.ts's memorializePerson(), not this field alone.",
+          ),
+      ])
+      .describe(
+        "Set once, never cleared: a read-only profile (BACKLOG.md's 'memorialise (read-only profile, PIN cleared, sessions revoked, export offered)'). The action that sets this also clears personCredentials, passkeys and every device token/session for the person - lib/personLifecycle.ts's memorializePerson(), not this field alone.",
+      )
+      .default(null),
     created_at: z.string().datetime({ offset: true }),
     updated_at: z.string().datetime({ offset: true }),
     deleted_at: z

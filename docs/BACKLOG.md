@@ -221,6 +221,19 @@ clear it in full:
 - [ ] **The far surface's type scale per script** (S, blocked on a
       non-Latin `household.locale` option existing) - see the deferral
       note above.
+- [ ] **Real code-splitting for the frontend shell chunk** (M) - found
+      at Session E's own step 10 wrap-up merge (2026-09-06): the main
+      chunk crossed the PWA plugin's default 2 MiB precache ceiling once
+      everything Wave 2 merged in landed together (real growth, not a
+      broken build - `vite build`'s own "chunks larger than 500 kB"
+      warning had already been firing for a while before this). Worked
+      around for now by raising `workbox.
+      maximumFileSizeToCacheInBytes` to 5 MiB in `vite.config.ts` so the
+      app-shell service worker keeps precaching the real shell in full,
+      rather than silently dropping it from the one cache it exists to
+      populate - not a fix for the underlying size. `vite build`'s own
+      suggestion (`dynamic import()`, `rolldownOptions.output.
+      codeSplitting`) is the real fix, unexplored so far.
 
 Default packages are held to the same bar as community ones per
 `PACKAGES.md` - the release skill is meant to refuse shipping a default
@@ -446,10 +459,11 @@ alongside the first sourced skill, not before it.
       invent: "pets need ownership" is one of Jesse's own original
       points in `docs/dev.md`'s "Entities, relationships and grants" -
       a pet is a `kind: entity` record and "owns"/"belongs to" is exactly
-      the Relationship edge that spec already defines, so this is a
-      recognition-and-UI problem sitting on top of hub work that's
-      already spec'd but not yet built ("The hub half of entities and
-      relationships," People/relationships section above), not a new
+      the Relationship edge that spec already defines. That storage is
+      real now (Session F step 7, 2026-09-06: `POST /api/entities`
+      `kind: pet`, `POST /api/relationships` `type: owns` - its stored
+      inverse, `owned_by`, comes free), so this is purely a recognition-
+      and-UI problem sitting on top of already-built hub work, not a new
       data model to design from scratch.
 
 ## Generation (image, video)
@@ -470,7 +484,9 @@ alongside the first sourced skill, not before it.
       already decided: ship `embed` (real semantic routing) first, ship
       more real skills, measure the actual fall-through rate from real
       conversation history, then decide whether to build this at all.
-- [ ] **Wire the `embed` role into routing** (M) - corrected 2026-09-05:
+- [x] **Wire the `embed` role into routing** (M) - shipped 2026-09-06,
+      Session C step 1 (`lib/routing.ts`, `spec/llm/routing-corpus.json`,
+      docs/dev/session-c.md). corrected 2026-09-05:
       the role itself is built and live-verified (nomic-embed-text on a
       second llama-server, `embedSupervisor.ts`), reachable only through
       a diagnostic route. What is missing is embedding `routing.examples`
@@ -659,14 +675,16 @@ into a conversation with someone who knows who is talking.
       the old per-section inline copies all had, fixed in the same pass).
 - [ ] **Rate-limit `/api/turn` and `/api/llm/*` per person** (S) - named
       in `spec/llm/README.md`, tracked nowhere.
-- [ ] **Decide what an emptied conversation becomes** (S decision, found
-      by Session A step 3's own code review, 2026-09-05) -
-      `runRetention()` purges aged-out `conversation_turns` but never
-      touches the `conversations` thread record once every one of its
-      turns is gone, so it lingers forever with `turn_count: 0` and a
-      stale `updated_at`. Auto-close, auto-delete (tombstone), or a
-      household setting are all real options; the contract in
-      `docs/plans/session-a-intelligence.md` doesn't specify one.
+- [x] **Decide what an emptied conversation becomes** (S decision, found
+      by Session A step 3's own code review, 2026-09-05) - decided and
+      shipped, Session C step 9 (2026-09-06): auto-close, tombstoned by
+      retention. `runRetention()` now closes (`status: "closed"`, the
+      same value a household member's own "start a new conversation"
+      already writes) any conversation its own delete emptied out to
+      zero remaining turns, gated on `status = 'open'` so an already-
+      closed or already-deleted thread is never touched. Three tests:
+      an emptied conversation closes, a surviving-turn one stays open,
+      a deleted one is never reopened.
 
 **Memory**
 
@@ -726,9 +744,12 @@ into a conversation with someone who knows who is talking.
       records into one new one" primitive this store doesn't have yet)
       or "re-tense expired states" (nothing consumes `valid_to` yet -
       real bi-temporal reads are step 10's own job). Entity-record
-      creation and procedural/Notes routing are also real, deferred gaps:
-      the plan's own step 6 schema has no `entities` or `kind` field, so
-      neither was built. Bench (`backend/scripts/bench/judge-eval.ts`,
+      creation was a real, deferred gap here; closed by Session C step 9
+      (2026-09-06, see the memory bench entry below) - the extraction
+      schema's own "person"/"place"/"thing" categories now write
+      `record_kind: "entity"`. Procedural/Notes routing remains deferred:
+      the plan's own step 6 schema still has no `kind` field for it.
+      Bench (`backend/scripts/bench/judge-eval.ts`,
       LongMemEval-shaped): run against the stub chat backend, extraction
       never produces valid JSON (the stub only echoes text), so 0 facts
       were ever written - the honest result is abstention trivially
@@ -790,11 +811,18 @@ into a conversation with someone who knows who is talking.
       `parseListOptions` in `backend/src/routes/memory.ts` - it only
       reads `scope`/`person`), unlike Conversations' `GET /:id/turns`,
       which already supports a real `since`.
-- [ ] **A household memory bench** (M) - a LongMemEval-shaped fixture
-      built on the persona roster, testing updates and abstention, run
-      against the local model in the bench tier. Legacy had router (53),
-      memory (11) and continuity (5) probes; the rebuild has unit tests
-      only.
+- [x] **A household memory bench** (M) - shipped, Session C step 9
+      (2026-09-06): `backend/scripts/bench/memory/{fixture,run}.ts`, the
+      four LongMemEval categories `scripts/bench/memory-eval.ts` (session-a
+      step 5) doesn't cover - knowledge updates, abstention, temporal
+      reasoning, multi-session recall - driving real `runTurn()` calls,
+      not just `recall()`/`buildSystemPrompt()` lookups. Run for real
+      against this dev machine's Qwen3 8B + nomic-embed-text: abstention
+      2/2, multi-session 1/2, knowledge-update 0/2, temporal 0/1 - the
+      low numbers are the SAME already-tracked "short utterances free-
+      associate onto the plugins list" bug step 4 first found (confirmed
+      via `route()` returning null for every failing probe), not a new
+      memory-store problem; see docs/dev/session-c.md's step 9 entry.
 - [ ] **Skip the graph database** (decision, recorded) - Mem0 dropped its
       graph store for entity linking in a flat table; Graphiti needs
       Neo4j and a capable model. Entity columns, FTS5 and vectors on the
@@ -831,15 +859,27 @@ into a conversation with someone who knows who is talking.
       "speech profile per person" item under People is the other half;
       build them as two records injected in order: who I am, then who
       you are, then memory, so style never blunts facts.
-- [ ] **Activation steering spike** (M, before any nine-slider prose) -
-      plan 5.4 and org principle 6 both say steering vectors over
-      personality prose. llama-server (the mandated engine) already
-      takes `--control-vector` and `--control-vector-scaled`, and ships a
-      `cvector-generator` that trains one from paired prompts; the 2026
-      PERSONA result reports fine-tuning-level trait scores on small
-      models by this route, with Qwen3-4B strongest among those tested.
-      Measure on the bench: does one vector hold register better than a
-      paragraph over thirty turns, and what does it cost per token.
+- [x] **Activation steering spike** (M, before any nine-slider prose) -
+      shipped and run for real, Session C step 4 (2026-09-06):
+      `backend/scripts/bench/steering-spike.ts` +
+      `backend/scripts/bench/steering/{positive,negative}.txt`. Trained a
+      control vector from Buddy's own register (in under a second, CPU
+      only, on this dev machine's already-downloaded Qwen3 8B and the
+      pinned llama-server build, which bundles `llama-cvector-generator`)
+      and ran the same thirty-turn scripted conversation live against
+      both conditions. **Decision recorded**: the vector wins cleanly on
+      cost (a 72-char system prompt vs. 707, ~26% fewer total prompt
+      tokens over thirty turns, seconds to train) and edges out the
+      paragraph on a crude register proxy (23/30 vs. 19/30 casual-
+      contraction turns), but reading the transcripts side by side shows
+      the paragraph currently captures Buddy's SPECIFIC voice markers
+      (the "I mean" filler, playful asides) better than this spike's
+      generically-trained vector does - likely because the training
+      pairs were generic casual/formal contrast, not Buddy's own
+      `examples` field. Not yet a clear win on fidelity; worth a second
+      pass training on each companion's own examples before the
+      nine-slider prose question is decided either way. Full writeup:
+      docs/dev/session-c.md's step 4 entry.
 - [x] **A persona consistency test** - shipped, Session A step 8
       (2026-09-05), as a bench (`backend/scripts/bench/persona-eval.ts`)
       rather than the deterministic suite: ten scripted exchanges through
@@ -849,10 +889,19 @@ into a conversation with someone who knows who is talking.
       each - a content-blind echo can't leak another companion's name or
       run long), forbidden-phrases (12/40) is honestly uninformative
       against a stub that echoes the user's own words regardless of any
-      system prompt. Needs a real chat model before this means anything
-      for persona fidelity; see docs/dev.md's step 8 entry. A
-      model-judged version is still real, unbuilt work.
-- [ ] **The bot's honesty guards as a post-model pass** (M) - legacy
+      system prompt. The model-judged version shipped Session C step 4
+      (2026-09-06): `backend/src/lib/personaJudge.ts`, wired into
+      persona-eval.ts behind `--judge`, run for real against this dev
+      machine's Qwen3 8B - tutor held its register the WORST of the four
+      (0/10), opposite of what the string checks alone suggested; see
+      docs/dev/session-c.md's step 4 entry for the full numbers and a
+      genuine, unrelated finding it surfaced (short ambiguous utterances
+      free-associating onto the household's Weather plugin listing).
+- [x] **The bot's honesty guards as a post-model pass** (M) - shipped
+      2026-09-06, Session C step 3 (`backend/src/lib/guards.ts`,
+      `backend/tests/guards.test.ts`,
+      `backend/scripts/bench/conversation.ts`, docs/dev/session-c.md).
+      legacy
       `guards.py` (invention, unrelated recall, near-echo, medication
       doses, capability claims), `_marked_repeat` ("Like I said" never
       across conversations) and the attractor-removal rule for prompt
@@ -872,11 +921,16 @@ into a conversation with someone who knows who is talking.
       each package exposes a few parameterized reads ("events between",
       "chores for person") backed by SQL we wrote. Small models fill
       parameters reliably and do not write safe SQL.
-- [ ] **Grammar-constrained tool calls, verified before acting** (S, with
-      Tier 2) - an unparseable call is "ask again", never a silent drop;
+- [x] **Grammar-constrained tool calls, verified before acting** (S, with
+      Tier 2) - shipped 2026-09-06, Session C step 2 (`lib/llm.ts`'s
+      `tools`/`tool_choice`, a `response_format` JSON-schema grammar, not
+      OpenAI-wire tool_calls; `runPlugin()`'s existing ajv validation is
+      the reused "verified before acting" check). an unparseable call is "ask again", never a silent drop;
       llama.cpp's lazy grammars still let malformed calls through on
       recent Qwen builds (upstream issue 24807).
-- [ ] **The routing eval corpus as a permanent test** (M) - plan 4.5 says
+- [x] **The routing eval corpus as a permanent test** (M) - shipped
+      2026-09-06, Session C step 1 (`spec/llm/routing-corpus.json`,
+      `backend/tests/routingCorpus.test.ts`). plan 4.5 says
       routing accuracy "is the number that decides whether tier 2 is
       built at all"; no corpus exists. Utterance, expected package or
       none, expected arguments, near misses that must not fire, every
@@ -884,7 +938,12 @@ into a conversation with someone who knows who is talking.
       about twenty regex classes each annotated with a live misroute
       ("I GOT THE JOB" routed to remember; "do you know who X is" must
       never hit search); mine those for the first rows.
-- [ ] **Bench models for tool calling** (S) - Qwen3-4B-Instruct-2507 and
+- [x] **Bench models for tool calling** (S) - mechanism shipped
+      2026-09-06, Session C step 2 (`backend/scripts/bench/tool-calling.ts`,
+      `spec/llm/tool-call-corpus.json`) - the actual Qwen3-4B-Instruct-2507/
+      Gemma 4 E4B numbers are NOT recorded (no real llama-server/GGUF
+      available in that session's environment; run against the stub only,
+      0/3, expected - see docs/dev/session-c.md). Qwen3-4B-Instruct-2507 and
       Gemma 4 E4B are the published sweet spots for on-device tool use
       in 2026; measure on our own tool set, not their leaderboards.
 - [ ] **Speak MCP for local tools inside the hub** (M, decision first) -
@@ -914,48 +973,71 @@ Sources for this section (research pass, 2026-09-05): [Mem0, state of agent memo
 
 The spec landed 2026-09-05 (`docs/dev.md`, "Entities, relationships and
 grants"): Entity, Relationship and Grant, with the relationship-type and
-grant-action vocabularies and the cross-field validators. None of it is
-implemented on the hub yet.
+grant-action vocabularies and the cross-field validators. The hub half
+landed with Session F step 7, 2026-09-06 - see below for what did and
+didn't ship, and `docs/dev/session-f.md`'s step 7 write-up for the full
+detail.
 
-**Session E's step 6 (2026-09-06) confirmed this section is still
-accurate, and checked directly with F rather than assuming silence means
-"not started" (the same coordination this session already did with D for
-the store in step 3).** Zero backend exists for `/api/entities`,
-`/api/relationships`, `/api/grants`, `GET /api/people/:id/permissions`,
-or `/api/approvals` - F confirmed (2026-09-06) these are genuinely not
-started, grouped as F's own step 7 ("bigger than step 6"), with steps
-8-12 still ahead of it in F's own order. Content ceilings are **not
-F's record at all** - F named them as C's (session C, per wave-2's
-ownership split), and neither has a spec schema yet (the platform plan
-describes the ceiling in prose only: dials `none | limited | open`,
-band-defaulted with a non-movable safety floor). Time allowances/
-schedules are F's (this file's own earlier "M, F backend, E controls
-page" note, confirmed still accurate) and also not started, also with
-no spec schema. **Devices and sessions with revoke are the one real
-exception**: F's own step 6 (passkeys, device tokens, Quick Connect,
-sessions, optional TOTP - `GET/DELETE /api/devices`,
-`GET/DELETE /api/auth/sessions`) is done, code-reviewed, and merging to
-`main` imminently as of this note - the frontend half of "sessions and
-devices with revoke" is real, buildable work once that lands, unlike
-everything else this step named. `AdminGatedPage.tsx`'s existing role-
-based gate (already reused for Repairs, Backups, AI models, and the
-person-pickers on Conversations/Memory) is confirmed the right mechanism
-for a parent's controls page whenever the rest of this lands -
-`settings.admin`'s own grant-action wording in
-`spec/vocab/grant-actions.json` is a stated future state (line 744 of
-this file's earlier note), not something to build against today.
+**Session E's step 6 (2026-09-06) confirmed this section was still
+accurate at the time, checking directly with F rather than assuming
+silence means "not started" (the same coordination this session already
+did with D for the store in step 3): zero backend existed yet for any
+of this.** F's own step 7 (below, merged after that check) has since
+built all of it for real. **Devices and sessions with revoke were the
+one piece already real at the time of that check**: F's step 6
+(passkeys, device tokens, Quick Connect, sessions, optional TOTP -
+`GET/DELETE /api/devices`, `GET/DELETE /api/auth/sessions`) - Session E
+built the frontend for it (`DevicesSection.tsx`/`DevicesPage.tsx`,
+step 6). `AdminGatedPage.tsx`'s existing role-based gate (already reused
+for Repairs, Backups, AI models, and the person-pickers on
+Conversations/Memory) is the right mechanism for a parent's controls
+page on top of what F built below - `settings.admin`'s own grant-action
+wording in `spec/vocab/grant-actions.json` is still a stated future
+state, not something built against yet. A frontend for entities,
+relationships, grants, and approvals is real, unstarted work for a
+future session now that F's hub half exists.
 
-- [ ] **The hub half of entities and relationships** (L) - tables,
-      migration, routes, and a UI. Held back deliberately: a parallel
-      session was mid-edit across `db/schema.ts`, the migrations and
-      `turnEngine.ts` when the spec landed, and a change this shape on
-      top of that is how two sessions lose work.
-- [ ] **Migrate authorization from roles to grants** (L) - `min_role` on
-      every package manifest, `CREATABLE_BY`/`MANAGEABLE_BY` in
-      `routes/people.ts` and `lib/personLifecycle.ts`, and every
-      `requireRole` call become grant checks. Age stops deciding access
-      entirely (see the spec's reasoning); it keeps its place in safety
-      and retention only.
+- [x] **The hub half of entities and relationships** (Session F step 7,
+      2026-09-06) - tables and migration (`entities`, `relationships`,
+      `grants`, plus the hub-internal `approvals` queue), every cross-
+      field rule from `spec/records/ts/validate.ts` enforced at the
+      write boundary (`lib/entities.ts`, `lib/relationships.ts`,
+      `lib/grants.ts`), and `GET/POST/PATCH/DELETE` routes for all
+      three plus `GET /api/people/:id/permissions` (the effective,
+      resolved grant set - denies win over allows on the same action;
+      `safety_stop` needs no special case since no grant action for it
+      exists in the closed vocabulary to begin with) and the approval
+      queue (`GET/POST /api/approvals`, `POST /:id/{approve,deny}`, its
+      own `approvals.requested` notification to every adult). No UI yet
+      - that's E's kit work on top of this.
+- [x] **Migrate authorization from roles to grants, additively** (Session
+      F step 7, 2026-09-06) - narrower than the original framing: grants
+      were added *beside* roles this wave, not as a full replacement.
+      `requireRoleOrGrant()` (`middleware/auth.ts`) lets an active ALLOW
+      grant open a gate for someone outside the usual `roles` list, as a
+      pure OR - it never narrows what an owner/admin's role already
+      allows, so nothing a family could do before this landed stopped
+      working. Wired to the 5 route groups with a real, already-defined
+      grant action to check (`people.manage`/`people.grant` on
+      `routes/people.ts` and `routes/grants.ts`, `backups.run`/
+      `backups.restore` on `routes/backups.ts`, `relationships.manage`
+      on the new `routes/relationships.ts`). The other ~17 `requireRole`
+      call sites (`host.ts`, `plugins.ts`, `scheduler.ts`, `repairs.ts`,
+      `memory.ts`'s `maintenance/run`, `totp.ts`) have no matching
+      `grant-actions.json` entry today and were deliberately left on
+      plain `requireRole()` rather than mechanically converted for zero
+      behavioral gain - each needs a real vocabulary entry (a spec
+      change) before it can gain a grant check, and `totp.ts` specifically
+      should probably never gain one: which roles may even HAVE TOTP is
+      a hard policy (plan 4.1: "optional TOTP for owner and admin only"),
+      not an action a household should be able to grant its way around.
+- [ ] **`min_role` on every package manifest becomes a grant check too**
+      (L) - a manifest's declared minimum role is D's package-host
+      territory (`packageHost.ts`), not touched by Session F step 7.
+      Once `use:<package>` grants are actually consulted anywhere (see
+      `ctx.allowance`/package gating below), a manifest's `min_role`
+      should become the *default* grant a package's install seeds,
+      overridable per person the same way `packages.use_all` already is.
 - [ ] **Resolve the unrestricted-mode age collision** (S, Jesse's call) -
       the org's Safety invariants unlock unrestricted chat and generation
       "per-user by an adult" and restrict child profiles by default, both
@@ -979,9 +1061,11 @@ this file's earlier note), not something to build against today.
       the assistant is being. `persona.ts` already has a `complexity`
       dimension doing half the job for the wrong owner: two people
       sharing a companion must still be addressed differently.
-- [ ] **An `enabled` state for a person** (S) - `Person` has only
-      `deleted_at`; disabled-but-present has no representation today.
-- [ ] **Retire the free-text memory entity** (M) - `record_kind: entity`
+- [x] **An `enabled` state for a person** (Session F step 7, 2026-09-06)
+      - see "Lifecycle events" above.
+- [ ] **Retire the free-text memory entity** (M, C) - now unblocked: the
+      real `entities` table landed with Session F step 7, 2026-09-06.
+      `record_kind: entity`
       keeps a name and description in one `text` field and recovers the
       name by splitting on the first colon, which `lib/memory.ts`
       documents as an approximation. Entity records replace it; memory
@@ -1827,12 +1911,37 @@ on a spec tag that was never cut.
       export the spec already promises. Watch the W3C agent-memory
       interop group and the Agent Memory Protocol rather than adopting
       either; nothing is used widely enough to depend on.
-- [ ] **Speak Wyoming and expose an OpenAI-compatible chat endpoint** (M)
-      - Home Assistant satellites, Willow boxes and OVOS personas can
-      then use the hub as their brain; the robot becomes one more
-      Wyoming client. Hardware breadth for free, and it fits plan 8's
-      ESPHome/HA posture. Legacy's Wyoming socket ran unauthenticated as
-      admin; not that.
+- [x] **Speak Wyoming and expose an OpenAI-compatible chat endpoint** (M)
+      - shipped, Session C step 8 (2026-09-06):
+      `POST /v1/chat/completions` (`backend/src/routes/openai.ts`,
+      streaming and non-streaming, reusing spec/llm/ts/types.ts's own
+      OpenAI shapes) and a real Wyoming TCP server
+      (`backend/src/lib/{wyoming,wyomingServer}.ts` - hand-written
+      framing, not the `wyoming` npm package, which is real and ISC-
+      licensed but a 0.1.0 "work in progress" with no stable API to
+      build a child-safety-adjacent listener against). Both authenticate
+      against a new interim per-person API token
+      (`backend/src/lib/apiToken.ts`, `POST`/`DELETE
+      /api/settings/api-token`) - kept as its own mechanism even after
+      F's real device tokens (session-f-platform-and-trust.md step 6)
+      landed mid-step, once checked directly and found to solve a
+      different problem (a native client's session redemption after a
+      network change, not a stateless bearer credential for programmatic
+      access); see docs/dev/session-c.md's step 8 entry for the full
+      reasoning. Unlike the base Wyoming protocol (confirmed against the
+      reference docs: "no authentication or encryption, by design") and
+      unlike legacy's own unauthenticated socket, every connection must
+      send a real token as its first message or gets closed outright -
+      `describe`/`transcribe`/`synthesize`/`handle` never run for an
+      unauthenticated caller. Verified live end to end over a real TCP
+      socket and a real HTTP request (not just unit tests): a scripted
+      client authenticates, gets a real `info` response, a real
+      `handled` reply from the turn engine, a real `transcript` from
+      step 5's STT (scripted backend, no model installed in this
+      sandbox), and real framed audio from TTS's own stub backend. No
+      Home Assistant instance was reachable to verify the Assist-
+      pipeline acceptance itself - noted as owed to Jesse in
+      docs/dev/session-c.md.
 - [ ] **Round-trip fixtures across both repos** (S, once the link exists)
       - a record written on the robot and synced to the hub is byte-
       identical to one written on the hub; the robot never translates.
@@ -1891,12 +2000,37 @@ on a spec tag that was never cut.
       People** (S decision) - the Grant spec removes age and role from
       authorization while `Person.role` stays required, `min_role` is on
       every manifest, and ENGINEERING.md, UI.md's kid presets and plan
-      4.2/4.3/5.7 are all age-shaped. Safety still needs an age band
-      either way: derive it from birthdate and put `age_range` in the
-      turn context (S), then decide the rest once.
-- [ ] **Content ceiling record and dials** (M) - `spec/README.md` lists
-      it unbuilt; the safety classifier reads the band through a role
-      proxy. Never mentioned here until now.
+      4.2/4.3/5.7 are all age-shaped. Safety's own half of this is done
+      (Session C step 7, 2026-09-06: `lib/ageBand.ts`, birthdate-derived,
+      shared by both the prompt and `evaluateSafety()`) - the wider
+      roles-vs-grants decision itself is still Jesse's call, unchanged.
+      `age_range` in a package's own `ctx` is still real, deferred work:
+      it needs session-f-platform-and-trust.md step 7's package-host
+      `ctx` mechanism, which does not exist yet (F is at step 5 as of
+      2026-09-06).
+- [x] **Content ceiling record and dials** (M) - shipped, Session C step
+      7 (2026-09-06): `spec/schemas/content-ceiling.schema.json` (per
+      band: the 8 legacy-endorsed dial categories, a `floor` field
+      documenting - never enforcing - the classifier's own non-
+      configurable refuse categories, hlc), three fixtures (child/teen/
+      adult), generated bindings, `backend/src/lib/contentCeiling.ts`
+      (the three built-in records as reviewed code, not household-
+      editable data - no per-household custom-profile authoring UI yet,
+      that's the separate, larger "nine sliders" work). The safety
+      classifier now reads the age band (`lib/ageBand.ts`, shared with
+      the prompt) instead of the role proxy - proven with two direct
+      tests (a birthdate overriding a mismatched role in both
+      directions). The crisis overlay's non-configurability is proven
+      for real: a test stresses every real settings-registry key to its
+      most permissive value and confirms a self-harm turn still returns
+      `allow_with_resources` with real crisis resources every time.
+      Deferred, honestly: `age_range` in package `ctx` (blocked on F's
+      step 7) and the one-time adult acknowledgment via a Grant (the
+      Grant SPEC already ships `chat.unrestricted`/`generate.unrestricted`
+      with `acknowledged_at` - real, ready to consume - but F's hub-side
+      grants table doesn't exist yet, so `hasUnrestrictedGrant()` is a
+      documented stub returning false, the safe direction for this
+      specific gap to fail in).
 - [x] **`@hono/zod-openapi` conversion, the scaffolding and F's own
       routes** (Session F step 4, 2026-09-06) - `lib/openapi.ts`
       (`apiRouter()`, `errorResponses()`, `PaginationQuerySchema`/
@@ -1955,16 +2089,21 @@ on a spec tag that was never cut.
       unknown personId, and `auth.ts`'s own conversion to
       `@hono/zod-openapi` (deferred past the first pass since it wasn't
       new code, then required once this diff rewrote most of the file).
+- [x] **The approval queue** (Session F step 7, 2026-09-06) - see the
+      People/relationships/permissions section below.
 - [ ] **Identity and trust pieces plan v0.1 scopes and this file did not
-      track, still open** (M each) - an approval queue, hub-key signing
-      of the bundled default set, the emergency kit and hub/SMB backup
-      targets, a restore drill in the release skill, and the `user/`
-      docs tier (only `dev/` exists).
-- [ ] **Tests the audit found missing** (S) - `hlc.ts` seed and compare,
-      `personLifecycle`, `access`, and one test proving a specific
-      recalled memory text actually lands in the prompt for a matching
-      query (memory tests stop at `recall`; prompt tests use synthetic
-      matches).
+      track, still open** (M each) - hub-key signing of the bundled
+      default set, the emergency kit and hub/SMB backup targets, a
+      restore drill in the release skill, and the `user/` docs tier
+      (only `dev/` exists).
+- [ ] **Tests the audit found missing** (S) - `access`, and one test
+      proving a specific recalled memory text actually lands in the
+      prompt for a matching query (memory tests stop at `recall`; prompt
+      tests use synthetic matches). `hlc.ts` seed and compare landed
+      earlier (this line was never checked off); `personLifecycle`
+      landed with Session F step 7, 2026-09-06
+      (`memorializePerson`/`disableExpiredGuests`/`ageBandForBirthdate`/
+      `applyAgeBandChanges`).
 - [x] **Copy the legacy runtime guards, most of them** (Session F step 3,
       2026-09-06) - checked `llmSupervisor.ts`/`modelDownload.ts`/
       `telegramChannel.ts` for equivalents first, per this item's own
@@ -2073,11 +2212,17 @@ otherwise be lost with the mirror.
       hub's), which needs real held-out speech to validate against per
       this org's own training-data standards, not numbers copied in
       blind.
-- [ ] **The bot's four bench harnesses** (L) - honesty (105 questions,
+- [ ] **The bot's four bench harnesses** (L) - one of four shipped
+      2026-09-06, Session C step 3: conversation (28 of 34 real broken
+      replies - six excluded and named in
+      `backend/scripts/bench/conversation.ts`'s own header, genuinely out
+      of scope for a stationary hub or already covered by the routing
+      corpus), rebuilt against `lib/guards.ts` directly (no model needed
+      for the offline half - see docs/dev/session-c.md). Still unbuilt:
+      honesty (105 questions,
       raw versus guarded), interaction (424 cases), latency (refuses to
-      run on a busy machine), conversation (34 real broken replies),
-      rebuilt against the turn engine. The plan's "bench on demand" tier
-      has no benches.
+      run on a busy machine). The plan's "bench on demand" tier
+      has no benches for these three yet.
 - [ ] **Lessons to record in the right doc, so they survive the mirror**
       (S) - in org `CLAUDE.md`: cache only genuine misses, never a
       transient failure; never throw synchronously inside a socket
@@ -2156,16 +2301,37 @@ that owns it.
       picker, PIN or passkey; birthdate in, band out, presets shown to
       the parent with what they will see; a guest with an expiry and no
       memory (plan 12, 7.4).
-- [ ] **Lifecycle events** (S-M, F) - `enabled` on Person, guest expiry
-      removal, memorialise (read-only profile, PIN cleared, sessions
-      revoked, export offered), the band change on a birthday with a
-      passive notification to parents (plan 7.4). None exist.
+- [x] **Lifecycle events** (Session F step 7, 2026-09-06) - `enabled`
+      on Person (enforced at every sign-in boundary: `/select`,
+      `/verify-secret`, passkey authenticate, device-token redeem, Quick
+      Connect's poll, TOTP challenge, plus the 10s session cache), guest
+      expiry removal (`disableExpiredGuests()`, a daily core job),
+      memorialise (`POST /api/people/:id/memorialize` - every credential
+      and session revoked, memories and conversations untouched, "export
+      offered" left to the client), the band change on a birthday
+      (`applyAgeBandChanges()`, a daily core job, `person.band_changed`
+      passive notification to adults). See the People/relationships/
+      permissions section below.
 - [x] **Sessions per device with revoke, optional TOTP for owner and
       admin** (Session F step 6, 2026-09-06) - see the entry above under
       "Identity and trust pieces".
-- [ ] **Time allowances and schedules per category** (M, F backend, E
-      controls page) - plan 4.2 names them as household settings enforced
-      in the turn engine and package host; nothing exists.
+- [x] **Time allowances per category** (Session F step 7, 2026-09-06,
+      backend half only) - `settings/allowanceKeys.ts` +
+      `lib/allowance.ts::dailyMinutesAllowed()`, one person-scoped daily-
+      minutes setting per manifest category, default 0 (no limit
+      configured). Deliberately daily-minutes only, not "and schedules":
+      a time-of-day window needs either the settings system's untested
+      `time` selector (nothing renders one yet) or a JSON blob the
+      settings standard's one-atomic-value-per-key shape does not
+      support - landing an untested selector to satisfy the letter of
+      the plan text would be its own half-finished feature. Also not
+      done: actually enforcing this in `ctx.allowance` - that needs live
+      per-day usage bookkeeping, which belongs to the package host's own
+      session tracking (D's file, out of this session's scope per this
+      repo's own `CLAUDE.md`); D reads the configured limit from
+      `dailyMinutesAllowed()` and combines it with elapsed usage to
+      produce `ctx.allowance`. E's controls page still needs building on
+      top of this.
 
 **Health, updates, storage, install**
 
@@ -2261,27 +2427,101 @@ that owns it.
 
 **Intelligence and voice**
 
-- [ ] **A naturalness bench** (S-M, C) - plan 4.5's paired robotic and
-      natural phrasings corpus scoring a model and prompt before it
-      becomes a default; the framing example pairs (time as a fragment,
-      yes/no as a fragment, a list as a sentence) joining the stable
-      prefix. Neither exists.
-- [ ] **Spoken numbers by library, in both languages** (S, C) -
-      `normalizeForSpeech.ts` hand-rolls `numberToWords` (principle 6 says
-      a library: `to-words` on the hub, `num2words` on the robot, licences
-      checked), with the clock-time and unit ruleset beside it and one
-      fixture set for both; the Python twin does not exist.
-- [ ] **STT on the hub** (M, C) - no STT engine, route or session exists;
-      push-to-talk (listed above under Chat surface) is blocked on it.
-      sherpa-onnx with Moonshine is the robot's choice and should be the
-      hub's too (one runtime, both products).
-- [ ] **Import from the legacy hub** (M, C) - Hub v0.2 scope: people,
-      memories and conversations from the legacy data directory into
-      spec-shaped records with provenance, run once, dry run first,
-      backup required. Without it the family starts from zero.
-- [ ] **Routing embeddings persisted per package** (S, C, with Tier 1) -
+- [x] **A naturalness bench** (S-M, C) - shipped, Session C step 4
+      (2026-09-06): `spec/llm/naturalness-corpus.json` (8 robotic/natural
+      pairs) and `backend/scripts/bench/naturalness.ts`. The three named
+      framing pairs (time as a fragment, yes/no as a fragment, a list as
+      a sentence) joined the stable prefix as `lib/persona.ts`'s
+      `NATURALNESS_POLICY`. Run for real against this dev machine's
+      Qwen3 8B: 1 natural, 0 robotic, 7 ambiguous of 8 - a real first
+      data point, not a gate; see docs/dev/session-c.md's step 4 entry,
+      including a genuine unrelated finding it helped surface (below).
+- [ ] **Short, ambiguous utterances free-associate onto the plugins
+      list** (S, C found it) - `buildSystemPrompt()`'s standing "Things
+      this household has set up" section names Weather unconditionally;
+      Session C step 4's live naturalness/persona bench runs against a
+      real Qwen3 8B (2026-09-06) found several completely unrelated
+      utterances ("what time is it", "okay thanks", "why did the router
+      just restart") all getting the identical reply, "It's 57.5 degrees
+      in San Francisco" - confirmed via a direct `route()` call that this
+      is model free-association onto the plugins list, not the
+      deterministic floor firing (every score was well under
+      `TIER1_THRESHOLD`). Needs whoever next touches `pluginsListLine()`
+      to look at grounding it better (maybe: don't list a plugin's
+      capability unless something in the turn is actually plugin-shaped).
+- [x] **Spoken numbers by library, in both languages** (S, C) - shipped,
+      Session C step 6 (2026-09-06): `numberToWords` replaced with
+      `to-words` (MIT) on the TS side, `spec/voice/py/
+      normalize_for_speech.py` added using `num2words` (LGPL-2.1,
+      dependency only) on the Python side, both licences recorded in
+      NOTICE. The clock-time, ordinal, currency, and unit ruleset stays
+      hand-written beside it, unchanged, per the plan's own words. One
+      shared fixture (`spec/voice/fixtures/normalize-for-speech.json`,
+      32 cases) drives both `bun test` and `pytest`; both passed on the
+      first real run. The speech lint (`lintSpeechTemplate()`) shipped
+      alongside it, wired into `spec/tests/ts/package-bronze.test.ts` -
+      see docs/dev/session-c.md's step 6 entry for a real false positive
+      it found and fixed against D's own `trivia` package before landing.
+- [x] **STT on the hub** (M, C) - shipped, Session C step 5 (2026-09-06):
+      `backend/src/lib/{sttAssets,sileroVad,stt,sttSession}.ts`,
+      `backend/src/routes/stt.ts`, `spec/voice/ts/sttTypes.ts`.
+      `WS /api/stt/stream`, `POST /api/stt/transcribe`,
+      `GET /api/voice/stt/status`. Sherpa-onnx-node's real Node bindings
+      (verified live under Bun, no segfault) mean this needs no
+      supervision through `lib/sidecars.ts` or a bespoke process
+      supervisor the way `ttsSupervisor.ts` needs one for Pocket TTS's
+      separate Python process - a deliberate, positive deviation from
+      this item's own original wording; see docs/dev/session-c.md's step
+      5 entry for the full reasoning. Silero VAD hysteresis (0.5/0.35),
+      0.32s pre-roll, RMS pre-gate, 30s force-flush, and Moonshine's own
+      silent-head retry are all ported from the legacy hub's proven
+      `sttSession.ts`/`sileroVad.ts`, repointed at Moonshine instead of a
+      whisper.cpp sidecar. Live acceptance verified against the pinned
+      Moonshine tiny-en model and its own test fixture: exact transcript
+      match.
+- [x] **Import from the legacy hub** (M, C) - shipped, Session C step 10
+      (2026-09-06): `lib/legacyImport.ts` + owner-only `POST /api/memory/
+      import/legacy`, reads a legacy `app.db` directly, matches people by
+      display name (never auto-creating a child or teen without a
+      parent's own pick), imports `memories` (person/household scope,
+      `source: import:legacy:memory:<id>`, embedded fresh on write, an
+      entity-shaped category correctly kinded `record_kind: "entity"`
+      via the same `categoryToRecordKind()` the judge uses), and pairs
+      legacy `messages` into `conversations`/`conversation_turns` per
+      person. Idempotent by construction (deterministic ids and a
+      source-lookup, not a separate tracking table) rather than a literal
+      once-only lock, so a household can re-run it after picking a
+      profile for a previously-skipped child. A real (non-dry-run) run
+      refuses without a backup on file first. **Real, deferred gap**:
+      legacy's separate `entities` table now has a better home in F's
+      own `lib/entities.ts` (`source: "imported"` already exists there
+      for exactly this), but `createEntity()` has no override for it and
+      no idempotency support, and it's F's owned file - left for F to add
+      a bulk-import path to, not mechanically converted mid-wave. Legacy
+      `memory_episodes` isn't imported either; the plan's own words for
+      this step name only people/memories/conversations. See
+      docs/dev/session-c.md's step 10 entry.
+- [x] **Routing embeddings persisted per package** (S, C, with Tier 1) -
+      shipped 2026-09-06, Session C step 1: `routing_embeddings`, keyed
+      by `(package_id, example_hash, space)` so an unchanged example is a
+      pure DB lookup, never a re-embed.
       re-embed only when an example changes; a cold boot must not
       re-embed sixty packages.
+- [ ] **Re-embed on an embedding model change** (S) - found 2026-09-06
+      (Session C step 1's own code review, while adding
+      `routing_embeddings`): neither `memory_embeddings` nor
+      `routing_embeddings` reconciles `space` on lookup - `recall()`'s
+      cosine compare and `scoreByEmbedding()` both compare a query/
+      utterance vector against every stored vector regardless of which
+      model embedded it. A household that changes its embedding model
+      keeps scoring against stale vectors from the old one indefinitely,
+      silently, no error. Today's real mitigation is "there is exactly
+      one pinned embedding model" (embedAssets.ts); this is real data
+      debt the day that stops being true. Fix belongs to both stores at
+      once (the identical gap, not two separate ones): either filter by
+      the CURRENT space at query time (cheap only if the current space is
+      known without an embed call) or a real migration that re-embeds
+      everything on a model change.
 
 **Deferred to Wave 3, recorded so it is not lost**
 

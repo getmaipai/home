@@ -18,6 +18,7 @@ import { Grant } from "../../gen/ts/grant.js";
 import { Issue } from "../../gen/ts/issue.js";
 import { Conversation } from "../../gen/ts/conversation.js";
 import { Device } from "../../gen/ts/device.js";
+import { ContentCeiling } from "../../gen/ts/content-ceiling.js";
 // ErrorEntry is standards-owned (std-v0.2.0), not generated here; the error
 // catalogue's shape is imported from the sibling .github checkout, the same
 // way spec/schemas/manifest.schema.json imports PrivacyRow by $ref.
@@ -104,6 +105,22 @@ describe("record fixtures validate against their generated Zod models", () => {
       ).not.toThrow();
     });
   }
+
+  for (const band of ["child", "teen", "adult"]) {
+    test(`content-ceiling.${band}.example.json`, () => {
+      expect(() =>
+        ContentCeiling.parse(loadFixture(`content-ceiling.${band}.example.json`)),
+      ).not.toThrow();
+    });
+  }
+
+  test("every content-ceiling band carries the identical floor - it documents an invariant, not a per-band setting", () => {
+    const floors = ["child", "teen", "adult"].map(
+      (band) => (loadFixture(`content-ceiling.${band}.example.json`) as { floor: string[] }).floor,
+    );
+    expect(floors[0]).toEqual(floors[1]);
+    expect(floors[1]).toEqual(floors[2]);
+  });
 
   test("error catalogue entries", () => {
     const errors = JSON.parse(

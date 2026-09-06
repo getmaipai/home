@@ -43,6 +43,9 @@ function makePerson(role: Roster["role"] = "child"): Roster {
     created_at: "2026-09-04T00:00:00.000Z",
     updated_at: "2026-09-04T00:00:00.000Z",
     deleted_at: null,
+    enabled: true,
+    guest_expires_at: null,
+    memorialized_at: null,
     hlc: "1788000000000:0:test",
     hasSecret: true,
   };
