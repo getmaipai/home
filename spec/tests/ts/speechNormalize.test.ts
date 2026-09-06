@@ -4,8 +4,24 @@
 // untouched (Jesse, 2026-09-04: "if you have the voice say ten O four, you
 // still display 10:04" - this file never asserts anything about display
 // text because this module never produces any).
+//
+// Session C step 6: the full-pipeline cases below are loaded from
+// spec/voice/fixtures/normalize-for-speech.json rather than hardcoded here,
+// so the SAME cases also drive spec/tests/py/test_speech_normalize.py
+// against the Python twin - "one fixture set both must pass" (the plan's
+// own words), not two hand-maintained lists that can silently drift apart.
 import { describe, expect, test } from "bun:test";
-import { normalizeForSpeech, numberToWords } from "../../voice/ts/normalizeForSpeech.js";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+import { normalizeForSpeech, numberToWords, lintSpeechTemplate } from "../../voice/ts/normalizeForSpeech.js";
+
+interface Fixture {
+  input: string;
+  expected: string;
+  note?: string;
+}
+
+const fixtures: Fixture[] = JSON.parse(readFileSync(join(import.meta.dir, "..", "..", "voice", "fixtures", "normalize-for-speech.json"), "utf-8"));
 
 describe("numberToWords", () => {
   test("zero and small numbers", () => {
@@ -31,117 +47,47 @@ describe("numberToWords", () => {
   test("negative numbers", () => {
     expect(numberToWords(-42)).toBe("negative forty-two");
   });
-});
-
-describe("normalizeForSpeech: times", () => {
-  test("a plain digital time reads with 'oh' for a single-digit minute, never a bare digit or 'zero'", () => {
-    expect(normalizeForSpeech("It's 10:04.")).toBe("It's ten oh four.");
-  });
-  test("pm reads as 'in the evening', am as 'in the morning'", () => {
-    expect(normalizeForSpeech("It's 10:04pm.")).toBe("It's ten oh four in the evening.");
-    expect(normalizeForSpeech("It's 7:15 am.")).toBe("It's seven fifteen in the morning.");
-  });
-  test("the dotted 'a.m.'/'p.m.' forms get their suffix too, even right before a sentence period", () => {
-    // A real bug this module's own live verification caught (2026-09-05):
-    // a trailing `\b` right after a dotted marker never matched (both the
-    // period and whatever follows it are non-word characters), so the
-    // whole marker silently got dropped.
-    expect(normalizeForSpeech("It's about 4:13 a.m. here.")).toBe("It's about four thirteen in the morning here.");
-    // "p.m."'s own trailing period is consumed as part of the abbreviation
-    // itself, correctly - there's no separate sentence-terminating period
-    // left over to keep.
-    expect(normalizeForSpeech("Set an alarm for 9:00 p.m.")).toBe("Set an alarm for nine o'clock in the evening");
-  });
-  test("on the hour reads as o'clock, not 'oh zero'", () => {
-    expect(normalizeForSpeech("The bus leaves at 3:00.")).toBe("The bus leaves at three o'clock.");
-  });
-  test("12:00 am/pm are midnight and noon, not 'twelve o'clock'", () => {
-    expect(normalizeForSpeech("Set it for 12:00 am.")).toBe("Set it for midnight.");
-    expect(normalizeForSpeech("Lunch is at 12:00 pm.")).toBe("Lunch is at noon.");
-  });
-  test("24-hour input past noon converts to a spoken 12-hour hour", () => {
-    expect(normalizeForSpeech("It's 21:00.")).toBe("It's nine o'clock.");
+  test("a number whose final chunk has no hundreds digit, cross-checked against the Python twin's own regression case", () => {
+    // A code review (2026-09-06) found the Python twin's num2words
+    // inserted a stray "and" for exactly this shape (1021, 100021,
+    // 1000021) that to-words never produces - kept here too so a future
+    // change to either adapter has a matching case on both sides.
+    expect(numberToWords(1021)).toBe("one thousand twenty-one");
+    expect(numberToWords(100021)).toBe("one hundred thousand twenty-one");
+    expect(numberToWords(1000021)).toBe("one million twenty-one");
   });
 });
 
-describe("normalizeForSpeech: dates", () => {
-  test("an ISO date reads as month, ordinal day, and spoken year", () => {
-    expect(normalizeForSpeech("Due 2026-09-04.")).toBe("Due September fourth, twenty twenty-six.");
-  });
-  test("a written month/day/year reads the day as an ordinal", () => {
-    expect(normalizeForSpeech("It's due September 4, 2026.")).toBe("It's due September fourth, twenty twenty-six.");
-  });
-  test("a month/day with no year still ordinalizes the day", () => {
-    expect(normalizeForSpeech("The party is May 21.")).toBe("The party is May twenty-first.");
-  });
+describe("normalizeForSpeech: the shared fixture set", () => {
+  for (const { input, expected, note } of fixtures) {
+    test(note ? `${JSON.stringify(input)}: ${note}` : JSON.stringify(input), () => {
+      expect(normalizeForSpeech(input)).toBe(expected);
+    });
+  }
 });
 
-describe("normalizeForSpeech: currency", () => {
-  test("a whole dollar amount", () => {
-    expect(normalizeForSpeech("It costs $5.")).toBe("It costs five dollars.");
+describe("lintSpeechTemplate", () => {
+  test("a template already in spoken form has nothing to flag", () => {
+    expect(lintSpeechTemplate("Got it, I'll remember that.")).toEqual([]);
+    expect(lintSpeechTemplate("{summary}")).toEqual([]);
+    expect(lintSpeechTemplate("It's {temp} degrees in {place_name} right now.")).toEqual([]);
   });
-  test("dollars and cents, both pluralized correctly", () => {
-    expect(normalizeForSpeech("It's $1.01.")).toBe("It's one dollar and one cent.");
-    expect(normalizeForSpeech("It's $5.50.")).toBe("It's five dollars and fifty cents.");
+  test("an author's own harmless whitespace (never audible either way) doesn't lint", () => {
+    // "{question} ... The answer" - the same real shape a recipe.json's
+    // own speech field used before this exact false positive was found
+    // and fixed: normalizeForSpeech()'s own whitespace tidy-up removes
+    // the space before the ellipsis, a purely cosmetic difference no TTS
+    // engine would ever voice differently either way.
+    expect(lintSpeechTemplate("{question} ... The answer: {answer}.")).toEqual([]);
   });
-  test("a thousands-separated amount", () => {
-    expect(normalizeForSpeech("It's $1,250.")).toBe("It's one thousand two hundred fifty dollars.");
+  test("a static, un-normalized number or currency amount is flagged", () => {
+    expect(lintSpeechTemplate("It costs $5.")).toHaveLength(1);
   });
-});
-
-describe("normalizeForSpeech: percentages", () => {
-  test("a whole percent", () => {
-    expect(normalizeForSpeech("There's a 25% chance of rain.")).toBe("There's a twenty-five percent chance of rain.");
+  test("static markdown baked into the template is flagged", () => {
+    expect(lintSpeechTemplate("This is **great**!")).toHaveLength(1);
   });
-  test("a decimal percent reads digit by digit after 'point'", () => {
-    expect(normalizeForSpeech("Inflation is 3.5%.")).toBe("Inflation is three point five percent.");
-  });
-});
-
-describe("normalizeForSpeech: units and abbreviations", () => {
-  test("a speed unit expands before the leading number is spelled out", () => {
-    expect(normalizeForSpeech("Winds at 5 mph.")).toBe("Winds at five miles per hour.");
-  });
-  test("a temperature unit expands to the full word", () => {
-    expect(normalizeForSpeech("It's 72°F outside.")).toBe("It's seventy-two degrees Fahrenheit outside.");
-  });
-  test("a digit-anchored inches abbreviation expands, but a bare sentence-final 'in.' is left alone", () => {
-    expect(normalizeForSpeech("It's 5in. long.")).toBe("It's five inches long.");
-    expect(normalizeForSpeech("Come in.")).toBe("Come in.");
-  });
-  test("a title abbreviation expands to the spoken word", () => {
-    expect(normalizeForSpeech("Ask Dr. Lee.")).toBe("Ask Doctor Lee.");
-  });
-});
-
-describe("normalizeForSpeech: generic numbers and ordinals", () => {
-  test("a bare cardinal number", () => {
-    expect(normalizeForSpeech("There are 42 emails.")).toBe("There are forty-two emails.");
-  });
-  test("a digit ordinal", () => {
-    expect(normalizeForSpeech("It's her 3rd try.")).toBe("It's her third try.");
-    expect(normalizeForSpeech("Finished 21st.")).toBe("Finished twenty-first.");
-  });
-  test("a decimal number reads digit by digit after 'point'", () => {
-    expect(normalizeForSpeech("It's 3.5 miles away.")).toBe("It's three point five miles away.");
-  });
-  test("singularizes a count of one against a naive plural noun", () => {
-    expect(normalizeForSpeech("You have 1 items in your cart.")).toBe("You have one item in your cart.");
-  });
-  test("does not mangle a noun that is already singular but ends in 's'", () => {
-    expect(normalizeForSpeech("There's 1 bus outside.")).toBe("There's one bus outside.");
-  });
-});
-
-describe("normalizeForSpeech: markup and emoji", () => {
-  test("strips bold/italic markers but keeps the words", () => {
-    expect(normalizeForSpeech("It's **very** cold, *really*.")).toBe("It's very cold, really.");
-  });
-  test("strips a bullet list into plain lines", () => {
-    expect(normalizeForSpeech("- milk\n- eggs")).toBe("milk\neggs");
-  });
-  test("drops emoji entirely", () => {
-    expect(normalizeForSpeech("Sounds good! \u{1F389}")).toBe("Sounds good!");
+  test("a placeholder alone is never flagged, regardless of its name", () => {
+    expect(lintSpeechTemplate("{word}: {definition}")).toEqual([]);
   });
 });
 

@@ -1924,11 +1924,19 @@ that owns it.
       `TIER1_THRESHOLD`). Needs whoever next touches `pluginsListLine()`
       to look at grounding it better (maybe: don't list a plugin's
       capability unless something in the turn is actually plugin-shaped).
-- [ ] **Spoken numbers by library, in both languages** (S, C) -
-      `normalizeForSpeech.ts` hand-rolls `numberToWords` (principle 6 says
-      a library: `to-words` on the hub, `num2words` on the robot, licences
-      checked), with the clock-time and unit ruleset beside it and one
-      fixture set for both; the Python twin does not exist.
+- [x] **Spoken numbers by library, in both languages** (S, C) - shipped,
+      Session C step 6 (2026-09-06): `numberToWords` replaced with
+      `to-words` (MIT) on the TS side, `spec/voice/py/
+      normalize_for_speech.py` added using `num2words` (LGPL-2.1,
+      dependency only) on the Python side, both licences recorded in
+      NOTICE. The clock-time, ordinal, currency, and unit ruleset stays
+      hand-written beside it, unchanged, per the plan's own words. One
+      shared fixture (`spec/voice/fixtures/normalize-for-speech.json`,
+      32 cases) drives both `bun test` and `pytest`; both passed on the
+      first real run. The speech lint (`lintSpeechTemplate()`) shipped
+      alongside it, wired into `spec/tests/ts/package-bronze.test.ts` -
+      see docs/dev/session-c.md's step 6 entry for a real false positive
+      it found and fixed against D's own `trivia` package before landing.
 - [x] **STT on the hub** (M, C) - shipped, Session C step 5 (2026-09-06):
       `backend/src/lib/{sttAssets,sileroVad,stt,sttSession}.ts`,
       `backend/src/routes/stt.ts`, `spec/voice/ts/sttTypes.ts`.

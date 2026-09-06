@@ -844,3 +844,106 @@ it, wired it in for real: `GET /api/voice/stt/status` now reports
 `sileroInstalled`/`moonshineInstalled` separately (a real, reachable
 state, since `ensureSttAssets()` downloads Silero first), with a test
 proving the partial-install case.
+
+## Step 6: spoken numbers, dates and units by library
+
+`spec/voice/ts/normalizeForSpeech.ts`'s hand-rolled `numberToWords`
+(the scale-table cardinal converter) is replaced with `to-words` (MIT),
+kept as a thin adapter rather than a bare re-export: its raw output
+("Twenty One", "Minus Forty Two") is Title Case with no hyphen and says
+"Minus," none of which matches this file's own established register, so
+the adapter lowercases it, restores the hyphen a person actually writes
+between a compound ten and one, and swaps in "negative." Everything else
+in the file - the clock-time ruleset, ordinals in dates, currency,
+percentages, units, and markup/emoji stripping - stays exactly as it was,
+per the plan's own words ("keep the hand-written ruleset... beside it"):
+none of that is "convert a number to words," and a library replacing it
+would be a worse fit for the same reason `to-words` itself needed an
+adapter to fit this domain's register at all.
+
+`spec/voice/py/normalize_for_speech.py` is the Python twin, mirroring
+the TS file function-for-function using `num2words` (LGPL-2.1, a
+dependency via `uv add`, never vendored - the org's own third-party-code
+rule, and the plan's own explicit call-out) in the identical adapter
+role: `num2words`'s raw en output uses the British "and" ("two hundred
+and thirty-four"), thousands commas, and "minus," so the Python
+`number_to_words()` strips and swaps the same three things the TS
+adapter does, landing on byte-identical output.
+
+**One fixture set, not two hand-maintained lists.**
+`spec/voice/fixtures/normalize-for-speech.json` holds every full-pipeline
+case (32 of them, covering times, dates, currency, percentages, units,
+abbreviations, generic numbers, and markup stripping) that used to be
+hardcoded directly in `spec/tests/ts/speechNormalize.test.ts`; that file
+now loads the fixture and iterates it, and a new
+`spec/tests/py/test_speech_normalize.py` loads the identical file against
+the Python twin. Both passed on the very first run once the two adapters
+were written - real behavioral parity, not asserted parity. The
+`numberToWords`-specific unit tests (not full-pipeline cases) stay
+TS-only, since they test an internal helper each language names
+differently (`number_to_words` in Python), not the shared public
+contract the fixture exists to prove.
+
+**The speech lint** (`docs/PACKAGES.md`'s own definition-of-done line,
+"the speech lint on every package `speech` string"): `lintSpeechTemplate()`
+in `normalizeForSpeech.ts`, wired into
+`spec/tests/ts/package-bronze.test.ts`'s existing per-package loop (the
+suite D's own packages already run against for every other bronze
+criterion). A `speech` field is a template with `{placeholder}` spans
+substituted at runtime, so the lint can only ever see the STATIC text an
+author typed - which turns out to be exactly enough, since every
+normalization pass is already a no-op on a `{placeholder}` span: running
+the whole `normalizeForSpeech()` against the raw template and diffing
+against the input catches a static, un-normalized `"$5"` or a literal
+`"**bold**"` an author baked in, with no need to mock a placeholder's
+runtime value first. Found and fixed one real false positive against
+this exact mechanism before wiring it into package-bronze.test.ts:
+`normalizeForSpeech()`'s own trailing whitespace tidy-up (dropping a
+space before punctuation) flagged D's own `trivia` package's
+`"{question} ... The answer: {answer}."` as "would be rewritten," even
+though the only difference is a stray space before an ellipsis - never
+audible either way, since TTS doesn't voice whitespace. Fixed by
+extracting that tidy-up into its own `tidyWhitespace()` function and
+comparing the lint's output against the whitespace-tidied INPUT, not the
+raw one, so only a genuine content change (a number, a markdown marker)
+trips the lint. All six of today's bundled packages with a `speech`
+field (`remember`/`recall`, C's own, checked by hand; `define`/`joke`/
+`recall`/`trivia`/`weather`, D-owned, checked by the wired-in suite) pass
+clean.
+
+**NOTICE.** `to-words` and `num2words` are recorded, alongside
+`sherpa-onnx-node` and `onnxruntime-web` from step 5 - neither had been
+added when those landed. The file's own header note ("backend
+dependencies are server-side only and not redistributed") predates both
+steps and undersold `docs/PACKAGES.md`'s actual rule (every third-party
+component, not just frontend-bundled ones); reworded rather than left
+stale, but this is NOT a retroactive audit of every backend dependency
+already in `bun.lock`/`uv.lock` - only the four this session's own two
+most recent steps introduced.
+
+**Considered, not built**: this step's Python twin and fixture work
+happened as a direct continuation of a background session that had
+already landed the `to-words` swap and was interrupted mid-way (a rate
+limit) before finishing the Python side, the fixture extraction, NOTICE,
+or the speech lint - all of which this entry covers. No corners were cut
+picking the work back up; every piece above was verified fresh (real
+`uv run pytest`, real `bun test`, a real full `scripts/check.sh`), not
+assumed carried over from the interrupted run.
+
+**A code review found one real bug, fixed**: `number_to_words()`'s
+`_AND_RE` only stripped `num2words`'s British "and" when it directly
+followed "hundred" ("one hundred and five" -> "one hundred five"),
+missing that `num2words` inserts the identical connective before the
+final sub-100 chunk after ANY scale word when that chunk has no hundreds
+digit of its own - verified live: `num2words(1021, lang="en")` is
+"one thousand and twenty-one", not "one thousand, twenty-one". None of
+the shared fixture's 32 cases or either language's own `numberToWords`
+unit tests happened to exercise a number shaped exactly that way (1234,
+905, and 2,500,000 all have a nonzero hundreds digit or land on an exact
+scale), so this real divergence between the two ports was invisible to
+both test suites until reviewed. Fixed by matching the connective itself
+(`\s+and\s+`, collapsed to one space) rather than only the one place it
+happens to follow "hundred"; a regression test on both sides
+(`number_to_words(1021)`/`numberToWords(1021)` and three more shapes)
+now covers it, cross-referencing each other so a future change to either
+adapter has a matching case to check on the other language too.

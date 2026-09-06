@@ -22,6 +22,7 @@
 // purely MECHANICAL half: a correctly-written number, time, date, or
 // abbreviation read the way a person would say it out loud, regardless of
 // how the text was produced (model, skill, or a constant string).
+import { ToWords } from "to-words";
 
 // ── Markup/emoji stripping ────────────────────────────────────────────────
 // A small model can still emit markdown or emoji despite the system
@@ -52,16 +53,17 @@ function stripMarkupForSpeech(text: string): string {
 }
 
 // ── Number-to-words ─────────────────────────────────────────────────────
+// ONES/TENS/twoDigitsToWords stay hand-written: spokenYear() and
+// spokenDecimal() below use them directly for their own narrow, specific
+// jobs (a year's two-digit halves, a decimal's digit-by-digit read) that
+// aren't "convert this whole number to words" at all - keeping them
+// small and local is simpler than routing a two-digit or single-digit
+// lookup through the full library below.
 const ONES = [
   "zero", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine",
   "ten", "eleven", "twelve", "thirteen", "fourteen", "fifteen", "sixteen", "seventeen", "eighteen", "nineteen",
 ];
 const TENS = ["", "", "twenty", "thirty", "forty", "fifty", "sixty", "seventy", "eighty", "ninety"];
-const SCALES: [number, string][] = [
-  [1_000_000_000, "billion"],
-  [1_000_000, "million"],
-  [1_000, "thousand"],
-];
 
 function twoDigitsToWords(n: number): string {
   if (n < 20) return ONES[n]!;
@@ -70,33 +72,30 @@ function twoDigitsToWords(n: number): string {
   return ones === 0 ? TENS[tens]! : `${TENS[tens]}-${ONES[ones]}`;
 }
 
-function threeDigitsToWords(n: number): string {
-  const hundreds = Math.floor(n / 100);
-  const rest = n % 100;
-  if (hundreds === 0) return twoDigitsToWords(rest);
-  const hundredsPart = `${ONES[hundreds]} hundred`;
-  return rest === 0 ? hundredsPart : `${hundredsPart} ${twoDigitsToWords(rest)}`;
-}
+// Session C step 6 (session-c-brain-and-voice.md): "replace hand-rolled
+// numberToWords with a library" (org principle 6 - a maintained library
+// for a solved problem beats hand-rolled logic doing the identical job).
+// `to-words` (MIT, NOTICE) - live-tested against every case this file's
+// own test suite already asserted before the swap, all still passing.
+// Its raw output ("Twenty One", "Minus Forty Two") doesn't match this
+// domain's register on its own (Title Case, no hyphen, "Minus" not
+// "negative"), so this is a thin adapter, not a bare re-export: lowercase
+// it, restore the hyphen a person actually writes between a compound
+// ten and one ("twenty-one", never "twenty one"), and use this
+// register's own word for a negative number.
+const toWordsConverter = new ToWords({ localeCode: "en-US" });
+const COMPOUND_TEN_RE =
+  /\b(twenty|thirty|forty|fifty|sixty|seventy|eighty|ninety) (one|two|three|four|five|six|seven|eight|nine)\b/g;
 
-/** Whole numbers only, up to just under a trillion (a home assistant
- * never has a real reason to say a number larger than that; standard
- * English scale words - thousand/million/billion - beyond it need a
- * longer table this domain has no use for). Negative numbers keep their
- * spoken "negative" prefix; 0 reads as "zero". */
+/** Whole numbers only (a home assistant never has a real reason to say
+ * a number larger than what `to-words` itself supports). Negative
+ * numbers keep their spoken "negative" prefix; 0 reads as "zero". */
 export function numberToWords(n: number): string {
-  if (n < 0) return `negative ${numberToWords(-n)}`;
-  if (n === 0) return "zero";
-  const parts: string[] = [];
-  let remaining = n;
-  for (const [scale, word] of SCALES) {
-    if (remaining >= scale) {
-      const count = Math.floor(remaining / scale);
-      parts.push(`${threeDigitsToWords(count)} ${word}`);
-      remaining %= scale;
-    }
-  }
-  if (remaining > 0 || parts.length === 0) parts.push(threeDigitsToWords(remaining));
-  return parts.join(" ");
+  return toWordsConverter
+    .convert(n)
+    .toLowerCase()
+    .replace(/^minus /, "negative ")
+    .replace(COMPOUND_TEN_RE, "$1-$2");
 }
 
 const ORDINAL_WORD: Record<string, string> = {
@@ -333,6 +332,21 @@ function normalizeGenericNumbers(text: string): string {
  * would otherwise mis-read (a time's "10:04" must become words before the
  * generic number pass ever sees a bare "04"), so this is not a set of
  * independent regexes callers can reorder or run a subset of. */
+// Whitespace tidy-up shared by normalizeForSpeech() (below) and
+// lintSpeechTemplate()'s own comparison baseline: collapses runs of
+// spaces/tabs and drops whitespace immediately before punctuation. This
+// exists to clean up ARTIFACTS the passes above can leave behind (a
+// removed word stranding a double space), not to critique an author's
+// own whitespace choices - TTS never voices whitespace either way, so a
+// template whose only "change" under normalizeForSpeech() is this tidy-up
+// (an author's stray double space, or a space before a period) hasn't
+// actually changed what gets SAID and shouldn't lint as if it had.
+function tidyWhitespace(text: string): string {
+  let s = text.replace(/[ \t]{2,}/g, " ");
+  s = s.replace(/\s+([.,!?;:])/g, "$1");
+  return s.trim();
+}
+
 export function normalizeForSpeech(text: string): string {
   let s = stripMarkupForSpeech(text);
   s = normalizeDates(s);
@@ -341,7 +355,28 @@ export function normalizeForSpeech(text: string): string {
   s = normalizePercent(s);
   s = normalizeUnitsAndAbbreviations(s);
   s = normalizeGenericNumbers(s);
-  s = s.replace(/[ \t]{2,}/g, " ");
-  s = s.replace(/\s+([.,!?;:])/g, "$1");
-  return s.trim();
+  return tidyWhitespace(s);
+}
+
+// ── The speech lint (session-c-brain-and-voice.md step 6, docs/PACKAGES.md's
+// "the speech lint on every package `speech` string") ──────────────────────
+// A package's `speech` field (recipe.schema.json/manifest.schema.json) is a
+// template with `{placeholder}` spans substituted at runtime - this lint
+// only ever sees the STATIC text an author actually typed, since a
+// placeholder's real value doesn't exist yet. That's enough: every pass in
+// normalizeForSpeech() above (markup/emoji stripping, dates, times,
+// currency, percentages, units, generic numbers) is a no-op on a
+// `{placeholder}` span (nothing in it matches any of those patterns), so
+// running the WHOLE function against the raw template and diffing against
+// the input catches exactly what it should - a STATIC "$5" or "**bold**"
+// baked into the template by the author - without needing to parse out or
+// mock placeholder values first.
+export function lintSpeechTemplate(template: string): string[] {
+  const normalized = normalizeForSpeech(template);
+  // Compared against the whitespace-tidied INPUT, not the raw one: an
+  // author's own stray spacing (never audible either way) shouldn't lint
+  // as if it were the same kind of issue as an un-normalized "$5" or a
+  // literal "**bold**" baked into the template.
+  if (normalized === tidyWhitespace(template)) return [];
+  return [`speech template would be rewritten at speak time ("${template}" -> "${normalized}") - write it already in its spoken form`];
 }

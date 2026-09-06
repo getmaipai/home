@@ -102,6 +102,7 @@
             "npm:json-schema-to-zod@^2.6.1",
             "npm:mathjs@^15.2.0",
             "npm:prettier@^3.9.6",
+            "npm:to-words@^7.1.0",
             "npm:typescript@^7.0.2",
             "npm:zod@4"
           ]
