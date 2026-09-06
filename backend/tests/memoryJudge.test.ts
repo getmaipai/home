@@ -256,6 +256,35 @@ describe("judgeTurn() - dedupe by supersede", () => {
     const matches = similarByVector(actor, new Float32Array([1, 0, 0, 0]), { scope: "household" });
     expect(matches.length).toBe(0);
   });
+
+  // A post-hoc review (2026-09-05) found this filter only excluded
+  // entity records, not the profile paragraph - so a new fact's dedupe
+  // search could select a person's own profile paragraph as a
+  // SUPERSEDE candidate and overwrite it with an ordinary judge-authored
+  // fact, breaking "written and rewritten only by consolidate, never by
+  // the extractor" (step 7's own invariant) the same way the missing
+  // entity-record exclusion above broke the entity registry.
+  test("similarByVector() never surfaces the profile paragraph as a dedupe candidate", async () => {
+    const { actor } = await owner();
+    const profile = remember(actor, {
+      text: "Marlow is a night-shift paramedic who loves running.",
+      category: "identity",
+      tier: "durable",
+      scope: "person",
+      person: actor.id,
+      source: PROFILE_SOURCE,
+      importance: 0.9,
+      pinned: true,
+    });
+    if (!profile.ok) throw new Error("setup failed");
+    const { sqlite } = await import("@/db");
+    sqlite
+      .query("INSERT INTO memory_embeddings (memory_id, space, dims, vector, hlc) VALUES (?, 'test', 4, ?, 'test-hlc')")
+      .run(profile.value.id, Buffer.from(new Float32Array([1, 0, 0, 0]).buffer));
+
+    const matches = similarByVector(actor, new Float32Array([1, 0, 0, 0]), { scope: "person", person: actor.id });
+    expect(matches.map((m) => m.record.id)).not.toContain(profile.value.id);
+  });
 });
 
 describe("judgeTurn() - the poison guard", () => {

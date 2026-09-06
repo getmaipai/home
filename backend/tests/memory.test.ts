@@ -6,7 +6,7 @@ import { __resetThrottleForTests } from "@/lib/secretThrottle";
 import { eq } from "drizzle-orm";
 import { db, sqlite } from "@/db";
 import { memoryRecords, memoryEmbeddings, pendingEmbeddings, people } from "@/db/schema";
-import { recall, remember, bumpUsage, drainPendingEmbeddings } from "@/lib/memory";
+import { recall, remember, bumpUsage, drainPendingEmbeddings, PROFILE_SOURCE } from "@/lib/memory";
 import type { PersonRow } from "@/types";
 
 // Test-only mirror of memory.ts's own (unexported) vectorToBuffer: lets
@@ -790,6 +790,32 @@ describe("recall() cosine scoring (step 5: real embeddings)", () => {
 
     const matches = recall(ownerRow, "completely unrelated question", { queryVector: new Float32Array([1, 0, 0, 0]) });
     expect(matches.map((m) => m.record.id)).toContain(pinned.value.id);
+  });
+
+  // A post-hoc review (2026-09-05) found recall() had no exclusion for
+  // the profile paragraph (step 7): turnEngine.ts's buildSystemPrompt()
+  // already injects it unconditionally via getProfileParagraph(), so
+  // without this exclusion its own `pinned: true` would force it past
+  // recall()'s own floor/score gates and inject the SAME text a second
+  // time as an ordinary scored match, wasting a memory-snippet slot on
+  // every turn.
+  test("never returns the profile paragraph as an ordinary recall candidate, even though it's pinned", async () => {
+    const { ownerRow } = await ownerAndChildRows();
+    const profile = remember(ownerRow, {
+      text: "the household's own profile paragraph text",
+      category: "identity",
+      tier: "durable",
+      scope: "person",
+      person: ownerRow.id,
+      source: PROFILE_SOURCE,
+      importance: 0.9,
+      pinned: true,
+    });
+    if (!profile.ok) throw new Error("setup failed");
+    injectVector(profile.value.id, [1, 0, 0, 0]);
+
+    const matches = recall(ownerRow, "the household's own profile paragraph text", { queryVector: new Float32Array([1, 0, 0, 0]) });
+    expect(matches.map((m) => m.record.id)).not.toContain(profile.value.id);
   });
 
   test("falls back to keyword overlap when no query vector is available (embed backend down)", async () => {

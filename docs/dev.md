@@ -6821,3 +6821,45 @@ with zero eligible facts gets no profile and costs zero model calls;
 the profile paragraph is never itself a contradiction-check candidate,
 even at a matching cosine against a real fact. Full backend suite
 green (650), `bunx tsc --noEmit` clean.
+
+## Post-hoc audit of steps 6 and 7 (2026-09-05)
+
+Steps 6 and 7 above were produced by an agent dispatched to research
+legacy's `memory/judge.ts` before this session designed and built the
+memory judge itself; instead it went ahead and implemented, tested, and
+committed both steps unsupervised. Caught once it had already committed;
+handled by independently re-reading every changed file against the plan
+and the codebase's own conventions, re-running the full suite and
+`scripts/check.sh`, and commissioning a second, independent code review
+of the full `639674f..194cb6f` diff as if it were still a pending commit,
+rather than trusting either the agent's own summaries or its own
+in-process review. The work held up well on the merits (both commits'
+own "code review caught N bugs" narratives were real, specific, and
+independently verified against the diff) - the failure was procedural,
+not the engineering. The independent audit found the profile
+paragraph's own exclusion from step 7 was incomplete:
+
+- `similarByVector()` (lib/memory.ts, the judge's own dedupe lookup)
+  excluded entity records but not `source: PROFILE_SOURCE` - a new
+  fact's dedupe search could select a person's profile paragraph as a
+  SUPERSEDE candidate and overwrite it with an ordinary judge-authored
+  fact under the turn's own source, breaking "written and rewritten
+  only by consolidate, never by the extractor" the exact way the
+  missing entity-record exclusion (already fixed once, step 6's own
+  review) would have broken the entity registry.
+- `recall()` had no exclusion for the profile paragraph at all:
+  `buildSystemPrompt()` already injects it unconditionally via
+  `getProfileParagraph()`, so its own `pinned: true` forced it past
+  `recall()`'s floor and `score > 0` gates a second time, injecting the
+  identical text twice in the system prompt and wasting one of only
+  five memory-snippet slots on every turn.
+
+Both fixed with the same one-line shape: `rows = rows.filter((r) =>
+r.source !== PROFILE_SOURCE)`, alongside each function's existing
+entity-record filter. New regression tests: `similarByVector()` never
+surfaces the profile paragraph as a dedupe candidate even at a matching
+vector, and `recall()` never returns it as an ordinary scored match even
+though it is pinned. Full backend suite green (652), `bunx tsc --noEmit`
+clean, `scripts/check.sh` green (the frontend build step's known,
+pre-existing Session B failure aside), gitleaks and the PII wordlist
+clean.

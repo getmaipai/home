@@ -472,6 +472,16 @@ function bumpMatchUsage(matches: RecallMatch[]): void {
 export function recall(actor: PersonRow, query: string, opts: RecallOptions = {}): RecallMatch[] {
   const roleOf = rolesById();
   let rows = db.select().from(memoryRecords).where(eq(memoryRecords.status, "active")).all();
+  // Never the profile paragraph: turnEngine.ts's buildSystemPrompt()
+  // already injects it unconditionally via getProfileParagraph(), "not
+  // a recall() candidate... never something that competes with other
+  // facts for a cosine-scored slot" (step 7's own design). Without this
+  // exclusion, its own `pinned: true` sets `forceInclude` below and it
+  // would surface a SECOND time as an ordinary scored match - a
+  // post-hoc review (2026-09-05) found this duplicate-injection bug,
+  // the read-side twin of the dedupe-candidate bug similarByVector()
+  // below has the identical fix for.
+  rows = rows.filter((r) => r.source !== PROFILE_SOURCE);
   if (opts.scope) rows = rows.filter((r) => r.scope === opts.scope);
   if (opts.person) rows = rows.filter((r) => r.person === opts.person);
   rows = rows.filter((r) => canRead(actor, r, roleOf, opts.selfOnly));
@@ -599,6 +609,15 @@ export function similarByVector(actor: PersonRow, vector: Float32Array, opts: Li
   // actual entity registry with plain-fact text that recall()'s own
   // entity-match boost would then silently stop recognizing.
   rows = rows.filter((r) => r.recordKind !== "entity");
+  // Never the profile paragraph either: a post-hoc review (2026-09-05)
+  // found this filter only excluded entity records, not source ===
+  // PROFILE_SOURCE, so the judge's own dedupe pass could select a
+  // person's profile paragraph as a merge/SUPERSEDE candidate and
+  // overwrite it with an ordinary judge-authored fact under the turn's
+  // own source - exactly the "written and rewritten only by consolidate,
+  // never by the extractor" invariant step 7 exists to hold, broken by
+  // the one lookup that wasn't taught about it.
+  rows = rows.filter((r) => r.source !== PROFILE_SOURCE);
   if (opts.scope) rows = rows.filter((r) => r.scope === opts.scope);
   if (opts.person) rows = rows.filter((r) => r.person === opts.person);
   rows = rows.filter((r) => canRead(actor, r, roleOf, opts.selfOnly));
