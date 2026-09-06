@@ -2410,18 +2410,58 @@ that owns it.
       backup mode and exclude patterns. Today `llmSupervisor.ts`,
       `embedSupervisor.ts` and `ttsSupervisor.ts` are three copies of the
       same shape.
-- [ ] **Storage: layout, quotas, disk-full policy, NAS mounts** (M, F) -
-      plan 4.15's `data/` layout, per-person quotas, caches-first
-      eviction then a Repairs item, media libraries as declared mount
-      points; a Storage page (E). Only "storage locations" appears above,
-      as a legacy feature awaiting a verdict.
-- [ ] **Uninstall, factory reset, hub migration, two hubs** (S-M, F) -
-      plan 4.15; none exist. Migration keeps the instance id and CA so
-      pinned clients survive; two hubs are two instance ids and a client
-      remembers its choice.
-- [ ] **Redacted diagnostics with a `TO_REDACT` list in the spec** (S,
-      F) - plan 4.13; a test that no secret, address or family name
-      survives the download.
+- [x] **Storage: sizes, quotas, disk-full policy, NAS mounts, factory
+      reset, diagnostics** (Session F step 9, 2026-09-06) -
+      `GET /api/storage` (bytes per area - database/models/engines/voice/
+      cache/backups, plus D's `getCacheStats()` per package, plus real
+      free/total disk via `statfsSync`). "Caches first" needed no new
+      code: `lib/packageCache.ts` (D's file) already evicts its own
+      oldest entries against real free disk space on every write; this
+      step's own job (`storage.check_disk_full`, hourly) is the "then a
+      Repairs item" half for when free space is STILL critical after
+      caches have done everything they can, since real household data
+      cannot shrink itself the way a cache can. Per-person quotas:
+      `checkPersonQuota()` checks the one per-person upload with a
+      tracked byte count today (cloned voices), default unlimited - the
+      mechanism is built, `routes/voice.ts` (C's file) still needs to
+      call it before a new upload, the same "mechanism here, wiring
+      there" cross-session split step 7's `ctx.allowance` uses. NAS
+      mounts: `GET/POST/DELETE /api/storage/nas-mounts`, declaration
+      only (a real, already-mounted directory path + scan-path strings)
+      - no media-library scanner exists yet to walk them, so nothing
+      reads `scanPaths` today. Factory reset: `POST /api/storage/
+      factory-reset` (owner-only, no grant widening), typed confirmation
+      (`"DELETE EVERYTHING"`), a real backup taken first and refused
+      whole if that backup fails, staged and applied at the next boot -
+      the identical safety shape `lib/restoreStaging.ts` already
+      established for restore (the live database is renamed aside, never
+      deleted outright, so a mistaken reset is still recoverable by
+      hand). Diagnostics: `GET /api/storage/diagnostics`, built
+      structurally (every field deliberately chosen, never a fuller dump
+      filtered after the fact) per `spec/diagnostics/to-redact.json`'s
+      own categories - never a display name/nickname/birthdate, never a
+      hub endpoint's address or the hub's own (admin-typable) display
+      name, never a person-scoped settings value, never a settings value
+      the registry marks `secret: true`. `data/` layout formalization
+      (plan 4.15's `db/` subdirectory) was NOT done: `hub.db` stays at
+      `dataDir`'s own root rather than moving under a new `db/` folder -
+      a real migration of the live database's own path is a materially
+      riskier change than this step's other pieces, and nothing found a
+      concrete reason it's needed yet. Hub migration and two-hubs support
+      also NOT done (genuinely separate scope from a single hub's own
+      storage/reset/diagnostics story). No UI yet for any of this - a
+      Storage page is E's kit work on top of these routes.
+      **A real bug fixed in already-merged code while building this**:
+      `lib/restoreStaging.ts`'s `applyPendingRestore()` (step 5) could
+      split a database from its own WAL/SHM journal across a crash mid-
+      rename - found while giving `lib/factoryReset.ts`'s copy of the
+      identical shape the same treatment, and it took two review passes
+      to get fully right (see `docs/dev/session-f.md`'s step 9 write-up).
+      Both files now share one fixed implementation
+      (`moveDbSet`/`dbSetExists`/`partialMoveInProgress`).
+- [ ] **Hub migration, two hubs** (S-M, F) - plan 4.15; none exist.
+      Migration keeps the instance id and CA so pinned clients survive;
+      two hubs are two instance ids and a client remembers its choice.
 - [ ] **Service install and the one-line installer** (M, F) - a Windows
       service, launchd, systemd, the GPU power ordering legacy `run.ps1`
       learned, port-conflict detection; `install.sh`/`install.ps1`

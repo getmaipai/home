@@ -47,6 +47,12 @@ ensureCoreJob("memory.consolidate", "every:7d");
 // comment), so this is a relative daily interval from whenever the job
 // first seeds, not a real nightly-window guarantee.
 ensureCoreJob("backup.run", "every:1d");
+// Step 9: the disk-full policy's own "then a Repairs item" half - see
+// lib/storage.ts's own header for why "caches first" needs no job at
+// all here (already automatic in lib/packageCache.ts). Every 1h, not
+// daily: unlike a backup, running low on disk is not something a
+// household should ever wait most of a day to hear about.
+ensureCoreJob("storage.check_disk_full", "every:1h");
 // docs/PACKAGES.md's bronze bar: smoke "at install, at every update, and
 // on a schedule" (lib/smoke.ts). No install/update flow exists yet
 // (session-d step 6 builds the store), so a boot-time pass below stands

@@ -82,6 +82,44 @@ export function cancelPendingRestore(dir: string = dataDir): boolean {
   return had;
 }
 
+// Moves a main SQLite file and its -wal/-shm siblings together, as one
+// call - shared with lib/factoryReset.ts (a code review, 2026-09-06,
+// found and fixed the identical crash-ordering hazard in both files: see
+// applyPendingRestore()'s own comment on `dbSetExists()`'s use below for
+// the full failure scenario). Exported so factoryReset.ts reuses this
+// exact implementation rather than a second hand-copy that could drift.
+export function moveDbSet(fromBase: string, toBase: string): void {
+  if (existsSync(fromBase)) renameSync(fromBase, toBase);
+  for (const suffix of ["-wal", "-shm"]) {
+    if (existsSync(fromBase + suffix)) renameSync(fromBase + suffix, toBase + suffix);
+  }
+}
+
+export function dbSetExists(base: string): boolean {
+  return existsSync(base) || existsSync(`${base}-wal`) || existsSync(`${base}-shm`);
+}
+
+// A second, subtler crash window a review (2026-09-06) surfaced while
+// verifying the moveDbSet() fix above with a real regression test: at
+// the moment `moveDbSet(fromBase, toBase)` moves a main file BEFORE its
+// own -wal/-shm (the only order it uses), a crash between those two
+// steps leaves the main file already at `toBase` while its -wal/-shm
+// are still sitting under `fromBase`'s OLD name - not yet renamed, and
+// so invisible to a `dbSetExists(toBase)` check looking for THEM at the
+// NEW name. A naive retry would then archive that lone main file away
+// (there being nothing else at `toBase` to associate the stragglers
+// with), then reunite the stragglers with the empty slot left behind -
+// splitting a database from its own journal exactly the way the
+// original bug did, just one crash-window over. Detected here (main
+// file gone from `fromBase`, but its -wal/-shm still there, AND a main
+// file already present at `toBase`) so the caller can finish that exact
+// move instead of archiving: this is the only partially-moved state
+// `moveDbSet()`'s own order can ever leave behind, so there is nothing
+// ambiguous about where these stragglers belong.
+export function partialMoveInProgress(fromBase: string, toBase: string): boolean {
+  return !existsSync(fromBase) && (existsSync(`${fromBase}-wal`) || existsSync(`${fromBase}-shm`)) && existsSync(toBase);
+}
+
 /** Everything that must be true before a file is allowed to become the
  * household's database at the next boot. Each check exists because
  * failing it turns a restore into a hub that will not start:
@@ -233,19 +271,37 @@ export function applyPendingRestore(dir: string = dataDir): PendingRestore | nul
   // realise it was the wrong one, restore B, restart: overwriting here
   // would leave the household's ORIGINAL database gone for good, with
   // A's data sitting in the file that is supposed to be the way back.
-  if (existsSync(preRestorePath)) {
-    const stamp = new Date().toISOString().replace(/[:.]/g, "-");
-    renameSync(preRestorePath, `${preRestorePath}-${stamp}`);
-    for (const suffix of ["-wal", "-shm"]) {
-      if (existsSync(preRestorePath + suffix)) {
-        renameSync(preRestorePath + suffix, `${preRestorePath}-${stamp}${suffix}`);
-      }
-    }
+  //
+  // A code review (2026-09-06), on lib/factoryReset.ts's own copy of
+  // this exact same shape, found that gating the archive step on the
+  // main file's existence ALONE could split a database from its own
+  // WAL/SHM across a crash: a crash between renaming the main file here
+  // and renaming its -wal/-shm below leaves them under the OLD names on
+  // the next boot's retry, so THIS check (looking only at
+  // `preRestorePath` itself) misses them, archives the bare main file
+  // alone, and the later loop then renames the orphaned -wal/-shm onto
+  // the now-empty pre-restore slot - a main file with no journal next to
+  // a journal with no main file, on the one copy this feature promises
+  // is recoverable by hand. Fixed the same way there: move a main file
+  // and its -wal/-shm together, as one call, keyed off whether ANY of
+  // the three exist rather than the main file alone.
+  // A second crash window (also caught by the same review pass, with a
+  // regression test): if THIS retry is itself resuming a previously
+  // crashed attempt (partialMoveInProgress() - see its own header),
+  // finish reuniting that main file with its still-straggling -wal/-shm
+  // instead of archiving it away from them.
+  if (partialMoveInProgress(livePath, preRestorePath)) {
+    moveDbSet(livePath, preRestorePath);
+    renameSync(pendingDbPath(dir), livePath);
+    if (existsSync(pendingMetaPath(dir))) unlinkSync(pendingMetaPath(dir));
+    return pending;
   }
 
-  if (existsSync(livePath)) {
-    renameSync(livePath, preRestorePath);
+  if (dbSetExists(preRestorePath)) {
+    const stamp = new Date().toISOString().replace(/[:.]/g, "-");
+    moveDbSet(preRestorePath, `${preRestorePath}-${stamp}`);
   }
+
   // The journal files move WITH the database they belong to, rather than
   // being deleted. In WAL mode a committed transaction lives in the
   // -wal until a checkpoint, and auto-checkpoint only fires at 1000
@@ -256,10 +312,7 @@ export function applyPendingRestore(dir: string = dataDir): PendingRestore | nul
   // hub.db.pre-restore keeps that copy complete and recoverable, and
   // leaves nothing stale next to the restored database (code review,
   // 2026-09-05, verified against a real 1.2 MB journal).
-  for (const suffix of ["-wal", "-shm"]) {
-    const from = join(dir, `hub.db${suffix}`);
-    if (existsSync(from)) renameSync(from, preRestorePath + suffix);
-  }
+  moveDbSet(livePath, preRestorePath);
   renameSync(pendingDbPath(dir), livePath);
   if (existsSync(pendingMetaPath(dir))) unlinkSync(pendingMetaPath(dir));
   return pending;

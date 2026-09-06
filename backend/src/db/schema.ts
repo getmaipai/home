@@ -791,3 +791,19 @@ export const receivedBackups = sqliteTable("received_backups", {
   bytes: integer("bytes").notNull(),
   createdAt: text("created_at").notNull(),
 });
+
+// Step 9: "NAS mounts declared with scan paths" (plan 4.15). Declaration
+// only, matching backup_targets' own "admin mounts the share at the OS
+// level" posture - this is not an SMB client either, just a record of
+// where an admin says a media library lives, for whatever media-library
+// scanner eventually reads it (none exists yet - no media app/package
+// has landed to consume this, so `scanPaths` is stored and returned
+// as-is, never walked or indexed by anything in this repo today).
+export const nasMounts = sqliteTable("nas_mounts", {
+  id: text("id").primaryKey(),
+  label: text("label").notNull(),
+  path: text("path").notNull(),
+  scanPaths: text("scan_paths").notNull().default("[]"), // JSON string[], relative to `path`
+  createdAt: text("created_at").notNull(),
+  updatedAt: text("updated_at").notNull(),
+});

@@ -1,0 +1,40 @@
+{
+  "$comment": "Step 9: 'redacted diagnostics download... a test that no secret, address or family name survives it' (plan 4.15). lib/diagnostics.ts's generateDiagnostics() is the one place this repo builds a support-bundle-style dump, and it is built structurally (never including these fields at all, not filtering them out of a fuller dump after the fact) - this list documents WHY each category is excluded, and is read by that file's own test suite as the single source both check against, so a new field added to the report later has to be reasoned about here first.",
+  "categories": [
+    {
+      "id": "family_names",
+      "description": "display_name, nickname on every Person row - the literal names of real people, the plan's own 'family name' concern.",
+      "fields": ["people.display_name", "people.nickname"]
+    },
+    {
+      "id": "birthdate",
+      "description": "Not a name, but identifying enough (with a display_name, an exact age) that the diagnostics report never carries it either.",
+      "fields": ["people.birthdate"]
+    },
+    {
+      "id": "addresses",
+      "description": "Real LAN/Tailscale addresses and any admin-typed name (lib/hubEndpoints.ts's `url`/`name` columns) - a diagnostics bundle leaving the house should never carry the house's own network map. generateDiagnostics() includes only a count of configured endpoints, never the rows themselves.",
+      "fields": ["hub_endpoints.url", "hub_endpoints.name"]
+    },
+    {
+      "id": "hub_display_name",
+      "description": "lib/hubIdentity.ts's setHubName() lets an admin type anything (\"The Torres House\") - exactly the family-name risk this report exists to avoid, so only the random, nobody-chose-it instanceId is included, never the display name.",
+      "fields": ["hub_identity.name"]
+    },
+    {
+      "id": "secrets",
+      "description": "Any settings value whose registry entry (spec/settings/keys.json) declares secret: true (Telegram bot tokens, API keys, anything CLAUDE.md's own 'Credentials and secrets' rules cover) - checked dynamically against the live registry by generateDiagnostics(), not hand-listed by key name here, so a new secret settings key is covered automatically the moment it is declared `secret: true`.",
+      "fields": []
+    },
+    {
+      "id": "issue_free_text",
+      "description": "An Issue's own `title`/`detail` fields (spec/schemas/issue.schema.json) are free text with no redaction allowlist to check them against - every current raiseIssue() call site only interpolates internal ids and fixed strings, but nothing structural stops a future call from embedding an admin-typed value (a NAS mount's label, a hub endpoint's name, a person's display name in some future per-person warning). generateDiagnostics() includes only `source`/`key`/`severity`/timestamps for each issue, never `title` or `detail` - source+key alone already identify what's broken.",
+      "fields": ["issues.title", "issues.detail"]
+    },
+    {
+      "id": "person_scoped_settings",
+      "description": "Every person-scoped settings value is excluded wholesale, not filtered field-by-field - a person's own Telegram chat id, cloned-voice selection, or notification preferences are all individually identifying in a way a household-wide setting (a backup cap, a retention window) is not. Only household-scoped settings appear in the report.",
+      "fields": []
+    }
+  ]
+}
