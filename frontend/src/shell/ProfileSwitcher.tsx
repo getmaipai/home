@@ -1,10 +1,11 @@
-import { useEffect, useRef, useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import * as RadixPopover from "@radix-ui/react-popover";
 import { Button } from "@/kit/ui/button";
 import { Input } from "@/kit/ui/input";
 import { Separator } from "@/kit/ui/separator";
 import { Avatar } from "@/kit/primitives/Avatar";
 import { getIcon } from "@/kit/icons";
+import { usePinAutoSubmit } from "@/kit/hooks/usePinAutoSubmit";
 import { pauseTvNavForOverlay } from "@/shell/tvNav";
 import { api, ApiError, type Roster } from "@/lib/api";
 
@@ -20,12 +21,10 @@ interface ProfileSwitcherProps {
 // generated DropdownMenu - same reasoning as NotificationBell: switching
 // or backing out never blocks the rest of the page, and this reuses that
 // same hand-rolled Radix Popover rather than inventing a second small-
-// panel pattern. Internally swaps between a profile grid and a PIN
-// prompt exactly the way the full-screen `SignIn` picker does; the PIN
-// auto-submit-on-4-digits behavior is intentionally duplicated in small
-// form here rather than risking a refactor of SignIn.tsx's own tested
-// flow under this session's time budget - a real follow-up (a shared
-// `usePinAutoSubmit` hook) is worth doing, not done here.
+// panel pattern. Internally swaps between a profile grid and a PIN prompt
+// exactly the way the full-screen `SignIn` picker does, sharing its
+// `usePinAutoSubmit` hook for the auto-submit-on-4-digits behavior rather
+// than a second copy.
 export function ProfileSwitcher({ person, onSwitched, onSignOut }: ProfileSwitcherProps) {
   const [open, setOpen] = useState(false);
   const [profiles, setProfiles] = useState<Roster[] | null>(null);
@@ -33,7 +32,6 @@ export function ProfileSwitcher({ person, onSwitched, onSignOut }: ProfileSwitch
   const [secret, setSecret] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  const autoSubmitDisabledRef = useRef(false);
 
   useEffect(() => {
     if (!open) return;
@@ -46,18 +44,7 @@ export function ProfileSwitcher({ person, onSwitched, onSignOut }: ProfileSwitch
       .catch(() => setError("Could not reach the hub"));
   }, [open]);
 
-  useEffect(() => {
-    autoSubmitDisabledRef.current = false;
-  }, [selected]);
-
-  useEffect(() => {
-    if (!selected || busy) return;
-    if (autoSubmitDisabledRef.current) return;
-    if (!/^\d{4}$/.test(secret)) return;
-    autoSubmitDisabledRef.current = true;
-    void handleSecretSubmit();
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- same shape as SignIn.tsx's identical auto-submit effect.
-  }, [secret, selected, busy]);
+  usePinAutoSubmit({ secret, selected, busy, onSubmit: () => void handleSecretSubmit() });
 
   async function switchTo(target: Roster) {
     if (target.hasSecret) {

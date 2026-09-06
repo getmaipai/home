@@ -225,7 +225,14 @@ export function Shell({ person, onSignOut, onPersonChange, children }: ShellProp
           this pair, as this file's first draft had it, sat behind the
           sidebar's fixed layer and was unclickable near the edge - found
           live, not by any test, since jsdom never lays anything out. */}
-      <Sidebar collapsible="icon" className="hidden sm:flex">
+      {/* `role`/`aria-label` here, not in the generated kit/ui/sidebar.tsx:
+          shadcn's own `Sidebar` renders a plain `div` with no landmark role
+          (docs/UI.md: "never reimplements a widget the library ships" -
+          the fix belongs at the call site, not a hand-patch of the
+          generated file). Its nav links otherwise sat outside every
+          landmark, axe's `region` rule on the desktop sidebar - found
+          live, 2026-09-06, by the new screenshot/a11y matrix. */}
+      <Sidebar collapsible="icon" className="hidden sm:flex" role="navigation" aria-label="Main navigation">
         <SidebarHeader />
         {/* `p-2` + the menu's own `gap-1`: shadcn's own usual nesting
             (SidebarGroup > SidebarGroupContent) is what supplies this
@@ -271,7 +278,12 @@ export function Shell({ person, onSignOut, onPersonChange, children }: ShellProp
             page to 510px inside a 390px phone viewport. Found by the
             accessibility pass, 2026-09-05; docs/UI.md counts anything
             wider than the viewport as a failure. The bottom padding on
-            phone clears PhoneNav's fixed bar. */}
+            phone clears PhoneNav's fixed bar. Plain `div`, not `main`:
+            `SidebarInset` (kit/ui/sidebar.tsx) already renders as `<main>`
+            around this whole column - a second one here is a duplicate
+            landmark, not a fix (found live, 2026-09-06, by the new
+            screenshot/a11y matrix's own `region` finding: the real gap is
+            elsewhere, see docs/BACKLOG.md). */}
         <div className="flex min-h-0 min-w-0 flex-1 flex-col pb-16 sm:pb-0">{children}</div>
         <PhoneNav />
       </SidebarInset>

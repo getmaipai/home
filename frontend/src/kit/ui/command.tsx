@@ -46,10 +46,6 @@ function CommandDialog({
 }) {
   return (
     <Dialog {...props}>
-      <DialogHeader className="sr-only">
-        <DialogTitle>{title}</DialogTitle>
-        <DialogDescription>{description}</DialogDescription>
-      </DialogHeader>
       <DialogContent
         className={cn(
           "top-1/3 translate-y-0 overflow-hidden rounded-xl! p-0",
@@ -57,6 +53,21 @@ function CommandDialog({
         )}
         showCloseButton={showCloseButton}
       >
+        {/* Inside DialogContent, not a sibling of it: `Dialog` (Radix's
+            `Dialog.Root`) is a bare context provider with no DOM output of
+            its own, so a child that isn't `DialogContent` (or wrapped in
+            `DialogPortal`) rendered directly, always, in place, regardless
+            of `open` - the stock shadcn/ui registry output for this file.
+            axe's `region` rule caught it live (2026-09-06, the new
+            screenshot/a11y matrix): this sr-only header sat outside every
+            landmark on every page that mounts a `CommandDialog`, closed or
+            not. `DialogContent` is what Radix actually portals and gates
+            on `open`, and what its own `aria-labelledby`/`aria-describedby`
+            wiring expects a `DialogTitle`/`DialogDescription` inside. */}
+        <DialogHeader className="sr-only">
+          <DialogTitle>{title}</DialogTitle>
+          <DialogDescription>{description}</DialogDescription>
+        </DialogHeader>
         {children}
       </DialogContent>
     </Dialog>

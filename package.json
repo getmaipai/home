@@ -5,9 +5,11 @@
   "description": "MaiPai Home: the self-hosted family AI hub. See docs/dev.md.",
   "license": "AGPL-3.0",
   "scripts": {
-    "screenshots": "bun run scripts/screenshot.ts"
+    "screenshots": "bun run scripts/screenshot.ts",
+    "a11y": "bun run scripts/screenshot.ts --a11y-only"
   },
   "devDependencies": {
+    "@axe-core/playwright": "^4.13.0",
     "playwright": "^1.48.0"
   },
   "workspaces": [

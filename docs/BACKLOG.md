@@ -777,14 +777,45 @@ implemented on the hub yet.
       run at all.
 - [ ] Admin / parental-controls surface beyond the generic settings
       renderer (M)
-- [ ] **The rest of accessibility** (M) - the 2026-09-05 pass measured
-      what can be measured mechanically (targets, names, text size,
-      overflow, focus rings). Untouched: colour contrast ratios against
+- [x] **Wire the measurable half of accessibility into the screenshot
+      pipeline** (S) - done 2026-09-06 (Session E, step 0).
+      `scripts/screenshot.ts` now runs `@axe-core/playwright` plus a
+      horizontal-overflow check against every route App.tsx declares, at
+      every viewport (phone/tablet/desktop/far) and theme (light/dark);
+      `bun run screenshots` is the full matrix (saves PNGs under
+      `docs/assets/screens/` for a human to look at before a commit),
+      `bun run a11y` is a fast two-combo subset meant for `scripts/
+      check.sh`.
+- [ ] **Wire `bun run a11y` into `scripts/check.sh`** (S, Session F -
+      that file's owner per `wave-2.md`'s shared-file protocol) - the
+      script exists and is fast (two combos, no screenshots saved); it
+      just isn't called from the gate yet.
+- [ ] **Parallelize `scripts/screenshot.ts`'s full matrix** (S) - a code
+      review (2026-09-06) noted the 4 viewport x 2 theme x 11 route
+      matrix runs fully sequentially against one browser (up to 88
+      visits), taking several minutes; nothing about Playwright requires
+      that (one Chromium process supports many concurrent contexts), a
+      small concurrency pool would cut it roughly in proportion to pool
+      size. Not done in the same commit that added the matrix: `bun run
+      a11y`'s two-combo subset (the one that matters for check.sh) is
+      already fast, and getting the full matrix's correctness right
+      (the service-worker race it already found once) took priority
+      over its wall-clock time.
+- [ ] **The rest of accessibility** (M) - colour contrast ratios against
       the real token palette in both themes, a screen-reader read-through
       of each page, keyboard-trap testing, reduced-motion, and the TV
-      surface (which has no input-mode detection yet, so there is nothing
-      to test). Worth wiring the measurable half into a script the
-      screenshot pipeline runs, so it cannot regress silently.
+      surface (session-e-ui-and-docs.md's own step 7). One violation
+      already confirmed, exact numbers so step 7 doesn't have to
+      re-discover it: the new screenshot/a11y matrix's first run
+      (2026-09-06) found white text on `--primary` (`#ffffff` on
+      `#06a9c6`) at 2.8:1, under WCAG AA's 4.5:1 floor for normal text -
+      hits the active sidebar nav item's label and every default-variant
+      `Button` (`kit/ui/button.tsx`'s `bg-primary` variant), so this is a
+      token-level fix (a darker `--primary`, checked against both
+      themes), not a per-component one. Left for step 7 rather than
+      patched here: it is a real design decision (what shade stays "on
+      brand" while clearing 4.5:1), not a one-line hack to make the
+      matrix pass.
 - [ ] Onboarding beyond the one-time initial household setup (M)
 - [x] Accessibility audit (M) - done 2026-09-05, driven against the
       running app at phone and desktop, not read off the source: 142

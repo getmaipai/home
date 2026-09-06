@@ -66,7 +66,7 @@ export function DayDivider() {
   if (!isFirstOfDay) return null;
 
   return (
-    <div role="separator" className="my-2 flex items-center gap-2 px-2 text-xs text-muted-foreground select-none">
+    <div role="separator" className="my-2 flex items-center gap-2 px-2 text-base text-muted-foreground select-none">
       <div className="h-px flex-1 bg-border" />
       {dayLabel(createdAt)}
       <div className="h-px flex-1 bg-border" />
@@ -77,7 +77,7 @@ export function DayDivider() {
 export function MessageTimestamp() {
   const createdAt = useAuiState((s) => s.message.createdAt);
   return (
-    <time dateTime={createdAt.toISOString()} className="text-xs text-muted-foreground">
+    <time dateTime={createdAt.toISOString()} className="text-base text-muted-foreground">
       {createdAt.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" })}
     </time>
   );
