@@ -11,7 +11,7 @@ import html
 import re
 from typing import Any
 
-from .compute import ComputeError, evaluate_expression
+from .compute import evaluate_expression
 
 INTERP_RE = re.compile(r"\{([a-zA-Z_][a-zA-Z0-9_]*)\}")
 
@@ -130,11 +130,16 @@ async def run_recipe(recipe: Any, inputs: dict[str, Any], host: Any) -> dict[str
             args = interpolate_deep(step.args, scope) if step.args else None
             scope[step.as_] = await host.integration.call(step.id, step.method, args)
         elif op == "compute":
+            # evaluate_expression() already raises ComputeError for a
+            # household member's own bad input - a real, expected,
+            # recoverable case now that `math`/`convert` (step 7) hand
+            # it free-typed text. Let it propagate as-is: wrapping it in
+            # ValueError (the previous shape here) erased the type a
+            # caller needs to tell "bad input" apart from a real bug,
+            # the identical fix made on the TS interpreter's own
+            # twin case (found while building those two packages).
             expression = interpolate(step.expression, scope)
-            try:
-                scope[step.as_] = evaluate_expression(expression)
-            except ComputeError as err:
-                raise ValueError(str(err)) from err
+            scope[step.as_] = evaluate_expression(expression)
         elif op == "ask":
             # Always the recipe's last meaningful step (the schema's own
             # description): nothing after it can depend on an answer that

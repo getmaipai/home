@@ -1,0 +1,46 @@
+{
+  "id": "convert",
+  "version": "0.1.0",
+  "kind": "plugin",
+  "category": "Utilities",
+  "display": "Convert",
+  "description": "Converts between physical units - length, weight, temperature, volume. No network. Currency needs live exchange rates, so it's a separate package.",
+  "author": "MaiPai",
+  "license": "AGPL-3.0",
+  "homepage": "https://github.com/getmaipai/home",
+  "routing": {
+    "examples": [
+      "convert 5 miles to km",
+      "convert 100 fahrenheit to celsius",
+      "convert 2 cups to ml",
+      "convert 10 kg to lbs",
+      "convert 3 feet to meters"
+    ],
+    "patterns": ["convert *"]
+  },
+  "args": {
+    "type": "object",
+    "required": ["expression"],
+    "properties": {
+      "expression": { "type": "string", "minLength": 1 }
+    }
+  },
+  "requires": [],
+  "optional": [],
+  "platforms": ["home", "bot"],
+  "min_role": "child",
+  "consequential": false,
+  "offline": "full",
+  "config": [],
+  "data_sources": [],
+  "permissions": [],
+  "notifications": [],
+  "backup": "exclude",
+  "background": false,
+  "contributes": {},
+  "pages": [],
+  "min_app": "0.1.0",
+  "tier": 0,
+  "quality_scale": "bronze",
+  "smoke": { "kind": "recipe_fixture", "fixture": "tests/smoke.json" }
+}

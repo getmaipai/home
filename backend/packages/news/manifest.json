@@ -1,0 +1,55 @@
+{
+  "id": "news",
+  "version": "0.1.0",
+  "kind": "plugin",
+  "category": "Info",
+  "display": "News",
+  "description": "Top news headlines (2026-09-06, step 7), via NPR's own public RSS feed - no API key, no per-topic personalization.",
+  "author": "MaiPai",
+  "license": "AGPL-3.0",
+  "homepage": "https://github.com/getmaipai/home",
+  "routing": {
+    "examples": [
+      "what's the news",
+      "what's in the news today",
+      "give me the news headlines",
+      "read me the headlines",
+      "what's happening in the news"
+    ],
+    "patterns": ["what's the news", "what's in the news today"]
+  },
+  "requires": [],
+  "optional": [],
+  "platforms": ["home"],
+  "min_role": "child",
+  "consequential": false,
+  "offline": "unavailable",
+  "config": [],
+  "data_sources": [
+    {
+      "id": "npr-rss",
+      "destination": "NPR's own public RSS feed",
+      "when": "the household asks for the news",
+      "what": "nothing personal - a plain, unauthenticated GET",
+      "who": "NPR",
+      "opt_in": true,
+      "retention": "unknown, see NPR's own policy"
+    }
+  ],
+  "permissions": ["net:feeds.npr.org"],
+  "notifications": [],
+  "cache": { "key_template": "news:top", "ttl_s": 900, "stale_ok_s": 3600, "max_bytes": 200000 },
+  "fallback_reply": {
+    "text": "Sorry, I'm having trouble looking that up right now.",
+    "speech": "Sorry, I'm having trouble looking that up right now."
+  },
+  "backup": "exclude",
+  "background": false,
+  "contributes": {},
+  "pages": [],
+  "min_app": "0.1.0",
+  "timeout_ms": 8000,
+  "tier": 1,
+  "quality_scale": "bronze",
+  "smoke": { "kind": "deno_test" }
+}

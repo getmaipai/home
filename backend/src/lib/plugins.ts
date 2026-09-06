@@ -18,6 +18,7 @@ import { PackageManifest } from "@maipai/spec/gen/ts/manifest.js";
 import { Recipe } from "@maipai/spec/gen/ts/recipe.js";
 import { runRecipe, type PluginResult } from "@maipai/spec/interpreters/ts/recipe-interpreter.js";
 import { HostError } from "@maipai/spec/emulators/ts/host-emulator.js";
+import { ComputeError } from "@maipai/spec/interpreters/ts/compute.js";
 import { createHost } from "@/lib/packageHost";
 import { callTier1Handle } from "@/lib/denoHost";
 import { registerPackageNotificationTypes } from "@/lib/notificationTypes";
@@ -212,6 +213,19 @@ export async function runPlugin(
     if (err instanceof HostError) {
       const status = err.code === "permission_denied" ? 403 : err.code === "not_found" ? 404 : 400;
       return { ok: false, status, error: err.message };
+    }
+    // A `compute` step's own bad input (an expression the restricted
+    // evaluator can't parse) - a real, expected, recoverable case now
+    // that `math`/`convert` (step 7) hand it a household member's own
+    // free-typed text rather than a package's own hardcoded template. A
+    // real gap found while building those: this used to have no case
+    // for it at all, so a malformed expression fell through to `throw
+    // err` below and propagated as an unhandled error all the way to
+    // POST /api/plugins/:id/run's own route handler (no try/catch of
+    // its own), instead of the clean 400 every other bad-input case
+    // here already gets.
+    if (err instanceof ComputeError) {
+      return { ok: false, status: 400, error: err.message };
     }
     throw err;
   }

@@ -1,0 +1,46 @@
+{
+  "id": "math",
+  "version": "0.1.0",
+  "kind": "plugin",
+  "category": "Utilities",
+  "display": "Math",
+  "description": "Evaluates a math expression (2026-09-06, step 7) - standard notation only (+ - * / ^, sqrt(), %), no network, via the compute step's restricted evaluator (step 4).",
+  "author": "MaiPai",
+  "license": "AGPL-3.0",
+  "homepage": "https://github.com/getmaipai/home",
+  "routing": {
+    "examples": [
+      "calculate 15 * 12",
+      "compute 2^10",
+      "calculate sqrt(144)",
+      "what does 15 * 12 equal",
+      "compute (15 + 5) * 2"
+    ],
+    "patterns": ["calculate *", "compute *", "what does * equal"]
+  },
+  "args": {
+    "type": "object",
+    "required": ["expression"],
+    "properties": {
+      "expression": { "type": "string", "minLength": 1 }
+    }
+  },
+  "requires": [],
+  "optional": [],
+  "platforms": ["home", "bot"],
+  "min_role": "child",
+  "consequential": false,
+  "offline": "full",
+  "config": [],
+  "data_sources": [],
+  "permissions": [],
+  "notifications": [],
+  "backup": "exclude",
+  "background": false,
+  "contributes": {},
+  "pages": [],
+  "min_app": "0.1.0",
+  "tier": 0,
+  "quality_scale": "bronze",
+  "smoke": { "kind": "recipe_fixture", "fixture": "tests/smoke.json" }
+}

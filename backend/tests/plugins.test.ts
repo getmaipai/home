@@ -121,6 +121,36 @@ describe("the bundled trivia package", () => {
   });
 });
 
+// The first package to hand a household member's own free-typed text
+// straight to the `compute` step (step 7) rather than a package's own
+// hardcoded template - unlike weather/define/joke/trivia above, no
+// network call to avoid, so this one runs for real, deterministically
+// and offline, in every test run rather than only being conformance-
+// fixture-covered.
+describe("the bundled math package", () => {
+  test("is discoverable and its manifest + recipe validate against spec's schemas", () => {
+    expect(listPackageIds()).toContain("math");
+    const loaded = loadPackage("math");
+    expect(loaded.ok).toBe(true);
+    if (!loaded.ok) return;
+    expect(loaded.value.manifest.id).toBe("math");
+    expect(loaded.value.manifest.permissions).toEqual([]);
+    expect(loaded.value.recipe.steps.length).toBeGreaterThan(0);
+  });
+});
+
+describe("the bundled convert package", () => {
+  test("is discoverable and its manifest + recipe validate against spec's schemas", () => {
+    expect(listPackageIds()).toContain("convert");
+    const loaded = loadPackage("convert");
+    expect(loaded.ok).toBe(true);
+    if (!loaded.ok) return;
+    expect(loaded.value.manifest.id).toBe("convert");
+    expect(loaded.value.manifest.permissions).toEqual([]);
+    expect(loaded.value.recipe.steps.length).toBeGreaterThan(0);
+  });
+});
+
 async function owner() {
   const client = new TestClient();
   await client.post("/api/auth/setup", { displayName: "Sage", secret: "correcthorse" });
@@ -221,6 +251,69 @@ describe("POST /api/plugins/recall/run", () => {
     const client = await owner();
     const res = await client.post("/api/plugins/recall/run", {});
     expect(res.status).toBe(400);
+  });
+});
+
+describe("POST /api/plugins/math/run", () => {
+  test("runs the recipe end to end: a real compute step evaluation", async () => {
+    const client = await owner();
+    const res = await client.post("/api/plugins/math/run", { expression: "15 * 12" });
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { reply?: { text: string } };
+    expect(body.reply?.text).toBe("180");
+  });
+
+  // Names what this actually exercises: sqrt(), not unit conversion -
+  // real unit-conversion coverage (compute's "X unit to unit" syntax)
+  // lives in the convert package's own tests below, since that's the
+  // package scoped to that syntax.
+  test("supports sqrt(), via compute's own restricted evaluator", async () => {
+    const client = await owner();
+    const res = await client.post("/api/plugins/math/run", { expression: "sqrt(144)" });
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { reply?: { text: string } };
+    expect(body.reply?.text).toBe("12");
+  });
+
+  // A real gap found while building this package: a malformed expression
+  // (compute's own restricted evaluator can't parse "plus" as an
+  // operator) used to propagate as an unhandled error all the way past
+  // this route - runPlugin() had no case for ComputeError, only
+  // HostError, so it fell through to `throw err` and Hono's own
+  // catch-all returned a bare 500 instead of a clean, specific 400. This
+  // is the regression test for that fix (lib/plugins.ts, spec's own
+  // recipe-interpreter.ts on both TS and Python). The exact message is
+  // asserted (not just a substring that's always present because the
+  // input round-trips into it) so a regression in evaluateExpression's
+  // own message-generation logic - not just its ComputeError-ness -
+  // would fail this test too.
+  test("400s with a clear message for a malformed expression, not a 500", async () => {
+    const client = await owner();
+    const res = await client.post("/api/plugins/math/run", { expression: "15 plus 12" });
+    expect(res.status).toBe(400);
+    const body = (await res.json()) as { error?: string };
+    expect(body.error).toBe('"15 plus 12" failed to evaluate: Undefined symbol plus');
+  });
+});
+
+describe("POST /api/plugins/convert/run", () => {
+  test("runs the recipe end to end: compute's own unit-conversion syntax", async () => {
+    const client = await owner();
+    const res = await client.post("/api/plugins/convert/run", { expression: "5 miles to km" });
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { reply?: { text: string } };
+    expect(body.reply?.text).toBe("8.04672 km");
+  });
+
+  // mathjs has no currency units - this is the honest boundary
+  // documented in the package's own README, not a bug: currency needs a
+  // separate package with a real exchange-rate lookup.
+  test("400s for currency, which isn't a unit mathjs knows", async () => {
+    const client = await owner();
+    const res = await client.post("/api/plugins/convert/run", { expression: "5 dollars to euros" });
+    expect(res.status).toBe(400);
+    const body = (await res.json()) as { error?: string };
+    expect(body.error).toBe('"5 dollars to euros" failed to evaluate: Undefined symbol dollars');
   });
 });
 

@@ -66,5 +66,15 @@
   { "utterance": "what's the next holiday", "expect": "almanac-holiday", "must_not": [] },
   { "utterance": "is there a holiday coming up", "expect": "almanac-holiday", "must_not": [] },
   { "utterance": "what phase is the moon in", "expect": "almanac-moon", "must_not": [] },
-  { "utterance": "what happened on this day in history", "expect": "almanac-onthisday", "must_not": [] }
+  { "utterance": "what happened on this day in history", "expect": "almanac-onthisday", "must_not": [] },
+
+  { "utterance": "calculate 15 * 12", "expect": "math", "must_not": [], "note": "math has a required arg (expression), so it can only ever fire via a literal routing.patterns wildcard capture, never fuzzy scoring - this is that path." },
+  { "utterance": "compute 2^10", "expect": "math", "must_not": [] },
+  { "utterance": "what does 20 / 4 equal", "expect": "math", "must_not": [] },
+
+  { "utterance": "convert 5 miles to km", "expect": "convert", "must_not": [], "note": "convert also has a required arg, so only the literal 'convert *' pattern can fire it." },
+  { "utterance": "convert 100 fahrenheit to celsius", "expect": "convert", "must_not": [] },
+
+  { "utterance": "what's the news", "expect": "news", "must_not": [] },
+  { "utterance": "read me the headlines", "expect": "news", "must_not": [] }
 ]

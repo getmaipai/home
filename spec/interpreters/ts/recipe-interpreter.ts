@@ -6,7 +6,7 @@
 import { decode } from "he";
 import type { Recipe } from "../../gen/ts/recipe.js";
 import type { Host } from "../../emulators/ts/host-emulator.js";
-import { evaluateExpression, ComputeError } from "./compute.js";
+import { evaluateExpression } from "./compute.js";
 
 export interface PluginResult {
   reply?: { text: string; speech?: string };
@@ -163,13 +163,18 @@ export async function runRecipe(recipe: Recipe, inputs: Scope, host: Host): Prom
         break;
       }
       case "compute": {
+        // evaluateExpression() throws ComputeError for a household
+        // member's own bad input (an expression compute's restricted
+        // evaluator can't parse) - a real, expected, recoverable case
+        // now that `math`/`convert` (step 7) hand it free-typed text
+        // rather than a package's own hardcoded template. A real gap
+        // found while building those: this used to re-wrap it as a
+        // bare `Error`, losing the type `lib/plugins.ts`'s own
+        // runPlugin() needs to tell "bad input, a clean 400" apart from
+        // a real bug worth throwing all the way up - fixed by
+        // preserving ComputeError's own identity instead of erasing it.
         const expression = interpolate(step.expression, scope);
-        try {
-          scope[step.as] = evaluateExpression(expression);
-        } catch (err) {
-          if (err instanceof ComputeError) throw new Error(err.message);
-          throw err;
-        }
+        scope[step.as] = evaluateExpression(expression);
         break;
       }
       case "ask": {
