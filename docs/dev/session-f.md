@@ -1526,3 +1526,153 @@ Typecheck and the full backend suite (1302 tests) are green after all
 five fixes; `spec/settings/keys.json` and `docs/api/openapi.json` were
 regenerated against a scratch data directory and show no unexpected
 drift beyond this step's own additions.
+
+## Step 11: install, the service, the docs site (narrowed scope)
+
+**Scoped down before writing anything, by Jesse's own explicit choice,
+not a guess.** The full plan step also names a performance-budget bench
+and the release ceremony itself (a security review pass, the clean-clone
+build, the changelog, the tag, `spec-v0.1.0`'s own tag prep). Jesse chose
+to build the installer, the service files, and the docs site now, and to
+leave the bench and the release ceremony for later - "deploys and
+releases are always explicit," and a performance bench compared against
+numbers this sandbox has no GPU or downloaded model to reproduce
+honestly is exactly the kind of thing that needs his own hardware, not a
+guess. Both are recorded as deliberately deferred in `docs/BACKLOG.md`.
+
+**`POST /api/setup/hardware`**: the plan's own text named this endpoint
+as already built by an earlier step, and it wasn't - `routes/setup.ts`
+only had `/ca` (step 5). Added now, since `scripts/install.sh`/
+`install.ps1` genuinely need something real to check hardware minimums
+against. Unauthenticated (setup happens before a household exists,
+same reasoning as `/ca`) and rate-limited (it spawns `nvidia-smi` via
+`detectHardware()`). Reuses `lib/hardware.ts` and `lib/modelCatalog.ts`'s
+`recommend()` read-only rather than re-deriving hardware-fit logic - on
+a CPU-only, non-Apple-Silicon box, `primaryBudgetBytes()` has no chat-
+inference sizing model (returns 0 by its own doc comment), so the
+response honestly reports `chatFit.determined: false` rather than a
+false pass or fail off an empty budget. Seven new tests in
+`tests/setup.test.ts`.
+
+**`scripts/install.sh`** (macOS + Linux) and **`scripts/install.ps1`**
+(Windows): one-line installers that fetch the latest GitHub release tag
+(never `main`), install Bun system-wide, build the app, and register it
+as a real background service - systemd on Linux, a launchd LaunchDaemon
+on macOS (not a LaunchAgent: the hub has to keep running with no one
+logged in, the same reason the systemd unit targets
+`multi-user.target`), and a Windows service via WinSW (a small,
+maintained, MIT-licensed service wrapper - Windows has no native way to
+run an arbitrary console process as a real service, and hand-rolling the
+Service Control Manager protocol would be exactly the kind of hand-built
+logic CLAUDE.md's "prebuilt over hand-built" rules out). WinSW is pinned
+to v2.12.0 and checksum-verified before use (downloaded and hashed by
+hand to get a real, verified SHA-256, not a fabricated one) - the same
+"pinned version, pinned URL, checksum verified" pattern every other
+on-demand third-party download in this project already follows. Both
+scripts detect a port already in use and pick the next free one, and are
+idempotent: re-running upgrades an existing install in place (`rsync
+--delete` / `robocopy /MIR`, both excluding `data/`, `backups/`, and
+`received-backups/` - real runtime state, never part of a release
+archive) rather than requiring a clean uninstall first.
+
+**`scripts/uninstall.sh` (step 9) had drifted from what step 11 actually
+built** - it looked for a LaunchAgent at `~/Library/LaunchAgents/`, but
+install.sh registers a LaunchDaemon at `/Library/LaunchDaemons/`. Fixed
+to match, and given a Windows removal hint (`winsw.exe uninstall`) now
+that a real Windows service mechanism exists to name.
+
+**Verification**: `install.sh` is shellcheck-clean; `install.ps1` parses
+cleanly under PowerShell's own AST parser (`pwsh` and `shellcheck` were
+both installed locally via `brew` to make this possible - neither was
+available beforehand). The non-destructive logic in both (port
+detection, the "no release published yet" failure path, the WinSW XML
+service-config generation) was function-tested directly. **Registering a
+real system service was not exercised end to end** - that would mean
+installing a real systemd unit, a real LaunchDaemon, or a real Windows
+service on a machine this session doesn't own the right to modify that
+way; this is the "ship the code with tests, name the manual check"
+case the plan's own "If you get stuck" section describes. The manual
+check: run `install.sh`/`install.ps1` on a real target machine once
+`v0.1.0` is cut, confirm the service starts on boot with no one logged
+in, and confirm `uninstall.sh` cleanly removes it again.
+
+**The docs site**: `docs/site/`, a real Astro Starlight project (the
+official `create-astro --template starlight` scaffold, not hand-rolled
+config guessed from memory - a fast-moving framework's exact config
+shape is worth getting from the tool itself). `scripts/sync-content.mjs`
+copies `docs/user/*.md` verbatim (already carries the frontmatter
+Starlight requires) and `docs/dev.md` + `docs/dev/*.md` with a real
+title/description injected from each file's own first heading
+(Starlight's `docsLoader()` only reads its own `src/content/docs/`, with
+no external base-path option, so this sync step is the bridge, not a
+content fork - the synced directories are gitignored and regenerated on
+every `dev`/`build`, never hand-edited). The API reference uses
+`starlight-openapi` (MIT, maintained) against the generated
+`docs/api/openapi.json` directly, rather than hand-building a spec
+renderer. Kept as its own standalone project (its own `bun install`, own
+lockfile) after folding it into the root workspace broke Astro's native
+optional-dependency resolution (a real, reproduced failure, not a
+guess) - reverted once found.
+
+**Built and actually looked at, not just typechecked**: `bun run build`
+produces 103 pages with no errors; a local `astro preview` was hit with
+`curl` for every major route (200 everywhere) since no browser
+automation was available in this environment to load it visually. Two
+real bugs were caught and fixed by actually building rather than just
+writing config: a `docs/user/privacy.md` screenshot broke because its
+`../assets/screens/...` relative path didn't survive being copied into
+the synced location (fixed by copying `docs/assets/` to the matching
+relative depth, not by rewriting the reference) and a duplicated
+"MaiPai Home | MaiPai Home" browser-tab title on the one page whose own
+title matches the site title (fixed with a per-page `head` override,
+without changing the visible hero heading).
+
+**`scripts/check.sh` gains one of the plan's four named additions
+outright**: a new check confirms the sibling `.github` checkout's own
+`standards/gen/ts`/`gen/py` output exists and is non-empty before spec
+codegen runs (`spec/README.md`'s own documented gap: home's codegen
+needs those already generated, and nothing verified that). `docs/api`'s
+drift check already existed from an earlier step; no change needed
+there.
+
+**The a11y half (E's matrix, `bun run a11y`) was tried and backed
+out.** It's self-contained and safe to run unattended (spawns its own
+throwaway backend, tears it down) - the problem wasn't the script, it
+was what it found. It reproducibly fails on `chat @ desktop/light`
+(6 `color-contrast` nodes), which turned out to be an already-known,
+already-deeply-diagnosed bug: `docs/BACKLOG.md`'s own "second, narrower
+contrast finding" (Session E, step 7) traced this to `@assistant-ui/
+react`'s internal `<time>` element resolving `--muted-foreground` to a
+lighter value than this kit's tokens give the rest of the app. A first
+pass at investigating this mid-step actually chased a red herring: this
+dev machine has an unrelated, long-running `pocket-tts serve --port
+8793` process (not started by this session) squatting the TTS
+supervisor's default port, which broke the sidecar's own startup during
+the scan - ruled out by re-running with `MAIPAI_TTS_PORT` overridden,
+which reproduced the identical failure, confirming it was the tracked
+bug, not a local environment artifact. Filed `getmaipai/home#44` for the
+port-conflict gap itself (`ttsSupervisor.ts` has no fallback the way
+`install.sh`'s own `find_free_port()` does - not this session's file to
+fix). Wiring `bun run a11y` into check.sh now would block every commit
+repo-wide over a bug this session doesn't own; the BACKLOG entry has the
+two-line addition to make once it's fixed.
+
+**The reading-level lint on `docs/user/` is real and working, but
+deliberately not wired into check.sh as a gate either.** `scripts/
+reading-level.ts` scores each page with Flesch-Kincaid Grade Level
+(`text-readability`, not a hand-rolled syllable counter) against
+`docs/STYLE.md`'s "grade 6 to 8" user-tier standard. Running it found a
+bug in its own first draft: stripping a bullet's `-`/`*` marker left a
+stray leading space that broke the library's sentence-boundary
+detection (it only splits on punctuation immediately followed by a
+capital letter), fusing an entire bulleted list into one "sentence" and
+scoring `settings.md` at grade 35. Fixed by trimming per-line leading
+whitespace after marker removal; verified by re-running and watching
+every score drop into a plausible range. With that bug fixed, the
+finding is real: 7 of 9 `docs/user/` pages exceed grade 8 (memory.md
+14.4 down to chat.md 8.9). Wiring this into check.sh now would block
+every commit repo-wide, across every active session, over content this
+session doesn't own the prose of - filed as `getmaipai/home#42` with the
+exact scores and the one-line check.sh addition to make it a hard gate
+once Session E has simplified the flagged pages, and messaged directly
+rather than left for the issue queue alone.

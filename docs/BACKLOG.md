@@ -1238,9 +1238,19 @@ future session now that F's hub half exists.
       `bun run a11y` is a fast two-combo subset meant for `scripts/
       check.sh`.
 - [ ] **Wire `bun run a11y` into `scripts/check.sh`** (S, Session F -
-      that file's owner per `wave-2.md`'s shared-file protocol) - the
-      script exists and is fast (two combos, no screenshots saved); it
-      just isn't called from the gate yet.
+      that file's owner per `wave-2.md`'s shared-file protocol) - tried
+      in step 11 (2026-09-06) and backed out: it immediately fails on
+      the still-open "second, narrower contrast finding" above
+      (`chat @ desktop/light`, 6 nodes) every time, a real pre-existing
+      bug outside `frontend/`'s scope for this session to fix. Wiring it
+      in now would block every commit repo-wide over that one page,
+      the same "don't gate on content/code this session doesn't own"
+      call already made for the reading-level lint. Add the two lines
+      back to check.sh's frontend section once that finding is fixed:
+      ```
+      echo "== a11y: axe-core scan"
+      bun run a11y
+      ```
 - [ ] **Parallelize `scripts/screenshot.ts`'s full matrix** (S) - a code
       review (2026-09-06) noted the 4 viewport x 2 theme x 11 route
       matrix runs fully sequentially against one browser (up to 88
@@ -2505,11 +2515,98 @@ that owns it.
 - [ ] **Hub migration, two hubs** (S-M, F) - plan 4.15; none exist.
       Migration keeps the instance id and CA so pinned clients survive;
       two hubs are two instance ids and a client remembers its choice.
-- [ ] **Service install and the one-line installer** (M, F) - a Windows
-      service, launchd, systemd, the GPU power ordering legacy `run.ps1`
-      learned, port-conflict detection; `install.sh`/`install.ps1`
-      checking out the latest tag, never `main` (legacy had both under
-      `docs/public/`).
+- [x] **Service install and the one-line installer** (Session F step 11,
+      2026-09-06) - `scripts/install.sh` (macOS + Linux) and `scripts/
+      install.ps1` (Windows): fetch the latest GitHub release tag (never
+      `main`), install Bun system-wide, build the app, register a real
+      background service (systemd on Linux, a launchd LaunchDaemon on
+      macOS - not a LaunchAgent, since the hub has to run with no one
+      logged in - and a Windows service via WinSW, pinned to v2.12.0 and
+      checksum-verified before use), and start it. Both detect a port
+      already in use and pick the next free one, and are idempotent
+      (re-running upgrades in place via `rsync --delete`/`robocopy /MIR`,
+      excluding `data/`/`backups/`/`received-backups/`). `scripts/
+      uninstall.sh` (step 9) had drifted from this - it looked for a
+      LaunchAgent - fixed to match, plus a Windows removal hint.
+      A new `POST /api/setup/hardware` (the plan itself assumed this
+      already existed from an earlier step; it didn't) gives both
+      scripts something real to check hardware minimums against, reusing
+      `lib/hardware.ts`/`lib/modelCatalog.ts` read-only.
+      **The legacy `run.ps1`'s GPU power-ordering lesson was deliberately
+      NOT carried forward**: its own comments record that the brownouts
+      it guarded against were traced to a failing laptop battery (since
+      replaced), and the power-cap workaround was already disabled by
+      default in the last legacy version before this repo's fresh start.
+      Reimplementing a mitigation for a hardware fault that turned out to
+      have a hardware fix would be exactly the "carrying forward feature
+      scope, not hard-won logic" the org's own rebuild standard warns
+      against.
+      **Real system-service registration was not exercised end to end**
+      (no machine here to safely register a real systemd/launchd/Windows
+      service on) - `install.sh` is shellcheck-clean, `install.ps1`
+      parses cleanly under PowerShell's own AST parser, and every
+      non-destructive function (port detection, the WinSW XML config
+      generation, the "no release published yet" path) was function-
+      tested directly. Manual check, once `v0.1.0` is cut: run the
+      installer on a real target machine of each OS, confirm the service
+      survives a reboot with no one logged in, confirm `uninstall.sh`
+      cleanly removes it.
+      **The performance-budget bench (first token, page open, cold
+      start, measured against the archived legacy numbers) was NOT
+      built** - Jesse's own explicit scoping choice, not a guess: it
+      needs a real GPU and a downloaded, warm model to produce numbers
+      worth recording, neither of which exists in a dev sandbox, and a
+      fabricated number would be worse than no number. Left for whenever
+      real bench hardware is available.
+      **The docs site** (`docs/site/`, Astro Starlight, reading `docs/
+      user/`, `docs/dev/`, and the generated `docs/api/openapi.json` via
+      `starlight-openapi`) shipped as part of this same step - see
+      `docs/dev/session-f.md`'s step 11 writeup for the full detail
+      (the sync-script bridge, the two real bugs a real build caught,
+      why it stayed a standalone project rather than a root workspace
+      member).
+      **`scripts/check.sh` gained one of the plan's four named
+      additions outright**: a check that the sibling `.github` checkout's
+      own `standards/gen/ts`/`gen/py` output exists before spec codegen
+      runs (`docs/api`'s drift check already existed from an earlier
+      step). **The other two exist as real, working tools but are
+      deliberately NOT wired in as gates**: E's a11y matrix (`bun run
+      a11y`, already built) was tried and backed out - it immediately
+      and reproducibly fails on the already-tracked "second, narrower
+      contrast finding" above, not anything new; a reading-level lint on
+      `docs/user/` (`scripts/reading-level.ts`, real Flesch-Kincaid
+      scoring, built this step) finds 7 of 9 pages over grade 8. Both
+      would block every commit repo-wide over content/code this session
+      doesn't own - see the two entries above/below for exactly what's
+      blocking each and the one-line check.sh addition to make once
+      they're clear.
+      **The release ceremony itself (a security review pass, the
+      clean-clone build, the changelog, the tag, and `spec-v0.1.0`'s own
+      tag prep) was NOT attempted** - Jesse's own explicit call, matching
+      the org standard that cutting a release is always his word in the
+      moment, not a session's to schedule.
+- [ ] **The reading-level lint, wired as a check.sh gate** (S, F/E) -
+      `scripts/reading-level.ts` exists and is correct (Flesch-Kincaid
+      Grade Level against docs/STYLE.md's grade 6-8 target), but wiring
+      it into check.sh now would block every commit repo-wide over
+      content this session doesn't own the prose of: 7 of 9 docs/user/
+      pages currently exceed grade 8 (memory.md highest at 14.4). Filed
+      as `getmaipai/home#42` with the exact scores and the one-line
+      check.sh addition to add once Session E has simplified the flagged
+      pages.
+- [ ] **The performance-budget bench** (S, F) - first token, page open,
+      cold start, measured against the archived legacy numbers (200 to
+      900 ms first token warm) and recorded; a regression is a Repairs
+      item on the bench machine only. Needs real bench hardware (a GPU,
+      a downloaded warm model) this dev sandbox doesn't have - Jesse's
+      own explicit call to defer it, not a scope guess.
+- [ ] **The release ceremony for v0.1.0** (M, F, only when Jesse says so)
+      - a security review pass, the clean-clone build, the restore
+      drill, the changelog, the tag; `spec-v0.1.0`'s own tag prep (the
+      spec README's pin line, the fixtures green in both languages) so
+      it unblocks the `bot` repo. Cutting it is Jesse's word in the
+      moment; everything up to the tag should be ready to go once he
+      gives it.
 - [ ] **The Windows self-update rules as tests** (S, F, with self-update)
       - Defender holds `dist/` handles past 3 s; untracked files are not
       dirty; an unresolvable upstream never reads "up to date". Listed

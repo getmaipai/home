@@ -1,0 +1,28 @@
+# build output
+dist/
+# generated types
+.astro/
+
+# Synced from ../user/ and ../dev.md + ../dev/*.md by scripts/sync-content.mjs,
+# run before every dev/build - never hand-edit a file under here, edit the
+# source in docs/user or docs/dev instead and re-run.
+src/content/docs/guide/
+src/content/docs/dev/
+src/content/docs/assets/screens/
+
+# dependencies
+node_modules/
+
+# logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+
+# environment variables
+.env
+.env.production
+
+# macOS-specific files
+.DS_Store

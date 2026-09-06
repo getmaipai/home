@@ -1,0 +1,55 @@
+---
+title: MaiPai Home
+description: Your own AI, music, videos, podcasts, maps, books, and more, on your own hardware, online or offline - for protection, privacy, and independence.
+template: splash
+# Overrides the auto-generated "<title> | <site title>" (which would
+# otherwise duplicate to "MaiPai Home | MaiPai Home" on this one page,
+# the only page whose own title matches the site title).
+head:
+  - tag: title
+    content: MaiPai Home
+hero:
+  tagline: Your own AI, music, videos, podcasts, maps, books, and more, on your own hardware, online or offline - for protection, privacy, and independence.
+  actions:
+    - text: Get started
+      link: /guide/getting-started/
+      icon: right-arrow
+    - text: See what leaves the house
+      link: /guide/privacy/
+      icon: right-arrow
+      variant: minimal
+    - text: API reference
+      link: /api/
+      icon: right-arrow
+      variant: minimal
+---
+
+import { Card, CardGrid } from '@astrojs/starlight/components';
+
+## What's here
+
+<CardGrid stagger>
+	<Card title="Set up your hub" icon="rocket">
+		A short setup wizard, once. See [Get started](/guide/getting-started/).
+	</Card>
+	<Card title="What leaves the house" icon="seti:lock">
+		MaiPai's promise is that nothing does, by default. See [Privacy](/guide/privacy/) for the exact table.
+	</Card>
+	<Card title="Fix a problem" icon="magnifier">
+		Notifications, backups, and what to do when something goes wrong: [Fix a problem](/guide/fix-a-problem/).
+	</Card>
+	<Card title="Build on the API" icon="document">
+		Every route MaiPai Home exposes, generated from the source: [API reference](/api/).
+	</Card>
+</CardGrid>
+
+## About this project
+
+MaiPai Home is open-source software for personal, self-hosted, non-commercial
+use by you and your household. It is not affiliated with, endorsed by, or
+sponsored by any platform it can connect to. All product names and
+trademarks belong to their respective owners. You are responsible for
+complying with the terms and laws that apply to you and the services you
+access.
+
+Licensed under [AGPL-3.0](https://github.com/getmaipai/home/blob/main/LICENSE).

@@ -4,7 +4,24 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
+STANDARDS_DIR="${MAIPAI_STANDARDS_DIR:-../.github}"
+
 if [ -d spec/schemas ]; then
+  # spec/README.md: "standards/gen/ts/ and standards/gen/py/ (in the
+  # sibling .github checkout) need to already be generated before home's
+  # codegen runs" - a schema here $ref's a standards schema by bare
+  # filename, so gen:ts/gen-py.sh silently produce a broken import if the
+  # sibling checkout's own gen/ output is missing or stale, and nothing
+  # caught that until now.
+  echo "== spec: standards gen/ presence"
+  for lang in ts py; do
+    dir="$STANDARDS_DIR/standards/gen/$lang"
+    if [ ! -d "$dir" ] || [ -z "$(ls -A "$dir" 2>/dev/null)" ]; then
+      echo "missing or empty $dir - generate the sibling @maipai/standards checkout's own gen/ output first (its own gen:ts / gen-py.sh)."
+      exit 1
+    fi
+  done
+
   echo "== spec: regenerate and check for drift"
   (cd spec && bun run gen:ts >/dev/null)
   (cd spec && bash scripts/gen-py.sh >/dev/null)
@@ -66,9 +83,19 @@ if [ -d frontend/src ]; then
 
   echo "== frontend: build (includes typecheck)"
   (cd frontend && bun run build >/dev/null)
+
+  # E's a11y matrix (scripts/screenshot.ts --a11y-only, wired as the root
+  # `a11y` script) is real and otherwise solid - a live axe-core scan
+  # against a throwaway backend + built frontend, self-contained (builds
+  # its own frontend, spawns its own backend, tears both down). NOT
+  # wired in as a hard gate yet: it found a real, pre-existing
+  # color-contrast failure on the chat page (desktop/light) that isn't
+  # this step's to fix and isn't fixed yet (getmaipai/home#43) - the
+  # same "don't block every commit over something this session doesn't
+  # own" reasoning already applied to the reading-level lint below. Add
+  # `bun run a11y` back here once #43 is fixed.
 fi
 
-STANDARDS_DIR="${MAIPAI_STANDARDS_DIR:-../.github}"
 if [ ! -d "$STANDARDS_DIR/standards" ]; then
   echo "missing @maipai/standards checkout at $STANDARDS_DIR (pin std-v0.2.0)"
   exit 1
