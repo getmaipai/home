@@ -6812,3 +6812,57 @@ session's own tooling ceiling - the `lg`/1024px tree-visible breakpoint
 itself is unverified live, a disclosed gap, not a silent one); the
 Checkbox/Switch fill and the solid active-nav pill both confirmed by
 screenshot.
+
+## Session B: a sitewide scroll bug, and a dropped glass experiment (2026-09-05)
+
+Two pieces: a real, sitewide layout bug found while Jesse kept reviewing the app live, and a visual direction tried and explicitly dropped.
+
+**The scroll bug.** Jesse: "the settings sidebar and header shouldn't
+scroll away" - they were structurally already siblings of the one
+`overflow-y-auto` region, which should have kept them pinned. Tracing it
+live (`document.body.scrollHeight` exceeding `window.innerHeight`)
+found the real cause one level up: `kit/ui/sidebar.tsx`'s
+`SidebarProvider` wrapper used shadcn's own default `min-h-svh` - a
+*minimum* height, which lets any child grow the wrapper past the
+viewport instead of ever activating its own inner scroll region. Every
+page's `flex-1 min-h-0 overflow-y-auto` chain (`SidebarInset`, every
+`Page.tsx`) was built assuming a hard viewport boundary existed above
+it; `min-h-svh` never provided one. Changed to `h-svh` - a real, sitewide
+fix (every page's own long-content scroll behavior, not just Settings',
+depended on this), verified by confirming `document.body.scrollHeight`
+now equals `window.innerHeight` exactly and that scrolling the inner
+region no longer moves the page's own fixed chrome.
+
+**Glass, tried and dropped.** Jesse asked for a translucent,
+frosted-glass surface treatment as an opt-in, per-person setting
+("people can turn that off if they don't like it"). Built it, then
+rebuilt it three more times chasing his live feedback on each attempt
+(a first pass that read as "3D with gradients, not glass"; a second,
+research-grounded pass matching a real shipped component library's
+minimal recipe, correct for that library's own purposes but not what he
+wanted; a third matching a concrete reference generator's CSS output
+literally, which still read as flat gray because tinting a near-black
+card background with white at any real opacity has no depth cue to
+read as translucency; a fourth with the tint and blur both turned down
+and the three values - blur, opacity, depth - exposed as tunable
+settings). Verified live end to end (all three sliders render, persist,
+and update the page instantly with no reload), and still Jesse's
+verdict on seeing it was final: "looks like a glow instead of glass" -
+dropped entirely rather than keep tuning. The settings keys, the hook,
+and the CSS were all removed before committing; nothing shipped.
+Two real CSS gotchas surfaced along the way and are worth keeping even
+though the feature isn't: a bare `.glass` class selector loses to a
+dark-mode default living behind `:root:not(.light)` inside a media
+query (specificity 0,2,0 beats 0,1,0) - matching selector specificity,
+not just adding a class, is what wins; and a custom property that
+references itself within the same rule that defines it
+(`--x: color-mix(..., var(--x), ...)`) is a genuine CSS cycle, treated
+as invalid rather than "the value before this rule," which silently
+breaks everything else in that rule too. Both will bite the next
+translucency or theming attempt if forgotten.
+
+The visual direction going forward instead: spacing, typography, and
+card styling modeled on well-designed native mobile apps Jesse pointed
+to directly, kept out of this file and out of commit messages by name
+per his standing rule against naming other products in our own code and
+history.

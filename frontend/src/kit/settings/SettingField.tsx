@@ -22,7 +22,7 @@ export function titleCaseOption(value: string): string {
     .join(" ");
 }
 
-// A code review, 2026-09-05, found `core.locale`'s BCP-47 values ("en-US",
+// A code review, 2026-09-05, found `household.locale`'s BCP-47 values ("en-US",
 // "en-GB") going through `titleCaseOption` above and coming out "En-US" -
 // the split only ever looked for "_", so the dash-joined locale tag was
 // treated as one word and had only its first letter capitalized.
@@ -133,7 +133,7 @@ export function SettingField({ setting, onChange, onReset, disabled }: SettingFi
         value={String(resolved.value)}
         onValueChange={onChange}
         options={options}
-        getLabel={def.key === "core.locale" ? localeDisplayName : titleCaseOption}
+        getLabel={def.key === "household.locale" ? localeDisplayName : titleCaseOption}
         disabled={disabled}
         aria-label={def.label}
       />

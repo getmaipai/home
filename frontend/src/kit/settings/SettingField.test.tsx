@@ -1,6 +1,6 @@
 import { describe, expect, test, mock, afterEach } from "bun:test";
 import { render, cleanup, fireEvent, act } from "@testing-library/react";
-import { SettingField, titleCaseOption } from "@/kit/settings/SettingField";
+import { SettingField, titleCaseOption, localeDisplayName } from "@/kit/settings/SettingField";
 import type { MergedSetting } from "@/kit/settings/groupSettings";
 
 afterEach(cleanup);
@@ -151,5 +151,56 @@ describe("titleCaseOption (select option labels)", () => {
 
   test("leaves an empty string alone", () => {
     expect(titleCaseOption("")).toBe("");
+  });
+});
+
+describe("localeDisplayName", () => {
+  test("renders a real BCP-47 tag as its language name, not a title-cased split", () => {
+    expect(localeDisplayName("en-US")).toBe("American English");
+    expect(localeDisplayName("en-GB")).toBe("British English");
+  });
+
+  test("falls through to titleCaseOption for anything Intl doesn't recognize as a locale", () => {
+    expect(localeDisplayName("bill_boerst")).toBe(titleCaseOption("bill_boerst"));
+  });
+});
+
+function localeSelectSetting(value: string): MergedSetting {
+  return {
+    def: {
+      key: "household.locale",
+      scope: "household",
+      selector: "select",
+      range: { options: ["en-US", "en-GB"] },
+      default: "en-US",
+      label: "Language and region",
+      level: "basic",
+      secret: false,
+      lives_in: "household.system",
+      honoured_by: ["home"],
+    },
+    resolved: {
+      key: "household.locale",
+      value,
+      source: "default",
+      label: "Language and region",
+      level: "basic",
+      secret: false,
+    },
+  };
+}
+
+describe("SettingField - select selector", () => {
+  // A code review, 2026-09-05, found the BCP-47 display-name fix scoped
+  // to the wrong key entirely (`core.locale`, which does not exist - the
+  // real key is `household.locale`), caught only by looking at the
+  // running app, not by any test - this is that test, rendering the real
+  // component against the real key so a future rename of either has
+  // somewhere to fail loudly instead of silently.
+  test("renders household.locale's value as a real language name, not a raw BCP-47 tag", () => {
+    const { getByRole } = render(
+      <SettingField setting={localeSelectSetting("en-US")} onChange={async () => true} onReset={() => {}} />,
+    );
+    expect(getByRole("combobox", { name: "Language and region" })).toHaveTextContent("American English");
   });
 });

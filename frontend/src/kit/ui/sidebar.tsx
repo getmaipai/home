@@ -137,7 +137,18 @@ function SidebarProvider({
           } as React.CSSProperties
         }
         className={cn(
-          "group/sidebar-wrapper flex min-h-svh w-full has-data-[variant=inset]:bg-sidebar",
+          // `h-svh`, not shadcn's own default `min-h-svh`: a *minimum*
+          // height lets any child grow the wrapper past the viewport
+          // instead of activating its own internal scroll - found live
+          // (2026-09-05, Jesse: the settings header/tree "shouldn't
+          // scroll away," but they did) tracing a long Settings page's
+          // scroll all the way up to `document.body.scrollHeight`
+          // exceeding `window.innerHeight`, meaning the whole page
+          // scrolled instead of the one inner `overflow-y-auto` region
+          // that was supposed to. A hard `h-svh` here is what the rest of
+          // the shell's own `flex-1 min-h-0` chain (`SidebarInset`, every
+          // `Page.tsx`) was already built assuming existed.
+          "group/sidebar-wrapper flex h-svh w-full has-data-[variant=inset]:bg-sidebar",
           className
         )}
         {...props}
