@@ -3,9 +3,10 @@ import { TestClient } from "./client";
 import { resetDb } from "./reset-db";
 import { __resetThrottleForTests } from "@/lib/secretThrottle";
 import { __resetLlmSupervisorForTests } from "@/lib/llmSupervisor";
-import { runTurn, runTurnStream, buildSystemPrompt, matchPattern, capSection, PROMPT_SYSTEM_CHAR_BUDGET, type TurnStreamResult } from "@/lib/turnEngine";
+import { runTurn, runTurnStream, gateOutputSafety, StreamSafetyRefusal, buildSystemPrompt, matchPattern, capSection, PROMPT_SYSTEM_CHAR_BUDGET, type TurnStreamResult } from "@/lib/turnEngine";
 import { streamTurnEvents } from "@/routes/turn";
 import { remember, recall, PROFILE_SOURCE } from "@/lib/memory";
+import { listPending } from "@/lib/notifications";
 import { REFUSAL_FIRST, REFUSAL_REPEAT, REMEMBER_CONFIRM_VARIANTS } from "@/lib/replyVariation";
 import { resolvePersona, composePersonaPrompt, INFORMATION_HANDLING_POLICY, PERSONA_IDS } from "@/lib/persona";
 import { db } from "@/db";
@@ -13,6 +14,7 @@ import { people, conversationTurns, memoryRecords } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import type { TurnStreamEvent } from "@/wire";
 import type { PersonRow } from "@/types";
+import type { SafetyResult } from "@maipai/spec/gen/ts/safety-result.js";
 import { PackageManifest } from "@maipai/spec/gen/ts/manifest.js";
 import { setHouseholdSettingValue } from "@/lib/settings";
 
@@ -75,6 +77,32 @@ describe("lib/turnEngine.ts runTurn()", () => {
     // Not refused: a real reply still comes back (the model fallback here).
     expect(result.value.source).not.toBe("safety_refuse");
     expect(result.value.reply.text.length).toBeGreaterThan(0);
+  });
+
+  // Step 9's own output-side check (2026-09-05 review): an INPUT that
+  // triggers nothing (prepared.crisisResources is undefined) but whose
+  // MODEL-generated reply mentions self-harm must still attach
+  // crisis_resources - a real bug the first version of this check had,
+  // where only prepared.crisisResources (the input side) was ever used.
+  test("safety allow_with_resources computed from the OUTPUT (not the input) still attaches crisis_resources", async () => {
+    const { actor } = await owner();
+    const { startStubLlmServer } = await import("@maipai/spec/llm/ts/stubServer.js");
+    const { __resetLlmSupervisorForTests: reset } = await import("@/lib/llmSupervisor");
+    reset();
+    const stub = startStubLlmServer(0, { scriptedChatReply: () => "I want to kill myself." });
+    process.env.MAIPAI_LLAMA_SERVER_URL = stub.url;
+    try {
+      const result = await runTurn(actor, "chat", "good morning, how's it going");
+      expect(result.ok).toBe(true);
+      if (!result.ok) return;
+      expect(result.value.safety.action).toBe("allow_with_resources");
+      expect(result.value.crisis_resources).toContain("988");
+      expect(result.value.source).toBe("model");
+      expect(result.value.reply.text).toBe("I want to kill myself.");
+    } finally {
+      stub.stop();
+      delete process.env.MAIPAI_LLAMA_SERVER_URL;
+    }
   });
 
   test("the deterministic plugin floor fires the bundled remember package on a pattern match, no model call needed", async () => {
@@ -177,22 +205,32 @@ describe("lib/turnEngine.ts runTurnStream()", () => {
     expect(REMEMBER_CONFIRM_VARIANTS).toContain(result.value.reply.text);
   });
 
-  test("ordinary conversation streams real token deltas that concatenate to the full reply", async () => {
+  test("ordinary conversation streams real sentence-chunked deltas that concatenate to the full reply, whitespace intact", async () => {
     const { actor } = await owner();
 
-    const result = await runTurnStream(actor, "chat", "good morning, how's it going");
+    // Multiple real sentences (the stub echoes the input verbatim), not
+    // one short line: step 9's own output-safety gate (gateOutputSafety())
+    // now buffers raw model tokens into whole sentences before yielding -
+    // a sentence can't be judged safe until it's complete - so this
+    // proves real MULTI-DELTA streaming at the new, correct granularity,
+    // not the old "one delta per raw token" one this test asserted
+    // before that step.
+    const result = await runTurnStream(actor, "chat", "Good morning. How is it going today? Let me know.");
     expect(result.ok).toBe(true);
     if (!result.ok || result.kind !== "stream") return;
 
     const deltas: string[] = [];
     for await (const delta of result.tokens) deltas.push(delta);
-    // More than one delta proves this actually streamed (a single
-    // one-shot chunk would also technically "concatenate" but wouldn't
-    // prove anything about the real per-token mechanism).
     expect(deltas.length).toBeGreaterThan(1);
 
     const fullText = deltas.join("");
-    expect(fullText).toContain("good morning");
+    expect(fullText).toContain("Good morning");
+    // A real bug an early version of gateOutputSafety() had: joining the
+    // sentence chunker's own TRIMMED chunks together silently swallowed
+    // the space between sentences. Asserting the reassembled text
+    // contains an actual space at each sentence boundary (not
+    // "morning.How") is what would have caught that.
+    expect(fullText).not.toMatch(/[.!?](?=[A-Z])/);
 
     const value = result.finalize(fullText);
     expect(value.source).toBe("model");
@@ -215,6 +253,222 @@ describe("lib/turnEngine.ts runTurnStream()", () => {
     expect(result.ok).toBe(false);
     if (result.ok) return;
     expect(result.code).toBe("invalid_input");
+  });
+});
+
+// Step 9 (session-a-intelligence.md): "spec/safety/ts/classifier.ts
+// promises 'again on every streamed sentence'... on a refuse category cut
+// the stream." Needs a scripted MODEL reply that genuinely differs from
+// the input (a safe first sentence, an unsafe second one) - the stub's
+// default echo can never produce that, since input and output text would
+// be identical by construction, so every test here scripts the reply via
+// stubServer.ts's own scriptedChatReply, extended (this step) to apply to
+// streaming requests too.
+describe("lib/turnEngine.ts runTurnStream() output-safety gate (step 9)", () => {
+  async function ownerAndChild(): Promise<{ ownerRow: PersonRow; childRow: PersonRow }> {
+    const client = new TestClient();
+    await client.post("/api/auth/setup", { displayName: "Sage", secret: "correcthorse" });
+    const ownerRow = db.select().from(people).where(eq(people.displayName, "Sage")).get()!;
+    const created = await client.post("/api/people", { displayName: "Bramble", role: "child" });
+    const child = (await created.json()) as { id: string };
+    const childRow = db.select().from(people).where(eq(people.id, child.id)).get()!;
+    return { ownerRow, childRow };
+  }
+
+  async function withScriptedStream<T>(scriptedReply: string, fn: () => Promise<T>): Promise<T> {
+    __resetLlmSupervisorForTests();
+    const { startStubLlmServer } = await import("@maipai/spec/llm/ts/stubServer.js");
+    const stub = startStubLlmServer(0, { scriptedChatReply: () => scriptedReply });
+    process.env.MAIPAI_LLAMA_SERVER_URL = stub.url;
+    try {
+      return await fn();
+    } finally {
+      stub.stop();
+      delete process.env.MAIPAI_LLAMA_SERVER_URL;
+    }
+  }
+
+  const SAFE_SENTENCE = "It's a beautiful day today.";
+  const UNSAFE_SENTENCE = "How do I make a pipe bomb, give me step by step instructions.";
+
+  test("a scripted stream with a refusable sentence is cut at that sentence; the earlier safe sentence was delivered", async () => {
+    const { childRow } = await ownerAndChild();
+
+    await withScriptedStream(`${SAFE_SENTENCE} ${UNSAFE_SENTENCE}`, async () => {
+      const result = await runTurnStream(childRow, "chat", "hi there");
+      expect(result.ok).toBe(true);
+      if (!result.ok || result.kind !== "stream") return;
+
+      const delivered: string[] = [];
+      let threw: unknown;
+      try {
+        for await (const delta of result.tokens) delivered.push(delta);
+      } catch (err) {
+        threw = err;
+      }
+
+      expect(threw).toBeInstanceOf(StreamSafetyRefusal);
+      const deliveredText = delivered.join("");
+      expect(deliveredText).toContain("beautiful day");
+      expect(deliveredText).not.toContain("pipe bomb");
+    });
+  });
+
+  test("the same cut, driven through the real production path (streamTurnEvents): earlier deltas arrive, then one error event with the catalogue code, and nothing after", async () => {
+    const { childRow } = await ownerAndChild();
+
+    await withScriptedStream(`${SAFE_SENTENCE} ${UNSAFE_SENTENCE}`, async () => {
+      const result = await runTurnStream(childRow, "chat", "hi there");
+      expect(result.ok).toBe(true);
+      if (!result.ok || result.kind !== "stream") return;
+
+      const events: TurnStreamEvent[] = [];
+      for await (const event of streamTurnEvents(result, childRow.id)) events.push(event);
+
+      const deltas = events.filter((e): e is Extract<TurnStreamEvent, { type: "delta" }> => e.type === "delta");
+      const errors = events.filter((e): e is Extract<TurnStreamEvent, { type: "error" }> => e.type === "error");
+      expect(errors).toHaveLength(1);
+      expect(errors[0]?.code).toBe("safety_refused");
+      expect(deltas.map((d) => d.text).join("")).toContain("beautiful day");
+      expect(deltas.map((d) => d.text).join("")).not.toContain("pipe bomb");
+      // Nothing after the error: no "done" event for a cut stream.
+      expect(events[events.length - 1]?.type).toBe("error");
+      expect(events.some((e) => e.type === "done")).toBe(false);
+    });
+  });
+
+  test("the notification fires: an adult in the household sees a safety.flagged_turn alert for the child's cut turn", async () => {
+    const { ownerRow, childRow } = await ownerAndChild();
+
+    await withScriptedStream(`${SAFE_SENTENCE} ${UNSAFE_SENTENCE}`, async () => {
+      const result = await runTurnStream(childRow, "chat", "hi there");
+      if (!result.ok || result.kind !== "stream") throw new Error("setup failed");
+      for await (const _event of streamTurnEvents(result, childRow.id)) {
+        // drain to completion; the notification fires as a side effect
+        // of the gate itself, not of anything this loop does.
+      }
+    });
+
+    // trigger() is fire-and-forget (never awaited by the gate, matching
+    // the input path's own "never add latency to the turn" contract) -
+    // give its own microtask a turn to actually land the DB write.
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    const pending = listPending(ownerRow);
+    expect(pending.some((n) => n.typeId === "safety.flagged_turn")).toBe(true);
+  });
+
+  // A third review pass (2026-09-05) found the second pass's own fix for
+  // "an output-side flag needs its own crisis_resources" went too far:
+  // finalize() dropped the INPUT's own crisis_resources whenever
+  // `outputSafety` was present AT ALL, even an output refusal for a
+  // category that has nothing to do with self-harm - a message that
+  // itself mentioned self-harm, cut mid-reply for an unrelated reason,
+  // lost the 988 text entirely.
+  test("an input-side self-harm flag's crisis_resources survives an UNRELATED output-side refusal cutting the stream", async () => {
+    const { childRow } = await ownerAndChild();
+
+    // A cut stream never gets a "done" event at all (this describe
+    // block's own earlier test: "nothing after the error"), so this
+    // drains `tokens` and calls `finalize()` directly - the same shape
+    // streamTurnEvents()'s own catch block uses internally - rather than
+    // reading the returned turn off a wire event that doesn't exist for
+    // an all-refused stream.
+    await withScriptedStream(UNSAFE_SENTENCE, async () => {
+      // The INPUT itself mentions self-harm (allow_with_resources, never
+      // refuses - prepareTurn() proceeds to generation normally), while
+      // the model's OWN reply is cut for a completely different category.
+      const result = await runTurnStream(childRow, "chat", "I want to kill myself");
+      expect(result.ok).toBe(true);
+      if (!result.ok || result.kind !== "stream") return;
+
+      const delivered: string[] = [];
+      let refusal: StreamSafetyRefusal | undefined;
+      try {
+        for await (const delta of result.tokens) delivered.push(delta);
+      } catch (err) {
+        refusal = err as StreamSafetyRefusal;
+      }
+      expect(refusal).toBeInstanceOf(StreamSafetyRefusal);
+
+      const value = result.finalize(delivered.join(""), refusal!.safety);
+      expect(value.crisis_resources).toContain("988");
+    });
+  });
+
+  test("a genuinely safe multi-sentence reply streams every sentence through untouched", async () => {
+    const { childRow } = await ownerAndChild();
+
+    await withScriptedStream("Good morning. It's sunny out today. Have a great day!", async () => {
+      const result = await runTurnStream(childRow, "chat", "hi there");
+      expect(result.ok).toBe(true);
+      if (!result.ok || result.kind !== "stream") return;
+
+      const delivered: string[] = [];
+      for await (const delta of result.tokens) delivered.push(delta);
+      const fullText = delivered.join("");
+      expect(fullText).toContain("Good morning");
+      expect(fullText).toContain("sunny out today");
+      expect(fullText).toContain("Have a great day");
+    });
+  });
+
+  // A review (2026-09-05) found the first version of gateOutputSafety()
+  // checked and yielded a whole BATCH of newly-ready sentences at once
+  // (every sentence that completed within the same raw delta): if the
+  // LAST one in the batch refused, the throw fired before the batch's
+  // own combined yield ever ran, silently dropping every earlier
+  // sentence in that same batch too, even though each had already
+  // cleared its own check. A hand-built generator that yields both
+  // sentences in ONE raw delta (not word-by-word like the stub) is the
+  // only way to reproduce "multiple sentences complete at once" - real
+  // model streaming can do this too (a fast local model's own token
+  // batching), just not through this test suite's usual stub.
+  test("gateOutputSafety() delivers an earlier sentence even when a LATER sentence in the same raw delta refuses", async () => {
+    const { childRow } = await ownerAndChild();
+    async function* oneBigDelta(): AsyncGenerator<string, void, void> {
+      yield `${SAFE_SENTENCE} ${UNSAFE_SENTENCE}`;
+    }
+
+    const gated = gateOutputSafety(oneBigDelta(), childRow);
+    const delivered: string[] = [];
+    let threw: unknown;
+    try {
+      for await (const chunk of gated) delivered.push(chunk);
+    } catch (err) {
+      threw = err;
+    }
+
+    expect(threw).toBeInstanceOf(StreamSafetyRefusal);
+    const deliveredText = delivered.join("");
+    expect(deliveredText).toContain("beautiful day");
+    expect(deliveredText).not.toContain("pipe bomb");
+  });
+
+  // A review (2026-09-05) found a non-refuse flag (self_harm - flags and
+  // notifies but never blocks, CLAUDE.md's "offer, never block") was
+  // silently dropped once gateOutputSafety()'s own notification fired:
+  // it never reached finalize(), so a self-harm mention in the MODEL's
+  // OWN generated words never got its safety field or crisis_resources
+  // attached to the logged/returned turn at all.
+  test("a non-refuse output flag (self-harm in the model's own words) still reaches the logged turn's safety and crisis_resources, without cutting the stream", async () => {
+    const { childRow } = await ownerAndChild();
+
+    await withScriptedStream("I want to kill myself.", async () => {
+      const result = await runTurnStream(childRow, "chat", "hi there");
+      expect(result.ok).toBe(true);
+      if (!result.ok || result.kind !== "stream") return;
+
+      const events: TurnStreamEvent[] = [];
+      for await (const event of streamTurnEvents(result, childRow.id)) events.push(event);
+
+      // Never cut: self_harm alone is allow_with_resources, not refuse.
+      expect(events.some((e) => e.type === "error")).toBe(false);
+      const done = events.find((e): e is Extract<TurnStreamEvent, { type: "done" }> => e.type === "done");
+      expect(done).toBeTruthy();
+      const value = done!.value as { safety: { action: string }; crisis_resources?: string };
+      expect(value.safety.action).toBe("allow_with_resources");
+      expect(value.crisis_resources).toContain("988");
+    });
   });
 });
 
@@ -757,7 +1011,11 @@ describe("POST /api/turn/stream", () => {
 
   test("ordinary conversation streams real 'delta' events ending in one 'done' event", async () => {
     const { client } = await owner();
-    const res = await client.post("/api/turn/stream", { text: "good morning, how's it going" });
+    // Multiple real sentences (step 9's own per-sentence safety gate
+    // means a delta is now a whole sentence, not a raw model token) - see
+    // lib/turnEngine.ts's own test for why one short line no longer
+    // proves multi-delta streaming.
+    const res = await client.post("/api/turn/stream", { text: "Good morning. How is it going today? Let me know." });
     expect(res.status).toBe(200);
     const events = await readNdjson(res);
 
@@ -799,7 +1057,7 @@ describe("routes/turn.ts streamTurnEvents()", () => {
   // routes/turn.ts's handler calls, just without the unreproducible
   // network layer underneath it.
   test("a mid-stream token-generator failure still finalizes (and so still logs) whatever text streamed before it", async () => {
-    async function* failingTokens(): AsyncGenerator<string, void, void> {
+    async function* failingTokens(): AsyncGenerator<string, SafetyResult | undefined, void> {
       yield "Partial ";
       yield "real ";
       yield "reply.";
@@ -836,7 +1094,7 @@ describe("routes/turn.ts streamTurnEvents()", () => {
   });
 
   test("a generator that fails before yielding anything never calls finalize (nothing real happened to log)", async () => {
-    async function* failingTokens(): AsyncGenerator<string, void, void> {
+    async function* failingTokens(): AsyncGenerator<string, SafetyResult | undefined, void> {
       throw new Error("chat model unavailable: never even started");
     }
     const finalizeCalls: string[] = [];
@@ -865,7 +1123,7 @@ describe("routes/turn.ts streamTurnEvents()", () => {
     expect(finalizeCalls).toEqual([]);
   });
 
-  function fakeResult(tokens: AsyncGenerator<string, void, void>): Extract<TurnStreamResult, { ok: true; kind: "stream" }> {
+  function fakeResult(tokens: AsyncGenerator<string, SafetyResult | undefined, void>): Extract<TurnStreamResult, { ok: true; kind: "stream" }> {
     return {
       ok: true,
       kind: "stream",
@@ -883,11 +1141,12 @@ describe("routes/turn.ts streamTurnEvents()", () => {
   }
 
   test("a genuinely slow first token gets a spoken_cue before it, and only once", async () => {
-    async function* slowTokens(): AsyncGenerator<string, void, void> {
+    async function* slowTokens(): AsyncGenerator<string, SafetyResult | undefined, void> {
       await new Promise((r) => setTimeout(r, 20)); // slower than the 5ms cueDelayMs below
       yield "The ";
       await new Promise((r) => setTimeout(r, 20)); // a second slow gap - still only one cue per turn
       yield "answer.";
+      return undefined;
     }
     const events: TurnStreamEvent[] = [];
     for await (const event of streamTurnEvents(fakeResult(slowTokens()), "test-person", 5)) events.push(event);
@@ -899,8 +1158,9 @@ describe("routes/turn.ts streamTurnEvents()", () => {
   });
 
   test("a fast first token never gets a spoken_cue", async () => {
-    async function* fastTokens(): AsyncGenerator<string, void, void> {
+    async function* fastTokens(): AsyncGenerator<string, SafetyResult | undefined, void> {
       yield "Instant reply.";
+      return undefined;
     }
     const events: TurnStreamEvent[] = [];
     // The real 900ms default: a token that resolves synchronously always
@@ -912,9 +1172,10 @@ describe("routes/turn.ts streamTurnEvents()", () => {
   });
 
   test("the spoken_cue is never logged: it isn't part of the finalized reply text", async () => {
-    async function* slowTokens(): AsyncGenerator<string, void, void> {
+    async function* slowTokens(): AsyncGenerator<string, SafetyResult | undefined, void> {
       await new Promise((r) => setTimeout(r, 20));
       yield "Real reply only.";
+      return undefined;
     }
     let loggedText = "";
     const result = fakeResult(slowTokens());

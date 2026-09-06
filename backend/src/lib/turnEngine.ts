@@ -23,6 +23,7 @@ import { tokenize } from "@/lib/text";
 import { logTurn, resolveOrCreateConversation, buildConversationWindow, maybeRefreshConversationSummary } from "@/lib/conversationHistory";
 import { pickRefusalVariant, varyKnownConstant } from "@/lib/replyVariation";
 import { normalizeForSpeech } from "@maipai/spec/voice/ts/normalizeForSpeech.js";
+import { nextSentenceBoundary } from "@maipai/spec/safety/ts/sentenceChunker.js";
 import { getPersonSettingValue, getHouseholdSettingValue } from "@/lib/settings";
 import { listActivePeople } from "@/lib/access";
 import { composePersonaPrompt, resolvePersona, DEFAULT_PERSONA, INFORMATION_HANDLING_POLICY, type Persona } from "@/lib/persona";
@@ -86,6 +87,18 @@ function logTurnSafely(actor: PersonRow, surface: Surface, userText: string, val
 
 const CRISIS_RESOURCES_TEXT =
   "If you're in crisis, the 988 Suicide & Crisis Lifeline is free and available 24/7: call or text 988.";
+
+/** The one derivation of `crisis_resources` from a SafetyResult, shared
+ * by prepareTurn()'s own input-side use below and step 9's two
+ * output-side call sites (runTurn(), runTurnStream()'s finalize()) - a
+ * review (2026-09-05) found the streaming path's own fix for "an
+ * output-side flag needs its own crisis_resources, not just the input
+ * side's" had no non-streaming twin, leaving runTurn() with the
+ * identical silent-drop bug the review's other finding had just fixed
+ * in the stream. */
+function deriveCrisisResources(safety: SafetyResult): string | undefined {
+  return safety.action === "allow_with_resources" ? CRISIS_RESOURCES_TEXT : undefined;
+}
 
 // Step 4: "identity and companion" are the first thing in the stable
 // prefix, and the identity line itself now names the selected persona's
@@ -608,7 +621,7 @@ async function prepareTurn(
     // sensibly in a debugger or log before finalizeReply runs.
     return immediate({ reply: { text: "I can't help with that." }, source: "safety_refuse", safety });
   }
-  const crisisResources = safety.action === "allow_with_resources" ? CRISIS_RESOURCES_TEXT : undefined;
+  const crisisResources = deriveCrisisResources(safety);
 
   // Checked before the plugin floor: a command is household-authored,
   // deliberate, and exact-match-only (never fuzzy) - the identical "a
@@ -824,14 +837,48 @@ export async function runTurn(
     if (!completion.ok) {
       return { ok: false, status: 503, code: "unavailable", error: completion.error };
     }
-    value = {
-      reply: { text: completion.value.text },
-      source: "model",
-      safety: prepared.safety,
-      crisis_resources: prepared.crisisResources,
-      conversation_id: conversation.id,
-      turn_id: prepared.turnId,
-    };
+    // Step 9's own principle (spec/safety/ts/classifier.ts's promise to
+    // run "again on every streamed sentence") applied to this function's
+    // non-streaming twin: a completed reply here always arrives as one
+    // atomic block, so a single whole-text check is exactly as strong as
+    // per-sentence checking and needs no chunker at all - the plan's own
+    // text names runTurnStream specifically, but leaving this function
+    // with literally no output-side check at all (worse than
+    // runTurnStream had before this step: at least that one only lacked
+    // the PER-SENTENCE granularity) would be a real, undocumented
+    // asymmetry between the two callers of the exact same model role.
+    // Never weakens the INPUT check above (prepareTurn()'s own
+    // evaluateSafety() call) - purely additive.
+    const outputSafety = evaluateSafety(completion.value.text, actor.role as Role);
+    if (outputSafety.notify_parent) {
+      trigger("safety.flagged_turn", { childName: actor.displayName, categories: outputSafety.categories.join(", ") }).catch((err: unknown) =>
+        console.error(`[turn] safety.flagged_turn notification failed: ${(err as Error).message}`),
+      );
+    }
+    value =
+      outputSafety.action === "refuse"
+        ? {
+            // A non-streaming reply is atomic - nothing was ever shown to
+            // the caller before this point, so replacing the WHOLE reply
+            // with a canned refusal (finalizeReply()'s own existing
+            // "safety_refuse" handling, unchanged) is exactly as clean
+            // here as it is for an input-side refusal, unlike
+            // runTurnStream()'s own partial-delivery case above.
+            reply: { text: "" },
+            source: "safety_refuse",
+            safety: outputSafety,
+            crisis_resources: prepared.crisisResources,
+            conversation_id: conversation.id,
+            turn_id: prepared.turnId,
+          }
+        : {
+            reply: { text: completion.value.text },
+            source: "model",
+            safety: outputSafety.flagged ? outputSafety : prepared.safety,
+            crisis_resources: outputSafety.flagged ? deriveCrisisResources(outputSafety) : prepared.crisisResources,
+            conversation_id: conversation.id,
+            turn_id: prepared.turnId,
+          };
   }
 
   value = finalizeReply(actor, value);
@@ -851,15 +898,136 @@ export type TurnStreamResult =
        * ("turn_meta"), before any delta. */
       conversationId: string;
       turnId: string;
-      tokens: AsyncGenerator<string, void, void>;
+      /** The generator's own return value (step 9), read from the final
+       * `iterator.next()` result once `done` is true on a NORMAL
+       * completion (never reached on a thrown StreamSafetyRefusal, which
+       * rejects instead): the most recently flagged, non-refuse
+       * SafetyResult gateOutputSafety() saw, if any - a self_harm mention
+       * in the model's own output, say. `undefined` when nothing was
+       * ever flagged. The caller passes this into `finalize()` the same
+       * way it passes a caught refusal's own SafetyResult, so a flag
+       * that never refuses still reaches the logged turn and its
+       * `crisis_resources` instead of being silently dropped once the
+       * notification fires. */
+      tokens: AsyncGenerator<string, SafetyResult | undefined, void>;
       /** Builds the final TurnValue once the caller has drained `tokens`
        * to completion and knows the full reply text - also logs the turn
        * (conversationHistory.ts), the same "log once the real reply is
        * known" timing runTurn() already has, just triggered by the
        * caller finishing the stream instead of by this function awaiting
-       * it directly. */
-      finalize: (replyText: string) => TurnValue;
+       * it directly. `outputSafety` (step 9): passed by the caller's own
+       * catch block when `tokens` threw a `StreamSafetyRefusal`, so the
+       * logged/returned TurnValue's `safety` field reflects what
+       * actually cut the stream rather than only ever the input-side
+       * result computed before generation started. */
+      finalize: (replyText: string, outputSafety?: SafetyResult) => TurnValue;
     };
+
+// Step 9 (session-a-intelligence.md): "spec/safety/ts/classifier.ts
+// promises 'again on every streamed sentence'... on a refuse category cut
+// the stream." Thrown by gateOutputSafety() below, from inside the
+// `tokens` generator runTurnStream() hands back - the ONE place a
+// generator can signal "stop, and here is why" to whatever is iterating
+// it. Carries the real SafetyResult so the caller (routes/turn.ts's
+// streamTurnEvents()) can both emit spec/errors/errors.json's
+// "safety_refused" code on the wire and pass the same result into
+// finalize() so the logged turn reflects the real reason, not a generic
+// failure message.
+export class StreamSafetyRefusal extends Error {
+  constructor(public readonly safety: SafetyResult) {
+    super("the model's own reply was flagged by the safety classifier mid-stream");
+  }
+}
+
+/** Wraps a raw token-delta generator with a per-sentence safety gate:
+ * buffers deltas until `spec/safety/ts/sentenceChunker.ts`'s own boundary
+ * detection has one complete sentence, checks THAT ONE sentence with the
+ * IDENTICAL `evaluateSafety()` the input path uses (never a weaker check
+ * - the plan's own "never weaken the input check" applies symmetrically
+ * to not inventing a laxer one for output), and only then yields it -
+ * one sentence at a time, never batched, so a review (2026-09-05) found
+ * batching them (checking every newly-ready sentence in a loop, then
+ * yielding the whole group at once) had a real bug: if the SECOND of two
+ * sentences that became ready in the same delta refused, the throw fired
+ * before the group's own combined yield ever ran, silently dropping the
+ * FIRST sentence too, even though it had already cleared its own check
+ * and the plan's own contract says earlier sentences were delivered.
+ * `notify_parent` fires independently of `action`, the exact shape
+ * prepareTurn()'s own input-side check already has (self_harm flags and
+ * notifies without ever blocking - CLAUDE.md's "Crisis resources: offer,
+ * never block" - so an output-side self_harm mention must behave
+ * identically, not accidentally cut a reply that should only ever be
+ * augmented with resources, never refused). A `refuse` category throws
+ * `StreamSafetyRefusal` immediately, before yielding the offending
+ * sentence at all: nothing from it, or anything the model might have
+ * generated after it, ever reaches a caller. A non-refuse flag (self_harm)
+ * is tracked and returned as this generator's own return value once
+ * generation ends normally - the second half of the same review's
+ * finding: a flag that never refuses was being silently dropped
+ * entirely once checkAndNotify() fired the notification, never reaching
+ * the caller's own finalize() call, so `crisis_resources` never made it
+ * onto a turn whose OUTPUT (not input) was what actually mentioned
+ * self-harm. Yields the RAW consumed substring for each sentence, not
+ * `nextSentenceBoundary()`'s own implicit trimmed span: blindly
+ * concatenating trimmed chunks back together would silently swallow the
+ * whitespace between sentences - a real, separate bug an early version
+ * of this function had, caught by two existing tests asserting the
+ * reassembled text matches what was actually generated. Delta
+ * granularity changes from raw model tokens to whole sentences/clauses
+ * as a direct, necessary consequence of gating at all - a sentence can't
+ * be judged safe before it's complete, so it can't be delivered before
+ * that either. */
+export async function* gateOutputSafety(
+  tokens: AsyncGenerator<string, void, void>,
+  actor: PersonRow,
+): AsyncGenerator<string, SafetyResult | undefined, void> {
+  let pending = "";
+  let isFirstChunk = true;
+  let lastFlagged: SafetyResult | undefined;
+
+  const checkAndNotify = (chunk: string): SafetyResult => {
+    const safety = evaluateSafety(chunk, actor.role as Role);
+    if (safety.notify_parent) {
+      trigger("safety.flagged_turn", { childName: actor.displayName, categories: safety.categories.join(", ") }).catch((err: unknown) =>
+        console.error(`[turn] safety.flagged_turn notification failed: ${(err as Error).message}`),
+      );
+    }
+    if (safety.flagged) lastFlagged = safety;
+    return safety;
+  };
+
+  for await (const delta of tokens) {
+    pending += delta;
+    for (;;) {
+      const end = nextSentenceBoundary(pending, isFirstChunk);
+      if (end < 0) break;
+      isFirstChunk = false;
+      const rawSpan = pending.slice(0, end);
+      pending = pending.slice(end);
+      const trimmed = rawSpan.trim();
+      if (!trimmed) continue; // a boundary with nothing but whitespace before it - nothing to check or yield
+      const safety = checkAndNotify(trimmed);
+      if (safety.action === "refuse") throw new StreamSafetyRefusal(safety);
+      yield rawSpan;
+    }
+  }
+
+  // Whatever's left after the model's own generation ends is the final
+  // chunk, complete or not (there's no more text coming to complete it
+  // with) - checked and yielded the same way, since a short, unterminated
+  // final clause is exactly as capable of being unsafe as a properly
+  // punctuated sentence. Checked trimmed (clean text for the
+  // classifier), yielded raw (pending itself, not the trimmed copy) for
+  // the identical whitespace-fidelity reason as the loop above.
+  const remainder = pending.trim();
+  if (remainder) {
+    const safety = checkAndNotify(remainder);
+    if (safety.action === "refuse") throw new StreamSafetyRefusal(safety);
+    yield pending;
+  }
+
+  return lastFlagged;
+}
 
 /** Same safety-first routing and deterministic plugin floor as runTurn(),
  * but the `chat` role's own answer streams token by token instead of
@@ -918,13 +1086,43 @@ export async function runTurnStream(
     kind: "stream",
     conversationId: conversation.id,
     turnId: prepared.turnId,
-    tokens: started.tokens,
-    finalize: (replyText: string): TurnValue => {
+    tokens: gateOutputSafety(started.tokens, actor),
+    finalize: (replyText: string, outputSafety?: SafetyResult): TurnValue => {
+      // A safety cut with nothing safe delivered before it (the very
+      // first sentence was itself the unsafe one, replyText === "") gets
+      // treated as a real safety_refuse, the same clean "nothing shown
+      // yet, replace the whole thing with a canned refusal"
+      // finalizeReply() already gives an input-side refusal - runTurn()'s
+      // own non-streaming twin makes the identical call. A cut with real
+      // partial content already streamed stays source: "model" so that
+      // content survives in the log rather than being erased by a canned
+      // phrase the household never actually heard replace it.
+      const refusedWithNothingDelivered = outputSafety?.action === "refuse" && replyText === "";
+      // A review (2026-09-05) found this always used prepared.crisis
+      // Resources (the INPUT check's own derivation) even when
+      // `outputSafety` was the one actually flagged - so a self_harm
+      // mention in the MODEL's own words (never a refuse, so it never
+      // threw and reached this function only via gateOutputSafety()'s
+      // own return value) got `value.safety.action ===
+      // "allow_with_resources"` with no `crisis_resources` attached at
+      // all, the exact silent drop CLAUDE.md's non-configurable "offer,
+      // never block" invariant exists to prevent. A second review pass
+      // found the first fix then dropped the INPUT's own crisis
+      // resources whenever `outputSafety` was present at all, even an
+      // output refusal for a category that has nothing to do with
+      // self-harm: a message that itself mentioned self-harm
+      // (`prepared.crisisResources` set) whose reply then got cut for an
+      // unrelated refuse category lost the 988 text entirely.
+      // `?? prepared.crisisResources` keeps the input's own resources as
+      // the fallback whenever the output side isn't itself the
+      // allow_with_resources case, matching runTurn()'s own refuse
+      // branch, which never had this bug.
+      const crisisResources = (outputSafety && deriveCrisisResources(outputSafety)) ?? prepared.crisisResources;
       const value: TurnValue = finalizeReply(actor, {
         reply: { text: replyText },
-        source: "model",
-        safety: prepared.safety,
-        crisis_resources: prepared.crisisResources,
+        source: refusedWithNothingDelivered ? "safety_refuse" : "model",
+        safety: outputSafety ?? prepared.safety,
+        crisis_resources: crisisResources,
         conversation_id: conversation.id,
         turn_id: prepared.turnId,
       });

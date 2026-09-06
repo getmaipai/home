@@ -44,9 +44,12 @@ function handleChatCompletion(request: ChatCompletionRequest): ChatCompletionRes
  * exercised for real in tests rather than degenerating into one big
  * chunk. Split on spaces, each word (plus its trailing space, so
  * concatenating every delta reproduces the original text exactly) is its
- * own chunk. */
-function streamChatCompletion(request: ChatCompletionRequest): ReadableStream<Uint8Array> {
-  const text = stubReplyText(request);
+ * own chunk. `text` defaults to the usual echo reply; a caller (the
+ * scripted-reply path below, added for session-a-intelligence.md step 9's
+ * own output-safety-gate tests, which need a MODEL reply that differs
+ * from the input - the default echo can't ever produce that by
+ * construction) can override it with any string. */
+function streamChatCompletion(request: ChatCompletionRequest, text: string = stubReplyText(request)): ReadableStream<Uint8Array> {
   const words = text.split(" ");
   const id = `stub-${Date.now()}`;
   const model = request.model || "stub-chat";
@@ -145,7 +148,12 @@ export interface StubLlmServerOptions {
    * JSON.stringify'd first, matching what a real json_schema-constrained
    * llama-server reply looks like on the wire); returning `undefined`
    * (or omitting this option) falls through to the existing default -
-   * every current call site is unaffected. */
+   * every current call site is unaffected. Applies to a streaming
+   * request too (step 9): the scripted text is streamed word-by-word the
+   * same way the default echo reply always was, needed for testing
+   * turnEngine.ts's output-safety gate, which requires a MODEL reply
+   * that genuinely differs from the input - the default echo can never
+   * produce that by construction. */
   scriptedChatReply?: (request: ChatCompletionRequest) => unknown;
 }
 
@@ -167,22 +175,20 @@ export function startStubLlmServer(port = 0, opts: StubLlmServerOptions = {}): S
         if (!body || !Array.isArray(body.messages)) {
           return Response.json({ error: "messages is required" }, { status: 400 });
         }
+        const scripted = opts.scriptedChatReply?.(body);
+        const scriptedContent = scripted !== undefined ? (typeof scripted === "string" ? scripted : JSON.stringify(scripted)) : undefined;
         if (body.stream) {
-          return new Response(streamChatCompletion(body), {
+          return new Response(streamChatCompletion(body, scriptedContent), {
             headers: { "content-type": "text/event-stream" },
           });
         }
-        if (opts.scriptedChatReply) {
-          const scripted = opts.scriptedChatReply(body);
-          if (scripted !== undefined) {
-            const content = typeof scripted === "string" ? scripted : JSON.stringify(scripted);
-            return Response.json({
-              id: `stub-${Date.now()}`,
-              model: body.model || "stub-chat",
-              choices: [{ index: 0, message: { role: "assistant", content }, finish_reason: "stop" }],
-              usage: { prompt_tokens: 0, completion_tokens: 0, total_tokens: 0 },
-            });
-          }
+        if (scriptedContent !== undefined) {
+          return Response.json({
+            id: `stub-${Date.now()}`,
+            model: body.model || "stub-chat",
+            choices: [{ index: 0, message: { role: "assistant", content: scriptedContent }, finish_reason: "stop" }],
+            usage: { prompt_tokens: 0, completion_tokens: 0, total_tokens: 0 },
+          });
         }
         return Response.json(handleChatCompletion(body));
       }

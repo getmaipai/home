@@ -624,10 +624,22 @@ into a conversation with someone who knows who is talking.
       one tool contract that catalog packages and Go can share, and the
       route by which MCP Apps result panels could arrive later. Plan
       v0.1 named an "MCP spike"; nothing was spiked.
-- [ ] **Output-side safety on streamed sentences** (S-M) - the classifier
-      header promises "again on every streamed sentence"; only the input
-      is checked. Run it per sentence in `streamTurnEvents` and cut the
-      stream on a refuse category.
+- [x] **Output-side safety on streamed sentences** - shipped, Session A
+      step 9 (2026-09-05): `runTurnStream()`'s own `tokens` generator is
+      wrapped by a new `gateOutputSafety()` (`lib/turnEngine.ts`, not
+      `streamTurnEvents` - the route layer just consumes whatever the
+      engine hands back), buffering deltas into whole sentences (the
+      chunker, moved to `spec/safety/ts/sentenceChunker.ts` per this
+      item's own plan text) and checking each with the identical
+      `evaluateSafety()` the input path uses. A refuse category throws
+      before the offending sentence (or anything after it) is ever
+      delivered; a new `spec/errors/errors.json` code
+      (`safety_refused`) rides the wire's `error` event. `runTurn()`'s
+      non-streaming twin got the same whole-text check for symmetry,
+      beyond this item's own literal ask. `frontend/src/lib/
+      sentenceChunker.ts` still has its own duplicate copy - Session A
+      doesn't own `frontend/`; see docs/dev.md's step 9 entry for the
+      Session B follow-up that finishes the "one definition" move.
 
 Sources for this section (research pass, 2026-09-05): [Mem0, state of agent memory 2026](https://mem0.ai/blog/state-of-ai-agent-memory-2026), [Letta sleep-time agents](https://docs.letta.com/guides/agents/architectures/sleeptime/), [Letta memory blocks](https://www.letta.com/blog/memory-blocks/), [Zep temporal knowledge graph](https://arxiv.org/abs/2501.13956), [LongMemEval](https://arxiv.org/abs/2410.10813), [Temporal semantic memory](https://arxiv.org/abs/2601.07468), [AFA, multi-user memory](https://arxiv.org/html/2604.25022v1), [ChatGPT memory Dreaming, secondary](https://letsdatascience.com/news/openai-upgrades-chatgpt-memory-architecture-for-fresher-pers-b26b51d5), [Open WebUI memory](https://docs.openwebui.com/features/chat-conversations/memory/), [PERSONA steering vectors, ICLR 2026](https://arxiv.org/html/2602.15669), [llama.cpp control vectors](https://github.com/jukofyork/control-vectors), [AgentFloor, small-model tool use](https://arxiv.org/abs/2605.00334), [llama.cpp tool-call grammar issue](https://github.com/ggml-org/llama.cpp/issues/24807), [Home Assistant LLM API](https://developers.home-assistant.io/docs/core/llm/), [Anthropic, context engineering](https://www.anthropic.com/engineering/effective-context-engineering-for-ai-agents), [semantic-router](https://github.com/aurelio-labs/semantic-router), [MCP Apps spec](https://blog.modelcontextprotocol.io/posts/2026-01-26-mcp-apps/).
 

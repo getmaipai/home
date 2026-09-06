@@ -93,7 +93,13 @@ export type TurnStreamEvent =
   | { type: "delta"; text: string }
   | { type: "spoken_cue"; text: string }
   | { type: "done"; value: TurnValue }
-  | { type: "error"; error: string };
+  // `code` (step 9, session-a-intelligence.md: "emit error with the
+  // catalogue code") is optional and additive: a spec/errors/errors.json
+  // code when the failure maps to one (today, only the output-side
+  // safety cut sets it, "safety_refused"), omitted for the generic
+  // mid-stream engine failure that already used this event before this
+  // step - existing clients reading only `error` see no change.
+  | { type: "error"; error: string; code?: string };
 
 export interface ResolvedSetting {
   key: string;

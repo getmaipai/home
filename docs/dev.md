@@ -7032,3 +7032,196 @@ sentence's word choice.
 Full backend suite green (659), `bunx tsc --noEmit` clean,
 `scripts/check.sh` green (the frontend build step's known, pre-existing
 Session B failure aside).
+
+## Session A: step 9, output-side safety on the stream (2026-09-05)
+
+`spec/safety/ts/classifier.ts`'s own header comment has promised "again
+on every streamed sentence" since 4.3 shipped; until this step, nothing
+in `runTurnStream()` ever checked the model's OWN generated text at all -
+only the household member's input got checked, once, before generation
+started.
+
+**The sentence chunker moves to `spec/safety/ts/sentenceChunker.ts`**
+(the plan's own ask: "the sentence chunker exists in
+`frontend/src/lib/sentenceChunker.ts`; move the chunker to `spec/` so
+both sides use one definition"), copied verbatim (same regex tuning,
+same clause-flush gates) since the logic itself needed no changes, only
+a new home. Session A doesn't own `frontend/` (session-b-ui.md), so the
+old copy there could not be deleted or repointed at the new one directly
+- see this entry's own Session B note below for what completes the
+move. A full test port (`spec/tests/ts/sentenceChunker.test.ts`, all ten
+cases) proves the moved copy behaves identically to the one it replaces.
+
+**`runTurnStream()`'s `tokens` generator is now wrapped by
+`gateOutputSafety()`**: buffers raw model-token deltas until the
+chunker has a complete sentence, checks it with the IDENTICAL
+`evaluateSafety()` the input path already uses (never a weaker check -
+"never weaken the input check" applies symmetrically to not inventing a
+laxer one for output), and only then yields it. `notify_parent` fires
+independently of `action`, the same shape the input path already has -
+a self-harm mention in the model's OWN output notifies a parent without
+ever blocking the reply (CLAUDE.md's "Crisis resources: offer, never
+block"). A `refuse` category throws `StreamSafetyRefusal` (carrying the
+real `SafetyResult`) before the offending chunk is ever yielded - nothing
+from it, or anything generated after it, reaches a caller. Delta
+granularity changes from raw model tokens to whole sentences/clauses as
+a direct, necessary consequence: a sentence can't be judged safe before
+it's complete, so it can't be delivered before that either.
+
+**A real bug caught before commit, by an early test failure, not a code
+review this time**: the chunker's own `splitReadyChunks()` trims each
+chunk (for its ORIGINAL caller's convenience, which never needed to
+reassemble the trimmed pieces back into the source text). Blindly
+yielding those trimmed chunks and letting the caller `.join("")` them,
+as a first draft of `gateOutputSafety()` did, silently swallowed the
+whitespace between sentences ("Good morning.How is it going" instead of
+"Good morning. How is it going"). Fixed by yielding the RAW consumed
+substring (`pending.slice(0, consumed)`, whitespace intact) instead of
+the chunker's own trimmed chunk array - the chunk text is still what
+gets checked (clean text is what the classifier wants), just not what
+gets yielded.
+
+**`spec/errors/errors.json` gains one new code, `safety_refused`**
+(`docs/ENGINEERING.md`'s "every package error maps to a code from the
+shared catalogue" - the plan's own "emit error with the catalogue
+code"): no existing code fit ("I can't do that on this device" would be
+actively wrong for a safety cut), so a new one was added rather than
+mis-fitting the closest existing one the way `packageHost.ts`'s own
+`capability_missing` reuse already documented as a real, narrower gap.
+`TurnStreamEvent`'s `error` variant gains an optional `code` field to
+carry it - additive, so an existing client reading only `error` sees no
+change; the generic mid-stream engine failure this event already
+handled keeps omitting it.
+
+**Logged provenance depends on whether anything safe survived the
+cut.** `finalize()` (the closure `runTurnStream()` hands back) now takes
+an optional `outputSafety` the caller passes from a caught
+`StreamSafetyRefusal`. A cut with real partial content already streamed
+stays `source: "model"` with `safety` overridden to the output result,
+so that content survives in conversation history rather than being
+erased by a canned phrase the household never actually heard replace
+it. A cut where NOTHING safe was ever delivered (the very first
+sentence was itself the unsafe one) uses `source: "safety_refuse"`
+instead - `finalizeReply()`'s existing, unchanged handling for that
+source cleanly replaces the (empty) text with a real, varied refusal
+phrase for the log, the identical clean "nothing shown yet" case an
+input-side refusal already is.
+
+**Judgment call: `runTurn()` (the non-streaming twin) gets the
+identical whole-text check, not just `runTurnStream()`.** The plan's own
+text names the stream specifically ("In `runTurnStream`, run it per
+sentence"), but a non-streaming reply arrives as one atomic block
+regardless - a single whole-text `evaluateSafety()` call is exactly as
+strong as per-sentence checking there and needs no chunker at all.
+Leaving `runTurn()` with literally zero output-side check (worse than
+`runTurnStream()` lacked before this step, which was at least missing
+only the granularity) would be a real, undocumented asymmetry between
+two callers of the identical model role. A refuse there behaves exactly
+like an input-side refusal (nothing was ever shown to the caller, so a
+clean whole-reply replacement is correct, unlike the partial-delivery
+streaming case).
+
+Tests: a scripted stream with a safe sentence followed by a refusable
+one is cut exactly at that sentence, with the safe sentence proven
+delivered and the unsafe one proven absent - both directly (draining
+`tokens`) and through the real production path
+(`streamTurnEvents()`), asserting exactly one `error` event carrying
+`code: "safety_refused"` and no `done` event follows it; the
+`safety.flagged_turn` notification actually lands for an adult when the
+speaker is a minor; a genuinely safe multi-sentence reply streams every
+sentence through untouched. Two pre-existing tests
+("streams real token deltas") were updated, not weakened: they used to
+assert MORE THAN ONE delta as proof of real per-token streaming, which
+a short one-sentence stub reply no longer produces now that a delta is
+a whole sentence - reworded to use a genuinely multi-sentence input and
+to also assert no swallowed whitespace at a sentence boundary (the
+regression test for the bug above). Full backend suite green (663),
+spec suite green (211, +10 for the moved chunker), `bunx tsc --noEmit`
+clean.
+
+**A second review pass found three more real issues, all fixed before
+commit:**
+- `gateOutputSafety()`'s first version checked and yielded a whole BATCH
+  of newly-ready sentences at once (every sentence that completed within
+  the same raw delta), not one at a time - if the LAST sentence in that
+  batch refused, the throw fired before the batch's own combined yield
+  ever ran, silently dropping every EARLIER sentence in the same batch
+  too, even though each had already cleared its own check, directly
+  contradicting the plan's own "earlier sentences were delivered."
+  Word-by-word stub streaming never exercises this (each delta completes
+  at most one sentence), so this needed a hand-built generator yielding
+  two full sentences in one raw delta to catch. Fixed by checking and
+  yielding one sentence at a time, immediately, inside the same loop
+  that finds sentence boundaries, rather than collecting a batch first.
+- A non-refuse flag (self_harm - flags and notifies but never blocks,
+  CLAUDE.md's "offer, never block") was silently dropped entirely once
+  `gateOutputSafety()`'s own notification fired: nothing carried it back
+  to the caller, since only a THROWN refusal ever reached `finalize()`
+  with its own `SafetyResult`. Fixed by having the generator itself
+  `return` the most recently flagged, non-refuse result once generation
+  ends normally - TypeScript's own `AsyncGenerator<Yield, Return>`
+  return channel, read from `iterator.next()`'s final `{done: true,
+  value}` result, which `streamTurnEvents()`'s existing loop structure
+  already captures in `current.value` for free once its own loop over
+  `current.done` exits. `runTurnStream()`'s own `tokens` field type
+  widened from `AsyncGenerator<string, void, void>` to `AsyncGenerator
+  <string, SafetyResult | undefined, void>` to carry it.
+- `runTurn()`'s own non-streaming twin had an identical, separate
+  instance of "an output-side flag's `crisis_resources` never gets
+  attached" - the streaming fix above only touched `runTurnStream()`'s
+  own `finalize()` closure and missed the equivalent branch in
+  `runTurn()` itself. Fixed by extracting the one derivation
+  (`safety.action === "allow_with_resources" ? CRISIS_RESOURCES_TEXT :
+  undefined`) into a shared `deriveCrisisResources()`, now used by
+  `prepareTurn()`'s own input-side computation and both output-side call
+  sites, so there is exactly one place this logic can drift out of sync
+  again.
+
+New tests: `gateOutputSafety()` (now exported for direct testing)
+delivers an earlier sentence even when a later sentence in the SAME raw
+delta refuses; a non-refuse output flag (self-harm in the model's own
+generated words) reaches the logged/returned turn's `safety` and
+`crisis_resources` without cutting the stream, through `runTurnStream()`;
+and the identical case through `runTurn()`'s non-streaming path. Full
+backend suite green (666), `bunx tsc --noEmit` clean.
+
+**A third review pass found one more real issue, fixed before commit:**
+the second pass's own `crisis_resources` fix (`deriveCrisisResources
+(outputSafety)`) went one step too far - it dropped the INPUT's own
+crisis resources whenever `outputSafety` was present AT ALL, even an
+output-side refusal for a category that has nothing to do with
+self-harm. A message that itself mentioned self-harm
+(`prepared.crisisResources` correctly set, generation proceeds
+normally since self-harm never refuses), whose reply then got cut
+mid-stream for an unrelated refuse category, lost the 988 text
+entirely - `runTurn()`'s own refuse branch never had this bug, only
+`runTurnStream()`'s `finalize()` did. Fixed with `?? prepared.
+crisisResources` as the fallback, so the input's own resources survive
+any output-side outcome that isn't itself the allow_with_resources
+case. New test: an input-side self-harm flag's `crisis_resources`
+survives an unrelated output-side refusal cutting the stream (verified
+by draining `tokens` and calling `finalize()` directly, since a fully
+cut stream never emits a `done` event to read the logged turn off of).
+Full backend suite green (667), `bunx tsc --noEmit` clean.
+
+**Frontend note for Session B**: the canonical sentence chunker is now
+`spec/safety/ts/sentenceChunker.ts`; `frontend/src/lib/
+sentenceChunker.ts` is Session A's own file's un-deleted duplicate
+(Session A can't touch `frontend/`) and should be replaced with a
+re-export of (or deleted in favor of importing directly from) the
+`spec/` copy to finish the "one definition" this step's own plan text
+asks for - the logic is byte-identical today, so this is a pure
+dedup, not a behavior change. Separately, and more load-bearing: `POST
+/api/turn/stream`'s `delta` events now arrive in whole-sentence chunks
+instead of raw model tokens (a direct, necessary consequence of
+checking each one for safety before it's ever sent) - any client-side
+assumption about delta cadence or size (a per-token typing animation
+timed to arrive frequently, say) should be re-checked against this new,
+chunkier real rhythm. The frontend's own local `sentenceChunker.ts`
+logic itself needs no change to keep working correctly against
+already-sentence-sized input - it will just find each incoming delta
+already a complete chunk and flush it immediately, which is a strict
+improvement (less buffering lag before TTS can start on a sentence), not
+a regression - but worth verifying visually before shipping this to
+real users, since faster flushing is a real UX change from smoother,
+more frequent raw-token deltas as they used to arrive.
