@@ -213,7 +213,7 @@ describe("runDueJobs", () => {
 
     const row = db.select().from(scheduledJobs).where(eq(scheduledJobs.id, scheduled.value.id)).get()!;
     expect(row.status).toBe("done");
-    expect(row.lastError).toContain("no bundled package");
+    expect(row.lastError).toContain("no such package");
   });
 
   // A review (2026-09-04) found the reschedule advanced from `now`

@@ -35,7 +35,7 @@ import { packageStatus } from "@/db/schema";
 import { listPackageIds, loadPackage } from "@/lib/plugins";
 import { loadSkill } from "@/lib/skills";
 import { raiseIssue, resolveIssue } from "@/lib/issues";
-import { PACKAGES_DIR } from "@/lib/paths";
+import { resolvePackageDir } from "@/lib/packageResolve";
 import { HostEmulator } from "@maipai/spec/emulators/ts/host-emulator.js";
 import { runRecipe } from "@maipai/spec/interpreters/ts/recipe-interpreter.js";
 
@@ -99,7 +99,7 @@ async function runRecipeFixtureSmoke(id: string, fixturePath: string): Promise<S
 
   let fixture: SmokeFixture;
   try {
-    fixture = JSON.parse(readFileSync(join(PACKAGES_DIR, id, fixturePath), "utf-8"));
+    fixture = JSON.parse(readFileSync(join(resolvePackageDir(id), fixturePath), "utf-8"));
   } catch (err) {
     return { ok: false, message: `smoke fixture ${fixturePath} failed to load: ${(err as Error).message}` };
   }
@@ -162,7 +162,7 @@ async function runRecipeFixtureSmoke(id: string, fixturePath: string): Promise<S
 // (`npm:@modelcontextprotocol/sdk@1.30.0/server/mcp.js`) that only
 // affects the type-checking pass, not execution.
 async function runDenoTestSmoke(id: string): Promise<SmokeResult> {
-  const dir = join(PACKAGES_DIR, id);
+  const dir = resolvePackageDir(id);
   const proc = Bun.spawn(["deno", "test", "--no-check", `--allow-read=${dir}`, "--cached-only", dir], {
     stdout: "pipe",
     stderr: "pipe",
@@ -183,7 +183,7 @@ async function runDenoTestSmoke(id: string): Promise<SmokeResult> {
 export async function runSmoke(id: string): Promise<SmokeResult> {
   let manifestJson: { kind?: string; smoke?: { kind?: string; fixture?: string } };
   try {
-    manifestJson = JSON.parse(readFileSync(join(PACKAGES_DIR, id, "manifest.json"), "utf-8"));
+    manifestJson = JSON.parse(readFileSync(join(resolvePackageDir(id), "manifest.json"), "utf-8"));
   } catch (err) {
     return recordResult(id, { ok: false, message: `manifest.json failed to load: ${(err as Error).message}` });
   }

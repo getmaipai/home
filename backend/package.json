@@ -29,6 +29,7 @@
     "onnxruntime-web": "^1.29.0",
     "otpauth": "^9.5.2",
     "sherpa-onnx-node": "^1.13.7",
+    "tar": "^7.5.22",
     "zod": "^4.0.0"
   },
   "devDependencies": {

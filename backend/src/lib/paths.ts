@@ -79,11 +79,40 @@ export const cacheDir = resolve(dataDir, "cache");
 // above (the package's checked-in source, read-only from the sandbox's
 // own point of view): a package's Deno process gets `--allow-read` on
 // both its source and this directory, but `--allow-write` only on this
-// one - it can never write into its own source tree. Foreshadows step
-// 6's real install layout (`data/packages/<id>/<version>/`) without
-// needing that step's versioning yet, since nothing is "installed"
-// today, only bundled.
-export const tier1PackageDataDir = (packageId: string): string => resolve(dataDir, "packages", packageId);
+// one - it can never write into its own source tree.
+//
+// A dedicated `state/` subdirectory, NOT `data/packages/<id>/` directly
+// (a real gap found by code review after step 6 landed
+// `installedPackageVersionDir` below as `data/packages/<id>/versions/
+// <version>/`: that made a store-installed Tier 1 package's own SOURCE a
+// SUBDIRECTORY of its writable grant, not a sibling, so `--allow-write`
+// covered its source tree after all and the "can never write into its
+// own source tree" guarantee above was simply false the moment a Tier 1
+// package was store-installed rather than bundled - a package's handler
+// could persist a backdoor into its own manifest.json/handler.ts across
+// restarts). `state/` sits beside `versions/` and `.staging/` below,
+// never inside either.
+export const tier1PackageDataDir = (packageId: string): string => resolve(dataDir, "packages", packageId, "state");
+
+// Step 6's real install layout (`lib/store.ts`): a store-installed
+// package's own unpacked SOURCE, one directory per version so a
+// rollback is just pointing `lib/packageResolve.ts`'s active-install row
+// back at a version whose files are still sitting right here, never a
+// re-download. A sibling of `tier1PackageDataDir`'s own `state/`
+// directory above, never a parent or child of it - see that constant's
+// own comment for why the distinction is load-bearing, not cosmetic.
+export const installedPackageVersionDir = (packageId: string, version: string): string =>
+  resolve(dataDir, "packages", packageId, "versions", version);
+
+// Where a package's tarball is verified and unpacked before it becomes
+// the active install - unpacking straight into `installedPackageVersionDir`
+// would leave a half-unpacked directory sitting where `packageResolve.ts`
+// could pick it up as "active" the moment its DB row is written, if
+// anything failed between the two. `lib/store.ts`'s install() unpacks
+// here, runs the smoke test against ITS OWN resolved path, and only then
+// renames it into place - the identical stage-then-rename shape
+// `scripts/refresh-bundled-packages.ts` already uses for the bundled set.
+export const installStagingDir = (packageId: string): string => resolve(dataDir, "packages", packageId, ".staging");
 
 // A household member's own uploaded voice-cloning sample (2026-09-04):
 // real, irreplaceable family data (unlike wakewordDir's re-downloadable

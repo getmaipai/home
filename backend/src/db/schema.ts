@@ -791,3 +791,40 @@ export const receivedBackups = sqliteTable("received_backups", {
   bytes: integer("bytes").notNull(),
   createdAt: text("created_at").notNull(),
 });
+
+// Step 6 (session-d-packages-and-store.md): the store's own active-
+// install record. A package with no row here resolves to its bundled
+// copy under `backend/packages/<id>/` (lib/packageResolve.ts); a row
+// means the store installed a version of it into
+// `data/packages/<id>/versions/<version>/` (lib/paths.ts's
+// `installedPackageVersionDir`) and that version is what actually runs,
+// bundled or not - "weather installed from the local index" (this
+// step's own acceptance test) means THIS package's own bundled copy
+// gets overridden by a row here. `previousVersion` is rollback's whole
+// implementation: the prior version's files are never deleted until a
+// NEWER install replaces them, so rollback is just writing this row
+// back, no re-download. Hub-internal, like packageStatus above, not a
+// spec 3.1 record type.
+export const packageInstalls = sqliteTable("package_installs", {
+  packageId: text("package_id").primaryKey(),
+  version: text("version").notNull(),
+  previousVersion: text("previous_version"),
+  channel: text("channel").notNull().default("stable"), // "stable" | "beta"
+  sourceCommit: text("source_commit").notNull(),
+  permissions: text("permissions").notNull(), // JSON string[] - the permission set this version was installed under
+  installedAt: text("installed_at").notNull(),
+});
+
+// The store's own rollback defense (lib/storeIndex.ts): the highest
+// `version` ever seen for each TUF role, so a validly-signed but
+// WITHDRAWN older index (the "rolled-back index" tamper case,
+// docs/PACKAGES.md) is refused even though its own expiry is still in
+// the future - an expiry check alone only catches staleness, never a
+// deliberate rollback to an older, still-unexpired file. Persisted (not
+// just in-memory) so a reboot can't reset what "the highest version
+// seen" means and let a rollback back in.
+export const storeIndexState = sqliteTable("store_index_state", {
+  role: text("role").primaryKey(), // "root" | "targets" | "timestamp"
+  version: integer("version").notNull(),
+  updatedAt: text("updated_at").notNull(),
+});

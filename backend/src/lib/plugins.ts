@@ -24,6 +24,7 @@ import { registerPackageNotificationTypes } from "@/lib/notificationTypes";
 import { parseWhen } from "@/lib/scheduler";
 import { listActivePeople } from "@/lib/access";
 import { PACKAGES_DIR } from "@/lib/paths";
+import { resolvePackageDir, listInstalledPackageIds } from "@/lib/packageResolve";
 import { ROLE_LADDER, type Role } from "@/middleware/auth";
 import type { PersonRow } from "@/types";
 
@@ -43,15 +44,21 @@ export type PluginOpResult<T> =
   | { ok: true; value: T }
   | { ok: false; status: 400 | 403 | 404; error: string };
 
-/** Every bundled package's id, from its directory name. */
+/** Every package id this hub can load: every bundled directory name,
+ * plus any id the store has installed that was never bundled at all (a
+ * genuinely new community package). A `Set` so a package that's both
+ * bundled AND store-installed (an update to a default package, step 6's
+ * own "weather installed from the local index" case) is listed once. */
 export function listPackageIds(): string[] {
+  let bundled: string[] = [];
   try {
-    return readdirSync(PACKAGES_DIR, { withFileTypes: true })
+    bundled = readdirSync(PACKAGES_DIR, { withFileTypes: true })
       .filter((e) => e.isDirectory())
       .map((e) => e.name);
   } catch {
-    return [];
+    bundled = [];
   }
+  return [...new Set([...bundled, ...listInstalledPackageIds()])];
 }
 
 /** Reads and validates just manifest.json, for lib/persona.ts's own
@@ -72,9 +79,9 @@ export function listPackageIds(): string[] {
 export function loadManifestOnly(id: string): PluginOpResult<PackageManifest> {
   let manifestJson: unknown;
   try {
-    manifestJson = JSON.parse(readFileSync(join(PACKAGES_DIR, id, "manifest.json"), "utf-8"));
+    manifestJson = JSON.parse(readFileSync(join(resolvePackageDir(id), "manifest.json"), "utf-8"));
   } catch {
-    return { ok: false, status: 404, error: `no bundled package ${id}` };
+    return { ok: false, status: 404, error: `no such package ${id}` };
   }
   const manifestParsed = PackageManifest.safeParse(manifestJson);
   if (!manifestParsed.success) {
@@ -86,8 +93,8 @@ export function loadManifestOnly(id: string): PluginOpResult<PackageManifest> {
 export function loadPackage(id: string): PluginOpResult<LoadedPackage> {
   let manifestJson: unknown, recipeJson: unknown;
   try {
-    manifestJson = JSON.parse(readFileSync(join(PACKAGES_DIR, id, "manifest.json"), "utf-8"));
-    recipeJson = JSON.parse(readFileSync(join(PACKAGES_DIR, id, "recipe.json"), "utf-8"));
+    manifestJson = JSON.parse(readFileSync(join(resolvePackageDir(id), "manifest.json"), "utf-8"));
+    recipeJson = JSON.parse(readFileSync(join(resolvePackageDir(id), "recipe.json"), "utf-8"));
   } catch {
     // The JSON.parse calls are inside the try on purpose. A code review
     // (2026-09-05) found them outside it, so a truncated or half-written
@@ -95,7 +102,7 @@ export function loadPackage(id: string): PluginOpResult<LoadedPackage> {
     // every caller instead of being reported as an unloadable package -
     // which took GET /api/privacy, whose whole job is to be readable, down
     // with a 500.
-    return { ok: false, status: 404, error: `no bundled package ${id}` };
+    return { ok: false, status: 404, error: `no such package ${id}` };
   }
   const manifestParsed = PackageManifest.safeParse(manifestJson);
   if (!manifestParsed.success) {

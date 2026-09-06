@@ -26,7 +26,8 @@ import type { PackageManifest } from "@maipai/spec/gen/ts/manifest.js";
 import type { PluginResult } from "@maipai/spec/interpreters/ts/recipe-interpreter.js";
 import { createHost } from "@/lib/packageHost";
 import { raiseIssue, resolveIssue } from "@/lib/issues";
-import { PACKAGES_DIR, tier1PackageDataDir, ensureDataDir } from "@/lib/paths";
+import { tier1PackageDataDir, ensureDataDir } from "@/lib/paths";
+import { resolvePackageDir } from "@/lib/packageResolve";
 import type { PersonRow } from "@/types";
 
 const IDLE_TIMEOUT_MS = 10 * 60 * 1000;
@@ -67,7 +68,7 @@ const disabledUntilReboot = new Set<string>();
  * shape for every Tier 1 package keeps a package's own directory
  * self-describing without another thing to get wrong in manifest.json. */
 function entryPath(id: string): string {
-  return join(PACKAGES_DIR, id, "handler.ts");
+  return join(resolvePackageDir(id), "handler.ts");
 }
 
 const HostFetchRequestSchema = z.object({
@@ -104,7 +105,7 @@ export function buildDenoRunArgs(sourceDir: string, dataDir: string, entry: stri
 }
 
 async function startProcess(id: string, manifest: PackageManifest, actor: PersonRow): Promise<SandboxProcess> {
-  const sourceDir = join(PACKAGES_DIR, id);
+  const sourceDir = resolvePackageDir(id);
   const dataDir = tier1PackageDataDir(id);
   ensureDataDir(dataDir);
 

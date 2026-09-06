@@ -185,4 +185,43 @@ describe("the sandbox's own permission model (real deno run, no MCP involved)", 
     const [stdout] = await Promise.all([new Response(proc.stdout).text(), proc.exited]);
     expect(stdout).toContain("WROTE:hello");
   });
+
+  // Every other test in this block passes the SAME directory for both
+  // sourceDir and dataDir, which can never catch the real bug found by
+  // code review: buildDenoRunArgs()'s own read/write split is correct,
+  // but tier1PackageDataDir used to be `data/packages/<id>/` directly
+  // while a store-installed package's source lived at
+  // `data/packages/<id>/versions/<version>/` - a SUBDIRECTORY of that
+  // same writable grant, silently defeating "can never write into its
+  // own source tree" the moment a Tier 1 package was store-installed
+  // rather than bundled. This test uses two genuinely SEPARATE
+  // directories (the shape lib/paths.ts's own tier1PackageDataDir/
+  // installedPackageVersionDir now guarantee, tests/paths.test.ts pins
+  // the guarantee itself) and proves the sandbox actually enforces it at
+  // the `deno run` level, not just in the argument list.
+  test("a script cannot write into its own source directory, only its separate data directory", async () => {
+    const sourceDir = mkdtempSync(join(tmpdir(), "maipai-denohost-source-"));
+    const dataDir = mkdtempSync(join(tmpdir(), "maipai-denohost-data-"));
+    const scriptPath = join(sourceDir, "escape-write.ts");
+    const targetInSource = join(sourceDir, "backdoor.ts");
+    writeFileSync(
+      scriptPath,
+      `try {
+         await Deno.writeTextFile(${JSON.stringify(targetInSource)}, "backdoor");
+         console.log("WRITE_SUCCEEDED");
+       } catch (err) {
+         console.log("WRITE_BLOCKED", err.name);
+       }`,
+    );
+    try {
+      const args = buildDenoRunArgs(sourceDir, dataDir, scriptPath);
+      const proc = Bun.spawn(["deno", ...args], { stdout: "pipe", stderr: "pipe" });
+      const [stdout] = await Promise.all([new Response(proc.stdout).text(), proc.exited]);
+      expect(stdout).toContain("WRITE_BLOCKED");
+      expect(stdout).toContain("NotCapable");
+    } finally {
+      rmSync(sourceDir, { recursive: true, force: true });
+      rmSync(dataDir, { recursive: true, force: true });
+    }
+  });
 });

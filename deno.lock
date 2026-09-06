@@ -41,6 +41,7 @@
             "npm:onnxruntime-web@^1.29.0",
             "npm:otpauth@^9.5.2",
             "npm:sherpa-onnx-node@^1.13.7",
+            "npm:tar@^7.5.22",
             "npm:typescript@^5.9.3",
             "npm:zod@4"
           ]
