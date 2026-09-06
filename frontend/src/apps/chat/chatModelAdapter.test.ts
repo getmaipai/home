@@ -163,6 +163,55 @@ describe("createChatModelAdapter streaming", () => {
     }
   });
 
+  // A code review (2026-09-06) found that a delta landing entirely inside
+  // an open <think> block still yielded an empty-string "text" content
+  // part - enough for assistant-ui's built-in "no-text" indicator check
+  // (thread.aui.tsx) to treat the message as having text and hide its
+  // pulsing "Assistant is working" dot, well before there was anything
+  // visible to replace it with. Someone without audio (speakers off, or
+  // deaf) lost the only signal that MaiPai was still working.
+  test("no content is yielded while inside a <think> block with nothing visible yet - the loading indicator stays up", async () => {
+    const { stream, release } = staggeredNdjsonStream(
+      [{ type: "delta", text: "<think>reasoning about the" }],
+      [
+        { type: "delta", text: " answer here</think>The real answer." },
+        { type: "done", value: { reply: { text: "<think>reasoning about the answer here</think>The real answer." }, source: "model", safety: SAFETY } },
+      ],
+    );
+    const env = stubEnvironment(stream);
+    try {
+      const adapter = createChatModelAdapter({
+        consumeThinking: () => false,
+        onCrisisResources: () => {},
+        turnSchedulerRef: { current: null },
+      });
+      const abortSignal = new AbortController().signal;
+      const options = {
+        messages: [fakeUserMessage("what's the answer")],
+        runConfig: {},
+        abortSignal,
+        context: {},
+        unstable_getMessage: () => fakeUserMessage("what's the answer"),
+      } as unknown as ChatModelRunOptions;
+      const yields: ChatModelRunResult[] = [];
+      const done = (async () => {
+        for await (const r of runAdapter(adapter, options)) yields.push(r);
+      })();
+
+      // Only the still-open <think> block has arrived so far - nothing
+      // visible exists yet, so nothing should have yielded (the indicator
+      // stays up rather than being replaced by an empty text part).
+      await new Promise((resolve) => setTimeout(resolve, 10));
+      expect(yields).toHaveLength(0);
+
+      release();
+      await done;
+      expect(lastText(yields)).toBe("The real answer.");
+    } finally {
+      env.restore();
+    }
+  });
+
   test("a <think> block never yielded or spoken - only the real answer after it", async () => {
     const env = stubEnvironment(
       ndjsonStream([

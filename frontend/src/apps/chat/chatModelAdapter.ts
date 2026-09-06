@@ -179,7 +179,16 @@ export function createChatModelAdapter(deps: ChatModelAdapterDeps): ChatModelAda
           if (event.type === "delta") {
             raw += event.text;
             resolveRaw();
-            yield { content: [{ type: "text", text: visible }] };
+            // Only yield once there's something to show. A delta that lands
+            // entirely inside an open <think> block leaves `visible` "" -
+            // yielding that anyway would hand assistant-ui a real (if empty)
+            // "text" part, which is enough to satisfy MessagePrimitive.
+            // GroupedParts's "no-text" check (thread.aui.tsx's built-in
+            // pulsing "Assistant is working" indicator) and hide it, well
+            // before there's any visible reply to replace it with - and, if
+            // a spoken_cue (below) is still audibly playing, exactly the
+            // moment someone without audio needs that indicator most.
+            if (visible) yield { content: [{ type: "text", text: visible }] };
             const pending = visible.slice(spokenLength);
             const { chunks, consumed } = splitReadyChunks(pending, spokenLength === 0);
             // Each chunk speaks its normalized form, never the displayed
