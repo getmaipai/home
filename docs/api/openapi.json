@@ -1,0 +1,2328 @@
+{
+  "openapi": "3.0.0",
+  "info": {
+    "title": "MaiPai Home API",
+    "version": "0.1.0"
+  },
+  "components": {
+    "schemas": {
+      "Error": {
+        "type": "object",
+        "properties": {
+          "error": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "error"
+        ]
+      }
+    },
+    "parameters": {}
+  },
+  "paths": {
+    "/api/health": {
+      "get": {
+        "tags": [
+          "Health"
+        ],
+        "summary": "Every registered sidecar's live status",
+        "responses": {
+          "200": {
+            "description": "Sidecar statuses. gpu/disk/last_backup/certificate/models/link land in later steps.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "sidecars": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "status": {
+                            "type": "string",
+                            "enum": [
+                              "stopped",
+                              "starting",
+                              "running",
+                              "unhealthy",
+                              "crashed"
+                            ]
+                          },
+                          "baseUrl": {
+                            "type": "string",
+                            "nullable": true
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "status",
+                          "baseUrl"
+                        ]
+                      }
+                    }
+                  },
+                  "required": [
+                    "sidecars"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/people": {
+      "get": {
+        "tags": [
+          "People"
+        ],
+        "summary": "The household roster",
+        "responses": {
+          "200": {
+            "description": "Every active person.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "string",
+                        "pattern": "^person-[a-z0-9]{6,}$",
+                        "description": "Stable id, never reused, even after deletedAt is set."
+                      },
+                      "display_name": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 80
+                      },
+                      "nickname": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "maxLength": 80,
+                            "description": "What a companion calls this person, if different from display_name."
+                          },
+                          {
+                            "nullable": true,
+                            "description": "What a companion calls this person, if different from display_name."
+                          },
+                          {
+                            "nullable": true
+                          }
+                        ],
+                        "description": "What a companion calls this person, if different from display_name."
+                      },
+                      "role": {
+                        "type": "string",
+                        "enum": [
+                          "owner",
+                          "admin",
+                          "adult",
+                          "teen",
+                          "child",
+                          "guest"
+                        ],
+                        "description": "The role ladder (4.2). Two minor bands (teen 13-17, child under 13) so there is no thirteen-year cliff."
+                      },
+                      "avatar_seed": {
+                        "type": "string",
+                        "minLength": 1,
+                        "description": "Deterministic seed for a generated avatar; never a photo of a real person by default."
+                      },
+                      "source": {
+                        "type": "string",
+                        "enum": [
+                          "hub",
+                          "local"
+                        ],
+                        "description": "hub: authoritative on the hub, replicated to robots. local: a robot-only guest, never synced to the hub (4.2's local_only concept for a whole person)."
+                      },
+                      "local_only": {
+                        "type": "boolean",
+                        "default": false,
+                        "description": "Keeps this person off the overlay network entirely (4.2, 4.12)."
+                      },
+                      "created_at": {
+                        "type": "string",
+                        "format": "date-time"
+                      },
+                      "updated_at": {
+                        "type": "string",
+                        "format": "date-time"
+                      },
+                      "deleted_at": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "format": "date-time"
+                          },
+                          {
+                            "nullable": true
+                          }
+                        ],
+                        "default": null
+                      },
+                      "hlc": {
+                        "type": "string",
+                        "pattern": "^[0-9]+:[0-9]+:[a-z0-9]{6,}$",
+                        "description": "Hybrid logical clock: wall_ms:counter:node (7.3)."
+                      }
+                    },
+                    "required": [
+                      "id",
+                      "display_name",
+                      "role",
+                      "avatar_seed",
+                      "source",
+                      "created_at",
+                      "updated_at",
+                      "hlc"
+                    ],
+                    "additionalProperties": false
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "People"
+        ],
+        "summary": "Create a new household profile",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "displayName": {
+                    "type": "string"
+                  },
+                  "nickname": {
+                    "type": "string",
+                    "nullable": true
+                  },
+                  "birthdate": {
+                    "type": "string",
+                    "nullable": true
+                  },
+                  "role": {
+                    "type": "string"
+                  },
+                  "avatarSeed": {
+                    "type": "string"
+                  },
+                  "secret": {
+                    "type": "string"
+                  },
+                  "localOnly": {
+                    "type": "boolean"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Created.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "pattern": "^person-[a-z0-9]{6,}$",
+                      "description": "Stable id, never reused, even after deletedAt is set."
+                    },
+                    "display_name": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 80
+                    },
+                    "nickname": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "maxLength": 80,
+                          "description": "What a companion calls this person, if different from display_name."
+                        },
+                        {
+                          "nullable": true,
+                          "description": "What a companion calls this person, if different from display_name."
+                        },
+                        {
+                          "nullable": true
+                        }
+                      ],
+                      "description": "What a companion calls this person, if different from display_name."
+                    },
+                    "role": {
+                      "type": "string",
+                      "enum": [
+                        "owner",
+                        "admin",
+                        "adult",
+                        "teen",
+                        "child",
+                        "guest"
+                      ],
+                      "description": "The role ladder (4.2). Two minor bands (teen 13-17, child under 13) so there is no thirteen-year cliff."
+                    },
+                    "avatar_seed": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "Deterministic seed for a generated avatar; never a photo of a real person by default."
+                    },
+                    "source": {
+                      "type": "string",
+                      "enum": [
+                        "hub",
+                        "local"
+                      ],
+                      "description": "hub: authoritative on the hub, replicated to robots. local: a robot-only guest, never synced to the hub (4.2's local_only concept for a whole person)."
+                    },
+                    "local_only": {
+                      "type": "boolean",
+                      "default": false,
+                      "description": "Keeps this person off the overlay network entirely (4.2, 4.12)."
+                    },
+                    "created_at": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "updated_at": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "deleted_at": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "format": "date-time"
+                        },
+                        {
+                          "nullable": true
+                        }
+                      ],
+                      "default": null
+                    },
+                    "hlc": {
+                      "type": "string",
+                      "pattern": "^[0-9]+:[0-9]+:[a-z0-9]{6,}$",
+                      "description": "Hybrid logical clock: wall_ms:counter:node (7.3)."
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "display_name",
+                    "role",
+                    "avatar_seed",
+                    "source",
+                    "created_at",
+                    "updated_at",
+                    "hlc"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid displayName/role/secret",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not allowed to create this role",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/people/{id}": {
+      "patch": {
+        "tags": [
+          "People"
+        ],
+        "summary": "Edit a person's profile",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "displayName": {
+                    "type": "string"
+                  },
+                  "nickname": {
+                    "type": "string",
+                    "nullable": true
+                  },
+                  "birthdate": {
+                    "type": "string",
+                    "nullable": true
+                  },
+                  "role": {
+                    "type": "string"
+                  },
+                  "avatarSeed": {
+                    "type": "string"
+                  },
+                  "localOnly": {
+                    "type": "boolean"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Updated.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "pattern": "^person-[a-z0-9]{6,}$",
+                      "description": "Stable id, never reused, even after deletedAt is set."
+                    },
+                    "display_name": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 80
+                    },
+                    "nickname": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "maxLength": 80,
+                          "description": "What a companion calls this person, if different from display_name."
+                        },
+                        {
+                          "nullable": true,
+                          "description": "What a companion calls this person, if different from display_name."
+                        },
+                        {
+                          "nullable": true
+                        }
+                      ],
+                      "description": "What a companion calls this person, if different from display_name."
+                    },
+                    "role": {
+                      "type": "string",
+                      "enum": [
+                        "owner",
+                        "admin",
+                        "adult",
+                        "teen",
+                        "child",
+                        "guest"
+                      ],
+                      "description": "The role ladder (4.2). Two minor bands (teen 13-17, child under 13) so there is no thirteen-year cliff."
+                    },
+                    "avatar_seed": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "Deterministic seed for a generated avatar; never a photo of a real person by default."
+                    },
+                    "source": {
+                      "type": "string",
+                      "enum": [
+                        "hub",
+                        "local"
+                      ],
+                      "description": "hub: authoritative on the hub, replicated to robots. local: a robot-only guest, never synced to the hub (4.2's local_only concept for a whole person)."
+                    },
+                    "local_only": {
+                      "type": "boolean",
+                      "default": false,
+                      "description": "Keeps this person off the overlay network entirely (4.2, 4.12)."
+                    },
+                    "created_at": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "updated_at": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "deleted_at": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "format": "date-time"
+                        },
+                        {
+                          "nullable": true
+                        }
+                      ],
+                      "default": null
+                    },
+                    "hlc": {
+                      "type": "string",
+                      "pattern": "^[0-9]+:[0-9]+:[a-z0-9]{6,}$",
+                      "description": "Hybrid logical clock: wall_ms:counter:node (7.3)."
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "display_name",
+                    "role",
+                    "avatar_seed",
+                    "source",
+                    "created_at",
+                    "updated_at",
+                    "hlc"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid role/displayName/birthdate",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not allowed to edit this person",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such person",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "People"
+        ],
+        "summary": "Delete a person and erase what the household holds about them",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "What was actually removed, so the household can see the size of the erasure.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "erased": {
+                      "type": "object",
+                      "properties": {
+                        "memories": {
+                          "type": "number"
+                        },
+                        "conversations": {
+                          "type": "number"
+                        },
+                        "conversationThreads": {
+                          "type": "number"
+                        },
+                        "settings": {
+                          "type": "number"
+                        },
+                        "clonedVoices": {
+                          "type": "number"
+                        },
+                        "scheduledJobs": {
+                          "type": "number"
+                        },
+                        "sessions": {
+                          "type": "number"
+                        }
+                      },
+                      "required": [
+                        "memories",
+                        "conversations",
+                        "conversationThreads",
+                        "settings",
+                        "clonedVoices",
+                        "scheduledJobs",
+                        "sessions"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "erased"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Cannot delete this person",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "You cannot delete your own profile, or you cannot manage this role",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such person",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/people/batch-delete": {
+      "post": {
+        "tags": [
+          "People"
+        ],
+        "summary": "Delete several people at once",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "ids": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  }
+                },
+                "required": [
+                  "ids"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "One outcome per requested id, in the same words the single-delete route would have used for a failure.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "outcomes": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "deleted": {
+                            "type": "boolean"
+                          },
+                          "reason": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "deleted"
+                        ]
+                      }
+                    }
+                  },
+                  "required": [
+                    "outcomes"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "ids is missing, empty, or not a list of strings",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not owner/admin",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/settings/registry": {
+      "get": {
+        "tags": [
+          "Settings"
+        ],
+        "summary": "Every declared settings key's metadata",
+        "responses": {
+          "200": {
+            "description": "The full registry.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "key": {
+                        "type": "string",
+                        "pattern": "^[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*)+$"
+                      },
+                      "scope": {
+                        "type": "string",
+                        "enum": [
+                          "household",
+                          "person",
+                          "device"
+                        ]
+                      },
+                      "selector": {
+                        "type": "string",
+                        "enum": [
+                          "number",
+                          "select",
+                          "text",
+                          "boolean",
+                          "duration",
+                          "time",
+                          "entity",
+                          "area",
+                          "person",
+                          "media"
+                        ],
+                        "description": "Home Assistant's selector names (3.2)."
+                      },
+                      "range": {
+                        "nullable": true,
+                        "description": "Selector-specific: min/max for number, a duration unit, an option list for select, and so on. Shape depends on selector."
+                      },
+                      "default": {
+                        "nullable": true
+                      },
+                      "label": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "help": {
+                        "type": "string"
+                      },
+                      "section": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "collapsed": {
+                            "type": "boolean",
+                            "default": false
+                          },
+                          "order": {
+                            "type": "integer"
+                          }
+                        },
+                        "additionalProperties": false
+                      },
+                      "level": {
+                        "type": "string",
+                        "enum": [
+                          "basic",
+                          "advanced",
+                          "expert"
+                        ]
+                      },
+                      "secret": {
+                        "type": "boolean",
+                        "default": false
+                      },
+                      "needs": {
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        },
+                        "description": "Capabilities required for this key to apply."
+                      },
+                      "lives_in": {
+                        "type": "string",
+                        "description": "The package, companion, integration, or central page id that renders this key."
+                      },
+                      "honoured_by": {
+                        "type": "array",
+                        "items": {
+                          "type": "string",
+                          "enum": [
+                            "home",
+                            "bot"
+                          ]
+                        },
+                        "minItems": 1
+                      }
+                    },
+                    "required": [
+                      "key",
+                      "scope",
+                      "selector",
+                      "label",
+                      "level",
+                      "lives_in",
+                      "honoured_by"
+                    ],
+                    "additionalProperties": false,
+                    "description": "One entry in the settings registry (spec/settings/keys.json) or a package manifest's config[]. See platform plan 3.2 and .github's docs/SETTINGS.md."
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/settings": {
+      "get": {
+        "tags": [
+          "Settings"
+        ],
+        "summary": "Resolved settings values for a scope",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "household"
+            },
+            "required": true,
+            "name": "scope",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Every key resolved for this scope.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "key": {
+                        "type": "string"
+                      },
+                      "value": {
+                        "nullable": true
+                      },
+                      "source": {
+                        "type": "string",
+                        "enum": [
+                          "user",
+                          "default",
+                          "package",
+                          "sync"
+                        ]
+                      },
+                      "label": {
+                        "type": "string"
+                      },
+                      "help": {
+                        "type": "string"
+                      },
+                      "level": {
+                        "type": "string",
+                        "enum": [
+                          "basic",
+                          "advanced",
+                          "expert"
+                        ]
+                      },
+                      "secret": {
+                        "type": "boolean"
+                      },
+                      "isSet": {
+                        "type": "boolean"
+                      }
+                    },
+                    "required": [
+                      "key",
+                      "source",
+                      "label",
+                      "level",
+                      "secret"
+                    ]
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid scope, or scope is missing",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not allowed to read this scope",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "Settings"
+        ],
+        "summary": "Set one settings value",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "scope": {
+                    "type": "string"
+                  },
+                  "key": {
+                    "type": "string"
+                  },
+                  "value": {
+                    "nullable": true
+                  }
+                },
+                "required": [
+                  "scope",
+                  "key"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The value as stored.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "key": {
+                      "type": "string"
+                    },
+                    "value": {
+                      "nullable": true
+                    },
+                    "source": {
+                      "type": "string",
+                      "enum": [
+                        "user",
+                        "default",
+                        "package",
+                        "sync"
+                      ]
+                    },
+                    "label": {
+                      "type": "string"
+                    },
+                    "help": {
+                      "type": "string"
+                    },
+                    "level": {
+                      "type": "string",
+                      "enum": [
+                        "basic",
+                        "advanced",
+                        "expert"
+                      ]
+                    },
+                    "secret": {
+                      "type": "boolean"
+                    },
+                    "isSet": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "key",
+                    "source",
+                    "label",
+                    "level",
+                    "secret"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid scope/key/value, or a newer value already exists",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not allowed to write this scope",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/settings/reset": {
+      "post": {
+        "tags": [
+          "Settings"
+        ],
+        "summary": "Reset one settings value to its default",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "scope": {
+                    "type": "string"
+                  },
+                  "key": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "scope",
+                  "key"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Reset to default.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "key": {
+                      "type": "string"
+                    },
+                    "value": {
+                      "nullable": true
+                    },
+                    "source": {
+                      "type": "string",
+                      "enum": [
+                        "user",
+                        "default",
+                        "package",
+                        "sync"
+                      ]
+                    },
+                    "label": {
+                      "type": "string"
+                    },
+                    "help": {
+                      "type": "string"
+                    },
+                    "level": {
+                      "type": "string",
+                      "enum": [
+                        "basic",
+                        "advanced",
+                        "expert"
+                      ]
+                    },
+                    "secret": {
+                      "type": "boolean"
+                    },
+                    "isSet": {
+                      "type": "boolean"
+                    },
+                    "success": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    }
+                  },
+                  "required": [
+                    "key",
+                    "source",
+                    "label",
+                    "level",
+                    "secret",
+                    "success"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid scope/key",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not allowed to write this scope",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/notifications": {
+      "get": {
+        "tags": [
+          "Notifications"
+        ],
+        "summary": "The signed-in person's own pending (not dismissed) notifications",
+        "responses": {
+          "200": {
+            "description": "Pending notifications, newest first.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "string"
+                      },
+                      "typeId": {
+                        "type": "string"
+                      },
+                      "text": {
+                        "type": "string"
+                      },
+                      "channels": {
+                        "type": "array",
+                        "items": {
+                          "type": "string",
+                          "enum": [
+                            "in_app",
+                            "telegram"
+                          ]
+                        }
+                      },
+                      "createdAt": {
+                        "type": "string"
+                      },
+                      "readAt": {
+                        "type": "string",
+                        "nullable": true
+                      },
+                      "dismissedAt": {
+                        "type": "string",
+                        "nullable": true
+                      }
+                    },
+                    "required": [
+                      "id",
+                      "typeId",
+                      "text",
+                      "channels",
+                      "createdAt",
+                      "readAt",
+                      "dismissedAt"
+                    ]
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/notifications/history": {
+      "get": {
+        "tags": [
+          "Notifications"
+        ],
+        "summary": "The signed-in person's full notification history, dismissed or not",
+        "responses": {
+          "200": {
+            "description": "Every delivery, newest first.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "string"
+                      },
+                      "typeId": {
+                        "type": "string"
+                      },
+                      "text": {
+                        "type": "string"
+                      },
+                      "channels": {
+                        "type": "array",
+                        "items": {
+                          "type": "string",
+                          "enum": [
+                            "in_app",
+                            "telegram"
+                          ]
+                        }
+                      },
+                      "createdAt": {
+                        "type": "string"
+                      },
+                      "readAt": {
+                        "type": "string",
+                        "nullable": true
+                      },
+                      "dismissedAt": {
+                        "type": "string",
+                        "nullable": true
+                      }
+                    },
+                    "required": [
+                      "id",
+                      "typeId",
+                      "text",
+                      "channels",
+                      "createdAt",
+                      "readAt",
+                      "dismissedAt"
+                    ]
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/notifications/{id}/read": {
+      "post": {
+        "tags": [
+          "Notifications"
+        ],
+        "summary": "Mark one of the signed-in person's own notifications read",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "notif-a1b2c3"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Marked read.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "typeId": {
+                      "type": "string"
+                    },
+                    "text": {
+                      "type": "string"
+                    },
+                    "channels": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "enum": [
+                          "in_app",
+                          "telegram"
+                        ]
+                      }
+                    },
+                    "createdAt": {
+                      "type": "string"
+                    },
+                    "readAt": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "dismissedAt": {
+                      "type": "string",
+                      "nullable": true
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "typeId",
+                    "text",
+                    "channels",
+                    "createdAt",
+                    "readAt",
+                    "dismissedAt"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not this person's notification",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such notification",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/notifications/{id}/dismiss": {
+      "post": {
+        "tags": [
+          "Notifications"
+        ],
+        "summary": "Dismiss one of the signed-in person's own notifications",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "notif-a1b2c3"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Dismissed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "id"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not this person's notification",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such notification",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/backups": {
+      "get": {
+        "tags": [
+          "Backups"
+        ],
+        "summary": "List available backup files",
+        "responses": {
+          "200": {
+            "description": "Every backup on disk.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "filename": {
+                        "type": "string"
+                      },
+                      "createdAt": {
+                        "type": "string"
+                      },
+                      "bytes": {
+                        "type": "number"
+                      }
+                    },
+                    "required": [
+                      "filename",
+                      "createdAt",
+                      "bytes"
+                    ]
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not owner/admin",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/backups/run": {
+      "post": {
+        "tags": [
+          "Backups"
+        ],
+        "summary": "Run a backup now",
+        "responses": {
+          "200": {
+            "description": "The new backup.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "filename": {
+                      "type": "string"
+                    },
+                    "createdAt": {
+                      "type": "string"
+                    },
+                    "bytes": {
+                      "type": "number"
+                    }
+                  },
+                  "required": [
+                    "filename",
+                    "createdAt",
+                    "bytes"
+                  ]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not owner/admin",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/backups/restore/pending": {
+      "get": {
+        "tags": [
+          "Backups"
+        ],
+        "summary": "The restore staged for the next boot, if any",
+        "responses": {
+          "200": {
+            "description": "Null if nothing is staged.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "pending": {
+                      "type": "object",
+                      "nullable": true,
+                      "properties": {
+                        "filename": {
+                          "type": "string"
+                        },
+                        "stagedAt": {
+                          "type": "string"
+                        },
+                        "stagedByPersonId": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "filename",
+                        "stagedAt",
+                        "stagedByPersonId"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "pending"
+                  ]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not owner/admin",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/backups/restore/cancel": {
+      "post": {
+        "tags": [
+          "Backups"
+        ],
+        "summary": "Cancel a staged restore",
+        "responses": {
+          "200": {
+            "description": "Whether there was anything to cancel.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "cancelled": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "cancelled"
+                  ]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Owner only",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/backups/{filename}/restore": {
+      "post": {
+        "tags": [
+          "Backups"
+        ],
+        "summary": "Stage a backup file to restore at the next boot",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "filename",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Staged for the next boot.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "pending": {
+                      "type": "object",
+                      "properties": {
+                        "filename": {
+                          "type": "string"
+                        },
+                        "stagedAt": {
+                          "type": "string"
+                        },
+                        "stagedByPersonId": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "filename",
+                        "stagedAt",
+                        "stagedByPersonId"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "pending"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The archive is refused (tampered, corrupt, or not a MaiPai Home backup)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Owner only",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such backup",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/repairs": {
+      "get": {
+        "tags": [
+          "Repairs"
+        ],
+        "summary": "List Repairs issues",
+        "description": "Owner/admin only: Health/Repairs spans the whole household's hub, not any one person's own data.",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "true",
+                "false"
+              ]
+            },
+            "required": false,
+            "name": "include_resolved",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Unresolved-and-undismissed issues by default; every issue ever raised when include_resolved=true.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "string",
+                        "pattern": "^issue-[a-z0-9]{6,}$"
+                      },
+                      "source": {
+                        "type": "string",
+                        "minLength": 1,
+                        "description": "The subsystem that raised this: a sidecar id, a package id, or a core name like `backup` or `engine`. Paired with `key` as the upsert identity."
+                      },
+                      "key": {
+                        "type": "string",
+                        "minLength": 1,
+                        "description": "The source's own stable name for this specific problem, so `raiseIssue` called again with the same `(source, key)` updates the existing row instead of creating a second one."
+                      },
+                      "severity": {
+                        "type": "string",
+                        "enum": [
+                          "info",
+                          "warning",
+                          "error"
+                        ],
+                        "description": "`error` is the only severity that fires the `repairs.new` notification (time_sensitive, to adults) - `info` and `warning` sit on the Repairs list for a person to notice on their own."
+                      },
+                      "title": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 200,
+                        "description": "One line, dad-test plain language - shown on the Repairs list."
+                      },
+                      "detail": {
+                        "type": "string",
+                        "minLength": 1,
+                        "description": "Longer explanation shown when the row is expanded."
+                      },
+                      "fix": {
+                        "anyOf": [
+                          {
+                            "type": "object",
+                            "properties": {
+                              "label": {
+                                "type": "string",
+                                "minLength": 1,
+                                "description": "Button text, e.g. \"Restart the search sidecar\"."
+                              },
+                              "action": {
+                                "type": "string",
+                                "minLength": 1,
+                                "description": "An opaque id the owning source recognises when `POST /api/repairs/:id/fix` calls back into it - never a shell command or arbitrary code, just a name the source's own fix table looks up."
+                              }
+                            },
+                            "required": [
+                              "label",
+                              "action"
+                            ],
+                            "additionalProperties": false,
+                            "description": "A one-click remedy, when one exists. Null means the row is informational only - a person reads it and decides what to do."
+                          },
+                          {
+                            "nullable": true,
+                            "description": "A one-click remedy, when one exists. Null means the row is informational only - a person reads it and decides what to do."
+                          },
+                          {
+                            "nullable": true
+                          }
+                        ],
+                        "default": null,
+                        "description": "A one-click remedy, when one exists. Null means the row is informational only - a person reads it and decides what to do."
+                      },
+                      "learn_more": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "description": "A path into docs/user/ or docs/dev/, not an external URL - the same 'nothing leaves the house' posture as every other outbound-looking link in the product."
+                          },
+                          {
+                            "nullable": true,
+                            "description": "A path into docs/user/ or docs/dev/, not an external URL - the same 'nothing leaves the house' posture as every other outbound-looking link in the product."
+                          },
+                          {
+                            "nullable": true
+                          }
+                        ],
+                        "default": null,
+                        "description": "A path into docs/user/ or docs/dev/, not an external URL - the same 'nothing leaves the house' posture as every other outbound-looking link in the product."
+                      },
+                      "created_at": {
+                        "type": "string",
+                        "format": "date-time",
+                        "description": "When this (source, key) was first raised. Preserved across an upsert that only refreshes detail/severity - a still-open issue keeps its original age."
+                      },
+                      "resolved_at": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "format": "date-time",
+                            "description": "Set only by resolveIssue() - the owning source itself detected the underlying problem is gone. Clears dismissed_at too: a genuinely-resolved incident is over, so if the same (source, key) is raised again later it is treated as a fresh occurrence, not a reopening of something the household already dismissed. A resolved row stays in the table (the history a household might want later) rather than being deleted; GET /api/repairs only lists rows with neither resolved_at nor dismissed_at set, by default."
+                          },
+                          {
+                            "nullable": true,
+                            "description": "Set only by resolveIssue() - the owning source itself detected the underlying problem is gone. Clears dismissed_at too: a genuinely-resolved incident is over, so if the same (source, key) is raised again later it is treated as a fresh occurrence, not a reopening of something the household already dismissed. A resolved row stays in the table (the history a household might want later) rather than being deleted; GET /api/repairs only lists rows with neither resolved_at nor dismissed_at set, by default."
+                          },
+                          {
+                            "nullable": true
+                          }
+                        ],
+                        "default": null,
+                        "description": "Set only by resolveIssue() - the owning source itself detected the underlying problem is gone. Clears dismissed_at too: a genuinely-resolved incident is over, so if the same (source, key) is raised again later it is treated as a fresh occurrence, not a reopening of something the household already dismissed. A resolved row stays in the table (the history a household might want later) rather than being deleted; GET /api/repairs only lists rows with neither resolved_at nor dismissed_at set, by default."
+                      },
+                      "dismissed_at": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "format": "date-time",
+                            "description": "Set by a person saying 'stop showing me this' (POST /api/repairs/:id/fix or /dismiss), distinct from resolved_at: a code review (2026-09-06) found an earlier version reused resolved_at for dismissal, which meant the very next raiseIssue() from the same still-broken source's routine recheck reopened it and re-sent the repairs.new notification, defeating the dismiss a person just performed. raiseIssue() preserves this field across an upsert of an otherwise-still-open issue (sticky until the source calls resolveIssue() for real), so a dismissed-but-not-yet-fixed issue stays quiet through repeat checks and only resurfaces once it is either genuinely resolved and recurs, or a person reopens it by hand."
+                          },
+                          {
+                            "nullable": true,
+                            "description": "Set by a person saying 'stop showing me this' (POST /api/repairs/:id/fix or /dismiss), distinct from resolved_at: a code review (2026-09-06) found an earlier version reused resolved_at for dismissal, which meant the very next raiseIssue() from the same still-broken source's routine recheck reopened it and re-sent the repairs.new notification, defeating the dismiss a person just performed. raiseIssue() preserves this field across an upsert of an otherwise-still-open issue (sticky until the source calls resolveIssue() for real), so a dismissed-but-not-yet-fixed issue stays quiet through repeat checks and only resurfaces once it is either genuinely resolved and recurs, or a person reopens it by hand."
+                          },
+                          {
+                            "nullable": true
+                          }
+                        ],
+                        "default": null,
+                        "description": "Set by a person saying 'stop showing me this' (POST /api/repairs/:id/fix or /dismiss), distinct from resolved_at: a code review (2026-09-06) found an earlier version reused resolved_at for dismissal, which meant the very next raiseIssue() from the same still-broken source's routine recheck reopened it and re-sent the repairs.new notification, defeating the dismiss a person just performed. raiseIssue() preserves this field across an upsert of an otherwise-still-open issue (sticky until the source calls resolveIssue() for real), so a dismissed-but-not-yet-fixed issue stays quiet through repeat checks and only resurfaces once it is either genuinely resolved and recurs, or a person reopens it by hand."
+                      },
+                      "hlc": {
+                        "type": "string",
+                        "pattern": "^[0-9]+:[0-9]+:[a-z0-9]{6,}$",
+                        "description": "Hybrid logical clock: wall_ms:counter:node (7.3), the same shape setting-value.schema.json's hlc uses."
+                      }
+                    },
+                    "required": [
+                      "id",
+                      "source",
+                      "key",
+                      "severity",
+                      "title",
+                      "detail",
+                      "created_at",
+                      "hlc"
+                    ],
+                    "additionalProperties": false,
+                    "description": "One row on the Health/Repairs surface (platform plan 4.11-4.12, session-f-platform-and-trust.md step 1). Raised by `lib/issues.ts`'s `raiseIssue({ source, key, severity, title, detail, fix? })`, upserted by the `(source, key)` pair so a still-broken thing does not pile up duplicate rows every time its owner re-checks, and cleared by `resolveIssue(source, key)` the moment the owner sees it fixed. `source` names the subsystem that raised it (a sidecar id, a package id, `backup`, `engine`, ...); `key` is that source's own stable name for the specific problem (so one source can hold several open issues at once, each with its own key). Carries `hlc` from the first record this platform stamps with one (docs/plans/wave-2.md: 'F lays the pieces the link needs that are also useful now... HLC on every table') even though Issues are hub-local and never sync - the field costs nothing here and proves the shape out before a synced record needs it for real."
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not owner/admin",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/repairs/{id}/fix": {
+      "post": {
+        "tags": [
+          "Repairs"
+        ],
+        "summary": "Run an issue's one-click fix",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "issue-a1b2c3"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The fix ran and the issue resolved.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "pattern": "^issue-[a-z0-9]{6,}$"
+                    },
+                    "source": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "The subsystem that raised this: a sidecar id, a package id, or a core name like `backup` or `engine`. Paired with `key` as the upsert identity."
+                    },
+                    "key": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "The source's own stable name for this specific problem, so `raiseIssue` called again with the same `(source, key)` updates the existing row instead of creating a second one."
+                    },
+                    "severity": {
+                      "type": "string",
+                      "enum": [
+                        "info",
+                        "warning",
+                        "error"
+                      ],
+                      "description": "`error` is the only severity that fires the `repairs.new` notification (time_sensitive, to adults) - `info` and `warning` sit on the Repairs list for a person to notice on their own."
+                    },
+                    "title": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 200,
+                      "description": "One line, dad-test plain language - shown on the Repairs list."
+                    },
+                    "detail": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "Longer explanation shown when the row is expanded."
+                    },
+                    "fix": {
+                      "anyOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "label": {
+                              "type": "string",
+                              "minLength": 1,
+                              "description": "Button text, e.g. \"Restart the search sidecar\"."
+                            },
+                            "action": {
+                              "type": "string",
+                              "minLength": 1,
+                              "description": "An opaque id the owning source recognises when `POST /api/repairs/:id/fix` calls back into it - never a shell command or arbitrary code, just a name the source's own fix table looks up."
+                            }
+                          },
+                          "required": [
+                            "label",
+                            "action"
+                          ],
+                          "additionalProperties": false,
+                          "description": "A one-click remedy, when one exists. Null means the row is informational only - a person reads it and decides what to do."
+                        },
+                        {
+                          "nullable": true,
+                          "description": "A one-click remedy, when one exists. Null means the row is informational only - a person reads it and decides what to do."
+                        },
+                        {
+                          "nullable": true
+                        }
+                      ],
+                      "default": null,
+                      "description": "A one-click remedy, when one exists. Null means the row is informational only - a person reads it and decides what to do."
+                    },
+                    "learn_more": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "description": "A path into docs/user/ or docs/dev/, not an external URL - the same 'nothing leaves the house' posture as every other outbound-looking link in the product."
+                        },
+                        {
+                          "nullable": true,
+                          "description": "A path into docs/user/ or docs/dev/, not an external URL - the same 'nothing leaves the house' posture as every other outbound-looking link in the product."
+                        },
+                        {
+                          "nullable": true
+                        }
+                      ],
+                      "default": null,
+                      "description": "A path into docs/user/ or docs/dev/, not an external URL - the same 'nothing leaves the house' posture as every other outbound-looking link in the product."
+                    },
+                    "created_at": {
+                      "type": "string",
+                      "format": "date-time",
+                      "description": "When this (source, key) was first raised. Preserved across an upsert that only refreshes detail/severity - a still-open issue keeps its original age."
+                    },
+                    "resolved_at": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "format": "date-time",
+                          "description": "Set only by resolveIssue() - the owning source itself detected the underlying problem is gone. Clears dismissed_at too: a genuinely-resolved incident is over, so if the same (source, key) is raised again later it is treated as a fresh occurrence, not a reopening of something the household already dismissed. A resolved row stays in the table (the history a household might want later) rather than being deleted; GET /api/repairs only lists rows with neither resolved_at nor dismissed_at set, by default."
+                        },
+                        {
+                          "nullable": true,
+                          "description": "Set only by resolveIssue() - the owning source itself detected the underlying problem is gone. Clears dismissed_at too: a genuinely-resolved incident is over, so if the same (source, key) is raised again later it is treated as a fresh occurrence, not a reopening of something the household already dismissed. A resolved row stays in the table (the history a household might want later) rather than being deleted; GET /api/repairs only lists rows with neither resolved_at nor dismissed_at set, by default."
+                        },
+                        {
+                          "nullable": true
+                        }
+                      ],
+                      "default": null,
+                      "description": "Set only by resolveIssue() - the owning source itself detected the underlying problem is gone. Clears dismissed_at too: a genuinely-resolved incident is over, so if the same (source, key) is raised again later it is treated as a fresh occurrence, not a reopening of something the household already dismissed. A resolved row stays in the table (the history a household might want later) rather than being deleted; GET /api/repairs only lists rows with neither resolved_at nor dismissed_at set, by default."
+                    },
+                    "dismissed_at": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "format": "date-time",
+                          "description": "Set by a person saying 'stop showing me this' (POST /api/repairs/:id/fix or /dismiss), distinct from resolved_at: a code review (2026-09-06) found an earlier version reused resolved_at for dismissal, which meant the very next raiseIssue() from the same still-broken source's routine recheck reopened it and re-sent the repairs.new notification, defeating the dismiss a person just performed. raiseIssue() preserves this field across an upsert of an otherwise-still-open issue (sticky until the source calls resolveIssue() for real), so a dismissed-but-not-yet-fixed issue stays quiet through repeat checks and only resurfaces once it is either genuinely resolved and recurs, or a person reopens it by hand."
+                        },
+                        {
+                          "nullable": true,
+                          "description": "Set by a person saying 'stop showing me this' (POST /api/repairs/:id/fix or /dismiss), distinct from resolved_at: a code review (2026-09-06) found an earlier version reused resolved_at for dismissal, which meant the very next raiseIssue() from the same still-broken source's routine recheck reopened it and re-sent the repairs.new notification, defeating the dismiss a person just performed. raiseIssue() preserves this field across an upsert of an otherwise-still-open issue (sticky until the source calls resolveIssue() for real), so a dismissed-but-not-yet-fixed issue stays quiet through repeat checks and only resurfaces once it is either genuinely resolved and recurs, or a person reopens it by hand."
+                        },
+                        {
+                          "nullable": true
+                        }
+                      ],
+                      "default": null,
+                      "description": "Set by a person saying 'stop showing me this' (POST /api/repairs/:id/fix or /dismiss), distinct from resolved_at: a code review (2026-09-06) found an earlier version reused resolved_at for dismissal, which meant the very next raiseIssue() from the same still-broken source's routine recheck reopened it and re-sent the repairs.new notification, defeating the dismiss a person just performed. raiseIssue() preserves this field across an upsert of an otherwise-still-open issue (sticky until the source calls resolveIssue() for real), so a dismissed-but-not-yet-fixed issue stays quiet through repeat checks and only resurfaces once it is either genuinely resolved and recurs, or a person reopens it by hand."
+                    },
+                    "hlc": {
+                      "type": "string",
+                      "pattern": "^[0-9]+:[0-9]+:[a-z0-9]{6,}$",
+                      "description": "Hybrid logical clock: wall_ms:counter:node (7.3), the same shape setting-value.schema.json's hlc uses."
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "source",
+                    "key",
+                    "severity",
+                    "title",
+                    "detail",
+                    "created_at",
+                    "hlc"
+                  ],
+                  "additionalProperties": false,
+                  "description": "One row on the Health/Repairs surface (platform plan 4.11-4.12, session-f-platform-and-trust.md step 1). Raised by `lib/issues.ts`'s `raiseIssue({ source, key, severity, title, detail, fix? })`, upserted by the `(source, key)` pair so a still-broken thing does not pile up duplicate rows every time its owner re-checks, and cleared by `resolveIssue(source, key)` the moment the owner sees it fixed. `source` names the subsystem that raised it (a sidecar id, a package id, `backup`, `engine`, ...); `key` is that source's own stable name for the specific problem (so one source can hold several open issues at once, each with its own key). Carries `hlc` from the first record this platform stamps with one (docs/plans/wave-2.md: 'F lays the pieces the link needs that are also useful now... HLC on every table') even though Issues are hub-local and never sync - the field costs nothing here and proves the shape out before a synced record needs it for real."
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "This issue has no fix, or no handler is registered for its action",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not owner/admin",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such issue",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/repairs/{id}/dismiss": {
+      "post": {
+        "tags": [
+          "Repairs"
+        ],
+        "summary": "Dismiss an issue without running its fix",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "issue-a1b2c3"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Dismissed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "id"
+                  ]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not owner/admin",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such issue",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

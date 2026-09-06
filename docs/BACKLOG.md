@@ -1243,12 +1243,21 @@ on a spec tag that was never cut.
 - [ ] **Content ceiling record and dials** (M) - `spec/README.md` lists
       it unbuilt; the safety classifier reads the band through a role
       proxy. Never mentioned here until now.
-- [ ] **`@hono/zod-openapi` conversion** (M) - org rule: "any route you
-      touch gets converted"; zero of 17 route files comply and dev.md
-      tracks it as debt with no backlog line.
-- [ ] **Rate-limit the remaining raw fetches** (S) - Telegram (fired per
-      notification, no bucket) and the HF voice catalog bypass
-      `tryConsume`; only `host.fetch` and Home Assistant go through it.
+- [x] **`@hono/zod-openapi` conversion, the scaffolding and F's own
+      routes** (Session F step 4, 2026-09-06) - `lib/openapi.ts`
+      (`apiRouter()`, `errorResponses()`, `PaginationQuerySchema`/
+      `paginatedResponseSchema()`), `/api/docs` (Scalar), `docs/api/
+      openapi.json` generated and drift-checked by `check.sh`.
+      `repairs.ts`, `notifications.ts`, `settings.ts`, `backups.ts`,
+      `people.ts` converted (five of F's six pre-existing route files);
+      `auth.ts` deliberately left for a dedicated pass (a shared
+      Response-building helper across two differently-shaped routes -
+      see `docs/dev/session-f.md`'s step 4 for the real reason). The
+      other 11 route files (C, D, E's) still need converting when each
+      session next touches theirs, per the org rule.
+- [x] **Rate-limit the remaining raw fetches** (Session F step 3,
+      2026-09-06) - `telegramChannel.ts` and the HF voice catalog both
+      go through `tryConsume` now.
 - [ ] **A generic wall, budget and probe layer before any media package**
       (M) - `rateLimiter.ts` is a non-blocking bucket only. Legacy's
       `quiet.ts`/`accessMonitor.ts`/`sessionKeeper.ts` trio encodes the
