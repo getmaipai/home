@@ -68,3 +68,6 @@ class Grant(BaseModel):
         None,
         description="A revoked grant is tombstoned, not deleted: 'who removed this, and when' is exactly the question a household asks after something stops working.",
     )
+    hlc: constr(pattern=r'^[0-9]+:[0-9]+:[a-z0-9]{6,}$') = Field(
+        ..., description='Hybrid logical clock: wall_ms:counter:node (7.3).'
+    )

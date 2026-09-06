@@ -288,7 +288,7 @@ describe("assertCanAccessScope (person and device scope authorization)", () => {
     const now = new Date().toISOString();
     const id = "person-selftest1";
     db.insert(people)
-      .values({ id, displayName: "X", role: "adult", avatarSeed: id, source: "hub", createdAt: now, updatedAt: now })
+      .values({ id, displayName: "X", role: "adult", avatarSeed: id, source: "hub", createdAt: now, updatedAt: now, hlc: "1700000000000:0:testfix" })
       .run();
     const actor = db.select().from(people).where(eq(people.id, id)).get()!;
     const result = assertCanAccessScope(actor, { kind: "person", id }, "write");
@@ -301,8 +301,8 @@ describe("assertCanAccessScope (person and device scope authorization)", () => {
     const adultId = "person-adulttest1";
     db.insert(people)
       .values([
-        { id: ownerId, displayName: "Owner", role: "owner", avatarSeed: ownerId, source: "hub", createdAt: now, updatedAt: now },
-        { id: adultId, displayName: "Adult", role: "adult", avatarSeed: adultId, source: "hub", createdAt: now, updatedAt: now },
+        { id: ownerId, displayName: "Owner", role: "owner", avatarSeed: ownerId, source: "hub", createdAt: now, updatedAt: now, hlc: "1700000000000:0:testfix" },
+        { id: adultId, displayName: "Adult", role: "adult", avatarSeed: adultId, source: "hub", createdAt: now, updatedAt: now, hlc: "1700000000000:1:testfix" },
       ])
       .run();
     const owner = db.select().from(people).where(eq(people.id, ownerId)).get()!;
@@ -318,8 +318,8 @@ describe("assertCanAccessScope (person and device scope authorization)", () => {
     const childId = "person-childtest1";
     db.insert(people)
       .values([
-        { id: ownerId, displayName: "Owner", role: "owner", avatarSeed: ownerId, source: "hub", createdAt: now, updatedAt: now },
-        { id: childId, displayName: "Child", role: "child", avatarSeed: childId, source: "hub", createdAt: now, updatedAt: now },
+        { id: ownerId, displayName: "Owner", role: "owner", avatarSeed: ownerId, source: "hub", createdAt: now, updatedAt: now, hlc: "1700000000000:0:testfix" },
+        { id: childId, displayName: "Child", role: "child", avatarSeed: childId, source: "hub", createdAt: now, updatedAt: now, hlc: "1700000000000:1:testfix" },
       ])
       .run();
     const owner = db.select().from(people).where(eq(people.id, ownerId)).get()!;
@@ -331,7 +331,7 @@ describe("assertCanAccessScope (person and device scope authorization)", () => {
     const now = new Date().toISOString();
     const adultId = "person-devicetest1";
     db.insert(people)
-      .values({ id: adultId, displayName: "Adult", role: "adult", avatarSeed: adultId, source: "hub", createdAt: now, updatedAt: now })
+      .values({ id: adultId, displayName: "Adult", role: "adult", avatarSeed: adultId, source: "hub", createdAt: now, updatedAt: now, hlc: "1700000000000:0:testfix" })
       .run();
     const adult = db.select().from(people).where(eq(people.id, adultId)).get()!;
     const result = assertCanAccessScope(adult, { kind: "device", id: "device-1" }, "read");

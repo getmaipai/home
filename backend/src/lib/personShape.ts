@@ -20,6 +20,7 @@ export function toPerson(row: PersonRow): Person {
     created_at: row.createdAt,
     updated_at: row.updatedAt,
     deleted_at: row.deletedAt,
+    hlc: row.hlc,
   });
 }
 
@@ -66,5 +67,6 @@ export function personToDbValues(person: Person) {
     createdAt: person.created_at,
     updatedAt: person.updated_at,
     deletedAt: person.deleted_at,
+    hlc: person.hlc,
   };
 }

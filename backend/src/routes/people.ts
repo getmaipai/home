@@ -4,6 +4,7 @@ import { db } from "@/db";
 import { people, personCredentials } from "@/db/schema";
 import { hashSecret } from "@/lib/secret";
 import { newPersonId } from "@/lib/id";
+import { nextHlc } from "@/lib/hlc";
 import {
   requireAuth,
   requireRole,
@@ -106,6 +107,7 @@ peopleRoutes.post("/", requireRole("owner", "admin"), async (c) => {
     created_at: now,
     updated_at: now,
     deleted_at: null,
+    hlc: nextHlc(),
   });
   if (!candidate.success) {
     return c.json({ error: candidate.error.issues.map((i) => i.message).join("; ") }, 400);
@@ -182,6 +184,7 @@ peopleRoutes.patch("/:id", requireAuth, async (c) => {
     created_at: target.createdAt,
     updated_at: now,
     deleted_at: null,
+    hlc: nextHlc(),
   });
   if (!candidate.success) {
     return c.json({ error: candidate.error.issues.map((i) => i.message).join("; ") }, 400);

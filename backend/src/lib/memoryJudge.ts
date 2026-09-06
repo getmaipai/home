@@ -72,6 +72,7 @@ import {
   type SimilarMatch,
 } from "@/lib/memory";
 import { trigger } from "@/lib/notifications";
+import { nextHlc } from "@/lib/hlc";
 import type { ConversationTurnRow } from "@/wire";
 import type { PersonRow } from "@/types";
 
@@ -314,7 +315,7 @@ async function decideDedupe(newText: string, candidates: SimilarMatch[]): Promis
 
 function markAttempt(turnId: string, attempts: number): void {
   const status = attempts >= MAX_JUDGE_ATTEMPTS ? "failed" : null;
-  db.update(conversationTurns).set({ judgeAttempts: attempts, judgeStatus: status }).where(eq(conversationTurns.id, turnId)).run();
+  db.update(conversationTurns).set({ judgeAttempts: attempts, judgeStatus: status, hlc: nextHlc() }).where(eq(conversationTurns.id, turnId)).run();
 }
 
 export interface JudgeTurnResult {
@@ -337,7 +338,7 @@ export async function judgeTurn(turn: ConversationTurnRow): Promise<JudgeTurnRes
   if (!speaker) {
     // The speaker was deleted since this turn was logged - nothing to
     // attribute a memory write to, and never recoverable by retrying.
-    db.update(conversationTurns).set({ judgeStatus: "failed" }).where(eq(conversationTurns.id, turn.id)).run();
+    db.update(conversationTurns).set({ judgeStatus: "failed", hlc: nextHlc() }).where(eq(conversationTurns.id, turn.id)).run();
     return { ok: false, factsWritten: 0 };
   }
 
@@ -414,7 +415,7 @@ export async function judgeTurn(turn: ConversationTurnRow): Promise<JudgeTurnRes
     }
   }
 
-  db.update(conversationTurns).set({ judgeStatus: "done" }).where(eq(conversationTurns.id, turn.id)).run();
+  db.update(conversationTurns).set({ judgeStatus: "done", hlc: nextHlc() }).where(eq(conversationTurns.id, turn.id)).run();
 
   if (written > 0) {
     const summary = writtenTexts.length === 1 ? writtenTexts[0]! : `${writtenTexts.length} things from our conversation`;

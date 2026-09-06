@@ -149,6 +149,8 @@ export function remember(actor: PersonRow, input: RememberInput): MemoryOpResult
     expired_at: null,
     superseded_by: null,
     embedding_space: input.embedding_space ?? null,
+    hlc: nextHlc(),
+    deleted_at: null,
   };
 
   // Validate against the spec BEFORE writing: the single source of truth
@@ -181,6 +183,8 @@ export function remember(actor: PersonRow, input: RememberInput): MemoryOpResult
       expiredAt: parsed.data.expired_at,
       supersededBy: parsed.data.superseded_by,
       embeddingSpace: parsed.data.embedding_space,
+      hlc: parsed.data.hlc,
+      deletedAt: parsed.data.deleted_at,
     })
     .run();
 
@@ -253,7 +257,7 @@ function storeEmbedding(memoryId: string, space: string, vector: readonly number
       .values(row)
       .onConflictDoUpdate({ target: memoryEmbeddings.memoryId, set: row })
       .run();
-    db.update(memoryRecords).set({ embeddingSpace: space }).where(eq(memoryRecords.id, memoryId)).run();
+    db.update(memoryRecords).set({ embeddingSpace: space, hlc: nextHlc() }).where(eq(memoryRecords.id, memoryId)).run();
     db.delete(pendingEmbeddings).where(eq(pendingEmbeddings.memoryId, memoryId)).run();
   } catch (err) {
     // The record itself is gone by now (forgot, or a test's resetDb()
@@ -457,7 +461,13 @@ export async function embedQueryForRecall(query: string): Promise<Float32Array |
 /** Shared by recall()'s default behavior and turnEngine.ts's own
  * turn-scoped call: bumps uses/last_used_at on exactly these matches,
  * mutating each match's own `record` in place so a caller that already
- * has the returned array sees the updated count without a re-read. */
+ * has the returned array sees the updated count without a re-read.
+ * Deliberately does NOT stamp a fresh hlc (step 10): hlc exists to
+ * resolve conflicts on a record's own synced CONTENT, and a usage bump
+ * happens purely from a local recall touching the record - stamping it
+ * here would make an ordinary read look like a newer edit than a
+ * genuinely concurrent real change to the record's text/status/tier,
+ * defeating the comparison hlc exists to make correct. */
 function bumpMatchUsage(matches: RecallMatch[]): void {
   const now = new Date().toISOString();
   for (const match of matches) {
@@ -660,7 +670,7 @@ export function archive(actor: PersonRow, id: string): MemoryOpResult<MemoryReco
     return { ok: false, status: 400, error: `cannot archive a record with status ${found.value.status}` };
   }
   const now = new Date().toISOString();
-  db.update(memoryRecords).set({ status: "archived", expiredAt: now }).where(eq(memoryRecords.id, id)).run();
+  db.update(memoryRecords).set({ status: "archived", expiredAt: now, hlc: nextHlc() }).where(eq(memoryRecords.id, id)).run();
   const updated = db.select().from(memoryRecords).where(eq(memoryRecords.id, id)).get()!;
   return { ok: true, value: toMemoryRecord(updated) };
 }
@@ -731,6 +741,7 @@ export function supersede(
       status: "superseded",
       expiredAt: now,
       supersededBy: created.value.id,
+      hlc: nextHlc(),
       ...(opts.closeValidTo ? { validTo: opts.closeValidTo } : {}),
     })
     .where(eq(memoryRecords.id, oldId))
@@ -745,36 +756,39 @@ function assertCanForgetOrExport(actor: PersonRow, personId: string): MemoryOpRe
   return { ok: false, status: 403, error: "cannot forget or export another person's memories" };
 }
 
+// Step 10 (session-a-intelligence.md): what a tombstoned record's own
+// `text` becomes. `text` keeps memory-record.schema.json's `minLength: 1`
+// (relaxing it to allow "" for every record just to cover this one path
+// would weaken the schema's own guarantee for every ACTIVE record, most
+// of which have no business ever having empty text), so a real, fixed,
+// never-a-real-fact sentinel stands in for "the actual content is gone" -
+// the same shape a person's own tombstone keeps display_name but wipes
+// nickname/birthdate (personLifecycle.ts's own erasePersonData()).
+export const TOMBSTONE_TEXT = "[forgotten]";
+
 /** The deliberate erasure right (2.2's privacy architecture:
- * "host.data.forget(person) is mandatory for person-scoped storage"),
- * distinct from the routine lifecycle above: this is a real DELETE, not a
- * tombstone. Only scope=person records for this person are touched;
- * household memories that happen to mention them are out of scope (a
- * much harder redaction problem, not attempted here). One bulk DELETE, not
- * a select-then-loop (a code review, 2026-09-04, flagged the N+1 version). */
+ * "host.data.forget(person) is mandatory for person-scoped storage").
+ * Tombstones as of step 10, not a real DELETE: `status` becomes
+ * `archived`, `text` and `embedding_space` are wiped, `deleted_at` is
+ * set, and the row itself is kept - a hard delete cannot be told apart
+ * from "never existed" once a robot or a second hub can sync, so a
+ * device offline during the forget could resurrect the record right
+ * back once it reconnects. Only scope=person records for this person are
+ * touched; household memories that happen to mention them are out of
+ * scope (a much harder redaction problem, not attempted here). */
 export function forget(actor: PersonRow, personId: string): MemoryOpResult<{ deleted: number }> {
   const auth = assertCanForgetOrExport(actor, personId);
   if (!auth.ok) return auth;
-  // One DELETE, no preceding SELECT: bun:sqlite's own result already
-  // carries the affected-row count (a follow-up review, 2026-09-04, found
-  // a redundant count-first SELECT still here after the N+1 loop was
-  // already replaced with a single DELETE). Raw sqlite, not
-  // db.delete().run(): Drizzle's bun-sqlite typing declares .run()'s
-  // result as void even though it returns {changes, lastInsertRowid} at
-  // runtime, so the typed changes count needs the same raw-sqlite escape
-  // hatch lib/secret.ts's recordFailedAttempt and lib/memoryId.ts's
-  // nextSeq already use.
-  //
-  // Step 5: memory_embeddings/pending_embeddings both carry a real FK to
-  // memory_records.id, so their rows for this person's records have to
-  // go first (or the memory_records delete itself fails under
-  // foreign_keys=ON) - both cleared inside the same transaction as the
-  // main delete so a crash midway can't leave one half done.
-  const result = forgetTransaction(personId);
-  return { ok: true, value: { deleted: result.changes } };
+  const forgotten = forgetTransaction(personId);
+  return { ok: true, value: { deleted: forgotten } };
 }
 
-const forgetTransaction = sqlite.transaction((personId: string) => {
+const forgetTransaction = sqlite.transaction((personId: string): number => {
+  // Step 5: memory_embeddings/pending_embeddings both carry a real FK to
+  // memory_records.id; the vector store itself isn't spec-synced
+  // content (memory-record.schema.json's own comment: "the embedding
+  // vector itself is never part of this record and never syncs"), so
+  // it's really gone, not tombstoned, same as before this step.
   sqlite
     .query(
       "DELETE FROM memory_embeddings WHERE memory_id IN (SELECT id FROM memory_records WHERE scope = 'person' AND person = ?)",
@@ -785,18 +799,37 @@ const forgetTransaction = sqlite.transaction((personId: string) => {
       "DELETE FROM pending_embeddings WHERE memory_id IN (SELECT id FROM memory_records WHERE scope = 'person' AND person = ?)",
     )
     .run(personId);
-  return sqlite.query("DELETE FROM memory_records WHERE scope = 'person' AND person = ?").run(personId);
+  const ids = sqlite.query("SELECT id FROM memory_records WHERE scope = 'person' AND person = ?").all(personId) as {
+    id: string;
+  }[];
+  const now = new Date().toISOString();
+  // One UPDATE per row, not a single bulk statement, so each tombstone
+  // gets its own genuinely unique hlc (nextHlc()'s counter only advances
+  // on each real call) - the identical "a flat shared stamp defeats hlc's
+  // whole point" fix a code review already found necessary for migration
+  // 0010's own conversations backfill. Household scale (a person's own
+  // memories, not the whole store) keeps this cheap.
+  for (const row of ids) {
+    sqlite
+      .query("UPDATE memory_records SET status = 'archived', text = ?, embedding_space = NULL, deleted_at = ?, hlc = ? WHERE id = ?")
+      .run(TOMBSTONE_TEXT, now, nextHlc(), row.id);
+  }
+  return ids.length;
 });
 
 /** Per-person export (4.14): every scope=person record about them,
- * whatever its status, so the archive is complete. */
+ * whatever its status, so the archive is complete - EXCEPT a tombstone
+ * (step 10: `deleted_at` set): its content is already wiped, so
+ * returning it would only show `TOMBSTONE_TEXT` back to the person who
+ * just asked to forget it, looking exactly like the erasure didn't
+ * actually happen. */
 export function exportPerson(actor: PersonRow, personId: string): MemoryOpResult<MemoryRecord[]> {
   const auth = assertCanForgetOrExport(actor, personId);
   if (!auth.ok) return auth;
   const rows = db
     .select()
     .from(memoryRecords)
-    .where(and(eq(memoryRecords.scope, "person"), eq(memoryRecords.person, personId)))
+    .where(and(eq(memoryRecords.scope, "person"), eq(memoryRecords.person, personId), isNull(memoryRecords.deletedAt)))
     .all();
   return { ok: true, value: rows.map(toMemoryRecord) };
 }
@@ -876,7 +909,7 @@ export function runMaintenance(): { archived: number } {
       for (const excess of survivors.slice(EPISODIC_CAP_PER_SCOPE)) toArchive.add(excess.row.id);
     }
     for (const id of toArchive) {
-      db.update(memoryRecords).set({ status: "archived", expiredAt: nowIso }).where(eq(memoryRecords.id, id)).run();
+      db.update(memoryRecords).set({ status: "archived", expiredAt: nowIso, hlc: nextHlc() }).where(eq(memoryRecords.id, id)).run();
       archived++;
     }
   }
@@ -899,7 +932,7 @@ export function runMaintenance(): { archived: number } {
     )
     .all();
   for (const row of staleStates) {
-    db.update(memoryRecords).set({ status: "archived", expiredAt: nowIso }).where(eq(memoryRecords.id, row.id)).run();
+    db.update(memoryRecords).set({ status: "archived", expiredAt: nowIso, hlc: nextHlc() }).where(eq(memoryRecords.id, row.id)).run();
     archived++;
   }
 
@@ -953,11 +986,13 @@ export function supersedeInFavorOfExisting(oldId: string, existingId: string, cl
   const now = new Date().toISOString();
   const result = closeValidTo
     ? sqlite
-        .query("UPDATE memory_records SET status = 'superseded', expired_at = ?, superseded_by = ?, valid_to = ? WHERE id = ? AND status = 'active'")
-        .run(now, existingId, closeValidTo, oldId)
+        .query(
+          "UPDATE memory_records SET status = 'superseded', expired_at = ?, superseded_by = ?, valid_to = ?, hlc = ? WHERE id = ? AND status = 'active'",
+        )
+        .run(now, existingId, closeValidTo, nextHlc(), oldId)
     : sqlite
-        .query("UPDATE memory_records SET status = 'superseded', expired_at = ?, superseded_by = ? WHERE id = ? AND status = 'active'")
-        .run(now, existingId, oldId);
+        .query("UPDATE memory_records SET status = 'superseded', expired_at = ?, superseded_by = ?, hlc = ? WHERE id = ? AND status = 'active'")
+        .run(now, existingId, nextHlc(), oldId);
   return result.changes > 0;
 }
 
@@ -991,7 +1026,7 @@ export function demoteNeverRecalledDurables(now: Date = new Date()): number {
     )
     .all();
   for (const row of stale) {
-    db.update(memoryRecords).set({ tier: "episodic" }).where(eq(memoryRecords.id, row.id)).run();
+    db.update(memoryRecords).set({ tier: "episodic", hlc: nextHlc() }).where(eq(memoryRecords.id, row.id)).run();
   }
   return stale.length;
 }

@@ -31,10 +31,12 @@ import { eq } from "drizzle-orm";
 import { db, sqlite } from "@/db";
 import { people } from "@/db/schema";
 import { newPersonId, randomSuffix } from "@/lib/id";
+import { nextHlc } from "@/lib/hlc";
 import { runTurn } from "@/lib/turnEngine";
 import { setValue } from "@/lib/settings";
 import { PERSONAS } from "@/lib/persona";
-import { getEngineStatus } from "@/lib/llmSupervisor";
+import { getEngineStatus, stopChatBackend } from "@/lib/llmSupervisor";
+import { __resetEmbedSupervisorForTests } from "@/lib/embedSupervisor";
 import type { PersonRow } from "@/types";
 
 const testPersonId = newPersonId();
@@ -78,9 +80,9 @@ async function main(): Promise<void> {
   const nowIso = new Date().toISOString();
   sqlite
     .query(
-      "INSERT INTO people (id, display_name, role, avatar_seed, source, local_only, created_at, updated_at) VALUES (?, 'Sprout', 'owner', ?, 'bench', 0, ?, ?)",
+      "INSERT INTO people (id, display_name, role, avatar_seed, source, local_only, created_at, updated_at, hlc) VALUES (?, 'Sprout', 'owner', ?, 'bench', 0, ?, ?, ?)",
     )
-    .run(testPersonId, randomSuffix(12), nowIso, nowIso);
+    .run(testPersonId, randomSuffix(12), nowIso, nowIso, nextHlc());
   const actor = db.select().from(people).where(eq(people.id, testPersonId)).get();
   if (!actor) throw new Error("failed to create the bench person row");
 
@@ -132,4 +134,13 @@ try {
   await main();
 } finally {
   cleanup();
+  // Found live (session-a-intelligence.md step 10's own verification
+  // run): runTurn() lazily starts real embed AND chat backends (its own
+  // prepareTurn() always calls embedQueryForRecall(), and the chat role
+  // for the reply itself; the stub is a real Bun.serve() HTTP listener
+  // either way) that nothing ever stopped, so this script's own process
+  // never exited on its own - earlier runs sat as zombies for hours,
+  // silently contending for the same SQLite file a later run needed.
+  __resetEmbedSupervisorForTests();
+  stopChatBackend();
 }

@@ -113,6 +113,7 @@ export function logTurn(actor: PersonRow, surface: Surface, userText: string, va
     // lib/memoryJudge.ts) - never anything but null/0 at insert time.
     judgeStatus: null,
     judgeAttempts: 0,
+    hlc: nextHlc(),
   };
   insertTurnAndBumpConversation(row, value.conversation_id);
   return row;

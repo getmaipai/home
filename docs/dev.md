@@ -7225,3 +7225,135 @@ improvement (less buffering lag before TTS can start on a sentence), not
 a regression - but worth verifying visually before shipping this to
 real users, since faster flushing is a real UX change from smoother,
 more frequent raw-token deltas as they used to arrive.
+
+## Session A: step 10, tombstones and clock stamps on the records you own (2026-09-05)
+
+The portability half that lives in the hub's own files: every record
+this session owns now carries a real hlc, and forgetting a memory stops
+meaning "gone without a trace."
+
+**Spec first**: `hlc` added to `memory-record`, `person`, and `grant`
+(the plan's own explicit "Grant already should have one per plan 3.1;
+add it there too" - Grant is spec-only today, no hub table exists yet,
+so this was schema-and-regenerate only, nothing to wire up). `deleted_at`
+added to `memory-record` too, distinct from a PERSON's own `deleted_at`
+(person.schema.json): this one is about ONE memory, never the whole
+person. Regenerated, fixtures updated (all five needed a real, pattern-
+valid `hlc` value to keep validating).
+
+**The hub side, three new NOT NULL columns on tables that already had
+real rows** (`memory_records.hlc`, `people.hlc`, `conversation_turns.hlc`
+- `conversations.hlc` already existed, step 3): SQLite refuses to `ADD`
+a NOT NULL column with no default to a non-empty table, so the migration
+adds each with a temporary `''` placeholder, then backfills a real,
+genuinely unique hlc per row using `rowid` (every one of these tables is
+an ordinary rowid table) as the per-row counter - the identical "a flat
+shared stamp defeats hlc's whole point" fix a code review already found
+necessary for migration 0010's own conversations backfill, without
+needing that migration's own window-function-in-an-INSERT shape (a
+plain per-row `rowid` read is enough here). Verified against a real copy
+of this worktree's own dev database (`data-a/hub.db`, which already had
+real rows from every earlier step's own tests and benches), not just an
+empty test database: the migration applies cleanly and every existing
+row gets its own distinct hlc.
+
+**Every real write now stamps a fresh hlc** - `remember()`, `supersede()`
+(both records), `archive()`, `runMaintenance()`'s decay, `demote
+NeverRecalledDurables()`, `supersedeInFavorOfExisting()`, a person's
+creation/profile-edit/role-change/delete, and `logTurn()`. One
+deliberate exclusion, documented at the code itself: `bumpMatchUsage()`
+(a plain recall touching `uses`/`last_used_at`) does NOT stamp a new
+hlc - hlc exists to resolve conflicts on a record's own synced CONTENT,
+and stamping it on every local read-driven usage bump would make an
+ordinary read look like a newer edit than a genuinely concurrent real
+change, defeating the exact comparison hlc exists to make correct.
+
+**`forget()` tombstones, it no longer hard-deletes.** A hard delete
+cannot be told apart from "never existed" once a robot or a second hub
+can sync - a device offline during the forget could resurrect the
+record right back the moment it reconnects. The tombstoned row now
+keeps `scope`/`person`/every other field, but `status` becomes
+`archived`, `text` is replaced with a new `TOMBSTONE_TEXT` sentinel
+(`"[forgotten]"`, exported from `lib/memory.ts`) rather than an empty
+string (`memory-record.schema.json`'s own `minLength: 1` on `text`
+stays a real guarantee for every genuinely active record - relaxing it
+for every record just to cover this one path would have been the wrong
+trade), `embedding_space` is cleared, and `deleted_at` is set. One
+`UPDATE` per affected row rather than a single bulk statement, so each
+tombstone gets its own genuinely unique hlc too (the exact backfill
+concern above, applied to a live write instead of a migration).
+`erasePersonData()`'s own memory-records handling (the FULL person-
+erasure cascade, a different, harsher operation than a household
+member's own `forget()` request) gets the identical tombstone treatment
+- the plan's own "the person-delete cascade stop hard-deleting memory
+rows" - while everything else that function erases (conversations,
+settings, sessions, jobs) stays a real, hard delete: only memory records
+carry the "a device could resurrect this via sync" risk a tombstone
+exists to close.
+
+**`exportPerson()` skips tombstones**, the one exception to its own
+"whatever its status, so the archive is complete" rule: a tombstone's
+own content is already wiped, so returning it would show
+`TOMBSTONE_TEXT` back to the exact person who just asked to forget it -
+looking precisely like the erasure never actually happened. An ordinary
+archived record (decayed, not forgotten) still exports in full; only
+`deleted_at` being set excludes a row.
+
+**`hlc.ts`'s own missing tests**: `settings.test.ts` already had solid
+coverage (the pattern, basic monotonicity, `seedHlc`'s two headline
+regression scenarios) but never proved the counter branch advances
+within the same millisecond rather than just inferring it from "eventually
+increasing" output, never exercised `compareHlc()`'s own node tiebreak
+(the file's own header calls it "the rarely-needed final tiebreak,"
+real code that had never actually run), and never checked `seedHlc()`'s
+exact boundary (a seed at the identical `wall_ms` with a strictly LOWER
+counter must be a no-op, not just "an older `wall_ms` is"). A new
+`tests/hlc.test.ts` covers all three directly, alongside the existing
+coverage rather than duplicating it.
+
+**A real bug found live, not by a review or a test: three bench scripts
+(memory-eval.ts, judge-eval.ts, persona-eval.ts) never shut down the
+embed/chat backend they lazily start** (a real `Bun.serve()` HTTP
+listener even in stub mode), so none of them ever exited on their own.
+Discovered because this step's own migration-safety verification kept
+silently hanging: four bench-script processes from EARLIER steps (as
+far back as 7:25 PM) had been running as zombies for hours, all holding
+the same `data-a/hub.db` SQLite file open and contending for its lock.
+Killed the stale processes, then fixed all three scripts to call their
+supervisors' real stop functions (`__resetEmbedSupervisorForTests()` and
+`stopChatBackend()` - the former isn't test-only in effect, only in
+name) in their own `finally` block alongside the existing DB cleanup.
+Verified each script now exits with code 0 and leaves no process behind.
+
+Tests: `forget()` leaves a tombstone with wiped text/embedding_space and
+a real `deleted_at`, not a deleted row; the identical assertions for
+`erasePersonData()`'s own person-delete cascade (both the dedicated
+forget-and-export describe block and the schema-walking "no table is
+left holding rows about a deleted person" test, which now carries an
+explicit, documented exception for `memory_records` alongside the
+pre-existing one for `people`); `exportPerson()` omits a tombstoned
+record while still returning an ordinary archived one; successive
+`remember()` calls and successive person creations/edits get
+monotonically increasing hlcs, checked with the real `compareHlc()`
+rather than a lexical string comparison; the full `hlc.test.ts` suite.
+Full backend suite green (680, +13 net for this step alone), spec suite
+green (211), `bunx tsc --noEmit` clean, `scripts/check.sh` green (the
+frontend build step's known, pre-existing Session B failure aside),
+gitleaks and the PII wordlist clean.
+
+**A code review found one real gap and one worth documenting, both
+fixed before commit:** `lib/memoryJudge.ts`'s own three
+`conversation_turns` writes (the poison-guard's `markAttempt()`, the
+speaker-deleted failure path, and the terminal "done" status) stamped
+`judge_status`/`judge_attempts` but left `hlc` untouched - the one real,
+undocumented exception to this entry's own "every real write" claim
+(unlike `bumpMatchUsage()`'s deliberate, commented exclusion for
+`memory_records`). Fixed to stamp `hlc: nextHlc()` on all three.
+Separately, the migration's `rowid`-based backfill is genuinely safe as
+written (verified: `rowid` is unique per rowid table, and drizzle's own
+migrator runs a whole migration file in one transaction, so the `''`
+placeholder is never visible outside it), but the file's own comment
+didn't say so - a future migration copying this exact shape under a
+runner that commits each statement separately would have a real,
+briefly-persisted, pattern-invalid `hlc` value. Documented the
+dependency directly in the migration file.

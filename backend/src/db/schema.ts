@@ -18,6 +18,11 @@ export const people = sqliteTable("people", {
   createdAt: text("created_at").notNull(),
   updatedAt: text("updated_at").notNull(),
   deletedAt: text("deleted_at"),
+  // Step 10 (session-a-intelligence.md): "the portability half that lives
+  // in your files" - person.schema.json's own hlc field, set from
+  // lib/hlc.ts on every write (create, profile edit, role change, delete)
+  // the same way memory_records/conversations already do.
+  hlc: text("hlc").notNull(),
 });
 
 // A person's sign-in secret (PIN or password, same hashing either way, see
@@ -57,11 +62,14 @@ export const idSequences = sqliteTable("id_sequences", {
 
 // Mirrors spec/schemas/memory-record.schema.json (4.4): one table for all
 // three record_kinds (memory, entity, episode), matching the spec's "one
-// row, one field set" shape. Never hard-deleted by the routine store
-// operations (supersede/archive); a real DELETE only happens through
-// lib/memory.ts's forget(), the deliberate per-person erasure right
-// (2.2's privacy architecture, distinct from the judge's normal
-// never-hard-delete lifecycle).
+// row, one field set" shape. Never hard-deleted at all, as of step 10
+// (session-a-intelligence.md): `forget()` used to be the one real DELETE
+// (2.2's privacy architecture, the deliberate per-person erasure right),
+// but a hard delete cannot be told apart from "never existed" once a
+// robot or a second hub syncs - a device offline during the forget could
+// resurrect the record right back. `forget()` now tombstones instead
+// (status: archived, text and embeddingSpace wiped, deletedAt set),
+// keeping the row itself as proof the erasure happened.
 export const memoryRecords = sqliteTable("memory_records", {
   id: text("id").primaryKey(),
   recordKind: text("record_kind").notNull(),
@@ -83,6 +91,21 @@ export const memoryRecords = sqliteTable("memory_records", {
   expiredAt: text("expired_at"),
   supersededBy: text("superseded_by"),
   embeddingSpace: text("embedding_space"),
+  // Step 10: hlc set from lib/hlc.ts on every real state change (an
+  // insert, a status/tier/text change) - NOT on a plain usage bump
+  // (uses/lastUsedAt from a recall touching this record), a deliberate
+  // exclusion documented at bumpMatchUsage() itself: hlc exists to
+  // resolve conflicts on the record's actual synced content, and
+  // stamping it on every read-driven usage bump would make a purely
+  // local read look like a newer edit than a genuine concurrent one.
+  hlc: text("hlc").notNull(),
+  // Set only by forget() (a tombstone) - distinct from a PERSON's own
+  // deletedAt (people.deletedAt): this is about one memory, never the
+  // whole person. isNull(deletedAt) is NOT how active-vs-tombstoned is
+  // checked day to day (status = 'active' already does that everywhere
+  // recall/list/similarByVector query); this column exists specifically
+  // for exportPerson() to skip tombstones without a second status value.
+  deletedAt: text("deleted_at"),
 });
 
 // Step 5's real vector store: never a spec-shaped record itself (the
@@ -227,6 +250,12 @@ export const conversationTurns = sqliteTable(
     // seem to parse.
     judgeStatus: text("judge_status"),
     judgeAttempts: integer("judge_attempts").notNull().default(0),
+    // Step 10: not a spec-shaped record itself (conversation_turns stays
+    // hub-internal, see the table's own header above), but the plan's
+    // own text still asks for it here so a synced conversation's
+    // individual turns carry a real clock stamp too, not just the
+    // conversation thread they belong to.
+    hlc: text("hlc").notNull(),
   },
   // buildConversationWindow() and maybeRefreshConversationSummary() (step 3)
   // both filter by conversation_id on every model-routed turn - the

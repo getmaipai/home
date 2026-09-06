@@ -155,6 +155,11 @@ export const Grant = z
         "A revoked grant is tombstoned, not deleted: 'who removed this, and when' is exactly the question a household asks after something stops working.",
       )
       .default(null),
+    /**Hybrid logical clock: wall_ms:counter:node (7.3).*/
+    hlc: z
+      .string()
+      .regex(new RegExp("^[0-9]+:[0-9]+:[a-z0-9]{6,}$"))
+      .describe("Hybrid logical clock: wall_ms:counter:node (7.3)."),
   })
   .strict()
   .describe(

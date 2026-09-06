@@ -82,6 +82,11 @@ export const Person = z
     deleted_at: z
       .union([z.string().datetime({ offset: true }), z.null()])
       .default(null),
+    /**Hybrid logical clock: wall_ms:counter:node (7.3).*/
+    hlc: z
+      .string()
+      .regex(new RegExp("^[0-9]+:[0-9]+:[a-z0-9]{6,}$"))
+      .describe("Hybrid logical clock: wall_ms:counter:node (7.3)."),
   })
   .strict()
   .describe(

@@ -18,5 +18,7 @@
   "valid_to": null,
   "expired_at": null,
   "superseded_by": null,
-  "embedding_space": "hub-bge-m3"
+  "embedding_space": "hub-bge-m3",
+  "hlc": "1756800000000:0:a1b2c3",
+  "deleted_at": null
 }

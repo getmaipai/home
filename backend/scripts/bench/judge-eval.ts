@@ -32,11 +32,12 @@ import { eq } from "drizzle-orm";
 import { db, sqlite } from "@/db";
 import { people, conversationTurns } from "@/db/schema";
 import { newPersonId, randomSuffix } from "@/lib/id";
+import { nextHlc } from "@/lib/hlc";
 import { resolveOrCreateConversation, logTurn } from "@/lib/conversationHistory";
 import { runJudgeBatch } from "@/lib/memoryJudge";
 import { recall, embedQueryForRecall } from "@/lib/memory";
-import { getEmbedBackendKind } from "@/lib/embedSupervisor";
-import { getEngineStatus } from "@/lib/llmSupervisor";
+import { getEmbedBackendKind, __resetEmbedSupervisorForTests } from "@/lib/embedSupervisor";
+import { getEngineStatus, stopChatBackend } from "@/lib/llmSupervisor";
 import type { PersonRow } from "@/types";
 import type { TurnValue } from "@/wire";
 
@@ -78,9 +79,9 @@ async function main(): Promise<void> {
   const nowIso = new Date().toISOString();
   sqlite
     .query(
-      "INSERT INTO people (id, display_name, role, avatar_seed, source, local_only, created_at, updated_at) VALUES (?, 'Iris', 'owner', ?, 'bench', 0, ?, ?)",
+      "INSERT INTO people (id, display_name, role, avatar_seed, source, local_only, created_at, updated_at, hlc) VALUES (?, 'Iris', 'owner', ?, 'bench', 0, ?, ?, ?)",
     )
-    .run(testPersonId, randomSuffix(12), nowIso, nowIso);
+    .run(testPersonId, randomSuffix(12), nowIso, nowIso, nextHlc());
   const actor = db.select().from(people).where(eq(people.id, testPersonId)).get();
   if (!actor) throw new Error("failed to create the bench person row");
 
@@ -119,4 +120,14 @@ try {
   await main();
 } finally {
   cleanup();
+  // Found live (session-a-intelligence.md step 10's own verification
+  // run): runJudgeBatch() lazily starts real embed AND chat backends
+  // (the stub is a real Bun.serve() HTTP listener either way) that
+  // nothing ever stopped, so this script's own process never exited on
+  // its own - earlier runs sat as zombies for hours, silently
+  // contending for the same SQLite file a later run needed. Both
+  // supervisors' real stop functions are called here, not just for
+  // tests despite the embed one's name.
+  __resetEmbedSupervisorForTests();
+  stopChatBackend();
 }

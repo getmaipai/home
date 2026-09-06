@@ -7,6 +7,7 @@ import { eq } from "drizzle-orm";
 import { db, sqlite } from "@/db";
 import { memoryRecords, memoryEmbeddings, pendingEmbeddings, people } from "@/db/schema";
 import { recall, remember, bumpUsage, drainPendingEmbeddings, PROFILE_SOURCE } from "@/lib/memory";
+import { compareHlc } from "@/lib/hlc";
 import type { PersonRow } from "@/types";
 
 // Test-only mirror of memory.ts's own (unexported) vectorToBuffer: lets
@@ -66,6 +67,40 @@ describe("POST /api/memory (remember)", () => {
     expect(() => MemoryRecord.parse(body)).not.toThrow();
     expect((body as MemoryRecord).id).toMatch(/^mem[0-9]+-[a-z0-9]{6}$/);
     expect((body as MemoryRecord).status).toBe("active");
+    // Step 10: every write sets a real, spec-shaped hlc.
+    expect((body as MemoryRecord).hlc).toMatch(/^[0-9]+:[0-9]+:[a-z0-9]{6,}$/);
+  });
+
+  // Step 10 (session-a-intelligence.md): "every write sets a monotonic
+  // hlc." Two independent writes to two different records, in order,
+  // must compare as increasing - proven with the real compareHlc()
+  // rather than a string/lexical comparison, since hlc's own format
+  // (wall_ms:counter:node) isn't lexically sortable once counters or
+  // wall_ms values differ in digit length.
+  test("successive writes get monotonically increasing hlcs", async () => {
+    const owner = new TestClient();
+    await owner.post("/api/auth/setup", { displayName: "Sage", secret: "correcthorse" });
+    const first = (await (
+      await owner.post("/api/memory", {
+        text: "First fact",
+        category: "fact",
+        tier: "durable",
+        scope: "household",
+        source: "test",
+        importance: 0.5,
+      })
+    ).json()) as MemoryRecord;
+    const second = (await (
+      await owner.post("/api/memory", {
+        text: "Second fact",
+        category: "fact",
+        tier: "durable",
+        scope: "household",
+        source: "test",
+        importance: 0.5,
+      })
+    ).json()) as MemoryRecord;
+    expect(compareHlc(second.hlc, first.hlc)).toBeGreaterThan(0);
   });
 
   test("a person cannot write a memory scoped to someone else", async () => {
@@ -421,7 +456,11 @@ describe("supersede and archive", () => {
 });
 
 describe("forget and export", () => {
-  test("a person can forget their own memories; the row is actually deleted", async () => {
+  // Step 10 (session-a-intelligence.md): forget() tombstones, it no
+  // longer hard-deletes - a hard delete cannot be told apart from "never
+  // existed" once a robot or a second hub syncs, so a device offline
+  // during the forget could resurrect the record right back.
+  test("a person can forget their own memories; the row is tombstoned, not deleted", async () => {
     const { childClient, childId } = await ownerAndChild();
     await childClient.post("/api/memory", {
       text: "Bramble's own secret",
@@ -439,7 +478,11 @@ describe("forget and export", () => {
     expect(body.deleted).toBe(1);
 
     const remaining = db.select().from(memoryRecords).where(eq(memoryRecords.person, childId)).all();
-    expect(remaining.length).toBe(0);
+    expect(remaining.length).toBe(1);
+    expect(remaining[0]!.status).toBe("archived");
+    expect(remaining[0]!.text).toBe("[forgotten]");
+    expect(remaining[0]!.embeddingSpace).toBeNull();
+    expect(remaining[0]!.deletedAt).not.toBeNull();
   });
 
   test("forgetting another person's memories is refused for a non-admin", async () => {
@@ -519,6 +562,29 @@ describe("forget and export", () => {
     const body = (await res.json()) as MemoryRecord[];
     expect(body.length).toBe(1);
     expect(body[0]!.status).toBe("archived");
+  });
+
+  // Step 10: an ordinary archived record (above) still exports - its
+  // content is real. A tombstoned one must not: showing TOMBSTONE_TEXT
+  // back to the person who just asked to forget it would look exactly
+  // like the erasure didn't actually happen.
+  test("export omits a tombstoned (forgotten) record, unlike an ordinary archived one", async () => {
+    const { childClient, childId } = await ownerAndChild();
+    await childClient.post("/api/memory", {
+      text: "A memory that will be forgotten",
+      category: "fact",
+      tier: "durable",
+      scope: "person",
+      person: childId,
+      source: "test",
+      importance: 0.5,
+    });
+
+    await childClient.post("/api/memory/forget", { personId: childId });
+
+    const res = await childClient.get(`/api/memory/export?personId=${childId}`);
+    const body = (await res.json()) as MemoryRecord[];
+    expect(body.length).toBe(0);
   });
 });
 
