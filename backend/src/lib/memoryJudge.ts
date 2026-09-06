@@ -410,6 +410,16 @@ export async function judgeTurn(turn: ConversationTurnRow): Promise<JudgeTurnRes
       // happened to carry its own valid_to, e.g. a trip's end date, was
       // stamping the OLD record's boundary with the trip's end instead
       // of with when the contradiction was actually learned).
+      // enforcePrivilegedRoute (a code review of issue #27's fix,
+      // 2026-09-06): speaker is whoever's turn this was - any household
+      // role, including a child - and similarByVector()'s own candidate
+      // search does not exclude pinned records, so an ordinary chat turn
+      // could dedupe onto and silently rewrite one with no check at all
+      // otherwise. Distinct from this file's OTHER supersede() call
+      // (the profile-paragraph summarizer, SupersedeOptions' own comment
+      // has the reasoning): that one only ever writes a person's own
+      // pinned summary of themselves, this one can target ANY household
+      // or person-scope candidate similarByVector() turned up.
       const result = supersede(
         speaker,
         decision.id,
@@ -420,7 +430,7 @@ export async function judgeTurn(turn: ConversationTurnRow): Promise<JudgeTurnRes
           valid_from: fact.valid_from,
           valid_to: fact.valid_to,
         },
-        decision.contradiction ? { closeValidTo: turn.createdAt } : {},
+        { ...(decision.contradiction ? { closeValidTo: turn.createdAt } : {}), enforcePrivilegedRoute: true },
       );
       if (result.ok) {
         written++;

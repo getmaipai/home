@@ -72,6 +72,22 @@ function assertCanWrite(
   return { ok: false, status: 400, error: `unknown scope: ${scope}` };
 }
 
+// A code review of the issue #27 fix (2026-09-06) found "privileged"
+// (owner/admin-only) encoded independently in three places - routes/
+// memory.ts's sanitizedRecordKind, supersede()'s enforcePrivilegedRoute
+// check below, and (missing entirely) archive() - and they had already
+// drifted: sanitizedRecordKind treated a non-default record_kind
+// ("entity" OR "episode") as privileged, while the supersede check only
+// checked for "entity". One definition, consulted everywhere a
+// privileged record is written, retired or removed.
+export function isPrivilegedRecordKind(kind: string): boolean {
+  return kind !== "memory";
+}
+
+export function isPrivilegedRecord(row: { recordKind: string; pinned: boolean }): boolean {
+  return isPrivilegedRecordKind(row.recordKind) || row.pinned;
+}
+
 export interface RememberInput {
   record_kind?: "memory" | "entity" | "episode";
   text: string;
@@ -687,12 +703,24 @@ function getWritable(actor: PersonRow, id: string): MemoryOpResult<MemoryRecordR
 }
 
 /** Tombstone, never a hard delete (4.4's routine lifecycle): status ->
- * archived, expired_at stamped. The one hard delete is forget(), below. */
+ * archived, expired_at stamped. The one hard delete is forget(), below.
+ *
+ * A code review of the issue #27 fix (2026-09-06) found this route had no
+ * privilege gate at all: household scope is writable by anyone
+ * (assertCanWrite), so a non-owner could tombstone (delete) an owner-
+ * pinned or entity-kind household record outright - achieving the same
+ * "remove this from every family member's system prompt against the
+ * owner's wishes" result supersede()'s own enforcePrivilegedRoute check
+ * exists to prevent, just via deletion instead of rewriting. archive()
+ * has exactly one caller (the HTTP route), so this is unconditional. */
 export function archive(actor: PersonRow, id: string): MemoryOpResult<MemoryRecord> {
   const found = getWritable(actor, id);
   if (!found.ok) return found;
   if (found.value.status !== "active") {
     return { ok: false, status: 400, error: `cannot archive a record with status ${found.value.status}` };
+  }
+  if (!isOwnerOrAdmin(actor) && isPrivilegedRecord(found.value)) {
+    return { ok: false, status: 403, error: "only owner or admin may archive an entity or pinned memory" };
   }
   const now = new Date().toISOString();
   db.update(memoryRecords).set({ status: "archived", expiredAt: now, hlc: nextHlc() }).where(eq(memoryRecords.id, id)).run();
@@ -725,6 +753,28 @@ export interface SupersedeOptions {
    * distinct from expired_at (when we retired the row, stamped
    * unconditionally below) which records when it STOPPED BEING TRUE. */
   closeValidTo?: string;
+  /** SEC-4 blocked a non-owner from setting `pinned: true` or a privileged
+   * `record_kind` on a NEW record, but a household-scope entity/pinned
+   * record is still writable by anyone per assertCanWrite's household
+   * rule, and sanitizedPinned's blocked-true-becomes-undefined only stops
+   * un-pinning, not the supersede itself - so a non-owner could still
+   * rewrite the TEXT of an already-pinned household record while its
+   * pinned status carried forward unchanged (issue #27's actual exploit:
+   * a persistent line in every family member's system prompt, attacker-
+   * controlled content).
+   *
+   * Set by the HTTP route AND by memoryJudge.ts's fact-extraction dedupe
+   * path (a code review, 2026-09-06, found the judge attributes its own
+   * supersede() call to the conversation's speaker - any household role,
+   * including a child - and its own candidate search does not exclude
+   * pinned records, so an ordinary chat turn could dedupe onto and
+   * silently rewrite one with no check at all). memoryJudge.ts's OTHER
+   * supersede() call (the profile-paragraph summarizer) is the one
+   * genuinely different authorization path this option is NOT set for:
+   * it only ever writes a person's own pinned, system-generated summary
+   * of themselves, keyed to their own id, never another person's or the
+   * household's record. */
+  enforcePrivilegedRoute?: boolean;
 }
 
 /** Replace an active record with a new one carrying forward its scope and
@@ -741,6 +791,9 @@ export function supersede(
   const old = found.value;
   if (old.status !== "active") {
     return { ok: false, status: 400, error: `cannot supersede a record with status ${old.status}` };
+  }
+  if (opts.enforcePrivilegedRoute && !isOwnerOrAdmin(actor) && isPrivilegedRecord(old)) {
+    return { ok: false, status: 403, error: "only owner or admin may supersede an entity or pinned memory" };
   }
 
   const created = remember(actor, {
