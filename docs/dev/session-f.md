@@ -1413,3 +1413,116 @@ back to `@/db`.
    `source`/`key` alone already identify what's broken, and are safe by
    construction regardless of what a future issue's free text contains.
    Added as its own category to `spec/diagnostics/to-redact.json`.
+
+## Step 10: the updates projection (app half only)
+
+**Scoped down before writing anything, not after.** The plan's full
+projection names four halves - the app, packages (D's store), models
+(the catalogue), sidecars (pinned with the app) - and only one of them
+has anything real to check against today. No package catalog is live
+(`getmaipai/catalog` doesn't consume anything yet), `lib/modelCatalog.ts`
+is a static, hand-maintained list with no "latest version" concept of
+its own, and sidecars simply follow whatever the app's own release
+settles on. Building a projection for data with nothing real behind it
+would be exactly the kind of speculative code this org's own standards
+warn against - `docs/BACKLOG.md` records the other three as deferred,
+with the reason each one is, rather than silently narrowing scope with
+no trace.
+
+**`lib/updates.ts`: a real check against GitHub's own public release
+API for `getmaipai/home`.** Cached in a new `app_update_state` table (one
+row, `id: "app"`) so `GET /api/updates` never blocks on a live network
+call; the daily `updates.check` core job is the only thing that actually
+calls GitHub. `isNewerVersion()` does a real numeric three-part
+comparison, never a string one - `"0.9.0" < "0.10.0"` fails
+lexicographically, exactly the kind of bug a semver library exists to
+prevent and a hand-rolled comparison has to get right on its own. A 404
+(no release has ever been published - true for this project today,
+`CHANGELOG.md`'s own header still says so) is recorded as informational,
+not an error: the projection has nothing to show either way, but the
+wording says "checked, nothing published" rather than implying
+something broke. A genuine network failure is caught and recorded the
+same way, never thrown past the unattended daily job.
+
+**The privacy page gained its matching row in the same commit.** This
+is the one outbound call this hub makes on its own schedule, not in
+response to a household action - the org's own "adding an outbound
+endpoint updates the privacy page in the same commit, no exceptions"
+rule applies exactly here, and `lib/privacy.ts`'s own header (which used
+to say "there is no update ping") was updated alongside the new row,
+not left to quietly contradict it.
+
+**`lib/selfUpdate.ts` (verify, back up, stage, swap, restart,
+health-check-or-roll-back) was not attempted.** It is genuinely blocked
+on step 11: no service exists yet to restart under, and no release has
+ever been cut for this project at all, so `releases/<version>` has never
+existed on a real machine either. It also needs cross-cutting "never
+during a conversation, a generation, a download, or playback" checks
+into `turnEngine.ts`, `packageHost.ts`, and voice playback - every one of
+them another session's file, not F's to wire. Building this now would be
+unverifiable by construction (nothing real to restart, nothing real to
+roll back to), the same reasoning that already deferred packages/
+models/sidecars above.
+
+**A test bug caught before any review, by running the full suite rather
+than the one new file alone:** a test asserting `cachedUpdateProjection()`
+never calls GitHub replaced `globalThis.fetch` with a mock and never
+restored it - passing cleanly in isolation (`bun test tests/updates.
+test.ts`), but leaking that broken mock into every OTHER test file that
+runs afterward in the same process once the full suite ran together (87
+failures, none in the new file itself). Fixed with the same `try`/
+`finally` restore pattern every other fetch-mocking test in this repo
+already uses; a reminder that "the new test passes" is not the same
+question as "did anything else start failing," which only the full
+suite answers.
+
+**A code review (2026-09-06) found five issues, all fixed:**
+
+1. `checkForAppUpdate()` fired `updates.available` unconditionally on
+   every daily check as long as a newer version existed, with no
+   per-version dedup - since nothing here ever advances
+   `installedVersion()` (self-update isn't built), the same still-
+   unapplied release would have renotified every household, every day,
+   forever. Fixed with a new `notified_version` column on
+   `app_update_state` (migration 0024, folded into the same not-yet-
+   merged migration as the table itself rather than a second one) and a
+   read-before-fire check: the notification now only goes out the first
+   time a given version is seen, the same "notify on open, not on every
+   recheck" discipline `lib/issues.ts`'s `raiseIssue()` already applies
+   to Repairs items. Covered by two new tests: the same release checked
+   twice notifies once, and a genuinely newer release after that
+   notifies again.
+2. The GitHub fetch had no rate limiter, unlike every other outbound
+   integration in this codebase - "every integration gets a rate
+   limiter at its single choke point... never a raw fetch on the side"
+   (org standard). The daily job alone is no risk, but
+   `POST /api/updates/check` lets any owner/admin (or a `backups.run`
+   grant holder) force a fresh check on demand, with no cooldown. Fixed
+   with `lib/rateLimiter.ts`'s existing `tryConsume()` (capacity 5, slow
+   refill - GitHub's own unauthenticated limit is 60/hour and a
+   household has no reason to come remotely close to it), covered by a
+   new test that calls `checkForAppUpdate()` six times back to back and
+   confirms only five actually reach the mocked `fetch`.
+3. The fetch had no timeout - `scheduler.ts`'s `runDueJobsUnguarded()`
+   awaits each due core job sequentially, so a stalled GitHub connection
+   would have blocked every other due job behind it indefinitely. Fixed
+   with `signal: AbortSignal.timeout(5_000)`, matching `sidecars.ts`'s
+   own precedent for outbound calls in the scheduler's path.
+4. `parseSemver()`'s regex was anchored at the start (`^v?`) but not the
+   end, so a prerelease-suffixed tag like `v0.2.0-rc.1` parsed
+   identically to a clean `v0.2.0`, silently ignoring the suffix. Fixed
+   by anchoring both ends; an unparseable tag was already treated as
+   "not newer" by `isNewerVersion()`, so a prerelease tag is now simply
+   never offered as an update rather than miscompared as an
+   equal-or-newer stable release. Covered by two new test cases.
+5. The success, 404, and network-failure branches of
+   `checkForAppUpdate()` each hand-rolled a near-identical
+   `db.insert(...).onConflictDoUpdate(...)` upsert - three copies to
+   keep in sync by hand, and one already had drifted (missing the new
+   `notifiedVersion` field) before the review caught it. Extracted into
+   one `upsertState()` helper all three branches now call.
+
+Typecheck and the full backend suite (1302 tests) are green after all
+five fixes; `spec/settings/keys.json` and `docs/api/openapi.json` were
+regenerated against a scratch data directory and show no unexpected
+drift beyond this step's own additions.

@@ -807,3 +807,26 @@ export const nasMounts = sqliteTable("nas_mounts", {
   createdAt: text("created_at").notNull(),
   updatedAt: text("updated_at").notNull(),
 });
+
+// Step 10: the app half of "the updates projection" (plan 4.15/2.4) -
+// the one daily check's own last result, cached so a route doesn't have
+// to hit GitHub's API on every page load. Single row (id is always the
+// literal "app"). Hub-internal, the same reasoning hubIdentity/
+// backupHealth above give - this is a cache of a third party's own
+// answer, never a spec-shaped household record.
+export const appUpdateState = sqliteTable("app_update_state", {
+  id: text("id").primaryKey(),
+  checkedAt: text("checked_at").notNull(),
+  latestVersion: text("latest_version"),
+  latestUrl: text("latest_url"),
+  latestSummary: text("latest_summary"),
+  error: text("error"),
+  // The version `updates.available` was last fired for - a code review
+  // (2026-09-06) found the daily updates.check job re-firing the
+  // identical notification forever for the same still-unapplied release
+  // (nothing here ever changes `installedVersion()`, since self-update
+  // isn't built), the same "notify once per genuine transition, not
+  // once per check" discipline lib/issues.ts's raiseIssue() already
+  // applies to Repairs items.
+  notifiedVersion: text("notified_version"),
+});
