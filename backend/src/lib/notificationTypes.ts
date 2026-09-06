@@ -154,6 +154,18 @@ export const NOTIFICATION_TYPES: readonly NotificationType[] = [
     configurable: true,
     defaultChannels: ["in_app"],
   },
+  // Step 10: "a digest-level notification at most once a day" - the
+  // daily core job's own cadence already satisfies "at most once a day"
+  // without extra dedup logic here; `passive` (not time_sensitive) since
+  // an available update is never urgent the way a failing backup is.
+  {
+    id: "updates.available",
+    level: "passive",
+    audience: "adults",
+    template: "MaiPai Home {version} is available.",
+    configurable: true,
+    defaultChannels: ["in_app"],
+  },
 ] as const;
 
 // session-d-packages-and-store.md step 2: a package's own manifest

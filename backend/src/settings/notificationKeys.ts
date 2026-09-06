@@ -116,4 +116,15 @@ export const NOTIFICATION_SETTINGS_KEYS: SettingsKey[] = [
     lives_in: "person.notifications",
     honoured_by: ["home"],
   }),
+  // Step 10: lib/notificationTypes.ts's "updates.available".
+  SettingsKey.parse({
+    key: "notifications.updates.available.telegram",
+    scope: "person",
+    selector: "boolean",
+    default: false,
+    label: "Telegram me when a MaiPai Home update is available",
+    level: "basic",
+    lives_in: "person.notifications",
+    honoured_by: ["home"],
+  }),
 ];

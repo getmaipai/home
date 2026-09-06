@@ -9045,6 +9045,226 @@
           }
         }
       }
+    },
+    "/api/updates": {
+      "get": {
+        "tags": [
+          "Updates"
+        ],
+        "summary": "The last known update check result (app only)",
+        "responses": {
+          "200": {
+            "description": "Cached - does not itself call GitHub.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "installed": {
+                      "type": "string"
+                    },
+                    "latest": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "summary": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "url": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "assets": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "name": {
+                            "type": "string"
+                          },
+                          "url": {
+                            "type": "string"
+                          },
+                          "digest": {
+                            "type": "string",
+                            "nullable": true
+                          }
+                        },
+                        "required": [
+                          "name",
+                          "url",
+                          "digest"
+                        ]
+                      }
+                    },
+                    "channel": {
+                      "type": "string",
+                      "enum": [
+                        "stable"
+                      ]
+                    },
+                    "progress": {
+                      "nullable": true
+                    },
+                    "needs": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "blockedBy": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "checkedAt": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "error": {
+                      "type": "string",
+                      "nullable": true
+                    }
+                  },
+                  "required": [
+                    "installed",
+                    "latest",
+                    "summary",
+                    "url",
+                    "assets",
+                    "channel",
+                    "progress",
+                    "needs",
+                    "blockedBy",
+                    "checkedAt",
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/updates/check": {
+      "post": {
+        "tags": [
+          "Updates"
+        ],
+        "summary": "Check GitHub for a new release right now",
+        "responses": {
+          "200": {
+            "description": "The fresh result.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "installed": {
+                      "type": "string"
+                    },
+                    "latest": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "summary": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "url": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "assets": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "name": {
+                            "type": "string"
+                          },
+                          "url": {
+                            "type": "string"
+                          },
+                          "digest": {
+                            "type": "string",
+                            "nullable": true
+                          }
+                        },
+                        "required": [
+                          "name",
+                          "url",
+                          "digest"
+                        ]
+                      }
+                    },
+                    "channel": {
+                      "type": "string",
+                      "enum": [
+                        "stable"
+                      ]
+                    },
+                    "progress": {
+                      "nullable": true
+                    },
+                    "needs": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "blockedBy": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "checkedAt": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "error": {
+                      "type": "string",
+                      "nullable": true
+                    }
+                  },
+                  "required": [
+                    "installed",
+                    "latest",
+                    "summary",
+                    "url",
+                    "assets",
+                    "channel",
+                    "progress",
+                    "needs",
+                    "blockedBy",
+                    "checkedAt",
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not owner/admin",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   }
 }

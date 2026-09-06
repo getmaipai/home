@@ -391,6 +391,19 @@
     ]
   },
   {
+    "key": "notifications.updates.available.telegram",
+    "scope": "person",
+    "selector": "boolean",
+    "default": false,
+    "label": "Telegram me when a MaiPai Home update is available",
+    "level": "basic",
+    "secret": false,
+    "lives_in": "person.notifications",
+    "honoured_by": [
+      "home"
+    ]
+  },
+  {
     "key": "persona.active_id",
     "scope": "person",
     "selector": "select",

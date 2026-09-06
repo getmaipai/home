@@ -2459,6 +2459,49 @@ that owns it.
       to get fully right (see `docs/dev/session-f.md`'s step 9 write-up).
       Both files now share one fixed implementation
       (`moveDbSet`/`dbSetExists`/`partialMoveInProgress`).
+- [x] **The updates projection, app half only** (Session F step 10,
+      2026-09-06) - `GET/POST /api/updates` (`GET` reads the cached last
+      check; `POST /check`, owner/admin, forces a fresh one), a real GET
+      against GitHub's own public release API for `getmaipai/home`,
+      cached in a new `app_update_state` table so a route never blocks on
+      a live network call, a daily core job (`updates.check`), a
+      `passive`-level `updates.available` notification when
+      `isNewerVersion()` (real numeric semver comparison, not a string
+      one - `"0.9.0" < "0.10.0"` fails lexicographically) says the
+      release found is genuinely newer than the installed version.
+      `lib/privacy.ts` gained the matching row in the same commit (org
+      standard: an outbound endpoint's privacy-page row lands with the
+      code that adds it) - this is the ONE periodic, not household-
+      triggered outbound call this hub makes, and it reaches GitHub's own
+      public API, never a MaiPai-operated server.
+      **Deliberately not built, and why:**
+      - **Packages, models, sidecars** (the plan's other three
+        projection halves) - nothing real to check against yet. No
+        package catalog is live (`getmaipai/catalog` doesn't consume
+        anything yet), `lib/modelCatalog.ts` (D's/F's shared catalog) is
+        a static hand-maintained list with no version-comparison concept
+        of its own, and sidecars are "pinned with the app" (they follow
+        whatever the app's own release settles on, not tracked
+        separately). Building a projection for data with no real
+        "latest" to compare against would be speculative code with
+        nothing to verify it against.
+      - **`lib/selfUpdate.ts`** (verify, back up, stage into
+        `releases/<version>`, dry-run migrations, swap, restart, health-
+        check-or-roll-back) - genuinely blocked on step 11 (no service
+        exists yet to restart under, and no release has EVER been cut
+        for this project - `CHANGELOG.md`'s own header still says so),
+        and on cross-cutting "never during a conversation/generation/
+        download/playback" hooks into `turnEngine.ts`/`packageHost.ts`/
+        voice playback - all other sessions' files, not F's to wire.
+        Attempting this now would be unverifiable by construction
+        (nothing real to restart, nothing real to roll back to).
+      - **`installedVersion()`** currently reads a placeholder
+        (`package.json`'s own `0.1.0`, or a global override tests set) -
+        there is no real "what version is this build" stamping mechanism
+        yet either, since that is properly the release skill's job
+        (a separate, org-level repo) once a release is actually cut.
+      No UI yet - the "MaiPai Home {version} is available" surface is
+      E's kit work on top of `GET /api/updates`.
 - [ ] **Hub migration, two hubs** (S-M, F) - plan 4.15; none exist.
       Migration keeps the instance id and CA so pinned clients survive;
       two hubs are two instance ids and a client remembers its choice.

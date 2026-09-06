@@ -39,6 +39,7 @@ import { runBackupAndMirror } from "@/lib/backup";
 import { checkLeafExpiry } from "@/lib/householdCa";
 import { disableExpiredGuests, applyAgeBandChanges } from "@/lib/personLifecycle";
 import { checkDiskFull } from "@/lib/storage";
+import { checkForAppUpdate } from "@/lib/updates";
 import type { PluginOpResult } from "@/lib/plugins";
 import type { PluginResult } from "@maipai/spec/interpreters/ts/recipe-interpreter.js";
 import type { PersonRow } from "@/types";
@@ -196,6 +197,9 @@ const CORE_JOBS: Record<string, CoreJobHandler> = {
   },
   "storage.check_disk_full": () => {
     checkDiskFull();
+  },
+  "updates.check": async () => {
+    await checkForAppUpdate();
   },
   "memory.embedding_retry": async () => {
     await drainPendingEmbeddings();

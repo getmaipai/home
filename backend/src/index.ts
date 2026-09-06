@@ -53,6 +53,11 @@ ensureCoreJob("backup.run", "every:1d");
 // daily: unlike a backup, running low on disk is not something a
 // household should ever wait most of a day to hear about.
 ensureCoreJob("storage.check_disk_full", "every:1h");
+// Step 10: "one check a day" against GitHub's own public release API -
+// see lib/updates.ts's own header for the full scope (app only; the
+// plan's packages/models/sidecars projection halves are deferred, no
+// catalog or per-model version tracking exists yet to check against).
+ensureCoreJob("updates.check", "every:1d");
 // docs/PACKAGES.md's bronze bar: smoke "at install, at every update, and
 // on a schedule" (lib/smoke.ts). No install/update flow exists yet
 // (session-d step 6 builds the store), so a boot-time pass below stands
