@@ -3,6 +3,7 @@ import type { SettingsKey } from "@maipai/spec/gen/ts/settings-key.js";
 import type { Person } from "@maipai/spec/gen/ts/person.js";
 import type { MemoryRecord } from "@maipai/spec/gen/ts/memory-record.js";
 import type { PackageManifest } from "@maipai/spec/gen/ts/manifest.js";
+import type { Issue } from "@maipai/spec/gen/ts/issue.js";
 import type {
   Roster,
   TurnValue,
@@ -48,6 +49,7 @@ export type Role = Person["role"];
 export type { Roster, TurnValue, TurnStreamEvent, ConversationTurnRow, ResolvedSetting, BackupInfo, HardwareInfo, ModelFit, ModelJob, EngineStatus, EngineStatsSample, ClonedVoiceInfo, RoutingStats, PrivacyConnection, PendingRestore, CommandRow, CommandAction, NotificationDeliveryView };
 export type { MemoryRecord };
 export type { PackageManifest };
+export type { Issue };
 export { isOwnerOrAdminRole };
 // SettingsKey is spec-generated (@maipai/spec), not backend-only, so it's
 // imported directly rather than through @/wire.
@@ -374,6 +376,18 @@ export const api = {
         throw e;
       },
     ),
+  // GET /api/repairs (backend/src/routes/repairs.ts): real and fully
+  // landed (F step 1), unlike widgets/lists above - no graceful-404
+  // handling needed, a failure here is a real failure.
+  repairs: () => request<Issue[]>("/api/repairs"),
+  // fixIssue() really does return the updated Issue (backend/src/lib/
+  // issues.ts's fixIssue()); dismissIssue() returns only `{id}`
+  // (dismissIssue()'s own return type) - a code review, 2026-09-06,
+  // caught this file originally typing both as `Issue`, which
+  // type-checked but would hand a future caller `undefined` for every
+  // field but `id`.
+  fixIssue: (id: string) => request<Issue>(`/api/repairs/${encodeURIComponent(id)}/fix`, { method: "POST" }),
+  dismissIssue: (id: string) => request<{ id: string }>(`/api/repairs/${encodeURIComponent(id)}/dismiss`, { method: "POST" }),
   memories: () => request<MemoryRecord[]>("/api/memory"),
   archiveMemory: (id: string) =>
     request<MemoryRecord>(`/api/memory/${encodeURIComponent(id)}/archive`, { method: "POST" }),

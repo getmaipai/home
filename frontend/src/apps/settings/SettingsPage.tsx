@@ -39,6 +39,7 @@ const HOUSEHOLD_TREE: TreeEntry[] = [
   { id: "section-hf-token", label: "Hugging Face token" },
   { id: "models-page-link", label: "AI models", to: "/settings/models" },
   { id: "backups-page-link", label: "Backups", to: "/settings/backups" },
+  { id: "repairs-page-link", label: "Repairs", to: "/settings/repairs" },
   { id: "section-routing", label: "Plugin routing" },
 ];
 

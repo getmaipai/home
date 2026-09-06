@@ -65,6 +65,7 @@ const ROUTES: RouteSpec[] = [
   { slug: "settings-backups", path: "/settings/backups" },
   { slug: "settings-voices", path: "/settings/voices" },
   { slug: "settings-commands", path: "/settings/commands" },
+  { slug: "settings-repairs", path: "/settings/repairs" },
 ];
 
 interface ViewportSpec {

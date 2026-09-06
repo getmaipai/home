@@ -13,6 +13,7 @@ import { ModelsPage } from "@/apps/settings/ModelsPage";
 import { BackupsPage } from "@/apps/settings/BackupsPage";
 import { VoicesPage } from "@/apps/settings/VoicesPage";
 import { CommandsPage } from "@/apps/settings/CommandsPage";
+import { RepairsPage } from "@/apps/settings/RepairsPage";
 import { PeoplePage } from "@/apps/people/PeoplePage";
 import { MemoryPage } from "@/apps/memory/MemoryPage";
 import { PrivacyPage } from "@/apps/privacy/PrivacyPage";
@@ -101,6 +102,7 @@ export function App() {
                         <Route path="/settings/backups" element={<BackupsPage person={person} />} />
                         <Route path="/settings/voices" element={<VoicesPage person={person} />} />
                         <Route path="/settings/commands" element={<CommandsPage person={person} />} />
+                        <Route path="/settings/repairs" element={<RepairsPage person={person} />} />
                       </Routes>
                     </Shell>
                   )

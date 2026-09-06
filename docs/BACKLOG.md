@@ -794,7 +794,17 @@ implemented on the hub yet.
       applies once it is).
 - [ ] Package/skill catalog browsing and install (L) - blocked on the
       `catalog` repo existing for real; today only local bundled packages
-      run at all.
+      run at all. Confirmed again in session E's step 3 (2026-09-06):
+      none of `GET /api/store/index`, `/packages`, `/packages/:id`,
+      `POST /install`, `/install/confirm`, `/uninstall`, `/rollback`,
+      `/channel` (docs/plans/wave-2.md's frozen D-to-E contract) exist
+      yet - "not a line of it exists" below is still literally true.
+      Deliberately not built against a fixture the way widgets/lists
+      were in step 2: the store's own real UX (a two-call permission
+      prompt, README rendering, channel/rollback/uninstall) is too large
+      and too security-sensitive to build convincingly without a real
+      install to drive it against, unlike a card that degrades to
+      "nothing yet."
 - [ ] Admin / parental-controls surface beyond the generic settings
       renderer (M)
 - [x] **Wire the measurable half of accessibility into the screenshot
@@ -1128,7 +1138,24 @@ implemented on the hub yet.
 - [ ] **Health and Repairs pages, the updates projection, self-update
       with stage, swap, health check and rollback** (L) - plan v0.1
       scope, absent here entirely; "cut a first release" below cannot be
-      exercised end to end without them.
+      exercised end to end without them. **Repairs done** (session E,
+      step 3, 2026-09-06): `GET /api/repairs` was the one real, fully
+      landed contract of the five this step named (F step 1) - a real
+      page, `frontend/src/apps/settings/RepairsPage.tsx`/`RepairsSection.tsx`,
+      linked from Settings' Household tree next to Backups/AI models
+      (owner/admin only, the same gate). Hand-written, not a schema
+      `list` node: an `Issue`'s `fix` and `learn_more` are both nullable
+      per-row, and the generic `list` node's `row_action` can't
+      conditionally disappear per row - the same "stays hand-written"
+      call already made for People/Privacy/Settings. **Health, Updates
+      and Storage still not built** (all three confirmed backend-unbuilt
+      2026-09-06): `GET /api/health` is still `{status: "ok"}`, an
+      unrelated liveness check (F's own step 2 replaces it, not landed);
+      `GET /api/updates`/`GET /api/storage` don't exist at all. Left for
+      whoever lands each contract - the frozen shapes are in
+      `docs/plans/wave-2.md`'s "F to E" section, and the frontend side of
+      each is a small schema or hand-written page against a real
+      `GET`, the same size of work Repairs just was.
 
 ## Proactive / ambient intelligence
 

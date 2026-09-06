@@ -489,3 +489,85 @@ entry above (color contrast, `scrollable-region-focusable` on Privacy) -
 confirmed by running the full matrix twice, once before and once after
 the slider's aria-label fix, not assumed from the two-combo quick check
 alone.
+
+## Step 3: the store, Health, Repairs, Updates, Storage
+
+**Investigated all five before writing any code** and found only one of
+them has a real backend today: `GET /api/repairs` (F's step 1, fully
+landed - `Issue`'s spec type, `POST /:id/fix`, `POST /:id/dismiss`).
+`GET /api/health` is still F's original `{status: "ok"}` liveness
+placeholder (F's own dev doc names step 2 as the real replacement, not
+written up yet). `GET /api/updates`, `GET /api/storage`, and every
+`GET /api/store/*` route in the D-to-E contract don't exist at all -
+confirmed by grepping `backend/src/routes/` and `git log --all` for
+each, not assumed from docs/BACKLOG.md alone.
+
+**Repairs is the one real page this step ships**
+(`frontend/src/apps/settings/RepairsPage.tsx`/`RepairsSection.tsx`,
+linked from Settings' Household tree next to AI models/Backups, the same
+owner/admin gate via the already-shared `AdminGatedPage`). Not a schema
+`list` node, on purpose: an `Issue`'s `fix` and `learn_more` are both
+nullable per-row, and the generic `list` node's `row_action` is
+unconditional across every row - the same "stays hand-written" call
+already made for People/Privacy/Settings (docs/dev.md's A2UI entry), for
+the same reason (the generic interpreter's capability doesn't fit this
+real data shape's conditionality). Reuses the kit's own `List` for the
+row surface, `Badge` for severity (destructive/outline/secondary for
+error/warning/info), `EmptyState` for "Everything looks good. No repairs
+needed." - this step's own text asked for exactly that ("says what a
+healthy hub looks like, not a blank"), which is why `AsyncState`'s own
+`isEmpty` prop is deliberately left unset here: it renders its own
+generic EmptyState before `children` ever runs, which would have
+silently made the custom copy unreachable dead code (caught by the
+section's own tests failing on the wrong empty-state text before it
+shipped, not by inspection).
+
+**Health, Updates, Storage and the store are deferred**, not built
+against a fixture the way widgets/lists were in step 2 - and for two
+different reasons, both recorded in `docs/BACKLOG.md`:
+- Updates and Storage: genuinely nothing to build against yet (no route
+  at all), the same shape as step 2's widgets/lists deferral - whoever
+  lands the backend gets a small schema or hand-written page against a
+  real `GET`, the size Repairs just was.
+- The store: deliberately not treated the same as widgets/lists even
+  though its contract is just as frozen. The store's real UX (a two-call
+  permission prompt, README rendered as markdown, channel/rollback/
+  uninstall) is too large and too security-sensitive to build
+  convincingly against nothing real to install - unlike a widget card,
+  which degrades honestly to "nothing yet" with no loss of design
+  fidelity, a store page built against a fixture would either fake an
+  install flow that doesn't exist or ship untested chrome around one.
+- Health specifically: the route already exists, but returns the wrong
+  shape entirely (`{status: "ok"}`, not even a partial version of
+  `{sidecars, gpu, disk, last_backup, certificate, models, link}`) -
+  there is nothing shaped like the real contract to degrade gracefully
+  from, the way a 404 degrades to "no widgets yet."
+
+A code review before commit caught five real issues, all fixed: a
+`learn_more` value rendered through react-router's `Link`, but App.tsx
+declares no route for the `docs/user/`/`docs/dev/` paths it actually
+carries (a plain `<a href>` instead, same as WidgetCard.tsx's own href
+handling); `api.dismissIssue()` typed its response as a full `Issue`
+when the real route (`dismissIssue()`, `backend/src/lib/issues.ts`)
+returns only `{id}` - latent today since the page discards the value,
+real the moment anything reads a field off it; a single `pendingId`
+string instead of a set, so starting an action on one row silently
+re-enabled a different row's buttons mid-flight - fixed to a `Set`, with
+a regression test that resolves two rows' actions out of order and
+checks the still-pending one stays disabled throughout; `refetch()`
+instead of `queryClient.invalidateQueries` (`PeoplePage.tsx`'s own
+`invalidateRoster` is the established pattern); and the test's own fetch
+stub returning a full `Issue` for a dismiss call too, which was exactly
+why the response-type bug above couldn't have been caught by the suite
+as first written.
+
+Verified: `bun test` (frontend, 382 passing - `RepairsSection.test.tsx`
+at 6 cases after the concurrency regression test), `bunx tsc --noEmit`
+clean, `lint` clean (same two pre-existing warnings), `scripts/check.sh`
+green end to end (one `NotificationBell`/one `MemoryPage` test each hit
+an isolated timing timeout under this session's own background agent
+load, both confirmed passing cleanly on repeat and in isolation - a
+machine-load flake, not a regression from this diff), and
+`/settings/repairs` added to `scripts/screenshot.ts`'s route list and
+re-verified through the full `bun run a11y` matrix (clean except the
+same two pre-existing, already-deferred findings named above).
