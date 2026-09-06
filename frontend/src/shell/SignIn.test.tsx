@@ -175,3 +175,64 @@ describe("SignIn auto-submit", () => {
     }
   });
 });
+
+describe("SignIn wrong PIN (issue #19)", () => {
+  // A wrong PIN used to set the SAME `error` state the profile-fetch
+  // effect uses, and the component's top-level `if (error)` early return
+  // fires for either one - nuking the whole screen (picker, PIN pad,
+  // everything) down to bare error text with no way back except a
+  // refresh. The fix is a separate `secretError`, rendered inline, so the
+  // PIN screen (and the way back to the picker) survives a wrong guess.
+  test("shows the error inline and keeps the PIN screen, not a full-screen wipe", async () => {
+    const onSignedIn = mock(() => {});
+    const restore = stubFetch({
+      "/api/auth/profiles": [makePerson()],
+      "/api/auth/verify-secret": () => jsonResponse({ error: "Invalid PIN or password" }, 401),
+    });
+    try {
+      const rendered = render(<SignIn onSignedIn={onSignedIn} />);
+      await selectJesse(rendered);
+      const input = rendered.getByPlaceholderText("PIN or password");
+      await act(async () => {
+        fireEvent.change(input, { target: { value: "9999" } });
+      });
+      await rendered.findByText("Invalid PIN or password");
+
+      // The PIN screen is still fully intact, not replaced by bare error
+      // text: the field to retry in, the person's name, and the way back
+      // to the picker are all still there (each throws if missing).
+      rendered.getByPlaceholderText("PIN or password");
+      rendered.getByText("Jesse");
+      rendered.getByText("Back");
+      expect(onSignedIn).not.toHaveBeenCalled();
+    } finally {
+      restore();
+    }
+  });
+
+  // Found in review of the fix above: handleProfileTap's own tapError
+  // (a failed direct, no-PIN sign-in) is set on the picker screen, but a
+  // stale one used to survive tapping a DIFFERENT, secret-holding
+  // profile afterward - it isn't cleared until the direct-sign-in path
+  // runs again, which the PIN-flow's own early return skips entirely.
+  test("a stale tap-error from a different profile doesn't resurface after a PIN flow", async () => {
+    const noSecretPerson = makePerson({ id: "person-def456", display_name: "Bramble", hasSecret: false });
+    const restore = stubFetch({
+      "/api/auth/profiles": [makePerson(), noSecretPerson],
+      "/api/auth/select": () => jsonResponse({ error: "profile disabled" }, 403),
+    });
+    try {
+      const rendered = render(<SignIn onSignedIn={() => {}} />);
+      const bramble = await rendered.findByText("Bramble");
+      await act(async () => {
+        fireEvent.click(bramble);
+      });
+      await rendered.findByText("profile disabled");
+
+      await selectJesse(rendered);
+      expect(rendered.queryByText("profile disabled")).toBeNull();
+    } finally {
+      restore();
+    }
+  });
+});

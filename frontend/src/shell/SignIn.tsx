@@ -20,7 +20,19 @@ export function SignIn({ onSignedIn }: SignInProps) {
   const [profiles, setProfiles] = useState<Roster[] | null>(null);
   const [selected, setSelected] = useState<Roster | null>(null);
   const [secret, setSecret] = useState("");
+  // `error` is reserved for the profile-fetch failure below (there's no
+  // picker to show yet, so a full-screen message is the only option). A
+  // wrong PIN or a failed direct tap both have a real screen behind them
+  // to keep showing - issue #19 found the top-level `if (error)` early
+  // return below firing for handleSecretSubmit's own catch too, nuking
+  // the whole sign-in screen (profile picker, PIN pad, everything) down
+  // to bare error text with no way back except a refresh. Two more
+  // states, each rendered inline on the screen it belongs to, instead of
+  // funneling every failure through the one state that also controls
+  // whether a picker exists to render at all.
   const [error, setError] = useState<string | null>(null);
+  const [secretError, setSecretError] = useState<string | null>(null);
+  const [tapError, setTapError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
@@ -58,17 +70,17 @@ export function SignIn({ onSignedIn }: SignInProps) {
     e?.preventDefault();
     if (!selected) return;
     setBusy(true);
-    setError(null);
+    setSecretError(null);
     try {
       await api.verifySecret(selected.id, secret);
       onSignedIn();
     } catch (e) {
       // Whether this call came from the auto-submit effect (which already
       // flipped autoSubmitDisabledRef before calling this) or a manual
-      // Sign-in click, a wrong PIN just shows the error - manual Sign-in
-      // keeps working normally either way, same as before this feature
-      // existed.
-      setError(e instanceof ApiError ? e.message : "Sign-in failed");
+      // Sign-in click, a wrong PIN just shows the error inline, next to
+      // the PIN field - manual Sign-in keeps working normally either
+      // way, same as before this feature existed.
+      setSecretError(e instanceof ApiError ? e.message : "Sign-in failed");
     } finally {
       setBusy(false);
     }
@@ -76,16 +88,21 @@ export function SignIn({ onSignedIn }: SignInProps) {
 
   async function handleProfileTap(person: Roster) {
     if (person.hasSecret) {
+      // A stale tapError from a PREVIOUS, unrelated failed tap (a
+      // different no-secret profile) must not resurface on the picker
+      // once this PIN flow ends - clear it here rather than only where
+      // it's set, since this early-return path skips that entirely.
+      setTapError(null);
       setSelected(person);
       return;
     }
     setBusy(true);
-    setError(null);
+    setTapError(null);
     try {
       await api.select(person.id);
       onSignedIn();
     } catch (e) {
-      setError(e instanceof ApiError ? e.message : "Sign-in failed");
+      setTapError(e instanceof ApiError ? e.message : "Sign-in failed");
     } finally {
       setBusy(false);
     }
@@ -122,11 +139,11 @@ export function SignIn({ onSignedIn }: SignInProps) {
             autoFocus
             required
           />
-          {error ? <p className="text-sm text-[var(--destructive)]">{error}</p> : null}
+          {secretError ? <p className="text-sm text-[var(--destructive)]">{secretError}</p> : null}
           <Button type="submit" disabled={busy}>
             {busy ? "Signing in…" : "Sign in"}
           </Button>
-          <Button type="button" variant="ghost" onClick={() => { setSelected(null); setError(null); setSecret(""); }}>
+          <Button type="button" variant="ghost" onClick={() => { setSelected(null); setSecretError(null); setSecret(""); }}>
             Back
           </Button>
         </form>
@@ -155,7 +172,7 @@ export function SignIn({ onSignedIn }: SignInProps) {
           </button>
         ))}
       </div>
-      {error ? <p className="text-sm text-[var(--destructive)]">{error}</p> : null}
+      {tapError ? <p className="text-sm text-[var(--destructive)]">{tapError}</p> : null}
     </div>
   );
 }
