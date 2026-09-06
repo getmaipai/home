@@ -2852,6 +2852,60 @@ that owns it.
   the top of this file.
 - Generation (image, video), the Desktop shell, pods on ESPHome, Go.
 
+## The 2026-09-06 code review: deferred findings
+
+A security/correctness/performance review (23 findings, `NOTE-review-
+2026-09-06/code-review.md`, outside git) was worked through in full;
+every High and Medium landed as its own commit, along with all but four
+Lows. Those four needed real design work or broke an existing,
+widespread test/UX convention badly enough that forcing them in the
+same sitting would have been its own separate, disruptive change - each
+is filed as a GitHub issue with the full finding and is tracked here so
+it stays visible on the dashboard, not just in the tracker.
+
+- [ ] **PIN-free adult/teen profiles are a one-tap sign-in** (S-M,
+      `getmaipai/home#47`) - `routes/auth.ts`'s `/select` issues a
+      session for any secret-free, non-deleted profile with no throttle;
+      `routes/people.ts` only forces a secret for owner/admin. Anyone on
+      the LAN gets full adult-tier chat with one tap. A real design
+      decision (a default policy change, not a bug fix), and touching it
+      breaks the sign-in convention ~15 test files rely on (bare-tap
+      `/select` for a secret-free fixture person) - needs a coordinated
+      pass across those tests, not a one-file patch. Acceptance: a new
+      adult/teen profile defaults to requiring a PIN/password/passkey
+      before `/select` will sign it in, with a migration note for
+      existing secret-free profiles. Exit check: `scripts/check.sh`
+      green with the updated test convention.
+- [ ] **Background LLM work has no idle gate against foreground turns**
+      (S, `getmaipai/home#45`) - `conversationHistory.ts`'s
+      `maybeRefreshConversationSummary()` runs post-turn with no check
+      for whether the household is mid-conversation right now, so a
+      summary refresh can start generating on the shared chat engine
+      slot just as someone sends their next message, queuing it behind
+      a background job. Mirror the idle-gate shape already used
+      elsewhere for background jobs sharing the same engine (see
+      `docs/dev.md`'s notes on the chat engine's single generation
+      slot). Acceptance: a foreground turn never waits behind a summary
+      refresh that could have been delayed. Exit check: a regression
+      test proving a summary refresh yields to an in-flight foreground
+      turn.
+- [ ] **Backups block the event loop** (M, `getmaipai/home#46`) -
+      `lib/backup.ts`'s `runBackup()` runs SQLite's `VACUUM INTO` and
+      `backupCrypto.ts`'s whole-file AES encrypt/decrypt synchronously,
+      called from both a request handler and the scheduler - every
+      other request stalls for the duration on a large database.
+      Acceptance: a backup/restore no longer blocks concurrent request
+      handling (moved off the main thread, or chunked/async I/O).
+      Exit check: a test that starts a backup and confirms an unrelated
+      request completes without waiting on it.
+- [ ] **`memorializePerson()` isn't atomic** (S, `getmaipai/home#49`) -
+      the same multi-statement-with-no-transaction shape `deletePerson()`
+      had before this review's COR-5 fix (`personLifecycle.ts`), just
+      not yet applied here. Mirror COR-5's fix exactly: wrap in
+      `sqlite.transaction()`. Exit check: `tests/people.test.ts` gets a
+      concurrent-memorialize regression test matching COR-5's own
+      "two owners deleting each other" test shape.
+
 ## How to use this file
 
 - Check an item off only when it's shipped and verified (per
