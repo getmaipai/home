@@ -259,6 +259,40 @@ export function resolveOrCreateConversation(
   return { ok: true, value: insertNewConversation(actor, surface) };
 }
 
+// ==== Session C step 2: pendingAsk (Tier 2 confirmation / ask continuation) ====
+
+export interface PendingAsk {
+  kind: "confirm" | "ask";
+  prompt: string;
+  packageId: string;
+  args: Record<string, unknown>;
+  /** Only set for kind:"ask" (a recipe result's own `ask.expects` hint,
+   * spec/schemas/result.schema.json) - free text, not a structured
+   * matcher; turnEngine.ts's own consumption is documented at its call
+   * site since the shape genuinely doesn't say more than this. */
+  expects?: string;
+}
+
+export function getPendingAsk(conversationId: string): PendingAsk | null {
+  const row = db.select({ pendingAsk: conversations.pendingAsk }).from(conversations).where(eq(conversations.id, conversationId)).get();
+  if (!row?.pendingAsk) return null;
+  try {
+    return JSON.parse(row.pendingAsk) as PendingAsk;
+  } catch {
+    return null; // a corrupt value is treated the same as none - never a crash on the next turn
+  }
+}
+
+/** `null` clears it - always called after a pendingAsk is consumed
+ * (matched or not), single-shot per this step's own text ("the NEXT
+ * utterance is matched against it"), never left open past one turn. */
+export function setPendingAsk(conversationId: string, ask: PendingAsk | null): void {
+  db.update(conversations)
+    .set({ pendingAsk: ask ? JSON.stringify(ask) : null, updatedAt: new Date().toISOString(), hlc: nextHlc() })
+    .where(eq(conversations.id, conversationId))
+    .run();
+}
+
 /** POST /api/conversations: an explicit "start a new conversation"
  * action, distinct from the implicit resolve-or-create above - always
  * creates, closing (never deleting) whichever conversation was

@@ -45,6 +45,9 @@ function benchActor(): PersonRow {
     createdAt: "2026-01-01T00:00:00.000Z",
     updatedAt: "2026-01-01T00:00:00.000Z",
     deletedAt: null,
+    enabled: true,
+    guestExpiresAt: null,
+    memorializedAt: null,
     hlc: "1700000000000:0:bench",
   };
 }
@@ -80,7 +83,7 @@ async function main() {
 
   let pass = 0;
   for (const row of corpus) {
-    const routed = await route(row.utterance, actor, loaded);
+    const { winner: routed } = await route(row.utterance, actor, loaded);
     const skillMatches = matchingSkills(row.utterance, skills);
     const routedId = routed ? routed.id : (skillMatches[0]?.skill.manifest.id ?? null);
 

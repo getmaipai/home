@@ -759,11 +759,16 @@ into a conversation with someone who knows who is talking.
       each package exposes a few parameterized reads ("events between",
       "chores for person") backed by SQL we wrote. Small models fill
       parameters reliably and do not write safe SQL.
-- [ ] **Grammar-constrained tool calls, verified before acting** (S, with
-      Tier 2) - an unparseable call is "ask again", never a silent drop;
+- [x] **Grammar-constrained tool calls, verified before acting** (S, with
+      Tier 2) - shipped 2026-09-06, Session C step 2 (`lib/llm.ts`'s
+      `tools`/`tool_choice`, a `response_format` JSON-schema grammar, not
+      OpenAI-wire tool_calls; `runPlugin()`'s existing ajv validation is
+      the reused "verified before acting" check). an unparseable call is "ask again", never a silent drop;
       llama.cpp's lazy grammars still let malformed calls through on
       recent Qwen builds (upstream issue 24807).
-- [ ] **The routing eval corpus as a permanent test** (M) - plan 4.5 says
+- [x] **The routing eval corpus as a permanent test** (M) - shipped
+      2026-09-06, Session C step 1 (`spec/llm/routing-corpus.json`,
+      `backend/tests/routingCorpus.test.ts`). plan 4.5 says
       routing accuracy "is the number that decides whether tier 2 is
       built at all"; no corpus exists. Utterance, expected package or
       none, expected arguments, near misses that must not fire, every
@@ -771,7 +776,12 @@ into a conversation with someone who knows who is talking.
       about twenty regex classes each annotated with a live misroute
       ("I GOT THE JOB" routed to remember; "do you know who X is" must
       never hit search); mine those for the first rows.
-- [ ] **Bench models for tool calling** (S) - Qwen3-4B-Instruct-2507 and
+- [x] **Bench models for tool calling** (S) - mechanism shipped
+      2026-09-06, Session C step 2 (`backend/scripts/bench/tool-calling.ts`,
+      `spec/llm/tool-call-corpus.json`) - the actual Qwen3-4B-Instruct-2507/
+      Gemma 4 E4B numbers are NOT recorded (no real llama-server/GGUF
+      available in that session's environment; run against the stub only,
+      0/3, expected - see docs/dev/session-c.md). Qwen3-4B-Instruct-2507 and
       Gemma 4 E4B are the published sweet spots for on-device tool use
       in 2026; measure on our own tool set, not their leaderboards.
 - [ ] **Speak MCP for local tools inside the hub** (M, decision first) -

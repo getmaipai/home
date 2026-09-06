@@ -214,6 +214,18 @@ export const conversations = sqliteTable(
     summary: text("summary"),
     summaryThroughTurn: text("summary_through_turn"),
     source: text("source").notNull().default("hub"), // hub|local
+    // Session C step 2: JSON-encoded PendingAsk (turnEngine.ts) or null.
+    // Set either by a Tier 2 tool proposal naming a `consequential`
+    // package (waiting on the person's yes/no) or by a recipe result's
+    // own `ask`/`confirm` field (spec/schemas/result.schema.json - typed
+    // there since step 6, session-a-intelligence.md, but no recipe
+    // interpreter step can SET either field yet: spec/interpreters/**
+    // is Session D's file, so this consumption path is real and tested
+    // against a hand-built PluginResult, genuinely unreachable by any
+    // bundled package until D adds the op). Matched against the NEXT
+    // utterance, before the floor, then cleared either way - never left
+    // open past one turn.
+    pendingAsk: text("pending_ask"),
     hlc: text("hlc").notNull(),
     createdAt: text("created_at").notNull(),
     updatedAt: text("updated_at").notNull(),
@@ -247,7 +259,7 @@ export const conversationTurns = sqliteTable(
     conversationId: text("conversation_id").references(() => conversations.id),
     userText: text("user_text").notNull(),
     replyText: text("reply_text").notNull(),
-    source: text("source").notNull(), // "safety_refuse" | "plugin" | "plugin_error" | "command" | "command_error" | "model"
+    source: text("source").notNull(), // "safety_refuse" | "plugin" | "plugin_error" | "command" | "command_error" | "model" | "confirm"
     pluginId: text("plugin_id"),
     commandId: text("command_id"),
     safetyFlagged: integer("safety_flagged", { mode: "boolean" }).notNull().default(false),

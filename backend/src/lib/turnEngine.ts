@@ -19,9 +19,17 @@ import { matchCommand, runCommand } from "@/lib/commands";
 import { trigger } from "@/lib/notifications";
 import { recall, bumpUsage, embedQueryForRecall, getProfileParagraph, type RecallMatch } from "@/lib/memory";
 import { newConversationTurnId } from "@/lib/id";
-import { complete, startCompleteStream, type LlmMessage } from "@/lib/llm";
+import { complete, startCompleteStream, type LlmMessage, type ToolSpec, type ToolCall } from "@/lib/llm";
 import { tokenize } from "@/lib/text";
-import { logTurn, resolveOrCreateConversation, buildConversationWindow, maybeRefreshConversationSummary } from "@/lib/conversationHistory";
+import {
+  logTurn,
+  resolveOrCreateConversation,
+  buildConversationWindow,
+  maybeRefreshConversationSummary,
+  getPendingAsk,
+  setPendingAsk,
+  type PendingAsk,
+} from "@/lib/conversationHistory";
 import { pickRefusalVariant, varyKnownConstant } from "@/lib/replyVariation";
 import { normalizeForSpeech } from "@maipai/spec/voice/ts/normalizeForSpeech.js";
 import { nextSentenceBoundary } from "@maipai/spec/safety/ts/sentenceChunker.js";
@@ -31,6 +39,7 @@ import { composePersonaPrompt, resolvePersona, DEFAULT_PERSONA, INFORMATION_HAND
 import type { Role } from "@/middleware/auth";
 import type { PersonRow } from "@/types";
 import type { PackageManifest } from "@maipai/spec/gen/ts/manifest.js";
+import type { PluginResult } from "@maipai/spec/interpreters/ts/recipe-interpreter.js";
 import type { SafetyResult } from "@maipai/spec/gen/ts/safety-result.js";
 // TurnReply/TurnValue moved to @/wire (alias-free, so a frontend client
 // can import the real shape through the @maipai/home-backend workspace
@@ -556,7 +565,37 @@ interface RoutedPlugin {
 // added, or the embed backend down) falls back to `exampleScore()` for
 // itself alone; the ranking runs on whatever mix of real and fallback
 // scores the turn actually has, never all-or-nothing.
-export async function route(text: string, actor: PersonRow, loaded: LoadedManifest[]): Promise<RoutedPlugin | null> {
+// Session C step 2's own pre-filter sizes: "offer only the top few Tier 1
+// candidates as tools" (a small, tunable number of candidates shown to
+// the model, not the whole catalog) and "capped at two calls per turn"
+// (the model's own decision, enforced independently of the grammar's
+// own maxItems - lib/llm.ts's parseToolCalls() already refuses more than
+// two, this is belt-and-suspenders at the call site too).
+const MAX_TIER2_TOOLS_OFFERED = 3;
+const MAX_TIER2_CALLS_PER_TURN = 2;
+
+export interface RankedCandidate {
+  id: string;
+  score: number;
+  manifest: PackageManifest;
+}
+
+export interface RouteResult {
+  /** Tier 0 or Tier 1's own firing decision - unchanged meaning from
+   * before this step. */
+  winner: RoutedPlugin | null;
+  /** Every candidate Tier 1 scored (never populated when a Tier 0
+   * pattern already fired - `winner` is returned immediately in that
+   * case, `ranked` stays empty), best score first. Session C step 2's
+   * own Tier 2 pre-filter reads this when `winner` is null: "offer only
+   * the top few Tier 1 candidates as tools." Deliberately includes
+   * `consequential` packages (excluded from ever WINNING Tier 1 by
+   * `canFire` below, but still real candidates to OFFER - the model may
+   * PROPOSE one, gated on confirmation before it runs). */
+  ranked: RankedCandidate[];
+}
+
+export async function route(text: string, actor: PersonRow, loaded: LoadedManifest[]): Promise<RouteResult> {
   const eligible: LoadedManifest[] = [];
   for (const { id, manifest } of loaded) {
     if (!meetsMinRole(actor.role, manifest.min_role)) continue;
@@ -566,13 +605,13 @@ export async function route(text: string, actor: PersonRow, loaded: LoadedManife
       if (captured === null) continue;
       const args = deterministicArgs(manifest.args, captured);
       if (!args) continue;
-      return { id, args, score: 1, viaPattern: true, viaEmbedding: true }; // Tier 0 always wins, immediately
+      // Tier 0 always wins, immediately - no Tier 1 ranking to report.
+      return { winner: { id, args, score: 1, viaPattern: true, viaEmbedding: true }, ranked: [] };
     }
 
-    if (manifest.consequential) continue; // examples alone never clear a raised bar
     eligible.push({ id, manifest });
   }
-  if (eligible.length === 0) return null;
+  if (eligible.length === 0) return { winner: null, ranked: [] };
 
   await ensureRoutingEmbeddings(eligible.map(({ id, manifest }) => ({ id, examples: manifest.routing?.examples })));
   const utteranceVector = await embedUtterance(text);
@@ -583,20 +622,135 @@ export async function route(text: string, actor: PersonRow, loaded: LoadedManife
     score: embeddingScores.get(id) ?? exampleScore(text, manifest.routing?.examples),
     viaEmbedding: embeddingScores.has(id),
   }));
+  const ranked: RankedCandidate[] = [...scored]
+    .sort((a, b) => b.score - a.score)
+    .map((s) => ({ id: s.id, score: s.score, manifest: eligible.find((e) => e.id === s.id)!.manifest }));
 
-  const canFire = (id: string) => deterministicArgs(eligible.find((e) => e.id === id)!.manifest.args, null) !== null;
-  const winner = pickTier1WinnerAmong(scored, canFire);
-  if (!winner) return null;
+  // A consequential package never WINS Tier 1 (examples alone never
+  // clear its raised bar) - folded into canFire alongside the existing
+  // arg-binding check, rather than excluded from `eligible`/`scored`
+  // outright, so it still appears in `ranked` for Tier 2 to offer.
+  const canFire = (id: string) => {
+    const manifest = eligible.find((e) => e.id === id)!.manifest;
+    if (manifest.consequential) return false;
+    return deterministicArgs(manifest.args, null) !== null;
+  };
+  const tier1Winner = pickTier1WinnerAmong(scored, canFire);
+  if (!tier1Winner) return { winner: null, ranked };
 
-  const manifest = eligible.find((e) => e.id === winner.id)!.manifest;
+  const manifest = eligible.find((e) => e.id === tier1Winner.id)!.manifest;
   const args = deterministicArgs(manifest.args, null)!; // canFire already proved this binds
-  const viaEmbedding = scored.find((s) => s.id === winner.id)!.viaEmbedding;
-  return { id: winner.id, args, score: winner.score, viaPattern: false, viaEmbedding };
+  const viaEmbedding = scored.find((s) => s.id === tier1Winner.id)!.viaEmbedding;
+  return { winner: { id: tier1Winner.id, args, score: tier1Winner.score, viaPattern: false, viaEmbedding }, ranked };
 }
 
 type PreparedTurn =
   | { kind: "immediate"; value: TurnValue; turnId: string }
   | { kind: "model"; messages: LlmMessage[]; safety: SafetyResult; crisisResources?: string; turnId: string };
+
+// Session C step 2: a plain word-list, not a model call - a pendingAsk
+// confirmation is exactly the kind of turn that must resolve
+// deterministically and instantly (a "yes" waiting on an LLM round trip
+// to be recognized as "yes" is its own small reliability problem to
+// invite for no reason).
+// Matched at the START of the trimmed reply, not the whole string: "no
+// thanks" and "yeah, go for it" are exactly as real as a bare "yes" or
+// "no" and shouldn't need to match it exactly to be understood.
+const AFFIRMATIVE_RE = /^(yes|yeah|yep|yup|sure|ok|okay|go ahead|do it|please do|confirmed?)\b/i;
+const NEGATIVE_RE = /^(no|nope|nah|cancel|never ?mind|don'?t|stop)\b/i;
+
+/** Session C step 2's pendingAsk continuation, either trigger
+ * (Tier 2 proposing a `consequential` package, or a recipe result's own
+ * `confirm`/`ask` - unbuilt on the producing side, see the `conversations.
+ * pending_ask` column's own comment). Matched against the utterance
+ * BEFORE the floor (Tier 0/1/2, commands) and always cleared after one
+ * try, whether it matched or not - a stale confirmation waiting
+ * indefinitely for a "yes" that never comes is worse than dropping it.
+ * Returns null (proceed with normal routing for this utterance) when
+ * nothing pending exists, the reply is ambiguous, or an "ask" can't bind
+ * (no manifest, or the wrong arg shape to bind free text to). */
+// spec/interpreters/ts/recipe-interpreter.ts's own hand-written
+// `PluginResult` (Session D's file) only declares `reply`/`actions` -
+// `confirm`/`ask` are real, generated spec fields
+// (spec/schemas/result.schema.json, spec/gen/ts/result.ts) that no
+// current recipe `Step` can actually set, so the interpreter's own
+// narrower type doesn't type them at all. Widened locally rather than
+// editing D's file: today's real runtime objects simply don't have
+// either key (accessing an absent optional property is always safe,
+// just `undefined`), and the cast stays exactly forward-compatible with
+// whatever D eventually ships.
+export type PluginResultWithConfirmAsk = PluginResult & {
+  confirm?: { prompt?: string; on_confirm?: Record<string, unknown> };
+  ask?: { prompt?: string; expects?: string };
+};
+
+/** A successful runPlugin() result carrying `confirm`/`ask` (spec/schemas/
+ * result.schema.json, typed since session-a-intelligence.md step 6) does
+ * not answer the turn with its own `.reply` - it asks the person
+ * instead, storing a PendingAsk for the same resolvePendingAsk() flow a
+ * Tier 2 consequential proposal (below) also feeds. No bundled recipe
+ * can set either field yet (spec/interpreters/**'s `Step` union has no
+ * op for it - Session D's file, not this session's to add): real and
+ * tested against a hand-built PluginResult, not reachable by any real
+ * package today. Returns null for the ordinary case (neither field
+ * set) - the caller uses `.reply` as usual. */
+export function pendingAskFromPluginResult(packageId: string, args: Record<string, unknown>, result: PluginResultWithConfirmAsk, conversationId: string): { prompt: string } | null {
+  if (result.confirm) {
+    const prompt = result.confirm.prompt ?? `Go ahead with ${packageId}?`;
+    setPendingAsk(conversationId, { kind: "confirm", prompt, packageId, args });
+    return { prompt };
+  }
+  if (result.ask) {
+    const prompt = result.ask.prompt ?? "";
+    setPendingAsk(conversationId, { kind: "ask", prompt, packageId, args, expects: result.ask.expects });
+    return { prompt };
+  }
+  return null;
+}
+
+export async function resolvePendingAsk(
+  text: string,
+  actor: PersonRow,
+  conversation: Conversation,
+  loaded: LoadedManifest[],
+  turnId: string,
+  safety: SafetyResult,
+  crisisResources: string | undefined,
+): Promise<TurnValue | null> {
+  const pending = getPendingAsk(conversation.id);
+  if (!pending) return null;
+
+  if (pending.kind === "confirm") {
+    if (AFFIRMATIVE_RE.test(text.trim())) {
+      setPendingAsk(conversation.id, null);
+      const result = await runPlugin(pending.packageId, actor, pending.args, turnId);
+      if (result.ok) {
+        return { reply: result.value.reply ?? { text: "Done." }, source: "plugin", plugin_id: pending.packageId, safety, crisis_resources: crisisResources, conversation_id: conversation.id, turn_id: turnId };
+      }
+      return { reply: { text: "Sorry, I couldn't do that." }, source: "plugin_error", plugin_id: pending.packageId, safety, crisis_resources: crisisResources, conversation_id: conversation.id, turn_id: turnId };
+    }
+    if (NEGATIVE_RE.test(text.trim())) {
+      setPendingAsk(conversation.id, null);
+      return { reply: { text: "Okay, I won't do that." }, source: "confirm", safety, crisis_resources: crisisResources, conversation_id: conversation.id, turn_id: turnId };
+    }
+    // Ambiguous: cleared anyway (single-shot), utterance falls through
+    // to normal routing rather than being force-fit as an answer.
+    setPendingAsk(conversation.id, null);
+    return null;
+  }
+
+  // kind: "ask" - the raw utterance is the answer; deterministicArgs()
+  // (already exported above) is the exact "bind one required string arg,
+  // no wildcard capture needed" logic this needs, reused rather than a
+  // second copy of it.
+  setPendingAsk(conversation.id, null);
+  const manifest = loaded.find((l) => l.id === pending.packageId)?.manifest;
+  const boundArg = manifest ? deterministicArgs(manifest.args, text) : null;
+  if (!boundArg) return null; // can't bind - fall through to normal routing rather than guess
+  const result = await runPlugin(pending.packageId, actor, { ...pending.args, ...boundArg }, turnId);
+  if (!result.ok) return null; // the continuation attempt failed - fall through rather than report a confusing error for an utterance that wasn't really about this
+  return { reply: result.value.reply ?? { text: "Done." }, source: "plugin", plugin_id: pending.packageId, safety, crisis_resources: crisisResources, conversation_id: conversation.id, turn_id: turnId };
+}
 
 /** Safety-first routing and the deterministic plugin floor (4.5), shared
  * by runTurn() and runTurnStream(): identical for both, and the only real
@@ -662,6 +816,12 @@ async function prepareTurn(
   }
   const crisisResources = deriveCrisisResources(safety);
 
+  // Session C step 2: matched against the utterance before the floor
+  // (commands, Tier 0/1/2) - a pendingAsk from an earlier turn always
+  // gets first refusal on what this utterance means.
+  const pendingAskValue = await resolvePendingAsk(text, actor, conversation, loaded, turnId, safety, crisisResources);
+  if (pendingAskValue) return { kind: "immediate", value: pendingAskValue, turnId };
+
   // Checked before the plugin floor: a command is household-authored,
   // deliberate, and exact-match-only (never fuzzy) - the identical "a
   // real trigger always wins" property a plugin's own pattern match has,
@@ -691,7 +851,7 @@ async function prepareTurn(
     });
   }
 
-  const routed = await route(text, actor, loaded);
+  const { winner: routed, ranked } = await route(text, actor, loaded);
   // A real trigger phrase always wins outright (see RoutedPlugin's own
   // comment on why `viaPattern`, not `score === 1`, is the real signal).
   // Only a FUZZY plugin match is subject to being outscored - found live
@@ -709,6 +869,10 @@ async function prepareTurn(
   if (routed && !(routedViaFuzzyMatch && bestSkillScore > routed.score)) {
     const result = await runPlugin(routed.id, actor, routed.args, turnId);
     if (result.ok) {
+      const pending = pendingAskFromPluginResult(routed.id, routed.args, result.value as PluginResultWithConfirmAsk, conversation.id);
+      if (pending) {
+        return immediate({ reply: { text: pending.prompt }, source: "confirm", plugin_id: routed.id, safety, crisis_resources: crisisResources });
+      }
       const reply = result.value.reply ?? { text: "Done." };
       return immediate({
         reply,
@@ -776,7 +940,116 @@ async function prepareTurn(
     ...window.messages,
     { role: "user", content: text },
   ];
+  // Session C step 2: Tier 2, native tool calling. Only reached when
+  // Tier 0/1 found no winner - `ranked` (route()'s own Tier 1 scoring)
+  // is the pre-filter this step's own text asks for ("offer only the
+  // top few Tier 1 candidates as tools"). Extracted as its own function
+  // (rather than inlined here) specifically so it's directly unit-
+  // testable without a full runTurn() and a fixture package on disk -
+  // see its own comment.
+  const tier2 = await attemptTier2Tools(text, actor, ranked, messages, turnId, conversation.id, safety, crisisResources);
+  if (tier2) return { kind: "immediate", value: tier2, turnId };
+
   return { kind: "model", messages, safety, crisisResources, turnId };
+}
+
+/** Session C step 2's Tier 2: offers `ranked`'s top few candidates
+ * (including `consequential` ones - the model may PROPOSE one, gated on
+ * confirmation before it runs) as tools, and either runs what it
+ * proposes, asks for confirmation, or returns null to fall through to
+ * the ordinary conversational reply using the SAME `messages` already
+ * built (no separate retry call, no second grammar attempt) - the exact
+ * "ask again, never a silent drop" contract for an unparseable or fully-
+ * invalid proposal. Extracted as its own function so it's testable
+ * directly: `ranked` can be a hand-built list (a `consequential` fixture
+ * manifest needs no file on disk - the confirmation path never reaches
+ * runPlugin() at all), while the "a proposed call actually runs" path
+ * exercises a real bundled package. */
+export async function attemptTier2Tools(
+  text: string,
+  actor: PersonRow,
+  ranked: RankedCandidate[],
+  messages: LlmMessage[],
+  turnId: string,
+  conversationId: string,
+  safety: SafetyResult,
+  crisisResources: string | undefined,
+): Promise<TurnValue | null> {
+  if (ranked.length === 0) return null; // nothing here has any routing.examples at all - nothing to offer
+
+  const offered: ToolSpec[] = ranked.slice(0, MAX_TIER2_TOOLS_OFFERED).map((r) => ({ id: r.id, description: r.manifest.description, args: r.manifest.args }));
+  const toolResult = await complete("chat", messages, { tools: offered, tool_choice: "auto" });
+  const calls = toolResult.ok ? toolResult.value.tool_calls : undefined;
+  // `undefined` (a reply that didn't parse as the requested shape at all
+  // - lib/llm.ts's own "ask again, never a silent drop" contract) and
+  // `[]` (the model looked and genuinely found nothing worth calling)
+  // both fall straight through to null (the caller's normal
+  // conversational reply).
+  if (!calls || calls.length === 0) return null;
+
+  const capped = calls.slice(0, MAX_TIER2_CALLS_PER_TURN);
+  const rankedById = new Map(ranked.map((r) => [r.id, r]));
+  // A `consequential` proposal never runs on the model's say-so alone
+  // (4.9: "raises the routing bar") - the turn engine itself asks first,
+  // the identical PendingAsk flow a recipe's own `confirm` field feeds.
+  // Any OTHER call proposed in the same batch is dropped for this turn
+  // (a documented simplification: one confirmation question at a time,
+  // not "yes, and also...").
+  const consequential = capped.find((c) => rankedById.get(c.tool)?.manifest.consequential);
+  if (consequential) {
+    const manifest = rankedById.get(consequential.tool)!.manifest;
+    const prompt = `Do you want me to ${manifest.description.replace(/\.$/, "").toLowerCase()}?`;
+    const args = (consequential.args ?? {}) as Record<string, unknown>;
+    setPendingAsk(conversationId, { kind: "confirm", prompt, packageId: consequential.tool, args });
+    return { reply: { text: prompt }, source: "confirm", plugin_id: consequential.tool, safety, crisis_resources: crisisResources, conversation_id: conversationId, turn_id: turnId };
+  }
+
+  // Two independent calls, run in parallel - never chained (a result
+  // feeding another is a recipe, not this step's job).
+  const ran = await Promise.all(
+    capped.map(async (c) => ({ call: c, result: await runPlugin(c.tool, actor, (c.args ?? {}) as Record<string, unknown>, turnId) })),
+  );
+  const oks = ran.filter((r): r is { call: ToolCall; result: Extract<(typeof r)["result"], { ok: true }> } => r.result.ok);
+  // Every proposed call failed (invalid args - "verify every call with
+  // the package's args schema before acting" - or a runtime error): "ask
+  // again," never a silent drop, means null (a normal conversational
+  // reply), not fabricating a plugin success or reporting a confusing
+  // tool-shaped error.
+  if (oks.length === 0) return null;
+
+  const withPending = oks.find((r) => (r.result.value as PluginResultWithConfirmAsk).confirm || (r.result.value as PluginResultWithConfirmAsk).ask);
+  if (withPending) {
+    const args = (withPending.call.args ?? {}) as Record<string, unknown>;
+    const pending = pendingAskFromPluginResult(withPending.call.tool, args, withPending.result.value as PluginResultWithConfirmAsk, conversationId);
+    if (pending) {
+      // A code review (2026-09-06) found this discarding any OTHER
+      // call's own reply text outright - two independent calls, one
+      // that already ran with a real side effect and a real answer, the
+      // other asking to be confirmed, and only the confirmation prompt
+      // ever reached the person, silently dropping the first one's
+      // result. Both are real information about the same turn.
+      const otherText = oks
+        .filter((r) => r !== withPending)
+        .map((r) => r.result.value.reply?.text)
+        .filter((t): t is string => !!t)
+        .join(" ");
+      const text = otherText ? `${otherText} ${pending.prompt}` : pending.prompt;
+      return { reply: { text }, source: "confirm", plugin_id: withPending.call.tool, safety, crisis_resources: crisisResources, conversation_id: conversationId, turn_id: turnId };
+    }
+  }
+  const replyText = oks.map((r) => r.result.value.reply?.text ?? "Done.").join(" ");
+  const pluginIds = oks.map((r) => r.call.tool).join("+");
+  const bestScore = Math.max(...oks.map((r) => rankedById.get(r.call.tool)?.score ?? 0));
+  return {
+    reply: { text: replyText },
+    source: "plugin",
+    plugin_id: pluginIds,
+    safety,
+    crisis_resources: crisisResources,
+    routing: { tier: "embedding", score: bestScore },
+    conversation_id: conversationId,
+    turn_id: turnId,
+  };
 }
 
 /** The one central point every TurnValue passes through before it reaches

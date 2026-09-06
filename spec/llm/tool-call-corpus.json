@@ -1,0 +1,14 @@
+[
+  {
+    "utterance": "remember that pizza night is Friday and what do you know about the wifi password",
+    "expect_calls": ["remember", "recall"]
+  },
+  {
+    "utterance": "what does ephemeral mean and remember that my dentist appointment is next week",
+    "expect_calls": ["define", "remember"]
+  },
+  {
+    "utterance": "give me a trivia question and what do you remember about pizza night",
+    "expect_calls": ["trivia", "recall"]
+  }
+]

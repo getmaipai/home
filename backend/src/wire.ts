@@ -39,7 +39,10 @@ export interface TurnReply {
 
 export interface TurnValue {
   reply: TurnReply;
-  source: "safety_refuse" | "plugin" | "plugin_error" | "command" | "command_error" | "model";
+  // "confirm" (Session C step 2): a pendingAsk resolved to "no" - the
+  // person declined, nothing ran. A "yes" instead runs the pending
+  // plugin and reports "plugin"/"plugin_error" as usual.
+  source: "safety_refuse" | "plugin" | "plugin_error" | "command" | "command_error" | "model" | "confirm";
   plugin_id?: string;
   command_id?: string;
   safety: SafetyResult;

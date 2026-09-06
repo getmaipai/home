@@ -59,7 +59,7 @@ function fakeActor(): PersonRow {
 async function resolve(utterance: string, actor: PersonRow): Promise<{ routedId: string | null; args?: Record<string, unknown>; candidates: string[] }> {
   const loaded = loadAllManifests();
   const skills = loadAllSkills();
-  const routed = await route(utterance, actor, loaded);
+  const { winner: routed } = await route(utterance, actor, loaded);
   const skillMatches = matchingSkills(utterance, skills);
   const candidates = [...(routed ? [routed.id] : []), ...skillMatches.map((m) => m.skill.manifest.id)];
   if (routed) return { routedId: routed.id, args: routed.args, candidates };

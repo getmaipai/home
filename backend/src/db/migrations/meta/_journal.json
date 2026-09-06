@@ -141,6 +141,20 @@
       "when": 1788701259479,
       "tag": "0019_same_roland_deschain",
       "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "6",
+      "when": 1788696719584,
+      "tag": "0019_ambiguous_exodus",
+      "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "6",
+      "when": 1788701350238,
+      "tag": "0020_zippy_starhawk",
+      "breakpoints": true
     }
   ]
 }

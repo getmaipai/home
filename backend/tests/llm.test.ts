@@ -5,7 +5,8 @@ import { __resetThrottleForTests } from "@/lib/secretThrottle";
 import { __resetLlmSupervisorForTests } from "@/lib/llmSupervisor";
 import { __resetEmbedSupervisorForTests } from "@/lib/embedSupervisor";
 import { __resetRateLimiterForTests } from "@/lib/rateLimiter";
-import { complete, startCompleteStream, embed, PERSON_TURN_BUDGET } from "@/lib/llm";
+import { complete, startCompleteStream, embed, PERSON_TURN_BUDGET, type ToolSpec } from "@/lib/llm";
+import type { ChatCompletionRequest } from "@maipai/spec/llm/ts/types.js";
 
 beforeEach(() => {
   resetDb();
@@ -16,6 +17,7 @@ beforeEach(() => {
 afterEach(() => {
   __resetLlmSupervisorForTests();
   __resetEmbedSupervisorForTests();
+  delete process.env.MAIPAI_LLAMA_SERVER_URL;
 });
 
 describe("lib/llm.ts complete()", () => {
@@ -47,6 +49,123 @@ describe("lib/llm.ts complete()", () => {
     const result = await complete("chat", [{ role: "narrator" as never, content: "hi" }]);
     expect(result.ok).toBe(false);
     if (!result.ok) expect(result.code).toBe("invalid_input");
+  });
+});
+
+/** Session C step 2: points the chat backend at a fresh stub scripted to
+ * answer a tool-call request specifically - memoryJudge.test.ts's own
+ * withScriptedJudge() precedent, keyed the same way (response_format's
+ * own json_schema.name, "tool_calls" here). A plain string reply falls
+ * through to the default echo, matching a call that never offered
+ * tools at all. */
+async function withScriptedToolCall<T>(reply: (request: ChatCompletionRequest) => string, fn: () => Promise<T>): Promise<T> {
+  __resetLlmSupervisorForTests();
+  const { startStubLlmServer } = await import("@maipai/spec/llm/ts/stubServer.js");
+  const stub = startStubLlmServer(0, {
+    scriptedChatReply: (request) => {
+      if (request.response_format?.type !== "json_schema" || request.response_format.json_schema.name !== "tool_calls") return undefined;
+      return reply(request);
+    },
+  });
+  process.env.MAIPAI_LLAMA_SERVER_URL = stub.url;
+  try {
+    return await fn();
+  } finally {
+    stub.stop();
+  }
+}
+
+const WEATHER_TOOL: ToolSpec = { id: "weather", description: "current weather for a place", args: { type: "object", required: ["place"], properties: { place: { type: "string" } } } };
+const TRIVIA_TOOL: ToolSpec = { id: "trivia", description: "a trivia question", args: { type: "object", properties: {} } };
+
+describe("lib/llm.ts complete() with tools (Session C step 2)", () => {
+  test("a scripted valid tool-call reply parses into tool_calls", async () => {
+    const result = await withScriptedToolCall(
+      () => JSON.stringify([{ tool: "weather", args: { place: "Seattle" } }]),
+      () => complete("chat", [{ role: "user", content: "what's the weather in Seattle" }], { tools: [WEATHER_TOOL] }),
+    );
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.value.tool_calls).toEqual([{ tool: "weather", args: { place: "Seattle" } }]);
+  });
+
+  test("two independent calls in one reply both parse", async () => {
+    const result = await withScriptedToolCall(
+      () => JSON.stringify([{ tool: "weather", args: { place: "Denver" } }, { tool: "trivia", args: {} }]),
+      () => complete("chat", [{ role: "user", content: "weather in Denver and a trivia question" }], { tools: [WEATHER_TOOL, TRIVIA_TOOL] }),
+    );
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.value.tool_calls).toHaveLength(2);
+  });
+
+  test("an empty array is a real decision (no tool fits), not a parse failure", async () => {
+    const result = await withScriptedToolCall(
+      () => "[]",
+      () => complete("chat", [{ role: "user", content: "hi there" }], { tools: [WEATHER_TOOL] }),
+    );
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.value.tool_calls).toEqual([]);
+  });
+
+  test("a reply that isn't the requested shape at all is a parse failure (undefined), never a silent drop into an empty decision", async () => {
+    const result = await withScriptedToolCall(
+      () => "I'm not sure, let me think about that.",
+      () => complete("chat", [{ role: "user", content: "what's the weather in Seattle" }], { tools: [WEATHER_TOOL] }),
+    );
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.value.tool_calls).toBeUndefined();
+  });
+
+  test("a call naming a tool that wasn't offered is a parse failure too", async () => {
+    const result = await withScriptedToolCall(
+      () => JSON.stringify([{ tool: "not-offered", args: {} }]),
+      () => complete("chat", [{ role: "user", content: "hi" }], { tools: [WEATHER_TOOL] }),
+    );
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.value.tool_calls).toBeUndefined();
+  });
+
+  test("more than two calls in one reply is a parse failure (the cap is enforced on the way in, not trusted from the grammar alone)", async () => {
+    const result = await withScriptedToolCall(
+      () => JSON.stringify([{ tool: "weather", args: { place: "A" } }, { tool: "weather", args: { place: "B" } }, { tool: "trivia", args: {} }]),
+      () => complete("chat", [{ role: "user", content: "hi" }], { tools: [WEATHER_TOOL, TRIVIA_TOOL] }),
+    );
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.value.tool_calls).toBeUndefined();
+  });
+
+  test("tool_choice: required is sent through as minItems: 1 on the grammar schema", async () => {
+    let seenSchema: unknown;
+    await withScriptedToolCall(
+      (request) => {
+        if (request.response_format?.type === "json_schema") seenSchema = request.response_format.json_schema.schema;
+        return "[]";
+      },
+      () => complete("chat", [{ role: "user", content: "hi" }], { tools: [WEATHER_TOOL], tool_choice: "required" }),
+    );
+    expect((seenSchema as { minItems: number }).minItems).toBe(1);
+  });
+
+  test("tool_choice: required also re-checks minItems:1 on the reply itself, not just the schema it asked for - an empty array is a parse failure here, never a real 'no tool needed' decision", async () => {
+    const result = await withScriptedToolCall(
+      () => "[]", // llama.cpp's lazy grammars can still let this through despite minItems:1 (upstream issue 24807)
+      () => complete("chat", [{ role: "user", content: "hi" }], { tools: [WEATHER_TOOL], tool_choice: "required" }),
+    );
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.value.tool_calls).toBeUndefined();
+  });
+
+  test("no tools offered means an ordinary reply, tool_calls absent entirely", async () => {
+    const result = await complete("chat", [{ role: "user", content: "good morning" }]);
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.value.tool_calls).toBeUndefined();
   });
 });
 
