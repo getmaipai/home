@@ -22,6 +22,35 @@ class Routing(BaseModel):
     patterns: list[constr(min_length=1)] | None = None
 
 
+class Companion(BaseModel):
+    """
+    Required when kind is "companion" (session-a-intelligence.md step 8), unused otherwise. Composed by home/backend/src/lib/persona.ts into the turn engine's identity line and system-prompt fragment: display_name replaces the hardcoded "MaiPai" in "You are {display_name}, ...", the four style dials are the same ones lib/persona.ts already had before companions were packages, and examples is a short few-shot block (legacy's own finding: "the single biggest lever for small-model voice fidelity").
+    """
+
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    display_name: constr(min_length=1, max_length=40)
+    pronouns: constr(min_length=1, max_length=20) | None = None
+    tagline: constr(min_length=1, max_length=80) | None = None
+    backstory: constr(min_length=1, max_length=400) | None = Field(
+        None,
+        description="Short by design: no authoring UI exists yet to keep a longer one consistent with itself turn to turn (docs/dev.md's persona research).",
+    )
+    interests: list[constr(min_length=1)] | None = Field(None, max_length=8)
+    examples: list[constr(min_length=1)] | None = Field(
+        None,
+        description="3 to 5 lines in the character's own voice, composed as a few-shot block.",
+        max_length=5,
+        min_length=3,
+    )
+    voice_id: constr(min_length=1) | None = None
+    formality: Literal['casual', 'neutral', 'formal']
+    complexity: Literal['simple', 'standard', 'advanced']
+    engagement: Literal['brief', 'balanced', 'curious']
+    filler_density: Literal['none', 'light', 'frequent']
+
+
 class Source(BaseModel):
     """
     For a package that graduated to its own repo (5.1).
@@ -79,6 +108,10 @@ class PackageManifest(BaseModel):
     license: constr(min_length=1)
     homepage: AnyUrl | None = None
     routing: Routing | None = None
+    companion: Companion | None = Field(
+        None,
+        description='Required when kind is "companion" (session-a-intelligence.md step 8), unused otherwise. Composed by home/backend/src/lib/persona.ts into the turn engine\'s identity line and system-prompt fragment: display_name replaces the hardcoded "MaiPai" in "You are {display_name}, ...", the four style dials are the same ones lib/persona.ts already had before companions were packages, and examples is a short few-shot block (legacy\'s own finding: "the single biggest lever for small-model voice fidelity").',
+    )
     args: Any | None = Field(
         None, description="A JSON Schema for this package's call arguments."
     )

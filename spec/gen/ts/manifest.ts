@@ -58,6 +58,42 @@ export const PackageManifest = z
       })
       .strict()
       .optional(),
+    /**Required when kind is "companion" (session-a-intelligence.md step 8), unused otherwise. Composed by home/backend/src/lib/persona.ts into the turn engine's identity line and system-prompt fragment: display_name replaces the hardcoded "MaiPai" in "You are {display_name}, ...", the four style dials are the same ones lib/persona.ts already had before companions were packages, and examples is a short few-shot block (legacy's own finding: "the single biggest lever for small-model voice fidelity").*/
+    companion: z
+      .object({
+        display_name: z.string().min(1).max(40),
+        pronouns: z.string().min(1).max(20).optional(),
+        tagline: z.string().min(1).max(80).optional(),
+        /**Short by design: no authoring UI exists yet to keep a longer one consistent with itself turn to turn (docs/dev.md's persona research).*/
+        backstory: z
+          .string()
+          .min(1)
+          .max(400)
+          .describe(
+            "Short by design: no authoring UI exists yet to keep a longer one consistent with itself turn to turn (docs/dev.md's persona research).",
+          )
+          .optional(),
+        interests: z.array(z.string().min(1)).max(8).optional(),
+        /**3 to 5 lines in the character's own voice, composed as a few-shot block.*/
+        examples: z
+          .array(z.string().min(1))
+          .min(3)
+          .max(5)
+          .describe(
+            "3 to 5 lines in the character's own voice, composed as a few-shot block.",
+          )
+          .optional(),
+        voice_id: z.string().min(1).optional(),
+        formality: z.enum(["casual", "neutral", "formal"]),
+        complexity: z.enum(["simple", "standard", "advanced"]),
+        engagement: z.enum(["brief", "balanced", "curious"]),
+        filler_density: z.enum(["none", "light", "frequent"]),
+      })
+      .strict()
+      .describe(
+        'Required when kind is "companion" (session-a-intelligence.md step 8), unused otherwise. Composed by home/backend/src/lib/persona.ts into the turn engine\'s identity line and system-prompt fragment: display_name replaces the hardcoded "MaiPai" in "You are {display_name}, ...", the four style dials are the same ones lib/persona.ts already had before companions were packages, and examples is a short few-shot block (legacy\'s own finding: "the single biggest lever for small-model voice fidelity").',
+      )
+      .optional(),
     /**A JSON Schema for this package's call arguments.*/
     args: z
       .any()

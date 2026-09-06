@@ -28,5 +28,7 @@ export function toMemoryRecord(row: MemoryRecordRow): MemoryRecord {
     expired_at: row.expiredAt,
     superseded_by: row.supersededBy,
     embedding_space: row.embeddingSpace,
+    hlc: row.hlc,
+    deleted_at: row.deletedAt,
   });
 }

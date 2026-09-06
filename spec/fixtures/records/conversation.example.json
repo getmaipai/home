@@ -1,0 +1,14 @@
+{
+  "id": "conv-a1b2c3",
+  "person": "person-a1b2c3",
+  "surface": "chat",
+  "companion_id": null,
+  "title": "Weekend plans",
+  "status": "open",
+  "summary": "Riff asked about the weather earlier and then about weekend plans for a trip to Boston.",
+  "summary_through_turn": "turn-d4e5f6",
+  "source": "hub",
+  "hlc": "1757000000000:0:a1b2c3",
+  "created_at": "2026-09-05T12:00:00Z",
+  "updated_at": "2026-09-05T12:05:00Z"
+}

@@ -119,7 +119,12 @@ export async function runRecipe(recipe: Recipe, inputs: Scope, host: Host): Prom
       }
       case "recall": {
         const query = interpolate(step.query, scope);
-        const matches = host.memory.recall(query, { scope: step.scope });
+        // Step 5 (session-a-intelligence.md): the real host now embeds
+        // the query before scoring, real I/O this step has to wait on -
+        // `await` on a plain (non-Promise) array, the emulator's own
+        // case, is a documented JS no-op, so this line is correct
+        // against either host.
+        const matches = await host.memory.recall(query, { scope: step.scope });
         const top = matches.slice(0, step.limit ?? 3);
         scope[step.as] = top.length > 0 ? top.map((m) => m.text).join("; ") : NOTHING_RECALLED;
         break;

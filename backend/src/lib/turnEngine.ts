@@ -16,13 +16,16 @@ import { listPackageIds, loadPackage, meetsMinRole, runPlugin } from "@/lib/plug
 import { loadAllSkills, type LoadedSkill } from "@/lib/skills";
 import { matchCommand, runCommand } from "@/lib/commands";
 import { trigger } from "@/lib/notifications";
-import { recall, type RecallMatch } from "@/lib/memory";
+import { recall, bumpUsage, embedQueryForRecall, getProfileParagraph, type RecallMatch } from "@/lib/memory";
+import { newConversationTurnId } from "@/lib/id";
 import { complete, startCompleteStream, type LlmMessage } from "@/lib/llm";
 import { tokenize } from "@/lib/text";
-import { logTurn } from "@/lib/conversationHistory";
+import { logTurn, resolveOrCreateConversation, buildConversationWindow, maybeRefreshConversationSummary } from "@/lib/conversationHistory";
 import { pickRefusalVariant, varyKnownConstant } from "@/lib/replyVariation";
 import { normalizeForSpeech } from "@maipai/spec/voice/ts/normalizeForSpeech.js";
-import { getPersonSettingValue } from "@/lib/settings";
+import { nextSentenceBoundary } from "@maipai/spec/safety/ts/sentenceChunker.js";
+import { getPersonSettingValue, getHouseholdSettingValue } from "@/lib/settings";
+import { listActivePeople } from "@/lib/access";
 import { composePersonaPrompt, resolvePersona, DEFAULT_PERSONA, INFORMATION_HANDLING_POLICY, type Persona } from "@/lib/persona";
 import type { Role } from "@/middleware/auth";
 import type { PersonRow } from "@/types";
@@ -33,6 +36,7 @@ import type { SafetyResult } from "@maipai/spec/gen/ts/safety-result.js";
 // dependency instead of a hand-duplicated mirror); re-exported here since
 // this is where callers already look for them.
 import type { TurnValue } from "@/wire";
+import type { Conversation } from "@maipai/spec/gen/ts/conversation.js";
 export type { TurnReply, TurnValue } from "@/wire";
 
 // 4.5 names six surfaces (chat, overlay, pod, robot, tv, phone), each
@@ -71,13 +75,44 @@ function logTurnSafely(actor: PersonRow, surface: Surface, userText: string, val
   } catch (err) {
     console.error(`[turn] logTurn failed for an otherwise-successful turn: ${(err as Error).message}`);
   }
+  // Post-turn, fire-and-forget (step 3: "it never runs in the request
+  // path"): whether this conversation's rolling summary needs a refresh.
+  // Never awaited and never allowed to affect the turn's own outcome,
+  // the same posture safety.flagged_turn's notification already takes
+  // just above prepareTurn() in this file.
+  maybeRefreshConversationSummary(value.conversation_id).catch((err: unknown) =>
+    console.error(`[turn] conversation summary refresh failed: ${(err as Error).message}`),
+  );
 }
 
 const CRISIS_RESOURCES_TEXT =
   "If you're in crisis, the 988 Suicide & Crisis Lifeline is free and available 24/7: call or text 988.";
 
-const STABLE_SYSTEM_PREFIX = [
-  "You are MaiPai, a private, self-hosted AI assistant for this household. Be warm, concise and honest. Nothing you say leaves this house.",
+/** The one derivation of `crisis_resources` from a SafetyResult, shared
+ * by prepareTurn()'s own input-side use below and step 9's two
+ * output-side call sites (runTurn(), runTurnStream()'s finalize()) - a
+ * review (2026-09-05) found the streaming path's own fix for "an
+ * output-side flag needs its own crisis_resources, not just the input
+ * side's" had no non-streaming twin, leaving runTurn() with the
+ * identical silent-drop bug the review's other finding had just fixed
+ * in the stream. */
+function deriveCrisisResources(safety: SafetyResult): string | undefined {
+  return safety.action === "allow_with_resources" ? CRISIS_RESOURCES_TEXT : undefined;
+}
+
+// Step 4: "identity and companion" are the first thing in the stable
+// prefix, and the identity line itself now names the selected persona's
+// display_name rather than a hardcoded "MaiPai" - a real gap the
+// original version had (a household that picked "Buddy" still heard the
+// model call itself MaiPai every turn). DEFAULT_PERSONA.display_name is
+// literally "MaiPai", so this produces byte-identical text to the old
+// constant for every household that never touches persona.active_id.
+function identityLine(persona: Persona): string {
+  return `You are ${persona.display_name}, a private, self-hosted AI assistant for this household.`;
+}
+
+const STABLE_SYSTEM_SUFFIX = [
+  "Be warm, concise and honest. Nothing you say leaves this house.",
   "Requests already blocked by the household's safety rules never reach you; answer anything else helpfully and honestly.",
   "If you don't know something the household hasn't told you, say so instead of guessing.",
 ].join(" ");
@@ -86,7 +121,7 @@ const STABLE_SYSTEM_PREFIX = [
 // 2026-09-05): what used to be a single fixed NATURAL_REGISTER_POLICY
 // constant is the "default" entry in `PERSONAS`, composed through the
 // exact same mechanism every other persona uses, rather than a special
-// case. Kept separate from STABLE_SYSTEM_PREFIX for the same reason it
+// case. Kept separate from STABLE_SYSTEM_SUFFIX for the same reason it
 // always was: a persona's own fragment can change per person turn to
 // turn while the identity/safety-posture prefix above it can't.
 
@@ -128,6 +163,39 @@ const MAX_MEMORY_SNIPPETS = 5;
 const MAX_MEMORY_SECTION_CHARS = 800;
 const MAX_PLUGINS_SECTION_CHARS = 800;
 const MAX_SKILLS_SECTION_CHARS = 1200;
+// Step 3: one line, so a generous cap is plenty; guards the same way
+// every other section does against a runaway conversation summary ever
+// dominating the prompt on its own.
+const MAX_SUMMARY_SECTION_CHARS = 600;
+// Step 4's own two: "rules" (INFORMATION_HANDLING_POLICY, currently 617
+// chars) and "companion" (composePersonaPrompt()'s output, which
+// genuinely varies per persona) each get their own cap too - the bot's
+// test_prompt_budget.py precedent this step copies found rules alone
+// once hit 68% of a prompt with no independent section cap to stop it.
+const MAX_RULES_SECTION_CHARS = 800;
+// Step 8 (session-a-intelligence.md) added each companion's own
+// few-shot examples to this section (composePersonaPrompt()'s own
+// examplesBlock()), which pushed the real catalog's longest fragment
+// (composePersonaPrompt("tutor")) from ~645 chars to ~941 - re-measured
+// against real content rather than assumed unchanged, the same step-4
+// lesson ("sized from real content with headroom, not picked arbitrarily
+// and then found too small") applying a second time to the same
+// constant. 1200 gives real headroom above that, matching
+// MAX_SKILLS_SECTION_CHARS's own budget for the section most likely to
+// grow with real content.
+const MAX_COMPANION_SECTION_CHARS = 1200;
+
+/** Shared by every capped section below (a code review pass on this
+ * step found the same "slice then append '...'" logic repeated inline
+ * five times, each one actually allowing the result to run 3 chars past
+ * its own declared cap for the ellipsis) - one place, and the ellipsis
+ * now counts INSIDE maxChars, so "each section has a cap" is a real,
+ * exact guarantee a test can assert on directly, not an approximation. */
+export function capSection(text: string, maxChars: number): string {
+  if (text.length <= maxChars) return text;
+  if (maxChars <= 3) return text.slice(0, maxChars);
+  return text.slice(0, maxChars - 3) + "...";
+}
 // A cap on how many matching skills compose into one turn, not just a
 // character budget: even under budget, five unrelated skills all
 // clearing the threshold on a short utterance is a real sign the
@@ -168,47 +236,182 @@ function skillsSection(text: string, skills: LoadedSkill[]): string {
   return `\n\n${matching.map((m) => m.skill.body).join("\n\n")}`;
 }
 
-// Stable-first (4.5): persona/rules/content-policy/standing-instructions
-// and the plugins list are the same for every turn on this install, so they
-// sit first for prefix caching; the volatile zone (memory, then time)
-// comes after. Matching skills sit with memory in the volatile zone, not
-// with the stable prefix: unlike the plugins list (every installed
-// plugin, unconditionally, every turn), which skills compose in
-// genuinely depends on this turn's own utterance. 4.5 also names notes,
-// methods, summary and context in the volatile zone: notes/methods need
-// persona/companion state (not built); summary needs an LLM to distill
-// conversation history into one (the raw history now exists for real,
-// lib/conversationHistory.ts, but nothing summarizes it, 4.11's other
-// roles); context needs the ambient-context wiring the robot side
-// already has but the hub doesn't yet: all three are real gaps, not
-// silently skipped.
+// Age band derivation (session-a-intelligence.md step 1). Deliberately
+// narrow: just enough to calibrate the model's phrasing for the speaker
+// in front of it, computed inline for the prompt only. This is NOT the
+// wider `age_range`-on-Person-ctx question BACKLOG.md tracks separately
+// under "roles versus grants" (a package-visible, schema-level field);
+// nothing here is stored or exposed to a package. The three bands mirror
+// the role ladder's own two minor bands (person.schema.json: "teen 13-17,
+// child under 13") rather than inventing a finer taxonomy nothing in the
+// spec or platform plan defines - a real, independent cross-check
+// computed from birthdate when one is on file, falling back to the
+// speaker's role (which already carries the same distinction) when it
+// isn't.
+type AgeBand = "child" | "teen" | "adult";
+
+function ageInYears(birthdate: string, now: Date): number {
+  const dob = new Date(birthdate);
+  let age = now.getUTCFullYear() - dob.getUTCFullYear();
+  const monthDiff = now.getUTCMonth() - dob.getUTCMonth();
+  if (monthDiff < 0 || (monthDiff === 0 && now.getUTCDate() < dob.getUTCDate())) age--;
+  return age;
+}
+
+function ageBandFromRole(role: string): AgeBand {
+  if (role === "child") return "child";
+  if (role === "teen") return "teen";
+  return "adult"; // owner/admin/adult/guest: role carries no minor signal
+}
+
+function speakerAgeBand(actor: PersonRow, now: Date): AgeBand {
+  if (!actor.birthdate) return ageBandFromRole(actor.role);
+  const years = ageInYears(actor.birthdate, now);
+  // A malformed birthdate (Person's generated Zod schema enforces
+  // `.date()` today, so this shouldn't be reachable through any real
+  // write path, but a code review, 2026-09-05, pointed out nothing here
+  // defended against it anyway) must never silently fall through to
+  // "adult": both `years < 13` and `years < 18` are false for NaN,
+  // which is exactly the wrong direction for a safety-adjacent signal.
+  if (Number.isNaN(years)) return ageBandFromRole(actor.role);
+  if (years < 13) return "child";
+  if (years < 18) return "teen";
+  return "adult";
+}
+
+// No household timezone setting exists yet (3.2's clock/timezone key
+// hasn't landed), so this renders in the hub process's own system
+// timezone - correct for a self-hosted install physically in the house,
+// revisit once a real timezone key exists. `household.locale` only
+// changes date/time formatting conventions (4.5: "Friday 3:40 pm" style,
+// never raw ISO UTC"), not the zone itself. Includes the full date (not
+// just weekday/time): a code review, 2026-09-05, found the first cut
+// dropped month/day/year entirely, a real loss versus the old raw-ISO
+// line it replaced (a question near a month or year boundary, or "what's
+// today's date", had nothing to go on) - "never raw ISO" doesn't mean
+// "never the date", just formatted for a person, not a machine.
+function formatLocalTime(now: Date, locale: string): string {
+  const date = new Intl.DateTimeFormat(locale, { weekday: "long", month: "long", day: "numeric", year: "numeric" }).format(now);
+  const time = new Intl.DateTimeFormat(locale, { hour: "numeric", minute: "2-digit", hour12: true })
+    .format(now)
+    .toLowerCase();
+  return `${date}, ${time}`;
+}
+
+function speakerLine(actor: PersonRow, locale: string, now: Date): string {
+  const nicknamePart = actor.nickname ? ` (goes by ${actor.nickname})` : "";
+  const band = speakerAgeBand(actor, now);
+  return `\n\nYou're talking with ${actor.displayName}${nicknamePart} right now: role ${actor.role}, age band ${band}, locale ${locale}.`;
+}
+
+// "Presence unknown for now" (step 1): no presence signal exists on the
+// hub yet (that's the robot/ambient-context side, 4.16, not built here),
+// so this lists who lives here, never who's home right now.
+function householdLine(): string {
+  const household = listActivePeople();
+  if (household.length === 0) return "";
+  const lines = household.map((p) => `- ${p.displayName} (${p.role})`);
+  return `\n\nWho lives here:\n${lines.join("\n")}`;
+}
+
+// Step 4: "as of <date>, <n> days ago" on each memory line - legacy's
+// own `formatMemoriesForPrompt`, ported because small models measurably
+// drift toward the freshest tokens otherwise (docs/dev.md's BACKLOG
+// entry on this). `record.created_at` (when the fact was first
+// asserted), not `last_used_at` (when it was last recalled) - "as of"
+// asks when the fact became true, not when it was last useful.
+function formatShortDate(iso: string, locale: string): string {
+  return new Intl.DateTimeFormat(locale, { month: "short", day: "numeric" }).format(new Date(iso));
+}
+
+function daysAgoLabel(iso: string, now: Date): string {
+  const days = Math.max(0, Math.floor((now.getTime() - new Date(iso).getTime()) / 86_400_000));
+  return `${days} day${days === 1 ? "" : "s"} ago`;
+}
+
+function memoryBulletLine(match: RecallMatch, locale: string, now: Date): string {
+  return `- ${match.record.text} (as of ${formatShortDate(match.record.created_at, locale)}, ${daysAgoLabel(match.record.created_at, now)})`;
+}
+
+const MEMORY_TRUST_REMINDER = "Prefer these facts over guessing when they're relevant.";
+
+// Step 4: "re-anchor the companion's one-line identity after the memory
+// block" - legacy measured real drift (losing the persona's voice)
+// after about eight turns with no repeat of who's speaking. Companions-
+// as-packages don't exist yet (step 8), so this repeats the same
+// display_name the stable identityLine() above already used - a real,
+// if small, anchor today, and already the right shape for a companion
+// package's own name once one exists.
+function companionReanchorLine(persona: Persona): string {
+  return `\n\nRemember: you are ${persona.display_name}.`;
+}
+
+// Stable-first (4.5, made real in step 4): identity and companion
+// (identityLine + the persona's own voice fragment), information policy
+// (INFORMATION_HANDLING_POLICY), then standing skills (the plugins
+// list - every installed package, unconditionally, every turn, "skills"
+// in 4.5's own loose sense of the word) all sit first for prefix
+// caching. The volatile zone after it, in order: household, speaker,
+// memory (with the dated suffix and trust reminder above), a companion
+// re-anchor, the conversation summary, then this turn's own matched
+// skills (utterance-dependent, so it can't be stable no matter what 4.5
+// calls it), and finally local time - never truncated, per the
+// existing "time last" protection below. 4.5 also names notes, methods
+// and context in the volatile zone: notes/methods need persona/
+// companion state beyond what step 8 will add; context needs the
+// ambient-context wiring the robot side already has but the hub
+// doesn't yet - both real gaps, not silently skipped.
 export function buildSystemPrompt(
+  actor: PersonRow,
   text: string,
   memoryMatches: RecallMatch[],
   loaded: LoadedManifest[] = loadAllManifests(),
   persona: Persona = DEFAULT_PERSONA,
   skills: LoadedSkill[] = loadAllSkills(),
+  // Step 3: the conversation's own rolling summary (buildConversationWindow(),
+  // lib/conversationHistory.ts), one line covering whatever fell out of
+  // the verbatim window.
+  conversationSummaryLine?: string,
 ): string {
-  let pluginsSection = pluginsListLine(loaded);
-  if (pluginsSection.length > MAX_PLUGINS_SECTION_CHARS) {
-    pluginsSection = pluginsSection.slice(0, MAX_PLUGINS_SECTION_CHARS) + "...";
-  }
+  const now = new Date();
+  const localeValue = getHouseholdSettingValue("household.locale");
+  const locale = typeof localeValue === "string" ? localeValue : "en-US";
 
+  // ── Stable prefix (step 4: "identity and companion, information
+  // policy, standing skills") ──
+  const companionSection = capSection(composePersonaPrompt(persona), MAX_COMPANION_SECTION_CHARS);
+  const rulesSection = capSection(INFORMATION_HANDLING_POLICY, MAX_RULES_SECTION_CHARS);
+  const pluginsSection = capSection(pluginsListLine(loaded), MAX_PLUGINS_SECTION_CHARS);
+  const stablePrefix = `${identityLine(persona)} ${STABLE_SYSTEM_SUFFIX} ${companionSection} ${rulesSection}${pluginsSection}`;
+
+  // ── Volatile zone (step 4: "household, speaker, memory, summary, time
+  // last"; matched skills sit here too - utterance-dependent, so never
+  // stable no matter what 4.5 calls it) ──
+  // Step 7: the profile paragraph - "injected whole at the top of the
+  // memory block before recalled items, counted inside the memory
+  // section budget" (session-a-intelligence.md), not a separate cap of
+  // its own. Unconditional lookup (a targeted query, not a recall()
+  // candidate): whether it exists at all is the only gate, never whether
+  // this turn happened to recall something else too.
+  const profile = getProfileParagraph(actor);
   let memorySection = "";
-  if (memoryMatches.length > 0) {
-    const lines = memoryMatches.slice(0, MAX_MEMORY_SNIPPETS).map((m) => `- ${m.record.text}`);
-    memorySection = `\n\nWhat you already know about this household:\n${lines.join("\n")}`;
-    if (memorySection.length > MAX_MEMORY_SECTION_CHARS) {
-      memorySection = memorySection.slice(0, MAX_MEMORY_SECTION_CHARS) + "...";
-    }
+  if (profile || memoryMatches.length > 0) {
+    const profileLine = profile ? `${profile.text}\n` : "";
+    const lines = memoryMatches.slice(0, MAX_MEMORY_SNIPPETS).map((m) => memoryBulletLine(m, locale, now));
+    const bulletsBlock = lines.length > 0 ? `${lines.join("\n")}\n` : "";
+    memorySection = `\n\nWhat you already know about this household:\n${profileLine}${bulletsBlock}${MEMORY_TRUST_REMINDER}`;
+    memorySection = capSection(memorySection, MAX_MEMORY_SECTION_CHARS);
   }
+  // Unconditional, not gated on whether any memory actually matched:
+  // drift accumulates with turn count, not with whether this particular
+  // turn happened to recall something (the plan's own "after the memory
+  // block" names a POSITION, not a precondition).
+  const reanchorSection = companionReanchorLine(persona);
+  const summarySection = capSection(conversationSummaryLine ? `\n\n${conversationSummaryLine}` : "", MAX_SUMMARY_SECTION_CHARS);
+  const skillsPart = capSection(skillsSection(text, skills), MAX_SKILLS_SECTION_CHARS);
+  const volatileZone = householdLine() + speakerLine(actor, locale, now) + memorySection + reanchorSection + summarySection + skillsPart;
 
-  let skillsPart = skillsSection(text, skills);
-  if (skillsPart.length > MAX_SKILLS_SECTION_CHARS) {
-    skillsPart = skillsPart.slice(0, MAX_SKILLS_SECTION_CHARS) + "...";
-  }
-
-  const timeLine = `\n\nCurrent time: ${new Date().toISOString()}`;
+  const localTimeLine = `\n\nLocal time: ${formatLocalTime(now, locale)}`;
 
   // The time line is appended last (4.5: "...time last") and must never
   // itself be truncated: a review (2026-09-04) found the first cut
@@ -217,13 +420,16 @@ export function buildSystemPrompt(
   // bullet) off mid-word once enough packages or memories pushed the
   // total over budget. Truncating the body first, then appending a
   // never-truncated time line, keeps every truncation boundary inside
-  // prose meant to be cut, never inside the one line a caller might parse.
-  const registerFragment = composePersonaPrompt(persona) + " " + INFORMATION_HANDLING_POLICY;
-  let body = STABLE_SYSTEM_PREFIX + " " + registerFragment + pluginsSection + memorySection + skillsPart;
-  const bodyBudget = Math.max(0, PROMPT_SYSTEM_CHAR_BUDGET - timeLine.length);
+  // prose meant to be cut, never inside the one line a caller might parse
+  // (step 1's "the blocks shrink, not the budget", extended to every
+  // section here since each already has its own independent cap above -
+  // this outer slice is the last-resort safety net for the sum of them
+  // all still somehow exceeding the whole-prompt budget).
+  let body = stablePrefix + volatileZone;
+  const bodyBudget = Math.max(0, PROMPT_SYSTEM_CHAR_BUDGET - localTimeLine.length);
   if (body.length > bodyBudget) body = body.slice(0, bodyBudget);
 
-  return body + timeLine;
+  return body + localTimeLine;
 }
 
 // Tier 1 of the deterministic plugin floor (4.5: "tier 1 example-embedding
@@ -350,8 +556,8 @@ function route(text: string, actor: PersonRow, loaded: LoadedManifest[]): Routed
 }
 
 type PreparedTurn =
-  | { kind: "immediate"; value: TurnValue }
-  | { kind: "model"; messages: LlmMessage[]; safety: SafetyResult; crisisResources?: string };
+  | { kind: "immediate"; value: TurnValue; turnId: string }
+  | { kind: "model"; messages: LlmMessage[]; safety: SafetyResult; crisisResources?: string; turnId: string };
 
 /** Safety-first routing and the deterministic plugin floor (4.5), shared
  * by runTurn() and runTurnStream(): identical for both, and the only real
@@ -359,13 +565,35 @@ type PreparedTurn =
  * `chat` role's own answer gets to the caller, never whether safety ran
  * or which plugin matched. Only the `kind: "model"` branch differs between
  * the two callers - runTurn() awaits complete(), runTurnStream() awaits
- * startCompleteStream() instead. */
+ * startCompleteStream() instead.
+ *
+ * Generates this turn's own id once, up front (step 2's provenance rule:
+ * "createHost() receives the turn id... Host.memory.remember writes
+ * source: <turn id>"), and hands it to runPlugin() (so anything a plugin
+ * remembers via the package host is attributed to this exact turn) and
+ * back to the caller (so runTurn()/runTurnStream() log this turn's own
+ * conversation_turns row under that SAME id, not a second freshly-minted
+ * one) - one id names both "the turn that happened" and "the provenance
+ * of anything it wrote to memory". */
 async function prepareTurn(
   actor: PersonRow,
+  surface: Surface,
   text: string,
   loaded: LoadedManifest[],
+  conversation: Conversation,
   skills: LoadedSkill[] = loadAllSkills(),
 ): Promise<PreparedTurn> {
+  const turnId = newConversationTurnId();
+  // Stamps conversation_id/turn_id exactly once, rather than at each of
+  // this function's five immediate-return sites (a code review,
+  // 2026-09-05, found the two fields copy-pasted into every one of
+  // them - a future branch added here is a copy-paste-and-forget site
+  // waiting to happen).
+  const immediate = (value: Omit<TurnValue, "conversation_id" | "turn_id">): PreparedTurn => ({
+    kind: "immediate",
+    value: { ...value, conversation_id: conversation.id, turn_id: turnId },
+    turnId,
+  });
   const safety = evaluateSafety(text, actor.role as Role);
   if (safety.notify_parent) {
     // SafetyResult's own schema comment named this exact wiring as a
@@ -391,9 +619,9 @@ async function prepareTurn(
     // now-deleted REFUSAL_TEXT constant here, which looked editable but
     // silently wasn't). Any placeholder works; this one just reads
     // sensibly in a debugger or log before finalizeReply runs.
-    return { kind: "immediate", value: { reply: { text: "I can't help with that." }, source: "safety_refuse", safety } };
+    return immediate({ reply: { text: "I can't help with that." }, source: "safety_refuse", safety });
   }
-  const crisisResources = safety.action === "allow_with_resources" ? CRISIS_RESOURCES_TEXT : undefined;
+  const crisisResources = deriveCrisisResources(safety);
 
   // Checked before the plugin floor: a command is household-authored,
   // deliberate, and exact-match-only (never fuzzy) - the identical "a
@@ -406,28 +634,22 @@ async function prepareTurn(
   if (matchedCommand) {
     const result = await runCommand(matchedCommand);
     if (result.ok) {
-      return {
-        kind: "immediate",
-        value: {
-          reply: { text: result.value.text, speech: result.value.speech },
-          source: "command",
-          command_id: matchedCommand.id,
-          safety,
-          crisis_resources: crisisResources,
-        },
-      };
-    }
-    console.log(`[turn] command ${matchedCommand.id} matched but failed to run: ${result.error}`);
-    return {
-      kind: "immediate",
-      value: {
-        reply: { text: "Sorry, I couldn't do that." },
-        source: "command_error",
+      return immediate({
+        reply: { text: result.value.text, speech: result.value.speech },
+        source: "command",
         command_id: matchedCommand.id,
         safety,
         crisis_resources: crisisResources,
-      },
-    };
+      });
+    }
+    console.log(`[turn] command ${matchedCommand.id} matched but failed to run: ${result.error}`);
+    return immediate({
+      reply: { text: "Sorry, I couldn't do that." },
+      source: "command_error",
+      command_id: matchedCommand.id,
+      safety,
+      crisis_resources: crisisResources,
+    });
   }
 
   const routed = route(text, actor, loaded);
@@ -446,13 +668,10 @@ async function prepareTurn(
   const routedViaFuzzyMatch = routed && !routed.viaPattern;
   const bestSkillScore = routedViaFuzzyMatch ? (matchingSkills(text, skills)[0]?.score ?? 0) : 0;
   if (routed && !(routedViaFuzzyMatch && bestSkillScore > routed.score)) {
-    const result = await runPlugin(routed.id, actor, routed.args);
+    const result = await runPlugin(routed.id, actor, routed.args, turnId);
     if (result.ok) {
       const reply = result.value.reply ?? { text: "Done." };
-      return {
-        kind: "immediate",
-        value: { reply, source: "plugin", plugin_id: routed.id, safety, crisis_resources: crisisResources },
-      };
+      return immediate({ reply, source: "plugin", plugin_id: routed.id, safety, crisis_resources: crisisResources });
     }
     // A pre-filtered deterministic match failing at runPlugin is a real, if
     // rare, gap (a role change or a bad manifest between the router's
@@ -463,26 +682,55 @@ async function prepareTurn(
     // 2026-09-04, flagged this could otherwise look indistinguishable from
     // a real success to a caller branching on `.ok` alone).
     console.log(`[turn] plugin ${routed.id} matched but failed to run: ${result.error}`);
-    return {
-      kind: "immediate",
-      value: {
-        reply: { text: "Sorry, I couldn't do that." },
-        source: "plugin_error",
-        plugin_id: routed.id,
-        safety,
-        crisis_resources: crisisResources,
-      },
-    };
+    return immediate({
+      reply: { text: "Sorry, I couldn't do that." },
+      source: "plugin_error",
+      plugin_id: routed.id,
+      safety,
+      crisis_resources: crisisResources,
+    });
   }
 
-  const memoryMatches = recall(actor, text);
+  // selfOnly: true (step 2's privacy fix) - a person's own turn must
+  // never surface another person's person-scope memories into the
+  // model's context, regardless of role. Usage is bumped separately
+  // below, only on the subset that actually reached the prompt, not on
+  // every one of recall()'s top-20 candidates. The query is embedded
+  // here (step 5), before the sync recall() call, so real cosine
+  // scoring runs whenever the embed backend is up; embedQueryForRecall()
+  // degrades to undefined on any failure, which recall() already treats
+  // as "fall back to keyword overlap" - no separate handling needed here.
+  const queryVector = await embedQueryForRecall(text);
+  const memoryMatches = recall(actor, text, { selfOnly: true, bumpUsage: false, queryVector });
   const persona = resolvePersona(getPersonSettingValue(actor, "persona.active_id"));
-  const systemPrompt = buildSystemPrompt(text, memoryMatches, loaded, persona, skills);
+  // The follow-up-turn context (step 3): "and tomorrow?" needs the prior
+  // exchange in the messages array, not just in the system prompt's own
+  // text - buildConversationWindow() returns both the verbatim
+  // user/assistant messages AND, when older turns exist beyond them, one
+  // summary line for the system prompt's volatile zone.
+  const window = buildConversationWindow(conversation);
+  const systemPrompt = buildSystemPrompt(actor, text, memoryMatches, loaded, persona, skills, window.summaryLine);
+  // Bumping the top MAX_MEMORY_SNIPPETS candidates unconditionally was
+  // wrong (a code review, 2026-09-05): buildSystemPrompt's own
+  // MAX_MEMORY_SECTION_CHARS truncation, or the outer PROMPT_SYSTEM_CHAR_
+  // BUDGET slice, can still cut one of those candidates' bullet lines
+  // short (or drop it entirely) before it reaches the model, exactly the
+  // "bump only on records that reached the prompt" case this was meant
+  // to fix. Checking the bullet line's exact text is a real proof, not a
+  // re-derivation of buildSystemPrompt's own truncation math in a second
+  // place: a candidate only counts as "reached the prompt" if its whole,
+  // untruncated `- <text>` line is actually still there in the string the
+  // model was sent.
+  const actuallyInjected = memoryMatches
+    .slice(0, MAX_MEMORY_SNIPPETS)
+    .filter((m) => systemPrompt.includes(`- ${m.record.text}`));
+  bumpUsage(actuallyInjected);
   const messages: LlmMessage[] = [
     { role: "system", content: systemPrompt },
+    ...window.messages,
     { role: "user", content: text },
   ];
-  return { kind: "model", messages, safety, crisisResources };
+  return { kind: "model", messages, safety, crisisResources, turnId };
 }
 
 /** The one central point every TurnValue passes through before it reaches
@@ -517,6 +765,24 @@ function finalizeReply(actor: PersonRow, value: TurnValue): TurnValue {
   const { text, speech } = value.reply;
   if (speech !== undefined && speech !== text) return value;
 
+  // Resolved fresh here rather than threaded in from prepareTurn(): an
+  // immediate (plugin/refusal) reply never goes through prepareTurn()'s
+  // own "model" branch at all, so there's no persona already in scope by
+  // the time any TurnValue reaches this function - a plain settings
+  // lookup, not I/O, so re-resolving it here costs nothing real. A code
+  // review (2026-09-05) named the real, narrow consequence of resolving
+  // it fresh rather than threading it through: if the person changes
+  // persona.active_id via a concurrent request while THIS turn is still
+  // in flight, the per-companion confirmation pool below could pick the
+  // NEW persona's own phrasing for a reply whose system prompt (for a
+  // "model" source) was actually built under the OLD one - one
+  // confirmation sentence voiced as the just-switched-to companion, at
+  // most, never a data or safety correctness issue. Accepted rather than
+  // threading persona through prepareTurn()'s return value for it: the
+  // race requires the same person to change their own setting mid-turn,
+  // and its worst outcome is one word choice sounding like the wrong
+  // companion for one reply.
+  const personaId = resolvePersona(getPersonSettingValue(actor, "persona.active_id")).id;
   const variedText =
     value.source === "safety_refuse"
       ? pickRefusalVariant(actor.id)
@@ -524,7 +790,7 @@ function finalizeReply(actor: PersonRow, value: TurnValue): TurnValue {
           value.source === "plugin_error" ||
           value.source === "command" ||
           value.source === "command_error"
-        ? varyKnownConstant(actor.id, text)
+        ? varyKnownConstant(actor.id, text, personaId)
         : text;
   return { ...value, reply: { text: variedText, speech: normalizeForSpeech(variedText) } };
 }
@@ -535,7 +801,7 @@ export async function runTurn(
   actor: PersonRow,
   surface: Surface,
   text: string,
-  opts: { thinking?: boolean } = {},
+  opts: { thinking?: boolean; conversationId?: string } = {},
 ): Promise<TurnOpResult> {
   if (!IMPLEMENTED_SURFACES.has(surface)) {
     return {
@@ -549,8 +815,19 @@ export async function runTurn(
     return { ok: false, status: 400, code: "invalid_input", error: "text is required" };
   }
 
+  // Resolved before prepareTurn() runs (step 3's contract: "conversation_id
+  // absent means the actor's open conversation for that surface, created
+  // if none"): a given but invalid/foreign id is a real 400, the same
+  // "validate first, prepareTurn assumes valid inputs" shape this
+  // function's own surface/text checks above already establish.
+  const conversationResult = resolveOrCreateConversation(actor, surface, opts.conversationId);
+  if (!conversationResult.ok) {
+    return { ok: false, status: 400, code: "invalid_input", error: conversationResult.error };
+  }
+  const conversation = conversationResult.value;
+
   const loaded = loadAllManifests(); // one catalog scan, shared below
-  const prepared = await prepareTurn(actor, text, loaded);
+  const prepared = await prepareTurn(actor, surface, text, loaded, conversation);
 
   let value: TurnValue;
   if (prepared.kind === "immediate") {
@@ -560,12 +837,48 @@ export async function runTurn(
     if (!completion.ok) {
       return { ok: false, status: 503, code: "unavailable", error: completion.error };
     }
-    value = {
-      reply: { text: completion.value.text },
-      source: "model",
-      safety: prepared.safety,
-      crisis_resources: prepared.crisisResources,
-    };
+    // Step 9's own principle (spec/safety/ts/classifier.ts's promise to
+    // run "again on every streamed sentence") applied to this function's
+    // non-streaming twin: a completed reply here always arrives as one
+    // atomic block, so a single whole-text check is exactly as strong as
+    // per-sentence checking and needs no chunker at all - the plan's own
+    // text names runTurnStream specifically, but leaving this function
+    // with literally no output-side check at all (worse than
+    // runTurnStream had before this step: at least that one only lacked
+    // the PER-SENTENCE granularity) would be a real, undocumented
+    // asymmetry between the two callers of the exact same model role.
+    // Never weakens the INPUT check above (prepareTurn()'s own
+    // evaluateSafety() call) - purely additive.
+    const outputSafety = evaluateSafety(completion.value.text, actor.role as Role);
+    if (outputSafety.notify_parent) {
+      trigger("safety.flagged_turn", { childName: actor.displayName, categories: outputSafety.categories.join(", ") }).catch((err: unknown) =>
+        console.error(`[turn] safety.flagged_turn notification failed: ${(err as Error).message}`),
+      );
+    }
+    value =
+      outputSafety.action === "refuse"
+        ? {
+            // A non-streaming reply is atomic - nothing was ever shown to
+            // the caller before this point, so replacing the WHOLE reply
+            // with a canned refusal (finalizeReply()'s own existing
+            // "safety_refuse" handling, unchanged) is exactly as clean
+            // here as it is for an input-side refusal, unlike
+            // runTurnStream()'s own partial-delivery case above.
+            reply: { text: "" },
+            source: "safety_refuse",
+            safety: outputSafety,
+            crisis_resources: prepared.crisisResources,
+            conversation_id: conversation.id,
+            turn_id: prepared.turnId,
+          }
+        : {
+            reply: { text: completion.value.text },
+            source: "model",
+            safety: outputSafety.flagged ? outputSafety : prepared.safety,
+            crisis_resources: outputSafety.flagged ? deriveCrisisResources(outputSafety) : prepared.crisisResources,
+            conversation_id: conversation.id,
+            turn_id: prepared.turnId,
+          };
   }
 
   value = finalizeReply(actor, value);
@@ -579,15 +892,142 @@ export type TurnStreamResult =
   | {
       ok: true;
       kind: "stream";
-      tokens: AsyncGenerator<string, void, void>;
+      /** Known before a single token streams (the conversation is
+       * resolved and the turn id minted up front, step 2/3): routes/
+       * turn.ts's contract requires these as the very first NDJSON line
+       * ("turn_meta"), before any delta. */
+      conversationId: string;
+      turnId: string;
+      /** The generator's own return value (step 9), read from the final
+       * `iterator.next()` result once `done` is true on a NORMAL
+       * completion (never reached on a thrown StreamSafetyRefusal, which
+       * rejects instead): the most recently flagged, non-refuse
+       * SafetyResult gateOutputSafety() saw, if any - a self_harm mention
+       * in the model's own output, say. `undefined` when nothing was
+       * ever flagged. The caller passes this into `finalize()` the same
+       * way it passes a caught refusal's own SafetyResult, so a flag
+       * that never refuses still reaches the logged turn and its
+       * `crisis_resources` instead of being silently dropped once the
+       * notification fires. */
+      tokens: AsyncGenerator<string, SafetyResult | undefined, void>;
       /** Builds the final TurnValue once the caller has drained `tokens`
        * to completion and knows the full reply text - also logs the turn
        * (conversationHistory.ts), the same "log once the real reply is
        * known" timing runTurn() already has, just triggered by the
        * caller finishing the stream instead of by this function awaiting
-       * it directly. */
-      finalize: (replyText: string) => TurnValue;
+       * it directly. `outputSafety` (step 9): passed by the caller's own
+       * catch block when `tokens` threw a `StreamSafetyRefusal`, so the
+       * logged/returned TurnValue's `safety` field reflects what
+       * actually cut the stream rather than only ever the input-side
+       * result computed before generation started. */
+      finalize: (replyText: string, outputSafety?: SafetyResult) => TurnValue;
     };
+
+// Step 9 (session-a-intelligence.md): "spec/safety/ts/classifier.ts
+// promises 'again on every streamed sentence'... on a refuse category cut
+// the stream." Thrown by gateOutputSafety() below, from inside the
+// `tokens` generator runTurnStream() hands back - the ONE place a
+// generator can signal "stop, and here is why" to whatever is iterating
+// it. Carries the real SafetyResult so the caller (routes/turn.ts's
+// streamTurnEvents()) can both emit spec/errors/errors.json's
+// "safety_refused" code on the wire and pass the same result into
+// finalize() so the logged turn reflects the real reason, not a generic
+// failure message.
+export class StreamSafetyRefusal extends Error {
+  constructor(public readonly safety: SafetyResult) {
+    super("the model's own reply was flagged by the safety classifier mid-stream");
+  }
+}
+
+/** Wraps a raw token-delta generator with a per-sentence safety gate:
+ * buffers deltas until `spec/safety/ts/sentenceChunker.ts`'s own boundary
+ * detection has one complete sentence, checks THAT ONE sentence with the
+ * IDENTICAL `evaluateSafety()` the input path uses (never a weaker check
+ * - the plan's own "never weaken the input check" applies symmetrically
+ * to not inventing a laxer one for output), and only then yields it -
+ * one sentence at a time, never batched, so a review (2026-09-05) found
+ * batching them (checking every newly-ready sentence in a loop, then
+ * yielding the whole group at once) had a real bug: if the SECOND of two
+ * sentences that became ready in the same delta refused, the throw fired
+ * before the group's own combined yield ever ran, silently dropping the
+ * FIRST sentence too, even though it had already cleared its own check
+ * and the plan's own contract says earlier sentences were delivered.
+ * `notify_parent` fires independently of `action`, the exact shape
+ * prepareTurn()'s own input-side check already has (self_harm flags and
+ * notifies without ever blocking - CLAUDE.md's "Crisis resources: offer,
+ * never block" - so an output-side self_harm mention must behave
+ * identically, not accidentally cut a reply that should only ever be
+ * augmented with resources, never refused). A `refuse` category throws
+ * `StreamSafetyRefusal` immediately, before yielding the offending
+ * sentence at all: nothing from it, or anything the model might have
+ * generated after it, ever reaches a caller. A non-refuse flag (self_harm)
+ * is tracked and returned as this generator's own return value once
+ * generation ends normally - the second half of the same review's
+ * finding: a flag that never refuses was being silently dropped
+ * entirely once checkAndNotify() fired the notification, never reaching
+ * the caller's own finalize() call, so `crisis_resources` never made it
+ * onto a turn whose OUTPUT (not input) was what actually mentioned
+ * self-harm. Yields the RAW consumed substring for each sentence, not
+ * `nextSentenceBoundary()`'s own implicit trimmed span: blindly
+ * concatenating trimmed chunks back together would silently swallow the
+ * whitespace between sentences - a real, separate bug an early version
+ * of this function had, caught by two existing tests asserting the
+ * reassembled text matches what was actually generated. Delta
+ * granularity changes from raw model tokens to whole sentences/clauses
+ * as a direct, necessary consequence of gating at all - a sentence can't
+ * be judged safe before it's complete, so it can't be delivered before
+ * that either. */
+export async function* gateOutputSafety(
+  tokens: AsyncGenerator<string, void, void>,
+  actor: PersonRow,
+): AsyncGenerator<string, SafetyResult | undefined, void> {
+  let pending = "";
+  let isFirstChunk = true;
+  let lastFlagged: SafetyResult | undefined;
+
+  const checkAndNotify = (chunk: string): SafetyResult => {
+    const safety = evaluateSafety(chunk, actor.role as Role);
+    if (safety.notify_parent) {
+      trigger("safety.flagged_turn", { childName: actor.displayName, categories: safety.categories.join(", ") }).catch((err: unknown) =>
+        console.error(`[turn] safety.flagged_turn notification failed: ${(err as Error).message}`),
+      );
+    }
+    if (safety.flagged) lastFlagged = safety;
+    return safety;
+  };
+
+  for await (const delta of tokens) {
+    pending += delta;
+    for (;;) {
+      const end = nextSentenceBoundary(pending, isFirstChunk);
+      if (end < 0) break;
+      isFirstChunk = false;
+      const rawSpan = pending.slice(0, end);
+      pending = pending.slice(end);
+      const trimmed = rawSpan.trim();
+      if (!trimmed) continue; // a boundary with nothing but whitespace before it - nothing to check or yield
+      const safety = checkAndNotify(trimmed);
+      if (safety.action === "refuse") throw new StreamSafetyRefusal(safety);
+      yield rawSpan;
+    }
+  }
+
+  // Whatever's left after the model's own generation ends is the final
+  // chunk, complete or not (there's no more text coming to complete it
+  // with) - checked and yielded the same way, since a short, unterminated
+  // final clause is exactly as capable of being unsafe as a properly
+  // punctuated sentence. Checked trimmed (clean text for the
+  // classifier), yielded raw (pending itself, not the trimmed copy) for
+  // the identical whitespace-fidelity reason as the loop above.
+  const remainder = pending.trim();
+  if (remainder) {
+    const safety = checkAndNotify(remainder);
+    if (safety.action === "refuse") throw new StreamSafetyRefusal(safety);
+    yield pending;
+  }
+
+  return lastFlagged;
+}
 
 /** Same safety-first routing and deterministic plugin floor as runTurn(),
  * but the `chat` role's own answer streams token by token instead of
@@ -602,7 +1042,7 @@ export async function runTurnStream(
   actor: PersonRow,
   surface: Surface,
   text: string,
-  opts: { thinking?: boolean } = {},
+  opts: { thinking?: boolean; conversationId?: string } = {},
 ): Promise<TurnStreamResult> {
   if (!IMPLEMENTED_SURFACES.has(surface)) {
     return {
@@ -616,8 +1056,14 @@ export async function runTurnStream(
     return { ok: false, status: 400, code: "invalid_input", error: "text is required" };
   }
 
+  const conversationResult = resolveOrCreateConversation(actor, surface, opts.conversationId);
+  if (!conversationResult.ok) {
+    return { ok: false, status: 400, code: "invalid_input", error: conversationResult.error };
+  }
+  const conversation = conversationResult.value;
+
   const loaded = loadAllManifests();
-  const prepared = await prepareTurn(actor, text, loaded);
+  const prepared = await prepareTurn(actor, surface, text, loaded, conversation);
 
   if (prepared.kind === "immediate") {
     const value = finalizeReply(actor, prepared.value);
@@ -638,13 +1084,47 @@ export async function runTurnStream(
   return {
     ok: true,
     kind: "stream",
-    tokens: started.tokens,
-    finalize: (replyText: string): TurnValue => {
+    conversationId: conversation.id,
+    turnId: prepared.turnId,
+    tokens: gateOutputSafety(started.tokens, actor),
+    finalize: (replyText: string, outputSafety?: SafetyResult): TurnValue => {
+      // A safety cut with nothing safe delivered before it (the very
+      // first sentence was itself the unsafe one, replyText === "") gets
+      // treated as a real safety_refuse, the same clean "nothing shown
+      // yet, replace the whole thing with a canned refusal"
+      // finalizeReply() already gives an input-side refusal - runTurn()'s
+      // own non-streaming twin makes the identical call. A cut with real
+      // partial content already streamed stays source: "model" so that
+      // content survives in the log rather than being erased by a canned
+      // phrase the household never actually heard replace it.
+      const refusedWithNothingDelivered = outputSafety?.action === "refuse" && replyText === "";
+      // A review (2026-09-05) found this always used prepared.crisis
+      // Resources (the INPUT check's own derivation) even when
+      // `outputSafety` was the one actually flagged - so a self_harm
+      // mention in the MODEL's own words (never a refuse, so it never
+      // threw and reached this function only via gateOutputSafety()'s
+      // own return value) got `value.safety.action ===
+      // "allow_with_resources"` with no `crisis_resources` attached at
+      // all, the exact silent drop CLAUDE.md's non-configurable "offer,
+      // never block" invariant exists to prevent. A second review pass
+      // found the first fix then dropped the INPUT's own crisis
+      // resources whenever `outputSafety` was present at all, even an
+      // output refusal for a category that has nothing to do with
+      // self-harm: a message that itself mentioned self-harm
+      // (`prepared.crisisResources` set) whose reply then got cut for an
+      // unrelated refuse category lost the 988 text entirely.
+      // `?? prepared.crisisResources` keeps the input's own resources as
+      // the fallback whenever the output side isn't itself the
+      // allow_with_resources case, matching runTurn()'s own refuse
+      // branch, which never had this bug.
+      const crisisResources = (outputSafety && deriveCrisisResources(outputSafety)) ?? prepared.crisisResources;
       const value: TurnValue = finalizeReply(actor, {
         reply: { text: replyText },
-        source: "model",
-        safety: prepared.safety,
-        crisis_resources: prepared.crisisResources,
+        source: refusedWithNothingDelivered ? "safety_refuse" : "model",
+        safety: outputSafety ?? prepared.safety,
+        crisis_resources: crisisResources,
+        conversation_id: conversation.id,
+        turn_id: prepared.turnId,
       });
       logTurnSafely(actor, surface, text, value);
       return value;

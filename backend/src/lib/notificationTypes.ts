@@ -95,6 +95,25 @@ export const NOTIFICATION_TYPES: readonly NotificationType[] = [
     configurable: true,
     defaultChannels: ["in_app"],
   },
+  // The memory judge (step 6, session-a-intelligence.md: "one
+  // memory.updated notification per run that wrote something"). `person`
+  // audience, not `household` or `adults`: what the judge extracted came
+  // from THIS person's own turn, the same actor lib/memoryJudge.ts's
+  // remember()/supersede() calls already write as. `passive` (not
+  // `time_sensitive`): nothing needs attention right now, it's a record
+  // of what got remembered - the in_app pending list is where this is
+  // meant to be noticed, whenever a household member next looks.
+  // `configurable`: a household that finds "I remembered: ..." noisy can
+  // turn it off without losing anything - unlike safety.flagged_turn,
+  // there is no invariant here that requires it stay on.
+  {
+    id: "memory.updated",
+    level: "passive",
+    audience: "person",
+    template: "I remembered: {summary}",
+    configurable: true,
+    defaultChannels: ["in_app"],
+  },
 ] as const;
 
 export function getNotificationType(id: string): NotificationType | undefined {

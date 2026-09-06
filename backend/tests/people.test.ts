@@ -5,9 +5,10 @@ import { resetDb } from "./reset-db";
 import { __resetThrottleForTests } from "@/lib/secretThrottle";
 import { sqlite } from "@/db";
 import { remember } from "@/lib/memory";
-import { logTurn } from "@/lib/conversationHistory";
+import { logTurn, resolveOrCreateConversation } from "@/lib/conversationHistory";
 import { setValue } from "@/lib/settings";
 import { scheduleJob } from "@/lib/scheduler";
+import { compareHlc } from "@/lib/hlc";
 import type { PersonRow } from "@/types";
 
 /** The real PersonRow for someone already created through the API, so
@@ -59,6 +60,29 @@ describe("creating people", () => {
     // Filling it back in with null (its schema default) must still satisfy
     // Person, proving nothing else drifted from the spec shape.
     expect(() => Person.parse({ ...body, birthdate: null })).not.toThrow();
+  });
+
+  // Step 10 (session-a-intelligence.md): "every write sets a monotonic
+  // hlc." Real compareHlc(), not a lexical/string comparison - hlc's own
+  // wall_ms:counter:node shape isn't lexically sortable once digit
+  // lengths differ.
+  test("successive person creations get monotonically increasing hlcs", async () => {
+    const owner = await ownerClient();
+    const first = (await (await owner.post("/api/people", { displayName: "Bramble", role: "child" })).json()) as { hlc: string };
+    const second = (await (await owner.post("/api/people", { displayName: "Clover", role: "child" })).json()) as { hlc: string };
+    expect(compareHlc(second.hlc, first.hlc)).toBeGreaterThan(0);
+  });
+
+  test("a profile edit (PATCH) advances the person's own hlc", async () => {
+    const owner = await ownerClient();
+    const created = (await (await owner.post("/api/people", { displayName: "Bramble", role: "child" })).json()) as {
+      id: string;
+      hlc: string;
+    };
+    const patched = (await (
+      await owner.request(`/api/people/${created.id}`, { method: "PATCH", body: { nickname: "Bee" } })
+    ).json()) as { hlc: string };
+    expect(compareHlc(patched.hlc, created.hlc)).toBeGreaterThan(0);
   });
 
   test("admin cannot create another admin or an owner", async () => {
@@ -397,6 +421,8 @@ describe("deleting a person erases what the household held about them", () => {
       source: "hub",
       importance: 0.5,
     });
+    const conversationResult = resolveOrCreateConversation(toPersonRow(person.id), "chat");
+    if (!conversationResult.ok) throw new Error(conversationResult.error);
     logTurn(toPersonRow(person.id), "chat", "hello", {
       reply: { text: "hi" },
       source: "model",
@@ -408,6 +434,8 @@ describe("deleting a person erases what the household held about them", () => {
         matched_signals: [],
         checked_at: new Date().toISOString(),
       },
+      conversation_id: conversationResult.value.id,
+      turn_id: "turn-testfixture",
     });
     setValue(toPersonRow(person.id), `person:${person.id}`, "tts.voice_id", "alba");
     scheduleJob(toPersonRow(person.id), "joke", "tell", "every:1d", {});
@@ -417,11 +445,28 @@ describe("deleting a person erases what the household held about them", () => {
     const { erased } = (await res.json()) as { erased: Record<string, number> };
     expect(erased.memories).toBeGreaterThan(0);
     expect(erased.conversations).toBeGreaterThan(0);
+    expect(erased.conversationThreads).toBeGreaterThan(0);
     expect(erased.settings).toBeGreaterThan(0);
     expect(erased.scheduledJobs).toBeGreaterThan(0);
 
-    expect(countRows("memory_records", "person", person.id)).toBe(0);
+    // memory_records is the one deliberate exception (step 10, session-a-
+    // intelligence.md): the row is kept as a tombstone, not deleted - a
+    // hard delete cannot be told apart from "never existed" once a robot
+    // or a second hub syncs. Its own content is gone, checked directly.
+    expect(countRows("memory_records", "person", person.id)).toBeGreaterThan(0);
+    const tombstone = sqlite.query("SELECT * FROM memory_records WHERE person = ?").get(person.id) as {
+      status: string;
+      text: string;
+      embedding_space: string | null;
+      deleted_at: string | null;
+    };
+    expect(tombstone.status).toBe("archived");
+    expect(tombstone.text).toBe("[forgotten]");
+    expect(tombstone.embedding_space).toBeNull();
+    expect(tombstone.deleted_at).not.toBeNull();
+
     expect(countRows("conversation_turns", "person_id", person.id)).toBe(0);
+    expect(countRows("conversations", "person_id", person.id)).toBe(0);
     expect(countRows("settings_values", "scope", `person:${person.id}`)).toBe(0);
     expect(countRows("scheduled_jobs", "person_id", person.id)).toBe(0);
     expect(countRows("person_credentials", "person_id", person.id)).toBe(0);
@@ -481,6 +526,7 @@ describe("deleting a person erases what the household held about them", () => {
       source: "hub",
       importance: 0.5,
     });
+    resolveOrCreateConversation(toPersonRow(person.id), "chat");
     setValue(toPersonRow(person.id), `person:${person.id}`, "tts.voice_id", "alba");
 
     await owner.request(`/api/people/${person.id}`, { method: "DELETE" });
@@ -489,8 +535,13 @@ describe("deleting a person erases what the household held about them", () => {
       .query("SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%'")
       .all() as Array<{ name: string }>;
     for (const { name } of tables) {
-      // `people` itself holds the tombstone on purpose.
-      if (name === "people" || name.startsWith("__drizzle")) continue;
+      // `people` and `memory_records` both hold a tombstone on purpose
+      // (step 10, session-a-intelligence.md, for the latter): a row that
+      // simply vanishes is indistinguishable to a robot syncing later
+      // from one it was never told about, so a hard delete would undo
+      // itself on the next sync. What's checked instead, right below, is
+      // that the tombstoned row's own CONTENT is actually gone.
+      if (name === "people" || name === "memory_records" || name.startsWith("__drizzle")) continue;
       const columns = sqlite.query(`PRAGMA table_info(${name})`).all() as Array<{ name: string }>;
       for (const col of columns) {
         const isPersonColumn = col.name === "person_id" || col.name === "person" || col.name === "creator_id";
@@ -503,6 +554,15 @@ describe("deleting a person erases what the household held about them", () => {
         expect(left, `${name}.${col.name} still holds rows for a deleted person`).toBe(0);
       }
     }
+
+    const tombstone = sqlite.query("SELECT text, embedding_space, deleted_at FROM memory_records WHERE person = ?").get(person.id) as {
+      text: string;
+      embedding_space: string | null;
+      deleted_at: string | null;
+    };
+    expect(tombstone.text).toBe("[forgotten]");
+    expect(tombstone.embedding_space).toBeNull();
+    expect(tombstone.deleted_at).not.toBeNull();
   });
 });
 
@@ -548,7 +608,9 @@ describe("POST /api/people/batch-delete", () => {
 
     const roster = (await (await owner.get("/api/people")).json()) as Array<{ id: string }>;
     expect(roster.some((p) => p.id === a.id || p.id === b.id)).toBe(false);
-    expect(countRows("memory_records", "person", a.id)).toBe(0);
+    // Tombstoned, not deleted (step 10) - see the dedicated test above
+    // for the full tombstone-content assertions.
+    expect(countRows("memory_records", "person", a.id)).toBe(1);
   });
 
   // Partial success: one refusal must not take the whole batch down with

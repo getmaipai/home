@@ -32,7 +32,8 @@ import { db } from "@/db";
 import { scheduledJobs, people } from "@/db/schema";
 import { newJobId } from "@/lib/id";
 import { isOwnerOrAdmin } from "@/lib/access";
-import { runMaintenance } from "@/lib/memory";
+import { runMaintenance, drainPendingEmbeddings } from "@/lib/memory";
+import { runJudgeBatch, runConsolidation } from "@/lib/memoryJudge";
 import { runRetention } from "@/lib/conversationHistory";
 import { runBackup, pruneBackups } from "@/lib/backup";
 import type { PluginOpResult } from "@/lib/plugins";
@@ -163,7 +164,12 @@ export function cancelJob(actor: PersonRow, id: string): SchedulerOpResult<true>
   return { ok: true, value: true };
 }
 
-const CORE_JOBS: Record<string, () => void> = {
+// void | Promise<void>, not void alone: memory.embedding_retry (step 5,
+// session-a-intelligence.md) is the first core job whose work is
+// genuinely async (drainPendingEmbeddings awaits a real embed() call).
+// `await handler()` below resolves a plain void return immediately, so
+// the three pre-existing synchronous handlers are unaffected.
+const CORE_JOBS: Record<string, () => void | Promise<void>> = {
   "memory.maintenance": () => {
     runMaintenance();
   },
@@ -173,6 +179,21 @@ const CORE_JOBS: Record<string, () => void> = {
   "backup.run": () => {
     runBackup();
     pruneBackups();
+  },
+  "memory.embedding_retry": async () => {
+    await drainPendingEmbeddings();
+  },
+  // Step 6: the memory judge's own batch tick and the weekly consolidate
+  // sweep (lib/memoryJudge.ts). Both real LLM-touching core jobs, unlike
+  // the pure-code entries above - a slow or down chat model just means
+  // this tick's batch takes longer or a turn's own attempt counter ticks
+  // up, never a stuck scheduler (runDueJobsUnguarded's own in-flight
+  // guard already serializes overlapping ticks).
+  "memory.judge": async () => {
+    await runJudgeBatch();
+  },
+  "memory.consolidate": async () => {
+    await runConsolidation();
   },
 };
 
@@ -222,7 +243,7 @@ async function runDueJobsUnguarded(runPluginFn: RunPluginFn, now: Date): Promise
       if (row.kind === "core") {
         const handler = CORE_JOBS[row.job];
         if (!handler) throw new Error(`no core job registered for ${row.job}`);
-        handler();
+        await handler();
       } else {
         if (!row.personId) throw new Error(`plugin job ${row.id} has no personId`);
         const actor = db.select().from(people).where(and(eq(people.id, row.personId), isNull(people.deletedAt))).get();

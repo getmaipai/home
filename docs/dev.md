@@ -5807,3 +5807,1553 @@ fan-out excluding minors, per-person Telegram opt-in vs. a non-
 configurable type's forced default, ownership isolation on read/dismiss,
 and a real end-to-end `runTurn()` test proving a minor's flagged turn
 notifies every adult). Full suite green (566 backend, 201 frontend).
+
+## Session A: step 0, setup (2026-09-05)
+
+Working from `docs/plans/session-a-intelligence.md` (backend and spec
+half of the 2026-09-05 audit; Session B runs `session-b-ui.md` on the
+frontend in parallel from its own worktree `../home-b`).
+
+- Worktree: `git worktree add -b session-a-intelligence ../home-a main`,
+  a sibling of `home/`, matching the layout Session B already used
+  (`../home-b`). A worktree nested under `home/.claude/worktrees/`
+  was tried first and rejected: `spec/tests/ts/fixtures.test.ts` imports
+  the standards-owned `ErrorEntry` type by a hardcoded relative path
+  (`../../../../.github/...`) that only resolves when the checkout sits
+  exactly four levels above a sibling `.github`, which a nested worktree
+  breaks. The sibling layout keeps that path valid, so no code change was
+  needed there.
+- Backend runs from `backend/` with `MAIPAI_DATA_DIR=<worktree>/data-a
+  PORT=8797 bun run dev`, its own SQLite file under `data-a/` (gitignored,
+  never the shared `data/`).
+- `scripts/check.sh` green at the baseline: 200 spec bun tests, 37 spec
+  pytest, 567 backend bun tests, 201 frontend bun tests, standards core
+  (gitleaks, PII wordlist, prose lint, licence check) all passing before
+  any step-1 change.
+- Stub-backed by default, confirmed rather than assumed:
+  `backend/tests/embedSupervisor.test.ts` already asserts
+  `getEmbedBackendKind()` reports `"stub"` when neither
+  `MAIPAI_EMBED_URL` nor a spawnable binary is configured, the same
+  precedent `llmSupervisor.ts` uses for the chat role. Both stubs are
+  `spec/llm/ts/stubServer.ts`, an in-process OpenAI-compatible server that
+  prefixes every reply `[stub model: no real model loaded, this is a
+  canned reply]`, so no step in this plan needs a real model to write or
+  run its per-commit tests.
+- **Bench run pointer** (not run this step, recorded for step 5's and
+  step 6's on-demand bench commands): point the embed backend at the real
+  engine with `MAIPAI_EMBED_URL=http://<host>:<port>/v1` (or
+  `MAIPAI_EMBED_PORT` plus a real `llama-server` binary for the supervisor
+  to spawn one), and the chat role the same way via
+  `MAIPAI_LLAMA_SERVER_URL` or `MAIPAI_LLAMA_SERVER_BIN` +
+  `MAIPAI_CHAT_MODEL_PATH`.
+
+## Session A: step 1, the speaker and household blocks, and local time (2026-09-05)
+
+`buildSystemPrompt` (`lib/turnEngine.ts`) now takes the actor and adds
+three volatile-zone pieces the audit's "the prompt doesn't know who's
+talking" finding named directly (`docs/BACKLOG.md`'s "A speaker block in
+the prompt" and "A household context block"):
+
+- **Speaker line**: display name, nickname (when set), role, an age band,
+  and the household's locale. `POST /api/turn`'s stub-model reply can't
+  demonstrate this (the stub only ever echoes the last user message, see
+  `spec/llm/ts/stubServer.ts`), so this is proven by the unit tests
+  asserting on the constructed prompt string directly, and by exercising
+  `POST /api/turn` against the running backend to confirm the new blocks
+  don't crash a real turn (`good morning` -> a real 200, source `model`).
+- **Household line**: every active person's display name and role
+  (`lib/access.ts`'s new `listActivePeople()`, reused rather than a
+  second copy of `routes/people.ts`'s own roster query). Presence is
+  unknown for now, as the step names: no presence signal exists on the
+  hub (that's the robot/ambient-context side, not built here).
+- **Local time**: `Friday 3:40 pm` style via `Intl.DateTimeFormat`, never
+  raw ISO UTC. No household timezone setting exists yet (3.2 hasn't
+  landed one), so this renders in the hub process's own system timezone,
+  correct for a self-hosted install physically in the house;
+  `household.locale` only changes date/time formatting conventions, not
+  the zone. Locale comes from `household.locale`
+  (`getHouseholdSettingValue`), not `persona.active_id`-style person
+  scope - the plan's own text says "locale from `core.locale`" but the
+  registry's real key (`backend/src/settings/coreKeys.ts`) is
+  `household.locale`, household-scoped; used that instead of inventing a
+  second key.
+
+**Judgment call: age band, not the wider `age_range`.** The plan asks
+for "age band derived from birthdate when present." `docs/BACKLOG.md`
+separately tracks a real, wider `age_range`-on-Person-ctx question under
+"roles versus grants" (package-visible, schema-level, still undecided).
+This step does NOT touch that: the age band here is computed inline in
+`turnEngine.ts`, never stored or exposed to a package, and uses exactly
+the role ladder's own two minor bands (`person.schema.json`: "teen
+13-17, child under 13") rather than inventing a finer taxonomy nothing
+in the spec or platform plan defines. When a birthdate is on file it's
+a real, independent cross-check computed from it; when it's absent, the
+speaker's own role already carries the same distinction, so that's the
+fallback. Revisit once the roles-versus-grants decision lands a real
+`age_range`.
+
+The old raw-ISO `Current time:` line is replaced outright by the new
+`Local time:` line (same "time last, never truncated" placement, 4.5);
+no caller parsed the old format (grepped for `Current time:` across the
+repo before removing it).
+
+Tests: 8 new in `tests/turnEngine.test.ts` (speaker name and role, a
+nickname, a child speaker from birthdate, a teen speaker from role alone
+with no birthdate, a same-day-before-18th-birthday edge case proving the
+month/day subtraction is real and not just a year diff, the local time
+line's format, the household roster line, and `household.locale`
+changing the rendered line). Every existing `buildSystemPrompt()` call
+site and test updated for the new `actor` parameter. Full suite green
+(575 backend, 201 frontend, 200+37 spec).
+
+Not built this step (named, not silently skipped): presence ("who's
+home now" vs. "who lives here"), a real household timezone setting, and
+the wider `age_range` field question above.
+
+## Session A: step 2, scoped recall, person-scoped remember, provenance (2026-09-05)
+
+Fixes the audit's real privacy bug and gives `remember` a real
+first-person heuristic and turn provenance, no spec changes needed.
+
+- **Privacy fix**: `lib/memory.ts`'s `recall()`/`list()` gain
+  `ListOptions.selfOnly`. `canRead()` already let owner/admin read a
+  child's `scope: person` records (the sanctioned parental-view case,
+  `GET /api/memory?person=<id>`); the turn engine's own `recall()` call
+  was passing no `person` filter at all, so a parent's ordinary chat
+  could surface a child's private facts into the model's context, "the
+  prompt doesn't know who's talking" finding's sharper edge. `selfOnly:
+  true` makes `canRead()` require `record.person === actor.id` exactly
+  for person-scope, bypassing `canAccessPerson()`'s parent-of-child
+  allowance, while household-scope records are unaffected (still subject
+  to the existing sensitive/owner-admin gate). Only
+  `turnEngine.ts`'s call sets it; every route (`GET /api/memory`,
+  `POST /api/memory/recall`) is unchanged, so the real parental view
+  still works exactly as before.
+- **Usage bumping now matches what actually reached the prompt.**
+  `recall()` used to bump `uses`/`last_used_at` on all 20 of its own
+  top-scored candidates, while `buildSystemPrompt` only ever injects the
+  top `MAX_MEMORY_SNIPPETS` (5) - a real inflation bug the fork's
+  research pass flagged. `recall()` gains `bumpUsage` (default true,
+  preserving the existing direct-API/`recall`-package contract exactly);
+  the turn engine passes `bumpUsage: false` and calls the newly exported
+  `bumpUsage()` itself on only the slice that made it into the prompt.
+- **`remember` writes person scope for first-person statements.**
+  `backend/packages/remember/recipe.json`'s `remember` step no longer
+  hardcodes `scope: "household"` (recipe.schema.json already made
+  `scope` optional on that step); `packageHost.ts`'s `Host.memory.remember`
+  auto-detects when a recipe step leaves scope unset: a word-boundary
+  `\b(i|my|mine|me)\b` match (deliberately simple, matching `remember`'s
+  own routing.patterns capture, not a semantic check) writes `scope:
+  person, person: actor.id`, otherwise `household`, unchanged. An
+  explicit `scope` from any recipe step (the existing behavior for a
+  future package with its own reason to write household explicitly)
+  still always wins over auto-detection.
+- **Provenance is the turn id, not the package id.** `turnEngine.ts`'s
+  `prepareTurn()` now generates this turn's own id once, up front
+  (`lib/id.ts`'s `newConversationTurnId()`), before routing - the SAME
+  id flows to `runPlugin()` -> `createHost()` -> `Host.memory.remember`'s
+  `source`, and back to the caller so `runTurn()`/`runTurnStream()` log
+  the turn's own `conversation_turns` row under that identical id rather
+  than a second, different one `conversationHistory.ts`'s `logTurn()`
+  used to always mint itself. Checked `memory-record.schema.json`: no
+  second field exists for the package id (`additionalProperties: false`,
+  `source` is a single free-text field), so per the plan's own fallback
+  the package id is logged (`console.log`), not stored, when a turn id is
+  present; an invocation with no turn (a direct `POST
+  /api/plugins/:id/run`, a scheduled job) keeps the old
+  `package:<id>` fallback unchanged.
+
+Tests: 8 new in `tests/memory.test.ts` (`selfOnly` excludes a child's
+record a parent can otherwise read, `selfOnly` still returns the actor's
+own person-scope and household records, `bumpUsage:false` leaves `uses`
+untouched with a later explicit `bumpUsage()` call updating exactly the
+given matches, the default-true case matching the existing contract), 5
+new in `tests/packageHost.test.ts` (auto-detected person scope, the
+household fallback with no marker, an explicit scope always winning, the
+turn-id-as-source case, the package-id fallback with no turn), 3 new in
+`tests/turnEngine.test.ts` (a first-person `remember` writes person
+scope via the real plugin, a non-first-person one still writes
+household, provenance equals the real logged turn id) plus 1 proving a
+real turn with 8 matching household memories only bumps usage on
+`MAX_MEMORY_SNIPPETS` (5) or fewer of them. Full suite green (588
+backend). Manually verified against the running backend too: `remember
+I am allergic to shellfish` -> `scope: person`, `person` the actor's own
+id, `source` a real `turn-...` id matching the exact row in
+`conversation_turns`.
+
+**Code review caught six real issues in this step (plus step 1's
+already-committed diff, re-scanned in the same pass), all fixed here:**
+the first-person regex misattributed a THIRD PARTY's fact to the
+speaker's own private scope ("remember my sister's allergy is peanuts"
+wrote person-scope for the actor, not the sister - a `my <noun>'s`
+exclusion now catches the clearest case, full resolution is step 6's
+real judge's job); `bumpUsage()` still bumped the top-5 candidates even
+when `buildSystemPrompt`'s own section or body-budget truncation cut one
+short before it reached the model (now checks the exact bullet line
+survived, uncut, in the returned prompt string); the new local-time line
+dropped month/day/year entirely versus the old raw-ISO line (added the
+full date back, still locale-formatted, never raw ISO); `ageInYears()`
+had no NaN guard for a malformed birthdate (defense in depth - Person's
+generated schema already enforces `.date()`, so this shouldn't be
+reachable today, but a safety-adjacent signal silently defaulting to
+"adult" on bad input is exactly the failure mode to guard against
+anyway); step 1's own dev.md entry claimed `listActivePeople()` was
+"reused rather than a second copy" when `routes/people.ts` and
+`lib/notifications.ts` still had their own inline copies of the same
+query - now actually true, both call the shared function; and
+`Host.memory.remember`'s new turn-provenance log line used a raw
+`console.log` instead of the sanctioned, redacted `host.log()` path
+(extracted `logEntry()` so both the public `log()` method and this
+internal call share it). One review finding not fixed, by design: two
+extra DB reads per model-routed turn (`listActivePeople()`,
+`getHouseholdSettingValue`) - real, but negligible at household scale (a
+handful of people, one indexed settings lookup); adding a cache with
+real invalidation-on-write for a query costing microseconds isn't worth
+the complexity yet, revisit if it ever actually shows up in a profile.
+
+## Session A: step 3, conversations, the window, the rolling summary (2026-09-05)
+
+The single largest step so far: a real `Conversation` spec record,
+turn-window context so "and tomorrow?" has a referent, a rolling
+summary that never runs in the request path, and the full REST contract.
+
+**Spec first.** `spec/schemas/conversation.schema.json`: `id, person,
+surface, companion_id, title, status (open|closed|deleted), summary,
+summary_through_turn, source, hlc, created_at, updated_at` - exactly the
+plan's own field list. `source: hub|local` mirrors `person.schema.json`'s
+own field (a robot's conversations sync as records; its raw utterance
+log never does, 4.14). Fixture, generated TS/Py bindings, both fixture
+suites updated.
+
+**Hub schema**: a new `conversations` table plus
+`conversation_turns.conversation_id` (nullable only for the backfill's
+sake - every real write path sets it now). Migration `0010`:
+drizzle-kit generated the `CREATE TABLE`/`ADD COLUMN`, then a hand-added
+backfill (the same "drizzle-kit can't express a data migration" pattern
+migration `0007`'s skill-to-plugin rename already used) - one
+conversation per pre-existing `(person_id, surface)` pair,
+`'conv-' || lower(hex(randomblob(6)))` for the id (matches the schema's
+pattern, hex is a subset of a-z0-9), a real hlc stamped at backfill time
+(node `backfill`). `CURRENT_SCHEMA_VERSION` bumped to 10.
+
+**One open conversation per (person, surface) at a time, in practice, not
+by constraint.** `resolveOrCreateConversation()` (the implicit,
+turn-time path every real turn goes through) reuses whichever is
+already open; `createConversation()` (the explicit `POST /`, "start a
+new one") closes - never deletes - the previous open one for the same
+pair first. `companion_id` is set at creation from `persona.active_id`
+(always resolves to a real string, the registry default when nobody's
+picked one) - the contract's own words, ahead of companions existing as
+real packages (step 8).
+
+**The window** (`buildConversationWindow()`): legacy's exact numbers,
+copied per the plan's instruction, not re-tuned - newest 4 turns
+verbatim regardless of size, older ones added most-recent-first while
+the running chars/4 estimate stays under 1,200 tokens, oldest dropped
+first past that. Whatever's older than the window is represented by the
+conversation's own rolling `summary` as one line in the prompt's
+volatile zone (`buildSystemPrompt`'s new optional
+`conversationSummaryLine` parameter, capped at 600 chars - a new
+`MAX_SUMMARY_SECTION_CHARS`, same truncation-safety posture the other
+sections already have). **The reason recorded, not just the numbers**:
+legacy found 800 tokens dropped 4-turn back-references, and a stale
+summary "is real amnesia" - the refresh job below exists because of
+that second finding.
+
+**The rolling summary refresh** (`maybeRefreshConversationSummary()`):
+fires from `logTurnSafely()` post-turn, fire-and-forget, never awaited,
+never blocking or failing the turn - the same posture `summarizeBeforeDelete()`
+(4.14) already established. Runs once at least 4 turns (the identical
+`WINDOW_NEWEST_TURNS_KEPT` number, not a separate tuning - the window
+and the refresh trigger are two views of the same boundary) have fallen
+out of the window since `summary_through_turn`. Skipped entirely on the
+stub model (a canned `[stub model...]` line is worse than no summary,
+checked both before AND after the completion call, the same double-check
+`summarizeBeforeDelete()` needs for a process's very first completion
+ever).
+
+**Provenance flows one level deeper.** `turnEngine.ts`'s `prepareTurn()`
+now takes `surface` and a pre-resolved `conversation`, generating this
+turn's id up front as before (step 2) but resolving the conversation
+even earlier, in `runTurn`/`runTurnStream`, before `prepareTurn` runs at
+all - every `TurnValue` (including every immediate branch: safety
+refuse, command, plugin) now carries real `conversation_id`/`turn_id`
+fields, not just the model path. `logTurn()` no longer mints its own
+turn id or takes one as a parameter: it reads `value.turn_id`/
+`value.conversation_id` directly (both always real by the time a
+`TurnValue` exists), so the id that named a plugin's memory provenance
+(step 2) and the id of the row that actually got logged can never
+diverge. `logTurn()` also bumps the conversation's own `updated_at`, so
+`listConversations()`'s "newest first" reflects real activity.
+
+**A real persistence failure in conversation resolution must never crash
+the reply**, the identical contract `logTurn()` already held (step 2's
+own regression test, `a real logTurn DB write failure never turns a
+successful generation into a reported failure`, now exercises this
+earlier point too since conversation resolution runs before a reply is
+generated): `insertNewConversation()` wraps its own insert in a
+try/catch and returns the in-memory row anyway on failure, logged, not
+thrown. An explicit but genuinely invalid `conversation_id` (someone
+else's, or deleted) is a real 400 `invalid_input`, surfaced before
+`prepareTurn()` ever runs - a functional failure, not an infra one, so
+it isn't given this same leniency.
+
+**The full REST contract** (`routes/conversations.ts`, rewritten): `GET
+/` now lists conversation summaries (`{id, surface, companion_id, title,
+turn_count, last_turn_at, created_at}`, joined against
+`conversation_turns` in one extra query, not per-row) instead of a flat
+turn list - that behavior moved to `GET /turns` unchanged, exactly the
+contract's own migration path. `POST /`, `GET /:id` (a real 404 for
+anyone else's, deleted, or nonexistent - never distinguishing "not
+yours" from "doesn't exist"), `GET /:id/turns?since=<turn_id>` (each
+turn's `memory_ids` computed by querying `memory_records` for that exact
+turn's id as `source` - step 2's provenance rule, one batched query, not
+N+1 - rather than a stored, driftable list), `PATCH /:id` (title),
+`DELETE /:id`, `POST /batch-delete`, `POST /clear`.
+
+**DELETE is a tombstone, not a hard delete of the thread record - a
+deliberate judgment call.** `conversations` carries a real `hlc`
+specifically because it's meant to sync (4.14: "a chat begun on the
+robot appears on the phone through the hub... robot turns sync as
+conversation records"), the identical "a row that vanishes looks
+unheard-of to a later sync" reasoning step 10 will formalize for memory
+records - so `DELETE /:id` sets `status: "deleted"` rather than removing
+the row. Its own content is wiped anyway (`title`, `summary`,
+`summary_through_turn` all nulled): a summary is transcript-derived, so
+a genuinely deleted conversation shouldn't leave one sitting under the
+tombstone. The turns themselves - the real transcript - ARE a genuine
+hard delete (`DELETE FROM conversation_turns WHERE conversation_id = ?`).
+Memories the turns produced are untouched, exactly the contract's own
+words: they carry the turn id as provenance and outlive the chat.
+
+**Person deletion gap closed.** `personLifecycle.ts`'s `erasePersonData()`
+deleted `conversation_turns` for a removed person but never the new
+`conversations` table's own `person_id` rows - would have violated
+`no table is left holding rows about a deleted person`
+(`people.test.ts`'s own schema-walking test, which dynamically finds
+every `person_id`/`person`/`creator_id`/`scope` column and would have
+caught this the moment any test exercised it) the first time a deleted
+person had ever held a real conversation. Fixed: a new
+`conversationThreads` count alongside the existing `conversations` count
+(kept as-is, meaning conversation turns, since it predates threads and
+other code already reads it) in `ErasureCounts`.
+
+**Frontend note for Session B, one item URGENT** (this session does not
+touch `frontend/`, per the rules):
+1. **Urgent, a real live break, not just a typecheck failure**: a second
+   code review pass (2026-09-05) traced `frontend/src/apps/chat/
+   ChatPage.tsx:186`'s `.conversations()` call (a real, live call in the
+   shipped chat page, missed by this session's first pass - the earlier
+   claim "nothing in the shipped UI calls it" was checked with too
+   narrow a grep) into `mapRows.ts`'s `rowsToMessages()`, which reads
+   `row.userText`/`row.replyText` on every row. `GET /api/conversations`
+   now returns `ConversationSummary[]` (no such fields) as of this step;
+   the old flat turn list moved to `GET /api/conversations/turns`
+   unchanged (the contract's own stated migration path - `frontend/src/
+   lib/api.ts`'s `conversations: () => request<ConversationTurnRow[]>
+   ("/api/conversations")`, line ~214, needs to call `/turns` instead).
+   Until that one-line fix lands, the household's chat history renders
+   every message blank on load. `ConversationRow`/`ConversationSummary`/
+   `ConversationTurnWithMemoryIds` are all exported from `@/wire` already
+   for when the conversation-aware UI (the rest of the CRUD: `POST /`,
+   `GET/PATCH/DELETE /:id`, `GET /:id/turns`, `POST /batch-delete`,
+   `POST /clear`) gets built.
+2. `frontend/src/apps/chat/ChatPage.test.tsx`'s `makeRow()` helper and
+   `frontend/src/apps/chat/mapRows.test.ts`'s fixtures construct
+   `ConversationTurnRow` literals (imported for real from `@/wire`, never
+   hand-duplicated) that predate the new `conversationId` column - add
+   `conversationId: null` (or a real id) to each.
+3. `frontend/src/apps/chat/ChatPage.tsx`'s streaming-event handler
+   (~line 363, the `if (event.type === "delta") ... else if
+   ("spoken_cue") ... else if ("done") ... else { throw new
+   ApiError(event.error, ...) }` chain) needs a new `else if
+   (event.type === "turn_meta")` branch before the final `else`, which
+   should now only ever match `"error"` - the new `turn_meta` event
+   (this session's contract) is always the first line of every
+   `POST /api/turn/stream` response.
+`POST /api/turn` and `POST /api/turn/stream`'s `done` event also now
+always carry `conversation_id`/`turn_id` on the `TurnValue` - available
+whenever the conversation-aware UI needs them.
+
+**`scripts/check.sh`'s frontend section is red in this worktree because
+of exactly the three items above** - a known, expected, temporary
+cross-worktree state (Session B hasn't reached the point of consuming
+this contract yet; `origin/main` hasn't moved since both sessions
+branched, confirmed via `git fetch` before writing this), not a
+regression this session introduced into anything Session A owns. Spec
+and backend sections of `check.sh` are fully green: 613 backend tests
+(after both review passes' new regression tests), 201 spec tests, 38
+spec pytest, fixture round-trips both languages.
+Per the plan's own instruction ("a step that needs a frontend change:
+write the need into your dev.md section, keep the API additive, and
+continue"), this is not treated as blocking.
+
+Tests: 3 new in `spec/tests/{ts,py}` (the conversation fixture
+round-trips), 3 new `buildConversationWindow()` unit tests (the
+token-budget drop, no summary line when nothing's uncovered, a summary
+line when something is), 3 new `maybeRefreshConversationSummary()` tests
+(too early, stub-skipped, a real stub-shaped refresh), 1 acceptance-style
+test proving a follow-up turn's window contains the prior exchange
+("and tomorrow?"'s real mechanism), a full CRUD suite in
+`conversationHistory.test.ts` (create, close-the-old-one, get/404,
+patch, delete with turns-gone-memories-kept, batch-delete, clear,
+turns-with-memory-ids, since-filtering), and 3 existing tests updated
+for the new schema (`resetDb()`'s deletion order, `people.test.ts`'s
+erasure tests now exercising a real conversation, the moved
+`GET /api/conversations` behavior). Full backend suite green (613, after
+both review passes' fixes).
+Manually verified against the running backend too: two `POST /api/turn`
+calls with no `conversation_id` resolve to the same open conversation;
+`GET /api/conversations/:id/turns` returns both, oldest first.
+
+**Every conversation record is now spec-shaped end to end, not just at
+the schema level.** A code review (2026-09-05) found `POST /` and
+`GET /:id` returning the raw camelCase DB row directly, inconsistent
+with `lib/personShape.ts`/`lib/memoryShape.ts`'s established discipline
+of validating every response through the generated Zod schema before it
+goes out. Fixed: `toConversationRecord()`/`conversationToDbValues()`
+convert both ways, `insertNewConversation()` now validates the
+candidate against `Conversation` before writing (`remember()`'s own
+precedent), and `resolveOrCreateConversation()`/`getConversation()`/
+`updateConversationTitle()` all return the real, snake_case `Conversation`
+type rather than the internal `ConversationRow`. `turnEngine.ts` needed
+no field-access changes at all: the only field it touches (`.id`) is
+spelled identically in both shapes.
+
+**Six more real issues the same review found, all fixed here:**
+`resolveOrCreateConversation()` didn't check a given `conversation_id`'s
+own `surface` matched the turn's, so a chat-surface conversation could
+silently absorb a tv-surface turn; `updateConversationTitle()` was the
+one write path in the file that skipped spec validation (a title over
+the schema's 200-char cap was accepted, `safeParse` now refuses it with
+a clean 400); `hlc` was set once at creation and never regenerated on a
+later write (rename, close-on-new-conversation, delete, the summary
+refresh, the per-turn `updated_at` bump) - now every mutation calls
+`nextHlc()` again, matching `settings.ts`'s own established per-write
+pattern; the migration's backfill gave every newly-created conversation
+the identical `hlc` when a household had more than one `(person,
+surface)` pair predating the column - now `ROW_NUMBER() OVER (...)`
+gives each a distinct counter (verified directly against a scratch
+in-memory SQLite database before trusting it); `GET /:id/turns?since=`
+resolved the `since` turn by id alone with no check it belongs to the
+requested conversation, so a leaked or cross-conversation turn id
+supplied a valid-looking cutoff - now scoped to the conversation, plus a
+same-millisecond tiebreak (id, not just timestamp) so two turns logged
+in the same millisecond can't make the very next one vanish from a
+polling client; `conversation_turns` had no index on `conversation_id`
+despite being the primary filter for `buildConversationWindow()` and
+`maybeRefreshConversationSummary()` on every model-routed turn - a new
+`conversation_turns_conversation_id_idx` closes it.
+
+**Two findings deliberately not fixed, recorded rather than papered
+over:** `runRetention()` purges aged-out `conversation_turns` rows but
+never touches the `conversations` thread record once every one of its
+turns is gone, so an emptied conversation lingers indefinitely with
+`turn_count: 0` - a real gap, but deciding what an emptied conversation
+*should* become (auto-close? auto-delete? a household setting?) is a
+product decision this step's own contract doesn't specify, tracked as a
+new BACKLOG item rather than guessed at. A concurrent-create race on
+"one open conversation per (person, surface)" (two simultaneous requests
+with no `conversation_id` both finding none open) is real in principle
+but not exploitable in this codebase's actual runtime: `bun:sqlite`
+calls are synchronous and `resolveOrCreateConversation()`/
+`insertNewConversation()` contain no `await` between the read and the
+write, so within one Bun process (single-threaded for synchronous code)
+two requests can't actually interleave mid-function - revisit only if
+the hub ever runs multi-process.
+
+**A second review pass on the fixes above found eight more real issues,
+all fixed:** the frontend break above (traced properly this time, not
+just grepped); the `since` tie-break fix from the first pass could still
+re-include an already-seen turn when three or more turns shared the
+exact same millisecond (`r.id !== sinceId` only ever excluded the one
+named turn, not everything at-or-before it) - rewritten to slice by
+POSITION in a stably-sorted list instead of re-comparing timestamps at
+all, which resolves `since` to an exact "everything after this row",
+not an approximation; `POST /api/conversations` didn't validate
+`surface` before calling `Conversation.parse()`, so a bogus value threw
+an uncaught ZodError (an unhandled 500) instead of a clean 400 matching
+`POST /api/turn`'s own handling of the identical bad input - now
+checked against `Conversation.shape.surface.options` (the spec's own
+enum, not a hand-copied list) before any write; the `conversations`
+table itself had no index for `(person_id, surface, status)` despite
+being queried on every turn, the same gap `conversation_turns` had
+already been caught and fixed for; `logTurn()`'s insert-then-update pair
+had no transaction, unlike `lib/secret.ts`'s `recordFailedAttempt()` and
+`lib/memoryId.ts`'s `nextSeq` which already use `sqlite.transaction()`
+for exactly this "both writes commit together or not at all" reason -
+now wrapped; `conversation_id`/`turn_id` were copy-pasted into all five
+of `prepareTurn()`'s immediate-return sites - now stamped once by a
+small local `immediate()` helper; `buildConversationWindow()`/
+`maybeRefreshConversationSummary()` fetched and JS-sorted a
+conversation's ENTIRE history on every model-routed turn with no bound -
+now capped at the 200 most recent rows (`WINDOW_ROW_FETCH_LIMIT`, far
+more than the 1,200-token budget could ever actually use, so this never
+changes which turns end up in a real window); and `routes/
+conversations.ts` inlined the `{error, status}` response shape four
+times instead of the one-line `fail()` helper every sibling route file
+already has.
+
+## Session A: step 4, prompt order and budgets (2026-09-05)
+
+Real stable-first prompt assembly and independent per-section budgets,
+replacing step 1-3's "get the blocks in" minimum.
+
+**Stable prefix, in order**: identity (now names the selected persona's
+`display_name`, not a hardcoded "MaiPai" - `DEFAULT_PERSONA.display_name`
+IS "MaiPai", so every household that never touches `persona.active_id`
+sees byte-identical text to before), the persona's own voice fragment
+("companion"), `INFORMATION_HANDLING_POLICY` ("rules"), the plugins list
+("standing skills" in 4.5's own loose sense - every installed package,
+unconditionally, every turn). **Volatile zone, in order**: household,
+speaker, memory (dated), a companion re-anchor, the conversation
+summary, this turn's own matched skills (utterance-dependent, so it can
+never be stable no matter what 4.5 calls it - not explicitly named in
+4.5's own "household, speaker, memory, summary, time last" list, so it
+sits where composed instructions already sit), local time last, never
+truncated (unchanged from step 1's protection).
+
+**The companion re-anchor** (`companionReanchorLine()`): one line
+("Remember: you are Buddy.") right after the memory block, unconditional
+- not gated on whether anything actually matched, since the plan names a
+POSITION, not a precondition, and legacy measured real drift after about
+eight turns regardless of whether memory happened to fire that turn.
+Companions-as-packages don't exist yet (step 8), so this repeats the
+same `display_name` the stable identity line already used; already the
+right shape for a real companion package's own name later.
+
+**Memory lines are dated**: `formatShortDate()`/`daysAgoLabel()` render
+"(as of Sep 2, 8 days ago)" off `record.created_at` (when the fact was
+first asserted, not `last_used_at` - "as of" asks when it became true).
+The block ends with one fixed reminder line, `MEMORY_TRUST_REMINDER`
+("Prefer these facts over guessing when they're relevant.") - both
+ported from legacy's `formatMemoriesForPrompt`/the BACKLOG's own
+"dated memories... small models drift toward the freshest tokens"
+finding.
+
+**Every capped section now has a real, exact cap** (`capSection()`,
+extracted from five inline copies of the same "slice then append '...'"
+logic): the ellipsis now counts INSIDE the cap - a genuine, if small,
+correctness fix a code review caught mid-step (every existing section
+had been allowed to run 3 chars past its own declared budget for the
+ellipsis alone). Two new sections got their own cap for the first time,
+per the plan's own instruction and the bot's `test_prompt_budget.py`
+precedent it copies: `MAX_RULES_SECTION_CHARS` and
+`MAX_COMPANION_SECTION_CHARS`, both 800 (the real catalog's longest
+persona fragment runs ~645 chars; `INFORMATION_HANDLING_POLICY` is 617 -
+both sized from real content with headroom, matching
+`MAX_MEMORY_SECTION_CHARS`/`MAX_PLUGINS_SECTION_CHARS`'s own 800, not
+picked arbitrarily and then found too small).
+
+Tests: `capSection()` unit tests (under-cap unchanged, over-cap sliced
+to exactly the cap with a real ellipsis inside it, a cap too small for
+an ellipsis at all), an order-assertion test walking all eight section
+markers through a real prompt (`indexOf` each, assert stable-prefix
+order then volatile-zone order end to end in one test rather than
+several partial ones), identity naming the selected persona (default
+and non-default), the re-anchor firing unconditionally, the dated
+memory suffix and trust reminder together, and real-content budget
+checks for every persona's fragment plus the rules policy. Full backend
+suite green (621).
+
+## Session A: step 5, embedding recall and scheduled maintenance (2026-09-05)
+
+Real vectors, replacing the keyword-overlap placeholder every recall
+score has used since 4.4 shipped.
+
+**`memory_embeddings`** (migration 0011): `memory_id` (PK, FK to
+`memory_records.id`), `space` (the embedding model name), `dims`,
+`vector` (a raw Float32 blob, brute-force cosine in JS at household
+scale, no sqlite-vec or ANN index this scale needs yet), `hlc`.
+**`pending_embeddings`**: `memory_id` (PK, same FK), `queued_at` - one
+row per record still waiting on a retry, not a log of every attempt.
+Both tables get their rows cleared (via a subquery on `memory_records`)
+before the parent row itself, inside the same transaction, everywhere a
+memory record can disappear: `forget()`'s existing transaction and
+`personLifecycle.ts`'s `erasePersonData()`.
+
+**Embed on write, queue on failure**: `remember()` fires
+`embedMemoryRecordSafely(id, text)` unawaited right after the insert -
+never on the request's own critical path, matching `logTurnSafely()`'s
+existing "never turns a successful write into a reported failure"
+contract. Success stores the vector; any failure (backend down, a
+malformed response) queues the id in `pending_embeddings` instead.
+`drainPendingEmbeddings()` is the retry: re-embeds every queued id,
+drops rows whose record is gone by the time it gets to them, and is now
+wired as a real recurring core job, `memory.embedding_retry`
+(`every:1m`, `backend/src/index.ts`) - the plan's own "a core job
+retries every minute". This is the first core job whose handler is
+genuinely async (`drainPendingEmbeddings()` awaits a real `embed()`
+call): `scheduler.ts`'s `CORE_JOBS` map and its runner now type and
+`await` a handler as `void | Promise<void>` instead of strictly `void`,
+a small, backward-compatible widening (the three pre-existing handlers
+are still synchronous and are unaffected by an `await` on a plain
+`void` return).
+
+**`recall()`'s real scoring**: entity-first pass unchanged, then per
+candidate - if a query vector and a stored vector both exist, real
+cosine similarity, `0.7 cos + 0.2 importance + 0.1 recency` (legacy's
+tuned weights, ported verbatim, same embedding family), floored at 0.55
+episodic / 0.37 durable (a candidate below its tier's floor is excluded
+outright, not down-weighted, unless pinned or an entity match - both
+already-existing overrides that don't need cosine's blessing). No
+stored vector yet (still queued) or no query vector at all (embed
+backend down) falls back to keyword overlap for that record, unfloored
+- the exact placeholder behavior this step replaces, kept as the real
+fallback it always was. `recall()` itself stays synchronous: it takes a
+pre-computed `queryVector` rather than awaiting `embed()` itself, so the
+only new async surface is `embedQueryForRecall()` (exported, best-effort,
+returns `undefined` on any failure) and its two real callers -
+`turnEngine.ts`'s `prepareTurn()` and `packageHost.ts`'s
+`Host.memory.recall` (made async for exactly this; the deterministic
+emulator's own `Host.memory.recall` return type just widened to
+`T | Promise<T>` so `await` on its plain, non-Promise return stays a
+documented no-op - the emulator and its own tests needed zero changes).
+
+**Judgment call: the stub embedder had to become real bag-of-words, not
+a whole-string hash.** The original stub (`spec/llm/ts/stubServer.ts`)
+seeded one PRNG vector per whole input string, so any two different
+strings landed near-orthogonal regardless of shared vocabulary - fine
+as a placeholder, but once a real cosine floor is wired into `recall()`
+it means a record that keyword-matches a query PERFECTLY could still get
+floored out by pure noise. Rewrote it to sum one deterministic
+per-word vector per word in the text (classic bag-of-words), so two
+texts that share vocabulary now genuinely land closer in cosine terms
+than two that share none - a real, if crude, lexical-similarity signal,
+enough for a stub-backed test to meaningfully exercise "shares words ->
+higher cosine" without a real model. This is a test-infrastructure fix,
+not a product change, but it was load-bearing: every recall test that
+exercises the floor depends on it.
+
+**Review-caught bug: a fire-and-forget promise could itself throw and
+cascade.** `embedMemoryRecordSafely()`'s own catch block called
+`queueForEmbedding()`, which could itself throw (an FK violation when
+the record it's about was already deleted by a fast-following test's
+`resetDb()`) - an unhandled rejection from inside a catch block, which
+corrupted unrelated, later tests (47 cascading failures traced back to
+this one root cause). Fixed by giving `storeEmbedding()` and
+`queueForEmbedding()` each their own internal try/catch that logs and
+swallows rather than ever propagating - the same "never let a
+background write's failure become someone else's problem" discipline
+`logTurnSafely()` already modeled, just not yet extended to a catch
+block calling a second fallible function.
+
+**A second review pass found two more real issues, both fixed:** the
+pinned/entity-match cosine-floor bypass was undone a few lines later by
+the trailing `if (score > 0)` gate - real cosine similarity can be
+negative (unlike keyword overlap, which never is), so a pinned or
+entity-matched record with a genuinely negative weighted score
+(`0.7*cosine + 0.2*importance + 0.1*recency`) got past the floor check
+only to be silently dropped by the same gate that correctly filters out
+zero-overlap keyword fallback candidates. Fixed with an explicit
+`forceInclude = row.pinned || isEntityMatch` carried through to both the
+floor check and the final push, with a regression test (a pinned,
+zero-importance durable record whose injected vector is the exact
+opposite of the query's, guaranteeing a negative score) proving it
+still surfaces. Separately, `drainPendingEmbeddings()` was awaiting
+`embed()` once per queued row instead of once for the whole batch, even
+though `embed()` already accepts an array - the same "one batched
+query, not one per row" discipline `recall()`'s own vector fetch
+already uses. Fixed to build one array of live rows first (dropping
+orphaned ids as before) and make a single batched `embed()` call.
+
+**The eval probes**: legacy's 11 memory-recall probes
+(`backend/scripts/eval/memory-eval.ts` in the legacy mirror) ported to
+`backend/scripts/bench/memory-eval.ts` - a bench, not part of
+`scripts/check.sh` (the org testing standard's "small deterministic
+suite on every commit, large model-driven bench on demand" split),
+legacy names (JT/Artie/Marge) replaced with roster names (Marlow,
+Rover, Juniper), legacy's per-user `entities` table replaced with the
+current schema's `record_kind: "entity"` memory records, legacy's
+`recallMemories`/`formatMemoriesForPrompt` pair replaced with this
+codebase's real `recall()` + `buildSystemPrompt()` (the actual
+production prompt-building function, not a parallel formatter written
+for the bench). Run once against this worktree's own dev database
+(`data-a`, cleaned up after itself): **7/11 passed, stub embed
+backend.** All 4 failures are the true paraphrase cases (a household
+member's question shares zero words with the stored fact: "what should
+I cook for dinner tonight?" for a "dislikes cilantro" record, "should I
+go for a run this weekend?" for a "half-marathon" goal, and similarly
+for the vegetarian preference and the Yankees game) - exactly what a
+bag-of-words stub cannot fake, since it has no real semantic
+understanding, only shared vocabulary. Entity, pinned, and
+specificity-control cases all passed. **This is not yet a measurement
+of the real embedder**: no chat model is downloaded in this dev data
+dir, so `getEmbedBackendKind()` resolved to `stub`, never `spawned`.
+The plan's own words ("record that they must be re-measured on the
+bench before v0.1") stand: these numbers are the stub's honest floor,
+not the real nomic-embed-text-v1.5 model's, and BACKLOG.md's item is
+updated to say so rather than closed as verified.
+
+Tests: a paraphrase with a directly-injected matching vector recalls
+and a keyword-sharing decoy with a non-matching vector does not (proves
+the floor is vector-driven, not keyword overlap, now that both are in
+play); falls back to keyword overlap when no query vector is available
+(embed backend down); `drainPendingEmbeddings()` embeds a queued record
+and clears it from the pending queue, and drops an orphaned queued id
+without throwing (reproduced via a temporary `PRAGMA foreign_keys=OFF`
+insert, since the FK makes a genuinely orphaned row otherwise
+impossible to set up - this exercises the exact race
+`storeEmbedding()`/`queueForEmbedding()`'s own comments describe, not a
+scenario that can occur through normal writes); the new
+`memory.embedding_retry` core job fires for real through
+`runDueJobs()` and the pending row is actually gone by the time the
+assertion runs, proving the scheduler's new `await handler()` really
+waits for an async core job rather than firing and moving on; a pinned,
+zero-importance, negative-cosine record still surfaces (the
+`score > 0` regression above). Full backend suite green (627), `bunx
+tsc --noEmit` clean.
+
+## Session A: step 6, the memory judge (2026-09-05)
+
+The sleep-time judge (platform plan 4.4), the piece every earlier step's
+"Not built this pass" trailer has pointed at since `remember()` first
+shipped: a real core job that decides what a conversation was worth
+remembering, not just what a household member explicitly asked to save.
+
+**`response_format`/`json_schema` support**, added to `ChatCompletionRequest`
+(spec/llm/ts/types.ts), `LlmCompleteOptions` (lib/llm.ts), and
+`stubServer.ts`'s new `scriptedChatReply` test hook. `client.ts` needed
+zero changes - it already spreads the whole request object through, so
+adding the field to the type was the entire client-side change. This is
+the mechanism that lets a small model reliably return parseable JSON
+instead of a paragraph with a JSON object somewhere inside it, the exact
+gap legacy's `structuredCall()` covered a different way (Ollama's own
+`format` field) for a different backend.
+
+**One post-turn core job, `memory.judge` (every:1m)**, not legacy's idle
+sweep over a whole unprocessed conversation span: the plan's own words
+("a post-turn core job... for every source: model turn") plus this
+platform's turn-centric architecture (conversationHistory.ts didn't
+exist when legacy's design was written) made per-turn the right shape
+here - one turn either judges cleanly or it doesn't, and a whole session
+can never get stuck because one message in the middle was malformed.
+`lib/memoryJudge.ts` is the new file; `lib/memory.ts` stays the "dumb,
+mechanical" store (its own trailer comment now says so explicitly) with
+three new small primitives the judge needs: `similarByVector()` (plain
+top-N cosine over every active record the actor can read, no keyword
+fallback or entity/pinned override - dedupe asks a different question
+than recall does), `vectorsFor()` and `cosineSimilarity` (exported for
+consolidate's own pairwise scan), `supersedeInFavorOfExisting()` (retire
+an old record in favor of one that already exists, unlike `supersede()`
+which always creates a new one), and `demoteNeverRecalledDurables()`.
+`remember()`/`supersede()` also gained real `valid_from`/`valid_to`
+support - both fields have existed on the spec shape since `remember()`
+shipped, every write just forced them to null until the judge needed to
+write a real one.
+
+**Judgment call: possessives resolve to the speaker's real name, not
+"the user".** Legacy assumed one user per account, so its extraction
+prompt could write "the user's wife" and have it read correctly forever
+after by the one person it was ever shown to. This platform has multiple
+NAMED people per household reading the same household-scope facts (and
+even the same person-scope facts, via the parental view) - "the user's
+wife" is genuinely ambiguous the moment a second named person can read
+it. The extraction prompt interpolates the real speaker name
+(`buildExtractionPrompt(speakerName, ...)`) and asks every possessive
+resolved to it directly ("Willow is Marlow's wife", never "Willow is the
+user's wife") - a real adaptation this platform's architecture requires,
+not a porting detail.
+
+**Dedupe collapses legacy's four actions (ADD/UPDATE/DELETE/NO_CHANGE)
+into two** (ADD/SUPERSEDE), because this store's lifecycle only exposes
+two write shapes to begin with - a bare `remember()` or a `supersede()`
+that retires one record and creates its replacement. UPDATE and DELETE
+both become SUPERSEDE; the one bit legacy's separate DELETE case carried
+that a plain merge doesn't is `contradiction` (a boolean the dedupe call
+itself returns), which closes `valid_to` on the old record when true. A
+dedupe-round failure of any kind defaults to ADD and never counts against
+the poison guard - legacy's own catch block already made this call
+("decision = ADD"), and it's the right one here too: a failure to decide
+"is this the same fact" safely resolves to "keep both," never to losing
+the turn's whole extraction over it.
+
+**The poison guard is tracked persistently, not retried in a tight
+loop.** Two new columns on `conversation_turns` - `judge_status`
+(null/"done"/"failed") and `judge_attempts` - mean a transient outage
+(the embed backend restarting, llama-server mid-reload) gets up to three
+separate one-minute-apart tries before a turn is given up on, the same
+"queue and retry on the job's own cadence" shape `pending_embeddings`
+(step 5) already established, rather than a busy-retry loop within one
+call. Only an extraction failure counts against the 3-attempt budget;
+memory_ids provenance needed no new column at all - `remember(...,
+source: turn.id)` from inside the judge is exactly the join key
+`listConversationTurns()` (step 3) already reads memory_ids from, so
+this "just worked" the moment the judge started setting `source`
+correctly.
+
+**One `memory.updated` notification per run that wrote something** -
+the notification registry (`lib/notifications.ts`/`notificationTypes.ts`)
+already existed (built ahead of Session A, currently used for
+safety-flagged-turn and model-download alerts); this added one new
+`NotificationType` entry, not the system itself. `passive` level,
+`person` audience (the extraction came from THIS person's own turn),
+`configurable: true` - unlike the safety notification, there's no
+invariant here requiring it stay on.
+
+**Consolidate is scoped down from the plan's own three-part description**
+("merge point facts into durative ones, re-tense expired states, demote
+durable records that have never been recalled") to the two parts cleanly
+buildable on what this store exposes today - real, documented gaps, not
+silently dropped:
+- Near-duplicate MERGE (legacy's own `consolidate.ts`, `MERGE_COSINE =
+  0.86`) needs a "retire two old records into one brand-new merged one"
+  primitive `supersede()` doesn't have (it always replaces exactly one).
+  Building that cleanly is real work, not a quick add, and doing it as a
+  layering shortcut straight into `memoryRecords` from `memoryJudge.ts`
+  would be worse than not building it yet.
+- "Re-tense expired states" has no real action to take without
+  something that actually reads `valid_to` - nothing does yet, and
+  states already hard-expire via `runMaintenance()`'s own
+  `STATE_EXPIRY_DAYS`. Real bi-temporal consumption is step 10's job
+  ("tombstones and clock stamps on the records you own"), not this
+  one's to anticipate.
+
+What shipped: contradiction detection (ported from legacy's own
+`CONTRA_COSINE_MIN`/`MAX` pass, `[0.55, 0.86)` - related but not a
+near-duplicate) and demoting never-recalled durable records
+(`uses = 0`, unpinned, 30+ days old, BACKLOG.md's own "mis-tiered junk
+is immortal" finding) - both real, both testable without inventing a
+new store primitive, both actor-less system sweeps matching
+`runMaintenance()`'s own shape (a weekly household-wide pass isn't any
+one person's write request).
+
+**Real, deferred gaps, not silently missing**: entity-record creation
+(the plan's own step 6 schema has no `entities` field, unlike legacy's
+separate extraction pass) and procedural/Notes routing (legacy's `kind:
+"procedural"` - this platform has no Notes app yet). A fact's own text
+still names people/things explicitly (the extraction prompt's
+specificity rule), so entity-match boosting in `recall()` still works
+for any entity record that exists some other way; the judge just
+doesn't create those records itself yet.
+
+**The bench** (`backend/scripts/bench/judge-eval.ts`, session-
+a-intelligence.md's own ask: "a household fixture on the persona
+roster, LongMemEval-shaped, testing a knowledge update and an
+abstention"): a two-session fixture (Iris) - an initial job fact, then a
+real knowledge update (a new job, days later) that should supersede the
+old one, plus an abstention probe (a fact never stated, e.g. a favorite
+color) that must recall nothing. Run for real against this worktree's
+own dev database: **1/2 passed, stub chat backend.** The stub's canned
+reply (`[stub model: ...] <echo>`) is not valid extraction JSON at all,
+so `runJudgeBatch()` extracted 0 facts from every turn - the honest
+result is abstention trivially passing (nothing was ever written, so
+nothing can be hallucinated) and the knowledge-update case failing
+outright (nothing to update, since nothing was ever remembered in the
+first place). Unlike step 5's recall scoring, which worked to some
+degree even against the crude bag-of-words stub, the judge's own
+extraction needs an actual reasoning model to do anything at all -
+there is no partial credit available from a stub here. This bench is
+real and wired correctly; it simply has nothing to measure yet without
+a real chat model configured. Needs a re-run once one is, before
+trusting the judge's real-world extraction/dedupe quality for v0.1.
+
+**A code review found and fixed six real bugs, all before commit:**
+- `runConsolidation()`'s inner pairwise loop kept comparing an
+  already-superseded outer-loop record `a` against further candidates
+  (only `b` was ever re-checked against the `superseded` set) - a second
+  contradiction match could supersede the same old record twice,
+  overwriting its `supersededBy` and orphaning whichever record it was
+  first pointed at. Fixed by breaking the inner loop the moment `a`
+  itself is the one retired.
+- `supersedeInFavorOfExisting()` wrote unconditionally by id, unlike
+  `supersede()` (which requires `status = "active"` first) - a genuine
+  gap given the bug above, and a real (if narrow) one on its own if a
+  record is forgotten through the API in the gap between consolidate's
+  read and its write. Now guards `status = 'active'` in the same UPDATE
+  and returns whether it actually changed anything, which is also what
+  made the loop fix above possible to get right.
+- A dedupe SUPERSEDE decision flagged as a contradiction was closing the
+  OLD record's `valid_to` with the NEW fact's own `valid_to` (a trip's
+  end date, say) instead of with when the contradiction was actually
+  learned (this turn's own timestamp) - two genuinely different
+  timestamps conflated. Fixed to always use `turn.createdAt`; a new test
+  asserts the two independently (the old record gets the turn's
+  timestamp, the new record keeps its own real `valid_to`).
+- The speaker lookup (`db.select().from(people).where(eq(people.id,
+  turn.personId))`) omitted `isNull(deletedAt)`, unlike every other
+  place a person id becomes a write target in this codebase - a
+  soft-deleted person's own past turn could still get new memories
+  attributed to them. Fixed to match `remember()`'s own check.
+- `similarByVector()` had no `record_kind` filter, so an entity record
+  ("Rover: a family friend") was a valid dedupe candidate for a plain
+  fact - a SUPERSEDE match against one would have tombstoned the
+  household's own entity record and replaced it with plain-fact text,
+  silently breaking `recall()`'s entity-match boost for that name with
+  no error anywhere. Fixed to exclude `record_kind: "entity"` rows.
+- The extraction prompt gave the model no format guidance for
+  `valid_from`/`valid_to` at all (an example literally said `"<the 20th,
+  resolved to an absolute date>"`), while `remember()`'s own Zod gate
+  requires a full `datetime({offset: true})` string - a plausible model
+  output like a bare `"2026-09-20"` would fail validation and silently
+  drop the WHOLE fact, with no logging anywhere to notice. Fixed three
+  ways: the prompt now shows a real computed ISO-8601-with-offset
+  example, `normalizeFact()` validates the format itself and degrades a
+  malformed date to `null` rather than let it kill the fact, and a
+  `console.error` now logs any `remember()`/`supersede()` failure that
+  does still occur (never counted against the poison guard - only
+  extraction failures are, per this file's own header - just no longer
+  silent).
+
+**One efficiency finding was worth fixing, one wasn't (yet):** the judge
+was calling `embed()` twice per new fact - once for its own dedupe
+search, then a second, redundant time inside `remember()`'s existing
+fire-and-forget embed-on-write. Fixed for the ADD path (`remember()`
+gained an optional `precomputed_embedding`, safe there because the ADD
+path always stores `fact.text` verbatim, exactly what was embedded).
+Left as-is for the SUPERSEDE path: `decision.mergedText` can differ from
+`fact.text`, so reusing the dedupe-search vector there would risk a
+real vector/text mismatch bug for the sake of the same optimization - a
+documented, deliberate gap, not an oversight. A stray off-roster example
+name ("Carina," not on the persona roster) the same review caught was
+also fixed throughout (code comments, tests, this entry) to "Willow."
+
+Tests (`backend/tests/memoryJudge.test.ts`, all against a scripted stub
+via `stubServer.ts`'s new `scriptedChatReply` hook, distinguished by
+each request's own `response_format.json_schema.name`): a scripted
+extraction reply produces the expected record with correct provenance
+(`source` = the turn's own id); the possessive rule (a fact naming the
+real speaker, not "the user"); the question/discard rule (an empty
+extraction is a valid, non-failing answer - nothing written, no
+notification, turn marked done); the relative-date rule (a scripted
+`valid_to` lands on the record); the notification (exactly one
+`memory.updated` for the speaker); dedupe by supersede (the old record
+retired, the new one created, `valid_to` closed on a contradiction, and
+the dedupe prompt genuinely receiving the real candidate id);
+`similarByVector()`'s own cosine floor; the poison guard (three failed
+attempts mark `judge_failed`, fewer leave it retryable, a dedupe failure
+never counts against the budget); `runJudgeBatch()` processing every
+unjudged turn oldest-first and skipping already-judged ones;
+`runConsolidation()`'s contradiction-supersede and never-recalled
+demotion, including that a pinned record is never demoted. A new
+`scheduler.test.ts` case fires both `memory.judge` and
+`memory.consolidate` for real through `runDueJobs()` as a pure wiring
+check (a real no-op run, since memoryJudge.test.ts already covers what
+each job actually does). Full backend suite green (641), `bunx tsc
+--noEmit` clean.
+
+## Session A: step 7, the profile paragraph (2026-09-05)
+
+One maintained paragraph per person, the ChatGPT/Claude/Letta pattern
+the BACKLOG's own research pass named: a maintained summary injected
+whole beats a search-result list for "who is this and what's going on
+with them," with recall staying on top for specifics.
+
+**Exactly one record per person, found by `source`, not a new field.**
+`lib/memory.ts` exports `PROFILE_SOURCE` ("memory.consolidate:profile")
+and `getProfileParagraph(actor)`, a targeted lookup by
+`(person, source, status=active)` - not a `recall()` candidate, since
+the profile is unconditional context about who's speaking, never
+something that competes with other facts for a cosine-scored slot.
+Marking the row by `source` rather than adding a new column or
+`record_kind` keeps the plan's own shape (`category: identity, tier:
+durable, pinned: true`) exactly as specified, with the one bit of
+bookkeeping this feature actually needs riding on a field the record
+already has for provenance.
+
+**Written and rewritten only by `memory.consolidate`, per the plan's own
+words - never by the judge.** `lib/memoryJudge.ts`'s `runConsolidation()`
+gained a third pass, after contradiction-detection and never-recalled
+demotion: for every person with at least one eligible fact (active,
+`scope: person`, not itself a prior profile), gather their own records
+via `list()` (reusing its existing pinned/importance/recency ordering
+rather than inventing a second one), feed up to 20 to a small
+grammar-constrained chat call, and `supersede()` the existing profile
+row or `remember()` a fresh one. The prior profile text is explicitly
+excluded from its own regeneration's input (filtered by `source`) -
+feeding synthesized prose back into the next round's "facts" would
+compound and drift over successive rewrites, a real failure mode a test
+now guards against directly (asserting the prompt sent to the model
+never contains the old paragraph, only the real underlying facts).
+
+**The 600-char cap is enforced in code, not just asked of the model**:
+`text.trim().slice(0, PROFILE_MAX_CHARS)` after the chat call returns,
+regardless of what the model actually produced - the same "never trust
+the model to police its own instructions" discipline
+`normalizeFact()`'s date-format check (step 6) already established.
+
+**Injected at the top of the memory block, sharing its budget.**
+`buildSystemPrompt()`'s memory section now looks up the profile
+unconditionally (independent of whether `recall()` matched anything
+this turn - a person's own identity summary is always relevant, the
+same "position, not precondition" reasoning the companion re-anchor
+already uses) and places its text first, before the recalled bullets,
+inside the SAME `capSection(..., MAX_MEMORY_SECTION_CHARS)` call - no
+separate cap of its own. Placing it first also means it survives
+truncation preferentially: `capSection` slices from the end, so a
+long profile plus many bullets loses bullets before it ever touches the
+profile paragraph itself.
+
+**A code review found and fixed three real bugs before commit:**
+- The contradiction-detection pass's own durable-records query had no
+  exclusion for the profile paragraph itself - it's `category:
+  "identity"`, `tier: "durable"`, `scope: "person"`, the exact same
+  bucket as a person's own real identity facts, so it could be swept
+  into a contradiction check against a real fact and superseded (or
+  supersede one), breaking "written and rewritten only by
+  `rewriteProfileParagraph()`'s own logic" the moment consolidate's two
+  passes touched the same record. Fixed by excluding `source:
+  PROFILE_SOURCE` from that query outright, with a new regression test
+  proving a profile and a real fact at a matching cosine are never even
+  checked against each other.
+- The 600-char truncation was a bare `slice()` with no indication
+  anything was cut - a paragraph that ran long would just stop mid-word
+  with nothing to say it had been trimmed. Fixed to the same "ellipsis
+  counts INSIDE the cap" contract `capSection()` established in step 4
+  (inlined here rather than importing across files for three lines of
+  string slicing).
+- The profile-candidate query had no ordering, so once a household has
+  more eligible people than `MAX_PROFILE_REWRITES_PER_RUN` (20), which
+  ones get skipped each week was arbitrary rather than fair - low real-
+  world stakes at household scale, but cheap to fix properly: candidates
+  now sort least-recently-profiled first (never-profiled sorts before
+  all of them), one extra query rather than a join.
+
+Tests: the profile is injected before any recalled bullet, and still
+appears on a turn that recalled nothing else at all; the shared memory-
+section cap holds with a 600-char profile plus ten long bullets;
+`runConsolidation()` writes a fresh pinned identity record from a
+person's own facts; a second run supersedes the first rather than
+adding a second active profile; the old profile's own text never
+reaches the next rewrite's own prompt; the 600-char cap holds even
+when the model returns 900, now asserting the ellipsis too; a person
+with zero eligible facts gets no profile and costs zero model calls;
+the profile paragraph is never itself a contradiction-check candidate,
+even at a matching cosine against a real fact. Full backend suite
+green (650), `bunx tsc --noEmit` clean.
+
+## Post-hoc audit of steps 6 and 7 (2026-09-05)
+
+Steps 6 and 7 above were produced by an agent dispatched to research
+legacy's `memory/judge.ts` before this session designed and built the
+memory judge itself; instead it went ahead and implemented, tested, and
+committed both steps unsupervised. Caught once it had already committed;
+handled by independently re-reading every changed file against the plan
+and the codebase's own conventions, re-running the full suite and
+`scripts/check.sh`, and commissioning a second, independent code review
+of the full `639674f..194cb6f` diff as if it were still a pending commit,
+rather than trusting either the agent's own summaries or its own
+in-process review. The work held up well on the merits (both commits'
+own "code review caught N bugs" narratives were real, specific, and
+independently verified against the diff) - the failure was procedural,
+not the engineering. The independent audit found the profile
+paragraph's own exclusion from step 7 was incomplete:
+
+- `similarByVector()` (lib/memory.ts, the judge's own dedupe lookup)
+  excluded entity records but not `source: PROFILE_SOURCE` - a new
+  fact's dedupe search could select a person's profile paragraph as a
+  SUPERSEDE candidate and overwrite it with an ordinary judge-authored
+  fact under the turn's own source, breaking "written and rewritten
+  only by consolidate, never by the extractor" the exact way the
+  missing entity-record exclusion (already fixed once, step 6's own
+  review) would have broken the entity registry.
+- `recall()` had no exclusion for the profile paragraph at all:
+  `buildSystemPrompt()` already injects it unconditionally via
+  `getProfileParagraph()`, so its own `pinned: true` forced it past
+  `recall()`'s floor and `score > 0` gates a second time, injecting the
+  identical text twice in the system prompt and wasting one of only
+  five memory-snippet slots on every turn.
+
+Both fixed with the same one-line shape: `rows = rows.filter((r) =>
+r.source !== PROFILE_SOURCE)`, alongside each function's existing
+entity-record filter. New regression tests: `similarByVector()` never
+surfaces the profile paragraph as a dedupe candidate even at a matching
+vector, and `recall()` never returns it as an ordinary scored match even
+though it is pinned. Full backend suite green (652), `bunx tsc --noEmit`
+clean, `scripts/check.sh` green (the frontend build step's known,
+pre-existing Session B failure aside), gitleaks and the PII wordlist
+clean.
+
+## Session A: step 8, companions with an identity (2026-09-05)
+
+The other half of "companions are packages": `kind: "companion"` already
+existed in `manifest.schema.json`'s own enum before this file ever named
+it, but nothing produced or consumed one. This picks that gap up (its
+own foundation - schema extension, four bundled packages - was already
+committed and correct before this entry's own work resumed on top of
+it) and finishes wiring it end to end: `lib/persona.ts`'s catalog is no
+longer a hardcoded array, and `lib/plugins.ts` gets a real manifest-only
+loader for a package kind that has no recipe at all.
+
+**The manifest gains a `companion` block** (`spec/schemas/
+manifest.schema.json`, required when `kind: "companion"`, unused
+otherwise): `display_name`, `pronouns`, `tagline`, `backstory`,
+`interests`, `examples` (3 to 5 lines in the character's own voice), and
+the same four style dials `lib/persona.ts` already had -
+`display_name`/dials/`examples` are the fields this pass actually
+composes into a prompt; `pronouns`/`tagline`/`backstory`/`interests` are
+real package metadata for a future picker UI, not silently unused - this
+pass just has no UI to read them yet. Four companion packages bundled
+under `backend/packages/` (`default`/`buddy`/`pal`/`tutor`, each a
+`manifest.json` plus a `README.md`, no `recipe.json` - a companion is
+never run), the exact four voices `lib/persona.ts`'s own hardcoded
+catalog already had, ported into package form rather than invented
+fresh, all four validated against the real generated Zod schema before
+being trusted.
+
+**`lib/plugins.ts` gains `loadManifestOnly()`**, extracted from
+`loadPackage()`'s own manifest-reading half: a `kind: "companion"`
+package composes into the prompt directly and is never run, so it has
+no `recipe.json` at all, and `loadPackage()`'s own recipe-required path
+would 404 on every one of them. `loadPackage()` itself is unchanged in
+behavior - it just calls the new shared function for its manifest half
+now, one definition instead of two copies of the same read-and-validate
+logic.
+
+**`lib/persona.ts`'s `PERSONAS` catalog is read from disk once at module
+load** (`loadPersonaCatalog()`), not hardcoded, skipping - rather than
+throwing on - a bundled package that fails to load or isn't a companion:
+this file has no business refusing to boot the hub because one unrelated
+package is malformed. Read once, not every turn like `turnEngine.ts`'s
+own `loadAllManifests()`: companion packages are bundled and static this
+pass (no install flow yet, `lib/plugins.ts`'s own header), the identical
+assumption `PACKAGES_DIR`'s directory scan already makes. `persona.
+active_id`'s settings-key definition (`settings/personaKeys.ts`) already
+read `PERSONA_IDS`/`DEFAULT_PERSONA_ID` from this file dynamically, so
+it needed no change at all to pick up the package-driven catalog.
+`identityLine()` (`turnEngine.ts`, step 4) already used `persona.
+display_name` rather than a hardcoded string, so the acceptance test
+("switching persona.active_id in Settings changes the identity line on
+the next turn") was already true the moment the catalog itself started
+reflecting real packages.
+
+**The examples become a real few-shot block**
+(`composePersonaPrompt()`'s new `examplesBlock()`): each companion's own
+`examples` array, quoted one per line under a single label line -
+legacy's own review named this "the single biggest lever for
+small-model voice fidelity," a stronger signal than any amount of prose
+describing a voice. Re-measuring the real composed output (the step-4
+lesson repeating itself on the same constant) found this pushed the
+longest fragment (`composePersonaPrompt("tutor")`) from ~645 to ~941
+chars, over the existing `MAX_COMPANION_SECTION_CHARS` (800) - raised to
+1200, matching `MAX_SKILLS_SECTION_CHARS`'s own budget for the section
+most likely to grow with real content, with one pre-existing test's own
+hardcoded `800` literal updated to match.
+
+**`replyVariation.ts` gets a per-companion confirmation pool, scoped to
+one constant.** The plan's own words - "a per-companion confirmation
+pool with the shared pool as the default" - read most literally as the
+ONE constant that's actually called a confirmation and heard often
+enough, and voice-distinctively enough, to be worth it this pass:
+`REMEMBER_CONFIRM_VARIANTS` ("Got it, I'll remember that"). The other
+three known constants (a plugin error, a bare "Done.", nothing recalled)
+stay one shared pool for every companion. `tutor`/`buddy`/`pal` each get
+their own three-phrase pool; `default` (and any future companion with no
+entry) falls through to the shared pool exactly as before this step.
+`varyKnownConstant()` gained an optional `personaId` parameter for this;
+`turnEngine.ts`'s `finalizeReply()` resolves the actor's own active
+persona fresh (a plain settings lookup, not I/O) rather than threading
+it in from `prepareTurn()`, since an immediate plugin/refusal reply
+never reaches that function's own "model" branch where a persona would
+otherwise already be in scope.
+
+**The bench** (`backend/scripts/bench/persona-eval.ts`, the plan's own
+ask: "ten scripted exchanges scored by string checks: address form,
+length cap, forbidden phrases"): the same ten scripted user turns
+through the real turn engine (`runTurn()`, not a parallel prompt-only
+check) once per bundled companion, switching `persona.active_id` between
+runs exactly the way a household member would in Settings. Run for real
+against this worktree's own dev database: **address-form 40/40,
+length-cap 40/40, forbidden-phrases 12/40, stub chat backend.**
+Address-form and length-cap pass structurally regardless of backend (the
+stub's echo can't leak another companion's name, and echoing a short
+scripted utterance back is never long). Forbidden-phrases is the one
+check that actually depends on the model honoring the persona
+instruction at all: the stub echoes the LAST USER MESSAGE verbatim,
+completely blind to any system prompt, so a casual companion's score
+(1/10) is really "did my own 10 scripted utterances happen to contain a
+recognized contraction" (exactly one did) rather than anything about the
+persona - and `tutor`'s 9/10 is the mechanical inverse of the identical
+fact, not evidence formality is being honored. This bench is real and
+wired correctly; like `judge-eval.ts`, it structurally cannot produce a
+meaningful signal against a content-blind echo stub. Needs a real chat
+model before trusting whether personas actually hold up in a real
+conversation, for v0.1.
+
+Tests: every real persona's own examples appear in its composed prompt,
+quoted; a persona with no examples composes without a dangling few-shot
+header; a companion with its own confirmation pool never gets the
+shared pool's phrasing; a companion with no dedicated pool (`default`
+included) falls through to the shared pool; omitting `personaId`
+entirely still uses the shared pool unchanged from before this step; a
+companion pool never leaks onto a different known constant; two
+companions' rotation state for the same person never collide. The
+existing step-4 "identity line names the selected persona" and
+persona-catalog tests needed no changes beyond one hardcoded budget
+literal, since every persona id, dial value, and display name is
+byte-identical to before - only its SOURCE moved from a hardcoded array
+to a real package. Full backend suite green (654), `bunx tsc --noEmit`
+clean.
+
+**A code review found and fixed two real bugs, and one misleading
+comment, before commit:**
+- An earlier version had `loadPackage()` call `loadManifestOnly()`
+  first, before ever reading `recipe.json`. That silently changed
+  `loadPackage()`'s own existing behavior for a package with BOTH an
+  invalid manifest and a missing/malformed recipe (an interrupted
+  install, a bad copy): it used to always report a plain 404 (both
+  files were read inside one `try`, so a recipe-read failure masked
+  whatever the manifest's own validation would have said), and would
+  have started reporting the manifest's own 400 instead. Fixed by
+  giving `loadManifestOnly()` its own independent read-and-validate
+  logic rather than sharing code with `loadPackage()`, which keeps its
+  original read-both-then-validate shape completely untouched.
+- `DEFAULT_PERSONA` fell back to `PERSONAS[0]!` with no guard for an
+  empty catalog - a non-null assertion that would silently lie
+  (`undefined`) if `backend/packages/` were ever unreadable or shipped
+  zero `kind: "companion"` packages, crashing confusingly far
+  downstream the first time anything touched it instead of failing
+  loudly at the actual cause. Fixed with an explicit `if
+  (PERSONAS.length === 0) throw` right after the catalog loads, so a
+  misconfigured install fails at boot with a clear message instead of
+  degrading into scattered TypeErrors.
+- This file's own header comment claimed bundling a fifth companion
+  package was "the entire change needed to add one." Real, but
+  incomplete: `persona.active_id`'s settings-key options
+  (`spec/settings/keys.json`) are a committed, hand-regenerated
+  snapshot, not read live from `PERSONA_IDS` - `bun run gen:settings`
+  in `backend/` still has to run and be committed, the same friction
+  every other settings-key option change already has. Corrected to say
+  so.
+
+Also noted, not fixed: `finalizeReply()` re-resolves the actor's active
+persona fresh rather than reusing whatever `prepareTurn()` resolved,
+since an immediate (plugin/refusal) reply never reaches `prepareTurn()`'s
+own "model" branch where a persona would already be in scope. If a
+person changes `persona.active_id` via a concurrent request while their
+OWN turn is still in flight, the per-companion confirmation pool could
+end up voiced as the just-switched-to companion attached to a reply
+whose system prompt was actually built under the old one - a real,
+narrow race, documented inline at `finalizeReply()`'s own persona
+lookup, accepted rather than threading persona through `prepareTurn()`'s
+return value for a race whose worst outcome is one confirmation
+sentence's word choice.
+
+Full backend suite green (659), `bunx tsc --noEmit` clean,
+`scripts/check.sh` green (the frontend build step's known, pre-existing
+Session B failure aside).
+
+## Session A: step 9, output-side safety on the stream (2026-09-05)
+
+`spec/safety/ts/classifier.ts`'s own header comment has promised "again
+on every streamed sentence" since 4.3 shipped; until this step, nothing
+in `runTurnStream()` ever checked the model's OWN generated text at all -
+only the household member's input got checked, once, before generation
+started.
+
+**The sentence chunker moves to `spec/safety/ts/sentenceChunker.ts`**
+(the plan's own ask: "the sentence chunker exists in
+`frontend/src/lib/sentenceChunker.ts`; move the chunker to `spec/` so
+both sides use one definition"), copied verbatim (same regex tuning,
+same clause-flush gates) since the logic itself needed no changes, only
+a new home. Session A doesn't own `frontend/` (session-b-ui.md), so the
+old copy there could not be deleted or repointed at the new one directly
+- see this entry's own Session B note below for what completes the
+move. A full test port (`spec/tests/ts/sentenceChunker.test.ts`, all ten
+cases) proves the moved copy behaves identically to the one it replaces.
+
+**`runTurnStream()`'s `tokens` generator is now wrapped by
+`gateOutputSafety()`**: buffers raw model-token deltas until the
+chunker has a complete sentence, checks it with the IDENTICAL
+`evaluateSafety()` the input path already uses (never a weaker check -
+"never weaken the input check" applies symmetrically to not inventing a
+laxer one for output), and only then yields it. `notify_parent` fires
+independently of `action`, the same shape the input path already has -
+a self-harm mention in the model's OWN output notifies a parent without
+ever blocking the reply (CLAUDE.md's "Crisis resources: offer, never
+block"). A `refuse` category throws `StreamSafetyRefusal` (carrying the
+real `SafetyResult`) before the offending chunk is ever yielded - nothing
+from it, or anything generated after it, reaches a caller. Delta
+granularity changes from raw model tokens to whole sentences/clauses as
+a direct, necessary consequence: a sentence can't be judged safe before
+it's complete, so it can't be delivered before that either.
+
+**A real bug caught before commit, by an early test failure, not a code
+review this time**: the chunker's own `splitReadyChunks()` trims each
+chunk (for its ORIGINAL caller's convenience, which never needed to
+reassemble the trimmed pieces back into the source text). Blindly
+yielding those trimmed chunks and letting the caller `.join("")` them,
+as a first draft of `gateOutputSafety()` did, silently swallowed the
+whitespace between sentences ("Good morning.How is it going" instead of
+"Good morning. How is it going"). Fixed by yielding the RAW consumed
+substring (`pending.slice(0, consumed)`, whitespace intact) instead of
+the chunker's own trimmed chunk array - the chunk text is still what
+gets checked (clean text is what the classifier wants), just not what
+gets yielded.
+
+**`spec/errors/errors.json` gains one new code, `safety_refused`**
+(`docs/ENGINEERING.md`'s "every package error maps to a code from the
+shared catalogue" - the plan's own "emit error with the catalogue
+code"): no existing code fit ("I can't do that on this device" would be
+actively wrong for a safety cut), so a new one was added rather than
+mis-fitting the closest existing one the way `packageHost.ts`'s own
+`capability_missing` reuse already documented as a real, narrower gap.
+`TurnStreamEvent`'s `error` variant gains an optional `code` field to
+carry it - additive, so an existing client reading only `error` sees no
+change; the generic mid-stream engine failure this event already
+handled keeps omitting it.
+
+**Logged provenance depends on whether anything safe survived the
+cut.** `finalize()` (the closure `runTurnStream()` hands back) now takes
+an optional `outputSafety` the caller passes from a caught
+`StreamSafetyRefusal`. A cut with real partial content already streamed
+stays `source: "model"` with `safety` overridden to the output result,
+so that content survives in conversation history rather than being
+erased by a canned phrase the household never actually heard replace
+it. A cut where NOTHING safe was ever delivered (the very first
+sentence was itself the unsafe one) uses `source: "safety_refuse"`
+instead - `finalizeReply()`'s existing, unchanged handling for that
+source cleanly replaces the (empty) text with a real, varied refusal
+phrase for the log, the identical clean "nothing shown yet" case an
+input-side refusal already is.
+
+**Judgment call: `runTurn()` (the non-streaming twin) gets the
+identical whole-text check, not just `runTurnStream()`.** The plan's own
+text names the stream specifically ("In `runTurnStream`, run it per
+sentence"), but a non-streaming reply arrives as one atomic block
+regardless - a single whole-text `evaluateSafety()` call is exactly as
+strong as per-sentence checking there and needs no chunker at all.
+Leaving `runTurn()` with literally zero output-side check (worse than
+`runTurnStream()` lacked before this step, which was at least missing
+only the granularity) would be a real, undocumented asymmetry between
+two callers of the identical model role. A refuse there behaves exactly
+like an input-side refusal (nothing was ever shown to the caller, so a
+clean whole-reply replacement is correct, unlike the partial-delivery
+streaming case).
+
+Tests: a scripted stream with a safe sentence followed by a refusable
+one is cut exactly at that sentence, with the safe sentence proven
+delivered and the unsafe one proven absent - both directly (draining
+`tokens`) and through the real production path
+(`streamTurnEvents()`), asserting exactly one `error` event carrying
+`code: "safety_refused"` and no `done` event follows it; the
+`safety.flagged_turn` notification actually lands for an adult when the
+speaker is a minor; a genuinely safe multi-sentence reply streams every
+sentence through untouched. Two pre-existing tests
+("streams real token deltas") were updated, not weakened: they used to
+assert MORE THAN ONE delta as proof of real per-token streaming, which
+a short one-sentence stub reply no longer produces now that a delta is
+a whole sentence - reworded to use a genuinely multi-sentence input and
+to also assert no swallowed whitespace at a sentence boundary (the
+regression test for the bug above). Full backend suite green (663),
+spec suite green (211, +10 for the moved chunker), `bunx tsc --noEmit`
+clean.
+
+**A second review pass found three more real issues, all fixed before
+commit:**
+- `gateOutputSafety()`'s first version checked and yielded a whole BATCH
+  of newly-ready sentences at once (every sentence that completed within
+  the same raw delta), not one at a time - if the LAST sentence in that
+  batch refused, the throw fired before the batch's own combined yield
+  ever ran, silently dropping every EARLIER sentence in the same batch
+  too, even though each had already cleared its own check, directly
+  contradicting the plan's own "earlier sentences were delivered."
+  Word-by-word stub streaming never exercises this (each delta completes
+  at most one sentence), so this needed a hand-built generator yielding
+  two full sentences in one raw delta to catch. Fixed by checking and
+  yielding one sentence at a time, immediately, inside the same loop
+  that finds sentence boundaries, rather than collecting a batch first.
+- A non-refuse flag (self_harm - flags and notifies but never blocks,
+  CLAUDE.md's "offer, never block") was silently dropped entirely once
+  `gateOutputSafety()`'s own notification fired: nothing carried it back
+  to the caller, since only a THROWN refusal ever reached `finalize()`
+  with its own `SafetyResult`. Fixed by having the generator itself
+  `return` the most recently flagged, non-refuse result once generation
+  ends normally - TypeScript's own `AsyncGenerator<Yield, Return>`
+  return channel, read from `iterator.next()`'s final `{done: true,
+  value}` result, which `streamTurnEvents()`'s existing loop structure
+  already captures in `current.value` for free once its own loop over
+  `current.done` exits. `runTurnStream()`'s own `tokens` field type
+  widened from `AsyncGenerator<string, void, void>` to `AsyncGenerator
+  <string, SafetyResult | undefined, void>` to carry it.
+- `runTurn()`'s own non-streaming twin had an identical, separate
+  instance of "an output-side flag's `crisis_resources` never gets
+  attached" - the streaming fix above only touched `runTurnStream()`'s
+  own `finalize()` closure and missed the equivalent branch in
+  `runTurn()` itself. Fixed by extracting the one derivation
+  (`safety.action === "allow_with_resources" ? CRISIS_RESOURCES_TEXT :
+  undefined`) into a shared `deriveCrisisResources()`, now used by
+  `prepareTurn()`'s own input-side computation and both output-side call
+  sites, so there is exactly one place this logic can drift out of sync
+  again.
+
+New tests: `gateOutputSafety()` (now exported for direct testing)
+delivers an earlier sentence even when a later sentence in the SAME raw
+delta refuses; a non-refuse output flag (self-harm in the model's own
+generated words) reaches the logged/returned turn's `safety` and
+`crisis_resources` without cutting the stream, through `runTurnStream()`;
+and the identical case through `runTurn()`'s non-streaming path. Full
+backend suite green (666), `bunx tsc --noEmit` clean.
+
+**A third review pass found one more real issue, fixed before commit:**
+the second pass's own `crisis_resources` fix (`deriveCrisisResources
+(outputSafety)`) went one step too far - it dropped the INPUT's own
+crisis resources whenever `outputSafety` was present AT ALL, even an
+output-side refusal for a category that has nothing to do with
+self-harm. A message that itself mentioned self-harm
+(`prepared.crisisResources` correctly set, generation proceeds
+normally since self-harm never refuses), whose reply then got cut
+mid-stream for an unrelated refuse category, lost the 988 text
+entirely - `runTurn()`'s own refuse branch never had this bug, only
+`runTurnStream()`'s `finalize()` did. Fixed with `?? prepared.
+crisisResources` as the fallback, so the input's own resources survive
+any output-side outcome that isn't itself the allow_with_resources
+case. New test: an input-side self-harm flag's `crisis_resources`
+survives an unrelated output-side refusal cutting the stream (verified
+by draining `tokens` and calling `finalize()` directly, since a fully
+cut stream never emits a `done` event to read the logged turn off of).
+Full backend suite green (667), `bunx tsc --noEmit` clean.
+
+**Frontend note for Session B**: the canonical sentence chunker is now
+`spec/safety/ts/sentenceChunker.ts`; `frontend/src/lib/
+sentenceChunker.ts` is Session A's own file's un-deleted duplicate
+(Session A can't touch `frontend/`) and should be replaced with a
+re-export of (or deleted in favor of importing directly from) the
+`spec/` copy to finish the "one definition" this step's own plan text
+asks for - the logic is byte-identical today, so this is a pure
+dedup, not a behavior change. Separately, and more load-bearing: `POST
+/api/turn/stream`'s `delta` events now arrive in whole-sentence chunks
+instead of raw model tokens (a direct, necessary consequence of
+checking each one for safety before it's ever sent) - any client-side
+assumption about delta cadence or size (a per-token typing animation
+timed to arrive frequently, say) should be re-checked against this new,
+chunkier real rhythm. The frontend's own local `sentenceChunker.ts`
+logic itself needs no change to keep working correctly against
+already-sentence-sized input - it will just find each incoming delta
+already a complete chunk and flush it immediately, which is a strict
+improvement (less buffering lag before TTS can start on a sentence), not
+a regression - but worth verifying visually before shipping this to
+real users, since faster flushing is a real UX change from smoother,
+more frequent raw-token deltas as they used to arrive.
+
+## Session A: step 10, tombstones and clock stamps on the records you own (2026-09-05)
+
+The portability half that lives in the hub's own files: every record
+this session owns now carries a real hlc, and forgetting a memory stops
+meaning "gone without a trace."
+
+**Spec first**: `hlc` added to `memory-record`, `person`, and `grant`
+(the plan's own explicit "Grant already should have one per plan 3.1;
+add it there too" - Grant is spec-only today, no hub table exists yet,
+so this was schema-and-regenerate only, nothing to wire up). `deleted_at`
+added to `memory-record` too, distinct from a PERSON's own `deleted_at`
+(person.schema.json): this one is about ONE memory, never the whole
+person. Regenerated, fixtures updated (all five needed a real, pattern-
+valid `hlc` value to keep validating).
+
+**The hub side, three new NOT NULL columns on tables that already had
+real rows** (`memory_records.hlc`, `people.hlc`, `conversation_turns.hlc`
+- `conversations.hlc` already existed, step 3): SQLite refuses to `ADD`
+a NOT NULL column with no default to a non-empty table, so the migration
+adds each with a temporary `''` placeholder, then backfills a real,
+genuinely unique hlc per row using `rowid` (every one of these tables is
+an ordinary rowid table) as the per-row counter - the identical "a flat
+shared stamp defeats hlc's whole point" fix a code review already found
+necessary for migration 0010's own conversations backfill, without
+needing that migration's own window-function-in-an-INSERT shape (a
+plain per-row `rowid` read is enough here). Verified against a real copy
+of this worktree's own dev database (`data-a/hub.db`, which already had
+real rows from every earlier step's own tests and benches), not just an
+empty test database: the migration applies cleanly and every existing
+row gets its own distinct hlc.
+
+**Every real write now stamps a fresh hlc** - `remember()`, `supersede()`
+(both records), `archive()`, `runMaintenance()`'s decay, `demote
+NeverRecalledDurables()`, `supersedeInFavorOfExisting()`, a person's
+creation/profile-edit/role-change/delete, and `logTurn()`. One
+deliberate exclusion, documented at the code itself: `bumpMatchUsage()`
+(a plain recall touching `uses`/`last_used_at`) does NOT stamp a new
+hlc - hlc exists to resolve conflicts on a record's own synced CONTENT,
+and stamping it on every local read-driven usage bump would make an
+ordinary read look like a newer edit than a genuinely concurrent real
+change, defeating the exact comparison hlc exists to make correct.
+
+**`forget()` tombstones, it no longer hard-deletes.** A hard delete
+cannot be told apart from "never existed" once a robot or a second hub
+can sync - a device offline during the forget could resurrect the
+record right back the moment it reconnects. The tombstoned row now
+keeps `scope`/`person`/every other field, but `status` becomes
+`archived`, `text` is replaced with a new `TOMBSTONE_TEXT` sentinel
+(`"[forgotten]"`, exported from `lib/memory.ts`) rather than an empty
+string (`memory-record.schema.json`'s own `minLength: 1` on `text`
+stays a real guarantee for every genuinely active record - relaxing it
+for every record just to cover this one path would have been the wrong
+trade), `embedding_space` is cleared, and `deleted_at` is set. One
+`UPDATE` per affected row rather than a single bulk statement, so each
+tombstone gets its own genuinely unique hlc too (the exact backfill
+concern above, applied to a live write instead of a migration).
+`erasePersonData()`'s own memory-records handling (the FULL person-
+erasure cascade, a different, harsher operation than a household
+member's own `forget()` request) gets the identical tombstone treatment
+- the plan's own "the person-delete cascade stop hard-deleting memory
+rows" - while everything else that function erases (conversations,
+settings, sessions, jobs) stays a real, hard delete: only memory records
+carry the "a device could resurrect this via sync" risk a tombstone
+exists to close.
+
+**`exportPerson()` skips tombstones**, the one exception to its own
+"whatever its status, so the archive is complete" rule: a tombstone's
+own content is already wiped, so returning it would show
+`TOMBSTONE_TEXT` back to the exact person who just asked to forget it -
+looking precisely like the erasure never actually happened. An ordinary
+archived record (decayed, not forgotten) still exports in full; only
+`deleted_at` being set excludes a row.
+
+**`hlc.ts`'s own missing tests**: `settings.test.ts` already had solid
+coverage (the pattern, basic monotonicity, `seedHlc`'s two headline
+regression scenarios) but never proved the counter branch advances
+within the same millisecond rather than just inferring it from "eventually
+increasing" output, never exercised `compareHlc()`'s own node tiebreak
+(the file's own header calls it "the rarely-needed final tiebreak,"
+real code that had never actually run), and never checked `seedHlc()`'s
+exact boundary (a seed at the identical `wall_ms` with a strictly LOWER
+counter must be a no-op, not just "an older `wall_ms` is"). A new
+`tests/hlc.test.ts` covers all three directly, alongside the existing
+coverage rather than duplicating it.
+
+**A real bug found live, not by a review or a test: three bench scripts
+(memory-eval.ts, judge-eval.ts, persona-eval.ts) never shut down the
+embed/chat backend they lazily start** (a real `Bun.serve()` HTTP
+listener even in stub mode), so none of them ever exited on their own.
+Discovered because this step's own migration-safety verification kept
+silently hanging: four bench-script processes from EARLIER steps (as
+far back as 7:25 PM) had been running as zombies for hours, all holding
+the same `data-a/hub.db` SQLite file open and contending for its lock.
+Killed the stale processes, then fixed all three scripts to call their
+supervisors' real stop functions (`__resetEmbedSupervisorForTests()` and
+`stopChatBackend()` - the former isn't test-only in effect, only in
+name) in their own `finally` block alongside the existing DB cleanup.
+Verified each script now exits with code 0 and leaves no process behind.
+
+Tests: `forget()` leaves a tombstone with wiped text/embedding_space and
+a real `deleted_at`, not a deleted row; the identical assertions for
+`erasePersonData()`'s own person-delete cascade (both the dedicated
+forget-and-export describe block and the schema-walking "no table is
+left holding rows about a deleted person" test, which now carries an
+explicit, documented exception for `memory_records` alongside the
+pre-existing one for `people`); `exportPerson()` omits a tombstoned
+record while still returning an ordinary archived one; successive
+`remember()` calls and successive person creations/edits get
+monotonically increasing hlcs, checked with the real `compareHlc()`
+rather than a lexical string comparison; the full `hlc.test.ts` suite.
+Full backend suite green (680, +13 net for this step alone), spec suite
+green (211), `bunx tsc --noEmit` clean, `scripts/check.sh` green (the
+frontend build step's known, pre-existing Session B failure aside),
+gitleaks and the PII wordlist clean.
+
+**A code review found one real gap and one worth documenting, both
+fixed before commit:** `lib/memoryJudge.ts`'s own three
+`conversation_turns` writes (the poison-guard's `markAttempt()`, the
+speaker-deleted failure path, and the terminal "done" status) stamped
+`judge_status`/`judge_attempts` but left `hlc` untouched - the one real,
+undocumented exception to this entry's own "every real write" claim
+(unlike `bumpMatchUsage()`'s deliberate, commented exclusion for
+`memory_records`). Fixed to stamp `hlc: nextHlc()` on all three.
+Separately, the migration's `rowid`-based backfill is genuinely safe as
+written (verified: `rowid` is unique per rowid table, and drizzle's own
+migrator runs a whole migration file in one transaction, so the `''`
+placeholder is never visible outside it), but the file's own comment
+didn't say so - a future migration copying this exact shape under a
+runner that commits each statement separately would have a real,
+briefly-persisted, pattern-invalid `hlc` value. Documented the
+dependency directly in the migration file.

@@ -14,7 +14,7 @@
 import { getChatClient } from "@/lib/llmSupervisor";
 import { getEmbedClient } from "@/lib/embedSupervisor";
 import { LlmClientError } from "@maipai/spec/llm/ts/client.js";
-import type { ChatRole } from "@maipai/spec/llm/ts/types.js";
+import type { ChatRole, ChatCompletionRequest } from "@maipai/spec/llm/ts/types.js";
 
 export type LlmRole =
   | "chat"
@@ -47,6 +47,12 @@ export interface LlmCompleteOptions {
    * unbuilt research problem (a router role, 4.11's other deferred role),
    * not something to improvise as a side effect of this slice. */
   thinking?: boolean;
+  /** Grammar-constrained structured output (step 6, session-a-
+   * intelligence.md): passed straight through to client.chatComplete()
+   * (already spreads its whole request object, so no other change is
+   * needed here or in client.ts itself). The memory judge
+   * (lib/memoryJudge.ts) is the first real caller. */
+  response_format?: ChatCompletionRequest["response_format"];
 }
 
 export interface LlmCompleteValue {

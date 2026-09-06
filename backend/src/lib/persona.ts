@@ -10,14 +10,28 @@
 // mechanism (`composePersonaPrompt`), and what shipped before becomes
 // `DEFAULT_PERSONA`, not a separate code path.
 //
-// Deliberately NOT a database table, a spec-shaped record, or a
-// selection/authoring UI: those are real, larger, separate gaps (see
-// docs/dev.md's "Notes for later" persona research entry). This is the
-// smallest real thing that proves the mechanism end to end - a small,
-// in-code catalog (the exact shape `voiceKeys.ts`'s VOICE_PRESET_NAMES
-// already uses for Pocket TTS's fixed preset list, before any household
-// could add their own), a per-person settings key to pick one, and a
-// composer function that renders the pick into a system-prompt fragment.
+// Deliberately NOT a database table or a selection/authoring UI: those
+// are real, larger, separate gaps (see docs/dev.md's "Notes for later"
+// persona research entry). A per-person settings key picks one, and a
+// composer function renders the pick into a system-prompt fragment.
+//
+// The catalog itself IS a spec-shaped record now (step 8, session-a-
+// intelligence.md): "companions are packages" - `kind: "companion"`
+// already existed in manifest.schema.json's own enum before this file
+// ever named it. `PERSONAS` below is read from every bundled
+// `kind: "companion"` package's own `manifest.json` (via
+// `lib/plugins.ts`'s `loadManifestOnly()`, not `loadPackage()` - a
+// companion has no `recipe.json` at all, it's never run) rather than
+// hardcoded here, so bundling a fifth companion package is most of the
+// change needed to add one; this file only composes what a manifest
+// already declared. NOT the whole change, though (a code review,
+// 2026-09-05, found this comment overclaiming it): `persona.active_id`'s
+// settings-key `range.options` list (spec/settings/keys.json) is a
+// committed, hand-regenerated snapshot, not read live from `PERSONA_IDS`
+// - `bun run gen:settings` in backend/ still has to run and its result
+// still has to be committed, the identical friction adding any other
+// settings-key option already has, or `PUT /settings` for the new id
+// gets rejected as "must be one of [...]" against the stale list.
 //
 // Structured dimensions only, no freeform "backstory"/"interests" field:
 // the research this session did (docs/dev.md, both the legacy-mining and
@@ -37,6 +51,8 @@
 // removable child-safety invariants, `.github/CLAUDE.md`'s Safety
 // invariants section, and needs its own explicit reconciliation rule,
 // not a value dropped in beside three harmless ones).
+import { listPackageIds, loadManifestOnly } from "@/lib/plugins";
+
 export interface Persona {
   id: string;
   display_name: string;
@@ -57,46 +73,65 @@ export interface Persona {
    * serves a real stance/emphasis function in teen speech specifically,
    * not meaningless hesitation noise. */
   filler_density: "none" | "light" | "frequent";
+  /** 3 to 5 lines in the character's own voice (manifest.schema.json's
+   * own field), composed as a short few-shot block by
+   * `composePersonaPrompt()` below - legacy's own finding, "the single
+   * biggest lever for small-model voice fidelity." Optional here only
+   * because Zod's `.optional()` on the generated companion schema allows
+   * it; every bundled companion package actually sets it. */
+  examples?: readonly string[];
 }
 
-export const PERSONAS: readonly Persona[] = [
-  {
-    id: "default",
-    display_name: "MaiPai",
-    formality: "casual",
-    complexity: "standard",
-    engagement: "brief",
-    filler_density: "none",
-  },
-  {
-    id: "tutor",
-    display_name: "The Tutor",
-    formality: "formal",
-    complexity: "advanced",
-    engagement: "balanced",
-    filler_density: "none",
-  },
-  {
-    id: "buddy",
-    display_name: "Buddy",
-    formality: "casual",
-    complexity: "simple",
-    engagement: "curious",
-    filler_density: "light",
-  },
-  {
-    id: "pal",
-    display_name: "Pal",
-    formality: "casual",
-    complexity: "standard",
-    engagement: "brief",
-    filler_density: "frequent",
-  },
-] as const;
+// Read once at module load, the same "bundled packages are static this
+// pass, no install flow yet" assumption `lib/plugins.ts`'s own
+// PACKAGES_DIR scan already makes (unlike `loadAllManifests()` in
+// turnEngine.ts, which re-scans every turn because a plugin's OWN
+// recipe can matter mid-session - a companion's voice dials changing
+// requires editing a file on disk regardless of when this ran).
+// Skips (rather than throws on) a package that fails to load or isn't
+// `kind: "companion"`: this file has no business refusing to boot the
+// whole hub because one unrelated bundled package is malformed.
+function loadPersonaCatalog(): Persona[] {
+  const out: Persona[] = [];
+  for (const id of [...listPackageIds()].sort()) {
+    const loaded = loadManifestOnly(id);
+    if (!loaded.ok || loaded.value.kind !== "companion" || !loaded.value.companion) continue;
+    const c = loaded.value.companion;
+    out.push({
+      id,
+      display_name: c.display_name,
+      formality: c.formality,
+      complexity: c.complexity,
+      engagement: c.engagement,
+      filler_density: c.filler_density,
+      examples: c.examples,
+    });
+  }
+  return out;
+}
+
+export const PERSONAS: readonly Persona[] = loadPersonaCatalog();
+
+// Fails loudly, right here, rather than letting a `!`-asserted
+// DEFAULT_PERSONA silently be `undefined` and crash with a confusing
+// TypeError somewhere far downstream (composePersonaPrompt(undefined),
+// say) the first time anything touches it - a code review (2026-09-05)
+// found the original version trusted an empty catalog couldn't happen
+// without actually guarding it. An empty catalog (PACKAGES_DIR missing,
+// unreadable, or genuinely shipping zero companion packages) is exactly
+// the kind of misconfiguration that should stop the hub from starting,
+// not degrade into "every persona-dependent feature throws."
+if (PERSONAS.length === 0) {
+  throw new Error('persona.ts: no bundled kind:"companion" package found under backend/packages/ - at least one is required to boot');
+}
 
 export const PERSONA_IDS = PERSONAS.map((p) => p.id);
 export const DEFAULT_PERSONA_ID = "default";
-export const DEFAULT_PERSONA: Persona = PERSONAS.find((p) => p.id === DEFAULT_PERSONA_ID)!;
+// Falls back to whatever loaded first when "default" itself is missing
+// for some reason - PERSONAS is guaranteed non-empty by the guard above,
+// so this non-null assertion is now actually backed by something,
+// unlike the version the review above found.
+export const DEFAULT_PERSONA: Persona = PERSONAS.find((p) => p.id === DEFAULT_PERSONA_ID) ?? PERSONAS[0]!;
 
 /** Looks a persona id up in the catalog; an unset, unknown, or stale id
  * (a persona removed from the catalog after someone picked it, the
@@ -175,11 +210,27 @@ const FILLER_FRAGMENT: Record<Persona["filler_density"], string> = {
  * did exactly this - deterministic, parametrized realization, zero
  * runtime cost). Never touches INFORMATION_HANDLING_POLICY, which every
  * persona gets identically. */
+// Step 8's own addition: a short few-shot block of the companion's
+// examples, in its own voice - legacy's review named this "the single
+// biggest lever for small-model voice fidelity," a stronger signal than
+// any amount of prose describing the voice. Quoted, one per line, no
+// framing beyond a single label line: kept minimal on purpose (the
+// plan's own "keep the prose under about 150 tokens" applies to this
+// ADDITION specifically, not to the four dial sentences above it, which
+// predate step 8 and already run close to that budget on their own).
+function examplesBlock(examples: readonly string[] | undefined): string {
+  if (!examples || examples.length === 0) return "";
+  const lines = examples.map((e) => `"${e}"`).join("\n");
+  return ` Some examples of how you talk:\n${lines}`;
+}
+
 export function composePersonaPrompt(persona: Persona): string {
-  return [
-    FORMALITY_FRAGMENT[persona.formality],
-    COMPLEXITY_FRAGMENT[persona.complexity],
-    ENGAGEMENT_FRAGMENT[persona.engagement],
-    FILLER_FRAGMENT[persona.filler_density],
-  ].join(" ");
+  return (
+    [
+      FORMALITY_FRAGMENT[persona.formality],
+      COMPLEXITY_FRAGMENT[persona.complexity],
+      ENGAGEMENT_FRAGMENT[persona.engagement],
+      FILLER_FRAGMENT[persona.filler_density],
+    ].join(" ") + examplesBlock(persona.examples)
+  );
 }

@@ -29,13 +29,14 @@ import {
   people,
   personCredentials,
   sessions,
-  memoryRecords,
   conversationTurns,
   settingsValues,
   clonedVoices,
   scheduledJobs,
 } from "@/db/schema";
 import { clonedVoicesDir } from "@/lib/paths";
+import { nextHlc } from "@/lib/hlc";
+import { TOMBSTONE_TEXT } from "@/lib/memory";
 import { ROLE_LADDER, invalidateSessionCacheForPerson, type Role } from "@/middleware/auth";
 import type { PersonRow } from "@/types";
 
@@ -141,6 +142,12 @@ export function hasSecret(personId: string): boolean {
 export interface ErasureCounts {
   memories: number;
   conversations: number;
+  /** Session A step 3: conversation THREADS (the `conversations` table),
+   * distinct from `conversations` above (conversation_turns, the
+   * existing field name here since before threads existed - kept as-is
+   * rather than renamed, so nothing that reads erased.conversations
+   * today silently starts meaning something else). */
+  conversationThreads: number;
   settings: number;
   clonedVoices: number;
   scheduledJobs: number;
@@ -172,10 +179,46 @@ export function erasePersonData(personId: string): ErasureCounts {
   // Raw sqlite for the counts: Drizzle's bun-sqlite typing declares
   // .run() as void though it returns {changes} at runtime, the same
   // escape hatch memory.ts's forget() documents.
-  const memories = sqlite
-    .query("DELETE FROM memory_records WHERE scope = 'person' AND person = ?")
-    .run(personId).changes;
+  //
+  // Step 5: memory_embeddings/pending_embeddings carry a real FK to
+  // memory_records.id, so their rows for this person's records are
+  // cleared first - the same cascade memory.ts's forget() needs for the
+  // identical reason. The vector store itself isn't spec-synced content
+  // (memory-record.schema.json's own comment), so it's really gone here
+  // too, not tombstoned.
+  sqlite
+    .query(
+      "DELETE FROM memory_embeddings WHERE memory_id IN (SELECT id FROM memory_records WHERE scope = 'person' AND person = ?)",
+    )
+    .run(personId);
+  sqlite
+    .query(
+      "DELETE FROM pending_embeddings WHERE memory_id IN (SELECT id FROM memory_records WHERE scope = 'person' AND person = ?)",
+    )
+    .run(personId);
+  // Step 10 (session-a-intelligence.md): "the person-delete cascade stop
+  // hard-deleting memory rows" - tombstoned the same way memory.ts's own
+  // forget() now does, one UPDATE per row so each gets a genuinely
+  // unique hlc, not memory.ts's forget() reused directly: that function
+  // is a household member's OWN request about their OWN memories
+  // (assertCanForgetOrExport's access check), while this runs as part of
+  // deleting the PERSON, a different authorization path entirely.
+  const memoryIds = sqlite
+    .query("SELECT id FROM memory_records WHERE scope = 'person' AND person = ?")
+    .all(personId) as { id: string }[];
+  const tombstonedAt = new Date().toISOString();
+  for (const row of memoryIds) {
+    sqlite
+      .query("UPDATE memory_records SET status = 'archived', text = ?, embedding_space = NULL, deleted_at = ?, hlc = ? WHERE id = ?")
+      .run(TOMBSTONE_TEXT, tombstonedAt, nextHlc(), row.id);
+  }
+  const memories = memoryIds.length;
   const conversations = sqlite.query("DELETE FROM conversation_turns WHERE person_id = ?").run(personId).changes;
+  // The thread record itself (step 3's `conversations` table), not just
+  // its turns: left alone, this table's own person_id column would keep
+  // holding rows about a deleted person forever (caught by the schema-
+  // walking test below).
+  const conversationThreads = sqlite.query("DELETE FROM conversations WHERE person_id = ?").run(personId).changes;
   // Person-scope settings hold the spec's full scope string
   // ("person:<id>"), so they are matched by that, not by a person_id
   // column this table does not have.
@@ -200,6 +243,7 @@ export function erasePersonData(personId: string): ErasureCounts {
   return {
     memories,
     conversations,
+    conversationThreads,
     settings,
     clonedVoices: clonedVoiceRows,
     scheduledJobs: jobs,
@@ -235,7 +279,7 @@ export function deletePerson(actor: PersonRow, personId: string): PersonOpResult
   // who it was is not much of a record for a robot reconciling later.
   const now = new Date().toISOString();
   db.update(people)
-    .set({ deletedAt: now, updatedAt: now, nickname: null, birthdate: null })
+    .set({ deletedAt: now, updatedAt: now, nickname: null, birthdate: null, hlc: nextHlc() })
     .where(eq(people.id, personId))
     .run();
 

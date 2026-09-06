@@ -8,7 +8,7 @@ import { setHouseholdSettingValue } from "@/lib/settings";
 import { HostError } from "@maipai/spec/emulators/ts/host-emulator.js";
 import { PackageManifest } from "@maipai/spec/gen/ts/manifest.js";
 import { db } from "@/db";
-import { people } from "@/db/schema";
+import { people, memoryRecords } from "@/db/schema";
 import { eq } from "drizzle-orm";
 
 beforeEach(() => {
@@ -51,7 +51,7 @@ describe("packageHost memory.remember", () => {
     const id = host.memory.remember("the wifi password is on the fridge", "fact", "household");
     expect(typeof id).toBe("string");
 
-    const listed = createHost(actor, manifest({ permissions: ["memory:read"] })).memory.recall("wifi password");
+    const listed = await createHost(actor, manifest({ permissions: ["memory:read"] })).memory.recall("wifi password");
     expect(listed.some((r) => r.text.includes("wifi password"))).toBe(true);
   });
 
@@ -65,6 +65,66 @@ describe("packageHost memory.remember", () => {
       expect(err).toBeInstanceOf(HostError);
       expect((err as HostError).code).toBe("permission_denied");
     }
+  });
+
+  // Step 2: when a recipe step leaves `scope` unset (backend/packages/
+  // remember/recipe.json now does), the host auto-detects first-person
+  // scope instead of always defaulting to household.
+  test("no scope given, first-person text: writes scope person attributed to the actor", async () => {
+    const actor = await owner();
+    const host = createHost(actor, manifest({ permissions: ["memory:write"] }));
+    const id = host.memory.remember("I'm allergic to peanuts", "fact");
+    const row = db.select().from(memoryRecords).where(eq(memoryRecords.id, id)).get()!;
+    expect(row.scope).toBe("person");
+    expect(row.person).toBe(actor.id);
+  });
+
+  // A code review (2026-09-05) found the plain word-boundary check
+  // misattributed a THIRD PARTY's fact to the speaker's own private
+  // scope: "my sister's allergy" contains "my", so it wrote person scope
+  // for the actor, filing the sister's allergy as the parent's own secret.
+  test("a third party's possessive ('my <noun>'s ...') does not trigger first-person scope on its own", async () => {
+    const actor = await owner();
+    const host = createHost(actor, manifest({ permissions: ["memory:write"] }));
+    const id = host.memory.remember("my sister's allergy is peanuts", "fact");
+    const row = db.select().from(memoryRecords).where(eq(memoryRecords.id, id)).get()!;
+    expect(row.scope).toBe("household");
+  });
+
+  test("no scope given, no first-person marker: still defaults to household, unchanged", async () => {
+    const actor = await owner();
+    const host = createHost(actor, manifest({ permissions: ["memory:write"] }));
+    const id = host.memory.remember("Friday is pizza night", "fact");
+    const row = db.select().from(memoryRecords).where(eq(memoryRecords.id, id)).get()!;
+    expect(row.scope).toBe("household");
+    expect(row.person).toBeNull();
+  });
+
+  test("an explicit scope from the recipe step always wins over auto-detection", async () => {
+    const actor = await owner();
+    const host = createHost(actor, manifest({ permissions: ["memory:write"] }));
+    const id = host.memory.remember("I'm allergic to peanuts", "fact", "household");
+    const row = db.select().from(memoryRecords).where(eq(memoryRecords.id, id)).get()!;
+    expect(row.scope).toBe("household");
+  });
+
+  // Step 2 provenance: source is the turn id when createHost() was given
+  // one, never `package:<id>` in that case (the schema has no second
+  // field for the package id, see createHost()'s own comment).
+  test("with a turnId, source is the turn id, not the package id", async () => {
+    const actor = await owner();
+    const host = createHost(actor, manifest({ permissions: ["memory:write"] }), [], "turn-faketest01");
+    const id = host.memory.remember("the calendar rule about pizza night", "fact", "household");
+    const row = db.select().from(memoryRecords).where(eq(memoryRecords.id, id)).get()!;
+    expect(row.source).toBe("turn-faketest01");
+  });
+
+  test("with no turnId, source falls back to the package id, unchanged", async () => {
+    const actor = await owner();
+    const host = createHost(actor, manifest({ permissions: ["memory:write"] }));
+    const id = host.memory.remember("the calendar rule about pizza night", "fact", "household");
+    const row = db.select().from(memoryRecords).where(eq(memoryRecords.id, id)).get()!;
+    expect(row.source).toBe("package:test-pkg");
   });
 });
 

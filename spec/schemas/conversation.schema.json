@@ -1,0 +1,63 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://getmaipai.github.io/home/spec/schemas/conversation.schema.json",
+  "title": "Conversation",
+  "description": "One chat thread, per person and per surface (platform plan 4.14). Its turns live separately (hub-internal, conversation_turns); this record is the thread itself: title, rolling summary, and lifecycle. See session-a-intelligence.md step 3.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["id", "person", "surface", "status", "source", "hlc", "created_at", "updated_at"],
+  "properties": {
+    "id": {
+      "type": "string",
+      "pattern": "^conv-[a-z0-9]{6,}$"
+    },
+    "person": {
+      "type": "string",
+      "pattern": "^person-[a-z0-9]{6,}$",
+      "description": "Whose conversation this is. A conversation is never shared across people."
+    },
+    "surface": {
+      "type": "string",
+      "enum": ["chat", "overlay", "pod", "robot", "tv", "phone"],
+      "description": "Matches turnEngine.ts's Surface (4.5): a person may hold one open conversation per surface at a time."
+    },
+    "companion_id": {
+      "type": ["string", "null"],
+      "default": null,
+      "description": "The companion persona active when this conversation was created (5.4); null before companions exist as packages (step 8)."
+    },
+    "title": {
+      "type": ["string", "null"],
+      "maxLength": 200,
+      "default": null,
+      "description": "Household-editable; null until set (PATCH /api/conversations/:id)."
+    },
+    "status": {
+      "type": "string",
+      "enum": ["open", "closed", "deleted"],
+      "default": "open"
+    },
+    "summary": {
+      "type": ["string", "null"],
+      "default": null,
+      "description": "The rolling summary of turns that have fallen out of the prompt window (step 3's window/summary rule)."
+    },
+    "summary_through_turn": {
+      "type": ["string", "null"],
+      "default": null,
+      "description": "The last conversation_turns id folded into `summary`, so the refresh job knows what's new since then."
+    },
+    "source": {
+      "type": "string",
+      "enum": ["hub", "local"],
+      "description": "hub: authoritative on the hub. local: begun on a robot, not yet synced (4.14: 'a chat begun on the robot appears on the phone through the hub... robot turns sync as conversation records'). Mirrors person.schema.json's own source field."
+    },
+    "hlc": {
+      "type": "string",
+      "pattern": "^[0-9]+:[0-9]+:[a-z0-9]{6,}$",
+      "description": "Hybrid logical clock: wall_ms:counter:node (7.3)."
+    },
+    "created_at": { "type": "string", "format": "date-time" },
+    "updated_at": { "type": "string", "format": "date-time" }
+  }
+}

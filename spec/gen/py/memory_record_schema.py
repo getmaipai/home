@@ -77,3 +77,10 @@ class MemoryRecord(BaseModel):
         None,
         description='Names the embedding space this record was indexed under, e.g. hub-bge-m3 or bot-minilm. The embedding vector itself is never part of this record and never syncs (4.11).',
     )
+    hlc: constr(pattern=r'^[0-9]+:[0-9]+:[a-z0-9]{6,}$') = Field(
+        ..., description='Hybrid logical clock: wall_ms:counter:node (7.3).'
+    )
+    deleted_at: AwareDatetime | None = Field(
+        None,
+        description="Set when a person asks to forget this record (session-a-intelligence.md step 10): the row is kept as a tombstone, not hard-deleted, so a later sync cannot resurrect it. text is wiped and embedding_space cleared when this is set; status becomes archived. Distinct from a person's own deleted_at (person.schema.json): this is about ONE memory, not the whole person.",
+    )

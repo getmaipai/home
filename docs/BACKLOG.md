@@ -371,100 +371,155 @@ into a conversation with someone who knows who is talking.
 
 **Conversation and context**
 
-- [ ] **Send prior turns to the model** (S-M) - a per-person, per-surface
-      window from `conversation_turns`, newest few always kept whole, a
-      rolling summary above that, under the existing prompt budget. Copy
-      the tuned numbers from legacy `routes/chat.ts` (`trimHistory`,
-      `refreshConversationSummary`: 1200-token window, newest 4 turns
-      always kept, summary refreshed before the window drops a band, since
-      "an uncovered band is real amnesia"). Plan 4.5 names "summary" and
-      "context" in the volatile zone but never defines the window; this
-      item defines it.
-- [ ] **A speaker block in the prompt** (S) - pass the actor into
-      `buildSystemPrompt`: display name, nickname, role and age band,
-      locale (`core.locale` is declared and read by nothing), and a
-      locale-formatted local time instead of raw ISO UTC the policy then
-      asks the model to round. The cheapest large step toward
-      "personified".
-- [ ] **A household context block** (S) - who lives here (names, roles),
-      who is present when known, what packages are installed, so "ask
-      Nova to..." and "what can you do" answer from data, not guesswork.
-- [ ] **Stable-first prompt order with a persona re-anchor** (S) - legacy
-      `companionTurn.ts` put static policy first for KV reuse and
-      repeated the persona reminder near the end because drift was
-      measurable in about eight turns; plan 4.5 asks for the same
-      stable-first shape. Today's order is right at the top and has no
-      re-anchor.
-- [ ] **Per-section prompt budget test** (S) - one 4,000-char cap today.
-      The bot's `test_prompt_budget.py` capped each section (rules,
-      memory, persona) after rules alone hit 68% of a prompt and produced
-      8-14 s of silence. Same test here, per section.
+- [x] **Send prior turns to the model** (S-M) - shipped, Session A step 3
+      (2026-09-05): `buildConversationWindow()` in `lib/conversationHistory.ts`,
+      newest 4 turns always kept verbatim, older ones added
+      most-recent-first under a 1,200-token (chars/4) budget, exactly
+      legacy's numbers. `maybeRefreshConversationSummary()` refreshes the
+      rolling summary post-turn (never in the request path) once at
+      least 4 turns have fallen out of the window since
+      `summary_through_turn`.
+- [x] **A speaker block in the prompt** (S) - shipped, Session A step 1
+      (2026-09-05): display name, nickname, role, an age band (derived
+      from birthdate when present, role otherwise), and locale (the real
+      key is `household.locale`, not `core.locale` as this item names it)
+      with a locale-formatted local time replacing raw ISO UTC.
+- [x] **A household context block** (S) - shipped, Session A step 1
+      (2026-09-05): every active person's display name and role
+      (`lib/access.ts`'s `listActivePeople()`). Presence and "what
+      packages are installed" are not built - presence has no signal
+      source yet (robot/ambient-context, not this session), and the
+      plugins list already exists as its own separate prompt section
+      (`pluginsListLine()`, predates this item).
+- [x] **Stable-first prompt order with a persona re-anchor** (S) -
+      shipped, Session A step 4 (2026-09-05): identity/companion/rules/
+      standing-skills stable, household/speaker/memory/re-anchor/summary/
+      matched-skills/time volatile; `companionReanchorLine()` repeats the
+      persona's `display_name` right after the memory block,
+      unconditionally.
+- [x] **Per-section prompt budget test** (S) - shipped, Session A step 4
+      (2026-09-05): every section (rules, companion, memory, plugins,
+      skills, summary) has its own real cap via a shared `capSection()`
+      (the ellipsis now counts inside the cap - a genuine off-by-3 bug
+      the old per-section inline copies all had, fixed in the same pass).
 - [ ] **Rate-limit `/api/turn` and `/api/llm/*` per person** (S) - named
       in `spec/llm/README.md`, tracked nowhere.
+- [ ] **Decide what an emptied conversation becomes** (S decision, found
+      by Session A step 3's own code review, 2026-09-05) -
+      `runRetention()` purges aged-out `conversation_turns` but never
+      touches the `conversations` thread record once every one of its
+      turns is gone, so it lingers forever with `turn_count: 0` and a
+      stale `updated_at`. Auto-close, auto-delete (tombstone), or a
+      household setting are all real options; the contract in
+      `docs/plans/session-a-intelligence.md` doesn't specify one.
 
 **Memory**
 
-- [ ] **Scope recall to the actor** (S, privacy bug) - `recall()` in the
-      turn passes no scope, so an owner's turn injects every child's
-      person-scoped memories. Recall with the actor's own scope plus
-      household; the parental view on the list route stays.
-- [ ] **Person-scoped `remember`, with turn provenance** (S) - the recipe
-      always writes `scope: household`, importance 0.5, `source:
-      package:remember`. First-person facts write `scope: person`; the
-      host passes the turn id so provenance is the spec's "conversation
-      turn id", not the package name.
-- [ ] **Wire `embed` into recall** (M) - the role runs (nomic-embed-text
-      on a second llama-server) and its only caller is a diagnostic
-      route. Store vectors (sqlite-vec, or a `memory_embeddings` table
-      and brute-force cosine at household scale), embed on write, score
-      on read, keyword as the fallback when the engine is down. Start
-      from legacy `memory/recall.ts`'s tuned numbers, same embedding
-      family: `0.7 cos + 0.2 importance + 0.1 recency`, floor 0.55 for
-      episodic (top-5 used to be injected even for "hi"), 0.37 for
-      durable (durables were "stored but never recalled"), entity-first
-      pass. Re-run the legacy eval probes against the real embedder
-      before trusting either number.
-- [ ] **The memory judge: extract at turn end, consolidate at idle**
-      (M-L; plan 4.4's "sleep-time judge", unbuilt) - a post-turn job on
-      the scheduler asks the chat model for durable facts and preferences
-      as a tiny, grammar-constrained list (Mem0's 2026 ADD-only shape),
-      writes `tier: episodic` with the turn id, dedups by supersede. An
-      idle-time pass (Letta's sleep-time agent) merges point facts into
-      durative ones, re-tenses time-bound facts ("going to Boston in
-      July" becomes "went in July"), demotes mis-tiered junk, and
-      retries poison rows at most three times. Copy the rules legacy
-      learned on real transcripts (`memory/judge.ts`: user-asserted
-      facts only with a source quote, possessives resolved from the
-      speaker's view, relative dates made absolute, trips stored as
-      dated past-tense state; dedupe candidates at cosine 0.5, top 5,
-      a DELETE always inserts the replacement) and the bot's extractor
-      caps (8 entities, 12 facts, example names that never recur
-      because a small model copies the example).
-- [ ] **A maintained profile block per person** (S-M; plan 4.4's
-      "profile paragraphs") - one pinned paragraph the judge rewrites
-      ("who is talking, what they like, what is going on this week"),
-      injected whole and capped in characters, with retrieval on top only
-      for specifics. ChatGPT and Claude both inject a maintained summary
-      rather than a search-result list; Letta's memory blocks are the
-      same idea.
-- [ ] **Dated memories in the prompt, and a closing reminder** (S) -
-      legacy `formatMemoriesForPrompt` wrote "as of Aug 12, 2 weeks ago"
-      on each fact and put a one-line reminder after the memory block
-      because small models drift toward the freshest tokens. Today's
-      block is bare bullets.
+- [x] **Scope recall to the actor** (S, privacy bug) - shipped, Session A
+      step 2 (2026-09-05): `recall()`'s new `selfOnly` option makes the
+      turn engine's own call require `record.person === actor.id` for
+      person-scope, regardless of role; the parental view
+      (`GET /api/memory`, `POST /api/memory/recall`) is unchanged.
+- [x] **Person-scoped `remember`, with turn provenance** (S) - shipped,
+      Session A step 2 (2026-09-05): a word-boundary first-person check
+      in `packageHost.ts`'s `Host.memory.remember` writes `scope: person,
+      person: actor.id` when the recipe step leaves scope unset (an
+      explicit scope from a recipe step still always wins); `source` is
+      the real turn id end to end (`turnEngine.ts` generates it once,
+      up front, and hands it to `createHost()` and to the turn's own
+      `conversation_turns` row).
+- [x] **Wire `embed` into recall** (M) - shipped, Session A step 5
+      (2026-09-05): `memory_embeddings`/`pending_embeddings` tables,
+      embed on write with a `pending_embeddings` retry queue drained by
+      a real `every:1m` core job, `recall()` scores real cosine
+      (`0.7 cos + 0.2 importance + 0.1 recency`, floors 0.55
+      episodic / 0.37 durable, legacy's tuned numbers ported verbatim),
+      keyword overlap as the fallback when no vector exists either
+      side, entity-first pass kept. **Still open**: the legacy eval
+      probes are ported and passing 7/11 (`backend/scripts/bench/
+      memory-eval.ts`), but only against the stub embed backend - the 4
+      failures are the true paraphrase cases a stub can't fake. Re-run
+      against a real downloaded chat model (unlocks the real
+      nomic-embed-text-v1.5 spawn) before trusting either the floors or
+      the weights for v0.1; see docs/dev.md's step 5 entry.
+- [x] **The memory judge: extract at turn end, consolidate at idle** -
+      shipped, Session A step 6 (2026-09-05): `lib/memoryJudge.ts`, a
+      real `memory.judge` core job (every:1m) per `source: model` turn -
+      one grammar-constrained (`response_format`/`json_schema`, added to
+      `LlmCompleteOptions` and the wire types this pass) extraction call,
+      tier derived from category in code (not asked of the model - "the
+      schema is tiny on purpose"), dedupe against the speaker's own
+      readable records at cosine 0.5/top 5 (`similarByVector()`), a match
+      always supersedes rather than inserts, a contradiction closes
+      `valid_to` on the old record. Poison guard (3 attempts, tracked
+      persistently across ticks via new `judge_status`/`judge_attempts`
+      columns, then `judge_failed`) and one `memory.updated` notification
+      per run that wrote something (the notification registry already
+      existed - this added one entry, not the system itself). Legacy's
+      rules ported (source rule, time rule, discard rules) with one real
+      adaptation: possessives resolve to the SPEAKER'S REAL NAME, not a
+      generic "the user" - this platform has multiple named people per
+      household reading the same facts, unlike legacy's one-account
+      assumption, so "the user's wife" would be ambiguous the moment a
+      second person can read it. `memory_ids` provenance needed no new
+      column: `remember(..., source: turn.id)` is exactly what
+      `listConversationTurns()` already joins on (step 3). Consolidate is
+      scoped to what's cleanly buildable on existing primitives -
+      contradiction detection (ported from legacy's own consolidate.ts)
+      and demoting never-recalled durable records (`uses = 0`, 30+ days
+      old) - not the near-duplicate MERGE pass (needs a "retire two old
+      records into one new one" primitive this store doesn't have yet)
+      or "re-tense expired states" (nothing consumes `valid_to` yet -
+      real bi-temporal reads are step 10's own job). Entity-record
+      creation and procedural/Notes routing are also real, deferred gaps:
+      the plan's own step 6 schema has no `entities` or `kind` field, so
+      neither was built. Bench (`backend/scripts/bench/judge-eval.ts`,
+      LongMemEval-shaped): run against the stub chat backend, extraction
+      never produces valid JSON (the stub only echoes text), so 0 facts
+      were ever written - the honest result is abstention trivially
+      passing (nothing to hallucinate) and the knowledge-update case
+      failing (nothing to update). Needs a real chat model before this
+      bench means anything; see docs/dev.md's step 6 entry.
+- [x] **A maintained profile block per person** - shipped, Session A
+      step 7 (2026-09-05): one pinned, person-scoped `category: identity`
+      record per person (`lib/memory.ts`'s `PROFILE_SOURCE` marks it,
+      `getProfileParagraph()` is the read side), written and rewritten
+      ONLY by `memory.consolidate` (the weekly job, never the per-turn
+      judge) from that person's own facts via a small chat call, capped
+      in code at 600 chars regardless of what the model returns.
+      Injected whole at the top of `buildSystemPrompt()`'s memory block,
+      before any recalled item, sharing that section's existing budget
+      rather than a separate cap of its own. ChatGPT and Claude both
+      inject a maintained summary rather than a search-result list;
+      Letta's memory blocks are the same idea.
+- [x] **Dated memories in the prompt, and a closing reminder** (S) -
+      shipped, Session A step 4 (2026-09-05): each bullet carries "(as of
+      Sep 2, 8 days ago)" off `created_at`; the block ends with one fixed
+      trust-these-facts reminder. Absolute day count, not legacy's "N
+      weeks ago" rounding - the plan's own text asked for "<n> days ago"
+      literally.
 - [ ] **Use the bi-temporal fields, and add a clock to every memory**
-      (S in the spec, then hub) - the record already has `valid_from`/
-      `valid_to` next to supersede, and `memory.ts` writes null to both;
-      nothing reads them. The judge sets them (a trip has an end), recall
-      prefers currently-valid facts, and `hlc` is added to the shape.
-      "Did this change" and "we never discussed that" are the two cases
-      assistants fail most (LongMemEval); the 2026 temporal-memory
-      results say to organize by when things happened, not when they
-      were said. Spec change first, per the org rule; also listed under
-      Portability because sync needs the clock.
-- [ ] **Schedule `runMaintenance`, fix usage inflation** (S) - decay
-      exists and is only reachable by a manual route; `recall` bumps
-      `uses` on 20 matches while 5 reach the model.
+      (S in the spec, then hub) - the `hlc` half shipped, Session A step
+      10 (2026-09-05): `memory-record`/`person`/`grant` all carry `hlc`
+      now, set from `lib/hlc.ts` on every real write (`remember()`,
+      `supersede()`, `archive()`, decay, demotion, a person's own
+      create/edit/role-change/delete, `logTurn()`) - `conversation_turns`
+      and `conversations` (step 3) already had it. The `valid_from`/
+      `valid_to` half shipped earlier, Session A step 6: `remember()`/
+      `supersede()` accept and write real values (the judge sets
+      `valid_to` on a dated state and closes it on a contradiction),
+      where every write used to force both to null. **Still open**:
+      nothing READS `valid_to` yet - recall doesn't prefer currently-
+      valid facts over expired ones. "Did this change" and "we never
+      discussed that" are the two cases assistants fail most
+      (LongMemEval); the 2026 temporal-memory results say to organize by
+      when things happened, not when they were said.
+- [ ] **Schedule `runMaintenance`** (S) - decay exists and is only
+      reachable by a manual route; step 5 wires it to the scheduler.
+      (The other half of this item, `recall` bumping `uses` on 20
+      matches while 5 reach the model, shipped in Session A step 2,
+      2026-09-05: `recall()`'s new `bumpUsage` option lets the turn
+      engine bump usage only on what actually reached the prompt.)
 - [ ] **Memory in the chat UI** (S-M) - a "memory updated" chip when the
       judge writes, per-message "remember this" and "forget this"
       actions, a per-person memory page that an adult can edit for a
@@ -488,15 +543,24 @@ into a conversation with someone who knows who is talking.
 
 **Persona and companions**
 
-- [ ] **A Companion/Persona spec record** (M) - plan 3.1 lists it,
-      `spec/schemas` has none. Identity (name, pronouns, tagline), a
-      short backstory, interests, three to five few-shot lines (legacy's
-      review: "the single biggest lever for small-model voice fidelity"),
-      a linked voice, a per-persona confirmation pool (one shared pool
-      today, so every character acks identically), and the prompt prefix
-      using the persona's `display_name` instead of "You are MaiPai".
-      Map today's four dials onto the plan's nine sliders, or record why
-      four is enough. Keep the prose card under about 150 tokens.
+- [x] **A Companion/Persona spec record** - shipped, Session A step 8
+      (2026-09-05), as a `companion` block on the existing manifest
+      shape rather than a new top-level `spec/schemas` record:
+      "companions are packages" (`kind: "companion"` already existed in
+      manifest.schema.json's own enum). Identity (`display_name`,
+      `pronouns`, `tagline`), a short `backstory`, `interests`, 3-5
+      few-shot `examples` (legacy's review: "the single biggest lever
+      for small-model voice fidelity," now a real few-shot block in the
+      composed prompt, not just stored), a linked `voice_id`, a
+      per-companion confirmation pool (`replyVariation.ts`, scoped to
+      the one constant worth it this pass, shared pool as the default),
+      and the prompt prefix using `display_name` instead of a hardcoded
+      "You are MaiPai" (already true since step 4; this step just made
+      the catalog itself real packages). Four bundled companion packages
+      (`default`/`buddy`/`pal`/`tutor`) replace `lib/persona.ts`'s old
+      hardcoded array. Still open: the plan's nine sliders (four dials
+      shipped, mapping or justifying the rest is unstarted) and
+      activation steering (see that item below, unrelated to this one).
 - [ ] **Persona is not the same as how to address the listener** - the
       "speech profile per person" item under People is the other half;
       build them as two records injected in order: who I am, then who
@@ -510,9 +574,18 @@ into a conversation with someone who knows who is talking.
       models by this route, with Qwen3-4B strongest among those tested.
       Measure on the bench: does one vector hold register better than a
       paragraph over thirty turns, and what does it cost per token.
-- [ ] **A persona consistency test** (S) - ten scripted exchanges scored
-      by string checks (address form, length, forbidden phrases) in the
-      deterministic suite, plus a model-judged version on demand.
+- [x] **A persona consistency test** - shipped, Session A step 8
+      (2026-09-05), as a bench (`backend/scripts/bench/persona-eval.ts`)
+      rather than the deterministic suite: ten scripted exchanges through
+      the real turn engine per bundled companion, scored by string checks
+      (address form, length cap, forbidden phrases). Run against the stub
+      chat backend: address-form and length-cap pass structurally (40/40
+      each - a content-blind echo can't leak another companion's name or
+      run long), forbidden-phrases (12/40) is honestly uninformative
+      against a stub that echoes the user's own words regardless of any
+      system prompt. Needs a real chat model before this means anything
+      for persona fidelity; see docs/dev.md's step 8 entry. A
+      model-judged version is still real, unbuilt work.
 - [ ] **The bot's honesty guards as a post-model pass** (M) - legacy
       `guards.py` (invention, unrelated recall, near-echo, medication
       doses, capability claims), `_marked_repeat` ("Like I said" never
@@ -552,10 +625,22 @@ into a conversation with someone who knows who is talking.
       one tool contract that catalog packages and Go can share, and the
       route by which MCP Apps result panels could arrive later. Plan
       v0.1 named an "MCP spike"; nothing was spiked.
-- [ ] **Output-side safety on streamed sentences** (S-M) - the classifier
-      header promises "again on every streamed sentence"; only the input
-      is checked. Run it per sentence in `streamTurnEvents` and cut the
-      stream on a refuse category.
+- [x] **Output-side safety on streamed sentences** - shipped, Session A
+      step 9 (2026-09-05): `runTurnStream()`'s own `tokens` generator is
+      wrapped by a new `gateOutputSafety()` (`lib/turnEngine.ts`, not
+      `streamTurnEvents` - the route layer just consumes whatever the
+      engine hands back), buffering deltas into whole sentences (the
+      chunker, moved to `spec/safety/ts/sentenceChunker.ts` per this
+      item's own plan text) and checking each with the identical
+      `evaluateSafety()` the input path uses. A refuse category throws
+      before the offending sentence (or anything after it) is ever
+      delivered; a new `spec/errors/errors.json` code
+      (`safety_refused`) rides the wire's `error` event. `runTurn()`'s
+      non-streaming twin got the same whole-text check for symmetry,
+      beyond this item's own literal ask. `frontend/src/lib/
+      sentenceChunker.ts` still has its own duplicate copy - Session A
+      doesn't own `frontend/`; see docs/dev.md's step 9 entry for the
+      Session B follow-up that finishes the "one definition" move.
 
 Sources for this section (research pass, 2026-09-05): [Mem0, state of agent memory 2026](https://mem0.ai/blog/state-of-ai-agent-memory-2026), [Letta sleep-time agents](https://docs.letta.com/guides/agents/architectures/sleeptime/), [Letta memory blocks](https://www.letta.com/blog/memory-blocks/), [Zep temporal knowledge graph](https://arxiv.org/abs/2501.13956), [LongMemEval](https://arxiv.org/abs/2410.10813), [Temporal semantic memory](https://arxiv.org/abs/2601.07468), [AFA, multi-user memory](https://arxiv.org/html/2604.25022v1), [ChatGPT memory Dreaming, secondary](https://letsdatascience.com/news/openai-upgrades-chatgpt-memory-architecture-for-fresher-pers-b26b51d5), [Open WebUI memory](https://docs.openwebui.com/features/chat-conversations/memory/), [PERSONA steering vectors, ICLR 2026](https://arxiv.org/html/2602.15669), [llama.cpp control vectors](https://github.com/jukofyork/control-vectors), [AgentFloor, small-model tool use](https://arxiv.org/abs/2605.00334), [llama.cpp tool-call grammar issue](https://github.com/ggml-org/llama.cpp/issues/24807), [Home Assistant LLM API](https://developers.home-assistant.io/docs/core/llm/), [Anthropic, context engineering](https://www.anthropic.com/engineering/effective-context-engineering-for-ai-agents), [semantic-router](https://github.com/aurelio-labs/semantic-router), [MCP Apps spec](https://blog.modelcontextprotocol.io/posts/2026-01-26-mcp-apps/).
 
@@ -978,19 +1063,29 @@ on a spec tag that was never cut.
 
 **Fixes (data debt already accruing)**
 
-- [ ] **Forget and person-delete must write tombstone ops, not bare
-      DELETEs** (S-M) - `memory.forget()` is a bulk DELETE and person
-      deletion cascades hard deletes of memories, settings and jobs.
-      Plan 7.3: delete is a tombstone "kept in the log so a restore
-      cannot resurrect it; forget on either side is one op." A robot
-      that synced before the forget would push those memories back on
-      reconnect. The most direct principle-3 violation in the code.
-- [ ] **A clock stamp on every spec record** (S spec, M hub) - only
-      `SettingValue` carries `hlc`. Person, MemoryRecord, Entity,
-      Relationship and Grant have `source` but no clock (plan 3.1 gives
-      the grant one; the schema dropped it). Without it 7.3's "same id is
-      a no-op unless newer" cannot be evaluated. `lib/hlc.ts` exists and
-      is untested; test it while wiring it.
+- [x] **Forget and person-delete must write tombstone ops, not bare
+      DELETEs** - shipped, Session A step 10 (2026-09-05):
+      `memory.forget()` and `erasePersonData()`'s own memory-records
+      handling both tombstone now (`status: archived`, `text` wiped to a
+      real sentinel, `embedding_space` cleared, `deleted_at` set, row
+      kept) instead of hard-deleting - a robot that synced before the
+      forget can no longer push the memory back on reconnect. Settings
+      and scheduled jobs still hard-delete on person deletion
+      deliberately (see docs/dev.md's step 10 entry): only memory
+      records carry the "a device could resurrect this via sync" risk a
+      tombstone exists to close.
+- [x] **A clock stamp on every spec record** - shipped for Person,
+      MemoryRecord and Grant, Session A step 10 (2026-09-05): all three
+      now carry `hlc`, set from `lib/hlc.ts` on every real write.
+      `lib/hlc.ts` itself gets a real, dedicated test file
+      (`tests/hlc.test.ts`) covering what the existing settings.test.ts
+      coverage didn't - the counter's same-millisecond advance proven
+      directly, `compareHlc()`'s own node tiebreak, and `seedHlc()`'s
+      exact same-`wall_ms`-lower-counter boundary. Entity and
+      Relationship still need this (Entity is memory-record's own
+      `record_kind: "entity"`, already covered by this step's
+      memory-record change; Relationship is a separate schema, not
+      touched this pass).
 - [ ] **A spec-or-local verdict for each hub-internal table** (M) -
       `conversation_turns`, `scheduled_jobs`, `commands`,
       `notification_deliveries`, `cloned_voices`, `model_download_jobs`

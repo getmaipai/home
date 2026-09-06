@@ -68,6 +68,7 @@ describe("recordFailedAttempt (atomic counter)", () => {
         source: "hub",
         createdAt: now,
         updatedAt: now,
+        hlc: "1700000000000:0:testfix",
       })
       .run();
     db.insert(personCredentials)

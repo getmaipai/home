@@ -77,4 +77,44 @@ describe("varyKnownConstant", () => {
     expect(REMEMBER_CONFIRM_VARIANTS).toContain(rememberPick);
     expect(RECALL_NOTHING_VARIANTS).toContain(recallPick);
   });
+
+  // Step 8 (session-a-intelligence.md): "a per-companion confirmation
+  // pool with the shared pool as the default."
+  describe("per-companion confirmation pools (step 8)", () => {
+    test("a companion with its own pool never gets the shared pool's phrasing for the remember confirmation", () => {
+      const personId = crypto.randomUUID();
+      for (let i = 0; i < 10; i++) {
+        const pick = varyKnownConstant(personId, "Got it, I'll remember that.", "tutor");
+        expect(REMEMBER_CONFIRM_VARIANTS).not.toContain(pick);
+      }
+    });
+
+    test("a companion with no dedicated pool (including 'default') falls through to the shared pool", () => {
+      const personId = crypto.randomUUID();
+      const pick = varyKnownConstant(personId, "Got it, I'll remember that.", "default");
+      expect(REMEMBER_CONFIRM_VARIANTS).toContain(pick);
+    });
+
+    test("omitting personaId entirely still uses the shared pool, exactly as before this step", () => {
+      const personId = crypto.randomUUID();
+      const pick = varyKnownConstant(personId, "Got it, I'll remember that.");
+      expect(REMEMBER_CONFIRM_VARIANTS).toContain(pick);
+    });
+
+    test("a companion pool never applies to a DIFFERENT known constant, even for a companion with its own remember pool", () => {
+      const personId = crypto.randomUUID();
+      const pick = varyKnownConstant(personId, "I don't remember anything about that.", "tutor");
+      expect(RECALL_NOTHING_VARIANTS).toContain(pick);
+    });
+
+    test("two different companions' rotation state for the same person never collide", () => {
+      const personId = crypto.randomUUID();
+      const tutorPick = varyKnownConstant(personId, "Got it, I'll remember that.", "tutor");
+      const buddyPick = varyKnownConstant(personId, "Got it, I'll remember that.", "buddy");
+      // Distinct pools by construction (see replyVariation.ts's own
+      // COMPANION_REMEMBER_CONFIRM) - a real collision here would mean
+      // the two companions' rotation keys accidentally aliased.
+      expect(tutorPick).not.toBe(buddyPick);
+    });
+  });
 });

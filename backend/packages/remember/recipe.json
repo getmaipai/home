@@ -5,8 +5,7 @@
     {
       "op": "remember",
       "text": "{fact}",
-      "category": "fact",
-      "scope": "household"
+      "category": "fact"
     },
     {
       "op": "format",

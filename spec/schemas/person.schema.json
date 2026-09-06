@@ -5,7 +5,7 @@
   "description": "A household member or guest. Core holds the birthdate; packages only ever see age_range, derived server-side and never stored on the record a package can read. See platform plan 3.1 and 4.2.",
   "type": "object",
   "additionalProperties": false,
-  "required": ["id", "display_name", "role", "avatar_seed", "source", "created_at", "updated_at"],
+  "required": ["id", "display_name", "role", "avatar_seed", "source", "created_at", "updated_at", "hlc"],
   "properties": {
     "id": {
       "type": "string",
@@ -53,6 +53,11 @@
       "type": ["string", "null"],
       "format": "date-time",
       "default": null
+    },
+    "hlc": {
+      "type": "string",
+      "pattern": "^[0-9]+:[0-9]+:[a-z0-9]{6,}$",
+      "description": "Hybrid logical clock: wall_ms:counter:node (7.3)."
     }
   }
 }

@@ -16,6 +16,20 @@ const port = Number(process.env.PORT ?? 8787);
 // triggered for now"): daily, idempotent, safe to call on every boot.
 ensureCoreJob("memory.maintenance", "every:1d");
 ensureCoreJob("conversation.retention", "every:1d");
+// A memory whose embed() call failed at write time (embed backend down,
+// or a transient error) sits in pending_embeddings until this retries
+// it; every:1m is the finest grain the scheduler's own grammar supports,
+// same real-minute cadence the plan asks for ("a core job retries every
+// minute").
+ensureCoreJob("memory.embedding_retry", "every:1m");
+// The memory judge (step 6): "a post-turn core job" - every:1m so a
+// household sees what got remembered soon after the conversation that
+// produced it, not on the next day's maintenance pass. Consolidate is
+// explicitly weekly per the plan; every:7d is the scheduler's own
+// grammar for that (lib/scheduler.ts's `when` support, no time-of-day
+// concept, same documented gap backup.run's own comment names).
+ensureCoreJob("memory.judge", "every:1m");
+ensureCoreJob("memory.consolidate", "every:7d");
 // 2.5 asks for "daily at a household-set time in the nightly window";
 // the scheduler's `when` grammar has no time-of-day concept yet (a
 // pre-existing, already-documented gap, see lib/scheduler.ts's own header

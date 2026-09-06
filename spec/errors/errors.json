@@ -70,6 +70,13 @@
     "retriable": false
   },
   {
+    "code": "safety_refused",
+    "message": "The model's own generated reply was flagged by the safety classifier mid-stream (4.3: checked again on every streamed sentence); the response was cut before the flagged sentence and nothing after it was generated.",
+    "spoken_fallback": "I can't help with that.",
+    "ui_message": "I can't continue with that response.",
+    "retriable": false
+  },
+  {
     "code": "internal_error",
     "message": "An unmapped failure. The host wraps it so a package never leaks a raw stack trace past the boundary.",
     "spoken_fallback": "Something went wrong on my end.",

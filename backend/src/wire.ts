@@ -1,7 +1,7 @@
 import type { Person } from "@maipai/spec/gen/ts/person.js";
 import type { SafetyResult } from "@maipai/spec/gen/ts/safety-result.js";
 import type { ModelCapabilities } from "@maipai/spec/gen/ts/model-capabilities.js";
-import type { conversationTurns } from "./db/schema";
+import type { conversationTurns, conversations } from "./db/schema";
 // hardware.ts has zero "@/"-aliased imports of its own, unlike backup.ts
 // and modelCatalog.ts below, so its types are re-exported directly
 // instead of hand-copied a second time.
@@ -38,9 +38,36 @@ export interface TurnValue {
    * separate from `reply` so a surface can present it alongside the
    * answer rather than have it silently reshape the model's own words. */
   crisis_resources?: string;
+  /** Session A step 3 (conversations): every real turn resolves or
+   * creates a conversation and mints its own turn id up front
+   * (turnEngine.ts's prepareTurn(), also step 2's provenance carrier for
+   * anything a plugin remembered mid-turn) - both are always real by the
+   * time a TurnValue exists, never optional. */
+  conversation_id: string;
+  turn_id: string;
 }
 
 export type ConversationTurnRow = typeof conversationTurns.$inferSelect;
+
+export type ConversationRow = typeof conversations.$inferSelect;
+
+/** GET /api/conversations' listing shape (step 3's contract): the
+ * thread's own metadata plus two values derived by joining
+ * conversation_turns, not stored on the row itself. */
+export interface ConversationSummary {
+  id: string;
+  surface: string;
+  companion_id: string | null;
+  title: string | null;
+  turn_count: number;
+  last_turn_at: string | null;
+  created_at: string;
+}
+
+/** GET /api/conversations/:id/turns' per-turn shape (step 3's contract):
+ * the turn plus which memory records trace their provenance to it -
+ * empty until the judge (step 6) or an in-turn `remember` writes one. */
+export type ConversationTurnWithMemoryIds = ConversationTurnRow & { memory_ids: string[] };
 
 // POST /api/turn/stream's real wire shape (2026-09-04): newline-delimited
 // JSON, one event per line (the same shape the legacy hub's own
@@ -62,10 +89,17 @@ export type ConversationTurnRow = typeof conversationTurns.$inferSelect;
 // checking actually takes a moment, and a small model that saw its own
 // cue in its history would start opening every reply with it.
 export type TurnStreamEvent =
+  | { type: "turn_meta"; conversation_id: string; turn_id: string }
   | { type: "delta"; text: string }
   | { type: "spoken_cue"; text: string }
   | { type: "done"; value: TurnValue }
-  | { type: "error"; error: string };
+  // `code` (step 9, session-a-intelligence.md: "emit error with the
+  // catalogue code") is optional and additive: a spec/errors/errors.json
+  // code when the failure maps to one (today, only the output-side
+  // safety cut sets it, "safety_refused"), omitted for the generic
+  // mid-stream engine failure that already used this event before this
+  // step - existing clients reading only `error` see no change.
+  | { type: "error"; error: string; code?: string };
 
 export interface ResolvedSetting {
   key: string;

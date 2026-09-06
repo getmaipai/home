@@ -42,6 +42,7 @@ function makePerson(displayName: string, role: string): PersonRow {
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
     deletedAt: null,
+    hlc: "1700000000000:0:testfix",
   };
   db.insert(people).values(row).run();
   return row as unknown as PersonRow;

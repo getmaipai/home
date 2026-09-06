@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import { requireAuth } from "@/middleware/auth";
-import { runTurn, runTurnStream, type Surface, type TurnStreamResult } from "@/lib/turnEngine";
+import { runTurn, runTurnStream, StreamSafetyRefusal, type Surface, type TurnStreamResult } from "@/lib/turnEngine";
 import { pickThinkingCue } from "@/lib/replyVariation";
 import type { TurnStreamEvent } from "@/wire";
 import type { AppEnv } from "@/types";
@@ -15,9 +15,14 @@ export const turnRoutes = new Hono<AppEnv>();
 // checks) now that this one exists.
 turnRoutes.post("/", requireAuth, async (c) => {
   const actor = c.get("person");
-  const body = (await c.req.json().catch(() => ({}))) as { surface?: string; text?: string; thinking?: boolean };
+  const body = (await c.req.json().catch(() => ({}))) as {
+    surface?: string;
+    text?: string;
+    thinking?: boolean;
+    conversation_id?: string;
+  };
   const surface = (body.surface ?? "chat") as Surface;
-  const result = await runTurn(actor, surface, body.text ?? "", { thinking: body.thinking });
+  const result = await runTurn(actor, surface, body.text ?? "", { thinking: body.thinking, conversationId: body.conversation_id });
   if (!result.ok) {
     return c.json({ error: result.error, code: result.code }, result.status);
   }
@@ -87,7 +92,15 @@ export async function* streamTurnEvents(
       yield { type: "delta", text: current.value };
       current = await iterator.next();
     }
-    const value = result.finalize(fullText);
+    // `current.value` here is the generator's own RETURN value (step 9),
+    // not a yielded delta: gateOutputSafety() returns the most recently
+    // flagged, non-refuse SafetyResult it saw (self_harm in the model's
+    // own words, say), or undefined if nothing was ever flagged. A
+    // review (2026-09-05) found this was previously discarded entirely -
+    // only a THROWN refusal ever reached finalize() with its own
+    // SafetyResult, so a flag that never refuses silently never made it
+    // onto the logged turn or its crisis_resources at all.
+    const value = result.finalize(fullText, current.value);
     yield { type: "done", value };
   } catch (err) {
     // Headers (and a 200 status) are already committed by the time
@@ -96,7 +109,18 @@ export async function* streamTurnEvents(
     // (turnEngine.ts's "unavailable" code covers this same down-state
     // class for the non-streaming route; ChatPage.tsx maps this event to
     // the identical friendly message).
-    yield { type: "error", error: (err as Error).message };
+    //
+    // A StreamSafetyRefusal (step 9) is a real, mapped failure: it gets
+    // spec/errors/errors.json's own "safety_refused" code on the wire
+    // (every other failure here has none - a genuine down-engine error,
+    // not something the catalogue has a specific code for), and its own
+    // SafetyResult is passed into finalize() so the logged/returned turn
+    // reflects the real reason it was cut, not the input-side result
+    // computed before generation ever started.
+    const safetyRefusal = err instanceof StreamSafetyRefusal ? err : undefined;
+    yield safetyRefusal
+      ? { type: "error", error: safetyRefusal.message, code: "safety_refused" }
+      : { type: "error", error: (err as Error).message };
     // Still finalize (and so still log) whatever text actually streamed
     // before the failure: a code review (2026-09-04) found this skipped
     // on the error path, so a reply that had already streamed several
@@ -104,8 +128,13 @@ export async function* streamTurnEvents(
     // before the engine crashed - was never written to conversation
     // history at all, as if the exchange had never happened. Fine to run
     // after yielding the error event: `finalize` only builds and logs a
-    // TurnValue, it never writes to the response stream itself.
-    if (fullText) result.finalize(fullText);
+    // TurnValue, it never writes to the response stream itself. A safety
+    // refusal always finalizes even with an EMPTY fullText (the very
+    // first sentence was itself the unsafe one) - step 9's own "log a
+    // flagged turn" - unlike a generic mid-stream crash with nothing
+    // real to log, an all-refused turn is exactly the case worth a
+    // record of.
+    if (fullText || safetyRefusal) result.finalize(fullText, safetyRefusal?.safety);
   }
 }
 
@@ -118,18 +147,32 @@ export async function* streamTurnEvents(
 // event kinds. Same auth posture as POST /api/turn above.
 turnRoutes.post("/stream", requireAuth, async (c) => {
   const actor = c.get("person");
-  const body = (await c.req.json().catch(() => ({}))) as { surface?: string; text?: string; thinking?: boolean };
+  const body = (await c.req.json().catch(() => ({}))) as {
+    surface?: string;
+    text?: string;
+    thinking?: boolean;
+    conversation_id?: string;
+  };
   const surface = (body.surface ?? "chat") as Surface;
-  const result = await runTurnStream(actor, surface, body.text ?? "", { thinking: body.thinking });
+  const result = await runTurnStream(actor, surface, body.text ?? "", { thinking: body.thinking, conversationId: body.conversation_id });
   if (!result.ok) {
     return c.json({ error: result.error, code: result.code }, result.status);
   }
+
+  // The contract's first line, either way (step 3): "turn_meta" before
+  // anything else, so a client always knows which conversation and turn
+  // this reply belongs to even if it never reads past the first line.
+  const turnMeta: TurnStreamEvent =
+    result.kind === "immediate"
+      ? { type: "turn_meta", conversation_id: result.value.conversation_id, turn_id: result.value.turn_id }
+      : { type: "turn_meta", conversation_id: result.conversationId, turn_id: result.turnId };
 
   if (result.kind === "immediate") {
     // A safety refusal or a plugin reply is already complete, deterministic
     // text - one "done" event, no artificial trickle for something with
     // nothing left to stream.
-    return new Response(ndjsonLine({ type: "done", value: result.value }), {
+    const body = new Blob([ndjsonLine(turnMeta), ndjsonLine({ type: "done", value: result.value })]);
+    return new Response(body, {
       headers: { "content-type": "application/x-ndjson" },
     });
   }
@@ -137,6 +180,7 @@ turnRoutes.post("/stream", requireAuth, async (c) => {
   const stream = new ReadableStream<Uint8Array>({
     async start(controller) {
       try {
+        controller.enqueue(ndjsonLine(turnMeta));
         for await (const event of streamTurnEvents(result, actor.id)) {
           controller.enqueue(ndjsonLine(event));
         }

@@ -1,4 +1,4 @@
-import { sqliteTable, text, integer, real, primaryKey } from "drizzle-orm/sqlite-core";
+import { sqliteTable, text, integer, real, blob, primaryKey, index } from "drizzle-orm/sqlite-core";
 
 // Mirrors spec/schemas/person.schema.json (spec/gen/ts/person.ts is the
 // validated shape; this is its storage). `role` and `source` are the
@@ -18,6 +18,11 @@ export const people = sqliteTable("people", {
   createdAt: text("created_at").notNull(),
   updatedAt: text("updated_at").notNull(),
   deletedAt: text("deleted_at"),
+  // Step 10 (session-a-intelligence.md): "the portability half that lives
+  // in your files" - person.schema.json's own hlc field, set from
+  // lib/hlc.ts on every write (create, profile edit, role change, delete)
+  // the same way memory_records/conversations already do.
+  hlc: text("hlc").notNull(),
 });
 
 // A person's sign-in secret (PIN or password, same hashing either way, see
@@ -57,11 +62,14 @@ export const idSequences = sqliteTable("id_sequences", {
 
 // Mirrors spec/schemas/memory-record.schema.json (4.4): one table for all
 // three record_kinds (memory, entity, episode), matching the spec's "one
-// row, one field set" shape. Never hard-deleted by the routine store
-// operations (supersede/archive); a real DELETE only happens through
-// lib/memory.ts's forget(), the deliberate per-person erasure right
-// (2.2's privacy architecture, distinct from the judge's normal
-// never-hard-delete lifecycle).
+// row, one field set" shape. Never hard-deleted at all, as of step 10
+// (session-a-intelligence.md): `forget()` used to be the one real DELETE
+// (2.2's privacy architecture, the deliberate per-person erasure right),
+// but a hard delete cannot be told apart from "never existed" once a
+// robot or a second hub syncs - a device offline during the forget could
+// resurrect the record right back. `forget()` now tombstones instead
+// (status: archived, text and embeddingSpace wiped, deletedAt set),
+// keeping the row itself as proof the erasure happened.
 export const memoryRecords = sqliteTable("memory_records", {
   id: text("id").primaryKey(),
   recordKind: text("record_kind").notNull(),
@@ -83,6 +91,54 @@ export const memoryRecords = sqliteTable("memory_records", {
   expiredAt: text("expired_at"),
   supersededBy: text("superseded_by"),
   embeddingSpace: text("embedding_space"),
+  // Step 10: hlc set from lib/hlc.ts on every real state change (an
+  // insert, a status/tier/text change) - NOT on a plain usage bump
+  // (uses/lastUsedAt from a recall touching this record), a deliberate
+  // exclusion documented at bumpMatchUsage() itself: hlc exists to
+  // resolve conflicts on the record's actual synced content, and
+  // stamping it on every read-driven usage bump would make a purely
+  // local read look like a newer edit than a genuine concurrent one.
+  hlc: text("hlc").notNull(),
+  // Set only by forget() (a tombstone) - distinct from a PERSON's own
+  // deletedAt (people.deletedAt): this is about one memory, never the
+  // whole person. isNull(deletedAt) is NOT how active-vs-tombstoned is
+  // checked day to day (status = 'active' already does that everywhere
+  // recall/list/similarByVector query); this column exists specifically
+  // for exportPerson() to skip tombstones without a second status value.
+  deletedAt: text("deleted_at"),
+});
+
+// Step 5's real vector store: never a spec-shaped record itself (the
+// spec's own memory-record.schema.json comment already says why -
+// "embeddings themselves never sync, embedding_space only names the
+// space" - so this is hub-internal, the same "recognized but not spec-
+// synced" posture conversation_turns/scheduled_jobs already have.
+// `space` names the embedding model (`llm.ts`'s `embed()` reports the
+// real one at call time, "nomic-embed-text-v1.5" today, "stub-embed" in
+// tests - never hardcoded here); `vector` is a raw Float32 buffer (4
+// bytes per dim, `dims` says how many), brute-force cosine in JS at
+// household scale per the plan's own words, not sqlite-vec or any ANN
+// index this scale doesn't need yet.
+export const memoryEmbeddings = sqliteTable("memory_embeddings", {
+  memoryId: text("memory_id")
+    .primaryKey()
+    .references(() => memoryRecords.id),
+  space: text("space").notNull(),
+  dims: integer("dims").notNull(),
+  vector: blob("vector", { mode: "buffer" }).notNull(),
+  hlc: text("hlc").notNull(),
+});
+
+// The retry queue for a record written while the embed backend was down
+// (step 5: "queue the id in a pending_embeddings list, a core job
+// retries every minute"). One row per memory record still waiting, not
+// a log of every attempt - a record that successfully embeds is simply
+// removed.
+export const pendingEmbeddings = sqliteTable("pending_embeddings", {
+  memoryId: text("memory_id")
+    .primaryKey()
+    .references(() => memoryRecords.id),
+  queuedAt: text("queued_at").notNull(),
 });
 
 // Mirrors spec/schemas/setting-value.schema.json (4.6): one row per
@@ -116,32 +172,104 @@ export const settingsValues = sqliteTable(
 // lib/scheduler.ts for why, and what's deferred (device targets,
 // quiet-hours, the notification system) until this needs to be a spec
 // shape for real robot parity.
+// Conversations (4.14, session-a-intelligence.md step 3): the thread
+// itself, spec-shaped (spec/schemas/conversation.schema.json) unlike
+// conversation_turns below, which stays hub-internal - the individual
+// turns remain a flat per-turn log; this is what a title, a rolling
+// summary, and open/closed/deleted lifecycle hang off. One open
+// conversation per (person, surface) at a time in practice, enforced by
+// lib/conversationHistory.ts's resolveOrCreateConversation(), not a DB
+// constraint here (a closed or deleted conversation for the same pair
+// may coexist, same as any append-only history).
+export const conversations = sqliteTable(
+  "conversations",
+  {
+    id: text("id").primaryKey(),
+    personId: text("person_id")
+      .notNull()
+      .references(() => people.id),
+    surface: text("surface").notNull(),
+    companionId: text("companion_id"),
+    title: text("title"),
+    status: text("status").notNull().default("open"), // open|closed|deleted
+    summary: text("summary"),
+    summaryThroughTurn: text("summary_through_turn"),
+    source: text("source").notNull().default("hub"), // hub|local
+    hlc: text("hlc").notNull(),
+    createdAt: text("created_at").notNull(),
+    updatedAt: text("updated_at").notNull(),
+  },
+  // resolveOrCreateConversation()/createConversation()/listConversations()/
+  // clearConversations() all filter by (person_id, surface, status) on
+  // every turn - a code review, 2026-09-05, found conversation_turns got
+  // its own index in this same diff but this table was missed.
+  (table) => [index("conversations_person_surface_status_idx").on(table.personId, table.surface, table.status)],
+);
+
 // Conversation history (4.14, split): one row per completed turnEngine
 // turn, kept per person and per surface. Not a spec 3.1 record type
-// today (chapter 3's record table has no Conversation entry either), the
-// same "hub-internal, revisit for robot parity later" call scheduledJobs
+// today (chapter 3's record table has no Conversation-turn entry either,
+// distinct from the `conversations` thread record above), the same
+// "hub-internal, revisit for robot parity later" call scheduledJobs
 // made; see lib/conversationHistory.ts for the visibility and retention
 // rules built on top of this table.
-export const conversationTurns = sqliteTable("conversation_turns", {
-  id: text("id").primaryKey(),
-  personId: text("person_id")
-    .notNull()
-    .references(() => people.id),
-  surface: text("surface").notNull(),
-  userText: text("user_text").notNull(),
-  replyText: text("reply_text").notNull(),
-  source: text("source").notNull(), // "safety_refuse" | "plugin" | "plugin_error" | "command" | "command_error" | "model"
-  pluginId: text("plugin_id"),
-  commandId: text("command_id"),
-  safetyFlagged: integer("safety_flagged", { mode: "boolean" }).notNull().default(false),
-  safetyAction: text("safety_action").notNull(), // "allow" | "allow_with_resources" | "refuse"
-  // Captured at write time, not re-derived by joining to `people` later:
-  // a person's role can change, and this must reflect who they were when
-  // they spoke, the same "recorded, not recomputed" reasoning
-  // memory-record scoping already uses.
-  minorSpeaker: integer("minor_speaker", { mode: "boolean" }).notNull().default(false),
-  createdAt: text("created_at").notNull(),
-});
+export const conversationTurns = sqliteTable(
+  "conversation_turns",
+  {
+    id: text("id").primaryKey(),
+    personId: text("person_id")
+      .notNull()
+      .references(() => people.id),
+    surface: text("surface").notNull(),
+    // Nullable: a migration backfills one conversation per (person, surface)
+    // for every pre-existing row (step 3), but every real write path now
+    // sets this - lib/conversationHistory.ts's logTurn() requires it as a
+    // real parameter. Only nullable for the backfilled history's sake.
+    conversationId: text("conversation_id").references(() => conversations.id),
+    userText: text("user_text").notNull(),
+    replyText: text("reply_text").notNull(),
+    source: text("source").notNull(), // "safety_refuse" | "plugin" | "plugin_error" | "command" | "command_error" | "model"
+    pluginId: text("plugin_id"),
+    commandId: text("command_id"),
+    safetyFlagged: integer("safety_flagged", { mode: "boolean" }).notNull().default(false),
+    safetyAction: text("safety_action").notNull(), // "allow" | "allow_with_resources" | "refuse"
+    // Captured at write time, not re-derived by joining to `people` later:
+    // a person's role can change, and this must reflect who they were when
+    // they spoke, the same "recorded, not recomputed" reasoning
+    // memory-record scoping already uses.
+    minorSpeaker: integer("minor_speaker", { mode: "boolean" }).notNull().default(false),
+    createdAt: text("created_at").notNull(),
+    // The memory judge's own poison guard (step 6, session-a-
+    // intelligence.md): null means "not judged yet" (every pre-existing
+    // row, and every new one until the core job reaches it), "done" and
+    // "failed" are terminal - a turn is judged at most once, ever, never
+    // re-queued by a later run. judgeAttempts counts extraction failures
+    // only (a dedupe-round failure never counts, lib/memoryJudge.ts's own
+    // header explains why); it hits judge_attempts_max and flips to
+    // "failed" rather than retrying forever on a turn the model can't
+    // seem to parse.
+    judgeStatus: text("judge_status"),
+    judgeAttempts: integer("judge_attempts").notNull().default(0),
+    // Step 10: not a spec-shaped record itself (conversation_turns stays
+    // hub-internal, see the table's own header above), but the plan's
+    // own text still asks for it here so a synced conversation's
+    // individual turns carry a real clock stamp too, not just the
+    // conversation thread they belong to.
+    hlc: text("hlc").notNull(),
+  },
+  // buildConversationWindow() and maybeRefreshConversationSummary() (step 3)
+  // both filter by conversation_id on every model-routed turn - the
+  // hottest path in the app (a code review, 2026-09-05, flagged the
+  // missing index: a full table scan on every turn as history grows).
+  (table) => [
+    index("conversation_turns_conversation_id_idx").on(table.conversationId),
+    // The judge's own core job scans for `source = 'model' AND
+    // judge_status IS NULL` every tick (lib/memoryJudge.ts) - without
+    // this, that scan is a full table scan of every turn the household
+    // has ever had, not just the still-unjudged ones.
+    index("conversation_turns_judge_status_idx").on(table.source, table.judgeStatus),
+  ],
+);
 
 // The model-provisioning download-job queue (4.11's deferred "download
 // queue" gap, spec/llm/README.md): one row per catalog model id a

@@ -1,6 +1,17 @@
-import { describe, expect, test, afterEach } from "bun:test";
+import { describe, expect, test, beforeEach, afterEach } from "bun:test";
 import { getEmbedClient, getEmbedBackendKind, __resetEmbedSupervisorForTests } from "@/lib/embedSupervisor";
 import { LlamaServerClient } from "@maipai/spec/llm/ts/client.js";
+
+// beforeEach too, not just afterEach (step 5, session-a-intelligence.md:
+// found when memory.ts's remember() started firing a real, if fire-and-
+// forget, embed() call on every write - any earlier test file in the
+// same `bun test` process that ever calls remember() now starts this
+// module's real singleton before this file's own first test runs,
+// which "reports no backend until the first call" otherwise silently
+// assumed never happens).
+beforeEach(() => {
+  __resetEmbedSupervisorForTests();
+});
 
 afterEach(() => {
   __resetEmbedSupervisorForTests();

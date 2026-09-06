@@ -75,6 +75,25 @@ describe("composePersonaPrompt", () => {
     expect(prompt.toLowerCase()).not.toContain("um");
     expect(prompt.toLowerCase()).not.toContain('"uh"');
   });
+
+  // Step 8 (session-a-intelligence.md): every bundled companion package
+  // sets `examples` (manifest.schema.json's own "3 to 5 lines in the
+  // character's own voice"), so the few-shot block should appear for
+  // every real persona, not just be reachable in principle.
+  test("every real persona's own examples appear in its composed prompt, quoted", () => {
+    for (const persona of PERSONAS) {
+      expect(persona.examples?.length ?? 0).toBeGreaterThanOrEqual(3);
+      const prompt = composePersonaPrompt(persona);
+      for (const example of persona.examples!) {
+        expect(prompt).toContain(`"${example}"`);
+      }
+    }
+  });
+
+  test("a persona with no examples at all composes without a dangling few-shot header", () => {
+    const prompt = composePersonaPrompt({ ...DEFAULT_PERSONA, examples: undefined });
+    expect(prompt).not.toContain("Some examples of how you talk");
+  });
 });
 
 describe("INFORMATION_HANDLING_POLICY", () => {

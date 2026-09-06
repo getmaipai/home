@@ -12,6 +12,7 @@ import {
   throttleReset,
 } from "@/lib/secretThrottle";
 import { newPersonId } from "@/lib/id";
+import { nextHlc } from "@/lib/hlc";
 import { requireAuth, invalidateSessionCache } from "@/middleware/auth";
 import { toRoster, parsePersonCandidate, personToDbValues } from "@/lib/personShape";
 import { validateDisplayName, validateSecret } from "@/lib/validation";
@@ -121,6 +122,7 @@ auth.post("/setup", async (c) => {
     created_at: now,
     updated_at: now,
     deleted_at: null,
+    hlc: nextHlc(),
   });
   if (!candidate.success) {
     return c.json({ error: candidate.error.issues.map((i) => i.message).join("; ") }, 400);

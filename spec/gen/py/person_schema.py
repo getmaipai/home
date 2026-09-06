@@ -48,3 +48,6 @@ class Person(BaseModel):
     created_at: AwareDatetime
     updated_at: AwareDatetime
     deleted_at: AwareDatetime | None = None
+    hlc: constr(pattern=r'^[0-9]+:[0-9]+:[a-z0-9]{6,}$') = Field(
+        ..., description='Hybrid logical clock: wall_ms:counter:node (7.3).'
+    )

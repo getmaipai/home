@@ -44,9 +44,12 @@ function handleChatCompletion(request: ChatCompletionRequest): ChatCompletionRes
  * exercised for real in tests rather than degenerating into one big
  * chunk. Split on spaces, each word (plus its trailing space, so
  * concatenating every delta reproduces the original text exactly) is its
- * own chunk. */
-function streamChatCompletion(request: ChatCompletionRequest): ReadableStream<Uint8Array> {
-  const text = stubReplyText(request);
+ * own chunk. `text` defaults to the usual echo reply; a caller (the
+ * scripted-reply path below, added for session-a-intelligence.md step 9's
+ * own output-safety-gate tests, which need a MODEL reply that differs
+ * from the input - the default echo can't ever produce that by
+ * construction) can override it with any string. */
+function streamChatCompletion(request: ChatCompletionRequest, text: string = stubReplyText(request)): ReadableStream<Uint8Array> {
   const words = text.split(" ");
   const id = `stub-${Date.now()}`;
   const model = request.model || "stub-chat";
@@ -86,20 +89,44 @@ function hashString(text: string): number {
   return h >>> 0;
 }
 
-function stubEmbedding(text: string): number[] {
-  let seed = hashString(text) || 1;
+function vectorFromSeed(seed: number, dims: number): number[] {
+  let s = seed || 1;
   const vector: number[] = [];
-  for (let i = 0; i < EMBEDDING_DIMENSIONS; i++) {
+  for (let i = 0; i < dims; i++) {
     // mulberry32, a small deterministic PRNG - good enough for "stable,
     // distinct-per-input" without pulling in a real hashing/RNG library
     // for a canned test double.
-    seed |= 0;
-    seed = (seed + 0x6d2b79f5) | 0;
-    let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
+    s |= 0;
+    s = (s + 0x6d2b79f5) | 0;
+    let t = Math.imul(s ^ (s >>> 15), 1 | s);
     t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
     vector.push((((t ^ (t >>> 14)) >>> 0) / 4294967296) * 2 - 1);
   }
   return vector;
+}
+
+// Bag-of-words, not a single whole-string hash (session-a-intelligence.md
+// step 5, found live: the original whole-string version made every two
+// DIFFERENT texts land near-orthogonal regardless of shared vocabulary -
+// real for genuinely unrelated text, but it also meant an embedding
+// backend now genuinely wired into recall()'s cosine floor (step 5)
+// would wrongly floor out a memory whose text keyword-overlaps a query
+// perfectly, just because the stub's noise happened to land below the
+// floor for that pair. Summing each shared word's own deterministic
+// vector means two texts that share vocabulary land closer together in
+// cosine terms and two that share none stay near-orthogonal - a real,
+// if crude, lexical-similarity signal (classic bag-of-words averaging,
+// not a shortcut invented for this test double), enough to let a stub-
+// backed test meaningfully exercise "shares words -> higher cosine"
+// without needing a real model.
+function stubEmbedding(text: string): number[] {
+  const words = text.toLowerCase().match(/[a-z0-9]+/g) ?? [text];
+  const sum = new Array<number>(EMBEDDING_DIMENSIONS).fill(0);
+  for (const word of words) {
+    const wordVector = vectorFromSeed(hashString(word), EMBEDDING_DIMENSIONS);
+    for (let i = 0; i < EMBEDDING_DIMENSIONS; i++) sum[i]! += wordVector[i]!;
+  }
+  return sum;
 }
 
 function handleEmbeddings(request: EmbeddingRequest): EmbeddingResponse {
@@ -111,9 +138,28 @@ function handleEmbeddings(request: EmbeddingRequest): EmbeddingResponse {
   };
 }
 
+export interface StubLlmServerOptions {
+  /** Session-a-intelligence.md step 6: the memory judge's tests need a
+   * SPECIFIC canned JSON reply per test case (a possessive resolved a
+   * certain way, a particular dedupe decision), not the generic
+   * echo-the-user's-message reply every other test relies on. Returning
+   * a value here overrides the default reply for exactly that request
+   * (a string is sent verbatim as the message content, anything else is
+   * JSON.stringify'd first, matching what a real json_schema-constrained
+   * llama-server reply looks like on the wire); returning `undefined`
+   * (or omitting this option) falls through to the existing default -
+   * every current call site is unaffected. Applies to a streaming
+   * request too (step 9): the scripted text is streamed word-by-word the
+   * same way the default echo reply always was, needed for testing
+   * turnEngine.ts's output-safety gate, which requires a MODEL reply
+   * that genuinely differs from the input - the default echo can never
+   * produce that by construction. */
+  scriptedChatReply?: (request: ChatCompletionRequest) => unknown;
+}
+
 /** port 0 lets the OS assign a free port, avoiding a fixed-port clash
  * when tests and a dev server both start a stub. */
-export function startStubLlmServer(port = 0): StubLlmServerHandle {
+export function startStubLlmServer(port = 0, opts: StubLlmServerOptions = {}): StubLlmServerHandle {
   const server = Bun.serve({
     port,
     fetch: async (req) => {
@@ -129,9 +175,19 @@ export function startStubLlmServer(port = 0): StubLlmServerHandle {
         if (!body || !Array.isArray(body.messages)) {
           return Response.json({ error: "messages is required" }, { status: 400 });
         }
+        const scripted = opts.scriptedChatReply?.(body);
+        const scriptedContent = scripted !== undefined ? (typeof scripted === "string" ? scripted : JSON.stringify(scripted)) : undefined;
         if (body.stream) {
-          return new Response(streamChatCompletion(body), {
+          return new Response(streamChatCompletion(body, scriptedContent), {
             headers: { "content-type": "text/event-stream" },
+          });
+        }
+        if (scriptedContent !== undefined) {
+          return Response.json({
+            id: `stub-${Date.now()}`,
+            model: body.model || "stub-chat",
+            choices: [{ index: 0, message: { role: "assistant", content: scriptedContent }, finish_reason: "stop" }],
+            usage: { prompt_tokens: 0, completion_tokens: 0, total_tokens: 0 },
           });
         }
         return Response.json(handleChatCompletion(body));
