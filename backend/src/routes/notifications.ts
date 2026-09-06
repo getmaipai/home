@@ -1,13 +1,21 @@
-import { Hono } from "hono";
+import { createRoute, z } from "@hono/zod-openapi";
+import { apiRouter, errorResponses, idParamSchema } from "@/lib/openapi";
 import { requireAuth } from "@/middleware/auth";
-import { listPending, listHistory, markRead, dismiss, type NotificationOpResult } from "@/lib/notifications";
-import type { AppEnv } from "@/types";
+import { listPending, listHistory, markRead, dismiss } from "@/lib/notifications";
 
-export const notificationsRoutes = new Hono<AppEnv>();
+export const notificationsRoutes = apiRouter();
 
-function fail<T>(result: Extract<NotificationOpResult<T>, { ok: false }>) {
-  return { body: { error: result.error }, status: result.status } as const;
-}
+const NotificationSchema = z.object({
+  id: z.string(),
+  typeId: z.string(),
+  text: z.string(),
+  channels: z.array(z.enum(["in_app", "telegram"])),
+  createdAt: z.string(),
+  readAt: z.string().nullable(),
+  dismissedAt: z.string().nullable(),
+});
+
+const IdParamSchema = idParamSchema("id", "notif-a1b2c3");
 
 // A person's own pending list only - never another household member's,
 // even for an owner/admin: unlike commands/plugins (household-wide by
@@ -15,28 +23,68 @@ function fail<T>(result: Extract<NotificationOpResult<T>, { ok: false }>) {
 // NOTIFICATIONS.md: "to the person"), so there is no admin-sees-all view
 // here at all, the same posture lib/scheduler.ts's own listJobs() takes
 // for a non-admin's jobs.
-notificationsRoutes.get("/", requireAuth, async (c) => {
-  return c.json(listPending(c.get("person")));
+const listPendingRoute = createRoute({
+  method: "get",
+  path: "/",
+  tags: ["Notifications"],
+  summary: "The signed-in person's own pending (not dismissed) notifications",
+  middleware: [requireAuth] as const,
+  responses: {
+    200: { content: { "application/json": { schema: z.array(NotificationSchema) } }, description: "Pending notifications, newest first." },
+    ...errorResponses({ 401: "Not signed in" }),
+  },
 });
+notificationsRoutes.openapi(listPendingRoute, (c) => c.json(listPending(c.get("person")), 200));
 
-notificationsRoutes.get("/history", requireAuth, async (c) => {
-  return c.json(listHistory(c.get("person")));
+const listHistoryRoute = createRoute({
+  method: "get",
+  path: "/history",
+  tags: ["Notifications"],
+  summary: "The signed-in person's full notification history, dismissed or not",
+  middleware: [requireAuth] as const,
+  responses: {
+    200: { content: { "application/json": { schema: z.array(NotificationSchema) } }, description: "Every delivery, newest first." },
+    ...errorResponses({ 401: "Not signed in" }),
+  },
 });
+notificationsRoutes.openapi(listHistoryRoute, (c) => c.json(listHistory(c.get("person")), 200));
 
-notificationsRoutes.post("/:id/read", requireAuth, async (c) => {
-  const result = markRead(c.get("person"), c.req.param("id"));
+const readRoute = createRoute({
+  method: "post",
+  path: "/{id}/read",
+  tags: ["Notifications"],
+  summary: "Mark one of the signed-in person's own notifications read",
+  middleware: [requireAuth] as const,
+  request: { params: IdParamSchema },
+  responses: {
+    200: { content: { "application/json": { schema: NotificationSchema } }, description: "Marked read." },
+    ...errorResponses({ 401: "Not signed in", 403: "Not this person's notification", 404: "No such notification" }),
+  },
+});
+notificationsRoutes.openapi(readRoute, (c) => {
+  const result = markRead(c.get("person"), c.req.valid("param").id);
   if (!result.ok) {
-    const { body, status } = fail(result);
-    return c.json(body, status);
+    return result.status === 403 ? c.json({ error: result.error }, 403) : c.json({ error: result.error }, 404);
   }
-  return c.json(result.value);
+  return c.json(result.value, 200);
 });
 
-notificationsRoutes.post("/:id/dismiss", requireAuth, async (c) => {
-  const result = dismiss(c.get("person"), c.req.param("id"));
+const dismissRoute = createRoute({
+  method: "post",
+  path: "/{id}/dismiss",
+  tags: ["Notifications"],
+  summary: "Dismiss one of the signed-in person's own notifications",
+  middleware: [requireAuth] as const,
+  request: { params: IdParamSchema },
+  responses: {
+    200: { content: { "application/json": { schema: z.object({ id: z.string() }) } }, description: "Dismissed." },
+    ...errorResponses({ 401: "Not signed in", 403: "Not this person's notification", 404: "No such notification" }),
+  },
+});
+notificationsRoutes.openapi(dismissRoute, (c) => {
+  const result = dismiss(c.get("person"), c.req.valid("param").id);
   if (!result.ok) {
-    const { body, status } = fail(result);
-    return c.json(body, status);
+    return result.status === 403 ? c.json({ error: result.error }, 403) : c.json({ error: result.error }, 404);
   }
-  return c.json(result.value);
+  return c.json(result.value, 200);
 });

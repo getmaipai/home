@@ -12,10 +12,13 @@
     "db:generate": "drizzle-kit generate",
     "db:migrate": "bun run src/db/migrate.ts",
     "gen:settings": "bun run scripts/gen-settings-registry.ts",
+    "gen:api-docs": "bun run scripts/gen-api-docs.ts",
     "lint": "tsc --noEmit"
   },
   "dependencies": {
+    "@hono/zod-openapi": "^1.6.3",
     "@maipai/spec": "workspace:*",
+    "@scalar/hono-api-reference": "^0.12.0",
     "ajv": "^8.20.0",
     "drizzle-orm": "^0.44.6",
     "hono": "^4.10.7",

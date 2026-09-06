@@ -333,3 +333,144 @@ passed in isolation, failed once in ~3 full-suite runs). Slowed to
 way past capacity if unclamped"), a jitter margin two orders of
 magnitude wider. Five isolated runs and two full-suite runs afterward,
 all green.
+
+## Step 4: `@hono/zod-openapi` and `/api/docs` - the pattern (read this before converting a route file)
+
+Two new dependencies (`@hono/zod-openapi`, `@scalar/hono-api-reference`,
+both MIT - out of NOTICE's scope per that file's own header, which only
+covers components bundled into the shipped frontend). `lib/openapi.ts`
+(new) is the shared scaffolding every converted route file goes through;
+`routes/repairs.ts` is the worked example, fully converted, all its
+existing tests passing unchanged.
+
+**The conversion, mechanically:**
+
+1. `export const xRoutes = apiRouter();` (from `@/lib/openapi`) instead
+   of `new Hono<AppEnv>()`.
+2. One `createRoute({...})` per endpoint: `method`, `path` (Hono's `:id`
+   becomes OpenAPI's `{id}`), `tags` (groups it in `/api/docs`),
+   `summary`, `middleware: [requireAuth]` or `[requireRole(...)]` `as
+   const` (the exact same middleware chain, just declared in the route
+   object instead of as `.get()`'s second argument - `as const` is
+   required for TypeScript to infer the middleware's context correctly),
+   `request.params`/`request.query`/`request.body` (Zod schemas - path/
+   query fields need `.openapi({ param: { name, in } })` for correct
+   binding; body and response schemas don't), `responses` (a map of
+   status code to `{ content, description }` - use
+   `lib/openapi.ts`'s `errorResponses({ 400: "...", 404: "..." })` for
+   the error ones instead of repeating the same shape by hand).
+3. `xRoutes.openapi(theRoute, handler)` instead of
+   `.get/.post(path, middleware, handler)`. Inside the handler,
+   `c.req.valid("param"|"query"|"json")` instead of
+   `c.req.param()`/`c.req.query()`/`c.req.json()` - already validated
+   against the schema by the time the handler sees it.
+4. Reuse the real generated spec type as a response schema when the
+   route returns spec-shaped data (`import { Issue } from
+   "@maipai/spec/gen/ts/issue.js"`) rather than re-describing the shape
+   by hand in the route file - one definition, same as the lib layer's
+   own convention.
+
+**Two real gotchas found converting `repairs.ts`, both now load-bearing
+comments in `lib/openapi.ts` - read them before hitting the same wall:**
+
+- **`c.json(data)` needs an explicit literal status, even for 200.**
+  Omitting it left TypeScript unable to tell which of a route's several
+  declared response schemas the call was for, and it type-checked the
+  body against ALL of them (a 200 handler's data failing to type-check
+  against an unrelated 401 error schema, with a confusing error pointing
+  at the wrong line). Always `c.json(body, 200)`, `c.json(body, 404)`,
+  etc.
+- **The real bug was `lib/openapi.ts`'s own `errorResponses()` helper,
+  not a hono limitation** - worth stating plainly since the first
+  diagnosis while converting `repairs.ts` blamed the wrong thing (a
+  shared error-status helper returning `{ body, status: 400 | 404 }`,
+  used as `c.json(body, status)`) and rewrote every handler with manual
+  `if (result.status === 400) ...` branching to work around it. Verified
+  afterward: that branching was never necessary. `errorResponses()`'s
+  first version was typed `(statuses: Record<number, string>):
+  Record<number, {...}>` - a `Record<number, X>` return annotation
+  erases the actual literal keys (400, 403, 404) down to "some number",
+  so `createRoute`'s response union lost them regardless of how a
+  handler later called `c.json`. Once `errorResponses()` became generic
+  over the literal keys passed in (`<const T extends Record<number,
+  string>>`), a plain shared helper returning a union-typed `{ body,
+  status }` - the natural, less repetitive shape - type-checks exactly
+  as expected; `routes/repairs.ts` keeps the explicit-branching style
+  simply because it was already written that way when this was found,
+  not because it's required. Route files converted after this fix
+  (`notifications.ts`, `settings.ts`) use the shorter shared-helper
+  shape safely - use whichever style you find clearer.
+
+  A real, separate fix worth keeping regardless: `lib/issues.ts`'s
+  `IssueOpResult<T>` and `lib/notifications.ts`'s `NotificationOpResult<T>`
+  both declared a broader status union (400/403/404) than any one
+  function actually produces (`dismissIssue()` never returns 400,
+  `markRead()`/`dismiss()` never return 400 at all). Both gained a
+  second, defaulted type parameter (`IssueOpResult<T, S extends number =
+  400 | 404>`) so each function can declare its own true, narrower
+  range instead of the shared type's ceiling - a genuine accuracy fix
+  independent of the openapi conversion, since a `responses` map should
+  describe what a function can really return.
+
+**`docs/api/openapi.json`, generated and drift-checked:**
+`backend/scripts/gen-api-docs.ts` (`bun run gen:api-docs` from
+`backend/`) imports the live `app` and writes its OpenAPI document;
+`scripts/check.sh` regenerates it and fails if the working tree doesn't
+match, the identical shape `gen:settings`/`spec/settings/keys.json`
+already established. `/api/docs` (Scalar, reading `/api/openapi.json`
+live) is the interactive explorer; `docs/api/openapi.json` is the
+committed snapshot other tooling (the docs site, step 11) can read
+without a running hub.
+
+**What every other session converting their own route files needs to
+know:** `app.ts`'s top-level instance is now `apiRouter()` (an
+`OpenAPIHono`), not `new Hono()` - this is required for `/api/docs` to
+see anything, but it changes nothing for an UNCONVERTED router: a plain
+`Hono<AppEnv>` sub-router still mounts via `.route()` exactly as before
+and simply doesn't appear in the generated document until its own
+session converts it. Convert a route file only when you're already
+touching it (the org rule), copying `routes/repairs.ts`'s shape; nothing
+about this step requires converting a file you aren't otherwise editing.
+
+**Five of six pre-existing owned route files converted:**
+`notifications.ts`, `settings.ts`, `backups.ts` and `people.ts` followed
+`repairs.ts`'s exact shape, all their existing tests passing unchanged
+(749 backend tests green throughout). Two more real accuracy fixes at
+the source while converting, the same class as `lib/issues.ts`'s: both
+`lib/notifications.ts`'s `NotificationOpResult<T>` and this step's own
+narrowing pattern - `markRead()`/`dismiss()` never actually return 400,
+only 403/404, so the type (now `NotificationOpResult<T, S extends number
+= 403 | 404>`) stopped claiming otherwise.
+
+**A medium-effort code review on the whole step 4 diff found three
+cleanup findings, all fixed, no correctness bugs:** the same `{id: z.
+string().openapi(...)}` path-param shape was hand-declared separately in
+four files instead of once - `lib/openapi.ts` gained `idParamSchema(name,
+example?)`, now used by all four. Getting its own type right mattered:
+a naive `(paramName: string)` signature made the computed property key
+untypeable as anything but `string`, so `c.req.valid("param").id` came
+back as `string | undefined` at every call site instead of the
+guaranteed `string` a path param always is - fixed by making it generic
+over the literal name (`<const Name extends string>`), the identical
+"generic over literal keys" fix `errorResponses()` already needed for the
+same reason. Separately, `settings.ts`'s `settingsErrorResponse()` helper
+and `repairs.ts`/`notifications.ts`'s manual `if (result.status ===
+400) ... else ...` branching were both pure indirection around a plain
+ternary (`result.status === 400 ? c.json(...) : c.json(...)`) that
+type-checks identically and reads shorter - simplified to that shape
+everywhere.
+
+**`auth.ts` deliberately left unconverted.** Its `verifyAgainstRecord()`
+helper builds and returns a `Response` directly (via a generically-typed
+`Context<AppEnv>`, not a route-specific one) from inside a function
+shared by `/verify-secret` and `/change-secret` - two routes with
+different declared response shapes. Converting it properly means
+restructuring that helper to return a discriminated result each route's
+own typed handler turns into its own `c.json(...)` call, not a
+mechanical translation like the other five files - real, but genuinely
+different risk for session/credential-verification code specifically,
+the exact case docs/dev.md's own "API routes and @hono/zod-openapi"
+note already warned about ("converting the framework mid-feature-work
+risks introducing bugs in already-correct, already-tested code"). Left
+for a dedicated pass rather than rushed; `docs/BACKLOG.md` tracks it as
+the one remaining file.

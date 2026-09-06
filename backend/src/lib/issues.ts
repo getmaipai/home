@@ -162,7 +162,13 @@ export function listIssues(opts: { includeResolved?: boolean } = {}): Issue[] {
   return rows.map(toIssue);
 }
 
-export type IssueOpResult<T> = { ok: true; value: T } | { ok: false; status: 400 | 404; error: string };
+// `S` defaults to the union both real callers together produce, but each
+// is declared with its own true, narrower set below (dismissIssue() only
+// ever returns 404, never 400) - session-f-platform-and-trust.md step 4
+// found routes/repairs.ts's converted dismiss endpoint needed to declare
+// a 400 response it could never actually produce, just to satisfy a type
+// that claimed a possibility the function's own code never takes.
+export type IssueOpResult<T, S extends number = 400 | 404> = { ok: true; value: T } | { ok: false; status: S; error: string };
 
 function getRow(id: string): IssueRow | undefined {
   return db.select().from(issues).where(eq(issues.id, id)).get();
@@ -204,7 +210,7 @@ export async function fixIssue(id: string): Promise<IssueOpResult<Issue>> {
  * running any remedy - distinct from resolveIssue(), which means the
  * underlying problem actually went away (see spec/schemas/issue.schema.json's
  * dismissed_at comment for why the two must not share one field). */
-export function dismissIssue(id: string): IssueOpResult<{ id: string }> {
+export function dismissIssue(id: string): IssueOpResult<{ id: string }, 404> {
   const row = getRow(id);
   if (!row) return { ok: false, status: 404, error: `no issue ${id}` };
   if (!row.dismissedAt) {

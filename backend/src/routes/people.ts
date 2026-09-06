@@ -1,38 +1,42 @@
-import { Hono } from "hono";
+import { createRoute, z } from "@hono/zod-openapi";
 import { and, eq, isNull } from "drizzle-orm";
 import { db } from "@/db";
 import { people, personCredentials } from "@/db/schema";
 import { hashSecret } from "@/lib/secret";
 import { newPersonId } from "@/lib/id";
 import { nextHlc } from "@/lib/hlc";
-import {
-  requireAuth,
-  requireRole,
-  ROLE_LADDER,
-  invalidateSessionCacheForPerson,
-  type Role,
-} from "@/middleware/auth";
+import { requireAuth, requireRole, ROLE_LADDER, invalidateSessionCacheForPerson, type Role } from "@/middleware/auth";
 import { toRoster, parsePersonCandidate, personToDbValues } from "@/lib/personShape";
 import { listActivePeople } from "@/lib/access";
 import { validateDisplayName, validateSecret } from "@/lib/validation";
-import {
-  canManage,
-  checkRoleChange,
-  deletePerson,
-  deletePeople,
-  hasSecret,
-  type PersonEdit,
-} from "@/lib/personLifecycle";
-import type { AppEnv } from "@/types";
+import { canManage, checkRoleChange, deletePerson, deletePeople, hasSecret, type PersonEdit } from "@/lib/personLifecycle";
+import { apiRouter, errorResponses, idParamSchema } from "@/lib/openapi";
+import { Person } from "@maipai/spec/gen/ts/person.js";
 
-export const peopleRoutes = new Hono<AppEnv>();
+export const peopleRoutes = apiRouter();
+
+// The household roster shape every route below returns: a Person with
+// birthdate left out (4.2: birthdate is core-only). Derived from the
+// real generated spec schema with `.omit()` rather than redescribed by
+// hand, the same "one definition" reasoning lib/personShape.ts's own
+// toRoster() already applies at the lib layer.
+const RosterSchema = Person.omit({ birthdate: true });
 
 // Every signed-in person can see the household roster (who's who, not
 // management). Full admin views (birthdate, credential status per person)
 // are a follow-up once the People page exists (6, 12).
-peopleRoutes.get("/", requireAuth, async (c) => {
-  return c.json(listActivePeople().map(toRoster));
+const listRoute = createRoute({
+  method: "get",
+  path: "/",
+  tags: ["People"],
+  summary: "The household roster",
+  middleware: [requireAuth] as const,
+  responses: {
+    200: { content: { "application/json": { schema: z.array(RosterSchema) } }, description: "Every active person." },
+    ...errorResponses({ 401: "Not signed in" }),
+  },
 });
+peopleRoutes.openapi(listRoute, (c) => c.json(listActivePeople().map(toRoster), 200));
 
 // Who may create which role. Not spelled out verbatim in platform plan 4.2
 // (capability grants for "manage people" land with a later release); this
@@ -48,17 +52,37 @@ const CREATABLE_BY: Record<Role, Role[]> = {
   guest: [],
 };
 
-peopleRoutes.post("/", requireRole("owner", "admin"), async (c) => {
+const createRoute_ = createRoute({
+  method: "post",
+  path: "/",
+  tags: ["People"],
+  summary: "Create a new household profile",
+  middleware: [requireRole("owner", "admin")] as const,
+  request: {
+    body: {
+      content: {
+        "application/json": {
+          schema: z.object({
+            displayName: z.string().optional(),
+            nickname: z.string().nullable().optional(),
+            birthdate: z.string().nullable().optional(),
+            role: z.string().optional(),
+            avatarSeed: z.string().optional(),
+            secret: z.string().optional(),
+            localOnly: z.boolean().optional(),
+          }),
+        },
+      },
+    },
+  },
+  responses: {
+    201: { content: { "application/json": { schema: RosterSchema } }, description: "Created." },
+    ...errorResponses({ 400: "Invalid displayName/role/secret", 401: "Not signed in", 403: "Not allowed to create this role" }),
+  },
+});
+peopleRoutes.openapi(createRoute_, async (c) => {
   const actor = c.get("person");
-  const body = (await c.req.json().catch(() => ({}))) as {
-    displayName?: string;
-    nickname?: string | null;
-    birthdate?: string | null;
-    role?: string;
-    avatarSeed?: string;
-    secret?: string;
-    localOnly?: boolean;
-  };
+  const body = c.req.valid("json");
 
   const displayName = validateDisplayName(body.displayName);
   if (!displayName.ok) return c.json({ error: displayName.error }, 400);
@@ -117,13 +141,7 @@ peopleRoutes.post("/", requireRole("owner", "admin"), async (c) => {
 
   if (secret) {
     db.insert(personCredentials)
-      .values({
-        personId: id,
-        secretHash: await hashSecret(secret),
-        failedAttempts: 0,
-        createdAt: now,
-        updatedAt: now,
-      })
+      .values({ personId: id, secretHash: await hashSecret(secret), failedAttempts: 0, createdAt: now, updatedAt: now })
       .run();
   }
 
@@ -135,9 +153,37 @@ peopleRoutes.post("/", requireRole("owner", "admin"), async (c) => {
 // docs/BACKLOG.md as "no backend route exists for either, not just
 // missing UI"; lib/personLifecycle.ts holds the rules and the erasure,
 // with the reasoning for each.
-peopleRoutes.patch("/:id", requireAuth, async (c) => {
+const patchRoute = createRoute({
+  method: "patch",
+  path: "/{id}",
+  tags: ["People"],
+  summary: "Edit a person's profile",
+  middleware: [requireAuth] as const,
+  request: {
+    params: idParamSchema("id"),
+    body: {
+      content: {
+        "application/json": {
+          schema: z.object({
+            displayName: z.string().optional(),
+            nickname: z.string().nullable().optional(),
+            birthdate: z.string().nullable().optional(),
+            role: z.string().optional(),
+            avatarSeed: z.string().optional(),
+            localOnly: z.boolean().optional(),
+          }),
+        },
+      },
+    },
+  },
+  responses: {
+    200: { content: { "application/json": { schema: RosterSchema } }, description: "Updated." },
+    ...errorResponses({ 400: "Invalid role/displayName/birthdate", 401: "Not signed in", 403: "Not allowed to edit this person", 404: "No such person" }),
+  },
+});
+peopleRoutes.openapi(patchRoute, async (c) => {
   const actor = c.get("person");
-  const id = c.req.param("id");
+  const id = c.req.valid("param").id;
   const target = db
     .select()
     .from(people)
@@ -149,7 +195,7 @@ peopleRoutes.patch("/:id", requireAuth, async (c) => {
     return c.json({ error: `${actor.role} cannot edit a ${target.role} profile` }, 403);
   }
 
-  const body = (await c.req.json().catch(() => ({}))) as PersonEdit;
+  const body = c.req.valid("json") as PersonEdit;
 
   // The role is checked before anything is written, so a request that
   // changes a name AND an illegal role changes neither.
@@ -196,7 +242,7 @@ peopleRoutes.patch("/:id", requireAuth, async (c) => {
   // case auth.ts's invalidateSessionCacheForPerson was written for.
   if (nextRole !== target.role) invalidateSessionCacheForPerson(id);
   const { birthdate: _birthdate, ...roster } = candidate.data;
-  return c.json(roster);
+  return c.json(roster, 200);
 });
 
 // Batch delete (docs/UI.md > Batch actions). Registered before the
@@ -204,23 +250,76 @@ peopleRoutes.patch("/:id", requireAuth, async (c) => {
 // method and a literal path), but it is kept next to it deliberately:
 // the two share every rule, and a change to one that is not made to the
 // other is the bug this pairing exists to make obvious.
-peopleRoutes.post("/batch-delete", requireRole("owner", "admin"), async (c) => {
+const batchDeleteRoute = createRoute({
+  method: "post",
+  path: "/batch-delete",
+  tags: ["People"],
+  summary: "Delete several people at once",
+  middleware: [requireRole("owner", "admin")] as const,
+  request: {
+    body: { content: { "application/json": { schema: z.object({ ids: z.array(z.string()) }) } } },
+  },
+  responses: {
+    200: {
+      content: {
+        "application/json": {
+          schema: z.object({
+            outcomes: z.array(z.object({ id: z.string(), deleted: z.boolean(), reason: z.string().optional() })),
+          }),
+        },
+      },
+      description: "One outcome per requested id, in the same words the single-delete route would have used for a failure.",
+    },
+    ...errorResponses({ 400: "ids is missing, empty, or not a list of strings", 401: "Not signed in", 403: "Not owner/admin" }),
+  },
+});
+peopleRoutes.openapi(batchDeleteRoute, (c) => {
   const actor = c.get("person");
-  const body = (await c.req.json().catch(() => ({}))) as { ids?: unknown };
-  if (!Array.isArray(body.ids) || body.ids.some((id) => typeof id !== "string")) {
-    return c.json({ error: "ids must be a list of person ids" }, 400);
-  }
-  if (body.ids.length === 0) return c.json({ error: "no one was selected" }, 400);
-  return c.json({ outcomes: deletePeople(actor, body.ids as string[]) });
+  const { ids } = c.req.valid("json");
+  if (ids.length === 0) return c.json({ error: "no one was selected" }, 400);
+  return c.json({ outcomes: deletePeople(actor, ids) }, 200);
 });
 
-peopleRoutes.delete("/:id", requireRole("owner", "admin"), async (c) => {
+const deleteRoute = createRoute({
+  method: "delete",
+  path: "/{id}",
+  tags: ["People"],
+  summary: "Delete a person and erase what the household holds about them",
+  middleware: [requireRole("owner", "admin")] as const,
+  request: { params: idParamSchema("id") },
+  responses: {
+    200: {
+      content: {
+        "application/json": {
+          schema: z.object({
+            erased: z.object({
+              memories: z.number(),
+              conversations: z.number(),
+              conversationThreads: z.number(),
+              settings: z.number(),
+              clonedVoices: z.number(),
+              scheduledJobs: z.number(),
+              sessions: z.number(),
+            }),
+          }),
+        },
+      },
+      description: "What was actually removed, so the household can see the size of the erasure.",
+    },
+    ...errorResponses({ 400: "Cannot delete this person", 401: "Not signed in", 403: "You cannot delete your own profile, or you cannot manage this role", 404: "No such person" }),
+  },
+});
+peopleRoutes.openapi(deleteRoute, (c) => {
   const actor = c.get("person");
-  const result = deletePerson(actor, c.req.param("id"));
-  if (!result.ok) return c.json({ error: result.error }, result.status);
+  const result = deletePerson(actor, c.req.valid("param").id);
+  if (!result.ok) {
+    if (result.status === 400) return c.json({ error: result.error }, 400);
+    if (result.status === 403) return c.json({ error: result.error }, 403);
+    return c.json({ error: result.error }, 404);
+  }
   // The counts come back so the UI can say what was actually removed
   // rather than "done": this is the one action in the product that
   // destroys a person's history, and a family deserves to see the size
   // of it.
-  return c.json({ erased: result.value });
+  return c.json({ erased: result.value }, 200);
 });

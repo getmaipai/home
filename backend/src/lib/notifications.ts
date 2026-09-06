@@ -181,7 +181,15 @@ export function listHistory(actor: PersonRow): NotificationDeliveryView[] {
     .map(toView);
 }
 
-export type NotificationOpResult<T> = { ok: true; value: T } | { ok: false; status: 400 | 403 | 404; error: string };
+// `S` defaults to the union `ownedDelivery()` itself produces; a caller
+// with a genuinely narrower real range (neither markRead() nor dismiss()
+// below ever return anything but what ownedDelivery() gives them, so
+// both stay the default) declares its own S the way
+// lib/issues.ts's IssueOpResult<T, S> does, for the identical reason:
+// routes/notifications.ts's converted @hono/zod-openapi handlers need
+// each function's response `responses` map to describe what it can
+// really return, not a broader shared type's ceiling.
+export type NotificationOpResult<T, S extends number = 403 | 404> = { ok: true; value: T } | { ok: false; status: S; error: string };
 
 function ownedDelivery(actor: PersonRow, id: string): NotificationOpResult<typeof notificationDeliveries.$inferSelect> {
   const row = db.select().from(notificationDeliveries).where(eq(notificationDeliveries.id, id)).get();
