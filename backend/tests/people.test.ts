@@ -424,6 +424,56 @@ describe("DELETE /api/people/:id", () => {
     expect(res.status).toBe(403);
   });
 
+  // COR-5 (code review, 2026-09-06): otherOwnerCount() used to be checked
+  // BEFORE the writes, with nothing atomic tying the two together - two
+  // owners deleting each other at the same moment could each see "the
+  // other owner still exists" before either delete actually landed,
+  // leaving zero owners. Fired without awaiting the first, on purpose -
+  // the exact overlap the fix guards against.
+  test("two owners deleting each other at the same moment leave at least one owner", async () => {
+    const owner = await ownerSession();
+    const secondOwner = await addPerson(owner, "Marlow", "owner", "ownerpin2");
+    const ownerId = ((await (await owner.get("/api/auth/me")).json()) as { id: string }).id;
+    const secondClient = await sessionFor(secondOwner.id, "ownerpin2");
+
+    const [resA, resB] = await Promise.all([
+      owner.request(`/api/people/${secondOwner.id}`, { method: "DELETE" }),
+      secondClient.request(`/api/people/${ownerId}`, { method: "DELETE" }),
+    ]);
+    const statuses = [resA.status, resB.status].sort((a, b) => a - b);
+    // Exactly one succeeds; the other's target is either already gone
+    // (404) or refused as the last owner (400) - either way, never both
+    // succeeding.
+    expect(statuses[0]).toBe(200);
+    expect([400, 404]).toContain(statuses[1]!);
+
+    const remainingOwners = (await (await owner.get("/api/people")).json()) as Array<{ id: string; role: string }>;
+    expect(remainingOwners.filter((p) => p.role === "owner").length).toBeGreaterThanOrEqual(1);
+  });
+
+  // A review of the COR-5 fix (2026-09-06) found checkRoleChange()'s own
+  // last-owner guard has the identical race, one function away: it runs
+  // before the route's own write, so two owners demoting each other at
+  // the same moment could each see "another owner still exists" before
+  // either write lands.
+  test("two owners demoting each other at the same moment leave at least one owner", async () => {
+    const owner = await ownerSession();
+    const secondOwner = await addPerson(owner, "Marlow", "owner", "ownerpin2");
+    const ownerId = ((await (await owner.get("/api/auth/me")).json()) as { id: string }).id;
+    const secondClient = await sessionFor(secondOwner.id, "ownerpin2");
+
+    const [resA, resB] = await Promise.all([
+      owner.request(`/api/people/${secondOwner.id}`, { method: "PATCH", body: { role: "admin" } }),
+      secondClient.request(`/api/people/${ownerId}`, { method: "PATCH", body: { role: "admin" } }),
+    ]);
+    const statuses = [resA.status, resB.status].sort((a, b) => a - b);
+    expect(statuses[0]).toBe(200);
+    expect(statuses[1]).toBe(400);
+
+    const roster = (await (await owner.get("/api/people")).json()) as Array<{ role: string }>;
+    expect(roster.filter((p) => p.role === "owner").length).toBeGreaterThanOrEqual(1);
+  });
+
   test("a deleted person cannot sign in again", async () => {
     const owner = await ownerSession();
     const child = await addPerson(owner, "Bramble", "child");

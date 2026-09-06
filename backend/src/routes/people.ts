@@ -9,7 +9,7 @@ import { requireAuth, requireRoleOrGrant, ROLE_LADDER, invalidateSessionCacheFor
 import { toRoster, parsePersonCandidate, personToDbValues, guestExpiryProblem } from "@/lib/personShape";
 import { listActivePeople } from "@/lib/access";
 import { validateDisplayName, validateSecret } from "@/lib/validation";
-import { canManage, checkRoleChange, deletePerson, deletePeople, memorializePerson, type PersonEdit } from "@/lib/personLifecycle";
+import { canManage, checkRoleChange, commitPersonUpdate, deletePerson, deletePeople, memorializePerson, type PersonEdit } from "@/lib/personLifecycle";
 import { requiresCredential } from "@/lib/personAuthMethods";
 import { effectivePermissions } from "@/lib/permissions";
 import { apiRouter, errorResponses, idParamSchema } from "@/lib/openapi";
@@ -268,7 +268,14 @@ peopleRoutes.openapi(patchRoute, async (c) => {
     return c.json({ error: candidate.error.issues.map((i) => i.message).join("; ") }, 400);
   }
 
-  db.update(people).set(personToDbValues(candidate.data)).where(eq(people.id, id)).run();
+  // commitPersonUpdate (lib/personLifecycle.ts), not a plain db.update():
+  // a review found checkRoleChange()'s own last-owner check above has the
+  // identical race COR-5 fixed for deletePerson() - this re-checks it
+  // atomically with the write, so a race that loses here returns the
+  // same error the early check above would have, instead of silently
+  // leaving the household with zero owners.
+  const committed = commitPersonUpdate(id, personToDbValues(candidate.data), target.role === "owner" && nextRole !== "owner");
+  if (!committed.ok) return c.json({ error: committed.error }, committed.status);
   // A cached session carries the whole PersonRow, role included, so a
   // demotion would not take effect until the cache expired: the other
   // case auth.ts's invalidateSessionCacheForPerson was written for.
