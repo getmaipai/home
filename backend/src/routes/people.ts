@@ -9,7 +9,7 @@ import { requireAuth, requireRoleOrGrant, ROLE_LADDER, invalidateSessionCacheFor
 import { toRoster, parsePersonCandidate, personToDbValues, guestExpiryProblem } from "@/lib/personShape";
 import { listActivePeople } from "@/lib/access";
 import { validateDisplayName, validateSecret } from "@/lib/validation";
-import { canManage, checkRoleChange, deletePerson, deletePeople, memorializePerson, type PersonEdit } from "@/lib/personLifecycle";
+import { canManage, checkRoleChange, commitPersonUpdate, deletePerson, deletePeople, memorializePerson, type PersonEdit } from "@/lib/personLifecycle";
 import { requiresCredential } from "@/lib/personAuthMethods";
 import { effectivePermissions } from "@/lib/permissions";
 import { apiRouter, errorResponses, idParamSchema } from "@/lib/openapi";
@@ -209,6 +209,25 @@ peopleRoutes.openapi(patchRoute, async (c) => {
 
   const body = c.req.valid("json") as PersonEdit;
 
+  // canManage() lets everyone edit their OWN profile (name, nickname,
+  // avatar) with no ladder check at all - birthdate and localOnly are
+  // safety-adjacent, not cosmetic, so a self-edit of either still needs
+  // the ladder. A code review (2026-09-06, SEC-8) found a child free to
+  // set their own birthdate to any adult year, which speakerAgeBand()
+  // (lib/ageBand.ts) used to read straight into "age band adult" for
+  // that same person's own turns - the classifier itself still gates on
+  // role, but the prompt's tone/content calibration and evaluateSafety()'s
+  // leniency both used to loosen on request. Owner/admin editing
+  // themselves is unaffected: they already sit at the top of the ladder.
+  if (actor.id === id && actor.role !== "owner" && actor.role !== "admin") {
+    if (body.birthdate !== undefined) {
+      return c.json({ error: "birthdate can only be changed by an owner or admin" }, 403);
+    }
+    if (body.localOnly !== undefined) {
+      return c.json({ error: "localOnly can only be changed by an owner or admin" }, 403);
+    }
+  }
+
   // The role is checked before anything is written, so a request that
   // changes a name AND an illegal role changes neither.
   let nextRole = target.role;
@@ -268,7 +287,14 @@ peopleRoutes.openapi(patchRoute, async (c) => {
     return c.json({ error: candidate.error.issues.map((i) => i.message).join("; ") }, 400);
   }
 
-  db.update(people).set(personToDbValues(candidate.data)).where(eq(people.id, id)).run();
+  // commitPersonUpdate (lib/personLifecycle.ts), not a plain db.update():
+  // a review found checkRoleChange()'s own last-owner check above has the
+  // identical race COR-5 fixed for deletePerson() - this re-checks it
+  // atomically with the write, so a race that loses here returns the
+  // same error the early check above would have, instead of silently
+  // leaving the household with zero owners.
+  const committed = commitPersonUpdate(id, personToDbValues(candidate.data), target.role === "owner" && nextRole !== "owner");
+  if (!committed.ok) return c.json({ error: committed.error }, committed.status);
   // A cached session carries the whole PersonRow, role included, so a
   // demotion would not take effect until the cache expired: the other
   // case auth.ts's invalidateSessionCacheForPerson was written for.

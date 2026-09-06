@@ -102,6 +102,34 @@ export function listJobs(): JobRow[] {
   return db.select().from(modelDownloadJobs).all().map(toJobRow);
 }
 
+// COR-8 (code review, 2026-09-06): `activeJob` above is in-memory only,
+// by design (it exists to serialize concurrent "choose this" calls
+// within ONE process's lifetime, not to survive a restart) - but nothing
+// ELSE recovered from a crash mid-download either. The job ROW persists
+// (that's the whole point of writing progress to model_download_jobs),
+// so a crash left it sitting in whatever non-terminal status it was in
+// (say "downloading_model") with nothing running, and
+// GET /models/:id/select-status kept reporting that phantom job forever -
+// a real (if resumable) download reads as permanently stuck until
+// someone clicks "choose this" again to notice it isn't actually
+// running. Called once at boot (index.ts), before anything could
+// legitimately claim to be mid-job again. The .part file downloadUrl()
+// already resumes from is untouched - this only corrects the STATUS a
+// restart made stale, not the partial download itself.
+const TERMINAL_STATUSES: ReadonlySet<JobStatus> = new Set(["ready", "failed"]);
+
+export function recoverInterruptedJobsAtBoot(): void {
+  // upsertJob(), not a hand-rolled db.update() - a review of this fix
+  // found every OTHER status write in this file already goes through it;
+  // this is the one exception that would silently drift the day
+  // upsertJob() gains a side effect (a cache invalidation, a changed
+  // updatedAt policy) this call site wouldn't pick up.
+  for (const row of db.select().from(modelDownloadJobs).all()) {
+    if (TERMINAL_STATUSES.has(row.status as JobStatus)) continue;
+    upsertJob(row.modelId, { status: "failed", error: "interrupted by restart" });
+  }
+}
+
 function engineDir(binaryId: string): string {
   return join(enginesDir, binaryId);
 }

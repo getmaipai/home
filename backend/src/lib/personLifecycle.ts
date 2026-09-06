@@ -50,6 +50,7 @@ import { deleteReceivedBackupsForDevice } from "@/lib/receivedBackups";
 import { ROLE_LADDER, invalidateSessionCacheForPerson, type Role } from "@/middleware/auth";
 import { trigger } from "@/lib/notifications";
 import type { PersonRow } from "@/types";
+import type { personToDbValues } from "@/lib/personShape";
 
 export type PersonOpResult<T> =
   | { ok: true; value: T }
@@ -86,8 +87,31 @@ function otherOwnerCount(excludingId: string): number {
     .all().length;
 }
 
-/** Everyone may edit their own name, nickname, birthdate and avatar.
- * Managing somebody else needs the ladder above. */
+// A review (2026-09-06) found this exact check - and the exact same
+// error it returns - hand-written three times (checkRoleChange,
+// commitPersonUpdate, deletePerson), each with its own copy of the
+// wording. One place now: `wouldLeaveOwnerRole` is each caller's own
+// "is this operation taking personId OUT of being an owner" condition
+// (a role change away from owner, or a delete of an owner), already
+// true by the time any of them reach this - the last-owner count is the
+// one part actually worth sharing. otherOwnerCount() no longer needs to
+// be exported: this is the only caller now, closing the "dead export
+// inviting a future caller to roll its own unguarded check" gap the same
+// review found.
+function lastOwnerGuardError(personId: string, wouldLeaveOwnerRole: boolean): PersonOpResult<never> | null {
+  if (!wouldLeaveOwnerRole) return null;
+  if (otherOwnerCount(personId) > 0) return null;
+  return { ok: false, status: 400, error: "this is the household's only owner. Make someone else an owner first." };
+}
+
+/** Everyone may edit their own name, nickname and avatar. Managing
+ * somebody else needs the ladder above.
+ *
+ * Birthdate and localOnly are the exception (SEC-8, code review,
+ * 2026-09-06): they're safety-adjacent, not cosmetic, so a self-edit of
+ * either still needs owner/admin - checked separately in
+ * routes/people.ts's PATCH handler, not here, since this function has no
+ * way to see WHICH fields a given request is touching. */
 export function canManage(actor: PersonRow, target: { id: string; role: string }): boolean {
   if (actor.id === target.id) return true;
   return (MANAGEABLE_BY[actor.role as Role] ?? []).includes(target.role as Role);
@@ -127,13 +151,8 @@ export function checkRoleChange(
   if (actor.role !== "owner") {
     return { ok: false, status: 403, error: `${actor.role} cannot change a person's role` };
   }
-  if (target.role === "owner" && otherOwnerCount(target.id) === 0) {
-    return {
-      ok: false,
-      status: 400,
-      error: "this is the household's only owner. Make someone else an owner first.",
-    };
-  }
+  const lastOwnerError = lastOwnerGuardError(target.id, target.role === "owner");
+  if (lastOwnerError) return lastOwnerError;
   // routes/people.ts: "a PIN-free owner or admin profile is a one-request
   // takeover for anyone who can reach the API." Promotion has to honour
   // that too, or the rule is only enforced on the path that happens to
@@ -151,6 +170,39 @@ export function checkRoleChange(
   }
   return { ok: true, value: nextRole as Role };
 }
+
+// A review of the COR-5 fix above (2026-09-06) found checkRoleChange()'s
+// own last-owner guard has the identical race deletePerson() just got
+// fixed for, one function away: it runs before routes/people.ts's own
+// write, so two concurrent demotions of two different sole-owner-adjacent
+// people (or a demote racing a delete) could each see "another owner
+// still exists" before either write lands. routes/people.ts's PATCH
+// handler does real work between checkRoleChange()'s own early check (a
+// nice, immediate 400 for the ordinary non-racing case) and the actual
+// write - re-validating a whole Person candidate, none of it needing
+// re-verification here - so this re-checks and writes atomically at the
+// one point that actually matters, rather than moving the whole handler
+// into one transaction. Never throws; a race that loses returns the
+// identical error checkRoleChange()'s own early check would have.
+export const commitPersonUpdate = sqlite.transaction(
+  (
+    personId: string,
+    dbValues: ReturnType<typeof personToDbValues>,
+    // A single pre-computed condition, matching checkRoleChange()'s and
+    // deletePerson()'s own call shape - a code review of this fix
+    // (2026-09-06) found the two-flag form here let a caller AND them
+    // together itself, which invites passing a `wasOwner`/`leavingOwnerRole`
+    // pair that don't reflect the same real before/after transition (a
+    // stale `wasOwner` read separately from the `nextRole` behind
+    // `leavingOwnerRole`, say) and silently defeat the guard.
+    wouldLeaveOwnerRole: boolean,
+  ): PersonOpResult<true> => {
+    const lastOwnerError = lastOwnerGuardError(personId, wouldLeaveOwnerRole);
+    if (lastOwnerError) return lastOwnerError;
+    db.update(people).set(dbValues).where(eq(people.id, personId)).run();
+    return { ok: true, value: true };
+  },
+);
 
 // A code review (2026-09-06) found this returning true for a row that
 // merely EXISTS, not one with a real secretHash - step 6 made secretHash
@@ -327,7 +379,27 @@ export function erasePersonData(personId: string): ErasureCounts {
   };
 }
 
-export function deletePerson(actor: PersonRow, personId: string): PersonOpResult<ErasureCounts> {
+// COR-5 (code review, 2026-09-06): erasePersonData()'s own SQL
+// statements plus the tombstone update below used to run outside any
+// transaction, and (the more concrete risk) the otherOwnerCount() check
+// below ran BEFORE the writes with nothing stopping two owners from
+// deleting each other at the same moment: both checks could see "another
+// owner still exists" before either delete actually landed, leaving zero
+// owners. sqlite.transaction()'s own callback runs synchronously start
+// to finish (bun:sqlite, like better-sqlite3, has no async transaction
+// API, and neither the check nor erasePersonData() ever awaits anything)
+// - on a single JS thread, that alone is what closes the race: a second,
+// "concurrent" call's own synchronous transaction cannot begin until
+// this one's callback has already returned, by which point either the
+// target owner is already gone (livingPerson() below returns null) or
+// the count already reflects the first delete. This covers every SQL
+// write erasePersonData() makes (all of them go through this same
+// connection); it does NOT extend to the plain-file unlinks inside it
+// (a cloned voice's audio file) - those were already best-effort,
+// tolerant of a leftover orphan, before this fix (that function's own
+// header explains why), and stay exactly that tolerant now, just with
+// the SQL side genuinely atomic underneath.
+export const deletePerson = sqlite.transaction((actor: PersonRow, personId: string): PersonOpResult<ErasureCounts> => {
   const target = livingPerson(personId);
   if (!target) return { ok: false, status: 404, error: "no such person" };
 
@@ -340,13 +412,8 @@ export function deletePerson(actor: PersonRow, personId: string): PersonOpResult
   if (!canManage(actor, target)) {
     return { ok: false, status: 403, error: `${actor.role} cannot delete a ${target.role} profile` };
   }
-  if (target.role === "owner" && otherOwnerCount(personId) === 0) {
-    return {
-      ok: false,
-      status: 400,
-      error: "this is the household's only owner. Make someone else an owner first.",
-    };
-  }
+  const lastOwnerError = lastOwnerGuardError(personId, target.role === "owner");
+  if (lastOwnerError) return lastOwnerError;
 
   const counts = erasePersonData(personId);
 
@@ -360,7 +427,7 @@ export function deletePerson(actor: PersonRow, personId: string): PersonOpResult
     .run();
 
   return { ok: true, value: counts };
-}
+});
 
 
 export interface BatchDeleteOutcome {

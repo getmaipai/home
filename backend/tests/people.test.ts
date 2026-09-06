@@ -234,6 +234,53 @@ describe("PATCH /api/people/:id", () => {
     expect(body.nickname).toBe("Bee");
   });
 
+  // SEC-8 (code review, 2026-09-06): canManage() lets anyone edit their
+  // own profile with no ladder check at all, which used to cover
+  // birthdate too - a child could set their own birthdate to any adult
+  // year and read as "age band adult" in their own prompt (lib/ageBand.ts
+  // speakerAgeBand()). Birthdate and localOnly are safety-adjacent, not
+  // cosmetic, so self-edits of either now need the same ladder as editing
+  // someone else.
+  test("a child cannot change their own birthdate or localOnly", async () => {
+    const ownerClient = await ownerSession();
+    const child = await addPerson(ownerClient, "Bramble", "child");
+    const childClient = await sessionFor(child.id);
+
+    const birthdateRes = await childClient.request(`/api/people/${child.id}`, {
+      method: "PATCH",
+      body: { birthdate: "1990-01-01" },
+    });
+    expect(birthdateRes.status).toBe(403);
+
+    const localOnlyRes = await childClient.request(`/api/people/${child.id}`, {
+      method: "PATCH",
+      body: { localOnly: true },
+    });
+    expect(localOnlyRes.status).toBe(403);
+
+    // Name/nickname in the SAME request as the refused field still goes
+    // nowhere, same "whole request refused together" rule as a rejected
+    // role change above.
+    const combined = await childClient.request(`/api/people/${child.id}`, {
+      method: "PATCH",
+      body: { displayName: "Renamed", birthdate: "1990-01-01" },
+    });
+    expect(combined.status).toBe(403);
+    const roster = (await (await ownerClient.get("/api/people")).json()) as Array<{ id: string; display_name: string }>;
+    expect(roster.find((p) => p.id === child.id)?.display_name).toBe("Bramble");
+  });
+
+  test("an owner or admin editing their own profile may still change their own birthdate and localOnly", async () => {
+    const ownerClient = await ownerSession();
+    const ownerId = ((await (await ownerClient.get("/api/auth/me")).json()) as { id: string }).id;
+
+    const res = await ownerClient.request(`/api/people/${ownerId}`, {
+      method: "PATCH",
+      body: { birthdate: "1980-01-01", localOnly: true },
+    });
+    expect(res.status).toBe(200);
+  });
+
   test("a child cannot edit somebody else's profile", async () => {
     const ownerClient = await ownerSession();
     const child = await addPerson(ownerClient, "Bramble", "child");
@@ -422,6 +469,56 @@ describe("DELETE /api/people/:id", () => {
     const adminClient = await sessionFor(admin.id, "adminpin3");
     const res = await adminClient.request(`/api/people/${secondOwner.id}`, { method: "DELETE" });
     expect(res.status).toBe(403);
+  });
+
+  // COR-5 (code review, 2026-09-06): otherOwnerCount() used to be checked
+  // BEFORE the writes, with nothing atomic tying the two together - two
+  // owners deleting each other at the same moment could each see "the
+  // other owner still exists" before either delete actually landed,
+  // leaving zero owners. Fired without awaiting the first, on purpose -
+  // the exact overlap the fix guards against.
+  test("two owners deleting each other at the same moment leave at least one owner", async () => {
+    const owner = await ownerSession();
+    const secondOwner = await addPerson(owner, "Marlow", "owner", "ownerpin2");
+    const ownerId = ((await (await owner.get("/api/auth/me")).json()) as { id: string }).id;
+    const secondClient = await sessionFor(secondOwner.id, "ownerpin2");
+
+    const [resA, resB] = await Promise.all([
+      owner.request(`/api/people/${secondOwner.id}`, { method: "DELETE" }),
+      secondClient.request(`/api/people/${ownerId}`, { method: "DELETE" }),
+    ]);
+    const statuses = [resA.status, resB.status].sort((a, b) => a - b);
+    // Exactly one succeeds; the other's target is either already gone
+    // (404) or refused as the last owner (400) - either way, never both
+    // succeeding.
+    expect(statuses[0]).toBe(200);
+    expect([400, 404]).toContain(statuses[1]!);
+
+    const remainingOwners = (await (await owner.get("/api/people")).json()) as Array<{ id: string; role: string }>;
+    expect(remainingOwners.filter((p) => p.role === "owner").length).toBeGreaterThanOrEqual(1);
+  });
+
+  // A review of the COR-5 fix (2026-09-06) found checkRoleChange()'s own
+  // last-owner guard has the identical race, one function away: it runs
+  // before the route's own write, so two owners demoting each other at
+  // the same moment could each see "another owner still exists" before
+  // either write lands.
+  test("two owners demoting each other at the same moment leave at least one owner", async () => {
+    const owner = await ownerSession();
+    const secondOwner = await addPerson(owner, "Marlow", "owner", "ownerpin2");
+    const ownerId = ((await (await owner.get("/api/auth/me")).json()) as { id: string }).id;
+    const secondClient = await sessionFor(secondOwner.id, "ownerpin2");
+
+    const [resA, resB] = await Promise.all([
+      owner.request(`/api/people/${secondOwner.id}`, { method: "PATCH", body: { role: "admin" } }),
+      secondClient.request(`/api/people/${ownerId}`, { method: "PATCH", body: { role: "admin" } }),
+    ]);
+    const statuses = [resA.status, resB.status].sort((a, b) => a - b);
+    expect(statuses[0]).toBe(200);
+    expect(statuses[1]).toBe(400);
+
+    const roster = (await (await owner.get("/api/people")).json()) as Array<{ role: string }>;
+    expect(roster.filter((p) => p.role === "owner").length).toBeGreaterThanOrEqual(1);
   });
 
   test("a deleted person cannot sign in again", async () => {

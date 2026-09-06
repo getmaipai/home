@@ -39,12 +39,30 @@ function ageBandFromRole(role: string): AgeBand {
   return "adult"; // owner/admin/adult/guest: role carries no minor signal
 }
 
+// child < teen < adult, most restrictive first. Used below to take the
+// STRICTER of the role-derived and birthdate-derived bands, never the
+// looser one.
+const BAND_STRICTNESS: Record<AgeBand, number> = { child: 0, teen: 1, adult: 2 };
+
 /** The one, shared age-band computation - turnEngine.ts's prompt
  * (speakerLine()) and safety.ts's evaluateSafety() both call this for the
  * same actor on the same turn, rather than each deriving their own
- * answer from a different signal. */
+ * answer from a different signal.
+ *
+ * A code review (2026-09-06, SEC-8) found birthdate could OVERRIDE role
+ * in either direction: a `child`-role person free to edit their own
+ * birthdate (routes/people.ts's self-edit rule) could set it to any
+ * adult year and read as "age band adult" here, loosening tone and
+ * content calibration role alone would have kept strict (the safety
+ * classifier itself still gates on role independently, so refusals held,
+ * but this is the identical signal evaluateSafety() reads for
+ * leniency). Role is now a FLOOR: birthdate may only make the band
+ * stricter than role would (an `adult`-role person with a birthdate on
+ * file that says teen still reads as teen, which was always the point of
+ * checking birthdate at all), never looser. */
 export function speakerAgeBand(actor: PersonRow, now: Date): AgeBand {
-  if (!actor.birthdate) return ageBandFromRole(actor.role);
+  const roleBand = ageBandFromRole(actor.role);
+  if (!actor.birthdate) return roleBand;
   const years = ageInYears(actor.birthdate, now);
   // A malformed birthdate (Person's generated Zod schema enforces
   // `.date()` today, so this shouldn't be reachable through any real
@@ -52,8 +70,7 @@ export function speakerAgeBand(actor: PersonRow, now: Date): AgeBand {
   // defended against it anyway) must never silently fall through to
   // "adult": both `years < 13` and `years < 18` are false for NaN,
   // which is exactly the wrong direction for a safety-adjacent signal.
-  if (Number.isNaN(years)) return ageBandFromRole(actor.role);
-  if (years < 13) return "child";
-  if (years < 18) return "teen";
-  return "adult";
+  if (Number.isNaN(years)) return roleBand;
+  const birthdateBand: AgeBand = years < 13 ? "child" : years < 18 ? "teen" : "adult";
+  return BAND_STRICTNESS[birthdateBand] < BAND_STRICTNESS[roleBand] ? birthdateBand : roleBand;
 }

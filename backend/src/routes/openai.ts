@@ -83,7 +83,17 @@ openaiRoutes.post("/v1/chat/completions", requireApiToken, bodyLimit({ maxSize: 
   const model = typeof body.model === "string" && body.model.length > 0 ? body.model : "maipai";
 
   if (body.stream) {
-    const result = await runTurnStream(actor, surface, text);
+    // COR-7 (code review, 2026-09-06; a follow-up review found this
+    // route had the identical gap routes/turn.ts's /stream was fixed
+    // for): an external client (Home Assistant, a scripted tool)
+    // disconnecting mid-reply used to leave generation running with
+    // nothing reading it, tying up the engine's one generation slot for
+    // the rest of that reply. Same fix: the signal reaches all the way
+    // to the real fetch (lib/llm.ts's startCompleteStream,
+    // spec/llm/ts/client.ts's chatCompleteStream), fired from the
+    // ReadableStream's own cancel() below.
+    const abortController = new AbortController();
+    const result = await runTurnStream(actor, surface, text, { signal: abortController.signal });
     if (!result.ok) {
       return c.json({ error: { message: result.error, code: result.code } }, result.status);
     }
@@ -111,6 +121,9 @@ openaiRoutes.post("/v1/chat/completions", requireApiToken, bodyLimit({ maxSize: 
         } finally {
           controller.close();
         }
+      },
+      cancel() {
+        abortController.abort();
       },
     });
     return new Response(stream, { headers: { "content-type": "text/event-stream", "cache-control": "no-cache" } });

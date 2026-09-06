@@ -9,9 +9,18 @@
 // seedHlc()'s exact boundary (a seed at the identical wall_ms with a
 // LOWER counter must be a no-op, not just "an older wall_ms is").
 import { describe, expect, test, beforeEach } from "bun:test";
-import { nextHlc, compareHlc, seedHlc, __resetHlcForTests } from "@/lib/hlc";
+import { is, getTableColumns, getTableName } from "drizzle-orm";
+import { SQLiteTable } from "drizzle-orm/sqlite-core";
+import { nextHlc, compareHlc, seedHlc, seedHlcFromDatabase, HLC_BEARING_TABLES, __resetHlcForTests } from "@/lib/hlc";
+import * as schema from "@/db/schema";
+import { db } from "@/db";
+import { people } from "@/db/schema";
+import { resetDb } from "./reset-db";
 
-beforeEach(() => __resetHlcForTests());
+beforeEach(() => {
+  __resetHlcForTests();
+  resetDb();
+});
 
 describe("nextHlc()", () => {
   test("matches the spec's hlc pattern (wall_ms:counter:node)", () => {
@@ -87,5 +96,50 @@ describe("seedHlc()", () => {
     seedHlc(`${wallMs}:0:zzzzzz`); // strictly lower counter at the identical wall_ms
     const third = nextHlc();
     expect(compareHlc(third, second)).toBeGreaterThan(0);
+  });
+});
+
+// COR-6 (code review, 2026-09-06): seedHlcFromDatabase() used to only
+// ever seed from settings_values (lib/settings.ts's own module-load
+// call) - memory_records, conversations, conversation_turns, people,
+// issues and the rest of HLC_BEARING_TABLES were all free to get a
+// stamp OLDER than what was already on disk after a clock regression.
+describe("HLC_BEARING_TABLES stays in sync with the real schema", () => {
+  test("every table with a real hlc column is in the list, and nothing else claims to be", () => {
+    const tablesWithHlcColumn: string[] = [];
+    for (const value of Object.values(schema)) {
+      if (!is(value, SQLiteTable)) continue;
+      const table = value as SQLiteTable;
+      if ("hlc" in getTableColumns(table)) tablesWithHlcColumn.push(getTableName(table));
+    }
+    tablesWithHlcColumn.sort();
+    expect(tablesWithHlcColumn).toEqual([...HLC_BEARING_TABLES].sort());
+  });
+});
+
+describe("seedHlcFromDatabase()", () => {
+  beforeEach(() => resetDb());
+
+  test("seeds from a real row's hlc, across a real table (people), not just settings_values", async () => {
+    db.insert(people)
+      .values({
+        id: "person-hlctest",
+        displayName: "Test",
+        role: "adult",
+        avatarSeed: "person-hlctest",
+        source: "hub",
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        hlc: "9999999999999:5:abc123",
+      })
+      .run();
+
+    seedHlcFromDatabase();
+    const fresh = nextHlc();
+    expect(compareHlc(fresh, "9999999999999:5:abc123")).toBeGreaterThan(0);
+  });
+
+  test("an empty database seeds nothing and never throws", () => {
+    expect(() => seedHlcFromDatabase()).not.toThrow();
   });
 });

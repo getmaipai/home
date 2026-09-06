@@ -171,7 +171,17 @@ turnRoutes.post("/stream", requireAuth, bodyLimit({ maxSize: TURN_BODY_LIMIT }),
     conversation_id?: string;
   };
   const surface = (body.surface ?? "chat") as Surface;
-  const result = await runTurnStream(actor, surface, body.text ?? "", { thinking: body.thinking, conversationId: body.conversation_id });
+  // COR-7 (code review, 2026-09-06): a disconnected client used to leave
+  // generation running with nothing reading it - this controller's
+  // signal reaches all the way to the real fetch (lib/llm.ts's
+  // startCompleteStream, spec/llm/ts/client.ts's chatCompleteStream),
+  // fired from the ReadableStream's own cancel() below.
+  const abortController = new AbortController();
+  const result = await runTurnStream(actor, surface, body.text ?? "", {
+    thinking: body.thinking,
+    conversationId: body.conversation_id,
+    signal: abortController.signal,
+  });
   if (!result.ok) {
     return c.json({ error: result.error, code: result.code }, result.status);
   }
@@ -204,6 +214,14 @@ turnRoutes.post("/stream", requireAuth, bodyLimit({ maxSize: TURN_BODY_LIMIT }),
       } finally {
         controller.close();
       }
+    },
+    // COR-7: called when the client disconnects mid-stream (a closed
+    // tab, a dropped connection) - without this, streamTurnEvents() kept
+    // pulling from gateOutputSafety()/chatCompleteStream() for a
+    // response nobody would ever read, tying up the engine's one
+    // generation slot for the rest of that reply's length.
+    cancel() {
+      abortController.abort();
     },
   });
   return new Response(stream, { headers: { "content-type": "application/x-ndjson" } });

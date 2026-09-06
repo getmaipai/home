@@ -109,6 +109,90 @@ describe("POST /v1/chat/completions", () => {
     expect(fullText).toContain("hello there");
   });
 
+  // COR-7 (code review, 2026-09-06): a follow-up review pass on the
+  // routes/turn.ts fix found this route had the identical gap - a client
+  // (Home Assistant's OpenAI Conversation integration, a scripted tool)
+  // disconnecting mid-reply used to leave generation running with
+  // nothing reading it. Same real-server setup as lib/llm.ts's own COR-7
+  // test (a real local server, not the canned stub, so it can observe
+  // its own request's AbortSignal actually firing) but exercised through
+  // the full HTTP route.
+  //
+  // Waits on `requestReceived`, not on reading real content back: Bun.serve
+  // was found (empirically, while writing this test) to buffer a small
+  // first ReadableStream write and not actually flush it to the client
+  // until a LATER write or close - so polling for the real "hello" token
+  // to come back through the route's own response stream would just be
+  // measuring that buffering delay, not proving the connection is live.
+  // The request reaching the server (and its fetch handler registering
+  // the abort listener) happens as soon as the underlying fetch is
+  // dispatched, independent of when its response body gets flushed back -
+  // that's the real "generation has actually started" signal this test
+  // needs.
+  test("cancelling the response stream reaches the real underlying connection", async () => {
+    let requestReceived = false;
+    let sawAbort = false;
+    const server = Bun.serve({
+      port: 0,
+      fetch(req) {
+        requestReceived = true;
+        req.signal.addEventListener("abort", () => {
+          sawAbort = true;
+        });
+        const encoder = new TextEncoder();
+        const body = new ReadableStream<Uint8Array>({
+          async start(controller) {
+            controller.enqueue(
+              encoder.encode(
+                `data: ${JSON.stringify({ id: "x", model: "chat", choices: [{ index: 0, delta: { content: "hello" }, finish_reason: null }] })}\n\n`,
+              ),
+            );
+            // Long enough that this test's own cancel() always lands
+            // first - never actually waited out.
+            await new Promise((resolve) => setTimeout(resolve, 10_000));
+            controller.enqueue(encoder.encode("data: [DONE]\n\n"));
+            controller.close();
+          },
+        });
+        return new Response(body, { headers: { "content-type": "text/event-stream" } });
+      },
+    });
+    process.env.MAIPAI_LLAMA_SERVER_URL = `http://127.0.0.1:${server.port}`;
+    try {
+      const { token } = await ownerWithApiToken();
+      const client = new TestClient();
+      const res = await client.request("/v1/chat/completions", {
+        method: "POST",
+        body: { messages: [{ role: "user", content: "hello there" }], stream: true },
+        headers: { authorization: `Bearer ${token}` },
+      });
+      expect(res.status).toBe(200);
+      const reader = res.body!.getReader();
+      await reader.read(); // this route's own locally-synthesized `{role: "assistant"}` marker
+
+      const requestDeadline = Date.now() + 5_000;
+      while (!requestReceived && Date.now() < requestDeadline) {
+        await new Promise((resolve) => setTimeout(resolve, 20));
+      }
+      expect(requestReceived).toBe(true);
+      await reader.cancel();
+
+      // The abort event is dispatched asynchronously through several
+      // layers here (the response stream's own cancel(), this route's
+      // AbortController, the fetch to the server above) - polling
+      // instead of one fixed sleep, so this doesn't flake under a loaded
+      // machine the way a single short setTimeout would.
+      const abortDeadline = Date.now() + 5_000;
+      while (!sawAbort && Date.now() < abortDeadline) {
+        await new Promise((resolve) => setTimeout(resolve, 20));
+      }
+      expect(sawAbort).toBe(true);
+    } finally {
+      server.stop(true);
+      delete process.env.MAIPAI_LLAMA_SERVER_URL;
+    }
+  }, 15_000);
+
   test("shares the same per-person turn rate limit as /api/turn and /api/llm/chat", async () => {
     const { token, personId } = await ownerWithApiToken();
     const owner = new TestClient();

@@ -158,14 +158,26 @@ export function getSidecarLogs(id: string): string[] {
  * implementation instead of each hand-rolling its own.
  *
  * `ps`, not `lsof`: proved unreliably slow on the machine this was first
- * written on, enough to make a passing test flake into a timeout. */
+ * written on, enough to make a passing test flake into a timeout.
+ *
+ * SEC-9 (code review, 2026-09-06): the original version ran plain
+ * `ps aux` - BSD ps's own "a" flag means "every user's processes," not
+ * just this one's - so a dev's Vite server started with `--port 8788`,
+ * or a second hub in a sibling worktree pointed at the same data
+ * directory, matched and got SIGKILLed right along with a real orphaned
+ * engine. `-u <uid>` scopes the scan to processes this hub's own OS user
+ * actually owns; `process.getuid` doesn't exist on Windows, where `ps`
+ * itself doesn't either, so this returns no matches there rather than
+ * guessing a uid (0 would mean root, which is not a safe fallback to
+ * silently substitute). */
 async function findPidsMatching(pattern: RegExp): Promise<number[]> {
+  if (typeof process.getuid !== "function") return [];
   try {
-    const { stdout } = await execFileAsync("ps", ["aux"], { timeout: 5_000 });
+    const { stdout } = await execFileAsync("ps", ["-u", String(process.getuid()), "-o", "pid=,command="], { timeout: 5_000 });
     return stdout
       .split("\n")
       .filter((line) => pattern.test(line))
-      .map((line) => Number(line.trim().split(/\s+/)[1]))
+      .map((line) => Number(line.trim().split(/\s+/)[0]))
       .filter((n) => Number.isFinite(n) && n > 0);
   } catch {
     return [];

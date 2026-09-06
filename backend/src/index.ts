@@ -16,8 +16,25 @@ import { rebindWithRetry } from "@/lib/serverRebind";
 import { raiseIssue } from "@/lib/issues";
 import { startWyomingServer } from "@/lib/wyomingServer";
 import { websocket } from "hono/bun";
+import { seedHlcFromDatabase } from "@/lib/hlc";
+import { recoverInterruptedJobsAtBoot } from "@/lib/modelDownloadJobs";
 
 const port = Number(process.env.PORT ?? 8787);
+
+// COR-6 (code review, 2026-09-06): before anything below this line can
+// possibly write a fresh hlc, recover monotonicity from every table that
+// stamps one, not just settings_values (lib/settings.ts's own narrower
+// module-load seeding, still there - see lib/hlc.ts's own header on why
+// the wider seed lives here instead of scattered per-table).
+seedHlcFromDatabase();
+
+// COR-8 (code review, 2026-09-06): activeJob (lib/modelDownloadJobs.ts)
+// is in-memory only and always starts null on a fresh process - a crash
+// mid-download left the job ROW in whatever non-terminal status it was
+// in, with GET /models/:id/select-status reporting that phantom job
+// forever. Correcting it once, here, before anything else touches
+// download-job state.
+recoverInterruptedJobsAtBoot();
 
 // The scheduler's own timer: app.ts/routes stay import-only (no side
 // effects) so tests booting the app via Hono's .request() never start a

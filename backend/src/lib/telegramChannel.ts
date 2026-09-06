@@ -39,6 +39,22 @@ export function telegramConfigured(): boolean {
  * admin-visible delivery log to read. A rate-limited send is simply not
  * sent this time - trigger()'s own `channels` list already only records
  * what was actually attempted, so a caller never sees a false "sent". */
+// SEC-10 (code review, 2026-09-06): this had no timeout at all - a
+// blackholed api.telegram.org (a home router that drops idle
+// connections is a real, ordinary way for that to happen) hung whoever
+// awaited this forever. It's awaited inside raiseIssue()/trigger()/
+// judgeTurn(), all on the scheduler's own single in-flight promise
+// (lib/scheduler.ts) - one stuck Telegram send could wedge every other
+// core job right along with it, the identical class of bug COR-2 fixed
+// at the LLM client for the same reason.
+const DEFAULT_TELEGRAM_TIMEOUT_MS = 5_000;
+// Test-only override so a test can prove the timeout actually fires in
+// milliseconds, not by waiting out the real 5s default.
+let telegramTimeoutMs = DEFAULT_TELEGRAM_TIMEOUT_MS;
+export function __setTelegramTimeoutMsForTests(ms: number | null): void {
+  telegramTimeoutMs = ms ?? DEFAULT_TELEGRAM_TIMEOUT_MS;
+}
+
 export async function sendTelegramMessage(chatId: string, text: string): Promise<boolean> {
   const botToken = getHouseholdSettingValue("notifications.telegram.bot_token") as string | undefined;
   if (!botToken || !chatId) return false;
@@ -48,6 +64,7 @@ export async function sendTelegramMessage(chatId: string, text: string): Promise
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ chat_id: chatId, text }),
+      signal: AbortSignal.timeout(telegramTimeoutMs),
     });
     return res.ok;
   } catch {

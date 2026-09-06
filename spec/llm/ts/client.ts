@@ -132,7 +132,16 @@ export class LlamaServerClient {
    * real llama-server: SSE `data: {...}` lines, a final `data: [DONE]`
    * with no JSON to parse. Works unmodified against stubServer.ts's
    * canned streaming reply too - both speak the identical line shape. */
-  async *chatCompleteStream(request: ChatCompletionRequest): AsyncGenerator<string, void, void> {
+  /** `externalSignal` (COR-7, code review, 2026-09-06): lets a caller
+   * cancel generation from OUTSIDE this generator's own control flow - a
+   * disconnected HTTP client's ReadableStream.cancel(), say. Calling
+   * `.return()` on a suspended async generator alone doesn't abort a
+   * pending network read (it only takes effect once that read settles on
+   * its own), so a caller that actually wants the underlying connection
+   * torn down needs a real signal reaching this fetch, not just "stop
+   * iterating." Composed with the internal idle-timeout controller
+   * below, not replacing it - either one firing ends the stream. */
+  async *chatCompleteStream(request: ChatCompletionRequest, externalSignal?: AbortSignal): AsyncGenerator<string, void, void> {
     // A review, 2026-09-06, found this was the one method on this client
     // still missing a timeout after chatComplete()/embed() got theirs -
     // the exact "wedged llama-server" failure mode is just as reachable
@@ -153,6 +162,10 @@ export class LlamaServerClient {
     // genuinely silent for `timeoutMs` ever fires it.
     const timeoutMs = this.opts.chatTimeoutMs ?? DEFAULT_CHAT_TIMEOUT_MS;
     const controller = new AbortController();
+    if (externalSignal) {
+      if (externalSignal.aborted) controller.abort();
+      else externalSignal.addEventListener("abort", () => controller.abort(), { once: true });
+    }
     let idleTimer: ReturnType<typeof setTimeout> | undefined;
     const armIdleTimer = (): void => {
       clearTimeout(idleTimer);

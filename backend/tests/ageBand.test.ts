@@ -33,11 +33,23 @@ describe("speakerAgeBand()", () => {
     expect(speakerAgeBand(actor({ role: "owner", birthdate: null }), NOW)).toBe("adult");
   });
 
-  test("a real birthdate wins over a mismatched role in both directions", () => {
+  test("a real birthdate can make the band STRICTER than role, never looser", () => {
     const fifteenYearsAgo = "2011-09-06";
     expect(speakerAgeBand(actor({ role: "adult", birthdate: fifteenYearsAgo }), NOW)).toBe("teen");
+  });
+
+  // SEC-8 (code review, 2026-09-06): routes/people.ts lets anyone edit
+  // their OWN birthdate with no ladder check (fixed separately in
+  // routes/people.ts to require owner/admin), but that is a route-level
+  // permission, not a defense this function can rely on - a person who
+  // gets a birthdate onto their row some other way (an owner mistake, a
+  // future write path) must not be able to launder a child/teen role
+  // into a looser age band just because the birthdate says otherwise.
+  // Role is the floor.
+  test("role is a floor: an adult-looking birthdate never raises a child or teen role", () => {
     const thirtyYearsAgo = "1996-09-06";
-    expect(speakerAgeBand(actor({ role: "teen", birthdate: thirtyYearsAgo }), NOW)).toBe("adult");
+    expect(speakerAgeBand(actor({ role: "teen", birthdate: thirtyYearsAgo }), NOW)).toBe("teen");
+    expect(speakerAgeBand(actor({ role: "child", birthdate: thirtyYearsAgo }), NOW)).toBe("child");
   });
 
   test("band boundaries: under 13 is child, 13-17 is teen, 18+ is adult", () => {

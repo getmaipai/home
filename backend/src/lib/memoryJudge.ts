@@ -72,6 +72,7 @@ import {
   type SimilarMatch,
 } from "@/lib/memory";
 import { trigger } from "@/lib/notifications";
+import { sanitizeForPrompt } from "@/lib/promptSanitize";
 import { nextHlc } from "@/lib/hlc";
 import { turnActiveWithin } from "@/lib/turnActivity";
 import type { ConversationTurnRow } from "@/wire";
@@ -375,7 +376,12 @@ export async function judgeTurn(turn: ConversationTurnRow): Promise<JudgeTurnRes
     return { ok: false, factsWritten: 0 };
   }
 
-  const facts = await extractFacts(speaker.displayName, turn);
+  // sanitizeForPrompt (SEC-8, code review, 2026-09-06): speaker.displayName
+  // is free text the speaker set on their own profile, interpolated
+  // straight into buildExtractionPrompt()'s system prompt below - the
+  // same class of injection turnEngine.ts's speakerLine()/householdLine()
+  // were fixed for.
+  const facts = await extractFacts(sanitizeForPrompt(speaker.displayName), turn);
   if (facts === null) {
     markAttempt(turn.id, turn.judgeAttempts + 1);
     return { ok: false, factsWritten: 0 };
@@ -593,7 +599,11 @@ async function rewriteProfileParagraph(personRow: PersonRow): Promise<boolean> {
   if (facts.length === 0) return false;
 
   const factLines = facts.map((f) => `- ${f.text}`).join("\n");
-  const prompt = `Write a single plain-prose paragraph (at most ${PROFILE_MAX_CHARS} characters) summarizing who ${personRow.displayName} is, what they like, and what's going on with them this week, based ONLY on the facts below - never invent anything not listed, and never mention a fact that isn't there. No bullet points or headings, third person, plain prose.\n\nKnown facts about ${personRow.displayName}:\n${factLines}`;
+  // sanitizeForPrompt (SEC-8, code review, 2026-09-06): personRow.displayName
+  // is free text the person set on their own profile - see extractFacts()'s
+  // own call above for the identical reasoning.
+  const safeDisplayName = sanitizeForPrompt(personRow.displayName);
+  const prompt = `Write a single plain-prose paragraph (at most ${PROFILE_MAX_CHARS} characters) summarizing who ${safeDisplayName} is, what they like, and what's going on with them this week, based ONLY on the facts below - never invent anything not listed, and never mention a fact that isn't there. No bullet points or headings, third person, plain prose.\n\nKnown facts about ${safeDisplayName}:\n${factLines}`;
 
   let text: string;
   try {
