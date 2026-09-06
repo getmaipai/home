@@ -18,7 +18,7 @@ import { ensureRoutingEmbeddings, embedUtterance, scoreByEmbedding, pickTier1Win
 import { loadAllSkills, type LoadedSkill } from "@/lib/skills";
 import { matchCommand, runCommand } from "@/lib/commands";
 import { trigger } from "@/lib/notifications";
-import { recall, bumpUsage, embedQueryForRecall, getProfileParagraph, type RecallMatch } from "@/lib/memory";
+import { recall, bumpUsage, getProfileParagraph, type RecallMatch } from "@/lib/memory";
 import { newConversationTurnId } from "@/lib/id";
 import { complete, startCompleteStream, type LlmMessage, type ToolSpec, type ToolCall } from "@/lib/llm";
 import { guardReply, guardSentence, replacementFor, type GuardContext } from "@/lib/guards";
@@ -33,6 +33,7 @@ import {
   type PendingAsk,
 } from "@/lib/conversationHistory";
 import { pickRefusalVariant, varyKnownConstant } from "@/lib/replyVariation";
+import { markTurnStarted } from "@/lib/turnActivity";
 import { normalizeForSpeech } from "@maipai/spec/voice/ts/normalizeForSpeech.js";
 import { nextSentenceBoundary } from "@maipai/spec/safety/ts/sentenceChunker.js";
 import { getPersonSettingValue, getHouseholdSettingValue } from "@/lib/settings";
@@ -288,9 +289,29 @@ function skillsSection(text: string, skills: LoadedSkill[]): string {
 // line it replaced (a question near a month or year boundary, or "what's
 // today's date", had nothing to go on) - "never raw ISO" doesn't mean
 // "never the date", just formatted for a person, not a machine.
+// Constructing an Intl.DateTimeFormat is 50 to 200 us (a latency review,
+// 2026-09-06) and buildSystemPrompt() does it 2 to 3 times every turn, for
+// a fixed set of options that only ever varies by locale - a household
+// practically never changes household.locale mid-conversation, so the
+// same formatter is rebuilt from scratch on every single turn for no
+// reason. Cached per (kind, locale): unbounded only in the sense that a
+// pathological number of distinct locales would grow it, which no real
+// household approaches.
+const dateTimeFormatCache = new Map<string, Intl.DateTimeFormat>();
+
+function cachedDateTimeFormat(kind: string, locale: string, options: Intl.DateTimeFormatOptions): Intl.DateTimeFormat {
+  const key = `${kind}:${locale}`;
+  let format = dateTimeFormatCache.get(key);
+  if (!format) {
+    format = new Intl.DateTimeFormat(locale, options);
+    dateTimeFormatCache.set(key, format);
+  }
+  return format;
+}
+
 function formatLocalTime(now: Date, locale: string): string {
-  const date = new Intl.DateTimeFormat(locale, { weekday: "long", month: "long", day: "numeric", year: "numeric" }).format(now);
-  const time = new Intl.DateTimeFormat(locale, { hour: "numeric", minute: "2-digit", hour12: true })
+  const date = cachedDateTimeFormat("date", locale, { weekday: "long", month: "long", day: "numeric", year: "numeric" }).format(now);
+  const time = cachedDateTimeFormat("time", locale, { hour: "numeric", minute: "2-digit", hour12: true })
     .format(now)
     .toLowerCase();
   return `${date}, ${time}`;
@@ -319,7 +340,7 @@ function householdLine(): string {
 // asserted), not `last_used_at` (when it was last recalled) - "as of"
 // asks when the fact became true, not when it was last useful.
 function formatShortDate(iso: string, locale: string): string {
-  return new Intl.DateTimeFormat(locale, { month: "short", day: "numeric" }).format(new Date(iso));
+  return cachedDateTimeFormat("short-date", locale, { month: "short", day: "numeric" }).format(new Date(iso));
 }
 
 function daysAgoLabel(iso: string, now: Date): string {
@@ -584,7 +605,13 @@ export interface RouteResult {
   ranked: RankedCandidate[];
 }
 
-export async function route(text: string, actor: PersonRow, loaded: LoadedManifest[]): Promise<RouteResult> {
+// `utteranceVector`: the caller's already-embedded utterance (prepareTurn
+// computes it once and reuses it for both this and recall() - a review,
+// 2026-09-06, found the utterance embedded twice per model turn, one HTTP
+// round trip each, for the identical text). Optional and still embedded
+// here when omitted, so routingCorpus.test.ts's direct call keeps working
+// unchanged.
+export async function route(text: string, actor: PersonRow, loaded: LoadedManifest[], utteranceVector?: Float32Array): Promise<RouteResult> {
   const eligible: LoadedManifest[] = [];
   for (const { id, manifest } of loaded) {
     if (!meetsMinRole(actor.role, manifest.min_role)) continue;
@@ -603,8 +630,8 @@ export async function route(text: string, actor: PersonRow, loaded: LoadedManife
   if (eligible.length === 0) return { winner: null, ranked: [] };
 
   await ensureRoutingEmbeddings(eligible.map(({ id, manifest }) => ({ id, examples: manifest.routing?.examples })));
-  const utteranceVector = await embedUtterance(text);
-  const embeddingScores = utteranceVector ? scoreByEmbedding(utteranceVector, eligible.map(({ id }) => id)) : new Map<string, number>();
+  const vector = utteranceVector ?? (await embedUtterance(text));
+  const embeddingScores = vector ? scoreByEmbedding(vector, eligible.map(({ id }) => id)) : new Map<string, number>();
 
   const scored = eligible.map(({ id, manifest }) => ({
     id,
@@ -851,7 +878,29 @@ async function prepareTurn(
     });
   }
 
-  const { winner: routed, ranked } = await route(text, actor, loaded);
+  // Marked here, not at the top of this function (lib/turnActivity.ts):
+  // a code review (2026-09-06) found the original placement marked
+  // EVERY turn as "chat engine active," including the safety-refuse,
+  // pendingAsk and matchCommand returns just above, none of which ever
+  // reach the chat engine - a household using mostly quick commands or
+  // hitting repeated safety refusals could keep the memory judge
+  // permanently gated even though nothing was ever actually contending
+  // for the slot. From here on, this turn is at minimum about to call
+  // the embed backend and possibly the chat model (route()'s Tier 1
+  // scoring, Tier 2's tool-calling complete() call, or the model
+  // fallback below) - a Tier 0/1 plugin firing without ever reaching the
+  // model is still marked (a small, deliberate over-approximation: a
+  // plugin match doesn't own its own gate here, and being a little
+  // conservative about the judge's timing costs far less than the
+  // per-call precision would).
+  markTurnStarted();
+  // Embedded once here (a review, 2026-09-06, found route() and recall()
+  // each embedding the identical utterance separately, two HTTP round
+  // trips to the embed sidecar for the same text) and reused below as
+  // recall()'s own queryVector - embedQueryForRecall() stays in memory.ts
+  // for its other real caller (packageHost.ts's Host.memory.recall).
+  const utteranceVector = await embedUtterance(text);
+  const { winner: routed, ranked } = await route(text, actor, loaded, utteranceVector);
   // A real trigger phrase always wins outright (see RoutedPlugin's own
   // comment on why `viaPattern`, not `score === 1`, is the real signal).
   // Only a FUZZY plugin match is subject to being outscored - found live
@@ -910,8 +959,7 @@ async function prepareTurn(
   // scoring runs whenever the embed backend is up; embedQueryForRecall()
   // degrades to undefined on any failure, which recall() already treats
   // as "fall back to keyword overlap" - no separate handling needed here.
-  const queryVector = await embedQueryForRecall(text);
-  const memoryMatches = recall(actor, text, { selfOnly: true, bumpUsage: false, queryVector });
+  const memoryMatches = recall(actor, text, { selfOnly: true, bumpUsage: false, queryVector: utteranceVector });
   const persona = resolvePersona(getPersonSettingValue(actor, "persona.active_id"));
   // The follow-up-turn context (step 3): "and tomorrow?" needs the prior
   // exchange in the messages array, not just in the system prompt's own
@@ -972,6 +1020,26 @@ async function prepareTurn(
  * manifest needs no file on disk - the confirmation path never reaches
  * runPlugin() at all), while the "a proposed call actually runs" path
  * exercises a real bundled package. */
+// A latency review (2026-09-06) found this step running its full,
+// non-streaming, grammar-constrained `complete()` call before EVERY
+// streamed turn that reaches here, because `ranked.length > 0` is true
+// whenever any eligible package declares routing.examples - which, with
+// the bundled catalog, is nearly every turn. That is a whole extra LLM
+// round trip (150 to 600 ms measured this way in the review) for turns
+// where nothing plausible was ever in contention. Gated instead on
+// `ranked`'s own top score (already sorted descending by route()):
+// below this floor there is nothing worth asking the model to consider,
+// so the call is skipped and this always falls through to null (the
+// ordinary conversational reply) exactly as if Tier 2 had run and found
+// nothing. The floor sits below TIER1_THRESHOLD on purpose - a
+// `consequential` candidate that scored well past the Tier 1 bar never
+// WINS Tier 1 by design (route()'s own `canFire`) and still needs to
+// reach here, and a candidate that lost only on Tier 1's margin check
+// (a close runner-up) is exactly the "ambiguous" case worth a real model
+// look. Start value, same "measure on the corpus before trusting it"
+// posture as TIER1_THRESHOLD/TIER1_MARGIN.
+export const TIER2_AMBIGUOUS_FLOOR = 0.45;
+
 export async function attemptTier2Tools(
   text: string,
   actor: PersonRow,
@@ -983,6 +1051,7 @@ export async function attemptTier2Tools(
   crisisResources: string | undefined,
 ): Promise<TurnValue | null> {
   if (ranked.length === 0) return null; // nothing here has any routing.examples at all - nothing to offer
+  if (ranked[0]!.score < TIER2_AMBIGUOUS_FLOOR) return null; // nothing plausible enough to ask the model about
 
   const offered: ToolSpec[] = ranked.slice(0, MAX_TIER2_TOOLS_OFFERED).map((r) => ({ id: r.id, description: r.manifest.description, args: r.manifest.args }));
   const toolResult = await complete("chat", messages, { tools: offered, tool_choice: "auto" });

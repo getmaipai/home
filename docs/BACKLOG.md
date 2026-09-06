@@ -2435,7 +2435,74 @@ that owns it.
       budgets and plan 4.11 says the archived latency numbers gate the
       first release (legacy `chat-latency.md`: 200 to 900 ms warm first
       token after six fixes, each documented); no bench measures first
-      token, page open or cold start here.
+      token, page open or cold start here. A full voice-turn latency
+      audit (2026-09-06, GitHub issue #36, full report in the private
+      review folder outside this repo) traced one turn end to end
+      (~2.8 s estimated warm speech-end-to-first-audio on the target
+      laptop) and found the real fix order below; this item is still
+      the measurement half none of it has landed yet - a `TurnTrace`
+      threaded through `routes/turn.ts`/`turnEngine.ts`, llama-server's
+      own `timings`/`/metrics` parsed per turn, a `turn_timings` table,
+      and `backend/scripts/bench/latency.ts` replaying scripted turns
+      against the real engine. Landed from that same review without
+      waiting on the harness (mechanical, no model-quality risk): one
+      embed call per turn instead of two (`turnEngine.ts`'s `route()`/
+      `recall()` shared `utteranceVector`), gating the Tier 2 grammar
+      call to an ambiguous score band (`TIER2_AMBIGUOUS_FLOOR`) instead
+      of every routable turn, mtime-cached package/skill manifests and
+      an in-process settings/commands cache (all previously re-read from
+      disk or SQLite every turn), warming the chat/embed/TTS engines at
+      boot instead of on a household's first message, and idle-gating
+      the memory judge's per-minute tick so it skips a batch while a
+      real turn is active instead of contending for the shared chat
+      slot. Still open, each needing the harness above (or, for the STT
+      items, a wired frontend client) to land safely rather than guessed
+      at blind:
+      - **Multi-slot separation for the chat engine** (`-np 2` +
+        `id_slot` per role so the judge/summary refresh never contend
+        with a live turn at the process level, not just the idle-gate
+        above) - real risk found by the review itself: llama-server
+        splits `-c` across slots, so this needs `autotuneContextSize`'s
+        own math re-derived for `np=2` and `/props` checked on the
+        pinned build before it ships, not assumed.
+      - **Reorder the prompt for the prefix cache** - move memory
+        bullets, summary, matched skills and the time line (currently
+        before the conversation history) to after it, so the cache hit
+        covers the whole history instead of just the stable prefix.
+        Same content, different position, but needs the persona/
+        routing/conversation bench re-run before landing (a small model
+        measurably drifts on prompt shape changes, `docs/dev.md`'s own
+        BACKLOG entry on this).
+      - **Shorten the first spoken chunk and fix the thinking-cue
+        timer** - `routes/turn.ts`'s 900 ms cue races the GATED
+        generator (first-sentence time), not the raw token stream
+        (first-token time), so it fires on most ordinary ~8B-model
+        turns; `sentenceChunker.ts`'s first-chunk gate (90 chars) is
+        also on the high side.
+      - **Stream the first TTS sentence** instead of buffering it whole
+        before playback (`sentenceSpeechScheduler.ts` already has the
+        incremental PCM path via `streamingWavPlayer.ts`, just not
+        wired into the turn path) and **pre-render fixed phrases**
+        (thinking cues, refusals, confirmations) per voice so they play
+        with no `/api/tts` round trip.
+      - **Streaming STT** (sherpa-onnx streaming Zipformer or Moonshine
+        v2) to replace the fixed 0.8 s silence timeout with Silero
+        (~0.2 s) plus Smart Turn v3.1, and speculative prefill on
+        speech onset - lower priority than the rest: no frontend client
+        exists yet for `WS /api/stt/stream` in either tree, so none of
+        this is reachable from a real conversation today.
+      - **The memory judge on its own small model** (a second
+        llama-server/router-mode process, ~1 GB) so its extraction/
+        dedupe calls stop sharing the 8B chat model's VRAM and slot
+        entirely, not just its scheduling.
+      - **Barge-in** (`vad speaking:true` stops the scheduler, aborts
+        the stream, truncates the logged reply to what actually played)
+        - a correctness requirement for hands-free voice, not a latency
+        win, but blocked on the same missing STT frontend client above.
+      - **Pod/robot transport** - one WebSocket carrying turn events and
+        PCM16 audio chunks, replacing the NDJSON-over-HTTP shape that's
+        fine for today's one browser client but wrong once a pod or the
+        robot is a real caller.
 - [ ] **Web push as a notification channel** (S-M, F backend, E opt-in)
       - the PWA exists after Wave 1, so the "no such clients yet" note
       above no longer holds; legacy `push.ts` (VAPID keys generated once,

@@ -17,7 +17,7 @@
 import { readFileSync, readdirSync, existsSync } from "node:fs";
 import { join } from "node:path";
 import { PackageManifest } from "@maipai/spec/gen/ts/manifest.js";
-import { PACKAGES_DIR } from "@/lib/paths";
+import { PACKAGES_DIR, statMtimeMs } from "@/lib/paths";
 
 export interface LoadedSkill {
   manifest: PackageManifest;
@@ -54,6 +54,21 @@ export function listSkillIds(): string[] {
   }
 }
 
+// mtime-keyed cache (a latency review, 2026-09-06: loadAllSkills() re-reads
+// and re-Zod-validates every bundled skill's manifest.json AND SKILL.md
+// every single turn, none of it ever changing between household
+// messages) - the same shape and rationale as lib/plugins.ts's
+// manifestCache/packageCache: unchanged files return the cached parse for
+// free, an edited or reinstalled skill (either file's mtime moves)
+// re-reads on its very next read. `statMtimeMs()` lives in lib/paths.ts,
+// shared with plugins.ts's identical caches (a code review, 2026-09-06,
+// found this file and that one had each written their own copy).
+const skillCache = new Map<string, { manifestMtimeMs: number; bodyMtimeMs: number; value: LoadedSkill }>();
+
+export function __resetSkillCacheForTests(): void {
+  skillCache.clear();
+}
+
 /** Null for anything unloadable (missing files, a manifest that fails
  * validation, or a manifest whose `kind` isn't actually `"skill"` - e.g.
  * a directory that happens to also carry a stray `SKILL.md`) rather than
@@ -61,16 +76,29 @@ export function listSkillIds(): string[] {
  * the same "an unloadable package is reported, not fatal" posture
  * lib/plugins.ts's loadPackage() already takes. */
 export function loadSkill(id: string): LoadedSkill | null {
+  const manifestPath = join(PACKAGES_DIR, id, "manifest.json");
+  const bodyPath = join(PACKAGES_DIR, id, "SKILL.md");
+  const manifestMtimeMs = statMtimeMs(manifestPath);
+  const bodyMtimeMs = statMtimeMs(bodyPath);
+  if (manifestMtimeMs === null || bodyMtimeMs === null) {
+    skillCache.delete(id);
+    return null;
+  }
+  const cached = skillCache.get(id);
+  if (cached && cached.manifestMtimeMs === manifestMtimeMs && cached.bodyMtimeMs === bodyMtimeMs) return cached.value;
+
   let manifestJson: unknown, bodyRaw: string;
   try {
-    manifestJson = JSON.parse(readFileSync(join(PACKAGES_DIR, id, "manifest.json"), "utf-8"));
-    bodyRaw = readFileSync(join(PACKAGES_DIR, id, "SKILL.md"), "utf-8");
+    manifestJson = JSON.parse(readFileSync(manifestPath, "utf-8"));
+    bodyRaw = readFileSync(bodyPath, "utf-8");
   } catch {
     return null;
   }
   const parsed = PackageManifest.safeParse(manifestJson);
   if (!parsed.success || parsed.data.kind !== "skill") return null;
-  return { manifest: parsed.data, body: stripFrontmatter(bodyRaw) };
+  const value: LoadedSkill = { manifest: parsed.data, body: stripFrontmatter(bodyRaw) };
+  skillCache.set(id, { manifestMtimeMs, bodyMtimeMs, value });
+  return value;
 }
 
 /** Every loadable skill, sorted by id for the same deterministic-order

@@ -241,6 +241,7 @@ function writeValue(
     db.insert(settingsValues).values({ scope, key, value: serialized, hlc, source: "user", updatedAt: now }).run();
   }
 
+  settingsCache.delete(settingsCacheKey(scope, key));
   return { ok: true, value: resolveForResponse(keyDef, value, "user") };
 }
 
@@ -346,6 +347,45 @@ export function setPersonTtsVoiceUnchecked(actor: PersonRow, hfPath: string): Se
   return writeValue(`person:${actor.id}`, keyDef, hfPath, { skipValidation: true });
 }
 
+// In-process cache for resolveStoredValue() (a latency review, 2026-09-06:
+// buildSystemPrompt() alone hits getHouseholdSettingValue()/
+// getPersonSettingValue() several times every single turn, each a
+// synchronous SQLite read on the same event loop that's also pumping
+// another household member's token stream). Keyed by scope+key so a
+// household-scope and a person-scope row for the same key never collide.
+// Invalidated exactly where a value can change: writeValue() (every
+// setValue()/setHouseholdSettingValue()/setPersonTtsVoiceUnchecked() call),
+// resetValue()'s delete, clearMatchingValues()'s cross-scope delete
+// (which doesn't know in advance which scopes it touched, so it clears
+// the whole cache rather than risk leaving a stale entry for one it
+// missed - a rare admin cleanup path, not a per-turn one, so the cost of
+// being conservative there is negligible), and personLifecycle.ts's own
+// raw `DELETE FROM settings_values WHERE scope = ?` (erasePersonData() -
+// a code review, 2026-09-06, found this bypassed every one of the three
+// invalidation points above, so a person's just-erased settings could
+// keep serving their last cached value for the rest of the process's
+// life) via invalidateScopeCache() below.
+const settingsCache = new Map<string, unknown>();
+
+function settingsCacheKey(scope: string, key: string): string {
+  return `${scope}:${key}`;
+}
+
+/** For a caller that deletes every row at one scope directly (bypassing
+ * writeValue()/resetValue()) and so can't invalidate key-by-key the way
+ * those do - today, personLifecycle.ts's erasePersonData() erasing a
+ * departed person's `person:<id>` settings wholesale. */
+export function invalidateScopeCache(scope: string): void {
+  const prefix = `${scope}:`;
+  for (const key of settingsCache.keys()) {
+    if (key.startsWith(prefix)) settingsCache.delete(key);
+  }
+}
+
+export function __resetSettingsCacheForTests(): void {
+  settingsCache.clear();
+}
+
 /** Shared by getHouseholdSettingValue() and getPersonSettingValue() above
  * (a code review, 2026-09-04, found the two had drifted into
  * near-identical copies of the same lookup/default-resolution logic): the
@@ -354,12 +394,16 @@ export function setPersonTtsVoiceUnchecked(actor: PersonRow, hfPath: string): Se
  * public function still owns its own registry lookup and scope-kind
  * guard - only the actual row query is shared. */
 function resolveStoredValue(scope: string, keyDef: SettingsKey): unknown {
+  const cacheKey = settingsCacheKey(scope, keyDef.key);
+  if (settingsCache.has(cacheKey)) return settingsCache.get(cacheKey);
   const row = db
     .select()
     .from(settingsValues)
     .where(and(eq(settingsValues.scope, scope), eq(settingsValues.key, keyDef.key)))
     .get();
-  return row ? decodeStoredRow(keyDef, row.value) : keyDef.default;
+  const value = row ? decodeStoredRow(keyDef, row.value) : keyDef.default;
+  settingsCache.set(cacheKey, value);
+  return value;
 }
 
 /** Reset a key back to its registry default: a real delete (this table
@@ -379,6 +423,7 @@ export function resetValue(actor: PersonRow, scope: string, key: string): Settin
   if (!auth.ok) return auth;
 
   db.delete(settingsValues).where(and(eq(settingsValues.scope, scope), eq(settingsValues.key, key))).run();
+  settingsCache.delete(settingsCacheKey(scope, key));
   return { ok: true, value: resolveForResponse(keyDef, keyDef.default, "default") };
 }
 
@@ -404,4 +449,9 @@ export function clearMatchingValues(key: string, valueContains: string): void {
   db.delete(settingsValues)
     .where(and(eq(settingsValues.key, key), like(settingsValues.value, `%${valueContains}%`)))
     .run();
+  // Which scopes this touched isn't known without a second query - clears
+  // the whole cache rather than risk leaving a stale entry behind for one
+  // of them (see the cache's own comment above); this path runs on an
+  // admin deleting a cloned voice, not on any per-turn hot path.
+  settingsCache.clear();
 }

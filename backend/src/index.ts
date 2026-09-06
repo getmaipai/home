@@ -5,7 +5,9 @@ import { cleanupStaleSnapshots } from "@/lib/backup";
 import { sampleEngineStats } from "@/lib/engineStats";
 import { startAllSidecars, registerGracefulExit } from "@/lib/sidecars";
 import { initCrashBootHold } from "@/lib/dirtyBoot";
-import { sweepOrphanEngineProcesses } from "@/lib/llmSupervisor";
+import { sweepOrphanEngineProcesses, getChatClient } from "@/lib/llmSupervisor";
+import { getEmbedClient } from "@/lib/embedSupervisor";
+import { getTtsClient } from "@/lib/ttsSupervisor";
 import { runAllSmokeTests } from "@/lib/smoke";
 import { startIdleSweep, registerDenoHostGracefulExit } from "@/lib/denoHost";
 import { hasHouseholdLeaf, getHouseholdLeafForServer, checkLeafExpiry, onLeafRenewed, registerRenewFixHandler } from "@/lib/householdCa";
@@ -93,6 +95,24 @@ registerDenoHostGracefulExit();
 await sweepOrphanEngineProcesses();
 await initCrashBootHold();
 void startAllSidecars();
+// A latency review (2026-09-06) found none of the three engines were
+// ever touched at boot: every getChatClient()/getEmbedClient()/
+// getTtsClient() call spawns lazily on FIRST USE, so a household's very
+// first message after a restart pays the chat spawn (up to a 60 s health
+// timeout), the embed spawn (60 s) and the Pocket TTS spawn (up to 180 s)
+// in series, on that one "hi." Fire-and-forget, not top-level-awaited
+// (unlike sweepOrphanEngineProcesses()/initCrashBootHold() above, which
+// gate what can spawn next): the point is to have the real engines
+// already warm behind the stub/nothing by the time a real turn arrives,
+// never to make every boot wait up to ~5 minutes for the slowest of the
+// three. A start failure here (no model selected yet, a broken
+// selection, engine files still downloading) is exactly the same
+// failure the first real request would have hit anyway - logged, not
+// fatal to boot, and the next real caller still gets the same clear
+// error getChatClient()/getEmbedClient()/getTtsClient() always throw.
+void getChatClient().catch((err: unknown) => console.error(`[boot] chat engine warm-up: ${(err as Error).message}`));
+void getEmbedClient().catch((err: unknown) => console.error(`[boot] embed engine warm-up: ${(err as Error).message}`));
+void getTtsClient().catch((err: unknown) => console.error(`[boot] TTS engine warm-up: ${(err as Error).message}`));
 // Step 5: idle Tier 1 sandbox processes get closed after ten minutes -
 // nothing is running yet at boot (every Deno process starts lazily, on
 // a package's first real call), so this just arms the sweep.

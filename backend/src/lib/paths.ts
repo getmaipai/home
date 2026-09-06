@@ -1,5 +1,5 @@
 import { resolve, join } from "node:path";
-import { existsSync, mkdirSync } from "node:fs";
+import { existsSync, mkdirSync, statSync } from "node:fs";
 
 // The bundled packages' own source directory - checked into git, never
 // per-household data, so it lives here (not under dataDir below) even
@@ -99,4 +99,16 @@ export const clonedVoicesDir = resolve(dataDir, "voice", "cloned");
 // should have to remember to pass.
 export function ensureDataDir(dir: string): void {
   if (!existsSync(dir)) mkdirSync(dir, { recursive: true, mode: 0o700 });
+}
+
+// Shared by lib/plugins.ts's and lib/skills.ts's mtime-keyed manifest/
+// recipe/skill caches (a latency review, 2026-09-06) - a code review the
+// same day found the identical try/statSync/catch written out verbatim
+// in both files, both of which already import PACKAGES_DIR from here.
+export function statMtimeMs(path: string): number | null {
+  try {
+    return statSync(path).mtimeMs;
+  } catch {
+    return null;
+  }
 }
