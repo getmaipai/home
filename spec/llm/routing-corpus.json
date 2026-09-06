@@ -1,0 +1,63 @@
+[
+  { "utterance": "what does curious mean", "expect": "define", "must_not": [] },
+  { "utterance": "define ambiguous", "expect": "define", "must_not": [] },
+  { "utterance": "what's the definition of ephemeral", "expect": "define", "must_not": [] },
+  { "utterance": "what does the word ubiquitous mean", "expect": "define", "must_not": [] },
+  { "utterance": "what does gregarious mean", "expect": "define", "must_not": [] },
+
+  { "utterance": "I could use a good laugh right now", "expect": "joke", "must_not": [] },
+  { "utterance": "tell me a dad joke", "expect": "joke", "must_not": [] },
+  { "utterance": "got any jokes", "expect": "joke", "must_not": [] },
+  { "utterance": "make me laugh", "expect": "joke", "must_not": [] },
+  { "utterance": "know any good jokes", "expect": "joke", "must_not": [] },
+
+  { "utterance": "what do you remember about the wifi password", "expect": "recall", "must_not": ["remember"] },
+  { "utterance": "do you remember what I said about my allergies", "expect": "recall", "must_not": ["remember"] },
+  { "utterance": "remember that I take my medicine at 8am", "expect": "remember", "must_not": ["recall"] },
+  { "utterance": "remember I'm allergic to peanuts", "expect": "remember", "must_not": ["recall"] },
+  { "utterance": "remember that Friday is pizza night", "expect": "remember", "must_not": ["recall"] },
+
+  { "utterance": "what have I told you to remember about pizza night", "expect": null, "must_not": ["remember"], "note": "recall's own routing.example, but it captures no `topic` for recall's required arg without matching one of its own patterns literally - Tier 1 alone can never bind it (deterministicArgs' documented gap); a real Tier 2 tool call (step 2) is what should eventually route this, not Tier 1." },
+  { "utterance": "what do you know about my dentist appointment", "expect": null, "must_not": ["remember"], "note": "same gap as above" },
+  { "utterance": "remind me what I said about the school schedule", "expect": null, "must_not": ["remember"], "note": "same gap as above" },
+  { "utterance": "please remember our wifi password is on the fridge", "expect": null, "must_not": ["recall"], "note": "remember's own routing.example that doesn't literally start with \"remember\" - same required-arg gap, `fact` this time" },
+  { "utterance": "can you remember I have a dentist appointment next week", "expect": null, "must_not": ["recall"], "note": "same gap as above" },
+
+  { "utterance": "tell me a bedtime story", "expect": "storytime-style", "must_not": ["joke"] },
+  { "utterance": "tell a story for my kid", "expect": "storytime-style", "must_not": ["joke"] },
+  { "utterance": "can you tell a story", "expect": "storytime-style", "must_not": ["joke"] },
+  { "utterance": "make up a story about a dragon", "expect": "storytime-style", "must_not": ["joke"] },
+  { "utterance": "tell a short story before bed", "expect": "storytime-style", "must_not": ["joke"] },
+
+  { "utterance": "give me a trivia question", "expect": "trivia", "must_not": [] },
+  { "utterance": "ask me a trivia question", "expect": "trivia", "must_not": [] },
+  { "utterance": "tell me some trivia", "expect": "trivia", "must_not": [] },
+  { "utterance": "quiz me", "expect": "trivia", "must_not": [] },
+  { "utterance": "got any trivia", "expect": "trivia", "must_not": [] },
+
+  { "utterance": "what's the weather in Seattle", "expect": "weather", "args": { "place": "Seattle" }, "must_not": [] },
+  { "utterance": "how's the weather in Chicago", "expect": "weather", "args": { "place": "Chicago" }, "must_not": [] },
+  { "utterance": "what's the weather like in Portland", "expect": "weather", "args": { "place": "Portland" }, "must_not": [] },
+  { "utterance": "weather in Denver", "expect": "weather", "args": { "place": "Denver" }, "must_not": [] },
+  { "utterance": "how's the weather in Miami today", "expect": "weather", "must_not": [] },
+
+  { "utterance": "tell me a bedtime story about a fox", "expect": "storytime-style", "must_not": ["joke"] },
+  { "utterance": "tell me a joke", "expect": "joke", "must_not": [] },
+
+  { "utterance": "I GOT THE JOB!!! they just called me this morning", "expect": null, "must_not": ["remember", "recall"] },
+  { "utterance": "we're engaged!", "expect": null, "must_not": ["remember", "recall"] },
+  { "utterance": "I got promoted at work today", "expect": null, "must_not": ["remember", "recall"] },
+
+  { "utterance": "do you know who Marlow is", "expect": null, "must_not": ["recall", "remember"] },
+  { "utterance": "do you know who my sister is", "expect": null, "must_not": ["recall", "remember"] },
+
+  { "utterance": "do you remember when we first met", "expect": "recall", "must_not": ["remember"], "note": "matches recall's own \"do you remember *\" pattern - a real Tier 0 fire, and the correct fix for the legacy 'recall question stored as junk memory' bug: it now retrieves, never stores." },
+  { "utterance": "can you remember our first conversation", "expect": null, "must_not": ["remember"] },
+
+  { "utterance": "what's my son's name", "expect": null, "must_not": ["remember", "recall"] },
+  { "utterance": "what's my address", "expect": null, "must_not": ["remember", "recall"] },
+
+  { "utterance": "what time is it", "expect": null, "must_not": ["define", "joke", "recall", "remember", "storytime-style", "trivia", "weather"] },
+  { "utterance": "how are you feeling today", "expect": null, "must_not": ["define", "joke", "recall", "remember", "storytime-style", "trivia", "weather"] },
+  { "utterance": "good morning", "expect": null, "must_not": ["define", "joke", "recall", "remember", "storytime-style", "trivia", "weather"] }
+]

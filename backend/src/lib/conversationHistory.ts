@@ -109,6 +109,10 @@ export function logTurn(actor: PersonRow, surface: Surface, userText: string, va
     safetyAction: value.safety.action,
     minorSpeaker: isMinorRole(actor.role as Role),
     createdAt: value.safety.checked_at,
+    // Session C step 1: null for every non-plugin turn (value.routing
+    // only exists on a "plugin" source).
+    routingTier: value.routing?.tier ?? null,
+    routingScore: value.routing?.score ?? null,
     // Every new turn starts unjudged (step 6's own poison-guard state,
     // lib/memoryJudge.ts) - never anything but null/0 at insert time.
     judgeStatus: null,
@@ -892,7 +896,13 @@ export interface RoutingStats {
  * lib/hardware.ts's detectHardware() precedent for the identical shape. */
 export function routingStats(): RoutingStats {
   const rows = db
-    .select({ source: conversationTurns.source, pluginId: conversationTurns.pluginId, commandId: conversationTurns.commandId })
+    .select({
+      source: conversationTurns.source,
+      pluginId: conversationTurns.pluginId,
+      commandId: conversationTurns.commandId,
+      routingTier: conversationTurns.routingTier,
+      routingScore: conversationTurns.routingScore,
+    })
     .from(conversationTurns)
     .all();
 
@@ -903,13 +913,28 @@ export function routingStats(): RoutingStats {
   let model = 0;
   let safetyRefuse = 0;
   const pluginCounts = new Map<string, number>();
+  const pluginTierCounts = new Map<string, { pattern: number; embedding: number; keyword: number }>();
+  const pluginScoreSums = new Map<string, { sum: number; n: number }>();
   const commandCounts = new Map<string, number>();
 
   for (const row of rows) {
     switch (row.source) {
       case "plugin":
         plugin++;
-        if (row.pluginId) pluginCounts.set(row.pluginId, (pluginCounts.get(row.pluginId) ?? 0) + 1);
+        if (row.pluginId) {
+          pluginCounts.set(row.pluginId, (pluginCounts.get(row.pluginId) ?? 0) + 1);
+          if (row.routingTier === "pattern" || row.routingTier === "embedding" || row.routingTier === "keyword") {
+            const tiers = pluginTierCounts.get(row.pluginId) ?? { pattern: 0, embedding: 0, keyword: 0 };
+            tiers[row.routingTier]++;
+            pluginTierCounts.set(row.pluginId, tiers);
+          }
+          if (row.routingScore !== null) {
+            const agg = pluginScoreSums.get(row.pluginId) ?? { sum: 0, n: 0 };
+            agg.sum += row.routingScore;
+            agg.n += 1;
+            pluginScoreSums.set(row.pluginId, agg);
+          }
+        }
         break;
       case "plugin_error":
         pluginError++;
@@ -932,7 +957,15 @@ export function routingStats(): RoutingStats {
 
   const routable = plugin + pluginError + command + commandError + model;
   const byPlugin = [...pluginCounts.entries()]
-    .map(([pluginId, count]) => ({ pluginId, count }))
+    .map(([pluginId, count]) => {
+      const agg = pluginScoreSums.get(pluginId);
+      return {
+        pluginId,
+        count,
+        tier: pluginTierCounts.get(pluginId) ?? { pattern: 0, embedding: 0, keyword: 0 },
+        avgScore: agg ? agg.sum / agg.n : null,
+      };
+    })
     .sort((a, b) => b.count - a.count);
   const byCommand = [...commandCounts.entries()]
     .map(([commandId, count]) => ({ commandId, count }))

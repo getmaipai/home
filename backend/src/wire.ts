@@ -54,6 +54,12 @@ export interface TurnValue {
    * time a TurnValue exists, never optional. */
   conversation_id: string;
   turn_id: string;
+  /** Session C step 1: only present for `source: "plugin"` - which tier
+   * of route()'s decision fired it and its own score (1.0 for
+   * "pattern"; the real cosine, or the keyword-overlap fallback score,
+   * for "embedding"/"keyword"). conversationHistory.ts's routingStats()
+   * aggregates this from the logged turn, not from here directly. */
+  routing?: { tier: "pattern" | "embedding" | "keyword"; score: number };
 }
 
 export type ConversationTurnRow = typeof conversationTurns.$inferSelect;
@@ -209,7 +215,14 @@ export interface RoutingStats {
   model: number;
   safetyRefuse: number;
   fallthroughRate: number | null;
-  byPlugin: { pluginId: string; count: number }[];
+  // Session C step 1: additive per-entry fields, kept alongside the
+  // existing `pluginId`/`count` RoutingStatsSection.tsx (Session E's
+  // file, not touched here) already reads - `tier` is a count breakdown
+  // ("pattern"/"embedding"/"keyword" fires for this plugin), `avgScore`
+  // its mean routing_score, both null-safe for a turn logged before this
+  // step (routing_tier/routing_score are nullable columns, backfilled by
+  // nothing - old rows just don't contribute to either field).
+  byPlugin: { pluginId: string; count: number; tier: { pattern: number; embedding: number; keyword: number }; avgScore: number | null }[];
   byCommand: { commandId: string; count: number }[];
 }
 

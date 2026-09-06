@@ -13,6 +13,7 @@
 // read docs/dev.md's turn engine section before extending this file.
 import { evaluateSafety } from "@/lib/safety";
 import { listPackageIds, loadPackage, meetsMinRole, runPlugin } from "@/lib/plugins";
+import { ensureRoutingEmbeddings, embedUtterance, scoreByEmbedding, pickTier1WinnerAmong } from "@/lib/routing";
 import { loadAllSkills, type LoadedSkill } from "@/lib/skills";
 import { matchCommand, runCommand } from "@/lib/commands";
 import { trigger } from "@/lib/notifications";
@@ -125,7 +126,7 @@ const STABLE_SYSTEM_SUFFIX = [
 // always was: a persona's own fragment can change per person turn to
 // turn while the identity/safety-posture prefix above it can't.
 
-interface LoadedManifest {
+export interface LoadedManifest {
   id: string;
   manifest: PackageManifest;
 }
@@ -140,7 +141,7 @@ interface LoadedManifest {
 // OS-dependent enumeration order, not just "whatever order the disk
 // returns," even though only one bundled package exists to tie against
 // today.
-function loadAllManifests(): LoadedManifest[] {
+export function loadAllManifests(): LoadedManifest[] {
   const out: LoadedManifest[] = [];
   for (const id of [...listPackageIds()].sort()) {
     const loaded = loadPackage(id);
@@ -223,7 +224,7 @@ const MAX_MATCHING_SKILLS = 3;
 // composition-budget concern, not part of what "relevant" means, and the
 // priority check only ever needs the single best score regardless of how
 // many would eventually compose in.
-function matchingSkills(text: string, skills: LoadedSkill[]): { skill: LoadedSkill; score: number }[] {
+export function matchingSkills(text: string, skills: LoadedSkill[]): { skill: LoadedSkill; score: number }[] {
   return skills
     .map((skill) => ({ skill, score: exampleScore(text, skill.manifest.routing?.examples) }))
     .filter((m) => m.score >= EXAMPLE_MATCH_THRESHOLD)
@@ -432,13 +433,18 @@ export function buildSystemPrompt(
   return body + localTimeLine;
 }
 
-// Tier 1 of the deterministic plugin floor (4.5: "tier 1 example-embedding
-// match"). No embedder exists (4.11's embed role), so `routing.examples`
-// is matched by keyword overlap against the utterance instead, the same
-// documented-placeholder move memory.ts's recall() already made for
-// "scored vectors." Coverage of the *example*'s words (not Jaccard) since
-// examples are short template sentences and the live utterance is often
-// longer or shorter; a 0..1 score, not a claim of semantic matching.
+// Tier 1 of the deterministic plugin floor's FALLBACK (session-c-brain-
+// and-voice.md step 1): route() below now scores Tier 1 by real cosine
+// similarity through lib/routing.ts, falling back to this keyword-overlap
+// function only when the embed backend is down (or a candidate has no
+// stored embedding yet). Kept as a real, separate scoring path rather
+// than deleted: `EXAMPLE_MATCH_THRESHOLD` was tuned for this scale
+// specifically, and skillsSection()'s own composition retrieval below
+// still uses it directly (a softer "which skills are worth composing in"
+// signal, not the hard Tier 1 routing decision route() makes). Coverage
+// of the *example*'s words (not Jaccard) since examples are short
+// template sentences and the live utterance is often longer or shorter;
+// a 0..1 score, not a claim of semantic matching.
 function exampleScore(text: string, examples: readonly string[] | undefined): number {
   if (!examples || examples.length === 0) return 0;
   const words = tokenize(text);
@@ -519,19 +525,39 @@ interface RoutedPlugin {
    * (2026-09-05, prepareTurn()'s skill-vs-plugin priority check) must
    * never depend on that coincidence. */
   viaPattern: boolean;
+  /** Session C step 1: which Tier 1 scoring actually produced `score`
+   * when `viaPattern` is false - real cosine ("embedding") or the
+   * keyword-overlap fallback ("embedding" candidate had no stored rows
+   * yet, or the embed backend is down this turn). Meaningless when
+   * `viaPattern` is true (always "embedding" by construction, never
+   * read). */
+  viaEmbedding: boolean;
 }
 
 // The deterministic plugin floor (4.5). A `consequential` package (4.9's
 // manifest field) "raises the routing bar": it only fires on a real
-// pattern match, never on a fuzzy example score, however high. Among
-// everything that clears its own bar, the highest-scoring candidate wins
-// (a pattern match always outranks a fuzzy one); a tie between two pattern
-// matches goes to whichever package sorts first by id (loadAllManifests()'s
-// deterministic order), a deliberately simple tie-break, not a claim of
-// ranking by pattern specificity.
-function route(text: string, actor: PersonRow, loaded: LoadedManifest[]): RoutedPlugin | null {
-  let best: { id: string; args: Record<string, unknown>; score: number; viaPattern: boolean } | null = null;
-
+// pattern match, never on a fuzzy example score, however high. A tie
+// between two pattern matches goes to whichever package sorts first by
+// id (loadAllManifests()'s deterministic order), a deliberately simple
+// tie-break, not a claim of ranking by pattern specificity. Tier 0
+// (patterns) always wins outright over Tier 1, checked first and
+// returned immediately - a real, deliberately-authored trigger phrase
+// never competes with a fuzzy score, however confident.
+//
+// Tier 1 (session-c-brain-and-voice.md step 1) is a real embedding
+// ranking now, not a single package's own score against a fixed bar: the
+// live-found bug this step's own goal names ("'bedtime story' reaches
+// the storytime skill, not the joke plugin") came from two candidates
+// landing close together purely from shared filler words ("tell me a"),
+// which a bare per-candidate threshold cannot tell apart from a genuine
+// match - lib/routing.ts's `pickTier1Winner()` requires the best
+// candidate to also clear the runner-up by a real margin, not just its
+// own bar. A candidate with no stored embedding yet (a package just
+// added, or the embed backend down) falls back to `exampleScore()` for
+// itself alone; the ranking runs on whatever mix of real and fallback
+// scores the turn actually has, never all-or-nothing.
+export async function route(text: string, actor: PersonRow, loaded: LoadedManifest[]): Promise<RoutedPlugin | null> {
+  const eligible: LoadedManifest[] = [];
   for (const { id, manifest } of loaded) {
     if (!meetsMinRole(actor.role, manifest.min_role)) continue;
 
@@ -540,19 +566,32 @@ function route(text: string, actor: PersonRow, loaded: LoadedManifest[]): Routed
       if (captured === null) continue;
       const args = deterministicArgs(manifest.args, captured);
       if (!args) continue;
-      if (!best || best.score < 1) best = { id, args, score: 1, viaPattern: true };
+      return { id, args, score: 1, viaPattern: true, viaEmbedding: true }; // Tier 0 always wins, immediately
     }
 
     if (manifest.consequential) continue; // examples alone never clear a raised bar
-    const score = exampleScore(text, manifest.routing?.examples);
-    if (score >= EXAMPLE_MATCH_THRESHOLD) {
-      const args = deterministicArgs(manifest.args, null);
-      if (!args) continue; // a fuzzy match has no capture to bind a required arg to
-      if (!best || best.score < score) best = { id, args, score, viaPattern: false };
-    }
+    eligible.push({ id, manifest });
   }
+  if (eligible.length === 0) return null;
 
-  return best;
+  await ensureRoutingEmbeddings(eligible.map(({ id, manifest }) => ({ id, examples: manifest.routing?.examples })));
+  const utteranceVector = await embedUtterance(text);
+  const embeddingScores = utteranceVector ? scoreByEmbedding(utteranceVector, eligible.map(({ id }) => id)) : new Map<string, number>();
+
+  const scored = eligible.map(({ id, manifest }) => ({
+    id,
+    score: embeddingScores.get(id) ?? exampleScore(text, manifest.routing?.examples),
+    viaEmbedding: embeddingScores.has(id),
+  }));
+
+  const canFire = (id: string) => deterministicArgs(eligible.find((e) => e.id === id)!.manifest.args, null) !== null;
+  const winner = pickTier1WinnerAmong(scored, canFire);
+  if (!winner) return null;
+
+  const manifest = eligible.find((e) => e.id === winner.id)!.manifest;
+  const args = deterministicArgs(manifest.args, null)!; // canFire already proved this binds
+  const viaEmbedding = scored.find((s) => s.id === winner.id)!.viaEmbedding;
+  return { id: winner.id, args, score: winner.score, viaPattern: false, viaEmbedding };
 }
 
 type PreparedTurn =
@@ -652,7 +691,7 @@ async function prepareTurn(
     });
   }
 
-  const routed = route(text, actor, loaded);
+  const routed = await route(text, actor, loaded);
   // A real trigger phrase always wins outright (see RoutedPlugin's own
   // comment on why `viaPattern`, not `score === 1`, is the real signal).
   // Only a FUZZY plugin match is subject to being outscored - found live
@@ -671,7 +710,14 @@ async function prepareTurn(
     const result = await runPlugin(routed.id, actor, routed.args, turnId);
     if (result.ok) {
       const reply = result.value.reply ?? { text: "Done." };
-      return immediate({ reply, source: "plugin", plugin_id: routed.id, safety, crisis_resources: crisisResources });
+      return immediate({
+        reply,
+        source: "plugin",
+        plugin_id: routed.id,
+        safety,
+        crisis_resources: crisisResources,
+        routing: { tier: routed.viaPattern ? "pattern" : routed.viaEmbedding ? "embedding" : "keyword", score: routed.score },
+      });
     }
     // A pre-filtered deterministic match failing at runPlugin is a real, if
     // rare, gap (a role change or a bad manifest between the router's

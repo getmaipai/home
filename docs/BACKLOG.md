@@ -366,7 +366,9 @@ alongside the first sourced skill, not before it.
       already decided: ship `embed` (real semantic routing) first, ship
       more real skills, measure the actual fall-through rate from real
       conversation history, then decide whether to build this at all.
-- [ ] **Wire the `embed` role into routing** (M) - corrected 2026-09-05:
+- [x] **Wire the `embed` role into routing** (M) - shipped 2026-09-06,
+      Session C step 1 (`lib/routing.ts`, `spec/llm/routing-corpus.json`,
+      docs/dev/session-c.md). corrected 2026-09-05:
       the role itself is built and live-verified (nomic-embed-text on a
       second llama-server, `embedSupervisor.ts`), reachable only through
       a diagnostic route. What is missing is embedding `routing.examples`
@@ -1881,9 +1883,27 @@ that owns it.
       memories and conversations from the legacy data directory into
       spec-shaped records with provenance, run once, dry run first,
       backup required. Without it the family starts from zero.
-- [ ] **Routing embeddings persisted per package** (S, C, with Tier 1) -
+- [x] **Routing embeddings persisted per package** (S, C, with Tier 1) -
+      shipped 2026-09-06, Session C step 1: `routing_embeddings`, keyed
+      by `(package_id, example_hash, space)` so an unchanged example is a
+      pure DB lookup, never a re-embed.
       re-embed only when an example changes; a cold boot must not
       re-embed sixty packages.
+- [ ] **Re-embed on an embedding model change** (S) - found 2026-09-06
+      (Session C step 1's own code review, while adding
+      `routing_embeddings`): neither `memory_embeddings` nor
+      `routing_embeddings` reconciles `space` on lookup - `recall()`'s
+      cosine compare and `scoreByEmbedding()` both compare a query/
+      utterance vector against every stored vector regardless of which
+      model embedded it. A household that changes its embedding model
+      keeps scoring against stale vectors from the old one indefinitely,
+      silently, no error. Today's real mitigation is "there is exactly
+      one pinned embedding model" (embedAssets.ts); this is real data
+      debt the day that stops being true. Fix belongs to both stores at
+      once (the identical gap, not two separate ones): either filter by
+      the CURRENT space at query time (cheap only if the current space is
+      known without an embed call) or a real migration that re-embeds
+      everything on a model change.
 
 **Deferred to Wave 3, recorded so it is not lost**
 

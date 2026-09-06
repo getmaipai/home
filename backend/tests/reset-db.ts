@@ -26,6 +26,7 @@ import {
   entities,
   grants,
   approvals,
+  routingEmbeddings,
 } from "@/db/schema";
 
 // All test files in one `bun test` run share the same imported `@/db`
@@ -53,6 +54,7 @@ export function resetDb(): void {
   db.delete(totpSecrets).run();
   db.delete(hubEndpoints).run();
   db.delete(hubIdentity).run();
+  db.delete(routingEmbeddings).run();
   db.delete(issues).run();
   db.delete(packageStatus).run();
   db.delete(notificationDeliveries).run();

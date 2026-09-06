@@ -269,6 +269,15 @@ export const conversationTurns = sqliteTable(
     // seem to parse.
     judgeStatus: text("judge_status"),
     judgeAttempts: integer("judge_attempts").notNull().default(0),
+    // Session C step 1: null for every non-plugin turn (a command, the
+    // model, a safety refusal). "pattern"/"embedding"/"keyword" for a
+    // plugin turn - which tier of route()'s decision actually fired it,
+    // and its own score (1.0 for a pattern; the real cosine or the
+    // keyword-overlap fallback score otherwise) - lib/conversationHistory.ts's
+    // routingStats() aggregates these; RoutingStatsSection.tsx (Session E's
+    // file) doesn't render them yet, a noted frontend follow-up.
+    routingTier: text("routing_tier"),
+    routingScore: real("routing_score"),
     // Step 10: not a spec-shaped record itself (conversation_turns stays
     // hub-internal, see the table's own header above), but the plan's
     // own text still asks for it here so a synced conversation's
@@ -666,3 +675,28 @@ export const approvals = sqliteTable("approvals", {
   decidedAt: text("decided_at"),
   createdAt: text("created_at").notNull(),
 });
+
+// Session C (brain and voice), step 1. Tier 1 routing's real embedding
+// store, the routing-specific twin of `memoryEmbeddings` above (same
+// buffer shape, `space`/`dims`/`vector`/`hlc`). Keyed by
+// (package_id, example_hash, space) rather than a single-column primary
+// key: a package has several `routing.examples` entries, not one, and
+// the composite key is what makes "a changed example re-embeds, an
+// unchanged one is a pure lookup" possible - lib/routing.ts hashes each
+// example's text and only calls `llm.embed` for hashes not already
+// here. No foreign key to a packages table: packages are files on disk
+// (lib/plugins.ts's `listPackageIds()`), never a DB row, the same
+// reason `manifest.json` itself is never mirrored into SQLite.
+export const routingEmbeddings = sqliteTable(
+  "routing_embeddings",
+  {
+    packageId: text("package_id").notNull(),
+    exampleHash: text("example_hash").notNull(),
+    space: text("space").notNull(),
+    example: text("example").notNull(),
+    dims: integer("dims").notNull(),
+    vector: blob("vector", { mode: "buffer" }).notNull(),
+    hlc: text("hlc").notNull(),
+  },
+  (table) => [primaryKey({ columns: [table.packageId, table.exampleHash, table.space] })],
+);

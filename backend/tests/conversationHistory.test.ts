@@ -121,10 +121,13 @@ describe("routingStats()", () => {
     // 1 model / (2 plugin + 0 pluginError + 1 model) = 1/3, NOT 1/4 -
     // the exact detail a review would need to double-check.
     expect(stats.fallthroughRate).toBeCloseTo(1 / 3);
+    // Both fire via a real routing.patterns match ("remember that *",
+    // "what do you remember about *"), Session C step 1's Tier 0 - never
+    // affected by embeddings, so this stays deterministic.
     expect(stats.byPlugin).toEqual(
       expect.arrayContaining([
-        { pluginId: "remember", count: 1 },
-        { pluginId: "recall", count: 1 },
+        { pluginId: "remember", count: 1, tier: { pattern: 1, embedding: 0, keyword: 0 }, avgScore: 1 },
+        { pluginId: "recall", count: 1, tier: { pattern: 1, embedding: 0, keyword: 0 }, avgScore: 1 },
       ]),
     );
   });

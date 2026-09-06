@@ -960,7 +960,7 @@ export function vectorsFor(ids: string[]): Map<string, Float32Array> {
   return new Map(rows.map((r) => [r.memoryId, bufferToVector(r.vector)]));
 }
 
-export { cosineSimilarity };
+export { cosineSimilarity, vectorToBuffer, bufferToVector };
 
 /** Retires an ACTIVE record in favor of one that already exists (unlike
  * supersede(), which always creates a brand-new record) - consolidate's
