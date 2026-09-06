@@ -540,13 +540,22 @@ describe("SettingsPage tree - tab stays in sync with the route, not just ?tab=",
         {} as IntersectionObserver,
       );
       expect(await findByRole("button", { name: "AI model tuning" })).toHaveClass("bg-muted");
+      // A scroll-anchor entry (no `to`) is selected, not navigated to -
+      // List.tsx's own convention for that ("true"), not "page" (a code
+      // review, 2026-09-06, caught a flat "page" applied to both kinds).
+      expect(await findByRole("button", { name: "AI model tuning" })).toHaveAttribute("aria-current", "true");
 
       fireEvent.click(await findByRole("button", { name: "AI models" }));
 
       // The stale scroll highlight must be gone now that we've left the
       // page it applied to - only the routed entry should be active.
       expect(await findByRole("button", { name: "AI model tuning" })).not.toHaveClass("bg-muted");
+      expect(await findByRole("button", { name: "AI model tuning" })).not.toHaveAttribute("aria-current");
       expect(await findByRole("button", { name: "AI models" })).toHaveClass("bg-muted");
+      // A routed entry is a real navigation, so it gets "page" - the
+      // same signal the shell's own main nav rail already gets from
+      // `NavLink` for free.
+      expect(await findByRole("button", { name: "AI models" })).toHaveAttribute("aria-current", "page");
     } finally {
       globalThis.IntersectionObserver = originalIO;
       restore();

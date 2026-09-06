@@ -1100,3 +1100,61 @@ clean, `scripts/check.sh` green end to end, and `bun run a11y` clean
 except the one already-known, already-diagnosed Chat timestamp contrast
 finding. Two commits: devices/sessions, then the accessibility/tooling
 fixes (code review ran on both together before either was made).
+
+## Step 7 (part 3): the screen-reader read-through
+
+Step 7's last item, "a screen-reader read-through of each page, recorded
+with fixes." No real screen reader (VoiceOver, NVDA) is drivable from a
+headless CLI session - that needs a real GUI session with accessibility
+permissions, hardware this environment doesn't have. Used the closest
+real, scriptable substitute instead of skipping the item: Playwright's
+`ariaSnapshot()`, the literal structured tree an assistive technology
+actually consumes, captured for all 17 real routes (a one-off script
+under the session scratchpad, not committed - its job was capturing the
+trees, not becoming a permanent check) and read through by hand.
+
+Two real findings, neither one axe's rule-based scan would ever catch
+(neither is a WCAG success-criterion violation on its own - both are
+real screen-reader confusion a sighted-only review would never notice):
+
+- `Avatar.tsx`'s fallback initial (`AvatarFallback`) had no
+  `aria-hidden`. Every place Avatar renders next to a name - People's
+  list, Home's "Who is here" strip - announced the bare initial letter
+  as real text immediately before the name: "S Sage Owner", "S You M
+  Marlow N Nova". The initial exists to stand in for a real picture
+  (this file's own header comment: "no real avatar rendering... this is
+  that fallback becoming real"), and every real caller already renders
+  the full name as separate, adjacent visible text, so the letter itself
+  carries nothing a screen reader needs to hear. Fixed once, centrally,
+  in `Avatar.tsx` - every caller inherits it.
+- `SettingsPage.tsx`'s tree sidebar (the "System"/"AI model tuning"/
+  etc. buttons) signaled which section is active only by color and font
+  weight (`bg-muted font-medium`) - real for a sighted user, silent for
+  a screen reader, which heard a flat list of identically-described
+  buttons with no sense of "you are here." Fixed with
+  `aria-current={isActive ? "page" : undefined}`, the same signal the
+  shell's own main nav rail already gets from `NavLink` for free.
+
+One hypothesis from the read-through was checked against the real DOM
+before being "fixed", and turned out wrong: the main nav rail's active
+link looked like it carried no `aria-current` at all in the captured
+snapshots (every route's active nav entry rendered identically to its
+siblings in the tree). Grabbing the real rendered `<a>` element directly
+(`element.outerHTML`) showed `aria-current="page"` was there the whole
+time - `NavLink`'s own built-in behavior, already correct -
+`ariaSnapshot()`'s own YAML-like format simply doesn't surface that
+attribute. Exactly the reason to verify a specific hypothesis against
+the real DOM before touching code, not just against the proxy tool's
+own rendering of it.
+
+**Not covered, and said so rather than silently skipped**: `/setup`'s
+real wizard steps. Seeding the demo household for this pass (the same
+`seedHousehold()` every other check in this session uses) completes
+setup as its first act, so every visit to `/setup` in this pass
+redirected straight to Home - its own accessibility tree was never
+actually captured. A second, unseeded backend run would be needed to
+read through the wizard for real; not done here.
+
+Verified: `bunx tsc --noEmit` clean, `bun test` (435 passing, both fixes
+are markup-only). Ran the code-review skill on this diff before
+committing, per the org's own gate.

@@ -286,6 +286,19 @@ export function SettingsPage({ person, onPersonChange }: SettingsPageProps) {
                   variant="ghost"
                   size="sm"
                   onClick={() => (entry.to ? navigate(entry.to) : scrollToSection(entry.id))}
+                  // A screen-reader read-through (2026-09-06) found the
+                  // active tree entry only ever signaled by color/weight
+                  // (`bg-muted font-medium`) - real for a sighted user,
+                  // silent for anyone using a screen reader, who heard
+                  // a flat list of buttons with no sense of "you are
+                  // here." "page" only for a routed entry (`entry.to`) -
+                  // a real navigation; a scroll-anchor entry never
+                  // navigates anywhere, so it gets List.tsx's own
+                  // established convention for "selected, not navigated"
+                  // (`aria-current="true"`) instead, a code review
+                  // (2026-09-06) caught a flat "page" applying the exact
+                  // same signal to both kinds of entry.
+                  aria-current={isActive ? (entry.to ? "page" : "true") : undefined}
                   className={cn(
                     "h-auto justify-start rounded-md px-2 py-1.5 text-left font-normal",
                     isActive ? "bg-muted font-medium text-foreground" : "text-muted-foreground",

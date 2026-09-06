@@ -1176,9 +1176,36 @@ this file's earlier note), not something to build against today.
       real signal without paying N times the cost. A trap or a motion
       regression confined to one specific page's own markup would not be
       caught by this - genuinely open, not implied "done" by this entry.
-- [ ] A screen-reader read-through of each page (session-e-ui-and-
-      docs.md's own step 7) - the rest of this step's own scope, still
-      open as of this note.
+- [x] **A screen-reader read-through of each real page, done as far as
+      this environment allows** (session E step 7, 2026-09-06) - no real
+      screen reader (VoiceOver/NVDA) is drivable from here (no GUI
+      session, no accessibility-permissioned macOS process), so this
+      used the closest real, scriptable proxy instead: Playwright's
+      `ariaSnapshot()`, the exact structured accessibility tree an AT
+      actually receives, captured for all 17 real routes and read
+      through by hand rather than skipped or claimed done without it.
+      Found and fixed two real gaps axe's rule-based scan can't catch
+      (neither is a WCAG success-criterion violation, both are real
+      screen-reader confusion): `Avatar.tsx`'s fallback initial had no
+      `aria-hidden`, so every avatar announced its own letter as real
+      text right before the adjacent name everywhere Avatar is used -
+      "S Sage Owner" on People, "S You M Marlow N Nova" on Home's Who's
+      Here strip; and `SettingsPage.tsx`'s tree sidebar signaled the
+      active section only by color/weight (`bg-muted font-medium`), so a
+      sighted user sees "you are here" and a screen-reader user hears a
+      flat list of identical buttons - fixed with `aria-current="page"`.
+      One hypothesis from the read-through turned out wrong before being
+      "fixed": the main nav rail's active-page marker looked absent in
+      the snapshot's own rendering, but checking the real DOM directly
+      showed `NavLink`'s own `aria-current="page"` was already there -
+      `ariaSnapshot()`'s format simply doesn't surface that attribute,
+      which is exactly why "check the read-through's own hypothesis
+      against the real DOM before touching code" mattered here. **Not
+      covered**: `/setup`'s real wizard steps - seeding the demo
+      household for this pass completes setup first, so every visit to
+      `/setup` redirects to Home before the wizard's own accessibility
+      tree can ever be captured; verifying it would need a second,
+      unseeded backend run, not done here.
 - [ ] Onboarding beyond the one-time initial household setup (M)
 - [x] Accessibility audit (M) - done 2026-09-05, driven against the
       running app at phone and desktop, not read off the source: 142

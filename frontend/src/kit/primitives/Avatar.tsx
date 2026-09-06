@@ -33,7 +33,16 @@ export function Avatar({ name, className }: AvatarProps) {
           "whatever the root above is set to", which is the one property
           Tailwind has no bare utility for (`text-inherit` sets color, not
           size). */}
-      <AvatarFallback delayMs={0} className="bg-transparent text-[length:inherit] text-primary-foreground">
+      {/* A screen-reader read-through (session E step 7, 2026-09-06)
+          found this initial announced as real text everywhere Avatar is
+          used - "S Sage Owner" on People, "S You M Marlow N Nova" on
+          Home's Who's Here strip - since nothing ever named the letter
+          decorative. It stands in for a real picture (this file's own
+          header comment), and every real caller already renders the
+          full name as separate, adjacent visible text, so the letter
+          itself carries no information a screen reader needs to hear
+          twice. */}
+      <AvatarFallback aria-hidden delayMs={0} className="bg-transparent text-[length:inherit] text-primary-foreground">
         {initial}
       </AvatarFallback>
     </AvatarRoot>
