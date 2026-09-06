@@ -71,6 +71,36 @@ export const sessions = sqliteTable("sessions", {
   createdAt: text("created_at").notNull(),
 });
 
+// Session C step 8 (session-c-brain-and-voice.md): "authenticated by a
+// device token (F's deviceTokens.ts; a per-person API token setting
+// until it lands)" - F's real device-token table (session-f-platform-
+// and-trust.md step 6) does not exist yet, so this is the interim
+// mechanism `/v1/chat/completions` and the Wyoming satellite server both
+// authenticate against. Deliberately its own table, not a `secret: true`
+// settings value the way `voice.hf_token` is stored: a settings value
+// round-trips (it can be decrypted and shown back), which is exactly
+// wrong for a bearer credential - this follows `sessions`' own shape
+// instead (a one-way SHA-256 hash, never the raw token, verified the
+// same way lib/session.ts's hashSessionToken() already is), the org's
+// own "one-way secrets are hashed... never encrypted" rule applied to a
+// long-lived API token instead of a short PIN. One token per person at a
+// time (generating a new one replaces the old, `tokenHash` unique) -
+// simpler than a list, and matches the plan's own singular "a per-person
+// API token." `expiresAt` follows lib/deviceTokens.ts's own year-long TTL
+// (CLAUDE.md: "every stored credential has a status, an expiry, and a
+// one-click revoke" - a leaked bearer token with no expiry never dies on
+// its own, matching that rule was a code-review finding on this table's
+// first version, fixed here rather than deferred).
+export const personApiTokens = sqliteTable("person_api_tokens", {
+  personId: text("person_id")
+    .primaryKey()
+    .references(() => people.id),
+  tokenHash: text("token_hash").notNull().unique(),
+  createdAt: text("created_at").notNull(),
+  expiresAt: text("expires_at").notNull(),
+  lastUsedAt: text("last_used_at"),
+});
+
 // Backs the spec's {prefix}{seq}-{device6} id shape (3.1) for
 // memory/entity/episode records: one monotonic counter per record_kind.
 // See lib/id.ts.

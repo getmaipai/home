@@ -3,6 +3,7 @@ import {
   people,
   personCredentials,
   sessions,
+  personApiTokens,
   memoryRecords,
   memoryEmbeddings,
   pendingEmbeddings,
@@ -69,6 +70,7 @@ export function resetDb(): void {
   db.delete(settingsValues).run();
   db.delete(idSequences).run();
   db.delete(sessions).run();
+  db.delete(personApiTokens).run();
   db.delete(personCredentials).run();
   db.delete(people).run();
 }

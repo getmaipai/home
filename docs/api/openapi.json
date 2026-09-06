@@ -2392,6 +2392,83 @@
         }
       }
     },
+    "/api/settings/api-token": {
+      "post": {
+        "tags": [
+          "Settings"
+        ],
+        "summary": "Generate a new API token for the signed-in person, replacing any existing one",
+        "responses": {
+          "200": {
+            "description": "The raw token - shown exactly once. It cannot be retrieved again; generate a new one to rotate.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "token": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "token"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Settings"
+        ],
+        "summary": "Revoke the signed-in person's API token, if one exists",
+        "responses": {
+          "200": {
+            "description": "Revoked (or there was none).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    }
+                  },
+                  "required": [
+                    "success"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/notifications": {
       "get": {
         "tags": [

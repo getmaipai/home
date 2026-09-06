@@ -35,6 +35,7 @@ import { entitiesRoutes } from "@/routes/entities";
 import { relationshipsRoutes } from "@/routes/relationships";
 import { grantsRoutes } from "@/routes/grants";
 import { approvalsRoutes } from "@/routes/approvals";
+import { openaiRoutes } from "@/routes/openai";
 import { requireAuth } from "@/middleware/auth";
 import { listSidecars } from "@/lib/sidecars";
 
@@ -130,6 +131,10 @@ app.route("/api/entities", entitiesRoutes);
 app.route("/api/relationships", relationshipsRoutes);
 app.route("/api/grants", grantsRoutes);
 app.route("/api/approvals", approvalsRoutes);
+// Root-mounted, not under /api: OpenAI's own wire contract names this
+// exact path (session-c-brain-and-voice.md step 8), which a client
+// integrating against it expects verbatim.
+app.route("/", openaiRoutes);
 
 // Serving the built frontend from this same process (docs/dev.md, the
 // shell/kit/Chat slice): a self-hosted single-process hub, no reverse

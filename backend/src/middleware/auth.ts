@@ -5,6 +5,7 @@ import { eq, gt, and, isNull } from "drizzle-orm";
 import { db } from "@/db";
 import { sessions, people } from "@/db/schema";
 import { hashSessionToken } from "@/lib/session";
+import { resolveApiToken } from "@/lib/apiToken";
 import { TRUST_PROXY } from "@/lib/trustProxy";
 import { personIsGranted } from "@/lib/grants";
 import { Person } from "@maipai/spec/gen/ts/person.js";
@@ -214,3 +215,24 @@ export function requireRoleOrGrant(roles: Role[], action: string) {
     await next();
   });
 }
+
+// Session C step 8 (session-c-brain-and-voice.md): a SEPARATE gate from
+// requireAuth/requireRole above on purpose - those authenticate a
+// browser's own cookie session (CSRF-checked, SameSite=Strict); this
+// authenticates an external client (an OpenAI-compatible caller, a
+// Wyoming satellite) presenting a bearer API token, a completely
+// different credential with no cookie or CSRF concept at all. Deliberately
+// does not fall back to a cookie session if no token is present - an
+// inbound API surface should never silently also accept "whatever browser
+// session happens to be attached to this request," which isn't a
+// coherent concept for a satellite or a script calling in anyway.
+export const requireApiToken = createMiddleware<AppEnv>(async (c, next) => {
+  const authHeader = c.req.header("authorization");
+  const token = authHeader?.startsWith("Bearer ") ? authHeader.slice("Bearer ".length) : undefined;
+  if (!token) return c.json({ error: "Unauthorized" }, 401);
+
+  const person = resolveApiToken(token);
+  if (!person) return c.json({ error: "Unauthorized" }, 401);
+  c.set("person", person);
+  await next();
+});

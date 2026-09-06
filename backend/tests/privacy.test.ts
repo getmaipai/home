@@ -114,6 +114,20 @@ describe("the hub's own connections", () => {
     expect(model?.what).toContain("Hugging Face access token");
   });
 
+  // Session C step 8 (session-c-brain-and-voice.md): "listed on the
+  // privacy page as inbound only" - the one row on this whole page that
+  // describes a connection running the opposite direction from every
+  // other row (something reaching INTO the hub, not the hub reaching
+  // out), so it gets its own test that it says so plainly rather than
+  // reading like an outbound row by accident.
+  test("the inbound API/Wyoming row is present and honestly describes the reversed direction", () => {
+    const row = privacyConnections().find((r) => r.id === "platform:inbound-api");
+    expect(row).toBeDefined();
+    expect(row!.destination.toLowerCase()).toContain("nothing leaves the house");
+    expect(row!.what).toContain("token");
+    expect(row!.what.toLowerCase()).toMatch(/inbound|reverse|reaches in|send text or audio to the hub/);
+  });
+
   test("none of them carries anything the family said or saved", () => {
     for (const row of platformConnections()) {
       expect(row.what.toLowerCase()).toMatch(/nothing anyone in the house said|no recording/);

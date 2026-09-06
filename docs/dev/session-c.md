@@ -1100,3 +1100,186 @@ threading a shared timestamp through both functions' signatures for -
 `gateOutputSafety()`'s own per-SENTENCE case was the one that mattered
 (a multi-second stream, not a multi-second completion), and that one
 already shares its band correctly.
+
+## Step 8: the hub as a brain for other clients
+
+Two pieces, one shared interim credential, both verified live over a
+real socket, not just unit-tested against an in-process router.
+
+**The interim per-person API token - and why F's real device tokens,
+which landed mid-step, turned out not to replace it.** The plan's own
+words anticipated a dependency: "authenticated by a device token (F's
+`deviceTokens.ts`; a per-person API token setting until it lands)."
+F's step 6 merged to main while this step was in progress - real device
+tokens now exist (`backend/src/lib/deviceTokens.ts`). Checked directly
+before assuming they were a drop-in replacement: they solve a genuinely
+different problem. `issueDeviceToken()`/`redeemDeviceToken()` exist so a
+NATIVE CLIENT that fails over between hub addresses (a phone app losing
+its cookie jar when it switches from `https://hub.example.com` to a raw
+LAN IP) can trade a long-lived token for a FRESH SESSION COOKIE on
+whichever address answered - a one-time redemption into a cookie, scoped
+to `DeviceKind`'s own closed enum (`robot | pod | tv | phone | desktop |
+browser`, none of which describes "an external API integration" or "a
+Wyoming satellite"). `/v1/chat/completions` and the Wyoming server both
+need the OPPOSITE shape: a stateless bearer credential presented on
+EVERY request, never exchanged for a session, the same "personal access
+token" pattern every REST API with programmatic clients uses - genuinely
+not what device-token redemption is for. So `backend/src/lib/
+apiToken.ts` keeps its own table (`person_api_tokens`) rather than
+reusing `deviceTokens`, though it borrows that table's own real shape
+(and `lib/session.ts`'s, which both already prove out): a one-way
+SHA-256 hash, never the raw token at rest, verified by hashing whatever's
+presented and comparing. `POST /api/settings/api-token` generates a new
+one (replacing any existing - one per person, matching the plan's own
+singular phrasing) and returns the raw value exactly once, the same
+personal-access-token UX GitHub and most services use for a credential
+that can never be shown again after issuance; `DELETE /api/settings/
+api-token` revokes it. A new `requireApiToken` middleware (`middleware/
+auth.ts`) is a genuinely separate gate from `requireAuth`/`requireRole`
+- it authenticates an external client's bearer token, never a browser's
+cookie session, and deliberately never falls back to one. If a real
+"API access token" concept ever gets added to the Device model itself
+(a `DeviceKind` value for exactly this, say), migrating this mechanism
+onto it would be a real, scoped follow-up - not urgent, since what's
+here today is a complete, secure, working answer to the actual need on
+its own.
+
+**`POST /v1/chat/completions`** (`routes/openai.ts`): OpenAI-compatible,
+streaming and non-streaming, reusing `spec/llm/ts/types.ts`'s own wire
+types rather than inventing new ones - the identical contract
+`llmSupervisor.ts` already speaks as a CLIENT to a real llama-server, now
+spoken as a SERVER. `surface` comes from an `X-MaiPai-Surface` header,
+validated against the real `Surface` enum and falling back to `"chat"` -
+deliberately NOT widening `IMPLEMENTED_SURFACES` to add a new value for
+"an external OpenAI client": an unsupported surface still fails exactly
+as honestly as it does for every other caller. A full OpenAI `messages`
+array doesn't map onto MaiPai's own server-side conversation history (the
+turn engine already resolves or creates the real conversation and reads
+its own rolling window), so this route takes the LAST `user`-role message
+as the turn's text and lets the turn engine's history do the rest - a
+real, named simplification, not context silently dropped. Listed on the
+privacy page (`lib/privacy.ts`'s new `inboundConnections()`) as the one
+row on that whole page describing a connection running the OPPOSITE
+direction from every other row there (something reaching INTO the hub,
+not the hub reaching out) - `destination`/`who` are repurposed to
+describe the caller, with the reversal spelled out in `what` so it never
+reads like an outbound row by accident.
+
+**The Wyoming satellite server** (`lib/{wyoming,wyomingServer}.ts`): a
+real TCP listener, not routed through Hono/HTTP at all. Hand-written
+protocol framing rather than the `wyoming` npm package - that package is
+real (checked: ISC, AGPL-3.0-compatible) but its own README says "work in
+progress" at version 0.1.0, with no documented stable surface worth
+building a child-safety-adjacent, always-on listener against; the plan's
+own fallback ("the small JSONL framing hand-written and tested") was the
+safer call, and the protocol itself (a JSON header line, an optional
+raw binary payload) is small enough to hand-roll correctly, proven by a
+real incremental framer test that feeds it a message split mid-payload
+across two `push()` calls. The base protocol has NO authentication "by
+design... meant for a trusted network" (confirmed against the reference
+docs before writing a line of this) - legacy's own Wyoming socket ran on
+that same unauthenticated posture, which the plan calls out by name as
+the wrong precedent. This implementation requires a real `authenticate`
+message (a MaiPai-specific extension; the base protocol defines none) as
+the FIRST message on every connection, checked against the same interim
+API token `/v1/chat/completions` uses - any other first message, or an
+invalid token, closes the connection outright before `describe`,
+`transcribe`, `synthesize`, or `handle` ever run.
+
+Four capabilities, each verified live over a real socket (`bun test`
+opens a real `Bun.listen()` server and a real `Bun.connect()` client, not
+a mock of either):
+- `describe` -> a real `info` response naming what this server offers.
+- `transcribe` (`audio-start`/`audio-chunk`*/`audio-stop`) -> a real
+  `transcript`, through step 5's own `transcribeUtterance()` (scripted in
+  tests the same way every other STT-driven test in this repo is - no
+  real ~110MB model installed in this sandbox).
+- `synthesize` -> real `audio-start`/`audio-chunk`*/`audio-stop`,
+  decoding TTS's own WAV output (`lib/tts.ts`) into the raw PCM bytes
+  Wyoming's `audio-chunk` wants, verified against the stub TTS backend.
+- `handle`, through the real turn engine: Wyoming's reference
+  implementation documents `handled`/`not-handled` as an intent-handling
+  service's own response events but no separately-named request event -
+  this implementation's own best-effort reading (confirmed against the
+  reference docs, not a live Home Assistant pipeline) is that a
+  CLIENT-sent `transcript` message is the request to handle that text,
+  answered with a real `handled`/`not-handled` from `runTurn()`. Flagged
+  explicitly, not asserted with false confidence: this exact request
+  shape is unverified against a real HA Assist pipeline.
+
+**Acceptance.** The plan's own words: "a Home Assistant Assist pipeline
+pointed at the hub gets an answer... if no HA instance is reachable, the
+scripted client is the acceptance and the HA check is noted for Jesse."
+No HA instance exists in this sandbox - the scripted-client tests above
+are the real acceptance bar this step actually met, end to end, over
+real sockets. **Owed to Jesse**: pointing a real Home Assistant Assist
+pipeline (its own OpenAI Conversation integration, or a Wyoming
+satellite entry) at this hub and confirming a real round trip, which
+would also be the first real-world proof of the `handle` request-shape
+guess above.
+
+**Code review findings, all fixed before this commit** (medium effort,
+extra scrutiny requested on framer buffer boundaries, auth bypass/timing
+risk, synthesize/transcribe failure handling, and whether
+`person_api_tokens` genuinely duplicates F's `deviceTokens`):
+
+- **Concurrent `data` events could interleave replies on one connection.**
+  Each socket `data` event spawned its own independent async run; a slow
+  handler (a real `synthesize` round trip, a real turn-engine call) still
+  in flight when a later chunk's messages started processing could answer
+  out of order on the wire, and a second `audio-start` arriving mid-flight
+  could reset `audioChunks`/`audioFormat` out from under an in-flight
+  `audio-stop`. Fixed by giving each connection its own promise chain
+  (`ConnectionState.chain`) that every `data` event appends onto, so a
+  socket's own messages are always handled strictly in the order they
+  arrived. Proven with a real regression test (`wyomingServer.test.ts`,
+  "never interleaved"): reverted against the old per-event-async-run code
+  first to confirm it reliably fails there (a scripted slow STT backend
+  racing a same-connection `describe`), then confirmed it reliably passes
+  against the fix.
+- **The `transcript` (handle) path had no per-person turn rate limit.**
+  Every other turn-engine entry point (`routes/turn.ts`, this step's own
+  `routes/openai.ts`) gates on `personWithinTurnBudget()`; the Wyoming
+  handle path called `runTurn()` straight through, so an authenticated
+  satellite could bypass the shared budget entirely over raw TCP. Fixed
+  by adding the same check, answering `not-handled` when exceeded.
+- **`audio-stop` declared but never checked its own audio format.**
+  `audio-start`'s `width`/`channels` were stored and then ignored -
+  `audio-stop` always decoded as 16-bit mono regardless of what a
+  satellite actually declared, silently producing garbage for any real
+  8-bit, 32-bit, or non-mono source. Fixed by rejecting the utterance with
+  a real `error` message when the declared format isn't 16-bit mono,
+  rather than mis-decoding it.
+- **No handshake timeout.** A connection that never sent `authenticate`
+  stayed open indefinitely, and the server binds `0.0.0.0` unconditionally
+  at boot - unbounded idle connections from anything on the LAN. Fixed
+  with a 10-second handshake timeout (`startWyomingServer`'s new, test-only
+  `handshakeTimeoutMs` override lets the test prove it fires without a
+  real 10-second wait) that's cleared the moment `authenticate` succeeds.
+- **`person_api_tokens` had no expiry.** CLAUDE.md's own credentials rule:
+  "every stored credential has a status, an expiry, and a one-click
+  revoke." The first version had the revoke but not the expiry - a leaked
+  token would have stayed valid forever. Fixed by adding `expiresAt`
+  (`0021_flippant_lady_mastermind.sql`), matching `lib/deviceTokens.ts`'s
+  own year-long TTL exactly, enforced in `resolveApiToken()` (deletes and
+  refuses an expired row) and swept by a new `pruneExpiredApiTokens()`
+  called on every `issueApiToken()`, the same lazy-prune-on-issuance
+  pattern `deviceTokens.ts` already uses (no dedicated cron for either
+  table).
+
+A second review pass on this fix set itself (same command, same effort)
+caught one real defect in the fix above: the generated `0021` migration
+was `ALTER TABLE ... ADD expires_at text NOT NULL` with no `DEFAULT`,
+which SQLite accepts on an empty table (why every test and a fresh
+install both passed clean) but refuses outright the moment the table has
+any existing row - reproduced directly against a real sqlite3 database
+seeded with a pre-migration token row before trusting the finding. Fixed
+by giving the `ALTER TABLE` a one-time `DEFAULT '1970-01-01T00:00:00.000Z'`
+(an already-expired timestamp, so any such pre-existing row reads as
+expired rather than silently valid forever - `schema.ts`'s own column
+declaration stays default-free, since every real `INSERT` always supplies
+`expiresAt` explicitly). Re-verified by replaying the exact scenario
+(migrate through 0020, insert a token row, then apply 0021) and
+confirming it now succeeds. The same pass also removed an unused
+`float32ToPcm16()` in `wyomingServer.ts`, dead code left over from an
+earlier draft of the synthesize path.

@@ -224,8 +224,37 @@ export function offlinePluginNames(manifests = loadedManifests()): string[] {
 
 /** The whole table: the hub's own connections first, then each
  * package's. */
+// Session C step 8 (session-c-brain-and-voice.md): "listed on the
+// privacy page as inbound only." Every row elsewhere in this file is
+// OUTBOUND - the hub reaching a third party - so `PrivacyConnection`'s
+// own fields (`destination`, `who` - a host the hub connects TO) don't
+// literally fit a connection running the other direction: nothing
+// leaves the house here, something reaches IN. Deliberately still a row
+// on this same table rather than a separate page or mechanism, since
+// "can anything reach into my house, and how" is exactly the question
+// this page exists to answer honestly - `destination`/`who` are
+// repurposed to describe the CALLER, not a host the hub reaches out to,
+// with the reversal spelled out in `what` so nobody reads it as an
+// outbound row by mistake.
+function inboundConnections(): PrivacyConnection[] {
+  return [
+    {
+      id: "platform:inbound-api",
+      source: "MaiPai Home",
+      sourceKind: "platform",
+      destination: "your own network only - nothing leaves the house for this row",
+      when: "only if an adult generates an API token in Settings and gives it to another app or device",
+      what:
+        "the reverse of every other row here: an app or device you configured (Home Assistant's own Assist pipeline, a script, a voice satellite) can send text or audio to the hub over your LAN and get a reply back, using the OpenAI-compatible chat API or the Wyoming voice-satellite protocol. Nothing is reachable without a token an adult generated and handed out; revoking it in Settings ends access immediately.",
+      who: "whichever app or device holds the token an adult generated",
+      optIn: true,
+      retention: "no separate record kept beyond the normal conversation history any chat turn already creates",
+    },
+  ];
+}
+
 export function privacyConnections(manifests = loadedManifests()): PrivacyConnection[] {
-  return [...platformConnections(), ...pluginConnections(manifests)];
+  return [...platformConnections(), ...inboundConnections(), ...pluginConnections(manifests)];
 }
 
 /** Both halves of the page from one pass over the packages. */

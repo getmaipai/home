@@ -1470,12 +1470,37 @@ on a spec tag that was never cut.
       export the spec already promises. Watch the W3C agent-memory
       interop group and the Agent Memory Protocol rather than adopting
       either; nothing is used widely enough to depend on.
-- [ ] **Speak Wyoming and expose an OpenAI-compatible chat endpoint** (M)
-      - Home Assistant satellites, Willow boxes and OVOS personas can
-      then use the hub as their brain; the robot becomes one more
-      Wyoming client. Hardware breadth for free, and it fits plan 8's
-      ESPHome/HA posture. Legacy's Wyoming socket ran unauthenticated as
-      admin; not that.
+- [x] **Speak Wyoming and expose an OpenAI-compatible chat endpoint** (M)
+      - shipped, Session C step 8 (2026-09-06):
+      `POST /v1/chat/completions` (`backend/src/routes/openai.ts`,
+      streaming and non-streaming, reusing spec/llm/ts/types.ts's own
+      OpenAI shapes) and a real Wyoming TCP server
+      (`backend/src/lib/{wyoming,wyomingServer}.ts` - hand-written
+      framing, not the `wyoming` npm package, which is real and ISC-
+      licensed but a 0.1.0 "work in progress" with no stable API to
+      build a child-safety-adjacent listener against). Both authenticate
+      against a new interim per-person API token
+      (`backend/src/lib/apiToken.ts`, `POST`/`DELETE
+      /api/settings/api-token`) - kept as its own mechanism even after
+      F's real device tokens (session-f-platform-and-trust.md step 6)
+      landed mid-step, once checked directly and found to solve a
+      different problem (a native client's session redemption after a
+      network change, not a stateless bearer credential for programmatic
+      access); see docs/dev/session-c.md's step 8 entry for the full
+      reasoning. Unlike the base Wyoming protocol (confirmed against the
+      reference docs: "no authentication or encryption, by design") and
+      unlike legacy's own unauthenticated socket, every connection must
+      send a real token as its first message or gets closed outright -
+      `describe`/`transcribe`/`synthesize`/`handle` never run for an
+      unauthenticated caller. Verified live end to end over a real TCP
+      socket and a real HTTP request (not just unit tests): a scripted
+      client authenticates, gets a real `info` response, a real
+      `handled` reply from the turn engine, a real `transcript` from
+      step 5's STT (scripted backend, no model installed in this
+      sandbox), and real framed audio from TTS's own stub backend. No
+      Home Assistant instance was reachable to verify the Assist-
+      pipeline acceptance itself - noted as owed to Jesse in
+      docs/dev/session-c.md.
 - [ ] **Round-trip fixtures across both repos** (S, once the link exists)
       - a record written on the robot and synced to the hub is byte-
       identical to one written on the hub; the robot never translates.
