@@ -763,3 +763,167 @@ since step 2) for C's Tier 2 router once C wires that side; a second
 Tier 1 package would be the first real test of whether `host/fetch`'s
 one-method RPC surface needs a second method (`host/memory.recall`,
 etc.) added the identical way.
+
+## Step 6: the store host and the catalog tooling
+
+**The `catalog` repo's own tooling** (`getmaipai/catalog@454e945`):
+`tools/src/{lint,pack,sign,index-builder,scorecard,check,build-index}.ts`,
+`@maipai/catalog-tools`. `lint.ts` validates a package's manifest (and,
+for Tier 0 plugins, its recipe.json) against `schema/` (mirrored from
+`home/spec/`) plus the rest of bronze - five-plus routing examples, a
+privacy row per `net:` permission, banned trademark vocabulary, README/
+CHANGELOG/quality_scale.yaml. `pack.ts` packs a package directory into a
+deterministic gzipped tarball (`node-tar`, BlueOak-1.0.0) and refuses a
+symlink outright (found by review: a symlink would otherwise pass
+`packPackage()`'s own file check via `statSync`, which follows it, and
+node-tar preserves the symlink itself - target string and all - in the
+signed tarball; `catalog` takes community PRs, so this is a real
+attacker-reachable path). `sign.ts` is Ed25519 via native `node:crypto`.
+`index-builder.ts` builds the TUF-shaped `root`/`targets`/`timestamp`,
+each carrying a monotonic `version` (added after `build-index.ts`
+landed and a rollback-detection gap became obvious: an expiry check
+alone can't catch a validly-signed, not-yet-expired, but WITHDRAWN
+older file). `build-index.ts` ties all of it together for a real set of
+packages, generating a local dev signing keypair outside the repo
+(`~/.config/maipai/catalog-dev-signing/`, never the real maintainer
+release key, which stays offline and is Jesse's own future call).
+`check.ts` is the CLI: `bun run check` finds every package in the repo
+(a directory with its own manifest.json, one level under `plugins/` and
+`skills/`, direct under everything else) and runs lint+scorecard on
+each. `scripts/check.sh` runs the whole suite before the standards core.
+59 tests across 7 files.
+
+**The bundled packages move to `catalog` as their canonical source**
+(`getmaipai/catalog@60788f1`): `define`, `joke`, `trivia`, `weather`,
+`knowledge`, and `storytime-style` (D's own six, all bronze-complete)
+migrated to their real catalog home (`plugins/<category>/<id>/` or
+`skills/<category>/<id>/`). `recall`, `remember`, and the companion
+packages (`buddy`, `default`, `pal`, `tutor`) stay in `home` - not
+D's packages (this file's own step-0 ownership note, and Session A's
+own companion work), and not yet at bronze (no README/CHANGELOG/
+quality_scale.yaml/smoke declaration), so they don't belong in the
+public catalog yet either: bronze is the actual publish gate, not a
+courtesy. `home` keeps its own checked-in copy under `backend/packages/`
+(`scripts/refresh-bundled-packages.ts`, `home-d@fc44642`) so the
+running hub never needs a network fetch or a sibling catalog checkout
+at runtime - `lib/bundledPackages.ts`'s `hashPackageDir()` (a plain
+sha256 over sorted relative-path + content, refusing a symlink the same
+way `pack.ts` does) is what makes "the copy matches" checkable without
+`home` depending on `catalog`'s own tar-based tooling (a real cross-repo
+dependency neither repo's build supports - the same reason `schema/` is
+a copy, not a live import). `backend/packages/bundled-provenance.json`
+records each id's hash/source-commit/catalog-path;
+`tests/bundledPackages.test.ts` recomputes the hash from whatever's on
+disk right now and fails loudly the moment someone hand-edits the
+checked-in copy instead of running the refresh script. 13 tests.
+
+**`lib/storeIndex.ts` verifies the signed index** - a deliberate,
+field-for-field TWIN of `catalog`'s own `index-builder.ts` (same reason
+as the bundled-copy hash above: no cross-repo dependency, different
+trust boundary, the same reasoning MCP's own independent client/server
+implementations already carry through this file). Checks, in order:
+root's signature against the pinned trust config (a CLIENT-side
+threshold, deliberately independent of whatever root.json's own
+self-reported threshold claims - trusting a root's self-declared
+threshold to verify ITSELF would let a malicious root simultaneously
+declare and satisfy threshold 1), root's expiry and rollback version;
+targets' signature against root's OWN declared keys/threshold for that
+role, expiry, rollback version; timestamp's signature the same way,
+expiry, rollback version; and finally targets.json's actual fetched
+bytes against timestamp's own hash pointer (the freshness anchor - even
+an independently well-signed targets.json must be the SAME BYTES the
+freshest timestamp vouches for). `lib/store.ts` builds install/rollback/
+uninstall/setChannel on top: downloads and hash-verifies a package's
+tarball against its targets entry, unpacks to a staging directory,
+checks the unpacked manifest's own `id` AND `version` match what was
+asked for (version validated against a safe semver pattern before it
+ever reaches a filesystem path), makes it the active install, and runs
+its smoke test - a failure leaves it installed but disabled
+(docs/PACKAGES.md's own words), never undone. `lib/packageResolve.ts`
+is the one place a package's active directory is computed (an
+installed override or the bundled default under `PACKAGES_DIR`),
+consumed by `lib/plugins.ts`, `lib/denoHost.ts`, `lib/smoke.ts`, and
+`lib/skills.ts`.
+
+**A high-effort code review before this landed caught real security
+gaps, all fixed**: (1) `lib/paths.ts`'s `tier1PackageDataDir` used to be
+`data/packages/<id>/` directly, and the new `installedPackageVersionDir`
+nested `versions/<version>/` INSIDE that same directory - a store-
+installed Tier 1 package's own SOURCE was a subdirectory of its own
+`--allow-write` grant, silently defeating `lib/denoHost.ts`'s "can never
+write into its own source tree" the moment a Tier 1 package was store-
+installed rather than bundled. Fixed by giving `tier1PackageDataDir` its
+own `state/` subdirectory, a true sibling of `versions/`; a real `deno
+run` regression test (two genuinely separate directories, not the same
+temp dir twice like every other test in that file) now proves it.
+(2) `verifyEnvelopeSignature` only checked "did SOME authorized key
+sign this" - a threshold-1 check regardless of what root.json's own
+`roles.*.threshold` actually declares, so compromising ONE signer among
+several would have been enough to forge an update. Fixed with a real
+`countSatisfiedKeys()` that counts DISTINCT keys satisfied, enforced
+against each role's own threshold. (3) `manifest.version`, read out of
+an unpacked tarball, went straight into a filesystem path with no
+validation - a manifest declaring `"../../../etc/cron.d"` would have
+flowed through `path.resolve`'s own `..` collapsing into a write outside
+`data/packages/` entirely, gated only on a malicious catalog entry
+passing hash verification, no signature break needed. Fixed with a
+semver-shaped pattern check plus a cross-check against the target
+path's own version segment. (4) An update that WIDENS a package's
+permissions installed silently - no comparison against what was already
+granted, contradicting this step's own acceptance line ("a permission-
+changing update demoted to notify"). Fixed: `install()` diffs the new
+permission set against the active install's own BEFORE downloading
+anything, and refuses with `requiresConfirmation` until the caller
+passes `confirmed: true` - the two-call permission-prompt flow, at the
+library level (a UI-level prompt is E's own consuming work once
+`routes/store.ts` exists). (5) Reinstalling the SAME version overwrote
+`previousVersion` with itself, silently destroying the real rollback
+target - a retry after a network blip would have looked like a
+successful rollback that was actually a no-op. Fixed: `previousVersion`
+only advances when the version actually changes. (6) Two concurrent
+installs of the same id raced on the same staging directory and both
+read pre-install state before either wrote it. Fixed with a per-package-
+id lock (`withPackageLock`, the identical shared-promise shape
+`lib/denoHost.ts`'s own `startingProcesses` map already uses for a Tier
+1 package's cold start) around install/rollback/uninstall. (7)
+`lib/skills.ts` was never migrated to `packageResolve.ts` - a store-
+installed or store-updated skill package was invisible to
+`loadAllSkills()`, the one place a skill reaches a chat turn's system
+prompt. Fixed. (8) `uninstall()` deleted the WHOLE
+`data/packages/<id>/` parent, wiping a Tier 1 package's own persistent
+state even when a bundled fallback kept running right afterward. Fixed
+to remove only the store's own `versions/`/`.staging/` subdirectories.
+Three independent hand-copies of the same TUF fixture-signing logic
+across two test files were also consolidated into
+`tests/support/tufFixtures.ts`.
+
+Tests: the full tamper suite (bad hash, swapped manifest, expired
+timestamp, rolled-back index, unknown signer, and now threshold
+bypass) in `storeIndex.test.ts`; install/rollback/uninstall/channel,
+the acceptance case (installing over an already-bundled package), and
+the concurrency/permission-escalation/path-traversal/Tier-1-state
+regressions above in `store.test.ts`. `scripts/check.sh` fully green,
+921 backend tests passing.
+
+**Verified for real**, against a real signed index built by `catalog`'s
+own `bun run build-index` (not a test fixture) and a real household-
+free dev data dir: `install()` against
+`plugins/utilities/weather/0.1.0` with `catalog`'s real dev signing key
+as the pinned trust returned `{ok: true, version: "0.1.0",
+previousVersion: null, smokeOk: true}`; `resolvePackageDir("weather")`
+then resolved to the store-installed version directory, not the
+bundled copy; `runPlugin("weather", ...)` - the exact same call a real
+`POST /api/plugins/weather/run` makes - answered "It's 54.7 degrees in
+Seattle" through the real recipe, the real host, and a real live
+Open-Meteo call, all served from the just-installed copy.
+
+What's left for whom: `routes/store.ts` (a thin HTTP surface over
+install/rollback/uninstall/setChannel, the two-call permission-prompt
+flow's UI-facing half) and the public CI workflow YAML for `catalog`
+(tag- and PR-triggered, running `bun run check`) are this step's own
+remaining pieces, next. The daily `catalog.check` core job and the full
+auto-update/notify flow (comparing an installed version against the
+index on a schedule, not just at an explicit install call) are real,
+deferred scope - `fetchVerifiedIndex()` is already exported standalone
+for exactly that future caller to build on, but the scheduled job
+itself, and the notification it would raise, don't exist yet.
