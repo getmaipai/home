@@ -767,3 +767,80 @@ error caught and fixed - the rename input doesn't autofocus, matching
 `bun run a11y` matrix is clean of any NEW violation type; Chat's own
 count is confirmed to vary run-to-run for the reason above, not from
 anything this step's own diff touches.
+
+## Step 5 (part 2): the memory per-person view, and notification history
+
+**Memory's per-person view** (`frontend/src/apps/memory/MemoryPage.tsx`'s
+`OtherPersonMemories`): the same owner/admin person picker Conversations
+already has, this time over `GET /api/memory?person=` plus two real
+routes with no frontend caller anywhere before this -
+`POST /api/memory/forget` (with the same named, "this cannot be undone"
+confirmation every other destructive action in this app already uses)
+and `GET /api/memory/export` (triggers a real browser download of the
+exported JSON - no download mechanism existed anywhere in this app
+before, a small, standard Blob-plus-anchor pattern, nothing borrowed).
+Not folded into the existing schema page: `SchemaPage`'s only extension
+point is `beforeBody` (a banner above the bound list), with no way to
+replace the body entirely - the picker itself stays in that shared slot,
+but picking someone else swaps the whole page to a hand-written view
+instead of also rendering the schema page's own always-the-actor's-own
+list underneath it. `?since=` (this step's own brief, "what changed
+since") is confirmed not buildable yet: `GET /api/memory` has no `since`
+handling at all (`parseListOptions` only reads `scope`/`person`) -
+recorded in `docs/BACKLOG.md`, not faked with a client-side filter over
+a full fetch pretending to be a real incremental read.
+
+**The notifications history page**
+(`frontend/src/apps/notifications/NotificationsPage.tsx` - reachable
+from the bell's own new "View history" link, not a new sidebar entry;
+the bell already lives in the shell header on every page) over the real,
+confirmed-unbounded `GET /api/notifications/history` (no date filter or
+cap exists server-side - read `listHistory()` directly rather than
+assumed), windowed to the last 30 days client-side. "Clear all" loops
+the real per-item `POST /:id/dismiss` (no batch route exists to call
+instead), only over rows not already dismissed - `Promise.allSettled`,
+not a plain `Promise.all`, so one failed dismiss in the middle of a
+clear-all doesn't stop the rest from going through, and any failures are
+reported by count rather than silently swallowed. Quiet hours and the
+web-push opt-in stay deferred: both need new settings keys in
+`backend/src/settings/notificationKeys.ts`, F's file per
+`docs/plans/wave-2.md`'s own grouping, not built yet and not this
+session's file to add to.
+
+Verified: `bun test` (frontend, 414 passing - `MemoryPage.test.tsx` gains
+3 cases for the picker/other-person view/forget flow,
+`NotificationsPage.test.tsx` new with 7 cases covering the empty state,
+state badges, the 30-day cutoff, per-row dismiss, and clear-all leaving
+already-dismissed rows alone), `bunx tsc --noEmit` clean, `lint` clean,
+`scripts/check.sh` green end to end, `/notifications` added to
+`scripts/screenshot.ts`'s route list, and the full `bun run a11y` matrix
+re-run clean of any new violation (the notifications page itself shows
+zero - a fresh household's history is empty).
+
+A code review before commit caught three real issues, all fixed:
+`NotificationBell.tsx`'s dismiss only invalidated its own `["notifications"]`
+query, never `NotificationsPage`'s `["notifications-history"]` - dismissing
+the same notification from the header bell while the history page was
+already open left a stale row there until an unrelated remount forced a
+refetch. Fixed by exporting both query keys from `NotificationBell.tsx`
+(shell owns them, the app page imports, not the other way - keeps the
+dependency direction the existing `NOTIFICATIONS_QUERY_KEY` export
+already established) and invalidating both on dismiss, with a regression
+test spying on `queryClient.invalidateQueries`. `MemoryPage.tsx`'s own
+unscoped `GET /api/memory` query had no `enabled` guard, so it stayed
+live even while viewing a child and its result was discarded outright -
+fixed with `enabled: viewingSelf`, checked directly against the query
+cache's own observer state rather than trying to provoke a real refetch
+inside a test. And a real "one implementation" finding: the bordered
+title/detail/buttons destructive-confirm block this step's own
+`OtherPersonMemories` forget-confirmation used was a verbatim third copy
+of markup already hand-duplicated in `PeoplePage.tsx`'s batch-remove
+confirm and (this session's own Step 5 part 1)
+`ConversationsPage.tsx`'s batch-delete and clear-all confirms - pulled
+into one shared `kit/primitives/DestructiveConfirm.tsx` and applied to
+all four call sites (the structurally different per-row inline confirms,
+which have no buttons of their own since `List`'s `renderAction` slot
+renders those separately, stayed as they were - a different shape, not
+a fifth copy of this one). Re-verified after every fix: `bun test`
+(frontend, 416 passing), `tsc --noEmit` clean, `lint` clean,
+`scripts/check.sh` green, `bun run a11y` unchanged. This closes Step 5.

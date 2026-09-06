@@ -10,6 +10,7 @@ import { Select } from "@/kit/primitives/Select";
 import { Button } from "@/kit/ui/button";
 import { Checkbox } from "@/kit/ui/checkbox";
 import { BatchBar, SelectModeToggle } from "@/kit/primitives/BatchBar";
+import { DestructiveConfirm } from "@/kit/primitives/DestructiveConfirm";
 import { api, ApiError, type PersonRosterEntry, type Role, type Roster } from "@/lib/api";
 import {
   ROLE_LABELS,
@@ -192,23 +193,16 @@ export function PeoplePage({ person }: PeoplePageProps) {
             ) : null}
 
             {confirmingDelete === "batch" ? (
-              <div className="flex flex-col gap-2 rounded-[var(--radius)] border border-[var(--destructive)] p-3">
-                <p className="text-base font-medium">
-                  Remove {selected.size} {selected.size === 1 ? "person" : "people"} from your household?
-                </p>
-                <p className="text-base text-[var(--muted-foreground)]">
-                  Everything MaiPai remembers about them, every conversation they had, their settings and any voice
-                  they recorded will be deleted. This cannot be undone.
-                </p>
-                <div className="flex flex-wrap gap-2">
-                  <Button variant="destructive" onClick={handleDeleteSelected} disabled={busy}>
-                    {busy ? "Removing…" : `Yes, remove ${selected.size}`}
-                  </Button>
-                  <Button variant="secondary" onClick={() => setConfirmingDelete(null)}>
-                    Keep them
-                  </Button>
-                </div>
-              </div>
+              <DestructiveConfirm
+                message={`Remove ${selected.size} ${selected.size === 1 ? "person" : "people"} from your household?`}
+                detail="Everything MaiPai remembers about them, every conversation they had, their settings and any voice they recorded will be deleted. This cannot be undone."
+                confirmLabel={`Yes, remove ${selected.size}`}
+                busyLabel="Removing…"
+                busy={busy}
+                onConfirm={handleDeleteSelected}
+                onCancel={() => setConfirmingDelete(null)}
+                cancelLabel="Keep them"
+              />
             ) : null}
 
             <List

@@ -415,7 +415,17 @@ export const api = {
   // field but `id`.
   fixIssue: (id: string) => request<Issue>(`/api/repairs/${encodeURIComponent(id)}/fix`, { method: "POST" }),
   dismissIssue: (id: string) => request<{ id: string }>(`/api/repairs/${encodeURIComponent(id)}/dismiss`, { method: "POST" }),
-  memories: () => request<MemoryRecord[]>("/api/memory"),
+  // `person`, for the per-person view an adult opens for a child
+  // (session E step 5): GET /api/memory's own `?person=` (backend/src/
+  // routes/memory.ts's parseListOptions) - the same real access check
+  // (assertCanForgetOrExport-adjacent) every other per-person read in
+  // this app already relies on server-side, not re-implemented here.
+  memories: (personId?: string) =>
+    request<MemoryRecord[]>(`/api/memory${personId ? `?person=${encodeURIComponent(personId)}` : ""}`),
+  forgetPersonMemories: (personId: string) =>
+    request<{ deleted: number }>("/api/memory/forget", { method: "POST", body: JSON.stringify({ personId }) }),
+  exportPersonMemories: (personId: string) =>
+    request<MemoryRecord[]>(`/api/memory/export?personId=${encodeURIComponent(personId)}`),
   archiveMemory: (id: string) =>
     request<MemoryRecord>(`/api/memory/${encodeURIComponent(id)}/archive`, { method: "POST" }),
   // POST /api/memory (backend/src/lib/memory.ts's remember(), already on

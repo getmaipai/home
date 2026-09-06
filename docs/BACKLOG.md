@@ -542,8 +542,19 @@ into a conversation with someone who knows who is talking.
       engine bump usage only on what actually reached the prompt.)
 - [ ] **Memory in the chat UI** (S-M) - a "memory updated" chip when the
       judge writes, per-message "remember this" and "forget this"
-      actions, a per-person memory page that an adult can edit for a
-      child. Every major assistant ships all three now.
+      actions. **The per-person memory page is done** (session E step 5,
+      2026-09-06, `frontend/src/apps/memory/MemoryPage.tsx`'s
+      `OtherPersonMemories`): an owner/admin picks a child from the same
+      person picker Conversations uses, sees that child's real memories
+      (`GET /api/memory?person=`), and can export
+      (`GET /api/memory/export`) or forget everything
+      (`POST /api/memory/forget`) about them - both real routes with no
+      frontend caller before this. "What changed since" from `?since=`
+      (this step's own brief) is still not built: `GET /api/memory` has
+      no `?since=` handling at all server-side (confirmed by reading
+      `parseListOptions` in `backend/src/routes/memory.ts` - it only
+      reads `scope`/`person`), unlike Conversations' `GET /:id/turns`,
+      which already supports a real `since`.
 - [ ] **A household memory bench** (M) - a LongMemEval-shaped fixture
       built on the persona roster, testing updates and abstention, run
       against the local model in the bench tier. Legacy had router (53),
@@ -1355,11 +1366,22 @@ on a spec tag that was never cut.
       2026-09-05, `docs/dev.md`'s "The notification system, a real
       working slice" entry) - declared types, `in_app` + Telegram
       channels, non-configurable types, `safety.flagged_turn` and
-      `model.download_ready`/`failed` wired to real events. Still open:
-      quiet hours, `passive`-level digest batching, browser push / Go /
-      TV overlay / robot speech (no such clients exist yet), a real
-      parent/guardian audience (see the Relationship/Grant work above),
-      and package-declared notification types (the manifest's
+      `model.download_ready`/`failed` wired to real events. Session E
+      step 5 (2026-09-06) adds the thirty-day history page
+      (`frontend/src/apps/notifications/NotificationsPage.tsx`, reachable
+      from the bell's own "View history" link) - a client-side window
+      over the real, genuinely unbounded `GET /api/notifications/history`
+      (confirmed by reading `lib/notifications.ts`'s `listHistory()`: no
+      date filter or cap exists server-side), and "clear all" as a real
+      loop over the real per-item `POST /:id/dismiss` (no
+      `POST /api/notifications/clear-all` route exists to call instead).
+      Still open: quiet hours and the web-push opt-in (both need new
+      settings keys in `backend/src/settings/notificationKeys.ts`, F's
+      file per `docs/plans/wave-2.md:113`'s grouping - not built, and not
+      E's file to add them to), `passive`-level digest batching, browser
+      push / Go / TV overlay / robot speech (no such clients exist yet),
+      a real parent/guardian audience (see the Relationship/Grant work
+      above), and package-declared notification types (the manifest's
       `notifications` field is read by nothing yet - a real, deliberately
       deferred extension point, not forgotten).
 

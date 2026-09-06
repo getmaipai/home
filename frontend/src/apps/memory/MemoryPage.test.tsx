@@ -3,17 +3,39 @@ import { cleanup, fireEvent, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { MemoryPage } from "@/apps/memory/MemoryPage";
 import { renderWithQueryClient } from "../../../tests/renderWithQueryClient";
-import type { MemoryRecord } from "@/lib/api";
+import type { MemoryRecord, Roster } from "@/lib/api";
 
 afterEach(cleanup);
+
+// "adult", not "owner"/"admin": the person picker (session E step 5)
+// only queries GET /api/people for someone who can view another
+// person's memories - every test here except the picker's own tests
+// below wants that fetch to simply never happen.
+function defaultPerson(overrides: Partial<Roster> = {}): Roster {
+  return {
+    id: "person-sage",
+    display_name: "Sage",
+    nickname: null,
+    role: "adult",
+    avatar_seed: "person-sage",
+    source: "hub",
+    local_only: false,
+    created_at: "2026-09-05T00:00:00.000Z",
+    updated_at: "2026-09-05T00:00:00.000Z",
+    deleted_at: null,
+    hlc: "1788000000000:0:test",
+    hasSecret: true,
+    ...overrides,
+  };
+}
 
 // A Router wrapper (PhoneNav.test.tsx's own convention): MemoryPage reads
 // ?ids= via useSearchParams (the "memory updated" chip's deep link,
 // docs/plans/session-b-ui.md step 4).
-function renderMemoryPage(path = "/memory") {
+function renderMemoryPage(path = "/memory", person: Roster = defaultPerson()) {
   return renderWithQueryClient(
     <MemoryRouter initialEntries={[path]}>
-      <MemoryPage />
+      <MemoryPage person={person} />
     </MemoryRouter>,
   );
 }
@@ -147,6 +169,129 @@ describe("MemoryPage", () => {
       await findByText("Showing 1 memory update");
     } finally {
       restore();
+    }
+  });
+
+  test("a non-admin never sees a person picker", async () => {
+    const restore = stubFetch({ "/api/memory": [] });
+    try {
+      const { queryByRole } = renderMemoryPage("/memory", defaultPerson({ role: "adult" }));
+      await waitFor(() => expect(queryByRole("combobox")).toBeNull());
+    } finally {
+      restore();
+    }
+  });
+
+  test("an owner picking a child sees that child's memories, with forget/export instead of the schema page's own list", async () => {
+    const restore = stubFetch({
+      "/api/memory?person=person-bramble": [record({ id: "mem2-def456", text: "Loves dinosaurs", person: "person-bramble" })],
+      "/api/memory": [record({ id: "mem1-abc123", text: "My own memory" })],
+      "/api/people": [
+        { id: "person-sage", display_name: "Sage", role: "owner" },
+        { id: "person-bramble", display_name: "Bramble", role: "child" },
+      ],
+    });
+    try {
+      const { findByRole, findByText, queryByText } = renderMemoryPage("/memory", defaultPerson({ role: "owner" }));
+      const picker = await findByRole("combobox", { name: "Viewing whose memories" });
+      fireEvent.click(picker);
+      fireEvent.click(await findByRole("option", { name: "Bramble" }));
+      await findByText("Loves dinosaurs");
+      expect(queryByText("My own memory")).toBeNull();
+      await findByRole("button", { name: "Export Bramble's memories" });
+      await findByRole("button", { name: "Forget everything about Bramble" });
+    } finally {
+      restore();
+    }
+  });
+
+  test("once viewing a child, the viewer's own unscoped memory query is disabled", async () => {
+    // The regression this guards: an earlier version's own-memory query
+    // (GET /api/memory, no `person`) had no `enabled` guard at all, so
+    // it stayed live (and its result always discarded) even while
+    // viewing someone else - a wasted request and DB read for data
+    // nothing on screen uses (a code review, 2026-09-06). Checked
+    // directly against the query's own state, not by trying to provoke
+    // a real refetch (window refocus, a remount) inside a test.
+    const ownListCalls: string[] = [];
+    const original = globalThis.fetch;
+    globalThis.fetch = mock((input: RequestInfo | URL) => {
+      const url = typeof input === "string" ? input : input.toString();
+      if (url.endsWith("/api/memory")) {
+        ownListCalls.push(url);
+        return Promise.resolve(new Response(JSON.stringify([]), { status: 200 }));
+      }
+      if (url.includes("person=person-bramble")) {
+        return Promise.resolve(new Response(JSON.stringify([record({ person: "person-bramble" })]), { status: 200 }));
+      }
+      if (url.endsWith("/api/people")) {
+        return Promise.resolve(
+          new Response(
+            JSON.stringify([
+              { id: "person-sage", display_name: "Sage", role: "owner" },
+              { id: "person-bramble", display_name: "Bramble", role: "child" },
+            ]),
+            { status: 200 },
+          ),
+        );
+      }
+      throw new Error(`unstubbed fetch: ${url}`);
+    }) as unknown as typeof fetch;
+    try {
+      const { findByRole, queryClient } = renderMemoryPage("/memory", defaultPerson({ role: "owner" }));
+      await waitFor(() => expect(ownListCalls.length).toBeGreaterThan(0)); // the legitimate self-view mount fetch
+      fireEvent.click(await findByRole("combobox", { name: "Viewing whose memories" }));
+      fireEvent.click(await findByRole("option", { name: "Bramble" }));
+      await findByRole("button", { name: "Forget everything about Bramble" });
+      const state = queryClient.getQueryState(["schema-binding", "/api/memory"]);
+      const observers = queryClient.getQueryCache().find({ queryKey: ["schema-binding", "/api/memory"] })?.observers ?? [];
+      expect(observers.every((o) => !o.options.enabled)).toBe(true);
+      expect(state).toBeDefined(); // still cached from the earlier self-view mount, just no longer active
+    } finally {
+      globalThis.fetch = original;
+    }
+  });
+
+  test("forgetting a child's memories asks first, then calls the real forget route", async () => {
+    let forgetCalled = false;
+    const original = globalThis.fetch;
+    globalThis.fetch = mock((input: RequestInfo | URL, init?: RequestInit) => {
+      const url = typeof input === "string" ? input : input.toString();
+      if (url.endsWith("/api/memory/forget") && init?.method === "POST") {
+        forgetCalled = true;
+        return Promise.resolve(new Response(JSON.stringify({ deleted: 1 }), { status: 200 }));
+      }
+      if (url.includes("person=person-bramble")) {
+        return Promise.resolve(
+          new Response(JSON.stringify([record({ id: "mem2-def456", text: "Loves dinosaurs", person: "person-bramble" })]), {
+            status: 200,
+          }),
+        );
+      }
+      if (url.endsWith("/api/memory")) return Promise.resolve(new Response(JSON.stringify([]), { status: 200 }));
+      if (url.endsWith("/api/people")) {
+        return Promise.resolve(
+          new Response(
+            JSON.stringify([
+              { id: "person-sage", display_name: "Sage", role: "owner" },
+              { id: "person-bramble", display_name: "Bramble", role: "child" },
+            ]),
+            { status: 200 },
+          ),
+        );
+      }
+      throw new Error(`unstubbed fetch: ${url}`);
+    }) as unknown as typeof fetch;
+    try {
+      const { findByRole, findByText } = renderMemoryPage("/memory", defaultPerson({ role: "owner" }));
+      fireEvent.click(await findByRole("combobox", { name: "Viewing whose memories" }));
+      fireEvent.click(await findByRole("option", { name: "Bramble" }));
+      fireEvent.click(await findByRole("button", { name: "Forget everything about Bramble" }));
+      await findByText("Forget everything MaiPai remembers about Bramble?");
+      fireEvent.click(await findByRole("button", { name: "Yes, forget everything" }));
+      await waitFor(() => expect(forgetCalled).toBe(true));
+    } finally {
+      globalThis.fetch = original;
     }
   });
 });

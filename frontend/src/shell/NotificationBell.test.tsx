@@ -1,5 +1,6 @@
 import { describe, expect, test, mock, afterEach } from "bun:test";
 import { cleanup, fireEvent, waitFor } from "@testing-library/react";
+import { MemoryRouter } from "react-router-dom";
 import { NotificationBell } from "@/shell/NotificationBell";
 import { ToastProvider } from "@/kit/primitives/Toast";
 import { renderWithQueryClient } from "../../tests/renderWithQueryClient";
@@ -9,9 +10,11 @@ afterEach(cleanup);
 
 function renderBell() {
   return renderWithQueryClient(
-    <ToastProvider>
-      <NotificationBell />
-    </ToastProvider>,
+    <MemoryRouter>
+      <ToastProvider>
+        <NotificationBell />
+      </ToastProvider>
+    </MemoryRouter>,
   );
 }
 
@@ -83,6 +86,38 @@ describe("NotificationBell", () => {
       getByText("Model download ready");
       fireEvent.click(getByRole("button", { name: "Dismiss" }));
       await waitFor(() => expect(queryByText("Model download ready")).toBeNull());
+    } finally {
+      globalThis.fetch = original;
+    }
+  });
+
+  test("dismissing here also invalidates NotificationsPage's own history cache, not just this popover's", async () => {
+    // The regression this guards: an earlier version's dismissMutation
+    // only invalidated its own ["notifications"] query - dismissing the
+    // same notification here while /notifications was already open
+    // (its history query mounted and cached) left that page showing a
+    // stale, still-live Dismiss button until an unrelated remount (a
+    // code review, 2026-09-06).
+    const original = globalThis.fetch;
+    globalThis.fetch = mock((input: RequestInfo | URL) => {
+      const url = typeof input === "string" ? input : input.toString();
+      if (url.includes("/dismiss")) return Promise.resolve(new Response(JSON.stringify({ success: true }), { status: 200 }));
+      if (url.includes("/api/notifications")) {
+        return Promise.resolve(new Response(JSON.stringify([notification("n1", "Model download ready")]), { status: 200 }));
+      }
+      throw new Error(`unstubbed fetch: ${url}`);
+    }) as unknown as typeof fetch;
+    try {
+      const { findByRole, getByRole, queryClient } = renderBell();
+      const invalidateSpy = mock(queryClient.invalidateQueries.bind(queryClient));
+      queryClient.invalidateQueries = invalidateSpy;
+      fireEvent.click(await findByRole("button", { name: /Notifications/ }));
+      fireEvent.click(getByRole("button", { name: "Dismiss" }));
+      await waitFor(() =>
+        expect(invalidateSpy.mock.calls.some((call) => (call[0] as { queryKey: string[] }).queryKey[0] === "notifications-history")).toBe(
+          true,
+        ),
+      );
     } finally {
       globalThis.fetch = original;
     }

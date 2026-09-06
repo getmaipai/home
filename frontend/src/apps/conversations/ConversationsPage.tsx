@@ -8,6 +8,7 @@ import { Input } from "@/kit/ui/input";
 import { Button } from "@/kit/ui/button";
 import { Select } from "@/kit/primitives/Select";
 import { BatchBar, SelectModeToggle } from "@/kit/primitives/BatchBar";
+import { DestructiveConfirm } from "@/kit/primitives/DestructiveConfirm";
 import { api, ApiError, isOwnerOrAdminRole, type ConversationSummary, type PersonRosterEntry, type Roster } from "@/lib/api";
 
 interface ConversationsPageProps {
@@ -182,33 +183,27 @@ export function ConversationsPage({ person }: ConversationsPageProps) {
         ) : null}
 
         {confirmingDelete === "batch" ? (
-          <div className="flex flex-col gap-2 rounded-[var(--radius)] border border-destructive p-3">
-            <p className="text-base font-medium">
-              Delete {selected.size} {selected.size === 1 ? "conversation" : "conversations"}? This cannot be undone.
-            </p>
-            <div className="flex flex-wrap gap-2">
-              <Button variant="destructive" onClick={handleDeleteSelected} disabled={busy}>
-                {busy ? "Deleting…" : `Yes, delete ${selected.size}`}
-              </Button>
-              <Button variant="secondary" onClick={() => setConfirmingDelete(null)}>
-                Keep them
-              </Button>
-            </div>
-          </div>
+          <DestructiveConfirm
+            message={`Delete ${selected.size} ${selected.size === 1 ? "conversation" : "conversations"}? This cannot be undone.`}
+            confirmLabel={`Yes, delete ${selected.size}`}
+            busyLabel="Deleting…"
+            busy={busy}
+            onConfirm={handleDeleteSelected}
+            onCancel={() => setConfirmingDelete(null)}
+            cancelLabel="Keep them"
+          />
         ) : null}
 
         {confirmingDelete === "clear" ? (
-          <div className="flex flex-col gap-2 rounded-[var(--radius)] border border-destructive p-3">
-            <p className="text-base font-medium">Delete every one of your conversations? This cannot be undone.</p>
-            <div className="flex flex-wrap gap-2">
-              <Button variant="destructive" onClick={handleClearAll} disabled={busy}>
-                {busy ? "Clearing…" : "Yes, clear all"}
-              </Button>
-              <Button variant="secondary" onClick={() => setConfirmingDelete(null)}>
-                Keep them
-              </Button>
-            </div>
-          </div>
+          <DestructiveConfirm
+            message="Delete every one of your conversations? This cannot be undone."
+            confirmLabel="Yes, clear all"
+            busyLabel="Clearing…"
+            busy={busy}
+            onConfirm={handleClearAll}
+            onCancel={() => setConfirmingDelete(null)}
+            cancelLabel="Keep them"
+          />
         ) : null}
 
         <AsyncState

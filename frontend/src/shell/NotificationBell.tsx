@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import * as RadixPopover from "@radix-ui/react-popover";
+import { Link } from "react-router-dom";
 import { Button } from "@/kit/ui/button";
 import { getIcon } from "@/kit/icons";
 import { useToast } from "@/kit/primitives/Toast";
@@ -12,6 +13,13 @@ const POLL_MS = 15_000;
 // updated" chip, docs/plans/session-b-ui.md step 4) rather than
 // duplicating the query key and risking the two drifting apart.
 export const NOTIFICATIONS_QUERY_KEY = ["notifications"];
+// NotificationsPage.tsx's own history query key, exported from here (not
+// the other way around) so this shell-level file never has to import
+// from an app page: a dismiss from EITHER surface has to invalidate both
+// caches, or whichever one isn't showing the dismiss keeps a stale row
+// until an unrelated remount forces a refetch (a code review, 2026-09-06,
+// caught this file only ever invalidating its own).
+export const NOTIFICATIONS_HISTORY_QUERY_KEY = ["notifications-history"];
 const QUERY_KEY = NOTIFICATIONS_QUERY_KEY;
 
 // The header half of the pending-list surface (getmaipai/.github/docs/
@@ -80,7 +88,11 @@ export function NotificationBell() {
       // server never actually applied.
       if (context?.previous) queryClient.setQueryData(QUERY_KEY, context.previous);
     },
-    onSettled: () => queryClient.invalidateQueries({ queryKey: QUERY_KEY }),
+    onSettled: () =>
+      Promise.all([
+        queryClient.invalidateQueries({ queryKey: QUERY_KEY }),
+        queryClient.invalidateQueries({ queryKey: NOTIFICATIONS_HISTORY_QUERY_KEY }),
+      ]),
   });
 
   return (
@@ -129,6 +141,15 @@ export function NotificationBell() {
               ))}
             </div>
           )}
+          {/* The thirty-day history page (session E step 5) - this popover
+              only ever shows what's still pending, never a dismissed or
+              already-read row, so "view history" is the one way to reach
+              those at all. */}
+          <div className="border-t border-border pt-1">
+            <Link to="/notifications" className="block px-2 py-2 text-sm text-primary underline" onClick={() => setOpen(false)}>
+              View history
+            </Link>
+          </div>
         </RadixPopover.Content>
       </RadixPopover.Portal>
     </RadixPopover.Root>

@@ -7,6 +7,7 @@ import { Shell } from "@/shell/Shell";
 import { SetupWizard } from "@/apps/setup/SetupWizard";
 import { ChatPage } from "@/apps/chat/ChatPage";
 import { ConversationsPage } from "@/apps/conversations/ConversationsPage";
+import { NotificationsPage } from "@/apps/notifications/NotificationsPage";
 import { HomePage } from "@/apps/home/HomePage";
 import { SearchPage } from "@/apps/search/SearchPage";
 import { SettingsPage } from "@/apps/settings/SettingsPage";
@@ -92,9 +93,10 @@ export function App() {
                         <Route path="/" element={<HomePage person={person} />} />
                         <Route path="/chat" element={<ChatPage person={person} />} />
                         <Route path="/conversations" element={<ConversationsPage person={person} />} />
+                        <Route path="/notifications" element={<NotificationsPage />} />
                         <Route path="/search" element={<SearchPage />} />
                         <Route path="/people" element={<PeoplePage person={person} />} />
-                        <Route path="/memory" element={<MemoryPage />} />
+                        <Route path="/memory" element={<MemoryPage person={person} />} />
                         <Route path="/privacy" element={<PrivacyPage />} />
                         <Route
                           path="/settings"

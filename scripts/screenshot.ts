@@ -58,6 +58,7 @@ const ROUTES: RouteSpec[] = [
   { slug: "chat", path: "/chat" },
   { slug: "conversations", path: "/conversations" },
   { slug: "search", path: "/search" },
+  { slug: "notifications", path: "/notifications" },
   { slug: "people", path: "/people" },
   { slug: "memory", path: "/memory" },
   { slug: "privacy", path: "/privacy" },
