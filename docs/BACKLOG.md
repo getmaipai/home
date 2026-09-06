@@ -739,7 +739,11 @@ into a conversation with someone who knows who is talking.
       system prompt. Needs a real chat model before this means anything
       for persona fidelity; see docs/dev.md's step 8 entry. A
       model-judged version is still real, unbuilt work.
-- [ ] **The bot's honesty guards as a post-model pass** (M) - legacy
+- [x] **The bot's honesty guards as a post-model pass** (M) - shipped
+      2026-09-06, Session C step 3 (`backend/src/lib/guards.ts`,
+      `backend/tests/guards.test.ts`,
+      `backend/scripts/bench/conversation.ts`, docs/dev/session-c.md).
+      legacy
       `guards.py` (invention, unrelated recall, near-echo, medication
       doses, capability claims), `_marked_repeat` ("Like I said" never
       across conversations) and the attractor-removal rule for prompt
@@ -1666,11 +1670,17 @@ otherwise be lost with the mirror.
       (`useHandsFree.ts`: 700 ms arm, RMS 0.04 plus probability 0.60
       over 12 frames). The hub's `sentenceSpeechScheduler.stop()` exists
       and nothing calls it.
-- [ ] **The bot's four bench harnesses** (L) - honesty (105 questions,
+- [ ] **The bot's four bench harnesses** (L) - one of four shipped
+      2026-09-06, Session C step 3: conversation (28 of 34 real broken
+      replies - six excluded and named in
+      `backend/scripts/bench/conversation.ts`'s own header, genuinely out
+      of scope for a stationary hub or already covered by the routing
+      corpus), rebuilt against `lib/guards.ts` directly (no model needed
+      for the offline half - see docs/dev/session-c.md). Still unbuilt:
+      honesty (105 questions,
       raw versus guarded), interaction (424 cases), latency (refuses to
-      run on a busy machine), conversation (34 real broken replies),
-      rebuilt against the turn engine. The plan's "bench on demand" tier
-      has no benches.
+      run on a busy machine). The plan's "bench on demand" tier
+      has no benches for these three yet.
 - [ ] **Lessons to record in the right doc, so they survive the mirror**
       (S) - in org `CLAUDE.md`: cache only genuine misses, never a
       transient failure; never throw synchronously inside a socket

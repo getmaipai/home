@@ -375,3 +375,194 @@ force-fit: skill composition is a "which skills are worth composing in"
 soft signal, not the hard Tier 1 routing decision step 1's text is
 actually about ("Tier 1 of the deterministic plugin floor" - the
 section's own pre-existing header, unchanged).
+
+## Step 3: the guards after the model
+
+**Shipped:** `lib/guards.ts`, ported from bot-legacy's own
+`robot/robot/cognition/dialogue/guards.py` and
+`robot/robot/cognition/skills/social.py` - real, hand-tuned rules against
+live conversation failures on-device, not a generic content filter. All
+seven of this step's own named guards: **invention** (a proper noun,
+number, date, third-party trait, location claim, attributed quote, a
+guessed identification, or a claimed first-person sensory experience -
+broadened past the plan's own literal "proper noun, number or date"
+after this step's own conversation bench proved that alone missed most
+of legacy's 34 real scenarios, which mostly invent lowercase nouns
+"gallery"/"sedan"/"kitchen" a name/number check can't see at all - each
+addition is a narrow, specific SHAPE ported directly from a guards.py
+regex of the same name, not a blanket "any ungrounded word" filter,
+which would flag ordinary harmless conversation too); **unrelated
+recall** (`_is_unrelated_source_line`, ported closely); **near-echo**
+(`_is_near_echo`, restricted to the reply's first sentence only - see
+the real bug this fixed, below); **medication doses** (a new OUTPUT rule,
+not in bot-legacy - its own medication rule is an INPUT-side safety
+escalation, lib/safety.ts's territory; never a bare number near a
+dose/pill/mg word, unconditional, no grounding check); **capability
+claims** (`_REQUEST`/`_CLAIMED`/`_ACCEPTS`, gated on `actionsRan`);
+**"like I said"** (bot-legacy's own mechanism is structural - the
+identical reply text twice in the SAME conversation becomes a
+"chat_loop" line; this step's own text asks for "never ACROSS
+conversations" specifically, so the literal phrase is checked directly:
+fine only when this conversation's own history actually grounds what it
+refers back to, always false in a fresh one); **the attractor rule**
+(`_is_example_parrot` - the reply IS one of the persona's own few-shot
+lines, normalized-exact).
+
+**Composition, ported from `guard_reply()`/`guard_sentence()`:**
+`guardReply()` splits a full reply into sentences and either cuts a
+CUTTABLE offender (invention, unrelated_recall - "the sentence was
+padding, not the answer," bot-legacy's own `_CUTTABLE` set) keeping
+whatever honest sentences came first, or replaces the WHOLE reply the
+instant a non-cuttable reason fires (capability_claim, medication_dose,
+near_echo, like_i_said, example_parrot - the sentence WAS the reply's
+thesis). `guardSentence()` is the same per-sentence check, exported for
+the streaming path. Replacement lines are small rotating banks
+(CANNOT_DO/NOT_TOLD/DONT_KNOW/CHAT_LOOP/MED_CAUTION) picked via
+`replyVariation.ts`'s existing `pickVariant()` - reused, not a second
+rotation mechanism - so the same household doesn't hear the identical
+guard line every time.
+
+**Wired into `turnEngine.ts` on `source: "model"` text only** - never a
+safety refusal, a command, or a package's own `speech` string, per this
+step's own "guards never block the safety floor" text. Non-streaming
+(`runTurn()`): `guardReply()` runs on the complete text, after the
+existing output-safety check (step 9, session-a-intelligence.md) and
+only when it doesn't refuse - safety is the floor, guards run after it,
+never instead of it. Streaming (`runTurnStream()`): a new `gateGuards()`
+wraps `gateOutputSafety()`'s own output (composed as a separate wrapper
+generator, not folded into that function directly - it already documents
+two real, subtle bugs of its own, a batching bug and a whitespace-
+fidelity bug, and this change had no reason to risk re-introducing
+either by editing it), running `guardSentence()` on each already-safety-
+gated, already-sentence-complete chunk before it's handed to the
+speaker - the exact "a sentence is out of the speaker the moment it is
+handed over" reasoning bot-legacy's own guards.py docstring gives, word
+for word. `PreparedTurn`'s "model" branch now carries a `guardContext`
+(utterance, sources from the turn's own recalled memories, history from
+the conversation window's prior user turns, the resolved persona's own
+`examples`) built once in `prepareTurn()` rather than re-derived at each
+of runTurn()/runTurnStream()'s two call sites.
+
+**Considered, not changed:** a code review (2026-09-06) flagged that
+`runTurn()`'s `safety`/`crisis_resources` are derived from
+`evaluateSafety()`'s classification of the RAW completion text, computed
+before `guardReply()` can cut or replace a sentence - a sentence that
+trips both an output-safety flag (not a refuse) and a guard on the same
+text could show crisis resources for wording the household never
+actually saw. Left as-is rather than "fixed": CLAUDE.md's own "Crisis
+resources: offer, never block" is non-configurable specifically because
+the CLASSIFICATION (a self-harm mention happened) is what earns the
+resources, not the exact surviving wording - suppressing them because a
+LATER, unrelated guard also rewrote a different clause would risk the
+opposite, worse bug (a real self-harm mention losing its resources over
+an incidental honesty fix). No test either way; recorded as a real,
+considered trade-off rather than silently decided.
+
+**A real bug this step's own tests found, not merely a port detail:**
+`near_echo` is a WHOLE-REPLY concept in bot-legacy
+(`_is_near_echo(reply, user_text)`, checked once against the complete
+candidate reply, never per-sentence) - the first cut of `guardSentence()`
+ran it on every streamed sentence against the FULL utterance's word
+pool, and a compound utterance ("Good morning. How is it going today?
+Let me know.") let an unrelated LATER sentence ("Let me know.")
+spuriously match words from an EARLIER, unrelated clause of the SAME
+utterance ("How is it going today?"), near-echo-flagging text that never
+echoed anything back in the shape the guard exists to catch. Found by an
+EXISTING, unmodified turnEngine.ts test (`runTurnStream()`'s own
+whitespace-fidelity assertion) failing once guards were wired into the
+stream - not a guards.test.ts case, a real regression this session's own
+established suite caught immediately. Fixed by restricting near_echo to
+the first sentence only (`guardSentence`'s new `isFirstSentence`
+parameter, default `true`; `guardReply()`'s loop and `gateGuards()`'s own
+streaming state both track it) - the guard's real job (a reply that
+opens by just restating the question) stays intact, the false positive
+on everything after it does not.
+
+**Tests:** `backend/tests/guards.test.ts` (25) - one test per guard, from
+the real broken replies bot-legacy's own `test_guards.py` and
+`social.py`'s bench comments name verbatim (the ps5 near-echo case, the
+Marlow/dentist unrelated-recall case, the milk/list capability claim,
+the fresh-conversation "like I said," the exact-example attractor line),
+plus `guardReply()`'s cut-vs-replace composition and the per-person
+rotation. No regressions in the existing suite - confirmed by the near-
+echo bug above being CAUGHT, not introduced silently.
+
+**Acceptance: the 34-case conversation bench, ported and run.**
+`backend/scripts/bench/conversation.ts` +
+`robot/robot/bench/conversation.py`'s own 28 of 34 scenarios (six
+excluded and named in the file's own header, not silently dropped: emoji
+stripping isn't one of this step's seven guards; two are the mobile
+robot's own embodiment, a camera and a battery, neither of which a
+stationary hub has; three test ROUTING to a specific skill - lookup/news
+- which session-c-brain-and-voice.md step 1 already has its own
+dedicated corpus for, and repeating it here would be the second copy
+CLAUDE.md's "one definition" principle warns against). Unlike step 1/2's
+own benches, this one runs meaningfully OFFLINE right now: bot-legacy's
+own offline mode already grades a RECORDED failing reply against
+`must`/`must_not` with no model call at all, and `guardReply()` is pure,
+deterministic TypeScript - no real model needed to get real numbers.
+**Run: `bun run backend/scripts/bench/conversation.ts` - 23/29 turns
+pass** (3 setup turns not graded). The five remaining failing scenarios
+(six turns - a first pass at this write-up named only four scenarios and
+missed `a-person-is-not-filled-in`'s two failing turns entirely; a
+medium-effort code review, 2026-09-06, caught the miscount by literally
+re-running the bench against this doc's own claim, corrected here) are
+each a real, named, out-of-scope gap rather than a silent miss:
+`a-person-is-not-filled-in` ("how's the art gallery been for you", "he's
+the one who always has a plan") invents a bare lowercase noun with no
+proper-noun/number/date shape and no pronoun-plus-specific-verb shape
+either of this step's own PERSON_TRAIT/LOCATION/GUESSING patterns catch -
+closing this needs bot-legacy's fuller `_about_household`/`_third_party`
+content-word-grounding mechanism (guards.py's own general case beyond
+this step's seven named shapes), a real, larger port left for later,
+not attempted here; `a-question-answered-sure` needs bot-legacy's own
+`non_answer` guard (a wh-question answered with a bare acknowledgement),
+not one of this step's seven; `chest-pain-urges-help` needs a SAFETY-side
+escalation (inserting "get help"), which is lib/safety.ts's job, not
+something a guard that only ever removes/replaces content can do;
+`no-oh-nice-opener`'s second turn needs a stylistic "never open with X"
+rule outside all seven guards' own definitions; `a-brother-nobody-
+mentioned` DOES get correctly guarded (the invented "good boy" is caught
+and replaced, since the same review also found and fixed a real bug
+where a decline earlier in the sentence was blocking this exact check
+from ever running at all) but the honest replacement bank's generic
+phrasing doesn't happen to repeat the word "brother" the way this
+specific legacy scenario's own `must` check expects - the guard did its
+real job, the exact wording just isn't tuned to this one bench's own
+assertion. Recorded honestly per this step's own "raw versus guarded"
+acceptance text, not smoothed over.
+
+**The same code review found three more real bugs in `guards.ts`
+itself, all fixed:** `groundedText()` checked groundedness with a plain
+substring scan (`grounded.includes(word)`) rather than real word-
+boundary matching, so an invented word that happened to be a substring
+of an unrelated grounded one (e.g. "barn" inside a source's own
+"carbarn") silently passed as grounded - replaced with a tokenized word
+SET (`groundedWords()`, reusing `tokenize()`) checked by membership, not
+substring, everywhere invention checks a candidate word.
+`guardCapabilityClaim`'s "never guard a question" exemption checked only
+the CURRENT sentence for a "?" - "Sure, what do you have in the fridge?"
+split into two sentences let the first ("Sure.") get flagged outright
+before the second sentence's own real clarifying question was ever
+considered, discarding an entirely honest reply; `GuardContext` gained
+`replyHasQuestion`, set once from the WHOLE reply text in `guardReply()`
+before it ever splits into sentences (the streaming path genuinely can't
+know a later sentence before it arrives, so this stays a non-streaming-
+only fix, honestly - no lookahead without delaying speech). And the
+`PERSON_TRAIT`/`ATTRIBUTED_QUOTE` claim-word checks were comparing EVERY
+raw tokenized word in the sentence against grounded text with no
+allowlist at all, so an otherwise fully-grounded, correct reply
+("He lives in Florida now." against a source that already says "Rover
+lives in Florida") got discarded purely because of incidental words like
+"he"/"now" that claim nothing on their own - fixed with a `CLAIM_SAFE_
+WORDS` allowlist (pronouns, time words, and bot-legacy's own `_SAFE_
+WORDS` list) shared by both checks (`unclaimedWords()`).
+
+**One more real finding, fixed but not code-related:**
+`backend/scripts/bench/conversation.ts`'s "no-invented-car-for-a-third-
+party" scenario used the name "Carina" - not on the org's approved
+persona roster (`getmaipai/.github`'s `CLAUDE.md`), and this file's own
+header claims scenarios use ONLY roster names. Renamed to "Iris"
+throughout; a real instance of the same class of leak this org's own
+"PII wordlist gap" memory already names from a different repo, caught
+here before it ever reached a commit.

@@ -20,6 +20,7 @@ import { trigger } from "@/lib/notifications";
 import { recall, bumpUsage, embedQueryForRecall, getProfileParagraph, type RecallMatch } from "@/lib/memory";
 import { newConversationTurnId } from "@/lib/id";
 import { complete, startCompleteStream, type LlmMessage, type ToolSpec, type ToolCall } from "@/lib/llm";
+import { guardReply, guardSentence, replacementFor, type GuardContext } from "@/lib/guards";
 import { tokenize } from "@/lib/text";
 import {
   logTurn,
@@ -646,7 +647,18 @@ export async function route(text: string, actor: PersonRow, loaded: LoadedManife
 
 type PreparedTurn =
   | { kind: "immediate"; value: TurnValue; turnId: string }
-  | { kind: "model"; messages: LlmMessage[]; safety: SafetyResult; crisisResources?: string; turnId: string };
+  | {
+      kind: "model";
+      messages: LlmMessage[];
+      safety: SafetyResult;
+      crisisResources?: string;
+      turnId: string;
+      /** Session C step 3: everything guards.ts needs about THIS turn to
+       * check the model's eventual reply - built once here (prepareTurn
+       * already has all of it in scope) rather than re-derived at each
+       * of runTurn()/runTurnStream()'s two call sites. */
+      guardContext: Omit<GuardContext, "personId">;
+    };
 
 // Session C step 2: a plain word-list, not a model call - a pendingAsk
 // confirmation is exactly the kind of turn that must resolve
@@ -950,7 +962,14 @@ async function prepareTurn(
   const tier2 = await attemptTier2Tools(text, actor, ranked, messages, turnId, conversation.id, safety, crisisResources);
   if (tier2) return { kind: "immediate", value: tier2, turnId };
 
-  return { kind: "model", messages, safety, crisisResources, turnId };
+  const guardContext: Omit<GuardContext, "personId"> = {
+    utterance: text,
+    history: window.messages.filter((m) => m.role === "user").map((m) => m.content),
+    sources: memoryMatches.map((m) => m.record.text),
+    actionsRan: false, // this IS the model fallback - by construction no plugin ran this turn
+    personaExamples: persona.examples,
+  };
+  return { kind: "model", messages, safety, crisisResources, turnId, guardContext };
 }
 
 /** Session C step 2's Tier 2: offers `ranked`'s top few candidates
@@ -1191,7 +1210,12 @@ export async function runTurn(
             turn_id: prepared.turnId,
           }
         : {
-            reply: { text: completion.value.text },
+            // Session C step 3: guards run AFTER the safety floor, never
+            // instead of it - a refused reply above never reaches this
+            // branch at all, and nothing here can turn a safe reply back
+            // into a refusal (guards.ts's own reasons are all honesty
+            // fixes, never a safety category).
+            reply: { text: guardReply(completion.value.text, { ...prepared.guardContext, personId: actor.id }).reply },
             source: "model",
             safety: outputSafety.flagged ? outputSafety : prepared.safety,
             crisis_resources: outputSafety.flagged ? deriveCrisisResources(outputSafety) : prepared.crisisResources,
@@ -1348,6 +1372,41 @@ export async function* gateOutputSafety(
   return lastFlagged;
 }
 
+/** Wraps gateOutputSafety()'s own output with guards.ts's `guardSentence`,
+ * one already-complete sentence at a time - the exact "the streaming
+ * path calls guard_sentence per sentence BEFORE the hand-off to the
+ * speaker" this step's own text and bot-legacy's guards.py docstring
+ * both ask for. A flagged sentence is REPLACED with its honest line
+ * (guards.ts's own `replacementFor`) rather than cut - unlike
+ * guardReply()'s whole-reply cut/keep decision, a sentence already
+ * queued for the speaker has no "earlier sentences" to fall back to; it
+ * simply becomes the honest sentence instead. Composed as its own
+ * wrapper rather than folded into gateOutputSafety() itself: that
+ * function's own comment already documents two real, subtle bugs
+ * (batched sentences dropping an earlier one, whitespace fidelity) this
+ * change has no reason to risk re-introducing by editing it directly.
+ * Propagates the wrapped generator's own return value (its `SafetyResult`
+ * flag) unchanged - guards never affect what streamTurnEvents()'s
+ * `finalize()` sees for safety. */
+export async function* gateGuards(
+  tokens: AsyncGenerator<string, SafetyResult | undefined, void>,
+  ctx: Omit<GuardContext, "personId">,
+  personId: string,
+): AsyncGenerator<string, SafetyResult | undefined, void> {
+  const iterator = tokens[Symbol.asyncIterator]();
+  let step = await iterator.next();
+  let isFirstSentence = true;
+  while (!step.done) {
+    const rawSpan = step.value;
+    const trimmed = rawSpan.trim();
+    const reason = trimmed ? guardSentence(trimmed, { ...ctx, personId }, isFirstSentence) : null;
+    if (trimmed) isFirstSentence = false;
+    yield reason ? `${replacementFor(reason, personId)} ` : rawSpan;
+    step = await iterator.next();
+  }
+  return step.value;
+}
+
 /** Same safety-first routing and deterministic plugin floor as runTurn(),
  * but the `chat` role's own answer streams token by token instead of
  * arriving as one blocking call - the real prerequisite for speaking a
@@ -1405,7 +1464,7 @@ export async function runTurnStream(
     kind: "stream",
     conversationId: conversation.id,
     turnId: prepared.turnId,
-    tokens: gateOutputSafety(started.tokens, actor),
+    tokens: gateGuards(gateOutputSafety(started.tokens, actor), prepared.guardContext, actor.id),
     finalize: (replyText: string, outputSafety?: SafetyResult): TurnValue => {
       // A safety cut with nothing safe delivered before it (the very
       // first sentence was itself the unsafe one, replyText === "") gets
