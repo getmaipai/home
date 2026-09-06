@@ -1523,12 +1523,37 @@ on a spec tag that was never cut.
       People** (S decision) - the Grant spec removes age and role from
       authorization while `Person.role` stays required, `min_role` is on
       every manifest, and ENGINEERING.md, UI.md's kid presets and plan
-      4.2/4.3/5.7 are all age-shaped. Safety still needs an age band
-      either way: derive it from birthdate and put `age_range` in the
-      turn context (S), then decide the rest once.
-- [ ] **Content ceiling record and dials** (M) - `spec/README.md` lists
-      it unbuilt; the safety classifier reads the band through a role
-      proxy. Never mentioned here until now.
+      4.2/4.3/5.7 are all age-shaped. Safety's own half of this is done
+      (Session C step 7, 2026-09-06: `lib/ageBand.ts`, birthdate-derived,
+      shared by both the prompt and `evaluateSafety()`) - the wider
+      roles-vs-grants decision itself is still Jesse's call, unchanged.
+      `age_range` in a package's own `ctx` is still real, deferred work:
+      it needs session-f-platform-and-trust.md step 7's package-host
+      `ctx` mechanism, which does not exist yet (F is at step 5 as of
+      2026-09-06).
+- [x] **Content ceiling record and dials** (M) - shipped, Session C step
+      7 (2026-09-06): `spec/schemas/content-ceiling.schema.json` (per
+      band: the 8 legacy-endorsed dial categories, a `floor` field
+      documenting - never enforcing - the classifier's own non-
+      configurable refuse categories, hlc), three fixtures (child/teen/
+      adult), generated bindings, `backend/src/lib/contentCeiling.ts`
+      (the three built-in records as reviewed code, not household-
+      editable data - no per-household custom-profile authoring UI yet,
+      that's the separate, larger "nine sliders" work). The safety
+      classifier now reads the age band (`lib/ageBand.ts`, shared with
+      the prompt) instead of the role proxy - proven with two direct
+      tests (a birthdate overriding a mismatched role in both
+      directions). The crisis overlay's non-configurability is proven
+      for real: a test stresses every real settings-registry key to its
+      most permissive value and confirms a self-harm turn still returns
+      `allow_with_resources` with real crisis resources every time.
+      Deferred, honestly: `age_range` in package `ctx` (blocked on F's
+      step 7) and the one-time adult acknowledgment via a Grant (the
+      Grant SPEC already ships `chat.unrestricted`/`generate.unrestricted`
+      with `acknowledged_at` - real, ready to consume - but F's hub-side
+      grants table doesn't exist yet, so `hasUnrestrictedGrant()` is a
+      documented stub returning false, the safe direction for this
+      specific gap to fail in).
 - [x] **`@hono/zod-openapi` conversion, the scaffolding and F's own
       routes** (Session F step 4, 2026-09-06) - `lib/openapi.ts`
       (`apiRouter()`, `errorResponses()`, `PaginationQuerySchema`/

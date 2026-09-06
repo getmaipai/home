@@ -36,14 +36,13 @@ import { db, sqlite } from "@/db";
 import { conversationTurns, conversations, people, memoryRecords } from "@/db/schema";
 import { newConversationTurnId, newConversationId } from "@/lib/id";
 import { canAccessPerson } from "@/lib/access";
-import { isMinorRole } from "@/lib/safety";
+import { speakerAgeBand } from "@/lib/ageBand";
 import { getHouseholdSettingValue, getPersonSettingValue } from "@/lib/settings";
 import { complete, type LlmMessage } from "@/lib/llm";
 import { getEngineStatus } from "@/lib/llmSupervisor";
 import { remember } from "@/lib/memory";
 import { nextHlc } from "@/lib/hlc";
 import { Conversation } from "@maipai/spec/gen/ts/conversation.js";
-import type { Role } from "@/middleware/auth";
 import type { TurnValue, Surface } from "@/lib/turnEngine";
 import type { PersonRow } from "@/types";
 import type { ConversationRow, ConversationSummary, ConversationTurnWithMemoryIds } from "@/wire";
@@ -107,7 +106,11 @@ export function logTurn(actor: PersonRow, surface: Surface, userText: string, va
     commandId: value.command_id ?? null,
     safetyFlagged: value.safety.flagged,
     safetyAction: value.safety.action,
-    minorSpeaker: isMinorRole(actor.role as Role),
+    // Session C step 7: real age-band accuracy, not the role proxy -
+    // the same fix evaluateSafety() itself got. Uses the safety check's
+    // own timestamp rather than a fresh `new Date()` so this reflects
+    // the actor's age at the moment the turn was actually checked.
+    minorSpeaker: speakerAgeBand(actor, new Date(value.safety.checked_at)) !== "adult",
     createdAt: value.safety.checked_at,
     // Session C step 1: null for every non-plugin turn (value.routing
     // only exists on a "plugin" source).

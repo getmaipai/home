@@ -1,0 +1,15 @@
+{
+  "band": "adult",
+  "dials": {
+    "profanity": "unrestricted",
+    "sexual": "unrestricted",
+    "violence": "unrestricted",
+    "substances": "discuss",
+    "crime": "discuss",
+    "hate": "fiction",
+    "self_harm": "discuss",
+    "privacy": "public"
+  },
+  "floor": ["harmful_request", "credible_threat", "csam", "grooming", "pii_extraction", "prompt_injection", "jailbreak"],
+  "hlc": "1757073600000:0:a1b2c3"
+}

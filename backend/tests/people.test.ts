@@ -629,6 +629,32 @@ describe("a role change takes effect immediately", () => {
 
     expect((await adminClient.get("/api/backups")).status).toBe(403);
   });
+
+  // A code review (2026-09-06, session-c-brain-and-voice.md step 7)
+  // found the identical staleness bug for birthdate: a cached session
+  // carries the whole PersonRow, so a corrected birthdate wouldn't take
+  // effect for evaluateSafety()'s own age-band accuracy (the whole point
+  // of that step) until the cache expired.
+  test("a corrected birthdate takes effect on the very next request, not after the cache expires", async () => {
+    const owner = await ownerSession();
+    const adultLabeled = await addPerson(owner, "Rover", "adult", "roverpin1");
+    const client = await sessionFor(adultLabeled.id, "roverpin1");
+
+    const asAdult = await client.post("/api/safety/check", { text: "This is our secret, don't tell your parents" });
+    expect((await asAdult.json() as Record<string, unknown>).flagged).toBe(false); // grooming never fires against an adult speaker
+
+    const fifteenYearsAgo = new Date();
+    fifteenYearsAgo.setFullYear(fifteenYearsAgo.getFullYear() - 15);
+    await owner.request(`/api/people/${adultLabeled.id}`, {
+      method: "PATCH",
+      body: { birthdate: fifteenYearsAgo.toISOString().slice(0, 10) },
+    });
+
+    const asTeen = await client.post("/api/safety/check", { text: "This is our secret, don't tell your parents" });
+    const body = (await asTeen.json()) as Record<string, unknown>;
+    expect(body.flagged).toBe(true);
+    expect(body.notify_parent).toBe(true);
+  });
 });
 
 // Batch delete (docs/UI.md > Batch actions, added 2026-09-05 at Jesse's

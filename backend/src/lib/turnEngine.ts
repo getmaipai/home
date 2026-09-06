@@ -12,6 +12,7 @@
 // What's deferred, and why, is repeated at the point it matters below;
 // read docs/dev.md's turn engine section before extending this file.
 import { evaluateSafety } from "@/lib/safety";
+import { speakerAgeBand } from "@/lib/ageBand";
 import { listPackageIds, loadPackage, meetsMinRole, runPlugin } from "@/lib/plugins";
 import { ensureRoutingEmbeddings, embedUtterance, scoreByEmbedding, pickTier1WinnerAmong } from "@/lib/routing";
 import { loadAllSkills, type LoadedSkill } from "@/lib/skills";
@@ -37,7 +38,6 @@ import { nextSentenceBoundary } from "@maipai/spec/safety/ts/sentenceChunker.js"
 import { getPersonSettingValue, getHouseholdSettingValue } from "@/lib/settings";
 import { listActivePeople } from "@/lib/access";
 import { composePersonaPrompt, resolvePersona, DEFAULT_PERSONA, INFORMATION_HANDLING_POLICY, NATURALNESS_POLICY, type Persona } from "@/lib/persona";
-import type { Role } from "@/middleware/auth";
 import type { PersonRow } from "@/types";
 import type { PackageManifest } from "@maipai/spec/gen/ts/manifest.js";
 import type { PluginResult } from "@maipai/spec/interpreters/ts/recipe-interpreter.js";
@@ -270,48 +270,12 @@ function skillsSection(text: string, skills: LoadedSkill[]): string {
   return `\n\n${matching.map((m) => m.skill.body).join("\n\n")}`;
 }
 
-// Age band derivation (session-a-intelligence.md step 1). Deliberately
-// narrow: just enough to calibrate the model's phrasing for the speaker
-// in front of it, computed inline for the prompt only. This is NOT the
-// wider `age_range`-on-Person-ctx question BACKLOG.md tracks separately
-// under "roles versus grants" (a package-visible, schema-level field);
-// nothing here is stored or exposed to a package. The three bands mirror
-// the role ladder's own two minor bands (person.schema.json: "teen 13-17,
-// child under 13") rather than inventing a finer taxonomy nothing in the
-// spec or platform plan defines - a real, independent cross-check
-// computed from birthdate when one is on file, falling back to the
-// speaker's role (which already carries the same distinction) when it
-// isn't.
-type AgeBand = "child" | "teen" | "adult";
-
-function ageInYears(birthdate: string, now: Date): number {
-  const dob = new Date(birthdate);
-  let age = now.getUTCFullYear() - dob.getUTCFullYear();
-  const monthDiff = now.getUTCMonth() - dob.getUTCMonth();
-  if (monthDiff < 0 || (monthDiff === 0 && now.getUTCDate() < dob.getUTCDate())) age--;
-  return age;
-}
-
-function ageBandFromRole(role: string): AgeBand {
-  if (role === "child") return "child";
-  if (role === "teen") return "teen";
-  return "adult"; // owner/admin/adult/guest: role carries no minor signal
-}
-
-function speakerAgeBand(actor: PersonRow, now: Date): AgeBand {
-  if (!actor.birthdate) return ageBandFromRole(actor.role);
-  const years = ageInYears(actor.birthdate, now);
-  // A malformed birthdate (Person's generated Zod schema enforces
-  // `.date()` today, so this shouldn't be reachable through any real
-  // write path, but a code review, 2026-09-05, pointed out nothing here
-  // defended against it anyway) must never silently fall through to
-  // "adult": both `years < 13` and `years < 18` are false for NaN,
-  // which is exactly the wrong direction for a safety-adjacent signal.
-  if (Number.isNaN(years)) return ageBandFromRole(actor.role);
-  if (years < 13) return "child";
-  if (years < 18) return "teen";
-  return "adult";
-}
+// Session C step 7: this used to be a local, prompt-only computation
+// (session-a-intelligence.md step 1's own comment said so explicitly).
+// Moved to lib/ageBand.ts so evaluateSafety() shares the IDENTICAL
+// computation for the same actor on the same turn, instead of deriving
+// its own less-accurate answer from `actor.role` directly - "the safety
+// layer reads the ceiling through the band instead of the role proxy."
 
 // No household timezone setting exists yet (3.2's clock/timezone key
 // hasn't landed), so this renders in the hub process's own system
@@ -823,7 +787,7 @@ async function prepareTurn(
     value: { ...value, conversation_id: conversation.id, turn_id: turnId },
     turnId,
   });
-  const safety = evaluateSafety(text, actor.role as Role);
+  const safety = evaluateSafety(text, speakerAgeBand(actor, new Date()));
   if (safety.notify_parent) {
     // SafetyResult's own schema comment named this exact wiring as a
     // "later hub release" gap the day the field was written: notify_parent
@@ -1211,7 +1175,7 @@ export async function runTurn(
     // asymmetry between the two callers of the exact same model role.
     // Never weakens the INPUT check above (prepareTurn()'s own
     // evaluateSafety() call) - purely additive.
-    const outputSafety = evaluateSafety(completion.value.text, actor.role as Role);
+    const outputSafety = evaluateSafety(completion.value.text, speakerAgeBand(actor, new Date()));
     if (outputSafety.notify_parent) {
       trigger("safety.flagged_turn", { childName: actor.displayName, categories: outputSafety.categories.join(", ") }).catch((err: unknown) =>
         console.error(`[turn] safety.flagged_turn notification failed: ${(err as Error).message}`),
@@ -1351,9 +1315,14 @@ export async function* gateOutputSafety(
   let pending = "";
   let isFirstChunk = true;
   let lastFlagged: SafetyResult | undefined;
+  // Computed once for the whole stream, not per sentence: the speaker
+  // doesn't age mid-turn, and speakerAgeBand() is otherwise a pure
+  // function of `actor` + "now" that would just recompute the identical
+  // answer on every one of a reply's sentences.
+  const band = speakerAgeBand(actor, new Date());
 
   const checkAndNotify = (chunk: string): SafetyResult => {
-    const safety = evaluateSafety(chunk, actor.role as Role);
+    const safety = evaluateSafety(chunk, band);
     if (safety.notify_parent) {
       trigger("safety.flagged_turn", { childName: actor.displayName, categories: safety.categories.join(", ") }).catch((err: unknown) =>
         console.error(`[turn] safety.flagged_turn notification failed: ${(err as Error).message}`),

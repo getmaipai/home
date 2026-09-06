@@ -947,3 +947,156 @@ happens to follow "hundred"; a regression test on both sides
 (`number_to_words(1021)`/`numberToWords(1021)` and three more shapes)
 now covers it, cross-referencing each other so a future change to either
 adapter has a matching case to check on the other language too.
+
+## Step 7: the content ceiling record and the age band in context
+
+Two real cross-session forward-dependencies surfaced while scoping this
+step, both handled the same honest way this session has handled every
+other one: build everything actually buildable now, document exactly
+what's blocked and why.
+
+**`age_range` in a package's own `ctx`** (the plan's own words) needs
+session-f-platform-and-trust.md step 7's package-host `ctx` mechanism -
+"time allowances and schedules per category as household settings
+enforced in the package host's `ctx` (D reads `ctx.allowance`; you write
+it)." That mechanism does not exist yet: F is at step 5 ("trust on the
+LAN") as of this writing, and `ctx` itself is F's own future step 7, not
+something already there to add a field to. `age_range` in the PROMPT's
+speaker block, the other half the plan names, was already real (Session
+A's own earlier work, `turnEngine.ts`'s `speakerLine()`) - confirmed,
+not rebuilt.
+
+**The one-time adult acknowledgment via a Grant** - the plan's "F's
+Grant carries it; you consume it" - turned out to be less blocked than
+it first looked. `spec/schemas/grant.schema.json` and
+`spec/vocab/grant-actions.json` already ship a complete, carefully
+reasoned spec (an earlier wave's work): `chat.unrestricted`/
+`generate.unrestricted` actions, `acknowledged_at`/
+`acknowledged_by_person_id` fields, and the schema's own header
+explicitly naming the exact age-vs-authorization collision
+`docs/BACKLOG.md`'s "Resolve the unrestricted-mode age collision" item
+tracks as Jesse's call, unresolved on purpose. What's still missing is
+the HUB implementation - a real `grants` table, confirmed absent from
+`backend/src/db/schema.ts` - which is session-f-platform-and-trust.md's
+own step 7 (F hasn't reached it either). `lib/contentCeiling.ts`'s
+`hasUnrestrictedGrant()` is a documented stub returning `false` always,
+shaped exactly like its real future caller (takes a `personId`) so
+wiring in F's real table later is a one-line change, not a redesign.
+Nobody can reach past the "adult" ceiling today - the safe direction for
+this specific gap to fail in.
+
+**What shipped for real.** `spec/schemas/content-ceiling.schema.json`:
+one record per age band (child/teen/adult, matching `lib/ageBand.ts`'s
+own `AgeBand` type exactly), each carrying the 8 dial categories
+`docs/dev.md`'s own redesign table names as sound architecture worth
+reusing (home-legacy.git's `lib/contentPolicy.ts`: profanity, sexual,
+violence, substances, crime, hate, self_harm, privacy), plus a `floor`
+field - not enforcement, documentation: the classifier's own hard-refuse
+categories (everything but self_harm, which is `allow_with_resources`,
+never `refuse`) that no dial on any band can ever reach, since
+`checkSafety()` never reads a ceiling at all and never will. Three
+fixtures, generated TS/Python bindings, a test proving every band's
+`floor` array is byte-identical (it documents one invariant, not three
+different settings). `backend/src/lib/contentCeiling.ts` holds the three
+built-in records as reviewed code, matching `persona.ts`'s own
+`PERSONAS`/legacy's own `BUILTIN_PROFILES` precedent - not data a
+household edits directly, since there is no per-household custom-profile
+authoring UI in this pass (that's the separate, larger "nine sliders"
+work `docs/BACKLOG.md` and this session's own step 4 spike already
+name).
+
+**The real fix: "the safety layer reads the ceiling through the band
+instead of the role proxy."** `evaluateSafety()` used to derive its own
+`isMinor` boolean from `actor.role` directly (`MINOR_ROLES`) - a real,
+less accurate signal than the birthdate-derived `AgeBand` `turnEngine.ts`'s
+own prompt already computed for the identical actor on the identical
+turn. `speakerAgeBand()` moved out of `turnEngine.ts` into the new
+`lib/ageBand.ts` so both share the one computation ("one definition, one
+place"), and all three `evaluateSafety()` call sites in `turnEngine.ts`
+(the input check, the non-streaming output check, and
+`gateOutputSafety()`'s per-sentence streaming check) now pass the real
+band. `routes/safety.ts`'s own diagnostic route and
+`conversationHistory.ts`'s `minorSpeaker` retention flag (the same
+role-proxy bug, one level removed - it gates the 90-day flagged-minor
+retention floor) got the identical fix; `notifications.ts`'s own
+`isMinorRole` use is left untouched on purpose - "who counts as an adult
+to notify" is a genuinely different, administrative-role question, not
+an age-accuracy one.
+
+Proven directly, not just by inspection: two new tests put a real
+birthdate on an account with a MISMATCHED role label in both directions
+(a 15-year-old on an "adult"-labeled account still gets the minor
+context; an actual adult on a stale "teen"-labeled account never does)
+and confirm the band wins.
+
+**The crisis overlay is verified non-configurable, for real, not just by
+code inspection.** A new test iterates every real key in the settings
+registry (19 today), stresses each one individually to its own most
+permissive-looking value (the last `select` option, `true` for a
+boolean, a range's max for a number, a non-default string for text),
+and runs a real self-harm turn through `runTurn()` after each one -
+confirming `allow_with_resources` and real crisis resources (checked for
+"988") never once go missing across all 19. A second test proves the
+content-ceiling angle specifically: three real ages spanning all three
+bands, checked directly, get the identical self-harm handling. Both
+pass because `checkSafety()` structurally never reads a setting or a
+ceiling at all - these tests exist so a FUTURE change that tried to wire
+one in would have to break a real, named test to do it, not because
+either was ever at risk from anything shipped in this step.
+
+**A code review, run with extra scrutiny given the safety-critical
+surface, found six real issues; five fixed, one considered and left.**
+
+The one that mattered most: `notifications.ts`'s own "adults" audience
+filter used the identical role proxy `evaluateSafety()` used before this
+step - the two agreed by construction while both read role. Once
+`evaluateSafety()` switched to the real band, the two could diverge: a
+minor mislabeled with an "adult" role would be correctly caught by
+`evaluateSafety()`'s minor protections but STILL counted as an eligible
+"adults" recipient, which for `safety.flagged_turn` specifically means a
+minor could receive their own (or a sibling's) flagged-turn notification
+- exactly the leak `notify_parent` exists to prevent. Fixed:
+`resolveRecipients()` now shares the identical `speakerAgeBand()` call,
+proven with a new test (a stale "adult"-labeled 15-year-old never counted
+as an eligible recipient). `isMinorRole()`/`MINOR_ROLES` had no real
+caller left after this and were deleted rather than kept as exported
+dead code.
+
+Four more, in `contentCeiling.ts` and the crisis-overlay test itself: the
+three built-in ceiling records were typed `Readonly<...>` (compile-time
+only) with no runtime enforcement - `Object.freeze()`'d now, proven by a
+test that a mutation attempt actually throws, not just that TypeScript
+would flag it at a checked call site. The settings-stress test's own
+`extremeValueFor()` silently fell through to `key.default` (a no-op
+stress) for six of ten real selector values nothing in the registry uses
+yet - now throws loudly instead, so a future settings key of one of
+those kinds fails the test until it's taught a real extreme value,
+rather than quietly stopping being tested. That same test also discarded
+each setting write's own result (a validation rejection would have left
+a setting unchanged while the loop still asserted success) and never
+reset between iterations (by the last key, all 19 were stressed
+simultaneously, contradicting the per-key assertion messages' own claim
+of isolation) - both fixed: every write's `.ok` is checked, and a fresh
+`resetDb()` plus a fresh actor runs before each key so "after stressing
+X" means exactly that.
+
+One more, real but narrow, also fixed: `PATCH /api/people/:id` only
+invalidated a demoted person's cached session on a ROLE change, not a
+birthdate change - so a corrected birthdate (a typo fix) wouldn't take
+effect for `evaluateSafety()`'s own accuracy, the entire point of this
+step, until the session cache's own TTL expired. Fixed and proven with a
+test mirroring the existing role-change one.
+
+**Considered, not changed**: `prepareTurn()`'s input-safety check and
+`runTurn()`'s non-streaming output-safety check each call
+`speakerAgeBand(actor, new Date())` with their own fresh timestamp,
+rather than sharing one `now` the way `gateOutputSafety()`'s own
+per-stream computation deliberately does. A turn whose generation
+straddles a birthday-boundary midnight (or a concurrent birthdate edit)
+could in principle see the input and output checks disagree on band.
+Real, but the practical window is a model completion's own few seconds
+landing on the literal instant of a birthday, not something worth
+threading a shared timestamp through both functions' signatures for -
+`gateOutputSafety()`'s own per-SENTENCE case was the one that mattered
+(a multi-second stream, not a multi-second completion), and that one
+already shares its band correctly.

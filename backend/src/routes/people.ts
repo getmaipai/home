@@ -272,14 +272,25 @@ peopleRoutes.openapi(patchRoute, async (c) => {
   // A cached session carries the whole PersonRow, role included, so a
   // demotion would not take effect until the cache expired: the other
   // case auth.ts's invalidateSessionCacheForPerson was written for.
-  // Step 7: a flip to enabled: false needs the exact same treatment -
+  // Step 7 (F): a flip to enabled: false needs the exact same treatment -
   // resolveSession()'s query excludes disabled people, but the 10s cache
   // in front of it doesn't re-run that query, so without this an
   // already-cached session would keep authenticating a disabled person
   // for up to 10 more seconds after the admin who disabled them believes
   // it already took effect.
+  //
+  // A separate code review (2026-09-06, session-c-brain-and-voice.md
+  // step 7) found birthdate wasn't covered here either, despite mattering
+  // just as much once evaluateSafety()/notifications.ts's own audience
+  // filter both started reading the real age band instead of role: a
+  // corrected birthdate (a typo fix, say) wouldn't take effect for
+  // anyone already mid-session as that person until the cache expired.
+  // Both real, independent gaps found the same week against the same
+  // cache - checked together rather than as two separate conditionals.
   const candidateEnabled = candidate.data.enabled;
-  if (nextRole !== target.role || candidateEnabled !== target.enabled) invalidateSessionCacheForPerson(id);
+  if (nextRole !== target.role || candidateEnabled !== target.enabled || candidate.data.birthdate !== target.birthdate) {
+    invalidateSessionCacheForPerson(id);
+  }
   const { birthdate: _birthdate, ...roster } = candidate.data;
   return c.json(roster, 200);
 });
