@@ -1,7 +1,9 @@
 import { describe, expect, test, afterEach } from "bun:test";
-import { getJob, startSelectJob } from "@/lib/modelDownloadJobs";
+import { getJob, startSelectJob, recoverInterruptedJobsAtBoot } from "@/lib/modelDownloadJobs";
 import { __resetLlmSupervisorForTests } from "@/lib/llmSupervisor";
 import { setHouseholdSettingValue } from "@/lib/settings";
+import { db } from "@/db";
+import { modelDownloadJobs } from "@/db/schema";
 
 afterEach(() => {
   __resetLlmSupervisorForTests();
@@ -57,5 +59,46 @@ describe("modelDownloadJobs", () => {
   test("a different model id while one is already selecting is refused, not raced", () => {
     startSelectJob("not-a-real-model-id-3");
     expect(() => startSelectJob("not-a-real-model-id-4")).toThrow(/not-a-real-model-id-3/);
+  });
+});
+
+// COR-8 (code review, 2026-09-06): activeJob is in-memory only and
+// always starts null on a fresh process - a crash mid-download left the
+// job ROW in whatever non-terminal status it was in, with
+// GET /models/:id/select-status reporting that phantom job forever.
+describe("recoverInterruptedJobsAtBoot()", () => {
+  function insertJobRow(modelId: string, status: string, error: string | null = null): void {
+    const now = new Date().toISOString();
+    db.insert(modelDownloadJobs)
+      .values({ modelId, status, phase: "mid-flight", completedBytes: 100, totalBytes: 1000, error, createdAt: now, updatedAt: now })
+      .run();
+  }
+
+  test("marks a non-terminal job (a real crash-mid-download shape) as failed", () => {
+    insertJobRow("crashed-model", "downloading_model");
+    recoverInterruptedJobsAtBoot();
+    const job = getJob("crashed-model");
+    expect(job?.status).toBe("failed");
+    expect(job?.error).toBe("interrupted by restart");
+  });
+
+  test("leaves an already-terminal job (ready or failed) alone", () => {
+    insertJobRow("ready-model", "ready");
+    insertJobRow("already-failed-model", "failed", "checksum mismatch");
+    recoverInterruptedJobsAtBoot();
+    expect(getJob("ready-model")?.status).toBe("ready");
+    const failedJob = getJob("already-failed-model");
+    expect(failedJob?.status).toBe("failed");
+    expect(failedJob?.error).toBe("checksum mismatch"); // untouched, not overwritten
+  });
+
+  test("every non-terminal status gets recovered, not just downloading_model", () => {
+    for (const status of ["queued", "downloading_engine", "downloading_model", "verifying", "loading", "testing"]) {
+      insertJobRow(`stuck-${status}`, status);
+    }
+    recoverInterruptedJobsAtBoot();
+    for (const status of ["queued", "downloading_engine", "downloading_model", "verifying", "loading", "testing"]) {
+      expect(getJob(`stuck-${status}`)?.status).toBe("failed");
+    }
   });
 });

@@ -16,8 +16,17 @@ import { rebindWithRetry } from "@/lib/serverRebind";
 import { raiseIssue } from "@/lib/issues";
 import { startWyomingServer } from "@/lib/wyomingServer";
 import { websocket } from "hono/bun";
+import { recoverInterruptedJobsAtBoot } from "@/lib/modelDownloadJobs";
 
 const port = Number(process.env.PORT ?? 8787);
+
+// COR-8 (code review, 2026-09-06): activeJob (lib/modelDownloadJobs.ts)
+// is in-memory only and always starts null on a fresh process - a crash
+// mid-download left the job ROW in whatever non-terminal status it was
+// in, with GET /models/:id/select-status reporting that phantom job
+// forever. Correcting it once, here, before anything else touches
+// download-job state.
+recoverInterruptedJobsAtBoot();
 
 // The scheduler's own timer: app.ts/routes stay import-only (no side
 // effects) so tests booting the app via Hono's .request() never start a
