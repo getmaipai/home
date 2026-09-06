@@ -2,16 +2,38 @@ import { Hono } from "hono";
 import { requireAuth, requireRole } from "@/middleware/auth";
 import { listPackageIds, loadPackage, runPlugin } from "@/lib/plugins";
 import { routingStats } from "@/lib/conversationHistory";
+import { allPackageStatuses, getPackageStatus, runSmoke } from "@/lib/smoke";
 import type { AppEnv } from "@/types";
+import type { PackageManifest } from "@maipai/spec/gen/ts/manifest.js";
 
 export const pluginsRoutes = new Hono<AppEnv>();
 
+// No store yet (session-d step 6), so `latest_version` and `channel`
+// have nothing real to report against: every bundled package is pinned
+// to its own manifest version on the "stable" channel until the store
+// exists to say otherwise.
 pluginsRoutes.get("/", requireAuth, async (c) => {
+  const statuses = allPackageStatuses();
   const manifests = listPackageIds()
     .map((id) => loadPackage(id))
     .filter((r) => r.ok)
-    .map((r) => (r as { ok: true; value: { manifest: unknown } }).value.manifest);
-  return c.json(manifests);
+    .map((r) => (r as { ok: true; value: { manifest: PackageManifest } }).value.manifest);
+  const rows = manifests.map((manifest) => {
+    const status = statuses.get(manifest.id);
+    return {
+      ...manifest,
+      installed_version: manifest.version,
+      latest_version: manifest.version,
+      channel: "stable" as const,
+      status: status?.status ?? "enabled",
+      smoke: {
+        last_run_at: status?.lastSmokeAt ?? null,
+        ok: status?.smokeOk ?? null,
+        message: status?.smokeMessage ?? null,
+      },
+    };
+  });
+  return c.json(rows);
 });
 
 // Owner/admin only: aggregate counts across every household member's
@@ -26,9 +48,25 @@ pluginsRoutes.get("/stats", requireRole("owner", "admin"), async (c) => {
 });
 
 pluginsRoutes.post("/:id/run", requireAuth, async (c) => {
+  const id = c.req.param("id");
+  // A package a failed smoke test disabled (docs/PACKAGES.md's bronze
+  // bar) stays installed but must not run - checked at the route layer,
+  // not inside lib/plugins.ts's runPlugin(), so this file can import
+  // lib/smoke.ts without smoke.ts's own import of lib/plugins.ts closing
+  // a cycle (see lib/smoke.ts's header).
+  if (getPackageStatus(id).status === "disabled") {
+    return c.json({ error: `${id} is disabled (failed its last smoke test)` }, 403);
+  }
   const actor = c.get("person");
   const body = (await c.req.json().catch(() => ({}))) as Record<string, unknown>;
-  const result = await runPlugin(c.req.param("id"), actor, body);
+  const result = await runPlugin(id, actor, body);
   if (!result.ok) return c.json({ error: result.error }, result.status);
   return c.json(result.value);
+});
+
+// Owner/admin only: forces a re-check outside the daily job, e.g. right
+// after fixing whatever a Repairs item points at.
+pluginsRoutes.post("/:id/smoke", requireRole("owner", "admin"), async (c) => {
+  const result = await runSmoke(c.req.param("id"));
+  return c.json(result);
 });

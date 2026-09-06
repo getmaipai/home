@@ -15,6 +15,7 @@ import {
   commands,
   notificationDeliveries,
   issues,
+  packageStatus,
 } from "@/db/schema";
 
 // All test files in one `bun test` run share the same imported `@/db`
@@ -33,6 +34,7 @@ import {
 // hidden dependency on what ran before it in the same process.
 export function resetDb(): void {
   db.delete(issues).run();
+  db.delete(packageStatus).run();
   db.delete(notificationDeliveries).run();
   db.delete(commands).run();
   db.delete(scheduledJobs).run();

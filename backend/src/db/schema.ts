@@ -401,3 +401,21 @@ export const issues = sqliteTable("issues", {
   dismissedAt: text("dismissed_at"),
   hlc: text("hlc").notNull(),
 });
+
+// --- Session D: packages and the store ------------------------------
+//
+// One row per bundled/installed package, tracking bronze's "a smoke
+// failure leaves the package installed but status: disabled" rule
+// (docs/PACKAGES.md, session-d-packages-and-store.md step 1). A package
+// with no row here is assumed "enabled" and never smoke-tested yet -
+// lib/smoke.ts's own runSmoke() is what creates the first row. Not a
+// spec 3.1 record type: purely a hub-local operational fact about a
+// package the way scheduledJobs/commands already are for their own
+// features, not household data that syncs to the robot.
+export const packageStatus = sqliteTable("package_status", {
+  packageId: text("package_id").primaryKey(),
+  status: text("status").notNull().default("enabled"), // "enabled" | "disabled"
+  lastSmokeAt: text("last_smoke_at"),
+  smokeOk: integer("smoke_ok", { mode: "boolean" }),
+  smokeMessage: text("smoke_message"),
+});

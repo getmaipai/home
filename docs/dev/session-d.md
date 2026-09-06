@@ -117,3 +117,129 @@ session's to build).
 
 Package ids above are working names, set for real at scaffold time in
 each step's own section below.
+
+## Step 1: bronze for real - quality, smoke, cards
+
+Scope: the 5 packages D owns (`define`, `joke`, `trivia`, `weather`,
+`storytime-style`). `remember`/`recall` are C's own packages
+(ownership map); they still need this same treatment from C.
+
+- **`quality_scale.yaml`**, one per package, in the bronze/silver/gold
+  shape docs/PACKAGES.md describes (no prescribed file schema existed
+  anywhere in the repo; this is the shape chosen, checked by the new
+  spec-level test below): `bronze`/`silver`/`gold` each a map of named
+  criteria to `{ met: boolean, note?, date? }`. All 5 packages meet
+  every bronze line today; none claim silver (no auth to diagnose, all
+  keyless public APIs) or full gold except the four fetch-based ones,
+  which record the exact date they were built and manually verified
+  against a real third-party response (2026-09-05, already documented
+  in each package's own manifest description).
+- **`lib/smoke.ts`**: the smoke mechanism, keyed off a manifest's
+  `smoke` field:
+  - `{ "kind": "static" }` - confirms `loadSkill()`/`loadPackage()`
+    succeeds. Used by `storytime-style` (a `skill`: no host, nothing
+    else to prove).
+  - `{ "kind": "recipe_fixture", "fixture": "<path>" }` - runs the
+    package's own `recipe.json` through the production interpreter
+    (`spec/interpreters/ts/recipe-interpreter.ts`) against a
+    `HostEmulator` seeded from the fixture, and diffs the result
+    against `expected`. Deliberately never the real host
+    (`packageHost.ts`): a smoke test must be deterministic and offline,
+    so it proves the recipe's own logic, not that a third-party API
+    happens to be up right now. Used by `define`/`joke`/`trivia`/
+    `weather`, each with its own `tests/smoke.json` (the same response
+    shapes already captured in `spec/fixtures/recipes/*.json`, copied
+    into the package's own `tests/` per the `new-package` skill's
+    layout rather than pointed at the spec fixture, since a package's
+    tests should be self-contained).
+  - `{ "kind": "deno_test" }` - reserved for step 5's Tier 1 host;
+    recorded as an explicit failure today so a Tier 1 package can never
+    read smoke-clean before the mechanism that would prove it exists.
+  - A package with **no** `smoke` field at all is treated as "not yet
+    bronze-complete," not a runtime failure - it is neither disabled
+    nor does it raise an issue. This matters concretely today:
+    `remember`/`recall` have no `smoke` field yet, and the daily/boot
+    smoke pass walks every bundled package regardless of owner. Making
+    an undeclared smoke check a hard failure would have this session's
+    own infrastructure disable another session's packages the moment it
+    boots - the bronze *completeness* gate (every package must
+    eventually declare one) is enforced separately, at build time, by
+    `spec/tests/ts/package-bronze.test.ts`, not at runtime.
+  - Persistence: a new `package_status` table (schema v12,
+    `db/migrations/0012_woozy_midnight.sql`) - `status` ("enabled" |
+    "disabled"), `last_smoke_at`, `smoke_ok`, `smoke_message`. A
+    package with no row yet reads as enabled with no history (the
+    same "absence isn't failure" default). On failure, `raiseIssue`
+    fires (source `"packages"`, key = package id); a later pass that
+    passes re-enables the package and calls `resolveIssue`.
+  - Runs: once at boot (index.ts - the stand-in for "at install" until
+    step 6's real install flow exists), daily via
+    `ensureCoreJob("packages.smoke", "every:1d")`, and on demand via
+    `POST /api/plugins/:id/smoke` (owner/admin). `POST /api/plugins/:id/run`
+    now refuses (403) a disabled package - checked at the route layer,
+    not inside `lib/plugins.ts`'s `runPlugin()`, to avoid a real
+    circular import (`lib/smoke.ts` -> `lib/plugins.ts` ->
+    `lib/packageHost.ts` -> `lib/scheduler.ts`; importing `lib/smoke.ts`
+    from `lib/scheduler.ts` directly would have closed that loop the
+    same way this file's own header already warns against for
+    `runPlugin`). `lib/scheduler.ts`'s `CORE_JOBS` handlers are now
+    `() => void | Promise<void>`, awaited; an extra core job (like
+    `packages.smoke`) is injected by the caller (`index.ts`) via a new
+    `extraCoreJobs` parameter on `runDueJobs`, the same
+    dependency-injection shape `runPluginFn` already used, for the
+    identical reason.
+- **`lib/issues.ts`**: F's step 1 (wave-2.md > "F to C and D: issues and
+  sidecars") merged to `main` before this step finished, so `lib/smoke.ts`
+  and `backend/tests/smoke.test.ts` import the real `raiseIssue`/
+  `resolveIssue`/`listIssues` directly - the planned temporary stub was
+  never needed.
+- **`GET /api/plugins`** gains the contract's fields:
+  `installed_version`, `latest_version` (both just `manifest.version`
+  today - no store exists yet to say otherwise, step 6), `channel`
+  (`"stable"`, same reason), `status`, and `smoke: { last_run_at, ok,
+  message }`.
+- **The speech lint placeholder**
+  (`backend/tests/speechLint.test.ts`): scans every bundled package's
+  `recipe.json` `format` step templates and every `skill` package's
+  `SKILL.md` body for an em dash or an exclamation point
+  (getmaipai/.github/CLAUDE.md's AI writing standard). Runs against
+  every package, not just D's, since a violation is a real defect
+  regardless of owner. C's step 6 replaces this with the real lint;
+  this file is deleted then.
+- **`spec/tests/ts/package-bronze.test.ts`**: the release skill's
+  "refuse below bronze" check now has something to read. Walks every
+  package under `backend/packages/` except `remember`/`recall` (C's,
+  not yet built to this bar) and asserts: 5+ routing examples, a stated
+  `offline` value, a `data_sources[]` row for every `net:` permission, a
+  declared `smoke` entry, a `README.md`, a `CHANGELOG.md`, and every
+  criterion in `quality_scale.yaml`'s `bronze` block reading `met: true`.
+
+Tests: `backend/tests/smoke.test.ts` (9 cases: a real fixture passing
+and passing through as enabled, `define`/`joke`/`trivia` each passing
+their own fixture, `storytime-style`'s static check, a nonexistent
+package failing and disabling itself with a raised issue, a later
+passing run resolving that issue, the untested-package default status,
+and a full `runAllSmokeTests()` pass counting only real failures),
+`backend/tests/speechLint.test.ts` (7 cases, one per bundled package),
+`spec/tests/ts/package-bronze.test.ts` (36 cases, 6 per D-owned
+package). Every `spec`/`backend` backend-side stage of `scripts/check.sh`
+is green.
+
+**A note on `scripts/check.sh`'s frontend stage.** As of this commit,
+`main`'s own `frontend: build (includes typecheck)` stage fails - 12
+pre-existing `tsc` errors, none in a file this session touches or owns
+(`frontend/**` is E's, per `wave-2.md`'s ownership map): `Person` gained
+a required `hlc` field in Session A's step 10 that several of E's test
+fixtures (`BackupsPage.test.tsx`, `SignIn.test.tsx`, and others) never
+picked up, and the turn-stream event union gained a `turn_meta` variant
+that `chatModelAdapter.ts`/`runFixedTurn.ts` narrow past without a type
+guard. Confirmed by running `tsc --noEmit` against plain `main` before
+this branch's own changes touch anything - the failure predates and is
+unrelated to this commit. Flagged to Session E twice (2026-09-06) with
+no fix landed yet at commit time; not blocking this step on someone
+else's file.
+
+What's left for whom: `remember`/`recall` need the identical
+`quality_scale.yaml`/`README.md`/`CHANGELOG.md`/`tests/smoke.json`/
+manifest `smoke` field treatment from C. The Tier 1 `deno_test` smoke
+kind is step 5's to implement.

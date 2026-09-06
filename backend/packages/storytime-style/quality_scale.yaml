@@ -1,0 +1,31 @@
+package: storytime-style
+scale: bronze
+bronze:
+  tests_green:
+    met: true
+    note: "static smoke check (kind: static, lib/smoke.ts) confirms the manifest and SKILL.md both load and parse"
+  routing_examples:
+    met: true
+    note: 5 examples in manifest.json's routing.examples
+  privacy_row_per_data_source:
+    met: true
+    note: a skill has no permissions or host access, so no data source exists to declare
+  offline_behavior_stated:
+    met: true
+    note: "offline: full - plain instructions composed into the system prompt, no network call"
+  smoke_test:
+    met: true
+    note: "kind: static in manifest.json's smoke field"
+  readme_and_changelog:
+    met: true
+  lint_clean:
+    met: true
+silver:
+  diagnostics_and_reauth:
+    met: false
+    note: no auth or diagnostics apply to a plain-instruction skill
+gold:
+  real_service_verified:
+    met: false
+    date: null
+    note: no external service to verify against

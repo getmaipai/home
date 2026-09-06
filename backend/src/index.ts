@@ -6,6 +6,7 @@ import { sampleEngineStats } from "@/lib/engineStats";
 import { startAllSidecars, registerGracefulExit } from "@/lib/sidecars";
 import { initCrashBootHold } from "@/lib/dirtyBoot";
 import { sweepOrphanEngineProcesses } from "@/lib/llmSupervisor";
+import { runAllSmokeTests } from "@/lib/smoke";
 
 const port = Number(process.env.PORT ?? 8787);
 
@@ -39,6 +40,15 @@ ensureCoreJob("memory.consolidate", "every:7d");
 // comment), so this is a relative daily interval from whenever the job
 // first seeds, not a real nightly-window guarantee.
 ensureCoreJob("backup.run", "every:1d");
+// docs/PACKAGES.md's bronze bar: smoke "at install, at every update, and
+// on a schedule" (lib/smoke.ts). No install/update flow exists yet
+// (session-d step 6 builds the store), so a boot-time pass below stands
+// in for "at install" until then; this daily job is the real "on a
+// schedule" half.
+ensureCoreJob("packages.smoke", "every:1d");
+void runAllSmokeTests().then(({ ran, failed }) => {
+  if (failed > 0) console.error(`[smoke] ${failed}/${ran} bundled package(s) failed their smoke test at boot`);
+});
 // A crash between VACUUM INTO and encryption (backup.ts) can leave an
 // unencrypted snapshot on disk; swept here too, not just at the top of
 // every runBackup() call, so a process that crashed mid-backup and then
@@ -69,7 +79,11 @@ await sweepOrphanEngineProcesses();
 await initCrashBootHold();
 void startAllSidecars();
 setInterval(() => {
-  runDueJobs(runPlugin).catch((err: Error) => console.error(`[scheduler] runDueJobs failed: ${err.message}`));
+  runDueJobs(runPlugin, new Date(), {
+    "packages.smoke": async () => {
+      await runAllSmokeTests();
+    },
+  }).catch((err: Error) => console.error(`[scheduler] runDueJobs failed: ${err.message}`));
 }, 60_000);
 // engineStats.ts's ring buffer, same 60s cadence as the job poll above -
 // "how busy the machine has been" (Jesse, 2026-09-04) doesn't need finer
