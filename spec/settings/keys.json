@@ -218,10 +218,10 @@
     "selector": "select",
     "range": {
       "options": [
-        "default",
-        "tutor",
         "buddy",
-        "pal"
+        "default",
+        "pal",
+        "tutor"
       ]
     },
     "default": "default",

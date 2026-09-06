@@ -542,15 +542,24 @@ into a conversation with someone who knows who is talking.
 
 **Persona and companions**
 
-- [ ] **A Companion/Persona spec record** (M) - plan 3.1 lists it,
-      `spec/schemas` has none. Identity (name, pronouns, tagline), a
-      short backstory, interests, three to five few-shot lines (legacy's
-      review: "the single biggest lever for small-model voice fidelity"),
-      a linked voice, a per-persona confirmation pool (one shared pool
-      today, so every character acks identically), and the prompt prefix
-      using the persona's `display_name` instead of "You are MaiPai".
-      Map today's four dials onto the plan's nine sliders, or record why
-      four is enough. Keep the prose card under about 150 tokens.
+- [x] **A Companion/Persona spec record** - shipped, Session A step 8
+      (2026-09-05), as a `companion` block on the existing manifest
+      shape rather than a new top-level `spec/schemas` record:
+      "companions are packages" (`kind: "companion"` already existed in
+      manifest.schema.json's own enum). Identity (`display_name`,
+      `pronouns`, `tagline`), a short `backstory`, `interests`, 3-5
+      few-shot `examples` (legacy's review: "the single biggest lever
+      for small-model voice fidelity," now a real few-shot block in the
+      composed prompt, not just stored), a linked `voice_id`, a
+      per-companion confirmation pool (`replyVariation.ts`, scoped to
+      the one constant worth it this pass, shared pool as the default),
+      and the prompt prefix using `display_name` instead of a hardcoded
+      "You are MaiPai" (already true since step 4; this step just made
+      the catalog itself real packages). Four bundled companion packages
+      (`default`/`buddy`/`pal`/`tutor`) replace `lib/persona.ts`'s old
+      hardcoded array. Still open: the plan's nine sliders (four dials
+      shipped, mapping or justifying the rest is unstarted) and
+      activation steering (see that item below, unrelated to this one).
 - [ ] **Persona is not the same as how to address the listener** - the
       "speech profile per person" item under People is the other half;
       build them as two records injected in order: who I am, then who
@@ -564,9 +573,18 @@ into a conversation with someone who knows who is talking.
       models by this route, with Qwen3-4B strongest among those tested.
       Measure on the bench: does one vector hold register better than a
       paragraph over thirty turns, and what does it cost per token.
-- [ ] **A persona consistency test** (S) - ten scripted exchanges scored
-      by string checks (address form, length, forbidden phrases) in the
-      deterministic suite, plus a model-judged version on demand.
+- [x] **A persona consistency test** - shipped, Session A step 8
+      (2026-09-05), as a bench (`backend/scripts/bench/persona-eval.ts`)
+      rather than the deterministic suite: ten scripted exchanges through
+      the real turn engine per bundled companion, scored by string checks
+      (address form, length cap, forbidden phrases). Run against the stub
+      chat backend: address-form and length-cap pass structurally (40/40
+      each - a content-blind echo can't leak another companion's name or
+      run long), forbidden-phrases (12/40) is honestly uninformative
+      against a stub that echoes the user's own words regardless of any
+      system prompt. Needs a real chat model before this means anything
+      for persona fidelity; see docs/dev.md's step 8 entry. A
+      model-judged version is still real, unbuilt work.
 - [ ] **The bot's honesty guards as a post-model pass** (M) - legacy
       `guards.py` (invention, unrelated recall, near-echo, medication
       doses, capability claims), `_marked_repeat` ("Like I said" never

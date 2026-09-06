@@ -56,6 +56,40 @@
         }
       }
     },
+    "companion": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Required when kind is \"companion\" (session-a-intelligence.md step 8), unused otherwise. Composed by home/backend/src/lib/persona.ts into the turn engine's identity line and system-prompt fragment: display_name replaces the hardcoded \"MaiPai\" in \"You are {display_name}, ...\", the four style dials are the same ones lib/persona.ts already had before companions were packages, and examples is a short few-shot block (legacy's own finding: \"the single biggest lever for small-model voice fidelity\").",
+      "required": ["display_name", "formality", "complexity", "engagement", "filler_density"],
+      "properties": {
+        "display_name": { "type": "string", "minLength": 1, "maxLength": 40 },
+        "pronouns": { "type": "string", "minLength": 1, "maxLength": 20 },
+        "tagline": { "type": "string", "minLength": 1, "maxLength": 80 },
+        "backstory": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 400,
+          "description": "Short by design: no authoring UI exists yet to keep a longer one consistent with itself turn to turn (docs/dev.md's persona research)."
+        },
+        "interests": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 },
+          "maxItems": 8
+        },
+        "examples": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 },
+          "minItems": 3,
+          "maxItems": 5,
+          "description": "3 to 5 lines in the character's own voice, composed as a few-shot block."
+        },
+        "voice_id": { "type": "string", "minLength": 1 },
+        "formality": { "type": "string", "enum": ["casual", "neutral", "formal"] },
+        "complexity": { "type": "string", "enum": ["simple", "standard", "advanced"] },
+        "engagement": { "type": "string", "enum": ["brief", "balanced", "curious"] },
+        "filler_density": { "type": "string", "enum": ["none", "light", "frequent"] }
+      }
+    },
     "args": {
       "description": "A JSON Schema for this package's call arguments."
     },

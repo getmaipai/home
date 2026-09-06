@@ -541,7 +541,7 @@ describe("buildSystemPrompt() stable-first order and budgets (step 4)", () => {
     // alone hit 68% of a prompt" before every section had its own cap).
     for (const id of PERSONA_IDS) {
       const fragment = composePersonaPrompt(resolvePersona(id));
-      expect(fragment.length).toBeLessThanOrEqual(800); // MAX_COMPANION_SECTION_CHARS
+      expect(fragment.length).toBeLessThanOrEqual(1200); // MAX_COMPANION_SECTION_CHARS (step 8: raised for each companion's own examples block)
     }
     expect(INFORMATION_HANDLING_POLICY.length).toBeLessThanOrEqual(800); // MAX_RULES_SECTION_CHARS
   });

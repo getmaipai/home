@@ -51,6 +51,35 @@ export function listPackageIds(): string[] {
   }
 }
 
+/** Reads and validates just manifest.json, for lib/persona.ts's own
+ * companion-catalog loader (step 8, session-a-intelligence.md): a
+ * `kind: "companion"` package has no recipe.json at all (it composes
+ * into the prompt directly, it's never run), so it can't go through
+ * loadPackage() below at all. Deliberately its OWN read-and-validate
+ * logic, not shared with loadPackage()'s: a code review (2026-09-05)
+ * found an earlier version that had loadPackage() call this function
+ * first, before reading recipe.json, changed loadPackage()'s own
+ * existing behavior for a package with BOTH an invalid manifest and a
+ * missing/malformed recipe.json - it used to always report the plain
+ * 404 below (both files were read inside one try, so a recipe-read
+ * failure masked whatever the manifest's own validation would have
+ * said) and would have started reporting the manifest's own 400
+ * instead. loadPackage() keeps its original read-both-then-validate
+ * shape untouched below. */
+export function loadManifestOnly(id: string): PluginOpResult<PackageManifest> {
+  let manifestJson: unknown;
+  try {
+    manifestJson = JSON.parse(readFileSync(join(PACKAGES_DIR, id, "manifest.json"), "utf-8"));
+  } catch {
+    return { ok: false, status: 404, error: `no bundled package ${id}` };
+  }
+  const manifestParsed = PackageManifest.safeParse(manifestJson);
+  if (!manifestParsed.success) {
+    return { ok: false, status: 400, error: `package ${id}'s manifest failed validation: ${manifestParsed.error.message}` };
+  }
+  return { ok: true, value: manifestParsed.data };
+}
+
 export function loadPackage(id: string): PluginOpResult<LoadedPackage> {
   let manifestJson: unknown, recipeJson: unknown;
   try {

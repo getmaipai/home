@@ -160,11 +160,17 @@ const MAX_SUMMARY_SECTION_CHARS = 600;
 // test_prompt_budget.py precedent this step copies found rules alone
 // once hit 68% of a prompt with no independent section cap to stop it.
 const MAX_RULES_SECTION_CHARS = 800;
-// The real catalog's longest fragment (composePersonaPrompt("pal")) runs
-// about 645 chars; 800 gives headroom without letting a future dial or
-// catalog entry balloon unnoticed, matching MAX_MEMORY_SECTION_CHARS/
-// MAX_PLUGINS_SECTION_CHARS's own 800.
-const MAX_COMPANION_SECTION_CHARS = 800;
+// Step 8 (session-a-intelligence.md) added each companion's own
+// few-shot examples to this section (composePersonaPrompt()'s own
+// examplesBlock()), which pushed the real catalog's longest fragment
+// (composePersonaPrompt("tutor")) from ~645 chars to ~941 - re-measured
+// against real content rather than assumed unchanged, the same step-4
+// lesson ("sized from real content with headroom, not picked arbitrarily
+// and then found too small") applying a second time to the same
+// constant. 1200 gives real headroom above that, matching
+// MAX_SKILLS_SECTION_CHARS's own budget for the section most likely to
+// grow with real content.
+const MAX_COMPANION_SECTION_CHARS = 1200;
 
 /** Shared by every capped section below (a code review pass on this
  * step found the same "slice then append '...'" logic repeated inline
@@ -746,6 +752,24 @@ function finalizeReply(actor: PersonRow, value: TurnValue): TurnValue {
   const { text, speech } = value.reply;
   if (speech !== undefined && speech !== text) return value;
 
+  // Resolved fresh here rather than threaded in from prepareTurn(): an
+  // immediate (plugin/refusal) reply never goes through prepareTurn()'s
+  // own "model" branch at all, so there's no persona already in scope by
+  // the time any TurnValue reaches this function - a plain settings
+  // lookup, not I/O, so re-resolving it here costs nothing real. A code
+  // review (2026-09-05) named the real, narrow consequence of resolving
+  // it fresh rather than threading it through: if the person changes
+  // persona.active_id via a concurrent request while THIS turn is still
+  // in flight, the per-companion confirmation pool below could pick the
+  // NEW persona's own phrasing for a reply whose system prompt (for a
+  // "model" source) was actually built under the OLD one - one
+  // confirmation sentence voiced as the just-switched-to companion, at
+  // most, never a data or safety correctness issue. Accepted rather than
+  // threading persona through prepareTurn()'s return value for it: the
+  // race requires the same person to change their own setting mid-turn,
+  // and its worst outcome is one word choice sounding like the wrong
+  // companion for one reply.
+  const personaId = resolvePersona(getPersonSettingValue(actor, "persona.active_id")).id;
   const variedText =
     value.source === "safety_refuse"
       ? pickRefusalVariant(actor.id)
@@ -753,7 +777,7 @@ function finalizeReply(actor: PersonRow, value: TurnValue): TurnValue {
           value.source === "plugin_error" ||
           value.source === "command" ||
           value.source === "command_error"
-        ? varyKnownConstant(actor.id, text)
+        ? varyKnownConstant(actor.id, text, personaId)
         : text;
   return { ...value, reply: { text: variedText, speech: normalizeForSpeech(variedText) } };
 }

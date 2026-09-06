@@ -141,22 +141,52 @@ export function pickThinkingCue(personId: string): string {
 // recipe.json, so it's called out here instead. The safety refusal is
 // the one constant NOT in this map: it alone needs pickRefusalVariant's
 // first/repeat distinction, not plain rotation.
+// backend/packages/remember/recipe.json's own reply text - pulled into a
+// named constant (step 8) since it's now looked up twice: once as
+// KNOWN_CONSTANT_POOLS's own key below, once by varyKnownConstant() to
+// decide whether a companion-specific pool even applies.
+const REMEMBER_CONFIRM_CONSTANT = "Got it, I'll remember that.";
+
 const KNOWN_CONSTANT_POOLS: ReadonlyMap<string, readonly string[]> = new Map([
   ["Sorry, I couldn't do that.", PLUGIN_ERROR_VARIANTS], // turnEngine.ts's own plugin_error fallback
   ["Done.", PLUGIN_DONE_VARIANTS], // turnEngine.ts's own no-reply plugin fallback
   ["I don't remember anything about that.", RECALL_NOTHING_VARIANTS], // spec/interpreters/{ts,py}/recipe-interpreter's NOTHING_RECALLED
-  ["Got it, I'll remember that.", REMEMBER_CONFIRM_VARIANTS], // backend/packages/remember/recipe.json's own reply text
+  [REMEMBER_CONFIRM_CONSTANT, REMEMBER_CONFIRM_VARIANTS],
+]);
+
+// Step 8 (session-a-intelligence.md): "a per-companion confirmation pool
+// with the shared pool as the default." Scoped to the ONE constant that
+// reads most like a genuine "confirmation" a household hears often
+// enough, and distinctively enough per voice, to be worth its own pool
+// this pass - "Got it, I'll remember that" said by a formal tutor should
+// not sound identical to the same moment said by an enthusiastic buddy.
+// The other three known constants (a plugin error, a bare "Done.",
+// nothing recalled) stay one shared pool for every companion; a
+// companion with no entry here (including "default" itself) falls
+// through to REMEMBER_CONFIRM_VARIANTS exactly as before this step.
+const COMPANION_REMEMBER_CONFIRM: ReadonlyMap<string, readonly string[]> = new Map([
+  ["tutor", ["Understood, I'll retain that.", "Noted - I'll keep that in mind.", "Very well, I'll remember that."]],
+  ["buddy", ["Aww, got it, I'll remember that for you!", "Yay, noted!", "Got it, I won't forget!"]],
+  ["pal", ["Bet, got it.", "Say less, noted.", "For sure, I got it."]],
 ]);
 
 /** Applied to a plugin's already-rendered reply text: if it's exactly one
  * of the package layer's known constant confirmations, rotate it; any
  * real, dynamic content (a recalled fact, a weather number, a recipe's
  * own bespoke confirmation sentence) passes through completely
- * unchanged, because it isn't in the map at all. */
-export function varyKnownConstant(personId: string, text: string): string {
-  const pool = KNOWN_CONSTANT_POOLS.get(text);
+ * unchanged, because it isn't in the map at all. `personaId` is optional
+ * (every current caller passes the actor's real active persona id;
+ * omitting it just means "use the shared pool," never an error) and
+ * only ever changes anything for the one constant with a companion-
+ * specific pool above. */
+export function varyKnownConstant(personId: string, text: string, personaId?: string): string {
+  const companionPool = text === REMEMBER_CONFIRM_CONSTANT && personaId ? COMPANION_REMEMBER_CONFIRM.get(personaId) : undefined;
+  const pool = companionPool ?? KNOWN_CONSTANT_POOLS.get(text);
   if (!pool) return text;
-  // The map's key IS the pool's own first/canonical entry, so it doubles
-  // as this constant's own dedicated rotation key.
-  return pickVariant(personId, text, pool);
+  // A companion-specific pool gets its own rotation key (distinct from
+  // the shared pool's key, which is just the constant's own text) so
+  // switching personas mid-household doesn't make one companion's
+  // rotation state leak into another's.
+  const poolKey = companionPool ? `${text}:${personaId}` : text;
+  return pickVariant(personId, poolKey, pool);
 }

@@ -6863,3 +6863,172 @@ though it is pinned. Full backend suite green (652), `bunx tsc --noEmit`
 clean, `scripts/check.sh` green (the frontend build step's known,
 pre-existing Session B failure aside), gitleaks and the PII wordlist
 clean.
+
+## Session A: step 8, companions with an identity (2026-09-05)
+
+The other half of "companions are packages": `kind: "companion"` already
+existed in `manifest.schema.json`'s own enum before this file ever named
+it, but nothing produced or consumed one. This picks that gap up (its
+own foundation - schema extension, four bundled packages - was already
+committed and correct before this entry's own work resumed on top of
+it) and finishes wiring it end to end: `lib/persona.ts`'s catalog is no
+longer a hardcoded array, and `lib/plugins.ts` gets a real manifest-only
+loader for a package kind that has no recipe at all.
+
+**The manifest gains a `companion` block** (`spec/schemas/
+manifest.schema.json`, required when `kind: "companion"`, unused
+otherwise): `display_name`, `pronouns`, `tagline`, `backstory`,
+`interests`, `examples` (3 to 5 lines in the character's own voice), and
+the same four style dials `lib/persona.ts` already had -
+`display_name`/dials/`examples` are the fields this pass actually
+composes into a prompt; `pronouns`/`tagline`/`backstory`/`interests` are
+real package metadata for a future picker UI, not silently unused - this
+pass just has no UI to read them yet. Four companion packages bundled
+under `backend/packages/` (`default`/`buddy`/`pal`/`tutor`, each a
+`manifest.json` plus a `README.md`, no `recipe.json` - a companion is
+never run), the exact four voices `lib/persona.ts`'s own hardcoded
+catalog already had, ported into package form rather than invented
+fresh, all four validated against the real generated Zod schema before
+being trusted.
+
+**`lib/plugins.ts` gains `loadManifestOnly()`**, extracted from
+`loadPackage()`'s own manifest-reading half: a `kind: "companion"`
+package composes into the prompt directly and is never run, so it has
+no `recipe.json` at all, and `loadPackage()`'s own recipe-required path
+would 404 on every one of them. `loadPackage()` itself is unchanged in
+behavior - it just calls the new shared function for its manifest half
+now, one definition instead of two copies of the same read-and-validate
+logic.
+
+**`lib/persona.ts`'s `PERSONAS` catalog is read from disk once at module
+load** (`loadPersonaCatalog()`), not hardcoded, skipping - rather than
+throwing on - a bundled package that fails to load or isn't a companion:
+this file has no business refusing to boot the hub because one unrelated
+package is malformed. Read once, not every turn like `turnEngine.ts`'s
+own `loadAllManifests()`: companion packages are bundled and static this
+pass (no install flow yet, `lib/plugins.ts`'s own header), the identical
+assumption `PACKAGES_DIR`'s directory scan already makes. `persona.
+active_id`'s settings-key definition (`settings/personaKeys.ts`) already
+read `PERSONA_IDS`/`DEFAULT_PERSONA_ID` from this file dynamically, so
+it needed no change at all to pick up the package-driven catalog.
+`identityLine()` (`turnEngine.ts`, step 4) already used `persona.
+display_name` rather than a hardcoded string, so the acceptance test
+("switching persona.active_id in Settings changes the identity line on
+the next turn") was already true the moment the catalog itself started
+reflecting real packages.
+
+**The examples become a real few-shot block**
+(`composePersonaPrompt()`'s new `examplesBlock()`): each companion's own
+`examples` array, quoted one per line under a single label line -
+legacy's own review named this "the single biggest lever for
+small-model voice fidelity," a stronger signal than any amount of prose
+describing a voice. Re-measuring the real composed output (the step-4
+lesson repeating itself on the same constant) found this pushed the
+longest fragment (`composePersonaPrompt("tutor")`) from ~645 to ~941
+chars, over the existing `MAX_COMPANION_SECTION_CHARS` (800) - raised to
+1200, matching `MAX_SKILLS_SECTION_CHARS`'s own budget for the section
+most likely to grow with real content, with one pre-existing test's own
+hardcoded `800` literal updated to match.
+
+**`replyVariation.ts` gets a per-companion confirmation pool, scoped to
+one constant.** The plan's own words - "a per-companion confirmation
+pool with the shared pool as the default" - read most literally as the
+ONE constant that's actually called a confirmation and heard often
+enough, and voice-distinctively enough, to be worth it this pass:
+`REMEMBER_CONFIRM_VARIANTS` ("Got it, I'll remember that"). The other
+three known constants (a plugin error, a bare "Done.", nothing recalled)
+stay one shared pool for every companion. `tutor`/`buddy`/`pal` each get
+their own three-phrase pool; `default` (and any future companion with no
+entry) falls through to the shared pool exactly as before this step.
+`varyKnownConstant()` gained an optional `personaId` parameter for this;
+`turnEngine.ts`'s `finalizeReply()` resolves the actor's own active
+persona fresh (a plain settings lookup, not I/O) rather than threading
+it in from `prepareTurn()`, since an immediate plugin/refusal reply
+never reaches that function's own "model" branch where a persona would
+otherwise already be in scope.
+
+**The bench** (`backend/scripts/bench/persona-eval.ts`, the plan's own
+ask: "ten scripted exchanges scored by string checks: address form,
+length cap, forbidden phrases"): the same ten scripted user turns
+through the real turn engine (`runTurn()`, not a parallel prompt-only
+check) once per bundled companion, switching `persona.active_id` between
+runs exactly the way a household member would in Settings. Run for real
+against this worktree's own dev database: **address-form 40/40,
+length-cap 40/40, forbidden-phrases 12/40, stub chat backend.**
+Address-form and length-cap pass structurally regardless of backend (the
+stub's echo can't leak another companion's name, and echoing a short
+scripted utterance back is never long). Forbidden-phrases is the one
+check that actually depends on the model honoring the persona
+instruction at all: the stub echoes the LAST USER MESSAGE verbatim,
+completely blind to any system prompt, so a casual companion's score
+(1/10) is really "did my own 10 scripted utterances happen to contain a
+recognized contraction" (exactly one did) rather than anything about the
+persona - and `tutor`'s 9/10 is the mechanical inverse of the identical
+fact, not evidence formality is being honored. This bench is real and
+wired correctly; like `judge-eval.ts`, it structurally cannot produce a
+meaningful signal against a content-blind echo stub. Needs a real chat
+model before trusting whether personas actually hold up in a real
+conversation, for v0.1.
+
+Tests: every real persona's own examples appear in its composed prompt,
+quoted; a persona with no examples composes without a dangling few-shot
+header; a companion with its own confirmation pool never gets the
+shared pool's phrasing; a companion with no dedicated pool (`default`
+included) falls through to the shared pool; omitting `personaId`
+entirely still uses the shared pool unchanged from before this step; a
+companion pool never leaks onto a different known constant; two
+companions' rotation state for the same person never collide. The
+existing step-4 "identity line names the selected persona" and
+persona-catalog tests needed no changes beyond one hardcoded budget
+literal, since every persona id, dial value, and display name is
+byte-identical to before - only its SOURCE moved from a hardcoded array
+to a real package. Full backend suite green (654), `bunx tsc --noEmit`
+clean.
+
+**A code review found and fixed two real bugs, and one misleading
+comment, before commit:**
+- An earlier version had `loadPackage()` call `loadManifestOnly()`
+  first, before ever reading `recipe.json`. That silently changed
+  `loadPackage()`'s own existing behavior for a package with BOTH an
+  invalid manifest and a missing/malformed recipe (an interrupted
+  install, a bad copy): it used to always report a plain 404 (both
+  files were read inside one `try`, so a recipe-read failure masked
+  whatever the manifest's own validation would have said), and would
+  have started reporting the manifest's own 400 instead. Fixed by
+  giving `loadManifestOnly()` its own independent read-and-validate
+  logic rather than sharing code with `loadPackage()`, which keeps its
+  original read-both-then-validate shape completely untouched.
+- `DEFAULT_PERSONA` fell back to `PERSONAS[0]!` with no guard for an
+  empty catalog - a non-null assertion that would silently lie
+  (`undefined`) if `backend/packages/` were ever unreadable or shipped
+  zero `kind: "companion"` packages, crashing confusingly far
+  downstream the first time anything touched it instead of failing
+  loudly at the actual cause. Fixed with an explicit `if
+  (PERSONAS.length === 0) throw` right after the catalog loads, so a
+  misconfigured install fails at boot with a clear message instead of
+  degrading into scattered TypeErrors.
+- This file's own header comment claimed bundling a fifth companion
+  package was "the entire change needed to add one." Real, but
+  incomplete: `persona.active_id`'s settings-key options
+  (`spec/settings/keys.json`) are a committed, hand-regenerated
+  snapshot, not read live from `PERSONA_IDS` - `bun run gen:settings`
+  in `backend/` still has to run and be committed, the same friction
+  every other settings-key option change already has. Corrected to say
+  so.
+
+Also noted, not fixed: `finalizeReply()` re-resolves the actor's active
+persona fresh rather than reusing whatever `prepareTurn()` resolved,
+since an immediate (plugin/refusal) reply never reaches `prepareTurn()`'s
+own "model" branch where a persona would already be in scope. If a
+person changes `persona.active_id` via a concurrent request while their
+OWN turn is still in flight, the per-companion confirmation pool could
+end up voiced as the just-switched-to companion attached to a reply
+whose system prompt was actually built under the old one - a real,
+narrow race, documented inline at `finalizeReply()`'s own persona
+lookup, accepted rather than threading persona through `prepareTurn()`'s
+return value for a race whose worst outcome is one confirmation
+sentence's word choice.
+
+Full backend suite green (659), `bunx tsc --noEmit` clean,
+`scripts/check.sh` green (the frontend build step's known, pre-existing
+Session B failure aside).
