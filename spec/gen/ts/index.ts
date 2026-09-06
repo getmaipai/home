@@ -4,6 +4,7 @@
 export * from "./recipe.js";
 export * from "./relationship.js";
 export * from "./setting-value.js";
+export * from "./issue.js";
 export * from "./model-capabilities.js";
 export * from "./entity.js";
 export * from "./person.js";

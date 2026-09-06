@@ -56,3 +56,8 @@ export function newCommandId(): string {
 export function newNotificationId(): string {
   return `notif-${randomSuffix(10)}`;
 }
+
+/** Matches spec/schemas/issue.schema.json's `^issue-[a-z0-9]{6,}$`. */
+export function newIssueId(): string {
+  return `issue-${randomSuffix(10)}`;
+}

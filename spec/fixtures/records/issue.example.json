@@ -1,0 +1,17 @@
+{
+  "id": "issue-a1b2c3",
+  "source": "backup",
+  "key": "no_offsite_target",
+  "severity": "warning",
+  "title": "Backups are only saved on this machine",
+  "detail": "A drive failure here would lose every backup along with the data it protects. Add an SMB or hub target in Settings > Storage.",
+  "fix": {
+    "label": "Open backup targets",
+    "action": "open_backup_targets"
+  },
+  "learn_more": "docs/user/backups.md",
+  "created_at": "2026-09-06T12:00:00Z",
+  "resolved_at": null,
+  "dismissed_at": null,
+  "hlc": "1757160000000:0:abc123"
+}

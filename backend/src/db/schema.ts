@@ -251,3 +251,25 @@ export const notificationDeliveries = sqliteTable("notification_deliveries", {
   readAt: text("read_at"),
   dismissedAt: text("dismissed_at"),
 });
+
+// Session F (platform and trust), step 1. Mirrors
+// spec/schemas/issue.schema.json: the Health/Repairs surface's backing
+// store. Upserted on `(source, key)` by lib/issues.ts's raiseIssue() -
+// enforced there, not by a DB UNIQUE constraint, since an upsert needs to
+// preserve the original `created_at` while refreshing everything else,
+// which a plain `ON CONFLICT` can't express without also naming every
+// column to keep.
+export const issues = sqliteTable("issues", {
+  id: text("id").primaryKey(),
+  source: text("source").notNull(),
+  key: text("key").notNull(),
+  severity: text("severity").notNull(), // "info" | "warning" | "error"
+  title: text("title").notNull(),
+  detail: text("detail").notNull(),
+  fix: text("fix"), // JSON: { label, action } | null
+  learnMore: text("learn_more"),
+  createdAt: text("created_at").notNull(),
+  resolvedAt: text("resolved_at"),
+  dismissedAt: text("dismissed_at"),
+  hlc: text("hlc").notNull(),
+});

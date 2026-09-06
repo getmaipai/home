@@ -185,6 +185,19 @@
     ]
   },
   {
+    "key": "notifications.repairs.new.telegram",
+    "scope": "person",
+    "selector": "boolean",
+    "default": false,
+    "label": "Telegram me about new Repairs items",
+    "level": "basic",
+    "secret": false,
+    "lives_in": "person.notifications",
+    "honoured_by": [
+      "home"
+    ]
+  },
+  {
     "key": "notifications.telegram.bot_token",
     "scope": "household",
     "selector": "text",

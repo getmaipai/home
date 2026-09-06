@@ -72,4 +72,15 @@ export const NOTIFICATION_SETTINGS_KEYS: SettingsKey[] = [
     lives_in: "person.notifications",
     honoured_by: ["home"],
   }),
+  // Session F, step 1: lib/notificationTypes.ts's "repairs.new".
+  SettingsKey.parse({
+    key: "notifications.repairs.new.telegram",
+    scope: "person",
+    selector: "boolean",
+    default: false,
+    label: "Telegram me about new Repairs items",
+    level: "basic",
+    lives_in: "person.notifications",
+    honoured_by: ["home"],
+  }),
 ];
