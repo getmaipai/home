@@ -24,6 +24,12 @@ import { voiceRoutes } from "@/routes/voice";
 import { privacyRoutes } from "@/routes/privacy";
 import { repairsRoutes } from "@/routes/repairs";
 import { setupRoutes } from "@/routes/setup";
+import { devicesRoutes } from "@/routes/devices";
+import { deviceAuthRoutes } from "@/routes/deviceAuth";
+import { quickConnectRoutes } from "@/routes/quickConnect";
+import { passkeysRoutes } from "@/routes/passkeys";
+import { authSessionsRoutes } from "@/routes/authSessions";
+import { totpRoutes } from "@/routes/totp";
 import { requireAuth } from "@/middleware/auth";
 import { listSidecars } from "@/lib/sidecars";
 
@@ -107,6 +113,12 @@ app.route("/api/voice", voiceRoutes);
 app.route("/api/privacy", privacyRoutes);
 app.route("/api/repairs", repairsRoutes);
 app.route("/api/setup", setupRoutes);
+app.route("/api/devices", devicesRoutes);
+app.route("/api/auth/devices", deviceAuthRoutes);
+app.route("/api/auth/quick-connect", quickConnectRoutes);
+app.route("/api/auth/passkeys", passkeysRoutes);
+app.route("/api/auth/sessions", authSessionsRoutes);
+app.route("/api/auth/totp", totpRoutes);
 
 // Serving the built frontend from this same process (docs/dev.md, the
 // shell/kit/Chat slice): a self-hosted single-process hub, no reverse

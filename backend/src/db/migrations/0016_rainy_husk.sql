@@ -1,0 +1,1 @@
+ALTER TABLE `sessions` ADD `user_agent` text;

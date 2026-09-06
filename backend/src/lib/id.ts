@@ -75,3 +75,15 @@ export function newIssueId(): string {
 export function newEndpointId(): string {
   return `endpoint-${randomSuffix(10)}`;
 }
+
+/** Matches spec/schemas/device.schema.json's `^device-[a-z0-9]{6,}$`. */
+export function newDeviceId(): string {
+  return `device-${randomSuffix(10)}`;
+}
+
+// Not a spec-shaped id (a device token row is hub-internal - the token
+// itself, not its id, is what a client ever sees, and only as a raw
+// secret returned once, never a persisted identifier).
+export function newDeviceTokenId(): string {
+  return `devtok-${randomSuffix(10)}`;
+}

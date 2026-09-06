@@ -38,6 +38,7 @@ export function issueSession(c: Context<AppEnv>, personId: string): void {
       id: crypto.randomUUID(),
       personId,
       tokenHash: hashSessionToken(token),
+      userAgent: c.req.header("user-agent") ?? null,
       expiresAt: expiresAt.toISOString(),
       createdAt: new Date().toISOString(),
     })

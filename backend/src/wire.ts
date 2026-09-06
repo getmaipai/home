@@ -21,7 +21,16 @@ export type { HardwareInfo, CudaDevice } from "./lib/hardware";
 // file both a "@/"-aliased backend module and an external package can
 // both resolve.
 
-export type Roster = Omit<Person, "birthdate"> & { hasSecret: boolean };
+// hasPasskeys added in step 6: a passkey-only profile (no PIN/password
+// at all) needs its own signal, distinct from hasSecret, so a client can
+// tell "bare-tap profile" apart from "needs its passkey" apart from
+// "needs its PIN/password". Optional in the type (never omitted by the
+// real routes, which always send it) so this stays an additive API
+// change per CLAUDE.md > Compatibility - existing frontend fixtures/
+// mocks built before step 6 that construct a Roster literal without it
+// keep compiling, rather than every one of them needing an edit the
+// moment this field was added.
+export type Roster = Omit<Person, "birthdate"> & { hasSecret: boolean; hasPasskeys?: boolean };
 
 export interface TurnReply {
   text: string;

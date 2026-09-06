@@ -744,3 +744,158 @@ finder subagents (general-purpose, full tool access) went beyond its
 findings - reported here because it happened, not because it changed the
 findings above (they were re-verified against the code as actually
 committed).
+
+## Step 6: passkeys, device tokens, Quick Connect, sessions
+
+**The Device record (`spec/schemas/device.schema.json`):** a physical
+device the household has paired - kind (`robot | pod | tv | phone |
+desktop | browser`), name, area, capabilities (drawn from
+`spec/vocab/capabilities.json`, same convention `manifest.schema.json`'s
+`requires`/`optional` use), `person_id` (whoever paired it), `watermarks`
+(always `{}` until Wave 3's link exists - laid now purely so the shape
+doesn't need a migration when it does), `hlc`. A Device row is created
+the moment a device token is minted for it (`lib/deviceTokens.ts`'s
+`issueDeviceToken()`, always alongside `lib/devices.ts`'s
+`createDevice()`) - there is no standalone "register a device" step;
+pairing and token issuance are the same moment.
+
+**`lib/deviceTokens.ts`:** ported from the archived legacy hub's
+`deviceToken.ts` (principle 8), adapted to this repo's synchronous
+drizzle pattern and to the new Device row (legacy stored label/platform
+inline on the token; here they live on Device, since a token and its
+Device are the same pairing moment). 365-day expiry, 20 per person with
+oldest-first eviction, sha256 stored, the raw value returned exactly
+once. `POST /api/auth/devices/redeem` (`routes/deviceAuth.ts`) is the
+other half legacy's own header names: "trades it for a session cookie on
+whichever address answered" - public by design, since redeeming IS the
+authentication, not a step after it.
+
+**`lib/quickConnect.ts`:** also ported from legacy, with one real
+security fix and one addition legacy didn't have:
+
+- **`code` and `poll_token` are two different secrets**, not one -
+  legacy's version let anyone who saw the code (shoulder-surfed off a TV
+  screen) poll for the result themselves and steal the session meant for
+  the TV, before the TV's own poll ever ran. The device gets both back
+  from `POST /api/auth/quick-connect/code`; only `poll_token` can ever
+  redeem an approval, `code` is only ever typed by the approving phone.
+- **Rate limited from the start** (`lib/rateLimiter.ts`'s token bucket) -
+  BACKLOG.md's own audit had flagged legacy's `/pair` as unlimited.
+
+**`lib/passkeys.ts` (new), `@simplewebauthn/server`:** registration is
+self-service on an already-signed-in profile (add a passkey to my own
+account) - there is no passkey-only account-creation flow this wave;
+`POST /api/auth/setup` still mints the owner with a PIN/password, and a
+passkey is offered as an enhancement afterward. WebAuthn ceremony
+challenges are in-memory, one per person, one-shot (the same "worthless
+after a restart, expires in minutes anyway" reasoning `lib/quickConnect.ts`
+already established for its own pending requests). rpID is fixed at
+`maipai.local` (the household CA leaf's own primary SAN entry, step 5) -
+WebAuthn requires rpID to be a valid domain string, and browser support
+for IP-address rpIDs is inconsistent - while every detected LAN IP is
+still accepted as a valid *origin* for the ceremony.
+
+**`lib/totp.ts` (new), `otpauth`:** optional second factor for owner and
+admin only (4.1). The shared secret is AES-256-GCM-encrypted via
+`lib/secrets.ts` before it ever touches disk, the same treatment
+`householdCa.ts`'s private keys got after step 5's own review found them
+plaintext. Enrollment isn't complete until a real generated code
+confirms it (`enabled` stays `false` otherwise) - a person who never
+finished scanning the QR must not get locked out of their own next
+sign-in.
+
+**Sessions per device (`routes/authSessions.ts`):** `GET/DELETE
+/api/auth/sessions`, scoped to the signed-in person's own browser
+sessions (device-token-backed native clients show up under
+`GET/DELETE /api/devices` instead - a native client's persistent
+identity is its device token, not a short-lived cookie).
+`sessions.userAgent` is captured once at issue time
+(`lib/session.ts`'s `issueSession()`) so the list has something
+recognizable to show ("Chrome on macOS") without re-parsing anything
+live.
+
+**`personCredentials.secretHash` became nullable:** a passkey-only
+person (4.1: "the owner with a passkey or password") has no PIN/password
+row content at all, but the shared lockout counter
+(`lib/credentialLockout.ts`, split out of `lib/secret.ts` so passkey
+failures share the identical exponential-backoff curve a PIN/password
+does) still needs a row to live on. `lib/personAuthMethods.ts`'s
+`getAuthMethods()`/`requiresCredential()` are the one place "does this
+profile need more than a bare tap" gets answered, spanning both
+`personCredentials.secretHash` and `passkeyCredentials` - `/profiles`,
+`/me`, and `/select` all went through this file to use it consistently
+rather than three slightly different inline checks.
+
+**A code review (2026-09-06) found seven issues on the first pass, all
+fixed:**
+
+1. **`/api/auth/totp/challenge` was callable standalone**, cold, with no
+   PIN/password/passkey ever verified first - `personId` is discoverable
+   via the public `GET /api/auth/profiles`, so only per-IP throttling
+   protected the 6-digit guess. Fixed by applying the same shared
+   per-person lockout (`lib/credentialLockout.ts`) every primary-factor
+   ceremony uses, keyed on `personId` directly.
+2. **Quick Connect's poll route minted a full session and a 365-day
+   device token with no TOTP check anywhere**, even for an owner/admin
+   with TOTP enabled - unlike `/verify-secret` and `/authenticate/verify`,
+   both of which gate session issuance on it. Fixed at the *approval*
+   step instead (`POST /api/auth/quick-connect/approve` now requires a
+   current TOTP code when the approver has it enabled) - approving a
+   device is exactly the privileged, long-lived-credential-granting
+   action TOTP exists to protect. `POST /api/auth/devices/redeem`
+   deliberately still never re-checks TOTP: that is the standard
+   "remembered device" shape every mainstream implementation uses
+   (redeeming is silent by design, so a native client isn't re-prompted
+   for 2FA on every reconnect); the security control belongs at the
+   moment the device was paired, not at every later use of what pairing
+   produced.
+3. **`hasSecret()` (`lib/personLifecycle.ts`)**, the check behind
+   `routes/people.ts`'s "an owner/admin needs a PIN or password before
+   promotion" guard, **returned `true` for any `person_credentials` row**,
+   including one that exists only to hold a passkey-only person's shared
+   lockout counter (`secretHash: null`) - silently letting that profile
+   be promoted to admin/owner with no real PIN/password ever set. Fixed
+   the bug (checks `secretHash != null` now) and, since 4.1 says a
+   passkey is an equally strong credential for this exact guard, changed
+   the caller to `requiresCredential()` (PIN/password OR passkey)
+   instead of the narrower `hasSecret()`.
+4. **`routes/passkeys.ts`'s authenticate/verify failure path called
+   `ensureCredentialRowExists(personId)` before ever checking `personId`
+   was real** - `person_credentials.person_id` references `people.id`
+   under an enforced foreign key, so a routine "unknown profile" probe
+   threw an unhandled `SqliteError` (a 500) instead of a clean 404. Fixed
+   by checking the person exists first, before any lockout bookkeeping.
+5. **`verifyTotp()`/`verifyEnrollment()` were stateless** - a code stays
+   valid for its whole ~90-second window and could be resubmitted any
+   number of times within it. Fixed per RFC 6238 section 5.2's own
+   recommendation: a `last_used_step` column, refusing anything at or
+   before the last step actually accepted.
+6. **`POST /api/auth/passkeys/authenticate/options` was unthrottled** -
+   it stores a fresh ceremony challenge keyed only by `personId`,
+   one-shot and *overwriting* whatever was pending, so an attacker who
+   knows a victim's `personId` could hammer this to keep clobbering
+   their pending challenge, denying that person's own concurrent
+   sign-in. `secretThrottle`'s throttleCheck/throttleFail pair was the
+   wrong tool (it only ever blocks after a wrong-answer failure records
+   one, and generating options never fails that way) - fixed with
+   `lib/rateLimiter.ts`'s token bucket instead, keyed on the *target*
+   `personId` rather than the caller's IP, which also closes the
+   rotating-IP evasion a per-IP limiter would have left open.
+7. **`routes/auth.ts` stayed a plain `Hono()` router** despite being
+   heavily rewritten in this same diff (new `hasPasskeys`/`totpRequired`
+   fields, rewritten `/select`, `/verify-secret`, `/me`,
+   `/change-secret`) - every other new route file in this step already
+   used the required `@hono/zod-openapi` style. Converted in full;
+   `verifyAgainstRecord()` (the shared PIN-check helper `/verify-secret`
+   and `/change-secret` both call) now returns a plain
+   `{ status, body }` result instead of calling `c.json()` itself, since
+   a shared helper's `Response` couldn't typecheck against each
+   converted route's own distinct declared response union.
+
+**Verified real, not just asserted:** the TOTP tests use `otpauth`'s own
+`TOTP`/`Secret` classes to generate real, currently-valid codes against
+the actual secret `beginEnrollment()` minted (parsing the returned
+`otpauth://` URI, not a hand-extracted regex) - proving the QR a person
+would actually scan produces codes this hub actually accepts, and that
+the anti-replay fix genuinely rejects a reused code rather than merely
+asserting a mocked function was called correctly.
