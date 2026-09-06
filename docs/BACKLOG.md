@@ -718,15 +718,27 @@ into a conversation with someone who knows who is talking.
       "speech profile per person" item under People is the other half;
       build them as two records injected in order: who I am, then who
       you are, then memory, so style never blunts facts.
-- [ ] **Activation steering spike** (M, before any nine-slider prose) -
-      plan 5.4 and org principle 6 both say steering vectors over
-      personality prose. llama-server (the mandated engine) already
-      takes `--control-vector` and `--control-vector-scaled`, and ships a
-      `cvector-generator` that trains one from paired prompts; the 2026
-      PERSONA result reports fine-tuning-level trait scores on small
-      models by this route, with Qwen3-4B strongest among those tested.
-      Measure on the bench: does one vector hold register better than a
-      paragraph over thirty turns, and what does it cost per token.
+- [x] **Activation steering spike** (M, before any nine-slider prose) -
+      shipped and run for real, Session C step 4 (2026-09-06):
+      `backend/scripts/bench/steering-spike.ts` +
+      `backend/scripts/bench/steering/{positive,negative}.txt`. Trained a
+      control vector from Buddy's own register (in under a second, CPU
+      only, on this dev machine's already-downloaded Qwen3 8B and the
+      pinned llama-server build, which bundles `llama-cvector-generator`)
+      and ran the same thirty-turn scripted conversation live against
+      both conditions. **Decision recorded**: the vector wins cleanly on
+      cost (a 72-char system prompt vs. 707, ~26% fewer total prompt
+      tokens over thirty turns, seconds to train) and edges out the
+      paragraph on a crude register proxy (23/30 vs. 19/30 casual-
+      contraction turns), but reading the transcripts side by side shows
+      the paragraph currently captures Buddy's SPECIFIC voice markers
+      (the "I mean" filler, playful asides) better than this spike's
+      generically-trained vector does - likely because the training
+      pairs were generic casual/formal contrast, not Buddy's own
+      `examples` field. Not yet a clear win on fidelity; worth a second
+      pass training on each companion's own examples before the
+      nine-slider prose question is decided either way. Full writeup:
+      docs/dev/session-c.md's step 4 entry.
 - [x] **A persona consistency test** - shipped, Session A step 8
       (2026-09-05), as a bench (`backend/scripts/bench/persona-eval.ts`)
       rather than the deterministic suite: ten scripted exchanges through
@@ -736,9 +748,14 @@ into a conversation with someone who knows who is talking.
       each - a content-blind echo can't leak another companion's name or
       run long), forbidden-phrases (12/40) is honestly uninformative
       against a stub that echoes the user's own words regardless of any
-      system prompt. Needs a real chat model before this means anything
-      for persona fidelity; see docs/dev.md's step 8 entry. A
-      model-judged version is still real, unbuilt work.
+      system prompt. The model-judged version shipped Session C step 4
+      (2026-09-06): `backend/src/lib/personaJudge.ts`, wired into
+      persona-eval.ts behind `--judge`, run for real against this dev
+      machine's Qwen3 8B - tutor held its register the WORST of the four
+      (0/10), opposite of what the string checks alone suggested; see
+      docs/dev/session-c.md's step 4 entry for the full numbers and a
+      genuine, unrelated finding it surfaced (short ambiguous utterances
+      free-associating onto the household's Weather plugin listing).
 - [x] **The bot's honesty guards as a post-model pass** (M) - shipped
       2026-09-06, Session C step 3 (`backend/src/lib/guards.ts`,
       `backend/tests/guards.test.ts`,
@@ -1885,11 +1902,28 @@ that owns it.
 
 **Intelligence and voice**
 
-- [ ] **A naturalness bench** (S-M, C) - plan 4.5's paired robotic and
-      natural phrasings corpus scoring a model and prompt before it
-      becomes a default; the framing example pairs (time as a fragment,
-      yes/no as a fragment, a list as a sentence) joining the stable
-      prefix. Neither exists.
+- [x] **A naturalness bench** (S-M, C) - shipped, Session C step 4
+      (2026-09-06): `spec/llm/naturalness-corpus.json` (8 robotic/natural
+      pairs) and `backend/scripts/bench/naturalness.ts`. The three named
+      framing pairs (time as a fragment, yes/no as a fragment, a list as
+      a sentence) joined the stable prefix as `lib/persona.ts`'s
+      `NATURALNESS_POLICY`. Run for real against this dev machine's
+      Qwen3 8B: 1 natural, 0 robotic, 7 ambiguous of 8 - a real first
+      data point, not a gate; see docs/dev/session-c.md's step 4 entry,
+      including a genuine unrelated finding it helped surface (below).
+- [ ] **Short, ambiguous utterances free-associate onto the plugins
+      list** (S, C found it) - `buildSystemPrompt()`'s standing "Things
+      this household has set up" section names Weather unconditionally;
+      Session C step 4's live naturalness/persona bench runs against a
+      real Qwen3 8B (2026-09-06) found several completely unrelated
+      utterances ("what time is it", "okay thanks", "why did the router
+      just restart") all getting the identical reply, "It's 57.5 degrees
+      in San Francisco" - confirmed via a direct `route()` call that this
+      is model free-association onto the plugins list, not the
+      deterministic floor firing (every score was well under
+      `TIER1_THRESHOLD`). Needs whoever next touches `pluginsListLine()`
+      to look at grounding it better (maybe: don't list a plugin's
+      capability unless something in the turn is actually plugin-shaped).
 - [ ] **Spoken numbers by library, in both languages** (S, C) -
       `normalizeForSpeech.ts` hand-rolls `numberToWords` (principle 6 says
       a library: `to-words` on the hub, `num2words` on the robot, licences

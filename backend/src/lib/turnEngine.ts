@@ -36,7 +36,7 @@ import { normalizeForSpeech } from "@maipai/spec/voice/ts/normalizeForSpeech.js"
 import { nextSentenceBoundary } from "@maipai/spec/safety/ts/sentenceChunker.js";
 import { getPersonSettingValue, getHouseholdSettingValue } from "@/lib/settings";
 import { listActivePeople } from "@/lib/access";
-import { composePersonaPrompt, resolvePersona, DEFAULT_PERSONA, INFORMATION_HANDLING_POLICY, type Persona } from "@/lib/persona";
+import { composePersonaPrompt, resolvePersona, DEFAULT_PERSONA, INFORMATION_HANDLING_POLICY, NATURALNESS_POLICY, type Persona } from "@/lib/persona";
 import type { Role } from "@/middleware/auth";
 import type { PersonRow } from "@/types";
 import type { PackageManifest } from "@maipai/spec/gen/ts/manifest.js";
@@ -184,6 +184,29 @@ const MAX_SUMMARY_SECTION_CHARS = 600;
 // test_prompt_budget.py precedent this step copies found rules alone
 // once hit 68% of a prompt with no independent section cap to stop it.
 const MAX_RULES_SECTION_CHARS = 800;
+// Session C step 4: NATURALNESS_POLICY's own budget, separate from
+// MAX_RULES_SECTION_CHARS above - a distinct concern (how something
+// sounds spoken aloud, not what information handling is allowed) added
+// after INFORMATION_HANDLING_POLICY was already sized against real
+// content, so it gets its own headroom rather than silently eating into
+// a cap measured before it existed.
+// Sized like every other section here: real content (383 chars) plus
+// headroom, the same ~30% margin INFORMATION_HANDLING_POLICY's own
+// 617-real/800-cap ratio already uses - a code review (2026-09-06)
+// pointed out this pushes the worst-case stable prefix (every section
+// simultaneously at its own max) to roughly 3,600 of PROMPT_SYSTEM_
+// CHAR_BUDGET's 4,000, leaving under 400 for the whole volatile zone
+// (household, speaker, memory, re-anchor, summary, matched skills) on a
+// household with a verbose persona and several installed packages.
+// Real, and worth knowing, but not a new failure mode: nothing in that
+// zone was ever protected against the same naive concatenate-then-slice
+// truncation except "time last" (this function's own header comment) -
+// a maxed-out household already relied on graceful degradation there,
+// not a guarantee every section fits. This section's fixed content
+// (hardcoded prose, not household data) can never itself exceed 383
+// regardless of the cap, so the actual, not worst-case, cost of this
+// addition is exactly those 383 chars.
+const MAX_NATURALNESS_SECTION_CHARS = 500;
 // Step 8 (session-a-intelligence.md) added each companion's own
 // few-shot examples to this section (composePersonaPrompt()'s own
 // examplesBlock()), which pushed the real catalog's longest fragment
@@ -392,8 +415,9 @@ export function buildSystemPrompt(
   // policy, standing skills") ──
   const companionSection = capSection(composePersonaPrompt(persona), MAX_COMPANION_SECTION_CHARS);
   const rulesSection = capSection(INFORMATION_HANDLING_POLICY, MAX_RULES_SECTION_CHARS);
+  const naturalnessSection = capSection(NATURALNESS_POLICY, MAX_NATURALNESS_SECTION_CHARS);
   const pluginsSection = capSection(pluginsListLine(loaded), MAX_PLUGINS_SECTION_CHARS);
-  const stablePrefix = `${identityLine(persona)} ${STABLE_SYSTEM_SUFFIX} ${companionSection} ${rulesSection}${pluginsSection}`;
+  const stablePrefix = `${identityLine(persona)} ${STABLE_SYSTEM_SUFFIX} ${companionSection} ${rulesSection} ${naturalnessSection}${pluginsSection}`;
 
   // ── Volatile zone (step 4: "household, speaker, memory, summary, time
   // last"; matched skills sit here too - utterance-dependent, so never

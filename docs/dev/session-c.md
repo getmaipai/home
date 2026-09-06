@@ -566,3 +566,161 @@ header claims scenarios use ONLY roster names. Renamed to "Iris"
 throughout; a real instance of the same class of leak this org's own
 "PII wordlist gap" memory already names from a different repo, caught
 here before it ever reached a commit.
+
+## Step 4: the persona floor: consistency test and the steering spike
+
+Two of this step's three deliverables were already shipped by Session A
+step 8 (2026-09-05, `docs/BACKLOG.md`): the Companion/Persona spec record
+(the `companion` block on `manifest.schema.json`, four bundled companion
+packages) and the string-check persona consistency bench
+(`backend/scripts/bench/persona-eval.ts`). What that step left open, and
+what this one closes: the model-judged version of that bench, the
+naturalness pairs corpus and bench, and the activation-steering spike.
+
+**The model-judged persona consistency check.** `lib/personaJudge.ts`
+adds `judgePersonaConsistency()`: one structured-output LLM call per
+persona (the same `response_format: json_schema` pattern
+`memoryJudge.ts`'s dedupe/contradiction calls already use, batched over
+the whole ten-exchange transcript rather than one call per exchange, for
+the same cost reason those calls are batched) judging whether each reply's
+tone matches the persona description, not whether it's a good answer.
+Wired into `persona-eval.ts` behind `--judge` (opt-in: it doubles the
+model calls the bench makes, for a signal that's exactly as
+uninformative against the stub backend as the string checks already
+documented themselves to be). Run for real against this dev machine's
+already-downloaded Qwen3 8B Instruct (Q4_K_M) and the pinned llama-server
+build (`engineCatalog.ts`'s own verified macOS arm64 pin), the first real
+numbers: buddy 56% (5/9), default 22% (2/9), pal 22% (2/9), tutor 0%
+(0/10) - the formal persona holding its register the WORST of the four,
+opposite of what the string checks alone would suggest (tutor's
+forbidden-phrases proxy was the best of the four, 4/10 avoiding
+contractions, because "no contractions" is easy to satisfy structurally
+while still sounding nothing like a patient formal tutor). The judge's
+own stated reasons are legible and specific ("uses casual language and
+emojis, inconsistent with the formal, professional tone expected of The
+Tutor") - real signal a string check structurally cannot produce, exactly
+the gap `docs/BACKLOG.md`'s own entry named.
+
+A genuine, unplanned finding from this same real run, unrelated to
+personas: several completely unrelated utterances ("what time is it",
+"okay thanks", "why did the router just restart") got the literal same
+reply, "It's 57.5 degrees in San Francisco." - confirmed via a direct
+`route()` call that this is NOT the deterministic plugin floor firing
+(every score was well under `TIER1_THRESHOLD`); the model itself
+free-associates onto the household's own "Weather" plugin listing
+(`buildSystemPrompt()`'s standing-skills section) when a short,
+ambiguous utterance gives it nothing else to grab onto. Recorded here
+rather than fixed: it's a real prompt-grounding gap in how the plugins
+list is presented, not a persona or naturalness concern, and belongs to
+whoever next touches `pluginsListLine()`, not folded into this step's
+own scope.
+
+**The naturalness pairs.** `spec/llm/naturalness-corpus.json`: eight
+robotic/natural phrasing pairs in the shape of the safety corpus,
+covering the plan's own three named examples (time as a fragment, yes/no
+as a fragment, a list as a sentence) plus five more pulled straight from
+`docs/internal/voice-naturalness.md`'s real corpus-study findings on the
+legacy mirror (rounding, secondhand evidentials, flat corrections, tiny
+acknowledgments, a brief "I don't know"). The three named examples join
+the stable prefix as `lib/persona.ts`'s new `NATURALNESS_POLICY`
+constant (hand-written prose, not loaded from the JSON at request time -
+the same "a system prompt fragment is reviewed product copy, not
+configuration" reasoning every other fragment in that file already
+follows), its own capped section in `buildSystemPrompt()`
+(`MAX_NATURALNESS_SECTION_CHARS`, separate from `MAX_RULES_SECTION_CHARS`
+since it's a distinct concern added after that cap was already sized).
+`backend/scripts/bench/naturalness.ts` scores a model and prompt against
+the full corpus via regex classification (natural/robotic/ambiguous),
+the same on-demand-bench shape as every other bench in this directory.
+Run for real against the same live Qwen3 8B: 1 natural, 0 robotic, 7
+ambiguous of 8 - the one clean pass ("what's on the grocery list" ->
+"You've got milk, eggs, and bread.") is exactly the list-as-sentence
+example the prompt now names explicitly; several of the ambiguous rows
+are the same weather free-association finding above rather than a
+naturalness failure specifically. A real, if early, first data point,
+not a pass/fail gate - this bench's own header says so plainly, matching
+`persona-eval.ts`'s own posture.
+
+**The activation-steering spike.** Verified live, not just described:
+this dev machine already has a real Qwen3 8B GGUF and the pinned
+llama-server build (`engineCatalog.ts`, downloaded and spawned in an
+earlier session), and that same pinned build bundles
+`llama-cvector-generator` - no separate download needed. Built fifteen
+paired casual/neutral one-liners (`backend/scripts/bench/steering/
+{positive,negative}.txt`, generic register contrast, not household- or
+family-specific), trained a control vector against Qwen3 8B in under a
+second, and ran the same thirty-turn scripted conversation
+(`backend/scripts/bench/steering-spike.ts`) through two live conditions:
+today's real paragraph approach (`composePersonaPrompt("buddy")` in the
+system message, no vector) versus an identity-only system message with
+the trained vector active on the server.
+
+Quantitatively, the vector condition won cleanly: a 72-character system
+prompt (vs. 707 for the paragraph) held casual register on 23/30 turns
+(vs. 19/30), using about 26% fewer total prompt tokens across the
+conversation (28,473 vs. 38,273) - and cost seconds to train, once, on
+CPU. But reading the actual transcripts side by side (both logged in
+full by `steering-spike.ts`, not summarized away here) complicates that
+clean numeric win: the paragraph condition's replies carry Buddy's
+specific voice markers from `composePersonaPrompt`'s own examples (the
+"I mean" filler, playful asides, "Oh man") that the vector condition's
+replies don't - the vector produces a generically warm, emoji-heavy
+assistant voice that scores well on the crude contraction-presence proxy
+without clearly tracking back to Buddy's four specific dial settings.
+The likely cause is the training data, not the technique: fifteen
+generic casual-vs-formal pairs teach a generic casual-vs-formal
+direction, not Buddy's own specific voice - the PERSONA paper's own
+strongest results (cited in `docs/BACKLOG.md`'s entry) trained on
+paired text actually written in-character, closer to what
+`composePersonaPrompt`'s own `examples` field already holds for every
+bundled companion.
+
+**The recorded decision**, per the plan's own "goes into the backlog as
+a decision" instruction: activation steering is real, working, and
+meaningfully cheaper per token on this exact hardware and model - not a
+research curiosity. It is NOT yet a clear win on register fidelity with
+generic training pairs, and should not replace `composePersonaPrompt()`
+as this step's own spike is currently trained. The concrete next step,
+if the nine-slider prose question comes up again: retrain the vector
+using each companion's own `examples` field (already-written,
+in-character lines) as the positive set paired with a neutral rewrite of
+the same content, and re-run this exact bench before deciding - not
+"steering vs. prose" in the abstract, but "steering trained on this
+specific companion's voice vs. this specific companion's paragraph."
+
+**A code review of this step found two real bugs, both fixed.**
+`personaJudge.ts`'s score was computed as matches divided by the
+SURVIVING verdict count, not the real transcript length - if the judge's
+reply dropped or duplicated an index, the denominator silently shrank
+too, which is exactly what the real run above hit (buddy's own "5/9"
+came from a 10-exchange transcript the judge only returned 9 verdicts
+for, with nothing printed to say one exchange was never judged at all).
+Fixed: verdicts are now keyed by index in a Map (dropping out-of-range
+indices, keeping the last of a duplicate), and the score's denominator
+is always `exchanges.length`, so a missing verdict counts as a
+non-match rather than vanishing from the average. `steering-spike.ts`
+had no cleanup at all (unlike `persona-eval.ts`, which added exactly
+this after hitting the same bug live) - a run against an unset
+`MAIPAI_LLAMA_SERVER_URL` would silently spawn a real, unmanaged
+llama-server process via `llmSupervisor.ts`'s own fallback and never
+stop it. Fixed with a fail-fast check on the env var (this spike always
+needs a hand-spawned server for its specific condition; falling back to
+auto-spawn would silently invalidate the comparison) and a
+`finally { stopChatBackend() }` matching `persona-eval.ts`'s own.
+
+**Two lower-severity findings, not fixed, both bounded.** The worst-case
+stable prefix (every section at its own maximum) now leaves noticeably
+less headroom for the volatile zone before `PROMPT_SYSTEM_CHAR_BUDGET`'s
+own end-of-string slice - real, but `NATURALNESS_POLICY`'s ACTUAL content
+is fixed, hardcoded prose (383 chars, never household data that could
+grow), so the true cost of this step is exactly 383 chars, not the
+worst-case 500; the volatile zone's own contents were already only
+protected against that same truncation for "time last," never
+guaranteed a fit, so this narrows an existing degradation mode rather
+than introducing a new one. `naturalness.ts` is the fourth bench script
+(after `memory-eval.ts`, `judge-eval.ts`, `persona-eval.ts`) with its own
+copy of the same bench-person setup/teardown block - a real "one
+definition, one place" gap worth a shared helper, but one that predates
+this step (three copies already existed) and touches three files this
+step doesn't otherwise own; left for whoever next adds a fifth bench
+rather than refactored here.

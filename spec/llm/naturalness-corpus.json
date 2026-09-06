@@ -1,0 +1,82 @@
+[
+  {
+    "id": "time_as_fragment",
+    "category": "brevity",
+    "utterance": "what time is it",
+    "robotic": "The current time is 3:45 PM.",
+    "natural": "It's three forty-five.",
+    "robotic_re": "(?i)the current time is|\\d{1,2}:\\d{2}\\s*(AM|PM)\\b",
+    "natural_re": "(?i)^it's [a-z]",
+    "note": "docs/internal/voice-naturalness.md (home-legacy): a robot says 'The current time is 9:51 PM', a person says 'it's 9:51'. The canonical example this step names."
+  },
+  {
+    "id": "yes_no_as_fragment",
+    "category": "brevity",
+    "utterance": "is it going to rain today",
+    "robotic": "The answer to your question is yes, it is going to rain today.",
+    "natural": "Yep, looks like it.",
+    "robotic_re": "(?i)the answer to your question is",
+    "natural_re": "(?i)^(yep|yeah|nope|nah|no\\b)",
+    "note": "elliptical answers piggyback the question's frame ('What time is it?' gets 'Five o'clock.', never a restated full sentence)."
+  },
+  {
+    "id": "list_as_sentence",
+    "category": "brevity",
+    "utterance": "what's on the grocery list",
+    "robotic": "Your grocery list contains the following items: milk, eggs, and bread.",
+    "natural": "You've got milk, eggs, and bread.",
+    "robotic_re": "(?i)contains the following items|^\\s*[-*]\\s",
+    "natural_re": "(?i)you'?(ve| have) got",
+    "note": "a list spoken as a sentence, not read back with framing language or bullet punctuation."
+  },
+  {
+    "id": "rounding_is_the_default",
+    "category": "precision",
+    "utterance": "how much does that cost",
+    "robotic": "That item costs $29.97.",
+    "natural": "That's about thirty bucks.",
+    "robotic_re": "\\$\\d+\\.\\d{2}",
+    "natural_re": "(?i)about|around|roughly|ish\\b",
+    "note": "rounding is the default, precision is marked: exact numbers only where exactness is the point (an appointment time, a corrected fact)."
+  },
+  {
+    "id": "secondhand_gets_an_evidential",
+    "category": "evidentials",
+    "utterance": "what's the weather going to be like tomorrow",
+    "robotic": "It will be sunny and 72 degrees tomorrow.",
+    "natural": "Supposed to be sunny, around seventy.",
+    "robotic_re": "(?i)^it will be",
+    "natural_re": "(?i)supposed to|i think|probably|they say",
+    "note": "a forecast is never asserted as flat fact - real speakers hedge secondhand information with an evidential every time."
+  },
+  {
+    "id": "flat_correction_no_hedge",
+    "category": "correction",
+    "utterance": "the dog's name is Rex, right",
+    "robotic": "No, that is incorrect. The dog's name is actually Riff, not Rex.",
+    "natural": "No, it's Riff.",
+    "robotic_re": "(?i)that is incorrect|actually,? the",
+    "natural_re": "(?i)^no,? it'?s",
+    "note": "factual correction is flat and instant (just the corrected value), unlike opinion disagreement, which is delayed and softened."
+  },
+  {
+    "id": "tiny_acknowledgment",
+    "category": "acknowledgment",
+    "utterance": "okay thanks",
+    "robotic": "You're very welcome! I'm happy to help with anything else you might need.",
+    "natural": "Sure.",
+    "robotic_re": "(?i)you'?re (very )?welcome|happy to help|anything else",
+    "natural_re": "(?i)^(sure|okay|yeah|mhm|yep)\\.?$",
+    "note": "acknowledgment tokens are tiny and varied (Sure. / Mhm. / Okay.), never 'Certainly!' or a restatement of the request."
+  },
+  {
+    "id": "brief_i_dont_know",
+    "category": "uncertainty",
+    "utterance": "why did the router just restart",
+    "robotic": "I do not have enough information to determine the exact cause of the router restart at this time.",
+    "natural": "Not sure, honestly.",
+    "robotic_re": "(?i)i do not have enough information|at this time",
+    "natural_re": "(?i)not sure|no idea|don'?t know",
+    "note": "'I don't know' is a real answer, under five words, unapologetic - not a hedge about the limits of the assistant's knowledge."
+  }
+]

@@ -27,6 +27,15 @@
 // every check below will fail against it by construction, not because
 // personas are broken. This script reports that plainly; see docs/
 // dev.md's own step 8 entry for what it actually recorded and why.
+//
+// Session C step 4 adds the model-judged half BACKLOG.md named as "still
+// real, unbuilt work": `--judge` runs each persona's real transcript
+// through `lib/personaJudge.ts` (one structured-output LLM call per
+// persona judging tone/voice consistency, not just the three structural
+// proxies above). Same stub caveat applies even harder here: a judge
+// reading the stub's own echoed-back user text is judging the user's
+// phrasing, not any persona - this flag is only informative once a real
+// chat model is configured (MAIPAI_LLAMA_SERVER_URL or a spawned engine).
 import { eq } from "drizzle-orm";
 import { db, sqlite } from "@/db";
 import { people } from "@/db/schema";
@@ -37,7 +46,17 @@ import { setValue } from "@/lib/settings";
 import { PERSONAS } from "@/lib/persona";
 import { getEngineStatus, stopChatBackend } from "@/lib/llmSupervisor";
 import { __resetEmbedSupervisorForTests } from "@/lib/embedSupervisor";
+import { judgePersonaConsistency, type JudgedExchange } from "@/lib/personaJudge";
 import type { PersonRow } from "@/types";
+
+// Step 4 (session-c-brain-and-voice.md): "plus a model-judged version on
+// demand" - opt-in, not the default, since it doubles the model calls
+// this bench makes (one extra judge call per persona) for a signal
+// that's just as uninformative against the stub as the string checks
+// already documented themselves to be (the stub echoes the user's own
+// words, so a judge reading those echoes back is judging the user's
+// phrasing, not any persona). `bun run scripts/bench/persona-eval.ts --judge`.
+const RUN_JUDGE = process.argv.includes("--judge");
 
 const testPersonId = newPersonId();
 
@@ -104,10 +123,12 @@ async function main(): Promise<void> {
     let addressFormOk = 0;
     let lengthCapOk = 0;
     let forbiddenPhrasesOk = 0;
+    const transcript: JudgedExchange[] = [];
     for (const utterance of EXCHANGES) {
       const result = await runTurn(actor as PersonRow, "chat", utterance);
       const replyText = result.ok ? result.value.reply.text : "";
       const lower = replyText.toLowerCase();
+      transcript.push({ user: utterance, reply: replyText });
 
       if (!otherDisplayNames.some((name) => replyText.includes(name))) addressFormOk++;
       if (replyText.length <= lengthCeiling) lengthCapOk++;
@@ -120,6 +141,18 @@ async function main(): Promise<void> {
     console.log(
       `${persona.id.padEnd(8)} address-form ${addressFormOk}/${EXCHANGES.length}  length-cap ${lengthCapOk}/${EXCHANGES.length}  forbidden-phrases ${forbiddenPhrasesOk}/${EXCHANGES.length}`,
     );
+
+    if (RUN_JUDGE) {
+      const judged = await judgePersonaConsistency(persona, transcript);
+      if (judged.ok) {
+        console.log(`${"".padEnd(8)} judge-score ${(judged.score * 100).toFixed(0)}% (${judged.verdicts.filter((v) => v.matches_persona).length}/${judged.verdicts.length})`);
+        for (const v of judged.verdicts.filter((v) => !v.matches_persona)) {
+          console.log(`${"".padEnd(11)}- #${v.index} "${transcript[v.index]?.reply}" - ${v.reason}`);
+        }
+      } else {
+        console.log(`${"".padEnd(8)} judge-score unavailable: ${judged.error}`);
+      }
+    }
   }
 
   const maxPerCheck = EXCHANGES.length * PERSONAS.length;

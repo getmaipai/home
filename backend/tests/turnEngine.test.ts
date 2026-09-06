@@ -10,7 +10,7 @@ import { __resetRateLimiterForTests } from "@/lib/rateLimiter";
 import { remember, recall, PROFILE_SOURCE } from "@/lib/memory";
 import { listPending } from "@/lib/notifications";
 import { REFUSAL_FIRST, REFUSAL_REPEAT, REMEMBER_CONFIRM_VARIANTS } from "@/lib/replyVariation";
-import { resolvePersona, composePersonaPrompt, INFORMATION_HANDLING_POLICY, PERSONA_IDS } from "@/lib/persona";
+import { resolvePersona, composePersonaPrompt, INFORMATION_HANDLING_POLICY, NATURALNESS_POLICY, PERSONA_IDS } from "@/lib/persona";
 import { db } from "@/db";
 import { people, conversationTurns, memoryRecords } from "@/db/schema";
 import { eq } from "drizzle-orm";
@@ -805,6 +805,17 @@ describe("buildSystemPrompt() stable-first order and budgets (step 4)", () => {
       expect(fragment.length).toBeLessThanOrEqual(1200); // MAX_COMPANION_SECTION_CHARS (step 8: raised for each companion's own examples block)
     }
     expect(INFORMATION_HANDLING_POLICY.length).toBeLessThanOrEqual(800); // MAX_RULES_SECTION_CHARS
+    expect(NATURALNESS_POLICY.length).toBeLessThanOrEqual(500); // MAX_NATURALNESS_SECTION_CHARS
+  });
+
+  test("the naturalness policy (step 4) is in the stable prefix, before the volatile zone", () => {
+    const prompt = buildSystemPrompt(fakeActor(), "hi there", []);
+    const rulesIdx = prompt.indexOf("Skip detail nobody asked for");
+    const naturalnessIdx = prompt.indexOf("the current time is 3:45");
+    const householdIdx = prompt.indexOf("Who lives here:");
+    expect(naturalnessIdx).toBeGreaterThan(rulesIdx);
+    expect(naturalnessIdx).toBeLessThan(prompt.length);
+    expect(householdIdx === -1 || naturalnessIdx < householdIdx).toBe(true);
   });
 });
 
