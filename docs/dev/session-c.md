@@ -724,3 +724,123 @@ definition, one place" gap worth a shared helper, but one that predates
 this step (three copies already existed) and touches three files this
 step doesn't otherwise own; left for whoever next adds a fifth bench
 rather than refactored here.
+
+## Step 5: speech to text on the hub, and push-to-talk's server half
+
+**A deliberate deviation from the plan's own literal words, found live,
+not assumed.** The plan text says STT should be "supervised through F's
+`sidecars.ts` once it lands (your own supervisor until then, same shape
+as `ttsSupervisor.ts`)" - written before anyone had confirmed whether
+sherpa-onnx ships real Node bindings or would need a Python sidecar the
+way Pocket TTS does. It has real ones: `sherpa-onnx-node` (a genuine
+per-platform native addon, `sherpa-onnx-darwin-arm64` on this dev
+machine) loaded and ran a real Moonshine transcription in-process under
+Bun with no segfault, verified with a live smoke test before a single
+line of this step's code was written. TTS needs a subprocess
+(`ttsSupervisor.ts`'s spawn-or-stub shape) because Pocket TTS is a
+separate Python process with its own lifecycle to manage; STT has
+nothing to spawn, health-poll, or restart - `lib/stt.ts` is a plain
+lazy-init, in-process singleton (construct the recognizer once, cache
+it), never a `lib/sidecars.ts` registrant. This is a real, positive
+finding about the actual shape of the dependency, not a shortcut around
+the plan's intent.
+
+**What shipped:**
+- `lib/sttAssets.ts`: Silero VAD v5.1.2 and the Moonshine tiny-en int8
+  archive, pinned URL + sha256 + byte count, the same
+  `downloadUrl()`/`singleflight()` shape `wakewordAssets.ts` already
+  established. The Silero pin is byte-identical to the one the archived
+  legacy hub's own `download.ts` carried - re-verified by downloading it
+  fresh this session rather than trusted from the old comment. The
+  Moonshine sha256 was computed locally against the file this session
+  actually downloaded (107,600,538 bytes), never copied from a
+  third-party listing.
+- `lib/sileroVad.ts`: `SileroVadStream`, ported near-verbatim from the
+  legacy hub's own working implementation - raw per-32ms-chunk Silero
+  inference via `onnxruntime-web`'s WASM execution provider (the same
+  ort-node-segfaults-under-Bun workaround legacy's own comment
+  documents, re-verified live in this sandbox before porting, not
+  trusted from the old comment either).
+- `lib/stt.ts`: the Moonshine `OfflineRecognizer` wrapper plus a
+  `__setSttBackendForTests()` seam (no real dev machine or CI has the
+  ~110MB model installed by default, the same posture `llm.ts`'s stub
+  backend already takes for the chat role).
+- `lib/sttSession.ts`: the full VAD-gated buffering state machine, ported
+  from legacy's own `sttSession.ts` - onset 0.5 / offset 0.35 Silero
+  hysteresis, a 0.32s pre-roll, an RMS pre-gate (typing/fan noise never
+  opens an utterance), the voiced-to-silence edge kicking a decode reused
+  at finalize when nothing voiced arrives after, a 30s force-flush,
+  `[BLANK_AUDIO]`-style annotation stripping. Repointed at
+  `transcribeUtterance()` (raw Float32 samples, no WAV round trip)
+  instead of legacy's HTTP call to a separate whisper.cpp sidecar.
+  Adds the plan's own Moonshine-specific rule that has no legacy
+  precedent (whisper.cpp never needed it): an empty first transcription
+  retries once from the real voiced onset, dropping the pre-roll that
+  may have read as dead air with nothing to transcribe.
+- `spec/voice/ts/sttTypes.ts`: the wire contract (`SttWireEvent` for the
+  WS dialect, `SttTranscribeResponse`, `SttStatusResponse`), the same
+  "plain types, language-portable in spirit" precedent `spec/llm/`
+  already set.
+- `routes/stt.ts`: `WS /api/stt/stream` (`hono/bun`'s `upgradeWebSocket`/
+  `websocket`, wired into both of `index.ts`'s `Bun.serve()` calls - Hono's
+  own Bun adapter reads the server handle from `app.fetch`'s second
+  argument automatically, so no other change to the TLS hot-swap or mDNS
+  code around those calls was needed), `POST /api/stt/transcribe` (a raw
+  WAV body, not multipart - the client already has the complete file by
+  upload time, unlike a browser form with a label field alongside audio),
+  and `GET /api/voice/stt/status` (mounted under `/api/voice`, mirroring
+  the wake-word status route's own path convention).
+
+**Live acceptance, not just unit tests.** Copied the real downloaded
+assets into this worktree's `data/voice/stt/` and ran the pinned
+Moonshine model's own bundled test fixture
+(`sherpa-onnx-moonshine-tiny-en-int8/test_wavs/0.wav`) through
+`lib/stt.ts`'s real `transcribe()`: "After early nightfall, the yellow
+lamps would light up here and there the squalid quarter of the
+brothels." against the fixture's own recorded transcript "AFTER EARLY
+NIGHTFALL THE YELLOW LAMPS WOULD LIGHT UP HERE AND THERE THE SQUALID
+QUARTER OF THE BROTHELS" - an exact match modulo casing and Moonshine's
+own added punctuation. Real assets are gitignored, not committed
+(`data/` is never tracked); a fresh checkout downloads them itself via
+`ensureSttAssets()` on first real use.
+
+**A real, unplanned finding along the way, unrelated to STT itself:**
+`bash scripts/check.sh` failed on `frontend`'s lint step after this
+step's own rebase onto main picked up a same-day frontend commit
+(`e19b961`, "add a dedicated control to stop a reply's speech") whose
+own `for await (const _ of ...)` drain loop tripped
+`@typescript-eslint/no-unused-vars` - `argsIgnorePattern: "^_"` only
+exempts unused function arguments, not a for-await loop binding. This
+blocks `check.sh` for any session rebasing onto that same point on
+main, not just this one; fixed with a one-line
+`eslint-disable-next-line` and committed separately
+(`fix(lint): silence a real no-unused-vars error in
+chatModelAdapter.test.ts`), kept out of this step's own commit since
+it's unrelated to STT and outside Session C's file ownership.
+
+**A code review found four real issues, all fixed.** The most severe:
+`lib/privacy.ts`'s "what leaves the house" table - the org's own hard
+rule ("adding or changing an outbound endpoint updates this page in the
+same commit, no exceptions") - had no row for either of this step's two
+downloads, the exact class of gap that page's own comments already
+record having happened and been fixed twice before (the TTS program and
+model). Fixed with a `platform:stt-models` row sourced from
+`sttAssets.ts`'s own pinned URLs (exported, not a second hand-copied
+host name) plus a regression test. Second: `routes/stt.ts`'s WS handler
+built a `Float32Array` straight from an incoming binary frame with no
+guard - a frame whose byte length isn't a multiple of 4 threw an
+uncaught `RangeError` that silently killed the whole connection with no
+error ever reaching the client, verified live before the review even
+flagged it as a real, reproducible bug, not a theoretical one. Fixed
+with a length check that sends a clean `{t:"error"}` instead, plus a
+real `Bun.serve()` + `WebSocket` client test reproducing the exact
+failure. Third: `sttSession.ts`'s Moonshine silent-head retry called
+`flatten()` a second time (a redundant full copy of up to a 30-second
+buffer) instead of reusing the first result via `.subarray()` - fixed.
+Fourth: `lib/stt.ts` exported a `moonshineFileExists()` whose own doc
+comment promised a partial-install distinction nothing actually wired
+in - genuinely dead code. Rather than delete the honest intent behind
+it, wired it in for real: `GET /api/voice/stt/status` now reports
+`sileroInstalled`/`moonshineInstalled` separately (a real, reachable
+state, since `ensureSttAssets()` downloads Silero first), with a test
+proving the partial-install case.

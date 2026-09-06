@@ -15,6 +15,7 @@ import { CATALOG } from "@/lib/modelCatalog";
 import { ENGINE_BINARIES } from "@/lib/engineCatalog";
 import { EMBED_MODEL_URL } from "@/lib/embedAssets";
 import { WAKEWORD_ALL_ASSETS } from "@/lib/wakewordAssets";
+import { SILERO_VAD_ASSET, MOONSHINE_ARCHIVE } from "@/lib/sttAssets";
 import { voiceCatalogUrl } from "@/lib/voiceCatalog";
 import { listPackageIds, loadPackage, type LoadedPackage } from "@/lib/plugins";
 import { telegramConfigured } from "@/lib/telegramChannel";
@@ -65,6 +66,7 @@ export function platformConnections(): PrivacyConnection[] {
   );
   const wakewordHosts = hostsOf(WAKEWORD_ALL_ASSETS.map((a) => a.url));
   const voiceHost = hostsOf([voiceCatalogUrl()]);
+  const sttHosts = hostsOf([SILERO_VAD_ASSET.url, MOONSHINE_ARCHIVE.url]);
 
   const rows: (PrivacyConnection | null)[] = [
     row("platform:language-models", modelHosts, {
@@ -82,6 +84,15 @@ export function platformConnections(): PrivacyConnection[] {
     row("platform:voice-list", voiceHost, {
       when: "when an adult opens the list of voices to pick one",
       what: "a request for the list of available voices, and your home's internet address. No recording, and no voice of anyone in the house.",
+    }),
+    // Session C step 5 (2026-09-06): speech-to-text's own two one-time
+    // downloads (the utterance-detection model and the transcription
+    // model) - found missing here by the same code review that already
+    // caught the tts-program/tts-model/tts-voice-files gap below, so it
+    // gets its own row rather than repeating that omission.
+    row("platform:stt-models", sttHosts, {
+      when: "the first time someone uses speech to text (push-to-talk)",
+      what: DOWNLOAD_CARRIES,
     }),
     // The three rows below are the ones a code review (2026-09-05) found
     // missing while this page told every family "if it is not on this

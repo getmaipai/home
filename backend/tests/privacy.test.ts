@@ -88,6 +88,17 @@ describe("the hub's own connections", () => {
     expect(byId.get("platform:text-embedding-model")?.destination).toContain("huggingface.co");
   });
 
+  // A code review (2026-09-06, Session C step 5) found the STT feature's
+  // two model downloads (Silero VAD, the Moonshine archive) missing from
+  // this page - the same "if it is not on this list, it does not
+  // happen" gap the tts-* rows below were already added to close once.
+  test("speech-to-text's model downloads are listed", () => {
+    const byId = new Map(platformConnections().map((r) => [r.id, r]));
+    const row = byId.get("platform:stt-models");
+    expect(row?.destination).toContain("github.com");
+    expect(row?.destination).toContain("raw.githubusercontent.com");
+  });
+
   // A code review (2026-09-05) found the whole speaking-voice path
   // missing from a page that tells families "if it is not on this list,
   // it does not happen": `uvx pocket-tts serve` installs from PyPI and

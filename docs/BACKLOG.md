@@ -1929,10 +1929,23 @@ that owns it.
       a library: `to-words` on the hub, `num2words` on the robot, licences
       checked), with the clock-time and unit ruleset beside it and one
       fixture set for both; the Python twin does not exist.
-- [ ] **STT on the hub** (M, C) - no STT engine, route or session exists;
-      push-to-talk (listed above under Chat surface) is blocked on it.
-      sherpa-onnx with Moonshine is the robot's choice and should be the
-      hub's too (one runtime, both products).
+- [x] **STT on the hub** (M, C) - shipped, Session C step 5 (2026-09-06):
+      `backend/src/lib/{sttAssets,sileroVad,stt,sttSession}.ts`,
+      `backend/src/routes/stt.ts`, `spec/voice/ts/sttTypes.ts`.
+      `WS /api/stt/stream`, `POST /api/stt/transcribe`,
+      `GET /api/voice/stt/status`. Sherpa-onnx-node's real Node bindings
+      (verified live under Bun, no segfault) mean this needs no
+      supervision through `lib/sidecars.ts` or a bespoke process
+      supervisor the way `ttsSupervisor.ts` needs one for Pocket TTS's
+      separate Python process - a deliberate, positive deviation from
+      this item's own original wording; see docs/dev/session-c.md's step
+      5 entry for the full reasoning. Silero VAD hysteresis (0.5/0.35),
+      0.32s pre-roll, RMS pre-gate, 30s force-flush, and Moonshine's own
+      silent-head retry are all ported from the legacy hub's proven
+      `sttSession.ts`/`sileroVad.ts`, repointed at Moonshine instead of a
+      whisper.cpp sidecar. Live acceptance verified against the pinned
+      Moonshine tiny-en model and its own test fixture: exact transcript
+      match.
 - [ ] **Import from the legacy hub** (M, C) - Hub v0.2 scope: people,
       memories and conversations from the legacy data directory into
       spec-shaped records with provenance, run once, dry run first,
