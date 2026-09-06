@@ -162,6 +162,13 @@
       "when": 1788710355731,
       "tag": "0022_previous_chamber",
       "breakpoints": true
+    },
+    {
+      "idx": 23,
+      "version": "6",
+      "when": 1788712222008,
+      "tag": "0023_powerful_black_queen",
+      "breakpoints": true
     }
   ]
 }
