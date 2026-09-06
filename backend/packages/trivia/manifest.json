@@ -44,5 +44,6 @@
   "pages": [],
   "min_app": "0.1.0",
   "tier": 0,
-  "quality_scale": "bronze"
+  "quality_scale": "bronze",
+  "smoke": { "kind": "recipe_fixture", "fixture": "tests/smoke.json" }
 }

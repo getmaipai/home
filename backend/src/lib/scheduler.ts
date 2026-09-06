@@ -163,7 +163,20 @@ export function cancelJob(actor: PersonRow, id: string): SchedulerOpResult<true>
   return { ok: true, value: true };
 }
 
-const CORE_JOBS: Record<string, () => void> = {
+// A handler may be sync or async - the built-in three never need to
+// await anything real, but a caller-supplied one (index.ts's own
+// "packages.smoke" -> lib/smoke.ts's runAllSmokeTests()) does, and
+// importing lib/smoke.ts directly from this file would recreate the
+// exact plugins.ts/packageHost.ts import cycle this file's own header
+// already avoids for runPlugin: smoke.ts imports lib/plugins.ts, which
+// imports lib/packageHost.ts, which imports this file for
+// scheduleJob(). So a core job beyond the three built-ins below is
+// injected by the caller (index.ts, which already imports both freely
+// as the composition root) via `extraCoreJobs`, exactly the same
+// dependency-injection shape `runPluginFn` already uses.
+type CoreJobHandler = () => void | Promise<void>;
+
+const CORE_JOBS: Record<string, CoreJobHandler> = {
   "memory.maintenance": () => {
     runMaintenance();
   },
@@ -199,15 +212,23 @@ let inFlight: Promise<{ ran: number; errors: number }> | null = null;
  * retries: a failure is recorded on the row and it's marked done, the
  * same "never a silent retry loop" choice lib/memory.ts's forget() makes
  * for its own one-shot erasure. */
-export function runDueJobs(runPluginFn: RunPluginFn, now: Date = new Date()): Promise<{ ran: number; errors: number }> {
+export function runDueJobs(
+  runPluginFn: RunPluginFn,
+  now: Date = new Date(),
+  extraCoreJobs: Record<string, CoreJobHandler> = {},
+): Promise<{ ran: number; errors: number }> {
   if (inFlight) return inFlight;
-  inFlight = runDueJobsUnguarded(runPluginFn, now).finally(() => {
+  inFlight = runDueJobsUnguarded(runPluginFn, now, extraCoreJobs).finally(() => {
     inFlight = null;
   });
   return inFlight;
 }
 
-async function runDueJobsUnguarded(runPluginFn: RunPluginFn, now: Date): Promise<{ ran: number; errors: number }> {
+async function runDueJobsUnguarded(
+  runPluginFn: RunPluginFn,
+  now: Date,
+  extraCoreJobs: Record<string, CoreJobHandler>,
+): Promise<{ ran: number; errors: number }> {
   const due = db
     .select()
     .from(scheduledJobs)
@@ -220,9 +241,9 @@ async function runDueJobsUnguarded(runPluginFn: RunPluginFn, now: Date): Promise
     let error: string | null = null;
     try {
       if (row.kind === "core") {
-        const handler = CORE_JOBS[row.job];
+        const handler = CORE_JOBS[row.job] ?? extraCoreJobs[row.job];
         if (!handler) throw new Error(`no core job registered for ${row.job}`);
-        handler();
+        await handler();
       } else {
         if (!row.personId) throw new Error(`plugin job ${row.id} has no personId`);
         const actor = db.select().from(people).where(and(eq(people.id, row.personId), isNull(people.deletedAt))).get();
