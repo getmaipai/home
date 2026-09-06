@@ -1,31 +1,12 @@
 import { describe, expect, test, beforeEach } from "bun:test";
-import { TestClient } from "./client";
 import { resetDb } from "./reset-db";
 import { raiseIssue, registerFixHandler, __resetFixHandlersForTests } from "@/lib/issues";
-import { db } from "@/db";
-import { people } from "@/db/schema";
-import { eq } from "drizzle-orm";
-import type { PersonRow } from "@/types";
+import { owner, teen } from "./support/testAuth";
 
 beforeEach(() => {
   resetDb();
   __resetFixHandlersForTests();
 });
-
-async function owner(): Promise<{ client: TestClient; row: PersonRow }> {
-  const client = new TestClient();
-  await client.post("/api/auth/setup", { displayName: "Sage", secret: "correcthorse" });
-  const row = db.select().from(people).where(eq(people.displayName, "Sage")).get()! as PersonRow;
-  return { client, row };
-}
-
-async function teen(ownerClient: TestClient): Promise<TestClient> {
-  const created = await ownerClient.post("/api/people", { displayName: "Bramble", role: "teen" });
-  const { id } = (await created.json()) as { id: string };
-  const client = new TestClient();
-  await client.post("/api/auth/select", { personId: id });
-  return client;
-}
 
 describe("GET /api/repairs", () => {
   test("requires owner/admin, not just any signed-in person", async () => {

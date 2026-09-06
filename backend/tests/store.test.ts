@@ -4,13 +4,13 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createHash } from "node:crypto";
 import * as tar from "tar";
-import { db } from "@/db";
-import { packageInstalls, packageStatus, storeIndexState } from "@/db/schema";
 import { PACKAGES_DIR, installedPackageVersionDir } from "@/lib/paths";
 import { resolvePackageDir, getActiveInstall } from "@/lib/packageResolve";
 import { install, rollback, uninstall, setChannel } from "@/lib/store";
 import type { RootMetadata, TargetsMetadata, TimestampMetadata, TargetEntry } from "@/lib/storeIndex";
 import { makeKeyPair, sign, type KeyPair } from "./support/tufFixtures";
+import { owner, teen } from "./support/testAuth";
+import { resetDb } from "./reset-db";
 
 // Builds a REAL packed tarball too (tests/support/tufFixtures.ts's own
 // buildFixtureIndex() only builds signed metadata, no actual package
@@ -19,16 +19,23 @@ import { makeKeyPair, sign, type KeyPair } from "./support/tufFixtures";
 let indexDir: string;
 let signer: KeyPair;
 
+// resetDb() alone clears packageInstalls/packageStatus/storeIndexState
+// (plus people/sessions, which the route tests below need clean too) -
+// a real gap found by code review: an earlier version ALSO hand-deleted
+// those three tables in its own afterEach, which was fully redundant
+// with resetDb() and masked that the owner()/teen()-based tests
+// actually depend on resetDb() running before each test (dropping it
+// would silently break every route test here with a confusing 409 from
+// a stale /api/auth/setup, not an obvious failure pointing at this
+// file).
 beforeEach(() => {
+  resetDb();
   indexDir = mkdtempSync(join(tmpdir(), "maipai-store-test-index-"));
   signer = makeKeyPair();
 });
 
 afterEach(() => {
   rmSync(indexDir, { recursive: true, force: true });
-  db.delete(packageInstalls).run();
-  db.delete(packageStatus).run();
-  db.delete(storeIndexState).run();
 });
 
 /** Packs a REAL package directory (weather's own real bundled files -
@@ -404,5 +411,86 @@ describe("setChannel", () => {
 
   test("refuses on a package with no active install", () => {
     expect(setChannel("never-installed-at-all", "beta").ok).toBe(false);
+  });
+});
+
+describe("the /api/store routes", () => {
+  test("every route requires owner/admin, not just any signed-in person", async () => {
+    const { client } = await owner();
+    const teenClient = await teen(client);
+    expect((await teenClient.get("/api/store/installs/weather")).status).toBe(403);
+    expect((await teenClient.post("/api/store/installs/weather", {})).status).toBe(403);
+    expect((await teenClient.post("/api/store/installs/weather/rollback", {})).status).toBe(403);
+    expect((await teenClient.post("/api/store/installs/weather/uninstall", {})).status).toBe(403);
+    expect((await teenClient.post("/api/store/installs/weather/channel", { channel: "beta" })).status).toBe(403);
+  });
+
+  // A real gap found by code review: every StoreResult failure used to
+  // collapse to 400 at the route layer, even "this package has no
+  // active install at all" - routes/repairs.ts's own convention (and
+  // this route's OpenAPI schema) says that's a 404, not a 400.
+  test("rollback/uninstall/channel on a package with no active install are 404, not 400", async () => {
+    const { client } = await owner();
+    expect((await client.post("/api/store/installs/never-installed-at-all/rollback", {})).status).toBe(404);
+    expect((await client.post("/api/store/installs/never-installed-at-all/uninstall", {})).status).toBe(404);
+    expect((await client.post("/api/store/installs/never-installed-at-all/channel", { channel: "beta" })).status).toBe(404);
+  });
+
+  test("GET returns null for a package with no active install", async () => {
+    const { client } = await owner();
+    const res = await client.get("/api/store/installs/weather");
+    expect(res.status).toBe(200);
+    expect(await res.json()).toBeNull();
+  });
+
+  test("POST install installs a real package and GET then reports it", async () => {
+    const { client } = await owner();
+    const { targetPath } = await buildInstallableFixture({ id: "test-store-route", version: "1.0.0" });
+    const res = await client.post("/api/store/installs/test-store-route", {
+      targetPath,
+      source: { kind: "dir", dir: indexDir },
+      trust: trust(),
+    });
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { version: string; smokeOk: boolean };
+    expect(body.version).toBe("1.0.0");
+    expect(body.smokeOk).toBe(true);
+
+    const getRes = await client.get("/api/store/installs/test-store-route");
+    const getBody = (await getRes.json()) as { id: string; version: string };
+    expect(getBody.id).toBe("test-store-route");
+    expect(getBody.version).toBe("1.0.0");
+  });
+
+  test("POST install returns 409 with the permission diff when an update needs confirmation", async () => {
+    const { client } = await owner();
+    const first = await buildInstallableFixture({ id: "test-store-route-perm", version: "1.0.0", permissions: ["net:a.example"] });
+    await client.post("/api/store/installs/test-store-route-perm", { targetPath: first.targetPath, source: { kind: "dir", dir: indexDir }, trust: trust() });
+
+    const second = await buildInstallableFixture({ id: "test-store-route-perm", version: "2.0.0", permissions: ["net:a.example", "net:b.example"] });
+    const res = await client.post("/api/store/installs/test-store-route-perm", { targetPath: second.targetPath, source: { kind: "dir", dir: indexDir }, trust: trust() });
+    expect(res.status).toBe(409);
+    const body = (await res.json()) as { requiresConfirmation: { newPermissions: string[] } };
+    expect(body.requiresConfirmation.newPermissions).toEqual(["net:b.example"]);
+  });
+
+  test("POST rollback, uninstall, and channel all work through the route", async () => {
+    const { client } = await owner();
+    const first = await buildInstallableFixture({ id: "test-store-route-lifecycle", version: "1.0.0" });
+    await client.post("/api/store/installs/test-store-route-lifecycle", { targetPath: first.targetPath, source: { kind: "dir", dir: indexDir }, trust: trust() });
+    const second = await buildInstallableFixture({ id: "test-store-route-lifecycle", version: "2.0.0" });
+    await client.post("/api/store/installs/test-store-route-lifecycle", { targetPath: second.targetPath, source: { kind: "dir", dir: indexDir }, trust: trust() });
+
+    const channelRes = await client.post("/api/store/installs/test-store-route-lifecycle/channel", { channel: "beta" });
+    expect(channelRes.status).toBe(200);
+    expect(getActiveInstall("test-store-route-lifecycle")?.channel).toBe("beta");
+
+    const rollbackRes = await client.post("/api/store/installs/test-store-route-lifecycle/rollback", {});
+    expect(rollbackRes.status).toBe(200);
+    expect((await rollbackRes.json()) as { version: string }).toEqual({ version: "1.0.0" });
+
+    const uninstallRes = await client.post("/api/store/installs/test-store-route-lifecycle/uninstall", {});
+    expect(uninstallRes.status).toBe(200);
+    expect(getActiveInstall("test-store-route-lifecycle")).toBeNull();
   });
 });

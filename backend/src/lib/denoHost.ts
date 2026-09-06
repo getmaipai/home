@@ -156,6 +156,23 @@ async function killProcess(id: string): Promise<void> {
   await entry.client.close().catch(() => {});
 }
 
+/** Kills a package's live sandbox process, if it has one - `lib/store.ts`
+ * calls this after install/uninstall/rollback (a real gap found by code
+ * review: those functions had no production caller before this diff,
+ * so nothing previously exercised a Tier 1 package's process staying
+ * warm across a file swap. `startProcess()` resolves `sourceDir` once,
+ * at spawn time, and never re-reads it - a live sandbox would otherwise
+ * keep running against files an install/uninstall/rollback just deleted
+ * or replaced, or a later call would resume against a stale handle.
+ * Killing it here means the NEXT real call lazily respawns fresh
+ * against whatever `lib/packageResolve.ts` resolves to now. A no-op for
+ * a package with no live process (the common case: most calls happen
+ * between household use, not mid-conversation), and safe for a Tier 0
+ * package (nothing here to kill). */
+export async function killLiveProcessForInstallChange(id: string): Promise<void> {
+  await killProcess(id);
+}
+
 /** A crash or timeout: counts a strike, and - past MAX_STRIKES - disables
  * the package for the rest of this boot and raises a Repairs item. Never
  * throws: the caller always gets a real PluginResult back (the

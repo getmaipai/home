@@ -17,6 +17,8 @@ import {
   notificationDeliveries,
   issues,
   packageStatus,
+  packageInstalls,
+  storeIndexState,
   hubIdentity,
   hubEndpoints,
   deviceTokens,
@@ -63,6 +65,8 @@ export function resetDb(): void {
   db.delete(hubIdentity).run();
   db.delete(routingEmbeddings).run();
   db.delete(issues).run();
+  db.delete(packageInstalls).run();
+  db.delete(storeIndexState).run();
   db.delete(packageStatus).run();
   db.delete(notificationDeliveries).run();
   db.delete(commands).run();

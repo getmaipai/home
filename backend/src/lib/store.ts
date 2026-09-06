@@ -17,6 +17,7 @@ import { packageInstalls, storeIndexState } from "@/db/schema";
 import { dataDir, installedPackageVersionDir, installStagingDir } from "@/lib/paths";
 import { getActiveInstall } from "@/lib/packageResolve";
 import { runSmoke } from "@/lib/smoke";
+import { killLiveProcessForInstallChange } from "@/lib/denoHost";
 import {
   fetchRawIndex,
   verifyIndex,
@@ -27,7 +28,14 @@ import {
   type VerifiedIndex,
 } from "@/lib/storeIndex";
 
-export type StoreResult<T> = { ok: true; value: T } | { ok: false; error: string };
+// `status` on the failure branch (matching lib/commands.ts's own
+// CommandOpResult and lib/plugins.ts's PluginOpResult) - a real gap
+// found by code review: without it, every StoreResult failure collapsed
+// to a single HTTP status at the route layer regardless of whether the
+// package simply doesn't exist (404, routes/repairs.ts's own convention
+// for "no such issue") or a real request problem (400). The function
+// that actually knows which case it hit is the one that should say so.
+export type StoreResult<T> = { ok: true; value: T } | { ok: false; error: string; status: 400 | 404 };
 
 // Serializes every install()/rollback()/uninstall() call for the SAME
 // package id - a real gap found by code review: two concurrent installs
@@ -111,7 +119,7 @@ function saveLastSeenVersions(index: VerifiedIndex): void {
 export async function fetchVerifiedIndex(source: IndexSource, trust: TrustConfig): Promise<StoreResult<VerifiedIndex>> {
   const raw = await fetchRawIndex(source);
   const result = verifyIndex(raw, trust, loadLastSeenVersions());
-  if (!result.ok) return { ok: false, error: result.error };
+  if (!result.ok) return { ok: false, error: result.error, status: 400 };
   saveLastSeenVersions(result.index);
   return { ok: true, value: result.index };
 }
@@ -276,6 +284,14 @@ async function installLocked(opts: InstallOptions): Promise<InstallResult> {
     })
     .run();
 
+  // A live sandbox process for the OLD version must not keep running
+  // against files this call just replaced - see
+  // killLiveProcessForInstallChange()'s own doc comment. Killed before
+  // the smoke check below so that check (the first real caller after
+  // install) lazily respawns fresh against the version just installed,
+  // never a stale handle to the one before it.
+  await killLiveProcessForInstallChange(opts.id);
+
   const smoke = await runSmoke(opts.id);
   return {
     ok: true,
@@ -300,18 +316,22 @@ async function readTarball(source: IndexSource, targetPath: string): Promise<Buf
  * for the same id could read a `previousVersion` that the install is
  * about to overwrite. */
 export async function rollback(id: string): Promise<StoreResult<{ version: string }>> {
-  return withPackageLock(id, () => {
+  return withPackageLock(id, async () => {
     const active = getActiveInstall(id);
-    if (!active) return { ok: false, error: `${id} has no active store install to roll back` };
-    if (!active.previousVersion) return { ok: false, error: `${id} has no previous version recorded to roll back to` };
+    if (!active) return { ok: false, error: `${id} has no active store install to roll back`, status: 404 };
+    if (!active.previousVersion) return { ok: false, error: `${id} has no previous version recorded to roll back to`, status: 400 };
     if (!existsSync(installedPackageVersionDir(id, active.previousVersion))) {
-      return { ok: false, error: `${id}'s previous version (${active.previousVersion}) is no longer on disk` };
+      return { ok: false, error: `${id}'s previous version (${active.previousVersion}) is no longer on disk`, status: 400 };
     }
 
     db.update(packageInstalls)
       .set({ version: active.previousVersion, previousVersion: null, installedAt: new Date().toISOString() })
       .where(eq(packageInstalls.packageId, id))
       .run();
+    // The now-active version's own files just changed under whatever
+    // sandbox process might still be running the OLD one - see
+    // killLiveProcessForInstallChange()'s own doc comment.
+    await killLiveProcessForInstallChange(id);
 
     return { ok: true, value: { version: active.previousVersion } };
   });
@@ -331,19 +351,23 @@ export async function rollback(id: string): Promise<StoreResult<{ version: strin
  * copy keeps running right afterward. Serialized per package id like
  * install()/rollback() above. */
 export async function uninstall(id: string): Promise<StoreResult<true>> {
-  return withPackageLock(id, () => {
+  return withPackageLock(id, async () => {
     const active = getActiveInstall(id);
-    if (!active) return { ok: false, error: `${id} has no active store install to remove` };
+    if (!active) return { ok: false, error: `${id} has no active store install to remove`, status: 404 };
     db.delete(packageInstalls).where(eq(packageInstalls.packageId, id)).run();
     rmSync(resolve(dataDir, "packages", id, "versions"), { recursive: true, force: true });
     rmSync(installStagingDir(id), { recursive: true, force: true });
+    // The files a live sandbox process might be running just disappeared
+    // (or the package fell back to its bundled copy) - see
+    // killLiveProcessForInstallChange()'s own doc comment.
+    await killLiveProcessForInstallChange(id);
     return { ok: true, value: true };
   });
 }
 
 export function setChannel(id: string, channel: "stable" | "beta"): StoreResult<true> {
   const active = getActiveInstall(id);
-  if (!active) return { ok: false, error: `${id} has no active store install to set a channel on` };
+  if (!active) return { ok: false, error: `${id} has no active store install to set a channel on`, status: 404 };
   db.update(packageInstalls).set({ channel }).where(eq(packageInstalls.packageId, id)).run();
   return { ok: true, value: true };
 }
