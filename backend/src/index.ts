@@ -3,6 +3,7 @@ import { ensureCoreJob, runDueJobs } from "@/lib/scheduler";
 import { runPlugin } from "@/lib/plugins";
 import { cleanupStaleSnapshots } from "@/lib/backup";
 import { sampleEngineStats } from "@/lib/engineStats";
+import { startAllSidecars, registerGracefulExit } from "@/lib/sidecars";
 
 const port = Number(process.env.PORT ?? 8787);
 
@@ -42,6 +43,13 @@ ensureCoreJob("backup.run", "every:1d");
 // restarted cleans up within seconds instead of waiting up to a day for
 // the next scheduled run.
 cleanupStaleSnapshots();
+// The graceful-exit hook first, then start whatever's registered: no
+// sidecar is registered by core itself yet (D's SearXNG and C's voice
+// programs are the first real registrants, wave-2.md's own contract), so
+// this boots an empty registry today - proving the wiring rather than
+// waiting for a first caller to also have to remember it.
+registerGracefulExit();
+void startAllSidecars();
 setInterval(() => {
   runDueJobs(runPlugin).catch((err: Error) => console.error(`[scheduler] runDueJobs failed: ${err.message}`));
 }, 60_000);

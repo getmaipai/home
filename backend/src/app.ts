@@ -21,11 +21,22 @@ import { hostRoutes } from "@/routes/host";
 import { voiceRoutes } from "@/routes/voice";
 import { privacyRoutes } from "@/routes/privacy";
 import { repairsRoutes } from "@/routes/repairs";
+import { requireAuth } from "@/middleware/auth";
+import { listSidecars } from "@/lib/sidecars";
 import type { AppEnv } from "@/types";
 
 export const app = new Hono<AppEnv>();
 
-app.get("/api/health", (c) => c.json({ status: "ok" }));
+// Session F, step 2: real sidecar reporting, per the wave-2 contract
+// ("F to E: health, repairs, updates..."). gpu/disk/last_backup/
+// certificate/models/link are the rest of that contract's shape - they
+// land with steps 3 (guards), 5 (trust), 8 (backups), 9 (storage), 10
+// (models) and Wave 3 (link) respectively; adding them now as guessed
+// placeholders would be a shape E has to revisit twice instead of once,
+// so this only returns what's real today. requireAuth, not a role gate:
+// unlike Repairs (owner/admin, remedial actions), Health is informational
+// and every signed-in household member can see it.
+app.get("/api/health", requireAuth, (c) => c.json({ sidecars: listSidecars() }));
 
 app.route("/api/auth", auth);
 app.route("/api/people", peopleRoutes);
