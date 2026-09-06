@@ -50,6 +50,7 @@ import * as memory from "@/lib/memory";
 import * as settings from "@/lib/settings";
 import { getHouseholdSettingValue } from "@/lib/settings";
 import { scheduleJob } from "@/lib/scheduler";
+import { cachedFetch } from "@/lib/packageCache";
 import type { PersonRow } from "@/types";
 
 // host.fetch's real network I/O settings (2026-09-05). Rate limit: "a
@@ -161,15 +162,33 @@ export interface AttemptResult {
    * connection refused) - never for a real HTTP response, including a
    * non-2xx one. Only this class of failure is worth retrying. */
   networkFailure?: boolean;
+  /** The real HTTP status, when a response was received at all (never
+   * set for a genuine network-level failure) - session-d step 4's own
+   * `getHomeAssistantState` needs this to remap a 404 to `not_found`
+   * rather than the generic `network_unreachable` every other non-2xx
+   * gets, without hand-rolling its own copy of this function's fetch/
+   * timeout/abort/body-limit sequence just to see the status code. */
+  status?: number;
 }
 
-async function attemptHttpFetch(url: string, method: string, headers: Record<string, string>, body: string | undefined): Promise<AttemptResult> {
+async function attemptHttpFetch(
+  url: string,
+  method: string,
+  headers: Record<string, string>,
+  body: string | undefined,
+  timeoutMs: number = FETCH_TIMEOUT_MS,
+): Promise<AttemptResult> {
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
     const response = await fetch(url, { method, headers, body, signal: controller.signal });
     if (!response.ok) {
-      return { ok: false, networkFailure: false, error: new HostError("network_unreachable", `${url} returned HTTP ${response.status}`) };
+      return {
+        ok: false,
+        networkFailure: false,
+        status: response.status,
+        error: new HostError("network_unreachable", `${url} returned HTTP ${response.status}`),
+      };
     }
     const text = await readBodyWithLimit(response, url);
     try {
@@ -283,6 +302,67 @@ export async function callHomeAssistantService(
   }
 }
 
+/** The read half of the Home Assistant integration (session-d-packages-
+ * and-store.md step 4): `GET /api/states/<entity_id>`, the first thing a
+ * recipe can reach through `host.integration.call("home_assistant",
+ * "get_state", ...)` rather than `home.call_service`'s write-only
+ * surface - "is the porch light on" has no service to call, only state
+ * to read. Same connection posture as `callHomeAssistantService`
+ * (household-configured baseUrl, no SSRF guard, a real GET this time so
+ * genuinely safe to retry once on a transient failure the way
+ * `performHttpFetch`'s own `withOneRetry` already does for `host.fetch` -
+ * unlike a service call, reading state twice can never double-fire a
+ * real-world action). */
+export async function getHomeAssistantState(baseUrl: string, accessToken: string, entityId: string): Promise<unknown> {
+  const url = `${baseUrl.replace(/\/+$/, "")}/api/states/${encodeURIComponent(entityId)}`;
+  const headers = { authorization: `Bearer ${accessToken}` };
+  // Reuses attemptHttpFetch/withOneRetry rather than hand-rolling a
+  // second fetch/timeout/abort/body-limit sequence (a code review,
+  // 2026-09-06, found the first version doing exactly that, with a
+  // comment claiming a retry that wasn't actually there). A GET read is
+  // genuinely safe to retry once, unlike a service call: reading state
+  // twice can never double-fire a real-world action, so `retryable` is
+  // unconditionally true here.
+  const result = await withOneRetry(() => attemptHttpFetch(url, "GET", headers, undefined, HOME_ASSISTANT_TIMEOUT_MS), true, RETRY_DELAY_MS);
+  if (result.ok) return result.value;
+  if (result.status === 404) {
+    throw new HostError("not_found", `Home Assistant returned HTTP 404 for entity ${entityId}`);
+  }
+  throw result.error;
+}
+
+/** The settings lookup and rate limit shared by every real Home Assistant
+ * call: `homeCallService` (below) and `homeAssistantGetState` (step 4).
+ * Throws the identical "isn't set up yet" error either way, since both
+ * need the same two settings to reach the same instance. */
+function requireHomeAssistantSettings(): { baseUrl: string; accessToken: string } {
+  const baseUrl = getHouseholdSettingValue("home.base_url") as string | undefined;
+  const accessToken = getHouseholdSettingValue("home.access_token") as string | undefined;
+  if (!baseUrl || !accessToken) {
+    throw new HostError("invalid_input", "Home Assistant isn't set up yet - add its URL and access token in Settings first");
+  }
+  if (!tryConsume(HOME_ASSISTANT_RATE_LIMIT_KEY, HOME_ASSISTANT_RATE_LIMIT)) {
+    throw new HostError("rate_limited", "Home Assistant is rate-limited - try again shortly");
+  }
+  return { baseUrl, accessToken };
+}
+
+/** `host.integration.call("home_assistant", "get_state", { entity_id })`'s
+ * real implementation. The one Home Assistant method reachable through
+ * the generic `integration.call` step rather than `home.call_service`'s
+ * own dedicated one - a read has no domain to gate on
+ * `isHomeAssistantSecurityDomain`'s own list, so `integration:
+ * home_assistant` (already required by createHost()'s generic
+ * `integration.call` wrapper) is the only gate a read needs. */
+export async function homeAssistantGetState(args: unknown): Promise<unknown> {
+  const entityId = (args as { entity_id?: unknown } | undefined)?.entity_id;
+  if (typeof entityId !== "string" || entityId.length === 0) {
+    throw new HostError("invalid_input", `home_assistant get_state needs a string "entity_id" argument`);
+  }
+  const { baseUrl, accessToken } = requireHomeAssistantSettings();
+  return getHomeAssistantState(baseUrl, accessToken, entityId);
+}
+
 /** The settings lookup, rate limit, and real call shared by every real
  * caller of Home Assistant - createHost()'s own call_service (permission
  * and consequential already checked by then) and lib/commands.ts's
@@ -292,14 +372,7 @@ export async function callHomeAssistantService(
  * plumbing once authorized). Pulled out specifically so that plumbing
  * lives in exactly one place, not two independently-maintained copies. */
 export async function homeCallService(domain: string, service: string, target: unknown, data: unknown): Promise<void> {
-  const baseUrl = getHouseholdSettingValue("home.base_url") as string | undefined;
-  const accessToken = getHouseholdSettingValue("home.access_token") as string | undefined;
-  if (!baseUrl || !accessToken) {
-    throw new HostError("invalid_input", "Home Assistant isn't set up yet - add its URL and access token in Settings first");
-  }
-  if (!tryConsume(HOME_ASSISTANT_RATE_LIMIT_KEY, HOME_ASSISTANT_RATE_LIMIT)) {
-    throw new HostError("rate_limited", "home.call_service is rate-limited - try again shortly");
-  }
+  const { baseUrl, accessToken } = requireHomeAssistantSettings();
   await callHomeAssistantService(baseUrl, accessToken, domain, service, target, data);
 }
 
@@ -414,24 +487,32 @@ export function createHost(actor: PersonRow, manifest: PackageManifest, secrets:
       }
       requirePermission(`net:${parsed.host}`);
 
-      // Rate limit BEFORE the SSRF/DNS check, not after: a package
-      // hammering host.fetch against a host that turns out to be blocked
-      // (or invalid) still costs a real DNS lookup and connection attempt
-      // per call, and the household's own hub deserves protection from
-      // that regardless of whether the target was ever going to be
-      // allowed - not just the destination service's own budget.
-      if (!tryConsume(parsed.host, FETCH_RATE_LIMIT)) {
-        throw new HostError("rate_limited", `host.fetch is rate-limited for ${parsed.host} - try again shortly`);
-      }
+      // The cache sits in front of the rate limiter and the SSRF check on
+      // purpose (session-d-packages-and-store.md step 3): a cache hit is
+      // not a network call at all, so it should cost neither a rate-limit
+      // token nor a DNS lookup - only a real doFetch() (below) reaches
+      // either. A package with no `cache` declared skips straight
+      // through, unaffected.
+      return cachedFetch(manifest.id, manifest.cache, url, opts, async () => {
+        // Rate limit BEFORE the SSRF/DNS check, not after: a package
+        // hammering host.fetch against a host that turns out to be blocked
+        // (or invalid) still costs a real DNS lookup and connection attempt
+        // per call, and the household's own hub deserves protection from
+        // that regardless of whether the target was ever going to be
+        // allowed - not just the destination service's own budget.
+        if (!tryConsume(parsed.host, FETCH_RATE_LIMIT)) {
+          throw new HostError("rate_limited", `host.fetch is rate-limited for ${parsed.host} - try again shortly`);
+        }
 
-      try {
-        await assertNotPrivateHost(parsed.hostname);
-      } catch (err) {
-        if (err instanceof SsrfBlockedError) throw new HostError("invalid_input", err.message);
-        throw new HostError("network_unreachable", `could not resolve ${parsed.hostname}`);
-      }
+        try {
+          await assertNotPrivateHost(parsed.hostname);
+        } catch (err) {
+          if (err instanceof SsrfBlockedError) throw new HostError("invalid_input", err.message);
+          throw new HostError("network_unreachable", `could not resolve ${parsed.hostname}`);
+        }
 
-      return performHttpFetch(url, opts);
+        return performHttpFetch(url, opts);
+      });
     },
     memory: {
       // Async as of step 5 (session-a-intelligence.md): a real embed()
@@ -513,8 +594,17 @@ export function createHost(actor: PersonRow, manifest: PackageManifest, secrets:
       },
     },
     integration: {
-      call(id: string, _method: string, _args?: unknown): unknown {
+      // Home Assistant, the first integration reachable through this
+      // generic path (session-d-packages-and-store.md step 4) - a read
+      // (get_state) rather than home.call_service's own dedicated,
+      // domain-gated write path. Every other id/method combination stays
+      // capability_missing until a second integration is actually built;
+      // this is deliberately not a registry pattern for one entry.
+      async call(id: string, method: string, args?: unknown): Promise<unknown> {
         requirePermission(`integration:${id}`);
+        if (id === "home_assistant" && method === "get_state") {
+          return homeAssistantGetState(args);
+        }
         notImplemented("integration.call");
       },
     },
@@ -589,8 +679,21 @@ export function createHost(actor: PersonRow, manifest: PackageManifest, secrets:
         return result.value.deleted;
       },
     },
+    // Real as of session-d-packages-and-store.md step 4: a package's own
+    // self-diagnostic snapshot - id, version, tier, and the permissions
+    // it actually declared (not whether each is currently working; a
+    // real health check per permission, e.g. "is net:api.open-meteo.com
+    // reachable right now," is F's Health/Repairs surface's job, not
+    // this method's). Genuinely useful today even with nothing else
+    // behind it: "what does this package think it is" is a real,
+    // answerable question a support flow can already ask.
     diagnostics(): unknown {
-      notImplemented("diagnostics");
+      return {
+        id: manifest.id,
+        version: manifest.version,
+        tier: manifest.tier,
+        permissions: manifest.permissions ?? [],
+      };
     },
   };
 }

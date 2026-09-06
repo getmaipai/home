@@ -1,6 +1,7 @@
 // GENERATED FILE. Do not edit by hand.
 // Regenerate with: cd spec && bun run gen:ts
 
+export * from "./device.js";
 export * from "./recipe.js";
 export * from "./relationship.js";
 export * from "./setting-value.js";

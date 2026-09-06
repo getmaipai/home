@@ -2,6 +2,7 @@ import { describe, expect, test, beforeEach, afterEach } from "bun:test";
 import { TestClient } from "./client";
 import { resetDb } from "./reset-db";
 import { __resetThrottleForTests } from "@/lib/secretThrottle";
+import { __resetRateLimiterForTests } from "@/lib/rateLimiter";
 import { getVoiceCatalog, isVoiceCatalogPath, __resetVoiceCatalogForTests } from "@/lib/voiceCatalog";
 
 // A real local HTTP server (not a mocked fetch), the same "prove the real
@@ -37,9 +38,31 @@ function makeFixtureServer() {
   return server;
 }
 
+// A page count past the rate limiter's own burst capacity, so pagination
+// genuinely has to wait for a refill rather than clearing the whole
+// catalog in one uninhibited burst - proves the limiter is a real choke
+// point on this fetch, not just present in an import list.
+function makeManyPageFixtureServer(pageCount: number) {
+  const server = Bun.serve({
+    port: 0,
+    fetch(req) {
+      const url = new URL(req.url);
+      const page = Number(url.searchParams.get("page") ?? "0");
+      const isLast = page >= pageCount - 1;
+      const headers: Record<string, string> = { "content-type": "application/json" };
+      if (!isLast) {
+        headers["link"] = `<http://127.0.0.1:${server.port}/tree?page=${page + 1}>; rel="next"`;
+      }
+      return new Response(JSON.stringify([{ type: "file", path: `p${page}/clip.wav` }]), { headers });
+    },
+  });
+  return server;
+}
+
 beforeEach(() => {
   resetDb();
   __resetThrottleForTests();
+  __resetRateLimiterForTests();
   __resetVoiceCatalogForTests();
 });
 
@@ -63,6 +86,32 @@ describe("lib/voiceCatalog.ts getVoiceCatalog()", () => {
       else process.env.MAIPAI_VOICE_CATALOG_URL = original;
     }
   });
+
+  // Session F, step 3/step 0's deferred fallback: every fetch here now
+  // goes through lib/rateLimiter.ts's tryConsume() (CLAUDE.md's "every
+  // integration gets a rate limiter... never a raw fetch on the side"),
+  // which A's own step 11 was going to add but hadn't landed yet.
+  test("throttles pagination past its burst capacity instead of firing every page back to back", async () => {
+    const server = makeManyPageFixtureServer(7); // capacity 5 -> 2 pages must wait for a refill
+    const original = process.env.MAIPAI_VOICE_CATALOG_URL;
+    process.env.MAIPAI_VOICE_CATALOG_URL = `http://127.0.0.1:${server.port}/tree?page=0`;
+    try {
+      const started = Date.now();
+      const entries = await getVoiceCatalog();
+      const elapsed = Date.now() - started;
+      expect(entries).toHaveLength(7);
+      // refillPerSecond: 1 means each of the 2 over-capacity pages waits
+      // roughly a second - real elapsed time, not a mocked clock, so this
+      // proves waitForToken() actually pauses rather than just existing
+      // in the import graph unused.
+      expect(elapsed).toBeGreaterThanOrEqual(1_500);
+      expect(elapsed).toBeLessThan(8_000);
+    } finally {
+      server.stop(true);
+      if (original === undefined) delete process.env.MAIPAI_VOICE_CATALOG_URL;
+      else process.env.MAIPAI_VOICE_CATALOG_URL = original;
+    }
+  }, 10_000);
 
   test("groups each entry under its top-level collection", async () => {
     const server = makeFixtureServer();

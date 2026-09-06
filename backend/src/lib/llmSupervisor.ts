@@ -27,10 +27,6 @@
 //      spec/llm/README.md's "What's real vs. stubbed".
 import { existsSync } from "node:fs";
 import { join } from "node:path";
-import { execFile } from "node:child_process";
-import { promisify } from "node:util";
-
-const execFileAsync = promisify(execFile);
 import { LlamaServerClient } from "@maipai/spec/llm/ts/client.js";
 import { startStubLlmServer } from "@maipai/spec/llm/ts/stubServer.js";
 import type { ModelCapabilities } from "@maipai/spec/gen/ts/model-capabilities.js";
@@ -41,6 +37,8 @@ import { modelsDir, enginesDir } from "@/lib/paths";
 import { resolveLaunchFlags, launchFlagsToArgs, type LaunchFlags, type LaunchFlagOverrides } from "@/lib/engineAutotune";
 import { runPostLoadCheck, type PostLoadCheckResult } from "@/lib/enginePostLoadCheck";
 import { getHouseholdSettingValue } from "@/lib/settings";
+import { spawnAndWaitHealthy, freePort, sweepOrphanProcesses } from "@/lib/sidecars";
+import { assertNotInCrashBootHold } from "@/lib/dirtyBoot";
 
 export type BackendKind = "url" | "override" | "selection" | "stub";
 
@@ -78,88 +76,31 @@ let lastPostLoadCheck: (PostLoadCheckResult & { modelId: string }) | null = null
 // nothing observable beyond one killed process.
 let manuallyStopped = false;
 
-async function waitForHealth(client: LlamaServerClient, timeoutMs: number): Promise<void> {
-  const deadline = Date.now() + timeoutMs;
-  while (Date.now() < deadline) {
-    if (await client.health()) return;
-    await new Promise((resolve) => setTimeout(resolve, 300));
-  }
-  throw new Error(`llama-server did not become healthy within ${timeoutMs}ms`);
-}
+// Session F, step 2: freePort() and the spawn+health-wait loop this
+// function used to hand-roll both moved to lib/sidecars.ts as
+// spawnAndWaitHealthy() - the shared primitive every process-shaped
+// supervisor in this codebase now spawns through, including
+// embedSupervisor.ts's identical shape. See that file's own header for
+// the freePort() incident writeup; freePort() itself is re-exported here
+// so this module's existing test suite and callers don't need to know it
+// moved.
+export { freePort };
 
-// Kills whatever's listening on `port`, best-effort. Real, observed
-// failure mode this guards against (2026-09-04): `bun run --hot`'s file
-// watcher reloads on ANY change under the repo it's watching - including
-// `check.sh` regenerating `spec/gen/`, unrelated to this module at all -
-// and a hot reload wipes every module-level `let` (chatBackend,
-// startingPromise) without touching the real child process it was
-// tracking. That process keeps running, still bound to the fixed port,
-// now untracked by the fresh module instance. The next spawn attempt
-// (e.g. a household member clicking Restart) then either fails to bind
-// the port (Bun.spawn's process exits immediately) or, worse, the health
-// check against that fixed port passes by polling the orphaned process
-// rather than the one just spawned - either way the UI gets stuck showing
-// "Starting..." forever, exactly what Jesse hit live tonight. Freeing the
-// port before every spawn makes "restart" actually mean restart,
-// regardless of what a dev-mode reload left behind.
-//
-// `ps`, not `lsof`: this same machine's `lsof` proved unreliably slow
-// (multiple times this session, unrelated to this feature) enough that
-// this module's own first version - lsof-based - made a passing test
-// start timing out. `ps aux` plus a plain-text match on the exact
-// `--port <N>` argument spawnLlamaServer always passes is faster and
-// matches the process this function actually needs to find, not "every
-// process with an open socket on this port" in general. Best-effort
-// throughout (no-op if `ps` is missing, or nothing matches) - this is a
-// robustness improvement, not something a spawn should ever hard-fail
-// over.
-// Exported for a real test (kills an actual listening process, not a
-// mock of ps/kill), the same "prove the real mechanism, not a simulation
-// of it" standard this module's other tests already hold to.
-export async function freePort(port: number): Promise<void> {
-  // A code review (2026-09-04) found the original version matched
-  // `--port ${port}` as a plain substring - true for "--port 87889" when
-  // freeing port 8788, since 8788 is a numeric prefix of 87889. Anchored
-  // to a word boundary after the number so it only ever matches the exact
-  // port, not anything with it as a prefix.
-  const portPattern = new RegExp(`--port[= ]${port}\\b`);
-  const findPids = async (): Promise<number[]> => {
-    try {
-      const { stdout } = await execFileAsync("ps", ["aux"], { timeout: 5_000 });
-      return stdout
-        .split("\n")
-        .filter((line) => portPattern.test(line))
-        .map((line) => Number(line.trim().split(/\s+/)[1]))
-        .filter((n) => Number.isFinite(n) && n > 0);
-    } catch {
-      return [];
-    }
-  };
-
-  const pids = await findPids();
-  for (const pid of pids) {
-    try {
-      process.kill(pid, "SIGKILL");
-    } catch {
-      // already gone
-    }
-  }
-  if (pids.length === 0) return;
-
-  // Give the OS a moment to actually release the socket before the
-  // caller tries to bind it again - SIGKILL is immediate but the kernel's
-  // own port teardown isn't guaranteed synchronous. A real connect
-  // attempt (not another ps scan) is both faster and the thing that
-  // actually matters: can something bind this port yet.
-  const deadline = Date.now() + 3_000;
-  while (Date.now() < deadline) {
-    const stillUp = await fetch(`http://127.0.0.1:${port}`, { signal: AbortSignal.timeout(300) }).then(
-      () => true,
-      () => false,
-    );
-    if (!stillUp) return;
-    await new Promise((resolve) => setTimeout(resolve, 100));
-  }
+/** Session F, step 3: the "max-resident models policy with an orphan
+ * sweep" guard (docs/BACKLOG.md's "Copy the legacy runtime guards" item -
+ * legacy's own incident: "orphaned runners once forced every load to
+ * CPU: a 90s 'hi'"). freePort() only catches an orphan bound to the
+ * EXACT port a fresh spawn is about to claim; this catches one sitting
+ * anywhere else - a leftover from a since-changed
+ * MAIPAI_LLAMA_SERVER_PORT/MAIPAI_EMBED_PORT, or any other stray engine
+ * process this codebase spawned before a crash or a dev-mode reload wiped
+ * the tracking that would have stopped it. Matches on `enginesDir` (every
+ * real spawn - chat and embed both - invokes the binary by its absolute
+ * path under here, per selectEngineBinary()'s own pin), so this covers
+ * both roles with one call. Meant to run once at boot (index.ts), before
+ * anything real spawns. */
+export async function sweepOrphanEngineProcesses(): Promise<number> {
+  return sweepOrphanProcesses(enginesDir);
 }
 
 async function spawnLlamaServer(
@@ -174,7 +115,6 @@ async function spawnLlamaServer(
   // (e.g. router) would need real port allocation, deferred with the rest
   // of the multi-role residency policy.
   const port = Number(process.env.MAIPAI_LLAMA_SERVER_PORT ?? 8788);
-  await freePort(port);
   const args = [
     bin,
     "--model",
@@ -185,14 +125,14 @@ async function spawnLlamaServer(
     "127.0.0.1",
     ...(launchFlags ? launchFlagsToArgs(launchFlags) : []),
   ];
-  const proc = Bun.spawn(args, { stdout: "inherit", stderr: "inherit" });
   const client = new LlamaServerClient(`http://127.0.0.1:${port}`);
-  try {
-    await waitForHealth(client, 60_000);
-  } catch (err) {
-    proc.kill();
-    throw err;
-  }
+  const proc = await spawnAndWaitHealthy({
+    command: args,
+    port,
+    healthCheck: () => client.health(),
+    timeoutMs: 60_000,
+    label: "llama-server",
+  });
   return { client, stop: () => proc.kill(), pid: proc.pid, kind, modelId, startedAt: new Date().toISOString() };
 }
 
@@ -223,6 +163,13 @@ export function engineBinaryPath(hw: Awaited<ReturnType<typeof detectHardware>>)
 async function trySpawnFromSelection(): Promise<ChatBackend | null> {
   const modelId = getHouseholdSettingValue("chat.model_id") as string;
   if (!modelId) return null;
+
+  // The crash-boot hold (lib/dirtyBoot.ts, session-f-platform-and-trust.md
+  // step 3): only gates a REAL spawn, never tier 1 (a developer's URL
+  // override) or tier 4's stub - a household that already has a model
+  // selected still gets a working (stubbed) chat surface immediately
+  // after a crash-boot, just not the real engine for 30 minutes.
+  assertNotInCrashBootHold();
 
   const model: ModelCapabilities | undefined = CATALOG.find(
     (m) => m.id === modelId && m.role === "chat" && m.implemented,
@@ -272,6 +219,13 @@ async function startChatBackend(): Promise<ChatBackend> {
   const bin = process.env.MAIPAI_LLAMA_SERVER_BIN;
   const modelPath = process.env.MAIPAI_CHAT_MODEL_PATH;
   if (bin && modelPath) {
+    // A code review (2026-09-06) found this real spawn path - a
+    // developer's explicit override, but still a real local process
+    // contending for the same GPU a crash-boot just took down - had no
+    // crash-boot-hold check at all, unlike tier 3 right below it. Only
+    // tier 1 (a bare URL, nothing spawned) and tier 4's stub are meant to
+    // bypass this.
+    assertNotInCrashBootHold();
     return spawnLlamaServer(bin, modelPath, "override");
   }
 

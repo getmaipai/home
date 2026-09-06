@@ -1,8 +1,10 @@
-import { Hono } from "hono";
 import { serveStatic } from "hono/bun";
+import { apiReference } from "@scalar/hono-api-reference";
 import { existsSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
+import { apiRouter, errorResponses } from "@/lib/openapi";
+import { createRoute, z } from "@hono/zod-openapi";
 import { auth } from "@/routes/auth";
 import { peopleRoutes } from "@/routes/people";
 import { safetyRoutes } from "@/routes/safety";
@@ -21,11 +23,76 @@ import { hostRoutes } from "@/routes/host";
 import { voiceRoutes } from "@/routes/voice";
 import { privacyRoutes } from "@/routes/privacy";
 import { repairsRoutes } from "@/routes/repairs";
-import type { AppEnv } from "@/types";
+import { setupRoutes } from "@/routes/setup";
+import { devicesRoutes } from "@/routes/devices";
+import { deviceAuthRoutes } from "@/routes/deviceAuth";
+import { quickConnectRoutes } from "@/routes/quickConnect";
+import { passkeysRoutes } from "@/routes/passkeys";
+import { authSessionsRoutes } from "@/routes/authSessions";
+import { totpRoutes } from "@/routes/totp";
+import { requireAuth } from "@/middleware/auth";
+import { listSidecars } from "@/lib/sidecars";
 
-export const app = new Hono<AppEnv>();
+// Session F, step 4: every route file converts to @hono/zod-openapi
+// through lib/openapi.ts's apiRouter() - app.ts's own top-level instance
+// is the root every session's `.route()`-mounted sub-router aggregates
+// into, so it has to be the OpenAPIHono variant too for /api/docs to see
+// anything. An UNCONVERTED sub-router (plain Hono, everything not yet
+// converted) mounts onto this exactly the same way it always did -
+// OpenAPIHono only adds the `.openapi()` method and the document
+// generation, it doesn't require every mounted router to use it.
+export const app = apiRouter();
 
-app.get("/api/health", (c) => c.json({ status: "ok" }));
+// Session F, step 2: real sidecar reporting, per the wave-2 contract
+// ("F to E: health, repairs, updates..."). gpu/disk/last_backup/
+// certificate/models/link are the rest of that contract's shape - they
+// land with steps 3 (guards), 5 (trust), 8 (backups), 9 (storage), 10
+// (models) and Wave 3 (link) respectively; adding them now as guessed
+// placeholders would be a shape E has to revisit twice instead of once,
+// so this only returns what's real today. requireAuth, not a role gate:
+// unlike Repairs (owner/admin, remedial actions), Health is informational
+// and every signed-in household member can see it.
+const SidecarStatusSchema = z.enum(["stopped", "starting", "running", "unhealthy", "crashed"]);
+const HealthResponseSchema = z.object({
+  sidecars: z.array(
+    z.object({
+      id: z.string(),
+      status: SidecarStatusSchema,
+      baseUrl: z.string().nullable(),
+    }),
+  ),
+});
+
+const healthRoute = createRoute({
+  method: "get",
+  path: "/api/health",
+  tags: ["Health"],
+  summary: "Every registered sidecar's live status",
+  middleware: [requireAuth] as const,
+  responses: {
+    200: {
+      content: { "application/json": { schema: HealthResponseSchema } },
+      description: "Sidecar statuses. gpu/disk/last_backup/certificate/models/link land in later steps.",
+    },
+    ...errorResponses({ 401: "Not signed in" }),
+  },
+});
+// The explicit `200` matters, not just style: omitting it left @hono/
+// zod-openapi unable to tell which of the route's declared response
+// schemas (200 vs 401) this call was for, and it type-checked the
+// response body against BOTH - a real error caught while converting
+// routes/repairs.ts to the identical pattern, fixed here too.
+app.openapi(healthRoute, (c) => c.json({ sidecars: listSidecars() }, 200));
+
+// /api/docs: the Scalar API reference reading the generated document
+// below. docs/api/ (a script check.sh runs and diffs, per this step's
+// own plan text) is generated FROM this same document, never hand-
+// written - see scripts/gen-api-docs.ts.
+app.doc("/api/openapi.json", {
+  openapi: "3.0.0",
+  info: { title: "MaiPai Home API", version: "0.1.0" },
+});
+app.get("/api/docs", apiReference({ url: "/api/openapi.json" }));
 
 app.route("/api/auth", auth);
 app.route("/api/people", peopleRoutes);
@@ -45,6 +112,13 @@ app.route("/api/host", hostRoutes);
 app.route("/api/voice", voiceRoutes);
 app.route("/api/privacy", privacyRoutes);
 app.route("/api/repairs", repairsRoutes);
+app.route("/api/setup", setupRoutes);
+app.route("/api/devices", devicesRoutes);
+app.route("/api/auth/devices", deviceAuthRoutes);
+app.route("/api/auth/quick-connect", quickConnectRoutes);
+app.route("/api/auth/passkeys", passkeysRoutes);
+app.route("/api/auth/sessions", authSessionsRoutes);
+app.route("/api/auth/totp", totpRoutes);
 
 // Serving the built frontend from this same process (docs/dev.md, the
 // shell/kit/Chat slice): a self-hosted single-process hub, no reverse

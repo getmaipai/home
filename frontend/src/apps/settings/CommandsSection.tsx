@@ -29,7 +29,7 @@ function summarize(action: CommandAction): string {
 // already has); the create form only renders for a role that could
 // actually create one (adult or higher - lib/commands.ts's own
 // MIN_ROLE_TO_CREATE), the same "hide what would just 403" posture
-// PeoplePage's own role gating already takes.
+// UsersSection.tsx's own role gating takes.
 export function CommandsSection({ person }: CommandsSectionProps) {
   const [commands, setCommands] = useState<CommandRow[] | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);

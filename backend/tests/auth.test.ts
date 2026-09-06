@@ -64,8 +64,51 @@ describe("profiles picker", () => {
     const body = (await res.json()) as Array<Record<string, unknown>>;
     expect(body).toHaveLength(1);
     expect(body[0]!.hasSecret).toBe(true);
+    expect(body[0]!.hasPasskeys).toBe(false);
     expect(JSON.stringify(body)).not.toContain("secretHash");
     expect(JSON.stringify(body)).not.toContain("correcthorse");
+  });
+});
+
+// Step 6: a passkey-only profile (no PIN/password at all) must be
+// refused the exact same bare-tap /select a PIN-free child profile gets
+// - it is not a credential-free profile just because personCredentials
+// has no secretHash.
+describe("passkey-only profiles are not bare-tap profiles", () => {
+  test("hasPasskeys is true and /select is refused once a passkey is registered, with no PIN ever set", async () => {
+    const owner = new TestClient();
+    const { person } = await setUpOwner(owner);
+    const created = await owner.post("/api/people", { displayName: "Bramble", role: "adult" });
+    const passkeyOnlyPerson = (await created.json()) as { id: string };
+
+    // No PIN/password ever set for this person - directly register a
+    // passkey credential (a full ceremony needs a real authenticator,
+    // covered by tests/passkeys.test.ts; this test only cares that ITS
+    // presence changes /select's and /profiles' behavior).
+    const { passkeyCredentials } = await import("@/db/schema");
+    const { db } = await import("@/db");
+    db.insert(passkeyCredentials)
+      .values({
+        id: "cred-bramble",
+        personId: passkeyOnlyPerson.id,
+        publicKey: "fake",
+        counter: 0,
+        transports: "[]",
+        deviceType: "singleDevice",
+        backedUp: false,
+        name: "Bramble's passkey",
+        createdAt: new Date().toISOString(),
+      })
+      .run();
+
+    const profiles = (await (await app.request("/api/auth/profiles")).json()) as Array<{ id: string; hasSecret: boolean; hasPasskeys: boolean }>;
+    const bramble = profiles.find((p) => p.id === passkeyOnlyPerson.id)!;
+    expect(bramble.hasSecret).toBe(false);
+    expect(bramble.hasPasskeys).toBe(true);
+
+    const client = new TestClient();
+    const res = await client.post("/api/auth/select", { personId: passkeyOnlyPerson.id });
+    expect(res.status).toBe(400);
   });
 });
 
@@ -117,6 +160,28 @@ describe("verify-secret and lockout", () => {
       secret: "correcthorse",
     });
     expect(locked.status).toBe(429);
+  });
+
+  // Step 6: TOTP delays the session, it never replaces the PIN check -
+  // /verify-secret's own lockout/attempts logic runs identically either
+  // way; only the final "issue a session" step changes.
+  test("with TOTP enabled, a correct secret does not sign in yet - totpRequired is true and no session cookie is set", async () => {
+    const setupClient = new TestClient();
+    const { person } = await setUpOwner(setupClient);
+    const { beginEnrollment, verifyEnrollment } = await import("@/lib/totp");
+    const { TOTP, Secret } = await import("otpauth");
+    const { uri } = beginEnrollment(person.id as string, "Sage");
+    const secret = Secret.fromBase32(new URL(uri).searchParams.get("secret")!);
+    verifyEnrollment(person.id as string, new TOTP({ secret }).generate());
+
+    const client = new TestClient();
+    const res = await client.post("/api/auth/verify-secret", { personId: person.id, secret: "correcthorse" });
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { totpRequired: boolean };
+    expect(body.totpRequired).toBe(true);
+
+    const me = await client.get("/api/auth/me");
+    expect(me.status).toBe(401); // no session cookie was set
   });
 });
 

@@ -1,6 +1,6 @@
 import { describe, expect, test, mock, afterEach } from "bun:test";
 import { cleanup, waitFor, fireEvent } from "@testing-library/react";
-import { MemoryRouter, useLocation } from "react-router-dom";
+import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
 import { SettingsPage } from "@/apps/settings/SettingsPage";
 import { renderWithQueryClient } from "../../../tests/renderWithQueryClient";
 import type { Roster, SettingsKey, ResolvedSetting } from "@/lib/api";
@@ -13,8 +13,13 @@ afterEach(cleanup);
 // tabs are URL-bound (`useSearchParams`), which throws outside a Router
 // - wrapped here the same way ChatPage.test.tsx already wraps ChatPage.
 function renderSettingsPage(props: Parameters<typeof SettingsPage>[0]) {
+  // `/settings` explicitly, not MemoryRouter's own "/" default: SettingsPage
+  // now compares `location.pathname` against the literal "/settings" path
+  // to decide whether to show its own tab content or a nested route's
+  // <Outlet/> (2026-09-06's rail/header/search-persistence fix) - it's
+  // always actually mounted at that path in the real app (App.tsx).
   return renderWithQueryClient(
-    <MemoryRouter>
+    <MemoryRouter initialEntries={["/settings"]}>
       <SettingsPage {...props} />
     </MemoryRouter>,
   );
@@ -315,6 +320,7 @@ describe("SettingsPage tree - navigable entries", () => {
   // to react to the location change - so its own tab state keeps
   // reading the current, now tab-less URL and falls back to Household).
   test.each([
+    ["Users", "/settings/users", "household"],
     ["Backups", "/settings/backups", "household"],
     ["Voices", "/settings/voices", "me"],
     ["Commands", "/settings/commands", "me"],
@@ -369,6 +375,279 @@ describe("SettingsPage tree - navigable entries", () => {
       expect(getByTestId("location-probe")).toHaveTextContent(path);
     } finally {
       globalThis.fetch = originalFetch;
+    }
+  });
+});
+
+function stubSettingsFetch() {
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = mock((input: RequestInfo | URL) => {
+    const url = typeof input === "string" ? input : input.toString();
+    if (url.includes("/api/settings/registry")) {
+      return Promise.resolve(new Response(JSON.stringify(REGISTRY), { status: 200 }));
+    }
+    if (url.includes("/api/settings?scope=household")) {
+      return Promise.resolve(
+        new Response(JSON.stringify([resolved("household.locale", "en-US", "Language and region")]), {
+          status: 200,
+        }),
+      );
+    }
+    // Any other scope is a `person:<id>` request - the exact id varies per
+    // test's own `makePerson()` call, so match on the still-unique prefix
+    // rather than needing the caller to thread its person through here too.
+    if (url.includes("/api/settings?scope=person")) {
+      return Promise.resolve(
+        new Response(JSON.stringify([resolved("tts.voice_id", "alba", "Speaking voice")]), { status: 200 }),
+      );
+    }
+    if (url.includes("/api/plugins/stats")) {
+      return Promise.resolve(
+        new Response(
+          JSON.stringify({
+            total: 0,
+            plugin: 0,
+            pluginError: 0,
+            command: 0,
+            commandError: 0,
+            model: 0,
+            safetyRefuse: 0,
+            fallthroughRate: 0,
+            byPlugin: [],
+            byCommand: [],
+          }),
+          { status: 200 },
+        ),
+      );
+    }
+    return Promise.reject(new Error(`unstubbed fetch: ${url}`));
+  }) as unknown as typeof fetch;
+  return () => {
+    globalThis.fetch = originalFetch;
+  };
+}
+
+// A code review (2026-09-06) found the rail deriving its tree from `?tab=`
+// alone once Models/Backups/Voices/Commands became nested routes: clicking
+// a Me-tab-only entry (`navigate(entry.to)`) drops the `tab` query param,
+// so `tab` fell back to "household" even while Voices/Commands content was
+// on screen - the sidebar swapped to HOUSEHOLD_TREE, which doesn't even
+// contain the page being shown. The fix makes the pathname itself the
+// source of truth for which tree to render whenever it names a known
+// nested route, rather than trusting a query param a navigation can drop.
+describe("SettingsPage tree - tab stays in sync with the route, not just ?tab=", () => {
+  test("clicking a Me-tab entry (Voices) keeps the Me tree, not Household's, even though the URL loses ?tab=me", async () => {
+    const person = makePerson("owner");
+    const restore = stubSettingsFetch();
+    try {
+      const { findByRole, findByText, queryByRole } = renderWithQueryClient(
+        <MemoryRouter initialEntries={["/settings?tab=me"]}>
+          <SettingsPage person={person} onPersonChange={() => {}} />
+        </MemoryRouter>,
+      );
+      await findByText("Speaking voice");
+      fireEvent.click(await findByRole("button", { name: "Voices" }));
+
+      // Still the Me tree (Commands, a PERSON_TREE-only entry, is still
+      // there) - not HOUSEHOLD_TREE, which doesn't contain "Voices" at all.
+      expect(await findByRole("button", { name: "Commands" })).toBeTruthy();
+      expect(queryByRole("button", { name: "AI models" })).toBeNull();
+      expect(await findByRole("button", { name: "Me" })).toHaveClass("bg-muted");
+    } finally {
+      restore();
+    }
+  });
+
+  test("a non-admin who lands directly on a household-only route still sees the tree that matches it, not the Me tree they're normally forced into", async () => {
+    const person = makePerson("child");
+    const restore = stubSettingsFetch();
+    try {
+      const { findByRole, queryByRole } = renderWithQueryClient(
+        <MemoryRouter initialEntries={["/settings/backups"]}>
+          <SettingsPage person={person} onPersonChange={() => {}} />
+        </MemoryRouter>,
+      );
+      expect(await findByRole("button", { name: "AI models" })).toBeTruthy();
+      expect(queryByRole("button", { name: "Voices" })).toBeNull();
+    } finally {
+      restore();
+    }
+  });
+
+  test("a direct/bookmarked URL with a mismatched ?tab= still shows the tree that actually matches the page", async () => {
+    const person = makePerson("owner");
+    const restore = stubSettingsFetch();
+    try {
+      // Backups is household-only, but the URL claims tab=me - the route
+      // itself must win.
+      const { findByRole, queryByRole } = renderWithQueryClient(
+        <MemoryRouter initialEntries={["/settings/backups?tab=me"]}>
+          <SettingsPage person={person} onPersonChange={() => {}} />
+        </MemoryRouter>,
+      );
+
+      expect(await findByRole("button", { name: "AI models" })).toBeTruthy();
+      expect(queryByRole("button", { name: "Voices" })).toBeNull();
+      expect(await findByRole("button", { name: "Household" })).toHaveClass("bg-muted");
+    } finally {
+      restore();
+    }
+  });
+
+  // A code review (2026-09-06) found the scrollspy's `activeId` never got
+  // cleared on navigating into a nested route - nothing there for its
+  // IntersectionObserver to re-target, so the last scroll-highlighted
+  // entry from BEFORE the navigation stayed lit up alongside the newly-
+  // active routed entry (two entries highlighted at once).
+  test("navigating to a nested route clears a stale scroll-highlighted entry from the tree", async () => {
+    const person = makePerson("owner");
+    // A holder object, not a plain reassigned `let`: TypeScript's control-
+    // flow narrowing can't see across the class constructor closure below
+    // into a captured `let` binding, and narrows a later read of it to
+    // `never` - a property on an object sidesteps that entirely.
+    const callbackHolder: { current: IntersectionObserverCallback | null } = { current: null };
+    const originalIO = globalThis.IntersectionObserver;
+    class FakeIntersectionObserver {
+      constructor(cb: IntersectionObserverCallback) {
+        callbackHolder.current = cb;
+      }
+      observe() {}
+      unobserve() {}
+      disconnect() {}
+      takeRecords() {
+        return [];
+      }
+    }
+    globalThis.IntersectionObserver = FakeIntersectionObserver as unknown as typeof IntersectionObserver;
+    const restore = stubSettingsFetch();
+    try {
+      const { findByRole, findByText } = renderWithQueryClient(
+        <MemoryRouter initialEntries={["/settings"]}>
+          <SettingsPage person={person} onPersonChange={() => {}} />
+        </MemoryRouter>,
+      );
+      await findByText("Language and region");
+
+      // Simulate a real mid-scroll state: "AI model tuning" scrolled into
+      // the observer's target zone. A plain detached element with the
+      // right id, not a real rendered section - the minimal REGISTRY stub
+      // here has nothing in that settings group to actually render one,
+      // and the component only ever reads `target.id` off the entry.
+      const fakeEl = document.createElement("div");
+      fakeEl.id = "settings-household.ai";
+      callbackHolder.current?.(
+        [{ isIntersecting: true, target: fakeEl, boundingClientRect: { top: 0 } } as unknown as IntersectionObserverEntry],
+        {} as IntersectionObserver,
+      );
+      expect(await findByRole("button", { name: "AI model tuning" })).toHaveClass("bg-muted");
+
+      fireEvent.click(await findByRole("button", { name: "AI models" }));
+
+      // The stale scroll highlight must be gone now that we've left the
+      // page it applied to - only the routed entry should be active.
+      expect(await findByRole("button", { name: "AI model tuning" })).not.toHaveClass("bg-muted");
+      expect(await findByRole("button", { name: "AI models" })).toHaveClass("bg-muted");
+    } finally {
+      globalThis.IntersectionObserver = originalIO;
+      restore();
+    }
+  });
+});
+
+// Jesse, 2026-09-06: clicking "Backups"/"AI models" made the content pane
+// "completely fill" and lost the rail, header, and search - the earlier
+// standalone routes (ModelsPage.tsx et al.) unmounted SettingsPage
+// entirely. Nested child routes (App.tsx) rendered through SettingsPage's
+// own <Outlet/> fix this; unlike the tests above (which render SettingsPage
+// bare, with no <Routes> around it, since they only assert the URL a click
+// navigates to), this one wires up a real nested <Route> so the <Outlet/>
+// actually has something to render, proving the shell survives the
+// navigation rather than just proving the URL changed.
+describe("SettingsPage nested routes keep the shell mounted", () => {
+  test("navigating into a nested route keeps the rail, tab switcher, and search box on screen", async () => {
+    const person = makePerson("owner");
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = mock((input: RequestInfo | URL) => {
+      const url = typeof input === "string" ? input : input.toString();
+      if (url.includes("/api/settings/registry")) {
+        return Promise.resolve(new Response(JSON.stringify(REGISTRY), { status: 200 }));
+      }
+      if (url.includes("/api/settings?scope=")) {
+        return Promise.resolve(
+          new Response(JSON.stringify([resolved("household.locale", "en-US", "Language and region")]), {
+            status: 200,
+          }),
+        );
+      }
+      if (url.includes("/api/plugins/stats")) {
+        return Promise.resolve(
+          new Response(
+            JSON.stringify({
+              total: 0,
+              plugin: 0,
+              pluginError: 0,
+              command: 0,
+              commandError: 0,
+              model: 0,
+              safetyRefuse: 0,
+              fallthroughRate: 0,
+              byPlugin: [],
+              byCommand: [],
+            }),
+            { status: 200 },
+          ),
+        );
+      }
+      return Promise.reject(new Error(`unstubbed fetch: ${url}`));
+    }) as unknown as typeof fetch;
+
+    try {
+      const { findByRole, findByText, findByLabelText } = renderWithQueryClient(
+        <MemoryRouter initialEntries={["/settings"]}>
+          <Routes>
+            <Route path="/settings" element={<SettingsPage person={person} onPersonChange={() => {}} />}>
+              <Route path="models" element={<div>Fake AI models content</div>} />
+            </Route>
+          </Routes>
+        </MemoryRouter>,
+      );
+
+      await findByText("Language and region");
+      fireEvent.click(await findByRole("button", { name: "AI models" }));
+
+      await findByText("Fake AI models content");
+      // The whole point of the fix: these three are still on screen, not
+      // gone because SettingsPage unmounted.
+      expect(await findByRole("button", { name: "AI models" })).toBeTruthy();
+      expect(await findByRole("button", { name: "Household" })).toBeTruthy();
+      // Still on screen, but disabled (a code review, 2026-09-06, found it
+      // stayed enabled here even though nothing on this route reads what's
+      // typed into it) - found by its stable aria-label, not the
+      // placeholder text, which changes to say so once disabled.
+      expect(await findByLabelText("Search settings")).toBeDisabled();
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+  });
+
+  // A code review (2026-09-06) found `location.pathname === "/settings"`
+  // rendered a blank <Outlet/> for the harmless "/settings/" (trailing
+  // slash) case - nothing recognized it as either the default route or a
+  // known nested one. Deriving `isDefaultRoute` from `routeTab` instead
+  // (routeTab is null for anything neither tree recognizes, trailing
+  // slash included) folds this back into the default view.
+  test("a trailing-slash URL (/settings/) still shows the default content, not a blank pane", async () => {
+    const person = makePerson("owner");
+    const restore = stubSettingsFetch();
+    try {
+      const { findByText } = renderWithQueryClient(
+        <MemoryRouter initialEntries={["/settings/"]}>
+          <SettingsPage person={person} onPersonChange={() => {}} />
+        </MemoryRouter>,
+      );
+      await findByText("Language and region");
+    } finally {
+      restore();
     }
   });
 });

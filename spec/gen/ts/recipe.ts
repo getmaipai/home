@@ -170,6 +170,75 @@ export const Recipe = z
               })
               .strict()
               .describe("Calls host.schedule."),
+            z
+              .object({
+                op: z.literal("integration.call"),
+                /**Binds the result into the recipe's variable scope under this name.*/
+                as: z
+                  .string()
+                  .describe(
+                    "Binds the result into the recipe's variable scope under this name.",
+                  ),
+                /**The integration id, e.g. "home_assistant". Requires the manifest to declare integration:<id>.*/
+                id: z
+                  .string()
+                  .describe(
+                    'The integration id, e.g. "home_assistant". Requires the manifest to declare integration:<id>.',
+                  ),
+                /**An id-specific method name, e.g. Home Assistant's "get_state" or "call_service".*/
+                method: z
+                  .string()
+                  .describe(
+                    'An id-specific method name, e.g. Home Assistant\'s "get_state" or "call_service".',
+                  ),
+                /**Every string value, at any depth, may reference input/variable names in {braces} - unlike fetch's own body, which is passed through as-is.*/
+                args: z
+                  .record(z.string(), z.any())
+                  .describe(
+                    "Every string value, at any depth, may reference input/variable names in {braces} - unlike fetch's own body, which is passed through as-is.",
+                  )
+                  .optional(),
+              })
+              .strict()
+              .describe(
+                "Goes through host.integration.call - a typed read or action against a household-configured third-party integration beyond Home Assistant's own dedicated home.call_service step (session-d-packages-and-store.md step 4).",
+              ),
+            z
+              .object({
+                op: z.literal("compute"),
+                as: z.string(),
+                /**A math/unit-conversion expression, e.g. "12 miles to km" or "{amount} * 1.08". {variable} references are substituted before evaluation, the same interpolation every other step's text fields use.*/
+                expression: z
+                  .string()
+                  .describe(
+                    'A math/unit-conversion expression, e.g. "12 miles to km" or "{amount} * 1.08". {variable} references are substituted before evaluation, the same interpolation every other step\'s text fields use.',
+                  ),
+              })
+              .strict()
+              .describe(
+                "A restricted math/unit expression evaluator (session-d-packages-and-store.md step 4) - no network call, no host access, real numbers and unit conversion only. Backs math/convert without either package needing its own fetch-based service.",
+              ),
+            z
+              .object({
+                op: z.literal("ask"),
+                /**A template with {variable} interpolation, spoken/shown as the follow-up question.*/
+                prompt: z
+                  .string()
+                  .describe(
+                    "A template with {variable} interpolation, spoken/shown as the follow-up question.",
+                  ),
+                /**What kind of answer the next utterance should satisfy, e.g. a variable name the recipe would otherwise have asked for. Free text, matched by the turn engine (wave-2.md's C-to-D contract), not this interpreter.*/
+                expects: z
+                  .string()
+                  .describe(
+                    "What kind of answer the next utterance should satisfy, e.g. a variable name the recipe would otherwise have asked for. Free text, matched by the turn engine (wave-2.md's C-to-D contract), not this interpreter.",
+                  )
+                  .optional(),
+              })
+              .strict()
+              .describe(
+                "Sets the result's ask field (result.schema.json, 4.5) so a recipe that can't disambiguate on its own (\"which Springfield\") can ask a deterministic follow-up instead of guessing or failing outright. Always the recipe's last step: nothing after an ask step can run in the same pass, since there is nothing left to compute until the follow-up answer arrives on a later turn.",
+              ),
           ];
           const { errors, failed } = schemas.reduce<{
             errors: z.core.$ZodIssue[];

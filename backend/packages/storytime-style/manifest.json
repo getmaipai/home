@@ -27,9 +27,10 @@
   "notifications": [],
   "backup": "exclude",
   "background": false,
-  "contributes": [],
+  "contributes": {},
   "pages": [],
   "min_app": "0.1.0",
   "tier": 0,
-  "quality_scale": "bronze"
+  "quality_scale": "bronze",
+  "smoke": { "kind": "static" }
 }

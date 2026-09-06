@@ -163,6 +163,55 @@ describe("createChatModelAdapter streaming", () => {
     }
   });
 
+  // A code review (2026-09-06) found that a delta landing entirely inside
+  // an open <think> block still yielded an empty-string "text" content
+  // part - enough for assistant-ui's built-in "no-text" indicator check
+  // (thread.aui.tsx) to treat the message as having text and hide its
+  // pulsing "Assistant is working" dot, well before there was anything
+  // visible to replace it with. Someone without audio (speakers off, or
+  // deaf) lost the only signal that MaiPai was still working.
+  test("no content is yielded while inside a <think> block with nothing visible yet - the loading indicator stays up", async () => {
+    const { stream, release } = staggeredNdjsonStream(
+      [{ type: "delta", text: "<think>reasoning about the" }],
+      [
+        { type: "delta", text: " answer here</think>The real answer." },
+        { type: "done", value: { reply: { text: "<think>reasoning about the answer here</think>The real answer." }, source: "model", safety: SAFETY } },
+      ],
+    );
+    const env = stubEnvironment(stream);
+    try {
+      const adapter = createChatModelAdapter({
+        consumeThinking: () => false,
+        onCrisisResources: () => {},
+        turnSchedulerRef: { current: null },
+      });
+      const abortSignal = new AbortController().signal;
+      const options = {
+        messages: [fakeUserMessage("what's the answer")],
+        runConfig: {},
+        abortSignal,
+        context: {},
+        unstable_getMessage: () => fakeUserMessage("what's the answer"),
+      } as unknown as ChatModelRunOptions;
+      const yields: ChatModelRunResult[] = [];
+      const done = (async () => {
+        for await (const r of runAdapter(adapter, options)) yields.push(r);
+      })();
+
+      // Only the still-open <think> block has arrived so far - nothing
+      // visible exists yet, so nothing should have yielded (the indicator
+      // stays up rather than being replaced by an empty text part).
+      await new Promise((resolve) => setTimeout(resolve, 10));
+      expect(yields).toHaveLength(0);
+
+      release();
+      await done;
+      expect(lastText(yields)).toBe("The real answer.");
+    } finally {
+      env.restore();
+    }
+  });
+
   test("a <think> block never yielded or spoken - only the real answer after it", async () => {
     const env = stubEnvironment(
       ndjsonStream([
@@ -273,6 +322,50 @@ describe("createChatModelAdapter streaming", () => {
       env.restore();
     }
   });
+
+  // Jesse, 2026-09-06: the composer's own Send/Stop toggle tracks only
+  // text generation, so it flipped back to "Send" while a reply was still
+  // being spoken - onSpeakingChange (ChatPage.tsx's "stop speaking"
+  // control) exists specifically because these two are genuinely
+  // different signals, not the same thing twice.
+  test("onSpeakingChange tracks the reply's own audio, independent of when text generation finishes", async () => {
+    const env = stubEnvironment(
+      ndjsonStream([
+        { type: "delta", text: "Hello there." },
+        { type: "done", value: { reply: { text: "Hello there." }, source: "model", safety: SAFETY } },
+      ]),
+    );
+    try {
+      const speakingEvents: boolean[] = [];
+      const adapter = createChatModelAdapter({
+        consumeThinking: () => false,
+        onCrisisResources: () => {},
+        turnSchedulerRef: { current: null },
+        onSpeakingChange: (speaking) => speakingEvents.push(speaking),
+      });
+      const options = {
+        messages: [fakeUserMessage("hi")],
+        runConfig: {},
+        abortSignal: new AbortController().signal,
+        context: {},
+        unstable_getMessage: () => fakeUserMessage("hi"),
+      } as unknown as ChatModelRunOptions;
+      // Draining the generator to completion is exactly "text generation
+      // finished" - speech (a separate TTS fetch, then playback) hasn't
+      // necessarily caught up yet, which is the entire gap this exists to
+      // cover. eslint's no-unused-vars only ignores a leading-underscore
+      // NAME on function args (argsIgnorePattern), not a for-of binding,
+      // hence the inline disable for this one intentionally-discarded value.
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      for await (const _ of runAdapter(adapter, options)) {
+        /* drain */
+      }
+      await new Promise((resolve) => setTimeout(resolve, 20));
+      expect(speakingEvents).toEqual([false, true, false]);
+    } finally {
+      env.restore();
+    }
+  });
 });
 
 describe("createChatModelAdapter errors", () => {
@@ -333,6 +426,50 @@ describe("createChatModelAdapter errors", () => {
       expect(error).toBeInstanceOf(DOMException);
       expect((error as DOMException).name).toBe("AbortError");
     } finally {
+      env.restore();
+    }
+  });
+
+  // Jesse, 2026-09-06: stopping a reply should behave like every other
+  // voice/chat app's barge-in - cut audio immediately, not let whatever's
+  // already queued keep playing out. scheduler.stop() (unlike finish())
+  // closes the AudioContext right away, so that's the observable signal
+  // a user-initiated stop actually took the barge-in path.
+  test("an aborted run cuts audio immediately (stop), not letting it finish naturally", async () => {
+    const originalClose = FakeAudioContext.prototype.close;
+    const close = mock(() => Promise.resolve());
+    FakeAudioContext.prototype.close = close;
+    const controller = new AbortController();
+    const env = stubEnvironment(() => {
+      controller.abort();
+      return Promise.reject(new DOMException("aborted", "AbortError"));
+    });
+    try {
+      const { error } = await collect([fakeUserMessage("hi")], controller.signal);
+      expect(error).toBeInstanceOf(DOMException);
+      expect(close).toHaveBeenCalledTimes(1);
+    } finally {
+      FakeAudioContext.prototype.close = originalClose;
+      env.restore();
+    }
+  });
+
+  // The flip side: a genuine failure (not a user-initiated stop) still
+  // lets whatever's already been enqueued finish naturally - only a real
+  // Stop click is barge-in.
+  test("a mid-stream failure that isn't a user stop never cuts audio short", async () => {
+    const originalClose = FakeAudioContext.prototype.close;
+    const close = mock(() => Promise.resolve());
+    FakeAudioContext.prototype.close = close;
+    const env = stubEnvironment(
+      ndjsonStream([{ type: "delta", text: "Partial reply" }, { type: "error", error: "chat model unavailable: llama-server crashed" }]),
+    );
+    try {
+      const { error } = await collect([fakeUserMessage("hi")]);
+      expect(error).toBeInstanceOf(Error);
+      expect(close).not.toHaveBeenCalled();
+    } finally {
+      FakeAudioContext.prototype.close = originalClose;
       env.restore();
     }
   });

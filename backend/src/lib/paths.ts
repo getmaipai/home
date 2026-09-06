@@ -1,5 +1,14 @@
-import { resolve } from "node:path";
+import { resolve, join } from "node:path";
 import { existsSync, mkdirSync } from "node:fs";
+
+// The bundled packages' own source directory - checked into git, never
+// per-household data, so it lives here (not under dataDir below) even
+// though it's a "path" in the same sense. Moved from lib/plugins.ts
+// (session-d-packages-and-store.md step 5) so lib/denoHost.ts can read
+// it too without creating a plugins.ts <-> denoHost.ts import cycle
+// (plugins.ts's own runPlugin() calls into denoHost.ts for a Tier 1
+// package).
+export const PACKAGES_DIR = join(import.meta.dir, "..", "..", "packages");
 
 // `data/` lives at the repo root (gitignored there, see .gitignore), the
 // same place the legacy hub kept it. `MAIPAI_DATA_DIR` overrides it, used by
@@ -36,6 +45,25 @@ export const enginesDir = resolve(dataDir, "engines");
 // download.ts's `WAKEWORD_DIR_REL`) since nothing about that path is
 // legacy-specific.
 export const wakewordDir = resolve(dataDir, "voice", "wakewords");
+
+// A package's own cached fetch responses (session-d-packages-and-store.md
+// step 3, `lib/packageCache.ts`): one subdirectory per package id under
+// here, never a spec-shaped record and never synced or backed up - a cache
+// entry is, by definition, reconstructible from the third-party service it
+// came from.
+export const cacheDir = resolve(dataDir, "cache");
+
+// A Tier 1 package's own writable state (session-d-packages-and-store.md
+// step 5, `lib/denoHost.ts`) - node:sqlite files, anything the sandboxed
+// Deno process itself persists. Deliberately separate from PACKAGES_DIR
+// above (the package's checked-in source, read-only from the sandbox's
+// own point of view): a package's Deno process gets `--allow-read` on
+// both its source and this directory, but `--allow-write` only on this
+// one - it can never write into its own source tree. Foreshadows step
+// 6's real install layout (`data/packages/<id>/<version>/`) without
+// needing that step's versioning yet, since nothing is "installed"
+// today, only bundled.
+export const tier1PackageDataDir = (packageId: string): string => resolve(dataDir, "packages", packageId);
 
 // A household member's own uploaded voice-cloning sample (2026-09-04):
 // real, irreplaceable family data (unlike wakewordDir's re-downloadable

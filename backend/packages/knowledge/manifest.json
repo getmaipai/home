@@ -1,0 +1,62 @@
+{
+  "id": "knowledge",
+  "version": "0.1.0",
+  "kind": "plugin",
+  "category": "Info",
+  "display": "Knowledge",
+  "description": "A quick answer to a general-knowledge question, the first Tier 1 package - it runs in its own sandboxed process, not a shared recipe interpreter.",
+  "author": "MaiPai",
+  "license": "AGPL-3.0",
+  "homepage": "https://github.com/getmaipai/home",
+  "routing": {
+    "examples": [
+      "who was Marie Curie",
+      "what is photosynthesis",
+      "tell me about the Eiffel Tower",
+      "what's the capital of Australia",
+      "who invented the telephone"
+    ],
+    "patterns": ["who was *", "what is *", "tell me about *", "what's the capital of *", "who invented *"]
+  },
+  "args": {
+    "type": "object",
+    "required": ["topic"],
+    "properties": {
+      "topic": { "type": "string", "minLength": 1 }
+    }
+  },
+  "requires": [],
+  "optional": [],
+  "platforms": ["home"],
+  "min_role": "child",
+  "consequential": false,
+  "offline": "unavailable",
+  "config": [],
+  "data_sources": [
+    {
+      "id": "wikipedia",
+      "destination": "Wikipedia's own public REST summary API (en.wikipedia.org)",
+      "when": "each time the family asks a general-knowledge question with no local offline copy to answer from",
+      "what": "the topic spoken in the request (e.g. 'Marie Curie')",
+      "who": "the Wikimedia Foundation",
+      "opt_in": true,
+      "retention": "unknown, see Wikimedia's own policy"
+    }
+  ],
+  "permissions": ["net:en.wikipedia.org"],
+  "notifications": [],
+  "cache": { "key_template": "knowledge:{topic}", "ttl_s": 3600, "stale_ok_s": 86400, "max_bytes": 100000 },
+  "fallback_reply": {
+    "text": "Sorry, I'm having trouble looking that up right now.",
+    "speech": "Sorry, I'm having trouble looking that up right now."
+  },
+  "backup": "exclude",
+  "background": false,
+  "contributes": {},
+  "pages": [],
+  "min_app": "0.1.0",
+  "timeout_ms": 8000,
+  "tier": 1,
+  "quality_scale": "bronze",
+  "smoke": { "kind": "deno_test" }
+}

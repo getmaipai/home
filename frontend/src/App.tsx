@@ -16,6 +16,7 @@ import { BackupsPage } from "@/apps/settings/BackupsPage";
 import { VoicesPage } from "@/apps/settings/VoicesPage";
 import { CommandsPage } from "@/apps/settings/CommandsPage";
 import { RepairsPage } from "@/apps/settings/RepairsPage";
+import { UsersPage } from "@/apps/settings/UsersPage";
 import { PeoplePage } from "@/apps/people/PeoplePage";
 import { MemoryPage } from "@/apps/memory/MemoryPage";
 import { PrivacyPage } from "@/apps/privacy/PrivacyPage";
@@ -95,18 +96,25 @@ export function App() {
                         <Route path="/conversations" element={<ConversationsPage person={person} />} />
                         <Route path="/notifications" element={<NotificationsPage />} />
                         <Route path="/search" element={<SearchPage />} />
-                        <Route path="/people" element={<PeoplePage person={person} />} />
+                        <Route path="/people" element={<PeoplePage />} />
                         <Route path="/memory" element={<MemoryPage person={person} />} />
                         <Route path="/privacy" element={<PrivacyPage />} />
                         <Route
                           path="/settings"
                           element={<SettingsPage person={person} onPersonChange={revalidatePerson} />}
-                        />
-                        <Route path="/settings/models" element={<ModelsPage person={person} />} />
-                        <Route path="/settings/backups" element={<BackupsPage person={person} />} />
-                        <Route path="/settings/voices" element={<VoicesPage person={person} />} />
-                        <Route path="/settings/commands" element={<CommandsPage person={person} />} />
-                        <Route path="/settings/repairs" element={<RepairsPage person={person} />} />
+                        >
+                          {/* Nested (2026-09-06), not sibling routes: navigating to
+                              one of these used to unmount SettingsPage entirely,
+                              taking the tree rail/Household-Me switcher/search box
+                              down with it. SettingsPage renders these through its
+                              own <Outlet/>, so its chrome stays put. */}
+                          <Route path="users" element={<UsersPage person={person} />} />
+                          <Route path="models" element={<ModelsPage person={person} />} />
+                          <Route path="backups" element={<BackupsPage person={person} />} />
+                          <Route path="voices" element={<VoicesPage person={person} />} />
+                          <Route path="commands" element={<CommandsPage person={person} />} />
+                          <Route path="repairs" element={<RepairsPage person={person} />} />
+                        </Route>
                       </Routes>
                     </Shell>
                   )

@@ -1,0 +1,1 @@
+ALTER TABLE `totp_secrets` ADD `last_used_step` integer;

@@ -43,7 +43,13 @@ export interface DnsLookup {
   (hostname: string): Promise<{ address: string; family: number }>;
 }
 
-function isPrivateOrLoopbackIpv4(ip: string): boolean {
+// Exported for lib/hubEndpoints.ts (2026-09-06): a code review found it
+// had re-implemented this exact classification with its own narrower
+// regex (missing 169.254.0.0/16 and 0.0.0.0/8, and dropping the 127.x
+// loopback case in one of its two checks) rather than reusing the
+// already-hardened version here - the same "one definition, one place"
+// bug class this file's own header already calls out for host.fetch.
+export function isPrivateOrLoopbackIpv4(ip: string): boolean {
   const parts = ip.split(".").map(Number);
   const [a, b] = parts;
   if (a === 127) return true; // loopback

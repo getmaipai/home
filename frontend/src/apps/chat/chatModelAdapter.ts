@@ -45,6 +45,15 @@ export interface ChatModelAdapterDeps {
   // ChatPage.tsx so a manual "Listen" click can stop it too - never let
   // two voices overlap.
   turnSchedulerRef: { current: SentenceSpeechScheduler | null };
+  // Jesse, 2026-09-06: the composer's Send/Stop toggle tracks only
+  // `thread.isRunning` (text generation) - text almost always finishes
+  // streaming well before its speech has finished playing (inherent to
+  // any pipeline that starts talking before the whole reply exists, not
+  // a bug), so the button flips back to "Send" while audio for the reply
+  // is still going, with nothing left on screen able to stop it. Wired to
+  // the scheduler's own onFirstAudio/onEnded so ChatPage.tsx can show a
+  // dedicated "stop speaking" control for exactly that window.
+  onSpeakingChange?(speaking: boolean): void;
 }
 
 // The real end-to-end streaming adapter (docs/plans/session-b-ui.md step
@@ -67,8 +76,15 @@ export function createChatModelAdapter(deps: ChatModelAdapterDeps): ChatModelAda
       // voices at once. A manual "Listen" replay (chatListen.ts) stops
       // itself independently when a new send starts (ChatPage.tsx).
       deps.turnSchedulerRef.current?.stop();
+      // The scheduler being stopped never fires its own onEnded (stop() is
+      // an abrupt cutoff, not a natural finish) - without this, a "stop
+      // speaking" control shown for the PREVIOUS reply would stay visible
+      // into this new one until/unless the new reply happens to speak too.
+      deps.onSpeakingChange?.(false);
       const scheduler = new SentenceSpeechScheduler();
       deps.turnSchedulerRef.current = scheduler;
+      scheduler.onFirstAudio = () => deps.onSpeakingChange?.(true);
+      scheduler.onEnded = () => deps.onSpeakingChange?.(false);
 
       // `raw` is every byte received so far, unstripped. `visible` is the
       // real, displayable/speakable answer built up incrementally with
@@ -179,7 +195,16 @@ export function createChatModelAdapter(deps: ChatModelAdapterDeps): ChatModelAda
           if (event.type === "delta") {
             raw += event.text;
             resolveRaw();
-            yield { content: [{ type: "text", text: visible }] };
+            // Only yield once there's something to show. A delta that lands
+            // entirely inside an open <think> block leaves `visible` "" -
+            // yielding that anyway would hand assistant-ui a real (if empty)
+            // "text" part, which is enough to satisfy MessagePrimitive.
+            // GroupedParts's "no-text" check (thread.aui.tsx's built-in
+            // pulsing "Assistant is working" indicator) and hide it, well
+            // before there's any visible reply to replace it with - and, if
+            // a spoken_cue (below) is still audibly playing, exactly the
+            // moment someone without audio needs that indicator most.
+            if (visible) yield { content: [{ type: "text", text: visible }] };
             const pending = visible.slice(spokenLength);
             const { chunks, consumed } = splitReadyChunks(pending, spokenLength === 0);
             // Each chunk speaks its normalized form, never the displayed
@@ -253,7 +278,6 @@ export function createChatModelAdapter(deps: ChatModelAdapterDeps): ChatModelAda
           throw new ApiError("The connection ended before MaiPai finished replying.", 0, "unavailable");
         }
       } catch (e) {
-        scheduler.finish(); // let whatever already started speaking finish naturally, enqueue nothing more
         if (abortSignal.aborted) {
           // The runtime's own stop button (ComposerPrimitive.Cancel):
           // rawStreamPost merges this same abortSignal into the fetch's
@@ -263,8 +287,19 @@ export function createChatModelAdapter(deps: ChatModelAdapterDeps): ChatModelAda
           // @assistant-ui/core's local-thread-runtime-core.ts specifically
           // checks for (`e.name === "AbortError"`), so a user-initiated
           // stop reads as cancelled, not as a failed reply.
+          //
+          // A user-initiated stop is barge-in, not "let the reply wind
+          // down": every other voice/chat app cuts audio the instant Stop
+          // is pressed (Jesse, 2026-09-06, asked for exactly that
+          // behavior) - scheduler.stop() (SentenceSpeechScheduler's own
+          // "the real mechanism a future barge-in feature needs" method)
+          // closes the AudioContext immediately, unlike finish() below,
+          // which lets whatever's already scheduled keep playing out.
+          scheduler.stop();
+          deps.onSpeakingChange?.(false); // stop() never fires onEnded itself
           throw new DOMException("The run was stopped.", "AbortError");
         }
+        scheduler.finish(); // a genuine failure, not a user stop - let whatever already started speaking finish naturally, enqueue nothing more
         // turnEngine.ts's "unavailable" code covers every real down-state
         // (still downloading, crashed, never selected): one friendly,
         // actionable message rather than the developer-facing reason string

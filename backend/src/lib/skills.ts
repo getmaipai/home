@@ -17,8 +17,7 @@
 import { readFileSync, readdirSync, existsSync } from "node:fs";
 import { join } from "node:path";
 import { PackageManifest } from "@maipai/spec/gen/ts/manifest.js";
-
-const PACKAGES_DIR = join(import.meta.dir, "..", "..", "packages");
+import { PACKAGES_DIR } from "@/lib/paths";
 
 export interface LoadedSkill {
   manifest: PackageManifest;

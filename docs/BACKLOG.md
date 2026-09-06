@@ -103,23 +103,29 @@ already defines a real bar for every package (skills included); checked
 against what the 6 bundled skills actually have today, none of them
 clear it in full:
 
-- [ ] **A real `quality_scale.yaml` per package** (S per package) - today
-      `quality_scale` is one string field inside `manifest.json`, not the
-      separate file with bronze/silver/gold criteria the standard
-      describes (tests green, five-plus routing examples, a privacy row
-      per data source, stated offline behavior, a smoke test, README and
-      changelog present, lint clean). The routing-examples and privacy-row
-      and offline-behavior parts are genuinely met already; the smoke test
-      and the file itself are not.
-- [ ] **A `smoke` entry per package** (S-M per package, M to design the
-      mechanism once) - "runs where the package will live, at install, at
-      every update, and on a schedule; a failure leaves it installed but
-      disabled with a Repairs item." No smoke-test mechanism or Repairs
-      concept exists anywhere in this codebase yet - this is real
-      infrastructure, not just a per-package checkbox.
-- [ ] **A user-tier `README.md` and `CHANGELOG.md` per package** (S per
-      package) - the "store card" a household or the catalog's browse UI
-      would show; none of the 6 bundled packages has either today.
+- [x] **A real `quality_scale.yaml` per package** (S per package) -
+      session-d-packages-and-store.md step 1, 2026-09-06: done for the 5
+      packages D owns (define, joke, trivia, weather, storytime-style),
+      each stating bronze/silver/gold against docs/PACKAGES.md's real
+      criteria, checked by `spec/tests/ts/package-bronze.test.ts`.
+      `remember`/`recall` are C's (session-d's ownership map); still
+      open for those two.
+- [x] **A `smoke` entry per package** (S-M per package, M to design the
+      mechanism once) - session-d step 1, 2026-09-06: the mechanism is
+      built (`lib/smoke.ts`: a `recipe_fixture` check against a
+      `HostEmulator`-run recipe for a Tier 0 plugin, a `static` load
+      check for a `skill`, `deno_test` reserved for Tier 1/step 5),
+      wired to a daily core job and a boot-time pass (standing in for
+      "at install" until the store's real install flow exists, step 6),
+      and a failure disables the package and raises an issue
+      (`lib/issues.ts`, a local stub until F's real one merges). Declared
+      for D's 5 packages; `remember`/`recall` still need their own
+      (C's). A package with no `smoke` entry is treated as "not yet
+      bronze," never disabled - this session's infrastructure must not
+      reach across ownership lines to break a package it doesn't own.
+- [x] **A user-tier `README.md` and `CHANGELOG.md` per package** (S per
+      package) - session-d step 1, 2026-09-06: done for D's 5 packages;
+      `remember`/`recall` still open (C's).
 - [ ] **Real i18n for skills** (L) - genuinely undecided, not just
       unbuilt: no `getmaipai/.github` standard mentions i18n at all today,
       so this needs a design decision before any code. At minimum:
@@ -139,6 +145,26 @@ set with anything below bronze, which today it structurally can't check
 ## Skills (Tier 0 catalog)
 
 Bundled today: `remember`, `recall`, `weather`, `define`, `joke`, `trivia`.
+All six are `kind: "plugin"` recipes (backend/packages/<name>/recipe.json),
+not `kind: "skill"`s in this repo's own architectural sense (a `SKILL.md`
+composed into the system prompt) - `storytime-style` is the only real one
+of those today. "Bundled skills" in this doc is the colloquial, family-
+facing sense, not the manifest kind.
+
+- [ ] **Fix trivia: it reveals the question and the answer in the same
+      reply** (blocked - see "Plugin/recipe `ask`-continuation" under
+      Advanced tool calling below) - Jesse noticed (2026-09-06) that
+      asking for a trivia question immediately gets both, which isn't
+      really trivia. Root cause confirmed in `backend/packages/trivia/
+      recipe.json`: its one `format` step interpolates `{question}` AND
+      `{answer}` into a single output in one shot - there's no LLM
+      authoring this reply and no instruction to fix, since the whole
+      recipe is deterministic fetch -> pick -> format. Needs the
+      `ask`-continuation primitive below before it can be rewritten as a
+      real ask-then-reveal flow (`recipe.json` splitting into an `ask`
+      step for the question and a resumed step that compares the user's
+      answer) - not fixable by editing this recipe alone.
+
 Everything else a family would reach for is missing, prioritized on one
 rule Jesse set (2026-09-05): **a lookup (read a fact, return it) beats a
 control/playback action (make something happen in the world) whenever
@@ -213,6 +239,69 @@ Priority-1 lookup landing first):**
       real device), though it's already unblocked (no missing
       integration to build first, unlike media playback).
 
+**Sourced-answer UI (citations, favicons)** - Jesse's ask (2026-09-06):
+noticed other chat apps mark which sentence used which source, researched
+both prior art and current practice before adding these. Both items below
+are blocked on any sourced skill actually existing (Web search above is the
+first) - nothing to cite until then, so treat as groundwork to design
+alongside the first sourced skill, not before it.
+
+- [ ] **Inline citation markers on sourced answers** (M-L) - doesn't exist
+      yet. Legacy (`home-legacy.git`, `loki-doki`) shipped this completely
+      once (issue #8, Open WebUI-inspired) and it's worth reading before
+      designing fresh, not porting verbatim (feature scope is re-examined
+      per `getmaipai/.github`, not carried): a fixed `SOURCE_TOOLS`
+      allowlist (search/news/youtube/where-to-watch/holidays/contentRating)
+      produced a `Source[]`; `companionTurn.ts` appended a numbered
+      `Sources:\n[1] Title — url` block to the prompt and instructed the
+      model to cite inline as `[1]`, `[2]`; an SSE `sources` event carried
+      the list to the client, persisted to a `messages.sources` column so
+      chips survived a reload; the frontend rewrote `[1]` into a
+      backtick-wrapped `` `CITE:1` `` token so react-markdown's own
+      inline-code renderer could intercept it and swap in a hover-tooltip
+      chip linking out, plus a numbered `SourcesCard` under the settled
+      (non-streaming) reply. It was entirely prompt-trusted - no
+      structural/tool-enforced citation - and scoped to that one tool
+      allowlist, never general RAG/notes retrieval.
+      Current practice (researched 2026-09-06, not recalled): two real
+      patterns exist. Perplexity's is the same shape legacy already built -
+      inject a numbered source list, instruct `[N]` markers, and on the
+      client accumulate the FULL text buffer before parsing (a marker can
+      split across streaming chunk boundaries - parsing one delta in
+      isolation misses it), then map `N` to the source list. Anthropic's
+      Citations API is structurally different and more reliable: the model
+      returns separate content blocks, each carrying real citation
+      objects (`document_index`, `cited_text`, a char/page/block location)
+      instead of a bare `[N]` in prose, streamed via a dedicated
+      `citations_delta` event - `cited_text` doesn't even count as output
+      tokens. That needs either a hosted API with native support or real
+      constrained-generation work on our own llama-server stack to fake
+      structurally, so the pragmatic path here is almost certainly the
+      first pattern (which is what legacy already validated), with the
+      same streaming-safe accumulate-then-parse discipline Perplexity's
+      own docs warn matters.
+- [ ] **Favicon fetch-once, cache, and reuse for citation/source chips**
+      (S) - doesn't exist yet, but legacy had a complete, two-layer
+      version worth reusing as-is (hard-won resolver/cache logic, not
+      feature scope, so this one IS a real port candidate per
+      `getmaipai/.github`): client-side, `faviconCache.ts` kept an
+      in-memory + `localStorage` cache (7-day TTL, `data:` URLs, in-flight
+      dedup so concurrent callers for the same domain share one fetch);
+      server-side, `/api/img` (`imageProxy.ts`) never let the browser hit
+      a third-party favicon host directly, fetching once through an
+      SSRF-guarded proxy, disk-caching bytes keyed by a URL hash with a
+      negative-result cache for confirmed-missing icons, and a periodic
+      size-bounded sweep. Confirmed by 2026-09-06 research this isn't just
+      a performance nicety: browser favicon caches are a known privacy/
+      fingerprinting vector (persist separately from cookies/history,
+      survive some browsers' private-mode and cache-clears), and a raw
+      `<img src="https://icons.duckduckgo.com/...">` leaks the household's
+      IP and Referer to every cited domain on every reply - exactly the
+      leak class the legacy proxy's own comment already named as its first
+      reason for existing. Wire this in as part of the citation-chip work
+      above, not standalone - a favicon cache with nothing to cache is
+      pointless work today.
+
 ## Integrations
 
 - [ ] **Calendar** (L) - doesn't exist. Needs a design decision first:
@@ -240,6 +329,19 @@ Priority-1 lookup landing first):**
 - [ ] A recipe step (or Tier 1 path) that can actually reach
       `host.integration.call` (M) - the host method exists; nothing can
       invoke it today.
+- [ ] **Find people and things** (L, Jesse's ask, 2026-09-06) - two
+      distinct halves. (1) Live location, ideally via iCloud/Find My -
+      real per-account OAuth/auth plumbing (same shape as Calendar/Email
+      above: privacy-sensitive, needs its own consent design, and Find
+      My specifically has no public API Apple supports, only reverse-
+      engineered ones - a real feasibility/ToS check before committing to
+      this path, not just an integration to wire up). (2) A static
+      location entry with no integration at all - "remember my passport
+      is in the safe" - which is a pure lookup already buildable on top
+      of the existing `remember`/`recall` skills (Skills, above) with no
+      new plumbing; ship this half first regardless of what happens with
+      (1), by the same lookup-before-integration rule the Skills section
+      already states.
 
 ## Vision
 
@@ -249,6 +351,21 @@ Priority-1 lookup landing first):**
 - [ ] `host.ocr.read` (M) - RapidOCR already decided as the library
       (`docs/dev.md`); needs wiring, a recipe step, and a real image input
       path (upload? robot capture?) before it's reachable at all.
+- [ ] **Pet recognition: name a pet, mark its owner, recognize it again**
+      (L, Jesse's ask, 2026-09-06) - "facial"/body recognition from an
+      image plus, ideally, bark/vocalization recognition from audio.
+      Blocked on the same missing image-input path as `host.camera.still`
+      above (no pipeline exists to get a photo INTO the hub at all yet),
+      and bark/sound recognition is a real second model, not a
+      by-product of the vision half. Ownership is not new scope to
+      invent: "pets need ownership" is one of Jesse's own original
+      points in `docs/dev.md`'s "Entities, relationships and grants" -
+      a pet is a `kind: entity` record and "owns"/"belongs to" is exactly
+      the Relationship edge that spec already defines, so this is a
+      recognition-and-UI problem sitting on top of hub work that's
+      already spec'd but not yet built ("The hub half of entities and
+      relationships," People/relationships section above), not a new
+      data model to design from scratch.
 
 ## Generation (image, video)
 
@@ -274,6 +391,39 @@ Priority-1 lookup landing first):**
       a diagnostic route. What is missing is embedding `routing.examples`
       once at package load and matching by similarity (Tier 1), plus
       recall (see "Chat, memory and persona").
+- [ ] **Plugin/recipe `ask`-continuation: let any plugin pause for a
+      real answer, not just reply in one shot** (L) - surfaced fixing
+      trivia (Skills above), and Jesse's own framing once he saw the
+      cause (2026-09-06): this needs to be a capability every plugin can
+      use, not a trivia-specific hack. It's a distinct gap from Tier 2
+      tool calling above - not about the model choosing which plugin to
+      call, but about a plugin that's already running needing to pause
+      mid-recipe, show something, and resume once the person answers.
+      Half-built already: `PluginResult.ask` is a real field in
+      `result.schema.json`, and both interpreters (`spec/interpreters/
+      ts/recipe-interpreter.ts` and its Python twin) support an
+      `"op": "ask"` recipe step - proven by the conformance fixture
+      `spec/fixtures/recipes/ask-disambiguate.json` - but nothing wires
+      it to anything real: `turnEngine.ts`'s plugin branch only ever
+      reads `result.value.reply`, silently falling back to "Done." if a
+      recipe ever produced `ask` instead; no bundled package uses the
+      `ask` op; and there is no cross-turn state anywhere remembering
+      "this conversation is mid-recipe, paused at step N, waiting on an
+      answer that binds to `expects`." `turnEngine.ts`'s own header
+      comment (~line 1142) already names this gap, though it's gone
+      slightly stale - it says the interpreter has no ask-producing step
+      at all, which the fixture disproves, but its actual conclusion
+      ("nothing routes a follow-up deterministically today") still
+      holds. Real design work before code: where paused-recipe state
+      lives and how a follow-up turn gets routed back into resuming the
+      right pause instead of hitting the normal router again, a timeout/
+      abandon story (the person never answers, or asks something
+      unrelated instead), and whether `ask` should offer real UI (tap a
+      multiple-choice option, not just type free text) given `spec/ui`'s
+      schema-driven pages already exist elsewhere in this app. Once this
+      lands, trivia's `recipe.json` is the first real caller: split into
+      an `ask` step for the question and a resumed step that compares
+      the answer, instead of today's one `format` step revealing both.
 
 ## Feature parity: ChatGPT / Gemini / Claude
 
@@ -754,6 +904,39 @@ this file's earlier note), not something to build against today.
 - [ ] **The Python half of `spec/records/ts/validate.ts`** (S) - lands
       when the robot writes one of these records, the same split
       `spec/safety/` takes today.
+- [ ] **Does the People directory grow beyond account holders?** (open
+      question, Jesse's call, 2026-09-06) - `/people` was split from
+      account management on 2026-09-06 (roster add/edit/remove moved to
+      Settings -> Household -> Users, `UsersSection.tsx`) and today only
+      ever lists people with a real account (`GET /api/people`). Jesse's
+      own framing when asking for the split: "anyone with a user account
+      should be able to browse people that are users - open question if
+      we let users browse all people" - naming a non-account entity
+      (an ex-partner, a delivery driver, a lunch lady) as his own example
+      of what a broader "people" concept could include. This is exactly
+      the Entity/Person-vs-User split "The hub half of entities and
+      relationships" (above) would introduce - PeoplePage.tsx cannot
+      answer this on its own since there is no Entity storage yet. When
+      that work starts, this needs a real design pass before code, not
+      just "show everything": the spec's own "Inference is the dangerous
+      half" section is exactly this risk (a household member browsing an
+      entry for someone else's relationship, an inferred connection
+      nobody confirmed) - same shape as the already-recorded open
+      question above ("may a parent see a relationship inferred from
+      their teen's conversation") but for browsing rather than
+      inference specifically.
+- [ ] **A self-service way to change your own display name** (S) - a
+      real, deliberate regression from the 2026-09-06 People/Users split:
+      the old PeoplePage.tsx let anyone edit their own row (`canManagePerson`
+      allows `actorId === target.id` regardless of role), which was the
+      only way a non-admin could rename themselves. That Edit button
+      moved to Settings -> Household -> Users with the rest of roster
+      management, which is admin-gated - a non-admin has no path to
+      renaming themselves at all today. Needs its own home (Settings ->
+      Me is the obvious candidate, alongside Appearance/Personality/
+      Voice) since `display_name` is a `Person` field, not a settings-
+      registry key, so it doesn't fit `SettingsRenderer`'s generic
+      schema without its own small hand-built section.
 
 ## Settings
 
@@ -787,6 +970,18 @@ this file's earlier note), not something to build against today.
       Add `duration`, `time`, `person`, `media` and a secret-entry flow,
       then re-declare the sections that only needed those.
 
+- [ ] **A household-location setting** (S-M) - found live, session-d-
+      packages-and-store.md step 3, 2026-09-06: no settings key, no
+      first-run prompt, no places picker exists anywhere for "where does
+      this household live." `weather`'s own `warm.keys` had to hardcode a
+      placeholder place (Seattle) instead of the household's real one for
+      exactly this reason, and step 0's own verdict queue separately
+      dropped `localNews.ts`/`localEvents.ts` on the identical gap. Once
+      this exists (`household.home_place` or similar, `coreKeys.ts`), any
+      package's `warm.keys` can resolve it directly with no further
+      cache/warm changes - the mechanism doesn't care what the value is,
+      only that a real one exists to resolve against.
+
 ## UI / shell
 
 - [x] Person edit and delete (M) - done 2026-09-05. `PATCH`/`DELETE`
@@ -806,6 +1001,24 @@ this file's earlier note), not something to build against today.
       wake word, TTS program, TTS model, voice files, embeddings);
       `/privacy` renders it in dad-test language. See `docs/dev.md`,
       "The privacy page".
+- [ ] **A generic "share" mechanism in the UI schema/manifest system**
+      (L, Jesse's ask, 2026-09-06) - the actual ask was sharing specific
+      creations (images, videos, music playlists, video playlists,
+      AI-generated podcasts), but Jesse's own follow-up reframed the
+      shape: this should be "a mechanism in our app template/schema...
+      ability to share," not a bespoke share button built per content
+      type. Matches platform principle 1 (one definition, one place) -
+      the right home is likely `spec/ui/schema.json` (a `share` action
+      alongside the existing action union - see `EmptyState.tsx`'s
+      comment on `navigate`/`call`/`play`/`confirm`/`ask`) or a manifest-
+      level capability a package declares once and the generic renderer
+      honors everywhere, rather than each of images/videos/playlists/
+      podcasts growing its own share affordance independently. Needs a
+      design pass on what "share" even means for a private, self-hosted,
+      no-phone-home hub before any code (share TO whom - another
+      household member only, or an exported file/link off the hub
+      entirely; the org's privacy architecture rules govern the second
+      case directly) - not just wiring up a button.
 - [ ] **Batch select and clear-all everywhere else** (M) - the org rule
       landed 2026-09-05 (`getmaipai/.github/docs/UI.md` > Batch actions,
       Jesse: "every section should provide easy batch and or delete all
@@ -1372,8 +1585,13 @@ on a spec tag that was never cut.
       transport lessons transfer.
 - [ ] **One pairing flow, with a rate limit** (M, verdict) - legacy grew
       three code flows (6-char pod, claim-by-hardware-id, 5-minute TV
-      Quick Connect) and `/pair` had no limiter. Plan 7.1 is one flow;
-      decide whether Quick Connect for TV is the same flow or a second.
+      Quick Connect) and `/pair` had no limiter. Plan 7.1 is one flow for
+      a ROBOT/pod pairing into the household (Wave 3, still deferred -
+      touches every record table). Decided for the human sign-in half
+      (Session F step 6, 2026-09-06): Quick Connect for TV sign-in is
+      its own separate flow, not this one - `lib/quickConnect.ts`, rate
+      limited from the start (`code + poll_token`, 5-minute expiry).
+      This item now covers only the robot/pod pairing flow.
 - [ ] **Verdict: robot fallback order** (Jesse's call) - the legacy bot's
       `FallbackLanguageModel` is local-first; the plan is hub-as-brain
       with a sub-second connect timeout and no hedging. Decide before
@@ -1458,12 +1676,21 @@ on a spec tag that was never cut.
 - [ ] **Content ceiling record and dials** (M) - `spec/README.md` lists
       it unbuilt; the safety classifier reads the band through a role
       proxy. Never mentioned here until now.
-- [ ] **`@hono/zod-openapi` conversion** (M) - org rule: "any route you
-      touch gets converted"; zero of 17 route files comply and dev.md
-      tracks it as debt with no backlog line.
-- [ ] **Rate-limit the remaining raw fetches** (S) - Telegram (fired per
-      notification, no bucket) and the HF voice catalog bypass
-      `tryConsume`; only `host.fetch` and Home Assistant go through it.
+- [x] **`@hono/zod-openapi` conversion, the scaffolding and F's own
+      routes** (Session F step 4, 2026-09-06) - `lib/openapi.ts`
+      (`apiRouter()`, `errorResponses()`, `PaginationQuerySchema`/
+      `paginatedResponseSchema()`), `/api/docs` (Scalar), `docs/api/
+      openapi.json` generated and drift-checked by `check.sh`.
+      `repairs.ts`, `notifications.ts`, `settings.ts`, `backups.ts`,
+      `people.ts` converted (five of F's six pre-existing route files);
+      `auth.ts` deliberately left for a dedicated pass (a shared
+      Response-building helper across two differently-shaped routes -
+      see `docs/dev/session-f.md`'s step 4 for the real reason). The
+      other 11 route files (C, D, E's) still need converting when each
+      session next touches theirs, per the org rule.
+- [x] **Rate-limit the remaining raw fetches** (Session F step 3,
+      2026-09-06) - `telegramChannel.ts` and the HF voice catalog both
+      go through `tryConsume` now.
 - [ ] **A generic wall, budget and probe layer before any media package**
       (M) - `rateLimiter.ts` is a non-blocking bucket only. Legacy's
       `quiet.ts`/`accessMonitor.ts`/`sessionKeeper.ts` trio encodes the
@@ -1476,28 +1703,74 @@ on a spec tag that was never cut.
 - [ ] **The hub's Python runtime question in STACK.md** (S decision) -
       STACK.md gives the hub no Python, yet `tts` needs `uvx` at runtime;
       flagged in `spec/voice/README.md`, decided nowhere.
+- [x] **A household CA with `maipai.local` mDNS and a trust step**
+      (Session F step 5, 2026-09-06) - `lib/householdCa.ts` (a real,
+      node-forge-minted CA and leaf, boot-time-conditional TLS),
+      `lib/mdns.ts` (`_maipai._tcp.local`, TXT fields designed for this
+      step since plan 7.1 wasn't available in this checkout - Jesse's
+      call, see docs/dev/session-f.md), `GET /api/setup/ca`. The
+      TXT field list and the trust-step UI (a device downloading and
+      installing the cert, rendering the QR) are not this - the fields
+      may need revisiting against the real platform plan text, and the
+      UI is E's kit work.
+- [x] **Passkeys, device tokens, Quick Connect, sessions, optional
+      TOTP** (Session F step 6, 2026-09-06) - `lib/passkeys.ts`
+      (`@simplewebauthn/server`, self-service registration on an
+      already-signed-in profile, shared lockout with PIN/password),
+      `lib/deviceTokens.ts` + `lib/devices.ts` (365-day tokens, 20 per
+      person, oldest-evicted, `spec/schemas/device.schema.json` laid for
+      the link), `lib/quickConnect.ts` (code + a separate poll_token, 5-
+      minute expiry, rate limited, TOTP re-confirmed at approval when
+      the approver has it on), `GET/DELETE /api/auth/sessions`
+      (per-device, revoke), `lib/totp.ts` (`otpauth`, owner/admin only,
+      anti-replay via a last-used-step counter, its own shared lockout).
+      Two review passes on this diff, both fixed: the first found seven
+      issues on first pass (see docs/dev/session-f.md); the second found
+      TOTP bypassable via Quick Connect's poll and a stolen device
+      token's redeem (fixed by gating the approval step instead - a
+      redeemed token stays silent by design, the standard "remembered
+      device" shape), a stale `hasSecret()` letting a passkey-only
+      person be promoted to admin/owner, a 500 instead of 401 on an
+      unknown personId, and `auth.ts`'s own conversion to
+      `@hono/zod-openapi` (deferred past the first pass since it wasn't
+      new code, then required once this diff rewrote most of the file).
 - [ ] **Identity and trust pieces plan v0.1 scopes and this file did not
-      track** (M each) - passkeys, an approval queue, Quick Connect for
-      TV sign-in, a household CA with `maipai.local` mDNS and a trust
-      step (wake word phase 1 already needs a secure context on the
-      LAN), hub-key signing of the bundled default set, the emergency
-      kit and hub/SMB backup targets, a restore drill in the release
-      skill, and the `user/` docs tier (only `dev/` exists).
+      track, still open** (M each) - an approval queue, hub-key signing
+      of the bundled default set, the emergency kit and hub/SMB backup
+      targets, a restore drill in the release skill, and the `user/`
+      docs tier (only `dev/` exists).
 - [ ] **Tests the audit found missing** (S) - `hlc.ts` seed and compare,
       `personLifecycle`, `access`, and one test proving a specific
       recalled memory text actually lands in the prompt for a matching
       query (memory tests stop at `recall`; prompt tests use synthetic
       matches).
-- [ ] **Copy the legacy runtime guards** (S-M) - a download stall
-      watchdog (a 7 GB checkpoint sat at "28 s left" for 21 min), 6-
-      attempt backoff, negative caches that store only genuine misses
-      (313 poisoned rows once purged), max resident models with an
-      orphan sweep (orphaned runners forced every load to CPU: a 90 s
-      "hi"), a boot watchdog capped at three reloads, and a crash-boot
-      hold that refuses heavy compute for 30 minutes after a dirty boot
-      (three power-offs in one night). Check `llmSupervisor.ts`,
-      `modelDownload.ts` and `telegramChannel.ts` for equivalents first;
-      the audit did not read them for that.
+- [x] **Copy the legacy runtime guards, most of them** (Session F step 3,
+      2026-09-06) - checked `llmSupervisor.ts`/`modelDownload.ts`/
+      `telegramChannel.ts` for equivalents first, per this item's own
+      instruction: the download stall watchdog (90s idle timeout) and
+      6-attempt backoff already existed in `modelDownload.ts`, untouched.
+      Shipped new: `lib/dirtyBoot.ts`'s crash-boot hold (Windows Kernel-
+      Power 41, macOS `pmset -g log` Shutdown Cause, Linux journalctl
+      boot-boundary check, all best-effort except Windows's real signal;
+      30-minute hold on a REAL chat/embed spawn only, never the stub or a
+      developer's URL override) and `lib/sidecars.ts`'s
+      `sweepOrphanProcesses()` (a boot-time sweep for a stray engine
+      process freePort() can't see because it isn't on the port a fresh
+      spawn is about to claim - the actual fix for "orphaned runners once
+      forced every load to CPU: a 90s 'hi'"; residency itself is already
+      capped at one process per role by construction, chat and embed each
+      being a single module-level singleton).
+- [ ] **The two runtime guards without a clean home yet** (S) - negative
+      caches for genuine misses: no analog exists in this architecture
+      today (nothing here repeatedly re-probes a known-failing URL or
+      resource the way legacy's media-stream resolution did; revisit once
+      the scheduler's own download lane or a package's periodic re-check
+      needs one, rather than inventing a cache for a problem that doesn't
+      exist yet). A boot watchdog capped at three reloads: not backend
+      code - that's the OS service manager's job (systemd's
+      `StartLimitBurst`, launchd's `ThrottleInterval`, or `run.sh`/
+      `run.ps1`'s own retry-with-a-cap), so it belongs in step 11's
+      install/service work, not here.
 
 ## Legacy: copy, re-examine, record
 
@@ -1666,8 +1939,9 @@ that owns it.
       removal, memorialise (read-only profile, PIN cleared, sessions
       revoked, export offered), the band change on a birthday with a
       passive notification to parents (plan 7.4). None exist.
-- [ ] **Sessions per device with revoke, optional TOTP for owner and
-      admin** (S-M, F) - plan 4.1; the identity slice deferred both.
+- [x] **Sessions per device with revoke, optional TOTP for owner and
+      admin** (Session F step 6, 2026-09-06) - see the entry above under
+      "Identity and trust pieces".
 - [ ] **Time allowances and schedules per category** (M, F backend, E
       controls page) - plan 4.2 names them as household settings enforced
       in the turn engine and package host; nothing exists.
@@ -1710,17 +1984,28 @@ that owns it.
       - the PWA exists after Wave 1, so the "no such clients yet" note
       above no longer holds; legacy `push.ts` (VAPID keys generated once,
       never a manual step) is the reference.
-- [ ] **A `Device` record** (S spec, F) - plan 7.1's device kind, name,
-      area, capabilities, token, watermarks; needed by device tokens and
-      Quick Connect now and by the link later. `deviceId.ts` is a plain
-      file stand-in.
+- [x] **A `Device` record** (Session F step 6, 2026-09-06) -
+      `spec/schemas/device.schema.json`; see the entry above under
+      "Identity and trust pieces". `lib/deviceId.ts` remains a separate,
+      unrelated thing (the memory/entity/episode id suffix, its own
+      header explains).
 
 **Packages**
 
-- [ ] **The Tier 1 host under Deno, and the MCP spike** (M-L, D) - Hub
-      v0.1 scope ("the Deno process host and the MCP spike"); not a line
-      of it exists, so no code package can run. The knowledge lookup is
-      the first Tier 1 package, proving the sandbox.
+- [x] **The Tier 1 host under Deno, and the MCP spike** - shipped,
+      session-d-packages-and-store.md step 5 (2026-09-06):
+      `lib/denoHost.ts` (lazy-started, `--allow-read`/`--allow-write`
+      scoped to exactly the package's source and data dirs, no env, no
+      net), MCP over stdio via the official SDK (`Client`/`McpServer`,
+      both directions of the `Protocol` base class's `request()`/
+      `setRequestHandler()` used for real - `vscode-jsonrpc`'s recorded
+      fallback was never needed), `host/fetch` proven end to end through
+      `packageHost.ts`'s own cache/rate-limit/SSRF path. Three-strikes
+      fault handling with a real Repairs issue, idle-kill, a graceful-
+      exit hook. `knowledge` (Wikipedia's public REST summary API) is
+      the first Tier 1 package, verified live against a running dev
+      server. `deno_test` smoke (step 1's own reserved, unbuilt kind) is
+      real now too.
 - [ ] **The store host on the hub** (M-L, D) - plan 4.10: install from
       the signed index, verify twice, unpack per version, smoke before
       enable, per-package channel, rollback, the permission prompt, the

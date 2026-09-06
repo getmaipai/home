@@ -2,7 +2,7 @@ import { describe, expect, test, beforeEach } from "bun:test";
 import { TestClient } from "./client";
 import { resetDb } from "./reset-db";
 import { __resetThrottleForTests } from "@/lib/secretThrottle";
-import { listPackageIds, loadPackage } from "@/lib/plugins";
+import { listPackageIds, loadPackage, registerAllPackageNotificationTypes, warmPackage } from "@/lib/plugins";
 
 beforeEach(() => {
   resetDb();
@@ -221,5 +221,42 @@ describe("POST /api/plugins/recall/run", () => {
     const client = await owner();
     const res = await client.post("/api/plugins/recall/run", {});
     expect(res.status).toBe(400);
+  });
+});
+
+describe("registerAllPackageNotificationTypes", () => {
+  test("the boot-time pass over every bundled package's manifest never throws", () => {
+    expect(() => registerAllPackageNotificationTypes()).not.toThrow();
+  });
+});
+
+describe("warmPackage (session-d-packages-and-store.md step 3)", () => {
+  test("a runPlugin failure (here: a key missing weather's own required 'place') is logged, never thrown or silent", async () => {
+    await owner(); // warmActor() needs at least one active person to run at all
+    const weather = loadPackage("weather");
+    expect(weather.ok).toBe(true);
+    if (!weather.ok) return;
+    const originalError = console.error;
+    const lines: string[] = [];
+    console.error = (line: string) => lines.push(line);
+    try {
+      // A deliberately invalid warm key (weather's real args schema
+      // requires "place") - runPlugin() fails ajv validation and
+      // returns { ok: false } before ever reaching host.fetch, so this
+      // never touches the network. Found by review: the first version
+      // of warmPackage() never inspected runPlugin()'s own returned
+      // failure shape at all, so this exact case failed silently.
+      await warmPackage("weather", { ...weather.value.manifest, warm: { keys: [{}] } });
+    } finally {
+      console.error = originalError;
+    }
+    expect(lines.some((l) => l.includes("weather") && l.includes("failed to warm"))).toBe(true);
+  });
+
+  test("no warm.keys declared: a no-op, no actor lookup, nothing logged", async () => {
+    const weather = loadPackage("weather");
+    expect(weather.ok).toBe(true);
+    if (!weather.ok) return;
+    await expect(warmPackage("weather", { ...weather.value.manifest, warm: undefined })).resolves.toBeUndefined();
   });
 });

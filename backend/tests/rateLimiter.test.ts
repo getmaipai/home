@@ -29,12 +29,23 @@ describe("tryConsume", () => {
     expect(tryConsume("host-c", opts)).toBe(true);
   });
 
+  // Observed flaky (2026-09-06) when the full suite runs under real
+  // system load (many other files' real subprocess-spawning tests
+  // competing for CPU at the same time): the original version used
+  // refillPerSecond: 1000 (one token every 1ms), so as little as a few
+  // milliseconds of scheduling jitter between the four tryConsume() calls
+  // below could tip the bucket over into an accidental 3rd token,
+  // failing the final assertion despite the clamp logic itself being
+  // correct. Slower rate (50ms/token) and a longer sleep give the same
+  // proof - "would refill way past capacity if unclamped" - with a
+  // jitter margin two orders of magnitude wider than a real test runner
+  // ever needs.
   test("never refills past capacity even after a long idle gap", async () => {
-    const opts = { capacity: 2, refillPerSecond: 1000 }; // would refill far past capacity if unclamped
+    const opts = { capacity: 2, refillPerSecond: 20 }; // would refill ~10 tokens in 500ms if unclamped
     expect(tryConsume("host-d", opts)).toBe(true);
     expect(tryConsume("host-d", opts)).toBe(true);
-    await new Promise((r) => setTimeout(r, 50)); // long enough to refill hundreds of tokens if unclamped
-    expect(tryConsume("host-d", opts)).toBe(true); // capped at capacity=2, not the unclamped ~50
+    await new Promise((r) => setTimeout(r, 500));
+    expect(tryConsume("host-d", opts)).toBe(true); // capped at capacity=2, not the unclamped ~10
     expect(tryConsume("host-d", opts)).toBe(true); // the 2nd of exactly 2 available tokens
     expect(tryConsume("host-d", opts)).toBe(false); // and no 3rd - proves the cap, not just "some refill happened"
   });

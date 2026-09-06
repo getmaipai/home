@@ -1,2 +1,10 @@
 [test]
 preload = ["./tests/preload.ts"]
+# Scopes bun's own test discovery to tests/ (session-d-packages-and-
+# store.md step 5): without this, bun test also picks up a Tier 1
+# package's own handler_test.ts (backend/packages/<id>/), a real Deno-
+# native test file (jsr:/npm: imports bun can't and shouldn't resolve -
+# lib/smoke.ts's runDenoTestSmoke() runs it through `deno test`, its own
+# real gate) as if it were one of ours, failing check.sh's `bun test`
+# step on an import bun was never meant to load.
+root = "tests"

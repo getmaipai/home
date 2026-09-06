@@ -293,7 +293,38 @@ describe("PATCH /api/people/:id", () => {
 
     const res = await ownerClient.request(`/api/people/${child.id}`, { method: "PATCH", body: { role: "admin" } });
     expect(res.status).toBe(400);
-    expect(((await res.json()) as { error: string }).error).toMatch(/PIN or password/);
+    expect(((await res.json()) as { error: string }).error).toMatch(/PIN, password, or passkey/);
+  });
+
+  // A code review (2026-09-06) found hasSecret() (the old check backing
+  // this guard) returning true for ANY personCredentials row, including
+  // one that exists only to hold a passkey-only person's shared lockout
+  // counter (secretHash: null) - promoting them to admin/owner without
+  // ever having set a real PIN/password. Step 6 also means a passkey
+  // alone should be ENOUGH for this guard ("the owner with a passkey or
+  // password"), so this proves both halves: a passkey satisfies it, and
+  // the lockout-only row alone (no passkey, no PIN) still does not.
+  test("a passkey satisfies the promotion guard, same as a PIN/password would", async () => {
+    const ownerClient = await ownerSession();
+    const adult = await addPerson(ownerClient, "Marlow", "adult");
+    const { passkeyCredentials } = await import("@/db/schema");
+    const { db } = await import("@/db");
+    db.insert(passkeyCredentials)
+      .values({
+        id: "cred-marlow",
+        personId: adult.id,
+        publicKey: "fake",
+        counter: 0,
+        transports: "[]",
+        deviceType: "singleDevice",
+        backedUp: false,
+        name: "Marlow's passkey",
+        createdAt: new Date().toISOString(),
+      })
+      .run();
+
+    const res = await ownerClient.request(`/api/people/${adult.id}`, { method: "PATCH", body: { role: "admin" } });
+    expect(res.status).toBe(200);
   });
 
   test("the owner may promote someone who does have a PIN", async () => {

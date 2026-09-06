@@ -31,11 +31,17 @@ export const people = sqliteTable("people", {
 // person has one: 4.1 says a PIN-free profile is allowed for a non-admin
 // role (the household picker), so this is 0-or-1 rows per person, not
 // 1-to-1.
+// secretHash is nullable as of step 6: a person can be passkey-only (4.1,
+// "the owner with a passkey or password") with no PIN/password at all,
+// but the shared failedAttempts/lockedUntil lockout counter below still
+// needs a row to live on for their passkey ceremonies - see
+// lib/credentialLockout.ts's own header for why this one row is shared
+// across every credential type rather than one lockout table per type.
 export const personCredentials = sqliteTable("person_credentials", {
   personId: text("person_id")
     .primaryKey()
     .references(() => people.id),
-  secretHash: text("secret_hash").notNull(),
+  secretHash: text("secret_hash"),
   failedAttempts: integer("failed_attempts").notNull().default(0),
   lockedUntil: text("locked_until"),
   createdAt: text("created_at").notNull(),
@@ -48,6 +54,11 @@ export const sessions = sqliteTable("sessions", {
     .notNull()
     .references(() => people.id),
   tokenHash: text("token_hash").notNull().unique(),
+  // Step 6: "Sessions per device under Profile with revoke" needs
+  // something recognizable to show ("Chrome on macOS") - captured once
+  // at issue time (lib/session.ts), never re-parsed live, so a person's
+  // list stays stable even if they change browsers on the same device.
+  userAgent: text("user_agent"),
   expiresAt: text("expires_at").notNull(),
   createdAt: text("created_at").notNull(),
 });
@@ -400,4 +411,151 @@ export const issues = sqliteTable("issues", {
   resolvedAt: text("resolved_at"),
   dismissedAt: text("dismissed_at"),
   hlc: text("hlc").notNull(),
+});
+
+// --- Session D: packages and the store ------------------------------
+//
+// One row per bundled/installed package, tracking bronze's "a smoke
+// failure leaves the package installed but status: disabled" rule
+// (docs/PACKAGES.md, session-d-packages-and-store.md step 1). A package
+// with no row here is assumed "enabled" and never smoke-tested yet -
+// lib/smoke.ts's own runSmoke() is what creates the first row. Not a
+// spec 3.1 record type: purely a hub-local operational fact about a
+// package the way scheduledJobs/commands already are for their own
+// features, not household data that syncs to the robot.
+export const packageStatus = sqliteTable("package_status", {
+  packageId: text("package_id").primaryKey(),
+  status: text("status").notNull().default("enabled"), // "enabled" | "disabled"
+  lastSmokeAt: text("last_smoke_at"),
+  smokeOk: integer("smoke_ok", { mode: "boolean" }),
+  smokeMessage: text("smoke_message"),
+});
+
+// Session F, step 5 (trust on the LAN). Who this hub is, independent of
+// how you reached it - lib/hubIdentity.ts's own header has the reasoning
+// (a client must be able to tell "the hub, via this LAN IP" from "some
+// other machine that happens to answer on this address"). A single row
+// (id is always the literal string "hub"), not the household settings
+// store: `instance_id` must never be user-editable through a generic PUT
+// /api/settings the way a household's own preferences are - rotating it
+// would sign out every device that has it cached, and nothing about
+// identity belongs in a registry meant for "the household's own
+// preferences." Hub-internal, like scheduledJobs/commands/
+// notificationDeliveries above, not a spec 3.1 record type.
+export const hubIdentity = sqliteTable("hub_identity", {
+  id: text("id").primaryKey(),
+  instanceId: text("instance_id").notNull(),
+  name: text("name").notNull(),
+  createdAt: text("created_at").notNull(),
+});
+
+// Session F, step 5. lib/hubEndpoints.ts's admin-managed address book
+// rows (Admin -> Server -> Addresses, ported from the archived legacy
+// hub) - detected LAN/Tailscale addresses are computed at read time, not
+// stored; only rows an admin typed in live here. Hub-internal, the same
+// reasoning hubIdentity above gives.
+export const hubEndpoints = sqliteTable("hub_endpoints", {
+  id: text("id").primaryKey(),
+  name: text("name").notNull(),
+  url: text("url").notNull(),
+  kind: text("kind").notNull(), // "lan" | "overlay" | "public"
+  priority: integer("priority").notNull(),
+  enabled: integer("enabled", { mode: "boolean" }).notNull().default(true),
+  createdAt: text("created_at").notNull(),
+  updatedAt: text("updated_at").notNull(),
+});
+
+// --- Session F, step 6: passkeys, device tokens, Quick Connect, sessions ---
+//
+// Mirrors spec/schemas/device.schema.json - a Device row is created the
+// first time a device token is minted for it (lib/deviceTokens.ts), and
+// deleting it revokes every token pointing at it. capabilities and
+// watermarks are stored as JSON text (sqlite has no array/object column);
+// lib/devices.ts is the only place that (de)serializes them.
+export const devices = sqliteTable("devices", {
+  id: text("id").primaryKey(),
+  kind: text("kind").notNull(), // "robot" | "pod" | "tv" | "phone" | "desktop" | "browser"
+  name: text("name").notNull(),
+  area: text("area"),
+  capabilities: text("capabilities").notNull().default("[]"), // JSON string[]
+  personId: text("person_id")
+    .notNull()
+    .references(() => people.id),
+  watermarks: text("watermarks").notNull().default("{}"), // JSON object
+  lastSeenAt: text("last_seen_at"),
+  createdAt: text("created_at").notNull(),
+  updatedAt: text("updated_at").notNull(),
+  hlc: text("hlc").notNull(),
+});
+
+// Long-lived per-device credentials (lib/deviceTokens.ts, ported from the
+// archived legacy hub's deviceToken.ts, principle 8): a native/TV client
+// trades one of these for a session cookie on whichever address answers,
+// so a change of address doesn't look like a sign-out. Never the raw
+// token at rest, only its hash - the same "returned exactly once" shape
+// sessions.tokenHash already uses.
+export const deviceTokens = sqliteTable("device_tokens", {
+  id: text("id").primaryKey(),
+  deviceId: text("device_id")
+    .notNull()
+    .references(() => devices.id),
+  personId: text("person_id")
+    .notNull()
+    .references(() => people.id),
+  tokenHash: text("token_hash").notNull().unique(),
+  expiresAt: text("expires_at").notNull(),
+  lastSeenAt: text("last_seen_at"),
+  lastSeenUrl: text("last_seen_url"),
+  createdAt: text("created_at").notNull(),
+});
+
+// WebAuthn credentials (lib/passkeys.ts, @simplewebauthn/server). A
+// person can register several (a phone's platform authenticator, a
+// security key), so this is one row per credential, not per person -
+// unlike person_credentials above, which is the single PIN/password hash.
+// publicKey is a base64url-encoded COSE public key (never a private key -
+// WebAuthn's whole point is the private key never leaves the
+// authenticator); counter guards against a cloned authenticator replaying
+// an old assertion.
+export const passkeyCredentials = sqliteTable("passkey_credentials", {
+  id: text("id").primaryKey(), // the credential id itself (base64url), not a minted id
+  personId: text("person_id")
+    .notNull()
+    .references(() => people.id),
+  publicKey: text("public_key").notNull(), // base64url COSE key
+  counter: integer("counter").notNull().default(0),
+  transports: text("transports").notNull().default("[]"), // JSON string[]
+  deviceType: text("device_type").notNull(), // "singleDevice" | "multiDevice"
+  backedUp: integer("backed_up", { mode: "boolean" }).notNull().default(false),
+  name: text("name").notNull(), // "iPhone Face ID", chosen at registration
+  createdAt: text("created_at").notNull(),
+  lastUsedAt: text("last_used_at"),
+});
+
+// TOTP (lib/totp.ts, `otpauth`), optional for owner and admin only (4.1).
+// One row per person, like person_credentials - a person has at most one
+// TOTP secret. `secret` is AES-256-GCM-encrypted via lib/secrets.ts
+// (CLAUDE.md > Credentials and secrets: "any reversible secret the app
+// stores... is encrypted with the keystore"), the same treatment
+// householdCa.ts's private keys got after a code review found them
+// plaintext (step 5) - this file starts from that lesson rather than
+// repeating it. `enabled` stays false until the person proves they can
+// generate a real code with it (enrollment isn't complete on secret
+// creation alone, or a person who never finished scanning the QR would
+// get locked out of their own account on their next sign-in).
+export const totpSecrets = sqliteTable("totp_secrets", {
+  personId: text("person_id")
+    .primaryKey()
+    .references(() => people.id),
+  secretEncrypted: text("secret_encrypted").notNull(),
+  enabled: integer("enabled", { mode: "boolean" }).notNull().default(false),
+  // A code review (2026-09-06) found verifyTotp() stateless - a valid
+  // code stays valid for its whole ~90s window (30s step, +/-1 step
+  // tolerance) and could be replayed any number of times within it. The
+  // last successfully-used 30s-period counter, so a step is accepted at
+  // most once - the standard TOTP anti-replay measure (RFC 6238 section
+  // 5.2's own recommendation).
+  lastUsedStep: integer("last_used_step"),
+  createdAt: text("created_at").notNull(),
+  updatedAt: text("updated_at").notNull(),
 });

@@ -162,7 +162,13 @@ export function listIssues(opts: { includeResolved?: boolean } = {}): Issue[] {
   return rows.map(toIssue);
 }
 
-export type IssueOpResult<T> = { ok: true; value: T } | { ok: false; status: 400 | 404; error: string };
+// `S` defaults to the union both real callers together produce, but each
+// is declared with its own true, narrower set below (dismissIssue() only
+// ever returns 404, never 400) - session-f-platform-and-trust.md step 4
+// found routes/repairs.ts's converted dismiss endpoint needed to declare
+// a 400 response it could never actually produce, just to satisfy a type
+// that claimed a possibility the function's own code never takes.
+export type IssueOpResult<T, S extends number = 400 | 404> = { ok: true; value: T } | { ok: false; status: S; error: string };
 
 function getRow(id: string): IssueRow | undefined {
   return db.select().from(issues).where(eq(issues.id, id)).get();
@@ -171,8 +177,20 @@ function getRow(id: string): IssueRow | undefined {
 // A source registers the handler behind its own `fix.action` id (the
 // schema's own comment: "an opaque id the owning source recognises...
 // never a shell command or arbitrary code"). Module-level, like
-// notificationTypes.ts's registry - a source registers once at import
-// time, not per-request.
+// notificationTypes.ts's registry.
+//
+// Never call registerFixHandler() at a module's top level (import time).
+// Every test file's beforeEach shares this one process-wide map (Bun only
+// evaluates a module once) and __resetFixHandlersForTests() wipes it
+// completely - an import-time registration is gone the instant ANY OTHER
+// test file resets it, permanently, for the rest of that `bun test` run,
+// with nothing pointing at why fixIssue() suddenly can't find a handler
+// that plainly exists in the source. This registry caught exactly that
+// bug (2026-09-06, lib/householdCa.ts). Instead, wrap the registration in
+// its own idempotent function (Map.set on the same key is a no-op re-add)
+// and call it from every real entry point that needs the handler present
+// - sidecars.ts's registerSidecar() and householdCa.ts's
+// registerRenewFixHandler() are the two existing examples to copy.
 const fixHandlers = new Map<string, () => Promise<void> | void>();
 
 export function registerFixHandler(action: string, handler: () => Promise<void> | void): void {
@@ -204,7 +222,7 @@ export async function fixIssue(id: string): Promise<IssueOpResult<Issue>> {
  * running any remedy - distinct from resolveIssue(), which means the
  * underlying problem actually went away (see spec/schemas/issue.schema.json's
  * dismissed_at comment for why the two must not share one field). */
-export function dismissIssue(id: string): IssueOpResult<{ id: string }> {
+export function dismissIssue(id: string): IssueOpResult<{ id: string }, 404> {
   const row = getRow(id);
   if (!row) return { ok: false, status: 404, error: `no issue ${id}` };
   if (!row.dismissedAt) {

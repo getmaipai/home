@@ -1,0 +1,13 @@
+{
+  "id": "device-a1b2c3",
+  "kind": "tv",
+  "name": "Living room TV",
+  "area": "Living room",
+  "capabilities": [],
+  "person_id": "person-d4e5f6",
+  "watermarks": {},
+  "last_seen_at": "2026-09-06T12:00:00Z",
+  "created_at": "2026-09-01T09:00:00Z",
+  "updated_at": "2026-09-06T12:00:00Z",
+  "hlc": "1757160000000:0:abc123"
+}
