@@ -45,9 +45,15 @@ describe("ModelsPage - access gate", () => {
       throw new Error("ModelsSection must not mount for a non-admin");
     }) as unknown as typeof fetch;
     try {
-      const { getByText, queryByText } = renderModelsPage(makePerson("child"));
+      const { getByText, getByRole, queryByText } = renderModelsPage(makePerson("child"));
       expect(getByText("Only an owner or admin can manage AI models.")).toBeTruthy();
       expect(queryByText("Back to Settings")).toBeTruthy();
+      // A code review (2026-09-06) found the denied branch had no heading
+      // at all identifying which page this was (AdminGatedContent.tsx
+      // dropped AdminGatedPage.tsx's own `<Page title>` wrapper without
+      // replacing it) - a non-admin hitting this route directly saw only
+      // a bare lock icon and message.
+      expect(getByRole("heading", { name: "AI models" })).toBeTruthy();
     } finally {
       globalThis.fetch = originalFetch;
     }

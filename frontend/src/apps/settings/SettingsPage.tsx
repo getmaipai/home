@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { Outlet, useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { Page } from "@/kit/primitives/Page";
 import { SettingsRenderer } from "@/kit/settings/SettingsRenderer";
 import { Input } from "@/kit/ui/input";
@@ -58,6 +58,19 @@ const PERSON_TREE: TreeEntry[] = [
   { id: "commands-page-link", label: "Commands", to: "/settings/commands" },
 ];
 
+// A code review (2026-09-06) found `tab` deriving from `?tab=` alone once
+// Models/Backups/Voices/Commands became nested routes: clicking a
+// PERSON_TREE link (`navigate(entry.to)`) drops whatever `tab` query was
+// in the URL, so `tab` fell back to "household" even while Voices/Commands
+// content was on screen - the sidebar swapped to HOUSEHOLD_TREE, which
+// doesn't even contain the page you're looking at. A direct/bookmarked URL
+// like `/settings/backups?tab=me` hit the same desync the other way.
+// Whichever tree actually contains the current path is the one honest
+// source of truth for it - the query param only matters on the plain
+// `/settings` index route, where the path itself says nothing.
+const HOUSEHOLD_ROUTE_PATHS = new Set(HOUSEHOLD_TREE.flatMap((e) => (e.to ? [e.to] : [])));
+const PERSON_ROUTE_PATHS = new Set(PERSON_TREE.flatMap((e) => (e.to ? [e.to] : [])));
+
 function scrollToSection(id: string) {
   document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" });
 }
@@ -94,6 +107,7 @@ export function SettingsPage({ person, onPersonChange }: SettingsPageProps) {
   // exactly that here).
   const canManageBackups = isOwnerOrAdminRole(person.role);
   const navigate = useNavigate();
+  const location = useLocation();
   const [searchParams, setSearchParams] = useSearchParams();
   const [search, setSearch] = useState("");
   // Household-scope settings are readable by anyone signed in but
@@ -104,9 +118,44 @@ export function SettingsPage({ person, onPersonChange }: SettingsPageProps) {
   // silently 403 on every change. Forced to "me" for anyone else, with
   // no tab switcher shown at all - there is only one scope they can act
   // on, so there is nothing to switch between.
-  const tab: "household" | "me" = !canManageBackups ? "me" : searchParams.get("tab") === "me" ? "me" : "household";
+  const routeTab: "household" | "me" | null = HOUSEHOLD_ROUTE_PATHS.has(location.pathname)
+    ? "household"
+    : PERSON_ROUTE_PATHS.has(location.pathname)
+      ? "me"
+      : null;
+  // A code review (2026-09-06) found the admin-forced-"me" check running
+  // BEFORE routeTab: a non-admin who lands on a household-only nested
+  // route by URL (bookmarked, typed, or shared) got the Me tree in the
+  // rail even though the page actually on screen (Backups/AI models,
+  // denied or not) belongs to Household - nothing in the sidebar matched
+  // what they were looking at. The route itself is what's actually on
+  // screen; it wins over both the query param and the admin-forced
+  // default.
+  const tab: "household" | "me" = routeTab ?? (!canManageBackups ? "me" : searchParams.get("tab") === "me" ? "me" : "household");
+  // Models/Backups/Voices/Commands are nested child routes (App.tsx) now,
+  // rendered through <Outlet/> below - anything that isn't one of their
+  // known paths shows this page's own default (tab-switched) content
+  // instead. A code review (2026-09-06) found the original literal
+  // `location.pathname === "/settings"` check both duplicated App.tsx's
+  // own route path with no compiler link between the two, AND rendered a
+  // blank Outlet for the harmless `/settings/` (trailing slash) case,
+  // since nothing there matches a nested route either. Deriving this from
+  // `routeTab` (already the single source of truth for "does this path
+  // name a known nested route") fixes both at once: `null` means neither
+  // tree recognizes this path, so it's the default view.
+  const isDefaultRoute = routeTab === null;
 
   function setTab(next: "household" | "me") {
+    // Switching scope while looking at a nested page (e.g. Backups, which
+    // is household-only) would otherwise leave the tree showing the OTHER
+    // scope's entries highlighted against content that doesn't belong to
+    // either - a state that couldn't happen before these became nested
+    // routes, since the tab switcher didn't exist alongside them yet.
+    // Land back on this page's own default content instead.
+    if (!isDefaultRoute) {
+      navigate(`/settings?tab=${next}`);
+      return;
+    }
     setSearchParams((prev) => {
       const params = new URLSearchParams(prev);
       params.set("tab", next);
@@ -211,32 +260,55 @@ export function SettingsPage({ person, onPersonChange }: SettingsPageProps) {
               vertical stack of single words). Below that width, the tree
               hides and the content gets the full column back. */}
           <aside className="hidden w-48 shrink-0 flex-col gap-0.5 lg:flex">
-            {tree.map((entry) => (
-              <Button
-                key={entry.id}
-                type="button"
-                variant="ghost"
-                size="sm"
-                onClick={() => (entry.to ? navigate(entry.to) : scrollToSection(entry.id))}
-                className={cn(
-                  "h-auto justify-start rounded-md px-2 py-1.5 text-left font-normal",
-                  activeId === entry.id ? "bg-muted font-medium text-foreground" : "text-muted-foreground",
-                )}
-              >
-                {entry.label}
-              </Button>
-            ))}
+            {tree.map((entry) => {
+              // A routed entry (`to`) is active by URL match, not scroll
+              // position - it has no in-page anchor for the scrollspy
+              // IntersectionObserver above to ever find. `activeId` only
+              // means anything on the default route: a code review
+              // (2026-09-06) found it never gets cleared on navigating
+              // into a nested route (there's nothing there for the
+              // observer to re-target), so its last value from before the
+              // navigation stayed highlighted alongside the newly-active
+              // routed entry - two entries lit up at once.
+              const isActive = entry.to ? location.pathname === entry.to : isDefaultRoute && activeId === entry.id;
+              return (
+                <Button
+                  key={entry.id}
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => (entry.to ? navigate(entry.to) : scrollToSection(entry.id))}
+                  className={cn(
+                    "h-auto justify-start rounded-md px-2 py-1.5 text-left font-normal",
+                    isActive ? "bg-muted font-medium text-foreground" : "text-muted-foreground",
+                  )}
+                >
+                  {entry.label}
+                </Button>
+              );
+            })}
           </aside>
 
           <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-4">
             <Input
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search settings"
+              // Only filters this page's own SettingsRenderer content - a
+              // code review (2026-09-06) found it stayed enabled and
+              // focusable on Models/Backups/Voices/Commands too, where
+              // typing into it silently did nothing (nothing downstream
+              // of <Outlet/> reads `search` at all).
+              disabled={!isDefaultRoute}
+              placeholder={isDefaultRoute ? "Search settings" : "Search (not available here)"}
               aria-label="Search settings"
             />
             <div ref={scrollRef} className="flex min-h-0 flex-1 flex-col gap-6 overflow-y-auto">
-              {tab === "household" ? (
+              {!isDefaultRoute ? (
+                // Models/Backups/Voices/Commands (App.tsx's nested routes) -
+                // rendered right here so the rail/tab switcher/search above
+                // stay mounted instead of the whole page unmounting.
+                <Outlet />
+              ) : tab === "household" ? (
                 <>
                   <SettingsRenderer scope="household" scopeValue="household" filter={search} />
                   <ExtraSections hidden={!!search.trim()}>

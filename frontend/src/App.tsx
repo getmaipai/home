@@ -88,11 +88,17 @@ export function App() {
                 <Route
                   path="/settings"
                   element={<SettingsPage person={person} onPersonChange={revalidatePerson} />}
-                />
-                <Route path="/settings/models" element={<ModelsPage person={person} />} />
-                <Route path="/settings/backups" element={<BackupsPage person={person} />} />
-                <Route path="/settings/voices" element={<VoicesPage person={person} />} />
-                <Route path="/settings/commands" element={<CommandsPage person={person} />} />
+                >
+                  {/* Nested (2026-09-06), not sibling routes: navigating to
+                      one of these used to unmount SettingsPage entirely,
+                      taking the tree rail/Household-Me switcher/search box
+                      down with it. SettingsPage renders these through its
+                      own <Outlet/>, so its chrome stays put. */}
+                  <Route path="models" element={<ModelsPage person={person} />} />
+                  <Route path="backups" element={<BackupsPage person={person} />} />
+                  <Route path="voices" element={<VoicesPage person={person} />} />
+                  <Route path="commands" element={<CommandsPage person={person} />} />
+                </Route>
               </Routes>
             </Shell>
           </BrowserRouter>
