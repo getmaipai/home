@@ -45,6 +45,25 @@ cd frontend && bun run build && cd ../backend && bun run start
 The hub listens on `http://localhost:8787`. The first person who signs in
 becomes the household owner.
 
+### Development mode
+
+For active development, run the backend and frontend as two hot-reloading
+processes instead of building once:
+
+```
+# terminal 1
+cd backend && bun run dev
+
+# terminal 2
+cd frontend && bun run dev
+```
+
+The frontend dev server proxies `/api` to the backend on port `8787` by
+default; set `VITE_BACKEND_PORT` before starting it if the backend is on a
+different port (a parallel worktree, for instance). Stop either process
+with Ctrl-C in its terminal, or `kill <pid>` if it was started in the
+background.
+
 ## Status
 
 Pre-alpha. The shell, sign-in, a household roster, Chat, and basic
