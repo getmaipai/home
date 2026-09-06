@@ -12,6 +12,8 @@ import { runAllSmokeTests } from "@/lib/smoke";
 import { startIdleSweep, registerDenoHostGracefulExit } from "@/lib/denoHost";
 import { hasHouseholdLeaf, getHouseholdLeafForServer, checkLeafExpiry, onLeafRenewed, registerRenewFixHandler } from "@/lib/householdCa";
 import { advertiseMdns } from "@/lib/mdns";
+import { rebindWithRetry } from "@/lib/serverRebind";
+import { raiseIssue } from "@/lib/issues";
 import { startWyomingServer } from "@/lib/wyomingServer";
 import { websocket } from "hono/bun";
 
@@ -221,10 +223,36 @@ void advertiseMdns({ port, tls: initialTls !== null });
 // the running process never actually picked up, and an mDNS
 // advertisement stuck claiming `tls: 0` (or `1`) forever after the state
 // that produced it changed.
+// COR-3 (code review, 2026-09-06): the rebind used to run with no
+// try/catch, synchronously inside ensureHouseholdLeaf()'s own listener
+// loop - a bind failure (port briefly held, EADDRINUSE, or a bad PEM)
+// threw straight out of whichever caller awaited ensureHouseholdLeaf()
+// (GET /api/setup/ca, unauthenticated), leaving the hub with no listener
+// at all. rebindWithRetry() (lib/serverRebind.ts) retries a few times
+// (the port the just-stopped server held usually frees up within one or
+// two hundred ms) before this raises a Repairs issue instead - honest
+// about the fact that a genuinely bad certificate still leaves the hub
+// down until a manual restart (no process supervisor exists yet to hand
+// a real restart to, this file's own header above already names that
+// gap), but no longer a silent, uncaught exception either.
 onLeafRenewed((leaf) => {
   server.stop(true);
-  server = Bun.serve({ port, fetch: app.fetch, websocket, tls: { cert: leaf.certPem, key: leaf.keyPem } });
-  void advertiseMdns({ port, tls: true });
+  void rebindWithRetry(() => Bun.serve({ port, fetch: app.fetch, websocket, tls: { cert: leaf.certPem, key: leaf.keyPem } }))
+    .then(({ server: newServer }) => {
+      server = newServer;
+      void advertiseMdns({ port, tls: true });
+    })
+    .catch((err: unknown) => {
+      const message = (err as Error).message;
+      console.error(`[index] TLS rebind after leaf renewal failed after retries, the hub has no listener: ${message}`);
+      void raiseIssue({
+        source: "householdCa",
+        key: "tls_rebind_failed",
+        severity: "error",
+        title: "The hub's web server failed to restart after renewing its certificate",
+        detail: message,
+      });
+    });
 });
 
 // The Wyoming satellite server (session-c-brain-and-voice.md step 8): a
