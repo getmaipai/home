@@ -4,11 +4,13 @@ import { resetDb } from "./reset-db";
 import { __resetThrottleForTests } from "@/lib/secretThrottle";
 import { __resetLlmSupervisorForTests } from "@/lib/llmSupervisor";
 import { __resetEmbedSupervisorForTests } from "@/lib/embedSupervisor";
-import { complete, startCompleteStream, embed } from "@/lib/llm";
+import { __resetRateLimiterForTests } from "@/lib/rateLimiter";
+import { complete, startCompleteStream, embed, PERSON_TURN_BUDGET } from "@/lib/llm";
 
 beforeEach(() => {
   resetDb();
   __resetThrottleForTests();
+  __resetRateLimiterForTests();
 });
 
 afterEach(() => {
@@ -119,6 +121,18 @@ describe("POST /api/llm/chat", () => {
     const res = await owner.post("/api/llm/chat", {});
     expect(res.status).toBe(400);
   });
+
+  test("shares turn.ts's per-person rate limit (Session C step 0, wave-2.md): a burst spent on /api/turn also exhausts /api/llm/chat", async () => {
+    const owner = new TestClient();
+    await owner.post("/api/auth/setup", { displayName: "Sage", secret: "correcthorse" });
+    for (let i = 0; i < PERSON_TURN_BUDGET.capacity; i++) {
+      expect((await owner.post("/api/turn", { text: "hi" })).status).toBe(200);
+    }
+    const res = await owner.post("/api/llm/chat", { messages: [{ role: "user", content: "hi" }] });
+    expect(res.status).toBe(429);
+    const body = (await res.json()) as { code: string };
+    expect(body.code).toBe("turn_rate_limited");
+  });
 });
 
 describe("lib/llm.ts embed()", () => {
@@ -167,5 +181,15 @@ describe("POST /api/llm/embed", () => {
 
     const res = await owner.post("/api/llm/embed", {});
     expect(res.status).toBe(400);
+  });
+
+  test("also shares the per-person rate limit", async () => {
+    const owner = new TestClient();
+    await owner.post("/api/auth/setup", { displayName: "Sage", secret: "correcthorse" });
+    for (let i = 0; i < PERSON_TURN_BUDGET.capacity; i++) {
+      expect((await owner.post("/api/turn", { text: "hi" })).status).toBe(200);
+    }
+    const res = await owner.post("/api/llm/embed", { texts: ["hi"] });
+    expect(res.status).toBe(429);
   });
 });

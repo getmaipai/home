@@ -13,8 +13,26 @@
 // wrong kind of code reuse, not real sharing.
 import { getChatClient } from "@/lib/llmSupervisor";
 import { getEmbedClient } from "@/lib/embedSupervisor";
+import { tryConsume } from "@/lib/rateLimiter";
 import { LlmClientError } from "@maipai/spec/llm/ts/client.js";
 import type { ChatRole, ChatCompletionRequest } from "@maipai/spec/llm/ts/types.js";
+
+// Session C step 0 (wave-2.md): a person every couple of seconds, burst
+// of a few - Session A's own per-person limit (its step 11) hadn't
+// landed on main when this session started. Lives here, the one module
+// both routes/turn.ts (via lib/turnEngine.ts) and routes/llm.ts already
+// sit above, rather than in either route file: a turn's own reply
+// generation goes through this identical model call, so a route-to-route
+// import (one HTTP handler reaching into another's module) would be the
+// wrong shape for what is really a shared policy on this port.
+export const PERSON_TURN_BUDGET = { capacity: 5, refillPerSecond: 0.5 };
+
+/** True (and consumes a token) if `personId` is still within budget;
+ * false if the caller should get back spec/errors/errors.json's
+ * "turn_rate_limited" instead. */
+export function personWithinTurnBudget(personId: string): boolean {
+  return tryConsume(`turn:${personId}`, PERSON_TURN_BUDGET);
+}
 
 export type LlmRole =
   | "chat"

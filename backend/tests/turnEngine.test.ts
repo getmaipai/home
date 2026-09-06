@@ -5,6 +5,8 @@ import { __resetThrottleForTests } from "@/lib/secretThrottle";
 import { __resetLlmSupervisorForTests } from "@/lib/llmSupervisor";
 import { runTurn, runTurnStream, gateOutputSafety, StreamSafetyRefusal, buildSystemPrompt, matchPattern, capSection, PROMPT_SYSTEM_CHAR_BUDGET, type TurnStreamResult } from "@/lib/turnEngine";
 import { streamTurnEvents } from "@/routes/turn";
+import { PERSON_TURN_BUDGET } from "@/lib/llm";
+import { __resetRateLimiterForTests } from "@/lib/rateLimiter";
 import { remember, recall, PROFILE_SOURCE } from "@/lib/memory";
 import { listPending } from "@/lib/notifications";
 import { REFUSAL_FIRST, REFUSAL_REPEAT, REMEMBER_CONFIRM_VARIANTS } from "@/lib/replyVariation";
@@ -45,6 +47,7 @@ function fakeActor(overrides: Partial<PersonRow> = {}): PersonRow {
 beforeEach(() => {
   resetDb();
   __resetThrottleForTests();
+  __resetRateLimiterForTests();
 });
 
 afterEach(() => {
@@ -1043,6 +1046,45 @@ describe("POST /api/turn/stream", () => {
     expect(body.code).toBe("unsupported_surface");
   });
 
+});
+
+describe("per-person turn rate limiting (Session C step 0, wave-2.md)", () => {
+  test("a burst up to the bucket's capacity succeeds, the next one is refused with the catalogue code", async () => {
+    const { client } = await owner();
+    for (let i = 0; i < PERSON_TURN_BUDGET.capacity; i++) {
+      const res = await client.post("/api/turn", { text: "hi" });
+      expect(res.status).toBe(200);
+    }
+    const over = await client.post("/api/turn", { text: "hi" });
+    expect(over.status).toBe(429);
+    const body = (await over.json()) as { code: string };
+    expect(body.code).toBe("turn_rate_limited");
+  });
+
+  test("the budget is per-person: a second person's own burst is unaffected by the first's", async () => {
+    const first = await owner();
+    for (let i = 0; i < PERSON_TURN_BUDGET.capacity; i++) {
+      expect((await first.client.post("/api/turn", { text: "hi" })).status).toBe(200);
+    }
+    expect((await first.client.post("/api/turn", { text: "hi" })).status).toBe(429);
+
+    const created = await first.client.post("/api/people", { displayName: "Bramble", role: "child" });
+    const child = (await created.json()) as { id: string };
+    const secondClient = new TestClient();
+    await secondClient.post("/api/auth/select", { personId: child.id });
+    expect((await secondClient.post("/api/turn", { text: "hi" })).status).toBe(200);
+  });
+
+  test("POST /api/turn/stream shares the same per-person budget as POST /api/turn", async () => {
+    const { client } = await owner();
+    for (let i = 0; i < PERSON_TURN_BUDGET.capacity; i++) {
+      expect((await client.post("/api/turn", { text: "hi" })).status).toBe(200);
+    }
+    const res = await client.post("/api/turn/stream", { text: "hi" });
+    expect(res.status).toBe(429);
+    const body = (await res.json()) as { code: string };
+    expect(body.code).toBe("turn_rate_limited");
+  });
 });
 
 describe("routes/turn.ts streamTurnEvents()", () => {

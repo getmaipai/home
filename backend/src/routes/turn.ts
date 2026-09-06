@@ -2,10 +2,13 @@ import { Hono } from "hono";
 import { requireAuth } from "@/middleware/auth";
 import { runTurn, runTurnStream, StreamSafetyRefusal, type Surface, type TurnStreamResult } from "@/lib/turnEngine";
 import { pickThinkingCue } from "@/lib/replyVariation";
+import { personWithinTurnBudget } from "@/lib/llm";
 import type { TurnStreamEvent } from "@/wire";
 import type { AppEnv } from "@/types";
 
 export const turnRoutes = new Hono<AppEnv>();
+
+const RATE_LIMIT_RESPONSE = { error: "Too many requests too quickly.", code: "turn_rate_limited" } as const;
 
 // Any signed-in person, no role gate: a household member's own
 // conversation turn isn't a privileged action, the same posture
@@ -15,6 +18,9 @@ export const turnRoutes = new Hono<AppEnv>();
 // checks) now that this one exists.
 turnRoutes.post("/", requireAuth, async (c) => {
   const actor = c.get("person");
+  if (!personWithinTurnBudget(actor.id)) {
+    return c.json(RATE_LIMIT_RESPONSE, 429);
+  }
   const body = (await c.req.json().catch(() => ({}))) as {
     surface?: string;
     text?: string;
@@ -147,6 +153,9 @@ export async function* streamTurnEvents(
 // event kinds. Same auth posture as POST /api/turn above.
 turnRoutes.post("/stream", requireAuth, async (c) => {
   const actor = c.get("person");
+  if (!personWithinTurnBudget(actor.id)) {
+    return c.json(RATE_LIMIT_RESPONSE, 429);
+  }
   const body = (await c.req.json().catch(() => ({}))) as {
     surface?: string;
     text?: string;
