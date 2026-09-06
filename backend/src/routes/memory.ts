@@ -15,6 +15,7 @@ import {
 } from "@/lib/memory";
 import { runLegacyImport, LegacyImportError } from "@/lib/legacyImport";
 import { apiRouter, errorResponses } from "@/lib/openapi";
+import { isOwnerOrAdmin } from "@/lib/access";
 import type { AppEnv } from "@/types";
 
 // apiRouter()'s OpenAPIHono extends Hono, so every plain `.post()`/`.get()`
@@ -25,6 +26,70 @@ import type { AppEnv } from "@/types";
 // converted" the org standard actually asks for when the touch is one
 // new endpoint, not a rewrite of a whole file's already-working routes.
 export const memoryRoutes = apiRouter();
+
+const MEMORY_TEXT_MAX_LENGTH = 2_000;
+const MEMORY_CATEGORY = z.enum([
+  "person",
+  "place",
+  "thing",
+  "preference",
+  "identity",
+  "event",
+  "project",
+  "goal",
+  "relationship",
+  "fact",
+  "state",
+]);
+const MEMORY_TIER = z.enum(["durable", "episodic", "observation"]);
+const MEMORY_SCOPE = z.enum(["household", "person", "self"]);
+const MEMORY_RECORD_KIND = z.enum(["memory", "entity", "episode"]);
+const PERSON_ID = z.string().regex(/^person-[a-z0-9]{6,}$/);
+const MEMORY_DATE = z.string().datetime({ offset: true }).nullable().optional();
+
+// The HTTP boundary is deliberately narrower than remember()'s core input:
+// callers may describe a memory, but cannot forge its provenance, supply an
+// embedding, or choose the embedding space. `.strict()` makes those fields a
+// visible 400 instead of silently carrying an accidental future field into
+// the core store.
+const MemoryWriteSchema = z
+  .object({
+    record_kind: MEMORY_RECORD_KIND.optional().default("memory"),
+    text: z.string().min(1).max(MEMORY_TEXT_MAX_LENGTH),
+    category: MEMORY_CATEGORY,
+    tier: MEMORY_TIER,
+    scope: MEMORY_SCOPE,
+    person: PERSON_ID.nullable().optional(),
+    // Accepted for compatibility with older clients, but never forwarded:
+    // the route always replaces it with the authenticated actor's id below.
+    source: z.string().min(1).max(200).optional(),
+    importance: z.number().gte(0).lte(1),
+    pinned: z.boolean().optional().default(false),
+    sensitive: z.boolean().optional().default(false),
+    valid_from: MEMORY_DATE,
+    valid_to: MEMORY_DATE,
+  })
+  .strict();
+
+const MemorySupersedeSchema = z
+  .object({
+    text: z.string().min(1).max(MEMORY_TEXT_MAX_LENGTH),
+    category: MEMORY_CATEGORY.optional(),
+    tier: MEMORY_TIER.optional(),
+    // See MemoryWriteSchema: this value is intentionally ignored and
+    // replaced with the authenticated actor's server-side provenance.
+    source: z.string().min(1).max(200).optional(),
+    importance: z.number().gte(0).lte(1).optional(),
+    pinned: z.boolean().optional(),
+    sensitive: z.boolean().optional(),
+    valid_from: MEMORY_DATE,
+    valid_to: MEMORY_DATE,
+  })
+  .strict();
+
+function invalidBody(c: Context<AppEnv>, error: { issues: Array<{ message: string }> }) {
+  return c.json({ error: error.issues.map((issue) => issue.message).join("; ") }, 400);
+}
 
 function fail(c: Context<AppEnv>, result: Extract<MemoryOpResult<unknown>, { ok: false }>) {
   return c.json({ error: result.error }, result.status);
@@ -42,8 +107,13 @@ function parseListOptions(query: URLSearchParams): ListOptions {
 memoryRoutes.post("/", requireAuth, async (c) => {
   const actor = c.get("person");
   const body = await c.req.json().catch(() => null);
-  if (!body || typeof body !== "object") return c.json({ error: "a JSON body is required" }, 400);
-  const result = remember(actor, body as Parameters<typeof remember>[1]);
+  if (!body || typeof body !== "object" || Array.isArray(body)) return c.json({ error: "a JSON body is required" }, 400);
+  const parsed = MemoryWriteSchema.safeParse(body);
+  if (!parsed.success) return invalidBody(c, parsed.error);
+  if ((parsed.data.record_kind === "entity" || parsed.data.pinned) && !isOwnerOrAdmin(actor)) {
+    return c.json({ error: "only owner or admin may create entity or pinned memories" }, 403);
+  }
+  const result = remember(actor, { ...parsed.data, source: `api:${actor.id}` });
   if (!result.ok) return fail(c, result);
   return c.json(result.value, 201);
 });
@@ -109,8 +179,18 @@ memoryRoutes.post("/:id/archive", requireAuth, async (c) => {
 memoryRoutes.post("/:id/supersede", requireAuth, async (c) => {
   const actor = c.get("person");
   const body = await c.req.json().catch(() => null);
-  if (!body || typeof body !== "object") return c.json({ error: "a JSON body is required" }, 400);
-  const result = supersede(actor, c.req.param("id"), body as Parameters<typeof supersede>[2]);
+  if (!body || typeof body !== "object" || Array.isArray(body)) return c.json({ error: "a JSON body is required" }, 400);
+  const parsed = MemorySupersedeSchema.safeParse(body);
+  if (!parsed.success) return invalidBody(c, parsed.error);
+  if (parsed.data.pinned === true && !isOwnerOrAdmin(actor)) {
+    return c.json({ error: "only owner or admin may create pinned memories" }, 403);
+  }
+  const result = supersede(
+    actor,
+    c.req.param("id"),
+    { ...parsed.data, source: `api:${actor.id}` },
+    { enforcePrivilegedRoute: true },
+  );
   if (!result.ok) return fail(c, result);
   return c.json(result.value);
 });

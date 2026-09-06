@@ -714,6 +714,11 @@ export interface SupersedeOptions {
    * distinct from expired_at (when we retired the row, stamped
    * unconditionally below) which records when it STOPPED BEING TRUE. */
   closeValidTo?: string;
+  /** HTTP routes use this to keep a non-privileged caller from changing an
+   * existing pinned/entity record into another privileged record. Internal
+   * judge/profile writes use the core API directly and keep their existing
+   * authorization path. */
+  enforcePrivilegedRoute?: boolean;
 }
 
 /** Replace an active record with a new one carrying forward its scope and
@@ -730,6 +735,9 @@ export function supersede(
   const old = found.value;
   if (old.status !== "active") {
     return { ok: false, status: 400, error: `cannot supersede a record with status ${old.status}` };
+  }
+  if (opts.enforcePrivilegedRoute && !isOwnerOrAdmin(actor) && (old.recordKind === "entity" || old.pinned || input.pinned === true)) {
+    return { ok: false, status: 403, error: "only owner or admin may supersede entity or pinned memories" };
   }
 
   const created = remember(actor, {

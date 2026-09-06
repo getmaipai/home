@@ -21,7 +21,7 @@ describe("rememberMessage", () => {
   // maintenance job's decay rules (chatMemoryActions.ts's own comment has
   // the full reasoning) - this is the contract test that catches a future
   // edit silently drifting from it.
-  test("posts to /api/memory with the decided one-click defaults, attributed to the turn and actor", async () => {
+  test("posts to /api/memory with the decided one-click defaults", async () => {
     const env = stubFetch();
     try {
       await rememberMessage({ text: "We're going to Boston in July", turnId: "turn-1", actorId: "person-abc123" });
@@ -33,7 +33,6 @@ describe("rememberMessage", () => {
         tier: "durable",
         scope: "person",
         person: "person-abc123",
-        source: "turn-1",
         importance: 0.6,
       });
     } finally {

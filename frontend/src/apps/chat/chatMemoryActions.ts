@@ -20,7 +20,8 @@ export function useChatActorId(): string {
 // memory_ids field on the message yet (session-a-intelligence.md's
 // contract adds `GET /:id/turns`' per-turn `memory_ids: string[]`, not
 // merged) - GET /api/memory also has no "by source" filter to check
-// this against the server instead. A store, not a plain Map: "forget
+// this against the server instead. The backend now owns memory provenance
+// and attributes this API write to the authenticated actor. A store, not a plain Map: "forget
 // this" (a separate component instance from "remember this", both mounted
 // per message) needs to notice the id land the moment the save succeeds,
 // not just on its own next unrelated re-render.
@@ -112,7 +113,6 @@ export async function rememberMessage(params: {
     tier: "durable",
     scope: "person",
     person: params.actorId,
-    source: params.turnId,
     importance: 0.6,
   });
   setRemembered(params.turnId, record.id);

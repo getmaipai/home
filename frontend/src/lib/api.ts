@@ -473,7 +473,6 @@ export const api = {
     tier: MemoryRecord["tier"];
     scope: MemoryRecord["scope"];
     person?: string | null;
-    source: string;
     importance: number;
   }) => request<MemoryRecord>("/api/memory", { method: "POST", body: JSON.stringify(input) }),
   // GET /api/plugins (already on main): every installed package's

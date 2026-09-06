@@ -198,6 +198,69 @@ describe("POST /api/memory (remember)", () => {
     });
     expect(res.status).toBe(400);
   });
+
+  test("the HTTP write boundary controls provenance, privileged records, and embeddings", async () => {
+    const { childClient, childId } = await ownerAndChild();
+
+    const embeddingAttempt = await childClient.post("/api/memory", {
+      text: "This request must not persist",
+      category: "fact",
+      tier: "durable",
+      scope: "person",
+      person: childId,
+      source: "forged-turn-id",
+      importance: 0.5,
+      embedding_space: "attacker",
+      precomputed_embedding: { space: "attacker", vector: [1, 2, 3] },
+    });
+    expect(embeddingAttempt.status).toBe(400);
+
+    const entityAttempt = await childClient.post("/api/memory", {
+      record_kind: "entity",
+      text: "A child cannot create an entity through this route",
+      category: "thing",
+      tier: "durable",
+      scope: "household",
+      source: "forged-turn-id",
+      importance: 0.5,
+    });
+    expect(entityAttempt.status).toBe(403);
+
+    const pinnedAttempt = await childClient.post("/api/memory", {
+      text: "A child cannot pin a household prompt",
+      category: "fact",
+      tier: "durable",
+      scope: "household",
+      source: "forged-turn-id",
+      importance: 0.5,
+      pinned: true,
+    });
+    expect(pinnedAttempt.status).toBe(403);
+
+    const longText = await childClient.post("/api/memory", {
+      text: "x".repeat(2_001),
+      category: "fact",
+      tier: "durable",
+      scope: "person",
+      person: childId,
+      importance: 0.5,
+    });
+    expect(longText.status).toBe(400);
+
+    const safe = await childClient.post("/api/memory", {
+      text: "The server owns this provenance",
+      category: "fact",
+      tier: "durable",
+      scope: "person",
+      person: childId,
+      source: "forged-turn-id",
+      importance: 0.5,
+    });
+    expect(safe.status).toBe(201);
+    const body = (await safe.json()) as MemoryRecord;
+    expect(body.source).toBe(`api:${childId}`);
+    expect(db.select().from(memoryRecords).all()).toHaveLength(1);
+  });
 });
 
 describe("GET /api/memory (list) and visibility", () => {
@@ -429,6 +492,35 @@ describe("supersede and archive", () => {
     expect(body.old.expired_at).not.toBeNull();
     expect(body.created.status).toBe("active");
     expect(body.created.text).toBe("Riff's favorite color is green now");
+  });
+
+  test("supersede applies the route boundary to privileged records", async () => {
+    const { owner, childClient } = await ownerAndChild();
+    const created = await owner.post("/api/memory", {
+      text: "A pinned household fact",
+      category: "fact",
+      tier: "durable",
+      scope: "household",
+      source: "forged-owner-source",
+      importance: 0.8,
+      pinned: true,
+    });
+    const original = (await created.json()) as MemoryRecord;
+
+    const childAttempt = await childClient.post(`/api/memory/${original.id}/supersede`, {
+      text: "A child must not rewrite a pinned prompt",
+      source: "forged-child-source",
+    });
+    expect(childAttempt.status).toBe(403);
+
+    const ownerAttempt = await owner.post(`/api/memory/${original.id}/supersede`, {
+      text: "The owner updated the pinned fact",
+      source: "forged-owner-source",
+    });
+    expect(ownerAttempt.status).toBe(200);
+    const body = (await ownerAttempt.json()) as { created: MemoryRecord };
+    expect(body.created.source).toMatch(/^api:person-[a-z0-9]+$/);
+    expect(body.created.pinned).toBe(true);
   });
 
   test("archive tombstones without deleting the row", async () => {
