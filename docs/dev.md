@@ -8575,6 +8575,16 @@ real detail lives in each session's own `docs/dev/session-<letter>.md`.
   view, devices and sessions with revoke, the TV/far surface and the
   rest of accessibility, i18n scaffolding with Lingui, and nine tier-1
   user docs. Merged 2026-09-06.
+- **Session F** (`docs/plans/session-f-platform-and-trust.md`, `docs/dev/
+  session-f.md`): the platform and trust layer - entities/relationships/
+  grants/approvals, passkeys and device pairing, backups to somewhere
+  else with the emergency kit and restore drill, storage/quotas/factory
+  reset/redacted diagnostics, the updates projection, and the installer/
+  service files (systemd, launchd, a Windows service via WinSW) plus a
+  real Astro Starlight docs site. The performance-budget bench and the
+  release ceremony itself are deliberately deferred (docs/BACKLOG.md;
+  cutting a release is always Jesse's word in the moment). Merged
+  2026-09-06.
 
 ## A resource governor for the chat engine (2026-09-06)
 
