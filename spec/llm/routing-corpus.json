@@ -54,10 +54,17 @@
   { "utterance": "do you remember when we first met", "expect": "recall", "must_not": ["remember"], "note": "matches recall's own \"do you remember *\" pattern - a real Tier 0 fire, and the correct fix for the legacy 'recall question stored as junk memory' bug: it now retrieves, never stores." },
   { "utterance": "can you remember our first conversation", "expect": null, "must_not": ["remember"] },
 
-  { "utterance": "what's my son's name", "expect": null, "must_not": ["remember", "recall"] },
-  { "utterance": "what's my address", "expect": null, "must_not": ["remember", "recall"] },
+  { "utterance": "what's my son's name", "expect": null, "must_not": ["remember", "recall", "almanac-date", "almanac-time"], "note": "a real false positive found live: the real embedding model scored this ~0.68 against almanac-date's own routing.examples before they were revised - kept as a permanent regression guard, not just a note in a commit message." },
+  { "utterance": "what's my address", "expect": null, "must_not": ["remember", "recall", "almanac-date", "almanac-time"] },
 
-  { "utterance": "what time is it", "expect": null, "must_not": ["define", "joke", "recall", "remember", "storytime-style", "trivia", "weather"] },
   { "utterance": "how are you feeling today", "expect": null, "must_not": ["define", "joke", "recall", "remember", "storytime-style", "trivia", "weather"] },
-  { "utterance": "good morning", "expect": null, "must_not": ["define", "joke", "recall", "remember", "storytime-style", "trivia", "weather"] }
+  { "utterance": "good morning", "expect": null, "must_not": ["define", "joke", "recall", "remember", "storytime-style", "trivia", "weather"] },
+
+  { "utterance": "what's today's date", "expect": "almanac-date", "must_not": [] },
+  { "utterance": "what day of the week is it", "expect": "almanac-date", "must_not": [] },
+  { "utterance": "what time is it", "expect": "almanac-time", "must_not": [] },
+  { "utterance": "what's the next holiday", "expect": "almanac-holiday", "must_not": [] },
+  { "utterance": "is there a holiday coming up", "expect": "almanac-holiday", "must_not": [] },
+  { "utterance": "what phase is the moon in", "expect": "almanac-moon", "must_not": [] },
+  { "utterance": "what happened on this day in history", "expect": "almanac-onthisday", "must_not": [] }
 ]

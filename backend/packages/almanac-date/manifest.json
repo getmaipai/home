@@ -1,0 +1,40 @@
+{
+  "id": "almanac-date",
+  "version": "0.1.0",
+  "kind": "plugin",
+  "category": "Info",
+  "display": "Today's Date",
+  "description": "Today's date, spoken naturally (2026-09-06, step 7) - one of the almanac's five small lookups (legacy had five separate tools for this).",
+  "author": "MaiPai",
+  "license": "AGPL-3.0",
+  "homepage": "https://github.com/getmaipai/home",
+  "routing": {
+    "examples": [
+      "what's today's calendar date",
+      "what's the date today",
+      "what day of the week is today",
+      "tell me today's date",
+      "what's the current date"
+    ],
+    "patterns": ["what's today's date", "what day is it", "what day of the week is it"]
+  },
+  "requires": [],
+  "optional": [],
+  "platforms": ["home"],
+  "min_role": "child",
+  "consequential": false,
+  "offline": "full",
+  "config": [],
+  "data_sources": [],
+  "permissions": [],
+  "notifications": [],
+  "backup": "exclude",
+  "background": false,
+  "contributes": {},
+  "pages": [],
+  "min_app": "0.1.0",
+  "timeout_ms": 8000,
+  "tier": 1,
+  "quality_scale": "bronze",
+  "smoke": { "kind": "deno_test" }
+}

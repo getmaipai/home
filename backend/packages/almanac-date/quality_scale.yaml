@@ -1,0 +1,35 @@
+# Bronze/silver/gold criteria per getmaipai/.github's docs/PACKAGES.md.
+# `met: true` on every bronze line is the publish gate; `scripts.sh`'s
+# bronze check (spec/tests/ts/package-bronze.test.ts) reads this file,
+# not just the manifest's own `quality_scale` string.
+package: almanac-date
+scale: bronze
+bronze:
+  tests_green:
+    met: true
+    note: "deno test (handler_test.ts) passes; run through lib/smoke.ts's real deno_test smoke kind"
+  routing_examples:
+    met: true
+    note: 5 examples in manifest.json's routing.examples
+  privacy_row_per_data_source:
+    met: true
+    note: no data_sources at all - nothing leaves the house
+  offline_behavior_stated:
+    met: true
+    note: "offline: full - pure local computation, no network ever"
+  smoke_test:
+    met: true
+    note: "smoke: { kind: deno_test }, handler_test.ts, run through lib/smoke.ts's runDenoTestSmoke()"
+  readme_and_changelog:
+    met: true
+  lint_clean:
+    met: true
+    note: "deno test itself is this package's own lint/typecheck gate, the same reason knowledge's own quality_scale.yaml gives"
+silver:
+  diagnostics_and_reauth:
+    met: false
+    note: no auth to diagnose (no network at all); nothing to add for silver yet
+gold:
+  real_service_verified:
+    met: false
+    note: not yet manually verified against a real running dev server

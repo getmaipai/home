@@ -226,9 +226,16 @@ and, on the robot later, speech. E draws the list and the running timer.
   `light.turn_off`, brightness) through the permission model shipped in
   Wave 1; a `consequential: true` example (`lock.lock`) proving C's
   confirm path from the package side.
-- Widgets: `weather`, `news`, `lists` and `almanac` declare
+- Widgets: `weather`, `news`, `lists` and `almanac-date` declare
   `contributes.widgets`; `GET /api/widgets` and the data route from the
-  contract, served from the cache.
+  contract, served from the cache. (Step 7's own design note: "one small
+  `almanac` package" became five - `almanac-date`, `almanac-time`,
+  `almanac-moon`, `almanac-holiday`, `almanac-onthisday` - once building
+  it revealed the router can only ever bind a package's ONE required arg
+  from a `routing.patterns` wildcard capture, with no way for a fired
+  package to learn which of several sub-questions it was actually asked;
+  see docs/dev/session-d.md's own step 7 entry for the full reasoning.
+  `almanac-date` is the one namesake widget makes the most sense for.)
 - `contributes.pages` from a manifest feeds the nav registry E built in
   Wave 1 (`GET /api/plugins` already lists packages; add the pages
   array, E reads it).

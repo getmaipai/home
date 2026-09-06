@@ -1,0 +1,55 @@
+{
+  "id": "almanac-onthisday",
+  "version": "0.1.0",
+  "kind": "plugin",
+  "category": "Info",
+  "display": "On This Day",
+  "description": "What happened on this day in history (2026-09-06, step 7) - one of the almanac's five small lookups (legacy had five separate tools for this), via Wikipedia's own free public 'on this day' feed.",
+  "author": "MaiPai",
+  "license": "AGPL-3.0",
+  "homepage": "https://github.com/getmaipai/home",
+  "routing": {
+    "examples": [
+      "what happened on this day in history",
+      "what happened today in history",
+      "tell me something that happened on this day",
+      "this day in history",
+      "what's special about today in history"
+    ],
+    "patterns": ["what happened on this day in history", "what happened today in history", "this day in history"]
+  },
+  "requires": [],
+  "optional": [],
+  "platforms": ["home"],
+  "min_role": "child",
+  "consequential": false,
+  "offline": "unavailable",
+  "config": [],
+  "data_sources": [
+    {
+      "id": "wikipedia",
+      "destination": "Wikipedia's own public REST 'on this day' feed (en.wikipedia.org)",
+      "when": "the household asks what happened on this day in history",
+      "what": "today's month and day only, never anything the household typed",
+      "who": "the Wikimedia Foundation",
+      "opt_in": true,
+      "retention": "unknown, see Wikimedia's own policy"
+    }
+  ],
+  "permissions": ["net:en.wikipedia.org"],
+  "notifications": [],
+  "cache": { "key_template": "almanac-onthisday:{month}-{day}", "ttl_s": 43200, "stale_ok_s": 86400, "max_bytes": 100000 },
+  "fallback_reply": {
+    "text": "Sorry, I'm having trouble looking that up right now.",
+    "speech": "Sorry, I'm having trouble looking that up right now."
+  },
+  "backup": "exclude",
+  "background": false,
+  "contributes": {},
+  "pages": [],
+  "min_app": "0.1.0",
+  "timeout_ms": 8000,
+  "tier": 1,
+  "quality_scale": "bronze",
+  "smoke": { "kind": "deno_test" }
+}

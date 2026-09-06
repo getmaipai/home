@@ -13,7 +13,7 @@
 // read docs/dev.md's turn engine section before extending this file.
 import { evaluateSafety } from "@/lib/safety";
 import { speakerAgeBand } from "@/lib/ageBand";
-import { listPackageIds, loadPackage, meetsMinRole, runPlugin } from "@/lib/plugins";
+import { listPackageIds, loadManifestOnly, meetsMinRole, runPlugin } from "@/lib/plugins";
 import { ensureRoutingEmbeddings, embedUtterance, scoreByEmbedding, pickTier1WinnerAmong } from "@/lib/routing";
 import { loadAllSkills, type LoadedSkill } from "@/lib/skills";
 import { matchCommand, runCommand } from "@/lib/commands";
@@ -151,11 +151,27 @@ export interface LoadedManifest {
 // OS-dependent enumeration order, not just "whatever order the disk
 // returns," even though only one bundled package exists to tie against
 // today.
+//
+// `loadManifestOnly()`, not `lib/plugins.ts`'s own `loadPackage()`: a
+// real bug found by code review (session-d-packages-and-store.md step
+// 7, the first time a routing-corpus row ever named a Tier 1 package) -
+// `loadPackage()` deliberately REJECTS anything but `tier: 0` (its own
+// header: "use runPlugin(), not loadPackage(), for a Tier 1 one"), so
+// every Tier 1 package (knowledge, and now every almanac-* one) was
+// silently invisible to route() and to buildSystemPrompt()'s own
+// plugins list from the day Tier 1 shipped (step 5) - nothing caught it
+// because no routing-corpus row had ever named one until now.
+// route()/buildSystemPrompt() only ever need the manifest (routing
+// examples/patterns, args, description), never the recipe -
+// loadManifestOnly() is the tier-agnostic read both actually want;
+// runPlugin() (this file's own execution call, not this listing) is
+// still what branches by tier to load the recipe or reach into
+// lib/denoHost.ts.
 export function loadAllManifests(): LoadedManifest[] {
   const out: LoadedManifest[] = [];
   for (const id of [...listPackageIds()].sort()) {
-    const loaded = loadPackage(id);
-    if (loaded.ok) out.push({ id, manifest: loaded.value.manifest });
+    const loaded = loadManifestOnly(id);
+    if (loaded.ok) out.push({ id, manifest: loaded.value });
   }
   return out;
 }
@@ -537,10 +553,17 @@ interface RoutedPlugin {
 // pattern match, never on a fuzzy example score, however high. A tie
 // between two pattern matches goes to whichever package sorts first by
 // id (loadAllManifests()'s deterministic order), a deliberately simple
-// tie-break, not a claim of ranking by pattern specificity. Tier 0
-// (patterns) always wins outright over Tier 1, checked first and
-// returned immediately - a real, deliberately-authored trigger phrase
-// never competes with a fuzzy score, however confident.
+// tie-break, not a claim of ranking by pattern specificity. A literal
+// `routing.patterns` match always wins outright over the fuzzy example/
+// embedding score below, checked first and returned immediately - a
+// real, deliberately-authored trigger phrase never competes with a
+// fuzzy score, however confident. This is NOT a Tier 0/Tier 1 split:
+// `loadAllManifests()` reads every package's manifest regardless of
+// tier (session-d-packages-and-store.md step 7 fix - it used to call a
+// Tier-0-only loader, so a Tier 1 package's own `routing.patterns`
+// never got a chance here at all), so a Tier 1 package with a literal
+// pattern (almanac-time's exact "what time is it") hits this identical
+// immediate-win branch too, same as any Tier 0 plugin's.
 //
 // Tier 1 (session-c-brain-and-voice.md step 1) is a real embedding
 // ranking now, not a single package's own score against a fixed bar: the
@@ -594,7 +617,9 @@ export async function route(text: string, actor: PersonRow, loaded: LoadedManife
       if (captured === null) continue;
       const args = deterministicArgs(manifest.args, captured);
       if (!args) continue;
-      // Tier 0 always wins, immediately - no Tier 1 ranking to report.
+      // A literal pattern match always wins, immediately - no ranking to
+      // report - regardless of which tier this package is (see this
+      // function's own header comment above).
       return { winner: { id, args, score: 1, viaPattern: true, viaEmbedding: true }, ranked: [] };
     }
 
