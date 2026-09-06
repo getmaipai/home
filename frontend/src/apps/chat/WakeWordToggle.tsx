@@ -1,9 +1,12 @@
 import { useEffect, useRef, useState } from "react";
 import { Button } from "@/kit/ui/button";
+import { getIcon } from "@/kit/icons";
 import { startMicCapture, type MicCaptureHandle } from "@/lib/voice/mic-capture";
 import { WakeWordLoop } from "@/lib/voice/wake-word-loop";
 import { onWakeDetected, type WakeDetectedEvent } from "@/lib/voice/wake-word-events";
 import { loadInstalledWakewords, DEFAULT_WAKE_WORD_MODEL_ID } from "@/lib/voice/wake-word-models";
+
+const MicIcon = getIcon("mic");
 
 interface WakeWordToggleProps {
   onWakeDetected: (event: WakeDetectedEvent) => void;
@@ -107,15 +110,17 @@ export function WakeWordToggle({ onWakeDetected: onWake }: WakeWordToggleProps) 
     <div className="flex flex-col items-end gap-1">
       <Button
         type="button"
-        variant={enabled ? "default" : "secondary"}
+        size="sm"
+        variant={enabled ? "default" : "outline"}
         onClick={() => (enabled ? stop() : start())}
         aria-pressed={enabled}
         className="rounded-full"
       >
+        <MicIcon />
         {status === "listening"
-          ? 'Wake word: listening for "hey jarvis"'
+          ? 'Listening for "hey jarvis"'
           : status === "starting"
-            ? "Wake word: starting…"
+            ? "Starting…"
             : "Wake word (experimental)"}
       </Button>
       {error ? <span className="text-base text-destructive">{error}</span> : null}

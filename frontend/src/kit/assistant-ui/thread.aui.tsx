@@ -73,6 +73,7 @@ import {
   type ComponentType,
   type FC,
   type PropsWithChildren,
+  type ReactNode,
 } from "react";
 
 export type ThreadGroupPart = MessagePrimitive.GroupedParts.GroupPart;
@@ -99,6 +100,13 @@ export type ThreadComponents = {
 export type ThreadProps = {
   components?: ThreadComponents | undefined;
   autoFocus?: boolean | undefined;
+  /** Extra controls rendered directly above the composer (not the page
+   * header) - per-turn behavior toggles (a wake-word listener, "think
+   * longer") read as odd floating above the whole message history, but
+   * make sense sitting right next to the thing they actually affect: the
+   * next message a person sends (Jesse, 2026-09-06: "its placement /
+   * location is also odd"). */
+  composerToolbar?: ReactNode | undefined;
 };
 
 const EMPTY_COMPONENTS: ThreadComponents = {};
@@ -143,20 +151,26 @@ const ThreadHistorySkeleton: FC = () => (
 export const Thread: FC<ThreadProps> = ({
   components = EMPTY_COMPONENTS,
   autoFocus = true,
+  composerToolbar,
 }) => {
   const isEmpty = useAuiState(isNewChatView);
 
   return (
     <ThreadComponentsContext.Provider value={components}>
-      <ThreadRoot isEmpty={isEmpty} autoFocus={autoFocus} />
+      <ThreadRoot
+        isEmpty={isEmpty}
+        autoFocus={autoFocus}
+        composerToolbar={composerToolbar}
+      />
     </ThreadComponentsContext.Provider>
   );
 };
 
-const ThreadRoot: FC<{ isEmpty: boolean; autoFocus: boolean }> = ({
-  isEmpty,
-  autoFocus,
-}) => {
+const ThreadRoot: FC<{
+  isEmpty: boolean;
+  autoFocus: boolean;
+  composerToolbar?: ReactNode;
+}> = ({ isEmpty, autoFocus, composerToolbar }) => {
   const { Welcome = ThreadWelcome } = useContext(ThreadComponentsContext);
 
   return (
@@ -207,6 +221,9 @@ const ThreadRoot: FC<{ isEmpty: boolean; autoFocus: boolean }> = ({
           >
             <ThreadScrollToBottom />
             <ThreadFollowupSuggestions />
+            {composerToolbar ? (
+              <div className="flex flex-wrap items-center justify-end gap-2">{composerToolbar}</div>
+            ) : null}
             <Composer autoFocus={autoFocus} />
             <AuiIf condition={(s) => isNewChatView(s) && s.composer.isEmpty}>
               <ThreadSuggestions />

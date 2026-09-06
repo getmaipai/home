@@ -57,7 +57,12 @@
   --destructive: hsl(0 72% 51%);
   --destructive-foreground: hsl(0 0% 100%);
   --ring: hsl(189 94% 40%);
-  --radius: 0.75rem;
+  /* 1rem, not shadcn's own 0.75rem default: a visual pass (2026-09-06)
+   * modeled on well-designed native mobile apps found every card, tile
+   * and control there noticeably rounder than this kit's own defaults -
+   * one token bump softens buttons, cards, inputs and popovers together
+   * rather than hand-tuning each. */
+  --radius: 1rem;
   --sidebar: hsl(0 0% 100%);
   --sidebar-foreground: hsl(240 10% 4%);
   --sidebar-primary: hsl(189 94% 40%);

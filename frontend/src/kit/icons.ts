@@ -26,6 +26,7 @@ import {
   PinOff,
   Search,
   Sparkles,
+  Mic,
   type LucideIcon,
 } from "lucide-react";
 
@@ -61,6 +62,7 @@ const REGISTRY: Record<string, LucideIcon> = {
   "pin-off": PinOff,
   search: Search,
   sparkles: Sparkles,
+  mic: Mic,
 };
 
 export function getIcon(name: string): LucideIcon {

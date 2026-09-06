@@ -6,12 +6,15 @@ import { Button } from "@/kit/ui/button";
 import { Thread } from "@/kit/assistant-ui/thread.aui";
 import { ThreadList } from "@/kit/assistant-ui/thread-list.aui";
 import { WakeWordToggle } from "@/apps/chat/WakeWordToggle";
+import { getIcon } from "@/kit/icons";
 import { createChatModelAdapter } from "@/apps/chat/chatModelAdapter";
 import { createChatThreadListAdapter } from "@/apps/chat/chatThreadListAdapter";
 import { createChatSuggestionAdapter } from "@/apps/chat/chatSuggestionAdapter";
 import { ChatActorContext } from "@/apps/chat/chatMemoryActions";
 import type { Roster } from "@/lib/api";
 import type { SentenceSpeechScheduler } from "@/lib/sentenceSpeechScheduler";
+
+const BrainIcon = getIcon("brain");
 
 interface ChatPageProps {
   person: Roster;
@@ -96,38 +99,51 @@ export function ChatPage({ person }: ChatPageProps) {
           {banner ? (
             <div className="mx-4 mb-2 rounded-[var(--radius)] bg-[var(--muted)] px-3 py-2 text-base">{banner}</div>
           ) : null}
-          <div className="flex flex-wrap items-center justify-end gap-2 px-4 pb-1">
-            {/* Phase 1 of the wake-word plan (docs/dev.md, 2026-09-04):
-                "infrastructure proof, no custom model yet" - fires on
-                openWakeWord's stock "hey jarvis" phrase, not a MaiPai-trained
-                one. No auto-send/auto-listen wiring yet: STT doesn't exist
-                anywhere in this codebase, so a real detection only shows a
-                banner proving the mechanism. */}
-            <WakeWordToggle
-              onWakeDetected={(event) =>
-                setBanner(`Wake word heard: "${event.modelId}" (demo only - MaiPai isn't listening for real commands yet)`)
-              }
-            />
-            <Button
-              type="button"
-              variant={thinking ? "default" : "secondary"}
-              onClick={() => setThinking((v) => !v)}
-              aria-pressed={thinking}
-              className="rounded-full"
-            >
-              {thinking ? "Thinking on for next message" : "Think longer"}
-            </Button>
-          </div>
           <div className="flex min-h-0 flex-1">
             {/* Threads (step 4): mocked to one conversation until Session
                 A's per-thread routes land (chatThreadListAdapter.ts) -
                 hidden below lg since there is, today, nothing to switch
                 between. */}
-            <aside className="hidden w-64 shrink-0 border-e border-border lg:block">
+            <aside className="hidden w-64 shrink-0 overflow-y-auto border-e border-border p-2 lg:block">
               <ThreadList />
             </aside>
             <div className="min-w-0 flex-1">
-              <Thread />
+              <Thread
+                composerToolbar={
+                  // Per-turn behavior toggles, not page chrome - moved off
+                  // the header (Jesse, 2026-09-06: "its placement / location
+                  // is also odd") to sit right above the composer they
+                  // actually affect, the same way a modern chat app's mode
+                  // switches live next to the input, not floating above the
+                  // whole conversation.
+                  <>
+                    {/* Phase 1 of the wake-word plan (docs/dev.md, 2026-09-04):
+                        "infrastructure proof, no custom model yet" - fires on
+                        openWakeWord's stock "hey jarvis" phrase, not a MaiPai-trained
+                        one. No auto-send/auto-listen wiring yet: STT doesn't exist
+                        anywhere in this codebase, so a real detection only shows a
+                        banner proving the mechanism. */}
+                    <WakeWordToggle
+                      onWakeDetected={(event) =>
+                        setBanner(
+                          `Wake word heard: "${event.modelId}" (demo only - MaiPai isn't listening for real commands yet)`,
+                        )
+                      }
+                    />
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant={thinking ? "default" : "outline"}
+                      onClick={() => setThinking((v) => !v)}
+                      aria-pressed={thinking}
+                      className="rounded-full"
+                    >
+                      <BrainIcon />
+                      {thinking ? "Thinking on for next message" : "Think longer"}
+                    </Button>
+                  </>
+                }
+              />
             </div>
           </div>
         </Page>
