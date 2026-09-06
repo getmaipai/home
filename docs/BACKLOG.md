@@ -199,6 +199,69 @@ Priority-1 lookup landing first):**
       real device), though it's already unblocked (no missing
       integration to build first, unlike media playback).
 
+**Sourced-answer UI (citations, favicons)** - Jesse's ask (2026-09-06):
+noticed other chat apps mark which sentence used which source, researched
+both prior art and current practice before adding these. Both items below
+are blocked on any sourced skill actually existing (Web search above is the
+first) - nothing to cite until then, so treat as groundwork to design
+alongside the first sourced skill, not before it.
+
+- [ ] **Inline citation markers on sourced answers** (M-L) - doesn't exist
+      yet. Legacy (`home-legacy.git`, `loki-doki`) shipped this completely
+      once (issue #8, Open WebUI-inspired) and it's worth reading before
+      designing fresh, not porting verbatim (feature scope is re-examined
+      per `getmaipai/.github`, not carried): a fixed `SOURCE_TOOLS`
+      allowlist (search/news/youtube/where-to-watch/holidays/contentRating)
+      produced a `Source[]`; `companionTurn.ts` appended a numbered
+      `Sources:\n[1] Title — url` block to the prompt and instructed the
+      model to cite inline as `[1]`, `[2]`; an SSE `sources` event carried
+      the list to the client, persisted to a `messages.sources` column so
+      chips survived a reload; the frontend rewrote `[1]` into a
+      backtick-wrapped `` `CITE:1` `` token so react-markdown's own
+      inline-code renderer could intercept it and swap in a hover-tooltip
+      chip linking out, plus a numbered `SourcesCard` under the settled
+      (non-streaming) reply. It was entirely prompt-trusted - no
+      structural/tool-enforced citation - and scoped to that one tool
+      allowlist, never general RAG/notes retrieval.
+      Current practice (researched 2026-09-06, not recalled): two real
+      patterns exist. Perplexity's is the same shape legacy already built -
+      inject a numbered source list, instruct `[N]` markers, and on the
+      client accumulate the FULL text buffer before parsing (a marker can
+      split across streaming chunk boundaries - parsing one delta in
+      isolation misses it), then map `N` to the source list. Anthropic's
+      Citations API is structurally different and more reliable: the model
+      returns separate content blocks, each carrying real citation
+      objects (`document_index`, `cited_text`, a char/page/block location)
+      instead of a bare `[N]` in prose, streamed via a dedicated
+      `citations_delta` event - `cited_text` doesn't even count as output
+      tokens. That needs either a hosted API with native support or real
+      constrained-generation work on our own llama-server stack to fake
+      structurally, so the pragmatic path here is almost certainly the
+      first pattern (which is what legacy already validated), with the
+      same streaming-safe accumulate-then-parse discipline Perplexity's
+      own docs warn matters.
+- [ ] **Favicon fetch-once, cache, and reuse for citation/source chips**
+      (S) - doesn't exist yet, but legacy had a complete, two-layer
+      version worth reusing as-is (hard-won resolver/cache logic, not
+      feature scope, so this one IS a real port candidate per
+      `getmaipai/.github`): client-side, `faviconCache.ts` kept an
+      in-memory + `localStorage` cache (7-day TTL, `data:` URLs, in-flight
+      dedup so concurrent callers for the same domain share one fetch);
+      server-side, `/api/img` (`imageProxy.ts`) never let the browser hit
+      a third-party favicon host directly, fetching once through an
+      SSRF-guarded proxy, disk-caching bytes keyed by a URL hash with a
+      negative-result cache for confirmed-missing icons, and a periodic
+      size-bounded sweep. Confirmed by 2026-09-06 research this isn't just
+      a performance nicety: browser favicon caches are a known privacy/
+      fingerprinting vector (persist separately from cookies/history,
+      survive some browsers' private-mode and cache-clears), and a raw
+      `<img src="https://icons.duckduckgo.com/...">` leaks the household's
+      IP and Referer to every cited domain on every reply - exactly the
+      leak class the legacy proxy's own comment already named as its first
+      reason for existing. Wire this in as part of the citation-chip work
+      above, not standalone - a favicon cache with nothing to cache is
+      pointless work today.
+
 ## Integrations
 
 - [ ] **Calendar** (L) - doesn't exist. Needs a design decision first:
