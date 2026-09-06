@@ -21,6 +21,11 @@ import {
   Inbox,
   MoreHorizontal,
   PanelLeft,
+  Home,
+  Pin,
+  PinOff,
+  Search,
+  Sparkles,
   type LucideIcon,
 } from "lucide-react";
 
@@ -51,6 +56,11 @@ const REGISTRY: Record<string, LucideIcon> = {
   inbox: Inbox,
   "more-horizontal": MoreHorizontal,
   "panel-left": PanelLeft,
+  home: Home,
+  pin: Pin,
+  "pin-off": PinOff,
+  search: Search,
+  sparkles: Sparkles,
 };
 
 export function getIcon(name: string): LucideIcon {

@@ -22,6 +22,32 @@ export function titleCaseOption(value: string): string {
     .join(" ");
 }
 
+// A code review, 2026-09-05, found `core.locale`'s BCP-47 values ("en-US",
+// "en-GB") going through `titleCaseOption` above and coming out "En-US" -
+// the split only ever looked for "_", so the dash-joined locale tag was
+// treated as one word and had only its first letter capitalized.
+// `Intl.DisplayNames` (a real browser-native API, not a hand-built locale-
+// name table) renders the language a real family recognizes ("American
+// English") - but a follow-up review, 2026-09-05, found the first fix
+// guessed by the VALUE's shape (any two-or-three-letter, dash-joined
+// string), applied inside `titleCaseOption` itself - which
+// `VoiceCatalogSection.tsx` also calls, for community voice *collection*
+// names, not locales. `Intl.DisplayNames` turned out lenient enough to
+// resolve non-locale dashed strings too (confirmed: `.of("vi-nh")` returns
+// "Vietnamese (Vanuatu)" instead of throwing), so a collection someday
+// named something dash-joined and locale-shaped would have silently
+// rendered as a wrong language name. Scoped to the one key that is
+// actually a locale, at the one call site that knows it, instead.
+export function localeDisplayName(value: string): string {
+  try {
+    const name = new Intl.DisplayNames(["en"], { type: "language" }).of(value);
+    if (name) return name.charAt(0).toUpperCase() + name.slice(1);
+  } catch {
+    // Not a real BCP-47 tag Intl recognizes - fall through.
+  }
+  return titleCaseOption(value);
+}
+
 interface SettingFieldProps {
   setting: MergedSetting;
   /** Resolves true if the write landed, false if the backend rejected it
@@ -107,7 +133,7 @@ export function SettingField({ setting, onChange, onReset, disabled }: SettingFi
         value={String(resolved.value)}
         onValueChange={onChange}
         options={options}
-        getLabel={titleCaseOption}
+        getLabel={def.key === "core.locale" ? localeDisplayName : titleCaseOption}
         disabled={disabled}
         aria-label={def.label}
       />

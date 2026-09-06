@@ -5,6 +5,8 @@ import { createQueryClient } from "@/lib/queryClient";
 import { SignIn } from "@/shell/SignIn";
 import { Shell } from "@/shell/Shell";
 import { ChatPage } from "@/apps/chat/ChatPage";
+import { HomePage } from "@/apps/home/HomePage";
+import { SearchPage } from "@/apps/search/SearchPage";
 import { SettingsPage } from "@/apps/settings/SettingsPage";
 import { PeoplePage } from "@/apps/people/PeoplePage";
 import { MemoryPage } from "@/apps/memory/MemoryPage";
@@ -73,7 +75,9 @@ export function App() {
               onPersonChange={revalidatePerson}
             >
               <Routes>
-                <Route path="/" element={<ChatPage person={person} />} />
+                <Route path="/" element={<HomePage person={person} />} />
+                <Route path="/chat" element={<ChatPage person={person} />} />
+                <Route path="/search" element={<SearchPage />} />
                 <Route path="/people" element={<PeoplePage person={person} />} />
                 <Route path="/memory" element={<MemoryPage />} />
                 <Route path="/privacy" element={<PrivacyPage />} />

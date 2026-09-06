@@ -12,8 +12,14 @@ export interface NavEntry {
   label: string;
 }
 
+// Step 6 moves Chat off `/` to make room for Home there (docs/BACKLOG.md's
+// home-screen item; `home-screen-dashboard-preference` memory): nothing in
+// this codebase hardcoded a link to bare "/" expecting Chat (checked
+// before moving it), so there is no broken old link to redirect - `/`
+// simply shows different, better content now.
 export const NAV_ENTRIES: readonly NavEntry[] = [
-  { to: "/", icon: "message-circle", label: "Chat" },
+  { to: "/", icon: "home", label: "Home" },
+  { to: "/chat", icon: "message-circle", label: "Chat" },
   { to: "/people", icon: "users", label: "People" },
   { to: "/memory", icon: "brain", label: "Memory" },
   { to: "/privacy", icon: "shield-check", label: "Privacy" },

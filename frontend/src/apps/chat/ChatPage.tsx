@@ -1,4 +1,5 @@
 import { useMemo, useRef, useState } from "react";
+import { useLocation } from "react-router-dom";
 import { AssistantRuntimeProvider, useLocalRuntime, useRemoteThreadListRuntime } from "@assistant-ui/react";
 import { Page } from "@/kit/primitives/Page";
 import { Button } from "@/kit/ui/button";
@@ -26,6 +27,17 @@ interface ChatPageProps {
 // controls that have no equivalent in the framework (wake word, "think
 // longer").
 export function ChatPage({ person }: ChatPageProps) {
+  // Home's prompt box and the search palette's "Ask MaiPai" row both
+  // navigate here with `state: { initialText }` (step 6) - read once,
+  // not kept reactive to `location.state` changing later, since a
+  // second navigation to /chat (the nav link, "Chat" in the palette)
+  // should land on a plain empty composer, not replay a stale prompt.
+  const location = useLocation();
+  const initialText =
+    typeof (location.state as { initialText?: unknown } | null)?.initialText === "string"
+      ? (location.state as { initialText: string }).initialText
+      : undefined;
+
   // Off by default (Jesse, 2026-09-04: "thinking mode off by default with
   // the ability to enable in chats when needed"): a per-message opt-in,
   // not a standing setting, since most turns don't need the extra
@@ -60,7 +72,7 @@ export function ChatPage({ person }: ChatPageProps) {
       }),
     [],
   );
-  const suggestionAdapter = useMemo(() => createChatSuggestionAdapter(), []);
+  const suggestionAdapter = useMemo(() => createChatSuggestionAdapter(initialText), [initialText]);
   const threadListAdapter = useMemo(() => createChatThreadListAdapter(person.display_name), [person.display_name]);
 
   // A named, `use`-prefixed function, not an inline arrow: `useRemoteThreadListRuntime`

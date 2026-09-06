@@ -32,7 +32,17 @@ const SECTION_TITLES: Record<string, string> = {
   "household.ai": "AI model tuning",
   "household.integrations": "Integrations",
   "household.notifications": "Notifications",
-  "person.notifications": "Notifications",
+  // Deliberately NOT the same string as "household.notifications": a
+  // design review (2026-09-05) found both sections rendering as
+  // "Notifications" back to back (SettingsPage.tsx stacks a household-
+  // scope and a person-scope SettingsRenderer as siblings), reading as a
+  // duplicated/broken section rather than two different scopes.
+  "person.notifications": "My notifications",
+  // `ui.pinned_apps`/`ui.appearance` (uiKeys.ts) - found showing its raw
+  // lives_in id ("profile.appearance") in the running app, a design
+  // review, 2026-09-05, same class of bug `household.ai` above was
+  // already caught for once.
+  "profile.appearance": "Appearance",
 };
 
 export function sectionTitle(id: string): string {

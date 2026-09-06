@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import { useFocusable } from "@noriginmedia/norigin-spatial-navigation";
 import {
@@ -17,10 +17,13 @@ import { NotificationBell } from "@/shell/NotificationBell";
 import { ProfileSwitcher } from "@/shell/ProfileSwitcher";
 import { PhoneNav } from "@/shell/PhoneNav";
 import { NAV_ENTRIES, type NavEntry } from "@/shell/nav";
+import { usePinnedApps } from "@/shell/usePinnedApps";
+import { CommandPalette } from "@/shell/search/CommandPalette";
 import { useSurface } from "@/kit/useSurface";
 import { useAppearance } from "@/shell/useAppearance";
 import { ensureTvNavInit } from "@/shell/tvNav";
 import { getIcon } from "@/kit/icons";
+import { Button } from "@/kit/ui/button";
 import { cn } from "@/kit/utils";
 import type { Roster } from "@/lib/api";
 
@@ -100,6 +103,75 @@ function TvNavItem({ entry, isFirst }: { entry: NavEntry; isFirst: boolean }) {
   );
 }
 
+/** The pin/unpin control for "each app's header" (docs/BACKLOG.md's
+ * home-screen item, step 6) - centralized here in the one shared header
+ * rather than duplicated into `Page.tsx` and `SchemaPage.tsx` both (org
+ * principle 4, "one definition, one place"), since every route already
+ * renders through this same header regardless of which of the two it
+ * uses. Home itself (`/`) has nothing to pin - it is the strip's own
+ * destination, not an entry in it. */
+function PinToggle({ person }: { person: Roster }) {
+  const location = useLocation();
+  const { isPinned, togglePin, isLoading } = usePinnedApps(person.id);
+  const entry = NAV_ENTRIES.find((e) => e.to !== "/" && isActivePath(location.pathname, e.to));
+  if (!entry || isLoading) return null;
+  const pinned = isPinned(entry.to);
+  const Icon = getIcon(pinned ? "pin-off" : "pin");
+  return (
+    <Button
+      type="button"
+      variant="ghost"
+      size="icon"
+      aria-pressed={pinned}
+      aria-label={pinned ? `Unpin ${entry.label}` : `Pin ${entry.label}`}
+      onClick={() => togglePin(entry.to)}
+    >
+      <Icon aria-hidden />
+    </Button>
+  );
+}
+
+function searchNavContent(onActivate: () => void) {
+  const SearchIcon = getIcon("search");
+  return (
+    <SidebarMenuButton tooltip="Search" onClick={onActivate}>
+      <SearchIcon aria-hidden />
+      <span>Search</span>
+    </SidebarMenuButton>
+  );
+}
+
+/** The "Search" nav row (step 6, the nav redesign note's 3.1 sketch: its
+ * own row above the page list, not folded into one of them) - a button,
+ * not a `NavLink`, since it opens the palette rather than navigating.
+ * Split into a plain and a TV variant for the same reason `NavItem`/
+ * `TvNavItem` are split below (rules of hooks: `useFocusable` can't be
+ * called conditionally, and only after `ensureTvNavInit()` has run). */
+function SearchNavItem({ onOpen }: { onOpen: () => void }) {
+  return <SidebarMenuItem>{searchNavContent(onOpen)}</SidebarMenuItem>;
+}
+
+/** `far` has no free text entry beyond the remote's keyboard (step 6), so
+ * this sends the household to a full `/search` page
+ * (`apps/search/SearchPage.tsx`) instead of opening a modal over a
+ * remote-navigated, ten-foot surface. `forceFocus`: Search is the first
+ * row (matching the plain surface's order), so it - not Home - gets the
+ * initial remote focus. */
+function TvSearchNavItem() {
+  const navigate = useNavigate();
+  const { ref, focused } = useFocusable<HTMLDivElement>({
+    onEnterPress: () => navigate("/search"),
+    forceFocus: true,
+  });
+  return (
+    <SidebarMenuItem>
+      <div ref={ref} className={cn(focused && "rounded-md ring-2 ring-ring")}>
+        {searchNavContent(() => navigate("/search"))}
+      </div>
+    </SidebarMenuItem>
+  );
+}
+
 // docs/UI.md's shell contract: "the platform owns all chrome... a
 // package never writes its own chrome." A header (wordmark, notification
 // bell, profile switcher) plus a nav that renders three different ways
@@ -111,12 +183,31 @@ function TvNavItem({ entry, isFirst }: { entry: NavEntry; isFirst: boolean }) {
 // focus (`useFocusable`) instead of hover or a pointer.
 //
 // Still deferred, one-line each (full list in docs/dev.md): the right
-// pane, the command palette, a settings/admin modal (Settings is a full
-// page tonight), breadcrumbs, and the player bar - none of chapter 6's
-// content exists yet for any of them to attach to.
+// pane, a settings/admin modal (Settings is a full page tonight),
+// breadcrumbs, and the player bar - none of chapter 6's content exists
+// yet for any of them to attach to. The command palette (step 6) is
+// built - see `CommandPalette`/`SearchNavItem` below.
 export function Shell({ person, onSignOut, onPersonChange, children }: ShellProps) {
   const surface = useSurface();
+  const navigate = useNavigate();
   useAppearance(person.id);
+
+  const [paletteOpen, setPaletteOpen] = useState(false);
+
+  // Cmd/Ctrl+K everywhere (step 6) - a real household member's own text
+  // fields (chat composer, settings search once step 7 lands, this
+  // palette's own input) all use the letter "k" constantly, so this only
+  // ever fires with the modifier held, never on a bare keypress.
+  useEffect(() => {
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.key.toLowerCase() !== "k" || !(e.metaKey || e.ctrlKey)) return;
+      e.preventDefault();
+      if (surface.far) navigate("/search");
+      else setPaletteOpen((open) => !open);
+    }
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [surface.far, navigate]);
 
   // Called during render, not inside a `useEffect`: React runs a child's
   // effects before its parent's, and `TvNavItem` below calls
@@ -136,14 +227,23 @@ export function Shell({ person, onSignOut, onPersonChange, children }: ShellProp
           live, not by any test, since jsdom never lays anything out. */}
       <Sidebar collapsible="icon" className="hidden sm:flex">
         <SidebarHeader />
-        <SidebarContent>
+        {/* `p-2` + the menu's own `gap-1`: shadcn's own usual nesting
+            (SidebarGroup > SidebarGroupContent) is what supplies this
+            spacing normally - this file renders SidebarMenu directly
+            inside SidebarContent, skipping it, which left every row
+            touching the next with no gap and the active highlight
+            running flush to both edges instead of sitting as an inset
+            pill (Jesse, 2026-09-05, comparing against MaiPai Bot's own
+            sidebar: "even the bot had better spacing"). */}
+        <SidebarContent className="p-2">
           {/* Keyed by `far`: if the surface flips mid-session (a gamepad
               connects), the whole list remounts as the other component
               rather than any single item conditionally changing which
               hooks it calls. */}
-          <SidebarMenu key={surface.far ? "tv" : "standard"}>
+          <SidebarMenu key={surface.far ? "tv" : "standard"} className="gap-1">
+            {surface.far ? <TvSearchNavItem /> : <SearchNavItem onOpen={() => setPaletteOpen(true)} />}
             {surface.far
-              ? NAV_ENTRIES.map((entry, i) => <TvNavItem key={entry.to} entry={entry} isFirst={i === 0} />)
+              ? NAV_ENTRIES.map((entry) => <TvNavItem key={entry.to} entry={entry} isFirst={false} />)
               : NAV_ENTRIES.map((entry) => <NavItem key={entry.to} entry={entry} />)}
           </SidebarMenu>
         </SidebarContent>
@@ -160,6 +260,7 @@ export function Shell({ person, onSignOut, onPersonChange, children }: ShellProp
             <img src="/brand/maipai-home-logo-dark.png" alt="MaiPai Home" className="h-7 w-auto brand-logo-dark" />
           </div>
           <div className="flex items-center gap-1">
+            <PinToggle person={person} />
             <NotificationBell />
             <ProfileSwitcher person={person} onSwitched={onPersonChange} onSignOut={onSignOut} />
           </div>
@@ -174,6 +275,7 @@ export function Shell({ person, onSignOut, onPersonChange, children }: ShellProp
         <div className="flex min-h-0 min-w-0 flex-1 flex-col pb-16 sm:pb-0">{children}</div>
         <PhoneNav />
       </SidebarInset>
+      <CommandPalette open={paletteOpen} onOpenChange={setPaletteOpen} />
     </SidebarProvider>
   );
 }

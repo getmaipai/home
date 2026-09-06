@@ -1,5 +1,6 @@
 import { describe, test, expect, mock, afterEach } from "bun:test";
 import { cleanup, fireEvent, waitFor } from "@testing-library/react";
+import { MemoryRouter } from "react-router-dom";
 import { ChatPage } from "@/apps/chat/ChatPage";
 import { renderWithQueryClient } from "../../../tests/renderWithQueryClient";
 import { FakeAudioContext } from "../../../tests/fakeAudioContext";
@@ -91,7 +92,11 @@ describe("ChatPage", () => {
   test("renders the composer once history loads, without crashing", async () => {
     const restore = stubFetch();
     try {
-      const { findByLabelText } = renderWithQueryClient(<ChatPage person={makePerson()} />);
+      const { findByLabelText } = renderWithQueryClient(
+        <MemoryRouter>
+          <ChatPage person={makePerson()} />
+        </MemoryRouter>,
+      );
       await findByLabelText("Message input");
     } finally {
       restore();
@@ -103,7 +108,11 @@ describe("ChatPage", () => {
     const ttsCalls: string[] = [];
     const restore = stubFetch({ ttsCalls });
     try {
-      const { findByLabelText, findByText, findByRole } = renderWithQueryClient(<ChatPage person={makePerson()} />);
+      const { findByLabelText, findByText, findByRole } = renderWithQueryClient(
+        <MemoryRouter>
+          <ChatPage person={makePerson()} />
+        </MemoryRouter>,
+      );
       const input = await findByLabelText("Message input");
       fireEvent.change(input, { target: { value: "hi there" } });
       fireEvent.click(await findByLabelText("Send message"));

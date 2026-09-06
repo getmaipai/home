@@ -6672,3 +6672,143 @@ caught the Radix auto-close bug live. 21/21 passing across both files
 against the running app (backend :8798, frontend :5173, household member
 Nova): re-fetched the dev server's compiled CSS directly to confirm the
 `data-checked`/`data-unchecked` selectors match Radix's real output.
+
+## Session B: step 6, home and unified search (2026-09-05)
+
+Home moved to `/` (a real page now, not Chat with a different nav
+highlight); Chat moved to `/chat`. `HomePage.tsx`: a time-of-day greeting,
+"who is here" (the household roster - no presence/session infrastructure
+exists yet, so this is who lives here, not who's home right now, a real
+distinction recorded rather than glossed over), two "today" cards
+(weather through the real turn route with a fixed utterance, cached 30
+minutes so opening Home repeatedly doesn't create a new turn every time;
+recent memories, client-side sorted/sliced since `GET /api/memory?since=`
+isn't on `main` yet - the same "local mock until Session A's route
+lands" pattern the conversations adapter already used in step 4), a
+pinned-apps strip (`usePinnedApps.ts`, TanStack Query with an optimistic
+write), and a prompt box.
+
+The prompt box and the search palette's final "Ask MaiPai: <text>" row
+both wanted to open Chat with the typed text already sent. Assistant-ui's
+public API has no documented way to append a message from outside the
+runtime tree - digging into it found only internal/legacy paths, not
+anything stable enough to build on (org principle 6: use the framework as
+intended, don't reach past its real API). Landed smaller instead: the
+text arrives as `location.state.initialText`, and `chatSuggestionAdapter`
+renders it as the one starter suggestion instead of the usual routing-
+example list - a real, one-tap "send this" affordance, not a silent drop
+and not a fragile auto-click hack. Recorded as a genuine gap, not a
+finished feature.
+
+Search: `shell/search/providers.ts` runs six independent, best-effort
+providers (pages, people, memories, conversations, settings, commands),
+each catching its own failure, "last token prefix-matched" against label/
+help text. `CommandPalette.tsx` (shadcn `Command`, `shouldFilter={false}`
+since the providers already filter) is Cmd/Ctrl+K and the new "Search"
+nav row on phone/tablet/desktop; `far` has no free text entry beyond the
+remote's keyboard, so there it's a real page (`SearchPage.tsx`) instead
+of a modal over a ten-foot, remote-navigated surface - same providers,
+laid out as a scrollable list. Three of six providers (people, settings,
+commands) have no per-item deep link yet and just open their page
+generically - honest interim state, matching the conversations
+provider's own "one real destination, not a list of fabricated
+conversations" restraint.
+
+`NAV_ENTRIES` gained a sixth entry (Home); `PhoneNav.tsx`'s overflow
+mechanism - built "ahead of the day a sixth page registers" back in step
+2 - fired for real for the first time (four entries direct, two behind
+"More"), and its own tests needed a real update to match, not just a
+number bump.
+
+**A design review, live in the running app (2026-09-05), Jesse in the
+loop throughout, found the visual result "amateurish" against a modern
+reference:** real bugs (a raw `profile.appearance` settings-section key
+leaking into the UI; "Notifications" rendering as two identical, back-
+to-back section headers with no way to tell the household-scope one from
+the person-scope one; "En-US" instead of a real language name), a
+structural gap (Settings had no visible title, no search, no way to jump
+to a section on a long page), and a real permissions bug found along the
+way: household-scope settings are readable by anyone signed in but
+writable only by owner/admin (`backend/src/lib/settings.ts`'s
+`assertCanAccessScope`) - the page never reflected that, so a non-admin
+would have seen live-looking Household controls that silently 403 on
+every change.
+
+Fixed together, ahead of its own step 7 turn: `SettingsPage.tsx` gained
+Household/Me tabs (URL-bound, and hidden entirely for non-admins - `tab`
+is forced to `"me"` server-side-permission-aware, not just client-side
+cosmetics), a tree sidebar scoped per tab (hidden below `lg`/1024px -
+the tree plus the shell's own global sidebar left the content column
+badly squeezed narrower than that, found live at an 800px viewport), a
+search box filtering label/help text across `SettingsRenderer`'s
+generic rows (surfacing a folded "advanced" match directly rather than
+leaving it hidden), and an IntersectionObserver-driven scrollspy
+highlighting the tree entry nearest the top of the scroll pane. `Page.tsx`
+gained a real visible title (was `sr-only`, `hideTitle` is the escape
+hatch - Home uses it, since its own greeting already gives the page an
+identity a second generic label would only repeat). `Section.tsx`
+(shared by Settings and Memory's schema pages both) gained a real card
+surface plus a thin accent-colored left rule on its heading, replacing an
+11px grey label with a 1px rule that gave the eye nothing to anchor on.
+`SettingField.tsx`'s generic option-label title-caser mishandled BCP-47
+locale codes (`core.locale`'s "en-US" splitting only on `_`, coming out
+"En-US") - fixed once as a shape-guessing heuristic inside the shared
+titleCaseOption, then re-scoped to a `localeDisplayName` helper used only
+at the one call site that actually renders `core.locale`, after a second
+review caught `Intl.DisplayNames` being lenient enough to also mislabel
+a future dashed voice-collection name that happened to look locale-
+shaped (`VoiceCatalogSection.tsx` shares the same generic title-caser).
+
+Two token-level fixes, each applying everywhere at once rather than as
+one-off patches: `--sidebar-accent`/`--sidebar-accent-foreground` went
+from a plain neutral gray (the same color an unpressed button's hover
+state already used - "the brand blue appears in exactly one spot,"
+Jesse's own words) to the sidebar's own primary color outright, with the
+matching foreground token - a fully solid, saturated active-nav pill
+rather than a light tint, landed after two independent design references
+Jesse pointed to both favored the same solid-pill treatment over a
+subtle wash. Separately, `Shell.tsx`'s sidebar menu had zero gap between
+rows and no group padding (shadcn's own usual `SidebarGroup` nesting
+supplies that; this file skips it) - Jesse, comparing against a sibling
+product's own sidebar: "even the bot had better spacing." Fixed with
+`gap-1`/`p-2` at the one call site rather than touching the generated
+component's own defaults.
+
+A follow-up code review on this whole round found four more: the tree
+sidebar's scrollspy `IntersectionObserver` ran once at mount, before
+`SettingsRenderer`'s own network-backed queries had resolved - none of
+its section elements existed yet, and neither of its dependencies
+changes once they actually appear, so the highlight was silently dead on
+first load. Fixed with a `MutationObserver` that re-syncs the
+`IntersectionObserver`'s observed targets on any DOM change under the
+scroll container (a tab switch, a search keystroke, an advanced-fold
+toggle, or the data simply arriving late), rather than trying to track
+every trigger by hand. Also caught: `PERSON_TREE`'s own hardcoded
+"Notifications" label had already drifted from `groupSettings.ts`'s
+freshly-renamed "My notifications" heading - the exact class of
+duplicate-heading confusion this whole round was fixing, reappearing in
+miniature; and the Household/Me tab bodies were close enough to
+duplicated that the drift above was able to happen at all - pulled the
+one truly shared shape (a section, hidden while search is active, in its
+own stack) into `ExtraSections`, left the genuinely different content
+(different components, different props, an owner/admin gate only one
+branch needs) inline rather than forcing a generic list-of-components
+abstraction over it.
+
+Tests: `PhoneNav.test.tsx` rewritten for the six-entry overflow (five
+top-level items, the rest behind "More", verified reachable once opened);
+`SettingsPage.test.tsx` gained a Household -> Me tab-switch registry-
+cache-reuse test (replacing a simultaneous-render assumption the tabs
+made obsolete) and a scrollspy regression test (a stubbed
+`IntersectionObserver` recording what it's asked to observe, proving a
+section is (re-)observed once it actually mounts, not just checked once
+against an empty page - would have failed under the pre-fix version).
+303/303 passing. Verified against the running app (backend :8798,
+frontend :5173, household member Nova): Home's greeting/who's-here/today
+cards/pinned strip/prompt box all render and the weather card round-
+trips through the real (stub) model; Settings' tabs, tree, search filter,
+and scrollspy highlight all confirmed at an 800px viewport (this
+session's own tooling ceiling - the `lg`/1024px tree-visible breakpoint
+itself is unverified live, a disclosed gap, not a silent one); the
+Checkbox/Switch fill and the solid active-nav pill both confirmed by
+screenshot.

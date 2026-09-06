@@ -12,9 +12,20 @@ import { api } from "@/lib/api";
 // are fixed starters for an EMPTY thread, not a model-generated
 // follow-up suggestion (ThreadFollowupSuggestions, thread.aui.tsx,
 // covers that separately once a reply exists).
-export function createChatSuggestionAdapter(): SuggestionAdapter {
+// `initialText` (step 6): Home's prompt box and the search palette's
+// "Ask MaiPai: <text>" row both navigate here with the household
+// member's own typed text - assistant-ui's public API has no documented
+// way to append a message from outside the runtime tree (its internal
+// composer-send path isn't part of the stable surface), so rather than
+// reaching into unstable internals, the typed text arrives as the ONE
+// suggestion instead of the package-routing-examples list: a real,
+// one-tap "send this" button, not silently dropped and not a fragile
+// auto-click hack. Still a real gap, not a finished feature - noted in
+// docs/dev.md.
+export function createChatSuggestionAdapter(initialText?: string): SuggestionAdapter {
   return {
     async generate() {
+      if (initialText) return [{ prompt: initialText }];
       const manifests = await api.plugins().catch(() => []);
       const prompts = manifests
         .map((m) => m.routing?.examples?.[0])

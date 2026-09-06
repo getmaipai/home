@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, ApiError, type SettingsKey, type ResolvedSetting } from "@/lib/api";
-import { groupSettings, sectionTitle, type SettingsGroup } from "@/kit/settings/groupSettings";
+import { groupSettings, sectionTitle, type SettingsGroup, type MergedSetting } from "@/kit/settings/groupSettings";
 import { SettingField } from "@/kit/settings/SettingField";
 import { AsyncState } from "@/kit/primitives/AsyncState";
 import { Section } from "@/kit/primitives/Section";
@@ -12,6 +12,14 @@ interface SettingsRendererProps {
   /** The runtime scope string the API expects: "household",
    * "person:<id>", or "device:<id>" (lib/settings.ts's parseScope). */
   scopeValue: string;
+  /** Step 7's search filter over label and help text, lifted from
+   * `SettingsPage.tsx`'s single search box rather than each renderer
+   * instance keeping its own - one query, both scopes, the same box
+   * VS Code's own Settings editor uses. Case-insensitive substring
+   * match; a group with nothing matching renders nothing at all, and a
+   * match inside a folded advanced key surfaces it directly rather than
+   * leaving it hidden behind "Show N advanced settings". */
+  filter?: string;
 }
 
 // The registry (unlike a scope's values) never varies by which
@@ -33,7 +41,7 @@ const REGISTRY_QUERY_KEY = ["settings-registry"];
 // (SettingsPage.tsx: household, then person, 2026-09-04) - the central
 // Household/Profile lists Rule 2 describes as a further, still-missing
 // render site for the same component.
-export function SettingsRenderer({ scope, scopeValue }: SettingsRendererProps) {
+export function SettingsRenderer({ scope, scopeValue, filter }: SettingsRendererProps) {
   const queryClient = useQueryClient();
   const registryQuery = useQuery<SettingsKey[]>({
     queryKey: REGISTRY_QUERY_KEY,
@@ -134,12 +142,22 @@ export function SettingsRenderer({ scope, scopeValue }: SettingsRendererProps) {
       >
         {({ registry, values }) => {
           const groups: SettingsGroup[] = groupSettings(registry, values, scope);
-          return groups.length === 0 ? (
-            <p className="text-base text-muted-foreground">No settings yet.</p>
+          const needle = filter?.trim().toLowerCase();
+          const matches = (s: MergedSetting) =>
+            !needle || s.def.label.toLowerCase().includes(needle) || (s.def.help?.toLowerCase().includes(needle) ?? false);
+          const visibleGroups = needle
+            ? groups
+                .map((g) => ({ ...g, basic: g.basic.filter(matches), advanced: g.advanced.filter(matches) }))
+                .filter((g) => g.basic.length > 0 || g.advanced.length > 0)
+            : groups;
+          return visibleGroups.length === 0 ? (
+            <p className="text-base text-muted-foreground">
+              {needle ? "No settings match that search." : "No settings yet."}
+            </p>
           ) : (
             <>
-              {groups.map((group) => (
-                <Section key={group.id} heading={sectionTitle(group.id)}>
+              {visibleGroups.map((group) => (
+                <Section key={group.id} id={`settings-${group.id}`} heading={sectionTitle(group.id)}>
                   <div className="divide-y divide-border">
                     {group.basic.map((s) => (
                       <SettingField
@@ -152,7 +170,11 @@ export function SettingsRenderer({ scope, scopeValue }: SettingsRendererProps) {
                     ))}
                   </div>
                   {group.advanced.length > 0 ? (
-                    group.foldAdvanced && !advancedOpen[group.id] ? (
+                    // A search match inside a folded advanced key has to
+                    // surface directly - hiding it behind "Show N advanced
+                    // settings" after the household member just searched
+                    // for it would defeat the search entirely.
+                    group.foldAdvanced && !advancedOpen[group.id] && !needle ? (
                       <Button
                         type="button"
                         variant="link"

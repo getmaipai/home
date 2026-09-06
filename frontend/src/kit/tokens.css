@@ -62,8 +62,20 @@
   --sidebar-foreground: hsl(240 10% 4%);
   --sidebar-primary: hsl(189 94% 40%);
   --sidebar-primary-foreground: hsl(0 0% 100%);
-  --sidebar-accent: hsl(240 5% 96%);
-  --sidebar-accent-foreground: hsl(240 10% 4%);
+  /* A design review (2026-09-05) on the running app: "the brand blue
+   * appears in exactly one spot" - the active nav item used the same
+   * neutral gray as an unpressed button's hover state, so the one place
+   * a household member looks at constantly (which page is this) carried
+   * no brand color at all. A first pass tinted it lightly; Jesse's own
+   * design references (2026-09-05) both favored a fully solid, saturated
+   * active pill over a light wash, so this is the sidebar's own primary
+   * color outright, not a mix - `--sidebar-primary-foreground` (already
+   * the readable-on-solid-primary color everywhere else it's used) is
+   * the matching foreground. One token change here, not a one-off:
+   * every surface that reads `--sidebar-accent` (the phone/TV nav rails
+   * included) gets it for free. */
+  --sidebar-accent: var(--sidebar-primary);
+  --sidebar-accent-foreground: var(--sidebar-primary-foreground);
   --sidebar-border: hsl(240 6% 90%);
   --sidebar-ring: hsl(189 94% 40%);
   --chart-1: hsl(189 94% 40%);
@@ -96,8 +108,8 @@
     --sidebar-foreground: hsl(0 0% 96%);
     --sidebar-primary: hsl(189 84% 55%);
     --sidebar-primary-foreground: hsl(240 10% 6%);
-    --sidebar-accent: hsl(240 6% 14%);
-    --sidebar-accent-foreground: hsl(0 0% 96%);
+    --sidebar-accent: var(--sidebar-primary);
+    --sidebar-accent-foreground: var(--sidebar-primary-foreground);
     --sidebar-border: hsl(240 6% 18%);
     --sidebar-ring: hsl(189 84% 55%);
   }
@@ -125,8 +137,8 @@
   --sidebar-foreground: hsl(0 0% 96%);
   --sidebar-primary: hsl(189 84% 55%);
   --sidebar-primary-foreground: hsl(240 10% 6%);
-  --sidebar-accent: hsl(240 6% 14%);
-  --sidebar-accent-foreground: hsl(0 0% 96%);
+  --sidebar-accent: var(--sidebar-primary);
+  --sidebar-accent-foreground: var(--sidebar-primary-foreground);
   --sidebar-border: hsl(240 6% 18%);
   --sidebar-ring: hsl(189 84% 55%);
 }
