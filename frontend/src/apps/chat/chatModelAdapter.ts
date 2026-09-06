@@ -262,7 +262,6 @@ export function createChatModelAdapter(deps: ChatModelAdapterDeps): ChatModelAda
           throw new ApiError("The connection ended before MaiPai finished replying.", 0, "unavailable");
         }
       } catch (e) {
-        scheduler.finish(); // let whatever already started speaking finish naturally, enqueue nothing more
         if (abortSignal.aborted) {
           // The runtime's own stop button (ComposerPrimitive.Cancel):
           // rawStreamPost merges this same abortSignal into the fetch's
@@ -272,8 +271,18 @@ export function createChatModelAdapter(deps: ChatModelAdapterDeps): ChatModelAda
           // @assistant-ui/core's local-thread-runtime-core.ts specifically
           // checks for (`e.name === "AbortError"`), so a user-initiated
           // stop reads as cancelled, not as a failed reply.
+          //
+          // A user-initiated stop is barge-in, not "let the reply wind
+          // down": every other voice/chat app cuts audio the instant Stop
+          // is pressed (Jesse, 2026-09-06, asked for exactly that
+          // behavior) - scheduler.stop() (SentenceSpeechScheduler's own
+          // "the real mechanism a future barge-in feature needs" method)
+          // closes the AudioContext immediately, unlike finish() below,
+          // which lets whatever's already scheduled keep playing out.
+          scheduler.stop();
           throw new DOMException("The run was stopped.", "AbortError");
         }
+        scheduler.finish(); // a genuine failure, not a user stop - let whatever already started speaking finish naturally, enqueue nothing more
         // turnEngine.ts's "unavailable" code covers every real down-state
         // (still downloading, crashed, never selected): one friendly,
         // actionable message rather than the developer-facing reason string

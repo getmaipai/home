@@ -385,4 +385,48 @@ describe("createChatModelAdapter errors", () => {
       env.restore();
     }
   });
+
+  // Jesse, 2026-09-06: stopping a reply should behave like every other
+  // voice/chat app's barge-in - cut audio immediately, not let whatever's
+  // already queued keep playing out. scheduler.stop() (unlike finish())
+  // closes the AudioContext right away, so that's the observable signal
+  // a user-initiated stop actually took the barge-in path.
+  test("an aborted run cuts audio immediately (stop), not letting it finish naturally", async () => {
+    const originalClose = FakeAudioContext.prototype.close;
+    const close = mock(() => Promise.resolve());
+    FakeAudioContext.prototype.close = close;
+    const controller = new AbortController();
+    const env = stubEnvironment(() => {
+      controller.abort();
+      return Promise.reject(new DOMException("aborted", "AbortError"));
+    });
+    try {
+      const { error } = await collect([fakeUserMessage("hi")], controller.signal);
+      expect(error).toBeInstanceOf(DOMException);
+      expect(close).toHaveBeenCalledTimes(1);
+    } finally {
+      FakeAudioContext.prototype.close = originalClose;
+      env.restore();
+    }
+  });
+
+  // The flip side: a genuine failure (not a user-initiated stop) still
+  // lets whatever's already been enqueued finish naturally - only a real
+  // Stop click is barge-in.
+  test("a mid-stream failure that isn't a user stop never cuts audio short", async () => {
+    const originalClose = FakeAudioContext.prototype.close;
+    const close = mock(() => Promise.resolve());
+    FakeAudioContext.prototype.close = close;
+    const env = stubEnvironment(
+      ndjsonStream([{ type: "delta", text: "Partial reply" }, { type: "error", error: "chat model unavailable: llama-server crashed" }]),
+    );
+    try {
+      const { error } = await collect([fakeUserMessage("hi")]);
+      expect(error).toBeInstanceOf(Error);
+      expect(close).not.toHaveBeenCalled();
+    } finally {
+      FakeAudioContext.prototype.close = originalClose;
+      env.restore();
+    }
+  });
 });
