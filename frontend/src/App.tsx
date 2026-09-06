@@ -17,6 +17,7 @@ import { VoicesPage } from "@/apps/settings/VoicesPage";
 import { CommandsPage } from "@/apps/settings/CommandsPage";
 import { RepairsPage } from "@/apps/settings/RepairsPage";
 import { UsersPage } from "@/apps/settings/UsersPage";
+import { DevicesPage } from "@/apps/settings/DevicesPage";
 import { PeoplePage } from "@/apps/people/PeoplePage";
 import { MemoryPage } from "@/apps/memory/MemoryPage";
 import { PrivacyPage } from "@/apps/privacy/PrivacyPage";
@@ -113,6 +114,7 @@ export function App() {
                           <Route path="backups" element={<BackupsPage person={person} />} />
                           <Route path="voices" element={<VoicesPage person={person} />} />
                           <Route path="commands" element={<CommandsPage person={person} />} />
+                          <Route path="devices" element={<DevicesPage />} />
                           <Route path="repairs" element={<RepairsPage person={person} />} />
                         </Route>
                       </Routes>

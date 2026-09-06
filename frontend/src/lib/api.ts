@@ -90,6 +90,29 @@ export interface WidgetData {
   items: WidgetItem[];
 }
 
+// Real and landed (F step 6, merged into this branch 2026-09-06):
+// GET/DELETE /api/devices and GET/DELETE /api/auth/sessions. Hand-typed
+// to match `backend/src/routes/{devices,authSessions}.ts`'s own zod
+// schemas exactly, not imported from `@/wire`: neither route re-exports
+// a wire type today (they're typed inline via `@hono/zod-openapi`'s
+// `createRoute`, a newer pattern than this file's usual `@/wire` re-
+// export convention) - update this to a real import if that changes.
+export interface DeviceInfo {
+  id: string;
+  kind: "robot" | "pod" | "tv" | "phone" | "desktop" | "browser";
+  name: string;
+  area: string | null;
+  lastSeenAt: string | null;
+  createdAt: string;
+}
+export interface SessionInfo {
+  id: string;
+  userAgent: string | null;
+  createdAt: string;
+  expiresAt: string;
+  isCurrent: boolean;
+}
+
 export class ApiError extends Error {
   constructor(
     message: string,
@@ -264,6 +287,16 @@ export const api = {
     }),
   me: () => request<Roster>("/api/auth/me"),
   logout: () => request<{ success: true }>("/api/auth/logout", { method: "POST" }),
+  // Session E step 6: "sessions and devices with revoke" - both scoped
+  // to the caller's own profile (devices.ts's own comment: "not a
+  // household-wide admin view"), the same personal-Profile-page scope
+  // PIN/password change already has.
+  devices: () => request<DeviceInfo[]>("/api/devices"),
+  revokeDevice: (id: string) =>
+    request<{ success: true }>(`/api/devices/${encodeURIComponent(id)}`, { method: "DELETE" }),
+  sessions: () => request<SessionInfo[]>("/api/auth/sessions"),
+  revokeSession: (id: string) =>
+    request<{ success: true }>(`/api/auth/sessions/${encodeURIComponent(id)}`, { method: "DELETE" }),
   // GET /api/conversations/turns, not the bare /api/conversations - a
   // real, LIVE bug fixed here (backend/src/routes/conversations.ts's own
   // comment already named it): session A step 3 repointed GET

@@ -67,6 +67,13 @@ const ROUTES: RouteSpec[] = [
   { slug: "settings-backups", path: "/settings/backups" },
   { slug: "settings-voices", path: "/settings/voices" },
   { slug: "settings-commands", path: "/settings/commands" },
+  // Added here 2026-09-06 alongside settings-devices: main's own commit
+  // that shipped this page (the People/Users split) never updated this
+  // file's own route list - this file's own comment above says "a route
+  // added later without an entry here is a real gap," so closing it now
+  // rather than leaving Users permanently unchecked by the matrix.
+  { slug: "settings-users", path: "/settings/users" },
+  { slug: "settings-devices", path: "/settings/devices" },
   { slug: "settings-repairs", path: "/settings/repairs" },
 ];
 
