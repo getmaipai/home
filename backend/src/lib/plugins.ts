@@ -29,7 +29,7 @@ import type { PersonRow } from "@/types";
 // since it can't be known at generation time.
 const ajv = new Ajv2020({ strict: false });
 
-const PACKAGES_DIR = join(import.meta.dir, "..", "..", "packages");
+export const PACKAGES_DIR = join(import.meta.dir, "..", "..", "packages");
 
 export interface LoadedPackage {
   manifest: PackageManifest;
