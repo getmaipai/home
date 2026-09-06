@@ -127,7 +127,12 @@ class _SpeakNamespace:
 
 
 class _LlmNamespace:
-    def complete(self, opts: Any = None) -> dict[str, Any]:
+    # Async like integration.call/fetch (session-d-packages-and-store.md
+    # step 7): the real host makes a real model-inference call, so
+    # callers must await it - kept in sync now so a real async Python
+    # host can't silently regress this the day it lands, the same call
+    # integration.call's own header comment already made.
+    async def complete(self, opts: Any = None) -> dict[str, Any]:
         return {"text": "[emulator: no model loaded, this is a canned reply]"}
 
 

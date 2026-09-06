@@ -47,6 +47,7 @@
         { "$ref": "#/$defs/schedule_step" },
         { "$ref": "#/$defs/integration_call_step" },
         { "$ref": "#/$defs/compute_step" },
+        { "$ref": "#/$defs/llm_complete_step" },
         { "$ref": "#/$defs/ask_step" }
       ]
     },
@@ -178,6 +179,17 @@
         }
       },
       "description": "A restricted math/unit expression evaluator (session-d-packages-and-store.md step 4) - no network call, no host access, real numbers and unit conversion only. Backs math/convert without either package needing its own fetch-based service."
+    },
+    "llm_complete_step": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["op", "as", "prompt"],
+      "properties": {
+        "op": { "const": "llm_complete" },
+        "as": { "type": "string", "description": "Binds the result ({\"text\": string}, the same raw-object shape fetch's own `as` binds) into the recipe's variable scope. Read the reply out with a `pick` step (`path: \"text\"`) before a `format` step interpolates it, the same two-step shape fetch+pick already uses." },
+        "prompt": { "type": "string", "description": "A template with {variable} interpolation, sent as a single user-role message to the household's own local chat model. No system prompt, no conversation history: a one-shot completion for a lookup, not a chat turn." }
+      },
+      "description": "Goes through host.llm.complete (permission llm:complete) - the household's own local chat model (session-d-packages-and-store.md step 7's own translate package is the first caller). A network translation service is explicitly opt-in per the platform plan and not this step's concern: a recipe that wants one calls it through its own fetch step instead."
     },
     "ask_step": {
       "type": "object",

@@ -23,6 +23,15 @@ All notable changes to the Music Lookup package, in [Keep a Changelog](https://k
   `music` by id - so that pattern could never actually fire, dead behind
   knowledge's own match. Dropped from both `routing.patterns` and
   `routing.examples`.
+- A second, different-shaped instance of math's own routing-collision
+  class, found by code review: "who is the artist *" is generic enough
+  on its own (painters, other visual artists) that a literal pattern
+  match (which wins immediately over the model, no fallback) could
+  confidently route a completely unrelated question into a MusicBrainz
+  lookup that finds nothing, or - worse - a wrong same-sounding band via
+  MusicBrainz's own fuzzy relevance scoring. Dropped; "who is the singer
+  *" is kept (much more narrowly musical) alongside the already-safe
+  "look up the artist *".
 
 ### Known gap
 

@@ -29,18 +29,29 @@
 // async the same day this landed) - `runPlugin()`/`prepareTurn()` now
 // await through to here.
 //
-// Everything else (home.call_service, integration.call, speak.sentence,
-// camera.still, ocr.read, files.*, action.emit, diagnostics) still has no
-// backing service (no Home Assistant link, no turn engine action route,
-// no package file storage) and throws `capability_missing`, checked
-// against the permission it would need first so the error is as specific
-// as it can honestly be. `llm.complete` is the same code but a different
-// reason: the `chat` role IS real (lib/llm.ts, lib/llmSupervisor.ts,
-// spec/llm/), and the interpreter can now await a host call - but no
-// recipe step calls llm.complete (recipe.schema.json has no "llm" step),
-// so there is still nothing to wire this to, a real gap independent of
-// the sync/async one that's now closed. See spec/llm/README.md and
-// docs/dev.md's Package Host section for everything else deferred and why.
+// Everything else (speak.sentence, camera.still, ocr.read, files.*,
+// action.emit, diagnostics, and integration.call for any id/method pair
+// besides home_assistant's own get_state) still has no backing service
+// (no turn engine action route, no package file storage) and throws
+// `capability_missing`, checked against the permission it would need
+// first so the error is as specific as it can honestly be. (This
+// comment previously also listed home.call_service here; it's been real
+// since session-d-packages-and-store.md step 4, and this paragraph had
+// drifted - found while touching the adjacent llm.complete case below,
+// not otherwise audited.)
+//
+// `llm.complete` is real too now (session-d-packages-and-store.md step
+// 7, translate's own case) - the same `chat` role llm.complete has
+// always been able to reach (lib/llm.ts), now that a recipe step
+// (recipe.schema.json's `llm_complete`) actually calls it. One
+// user-role completion per call, no system prompt, no conversation
+// history, no streaming, no tool calling: a lookup, not a chat turn. A
+// role other than `chat`, or a model that isn't loaded, reports
+// `model_unavailable` rather than a raw error - the same "the host
+// wraps errors so a package cannot throw an unmapped one" rule every
+// other real method here already follows. See spec/llm/README.md and
+// docs/dev.md's Package Host section for everything else deferred and
+// why.
 import type { Host, FetchOptions, MemoryRecordLike } from "@maipai/spec/emulators/ts/host-emulator.js";
 import { HostError, redactSecrets } from "@maipai/spec/emulators/ts/host-emulator.js";
 import type { PackageManifest } from "@maipai/spec/gen/ts/manifest.js";
@@ -51,6 +62,7 @@ import * as settings from "@/lib/settings";
 import { getHouseholdSettingValue } from "@/lib/settings";
 import { scheduleJob } from "@/lib/scheduler";
 import { cachedFetch } from "@/lib/packageCache";
+import { complete as llmComplete, type LlmMessage } from "@/lib/llm";
 import type { PersonRow } from "@/types";
 
 // host.fetch's real network I/O settings (2026-09-05). Rate limit: "a
@@ -615,9 +627,36 @@ export function createHost(actor: PersonRow, manifest: PackageManifest, secrets:
       },
     },
     llm: {
-      complete(_opts: unknown): unknown {
+      // The recipe interpreter's own llm_complete step (spec/interpreters/
+      // ts/recipe-interpreter.ts) is the only caller today, always with a
+      // single user-role message - but this reads whatever `messages`
+      // array it's given, the same shape lib/llm.ts's own complete()
+      // takes, so a future caller isn't boxed into a single-prompt shape.
+      async complete(opts: unknown): Promise<unknown> {
         requirePermission("llm:complete");
-        notImplemented("llm.complete");
+        const messages = (opts as { messages?: unknown } | null)?.messages;
+        // No shape check here beyond the cast: lib/llm.ts's own
+        // complete() already validates messages (non-empty array, every
+        // entry a real role/content pair) via its own validate() - a
+        // second hand-maintained copy here (a code review, 2026-09-06,
+        // found an earlier version doing exactly that) only had to drift
+        // out of sync with it, since it checked array-non-emptiness but
+        // not per-message shape the way validate() does.
+        const result = await llmComplete("chat", (messages ?? []) as LlmMessage[]);
+        if (!result.ok) {
+          // lib/llm.ts's own error codes aren't errors.json's own
+          // vocabulary - remapped to the closest real HostError code
+          // rather than leaking a foreign one past this boundary (the
+          // same "the host wraps errors" rule every other real method
+          // here follows). `invalid_input` maps directly (identical
+          // meaning); "chat" is the only role this call site ever passes
+          // and lib/llm.ts's own IMPLEMENTED_ROLES has just that one
+          // entry, so `unsupported_role` can't actually fire here today -
+          // any other failure is a model that isn't loaded, exactly
+          // errors.json's own `model_unavailable`.
+          throw new HostError(result.code === "invalid_input" ? "invalid_input" : "model_unavailable", result.error);
+        }
+        return { text: result.value.text };
       },
     },
     camera: {

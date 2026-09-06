@@ -5,7 +5,7 @@ Ask MaiPai about a music artist or band.
 
 ## Try it
 
-- "who is the artist Radiohead"
+- "look up the artist Radiohead"
 - "look up the artist Adele"
 - "who is the singer Prince"
 

@@ -11,10 +11,12 @@ import { PackageManifest } from "@maipai/spec/gen/ts/manifest.js";
 import { db } from "@/db";
 import { people, memoryRecords } from "@/db/schema";
 import { eq } from "drizzle-orm";
+import { __resetLlmSupervisorForTests } from "@/lib/llmSupervisor";
 
 beforeEach(() => {
   resetDb();
   __resetThrottleForTests();
+  __resetLlmSupervisorForTests();
 });
 
 function manifest(overrides: Partial<PackageManifest> = {}): PackageManifest {
@@ -737,22 +739,44 @@ describe("packageHost unimplemented methods", () => {
       expect((err as HostError).code).toBe("permission_denied");
     }
   });
+});
 
-  // llm.complete is a deliberate exception in this describe block: the
-  // `chat` role IS real now (lib/llm.ts), but the Host RPC boundary is
-  // synchronous and a chat completion is inherently async network I/O
-  // (see the header comment in packageHost.ts and spec/llm/README.md).
-  // This pins that the gap stays honest (capability_missing, permission
-  // checked first) rather than silently regressing to some other code.
-  test("llm.complete still reports capability_missing (sync Host boundary, async chat role)", async () => {
+// llm.complete is real now (session-d-packages-and-store.md step 7,
+// translate's own case): the Host RPC boundary is async (this file's
+// own beforeEach resets the chat supervisor so each test gets a fresh
+// stub client, the same fixture lib/llm.ts's own tests use - no live
+// model, no network, deterministic and offline). This used to only be
+// provably `capability_missing` (a synchronous boundary blocking an
+// inherently async chat completion); that gap is what step 7 closed.
+describe("packageHost llm.complete", () => {
+  test("checks permission before reaching the chat model", async () => {
+    const actor = await owner();
+    const host = createHost(actor, manifest({ permissions: [] }));
+    try {
+      await host.llm.complete({ messages: [{ role: "user", content: "hi" }] });
+      throw new Error("should have thrown");
+    } catch (err) {
+      expect((err as HostError).code).toBe("permission_denied");
+    }
+  });
+
+  test("rejects a missing or empty messages array as invalid_input, not a crash", async () => {
     const actor = await owner();
     const host = createHost(actor, manifest({ permissions: ["llm:complete"] }));
     try {
-      host.llm.complete({ messages: [{ role: "user", content: "hi" }] });
+      await host.llm.complete({});
       throw new Error("should have thrown");
     } catch (err) {
-      expect((err as HostError).code).toBe("capability_missing");
+      expect((err as HostError).code).toBe("invalid_input");
     }
+  });
+
+  test("returns a real reply from the stub chat backend (no engine configured in tests)", async () => {
+    const actor = await owner();
+    const host = createHost(actor, manifest({ permissions: ["llm:complete"] }));
+    const result = (await host.llm.complete({ messages: [{ role: "user", content: "translate hello to spanish" }] })) as { text: string };
+    expect(result.text).toContain("translate hello to spanish");
+    expect(result.text).toContain("[stub model: no real model loaded, this is a canned reply]");
   });
 });
 

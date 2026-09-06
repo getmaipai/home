@@ -85,7 +85,11 @@
   { "utterance": "exchange 50 usd for gbp", "expect": "currency", "must_not": [] },
   { "utterance": "convert 5 dollars to euros", "expect": "convert", "must_not": ["currency"], "note": "a real, documented limitation: convert already owns the literal 'convert *' pattern, so this phrasing routes to convert (then fails at runtime: dollars/euros aren't mathjs units), never to currency - currency answers to 'exchange' instead. This guards the routing decision itself against a future change that silently sends this phrasing to currency without also updating the README/CHANGELOG that describe the boundary." },
 
-  { "utterance": "who is the artist Radiohead", "expect": "music", "must_not": [] },
+  { "utterance": "who is the singer Radiohead", "expect": "music", "must_not": [] },
   { "utterance": "look up the artist Radiohead", "expect": "music", "must_not": [] },
-  { "utterance": "tell me about the band Radiohead", "expect": "knowledge", "must_not": ["music"], "note": "a real, documented collision: knowledge's own 'tell me about *' pattern sorts before music's own patterns (loadAllManifests() is id-sorted, k before m) and a literal pattern match wins immediately - music dropped this phrasing from its own routing.patterns entirely since it could never actually fire behind knowledge's." }
+  { "utterance": "who is the artist behind this painting", "expect": null, "must_not": ["music"], "note": "a real risk code review found: 'who is the artist *' was dropped from music's own routing.patterns for exactly this reason - a literal pattern match wins immediately over the model, and 'artist' alone is overloaded outside music. Kept as a permanent regression guard against re-adding that pattern." },
+  { "utterance": "tell me about the band Radiohead", "expect": "knowledge", "must_not": ["music"], "note": "a real, documented collision: knowledge's own 'tell me about *' pattern sorts before music's own patterns (loadAllManifests() is id-sorted, k before m) and a literal pattern match wins immediately - music dropped this phrasing from its own routing.patterns entirely since it could never actually fire behind knowledge's." },
+
+  { "utterance": "translate hello to spanish", "expect": "translate", "must_not": [] },
+  { "utterance": "translate good morning into french", "expect": "translate", "must_not": [] }
 ]

@@ -1,9 +1,11 @@
 // The model role port (platform plan 4.11): "Roles, not model names, in
 // code." Only `chat` is implemented this pass; every other role is a
 // real, named gap, not a silently missing one. See spec/llm/README.md for
-// the full scope and why `host.llm.complete` in packageHost.ts still
-// isn't wired to this (a real, separate architectural gap: the Host RPC
-// boundary is synchronous, this port is inherently async).
+// the full scope. `host.llm.complete` in packageHost.ts calls this file's
+// own complete() directly (session-d-packages-and-store.md step 7, the
+// translate package's own recipe) - the Host RPC boundary went async the
+// same day fetch/home.call_service did, and llm.complete followed once a
+// recipe step actually called it.
 //
 // `embed` (2026-09-04) is now real too, but through its own dedicated
 // embed() function below, not complete()/IMPLEMENTED_ROLES: a chat

@@ -1538,9 +1538,8 @@ export async function runTurnStream(
 // - `ask`-continuation: PluginResult.ask exists in the spec (result.schema.json)
 //   but the recipe interpreter has no step that ever produces one
 //   (runRecipe always sets `reply`, never `ask`), an interpreter-level gap
-//   the same shape as the scheduler's input-carrying gap and
-//   host.llm.complete's sync/async gap. Nothing routes a follow-up
-//   deterministically today.
+//   the same shape as the scheduler's input-carrying gap. Nothing routes
+//   a follow-up deterministically today.
 // - A real Persona/style record: 2026-09-05 built a first, narrow slice
 //   (lib/persona.ts) - a small in-code catalog, a person-scope settings
 //   key to pick one, and composePersonaPrompt() rendering the pick into

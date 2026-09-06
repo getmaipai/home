@@ -1,8 +1,8 @@
 // Interprets a Tier 0 Recipe (spec/schemas/recipe.schema.json) natively,
 // executing each step against a host (platform plan 5.2). No process, no
-// eval: every step is one of the seven declared primitives. This must stay
-// behaviorally identical to spec/interpreters/py/recipe_interpreter.py; the
-// conformance fixtures in spec/fixtures/recipes/ prove that.
+// eval: every step is one of the twelve declared primitives. This must
+// stay behaviorally identical to spec/interpreters/py/recipe_interpreter.py;
+// the conformance fixtures in spec/fixtures/recipes/ prove that.
 import { decode } from "he";
 import type { Recipe } from "../../gen/ts/recipe.js";
 import type { Host } from "../../emulators/ts/host-emulator.js";
@@ -24,7 +24,7 @@ type Scope = Record<string, unknown>;
 // throughout the switch (a typo'd property would have compiled). Found
 // when backend/ first imported this file and its `tsc --noEmit` actually
 // walked it (spec/ itself has never run a standalone typecheck). Hand-
-// written here, mirroring recipe.schema.json's 7 step defs exactly, so
+// written here, mirroring recipe.schema.json's 12 step defs exactly, so
 // the switch gets real per-branch types and a real `never` check back.
 type RecipeStep =
   | { op: "fetch"; as: string; url: string; method?: "GET" | "POST"; headers?: Record<string, string>; body?: unknown }
@@ -37,6 +37,7 @@ type RecipeStep =
   | { op: "schedule"; when: string; job?: string }
   | { op: "integration.call"; as: string; id: string; method: string; args?: Record<string, unknown> }
   | { op: "compute"; as: string; expression: string }
+  | { op: "llm_complete"; as: string; prompt: string }
   | { op: "ask"; prompt: string; expects?: string };
 
 // No conditional step exists in this declarative language to branch a
@@ -175,6 +176,25 @@ export async function runRecipe(recipe: Recipe, inputs: Scope, host: Host): Prom
         // preserving ComputeError's own identity instead of erasing it.
         const expression = interpolate(step.expression, scope);
         scope[step.as] = evaluateExpression(expression);
+        break;
+      }
+      case "llm_complete": {
+        // Raw-object binding, same style as `fetch`'s own `as` - a
+        // `pick` step reads `.text` out before a `format` step
+        // interpolates it, rather than this step special-casing its own
+        // result shape the way `compute`/`recall` bind a ready-to-use
+        // scalar directly. `host.llm.complete`'s own wire shape is a
+        // `messages` array (packageHost.ts's real implementation passes
+        // it straight to lib/llm.ts's own `complete()`, unchanged, which
+        // is already tested against that shape - backend/tests/
+        // packageHost.test.ts) - this step's own `prompt` field is a
+        // friendlier single-string template for a recipe author, wrapped
+        // into one user-role message here rather than asking recipe.json
+        // itself to spell out a messages array. No system prompt, no
+        // history: a one-shot lookup completion (step 7's own translate
+        // package is the first caller), not a chat turn.
+        const prompt = interpolate(step.prompt, scope);
+        scope[step.as] = await host.llm.complete({ messages: [{ role: "user", content: prompt }] });
         break;
       }
       case "ask": {

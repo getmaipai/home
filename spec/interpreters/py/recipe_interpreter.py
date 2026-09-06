@@ -1,6 +1,6 @@
 """Interprets a Tier 0 Recipe (spec/schemas/recipe.schema.json) natively,
 executing each step against a host (platform plan 5.2). No process, no
-eval: every step is one of the seven declared primitives. This must stay
+eval: every step is one of the twelve declared primitives. This must stay
 behaviorally identical to spec/interpreters/ts/recipe-interpreter.ts; the
 conformance fixtures in spec/fixtures/recipes/ prove that.
 """
@@ -140,6 +140,19 @@ async def run_recipe(recipe: Any, inputs: dict[str, Any], host: Any) -> dict[str
             # twin case (found while building those two packages).
             expression = interpolate(step.expression, scope)
             scope[step.as_] = evaluate_expression(expression)
+        elif op == "llm_complete":
+            # Raw-object binding, same style as `fetch`'s own `as_` - a
+            # `pick` step reads "text" out before a `format` step
+            # interpolates it. host.llm.complete's own wire shape is a
+            # `messages` array (the real host passes it straight to
+            # lib/llm.ts's own complete()); this step's `prompt` field is
+            # wrapped into one user-role message here. Must stay
+            # behaviorally identical to recipe-interpreter.ts's own twin
+            # case.
+            prompt = interpolate(step.prompt, scope)
+            scope[step.as_] = await host.llm.complete(
+                {"messages": [{"role": "user", "content": prompt}]}
+            )
         elif op == "ask":
             # Always the recipe's last meaningful step (the schema's own
             # description): nothing after it can depend on an answer that

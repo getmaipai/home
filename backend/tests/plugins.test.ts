@@ -2,11 +2,13 @@ import { describe, expect, test, beforeEach } from "bun:test";
 import { TestClient } from "./client";
 import { resetDb } from "./reset-db";
 import { __resetThrottleForTests } from "@/lib/secretThrottle";
+import { __resetLlmSupervisorForTests } from "@/lib/llmSupervisor";
 import { listPackageIds, loadPackage, registerAllPackageNotificationTypes, warmPackage } from "@/lib/plugins";
 
 beforeEach(() => {
   resetDb();
   __resetThrottleForTests();
+  __resetLlmSupervisorForTests();
 });
 
 describe("the bundled remember package", () => {
@@ -147,6 +149,18 @@ describe("the bundled convert package", () => {
     if (!loaded.ok) return;
     expect(loaded.value.manifest.id).toBe("convert");
     expect(loaded.value.manifest.permissions).toEqual([]);
+    expect(loaded.value.recipe.steps.length).toBeGreaterThan(0);
+  });
+});
+
+describe("the bundled translate package", () => {
+  test("is discoverable and its manifest + recipe validate against spec's schemas", () => {
+    expect(listPackageIds()).toContain("translate");
+    const loaded = loadPackage("translate");
+    expect(loaded.ok).toBe(true);
+    if (!loaded.ok) return;
+    expect(loaded.value.manifest.id).toBe("translate");
+    expect(loaded.value.manifest.permissions).toEqual(["llm:complete"]);
     expect(loaded.value.recipe.steps.length).toBeGreaterThan(0);
   });
 });
@@ -314,6 +328,23 @@ describe("POST /api/plugins/convert/run", () => {
     expect(res.status).toBe(400);
     const body = (await res.json()) as { error?: string };
     expect(body.error).toBe('"5 dollars to euros" failed to evaluate: Undefined symbol dollars');
+  });
+});
+
+describe("POST /api/plugins/translate/run", () => {
+  // No real chat model in tests - lib/llm.ts's own default (no engine
+  // configured) resolves to a deterministic stub client (the same one
+  // backend/tests/llm.test.ts and packageHost.test.ts use), so this
+  // proves the real recipe -> llm_complete -> host.llm.complete ->
+  // lib/llm.ts wiring end to end without needing a real model loaded,
+  // not real translation quality (that's the model's own job).
+  test("runs the recipe end to end: llm_complete through the real host, stub chat backend", async () => {
+    const client = await owner();
+    const res = await client.post("/api/plugins/translate/run", { expression: "hello world to spanish" });
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { reply?: { text: string } };
+    expect(body.reply?.text).toContain("hello world to spanish");
+    expect(body.reply?.text).toContain("[stub model: no real model loaded, this is a canned reply]");
   });
 });
 

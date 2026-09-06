@@ -148,22 +148,18 @@ What's still real deferred scope, unchanged by any of the above:
   5 and 6 work that hasn't started.
 - **Embeddings**, real or otherwise: the `embed` role throws
   `capability_missing`.
-- **`host.llm.complete` is still `capability_missing` in
-  `backend/src/lib/packageHost.ts`, on purpose, not because this role
-  doesn't exist any more.** The `Host` interface's methods are all
-  synchronous (`spec/emulators/ts/host-emulator.ts`), and so is
-  `runRecipe()` (`spec/interpreters/ts/recipe-interpreter.ts`): no step
-  handler ever awaits a host call. A real chat completion is inherently
-  asynchronous network I/O; there is no correct way to make that
-  synchronous. Wiring `host.llm.complete` for real needs the interpreter
-  itself to support async host calls, a change to both TS and Python
-  interpreters kept behaviorally identical, out of scope here, the same
-  category of deferral as the scheduler's recipe-input-carrying gap
-  (`docs/dev.md`). No recipe step calls `llm.complete` today either
-  (`recipe.schema.json` has no "llm" step type), so this has zero live
-  blast radius. `backend/src/routes/llm.ts`'s `POST /api/llm/chat` is
-  today's real (if provisional) caller instead, the same pattern
-  `/api/safety/check` set for the safety layer ahead of the turn engine.
+- **`host.llm.complete` is real now** (session-d-packages-and-store.md
+  step 7, the `translate` package's own recipe): `backend/src/lib/
+  packageHost.ts`'s `llm.complete` calls this file's own `complete("chat",
+  messages)` directly. The `Host` interface's `llm.complete` is
+  `Promise`-typed (`spec/emulators/ts/host-emulator.ts`), matching
+  `fetch`/`home.call_service`'s own async shape, and `runRecipe()`
+  (`spec/interpreters/ts/recipe-interpreter.ts`, both languages) awaits
+  it from a new `llm_complete` recipe step (`recipe.schema.json`). One
+  user-role message per call, no system prompt, no history, no
+  streaming, no tool calling - a lookup completion, not a chat turn.
+  `backend/src/routes/llm.ts`'s `POST /api/llm/chat` remains the real
+  chat-turn caller; this is a second, narrower one.
 
 ## A tracked gap, not silently repeated: no rate limit on `/api/llm/chat`
 

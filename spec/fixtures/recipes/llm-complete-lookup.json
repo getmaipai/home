@@ -1,0 +1,24 @@
+{
+  "description": "llm_complete + pick + format: the raw-object binding style fetch already uses (a pick step reads the bound `.text` out before format interpolates it) - proven with the emulator's fixed canned reply, the translate package's own recipe shape.",
+  "recipe": {
+    "id": "llm-complete-lookup",
+    "inputs": [{ "name": "expression", "selector": "text" }],
+    "steps": [
+      { "op": "llm_complete", "as": "llm_result", "prompt": "Translate this into the requested language. Reply with ONLY the translated text: {expression}" },
+      { "op": "pick", "as": "translation", "from": "llm_result", "path": "text" },
+      { "op": "format", "as": "reply", "text": "{translation}", "speech": "{translation}" }
+    ]
+  },
+  "inputs": { "expression": "hello world to spanish" },
+  "host_setup": {},
+  "expected": {
+    "reply": {
+      "text": "[emulator: no model loaded, this is a canned reply]",
+      "speech": "[emulator: no model loaded, this is a canned reply]"
+    },
+    "actions": [],
+    "scheduled_jobs": [],
+    "home_calls": [],
+    "memory_added": []
+  }
+}

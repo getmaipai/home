@@ -10,13 +10,13 @@
   "homepage": "https://github.com/getmaipai/home",
   "routing": {
     "examples": [
-      "who is the artist Radiohead",
       "look up the artist Radiohead",
       "look up the artist Adele",
       "who is the singer Prince",
-      "who is the singer Adele"
+      "who is the singer Adele",
+      "who is the singer in Radiohead"
     ],
-    "patterns": ["who is the artist *", "look up the artist *", "who is the singer *"]
+    "patterns": ["look up the artist *", "who is the singer *"]
   },
   "args": {
     "type": "object",

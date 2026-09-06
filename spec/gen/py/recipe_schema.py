@@ -211,6 +211,26 @@ class ComputeStep(BaseModel):
     )
 
 
+class LlmCompleteStep(BaseModel):
+    """
+    Goes through host.llm.complete (permission llm:complete) - the household's own local chat model (session-d-packages-and-store.md step 7's own translate package is the first caller). A network translation service is explicitly opt-in per the platform plan and not this step's concern: a recipe that wants one calls it through its own fetch step instead.
+    """
+
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    op: Literal['llm_complete']
+    as_: str = Field(
+        ...,
+        alias='as',
+        description='Binds the result ({"text": string}, the same raw-object shape fetch\'s own `as` binds) into the recipe\'s variable scope. Read the reply out with a `pick` step (`path: "text"`) before a `format` step interpolates it, the same two-step shape fetch+pick already uses.',
+    )
+    prompt: str = Field(
+        ...,
+        description="A template with {variable} interpolation, sent as a single user-role message to the household's own local chat model. No system prompt, no conversation history: a one-shot completion for a lookup, not a chat turn.",
+    )
+
+
 class AskStep(BaseModel):
     """
     Sets the result's ask field (result.schema.json, 4.5) so a recipe that can't disambiguate on its own ("which Springfield") can ask a deterministic follow-up instead of guessing or failing outright. Always the recipe's last step: nothing after an ask step can run in the same pass, since there is nothing left to compute until the follow-up answer arrives on a later turn.
@@ -254,5 +274,6 @@ class Recipe(BaseModel):
         | ScheduleStep
         | IntegrationCallStep
         | ComputeStep
+        | LlmCompleteStep
         | AskStep
     ] = Field(..., min_length=1)

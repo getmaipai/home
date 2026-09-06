@@ -115,7 +115,10 @@ export interface Host {
     sentence(text: string): void;
   };
   llm: {
-    complete(opts: unknown): unknown;
+    // Promise-typed like fetch/home.call_service above: the real host
+    // (packageHost.ts, session-d-packages-and-store.md step 7) makes a
+    // real model-inference call, so callers must await it.
+    complete(opts: unknown): Promise<unknown>;
   };
   camera: {
     still(): unknown;
@@ -241,7 +244,7 @@ export class HostEmulator implements Host {
   };
 
   readonly llm = {
-    complete: (_opts: unknown): unknown => {
+    complete: async (_opts: unknown): Promise<unknown> => {
       return { text: "[emulator: no model loaded, this is a canned reply]" };
     },
   };

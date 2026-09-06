@@ -220,6 +220,26 @@ export const Recipe = z
               ),
             z
               .object({
+                op: z.literal("llm_complete"),
+                /**Binds the result ({"text": string}, the same raw-object shape fetch's own `as` binds) into the recipe's variable scope. Read the reply out with a `pick` step (`path: "text"`) before a `format` step interpolates it, the same two-step shape fetch+pick already uses.*/
+                as: z
+                  .string()
+                  .describe(
+                    'Binds the result ({"text": string}, the same raw-object shape fetch\'s own `as` binds) into the recipe\'s variable scope. Read the reply out with a `pick` step (`path: "text"`) before a `format` step interpolates it, the same two-step shape fetch+pick already uses.',
+                  ),
+                /**A template with {variable} interpolation, sent as a single user-role message to the household's own local chat model. No system prompt, no conversation history: a one-shot completion for a lookup, not a chat turn.*/
+                prompt: z
+                  .string()
+                  .describe(
+                    "A template with {variable} interpolation, sent as a single user-role message to the household's own local chat model. No system prompt, no conversation history: a one-shot completion for a lookup, not a chat turn.",
+                  ),
+              })
+              .strict()
+              .describe(
+                "Goes through host.llm.complete (permission llm:complete) - the household's own local chat model (session-d-packages-and-store.md step 7's own translate package is the first caller). A network translation service is explicitly opt-in per the platform plan and not this step's concern: a recipe that wants one calls it through its own fetch step instead.",
+              ),
+            z
+              .object({
                 op: z.literal("ask"),
                 /**A template with {variable} interpolation, spoken/shown as the follow-up question.*/
                 prompt: z
