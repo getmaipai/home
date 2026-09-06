@@ -82,6 +82,19 @@ export const NOTIFICATION_TYPES: readonly NotificationType[] = [
     configurable: true,
     defaultChannels: ["in_app"],
   },
+  // Session F (platform and trust), step 1: the Health/Repairs surface.
+  // Only `error`-severity issues fire this (lib/issues.ts's raiseIssue());
+  // `info` and `warning` sit on GET /api/repairs for a person to notice on
+  // their own, the same "immediate is rare, most things are time_sensitive
+  // or passive" posture the org doc asks for.
+  {
+    id: "repairs.new",
+    level: "time_sensitive",
+    audience: "adults",
+    template: "{title}",
+    configurable: true,
+    defaultChannels: ["in_app"],
+  },
 ] as const;
 
 export function getNotificationType(id: string): NotificationType | undefined {

@@ -13,6 +13,7 @@ from pydantic import ValidationError
 
 from gen.py.entity_schema import Entity
 from gen.py.grant_schema import Grant
+from gen.py.issue_schema import Issue
 from gen.py.manifest_schema import PackageManifest
 from gen.py.memory_record_schema import MemoryRecord
 from gen.py.model_capabilities_schema import ModelCapabilities
@@ -63,6 +64,10 @@ def test_relationship_fixtures(kind: str):
 
 def test_grant_fixture():
     Grant.model_validate(load_fixture("grant.example.json"))
+
+
+def test_issue_fixture():
+    Issue.model_validate(load_fixture("issue.example.json"))
 
 
 @pytest.mark.parametrize("kind", ["memory", "entity", "episode"])

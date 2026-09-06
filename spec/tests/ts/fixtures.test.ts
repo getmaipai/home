@@ -15,6 +15,7 @@ import { ModelCapabilities } from "../../gen/ts/model-capabilities.js";
 import { Entity } from "../../gen/ts/entity.js";
 import { Relationship } from "../../gen/ts/relationship.js";
 import { Grant } from "../../gen/ts/grant.js";
+import { Issue } from "../../gen/ts/issue.js";
 // ErrorEntry is standards-owned (std-v0.2.0), not generated here; the error
 // catalogue's shape is imported from the sibling .github checkout, the same
 // way spec/schemas/manifest.schema.json imports PrivacyRow by $ref.
@@ -68,6 +69,10 @@ describe("record fixtures validate against their generated Zod models", () => {
 
   test("grant.example.json", () => {
     expect(() => Grant.parse(loadFixture("grant.example.json"))).not.toThrow();
+  });
+
+  test("issue.example.json", () => {
+    expect(() => Issue.parse(loadFixture("issue.example.json"))).not.toThrow();
   });
 
   test("manifest.example.json", () => {
