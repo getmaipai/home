@@ -1,0 +1,31 @@
+package: define
+scale: bronze
+bronze:
+  tests_green:
+    met: true
+    note: smoke fixture (tests/smoke.json) passes; recipe conformance covered by spec/fixtures/recipes/define-word.json
+  routing_examples:
+    met: true
+    note: 5 examples in manifest.json's routing.examples
+  privacy_row_per_data_source:
+    met: true
+    note: one data_sources[] row for dictionaryapi-dev
+  offline_behavior_stated:
+    met: true
+    note: "offline: unavailable - a live dictionary lookup every time"
+  smoke_test:
+    met: true
+    note: tests/smoke.json, run through lib/smoke.ts
+  readme_and_changelog:
+    met: true
+  lint_clean:
+    met: true
+silver:
+  diagnostics_and_reauth:
+    met: false
+    note: no auth to diagnose (a keyless public API)
+gold:
+  real_service_verified:
+    met: true
+    date: "2026-09-05"
+    note: built and manually verified against real dictionaryapi.dev responses the same day

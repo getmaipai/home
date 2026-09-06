@@ -1,0 +1,26 @@
+{
+  "description": "Smoke fixture for the bundled weather package (docs/PACKAGES.md's bronze smoke test): runs this package's own recipe.json against a canned host, the same response shape captured from a real Open-Meteo call in spec/fixtures/recipes/weather-geocoded.json. Run by lib/smoke.ts at boot (standing in for 'at install' until the store's real install flow exists, step 6), daily via the packages.smoke core job, and on demand via POST /api/plugins/:id/smoke.",
+  "inputs": { "place": "Seattle" },
+  "host_setup": {
+    "fetch": {
+      "https://geocoding-api.open-meteo.com/v1/search?count=1&name=Seattle": {
+        "results": [
+          { "id": 5809844, "name": "Seattle", "latitude": 47.60621, "longitude": -122.33207, "country": "United States" }
+        ]
+      },
+      "https://api.open-meteo.com/v1/forecast?latitude=47.60621&longitude=-122.33207&current=temperature_2m&temperature_unit=fahrenheit": {
+        "current": { "time": "2026-09-05T05:30", "temperature_2m": 57.3 }
+      }
+    }
+  },
+  "expected": {
+    "reply": {
+      "text": "It's 57.3 degrees in Seattle.",
+      "speech": "It's 57.3 degrees in Seattle right now."
+    },
+    "actions": [],
+    "scheduled_jobs": [],
+    "home_calls": [],
+    "memory_added": []
+  }
+}

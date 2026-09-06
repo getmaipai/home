@@ -1,0 +1,36 @@
+# Bronze/silver/gold criteria per getmaipai/.github's docs/PACKAGES.md.
+# `met: true` on every bronze line is the publish gate; `scripts.sh`'s
+# bronze check (spec/tests/ts/package-bronze.test.ts) reads this file,
+# not just the manifest's own `quality_scale` string.
+package: weather
+scale: bronze
+bronze:
+  tests_green:
+    met: true
+    note: smoke fixture (tests/smoke.json) passes; recipe conformance covered by spec/fixtures/recipes/weather-geocoded.json
+  routing_examples:
+    met: true
+    note: 5 examples in manifest.json's routing.examples
+  privacy_row_per_data_source:
+    met: true
+    note: one data_sources[] row for open-meteo, covering both the geocoding and forecast calls
+  offline_behavior_stated:
+    met: true
+    note: "offline: unavailable - a live geocode+forecast call every time, no cached fallback yet (see lib/packageCache.ts, step 3)"
+  smoke_test:
+    met: true
+    note: tests/smoke.json, run through lib/smoke.ts
+  readme_and_changelog:
+    met: true
+  lint_clean:
+    met: true
+    note: scripts/check.sh's tsc/test/standards passes with this package present
+silver:
+  diagnostics_and_reauth:
+    met: false
+    note: no auth to diagnose (a keyless public API); nothing to add for silver yet
+gold:
+  real_service_verified:
+    met: true
+    date: "2026-09-05"
+    note: built and manually verified against real Open-Meteo responses the same day (packageHost.ts's own header comment)

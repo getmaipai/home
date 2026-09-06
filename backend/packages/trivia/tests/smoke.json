@@ -1,0 +1,31 @@
+{
+  "description": "Smoke fixture for the bundled trivia package, the same response shape captured from a real opentdb.com call in spec/fixtures/recipes/trivia.json, including its HTML-entity-encoded text.",
+  "inputs": {},
+  "host_setup": {
+    "fetch": {
+      "https://opentdb.com/api.php?amount=1&type=multiple": {
+        "response_code": 0,
+        "results": [
+          {
+            "type": "multiple",
+            "difficulty": "medium",
+            "category": "Entertainment: Cartoon &amp; Animations",
+            "question": "What is the name of the Alligator that The Simpsons &quot;killed&quot; in the episode &quot;Kill The Alligator and Run&quot;?",
+            "correct_answer": "Captain Jack",
+            "incorrect_answers": ["Captain Jake", "Captain Hector", "Captain Flynn"]
+          }
+        ]
+      }
+    }
+  },
+  "expected": {
+    "reply": {
+      "text": "What is the name of the Alligator that The Simpsons \"killed\" in the episode \"Kill The Alligator and Run\"? The answer: Captain Jack.",
+      "speech": "What is the name of the Alligator that The Simpsons \"killed\" in the episode \"Kill The Alligator and Run\"? ... The answer: Captain Jack."
+    },
+    "actions": [],
+    "scheduled_jobs": [],
+    "home_calls": [],
+    "memory_added": []
+  }
+}
