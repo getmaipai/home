@@ -14,6 +14,7 @@
 // caches the real `hf://` file itself, the same way it already does for
 // the 26 built-in presets (spec/voice/README.md).
 import { singleflight } from "@/lib/singleflight";
+import { tryConsume, type TokenBucketOptions } from "@/lib/rateLimiter";
 
 // Overridable for tests only (MAIPAI_VOICE_CATALOG_URL, tests/preload.ts) -
 // the same "point the real fetch logic at a local fixture instead of the
@@ -50,7 +51,40 @@ function extensionOf(path: string): string {
   return dot === -1 ? "" : path.slice(dot + 1).toLowerCase();
 }
 
+// This whole fetch happens at most once an hour (CACHE_TTL_MS below),
+// behind a singleflight, so a burst covering the real 3-page case in one
+// go costs Hugging Face nothing meaningful - the limit exists for the
+// hard-cap-50 pathological case (an unexpected pagination loop), where it
+// keeps a runaway fetch to "a page every few seconds" instead of hammering
+// the host in a tight loop (CLAUDE.md's "Third-party services: we are the
+// user"). Session F, step 3/step 0's deferred fallback for A's
+// unshipped per-person-limits step (docs/plans/wave-2.md).
+const VOICE_CATALOG_RATE_LIMIT: TokenBucketOptions = { capacity: 5, refillPerSecond: 1 };
+
+// A code review (2026-09-06) found this file's own singleflight - the
+// reason `waitForToken` was written to wait rather than fail-fast - does
+// NOT mean nothing is waiting synchronously on it: routes/voice.ts's
+// GET /catalog and POST /catalog/select both `await getVoiceCatalog()`
+// directly inside a live request handler (the singleflight only dedupes
+// CONCURRENT callers, it doesn't make the first one non-blocking). An
+// uncapped wait loop against the pathological 50-page case could hold a
+// browser's request open for the better part a minute instead of the
+// fast 503 every other failure in this file already produces. Capped so
+// a caller always gets a real answer within a bounded time either way.
+const MAX_WAIT_FOR_TOKEN_MS = 15_000;
+
+async function waitForToken(key: string, opts: TokenBucketOptions): Promise<void> {
+  const deadline = Date.now() + MAX_WAIT_FOR_TOKEN_MS;
+  while (!tryConsume(key, opts)) {
+    if (Date.now() >= deadline) {
+      throw new Error(`rate-limited fetching the voice catalog - still no token after ${MAX_WAIT_FOR_TOKEN_MS / 1000}s`);
+    }
+    await new Promise((resolve) => setTimeout(resolve, Math.ceil(1000 / opts.refillPerSecond)));
+  }
+}
+
 async function fetchOnePage(url: string): Promise<{ entries: HfTreeEntry[]; next: string | null }> {
+  await waitForToken(new URL(url).host, VOICE_CATALOG_RATE_LIMIT);
   const res = await fetch(url);
   if (!res.ok) throw new Error(`GET ${url} returned ${res.status}`);
   const entries = (await res.json()) as HfTreeEntry[];

@@ -159,26 +159,26 @@ export function getSidecarLogs(id: string): string[] {
  *
  * `ps`, not `lsof`: proved unreliably slow on the machine this was first
  * written on, enough to make a passing test flake into a timeout. */
+async function findPidsMatching(pattern: RegExp): Promise<number[]> {
+  try {
+    const { stdout } = await execFileAsync("ps", ["aux"], { timeout: 5_000 });
+    return stdout
+      .split("\n")
+      .filter((line) => pattern.test(line))
+      .map((line) => Number(line.trim().split(/\s+/)[1]))
+      .filter((n) => Number.isFinite(n) && n > 0);
+  } catch {
+    return [];
+  }
+}
+
 export async function freePort(port: number): Promise<void> {
   // Anchored to a word boundary after the number: a plain substring test
   // ("--port 8788".includes(...)) would also match "--port 87889" and
   // kill an unrelated process whose port has this one as a numeric
   // prefix (a real bug a code review caught in the original version).
   const portPattern = new RegExp(`--port[= ]${port}\\b`);
-  const findPids = async (): Promise<number[]> => {
-    try {
-      const { stdout } = await execFileAsync("ps", ["aux"], { timeout: 5_000 });
-      return stdout
-        .split("\n")
-        .filter((line) => portPattern.test(line))
-        .map((line) => Number(line.trim().split(/\s+/)[1]))
-        .filter((n) => Number.isFinite(n) && n > 0);
-    } catch {
-      return [];
-    }
-  };
-
-  const pids = await findPids();
+  const pids = await findPidsMatching(portPattern);
   for (const pid of pids) {
     try {
       process.kill(pid, "SIGKILL");
@@ -202,6 +202,34 @@ export async function freePort(port: number): Promise<void> {
     if (!stillUp) return;
     await new Promise((resolve) => setTimeout(resolve, 100));
   }
+}
+
+/** Kills every process whose command line contains `matchSubstring` (a
+ * stable, absolute path is the intended match - an installed engine's own
+ * directory, say - not a generic binary name that could collide with an
+ * unrelated tool). freePort() only ever catches an orphan holding the
+ * EXACT port a fresh spawn is about to claim; an orphan sitting on some
+ * other port (a leftover from a since-changed MAIPAI_LLAMA_SERVER_PORT,
+ * or any other stale process this codebase spawned before a crash or a
+ * dev-mode reload wiped the tracking) is invisible to that check
+ * entirely, and legacy's own incident - "orphaned runners once forced
+ * every load to CPU: a 90s 'hi'" - was exactly a leftover resident
+ * process nothing was watching, not a port collision. Meant to run once
+ * at boot (session-f-platform-and-trust.md step 3's own "max-resident
+ * models policy with an orphan sweep"), before anything real spawns.
+ * Best-effort like freePort() (no-op if `ps` is missing); returns how
+ * many processes it killed. */
+export async function sweepOrphanProcesses(matchSubstring: string): Promise<number> {
+  const pattern = new RegExp(matchSubstring.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"));
+  const pids = (await findPidsMatching(pattern)).filter((pid) => pid !== process.pid);
+  for (const pid of pids) {
+    try {
+      process.kill(pid, "SIGKILL");
+    } catch {
+      // already gone
+    }
+  }
+  return pids.length;
 }
 
 export interface SpawnAndWaitOptions {

@@ -37,7 +37,8 @@ import { modelsDir, enginesDir } from "@/lib/paths";
 import { resolveLaunchFlags, launchFlagsToArgs, type LaunchFlags, type LaunchFlagOverrides } from "@/lib/engineAutotune";
 import { runPostLoadCheck, type PostLoadCheckResult } from "@/lib/enginePostLoadCheck";
 import { getHouseholdSettingValue } from "@/lib/settings";
-import { spawnAndWaitHealthy, freePort } from "@/lib/sidecars";
+import { spawnAndWaitHealthy, freePort, sweepOrphanProcesses } from "@/lib/sidecars";
+import { assertNotInCrashBootHold } from "@/lib/dirtyBoot";
 
 export type BackendKind = "url" | "override" | "selection" | "stub";
 
@@ -84,6 +85,23 @@ let manuallyStopped = false;
 // so this module's existing test suite and callers don't need to know it
 // moved.
 export { freePort };
+
+/** Session F, step 3: the "max-resident models policy with an orphan
+ * sweep" guard (docs/BACKLOG.md's "Copy the legacy runtime guards" item -
+ * legacy's own incident: "orphaned runners once forced every load to
+ * CPU: a 90s 'hi'"). freePort() only catches an orphan bound to the
+ * EXACT port a fresh spawn is about to claim; this catches one sitting
+ * anywhere else - a leftover from a since-changed
+ * MAIPAI_LLAMA_SERVER_PORT/MAIPAI_EMBED_PORT, or any other stray engine
+ * process this codebase spawned before a crash or a dev-mode reload wiped
+ * the tracking that would have stopped it. Matches on `enginesDir` (every
+ * real spawn - chat and embed both - invokes the binary by its absolute
+ * path under here, per selectEngineBinary()'s own pin), so this covers
+ * both roles with one call. Meant to run once at boot (index.ts), before
+ * anything real spawns. */
+export async function sweepOrphanEngineProcesses(): Promise<number> {
+  return sweepOrphanProcesses(enginesDir);
+}
 
 async function spawnLlamaServer(
   bin: string,
@@ -146,6 +164,13 @@ async function trySpawnFromSelection(): Promise<ChatBackend | null> {
   const modelId = getHouseholdSettingValue("chat.model_id") as string;
   if (!modelId) return null;
 
+  // The crash-boot hold (lib/dirtyBoot.ts, session-f-platform-and-trust.md
+  // step 3): only gates a REAL spawn, never tier 1 (a developer's URL
+  // override) or tier 4's stub - a household that already has a model
+  // selected still gets a working (stubbed) chat surface immediately
+  // after a crash-boot, just not the real engine for 30 minutes.
+  assertNotInCrashBootHold();
+
   const model: ModelCapabilities | undefined = CATALOG.find(
     (m) => m.id === modelId && m.role === "chat" && m.implemented,
   );
@@ -194,6 +219,13 @@ async function startChatBackend(): Promise<ChatBackend> {
   const bin = process.env.MAIPAI_LLAMA_SERVER_BIN;
   const modelPath = process.env.MAIPAI_CHAT_MODEL_PATH;
   if (bin && modelPath) {
+    // A code review (2026-09-06) found this real spawn path - a
+    // developer's explicit override, but still a real local process
+    // contending for the same GPU a crash-boot just took down - had no
+    // crash-boot-hold check at all, unlike tier 3 right below it. Only
+    // tier 1 (a bare URL, nothing spawned) and tier 4's stub are meant to
+    // bypass this.
+    assertNotInCrashBootHold();
     return spawnLlamaServer(bin, modelPath, "override");
   }
 

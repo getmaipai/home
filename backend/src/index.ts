@@ -4,6 +4,8 @@ import { runPlugin } from "@/lib/plugins";
 import { cleanupStaleSnapshots } from "@/lib/backup";
 import { sampleEngineStats } from "@/lib/engineStats";
 import { startAllSidecars, registerGracefulExit } from "@/lib/sidecars";
+import { initCrashBootHold } from "@/lib/dirtyBoot";
+import { sweepOrphanEngineProcesses } from "@/lib/llmSupervisor";
 
 const port = Number(process.env.PORT ?? 8787);
 
@@ -49,6 +51,22 @@ cleanupStaleSnapshots();
 // this boots an empty registry today - proving the wiring rather than
 // waiting for a first caller to also have to remember it.
 registerGracefulExit();
+// A code review (2026-09-06) found these three fire-and-forget (the
+// original comments here promised "before anything real spawns" and "no
+// real engine spawn happens before the first request arrives" without
+// anything actually enforcing that ordering): Bun starts serving requests
+// the instant this module finishes evaluating, which could race a very
+// early chat/embed request against the sweep still deciding what to kill,
+// or against the hold flag not being set yet. Top-level await blocks this
+// module's own evaluation - and so Bun picking up the `export default`
+// below - until both finish, which the sub-second-to-low-single-digit-
+// second cost of an OS process scan and log query is worth paying once at
+// boot for. startAllSidecars() stays fire-and-forget: it's an ongoing
+// health-poll loop, not a one-shot check with a real finish line, and
+// nothing registers a sidecar yet (D's SearXNG and C's voice programs are
+// the first real registrants).
+await sweepOrphanEngineProcesses();
+await initCrashBootHold();
 void startAllSidecars();
 setInterval(() => {
   runDueJobs(runPlugin).catch((err: Error) => console.error(`[scheduler] runDueJobs failed: ${err.message}`));

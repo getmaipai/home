@@ -172,3 +172,164 @@ attempts) - real, but not yet a problem with zero real registrants; a gap
 to close before D's or C's first sidecar ships, not before this step
 merges. The `backupMode`/`excludePatterns` fields are declared and typed
 but read by nothing yet - step 8's backup work is the real consumer.
+
+## Step 3: the runtime guards legacy paid for
+
+Checked `llmSupervisor.ts`, `modelDownload.ts` and `telegramChannel.ts`
+for equivalents first, per docs/BACKLOG.md's own instruction (the 2026-
+09-05 audit didn't). Two guards already existed and needed nothing: the
+download stall watchdog (`modelDownload.ts`'s 90s idle-read timeout) and
+6-attempt backoff. Also completed step 0's deferred fallback for A's
+unshipped per-person-limits step: `telegramChannel.ts` and
+`voiceCatalog.ts` now route their fetches through `lib/rateLimiter.ts`'s
+`tryConsume()`.
+
+**`lib/dirtyBoot.ts` (new):** ported from the archived legacy hub with a
+real change, not a straight port - legacy's version was Windows-only
+(`bootFollowedUncleanShutdown()` returned `false` outright on every other
+platform); this step's own text asks for "the equivalent on Linux and
+macOS best-effort," so all three are real: Windows keeps legacy's
+Kernel-Power-41 `wevtutil` query unchanged; macOS parses `pmset -g log`'s
+own "Shutdown Cause" line (a real mechanism macOS admins already use for
+this exact question); Linux checks whether the previous boot's own
+journal ends with a clean shutdown target via `journalctl -b -1`. Every
+platform's interpretation logic is a pure, exported function
+(`windowsEventIndicatesUncleanBoot`, `macosLogIndicatesUncleanShutdown`,
+`linuxPreviousBootLogIndicatesUncleanShutdown`) unit-tested against
+synthetic log/XML text, so the branches don't depend on this dev
+machine's own shutdown history; `bootFollowedUncleanShutdown()` itself
+also gets one real-mechanism test (resolves to a boolean on whatever
+platform actually runs the suite, no specific outcome asserted).
+
+**The crash-boot hold:** `initCrashBootHold()` runs once at boot
+(`index.ts`, fire-and-forget - the OS query takes at most a few seconds
+and no real spawn happens before the first request anyway) and sets a
+30-minute hold when the boot was unclean. `llmSupervisor.ts`'s
+`trySpawnFromSelection()` and `embedSupervisor.ts`'s real-spawn branch
+both check `isInCrashBootHold()` and throw a clear, dad-test error
+instead of spawning - placed so tier 1 (a developer's URL override) and
+the stub tier are never gated, only a genuine local model spawn. Embed's
+own check has no direct unit test: its real-spawn branch requires a real
+installed engine binary on disk, which nothing in this test environment
+has (the same pre-existing gap `spawnEmbedServer()` itself already has -
+not a coverage hole this step introduced, and reviewed by hand for
+symmetry with `llmSupervisor.ts`'s tested equivalent).
+
+**`lib/sidecars.ts`'s `sweepOrphanProcesses()` (new) and
+`llmSupervisor.ts`'s `sweepOrphanEngineProcesses()`:** the real fix for
+legacy's "orphaned runners once forced every load to CPU: a 90s 'hi'".
+`freePort()` only ever catches an orphan bound to the exact port a fresh
+spawn is about to claim; this catches one sitting anywhere else (a
+leftover from a since-changed port env var, or any stray engine process
+a crash or a `--hot` reload left running), matching on `enginesDir` - a
+real, this-install-specific absolute path every chat/embed spawn invokes
+its binary under, so nothing outside this hub's own spawned engines can
+ever match. Runs once at boot, before `startAllSidecars()`. "Max
+resident models" itself needed no new code: chat and embed are each a
+single module-level singleton already, so residency was already capped
+at one per role by construction - the orphan sweep is what actually
+closes the gap legacy's incident exposed.
+
+**A real safety catch while writing its own test:** the first draft of a
+`sweepOrphanProcesses()` test asserted self-protection with a broad
+match string (the current process's own binary name, "bun") - which,
+run for real via `execFileAsync("ps", ["aux"])` and `process.kill`,
+would have `SIGKILL`ed every other `bun` process on the machine,
+including the several other sessions' worktrees (`home-c`, `home-d`)
+actively running at the same time this step was being written. Caught
+before the test suite ever ran it (reasoned through what the test would
+actually do to a shared dev machine, not just what it would assert) and
+replaced with a comment explaining why that scenario isn't safe to test
+directly; the two remaining tests (a unique-marker-matched spawn dies,
+a non-matching marker kills nothing) already prove targeted matching
+without needing the dangerous case.
+
+**Also caught while testing, unrelated to the guards themselves:**
+`Bun.Subprocess.exitCode` doesn't reliably populate after an externally-
+delivered `SIGKILL` (only `.exited`, the promise, resolves reliably) -
+the sweep test's first version polled `.exitCode` and hung until its own
+timeout despite the process actually being dead (confirmed independently
+via `ps -p`). Fixed by asserting on `.exited` instead; noted here since
+it's a easy trap for any future test in this codebase that kills a
+`Bun.spawn()`ed process from outside and checks whether it died.
+
+**What's deferred, and why (docs/BACKLOG.md updated to match):**
+negative caches (no analog exists in this architecture - nothing here
+repeatedly re-probes a known-failing resource the way legacy's media-
+stream resolution did) and a boot watchdog capped at three reloads (an
+OS service-manager concern - `systemd`'s `StartLimitBurst`, launchd's
+`ThrottleInterval`, or `run.sh`/`run.ps1`'s own retry-cap - reassigned to
+step 11's install/service work, not backend code). The chat-latency rule
+(warm-up prefix == chat prefix) needs an export from `turnEngine.ts` that
+doesn't exist yet (`buildSystemPrompt()`'s `stablePrefix` is an inline
+local, never its own function) - filed as getmaipai/home#15 for Session
+C rather than guessed at or built against a fabricated prefix; the rest
+of this step shipped without it.
+
+**A medium-effort code review before commit found seven real issues,
+six fixed here:**
+
+1. Tier 2 (`MAIPAI_LLAMA_SERVER_BIN`/`MAIPAI_CHAT_MODEL_PATH`, "a
+   developer's explicit override" per this file's own header) had no
+   crash-boot-hold check at all - only tier 3 did, even though tier 2 is
+   just as real a spawn contending for the same hardware. Fixed: both
+   tiers now call one shared `assertNotInCrashBootHold()` (also fixes
+   finding 6 below).
+2. The first `macosLogIndicatesUncleanShutdown()` blocklisted a handful
+   of `pmset -g log` "Shutdown Cause" codes as clean and treated
+   everything else - including "-128", commonly logged for completely
+   ordinary restarts on modern macOS - as unclean. Replaced entirely: macOS
+   detection now looks for an actual kernel panic report in
+   `/Library/Logs/DiagnosticReports` timestamped near boot, an unambiguous
+   signal with no equivalent ambiguous code to misread (at the honest cost
+   of missing a raw power-off that never triggered a panic - accepted,
+   matching "never a false alarm" over "catch everything").
+3. `index.ts` had `sweepOrphanEngineProcesses()`/`initCrashBootHold()`/
+   `startAllSidecars()` all fire-and-forget while the comments claimed an
+   ordering ("before anything real spawns") nothing enforced - Bun starts
+   serving requests the moment the module finishes evaluating, so a very
+   early request could race both checks. Fixed: the two one-shot,
+   finite checks are now `await`ed via top-level await before the
+   module's `export default` is reached (and so before Bun picks up the
+   server); `startAllSidecars()` stays fire-and-forget since it's an
+   ongoing loop, not a one-shot check, and nothing registers a sidecar
+   yet.
+4. `ttsSupervisor.ts` (Session C's file) has the identical real-spawn
+   shape with no hold check - out of scope to fix here, filed as
+   getmaipai/home#16 for Session C.
+5. `voiceCatalog.ts`'s `waitForToken()` busy-polled forever with no cap;
+   this file's own new comment claimed nothing waits on it synchronously,
+   which was simply wrong - `routes/voice.ts`'s `GET /catalog` and
+   `POST /catalog/select` both `await getVoiceCatalog()` directly inside a
+   live request handler. Fixed with a 15s cap that throws (degrading into
+   the existing 503 both routes already handle) instead of hanging a
+   request for however long the pathological 50-page case would take to
+   refill.
+6. The Linux clean-shutdown pattern only matched "Reached target
+   ...Shutdown" - newer systemd (254+) split that into separate Reboot/
+   Power-Off/Halt targets with their own wording, which could have
+   misclassified a clean shutdown on a newer distro as unclean. Broadened
+   to match every documented target/verb variant; the residual gap (a
+   shutdown whose final log lines never reached disk, or future wording
+   this list doesn't know about) is accepted as part of this guard's
+   already-stated best-effort posture, not solved perfectly.
+7. `sidecars.ts`'s `sweepOrphanProcesses()` inlines the same regex-escape
+   one-liner `turnEngine.ts` (Session C's file) already has. Left as-is:
+   a standard, stable one-line JS idiom, not custom logic likely to drift
+   - extracting a shared module for one line used twice, or editing C's
+   file without coordination, would cost more than the duplication itself.
+
+**A pre-existing flaky test found while re-running the suite for this
+step, fixed since `rateLimiter.ts` is F's own file:**
+`tests/rateLimiter.test.ts`'s "never refills past capacity" test used
+`refillPerSecond: 1000` (one token every 1ms) with a 50ms sleep - under
+the real system load this step's own many-subprocess tests
+(`sidecars.test.ts`, `dirtyBoot.test.ts`) add to a full `bun test` run,
+a few milliseconds of scheduling jitter between its four `tryConsume()`
+calls could tip the bucket into an accidental 3rd token, failing the
+test despite the clamp logic itself being correct (confirmed: always
+passed in isolation, failed once in ~3 full-suite runs). Slowed to
+`refillPerSecond: 20` with a 500ms sleep - the same proof ("would refill
+way past capacity if unclamped"), a jitter margin two orders of
+magnitude wider. Five isolated runs and two full-suite runs afterward,
+all green.

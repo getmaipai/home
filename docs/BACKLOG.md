@@ -1273,16 +1273,33 @@ on a spec tag that was never cut.
       recalled memory text actually lands in the prompt for a matching
       query (memory tests stop at `recall`; prompt tests use synthetic
       matches).
-- [ ] **Copy the legacy runtime guards** (S-M) - a download stall
-      watchdog (a 7 GB checkpoint sat at "28 s left" for 21 min), 6-
-      attempt backoff, negative caches that store only genuine misses
-      (313 poisoned rows once purged), max resident models with an
-      orphan sweep (orphaned runners forced every load to CPU: a 90 s
-      "hi"), a boot watchdog capped at three reloads, and a crash-boot
-      hold that refuses heavy compute for 30 minutes after a dirty boot
-      (three power-offs in one night). Check `llmSupervisor.ts`,
-      `modelDownload.ts` and `telegramChannel.ts` for equivalents first;
-      the audit did not read them for that.
+- [x] **Copy the legacy runtime guards, most of them** (Session F step 3,
+      2026-09-06) - checked `llmSupervisor.ts`/`modelDownload.ts`/
+      `telegramChannel.ts` for equivalents first, per this item's own
+      instruction: the download stall watchdog (90s idle timeout) and
+      6-attempt backoff already existed in `modelDownload.ts`, untouched.
+      Shipped new: `lib/dirtyBoot.ts`'s crash-boot hold (Windows Kernel-
+      Power 41, macOS `pmset -g log` Shutdown Cause, Linux journalctl
+      boot-boundary check, all best-effort except Windows's real signal;
+      30-minute hold on a REAL chat/embed spawn only, never the stub or a
+      developer's URL override) and `lib/sidecars.ts`'s
+      `sweepOrphanProcesses()` (a boot-time sweep for a stray engine
+      process freePort() can't see because it isn't on the port a fresh
+      spawn is about to claim - the actual fix for "orphaned runners once
+      forced every load to CPU: a 90s 'hi'"; residency itself is already
+      capped at one process per role by construction, chat and embed each
+      being a single module-level singleton).
+- [ ] **The two runtime guards without a clean home yet** (S) - negative
+      caches for genuine misses: no analog exists in this architecture
+      today (nothing here repeatedly re-probes a known-failing URL or
+      resource the way legacy's media-stream resolution did; revisit once
+      the scheduler's own download lane or a package's periodic re-check
+      needs one, rather than inventing a cache for a problem that doesn't
+      exist yet). A boot watchdog capped at three reloads: not backend
+      code - that's the OS service manager's job (systemd's
+      `StartLimitBurst`, launchd's `ThrottleInterval`, or `run.sh`/
+      `run.ps1`'s own retry-with-a-cap), so it belongs in step 11's
+      install/service work, not here.
 
 ## Legacy: copy, re-examine, record
 
