@@ -15,6 +15,7 @@ import type { Roster } from "@/lib/api";
 import type { SentenceSpeechScheduler } from "@/lib/sentenceSpeechScheduler";
 
 const BrainIcon = getIcon("brain");
+const VolumeXIcon = getIcon("volume-x");
 
 interface ChatPageProps {
   person: Roster;
@@ -61,6 +62,15 @@ export function ChatPage({ person }: ChatPageProps) {
   // Listen on an earlier message mid-reply.
   const turnSchedulerRef = useRef<SentenceSpeechScheduler | null>(null);
 
+  // Jesse, 2026-09-06: the composer's own Send/Stop toggle only tracks
+  // text generation - text almost always finishes streaming before its
+  // speech has finished playing, so the button flips back to "Send"
+  // while the reply is still being read aloud, with nothing on screen
+  // able to stop it. This tracks that window (chatModelAdapter.ts's
+  // onSpeakingChange, wired to the scheduler's onFirstAudio/onEnded) so
+  // a dedicated control can cover it.
+  const [isSpeaking, setIsSpeaking] = useState(false);
+
   const chatModelAdapter = useMemo(
     () =>
       createChatModelAdapter({
@@ -72,6 +82,7 @@ export function ChatPage({ person }: ChatPageProps) {
         },
         onCrisisResources: setBanner,
         turnSchedulerRef,
+        onSpeakingChange: setIsSpeaking,
       }),
     [],
   );
@@ -130,6 +141,26 @@ export function ChatPage({ person }: ChatPageProps) {
                         )
                       }
                     />
+                    {/* Covers the gap the composer's own Send/Stop toggle
+                        can't: text generation finishing doesn't mean the
+                        reply is done being SPOKEN. Only shown while that's
+                        actually true, so it never sits there as dead
+                        chrome the rest of the time. */}
+                    {isSpeaking ? (
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        onClick={() => {
+                          turnSchedulerRef.current?.stop();
+                          setIsSpeaking(false);
+                        }}
+                        className="rounded-full"
+                      >
+                        <VolumeXIcon />
+                        Stop speaking
+                      </Button>
+                    ) : null}
                     <Button
                       type="button"
                       size="sm"

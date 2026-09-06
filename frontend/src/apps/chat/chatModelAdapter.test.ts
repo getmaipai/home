@@ -322,6 +322,47 @@ describe("createChatModelAdapter streaming", () => {
       env.restore();
     }
   });
+
+  // Jesse, 2026-09-06: the composer's own Send/Stop toggle tracks only
+  // text generation, so it flipped back to "Send" while a reply was still
+  // being spoken - onSpeakingChange (ChatPage.tsx's "stop speaking"
+  // control) exists specifically because these two are genuinely
+  // different signals, not the same thing twice.
+  test("onSpeakingChange tracks the reply's own audio, independent of when text generation finishes", async () => {
+    const env = stubEnvironment(
+      ndjsonStream([
+        { type: "delta", text: "Hello there." },
+        { type: "done", value: { reply: { text: "Hello there." }, source: "model", safety: SAFETY } },
+      ]),
+    );
+    try {
+      const speakingEvents: boolean[] = [];
+      const adapter = createChatModelAdapter({
+        consumeThinking: () => false,
+        onCrisisResources: () => {},
+        turnSchedulerRef: { current: null },
+        onSpeakingChange: (speaking) => speakingEvents.push(speaking),
+      });
+      const options = {
+        messages: [fakeUserMessage("hi")],
+        runConfig: {},
+        abortSignal: new AbortController().signal,
+        context: {},
+        unstable_getMessage: () => fakeUserMessage("hi"),
+      } as unknown as ChatModelRunOptions;
+      // Draining the generator to completion is exactly "text generation
+      // finished" - speech (a separate TTS fetch, then playback) hasn't
+      // necessarily caught up yet, which is the entire gap this exists to
+      // cover.
+      for await (const _ of runAdapter(adapter, options)) {
+        /* drain */
+      }
+      await new Promise((resolve) => setTimeout(resolve, 20));
+      expect(speakingEvents).toEqual([false, true, false]);
+    } finally {
+      env.restore();
+    }
+  });
 });
 
 describe("createChatModelAdapter errors", () => {
