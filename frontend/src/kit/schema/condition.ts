@@ -24,7 +24,19 @@ export function evaluateCondition(condition: string | undefined, state: Record<s
     return negated ? !result : result;
   }
 
-  // A bare dotted path: truthy check.
+  // A bare dotted path is the only other supported form - a code review
+  // (2026-09-05) found an unsupported operator (`!=`, `>`, `&&`...)
+  // silently fell all the way through to here, where it doesn't match a
+  // real path either, so `readField` just returns `undefined` and the
+  // section renders as always-hidden with no signal that the syntax was
+  // never valid. A dotted path only ever contains word characters and
+  // dots; anything else is a genuine authoring mistake, loud now rather
+  // than a silently-wrong render later.
+  if (!/^[\w.]+$/.test(withoutBang)) {
+    throw new Error(
+      `kit/schema: unsupported condition "${condition}" - only a bare dotted path, "!path", "path == 'value'" or "!path == 'value'" are supported`,
+    );
+  }
   const value = readField(state, withoutBang);
   const truthy = Boolean(value);
   return negated ? !truthy : truthy;

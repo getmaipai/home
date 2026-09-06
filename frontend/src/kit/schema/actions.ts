@@ -45,9 +45,12 @@ export interface PendingConfirm {
 
 // `{count}` is the one placeholder fillTemplate can't resolve from a
 // single item's own fields (spec/ui/schema.json's action.confirm.prompt
-// doc comment) - substituted here, once, ahead of the normal per-item
-// substitution, so "Archive {count} memories?" reads right for both a
-// single row_action (count always 1) and a batch action over N selected.
+// doc comment) - substituted BEFORE fillTemplate runs, not after (a code
+// review, 2026-09-05, found the original order let a bound item with its
+// own field literally named `count` silently win: fillTemplate would
+// already have consumed the `{count}` token from that field before this
+// function ever saw it). Resolving it first turns `{count}` into a plain
+// number, which fillTemplate's own `{field}` regex can't match again.
 function fillCount(template: string, count: number): string {
   return template.replace(/\{count\}/g, String(count));
 }
@@ -60,48 +63,80 @@ function fillCount(template: string, count: number): string {
  * immediately; every other action kind runs straight away, once per
  * item, sequentially (never `Promise.all` - a partial failure has to
  * stop at the item that failed, not fire the rest of the batch anyway).
- * After every item settles, every schema-bound query is invalidated
- * (kit/schema/binding.ts's `["schema-binding", path]` key) - simple and
- * safe at this app's scale (a household's own data), matching how
- * NotificationBell.tsx/MemoryPage.tsx's own mutations already invalidate
- * broadly rather than tracking exactly which binding an action affects. */
+ * Every schema-bound query is invalidated (kit/schema/binding.ts's
+ * `["schema-binding", path]` key) once the loop settles, success or
+ * failure - a code review (2026-09-05) found the original version only
+ * invalidated on full success, so items that DID mutate ahead of a
+ * later failure in the same loop never refreshed out of the stale list,
+ * and the failure itself surfaced nowhere (an unhandled rejection, no
+ * user-visible error). `lastError` carries that message for a
+ * non-confirm dispatch; `pendingConfirm.error` carries the equivalent
+ * for a confirmed one. `onSettled` (a code review, 2026-09-05) is for a
+ * caller like a list's own select-mode UI that needs to know when the
+ * action actually FINISHED, not when it was merely dispatched - the
+ * original version exited select mode (clearing the selection) the
+ * instant a batch action was clicked, including a `confirm`-wrapped one,
+ * so the selection was already gone underneath the confirm dialog before
+ * the household member had even answered it; cancelling lost the
+ * selection for nothing. `onSettled` fires once the action truly runs
+ * (success or failure), never on a plain `cancel()`. */
 export function useDispatchAction(): {
-  dispatch(action: Action, items?: Record<string, unknown>[]): void;
+  dispatch(action: Action, items?: Record<string, unknown>[], onSettled?: () => void): void;
   pendingConfirm: PendingConfirm | null;
+  lastError: string | null;
 } {
   const navigateTo = useNavigate();
   const queryClient = useQueryClient();
-  const [pending, setPending] = useState<{ action: Action; items: Record<string, unknown>[] } | null>(null);
+  const [pending, setPending] = useState<{
+    action: Action;
+    items: Record<string, unknown>[];
+    onSettled?: () => void;
+  } | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [lastError, setLastError] = useState<string | null>(null);
 
   const navigate = useCallback((to: string) => navigateTo(to), [navigateTo]);
 
   const runAndInvalidate = useCallback(
     async (action: Action, items: Record<string, unknown>[]) => {
-      for (const item of items) await runAction(action, item, navigate);
-      await queryClient.invalidateQueries({ queryKey: ["schema-binding"] });
+      try {
+        for (const item of items) await runAction(action, item, navigate);
+      } finally {
+        // Whatever succeeded before a failure still needs to leave the
+        // stale list, so this runs even when the loop above threw.
+        await queryClient.invalidateQueries({ queryKey: ["schema-binding"] });
+      }
     },
     [navigate, queryClient],
   );
 
   const dispatch = useCallback(
-    (action: Action, items: Record<string, unknown>[] = [{}]) => {
+    (action: Action, items: Record<string, unknown>[] = [{}], onSettled?: () => void) => {
       if ("confirm" in action) {
         setError(null);
-        setPending({ action, items });
+        // A stale lastError from an earlier failed non-confirm dispatch (a
+        // code review, 2026-09-05, found it was never cleared by any later
+        // confirm-based action, success or failure) would otherwise sit
+        // under the list forever once set - clearing it here means
+        // opening a new confirm always starts from a clean slate.
+        setLastError(null);
+        setPending({ action, items, onSettled });
         return;
       }
-      void runAndInvalidate(action, items);
+      setLastError(null);
+      void runAndInvalidate(action, items)
+        .catch((e: unknown) => setLastError(e instanceof Error ? e.message : "Something went wrong."))
+        .finally(() => onSettled?.());
     },
     [runAndInvalidate],
   );
 
   const pendingConfirm: PendingConfirm | null = pending
     ? {
-        prompt: fillCount(
-          fillTemplate((pending.action as { confirm: { prompt: string } }).confirm.prompt, pending.items[0] ?? {}),
-          pending.items.length,
+        prompt: fillTemplate(
+          fillCount((pending.action as { confirm: { prompt: string } }).confirm.prompt, pending.items.length),
+          pending.items[0] ?? {},
         ),
         busy,
         error,
@@ -109,7 +144,10 @@ export function useDispatchAction(): {
           setBusy(true);
           setError(null);
           void runAndInvalidate((pending.action as { confirm: { on_confirm: Action } }).confirm.on_confirm, pending.items)
-            .then(() => setPending(null))
+            .then(() => {
+              pending.onSettled?.();
+              setPending(null);
+            })
             .catch((e: unknown) => setError(e instanceof Error ? e.message : "Something went wrong."))
             .finally(() => setBusy(false));
         },
@@ -120,5 +158,5 @@ export function useDispatchAction(): {
       }
     : null;
 
-  return { dispatch, pendingConfirm };
+  return { dispatch, pendingConfirm, lastError };
 }

@@ -76,7 +76,20 @@ function ProgressNodeView({ node }: { node: ProgressNode }) {
 }
 
 function SectionNodeView({ node, state }: { node: SectionNode; state: Row }) {
-  if (!evaluateCondition(node.condition, state)) return null;
+  // evaluateCondition throws on an unsupported operator (a code review,
+  // 2026-09-05, made that loud on purpose - see condition.ts) - but this
+  // runs inside render, with no ErrorBoundary anywhere in the app, so an
+  // uncaught throw here would unmount the WHOLE page over one section's
+  // bad condition string. Caught here so the mistake is still loud (the
+  // console error), but contained to just this section staying hidden.
+  let visible: boolean;
+  try {
+    visible = evaluateCondition(node.condition, state);
+  } catch (e) {
+    console.error(`kit/schema: section "${node.heading}" hidden - ${e instanceof Error ? e.message : e}`);
+    visible = false;
+  }
+  if (!visible) return null;
   return (
     <Section heading={node.heading}>
       {node.children.map((child, i) => (
@@ -90,7 +103,8 @@ function ListNodeView({ node }: { node: ListNode }) {
   const query = useBinding<Row[]>(node.bind);
   const rowFilter = useContext(RowFilterContext);
   const filteredRows = query.data?.filter(rowFilter);
-  const { dispatch, pendingConfirm } = useDispatchAction();
+  const hasRows = (filteredRows?.length ?? 0) > 0;
+  const { dispatch, pendingConfirm, lastError } = useDispatchAction();
   const [selectMode, setSelectMode] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
 
@@ -115,7 +129,8 @@ function ListNodeView({ node }: { node: ListNode }) {
   return (
     <div className="flex min-w-0 flex-col gap-3">
       <ConfirmDialog pendingConfirm={pendingConfirm} />
-      {node.batch ? (
+      {lastError ? <p className="text-base text-destructive">{lastError}</p> : null}
+      {node.batch && hasRows ? (
         selectMode ? (
           <BatchBar count={selected.size} onExit={exitSelectMode}>
             {node.batch.actions.map((batchAction, i) => (
@@ -127,8 +142,17 @@ function ListNodeView({ node }: { node: ListNode }) {
                   const rows = filteredRows ?? [];
                   const items =
                     batchAction.scope === "all" ? rows : rows.filter((row) => selected.has(keyOf(row)));
-                  dispatch(batchAction.action, items);
-                  if (batchAction.scope !== "all") exitSelectMode();
+                  // exitSelectMode as onSettled, not called synchronously
+                  // here: a code review (2026-09-05) found the selection
+                  // being cleared the instant this action was dispatched,
+                  // including a confirm-wrapped one - the confirm dialog
+                  // then asked its question over a list that had already
+                  // silently dropped out of select mode, and cancelling
+                  // lost the selection for nothing. Now it only clears
+                  // once the action actually runs; a scope:"all" action
+                  // never had a selection to lose in the first place, so
+                  // it keeps not bothering.
+                  dispatch(batchAction.action, items, batchAction.scope !== "all" ? exitSelectMode : undefined);
                 }}
               >
                 {batchAction.label}

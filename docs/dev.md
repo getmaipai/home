@@ -6533,3 +6533,142 @@ frontend dependency too, for `chatThreadListAdapter.ts`'s
 `createAssistantStream()` - it was already a transitive dependency of
 `@assistant-ui/react`, just never imported directly before this session's
 `generateTitle()` implementation.
+
+## Session B: step 5 review fixes (2026-09-05)
+
+Step 5's own commit landed without the org's usual pre-commit code review
+(caught after the fact, not before) - run retroactively against the
+already-committed diff instead of skipped. Five real findings, all fixed
+here:
+
+1. **`actions.ts`'s batch loop only invalidated schema-bound queries on
+   full success.** A partial failure (item 2 of 3 rejects) left the item
+   that DID mutate stuck in the stale list forever, and the rejection
+   itself was unhandled - no user-visible error, just a console warning.
+   Wrapped the loop in try/finally so invalidation always runs, and added
+   a `lastError` string surfaced next to the list for a non-confirm
+   dispatch (a confirmed one already had `pendingConfirm.error` for this).
+2. **A list's select mode exited the instant a batch action was clicked**,
+   clearing the selection before the confirm dialog it opened had even
+   been answered - cancelling then lost the selection for nothing, and a
+   confirmed one that later failed left the household member staring at a
+   list that had silently left select mode underneath them. `dispatch()`
+   gained an `onSettled` callback, fired only once the action actually
+   finishes (success or failure), never on a plain cancel;
+   `NodeRenderer.tsx`'s batch button now passes its `exitSelectMode`
+   through that instead of calling it synchronously on click.
+3. **`{count}`'s substitution order let a bound item's own `count` field
+   win the race.** `fillTemplate` ran before `fillCount`, so an item
+   shaped like `{ count: 999, ... }` had its own field's value silently
+   fill `{count}` in the confirm prompt first, leaving fillCount's later
+   pass nothing to replace. Swapped the order: `{count}` resolves to the
+   true selection size before `fillTemplate` ever runs.
+4. **`condition.ts` fell through silently on any operator it didn't
+   recognize** (a not-equal check, a greater-than check, a logical AND,
+   ...), treating the whole expression string as a bare truthy path -
+   which never matches a real field, so the condition just always
+   evaluated to `false` with nothing pointing at the actual mistake.
+   Added a guard that throws naming the unsupported expression instead.
+5. **The batch bar (select toggle + actions) rendered even when the
+   bound list was empty** - a "Select" button with nothing to select.
+   Gated on the list actually having rows.
+
+The regression that took the longest to run down wasn't in any of the
+five: the new "partial batch failure surfaces an error" test kept failing
+even after fix #1, with the archive calls firing correctly (confirmed by
+the DOM: "First" gone, "Second" still there) but the error text nowhere
+in the document. Root cause was in `ConfirmDialog.tsx`, not `actions.ts`:
+its "Confirm" button was `kit/ui/alert-dialog.tsx`'s `AlertDialogAction`,
+a thin wrapper over Radix's own `AlertDialogPrimitive.Action` - and Radix
+closes the dialog itself the instant that's clicked, via its own internal
+`onOpenChange(false)`, independent of whatever `onClick` handler rides
+along with it. Since `ConfirmDialog`'s `onOpenChange` treated any
+`open === false` as a cancel, clicking Confirm on a batch action that
+takes real time to run (or fails) closed the dialog and nulled the
+pending-confirm state before the async operation's own success/failure
+ever got a dialog left to render into. Fixed by replacing
+`AlertDialogAction` with a plain `Button`: only `pendingConfirm`'s own
+`busy`/`error` state now decides when the dialog closes, Radix's
+auto-close never enters into it. `AlertDialogCancel` stays as-is
+(cancelling has no async result to wait for, so Radix closing it
+immediately is exactly right).
+
+A second, unrelated pre-existing bug turned up while verifying the fix
+live: `kit/ui/switch.tsx` and `kit/ui/checkbox.tsx` (both from step 1's
+shadcn regen) style their checked state on a bare `data-checked`/
+`data-unchecked` Tailwind variant, but Radix's own root only ever sets
+`data-state="checked"|"unchecked"` - never a literal `data-checked`
+attribute - so the checked-state fill and the switch thumb's slide never
+rendered; a toggle worked (`onCheckedChange` still fired) but looked
+permanently off. `tokens.css` already had this exact shape solved once,
+for `data-open`/`data-closed` (mapping Radix's `data-state` there too);
+added the matching `data-checked`/`data-unchecked` custom variants rather
+than hand-patching the two component files, so any future shadcn
+component with the same checked/unchecked shape picks it up for free.
+Verified by fetching the dev server's own compiled CSS and confirming
+`data-checked:bg-primary` compiled to
+`:where([data-state="checked"], [data-checked]:not([data-checked="false"]))`
+- a real selector match against Radix's actual output, not just
+plausible-looking source.
+
+Two other angle-review findings from the same pass turned out to already
+be fixed by an earlier fix cycle in this same step: the Sonner toast's
+6-second duration (dropped to Sonner's ~4s default when the hand-rolled
+Toast was deleted in step 1) already carries an explicit
+`duration={6000}` with a comment recording why; `chatListenStore.ts`'s
+stale-request handling already wires an `AbortController` all the way
+into the fetch, not just the player. Left as-is - re-fixing something
+already fixed is its own kind of regression.
+
+A second review pass, run against this fix round's own diff (the org's
+usual pre-commit review, this time run before rather than after), found
+three more real issues, all in the same fix's own blast radius:
+
+1. **`condition.ts`'s new throw had no containment.** `SectionNodeView`
+   calls `evaluateCondition` directly in render, and the app has no
+   `ErrorBoundary` anywhere - so a schema page with one badly-written
+   condition would have unmounted the *entire* page for every household
+   member, not just hidden the one section. `SectionNodeView` now catches
+   the throw itself, logs it to the console (still loud for whoever is
+   authoring the page), and treats the section as hidden rather than
+   crashing the page underneath it.
+2. **`lastError` (the banner a failed non-confirm dispatch, like a
+   row_action, leaves under the list) was never cleared by any later
+   confirm-based action** - success or failure - so it could sit there
+   indefinitely once set, even after the household member successfully
+   ran something else entirely. Cleared as soon as a new confirm dialog
+   opens, the same "starting fresh" moment `pendingConfirm.error` already
+   gets cleared at.
+3. **Radix's default Escape-to-dismiss wasn't gated on `busy`** the way
+   the visible Cancel/Confirm buttons already were. Pressing Escape
+   mid-confirm hid the dialog via `cancel()` while the request it started
+   kept running in the background; once that request resolved, its own
+   `onSettled` callback (a batch action's `exitSelectMode`) still fired -
+   a side effect landing after the household member believed they'd
+   backed out. `ConfirmDialog`'s `AlertDialogContent` now blocks Escape
+   the same way while `busy`, via `onEscapeKeyDown`'s `preventDefault()`.
+
+The regression test for #3 caught a real testing-library subtlety along
+the way: Radix marks everything outside an open modal `aria-hidden` (so
+assistive tech ignores it while blocked), and testing-library's
+role-based queries correctly refuse to find `aria-hidden` content - so a
+first draft of the test that tried to assert the list's own checkbox was
+still checked *while the dialog was still open* failed for the right
+reason, not the wrong one. The real proof that Escape did nothing (that
+the dialog stayed open, and that the list underneath only changed once
+the action actually finished and the dialog legitimately closed) doesn't
+need to reach behind the modal at all.
+
+Tests: five new `NodeRenderer.test.tsx` cases (cancelling a
+`scope: "selected"` batch action preserves selection and select mode;
+select mode only exits once the action actually confirms and runs; the
+select toggle and batch bar are hidden on an empty list; a stale
+row_action error clears once a new confirm dialog opens; Escape neither
+dismisses the dialog nor runs its `onSettled` while an action is still in
+flight), one new `condition.test.ts` case (not-equal, greater-than, and
+logical-AND operators all throw), and the partial-batch-failure case that
+caught the Radix auto-close bug live. 21/21 passing across both files
+(the full suite re-run 3x consecutively with no flakiness). Verified
+against the running app (backend :8798, frontend :5173, household member
+Nova): re-fetched the dev server's compiled CSS directly to confirm the
+`data-checked`/`data-unchecked` selectors match Radix's real output.
