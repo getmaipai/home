@@ -2,7 +2,7 @@ import { describe, expect, test, beforeEach } from "bun:test";
 import { TestClient } from "./client";
 import { resetDb } from "./reset-db";
 import { __resetThrottleForTests } from "@/lib/secretThrottle";
-import { createHost, performHttpFetch, withOneRetry, type AttemptResult } from "@/lib/packageHost";
+import { createHost, performHttpFetch, withOneRetry, formatSearxngResults, type AttemptResult } from "@/lib/packageHost";
 import { __resetRateLimiterForTests } from "@/lib/rateLimiter";
 import { cachedFetch, __resetPackageCacheForTests, __clearPackageCacheDirForTests } from "@/lib/packageCache";
 import { setHouseholdSettingValue } from "@/lib/settings";
@@ -712,6 +712,91 @@ describe("integration.call (session-d-packages-and-store.md step 4)", () => {
     } catch (err) {
       expect((err as HostError).code).toBe("capability_missing");
     }
+  });
+});
+
+describe("integration.call searxng (session-d-packages-and-store.md step 7, the websearch package's own case)", () => {
+  test("isn't set up yet: invalid_input, the same shape home_assistant gives", async () => {
+    const actor = await owner();
+    const host = createHost(actor, manifest({ permissions: ["integration:searxng"] }));
+    try {
+      await host.integration.call("searxng", "search", { query: "node.js" });
+      throw new Error("should have thrown");
+    } catch (err) {
+      expect((err as HostError).code).toBe("invalid_input");
+      expect((err as HostError).message).toContain("isn't set up yet");
+    }
+  });
+
+  test("search without a query raises invalid_input before any network attempt", async () => {
+    const actor = await owner();
+    const host = createHost(actor, manifest({ permissions: ["integration:searxng"] }));
+    try {
+      await host.integration.call("searxng", "search", {});
+      throw new Error("should have thrown");
+    } catch (err) {
+      expect((err as HostError).code).toBe("invalid_input");
+    }
+  });
+
+  test("a real GET to /search?q=...&format=json, formatted into a readable numbered list", async () => {
+    let seenUrl = new URL("http://placeholder.invalid");
+    const server = Bun.serve({
+      port: 0,
+      fetch: (req) => {
+        seenUrl = new URL(req.url);
+        return Response.json({
+          results: [
+            { title: "Node.js", url: "https://nodejs.org/", content: "Node.js is a JavaScript runtime." },
+            { title: "Node.js docs", url: "https://nodejs.org/docs", content: "API documentation." },
+          ],
+        });
+      },
+    });
+    try {
+      const actor = await owner();
+      setHouseholdSettingValue("search.searxng_url", `http://127.0.0.1:${server.port}`);
+      const host = createHost(actor, manifest({ permissions: ["integration:searxng"] }));
+      const result = await host.integration.call("searxng", "search", { query: "node.js runtime" });
+      expect(seenUrl.pathname).toBe("/search");
+      expect(seenUrl.searchParams.get("q")).toBe("node.js runtime");
+      expect(seenUrl.searchParams.get("format")).toBe("json");
+      expect(result).toBe(
+        "1. Node.js (https://nodejs.org/) - Node.js is a JavaScript runtime.\n2. Node.js docs (https://nodejs.org/docs) - API documentation.",
+      );
+    } finally {
+      server.stop(true);
+    }
+  });
+});
+
+describe("formatSearxngResults", () => {
+  test("reports no results found for an empty results array", () => {
+    expect(formatSearxngResults({ results: [] })).toBe("No web search results were found.");
+  });
+
+  test("reads a malformed (non-object) response as no results, not a throw", () => {
+    expect(formatSearxngResults(null)).toBe("No web search results were found.");
+  });
+
+  // The same class of gap code review found in almanac-holiday/onthisday/
+  // music: a result entry missing a usable title/url is skipped, never
+  // interpolated as "undefined".
+  test("skips a result missing a title or url rather than showing 'undefined'", () => {
+    const data = {
+      results: [
+        { title: "Real result", url: "https://example.com" },
+        { url: "https://example.com/no-title" },
+        { title: "No URL" },
+      ],
+    };
+    expect(formatSearxngResults(data)).toBe("1. Real result (https://example.com)");
+  });
+
+  test("respects the count cap", () => {
+    const data = { results: Array.from({ length: 10 }, (_, i) => ({ title: `Result ${i}`, url: `https://example.com/${i}` })) };
+    const text = formatSearxngResults(data, 2);
+    expect(text.split("\n")).toHaveLength(2);
   });
 });
 

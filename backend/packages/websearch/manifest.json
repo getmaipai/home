@@ -1,0 +1,60 @@
+{
+  "id": "websearch",
+  "version": "0.1.0",
+  "kind": "plugin",
+  "category": "Utilities",
+  "display": "Web Search",
+  "description": "Searches the web via a household-run SearXNG instance, then answers using the household's own local chat model. No SearXNG configured means no web search - never a scrape.",
+  "author": "MaiPai",
+  "license": "AGPL-3.0",
+  "homepage": "https://github.com/getmaipai/home",
+  "routing": {
+    "examples": [
+      "search the web for the tallest mountain",
+      "search online for tonight's game score",
+      "search the web for the weather forecast",
+      "search the web for the closest pharmacy",
+      "search online for today's headlines"
+    ],
+    "patterns": ["search the web for *", "search online for *"]
+  },
+  "args": {
+    "type": "object",
+    "required": ["expression"],
+    "properties": {
+      "expression": { "type": "string", "minLength": 1 }
+    }
+  },
+  "requires": [],
+  "optional": [],
+  "platforms": ["home"],
+  "min_role": "child",
+  "consequential": false,
+  "offline": "unavailable",
+  "config": [],
+  "data_sources": [
+    {
+      "id": "searxng",
+      "destination": "the household's own SearXNG instance (search.searxng_url)",
+      "when": "the household searches the web",
+      "what": "the search query, nothing else",
+      "who": "whichever search engines the household's own SearXNG instance is configured to use",
+      "opt_in": true,
+      "retention": "controlled entirely by the household's own SearXNG instance"
+    }
+  ],
+  "permissions": ["integration:searxng", "llm:complete"],
+  "notifications": [],
+  "fallback_reply": {
+    "text": "Sorry, I'm having trouble looking that up right now.",
+    "speech": "Sorry, I'm having trouble looking that up right now."
+  },
+  "backup": "exclude",
+  "background": false,
+  "contributes": {},
+  "pages": [],
+  "min_app": "0.1.0",
+  "tier": 0,
+  "quality_scale": "bronze",
+  "smoke": { "kind": "recipe_fixture", "fixture": "tests/smoke.json" }
+}

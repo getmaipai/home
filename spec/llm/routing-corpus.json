@@ -91,5 +91,9 @@
   { "utterance": "tell me about the band Radiohead", "expect": "knowledge", "must_not": ["music"], "note": "a real, documented collision: knowledge's own 'tell me about *' pattern sorts before music's own patterns (loadAllManifests() is id-sorted, k before m) and a literal pattern match wins immediately - music dropped this phrasing from its own routing.patterns entirely since it could never actually fire behind knowledge's." },
 
   { "utterance": "translate hello to spanish", "expect": "translate", "must_not": [] },
-  { "utterance": "translate good morning into french", "expect": "translate", "must_not": [] }
+  { "utterance": "translate good morning into french", "expect": "translate", "must_not": [] },
+
+  { "utterance": "search the web for the tallest mountain", "expect": "websearch", "must_not": [] },
+  { "utterance": "search online for today's headlines", "expect": "websearch", "must_not": [] },
+  { "utterance": "look up the artist Radiohead online", "expect": "music", "must_not": ["websearch"], "note": "a real, confirmed collision code review found: websearch's own routing.patterns originally included 'look up * online', which matches this utterance too - music's 'look up the artist *' wins the tie (sorts first by id) and captures 'Radiohead online' as a polluted artist name. Dropped 'look up * online' from websearch entirely rather than accept the collision; kept as a permanent regression guard." }
 ]

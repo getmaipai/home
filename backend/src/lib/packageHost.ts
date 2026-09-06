@@ -91,6 +91,19 @@ const HOME_ASSISTANT_RATE_LIMIT_KEY = "home_assistant";
 const HOME_ASSISTANT_RATE_LIMIT = { capacity: 10, refillPerSecond: 0.5 };
 const HOME_ASSISTANT_TIMEOUT_MS = 5_000;
 
+// The searxng integration's own settings (session-d-packages-and-store.md
+// step 7): a household-configured SearXNG instance, the same
+// household-configured-baseUrl shape (no SSRF guard, one shared rate
+// limit) Home Assistant already established above - see
+// backend/src/settings/searchKeys.ts's own header for why this is
+// bring-your-own-instance rather than a bundled sidecar. A longer
+// timeout than Home Assistant's: SearXNG fans a query out to several
+// real search engines and waits on the slowest one, not a single LAN
+// round-trip.
+const SEARXNG_RATE_LIMIT_KEY = "searxng";
+const SEARXNG_RATE_LIMIT = { capacity: 10, refillPerSecond: 0.5 };
+const SEARXNG_TIMEOUT_MS = 10_000;
+
 // The recipe schema's own comment on `home_call_service_step`
 // ("security domains are never covered by a wildcard target") named a
 // design requirement with nothing implementing it. `home:<domain>`
@@ -375,6 +388,100 @@ export async function homeAssistantGetState(args: unknown): Promise<unknown> {
   return getHomeAssistantState(baseUrl, accessToken, entityId);
 }
 
+/** The settings lookup and rate limit for `host.integration.call("searxng",
+ * "search", ...)` - the same "isn't set up yet" shape
+ * `requireHomeAssistantSettings()` established, one setting instead of
+ * two since SearXNG's default JSON API needs no credential. */
+function requireSearxngSettings(): { baseUrl: string } {
+  const baseUrl = getHouseholdSettingValue("search.searxng_url") as string | undefined;
+  if (!baseUrl) {
+    throw new HostError("invalid_input", "Web search isn't set up yet - add a SearXNG URL in Settings first");
+  }
+  if (!tryConsume(SEARXNG_RATE_LIMIT_KEY, SEARXNG_RATE_LIMIT)) {
+    throw new HostError("rate_limited", "Web search is rate-limited - try again shortly");
+  }
+  return { baseUrl };
+}
+
+interface SearxngResult {
+  title?: unknown;
+  url?: unknown;
+  content?: unknown;
+}
+
+/** Formats SearXNG's own `/search?format=json` response into a single
+ * readable string - a numbered list, title/url/snippet per result - not
+ * the raw JSON. The recipe language has no loop or array-map primitive
+ * (the same reason `recall`'s own step resolves its top matches into one
+ * ready-to-use string at the interpreter rather than binding a raw array
+ * for a `format` step that can't iterate it), so this does the identical
+ * "resolve the list-shaped result into a string at the source" move -
+ * ready for a `llm_complete` step to summarize into a real answer, or a
+ * `format` step to show as-is. Every field type-checked (not just
+ * existence) before use - the same gap class code review found in
+ * almanac-holiday/onthisday/music: a malformed entry is skipped, never
+ * interpolated as "undefined". */
+// A code review (2026-09-06) found no cap on a result's own title/
+// content length before it lands in an `llm_complete` prompt (websearch's
+// own recipe) - a misbehaving instance or a page with a huge meta-
+// description could otherwise splice hundreds of KB of arbitrary,
+// household-uncontrolled text into a single model call. Truncated, not
+// rejected: a long real title/snippet is still useful information, only
+// an implausibly long one is actually a problem.
+const SEARXNG_FIELD_MAX_CHARS = 300;
+
+function truncate(text: string, maxChars: number): string {
+  return text.length > maxChars ? `${text.slice(0, maxChars)}...` : text;
+}
+
+export function formatSearxngResults(data: unknown, count = 5): string {
+  const results = (data as { results?: unknown } | null)?.results;
+  if (!Array.isArray(results) || results.length === 0) {
+    return "No web search results were found.";
+  }
+  const lines: string[] = [];
+  let n = 0;
+  for (const raw of results) {
+    if (n >= count) break;
+    const result = raw as SearxngResult;
+    if (typeof result?.title !== "string" || typeof result?.url !== "string") continue;
+    n += 1;
+    const title = truncate(result.title, SEARXNG_FIELD_MAX_CHARS);
+    const snippet = typeof result.content === "string" && result.content.length > 0 ? ` - ${truncate(result.content, SEARXNG_FIELD_MAX_CHARS)}` : "";
+    lines.push(`${n}. ${title} (${result.url})${snippet}`);
+  }
+  return lines.length > 0 ? lines.join("\n") : "No web search results were found.";
+}
+
+/** `host.integration.call("searxng", "search", { query })`'s real
+ * implementation - SearXNG's own `/search?q=...&format=json` (its
+ * documented JSON output format, opt-in in a household's own
+ * settings.yml the same way a Home Assistant access token is opt-in on
+ * their side). Not yet verified against a real running SearXNG instance
+ * (backend/packages/websearch/README.md's own honest gap) - this
+ * environment has no Docker and no clean cross-platform way to stand one
+ * up, see backend/src/settings/searchKeys.ts's own header. */
+export async function searxngSearch(args: unknown): Promise<unknown> {
+  const query = (args as { query?: unknown } | undefined)?.query;
+  if (typeof query !== "string" || query.length === 0) {
+    throw new HostError("invalid_input", `searxng search needs a string "query" argument`);
+  }
+  const { baseUrl } = requireSearxngSettings();
+  const url = `${baseUrl.replace(/\/+$/, "")}/search?q=${encodeURIComponent(query)}&format=json`;
+  // No retry, unlike getHomeAssistantState's own GET - a code review
+  // (2026-09-06) found the retry doubled this call's own worst case to
+  // ~20s (SEARXNG_TIMEOUT_MS twice plus the retry delay) on top of
+  // `llm_complete`'s own real inference time, still ahead of it in the
+  // same recipe. A slow SearXNG round trip (it fans out to several real
+  // engines and waits on the slowest) is a real answer taking a while,
+  // not the transient blip a retry is meant to paper over the way a
+  // flaky LAN hop to Home Assistant is - retrying it just waits twice as
+  // long for the identical result.
+  const result = await attemptHttpFetch(url, "GET", {}, undefined, SEARXNG_TIMEOUT_MS);
+  if (result.ok) return formatSearxngResults(result.value);
+  throw result.error;
+}
+
 /** The settings lookup, rate limit, and real call shared by every real
  * caller of Home Assistant - createHost()'s own call_service (permission
  * and consequential already checked by then) and lib/commands.ts's
@@ -606,16 +713,20 @@ export function createHost(actor: PersonRow, manifest: PackageManifest, secrets:
       },
     },
     integration: {
-      // Home Assistant, the first integration reachable through this
-      // generic path (session-d-packages-and-store.md step 4) - a read
-      // (get_state) rather than home.call_service's own dedicated,
-      // domain-gated write path. Every other id/method combination stays
-      // capability_missing until a second integration is actually built;
-      // this is deliberately not a registry pattern for one entry.
+      // Home Assistant (session-d-packages-and-store.md step 4) and
+      // searxng (step 7, the websearch package's own case) are the two
+      // integrations reachable through this generic path today - two
+      // reads, neither with home.call_service's own dedicated,
+      // domain-gated write shape to reuse. Every other id/method
+      // combination stays capability_missing; this is deliberately not a
+      // registry pattern for two entries.
       async call(id: string, method: string, args?: unknown): Promise<unknown> {
         requirePermission(`integration:${id}`);
         if (id === "home_assistant" && method === "get_state") {
           return homeAssistantGetState(args);
+        }
+        if (id === "searxng" && method === "search") {
+          return searxngSearch(args);
         }
         notImplemented("integration.call");
       },

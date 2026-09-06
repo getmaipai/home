@@ -3,6 +3,7 @@ import { TestClient } from "./client";
 import { resetDb } from "./reset-db";
 import { __resetThrottleForTests } from "@/lib/secretThrottle";
 import { __resetLlmSupervisorForTests } from "@/lib/llmSupervisor";
+import { setHouseholdSettingValue } from "@/lib/settings";
 import { listPackageIds, loadPackage, registerAllPackageNotificationTypes, warmPackage } from "@/lib/plugins";
 
 beforeEach(() => {
@@ -161,6 +162,18 @@ describe("the bundled translate package", () => {
     if (!loaded.ok) return;
     expect(loaded.value.manifest.id).toBe("translate");
     expect(loaded.value.manifest.permissions).toEqual(["llm:complete"]);
+    expect(loaded.value.recipe.steps.length).toBeGreaterThan(0);
+  });
+});
+
+describe("the bundled websearch package", () => {
+  test("is discoverable and its manifest + recipe validate against spec's schemas", () => {
+    expect(listPackageIds()).toContain("websearch");
+    const loaded = loadPackage("websearch");
+    expect(loaded.ok).toBe(true);
+    if (!loaded.ok) return;
+    expect(loaded.value.manifest.id).toBe("websearch");
+    expect(loaded.value.manifest.permissions).toEqual(["integration:searxng", "llm:complete"]);
     expect(loaded.value.recipe.steps.length).toBeGreaterThan(0);
   });
 });
@@ -345,6 +358,44 @@ describe("POST /api/plugins/translate/run", () => {
     const body = (await res.json()) as { reply?: { text: string } };
     expect(body.reply?.text).toContain("hello world to spanish");
     expect(body.reply?.text).toContain("[stub model: no real model loaded, this is a canned reply]");
+  });
+});
+
+describe("POST /api/plugins/websearch/run", () => {
+  // A real local SearXNG stand-in (Bun.serve) plus the stub chat backend
+  // (no real engine configured in tests) - proves the real recipe chain
+  // end to end: integration.call("searxng", "search", ...) -> the real
+  // formatted-string binding -> llm_complete interpolating it into a
+  // prompt -> pick -> format. Not real search or answer quality (that
+  // needs a real SearXNG instance and a real model, see this package's
+  // own quality_scale.yaml).
+  test("runs the recipe end to end: integration.call through to llm_complete, stub chat backend", async () => {
+    const server = Bun.serve({
+      port: 0,
+      fetch: () =>
+        Response.json({
+          results: [{ title: "Mount Everest", url: "https://example.com/everest", content: "The tallest mountain above sea level." }],
+        }),
+    });
+    try {
+      setHouseholdSettingValue("search.searxng_url", `http://127.0.0.1:${server.port}`);
+      const client = await owner();
+      const res = await client.post("/api/plugins/websearch/run", { expression: "the tallest mountain" });
+      expect(res.status).toBe(200);
+      const body = (await res.json()) as { reply?: { text: string } };
+      expect(body.reply?.text).toContain("[stub model: no real model loaded, this is a canned reply]");
+      expect(body.reply?.text).toContain("Mount Everest");
+    } finally {
+      server.stop(true);
+    }
+  });
+
+  test("400s with a clear message when SearXNG isn't set up yet", async () => {
+    const client = await owner();
+    const res = await client.post("/api/plugins/websearch/run", { expression: "the tallest mountain" });
+    expect(res.status).toBe(400);
+    const body = (await res.json()) as { error?: string };
+    expect(body.error).toContain("isn't set up yet");
   });
 });
 

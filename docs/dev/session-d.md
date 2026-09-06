@@ -957,3 +957,219 @@ don't exist yet. The fuller CI feature set docs/PACKAGES.md eventually
 wants (a permission-diff PR comment, a vendoring scan, screenshot
 generation with vision review, the CLA check) is likewise deferred - a
 maintainer-review-plus-CLA merge gate is manual until then.
+
+## Step 7: the lookups
+
+The plan's own list, one package each unless noted: web search,
+conversions, math, news, sports, translation, music and media lookup,
+and the almanac. Every package here is Tier 0 or Tier 1, bronze-complete
+(README, CHANGELOG, quality_scale.yaml, 5+ routing examples, a smoke
+declaration), with routing-corpus rows appended to
+`spec/llm/routing-corpus.json` for C as they were built.
+
+**The almanac split into five packages** (`home-d@6a0133a`): the plan
+names one `almanac` package for date, time, holidays, moon phase, and
+on-this-day, but `deterministicArgs()` (`turnEngine.ts`, 4.5) can only
+ever bind ONE captured string to ONE required arg - a single package
+covering five distinct zero-argument lookups has no way to route "what
+time is it" to the time logic and "what phase is the moon in" to the
+moon logic from inside one recipe or handler. Found by direct testing
+against the real routing engine before committing to a design, not
+assumed. Split into `almanac-date`, `almanac-time`, `almanac-moon`
+(fixed a real off-by-one: `Math.floor` on the phase fraction had a
+systematic ~1.8-day lag, should have been `Math.round`),
+`almanac-holiday` (date.nager.at, hardcoded to US - no household-country
+setting exists yet, the same honest single-market scoping every
+network-dependent package in this step ended up needing somewhere),
+and `almanac-onthisday` (Wikipedia's own REST API). All five are Tier 1,
+zero required args, so they route on a literal `routing.patterns` phrase
+alone (`deterministicArgs`'s zero-required-args short circuit) - the
+same floor `loadAllManifests()`'s own bug (below) had been silently
+breaking for every Tier 1 package until this step. Also found: a real
+embedding false positive ("what's my son's name" scored ~0.68 against
+`almanac-date`'s first-draft routing examples) - revised the examples
+and added a permanent `must_not` regression row rather than trusting it
+wouldn't recur.
+
+**Two real, pre-existing production bugs, found by being the first
+packages to actually exercise the paths**: `turnEngine.ts`'s
+`loadAllManifests()` was calling the Tier-0-only `loadPackage()`, so a
+Tier 1 package's own `routing.patterns` never reached `route()` at all -
+every almanac package (and every other Tier 1 lookup this step built)
+would have been unroutable. Fixed to `loadManifestOnly()`, tier-agnostic,
+with the two stale "Tier 0 only" comments beside it corrected in the
+same commit. Separately, `compute`'s own `ComputeError` (spec/
+interpreters/{ts,py}/recipe-interpreter.ts) was being re-wrapped as a
+bare `Error` on the way out, erasing the type `lib/plugins.ts`'s
+`runPlugin()` needs to tell "a household member's bad input" apart from
+a real bug - found while building `math`, the first package to hand a
+turn's own free-typed text straight to `compute`. Fixed in both
+interpreters and `runPlugin()`, with permanent regression tests
+asserting the exact error message, not just its HostError-ness (a code
+review finding: the first version's assertion only checked that the
+input string round-tripped into the message, which would pass even if
+`evaluateExpression`'s own message text were garbled).
+
+**`math` and `convert`** (`home-d@8fad6ad`) both reuse `compute`'s
+restricted evaluator (step 4) - standard-notation arithmetic
+(`math`) and physical-unit conversion (`convert`, "5 miles to km" via
+mathjs's own `to`/`in` syntax), empirically verified before scoping
+either package's README rather than assumed. `math`'s first-draft
+`routing.patterns` (`solve *`, `evaluate *`) were dropped after code
+review: both are generic enough to collide with everyday non-math
+speech ("solve my marriage problems"), and a literal pattern match wins
+outright over the model with no fallback (`route()`'s own header
+comment) - narrower patterns lower the collision odds, they don't
+remove them, since a required-arg package can only ever route through a
+literal wildcard today. The identical collision class recurred twice
+more this step (`music`'s "who is the artist \*", `translate` needed no
+fix but was designed with it in mind from the start) - a real, standing
+architectural gap, not one package's bug, tracked for whoever eventually
+builds pattern-match-can-decline-and-fall-through.
+
+**`currency`** (`home-d@58ff10c`): `compute` has no currency units and
+can't safely gain any (`createUnit` is disabled there on purpose), so
+this is a real Tier 1 package with its own small parser
+(`parseCurrencyExpression`, a curated word table plus bare 3-letter ISO
+codes) and `api.frankfurter.dev` (frankfurter.app 301-redirected there
+mid-session - found by testing the literal URL from memory, not
+assumed). Routing note: `convert` already owns the literal `"convert *"`
+pattern and a tie goes to whichever package sorts first by id
+("convert" before "currency") - `currency` answers to `"exchange *"`
+instead, with a routing-corpus row proving "convert 5 dollars to euros"
+really does go to `convert` (and fail there) rather than silently
+starting to work if the pattern set ever changes underneath this
+decision.
+
+**`news`** (`home-d@8fad6ad`) and **`sports`** (`home-d@693bf75`): NPR's
+own public RSS feed (`feeds.npr.org`, hand-rolled `<item>`/`<title>`
+extraction, no XML library) and MLB's own public stats API
+(`statsapi.mlb.com`), both real, documented, key-free public services -
+"prefer the front door" satisfied by construction, not worked around.
+`sports` only reports a game whose `abstractGameState` is `Live` or
+`Final`; a scheduled-but-unplayed game is left out rather than shown as
+a false 0-0. Known, documented gaps rather than silent limitations:
+`news` ships one fixed feed where the plan wants "a household-chosen
+list" - a real per-household feed choice needs a settings key a Tier 1
+package's own sandboxed process can actually read, which no package has
+a way to do today; `sports` is MLB only, the same single-market call
+`almanac-holiday` already made for holidays, for the identical reason
+(no sport/team preference setting exists yet).
+
+**`music`** (`home-d@80122b7`): MusicBrainz's own public search API,
+artists only for v0.1.0 - the plan's fuller "music and media lookup"
+also wants movie/TV metadata via a TMDB-style API "with the user's own
+key where required," which needs a household-supplied secret a Tier 1
+package can actually read at runtime, the identical settings-access gap
+`news`'s own feed choice hit. First package to override `host.fetch`'s
+default User-Agent (`opts.headers`) per MusicBrainz's own API etiquette.
+Code review caught a second instance of the routing-collision class
+above: `"who is the artist *"` is generic enough (painters, other visual
+artists) to false-positive-route an unrelated question into a
+MusicBrainz lookup that either finds nothing or - worse - a wrong
+same-sounding band via MusicBrainz's own fuzzy relevance scoring.
+Dropped; `"who is the singer *"` (kept, more narrowly musical) and
+`"look up the artist *"` remain.
+
+**`translate` and the new `llm_complete` recipe step**
+(`home-d@0434201`): the plan's own "a local model through
+`host.llm.complete` first" - a real, previously-documented gap
+(`host.llm.complete` had been `capability_missing` in `packageHost.ts`
+since the `chat` role landed, because no recipe step had ever called
+it). Closed with a new Tier 0 primitive, `spec/schemas/recipe.schema.json`'s
+`llm_complete` step: one user-role message through `host.llm.complete`,
+binding the raw `{"text": string}` reply the same way `fetch`'s own
+`as` binds - a `pick` step reads `.text` out before `format`
+interpolates it, no new binding convention invented. Both interpreters
+(kept behaviorally identical per a new conformance fixture,
+`llm-complete-lookup.json`) and both host emulators updated in lockstep
+(`llm.complete` is now `Promise`-typed, matching `fetch`/
+`home.call_service`'s own async shape - the Python emulator's own
+`_LlmNamespace.complete` had to become `async def` too, since Python
+has no "await on a plain value is a no-op" leniency the way JS does).
+`packageHost.ts`'s real implementation calls `lib/llm.ts`'s own
+`complete("chat", messages)` directly; three docs that described the
+old gap as current (`spec/llm/README.md`, `lib/llm.ts`'s header, a
+stale comparison in `turnEngine.ts`) were found stale by code review in
+the same pass and corrected. `translate` itself hands the model the
+whole captured phrase (text plus target language, in whatever order a
+person says it) in one prompt asking it to identify both, rather than
+parsing them apart first - unlike `currency`'s own small parser, that
+split is exactly the fuzzy natural-language task a model suits and
+deterministic parsing doesn't.
+
+**`websearch` and the `searxng` integration** (`home-d@<pending>`): the
+plan calls for "SearXNG as a sidecar through F's `sidecars.ts`" - real
+research (not assumption) into a bundled, cross-platform, zero-dependency
+SearXNG the way `llama-server` is downloaded and pinned per-platform
+(the engine catalog's own precedent) found no clean path exists.
+SearXNG has no official prebuilt binary for any OS - only Docker, or a
+from-source install with real per-OS build dependencies, worse on
+Windows - and the one `searxng` package on PyPI is an unrelated
+third-party MCP wrapper by someone else, not the real project. Jesse's
+own call, given that research: bring-your-own-instance, not a bundled
+sidecar - `search.searxng_url` (`backend/src/settings/searchKeys.ts`,
+household scope, not secret, the same shape `home.base_url` already
+takes for Home Assistant) plus a second `host.integration.call` entry
+(`packageHost.ts`'s `searxngSearch`/`formatSearxngResults`, mirroring
+`homeAssistantGetState`'s own settings-lookup/rate-limit/real-call
+shape) reachable from a plain Tier 0 recipe: `integration.call` ->
+`llm_complete` (the household's own model turns raw results into a real
+answer) -> `pick` -> `format`. No sidecar registered with F's
+`lib/sidecars.ts` - there is nothing to auto-provision cross-platform
+today, so this doesn't claim to be one.
+
+A scraping fallback (`duck-duck-scrape`, npm's TypeScript-equivalent of
+Python's `ddgs`, since Tier 1 packages on the hub only run Deno) was
+seriously explored for the real cases Jesse raised - the robot offline,
+no SearXNG configured, the hub's own instance down - and rejected after
+being tested for real, not assumed to work or assumed to fail: both a
+direct request to DuckDuckGo's own HTML endpoint and the real
+`duck-duck-scrape` library's own request logic were bot-blocked on the
+very first call, cold, from a fresh IP (a CAPTCHA challenge, then "DDG
+detected an anomaly... you are likely making requests too quickly").
+This also reverses the plan's own "no keyless scraping of a search
+engine from the hub's address, ever" line's implicit assumption that
+the choice was purely a policy call - it's also, independently, a
+technique that does not currently work, evidenced live rather than
+argued. `websearch` stays SearXNG-only; unreachable or unconfigured
+reports the same honest "isn't set up yet" shape as Home Assistant.
+
+Code review found three real issues in this package before it shipped:
+a confirmed routing collision (`"look up * online"` also matched
+`music`'s own `"look up the artist *"`, and `music` wins the id-sorted
+tie - dropped, with a routing-corpus row guarding against re-adding
+it), a real prompt-injection surface (raw, household-uncontrolled
+SearXNG result text spliced into the `llm_complete` prompt with no
+delimiter or "treat as data" framing, reachable by `min_role: child`
+with no safety-classifier pass on `llm_complete`'s own output at all -
+`llm_complete` is new this step, and this is the first thing to
+surface that gap; hardened with explicit begin/end markers and a
+length cap per result field, real mitigation, not a guarantee absent a
+safety pass on this step's own output), and a doubled worst-case
+latency (`searxngSearch` retried its own GET the way
+`getHomeAssistantState` does, but a slow SearXNG round trip is a real
+answer taking a while, not the transient blip a retry is meant to
+paper over - dropped the retry).
+
+Step 7 is complete. Known, deferred gaps, each already recorded in its
+own package's CHANGELOG rather than only here: `news`'s single fixed
+feed (wants a household-chosen list), `music`'s artists-only scope
+(wants songs/albums and a TMDB-backed movie/TV lookup), `sports`'
+MLB-only scope (wants a sport/team preference), and `websearch`'s gold
+tier (wants a real running SearXNG instance to verify against - this
+dev environment has neither Docker nor a clean cross-platform way to
+stand one up). The first three share one real, unbuilt platform
+capability: a Tier 1 package's sandboxed process has no way to read a
+household setting or a household-supplied secret at runtime today -
+worth its own design pass before the next lookup package needs it
+rather than a fourth package inventing a fourth workaround. A fourth,
+cross-cutting gap `llm_complete` itself surfaces (found on `websearch`,
+but not specific to it): no `llm_complete` step's own output passes
+through the safety classifier a normal chat turn's streamed reply gets
+(`runTurn()`'s own mid-stream check) - `translate`'s input is entirely
+household-typed, low risk, but any future `llm_complete` caller that
+feeds it network-sourced content inherits the identical unguarded
+surface `websearch`'s own prompt-hardening only mitigates, not closes.
+Worth a real design pass (does every plugin reply need this, or only
+ones built from untrusted input) before a second such package ships.
