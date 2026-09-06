@@ -8356,6 +8356,494 @@
           }
         }
       }
+    },
+    "/api/store/installs/{id}": {
+      "get": {
+        "tags": [
+          "Store"
+        ],
+        "summary": "The active store install for a package, if any",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "weather"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "null if the package has no active store install (bundled-only, or never installed).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "nullable": true,
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "version": {
+                      "type": "string"
+                    },
+                    "previousVersion": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "channel": {
+                      "type": "string",
+                      "enum": [
+                        "stable",
+                        "beta"
+                      ]
+                    },
+                    "sourceCommit": {
+                      "type": "string"
+                    },
+                    "permissions": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "installedAt": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "version",
+                    "previousVersion",
+                    "channel",
+                    "sourceCommit",
+                    "permissions",
+                    "installedAt"
+                  ]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not owner/admin",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Store"
+        ],
+        "summary": "Install or update a package from a signed index",
+        "description": "Verifies the index and the package's own tarball hash, unpacks it, and runs its smoke test. An update that adds permissions beyond what's already installed is refused with requiresConfirmation until re-sent with confirmed: true.",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "weather"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "targetPath": {
+                    "type": "string",
+                    "example": "plugins/utilities/weather/0.1.0"
+                  },
+                  "source": {
+                    "anyOf": [
+                      {
+                        "type": "object",
+                        "properties": {
+                          "kind": {
+                            "type": "string",
+                            "enum": [
+                              "dir"
+                            ]
+                          },
+                          "dir": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "kind",
+                          "dir"
+                        ],
+                        "description": "A local directory holding root.json/targets.json/timestamp.json plus tarballs - dev and testing."
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "kind": {
+                            "type": "string",
+                            "enum": [
+                              "url"
+                            ]
+                          },
+                          "baseUrl": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "kind",
+                          "baseUrl"
+                        ],
+                        "description": "The base URL a published index's files sit under."
+                      }
+                    ]
+                  },
+                  "trust": {
+                    "type": "object",
+                    "properties": {
+                      "rootPublicKeysPem": {
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        },
+                        "minItems": 1
+                      },
+                      "rootThreshold": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "exclusiveMinimum": true
+                      }
+                    },
+                    "required": [
+                      "rootPublicKeysPem"
+                    ]
+                  },
+                  "confirmed": {
+                    "type": "boolean",
+                    "description": "Required to proceed when the update adds permissions beyond what's already installed."
+                  }
+                },
+                "required": [
+                  "targetPath",
+                  "source",
+                  "trust"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Installed (or updated); smokeOk says whether it's actually enabled.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "version": {
+                      "type": "string"
+                    },
+                    "previousVersion": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "smokeOk": {
+                      "type": "boolean"
+                    },
+                    "smokeMessage": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "version",
+                    "previousVersion",
+                    "smokeOk",
+                    "smokeMessage"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Verification failed (bad hash, unknown signer, expired or rolled-back index, manifest identity mismatch)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not owner/admin",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "This update adds permissions - re-send with confirmed: true to proceed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "requiresConfirmation": {
+                      "type": "object",
+                      "properties": {
+                        "newPermissions": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        }
+                      },
+                      "required": [
+                        "newPermissions"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "error",
+                    "requiresConfirmation"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/store/installs/{id}/rollback": {
+      "post": {
+        "tags": [
+          "Store"
+        ],
+        "summary": "Roll a store-installed package back to its previous version",
+        "description": "Single-step: rolls back to the immediately previous version, never a full history stack. Never re-downloads - the previous version's files are already on disk.",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "weather"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Rolled back.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "version": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "version"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "No previous version recorded, or the previous version's files are gone",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not owner/admin",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such active install",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/store/installs/{id}/uninstall": {
+      "post": {
+        "tags": [
+          "Store"
+        ],
+        "summary": "Remove a package's store install",
+        "description": "Falls back to the bundled copy if one exists. Removes only the store's own version files, never a Tier 1 package's separate persistent state.",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "weather"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Removed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    }
+                  },
+                  "required": [
+                    "ok"
+                  ]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not owner/admin",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No active store install to remove",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/store/installs/{id}/channel": {
+      "post": {
+        "tags": [
+          "Store"
+        ],
+        "summary": "Set a store-installed package's update channel",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "weather"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "channel": {
+                    "type": "string",
+                    "enum": [
+                      "stable",
+                      "beta"
+                    ]
+                  }
+                },
+                "required": [
+                  "channel"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Set.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    }
+                  },
+                  "required": [
+                    "ok"
+                  ]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not owner/admin",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No active store install to set a channel on",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   }
 }
