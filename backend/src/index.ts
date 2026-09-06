@@ -10,6 +10,8 @@ import { runAllSmokeTests } from "@/lib/smoke";
 import { startIdleSweep, registerDenoHostGracefulExit } from "@/lib/denoHost";
 import { hasHouseholdLeaf, getHouseholdLeafForServer, checkLeafExpiry, onLeafRenewed, registerRenewFixHandler } from "@/lib/householdCa";
 import { advertiseMdns } from "@/lib/mdns";
+import { startWyomingServer } from "@/lib/wyomingServer";
+import { websocket } from "hono/bun";
 
 const port = Number(process.env.PORT ?? 8787);
 
@@ -165,6 +167,13 @@ console.log(`MaiPai Home hub listening on ${initialTls ? "https" : "http"}://loc
 let server = Bun.serve({
   port,
   fetch: app.fetch,
+  // Session C step 5: routes/stt.ts's WS /api/stt/stream, hono/bun's own
+  // adapter (upgradeWebSocket() calls server.upgrade() internally; this
+  // handler is what actually processes the open/message/close lifecycle
+  // Bun's upgrade alone doesn't). Harmless to every other route: Bun
+  // only ever invokes it for a connection an upgradeWebSocket() call
+  // accepted, never for a plain HTTP request.
+  websocket,
   ...(initialTls ? { tls: initialTls } : {}),
 });
 
@@ -183,6 +192,31 @@ void advertiseMdns({ port, tls: initialTls !== null });
 // that produced it changed.
 onLeafRenewed((leaf) => {
   server.stop(true);
-  server = Bun.serve({ port, fetch: app.fetch, tls: { cert: leaf.certPem, key: leaf.keyPem } });
+  server = Bun.serve({ port, fetch: app.fetch, websocket, tls: { cert: leaf.certPem, key: leaf.keyPem } });
   void advertiseMdns({ port, tls: true });
+});
+
+// The Wyoming satellite server (session-c-brain-and-voice.md step 8): a
+// separate TCP listener, not routed through Bun.serve()/Hono at all -
+// Wyoming is a raw newline-delimited-JSON protocol on its own socket,
+// nothing like HTTP. No env-var convention exists yet for this hub's own
+// port choice (Wyoming itself doesn't mandate one; each real ecosystem
+// service - faster-whisper, piper, openwakeword - picks its own and gets
+// found by IP:port, mDNS, or manual config in Home Assistant), so
+// MAIPAI_WYOMING_PORT is this hub's own, defaulting to 10700 rather than
+// colliding with any of those well-known ones. Started unconditionally
+// at boot, same as the main HTTP server - lib/wyomingServer.ts's own
+// authentication gate (not "don't listen at all") is what keeps this
+// safe to have running by default, matching the plan's own "never open
+// on the LAN as admin" requirement.
+const wyomingServer = startWyomingServer(Number(process.env.MAIPAI_WYOMING_PORT ?? 10700));
+console.log(`MaiPai Home Wyoming satellite server listening on tcp://0.0.0.0:${wyomingServer.port}`);
+process.on("exit", () => wyomingServer.stop());
+process.on("SIGINT", () => {
+  wyomingServer.stop();
+  process.exit(0);
+});
+process.on("SIGTERM", () => {
+  wyomingServer.stop();
+  process.exit(0);
 });

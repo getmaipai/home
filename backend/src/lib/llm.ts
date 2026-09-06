@@ -13,8 +13,26 @@
 // wrong kind of code reuse, not real sharing.
 import { getChatClient } from "@/lib/llmSupervisor";
 import { getEmbedClient } from "@/lib/embedSupervisor";
+import { tryConsume } from "@/lib/rateLimiter";
 import { LlmClientError } from "@maipai/spec/llm/ts/client.js";
 import type { ChatRole, ChatCompletionRequest } from "@maipai/spec/llm/ts/types.js";
+
+// Session C step 0 (wave-2.md): a person every couple of seconds, burst
+// of a few - Session A's own per-person limit (its step 11) hadn't
+// landed on main when this session started. Lives here, the one module
+// both routes/turn.ts (via lib/turnEngine.ts) and routes/llm.ts already
+// sit above, rather than in either route file: a turn's own reply
+// generation goes through this identical model call, so a route-to-route
+// import (one HTTP handler reaching into another's module) would be the
+// wrong shape for what is really a shared policy on this port.
+export const PERSON_TURN_BUDGET = { capacity: 5, refillPerSecond: 0.5 };
+
+/** True (and consumes a token) if `personId` is still within budget;
+ * false if the caller should get back spec/errors/errors.json's
+ * "turn_rate_limited" instead. */
+export function personWithinTurnBudget(personId: string): boolean {
+  return tryConsume(`turn:${personId}`, PERSON_TURN_BUDGET);
+}
 
 export type LlmRole =
   | "chat"
@@ -51,13 +69,109 @@ export interface LlmCompleteOptions {
    * intelligence.md): passed straight through to client.chatComplete()
    * (already spreads its whole request object, so no other change is
    * needed here or in client.ts itself). The memory judge
-   * (lib/memoryJudge.ts) is the first real caller. */
+   * (lib/memoryJudge.ts) is the first real caller. Ignored (overridden)
+   * when `tools` is also set below - offering tools always wins. */
   response_format?: ChatCompletionRequest["response_format"];
+  /** Tier 2 native tool calling (step 2, session-c-brain-and-voice.md).
+   * Offering `tools` builds its OWN `response_format` grammar (a JSON
+   * array of `{tool, args}`, `args` shaped by the tool's own schema) -
+   * llama-server compiles any JSON Schema to GBNF, so the model's own
+   * tool-calling ability matters less than the grammar making its call
+   * valid by construction (docs/dev.md's own words on this). Capped at
+   * two calls per turn (turnEngine.ts's own pre-filter picks which
+   * candidates to offer at all) - two independent calls, never a
+   * chained pipeline. */
+  tools?: ToolSpec[];
+  /** "required" disallows an empty array (the model MUST propose
+   * something from `tools`); "auto" (the default) allows one, meaning
+   * "none of these fit, answer normally instead." */
+  tool_choice?: "auto" | "required";
+}
+
+/** One package (or, once D's `exposes.queries` lands, one typed query on
+ * a package) offered as a Tier 2 candidate. `args` is that candidate's
+ * own JSON Schema (manifest.args unchanged - the exact shape
+ * `runPlugin()` already validates against, reused here, not
+ * reinvented). */
+export interface ToolSpec {
+  id: string;
+  description: string;
+  args: unknown;
+}
+
+export interface ToolCall {
+  tool: string;
+  args: unknown;
+}
+
+/** A JSON array, one entry per proposed call, `args` constrained by
+ * WHICHEVER tool's schema `tool` names (a discriminated `oneOf`, not a
+ * single flat shape - each candidate's own `args` schema can differ
+ * completely, and llama-server's grammar compiler handles `oneOf` fine).
+ * `minItems: 0` under "auto" is what actually lets the model decline: an
+ * empty array is a valid, complete reply under this grammar, not an
+ * error. */
+function toolCallSchema(tools: readonly ToolSpec[], toolChoice: "auto" | "required"): Record<string, unknown> {
+  return {
+    type: "array",
+    minItems: toolChoice === "required" ? 1 : 0,
+    maxItems: 2,
+    items: {
+      oneOf: tools.map((t) => ({
+        type: "object",
+        additionalProperties: false,
+        required: ["tool", "args"],
+        properties: { tool: { const: t.id }, args: t.args },
+      })),
+    },
+  };
+}
+
+/** Never trusts the grammar blindly (llama.cpp's lazy grammars still let
+ * a malformed call through on recent Qwen builds, upstream issue 24807 -
+ * this step's own text names it): `undefined` means the reply didn't
+ * parse as SOME array of `{tool, args}` objects naming one of the
+ * offered ids at all - a caller treats that as "ask again," never as an
+ * empty (= "no tool needed") decision, and never runs anything from it.
+ * A tool's OWN `args` shape is deliberately NOT re-validated here -
+ * `runPlugin()` already does that with the real ajv-compiled schema
+ * (the exact mechanism `deterministicArgs()` can't reuse, and the one
+ * "verify every call... before acting" is really asking for); catching
+ * the same class of error twice, differently, would be the second,
+ * worse copy of that check, not real defense in depth. */
+function parseToolCalls(raw: string, tools: readonly ToolSpec[], toolChoice: "auto" | "required"): ToolCall[] | undefined {
+  const knownIds = new Set(tools.map((t) => t.id));
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    return undefined;
+  }
+  if (!Array.isArray(parsed) || parsed.length > 2) return undefined;
+  // A code review (2026-09-06) found this didn't re-check `required`'s
+  // own minItems:1 - the exact "don't trust the grammar blindly" gap
+  // this function's own header warns about, just for the other bound
+  // instead of the array-length ceiling: an empty array under
+  // `tool_choice: "required"` would have been accepted as a real "no
+  // tool needed" decision, which "required" specifically forbids.
+  if (parsed.length === 0 && toolChoice === "required") return undefined;
+  const calls: ToolCall[] = [];
+  for (const entry of parsed) {
+    if (!entry || typeof entry !== "object" || typeof (entry as { tool?: unknown }).tool !== "string") return undefined;
+    const tool = (entry as { tool: string }).tool;
+    if (!knownIds.has(tool)) return undefined;
+    calls.push({ tool, args: (entry as { args?: unknown }).args });
+  }
+  return calls;
 }
 
 export interface LlmCompleteValue {
   text: string;
   model: string;
+  /** Only set (even to `[]`) when `tools` was offered for this call -
+   * see parseToolCalls()'s own comment for what `undefined` vs `[]`
+   * means. */
+  tool_calls?: ToolCall[];
 }
 
 export type LlmOpResult =
@@ -113,18 +227,24 @@ export async function complete(
   }
 
   try {
-    const { thinking, ...rest } = opts;
+    const { thinking, tools, tool_choice, ...rest } = opts;
+    const response_format =
+      tools && tools.length > 0
+        ? { type: "json_schema" as const, json_schema: { name: "tool_calls", schema: toolCallSchema(tools, tool_choice ?? "auto") } }
+        : rest.response_format;
     const response = await client.chatComplete({
       model: "chat",
       messages,
       ...rest,
+      response_format,
       chat_template_kwargs: { enable_thinking: !!thinking },
     });
     const choice = response.choices[0];
     if (!choice) {
       return { ok: false, status: 503, code: "unavailable", error: "chat model returned no choices" };
     }
-    return { ok: true, value: { text: choice.message.content, model: response.model } };
+    const tool_calls = tools && tools.length > 0 ? parseToolCalls(choice.message.content, tools, tool_choice ?? "auto") : undefined;
+    return { ok: true, value: { text: choice.message.content, model: response.model, ...(tool_calls !== undefined ? { tool_calls } : {}) } };
   } catch (err) {
     const message = err instanceof LlmClientError ? err.message : (err as Error).message;
     return { ok: false, status: 503, code: "unavailable", error: `chat model unavailable: ${message}` };

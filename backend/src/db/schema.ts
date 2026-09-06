@@ -71,6 +71,36 @@ export const sessions = sqliteTable("sessions", {
   createdAt: text("created_at").notNull(),
 });
 
+// Session C step 8 (session-c-brain-and-voice.md): "authenticated by a
+// device token (F's deviceTokens.ts; a per-person API token setting
+// until it lands)" - F's real device-token table (session-f-platform-
+// and-trust.md step 6) does not exist yet, so this is the interim
+// mechanism `/v1/chat/completions` and the Wyoming satellite server both
+// authenticate against. Deliberately its own table, not a `secret: true`
+// settings value the way `voice.hf_token` is stored: a settings value
+// round-trips (it can be decrypted and shown back), which is exactly
+// wrong for a bearer credential - this follows `sessions`' own shape
+// instead (a one-way SHA-256 hash, never the raw token, verified the
+// same way lib/session.ts's hashSessionToken() already is), the org's
+// own "one-way secrets are hashed... never encrypted" rule applied to a
+// long-lived API token instead of a short PIN. One token per person at a
+// time (generating a new one replaces the old, `tokenHash` unique) -
+// simpler than a list, and matches the plan's own singular "a per-person
+// API token." `expiresAt` follows lib/deviceTokens.ts's own year-long TTL
+// (CLAUDE.md: "every stored credential has a status, an expiry, and a
+// one-click revoke" - a leaked bearer token with no expiry never dies on
+// its own, matching that rule was a code-review finding on this table's
+// first version, fixed here rather than deferred).
+export const personApiTokens = sqliteTable("person_api_tokens", {
+  personId: text("person_id")
+    .primaryKey()
+    .references(() => people.id),
+  tokenHash: text("token_hash").notNull().unique(),
+  createdAt: text("created_at").notNull(),
+  expiresAt: text("expires_at").notNull(),
+  lastUsedAt: text("last_used_at"),
+});
+
 // Backs the spec's {prefix}{seq}-{device6} id shape (3.1) for
 // memory/entity/episode records: one monotonic counter per record_kind.
 // See lib/id.ts.
@@ -214,6 +244,18 @@ export const conversations = sqliteTable(
     summary: text("summary"),
     summaryThroughTurn: text("summary_through_turn"),
     source: text("source").notNull().default("hub"), // hub|local
+    // Session C step 2: JSON-encoded PendingAsk (turnEngine.ts) or null.
+    // Set either by a Tier 2 tool proposal naming a `consequential`
+    // package (waiting on the person's yes/no) or by a recipe result's
+    // own `ask`/`confirm` field (spec/schemas/result.schema.json - typed
+    // there since step 6, session-a-intelligence.md, but no recipe
+    // interpreter step can SET either field yet: spec/interpreters/**
+    // is Session D's file, so this consumption path is real and tested
+    // against a hand-built PluginResult, genuinely unreachable by any
+    // bundled package until D adds the op). Matched against the NEXT
+    // utterance, before the floor, then cleared either way - never left
+    // open past one turn.
+    pendingAsk: text("pending_ask"),
     hlc: text("hlc").notNull(),
     createdAt: text("created_at").notNull(),
     updatedAt: text("updated_at").notNull(),
@@ -247,7 +289,7 @@ export const conversationTurns = sqliteTable(
     conversationId: text("conversation_id").references(() => conversations.id),
     userText: text("user_text").notNull(),
     replyText: text("reply_text").notNull(),
-    source: text("source").notNull(), // "safety_refuse" | "plugin" | "plugin_error" | "command" | "command_error" | "model"
+    source: text("source").notNull(), // "safety_refuse" | "plugin" | "plugin_error" | "command" | "command_error" | "model" | "confirm"
     pluginId: text("plugin_id"),
     commandId: text("command_id"),
     safetyFlagged: integer("safety_flagged", { mode: "boolean" }).notNull().default(false),
@@ -269,6 +311,15 @@ export const conversationTurns = sqliteTable(
     // seem to parse.
     judgeStatus: text("judge_status"),
     judgeAttempts: integer("judge_attempts").notNull().default(0),
+    // Session C step 1: null for every non-plugin turn (a command, the
+    // model, a safety refusal). "pattern"/"embedding"/"keyword" for a
+    // plugin turn - which tier of route()'s decision actually fired it,
+    // and its own score (1.0 for a pattern; the real cosine or the
+    // keyword-overlap fallback score otherwise) - lib/conversationHistory.ts's
+    // routingStats() aggregates these; RoutingStatsSection.tsx (Session E's
+    // file) doesn't render them yet, a noted frontend follow-up.
+    routingTier: text("routing_tier"),
+    routingScore: real("routing_score"),
     // Step 10: not a spec-shaped record itself (conversation_turns stays
     // hub-internal, see the table's own header above), but the plan's
     // own text still asks for it here so a synced conversation's
@@ -666,3 +717,28 @@ export const approvals = sqliteTable("approvals", {
   decidedAt: text("decided_at"),
   createdAt: text("created_at").notNull(),
 });
+
+// Session C (brain and voice), step 1. Tier 1 routing's real embedding
+// store, the routing-specific twin of `memoryEmbeddings` above (same
+// buffer shape, `space`/`dims`/`vector`/`hlc`). Keyed by
+// (package_id, example_hash, space) rather than a single-column primary
+// key: a package has several `routing.examples` entries, not one, and
+// the composite key is what makes "a changed example re-embeds, an
+// unchanged one is a pure lookup" possible - lib/routing.ts hashes each
+// example's text and only calls `llm.embed` for hashes not already
+// here. No foreign key to a packages table: packages are files on disk
+// (lib/plugins.ts's `listPackageIds()`), never a DB row, the same
+// reason `manifest.json` itself is never mirrored into SQLite.
+export const routingEmbeddings = sqliteTable(
+  "routing_embeddings",
+  {
+    packageId: text("package_id").notNull(),
+    exampleHash: text("example_hash").notNull(),
+    space: text("space").notNull(),
+    example: text("example").notNull(),
+    dims: integer("dims").notNull(),
+    vector: blob("vector", { mode: "buffer" }).notNull(),
+    hlc: text("hlc").notNull(),
+  },
+  (table) => [primaryKey({ columns: [table.packageId, table.exampleHash, table.space] })],
+);

@@ -1908,6 +1908,184 @@
         }
       }
     },
+    "/api/memory/import/legacy": {
+      "post": {
+        "tags": [
+          "Memory"
+        ],
+        "summary": "Import people, memories, and chat history from a legacy hub database",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "db_path": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "Absolute path to the legacy app.db file on this same machine.",
+                    "example": "/data/legacy/app.db"
+                  },
+                  "dry_run": {
+                    "type": "boolean",
+                    "description": "Default true. A real import (false) additionally refuses without at least one backup already on file."
+                  }
+                },
+                "required": [
+                  "db_path"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Dry run or real import result.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "dryRun": {
+                      "type": "boolean"
+                    },
+                    "people": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "legacyId": {
+                            "type": "string"
+                          },
+                          "displayName": {
+                            "type": "string"
+                          },
+                          "outcome": {
+                            "type": "string",
+                            "enum": [
+                              "matched_existing",
+                              "created",
+                              "skipped_needs_parent_pick"
+                            ]
+                          },
+                          "personId": {
+                            "type": "string",
+                            "nullable": true
+                          }
+                        },
+                        "required": [
+                          "legacyId",
+                          "displayName",
+                          "outcome",
+                          "personId"
+                        ]
+                      }
+                    },
+                    "counts": {
+                      "type": "object",
+                      "properties": {
+                        "peopleMatched": {
+                          "type": "number"
+                        },
+                        "peopleCreated": {
+                          "type": "number"
+                        },
+                        "peopleSkippedMinor": {
+                          "type": "number"
+                        },
+                        "memoriesImported": {
+                          "type": "number"
+                        },
+                        "memoriesAlreadyPresent": {
+                          "type": "number"
+                        },
+                        "memoriesSkippedNoPerson": {
+                          "type": "number"
+                        },
+                        "conversationsImported": {
+                          "type": "number"
+                        },
+                        "conversationsAlreadyPresent": {
+                          "type": "number"
+                        },
+                        "conversationsSkippedNoPerson": {
+                          "type": "number"
+                        },
+                        "turnsImported": {
+                          "type": "number"
+                        },
+                        "turnsAlreadyPresent": {
+                          "type": "number"
+                        },
+                        "turnsSkippedSystemMessages": {
+                          "type": "number"
+                        }
+                      },
+                      "required": [
+                        "peopleMatched",
+                        "peopleCreated",
+                        "peopleSkippedMinor",
+                        "memoriesImported",
+                        "memoriesAlreadyPresent",
+                        "memoriesSkippedNoPerson",
+                        "conversationsImported",
+                        "conversationsAlreadyPresent",
+                        "conversationsSkippedNoPerson",
+                        "turnsImported",
+                        "turnsAlreadyPresent",
+                        "turnsSkippedSystemMessages"
+                      ]
+                    },
+                    "errors": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    }
+                  },
+                  "required": [
+                    "dryRun",
+                    "people",
+                    "counts",
+                    "errors"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad db_path, or a real import with no backup on file",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not owner",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/settings/registry": {
       "get": {
         "tags": [
@@ -2381,6 +2559,83 @@
           },
           "403": {
             "description": "Not allowed to write this scope",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/settings/api-token": {
+      "post": {
+        "tags": [
+          "Settings"
+        ],
+        "summary": "Generate a new API token for the signed-in person, replacing any existing one",
+        "responses": {
+          "200": {
+            "description": "The raw token - shown exactly once. It cannot be retrieved again; generate a new one to rotate.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "token": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "token"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Settings"
+        ],
+        "summary": "Revoke the signed-in person's API token, if one exists",
+        "responses": {
+          "200": {
+            "description": "Revoked (or there was none).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    }
+                  },
+                  "required": [
+                    "success"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
             "content": {
               "application/json": {
                 "schema": {

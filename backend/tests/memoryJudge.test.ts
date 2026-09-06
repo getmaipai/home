@@ -126,6 +126,36 @@ describe("judgeTurn() - extraction and provenance", () => {
     expect(row.text).not.toContain("the user");
   });
 
+  // Session C step 9 (session-c-brain-and-voice.md): "the judge writes
+  // Entity records... until [F's real entities table] lands, the judge
+  // writes record_kind: entity memory records."
+  test("an entity-shaped category (person/place/thing) is written as record_kind entity, not a plain memory", async () => {
+    const { actor } = await owner();
+    const turn = makeTurn(actor, "by the way Riff is our dog", "Got it, Riff is the dog.");
+
+    await withScriptedJudge(
+      () => ({ facts: [{ text: "Riff is the family dog", category: "thing", scope: "household", importance: 0.6 }] }),
+      () => judgeTurn(turn),
+    );
+
+    const row = db.select().from(memoryRecords).get()!;
+    expect(row.recordKind).toBe("entity");
+    expect(row.text).toBe("Riff is the family dog");
+  });
+
+  test("a non-entity category (preference, relationship, ...) is still written as a plain memory record", async () => {
+    const { actor } = await owner();
+    const turn = makeTurn(actor, "I hate cilantro", "Noted.");
+
+    await withScriptedJudge(
+      () => ({ facts: [{ text: "Marlow dislikes cilantro", category: "preference", scope: "person", importance: 0.7 }] }),
+      () => judgeTurn(turn),
+    );
+
+    const row = db.select().from(memoryRecords).get()!;
+    expect(row.recordKind).toBe("memory");
+  });
+
   test("question rule: an empty extraction is a valid, non-failing answer - nothing written, no notification, turn marked done", async () => {
     const { actor } = await owner();
     const turn = makeTurn(actor, "How long until bacteria grows on meat left out?", "A few hours at room temperature.");
@@ -284,6 +314,70 @@ describe("judgeTurn() - dedupe by supersede", () => {
 
     const matches = similarByVector(actor, new Float32Array([1, 0, 0, 0]), { scope: "person", person: actor.id });
     expect(matches.map((m) => m.record.id)).not.toContain(profile.value.id);
+  });
+
+  // Session C step 9's own code review: excluding EVERY entity record
+  // unconditionally (the fix two tests above prove) also blocked an
+  // entity-shaped fact from ever deduping against an EXISTING entity of
+  // the SAME kind - a household mentioning "Riff is our dog" twice would
+  // get two permanent, un-mergeable entity records instead of one.
+  // `candidateRecordKind` narrows the exclusion to only ever apply when
+  // the NEW fact is a plain one, never entity-to-entity.
+  test("similarByVector() DOES surface an existing entity record when the new fact is itself entity-shaped", async () => {
+    const { actor } = await owner();
+    const entity = remember(actor, {
+      record_kind: "entity",
+      text: "Riff is the family dog",
+      category: "thing",
+      tier: "durable",
+      scope: "household",
+      source: "test",
+      importance: 0.6,
+    });
+    if (!entity.ok) throw new Error("setup failed");
+    const { sqlite } = await import("@/db");
+    sqlite
+      .query("INSERT INTO memory_embeddings (memory_id, space, dims, vector, hlc) VALUES (?, 'test', 4, ?, 'test-hlc')")
+      .run(entity.value.id, Buffer.from(new Float32Array([1, 0, 0, 0]).buffer));
+
+    const asEntity = similarByVector(actor, new Float32Array([1, 0, 0, 0]), { scope: "household" }, "entity");
+    expect(asEntity.map((m) => m.record.id)).toContain(entity.value.id);
+
+    // The original protection still holds: a PLAIN fact's own dedupe
+    // search still never selects an entity record as a candidate.
+    const asPlain = similarByVector(actor, new Float32Array([1, 0, 0, 0]), { scope: "household" }, "memory");
+    expect(asPlain.map((m) => m.record.id)).not.toContain(entity.value.id);
+  });
+
+  test("a second mention of the same entity SUPERSEDEs the first, rather than creating a permanent duplicate", async () => {
+    const { actor } = await owner();
+    const firstTurn = makeTurn(actor, "by the way Riff is our dog", "Got it.");
+    await withScriptedJudge(
+      () => ({ facts: [{ text: "Riff is the family dog", category: "thing", scope: "household", importance: 0.6 }] }),
+      () => judgeTurn(firstTurn),
+    );
+    expect(db.select().from(memoryRecords).all().length).toBe(1);
+    const firstEntityId = db.select().from(memoryRecords).get()!.id;
+
+    const secondTurn = makeTurn(actor, "Riff is getting older now", "Noted.");
+    await withScriptedJudge(
+      (schemaName) => {
+        if (schemaName === "memory_dedupe") return { action: "SUPERSEDE", id: firstEntityId, merged_text: "Riff is the family dog, now getting older" };
+        // Kept close in wording to the first mention (shares "Riff",
+        // "family", "dog") so the stub embedder's crude bag-of-words
+        // cosine actually clears DEDUPE_MIN_COSINE and similarByVector()
+        // surfaces a real candidate for decideDedupe() to act on -
+        // this test is about the SUPERSEDE path itself, not about
+        // proving semantic similarity across very different phrasings.
+        return { facts: [{ text: "Riff the family dog is getting older", category: "thing", scope: "household", importance: 0.6 }] };
+      },
+      () => judgeTurn(secondTurn),
+    );
+
+    const active = db.select().from(memoryRecords).where(eq(memoryRecords.status, "active")).all();
+    expect(active.length).toBe(1);
+    expect(active[0]!.recordKind).toBe("entity");
+    expect(active[0]!.text).toContain("getting older");
   });
 });
 

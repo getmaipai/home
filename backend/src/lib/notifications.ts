@@ -33,11 +33,10 @@ import { notificationDeliveries, people } from "@/db/schema";
 import { newNotificationId } from "@/lib/id";
 import { getSettingValueForPerson } from "@/lib/settings";
 import { sendTelegramMessage } from "@/lib/telegramChannel";
-import { isMinorRole } from "@/lib/safety";
+import { speakerAgeBand } from "@/lib/ageBand";
 import { listActivePeople } from "@/lib/access";
 import { getNotificationType, type NotificationChannel, type NotificationType } from "@/lib/notificationTypes";
 import type { PersonRow } from "@/types";
-import type { Role } from "@/middleware/auth";
 
 function renderTemplate(template: string, vars: Record<string, string>): string {
   return template.replace(/\{(\w+)\}/g, (match, name: string) => vars[name] ?? match);
@@ -51,7 +50,19 @@ function resolveRecipients(type: NotificationType, personId?: string): PersonRow
   }
   const everyone = listActivePeople();
   if (type.audience === "household") return everyone;
-  return everyone.filter((p) => !isMinorRole(p.role as Role)); // "adults"
+  // Session C step 7 (session-c-brain-and-voice.md): a code review found
+  // this used to share isMinorRole(role) with evaluateSafety()'s own
+  // pre-step-7 check, so the two always agreed by construction. Now that
+  // evaluateSafety() reads the real birthdate-derived band, a role-only
+  // check here can DIVERGE from it - a minor mislabeled with an "adult"
+  // role would be excluded from evaluateSafety()'s minor protections but
+  // still counted as an eligible "adults" recipient, which for
+  // safety.flagged_turn specifically means a minor could receive their
+  // OWN (or a sibling's) flagged-turn notification, exactly the leak
+  // notify_parent exists to prevent. The same band computation closes it
+  // here too.
+  const now = new Date();
+  return everyone.filter((p) => speakerAgeBand(p, now) === "adult"); // "adults"
 }
 
 /** Which channels actually fire for one recipient. `in_app` always does

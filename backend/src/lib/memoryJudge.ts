@@ -96,7 +96,12 @@ const CATEGORY_VALUES = [
   "fact",
   "state",
 ] as const;
-type Category = (typeof CATEGORY_VALUES)[number];
+// Exported alongside categoryToRecordKind (step 10) for the same reason:
+// lib/legacyImport.ts validates a legacy `memories.category` value
+// against this exact list rather than re-declaring it, since the legacy
+// enum and this one are the identical 11 values (confirmed against
+// home-legacy.git's own schema.ts).
+export type Category = (typeof CATEGORY_VALUES)[number];
 
 // Durable vs episodic is derived from category here, not asked of the
 // model (the plan's own schema for step 6 has no `tier` field at all -
@@ -108,6 +113,33 @@ type Category = (typeof CATEGORY_VALUES)[number];
 function categoryToTier(category: Category): "durable" | "episodic" {
   const durable: Category[] = ["identity", "relationship", "person", "preference"];
   return durable.includes(category) ? "durable" : "episodic";
+}
+
+// Session C step 9 (session-c-brain-and-voice.md): "the judge writes
+// Entity records... until [F's real entities table] lands, the judge
+// writes record_kind: entity memory records... and the switch is a
+// one-line change" - this is that one line, mapping the extractor's own
+// "person"/"place"/"thing" categories (the entity-shaped ones,
+// unchanged since this step's extraction schema already had them) onto
+// record_kind "entity" instead of the plain "memory" every other
+// category still gets. A real, if narrower, gap not closed here: an
+// entity record's own recall boost (memory.ts's entityNameWords()) reads
+// the record's `text` as "Name: description," but this extraction
+// schema has no separate name field to build that shape from - a
+// judge-written entity record here is real and correctly KINDED, just
+// not yet formatted for that specific boost to fire on it. Widening the
+// schema to ask for a name too is real, deferred work (the plan's own
+// "the schema is tiny on purpose" instinct from step 6 argues against
+// growing it without a concrete need proven first), not silently
+// dropped.
+// Exported (step 10, session-c-brain-and-voice.md) so lib/legacyImport.ts
+// can kind a legacy `memories` row the identical way a judge-extracted
+// fact of the same category already is - one definition, reused by both
+// writers of a memory_records row, rather than a second copy of this
+// three-line map living in the importer.
+export function categoryToRecordKind(category: Category): "memory" | "entity" {
+  const entityShaped: Category[] = ["person", "place", "thing"];
+  return entityShaped.includes(category) ? "entity" : "memory";
 }
 
 const EXTRACTION_SCHEMA = {
@@ -189,7 +221,7 @@ interface ExtractedFact {
   valid_to: string | null;
 }
 
-function isCategory(value: unknown): value is Category {
+export function isCategory(value: unknown): value is Category {
   return typeof value === "string" && (CATEGORY_VALUES as readonly string[]).includes(value);
 }
 
@@ -353,7 +385,14 @@ export async function judgeTurn(turn: ConversationTurnRow): Promise<JudgeTurnRes
   for (const fact of facts) {
     const embedded = await embed([fact.text]);
     const vector = embedded.ok ? new Float32Array(embedded.value.vectors[0]!) : undefined;
-    const candidates = vector ? similarByVector(speaker, vector, fact.scope === "person" ? { scope: "person", person: speaker.id } : { scope: "household" }) : [];
+    const candidates = vector
+      ? similarByVector(
+          speaker,
+          vector,
+          fact.scope === "person" ? { scope: "person", person: speaker.id } : { scope: "household" },
+          categoryToRecordKind(fact.category),
+        )
+      : [];
     const decision = await decideDedupe(fact.text, candidates);
 
     if (decision.action === "SUPERSEDE" && decision.id) {
@@ -391,6 +430,7 @@ export async function judgeTurn(turn: ConversationTurnRow): Promise<JudgeTurnRes
     } else {
       const result = remember(speaker, {
         text: fact.text,
+        record_kind: categoryToRecordKind(fact.category),
         category: fact.category,
         tier: categoryToTier(fact.category),
         scope: fact.scope,

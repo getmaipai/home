@@ -82,5 +82,12 @@
     "spoken_fallback": "Something went wrong on my end.",
     "ui_message": "Something went wrong. Try again, or check Repairs.",
     "retriable": true
+  },
+  {
+    "code": "turn_rate_limited",
+    "message": "Session C: the per-person token bucket on POST /api/turn, /api/turn/stream and /api/llm/* (wave-2.md's step 0) has no capacity left for this person.",
+    "spoken_fallback": "Let's slow down for a second before the next one.",
+    "ui_message": "Give it a moment before sending another message.",
+    "retriable": true
   }
 ]

@@ -1,0 +1,15 @@
+{
+  "band": "teen",
+  "dials": {
+    "profanity": "mild",
+    "sexual": "off",
+    "violence": "moderate",
+    "substances": "off",
+    "crime": "off",
+    "hate": "off",
+    "self_harm": "off",
+    "privacy": "public"
+  },
+  "floor": ["harmful_request", "credible_threat", "csam", "grooming", "pii_extraction", "prompt_injection", "jailbreak"],
+  "hlc": "1757073600000:0:a1b2c3"
+}

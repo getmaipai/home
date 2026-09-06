@@ -3,6 +3,7 @@ import { apiRouter, errorResponses } from "@/lib/openapi";
 import { requireAuth } from "@/middleware/auth";
 import { listValues, setValue, resetValue } from "@/lib/settings";
 import { getRegistry } from "@/lib/settingsRegistry";
+import { issueApiToken, revokeApiToken } from "@/lib/apiToken";
 import { SettingsKey } from "@maipai/spec/gen/ts/settings-key.js";
 
 export const settingsRoutes = apiRouter();
@@ -132,4 +133,50 @@ settingsRoutes.openapi(resetRoute, (c) => {
     return result.status === 400 ? c.json({ error: result.error }, 400) : c.json({ error: result.error }, 403);
   }
   return c.json({ ...result.value, success: true as const }, 200);
+});
+
+// Session C step 8 (session-c-brain-and-voice.md): the interim per-person
+// API token (lib/apiToken.ts's own header has the full reasoning) that
+// authenticates POST /v1/chat/completions and the Wyoming satellite
+// server until F's real device tokens (session-f-platform-and-trust.md
+// step 6) land. Not modeled as a settings key despite the plan's own
+// "API token setting" phrasing: a settings value round-trips (readable
+// back through GET), which is exactly wrong for a bearer credential -
+// this generates and returns the raw token EXACTLY ONCE, the same
+// personal-access-token UX every service with this kind of credential
+// uses, and never again after that.
+const apiTokenGenerateRoute = createRoute({
+  method: "post",
+  path: "/api-token",
+  tags: ["Settings"],
+  summary: "Generate a new API token for the signed-in person, replacing any existing one",
+  middleware: [requireAuth] as const,
+  responses: {
+    200: {
+      content: { "application/json": { schema: z.object({ token: z.string() }) } },
+      description: "The raw token - shown exactly once. It cannot be retrieved again; generate a new one to rotate.",
+    },
+    ...errorResponses({ 401: "Not signed in" }),
+  },
+});
+settingsRoutes.openapi(apiTokenGenerateRoute, (c) => {
+  const actor = c.get("person");
+  return c.json({ token: issueApiToken(actor.id) }, 200);
+});
+
+const apiTokenRevokeRoute = createRoute({
+  method: "delete",
+  path: "/api-token",
+  tags: ["Settings"],
+  summary: "Revoke the signed-in person's API token, if one exists",
+  middleware: [requireAuth] as const,
+  responses: {
+    200: { content: { "application/json": { schema: z.object({ success: z.literal(true) }) } }, description: "Revoked (or there was none)." },
+    ...errorResponses({ 401: "Not signed in" }),
+  },
+});
+settingsRoutes.openapi(apiTokenRevokeRoute, (c) => {
+  const actor = c.get("person");
+  revokeApiToken(actor.id);
+  return c.json({ success: true as const }, 200);
 });

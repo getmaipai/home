@@ -1,25 +1,33 @@
 import { checkSafety } from "@maipai/spec/safety/ts/classifier.js";
 import type { SafetyResult } from "@maipai/spec/gen/ts/safety-result.js";
-import type { Role } from "@/middleware/auth";
+import type { AgeBand } from "@/lib/ageBand";
 
-// 4.2's two minor bands map onto 4.3's "minor speaker" context. Age-band
-// derivation from birthdate doesn't exist yet (deferred, see
-// docs/dev.md), so role is the proxy available today; a robot-local guest
-// profile could in principle be a child with no way to know that yet,
-// which is a documented gap until age_range lands.
-const MINOR_ROLES: ReadonlySet<Role> = new Set(["teen", "child"]);
-
-export function isMinorRole(role: Role): boolean {
-  return MINOR_ROLES.has(role);
+// Session C step 7 (session-c-brain-and-voice.md): evaluateSafety() below
+// used to derive its own `isMinor` boolean straight from `actor.role`
+// (a MINOR_ROLES set, since removed) - a real, less accurate proxy than
+// the birthdate-derived AgeBand turnEngine.ts's own prompt already
+// computes for the identical actor on the identical turn ("the safety
+// layer reads the ceiling through the band instead of the role proxy").
+// A code review found notifications.ts's own "adults" audience filter
+// used the same role proxy this file's old isMinorRole() exported - the
+// two agreed by construction while both used role, but would have
+// silently diverged the moment only this file switched to band, so that
+// filter now shares this same AgeBand computation too
+// (lib/notifications.ts's resolveRecipients()). isMinorRole()/MINOR_ROLES
+// had no other caller left, so they're removed rather than kept as
+// exported dead code.
+function isMinorBand(band: AgeBand): boolean {
+  return band !== "adult";
 }
 
-// The turn engine (4.5) doesn't exist yet, so nothing calls this on a real
-// conversation turn today. This is exercised directly (routes/safety.ts,
-// tests/safety.test.ts) so the wiring is proven ahead of having a turn to
-// hook it into, the same way the recipe interpreters were proven against
-// fixtures before any package called them.
-export function evaluateSafety(text: string, speakerRole: Role): SafetyResult {
-  const result = checkSafety(text, { isMinor: isMinorRole(speakerRole) });
+/** The one, real caller in a running conversation turn (turnEngine.ts's
+ * prepareTurn(), runTurn(), and runTurnStream()'s gateOutputSafety() all
+ * pass the actor's real AgeBand, computed once via lib/ageBand.ts's
+ * speakerAgeBand()) - also exercised directly (routes/safety.ts,
+ * tests/safety.test.ts) so the wiring is proven independent of any one
+ * turn-engine caller. */
+export function evaluateSafety(text: string, speakerBand: AgeBand): SafetyResult {
+  const result = checkSafety(text, { isMinor: isMinorBand(speakerBand) });
   if (result.flagged) {
     // 4.3: "logged with the fact, never the transcript." No structured
     // host.log exists yet (that's 4.9's package host); this is a

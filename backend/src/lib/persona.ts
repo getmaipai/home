@@ -157,6 +157,34 @@ export const INFORMATION_HANDLING_POLICY = [
   "Never say the same thing the same way twice: vary how you open a reply and how you phrase something you've already said earlier in the conversation.",
 ].join(" ");
 
+// Step 4 (session-c-brain-and-voice.md): "the before/after framing
+// examples... joining the stable prefix." spec/llm/naturalness-corpus.json
+// holds the fuller set (rounding, hedged forecasts, flat corrections,
+// tiny acknowledgments, brief "I don't know"s) that `scripts/bench/
+// naturalness.ts` scores a model and prompt against; these three are the
+// ones the plan names by name (time, yes/no, a list), kept in prose here
+// rather than loaded from that JSON at runtime for the same reason every
+// other prompt fragment in this file is hand-written prose, not a data
+// file read at request time - a system prompt fragment is product
+// copy, reviewed and versioned like any other, not configuration.
+// Universal like INFORMATION_HANDLING_POLICY above: how something is
+// said varies by persona, but never saying a clock time or a list back
+// like a machine read them off a screen doesn't.
+//
+// Provisional, not permanent, unlike INFORMATION_HANDLING_POLICY next to
+// it: this step's own activation-steering spike (docs/BACKLOG.md,
+// docs/dev/session-c.md's step 4 entry) found a trained control vector
+// costs meaningfully fewer tokens than paragraph prose for exactly this
+// kind of register instruction, and org principle 6 names "a paragraph
+// of personality prose instead of activation steering" as the pattern to
+// avoid. The spike wasn't a clear enough win to act on yet (its own
+// training data didn't isolate naturalness specifically), so this stays
+// prose for now - but a future pass replacing it with a vector should
+// look here first, not treat this as settled the way the rules above it
+// are.
+export const NATURALNESS_POLICY =
+  'Say things the way a person talking out loud would, not the way a screen would print them: a time is "it\'s three forty-five," never "the current time is 3:45 PM"; a yes/no question gets "yep" or "nope," never "the answer to your question is yes"; a short list gets said as a sentence ("you\'ve got milk, eggs, and bread"), never read back with "the following items:" or bullet points.';
+
 const FORMALITY_FRAGMENT: Record<Persona["formality"], string> = {
   casual:
     "Talk the way a person actually talks in a relaxed conversation, not like a written page being read aloud: use contractions (it's, you're, don't) and keep your phrasing easygoing.",

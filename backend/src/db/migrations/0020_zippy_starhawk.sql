@@ -1,0 +1,1 @@
+ALTER TABLE `conversations` ADD `pending_ask` text;

@@ -36,14 +36,13 @@ import { db, sqlite } from "@/db";
 import { conversationTurns, conversations, people, memoryRecords } from "@/db/schema";
 import { newConversationTurnId, newConversationId } from "@/lib/id";
 import { canAccessPerson } from "@/lib/access";
-import { isMinorRole } from "@/lib/safety";
+import { speakerAgeBand } from "@/lib/ageBand";
 import { getHouseholdSettingValue, getPersonSettingValue } from "@/lib/settings";
 import { complete, type LlmMessage } from "@/lib/llm";
 import { getEngineStatus } from "@/lib/llmSupervisor";
 import { remember } from "@/lib/memory";
 import { nextHlc } from "@/lib/hlc";
 import { Conversation } from "@maipai/spec/gen/ts/conversation.js";
-import type { Role } from "@/middleware/auth";
 import type { TurnValue, Surface } from "@/lib/turnEngine";
 import type { PersonRow } from "@/types";
 import type { ConversationRow, ConversationSummary, ConversationTurnWithMemoryIds } from "@/wire";
@@ -107,8 +106,16 @@ export function logTurn(actor: PersonRow, surface: Surface, userText: string, va
     commandId: value.command_id ?? null,
     safetyFlagged: value.safety.flagged,
     safetyAction: value.safety.action,
-    minorSpeaker: isMinorRole(actor.role as Role),
+    // Session C step 7: real age-band accuracy, not the role proxy -
+    // the same fix evaluateSafety() itself got. Uses the safety check's
+    // own timestamp rather than a fresh `new Date()` so this reflects
+    // the actor's age at the moment the turn was actually checked.
+    minorSpeaker: speakerAgeBand(actor, new Date(value.safety.checked_at)) !== "adult",
     createdAt: value.safety.checked_at,
+    // Session C step 1: null for every non-plugin turn (value.routing
+    // only exists on a "plugin" source).
+    routingTier: value.routing?.tier ?? null,
+    routingScore: value.routing?.score ?? null,
     // Every new turn starts unjudged (step 6's own poison-guard state,
     // lib/memoryJudge.ts) - never anything but null/0 at insert time.
     judgeStatus: null,
@@ -236,7 +243,19 @@ export function resolveOrCreateConversation(
     // conversation_id from this actor's own "chat" conversation passed
     // for a "tv" turn, silently attaching a tv-surface turn under a
     // chat-surface conversation and desyncing the two.
-    if (!row || row.personId !== actor.id || row.status === "deleted" || row.surface !== surface) {
+    //
+    // A second code review (2026-09-06, Session C step 9's own
+    // auto-close work) found this only ever rejected "deleted," not
+    // "closed" - so a client holding a stale conversationId for a
+    // thread runRetention() had already auto-closed (every one of its
+    // turns aged out) could still attach a brand new turn to it here,
+    // growing turn_count on a conversation whose own status claims
+    // there's nothing left in it, forever. "Closed" is meant as a real
+    // terminal state the same way "deleted" already is - a client
+    // resuming with a closed conversation's own id falls through to
+    // starting a fresh conversation instead, exactly like it already
+    // does for a deleted one.
+    if (!row || row.personId !== actor.id || row.status !== "open" || row.surface !== surface) {
       return { ok: false, status: 400, error: `conversation not found: ${conversationId}` };
     }
     return { ok: true, value: toConversationRecord(row) };
@@ -253,6 +272,40 @@ export function resolveOrCreateConversation(
   }
 
   return { ok: true, value: insertNewConversation(actor, surface) };
+}
+
+// ==== Session C step 2: pendingAsk (Tier 2 confirmation / ask continuation) ====
+
+export interface PendingAsk {
+  kind: "confirm" | "ask";
+  prompt: string;
+  packageId: string;
+  args: Record<string, unknown>;
+  /** Only set for kind:"ask" (a recipe result's own `ask.expects` hint,
+   * spec/schemas/result.schema.json) - free text, not a structured
+   * matcher; turnEngine.ts's own consumption is documented at its call
+   * site since the shape genuinely doesn't say more than this. */
+  expects?: string;
+}
+
+export function getPendingAsk(conversationId: string): PendingAsk | null {
+  const row = db.select({ pendingAsk: conversations.pendingAsk }).from(conversations).where(eq(conversations.id, conversationId)).get();
+  if (!row?.pendingAsk) return null;
+  try {
+    return JSON.parse(row.pendingAsk) as PendingAsk;
+  } catch {
+    return null; // a corrupt value is treated the same as none - never a crash on the next turn
+  }
+}
+
+/** `null` clears it - always called after a pendingAsk is consumed
+ * (matched or not), single-shot per this step's own text ("the NEXT
+ * utterance is matched against it"), never left open past one turn. */
+export function setPendingAsk(conversationId: string, ask: PendingAsk | null): void {
+  db.update(conversations)
+    .set({ pendingAsk: ask ? JSON.stringify(ask) : null, updatedAt: new Date().toISOString(), hlc: nextHlc() })
+    .where(eq(conversations.id, conversationId))
+    .run();
 }
 
 /** POST /api/conversations: an explicit "start a new conversation"
@@ -832,6 +885,12 @@ export function runRetention(): { deleted: number } {
     console.log(`[conversationHistory] retention summarization batch failed: ${err.message}`),
   );
 
+  // Read before deleting: the set of conversations this run's own delete
+  // could empty out, so the auto-close pass below only ever has to check
+  // conversations retention actually touched, not every open one in the
+  // household.
+  const affectedConversationIds = [...new Set(expiring.map((t) => t.conversationId).filter((id): id is string => id !== null))];
+
   // Raw sqlite for a real affected-row count, not db.delete().run(): the
   // same escape hatch lib/memory.ts's forget() uses (Drizzle's bun-sqlite
   // .run() types its result void even though it returns {changes} at
@@ -843,6 +902,33 @@ export function runRetention(): { deleted: number } {
   const flaggedMinor = sqlite
     .query("DELETE FROM conversation_turns WHERE safety_flagged = 1 AND minor_speaker = 1 AND created_at < ?")
     .run(flaggedMinorCutoff);
+
+  // Session C step 9 (session-c-brain-and-voice.md): "decide and
+  // implement what an emptied conversation becomes" - the backlog's open
+  // decision from session-a-intelligence.md step 3's own code review,
+  // which found runRetention() purged every turn but left the parent
+  // `conversations` thread row behind forever, `turn_count: 0` and a
+  // stale `updated_at`. Decided: auto-close, tombstoned by retention -
+  // the same `status: "closed"` a household member's own "start a new
+  // conversation" action already uses (createConversation(), above),
+  // not a hard delete: the thread's title/summary are real content a
+  // household might still want to see even once its raw turns have
+  // aged out, the same reason forget() tombstones a memory record
+  // rather than deleting it. Checked per conversation (not a blind
+  // UPDATE ... WHERE turn_count = 0, since `conversations` has no such
+  // column) and gated on `status = 'open'` so this never reopens or
+  // touches an already-deleted/already-closed thread.
+  for (const conversationId of affectedConversationIds) {
+    const remaining = sqlite
+      .query("SELECT COUNT(*) as n FROM conversation_turns WHERE conversation_id = ?")
+      .get(conversationId) as { n: number };
+    if (remaining.n === 0) {
+      db.update(conversations)
+        .set({ status: "closed", updatedAt: new Date().toISOString(), hlc: nextHlc() })
+        .where(and(eq(conversations.id, conversationId), eq(conversations.status, "open")))
+        .run();
+    }
+  }
 
   return { deleted: normal.changes + flaggedMinor.changes };
 }
@@ -892,7 +978,13 @@ export interface RoutingStats {
  * lib/hardware.ts's detectHardware() precedent for the identical shape. */
 export function routingStats(): RoutingStats {
   const rows = db
-    .select({ source: conversationTurns.source, pluginId: conversationTurns.pluginId, commandId: conversationTurns.commandId })
+    .select({
+      source: conversationTurns.source,
+      pluginId: conversationTurns.pluginId,
+      commandId: conversationTurns.commandId,
+      routingTier: conversationTurns.routingTier,
+      routingScore: conversationTurns.routingScore,
+    })
     .from(conversationTurns)
     .all();
 
@@ -903,13 +995,28 @@ export function routingStats(): RoutingStats {
   let model = 0;
   let safetyRefuse = 0;
   const pluginCounts = new Map<string, number>();
+  const pluginTierCounts = new Map<string, { pattern: number; embedding: number; keyword: number }>();
+  const pluginScoreSums = new Map<string, { sum: number; n: number }>();
   const commandCounts = new Map<string, number>();
 
   for (const row of rows) {
     switch (row.source) {
       case "plugin":
         plugin++;
-        if (row.pluginId) pluginCounts.set(row.pluginId, (pluginCounts.get(row.pluginId) ?? 0) + 1);
+        if (row.pluginId) {
+          pluginCounts.set(row.pluginId, (pluginCounts.get(row.pluginId) ?? 0) + 1);
+          if (row.routingTier === "pattern" || row.routingTier === "embedding" || row.routingTier === "keyword") {
+            const tiers = pluginTierCounts.get(row.pluginId) ?? { pattern: 0, embedding: 0, keyword: 0 };
+            tiers[row.routingTier]++;
+            pluginTierCounts.set(row.pluginId, tiers);
+          }
+          if (row.routingScore !== null) {
+            const agg = pluginScoreSums.get(row.pluginId) ?? { sum: 0, n: 0 };
+            agg.sum += row.routingScore;
+            agg.n += 1;
+            pluginScoreSums.set(row.pluginId, agg);
+          }
+        }
         break;
       case "plugin_error":
         pluginError++;
@@ -932,7 +1039,15 @@ export function routingStats(): RoutingStats {
 
   const routable = plugin + pluginError + command + commandError + model;
   const byPlugin = [...pluginCounts.entries()]
-    .map(([pluginId, count]) => ({ pluginId, count }))
+    .map(([pluginId, count]) => {
+      const agg = pluginScoreSums.get(pluginId);
+      return {
+        pluginId,
+        count,
+        tier: pluginTierCounts.get(pluginId) ?? { pattern: 0, embedding: 0, keyword: 0 },
+        avgScore: agg ? agg.sum / agg.n : null,
+      };
+    })
     .sort((a, b) => b.count - a.count);
   const byCommand = [...commandCounts.entries()]
     .map(([commandId, count]) => ({ commandId, count }))

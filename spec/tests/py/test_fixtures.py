@@ -11,6 +11,7 @@ import pytest
 from _standards import load_standards_module
 from pydantic import ValidationError
 
+from gen.py.content_ceiling_schema import ContentCeiling
 from gen.py.conversation_schema import Conversation
 from gen.py.device_schema import Device
 from gen.py.entity_schema import Entity
@@ -91,6 +92,19 @@ def test_manifest_fixture():
 
 def test_safety_result_fixture():
     SafetyResult.model_validate(load_fixture("safety-result.example.json"))
+
+
+@pytest.mark.parametrize("band", ["child", "teen", "adult"])
+def test_content_ceiling_fixtures(band: str):
+    ContentCeiling.model_validate(load_fixture(f"content-ceiling.{band}.example.json"))
+
+
+def test_content_ceiling_floor_is_identical_across_every_band():
+    floors = [
+        load_fixture(f"content-ceiling.{band}.example.json")["floor"]
+        for band in ("child", "teen", "adult")
+    ]
+    assert floors[0] == floors[1] == floors[2]
 
 
 def test_error_catalogue_entries():

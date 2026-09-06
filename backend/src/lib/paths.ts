@@ -46,6 +46,12 @@ export const enginesDir = resolve(dataDir, "engines");
 // legacy-specific.
 export const wakewordDir = resolve(dataDir, "voice", "wakewords");
 
+// Session C step 5 (session-c-brain-and-voice.md): the STT program's own
+// re-downloadable models - the Silero VAD onnx file (utterance
+// endpointing, lib/sttSession.ts) and the Moonshine tiny-en archive
+// (transcription, lib/stt.ts). Same shape as wakewordDir above.
+export const sttDir = resolve(dataDir, "voice", "stt");
+
 // A package's own cached fetch responses (session-d-packages-and-store.md
 // step 3, `lib/packageCache.ts`): one subdirectory per package id under
 // here, never a spec-shaped record and never synced or backed up - a cache
