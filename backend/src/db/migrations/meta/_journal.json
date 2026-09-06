@@ -169,6 +169,13 @@
       "when": 1788712222008,
       "tag": "0023_powerful_black_queen",
       "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "6",
+      "when": 1788723602923,
+      "tag": "0024_lucky_talon",
+      "breakpoints": true
     }
   ]
 }

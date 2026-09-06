@@ -9,7 +9,7 @@ import { setHouseholdSettingValue } from "@/lib/settings";
 import { HostError } from "@maipai/spec/emulators/ts/host-emulator.js";
 import { PackageManifest } from "@maipai/spec/gen/ts/manifest.js";
 import { db } from "@/db";
-import { people, memoryRecords } from "@/db/schema";
+import { people, memoryRecords, scheduledJobs, lists } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { __resetLlmSupervisorForTests } from "@/lib/llmSupervisor";
 
@@ -862,6 +862,92 @@ describe("packageHost llm.complete", () => {
     const result = (await host.llm.complete({ messages: [{ role: "user", content: "translate hello to spanish" }] })) as { text: string };
     expect(result.text).toContain("translate hello to spanish");
     expect(result.text).toContain("[stub model: no real model loaded, this is a canned reply]");
+  });
+});
+
+describe("packageHost lists (session-d-packages-and-store.md step 8)", () => {
+  test("add checks permission before touching the shopping list", async () => {
+    const actor = await owner();
+    const host = createHost(actor, manifest({ permissions: [] }));
+    try {
+      host.lists.add("milk");
+      throw new Error("should have thrown");
+    } catch (err) {
+      expect((err as HostError).code).toBe("permission_denied");
+    }
+  });
+
+  test("view reports an empty shopping list plainly", async () => {
+    const actor = await owner();
+    const host = createHost(actor, manifest({ permissions: ["lists:read"] }));
+    expect(host.lists.view()).toBe("Your shopping list is empty.");
+  });
+
+  test("add then view: the real find-or-create shopping list, not a canned reply", async () => {
+    const actor = await owner();
+    const host = createHost(actor, manifest({ permissions: ["lists:write", "lists:read"] }));
+    host.lists.add("milk");
+    host.lists.add("eggs");
+    expect(host.lists.view()).toBe("milk, eggs");
+  });
+
+  test("add finds the same standing list across calls, never creating a second one", async () => {
+    const actor = await owner();
+    const host = createHost(actor, manifest({ permissions: ["lists:write"] }));
+    host.lists.add("milk");
+    host.lists.add("eggs");
+    const rows = db.select().from(lists).where(eq(lists.kind, "shopping")).all();
+    expect(rows).toHaveLength(1);
+  });
+});
+
+describe("packageHost reminders and timers (session-d-packages-and-store.md step 8)", () => {
+  test("reminders.set checks permission before parsing anything", async () => {
+    const actor = await owner();
+    const host = createHost(actor, manifest({ permissions: [] }));
+    expect(() => host.reminders.set("at 6 to call Nadia")).toThrow(HostError);
+  });
+
+  test("reminders.set schedules a real core job and returns a confirmation", async () => {
+    const actor = await owner();
+    const host = createHost(actor, manifest({ permissions: ["reminders:write"] }));
+    const result = host.reminders.set("at 6 to call Nadia");
+    expect(result.task).toBe("call Nadia");
+    const rows = db.select().from(scheduledJobs).where(eq(scheduledJobs.job, "reminders.fire")).all();
+    expect(rows).toHaveLength(1);
+    expect(rows[0]!.kind).toBe("core");
+    expect(rows[0]!.personId).toBe(actor.id);
+    expect(JSON.parse(rows[0]!.inputs)).toEqual({ task: "call Nadia" });
+  });
+
+  test("reminders.set raises invalid_input for text with no time in it", async () => {
+    const actor = await owner();
+    const host = createHost(actor, manifest({ permissions: ["reminders:write"] }));
+    try {
+      host.reminders.set("call Nadia");
+      throw new Error("should have thrown");
+    } catch (err) {
+      expect((err as HostError).code).toBe("invalid_input");
+    }
+  });
+
+  test("timers.set schedules a real core job with the exact requested duration", async () => {
+    const actor = await owner();
+    const host = createHost(actor, manifest({ permissions: ["timers:write"] }));
+    const before = Date.now();
+    const result = host.timers.set("ten minutes");
+    expect(result.label).toBe("ten minutes");
+    const rows = db.select().from(scheduledJobs).where(eq(scheduledJobs.job, "timers.fire")).all();
+    expect(rows).toHaveLength(1);
+    const nextRunAt = new Date(rows[0]!.nextRunAt).getTime();
+    expect(nextRunAt).toBeGreaterThanOrEqual(before + 600_000);
+    expect(nextRunAt).toBeLessThan(before + 601_000);
+  });
+
+  test("timers.set raises invalid_input for a duration this grammar doesn't cover", async () => {
+    const actor = await owner();
+    const host = createHost(actor, manifest({ permissions: ["timers:write"] }));
+    expect(() => host.timers.set("a while")).toThrow(HostError);
   });
 });
 

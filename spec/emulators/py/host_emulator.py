@@ -136,6 +136,51 @@ class _LlmNamespace:
         return {"text": "[emulator: no model loaded, this is a canned reply]"}
 
 
+class _ListsNamespace:
+    def __init__(self, host: HostEmulator):
+        self._host = host
+
+    def add(self, text: str) -> None:
+        self._host._shopping_list.append({"text": text, "done": False})
+
+    def view(self) -> str:
+        pending = [i for i in self._host._shopping_list if not i["done"]]
+        if not pending:
+            return "Your shopping list is empty."
+        return ", ".join(i["text"] for i in pending)
+
+
+# No real time-phrase or duration parsing here - deliberately canned, the
+# same "[emulator: ...]" convention _LlmNamespace's own stub already
+# uses, since this emulator does no real I/O or computation. The real
+# host (packageHost.ts) does the real parsing; a conformance fixture
+# proves the recipe -> host -> scheduled_jobs wiring, not real NL
+# understanding. Must stay behaviorally identical to host-emulator.ts's
+# own twin classes.
+class _RemindersNamespace:
+    def __init__(self, host: HostEmulator):
+        self._host = host
+
+    def set(self, text: str) -> dict[str, str]:
+        job_id = self._host._gen_id("job")
+        self._host.scheduled_jobs.append(
+            {"when": "[emulator: no real time parsing]", "job": "reminders.fire", "id": job_id, "inputs": {"task": text}}
+        )
+        return {"task": text, "when_text": "[emulator: no real time parsing]"}
+
+
+class _TimersNamespace:
+    def __init__(self, host: HostEmulator):
+        self._host = host
+
+    def set(self, text: str) -> dict[str, str]:
+        job_id = self._host._gen_id("job")
+        self._host.scheduled_jobs.append(
+            {"when": "[emulator: no real duration parsing]", "job": "timers.fire", "id": job_id, "inputs": {"label": text}}
+        )
+        return {"label": text, "when_text": "[emulator: no real duration parsing]"}
+
+
 class _CameraNamespace:
     def still(self) -> Any:
         raise HostError("capability_missing", "no camera in the emulator")
@@ -201,6 +246,10 @@ class HostEmulator:
         self.spoken_log: list[str] = []
         self.scheduled_jobs: list[dict[str, Any]] = []
         self.logs: list[LogEntry] = []
+        # {"text", "done"} dicts, not plain strings - see host-emulator.ts's
+        # own twin comment for why (a real emulator/real-host divergence
+        # code review found, 2026-09-06).
+        self._shopping_list: list[dict[str, Any]] = []
 
         self.memory = _MemoryNamespace(self)
         self.action = _ActionNamespace(self)
@@ -208,6 +257,9 @@ class HostEmulator:
         self.integration = _IntegrationNamespace(self)
         self.speak = _SpeakNamespace(self)
         self.llm = _LlmNamespace()
+        self.lists = _ListsNamespace(self)
+        self.reminders = _RemindersNamespace(self)
+        self.timers = _TimersNamespace(self)
         self.camera = _CameraNamespace()
         self.ocr = _OcrNamespace()
         self.config = _ConfigNamespace(self)
@@ -234,6 +286,10 @@ class HostEmulator:
 
     def seed_config(self, key: str, value: Any) -> None:
         self._config_values[key] = value
+
+    def seed_shopping_list(self, items: list[dict[str, Any]]) -> None:
+        for item in items:
+            self._shopping_list.append({"text": item["text"], "done": item.get("done", False)})
 
     def register_secret(self, value: str) -> None:
         """A value registered here is replaced with [redacted] anywhere log() would emit it."""
@@ -280,9 +336,14 @@ class HostEmulator:
             )
         )
 
-    def schedule(self, when: str, job: str) -> str:
+    def schedule(self, when: str, job: str, inputs: dict[str, Any] | None = None) -> str:
+        # inputs (session-d-packages-and-store.md step 8) closes a real,
+        # previously-documented gap: the real host used to always pass
+        # {} here, so a job re-firing this package lost its own input
+        # scope entirely. Must stay behaviorally identical to
+        # host-emulator.ts's own twin case.
         job_id = self._gen_id("job")
-        self.scheduled_jobs.append({"when": when, "job": job, "id": job_id})
+        self.scheduled_jobs.append({"when": when, "job": job, "id": job_id, "inputs": inputs or {}})
         return job_id
 
     def diagnostics(self) -> dict[str, Any]:

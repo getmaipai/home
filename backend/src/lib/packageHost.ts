@@ -60,7 +60,9 @@ import { assertNotPrivateHost, SsrfBlockedError } from "@/lib/ssrfGuard";
 import * as memory from "@/lib/memory";
 import * as settings from "@/lib/settings";
 import { getHouseholdSettingValue } from "@/lib/settings";
-import { scheduleJob } from "@/lib/scheduler";
+import { scheduleJob, scheduleCoreJob } from "@/lib/scheduler";
+import { findOrCreateStandingList, addItem as addListItem } from "@/lib/lists";
+import { parseReminder, parseTimerDuration } from "@/lib/reminderParsing";
 import { cachedFetch } from "@/lib/packageCache";
 import { complete as llmComplete, type LlmMessage } from "@/lib/llm";
 import type { PersonRow } from "@/types";
@@ -794,15 +796,56 @@ export function createHost(actor: PersonRow, manifest: PackageManifest, secrets:
       },
     },
     log: logEntry,
-    // Real, but with a known gap: neither this interface nor the
-    // interpreter's schedule-step handling carries the recipe's input
-    // scope through, so the job re-fires the package with an empty
-    // input scope, not today's inputs. See lib/scheduler.ts's header.
-    schedule(when: string, job: string): string {
+    // `inputs` (step 8) closes a real, previously-documented gap: this
+    // used to always pass {}, so a job scheduled from a recipe's own
+    // `schedule` step re-fired the package with an empty input scope.
+    schedule(when: string, job: string, inputs: Record<string, unknown> = {}): string {
       requirePermission("schedule");
-      const result = scheduleJob(actor, manifest.id, job, when, {});
+      const result = scheduleJob(actor, manifest.id, job, when, inputs);
       if (!result.ok) mapWriteFailure(result.status, result.error);
       return result.value.id;
+    },
+    lists: {
+      add(text: string): void {
+        requirePermission("lists:write");
+        const list = findOrCreateStandingList("shopping");
+        const result = addListItem(actor, list.id, { text });
+        if (!result.ok) mapWriteFailure(result.status, result.error);
+      },
+      view(): string {
+        requirePermission("lists:read");
+        const list = findOrCreateStandingList("shopping");
+        const items = (JSON.parse(list.items) as { text: string; done: boolean }[]).filter((i) => !i.done);
+        return items.length > 0 ? items.map((i) => i.text).join(", ") : "Your shopping list is empty.";
+      },
+    },
+    reminders: {
+      // The real natural-language time/task extraction (reminderParsing.ts,
+      // chrono-node) and the real scheduling both happen here - a
+      // declarative recipe step can do neither for itself. Schedules a
+      // "core" job (scheduleCoreJob, lib/scheduler.ts), never a "plugin"
+      // one: firing later raises `remind.due` directly (CORE_JOBS'
+      // `reminders.fire`), it never re-runs this recipe.
+      set(text: string): { task: string; when_text: string } {
+        requirePermission("reminders:write");
+        const parsed = parseReminder(text);
+        const result = scheduleCoreJob(actor, "reminders.fire", parsed.when, { task: parsed.task });
+        if (!result.ok) mapWriteFailure(result.status, result.error);
+        return { task: parsed.task, when_text: parsed.when_text };
+      },
+    },
+    timers: {
+      // Deterministic duration parsing (reminderParsing.ts), not a
+      // language model - see that file's own header for why a timer's
+      // precision needs exact arithmetic. Same core-job shape as
+      // reminders.set above; firing raises `timer.done` directly.
+      set(text: string): { label: string; when_text: string } {
+        requirePermission("timers:write");
+        const parsed = parseTimerDuration(text);
+        const result = scheduleCoreJob(actor, "timers.fire", parsed.when, { label: parsed.label });
+        if (!result.ok) mapWriteFailure(result.status, result.error);
+        return { label: parsed.label, when_text: parsed.when_text };
+      },
     },
     files: {
       read(path: string): unknown {

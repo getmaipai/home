@@ -1,0 +1,26 @@
+{
+  "description": "list_view + format: proves the real host's own done-item filtering (packageHost.ts's `lists.view()`: `.filter((i) => !i.done)`) is matched here too - a code review (2026-09-06) found the emulator had no concept of `done` at all before this, so nothing could have caught a real regression in that filter, or an interpreter/host divergence on it.",
+  "recipe": {
+    "id": "list-view-skips-done",
+    "inputs": [],
+    "steps": [
+      { "op": "list_view", "as": "list_summary" },
+      { "op": "format", "as": "reply", "text": "{list_summary}", "speech": "{list_summary}" }
+    ]
+  },
+  "inputs": {},
+  "host_setup": {
+    "shopping_list": [
+      { "text": "milk", "done": false },
+      { "text": "eggs", "done": true },
+      { "text": "bread", "done": false }
+    ]
+  },
+  "expected": {
+    "reply": { "text": "milk, bread", "speech": "milk, bread" },
+    "actions": [],
+    "scheduled_jobs": [],
+    "home_calls": [],
+    "memory_added": []
+  }
+}

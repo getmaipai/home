@@ -1,0 +1,27 @@
+{
+  "description": "remind + pick + format: the raw-object binding style llm_complete already uses (a pick step reads each field out before format interpolates it) - proven with the emulator's own canned time-parsing reply (session-d-packages-and-store.md step 8; the real time/task extraction is the real host's own job, via chrono-node, not this emulator's).",
+  "recipe": {
+    "id": "remind",
+    "inputs": [{ "name": "expression", "selector": "text" }],
+    "steps": [
+      { "op": "remind", "as": "reminder", "text": "{expression}" },
+      { "op": "pick", "as": "task", "from": "reminder", "path": "task" },
+      { "op": "pick", "as": "when_text", "from": "reminder", "path": "when_text" },
+      { "op": "format", "as": "reply", "text": "Okay, I'll remind you: {task} ({when_text}).", "speech": "Okay, I'll remind you: {task} ({when_text})." }
+    ]
+  },
+  "inputs": { "expression": "at 6 to call Nadia" },
+  "host_setup": {},
+  "expected": {
+    "reply": {
+      "text": "Okay, I'll remind you: at 6 to call Nadia ([emulator: no real time parsing]).",
+      "speech": "Okay, I'll remind you: at 6 to call Nadia ([emulator: no real time parsing])."
+    },
+    "actions": [],
+    "scheduled_jobs": [
+      { "when": "[emulator: no real time parsing]", "job": "reminders.fire", "inputs": { "task": "at 6 to call Nadia" } }
+    ],
+    "home_calls": [],
+    "memory_added": []
+  }
+}

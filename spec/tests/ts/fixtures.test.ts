@@ -13,6 +13,7 @@ import { PackageManifest } from "../../gen/ts/manifest.js";
 import { SafetyResult } from "../../gen/ts/safety-result.js";
 import { ModelCapabilities } from "../../gen/ts/model-capabilities.js";
 import { Entity } from "../../gen/ts/entity.js";
+import { List } from "../../gen/ts/list.js";
 import { Relationship } from "../../gen/ts/relationship.js";
 import { Grant } from "../../gen/ts/grant.js";
 import { Issue } from "../../gen/ts/issue.js";
@@ -58,6 +59,12 @@ describe("record fixtures validate against their generated Zod models", () => {
   for (const kind of ["person", "pet", "place"]) {
     test(`entity.${kind}.example.json`, () => {
       expect(() => Entity.parse(loadFixture(`entity.${kind}.example.json`))).not.toThrow();
+    });
+  }
+
+  for (const kind of ["shopping", "todo", "custom"]) {
+    test(`list.${kind}.example.json`, () => {
+      expect(() => List.parse(loadFixture(`list.${kind}.example.json`))).not.toThrow();
     });
   }
 

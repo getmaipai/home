@@ -1,0 +1,27 @@
+{
+  "description": "timer + pick + format: the same raw-object binding style remind uses, proven with the emulator's own canned duration-parsing reply (session-d-packages-and-store.md step 8; the real duration parsing is the real host's own small deterministic parser, not this emulator's).",
+  "recipe": {
+    "id": "timer",
+    "inputs": [{ "name": "expression", "selector": "text" }],
+    "steps": [
+      { "op": "timer", "as": "the_timer", "text": "{expression}" },
+      { "op": "pick", "as": "label", "from": "the_timer", "path": "label" },
+      { "op": "pick", "as": "when_text", "from": "the_timer", "path": "when_text" },
+      { "op": "format", "as": "reply", "text": "Timer set: {label} ({when_text}).", "speech": "Timer set: {label} ({when_text})." }
+    ]
+  },
+  "inputs": { "expression": "for ten minutes" },
+  "host_setup": {},
+  "expected": {
+    "reply": {
+      "text": "Timer set: for ten minutes ([emulator: no real duration parsing]).",
+      "speech": "Timer set: for ten minutes ([emulator: no real duration parsing])."
+    },
+    "actions": [],
+    "scheduled_jobs": [
+      { "when": "[emulator: no real duration parsing]", "job": "timers.fire", "inputs": { "label": "for ten minutes" } }
+    ],
+    "home_calls": [],
+    "memory_added": []
+  }
+}

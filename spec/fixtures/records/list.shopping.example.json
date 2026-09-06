@@ -1,0 +1,16 @@
+{
+  "id": "list-a1b2c3",
+  "scope": "household",
+  "person": null,
+  "kind": "shopping",
+  "title": "Shopping List",
+  "items": [
+    { "id": "item-a1b2c3", "text": "milk", "done": false, "due_at": null, "created_at": "2026-09-06T18:00:00Z" },
+    { "id": "item-d4e5f6", "text": "eggs", "done": true, "due_at": null, "created_at": "2026-09-06T18:01:00Z" }
+  ],
+  "source": "hub",
+  "created_at": "2026-09-06T18:00:00Z",
+  "updated_at": "2026-09-06T18:01:00Z",
+  "deleted_at": null,
+  "hlc": "1757181600000:0:a1b2c3"
+}

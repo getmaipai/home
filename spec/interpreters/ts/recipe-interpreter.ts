@@ -1,6 +1,6 @@
 // Interprets a Tier 0 Recipe (spec/schemas/recipe.schema.json) natively,
 // executing each step against a host (platform plan 5.2). No process, no
-// eval: every step is one of the twelve declared primitives. This must
+// eval: every step is one of the sixteen declared primitives. This must
 // stay behaviorally identical to spec/interpreters/py/recipe_interpreter.py;
 // the conformance fixtures in spec/fixtures/recipes/ prove that.
 import { decode } from "he";
@@ -24,7 +24,7 @@ type Scope = Record<string, unknown>;
 // throughout the switch (a typo'd property would have compiled). Found
 // when backend/ first imported this file and its `tsc --noEmit` actually
 // walked it (spec/ itself has never run a standalone typecheck). Hand-
-// written here, mirroring recipe.schema.json's 12 step defs exactly, so
+// written here, mirroring recipe.schema.json's 16 step defs exactly, so
 // the switch gets real per-branch types and a real `never` check back.
 type RecipeStep =
   | { op: "fetch"; as: string; url: string; method?: "GET" | "POST"; headers?: Record<string, string>; body?: unknown }
@@ -34,10 +34,14 @@ type RecipeStep =
   | { op: "action"; kind: string; payload?: Record<string, unknown> }
   | { op: "remember"; text: string; category?: string; scope?: string }
   | { op: "recall"; as: string; query: string; scope?: string; limit?: number }
-  | { op: "schedule"; when: string; job?: string }
+  | { op: "schedule"; when: string; job?: string; inputs?: Record<string, unknown> }
   | { op: "integration.call"; as: string; id: string; method: string; args?: Record<string, unknown> }
   | { op: "compute"; as: string; expression: string }
   | { op: "llm_complete"; as: string; prompt: string }
+  | { op: "list_add"; text: string }
+  | { op: "list_view"; as: string }
+  | { op: "remind"; as: string; text: string }
+  | { op: "timer"; as: string; text: string }
   | { op: "ask"; prompt: string; expects?: string };
 
 // No conditional step exists in this declarative language to branch a
@@ -154,8 +158,14 @@ export async function runRecipe(recipe: Recipe, inputs: Scope, host: Host): Prom
         break;
       }
       case "schedule": {
+        // `inputs` (session-d-packages-and-store.md step 8) closes a
+        // real, previously-documented gap: this used to always pass
+        // nothing, so a job scheduled from within a recipe re-fired the
+        // package with an empty input scope, not the inputs the
+        // original call had.
         const when = interpolate(step.when, scope);
-        host.schedule(when, step.job ?? recipe.id);
+        const inputs = step.inputs ? (interpolateDeep(step.inputs, scope) as Record<string, unknown>) : {};
+        host.schedule(when, step.job ?? recipe.id, inputs);
         break;
       }
       case "integration.call": {
@@ -195,6 +205,33 @@ export async function runRecipe(recipe: Recipe, inputs: Scope, host: Host): Prom
         // package is the first caller), not a chat turn.
         const prompt = interpolate(step.prompt, scope);
         scope[step.as] = await host.llm.complete({ messages: [{ role: "user", content: prompt }] });
+        break;
+      }
+      case "list_add": {
+        // Fire-and-forget, same shape `remember` already takes: nothing
+        // is bound, a recipe's own `format` step confirms using the
+        // input it already has (session-d-packages-and-store.md step 8).
+        const text = interpolate(step.text, scope);
+        host.lists.add(text);
+        break;
+      }
+      case "list_view": {
+        scope[step.as] = host.lists.view();
+        break;
+      }
+      case "remind": {
+        // Raw-object binding, same style as `llm_complete`'s own `as` -
+        // a `pick` step reads each field out before a `format` step
+        // interpolates it. host.reminders.set does the real natural-
+        // language time/task parsing and the real scheduling, both
+        // host-side: this step is declarative, neither is.
+        const text = interpolate(step.text, scope);
+        scope[step.as] = host.reminders.set(text);
+        break;
+      }
+      case "timer": {
+        const text = interpolate(step.text, scope);
+        scope[step.as] = host.timers.set(text);
         break;
       }
       case "ask": {

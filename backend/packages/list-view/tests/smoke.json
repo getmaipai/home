@@ -1,0 +1,12 @@
+{
+  "description": "Smoke fixture for the bundled list-view package: proves the recipe wiring (list_view + format) executes without throwing, against lib/smoke.ts's own HostEmulator - a fresh emulator's shopping list starts empty. Real list contents are lib/lists.ts's own job, covered by backend/tests/lists.test.ts and packageHost.test.ts.",
+  "inputs": {},
+  "host_setup": {},
+  "expected": {
+    "reply": { "text": "Your shopping list is empty.", "speech": "Your shopping list is empty." },
+    "actions": [],
+    "scheduled_jobs": [],
+    "home_calls": [],
+    "memory_added": []
+  }
+}

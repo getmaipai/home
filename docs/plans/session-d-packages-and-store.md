@@ -226,6 +226,17 @@ shopping list", "what's on my list", "remind me at 6 to call Nadia",
 store; a timer fires a `passive` notification through the declared type
 and, on the robot later, speech. E draws the list and the running timer.
 
+Built as four packages, not one - `list-add`, `list-view`, `remind`,
+`timer` (2026-09-06, `docs/dev/session-d.md`'s step 8 entry has the full
+reasoning): `deterministicArgs()`'s own one-arg-per-route limit is the
+same reason `remember`/`recall` are already two packages, not one, and
+`spec/vocab/capabilities.json` already listed `shopping_list`,
+`reminders`, `timers` as three separate grantable capabilities before
+this step touched anything. Firing a reminder/timer schedules a
+`"core"`-kind job (`lib/scheduler.ts`'s new `scheduleCoreJob`), never a
+replay of the recipe that set it - the real fix for "one recipe can't
+branch on set-vs-fire," not a workaround.
+
 ### Step 9: one real Home Assistant action, and the widgets (S-M)
 
 - A `lights` package that calls `home.call_service` (`light.turn_on`,

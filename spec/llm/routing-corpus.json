@@ -19,7 +19,7 @@
 
   { "utterance": "what have I told you to remember about pizza night", "expect": null, "must_not": ["remember"], "note": "recall's own routing.example, but it captures no `topic` for recall's required arg without matching one of its own patterns literally - Tier 1 alone can never bind it (deterministicArgs' documented gap); a real Tier 2 tool call (step 2) is what should eventually route this, not Tier 1." },
   { "utterance": "what do you know about my dentist appointment", "expect": null, "must_not": ["remember"], "note": "same gap as above" },
-  { "utterance": "remind me what I said about the school schedule", "expect": null, "must_not": ["remember"], "note": "same gap as above" },
+  { "utterance": "remind me what I said about the school schedule", "expect": "remind", "must_not": [], "note": "step 8's own remind package (added 2026-09-06) made this a real, different gap than the one this row used to document: \"remind me *\" is a literal pattern (a required-arg package can only ever route that way) and wins immediately over the model, so this genuinely ambiguous phrase - recall-flavored, not really a new-reminder request - now goes to remind, which will 400 (no time phrase found) rather than reach recall or the model. The underlying fix is Tier 2 native tool calling disambiguating this properly, already tracked in turnEngine.ts's own \"not built this pass\" list, not something remind's own pattern choice can solve." },
   { "utterance": "please remember our wifi password is on the fridge", "expect": null, "must_not": ["recall"], "note": "remember's own routing.example that doesn't literally start with \"remember\" - same required-arg gap, `fact` this time" },
   { "utterance": "can you remember I have a dentist appointment next week", "expect": null, "must_not": ["recall"], "note": "same gap as above" },
 
@@ -95,5 +95,16 @@
 
   { "utterance": "search the web for the tallest mountain", "expect": "websearch", "must_not": [] },
   { "utterance": "search online for today's headlines", "expect": "websearch", "must_not": [] },
-  { "utterance": "look up the artist Radiohead online", "expect": "music", "must_not": ["websearch"], "note": "a real, confirmed collision code review found: websearch's own routing.patterns originally included 'look up * online', which matches this utterance too - music's 'look up the artist *' wins the tie (sorts first by id) and captures 'Radiohead online' as a polluted artist name. Dropped 'look up * online' from websearch entirely rather than accept the collision; kept as a permanent regression guard." }
+  { "utterance": "look up the artist Radiohead online", "expect": "music", "must_not": ["websearch"], "note": "a real, confirmed collision code review found: websearch's own routing.patterns originally included 'look up * online', which matches this utterance too - music's 'look up the artist *' wins the tie (sorts first by id) and captures 'Radiohead online' as a polluted artist name. Dropped 'look up * online' from websearch entirely rather than accept the collision; kept as a permanent regression guard." },
+
+  { "utterance": "add milk to the shopping list", "expect": "list-add", "must_not": [] },
+  { "utterance": "put bread on the shopping list", "expect": "list-add", "must_not": [] },
+  { "utterance": "what's on my shopping list", "expect": "list-view", "must_not": [] },
+  { "utterance": "what do I need to buy", "expect": "list-view", "must_not": [] },
+
+  { "utterance": "remind me at 6 to call Nadia", "expect": "remind", "must_not": [] },
+  { "utterance": "remind me tomorrow at noon to walk the dog", "expect": "remind", "must_not": [] },
+
+  { "utterance": "set a timer for ten minutes", "expect": "timer", "must_not": [] },
+  { "utterance": "set a timer for an hour", "expect": "timer", "must_not": [] }
 ]

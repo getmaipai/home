@@ -1,0 +1,12 @@
+{
+  "description": "Smoke fixture for the bundled list-add package: proves the recipe wiring (list_add + format) executes without throwing, against lib/smoke.ts's own HostEmulator - real list persistence is lib/lists.ts's own job, covered by backend/tests/lists.test.ts and packageHost.test.ts, not this emulator.",
+  "inputs": { "item": "milk" },
+  "host_setup": {},
+  "expected": {
+    "reply": { "text": "Added milk to your shopping list.", "speech": "Added milk to your shopping list." },
+    "actions": [],
+    "scheduled_jobs": [],
+    "home_calls": [],
+    "memory_added": []
+  }
+}

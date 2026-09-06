@@ -1,6 +1,6 @@
 """Interprets a Tier 0 Recipe (spec/schemas/recipe.schema.json) natively,
 executing each step against a host (platform plan 5.2). No process, no
-eval: every step is one of the twelve declared primitives. This must stay
+eval: every step is one of the sixteen declared primitives. This must stay
 behaviorally identical to spec/interpreters/ts/recipe-interpreter.ts; the
 conformance fixtures in spec/fixtures/recipes/ prove that.
 """
@@ -37,7 +37,14 @@ def interpolate(template: str, scope: dict[str, Any]) -> str:
         name = m.group(1)
         if name not in scope:
             return m.group(0)
-        return html.unescape(str(scope[name]))
+        value = scope[name]
+        # Python's str(None) is "None"; JS's String(null) is "null" - a
+        # real cross-language divergence code review found (2026-09-06,
+        # step 8's own schedule_step.inputs is the first templated field
+        # a caller might plausibly pass a null value through): matched to
+        # the TS interpreter's own literal exactly rather than picking a
+        # third string neither side used before.
+        return html.unescape("null" if value is None else str(value))
 
     return INTERP_RE.sub(repl, template)
 
@@ -124,8 +131,15 @@ async def run_recipe(recipe: Any, inputs: dict[str, Any], host: Any) -> dict[str
                 "; ".join(m["text"] for m in top) if top else NOTHING_RECALLED
             )
         elif op == "schedule":
+            # inputs (session-d-packages-and-store.md step 8) closes a
+            # real, previously-documented gap: this used to always pass
+            # nothing, so a job scheduled from within a recipe re-fired
+            # the package with an empty input scope. Must stay
+            # behaviorally identical to recipe-interpreter.ts's own
+            # twin case.
             when = interpolate(step.when, scope)
-            host.schedule(when, step.job or recipe.id)
+            inputs = interpolate_deep(step.inputs, scope) if step.inputs else {}
+            host.schedule(when, step.job or recipe.id, inputs)
         elif op == "integration.call":
             args = interpolate_deep(step.args, scope) if step.args else None
             scope[step.as_] = await host.integration.call(step.id, step.method, args)
@@ -153,6 +167,23 @@ async def run_recipe(recipe: Any, inputs: dict[str, Any], host: Any) -> dict[str
             scope[step.as_] = await host.llm.complete(
                 {"messages": [{"role": "user", "content": prompt}]}
             )
+        elif op == "list_add":
+            # Fire-and-forget, same shape `remember` already takes.
+            # Must stay behaviorally identical to recipe-interpreter.ts's
+            # own twin case.
+            text = interpolate(step.text, scope)
+            host.lists.add(text)
+        elif op == "list_view":
+            scope[step.as_] = host.lists.view()
+        elif op == "remind":
+            # Raw-object binding, same style as `llm_complete`'s own
+            # `as_`. Must stay behaviorally identical to
+            # recipe-interpreter.ts's own twin case.
+            text = interpolate(step.text, scope)
+            scope[step.as_] = host.reminders.set(text)
+        elif op == "timer":
+            text = interpolate(step.text, scope)
+            scope[step.as_] = host.timers.set(text)
         elif op == "ask":
             # Always the recipe's last meaningful step (the schema's own
             # description): nothing after it can depend on an answer that

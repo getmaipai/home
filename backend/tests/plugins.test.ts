@@ -5,6 +5,9 @@ import { __resetThrottleForTests } from "@/lib/secretThrottle";
 import { __resetLlmSupervisorForTests } from "@/lib/llmSupervisor";
 import { setHouseholdSettingValue } from "@/lib/settings";
 import { listPackageIds, loadPackage, registerAllPackageNotificationTypes, warmPackage } from "@/lib/plugins";
+import { db } from "@/db";
+import { scheduledJobs } from "@/db/schema";
+import { eq } from "drizzle-orm";
 
 beforeEach(() => {
   resetDb();
@@ -176,6 +179,26 @@ describe("the bundled websearch package", () => {
     expect(loaded.value.manifest.permissions).toEqual(["integration:searxng", "llm:complete"]);
     expect(loaded.value.recipe.steps.length).toBeGreaterThan(0);
   });
+});
+
+describe("the bundled step-8 packages (lists, reminders, timers)", () => {
+  const cases: [string, string[]][] = [
+    ["list-add", ["lists:write"]],
+    ["list-view", ["lists:read"]],
+    ["remind", ["reminders:write"]],
+    ["timer", ["timers:write"]],
+  ];
+  for (const [id, permissions] of cases) {
+    test(`${id} is discoverable and its manifest + recipe validate against spec's schemas`, () => {
+      expect(listPackageIds()).toContain(id);
+      const loaded = loadPackage(id);
+      expect(loaded.ok).toBe(true);
+      if (!loaded.ok) return;
+      expect(loaded.value.manifest.id).toBe(id);
+      expect(loaded.value.manifest.permissions).toEqual(permissions);
+      expect(loaded.value.recipe.steps.length).toBeGreaterThan(0);
+    });
+  }
 });
 
 async function owner() {
@@ -396,6 +419,72 @@ describe("POST /api/plugins/websearch/run", () => {
     expect(res.status).toBe(400);
     const body = (await res.json()) as { error?: string };
     expect(body.error).toContain("isn't set up yet");
+  });
+});
+
+describe("POST /api/plugins/list-add/run and list-view/run", () => {
+  test("adds an item, then view reads it back - the real shopping list, not a canned reply", async () => {
+    const client = await owner();
+    const addRes = await client.post("/api/plugins/list-add/run", { item: "milk" });
+    expect(addRes.status).toBe(200);
+    const addBody = (await addRes.json()) as { reply?: { text: string } };
+    expect(addBody.reply?.text).toBe("Added milk to your shopping list.");
+
+    const viewRes = await client.post("/api/plugins/list-view/run", {});
+    expect(viewRes.status).toBe(200);
+    const viewBody = (await viewRes.json()) as { reply?: { text: string } };
+    expect(viewBody.reply?.text).toBe("milk");
+  });
+
+  test("view reports an empty list plainly", async () => {
+    const client = await owner();
+    const res = await client.post("/api/plugins/list-view/run", {});
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { reply?: { text: string } };
+    expect(body.reply?.text).toBe("Your shopping list is empty.");
+  });
+});
+
+describe("POST /api/plugins/remind/run", () => {
+  test("runs the recipe end to end: real chrono-node parsing, a real scheduled core job", async () => {
+    const client = await owner();
+    const res = await client.post("/api/plugins/remind/run", { expression: "at 6 to call Nadia" });
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { reply?: { text: string } };
+    expect(body.reply?.text).toContain("call Nadia");
+    const rows = db.select().from(scheduledJobs).where(eq(scheduledJobs.job, "reminders.fire")).all();
+    expect(rows).toHaveLength(1);
+    expect(rows[0]!.kind).toBe("core");
+  });
+
+  test("400s with a clear message when no time phrase is found", async () => {
+    const client = await owner();
+    const res = await client.post("/api/plugins/remind/run", { expression: "call Nadia" });
+    expect(res.status).toBe(400);
+    const body = (await res.json()) as { error?: string };
+    expect(body.error).toContain("figure out when");
+  });
+});
+
+describe("POST /api/plugins/timer/run", () => {
+  test("runs the recipe end to end: exact deterministic duration parsing, a real scheduled core job", async () => {
+    const client = await owner();
+    const before = Date.now();
+    const res = await client.post("/api/plugins/timer/run", { expression: "ten minutes" });
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { reply?: { text: string } };
+    expect(body.reply?.text).toContain("ten minutes");
+    const rows = db.select().from(scheduledJobs).where(eq(scheduledJobs.job, "timers.fire")).all();
+    expect(rows).toHaveLength(1);
+    const nextRunAt = new Date(rows[0]!.nextRunAt).getTime();
+    expect(nextRunAt).toBeGreaterThanOrEqual(before + 600_000);
+    expect(nextRunAt).toBeLessThan(before + 601_000);
+  });
+
+  test("400s with a clear message for a duration this grammar doesn't cover", async () => {
+    const client = await owner();
+    const res = await client.post("/api/plugins/timer/run", { expression: "a while" });
+    expect(res.status).toBe(400);
   });
 });
 

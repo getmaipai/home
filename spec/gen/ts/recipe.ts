@@ -167,6 +167,13 @@ export const Recipe = z
                     "The job id this schedules, resolved by host.schedule.",
                   )
                   .optional(),
+                /**Carried into the recipe's own input scope when the job fires and re-runs this package (session-d-packages-and-store.md step 8: host.schedule used to hardcode {} here, so a job scheduled from within a recipe re-fired with an empty scope - a known, documented gap, docs/dev.md's own scheduler entry). Every string value, at any depth, may reference input/variable names in {braces} - the same interpolate-before-send convention integration_call_step's own `args` already uses.*/
+                inputs: z
+                  .record(z.string(), z.any())
+                  .describe(
+                    "Carried into the recipe's own input scope when the job fires and re-runs this package (session-d-packages-and-store.md step 8: host.schedule used to hardcode {} here, so a job scheduled from within a recipe re-fired with an empty scope - a known, documented gap, docs/dev.md's own scheduler entry). Every string value, at any depth, may reference input/variable names in {braces} - the same interpolate-before-send convention integration_call_step's own `args` already uses.",
+                  )
+                  .optional(),
               })
               .strict()
               .describe("Calls host.schedule."),
@@ -237,6 +244,74 @@ export const Recipe = z
               .strict()
               .describe(
                 "Goes through host.llm.complete (permission llm:complete) - the household's own local chat model (session-d-packages-and-store.md step 7's own translate package is the first caller). A network translation service is explicitly opt-in per the platform plan and not this step's concern: a recipe that wants one calls it through its own fetch step instead.",
+              ),
+            z
+              .object({
+                op: z.literal("list_add"),
+                /**May reference input/variable names in {braces}. The item text added to the household's own default shopping list.*/
+                text: z
+                  .string()
+                  .describe(
+                    "May reference input/variable names in {braces}. The item text added to the household's own default shopping list.",
+                  ),
+              })
+              .strict()
+              .describe(
+                "Calls host.lists.add (permission lists:write, session-d-packages-and-store.md step 8's own list-add package) - fire-and-forget, the same shape remember_step already takes: nothing is bound, a recipe's own format step confirms using the input it already has.",
+              ),
+            z
+              .object({
+                op: z.literal("list_view"),
+                /**Binds a ready-to-speak summary of the household's own default shopping list - a plain 'your list is empty' phrase if there are none, the same 'resolve a list-shaped result into one string at the interpreter, since the recipe language has no loop' move recall_step already makes.*/
+                as: z
+                  .string()
+                  .describe(
+                    "Binds a ready-to-speak summary of the household's own default shopping list - a plain 'your list is empty' phrase if there are none, the same 'resolve a list-shaped result into one string at the interpreter, since the recipe language has no loop' move recall_step already makes.",
+                  ),
+              })
+              .strict()
+              .describe(
+                "Calls host.lists.view (permission lists:read, session-d-packages-and-store.md step 8's own list-view package).",
+              ),
+            z
+              .object({
+                op: z.literal("remind"),
+                /**Binds the result ({"task": string, "when_text": string}, the same raw-object shape fetch's own `as` binds) - a `pick` step reads each field out before a `format` step interpolates it.*/
+                as: z
+                  .string()
+                  .describe(
+                    'Binds the result ({"task": string, "when_text": string}, the same raw-object shape fetch\'s own `as` binds) - a `pick` step reads each field out before a `format` step interpolates it.',
+                  ),
+                /**May reference input/variable names in {braces}. The household member's own free-typed reminder request, e.g. "at 6 to call Nadia" - host.reminders.set does the natural-language time/task extraction and the real scheduling, both host-side, since neither is something this declarative step can do for itself.*/
+                text: z
+                  .string()
+                  .describe(
+                    'May reference input/variable names in {braces}. The household member\'s own free-typed reminder request, e.g. "at 6 to call Nadia" - host.reminders.set does the natural-language time/task extraction and the real scheduling, both host-side, since neither is something this declarative step can do for itself.',
+                  ),
+              })
+              .strict()
+              .describe(
+                "Calls host.reminders.set (permission reminders:write, session-d-packages-and-store.md step 8's own remind package) - schedules a core-kind job (session-d-packages-and-store.md step 8's own scheduler entry), never a replay of this recipe: firing later re-runs nothing, it raises the declared reminders.due notification directly.",
+              ),
+            z
+              .object({
+                op: z.literal("timer"),
+                /**Binds the result ({"label": string, "when_text": string}, the same raw-object shape fetch's own `as` binds) - a `pick` step reads each field out before a `format` step interpolates it.*/
+                as: z
+                  .string()
+                  .describe(
+                    'Binds the result ({"label": string, "when_text": string}, the same raw-object shape fetch\'s own `as` binds) - a `pick` step reads each field out before a `format` step interpolates it.',
+                  ),
+                /**May reference input/variable names in {braces}. The household member's own free-typed timer request, e.g. "for ten minutes". host.timers.set parses the duration with a small deterministic parser, not a language model - a timer's whole point is exact minute-level accuracy, which natural-language date grammars and models are not reliably good at (session-d-packages-and-store.md step 8's own scheduler entry).*/
+                text: z
+                  .string()
+                  .describe(
+                    "May reference input/variable names in {braces}. The household member's own free-typed timer request, e.g. \"for ten minutes\". host.timers.set parses the duration with a small deterministic parser, not a language model - a timer's whole point is exact minute-level accuracy, which natural-language date grammars and models are not reliably good at (session-d-packages-and-store.md step 8's own scheduler entry).",
+                  ),
+              })
+              .strict()
+              .describe(
+                "Calls host.timers.set (permission timers:write, session-d-packages-and-store.md step 8's own timer package) - schedules a core-kind job the same way remind_step does; firing later raises the declared timers.done notification directly, never a recipe replay.",
               ),
             z
               .object({

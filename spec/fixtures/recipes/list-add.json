@@ -1,0 +1,20 @@
+{
+  "description": "list_add + format: fire-and-forget, the same shape `remember` already takes - nothing bound, the reply reuses the input it already has (session-d-packages-and-store.md step 8).",
+  "recipe": {
+    "id": "list-add",
+    "inputs": [{ "name": "item", "selector": "text" }],
+    "steps": [
+      { "op": "list_add", "text": "{item}" },
+      { "op": "format", "as": "reply", "text": "Added {item} to your shopping list.", "speech": "Added {item} to your shopping list." }
+    ]
+  },
+  "inputs": { "item": "milk" },
+  "host_setup": {},
+  "expected": {
+    "reply": { "text": "Added milk to your shopping list.", "speech": "Added milk to your shopping list." },
+    "actions": [],
+    "scheduled_jobs": [],
+    "home_calls": [],
+    "memory_added": []
+  }
+}

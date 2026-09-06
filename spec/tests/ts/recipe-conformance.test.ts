@@ -19,11 +19,12 @@ interface ConformanceFixture {
     fetch?: Record<string, unknown>;
     config?: Record<string, unknown>;
     memory?: { text: string; category?: string; scope?: string; person?: string }[];
+    shopping_list?: { text: string; done?: boolean }[];
   };
   expected: {
     reply: { text: string; speech?: string } | null;
     actions: { kind: string; payload?: unknown }[];
-    scheduled_jobs: { when: string; job: string }[];
+    scheduled_jobs: { when: string; job: string; inputs?: Record<string, unknown> }[];
     home_calls: { domain: string; service: string; target: unknown; data: unknown }[];
     memory_added: { text: string; category?: string; scope?: string }[];
     ask?: { prompt: string; expects?: string } | null;
@@ -48,13 +49,16 @@ describe("recipe conformance", () => {
       if (fixture.host_setup.memory) {
         host.seedMemory(fixture.host_setup.memory);
       }
+      if (fixture.host_setup.shopping_list) {
+        host.seedShoppingList(fixture.host_setup.shopping_list);
+      }
 
       const result = await runRecipe(recipe, fixture.inputs, host);
 
       expect(result.reply ?? null).toEqual(fixture.expected.reply);
       expect(result.actions).toEqual(fixture.expected.actions);
       expect(result.ask ?? null).toEqual(fixture.expected.ask ?? null);
-      expect(host.scheduledJobs.map(({ when, job }) => ({ when, job }))).toEqual(
+      expect(host.scheduledJobs.map(({ when, job, inputs }) => ({ when, job, inputs }))).toEqual(
         fixture.expected.scheduled_jobs,
       );
       expect(host.homeCallsLog).toEqual(fixture.expected.home_calls);

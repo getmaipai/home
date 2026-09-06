@@ -1,0 +1,20 @@
+{
+  "description": "list_view + format: a fresh emulator's shopping list starts empty - proves the same 'resolve a list-shaped result into one string at the interpreter, since the recipe language has no loop' move recall_step already makes, for the empty case specifically (a real list's own contents are covered by lib/lists.ts's own backend-level tests, not the emulator).",
+  "recipe": {
+    "id": "list-view",
+    "inputs": [],
+    "steps": [
+      { "op": "list_view", "as": "list_summary" },
+      { "op": "format", "as": "reply", "text": "{list_summary}", "speech": "{list_summary}" }
+    ]
+  },
+  "inputs": {},
+  "host_setup": {},
+  "expected": {
+    "reply": { "text": "Your shopping list is empty.", "speech": "Your shopping list is empty." },
+    "actions": [],
+    "scheduled_jobs": [],
+    "home_calls": [],
+    "memory_added": []
+  }
+}

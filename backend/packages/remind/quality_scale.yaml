@@ -1,0 +1,34 @@
+# Bronze/silver/gold criteria per getmaipai/.github's docs/PACKAGES.md.
+# `met: true` on every bronze line is the publish gate; `scripts.sh`'s
+# bronze check (spec/tests/ts/package-bronze.test.ts) reads this file,
+# not just the manifest's own `quality_scale` string.
+package: remind
+scale: bronze
+bronze:
+  tests_green:
+    met: true
+    note: "tests/smoke.json passes against the real recipe interpreter and a HostEmulator; real time/task parsing is backend/tests/reminderParsing.test.ts's own job, real scheduling is packageHost.test.ts's"
+  routing_examples:
+    met: true
+    note: 5 examples in manifest.json's routing.examples
+  privacy_row_per_data_source:
+    met: true
+    note: no data_sources at all - a local computation and a local database write, nothing leaves the house
+  offline_behavior_stated:
+    met: true
+    note: "offline: full - chrono-node's own parsing needs no network, no model"
+  smoke_test:
+    met: true
+    note: "tests/smoke.json, run through lib/smoke.ts"
+  readme_and_changelog:
+    met: true
+  lint_clean:
+    met: true
+silver:
+  diagnostics_and_reauth:
+    met: false
+    note: no auth to diagnose (no network at all); nothing to add for silver yet
+gold:
+  real_service_verified:
+    met: false
+    note: not yet manually verified against a real running dev server

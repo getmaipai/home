@@ -1,0 +1,13 @@
+{
+  "id": "list-m3n4o5",
+  "scope": "person",
+  "person": "person-a1b2c3",
+  "kind": "custom",
+  "title": "Books to Read",
+  "items": [],
+  "source": "hub",
+  "created_at": "2026-09-06T18:10:00Z",
+  "updated_at": "2026-09-06T18:10:00Z",
+  "deleted_at": null,
+  "hlc": "1757182200000:0:a1b2c3"
+}

@@ -165,6 +165,10 @@ class ScheduleStep(BaseModel):
     job: str | None = Field(
         None, description='The job id this schedules, resolved by host.schedule.'
     )
+    inputs: dict[str, Any] | None = Field(
+        None,
+        description="Carried into the recipe's own input scope when the job fires and re-runs this package (session-d-packages-and-store.md step 8: host.schedule used to hardcode {} here, so a job scheduled from within a recipe re-fired with an empty scope - a known, documented gap, docs/dev.md's own scheduler entry). Every string value, at any depth, may reference input/variable names in {braces} - the same interpolate-before-send convention integration_call_step's own `args` already uses.",
+    )
 
 
 class IntegrationCallStep(BaseModel):
@@ -231,6 +235,77 @@ class LlmCompleteStep(BaseModel):
     )
 
 
+class ListAddStep(BaseModel):
+    """
+    Calls host.lists.add (permission lists:write, session-d-packages-and-store.md step 8's own list-add package) - fire-and-forget, the same shape remember_step already takes: nothing is bound, a recipe's own format step confirms using the input it already has.
+    """
+
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    op: Literal['list_add']
+    text: str = Field(
+        ...,
+        description="May reference input/variable names in {braces}. The item text added to the household's own default shopping list.",
+    )
+
+
+class ListViewStep(BaseModel):
+    """
+    Calls host.lists.view (permission lists:read, session-d-packages-and-store.md step 8's own list-view package).
+    """
+
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    op: Literal['list_view']
+    as_: str = Field(
+        ...,
+        alias='as',
+        description="Binds a ready-to-speak summary of the household's own default shopping list - a plain 'your list is empty' phrase if there are none, the same 'resolve a list-shaped result into one string at the interpreter, since the recipe language has no loop' move recall_step already makes.",
+    )
+
+
+class RemindStep(BaseModel):
+    """
+    Calls host.reminders.set (permission reminders:write, session-d-packages-and-store.md step 8's own remind package) - schedules a core-kind job (session-d-packages-and-store.md step 8's own scheduler entry), never a replay of this recipe: firing later re-runs nothing, it raises the declared reminders.due notification directly.
+    """
+
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    op: Literal['remind']
+    as_: str = Field(
+        ...,
+        alias='as',
+        description='Binds the result ({"task": string, "when_text": string}, the same raw-object shape fetch\'s own `as` binds) - a `pick` step reads each field out before a `format` step interpolates it.',
+    )
+    text: str = Field(
+        ...,
+        description='May reference input/variable names in {braces}. The household member\'s own free-typed reminder request, e.g. "at 6 to call Nadia" - host.reminders.set does the natural-language time/task extraction and the real scheduling, both host-side, since neither is something this declarative step can do for itself.',
+    )
+
+
+class TimerStep(BaseModel):
+    """
+    Calls host.timers.set (permission timers:write, session-d-packages-and-store.md step 8's own timer package) - schedules a core-kind job the same way remind_step does; firing later raises the declared timers.done notification directly, never a recipe replay.
+    """
+
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    op: Literal['timer']
+    as_: str = Field(
+        ...,
+        alias='as',
+        description='Binds the result ({"label": string, "when_text": string}, the same raw-object shape fetch\'s own `as` binds) - a `pick` step reads each field out before a `format` step interpolates it.',
+    )
+    text: str = Field(
+        ...,
+        description='May reference input/variable names in {braces}. The household member\'s own free-typed timer request, e.g. "for ten minutes". host.timers.set parses the duration with a small deterministic parser, not a language model - a timer\'s whole point is exact minute-level accuracy, which natural-language date grammars and models are not reliably good at (session-d-packages-and-store.md step 8\'s own scheduler entry).',
+    )
+
+
 class AskStep(BaseModel):
     """
     Sets the result's ask field (result.schema.json, 4.5) so a recipe that can't disambiguate on its own ("which Springfield") can ask a deterministic follow-up instead of guessing or failing outright. Always the recipe's last step: nothing after an ask step can run in the same pass, since there is nothing left to compute until the follow-up answer arrives on a later turn.
@@ -275,5 +350,9 @@ class Recipe(BaseModel):
         | IntegrationCallStep
         | ComputeStep
         | LlmCompleteStep
+        | ListAddStep
+        | ListViewStep
+        | RemindStep
+        | TimerStep
         | AskStep
     ] = Field(..., min_length=1)

@@ -1,0 +1,10 @@
+{
+  "id": "remind",
+  "inputs": [{ "name": "expression", "selector": "text" }],
+  "steps": [
+    { "op": "remind", "as": "reminder", "text": "{expression}" },
+    { "op": "pick", "as": "task", "from": "reminder", "path": "task" },
+    { "op": "pick", "as": "when_text", "from": "reminder", "path": "when_text" },
+    { "op": "format", "as": "reply", "text": "Okay, I'll remind you: {task} ({when_text}).", "speech": "Okay, I'll remind you: {task} ({when_text})." }
+  ]
+}

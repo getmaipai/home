@@ -117,3 +117,13 @@ export function newApprovalId(): string {
 export function newReceivedBackupId(): string {
   return `recvbak-${randomSuffix(10)}`;
 }
+
+/** Matches spec/schemas/list.schema.json's `^list-[a-z0-9]{6,}$`. */
+export function newListId(): string {
+  return `list-${randomSuffix(10)}`;
+}
+
+/** Matches spec/schemas/list.schema.json's own item `^item-[a-z0-9]{6,}$`. */
+export function newListItemId(): string {
+  return `item-${randomSuffix(10)}`;
+}

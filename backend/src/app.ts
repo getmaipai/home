@@ -37,6 +37,7 @@ import { grantsRoutes } from "@/routes/grants";
 import { approvalsRoutes } from "@/routes/approvals";
 import { openaiRoutes } from "@/routes/openai";
 import { storeRoutes } from "@/routes/store";
+import { listsRoutes } from "@/routes/lists";
 import { requireAuth } from "@/middleware/auth";
 import { listSidecars } from "@/lib/sidecars";
 
@@ -129,6 +130,7 @@ app.route("/api/auth/passkeys", passkeysRoutes);
 app.route("/api/auth/sessions", authSessionsRoutes);
 app.route("/api/auth/totp", totpRoutes);
 app.route("/api/entities", entitiesRoutes);
+app.route("/api/lists", listsRoutes);
 app.route("/api/relationships", relationshipsRoutes);
 app.route("/api/grants", grantsRoutes);
 app.route("/api/approvals", approvalsRoutes);

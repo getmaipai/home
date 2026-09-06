@@ -16,17 +16,15 @@
 // deliberately minimal `every:<n><unit>` grammar here, not RRULE; a
 // one-shot `when` is a plain ISO datetime. See this file's `parseWhen`.
 //
-// A real, narrow gap worth knowing before extending this: the Host
-// interface's `schedule(when, job)` (spec/emulators/ts/host-emulator.ts)
-// takes no recipe inputs, and neither does the interpreter's own
-// schedule-step handling (spec/interpreters/ts/recipe-interpreter.ts
-// calls `host.schedule(when, step.job ?? recipe.id)`, nothing else). So
-// a job scheduled from within a recipe re-fires its package with an
-// EMPTY input scope, not the inputs the original call had. Carrying
-// inputs through needs an interpreter-level change (both TS and Python,
-// kept behaviorally identical) that's out of scope here; ad-hoc jobs
-// scheduled directly via scheduleJob() (not through a recipe step) don't
-// have this limitation, since callers pass inputs explicitly.
+// A real gap this file used to document as out of scope, closed in
+// step 8: the Host interface's `schedule(when, job)`
+// (spec/emulators/ts/host-emulator.ts) used to take no recipe inputs,
+// and neither did the interpreter's own schedule-step handling - a job
+// scheduled from within a recipe re-fired its package with an EMPTY
+// input scope, not the inputs the original call had. Both interpreters
+// (kept behaviorally identical, spec/fixtures/recipes/) and this file's
+// own `host.schedule` real implementation (packageHost.ts) now carry a
+// recipe's own `schedule` step's `inputs` field through for real.
 import { eq, and, lte, isNull } from "drizzle-orm";
 import { db } from "@/db";
 import { scheduledJobs, people } from "@/db/schema";
@@ -38,6 +36,7 @@ import { runRetention } from "@/lib/conversationHistory";
 import { runBackupAndMirror } from "@/lib/backup";
 import { checkLeafExpiry } from "@/lib/householdCa";
 import { disableExpiredGuests, applyAgeBandChanges } from "@/lib/personLifecycle";
+import { trigger } from "@/lib/notifications";
 import type { PluginOpResult } from "@/lib/plugins";
 import type { PluginResult } from "@maipai/spec/interpreters/ts/recipe-interpreter.js";
 import type { PersonRow } from "@/types";
@@ -114,6 +113,42 @@ export function scheduleJob(
   return { ok: true, value: { id } };
 }
 
+/** Schedules a one-shot "core" job tied to one person, not a package
+ * replay - step 8's own reminders/timers case (packageHost.ts's
+ * `reminders.set`/`timers.set`): firing raises a notification directly
+ * (CORE_JOBS below), it never re-runs any recipe. Distinct from
+ * `ensureCoreJob`'s own idempotent, personId-less, usually-recurring
+ * household jobs (memory maintenance, backups) - a reminder is a real
+ * one-off action one person asked for, visible to them via `listJobs`'s
+ * own per-person filter the same way a `scheduleJob` plugin job already
+ * is. */
+export function scheduleCoreJob(
+  actor: PersonRow,
+  job: string,
+  when: string,
+  inputs: Record<string, unknown>,
+): SchedulerOpResult<{ id: string }> {
+  const parsed = parseWhen(when);
+  if (!parsed) return { ok: false, status: 400, error: `unrecognized or past-due "when": ${when}` };
+  const id = newJobId();
+  db.insert(scheduledJobs)
+    .values({
+      id,
+      kind: "core",
+      packageId: "core",
+      job,
+      personId: actor.id,
+      inputs: JSON.stringify(inputs),
+      when,
+      recurring: parsed.recurring,
+      nextRunAt: parsed.nextRunAt.toISOString(),
+      status: "pending",
+      createdAt: new Date().toISOString(),
+    })
+    .run();
+  return { ok: true, value: { id } };
+}
+
 /** Idempotent: only inserts if a pending job with this `job` id doesn't
  * already exist, so calling this on every boot (index.ts) is safe. */
 export function ensureCoreJob(job: string, when: string): void {
@@ -169,8 +204,8 @@ export function cancelJob(actor: PersonRow, id: string): SchedulerOpResult<true>
 // void | Promise<void>, not void alone: memory.embedding_retry (step 5,
 // session-a-intelligence.md) is the first core job whose work is
 // genuinely async (drainPendingEmbeddings awaits a real embed() call).
-// `await handler()` below resolves a plain void return immediately, so
-// the three pre-existing synchronous handlers are unaffected. Named as
+// `await handler(row)` below resolves a plain void return immediately,
+// so the three pre-existing synchronous handlers are unaffected. Named as
 // its own type because a core job beyond the built-ins here can also be
 // injected by the caller (index.ts's own "packages.smoke" ->
 // lib/smoke.ts's runAllSmokeTests(), session-d-packages-and-store.md
@@ -181,7 +216,12 @@ export function cancelJob(actor: PersonRow, id: string): SchedulerOpResult<true>
 // which imports this file for scheduleJob(). index.ts, the composition
 // root, already imports both freely, so it injects the handler instead -
 // the same dependency-injection shape `runPluginFn` already uses.
-type CoreJobHandler = () => void | Promise<void>;
+// `(row: JobRow)`, not `()` (step 8): reminders.fire/timers.fire below
+// need the row's own personId and inputs to know WHO to notify and
+// WHAT about - every pre-existing handler ignores the parameter it
+// wasn't written to take, a safe widen (TS structurally allows a
+// fewer-parameter function wherever a more-parameter one is expected).
+type CoreJobHandler = (row: JobRow) => void | Promise<void>;
 
 const CORE_JOBS: Record<string, CoreJobHandler> = {
   "memory.maintenance": () => {
@@ -228,6 +268,21 @@ const CORE_JOBS: Record<string, CoreJobHandler> = {
   // matches their age).
   "people.apply_age_band_changes": async () => {
     await applyAgeBandChanges();
+  },
+  // Step 8: reminders/timers (packageHost.ts's `reminders.set`/
+  // `timers.set`, scheduled via scheduleCoreJob above) fire by raising
+  // their declared notification directly - never a recipe replay, the
+  // real fix for "a recipe's own schedule step can't branch on whether
+  // it's being asked to set a reminder or fire one" (recipe.schema.json
+  // has no conditional step). `row.personId` is always set:
+  // scheduleCoreJob's own only caller path.
+  "reminders.fire": async (row) => {
+    const { task } = JSON.parse(row.inputs) as { task: string };
+    await trigger("remind.due", { task }, { personId: row.personId ?? undefined });
+  },
+  "timers.fire": async (row) => {
+    const { label } = JSON.parse(row.inputs) as { label: string };
+    await trigger("timer.done", { duration_text: label }, { personId: row.personId ?? undefined });
   },
 };
 
@@ -285,7 +340,7 @@ async function runDueJobsUnguarded(
       if (row.kind === "core") {
         const handler = CORE_JOBS[row.job] ?? extraCoreJobs[row.job];
         if (!handler) throw new Error(`no core job registered for ${row.job}`);
-        await handler();
+        await handler(row);
       } else {
         if (!row.personId) throw new Error(`plugin job ${row.id} has no personId`);
         const actor = db.select().from(people).where(and(eq(people.id, row.personId), isNull(people.deletedAt))).get();

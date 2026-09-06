@@ -16,6 +16,10 @@
     { "id": "speak", "parameterized": false, "description": "Call host.speak.sentence." },
     { "id": "schedule", "parameterized": false, "description": "Call host.schedule." },
     { "id": "files:<path>", "parameterized": true, "description": "Read or write this path through host.files." },
-    { "id": "logbook:read", "parameterized": false, "description": "Read the household logbook." }
+    { "id": "logbook:read", "parameterized": false, "description": "Read the household logbook." },
+    { "id": "lists:read", "parameterized": false, "description": "Call host.lists.view (session-d-packages-and-store.md step 8)." },
+    { "id": "lists:write", "parameterized": false, "description": "Call host.lists.add (session-d-packages-and-store.md step 8)." },
+    { "id": "reminders:write", "parameterized": false, "description": "Call host.reminders.set (session-d-packages-and-store.md step 8)." },
+    { "id": "timers:write", "parameterized": false, "description": "Call host.timers.set (session-d-packages-and-store.md step 8)." }
   ]
 }

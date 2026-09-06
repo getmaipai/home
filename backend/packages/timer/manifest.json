@@ -1,0 +1,55 @@
+{
+  "id": "timer",
+  "version": "0.1.0",
+  "kind": "plugin",
+  "category": "Utilities",
+  "display": "Timers",
+  "description": "Sets a timer for a length of time (2026-09-06, step 8) - a small deterministic duration parser, not a language model: exact minute-level accuracy is the whole point.",
+  "author": "MaiPai",
+  "license": "AGPL-3.0",
+  "homepage": "https://github.com/getmaipai/home",
+  "routing": {
+    "examples": [
+      "set a timer for ten minutes",
+      "set a timer for 5 minutes",
+      "set a timer for an hour",
+      "set a timer for 30 seconds",
+      "set a timer for 2 hours"
+    ],
+    "patterns": ["set a timer for *"]
+  },
+  "args": {
+    "type": "object",
+    "required": ["expression"],
+    "properties": {
+      "expression": { "type": "string", "minLength": 1 }
+    }
+  },
+  "requires": [],
+  "optional": [],
+  "platforms": ["home"],
+  "min_role": "child",
+  "consequential": false,
+  "offline": "full",
+  "config": [],
+  "data_sources": [],
+  "permissions": ["timers:write"],
+  "notifications": [
+    {
+      "id": "timer.done",
+      "level": "passive",
+      "audience": "person",
+      "template": "Your {duration_text} timer is up.",
+      "configurable": true,
+      "default_channels": ["in_app"]
+    }
+  ],
+  "backup": "exclude",
+  "background": false,
+  "contributes": {},
+  "pages": [],
+  "min_app": "0.1.0",
+  "tier": 0,
+  "quality_scale": "bronze",
+  "smoke": { "kind": "recipe_fixture", "fixture": "tests/smoke.json" }
+}

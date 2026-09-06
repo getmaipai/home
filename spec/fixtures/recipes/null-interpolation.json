@@ -1,0 +1,20 @@
+{
+  "description": "A real cross-language divergence code review found (2026-09-06): interpolate()'s literal for a null-valued variable used to differ between interpreters (JS's String(null) is \"null\", Python's str(None) is \"None\"). schedule_step's own inputs field is the first place a caller plausibly passes a null through templating (an optional recipe input left unset), so this proves both interpreters now render the identical literal.",
+  "recipe": {
+    "id": "null-interpolation",
+    "inputs": [{ "name": "note", "selector": "text", "required": false }],
+    "steps": [
+      { "op": "schedule", "when": "2026-09-08T17:00:00Z", "job": "some-job", "inputs": { "note": "{note}" } },
+      { "op": "format", "as": "reply", "text": "Scheduled.", "speech": "Scheduled." }
+    ]
+  },
+  "inputs": { "note": null },
+  "host_setup": {},
+  "expected": {
+    "reply": { "text": "Scheduled.", "speech": "Scheduled." },
+    "actions": [],
+    "scheduled_jobs": [{ "when": "2026-09-08T17:00:00Z", "job": "some-job", "inputs": { "note": "null" } }],
+    "home_calls": [],
+    "memory_added": []
+  }
+}

@@ -1173,3 +1173,139 @@ feeds it network-sourced content inherits the identical unguarded
 surface `websearch`'s own prompt-hardening only mitigates, not closes.
 Worth a real design pass (does every plugin reply need this, or only
 ones built from untrusted input) before a second such package ships.
+
+## Step 8: lists, reminders and timers (`home-d@<pending>`)
+
+The plan's own text names one `lists` package covering four behaviors
+("add milk to the shopping list", "what's on my list", "remind me at 6
+to call Nadia", "set a timer for ten minutes") over `host.schedule` and
+a new list store. Real research before writing any code (a dispatched
+research pass, since the obvious reading doesn't actually work) found
+the same routing-floor limit `remember`/`recall` already split on:
+`deterministicArgs()` binds at most one captured string to one required
+arg, so no single package can fan one utterance out into four different
+argument shapes at the routing layer, independent of Tier or of the
+recipe language's own lack of conditionals. Four packages, not one:
+`list-add`, `list-view`, `remind`, `timer` - `spec/vocab/capabilities.json`
+already listed `shopping_list`, `reminders`, `timers` as three separate
+grantable capabilities before this step touched anything, agreeing with
+the split before it was even proposed.
+
+**Why Tier 0, not Tier 1**: the actual hard part (parsing "at 6"
+reliably, and notifying later) isn't solved by Tier 1's real
+conditionals either - the fire-time behavior has to run off the
+scheduler with no live turn at all, which a chat-invoked Tier 1 handler
+can't do any better than a Tier 0 recipe can. Tier 1 would also need two
+new MCP bridge methods (`host/schedule`, `host/notify`) `denoHost.ts`
+doesn't have today - real, avoidable work for no benefit here.
+
+**The real fix, once "one recipe can't branch on set-vs-fire" was
+named**: don't make firing a recipe replay at all. `reminders.set`/
+`timers.set` (`packageHost.ts`) schedule a `"core"`-kind job
+(`lib/scheduler.ts`'s new `scheduleCoreJob`, parallel to `scheduleJob`'s
+existing `"plugin"`-kind one) rather than a `"plugin"`-kind one - firing
+raises the declared notification directly (`CORE_JOBS`'s new
+`"reminders.fire"`/`"timers.fire"` entries, `trigger()` from
+`lib/notifications.ts`), never re-running any recipe. `CoreJobHandler`
+widened from `() => void` to `(row: JobRow) => void` to give those two
+handlers the row's own `personId`/`inputs` - a safe, additive widen (TS
+accepts a fewer-parameter function wherever a more-parameter one is
+expected), so the nine pre-existing handlers needed no changes. No new
+`notify` recipe step: nothing today needs a *live, chat-invoked* recipe
+to raise a notification mid-turn, the only case such a step would
+actually serve.
+
+**The scheduler's own input-carrying gap, closed for real** (this
+file's step-4 entry first named it, `lib/scheduler.ts`'s own header
+carried it as a known gap since): `host.schedule(when, job)` hardcoded
+`{}` regardless of what a recipe's `schedule` step asked for, so a job
+re-firing a package lost its own input scope entirely.
+`recipe.schema.json`'s `schedule_step` gained an `inputs` field
+(interpolated the same way `integration_call_step`'s own `args`
+already is); both interpreters and `packageHost.ts`'s real
+implementation now carry it through; `bedtime-reminder.json`'s own
+fixture and both conformance test runners' `scheduled_jobs` projections
+were widened to prove it, not just assume it. A code review pass on
+this alone (before any backend wiring existed yet, spec-layer only)
+found one real, independent bug while checking it: `interpolate()`'s
+literal for a `null`-valued variable diverged between interpreters
+(JS's `String(null)` is `"null"`, Python's `str(None)` is `"None"`) -
+pre-existing in both interpreters since day one, invisible until this
+step's own optional `inputs` field became the first templated value a
+caller might plausibly pass `null` through. Fixed to match the TS
+literal exactly, with a new `null-interpolation.json` conformance
+fixture pinning it.
+
+**Time and duration parsing, two different tools for two different
+reliability needs** (`lib/reminderParsing.ts`, tested directly in
+`backend/tests/reminderParsing.test.ts`): `remind` needs genuine
+natural-language date resolution ("at 6", "tomorrow at noon", "tonight
+at 8pm") - `chrono-node` (MIT, actively maintained, real per-project
+convention for exactly this) per the org's own "prebuilt over
+hand-built" rule, verified real and current before adding it (not
+assumed) the same way `duck-duck-scrape` got verified and then rejected
+in step 7. `timer` deliberately does NOT use chrono-node, and
+deliberately does not use `llm_complete` either: "ten minutes" must
+mean exactly `now + 600000ms`, and neither a general NL date grammar
+nor a model is trustworthy for that precision - a ~15-line deterministic
+regex parser, unit-tested to assert the exact millisecond offset, not
+"close enough."
+
+**Two real routing collisions found while adding this step's own
+corpus rows** (both in `spec/llm/routing-corpus.json`, both caught by
+the deterministic stub-embedder suite before either could reach
+production): `list-view`'s own "what's on my list" (bare, no
+"shopping") scored close enough to an existing "what's my address"
+must-not-collide row to route a completely unrelated question there -
+dropped in favor of "shopping"-qualified phrasings only, the same
+revise-and-guard move `almanac-date` took in step 7. Separately,
+`remind`'s own "remind me *" pattern (unavoidably generic - a
+required-arg package can only route via a literal wildcard) now
+captures "remind me what I said about the school schedule," an
+existing corpus row that used to document a *different*, older gap
+(recall's own required arg can't be bound deterministically either).
+That row's `expect` changed from `null` to `"remind"`, reflecting the
+new, real, unavoidable fact rather than the gap it used to describe -
+`remind` 400s on it (chrono-node finds no time phrase), which is
+honest but still forecloses recall or the model for that turn. The
+actual fix is Tier 2 native tool calling, already tracked in
+`turnEngine.ts`'s own "not built this pass" list, not something this
+package's own pattern choice can solve.
+
+**`list.schema.json`** (fixtures: `list.shopping.example.json`,
+`list.todo.example.json`, `list.custom.example.json`;
+`validateList()` in `spec/records/ts/validate.ts`, TS-only like its
+sibling validators, the hub being the only writer today): the frozen
+D-to-E contract (`docs/plans/wave-2.md`, already committed before this
+step started - implemented verbatim, not renegotiated). One `hlc` for
+the whole list, not one per item - a real, deliberate v1 tradeoff (two
+people editing the same list concurrently resolve at whole-list
+granularity), matching the frozen shape exactly rather than
+re-litigating it. `lib/lists.ts` mirrors `lib/entities.ts`'s own shape
+(`toList`/`toRow`, person-scope visibility, a real cross-table
+existence check on `person`) with one addition, `findOrCreateStandingList`,
+the "exactly one shopping list, exactly one to-do list per household"
+rule `list-add`/`list-view` need and a REST-created custom list doesn't.
+`routes/lists.ts` implements the full frozen surface
+(`GET/POST /api/lists`, `PATCH/DELETE /api/lists/:id`,
+`POST /api/lists/:id/items`, `PATCH/DELETE .../items/:itemId`,
+`POST /api/lists/:id/clear`) for E's own list page; "the running timer"
+needed no route of its own - `GET /api/scheduler/jobs` already lists a
+person's own pending jobs, `reminders.fire`/`timers.fire` among them.
+
+Step 8 is complete. `backend/tests/lists.test.ts` (REST surface),
+`backend/tests/reminderParsing.test.ts` (the exact-millisecond timer
+regression test the design work called for), `backend/tests/
+packageHost.test.ts` and `plugins.test.ts` (the real
+`host.lists`/`reminders`/`timers` methods and all four packages end to
+end), and `backend/tests/scheduler.test.ts` (real `reminders.fire`/
+`timers.fire` core jobs firing real notifications, via the real
+bundled package manifests and `registerAllPackageNotificationTypes()` -
+not an inline fake manifest, so a mismatch between what's declared and
+what fires would actually be caught) all pass. Known gap, matching the
+shape step 7 already found three times over: `list-add`'s own
+`min_role: child` and `offline: full` mean any household member can add
+to the one shared shopping list with no per-person attribution kept
+beyond what `source`/creation timestamps already carry - a real "who
+added this" feature, if wanted, is `lib/lists.ts` schema work, not
+something this step's own scope needed to build speculatively.

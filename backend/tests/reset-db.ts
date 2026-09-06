@@ -19,6 +19,7 @@ import {
   packageStatus,
   packageInstalls,
   storeIndexState,
+  lists,
   hubIdentity,
   hubEndpoints,
   deviceTokens,
@@ -67,6 +68,7 @@ export function resetDb(): void {
   db.delete(issues).run();
   db.delete(packageInstalls).run();
   db.delete(storeIndexState).run();
+  db.delete(lists).run();
   db.delete(packageStatus).run();
   db.delete(notificationDeliveries).run();
   db.delete(commands).run();

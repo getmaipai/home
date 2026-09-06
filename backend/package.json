@@ -23,6 +23,7 @@
     "@simplewebauthn/server": "^14.0.1",
     "ajv": "^8.20.0",
     "bonjour-service": "^1.4.4",
+    "chrono-node": "^2.10.1",
     "drizzle-orm": "^0.44.6",
     "hono": "^4.10.7",
     "node-forge": "^1.4.0",

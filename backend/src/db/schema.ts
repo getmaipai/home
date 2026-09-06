@@ -828,3 +828,22 @@ export const storeIndexState = sqliteTable("store_index_state", {
   version: integer("version").notNull(),
   updatedAt: text("updated_at").notNull(),
 });
+
+// Mirrors spec/schemas/list.schema.json (session-d-packages-and-store.md
+// step 8): the frozen D-to-E contract (docs/plans/wave-2.md). `items` is
+// JSON text, the same "one hlc for the whole list, not one per item"
+// choice the schema's own description explains - a real, deliberate v1
+// tradeoff (docs/dev/session-d.md's step 8 entry), not an oversight.
+export const lists = sqliteTable("lists", {
+  id: text("id").primaryKey(),
+  scope: text("scope").notNull().default("household"), // "household" | "person"
+  person: text("person").references(() => people.id),
+  kind: text("kind").notNull(), // "shopping" | "todo" | "custom"
+  title: text("title").notNull(),
+  items: text("items").notNull().default("[]"), // JSON ListItem[]
+  source: text("source").notNull(),
+  createdAt: text("created_at").notNull(),
+  updatedAt: text("updated_at").notNull(),
+  deletedAt: text("deleted_at"),
+  hlc: text("hlc").notNull(),
+});

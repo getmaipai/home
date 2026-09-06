@@ -6423,6 +6423,1776 @@
         }
       }
     },
+    "/api/lists": {
+      "get": {
+        "tags": [
+          "Lists"
+        ],
+        "summary": "Every list I can see - the household's own, plus my own person-scoped ones",
+        "responses": {
+          "200": {
+            "description": "Found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "string",
+                        "pattern": "^list-[a-z0-9]{6,}$",
+                        "description": "Stable id, never reused, even after deleted_at is set."
+                      },
+                      "scope": {
+                        "type": "string",
+                        "enum": [
+                          "household",
+                          "person"
+                        ],
+                        "default": "household",
+                        "description": "Who this list belongs to, following entity.schema.json's own scoping minus its person-mention nuance: a list is either the whole household's (the shared shopping list) or one person's own (their private to-do list)."
+                      },
+                      "person": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "pattern": "^person-[a-z0-9]{6,}$",
+                            "description": "Required when scope is person; null for household scope. Same field and same rule as Entity and MemoryRecord. Enforced in validate.ts."
+                          },
+                          {
+                            "nullable": true,
+                            "description": "Required when scope is person; null for household scope. Same field and same rule as Entity and MemoryRecord. Enforced in validate.ts."
+                          },
+                          {
+                            "nullable": true
+                          }
+                        ],
+                        "default": null,
+                        "description": "Required when scope is person; null for household scope. Same field and same rule as Entity and MemoryRecord. Enforced in validate.ts."
+                      },
+                      "kind": {
+                        "type": "string",
+                        "enum": [
+                          "shopping",
+                          "todo",
+                          "custom"
+                        ],
+                        "description": "shopping and todo are each a household's one standing list of that kind (lib/lists.ts finds-or-creates rather than letting a second one exist); custom is a named list a person creates deliberately and may have several of."
+                      },
+                      "title": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 120,
+                        "description": "What the household calls this list. Defaulted from kind ('Shopping List', 'To-Do List') when not given; required and free-text for kind: custom."
+                      },
+                      "items": {
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "properties": {
+                            "id": {
+                              "type": "string",
+                              "pattern": "^item-[a-z0-9]{6,}$"
+                            },
+                            "text": {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 500
+                            },
+                            "done": {
+                              "type": "boolean"
+                            },
+                            "due_at": {
+                              "anyOf": [
+                                {
+                                  "type": "string",
+                                  "format": "date-time",
+                                  "description": "Only meaningful for kind: todo. Not how a reminder or timer is tracked (those are scheduler jobs, session-d-packages-and-store.md step 8's own remind/timer packages, not List records) - this is a plain to-do due date with no notification behavior of its own."
+                                },
+                                {
+                                  "nullable": true,
+                                  "description": "Only meaningful for kind: todo. Not how a reminder or timer is tracked (those are scheduler jobs, session-d-packages-and-store.md step 8's own remind/timer packages, not List records) - this is a plain to-do due date with no notification behavior of its own."
+                                },
+                                {
+                                  "nullable": true
+                                }
+                              ],
+                              "default": null,
+                              "description": "Only meaningful for kind: todo. Not how a reminder or timer is tracked (those are scheduler jobs, session-d-packages-and-store.md step 8's own remind/timer packages, not List records) - this is a plain to-do due date with no notification behavior of its own."
+                            },
+                            "created_at": {
+                              "type": "string",
+                              "format": "date-time"
+                            }
+                          },
+                          "required": [
+                            "id",
+                            "text",
+                            "done",
+                            "created_at"
+                          ],
+                          "additionalProperties": false
+                        },
+                        "default": []
+                      },
+                      "source": {
+                        "type": "string",
+                        "enum": [
+                          "hub",
+                          "local"
+                        ],
+                        "description": "Same meaning as person.schema.json's own source: hub is authoritative and replicates; local never syncs."
+                      },
+                      "created_at": {
+                        "type": "string",
+                        "format": "date-time"
+                      },
+                      "updated_at": {
+                        "type": "string",
+                        "format": "date-time"
+                      },
+                      "deleted_at": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "format": "date-time",
+                            "description": "A tombstone, not a removal - the same reason every other synced record type here uses one instead of a hard delete."
+                          },
+                          {
+                            "nullable": true,
+                            "description": "A tombstone, not a removal - the same reason every other synced record type here uses one instead of a hard delete."
+                          },
+                          {
+                            "nullable": true
+                          }
+                        ],
+                        "default": null,
+                        "description": "A tombstone, not a removal - the same reason every other synced record type here uses one instead of a hard delete."
+                      },
+                      "hlc": {
+                        "type": "string",
+                        "pattern": "^[0-9]+:[0-9]+:[a-z0-9]{6,}$",
+                        "description": "Hybrid logical clock: wall_ms:counter:node (7.3), the same shape every other synced record type uses."
+                      }
+                    },
+                    "required": [
+                      "id",
+                      "kind",
+                      "title",
+                      "source",
+                      "created_at",
+                      "updated_at",
+                      "hlc"
+                    ],
+                    "additionalProperties": false,
+                    "description": "A household or person's own list: the shopping list, a to-do list, or a custom one (session-d-packages-and-store.md step 8). The frozen D-to-E contract (docs/plans/wave-2.md, 'D to E: the store, widgets, lists'): `{ id, person, scope, kind, title, items: [{ id, text, done, due_at?, created_at }], hlc }`. One hlc for the whole list, not one per item: two people editing the same list concurrently resolve at whole-list granularity, a real, deliberate v1 tradeoff (docs/dev/session-d.md's step 8 entry) rather than a per-item oplog this step doesn't build."
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Lists"
+        ],
+        "summary": "Create a list - shopping/todo find-or-create their own standing one via chat instead; this is for a custom list, or an explicit household/person one",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "kind": {
+                    "type": "string",
+                    "enum": [
+                      "shopping",
+                      "todo",
+                      "custom"
+                    ]
+                  },
+                  "title": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 120
+                  },
+                  "scope": {
+                    "type": "string",
+                    "enum": [
+                      "household",
+                      "person"
+                    ]
+                  },
+                  "person": {
+                    "type": "string",
+                    "nullable": true
+                  }
+                },
+                "required": [
+                  "kind"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Created.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "pattern": "^list-[a-z0-9]{6,}$",
+                      "description": "Stable id, never reused, even after deleted_at is set."
+                    },
+                    "scope": {
+                      "type": "string",
+                      "enum": [
+                        "household",
+                        "person"
+                      ],
+                      "default": "household",
+                      "description": "Who this list belongs to, following entity.schema.json's own scoping minus its person-mention nuance: a list is either the whole household's (the shared shopping list) or one person's own (their private to-do list)."
+                    },
+                    "person": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "pattern": "^person-[a-z0-9]{6,}$",
+                          "description": "Required when scope is person; null for household scope. Same field and same rule as Entity and MemoryRecord. Enforced in validate.ts."
+                        },
+                        {
+                          "nullable": true,
+                          "description": "Required when scope is person; null for household scope. Same field and same rule as Entity and MemoryRecord. Enforced in validate.ts."
+                        },
+                        {
+                          "nullable": true
+                        }
+                      ],
+                      "default": null,
+                      "description": "Required when scope is person; null for household scope. Same field and same rule as Entity and MemoryRecord. Enforced in validate.ts."
+                    },
+                    "kind": {
+                      "type": "string",
+                      "enum": [
+                        "shopping",
+                        "todo",
+                        "custom"
+                      ],
+                      "description": "shopping and todo are each a household's one standing list of that kind (lib/lists.ts finds-or-creates rather than letting a second one exist); custom is a named list a person creates deliberately and may have several of."
+                    },
+                    "title": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 120,
+                      "description": "What the household calls this list. Defaulted from kind ('Shopping List', 'To-Do List') when not given; required and free-text for kind: custom."
+                    },
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "pattern": "^item-[a-z0-9]{6,}$"
+                          },
+                          "text": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 500
+                          },
+                          "done": {
+                            "type": "boolean"
+                          },
+                          "due_at": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "format": "date-time",
+                                "description": "Only meaningful for kind: todo. Not how a reminder or timer is tracked (those are scheduler jobs, session-d-packages-and-store.md step 8's own remind/timer packages, not List records) - this is a plain to-do due date with no notification behavior of its own."
+                              },
+                              {
+                                "nullable": true,
+                                "description": "Only meaningful for kind: todo. Not how a reminder or timer is tracked (those are scheduler jobs, session-d-packages-and-store.md step 8's own remind/timer packages, not List records) - this is a plain to-do due date with no notification behavior of its own."
+                              },
+                              {
+                                "nullable": true
+                              }
+                            ],
+                            "default": null,
+                            "description": "Only meaningful for kind: todo. Not how a reminder or timer is tracked (those are scheduler jobs, session-d-packages-and-store.md step 8's own remind/timer packages, not List records) - this is a plain to-do due date with no notification behavior of its own."
+                          },
+                          "created_at": {
+                            "type": "string",
+                            "format": "date-time"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "text",
+                          "done",
+                          "created_at"
+                        ],
+                        "additionalProperties": false
+                      },
+                      "default": []
+                    },
+                    "source": {
+                      "type": "string",
+                      "enum": [
+                        "hub",
+                        "local"
+                      ],
+                      "description": "Same meaning as person.schema.json's own source: hub is authoritative and replicates; local never syncs."
+                    },
+                    "created_at": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "updated_at": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "deleted_at": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "format": "date-time",
+                          "description": "A tombstone, not a removal - the same reason every other synced record type here uses one instead of a hard delete."
+                        },
+                        {
+                          "nullable": true,
+                          "description": "A tombstone, not a removal - the same reason every other synced record type here uses one instead of a hard delete."
+                        },
+                        {
+                          "nullable": true
+                        }
+                      ],
+                      "default": null,
+                      "description": "A tombstone, not a removal - the same reason every other synced record type here uses one instead of a hard delete."
+                    },
+                    "hlc": {
+                      "type": "string",
+                      "pattern": "^[0-9]+:[0-9]+:[a-z0-9]{6,}$",
+                      "description": "Hybrid logical clock: wall_ms:counter:node (7.3), the same shape every other synced record type uses."
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "kind",
+                    "title",
+                    "source",
+                    "created_at",
+                    "updated_at",
+                    "hlc"
+                  ],
+                  "additionalProperties": false,
+                  "description": "A household or person's own list: the shopping list, a to-do list, or a custom one (session-d-packages-and-store.md step 8). The frozen D-to-E contract (docs/plans/wave-2.md, 'D to E: the store, widgets, lists'): `{ id, person, scope, kind, title, items: [{ id, text, done, due_at?, created_at }], hlc }`. One hlc for the whole list, not one per item: two people editing the same list concurrently resolve at whole-list granularity, a real, deliberate v1 tradeoff (docs/dev/session-d.md's step 8 entry) rather than a per-item oplog this step doesn't build."
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid list",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/lists/{id}": {
+      "get": {
+        "tags": [
+          "Lists"
+        ],
+        "summary": "One list",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "list-a1b2c3"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "pattern": "^list-[a-z0-9]{6,}$",
+                      "description": "Stable id, never reused, even after deleted_at is set."
+                    },
+                    "scope": {
+                      "type": "string",
+                      "enum": [
+                        "household",
+                        "person"
+                      ],
+                      "default": "household",
+                      "description": "Who this list belongs to, following entity.schema.json's own scoping minus its person-mention nuance: a list is either the whole household's (the shared shopping list) or one person's own (their private to-do list)."
+                    },
+                    "person": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "pattern": "^person-[a-z0-9]{6,}$",
+                          "description": "Required when scope is person; null for household scope. Same field and same rule as Entity and MemoryRecord. Enforced in validate.ts."
+                        },
+                        {
+                          "nullable": true,
+                          "description": "Required when scope is person; null for household scope. Same field and same rule as Entity and MemoryRecord. Enforced in validate.ts."
+                        },
+                        {
+                          "nullable": true
+                        }
+                      ],
+                      "default": null,
+                      "description": "Required when scope is person; null for household scope. Same field and same rule as Entity and MemoryRecord. Enforced in validate.ts."
+                    },
+                    "kind": {
+                      "type": "string",
+                      "enum": [
+                        "shopping",
+                        "todo",
+                        "custom"
+                      ],
+                      "description": "shopping and todo are each a household's one standing list of that kind (lib/lists.ts finds-or-creates rather than letting a second one exist); custom is a named list a person creates deliberately and may have several of."
+                    },
+                    "title": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 120,
+                      "description": "What the household calls this list. Defaulted from kind ('Shopping List', 'To-Do List') when not given; required and free-text for kind: custom."
+                    },
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "pattern": "^item-[a-z0-9]{6,}$"
+                          },
+                          "text": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 500
+                          },
+                          "done": {
+                            "type": "boolean"
+                          },
+                          "due_at": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "format": "date-time",
+                                "description": "Only meaningful for kind: todo. Not how a reminder or timer is tracked (those are scheduler jobs, session-d-packages-and-store.md step 8's own remind/timer packages, not List records) - this is a plain to-do due date with no notification behavior of its own."
+                              },
+                              {
+                                "nullable": true,
+                                "description": "Only meaningful for kind: todo. Not how a reminder or timer is tracked (those are scheduler jobs, session-d-packages-and-store.md step 8's own remind/timer packages, not List records) - this is a plain to-do due date with no notification behavior of its own."
+                              },
+                              {
+                                "nullable": true
+                              }
+                            ],
+                            "default": null,
+                            "description": "Only meaningful for kind: todo. Not how a reminder or timer is tracked (those are scheduler jobs, session-d-packages-and-store.md step 8's own remind/timer packages, not List records) - this is a plain to-do due date with no notification behavior of its own."
+                          },
+                          "created_at": {
+                            "type": "string",
+                            "format": "date-time"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "text",
+                          "done",
+                          "created_at"
+                        ],
+                        "additionalProperties": false
+                      },
+                      "default": []
+                    },
+                    "source": {
+                      "type": "string",
+                      "enum": [
+                        "hub",
+                        "local"
+                      ],
+                      "description": "Same meaning as person.schema.json's own source: hub is authoritative and replicates; local never syncs."
+                    },
+                    "created_at": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "updated_at": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "deleted_at": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "format": "date-time",
+                          "description": "A tombstone, not a removal - the same reason every other synced record type here uses one instead of a hard delete."
+                        },
+                        {
+                          "nullable": true,
+                          "description": "A tombstone, not a removal - the same reason every other synced record type here uses one instead of a hard delete."
+                        },
+                        {
+                          "nullable": true
+                        }
+                      ],
+                      "default": null,
+                      "description": "A tombstone, not a removal - the same reason every other synced record type here uses one instead of a hard delete."
+                    },
+                    "hlc": {
+                      "type": "string",
+                      "pattern": "^[0-9]+:[0-9]+:[a-z0-9]{6,}$",
+                      "description": "Hybrid logical clock: wall_ms:counter:node (7.3), the same shape every other synced record type uses."
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "kind",
+                    "title",
+                    "source",
+                    "created_at",
+                    "updated_at",
+                    "hlc"
+                  ],
+                  "additionalProperties": false,
+                  "description": "A household or person's own list: the shopping list, a to-do list, or a custom one (session-d-packages-and-store.md step 8). The frozen D-to-E contract (docs/plans/wave-2.md, 'D to E: the store, widgets, lists'): `{ id, person, scope, kind, title, items: [{ id, text, done, due_at?, created_at }], hlc }`. One hlc for the whole list, not one per item: two people editing the same list concurrently resolve at whole-list granularity, a real, deliberate v1 tradeoff (docs/dev/session-d.md's step 8 entry) rather than a per-item oplog this step doesn't build."
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such list",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "tags": [
+          "Lists"
+        ],
+        "summary": "Rename a list",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "list-a1b2c3"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "title": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 120
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Updated.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "pattern": "^list-[a-z0-9]{6,}$",
+                      "description": "Stable id, never reused, even after deleted_at is set."
+                    },
+                    "scope": {
+                      "type": "string",
+                      "enum": [
+                        "household",
+                        "person"
+                      ],
+                      "default": "household",
+                      "description": "Who this list belongs to, following entity.schema.json's own scoping minus its person-mention nuance: a list is either the whole household's (the shared shopping list) or one person's own (their private to-do list)."
+                    },
+                    "person": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "pattern": "^person-[a-z0-9]{6,}$",
+                          "description": "Required when scope is person; null for household scope. Same field and same rule as Entity and MemoryRecord. Enforced in validate.ts."
+                        },
+                        {
+                          "nullable": true,
+                          "description": "Required when scope is person; null for household scope. Same field and same rule as Entity and MemoryRecord. Enforced in validate.ts."
+                        },
+                        {
+                          "nullable": true
+                        }
+                      ],
+                      "default": null,
+                      "description": "Required when scope is person; null for household scope. Same field and same rule as Entity and MemoryRecord. Enforced in validate.ts."
+                    },
+                    "kind": {
+                      "type": "string",
+                      "enum": [
+                        "shopping",
+                        "todo",
+                        "custom"
+                      ],
+                      "description": "shopping and todo are each a household's one standing list of that kind (lib/lists.ts finds-or-creates rather than letting a second one exist); custom is a named list a person creates deliberately and may have several of."
+                    },
+                    "title": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 120,
+                      "description": "What the household calls this list. Defaulted from kind ('Shopping List', 'To-Do List') when not given; required and free-text for kind: custom."
+                    },
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "pattern": "^item-[a-z0-9]{6,}$"
+                          },
+                          "text": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 500
+                          },
+                          "done": {
+                            "type": "boolean"
+                          },
+                          "due_at": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "format": "date-time",
+                                "description": "Only meaningful for kind: todo. Not how a reminder or timer is tracked (those are scheduler jobs, session-d-packages-and-store.md step 8's own remind/timer packages, not List records) - this is a plain to-do due date with no notification behavior of its own."
+                              },
+                              {
+                                "nullable": true,
+                                "description": "Only meaningful for kind: todo. Not how a reminder or timer is tracked (those are scheduler jobs, session-d-packages-and-store.md step 8's own remind/timer packages, not List records) - this is a plain to-do due date with no notification behavior of its own."
+                              },
+                              {
+                                "nullable": true
+                              }
+                            ],
+                            "default": null,
+                            "description": "Only meaningful for kind: todo. Not how a reminder or timer is tracked (those are scheduler jobs, session-d-packages-and-store.md step 8's own remind/timer packages, not List records) - this is a plain to-do due date with no notification behavior of its own."
+                          },
+                          "created_at": {
+                            "type": "string",
+                            "format": "date-time"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "text",
+                          "done",
+                          "created_at"
+                        ],
+                        "additionalProperties": false
+                      },
+                      "default": []
+                    },
+                    "source": {
+                      "type": "string",
+                      "enum": [
+                        "hub",
+                        "local"
+                      ],
+                      "description": "Same meaning as person.schema.json's own source: hub is authoritative and replicates; local never syncs."
+                    },
+                    "created_at": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "updated_at": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "deleted_at": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "format": "date-time",
+                          "description": "A tombstone, not a removal - the same reason every other synced record type here uses one instead of a hard delete."
+                        },
+                        {
+                          "nullable": true,
+                          "description": "A tombstone, not a removal - the same reason every other synced record type here uses one instead of a hard delete."
+                        },
+                        {
+                          "nullable": true
+                        }
+                      ],
+                      "default": null,
+                      "description": "A tombstone, not a removal - the same reason every other synced record type here uses one instead of a hard delete."
+                    },
+                    "hlc": {
+                      "type": "string",
+                      "pattern": "^[0-9]+:[0-9]+:[a-z0-9]{6,}$",
+                      "description": "Hybrid logical clock: wall_ms:counter:node (7.3), the same shape every other synced record type uses."
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "kind",
+                    "title",
+                    "source",
+                    "created_at",
+                    "updated_at",
+                    "hlc"
+                  ],
+                  "additionalProperties": false,
+                  "description": "A household or person's own list: the shopping list, a to-do list, or a custom one (session-d-packages-and-store.md step 8). The frozen D-to-E contract (docs/plans/wave-2.md, 'D to E: the store, widgets, lists'): `{ id, person, scope, kind, title, items: [{ id, text, done, due_at?, created_at }], hlc }`. One hlc for the whole list, not one per item: two people editing the same list concurrently resolve at whole-list granularity, a real, deliberate v1 tradeoff (docs/dev/session-d.md's step 8 entry) rather than a per-item oplog this step doesn't build."
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid edit",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such list",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Lists"
+        ],
+        "summary": "Remove a list",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "list-a1b2c3"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Removed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "id"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such list",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/lists/{id}/items": {
+      "post": {
+        "tags": [
+          "Lists"
+        ],
+        "summary": "Add an item to a list",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "list-a1b2c3"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "text": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 500
+                  },
+                  "due_at": {
+                    "type": "string",
+                    "nullable": true
+                  }
+                },
+                "required": [
+                  "text"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Added.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "pattern": "^list-[a-z0-9]{6,}$",
+                      "description": "Stable id, never reused, even after deleted_at is set."
+                    },
+                    "scope": {
+                      "type": "string",
+                      "enum": [
+                        "household",
+                        "person"
+                      ],
+                      "default": "household",
+                      "description": "Who this list belongs to, following entity.schema.json's own scoping minus its person-mention nuance: a list is either the whole household's (the shared shopping list) or one person's own (their private to-do list)."
+                    },
+                    "person": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "pattern": "^person-[a-z0-9]{6,}$",
+                          "description": "Required when scope is person; null for household scope. Same field and same rule as Entity and MemoryRecord. Enforced in validate.ts."
+                        },
+                        {
+                          "nullable": true,
+                          "description": "Required when scope is person; null for household scope. Same field and same rule as Entity and MemoryRecord. Enforced in validate.ts."
+                        },
+                        {
+                          "nullable": true
+                        }
+                      ],
+                      "default": null,
+                      "description": "Required when scope is person; null for household scope. Same field and same rule as Entity and MemoryRecord. Enforced in validate.ts."
+                    },
+                    "kind": {
+                      "type": "string",
+                      "enum": [
+                        "shopping",
+                        "todo",
+                        "custom"
+                      ],
+                      "description": "shopping and todo are each a household's one standing list of that kind (lib/lists.ts finds-or-creates rather than letting a second one exist); custom is a named list a person creates deliberately and may have several of."
+                    },
+                    "title": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 120,
+                      "description": "What the household calls this list. Defaulted from kind ('Shopping List', 'To-Do List') when not given; required and free-text for kind: custom."
+                    },
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "pattern": "^item-[a-z0-9]{6,}$"
+                          },
+                          "text": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 500
+                          },
+                          "done": {
+                            "type": "boolean"
+                          },
+                          "due_at": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "format": "date-time",
+                                "description": "Only meaningful for kind: todo. Not how a reminder or timer is tracked (those are scheduler jobs, session-d-packages-and-store.md step 8's own remind/timer packages, not List records) - this is a plain to-do due date with no notification behavior of its own."
+                              },
+                              {
+                                "nullable": true,
+                                "description": "Only meaningful for kind: todo. Not how a reminder or timer is tracked (those are scheduler jobs, session-d-packages-and-store.md step 8's own remind/timer packages, not List records) - this is a plain to-do due date with no notification behavior of its own."
+                              },
+                              {
+                                "nullable": true
+                              }
+                            ],
+                            "default": null,
+                            "description": "Only meaningful for kind: todo. Not how a reminder or timer is tracked (those are scheduler jobs, session-d-packages-and-store.md step 8's own remind/timer packages, not List records) - this is a plain to-do due date with no notification behavior of its own."
+                          },
+                          "created_at": {
+                            "type": "string",
+                            "format": "date-time"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "text",
+                          "done",
+                          "created_at"
+                        ],
+                        "additionalProperties": false
+                      },
+                      "default": []
+                    },
+                    "source": {
+                      "type": "string",
+                      "enum": [
+                        "hub",
+                        "local"
+                      ],
+                      "description": "Same meaning as person.schema.json's own source: hub is authoritative and replicates; local never syncs."
+                    },
+                    "created_at": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "updated_at": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "deleted_at": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "format": "date-time",
+                          "description": "A tombstone, not a removal - the same reason every other synced record type here uses one instead of a hard delete."
+                        },
+                        {
+                          "nullable": true,
+                          "description": "A tombstone, not a removal - the same reason every other synced record type here uses one instead of a hard delete."
+                        },
+                        {
+                          "nullable": true
+                        }
+                      ],
+                      "default": null,
+                      "description": "A tombstone, not a removal - the same reason every other synced record type here uses one instead of a hard delete."
+                    },
+                    "hlc": {
+                      "type": "string",
+                      "pattern": "^[0-9]+:[0-9]+:[a-z0-9]{6,}$",
+                      "description": "Hybrid logical clock: wall_ms:counter:node (7.3), the same shape every other synced record type uses."
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "kind",
+                    "title",
+                    "source",
+                    "created_at",
+                    "updated_at",
+                    "hlc"
+                  ],
+                  "additionalProperties": false,
+                  "description": "A household or person's own list: the shopping list, a to-do list, or a custom one (session-d-packages-and-store.md step 8). The frozen D-to-E contract (docs/plans/wave-2.md, 'D to E: the store, widgets, lists'): `{ id, person, scope, kind, title, items: [{ id, text, done, due_at?, created_at }], hlc }`. One hlc for the whole list, not one per item: two people editing the same list concurrently resolve at whole-list granularity, a real, deliberate v1 tradeoff (docs/dev/session-d.md's step 8 entry) rather than a per-item oplog this step doesn't build."
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid item",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such list",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/lists/{id}/items/{itemId}": {
+      "patch": {
+        "tags": [
+          "Lists"
+        ],
+        "summary": "Edit an item - text, done, or due date",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "list-a1b2c3"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "example": "item-a1b2c3"
+            },
+            "required": true,
+            "name": "itemId",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "text": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 500
+                  },
+                  "done": {
+                    "type": "boolean"
+                  },
+                  "due_at": {
+                    "type": "string",
+                    "nullable": true
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Updated.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "pattern": "^list-[a-z0-9]{6,}$",
+                      "description": "Stable id, never reused, even after deleted_at is set."
+                    },
+                    "scope": {
+                      "type": "string",
+                      "enum": [
+                        "household",
+                        "person"
+                      ],
+                      "default": "household",
+                      "description": "Who this list belongs to, following entity.schema.json's own scoping minus its person-mention nuance: a list is either the whole household's (the shared shopping list) or one person's own (their private to-do list)."
+                    },
+                    "person": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "pattern": "^person-[a-z0-9]{6,}$",
+                          "description": "Required when scope is person; null for household scope. Same field and same rule as Entity and MemoryRecord. Enforced in validate.ts."
+                        },
+                        {
+                          "nullable": true,
+                          "description": "Required when scope is person; null for household scope. Same field and same rule as Entity and MemoryRecord. Enforced in validate.ts."
+                        },
+                        {
+                          "nullable": true
+                        }
+                      ],
+                      "default": null,
+                      "description": "Required when scope is person; null for household scope. Same field and same rule as Entity and MemoryRecord. Enforced in validate.ts."
+                    },
+                    "kind": {
+                      "type": "string",
+                      "enum": [
+                        "shopping",
+                        "todo",
+                        "custom"
+                      ],
+                      "description": "shopping and todo are each a household's one standing list of that kind (lib/lists.ts finds-or-creates rather than letting a second one exist); custom is a named list a person creates deliberately and may have several of."
+                    },
+                    "title": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 120,
+                      "description": "What the household calls this list. Defaulted from kind ('Shopping List', 'To-Do List') when not given; required and free-text for kind: custom."
+                    },
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "pattern": "^item-[a-z0-9]{6,}$"
+                          },
+                          "text": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 500
+                          },
+                          "done": {
+                            "type": "boolean"
+                          },
+                          "due_at": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "format": "date-time",
+                                "description": "Only meaningful for kind: todo. Not how a reminder or timer is tracked (those are scheduler jobs, session-d-packages-and-store.md step 8's own remind/timer packages, not List records) - this is a plain to-do due date with no notification behavior of its own."
+                              },
+                              {
+                                "nullable": true,
+                                "description": "Only meaningful for kind: todo. Not how a reminder or timer is tracked (those are scheduler jobs, session-d-packages-and-store.md step 8's own remind/timer packages, not List records) - this is a plain to-do due date with no notification behavior of its own."
+                              },
+                              {
+                                "nullable": true
+                              }
+                            ],
+                            "default": null,
+                            "description": "Only meaningful for kind: todo. Not how a reminder or timer is tracked (those are scheduler jobs, session-d-packages-and-store.md step 8's own remind/timer packages, not List records) - this is a plain to-do due date with no notification behavior of its own."
+                          },
+                          "created_at": {
+                            "type": "string",
+                            "format": "date-time"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "text",
+                          "done",
+                          "created_at"
+                        ],
+                        "additionalProperties": false
+                      },
+                      "default": []
+                    },
+                    "source": {
+                      "type": "string",
+                      "enum": [
+                        "hub",
+                        "local"
+                      ],
+                      "description": "Same meaning as person.schema.json's own source: hub is authoritative and replicates; local never syncs."
+                    },
+                    "created_at": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "updated_at": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "deleted_at": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "format": "date-time",
+                          "description": "A tombstone, not a removal - the same reason every other synced record type here uses one instead of a hard delete."
+                        },
+                        {
+                          "nullable": true,
+                          "description": "A tombstone, not a removal - the same reason every other synced record type here uses one instead of a hard delete."
+                        },
+                        {
+                          "nullable": true
+                        }
+                      ],
+                      "default": null,
+                      "description": "A tombstone, not a removal - the same reason every other synced record type here uses one instead of a hard delete."
+                    },
+                    "hlc": {
+                      "type": "string",
+                      "pattern": "^[0-9]+:[0-9]+:[a-z0-9]{6,}$",
+                      "description": "Hybrid logical clock: wall_ms:counter:node (7.3), the same shape every other synced record type uses."
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "kind",
+                    "title",
+                    "source",
+                    "created_at",
+                    "updated_at",
+                    "hlc"
+                  ],
+                  "additionalProperties": false,
+                  "description": "A household or person's own list: the shopping list, a to-do list, or a custom one (session-d-packages-and-store.md step 8). The frozen D-to-E contract (docs/plans/wave-2.md, 'D to E: the store, widgets, lists'): `{ id, person, scope, kind, title, items: [{ id, text, done, due_at?, created_at }], hlc }`. One hlc for the whole list, not one per item: two people editing the same list concurrently resolve at whole-list granularity, a real, deliberate v1 tradeoff (docs/dev/session-d.md's step 8 entry) rather than a per-item oplog this step doesn't build."
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid edit",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such list or item",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Lists"
+        ],
+        "summary": "Remove one item",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "list-a1b2c3"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "example": "item-a1b2c3"
+            },
+            "required": true,
+            "name": "itemId",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Removed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "pattern": "^list-[a-z0-9]{6,}$",
+                      "description": "Stable id, never reused, even after deleted_at is set."
+                    },
+                    "scope": {
+                      "type": "string",
+                      "enum": [
+                        "household",
+                        "person"
+                      ],
+                      "default": "household",
+                      "description": "Who this list belongs to, following entity.schema.json's own scoping minus its person-mention nuance: a list is either the whole household's (the shared shopping list) or one person's own (their private to-do list)."
+                    },
+                    "person": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "pattern": "^person-[a-z0-9]{6,}$",
+                          "description": "Required when scope is person; null for household scope. Same field and same rule as Entity and MemoryRecord. Enforced in validate.ts."
+                        },
+                        {
+                          "nullable": true,
+                          "description": "Required when scope is person; null for household scope. Same field and same rule as Entity and MemoryRecord. Enforced in validate.ts."
+                        },
+                        {
+                          "nullable": true
+                        }
+                      ],
+                      "default": null,
+                      "description": "Required when scope is person; null for household scope. Same field and same rule as Entity and MemoryRecord. Enforced in validate.ts."
+                    },
+                    "kind": {
+                      "type": "string",
+                      "enum": [
+                        "shopping",
+                        "todo",
+                        "custom"
+                      ],
+                      "description": "shopping and todo are each a household's one standing list of that kind (lib/lists.ts finds-or-creates rather than letting a second one exist); custom is a named list a person creates deliberately and may have several of."
+                    },
+                    "title": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 120,
+                      "description": "What the household calls this list. Defaulted from kind ('Shopping List', 'To-Do List') when not given; required and free-text for kind: custom."
+                    },
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "pattern": "^item-[a-z0-9]{6,}$"
+                          },
+                          "text": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 500
+                          },
+                          "done": {
+                            "type": "boolean"
+                          },
+                          "due_at": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "format": "date-time",
+                                "description": "Only meaningful for kind: todo. Not how a reminder or timer is tracked (those are scheduler jobs, session-d-packages-and-store.md step 8's own remind/timer packages, not List records) - this is a plain to-do due date with no notification behavior of its own."
+                              },
+                              {
+                                "nullable": true,
+                                "description": "Only meaningful for kind: todo. Not how a reminder or timer is tracked (those are scheduler jobs, session-d-packages-and-store.md step 8's own remind/timer packages, not List records) - this is a plain to-do due date with no notification behavior of its own."
+                              },
+                              {
+                                "nullable": true
+                              }
+                            ],
+                            "default": null,
+                            "description": "Only meaningful for kind: todo. Not how a reminder or timer is tracked (those are scheduler jobs, session-d-packages-and-store.md step 8's own remind/timer packages, not List records) - this is a plain to-do due date with no notification behavior of its own."
+                          },
+                          "created_at": {
+                            "type": "string",
+                            "format": "date-time"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "text",
+                          "done",
+                          "created_at"
+                        ],
+                        "additionalProperties": false
+                      },
+                      "default": []
+                    },
+                    "source": {
+                      "type": "string",
+                      "enum": [
+                        "hub",
+                        "local"
+                      ],
+                      "description": "Same meaning as person.schema.json's own source: hub is authoritative and replicates; local never syncs."
+                    },
+                    "created_at": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "updated_at": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "deleted_at": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "format": "date-time",
+                          "description": "A tombstone, not a removal - the same reason every other synced record type here uses one instead of a hard delete."
+                        },
+                        {
+                          "nullable": true,
+                          "description": "A tombstone, not a removal - the same reason every other synced record type here uses one instead of a hard delete."
+                        },
+                        {
+                          "nullable": true
+                        }
+                      ],
+                      "default": null,
+                      "description": "A tombstone, not a removal - the same reason every other synced record type here uses one instead of a hard delete."
+                    },
+                    "hlc": {
+                      "type": "string",
+                      "pattern": "^[0-9]+:[0-9]+:[a-z0-9]{6,}$",
+                      "description": "Hybrid logical clock: wall_ms:counter:node (7.3), the same shape every other synced record type uses."
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "kind",
+                    "title",
+                    "source",
+                    "created_at",
+                    "updated_at",
+                    "hlc"
+                  ],
+                  "additionalProperties": false,
+                  "description": "A household or person's own list: the shopping list, a to-do list, or a custom one (session-d-packages-and-store.md step 8). The frozen D-to-E contract (docs/plans/wave-2.md, 'D to E: the store, widgets, lists'): `{ id, person, scope, kind, title, items: [{ id, text, done, due_at?, created_at }], hlc }`. One hlc for the whole list, not one per item: two people editing the same list concurrently resolve at whole-list granularity, a real, deliberate v1 tradeoff (docs/dev/session-d.md's step 8 entry) rather than a per-item oplog this step doesn't build."
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such list or item",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/lists/{id}/clear": {
+      "post": {
+        "tags": [
+          "Lists"
+        ],
+        "summary": "Remove every item, keeping the list itself - the batch clear-all affordance",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "list-a1b2c3"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Cleared.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "pattern": "^list-[a-z0-9]{6,}$",
+                      "description": "Stable id, never reused, even after deleted_at is set."
+                    },
+                    "scope": {
+                      "type": "string",
+                      "enum": [
+                        "household",
+                        "person"
+                      ],
+                      "default": "household",
+                      "description": "Who this list belongs to, following entity.schema.json's own scoping minus its person-mention nuance: a list is either the whole household's (the shared shopping list) or one person's own (their private to-do list)."
+                    },
+                    "person": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "pattern": "^person-[a-z0-9]{6,}$",
+                          "description": "Required when scope is person; null for household scope. Same field and same rule as Entity and MemoryRecord. Enforced in validate.ts."
+                        },
+                        {
+                          "nullable": true,
+                          "description": "Required when scope is person; null for household scope. Same field and same rule as Entity and MemoryRecord. Enforced in validate.ts."
+                        },
+                        {
+                          "nullable": true
+                        }
+                      ],
+                      "default": null,
+                      "description": "Required when scope is person; null for household scope. Same field and same rule as Entity and MemoryRecord. Enforced in validate.ts."
+                    },
+                    "kind": {
+                      "type": "string",
+                      "enum": [
+                        "shopping",
+                        "todo",
+                        "custom"
+                      ],
+                      "description": "shopping and todo are each a household's one standing list of that kind (lib/lists.ts finds-or-creates rather than letting a second one exist); custom is a named list a person creates deliberately and may have several of."
+                    },
+                    "title": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 120,
+                      "description": "What the household calls this list. Defaulted from kind ('Shopping List', 'To-Do List') when not given; required and free-text for kind: custom."
+                    },
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "pattern": "^item-[a-z0-9]{6,}$"
+                          },
+                          "text": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 500
+                          },
+                          "done": {
+                            "type": "boolean"
+                          },
+                          "due_at": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "format": "date-time",
+                                "description": "Only meaningful for kind: todo. Not how a reminder or timer is tracked (those are scheduler jobs, session-d-packages-and-store.md step 8's own remind/timer packages, not List records) - this is a plain to-do due date with no notification behavior of its own."
+                              },
+                              {
+                                "nullable": true,
+                                "description": "Only meaningful for kind: todo. Not how a reminder or timer is tracked (those are scheduler jobs, session-d-packages-and-store.md step 8's own remind/timer packages, not List records) - this is a plain to-do due date with no notification behavior of its own."
+                              },
+                              {
+                                "nullable": true
+                              }
+                            ],
+                            "default": null,
+                            "description": "Only meaningful for kind: todo. Not how a reminder or timer is tracked (those are scheduler jobs, session-d-packages-and-store.md step 8's own remind/timer packages, not List records) - this is a plain to-do due date with no notification behavior of its own."
+                          },
+                          "created_at": {
+                            "type": "string",
+                            "format": "date-time"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "text",
+                          "done",
+                          "created_at"
+                        ],
+                        "additionalProperties": false
+                      },
+                      "default": []
+                    },
+                    "source": {
+                      "type": "string",
+                      "enum": [
+                        "hub",
+                        "local"
+                      ],
+                      "description": "Same meaning as person.schema.json's own source: hub is authoritative and replicates; local never syncs."
+                    },
+                    "created_at": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "updated_at": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "deleted_at": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "format": "date-time",
+                          "description": "A tombstone, not a removal - the same reason every other synced record type here uses one instead of a hard delete."
+                        },
+                        {
+                          "nullable": true,
+                          "description": "A tombstone, not a removal - the same reason every other synced record type here uses one instead of a hard delete."
+                        },
+                        {
+                          "nullable": true
+                        }
+                      ],
+                      "default": null,
+                      "description": "A tombstone, not a removal - the same reason every other synced record type here uses one instead of a hard delete."
+                    },
+                    "hlc": {
+                      "type": "string",
+                      "pattern": "^[0-9]+:[0-9]+:[a-z0-9]{6,}$",
+                      "description": "Hybrid logical clock: wall_ms:counter:node (7.3), the same shape every other synced record type uses."
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "kind",
+                    "title",
+                    "source",
+                    "created_at",
+                    "updated_at",
+                    "hlc"
+                  ],
+                  "additionalProperties": false,
+                  "description": "A household or person's own list: the shopping list, a to-do list, or a custom one (session-d-packages-and-store.md step 8). The frozen D-to-E contract (docs/plans/wave-2.md, 'D to E: the store, widgets, lists'): `{ id, person, scope, kind, title, items: [{ id, text, done, due_at?, created_at }], hlc }`. One hlc for the whole list, not one per item: two people editing the same list concurrently resolve at whole-list granularity, a real, deliberate v1 tradeoff (docs/dev/session-d.md's step 8 entry) rather than a per-item oplog this step doesn't build."
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such list",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/relationships": {
       "get": {
         "tags": [
