@@ -1,5 +1,6 @@
 import { resolve, join } from "node:path";
 import { existsSync, mkdirSync, statSync } from "node:fs";
+import { PackageManifest } from "@maipai/spec/gen/ts/manifest.js";
 
 // The bundled packages' own source directory - checked into git, never
 // per-household data, so it lives here (not under dataDir below) even
@@ -9,6 +10,29 @@ import { existsSync, mkdirSync, statSync } from "node:fs";
 // (plugins.ts's own runPlugin() calls into denoHost.ts for a Tier 1
 // package).
 export const PACKAGES_DIR = join(import.meta.dir, "..", "..", "packages");
+
+// SEC-2 (code review, 2026-09-06): every `join(PACKAGES_DIR, id, ...)`
+// call site (lib/plugins.ts, lib/denoHost.ts, lib/smoke.ts, lib/skills.ts)
+// used to trust `id` straight from the route param with no shape check at
+// all. Hono matches `/:id/run` on the raw, un-decoded path (a `%2F` isn't
+// a segment separator to it) and only percent-decodes the param
+// afterward, so `..%2F..%2Fdata%2Fpackages%2Fweather` arrives as
+// `id = "../../data/packages/weather"` - reachable straight to
+// `join(PACKAGES_DIR, id, "manifest.json")`. The manifest schema's own id
+// pattern (spec/schemas/manifest.schema.json) is the one legitimate shape
+// a package id can ever have, so it doubles as the one validator every
+// PACKAGES_DIR reader now checks first, before any join() or filesystem
+// access. `resolve(...).startsWith(PACKAGES_DIR)` alone isn't enough on
+// its own (a sibling directory that merely starts with the same prefix,
+// e.g. `packages-evil`, would pass it) - this pattern is the real gate.
+// Reuses the generated PackageManifest schema's own `id` field validator
+// (a review, 2026-09-06, found the first version of this hand-copied the
+// regex as a second, independently-typed literal that could silently
+// drift from the schema it was meant to mirror) rather than a second
+// copy of the pattern.
+export function isValidPackageId(id: string): boolean {
+  return typeof id === "string" && PackageManifest.shape.id.safeParse(id).success;
+}
 
 // `data/` lives at the repo root (gitignored there, see .gitignore), the
 // same place the legacy hub kept it. `MAIPAI_DATA_DIR` overrides it, used by

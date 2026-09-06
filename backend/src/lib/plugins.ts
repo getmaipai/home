@@ -23,7 +23,7 @@ import { callTier1Handle } from "@/lib/denoHost";
 import { registerPackageNotificationTypes } from "@/lib/notificationTypes";
 import { parseWhen } from "@/lib/scheduler";
 import { listActivePeople } from "@/lib/access";
-import { PACKAGES_DIR, statMtimeMs } from "@/lib/paths";
+import { PACKAGES_DIR, statMtimeMs, isValidPackageId } from "@/lib/paths";
 import { ROLE_LADDER, type Role } from "@/middleware/auth";
 import type { PersonRow } from "@/types";
 
@@ -90,6 +90,9 @@ export function __resetPackageCachesForTests(): void {
  * instead. loadPackage() keeps its original read-both-then-validate
  * shape untouched below. */
 export function loadManifestOnly(id: string): PluginOpResult<PackageManifest> {
+  if (!isValidPackageId(id)) {
+    return { ok: false, status: 400, error: `${id} is not a valid package id` };
+  }
   const manifestPath = join(PACKAGES_DIR, id, "manifest.json");
   const mtimeMs = statMtimeMs(manifestPath);
   if (mtimeMs === null) {
@@ -127,6 +130,9 @@ export function loadManifestOnly(id: string): PluginOpResult<PackageManifest> {
 }
 
 export function loadPackage(id: string): PluginOpResult<LoadedPackage> {
+  if (!isValidPackageId(id)) {
+    return { ok: false, status: 400, error: `${id} is not a valid package id` };
+  }
   const manifestPath = join(PACKAGES_DIR, id, "manifest.json");
   const recipePath = join(PACKAGES_DIR, id, "recipe.json");
   const manifestMtimeMs = statMtimeMs(manifestPath);

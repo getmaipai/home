@@ -35,7 +35,7 @@ import { packageStatus } from "@/db/schema";
 import { listPackageIds, loadPackage } from "@/lib/plugins";
 import { loadSkill } from "@/lib/skills";
 import { raiseIssue, resolveIssue } from "@/lib/issues";
-import { PACKAGES_DIR } from "@/lib/paths";
+import { PACKAGES_DIR, isValidPackageId } from "@/lib/paths";
 import { HostEmulator } from "@maipai/spec/emulators/ts/host-emulator.js";
 import { runRecipe } from "@maipai/spec/interpreters/ts/recipe-interpreter.js";
 
@@ -181,6 +181,14 @@ async function runDenoTestSmoke(id: string): Promise<SmokeResult> {
  * unrecognized or missing smoke declaration is itself a smoke failure,
  * not an exception a caller has to handle specially. */
 export async function runSmoke(id: string): Promise<SmokeResult> {
+  // SEC-2 (code review, 2026-09-06): POST /:id/smoke (routes/plugins.ts)
+  // passes the raw route param straight here - without this, an
+  // owner/admin could point a `deno test`/recipe-fixture run at any
+  // directory the id resolves to via `..%2F` traversal, not just a real
+  // bundled package's own.
+  if (!isValidPackageId(id)) {
+    return recordResult(id, { ok: false, message: `${id} is not a valid package id` });
+  }
   let manifestJson: { kind?: string; smoke?: { kind?: string; fixture?: string } };
   try {
     manifestJson = JSON.parse(readFileSync(join(PACKAGES_DIR, id, "manifest.json"), "utf-8"));

@@ -17,7 +17,7 @@
 import { readFileSync, readdirSync, existsSync } from "node:fs";
 import { join } from "node:path";
 import { PackageManifest } from "@maipai/spec/gen/ts/manifest.js";
-import { PACKAGES_DIR, statMtimeMs } from "@/lib/paths";
+import { PACKAGES_DIR, statMtimeMs, isValidPackageId } from "@/lib/paths";
 
 export interface LoadedSkill {
   manifest: PackageManifest;
@@ -76,6 +76,10 @@ export function __resetSkillCacheForTests(): void {
  * the same "an unloadable package is reported, not fatal" posture
  * lib/plugins.ts's loadPackage() already takes. */
 export function loadSkill(id: string): LoadedSkill | null {
+  // SEC-2 (code review, 2026-09-06): the same PACKAGES_DIR-traversal
+  // guard lib/plugins.ts's loaders and lib/denoHost.ts's callTier1Handle()
+  // got - see lib/paths.ts's isValidPackageId() for the full rationale.
+  if (!isValidPackageId(id)) return null;
   const manifestPath = join(PACKAGES_DIR, id, "manifest.json");
   const bodyPath = join(PACKAGES_DIR, id, "SKILL.md");
   const manifestMtimeMs = statMtimeMs(manifestPath);

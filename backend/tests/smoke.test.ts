@@ -31,6 +31,18 @@ describe("runSmoke, static kind", () => {
   });
 });
 
+// SEC-2 (code review, 2026-09-06): POST /:id/smoke used to pass the raw
+// route param straight to join(PACKAGES_DIR, id, ...) with no shape
+// check, so an owner/admin could point a real `deno test`/recipe-fixture
+// run at any directory a traversal id resolved to.
+describe("runSmoke rejects a malformed/traversal id", () => {
+  test("fails without reading anything off disk for that id", async () => {
+    const result = await runSmoke("../../data/packages/weather");
+    expect(result.ok).toBe(false);
+    expect(result.message).toContain("not a valid package id");
+  });
+});
+
 describe("a failing smoke test", () => {
   test("disables the package and raises an issue", async () => {
     const result = await runSmoke("no-such-package");
