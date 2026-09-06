@@ -1,7 +1,7 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { Section } from "@/kit/primitives/Section";
-import { Input } from "@/kit/components/Input";
-import { Button } from "@/kit/components/Button";
+import { Input } from "@/kit/ui/input";
+import { Button } from "@/kit/ui/button";
 import { api, ApiError } from "@/lib/api";
 
 const KEY = "voice.hf_token";
@@ -77,13 +77,13 @@ export function HuggingFaceTokenSection() {
 
   return (
     <Section heading="Hugging Face token (for voice cloning)">
-      <p className="text-base text-[hsl(var(--muted-foreground))]">
+      <p className="text-base text-[var(--muted-foreground)]">
         Needed to clone a voice from a recording. Accept the terms at huggingface.co/kyutai/pocket-tts, then create a
         read token at huggingface.co/settings/tokens and paste it below.
       </p>
-      {loadError ? <p className="text-base text-[hsl(var(--destructive))]">{loadError}</p> : null}
+      {loadError ? <p className="text-base text-[var(--destructive)]">{loadError}</p> : null}
       {isSet !== null ? (
-        <p className="text-base text-[hsl(var(--muted-foreground))]">
+        <p className="text-base text-[var(--muted-foreground)]">
           {isSet ? "A token is connected." : "No token connected yet."}
         </p>
       ) : null}
@@ -96,8 +96,8 @@ export function HuggingFaceTokenSection() {
           disabled={submitting}
           required
         />
-        {error ? <p className="text-base text-[hsl(var(--destructive))]">{error}</p> : null}
-        {success ? <p className="text-base text-[hsl(var(--primary))]">Saved.</p> : null}
+        {error ? <p className="text-base text-[var(--destructive)]">{error}</p> : null}
+        {success ? <p className="text-base text-[var(--primary)]">Saved.</p> : null}
         <div className="flex gap-2">
           <Button type="submit" disabled={submitting} className="w-fit">
             {submitting ? "Saving…" : "Save"}

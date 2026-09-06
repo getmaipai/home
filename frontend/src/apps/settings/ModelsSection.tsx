@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Section } from "@/kit/primitives/Section";
 import { Progress } from "@/kit/primitives/Progress";
-import { Button } from "@/kit/components/Button";
+import { Button } from "@/kit/ui/button";
 import { getIcon } from "@/kit/icons";
 import { api, ApiError, type HardwareInfo, type ModelFit, type ModelJob, type EngineStatus } from "@/lib/api";
 import { formatBytes } from "@/apps/settings/formatBytes";
@@ -113,12 +113,12 @@ export function ModelsSection() {
 
   return (
     <Section heading="AI models">
-      {error ? <p className="text-base text-[hsl(var(--destructive))]">{error}</p> : null}
+      {error ? <p className="text-base text-[var(--destructive)]">{error}</p> : null}
       {hardware === null ? (
         <Progress mode="spinner" label="Checking this computer" />
       ) : (
         <div className="flex flex-col gap-4">
-          <p className="text-base text-[hsl(var(--muted-foreground))]">{describeHardware(hardware)}</p>
+          <p className="text-base text-[var(--muted-foreground)]">{describeHardware(hardware)}</p>
           <ChatModelCard
             fits={chatFits}
             selectedModelId={selectedModelId}
@@ -262,6 +262,15 @@ function ChatModelCard({
   const AlertIcon = getIcon("alert-triangle");
   const ChevronIcon = getIcon("chevron-down");
 
+  // `job` (unlike `fits`) is always available, so this can run before
+  // either early return below - it has to: a hook called only on some
+  // renders (after `fits` loads, say) breaks React's rules of hooks
+  // (found by eslint-plugin-react-hooks, 2026-09-05, no live symptom yet
+  // since `fits` is only ever null on the very first render). The hook
+  // itself still no-ops whenever totalBytes is 0.
+  const activeJob = activeJobOf(job);
+  const { bytesPerSecond, etaSeconds } = useDownloadRate(activeJob?.completedBytes ?? 0, activeJob?.totalBytes ?? 0, activeJob?.status ?? "");
+
   if (fits === null) return <RoleCardShell title="Chat"><Progress mode="spinner" label="Checking options" /></RoleCardShell>;
   // Only entries with a real backend can ever be offered a "Use this" -
   // the old read-only version explicitly gated on `implemented`; a code
@@ -271,10 +280,6 @@ function ChatModelCard({
   const implementedFits = fits.filter((f) => f.model.implemented);
   if (implementedFits.length === 0) return null;
 
-  const activeJob = activeJobOf(job);
-  // Called unconditionally (React's rules of hooks) even when nothing is
-  // downloading; the hook itself no-ops whenever totalBytes is 0.
-  const { bytesPerSecond, etaSeconds } = useDownloadRate(activeJob?.completedBytes ?? 0, activeJob?.totalBytes ?? 0, activeJob?.status ?? "");
   const failedJob = job && job.status === "failed" ? job : null;
   const primary = implementedFits.find((f) => f.model.id === (activeJob?.modelId ?? failedJob?.modelId ?? selectedModelId)) ?? implementedFits[0]!;
   const isSelected = selectedModelId === primary.model.id && !activeJob;
@@ -287,13 +292,13 @@ function ChatModelCard({
         <div className="flex items-center justify-between gap-2">
           <span className="text-base font-medium">{primary.model.label}</span>
           {isRunning ? (
-            <span className="flex items-center gap-1 text-base text-[hsl(var(--primary))]">
+            <span className="flex items-center gap-1 text-base text-[var(--primary)]">
               <CheckIcon className="h-4 w-4" aria-hidden /> Running
             </span>
           ) : isStopped ? (
-            <span className="text-base text-[hsl(var(--muted-foreground))]">Stopped</span>
+            <span className="text-base text-[var(--muted-foreground)]">Stopped</span>
           ) : isStarting ? (
-            <span className="text-base text-[hsl(var(--muted-foreground))]">Starting…</span>
+            <span className="text-base text-[var(--muted-foreground)]">Starting…</span>
           ) : null}
         </div>
 
@@ -317,13 +322,13 @@ function ChatModelCard({
             {/* Progress's determinate mode renders no label of its own
              * (spinner mode is the only one that does), so the phase text
              * is its own line here rather than passed as `label`. */}
-            <p className="text-base text-[hsl(var(--muted-foreground))]">{JOB_PHASE_LABEL[activeJob.status] ?? "Working…"}</p>
+            <p className="text-base text-[var(--muted-foreground)]">{JOB_PHASE_LABEL[activeJob.status] ?? "Working…"}</p>
             <Progress
               mode={activeJob.totalBytes > 0 ? "determinate" : "spinner"}
               value={activeJob.totalBytes > 0 ? (activeJob.completedBytes / activeJob.totalBytes) * 100 : undefined}
             />
             {activeJob.totalBytes > 0 ? (
-              <span className="text-base text-[hsl(var(--muted-foreground))]">
+              <span className="text-base text-[var(--muted-foreground)]">
                 {formatBytes(activeJob.completedBytes)} of {formatBytes(activeJob.totalBytes)}
                 {bytesPerSecond ? ` · ${formatBytes(bytesPerSecond)}/s` : ""}
                 {etaSeconds !== null ? ` · ${formatEta(etaSeconds)}` : ""}
@@ -332,7 +337,7 @@ function ChatModelCard({
           </div>
         ) : failedJob ? (
           <div className="flex flex-col gap-2">
-            <p className="flex items-start gap-1.5 text-base text-[hsl(var(--destructive))]">
+            <p className="flex items-start gap-1.5 text-base text-[var(--destructive)]">
               <AlertIcon className="mt-0.5 h-4 w-4 shrink-0" aria-hidden /> Something went wrong: {failedJob.error}
             </p>
             <Button variant="secondary" className="w-fit" onClick={() => onChoose(primary.model.id)}>
@@ -342,7 +347,7 @@ function ChatModelCard({
         ) : isSelected ? null : (
           <div className="flex flex-col gap-2">
             {!primary.fits ? (
-              <p className="flex items-start gap-1.5 text-base text-[hsl(var(--muted-foreground))]">
+              <p className="flex items-start gap-1.5 text-base text-[var(--muted-foreground)]">
                 <AlertIcon className="mt-0.5 h-4 w-4 shrink-0" aria-hidden /> This may run slowly on this computer.
               </p>
             ) : null}
@@ -355,12 +360,12 @@ function ChatModelCard({
         <Disclosure open={showDetails} onToggle={() => setShowDetails((v) => !v)} label="Details" icon={ChevronIcon}>
           <div className="flex flex-col gap-1 pt-1">
             {(primary.model.pros ?? []).map((pro) => (
-              <p key={pro} className="text-base text-[hsl(var(--muted-foreground))]">+ {pro}</p>
+              <p key={pro} className="text-base text-[var(--muted-foreground)]">+ {pro}</p>
             ))}
             {(primary.model.cons ?? []).map((con) => (
-              <p key={con} className="text-base text-[hsl(var(--muted-foreground))]">− {con}</p>
+              <p key={con} className="text-base text-[var(--muted-foreground)]">− {con}</p>
             ))}
-            <p className="text-base text-[hsl(var(--muted-foreground))]">Uses about {formatBytes(primary.requiredBytes)} of memory.</p>
+            <p className="text-base text-[var(--muted-foreground)]">Uses about {formatBytes(primary.requiredBytes)} of memory.</p>
           </div>
         </Disclosure>
 
@@ -368,7 +373,7 @@ function ChatModelCard({
           <Disclosure open={showOthers} onToggle={() => setShowOthers((v) => !v)} label="Other options" icon={ChevronIcon}>
             <div className="flex flex-col gap-2 pt-1">
               {others.map((f) => (
-                <div key={f.model.id} className="flex items-center justify-between gap-2 rounded-[var(--radius)] border border-[hsl(var(--border))] p-2 text-base">
+                <div key={f.model.id} className="flex items-center justify-between gap-2 rounded-[var(--radius)] border border-[var(--border)] p-2 text-base">
                   <span>{f.model.label}</span>
                   <Button variant="secondary" onClick={() => onChoose(f.model.id)} disabled={activeJob !== null}>
                     Use this
@@ -387,14 +392,14 @@ function PlannedRoleCard({ title, fits }: { title: string; fits: ModelFit[] | nu
   if (fits === null || fits.length === 0) return null;
   return (
     <RoleCardShell title={title}>
-      <p className="text-base text-[hsl(var(--muted-foreground))]">Not available on this computer yet.</p>
+      <p className="text-base text-[var(--muted-foreground)]">Not available on this computer yet.</p>
     </RoleCardShell>
   );
 }
 
 function RoleCardShell({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <div className="rounded-lg border border-[hsl(var(--border))] p-4">
+    <div className="rounded-lg border border-[var(--border)] p-4">
       <h3 className="mb-2 text-base font-medium">{title}</h3>
       {children}
     </div>
@@ -416,15 +421,16 @@ function Disclosure({
 }) {
   return (
     <div>
-      <button
+      <Button
         type="button"
+        variant="ghost"
         onClick={onToggle}
-        className="flex min-h-12 items-center gap-1 text-base text-[hsl(var(--muted-foreground))] hover:text-[hsl(var(--foreground))]"
+        className="justify-start gap-1 text-muted-foreground hover:text-foreground"
         aria-expanded={open}
       >
         <Icon className={`h-4 w-4 transition-transform ${open ? "rotate-180" : ""}`} aria-hidden />
         {label}
-      </button>
+      </Button>
       {open ? children : null}
     </div>
   );

@@ -1,9 +1,10 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { api, ApiError, type Roster } from "@/lib/api";
-import { Button } from "@/kit/components/Button";
-import { Input } from "@/kit/components/Input";
-import { Avatar } from "@/kit/components/Avatar";
+import { Button } from "@/kit/ui/button";
+import { Input } from "@/kit/ui/input";
+import { Avatar } from "@/kit/primitives/Avatar";
 import { Progress } from "@/kit/primitives/Progress";
+import { cn, FOCUS_RING } from "@/kit/utils";
 
 interface SignInProps {
   onSignedIn: () => void;
@@ -67,7 +68,7 @@ export function SignIn({ onSignedIn }: SignInProps) {
 
   if (error) {
     return (
-      <div className="flex h-screen items-center justify-center p-6 text-center text-[hsl(var(--destructive))]">
+      <div className="flex h-screen items-center justify-center p-6 text-center text-[var(--destructive)]">
         {error}
       </div>
     );
@@ -147,7 +148,7 @@ export function SignIn({ onSignedIn }: SignInProps) {
             onChange={(e) => setNewSecret(e.target.value)}
             required
           />
-          {error ? <p className="text-sm text-[hsl(var(--destructive))]">{error}</p> : null}
+          {error ? <p className="text-sm text-[var(--destructive)]">{error}</p> : null}
           <Button type="submit" disabled={busy}>
             {busy ? "Setting up…" : "Get started"}
           </Button>
@@ -167,10 +168,16 @@ export function SignIn({ onSignedIn }: SignInProps) {
             placeholder="PIN or password"
             value={secret}
             onChange={(e) => setSecret(e.target.value)}
+            // This is the entire screen's content, not a field inside a
+            // larger page (jsx-a11y's usual objection to autoFocus is
+            // that it can silently move a screen reader's position on a
+            // page with other content) - a PIN prompt with nothing else
+            // to focus is the accepted exception.
+            // eslint-disable-next-line jsx-a11y/no-autofocus
             autoFocus
             required
           />
-          {error ? <p className="text-sm text-[hsl(var(--destructive))]">{error}</p> : null}
+          {error ? <p className="text-sm text-[var(--destructive)]">{error}</p> : null}
           <Button type="submit" disabled={busy}>
             {busy ? "Signing in…" : "Sign in"}
           </Button>
@@ -190,16 +197,20 @@ export function SignIn({ onSignedIn }: SignInProps) {
         {profiles.map((p) => (
           <button
             key={p.id}
+            type="button"
             onClick={() => handleProfileTap(p)}
             disabled={busy}
-            className="flex flex-col items-center gap-2 rounded-[var(--radius)] p-3 hover:bg-[hsl(var(--muted))] disabled:opacity-50"
+            className={cn(
+              "flex flex-col items-center gap-2 rounded-lg p-3 hover:bg-muted disabled:opacity-50",
+              FOCUS_RING,
+            )}
           >
             <Avatar name={p.display_name} className="h-16 w-16 text-xl" />
             <span className="text-base">{p.display_name}</span>
           </button>
         ))}
       </div>
-      {error ? <p className="text-sm text-[hsl(var(--destructive))]">{error}</p> : null}
+      {error ? <p className="text-sm text-[var(--destructive)]">{error}</p> : null}
     </div>
   );
 }

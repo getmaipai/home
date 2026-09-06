@@ -1,117 +1,59 @@
-import { useCallback, useEffect, useState } from "react";
-import { Page } from "@/kit/primitives/Page";
-import { EmptyState } from "@/kit/primitives/EmptyState";
-import { Progress } from "@/kit/primitives/Progress";
-import { Button } from "@/kit/components/Button";
-import { getIcon } from "@/kit/icons";
-import { api, ApiError, type MemoryRecord } from "@/lib/api";
-import { CATEGORY_LABELS, scopeLabel } from "@/apps/memory/memoryLabels";
+import { useQuery } from "@tanstack/react-query";
+import { Link, useSearchParams } from "react-router-dom";
+import { SchemaPage } from "@/kit/schema/SchemaPage";
+import { RowFilterContext } from "@/kit/schema/NodeRenderer";
+import { api, type MemoryRecord } from "@/lib/api";
+import memoryPage from "../../../../spec/ui/pages/memory.json";
 
 // 4.4's real memory store (backend/src/lib/memory.ts: entity-first
 // recall, decay, tiers) has had no way for a family to see what's
-// actually remembered. This is the read half plus the one safe write:
-// list what the signed-in person can see (list()'s own canRead rule
-// already scopes this correctly - household, their own person-scope
-// records, and self-scope only for whoever admin can read those), and
-// Archive (a status change, not a delete). "Forget everything about a
-// person" (lib/memory.ts's forget(), a real permanent bulk DELETE) is
-// deliberately not wired up here: a destructive action like that needs a
-// real confirm dialog, and chapter 6's dialog pattern doesn't exist yet -
-// building it with a bare browser confirm() would also be untestable
-// through this session's own browser automation, which is barred from
-// triggering native dialogs.
+// actually remembered. Session B step 5 converts this to a real schema
+// page (spec/ui/pages/memory.json, the interpreter in kit/schema/) - the
+// first page this session's generic UiNode renderer actually executes
+// at runtime, not just validates. docs/dev.md's A2UI entry records why
+// People, Privacy and Settings stayed hand-written React instead.
+//
+// One real behavior change from the hand-rolled version this replaces:
+// a memory's scope line no longer resolves a person id to their display
+// name (that needed a second bound list - the people roster - joined
+// against this one by id, which the interpreter has no join mechanism
+// for; inventing one for a single page is exactly the kind of ahead-of-
+// need primitive docs/plans/session-b-ui.md step 5 says not to build).
+// The subtitle shows the raw scope value instead.
 export function MemoryPage() {
-  const [memories, setMemories] = useState<MemoryRecord[] | null>(null);
-  const [nameById, setNameById] = useState<Map<string, string>>(new Map());
-  const [error, setError] = useState<string | null>(null);
-  const [archivingId, setArchivingId] = useState<string | null>(null);
+  // Chat's "memory updated" chip (chatMemoryChip.tsx, step 4) deep-links
+  // here with ?ids=<memory ids>: a client-side filter over the same list
+  // the schema page's own binding already fetches (kit/schema/binding.ts's
+  // shared `["schema-binding", path]` query key), not a second fetch.
+  const [searchParams] = useSearchParams();
+  const idsParam = searchParams.get("ids");
+  const filterIds = idsParam ? new Set(idsParam.split(",")) : null;
 
-  const load = useCallback(() => {
-    setError(null);
-    Promise.all([api.memories(), api.people()])
-      .then(([mems, people]) => {
-        setMemories(mems);
-        setNameById(new Map(people.map((p) => [p.id, p.display_name])));
-      })
-      .catch((e: unknown) => setError(e instanceof ApiError ? e.message : "Could not load memory."));
-  }, []);
-
-  useEffect(load, [load]);
-
-  async function handleArchive(id: string) {
-    setArchivingId(id);
-    setError(null);
-    try {
-      await api.archiveMemory(id);
-      setMemories((prev) => (prev ?? []).filter((m) => m.id !== id));
-    } catch (e) {
-      setError(e instanceof ApiError ? e.message : "Could not archive that memory.");
-    } finally {
-      setArchivingId(null);
-    }
-  }
-
-  if (error && memories === null) {
-    return (
-      <Page title="Memory">
-        <div className="flex flex-1 flex-col items-center justify-center gap-3 p-8 text-center">
-          <p className="text-base text-[hsl(var(--destructive))]">{error}</p>
-          <Button variant="secondary" onClick={load}>
-            Try again
-          </Button>
-        </div>
-      </Page>
-    );
-  }
-
-  if (memories === null) {
-    return (
-      <Page title="Memory">
-        <div className="flex flex-1 items-center justify-center">
-          <Progress mode="spinner" label="Loading memory" />
-        </div>
-      </Page>
-    );
-  }
-
-  const ArchiveIcon = getIcon("archive");
+  const memoriesQuery = useQuery<MemoryRecord[]>({
+    queryKey: ["schema-binding", "/api/memory"],
+    queryFn: () => api.memories(),
+  });
+  const visibleCount = filterIds
+    ? (memoriesQuery.data?.filter((m) => filterIds.has(m.id)).length ?? 0)
+    : undefined;
 
   return (
-    <Page title="Memory">
-      <div className="flex flex-1 flex-col gap-3 overflow-y-auto p-4">
-        {error ? (
-          <div className="rounded-[var(--radius)] bg-[hsl(var(--muted))] px-3 py-2 text-sm text-[hsl(var(--destructive))]">
-            {error}
-          </div>
-        ) : null}
-        {memories.length === 0 ? (
-          <EmptyState icon="brain" text="Nothing remembered yet." />
-        ) : (
-          memories.map((m) => (
-            <div
-              key={m.id}
-              className="flex items-start justify-between gap-4 rounded-[var(--radius)] border border-[hsl(var(--border))] p-3"
-            >
-              <div className="flex flex-col gap-1">
-                <span className="text-base">{m.text}</span>
-                <span className="text-sm text-[hsl(var(--muted-foreground))]">
-                  {scopeLabel(m, nameById)} · {CATEGORY_LABELS[m.category]}
-                  {m.pinned ? " · Pinned" : ""}
-                </span>
-              </div>
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => handleArchive(m.id)}
-                disabled={archivingId === m.id}
-                aria-label={`Archive "${m.text}"`}
-              >
-                <ArchiveIcon className="h-5 w-5" aria-hidden />
-              </Button>
+    <RowFilterContext.Provider value={filterIds ? (row) => filterIds.has(String(row.id)) : () => true}>
+      <SchemaPage
+        page={memoryPage}
+        beforeBody={
+          filterIds ? (
+            <div className="flex items-center justify-between gap-2 rounded-lg bg-muted px-3 py-2 text-sm">
+              <span>
+                Showing {visibleCount ?? 0} memory update{visibleCount === 1 ? "" : "s"}
+              </span>
+              <Link to="/memory" className="text-primary underline">
+                Show all
+              </Link>
             </div>
-          ))
-        )}
-      </div>
-    </Page>
+          ) : null
+        }
+      />
+    </RowFilterContext.Provider>
   );
 }

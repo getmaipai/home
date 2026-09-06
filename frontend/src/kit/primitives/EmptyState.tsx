@@ -1,5 +1,5 @@
 import { getIcon } from "@/kit/icons";
-import { Button } from "@/kit/components/Button";
+import { Button } from "@/kit/ui/button";
 
 interface EmptyStateProps {
   icon: string;
@@ -16,8 +16,8 @@ export function EmptyState({ icon, text, actionLabel, onAction }: EmptyStateProp
   const Icon = getIcon(icon);
   return (
     <div className="flex flex-1 flex-col items-center justify-center gap-3 p-8 text-center">
-      <Icon className="h-10 w-10 text-[hsl(var(--muted-foreground))]" aria-hidden />
-      <p className="text-base text-[hsl(var(--muted-foreground))]">{text}</p>
+      <Icon className="h-10 w-10 text-[var(--muted-foreground)]" aria-hidden />
+      <p className="text-base text-[var(--muted-foreground)]">{text}</p>
       {actionLabel && onAction ? (
         <Button variant="secondary" onClick={onAction}>
           {actionLabel}

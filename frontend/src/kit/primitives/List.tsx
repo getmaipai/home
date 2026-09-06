@@ -53,7 +53,7 @@ export function List<T>({
       aria-label={label}
       className={cn(
         "flex list-none flex-col p-0",
-        dividers && "divide-y divide-[hsl(var(--border))]",
+        dividers && "divide-y divide-[var(--border)]",
       )}
     >
       {items.map((item) => {
@@ -73,9 +73,9 @@ export function List<T>({
                 // floor, WCAG 2.2 AA 2.5.5 and 2.4.13.
                 className={cn(
                   "flex min-h-12 min-w-0 flex-1 items-center rounded-[var(--radius)] text-left",
-                  "hover:bg-[hsl(var(--muted))]",
+                  "hover:bg-[var(--muted)]",
                   FOCUS_RING,
-                  selected && "bg-[hsl(var(--muted))]",
+                  selected && "bg-[var(--muted)]",
                 )}
               >
                 {content}

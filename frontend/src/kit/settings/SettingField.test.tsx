@@ -1,6 +1,6 @@
 import { describe, expect, test, mock, afterEach } from "bun:test";
 import { render, cleanup, fireEvent, act } from "@testing-library/react";
-import { SettingField, titleCaseOption } from "@/kit/settings/SettingField";
+import { SettingField, titleCaseOption, localeDisplayName } from "@/kit/settings/SettingField";
 import type { MergedSetting } from "@/kit/settings/groupSettings";
 
 afterEach(cleanup);
@@ -151,5 +151,194 @@ describe("titleCaseOption (select option labels)", () => {
 
   test("leaves an empty string alone", () => {
     expect(titleCaseOption("")).toBe("");
+  });
+});
+
+describe("localeDisplayName", () => {
+  test("renders a real BCP-47 tag as its language name, not a title-cased split", () => {
+    expect(localeDisplayName("en-US")).toBe("American English");
+    expect(localeDisplayName("en-GB")).toBe("British English");
+  });
+
+  test("falls through to titleCaseOption for anything Intl doesn't recognize as a locale", () => {
+    expect(localeDisplayName("bill_boerst")).toBe(titleCaseOption("bill_boerst"));
+  });
+});
+
+function localeSelectSetting(value: string): MergedSetting {
+  return {
+    def: {
+      key: "household.locale",
+      scope: "household",
+      selector: "select",
+      range: { options: ["en-US", "en-GB"] },
+      default: "en-US",
+      label: "Language and region",
+      level: "basic",
+      secret: false,
+      lives_in: "household.system",
+      honoured_by: ["home"],
+    },
+    resolved: {
+      key: "household.locale",
+      value,
+      source: "default",
+      label: "Language and region",
+      level: "basic",
+      secret: false,
+    },
+  };
+}
+
+describe("SettingField - select selector", () => {
+  // A code review, 2026-09-05, found the BCP-47 display-name fix scoped
+  // to the wrong key entirely (`core.locale`, which does not exist - the
+  // real key is `household.locale`), caught only by looking at the
+  // running app, not by any test - this is that test, rendering the real
+  // component against the real key so a future rename of either has
+  // somewhere to fail loudly instead of silently.
+  test("renders household.locale's value as a real language name, not a raw BCP-47 tag", () => {
+    const { getByRole } = render(
+      <SettingField setting={localeSelectSetting("en-US")} onChange={async () => true} onReset={() => {}} />,
+    );
+    expect(getByRole("combobox", { name: "Language and region" })).toHaveTextContent("American English");
+  });
+});
+
+// Session B step 7: a `secret: true` key with no dedicated backend route
+// (unlike voice.hf_token) had no way to be set at all - the generic
+// renderer only ever showed a static "Set"/"Not set" status. This is the
+// regression suite for the write-only paste-and-confirm flow that fixes
+// that, found live (2026-09-06) checking notifications.telegram.bot_token
+// in the running app.
+function secretSetting(isSet: boolean, source: "user" | "default" = isSet ? "user" : "default"): MergedSetting {
+  return {
+    def: {
+      key: "notifications.telegram.bot_token",
+      scope: "household",
+      selector: "text",
+      default: "",
+      label: "Telegram bot token",
+      level: "advanced",
+      secret: true,
+      lives_in: "household.notifications",
+      honoured_by: ["home"],
+    },
+    resolved: {
+      key: "notifications.telegram.bot_token",
+      value: null,
+      source,
+      label: "Telegram bot token",
+      level: "advanced",
+      secret: true,
+      isSet,
+    },
+  };
+}
+
+describe("SettingField - secret write-only flow", () => {
+  test("not set: shows status and a Set button, no input", () => {
+    const { getByText, getByRole, queryByLabelText } = render(
+      <SettingField setting={secretSetting(false)} onChange={async () => true} onReset={() => {}} />,
+    );
+    expect(getByText("Not set")).toBeTruthy();
+    expect(getByRole("button", { name: "Set" })).toBeTruthy();
+    expect(queryByLabelText("Telegram bot token")).toBeNull();
+  });
+
+  test("already set: shows status and a Change button", () => {
+    const { getByText, getByRole } = render(
+      <SettingField setting={secretSetting(true)} onChange={async () => true} onReset={() => {}} />,
+    );
+    expect(getByText("Set")).toBeTruthy();
+    expect(getByRole("button", { name: "Change" })).toBeTruthy();
+  });
+
+  test("clicking Set reveals a masked input with Save disabled until something is typed", () => {
+    const { getByRole, getByLabelText } = render(
+      <SettingField setting={secretSetting(false)} onChange={async () => true} onReset={() => {}} />,
+    );
+    fireEvent.click(getByRole("button", { name: "Set" }));
+    const input = getByLabelText("Telegram bot token") as HTMLInputElement;
+    expect(input.type).toBe("password");
+    expect(getByRole("button", { name: "Save" })).toBeDisabled();
+    fireEvent.change(input, { target: { value: "123:abc" } });
+    expect(getByRole("button", { name: "Save" })).not.toBeDisabled();
+  });
+
+  test("saving calls onChange with the typed value and collapses back to status on success", async () => {
+    const onChange = mock(() => Promise.resolve(true));
+    const { getByRole, getByLabelText, queryByLabelText } = render(
+      <SettingField setting={secretSetting(false)} onChange={onChange} onReset={() => {}} />,
+    );
+    fireEvent.click(getByRole("button", { name: "Set" }));
+    fireEvent.change(getByLabelText("Telegram bot token"), { target: { value: "123:abc" } });
+    await act(async () => {
+      fireEvent.click(getByRole("button", { name: "Save" }));
+    });
+    expect(onChange).toHaveBeenCalledWith("123:abc");
+    expect(queryByLabelText("Telegram bot token")).toBeNull();
+  });
+
+  test("a rejected save keeps the input open with the typed draft, not the never-returned old value", async () => {
+    const onChange = mock(() => Promise.resolve(false));
+    const { getByRole, getByLabelText } = render(
+      <SettingField setting={secretSetting(false)} onChange={onChange} onReset={() => {}} />,
+    );
+    fireEvent.click(getByRole("button", { name: "Set" }));
+    const input = getByLabelText("Telegram bot token") as HTMLInputElement;
+    fireEvent.change(input, { target: { value: "123:abc" } });
+    await act(async () => {
+      fireEvent.click(getByRole("button", { name: "Save" }));
+    });
+    expect(getByLabelText("Telegram bot token")).toHaveValue("123:abc");
+  });
+
+  test("Cancel discards the draft without calling onChange", () => {
+    const onChange = mock(() => Promise.resolve(true));
+    const { getByRole, getByLabelText, queryByLabelText } = render(
+      <SettingField setting={secretSetting(false)} onChange={onChange} onReset={() => {}} />,
+    );
+    fireEvent.click(getByRole("button", { name: "Set" }));
+    fireEvent.change(getByLabelText("Telegram bot token"), { target: { value: "123:abc" } });
+    fireEvent.click(getByRole("button", { name: "Cancel" }));
+    expect(onChange).not.toHaveBeenCalled();
+    expect(queryByLabelText("Telegram bot token")).toBeNull();
+  });
+
+  // A code review (2026-09-06) found this write flow made voice.hf_token
+  // writable a second way, bypassing HuggingFaceTokenSection.tsx's
+  // dedicated route (needed to restart pocket-tts after a save) - a
+  // household member using this row instead would see "Set" succeed
+  // while voice cloning silently kept failing.
+  test("voice.hf_token stays a static status row - its real write path is a dedicated section", () => {
+    const setting: MergedSetting = {
+      def: {
+        key: "voice.hf_token",
+        scope: "household",
+        selector: "text",
+        default: "",
+        label: "Hugging Face token (for voice cloning)",
+        level: "advanced",
+        secret: true,
+        lives_in: "household.ai",
+        honoured_by: ["home"],
+      },
+      resolved: {
+        key: "voice.hf_token",
+        value: null,
+        source: "default",
+        label: "Hugging Face token (for voice cloning)",
+        level: "advanced",
+        secret: true,
+        isSet: false,
+      },
+    };
+    const { getByText, queryByRole } = render(
+      <SettingField setting={setting} onChange={async () => true} onReset={() => {}} />,
+    );
+    expect(getByText("Not set")).toBeTruthy();
+    expect(queryByRole("button", { name: "Set" })).toBeNull();
+    expect(queryByRole("button", { name: "Change" })).toBeNull();
   });
 });

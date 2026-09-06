@@ -1,81 +1,103 @@
 # The UI schema
 
-v0, Chat only (platform plan 6.2, Hub v0.1 roadmap scope). `schema.json`
-is the source of truth: a JSON Schema 2020-12 document describing `UiNode`,
-a recursive tree of the kit's primitives. `pages/chat.json` is the first
-real page written against it.
+`schema.json` is the source of truth: a JSON Schema 2020-12 document
+describing `UiNode`, a recursive tree of the kit's primitives and pattern
+components. `pages/*.json` are real pages written against it, one of
+which (`memory.json`) is actually executed at runtime by the interpreter
+in `frontend/src/kit/schema/`; the rest are conformance fixtures only -
+see "What Session B step 5 actually converted" below for exactly which
+and why.
 
 ## Why this isn't run through the record codegen pipeline
 
 `spec/schemas/*.schema.json` (the record types) get generated Zod and
 Pydantic bindings (`spec/gen/ts/`, `spec/gen/py/`) because code
 *constructs* those objects: core creates a `Person`, a package returns a
-`SkillResult`. Nobody constructs a `UiNode` object graph in TypeScript;
-every page is authored as a JSON document, the way `pages/chat.json` is.
-`schema.json`'s recursive `$ref: "#"` structure also does not codegen well
-through `json-schema-to-zod` (its recursion handling falls back to
-`z.any()` past a shallow depth, which would silently stop validating
-nested content).
+`SkillResult`. Nobody constructs a `UiNode` object graph in TypeScript by
+hand; every page is authored as a JSON document. `schema.json`'s
+recursive `$ref: "#"` structure also does not codegen well through
+`json-schema-to-zod` (its recursion handling falls back to `z.any()` past
+a shallow depth, which would silently stop validating nested content).
 
-So UI pages are validated the more direct way: as JSON Schema, with
+So UI pages are validated the JSON Schema way, with
 [ajv](https://ajv.js.org) (draft 2020-12 support, proper `$ref` and
-`oneOf`/`discriminator` handling). See
-`spec/tests/ts/ui-schema.test.ts`. `Recipe`'s `oneOf` union of step types
-went through the codegen pipeline fine because it isn't recursive; `UiNode`
-is, hence the different treatment.
+`oneOf`/`discriminator` handling) - see `spec/tests/ts/ui-schema.test.ts`.
+The frontend's own interpreter (`frontend/src/kit/schema/types.ts`)
+separately hand-writes the same shapes in Zod, for its own reason: ajv's
+validation runs at `spec`'s own `check.sh` time, which a frontend build
+has no guarantee ran (or ran against the same file) - `SchemaPage.tsx`
+parses every page through its own Zod schema before rendering it, an
+independent, runtime proof. `catalog.test.ts` is the test that keeps
+schema.json's `$defs` and the frontend's `NODE_TYPES`/catalog from
+silently drifting apart.
 
-## What v0 covers, and what it does not
+## What Session B step 5 actually converted, and what didn't
 
-Only what the Chat page needs: `page`, `section`, `message_thread` (the
-pattern component Chat's own review resulted in, not a generic primitive
-the plan names), `form`, `empty_state`, `progress`, plus the five actions
-(`navigate`, `call`, `play`, `confirm`, `ask`) and a `binding` shape for
-route and `host.*` data sources with a `stream` flag for `turn.token`-style
-incremental delivery (7.2).
+The plan's own step 5 named four pages (people, memory, privacy,
+settings) for schema-page conversion. Building the interpreter
+(`kit/schema/`: `SchemaPage`, `NodeRenderer`, bindings via TanStack
+Query, the five actions, a minimal condition evaluator) and converting
+each page in turn surfaced real complexity the plan's own "time-box the
+hard pages, don't invent primitives ahead of need" methodology (platform
+plan 6.2, originally aimed at Chat/Videos/Music) turned out to apply
+more broadly than expected:
 
-`List`, `CardGrid`, `MediaShelf`, `DetailPane`, `SplitView`, and whatever
-pattern components the Videos and Music pages need do not exist here yet.
-Platform plan 6.2 calls out Chat, Videos, and Music as the three hardest
-pages to express and says to time-box each in turn, not invent primitives
-ahead of need; this file follows that.
+- **Memory** converted for real (`pages/memory.json`,
+  `frontend/src/apps/memory/MemoryPage.tsx` is now a thin mount). It was
+  the one candidate page shaped the way the generic interpreter actually
+  handles well: one bound list, one action per row, a batch capability
+  (`list.batch`, used here for "archive selected"/"clear all" - the
+  backlog's named consumer). One real, documented behavior change: the
+  hand-rolled version resolved a memory's `person` id against the
+  household roster to show a name ("Nova"); the schema page shows the
+  raw scope value instead, since joining two separately-bound lists by id
+  has no interpreter support (a real, separate feature, not built here).
+- **People** stayed hand-written React. Its batch-select flow sits on top
+  of a permission matrix (`roles.ts`'s `canManagePerson`/
+  `canDeletePerson`/`canManagePeople`, evaluated per row against the
+  actor's own role) plus inline per-row edit (a role picker, a name
+  field) and a write-only secret/PIN field on create - none of which the
+  schema's `action`/`condition` vocabulary expresses today without
+  inventing a permission-predicate system and an inline-edit node kind
+  that nothing else needs yet.
+- **Privacy** stayed hand-written React. Its one real list has a rich,
+  multi-field row template (destination/when/what/what/who/retention)
+  plus conditional prose (`sourceKind === "platform" ? ... : ...`,
+  `joinNames`'s own grammar-aware joining) that `list`'s single
+  `item_label_field`/`item_subtitle_field` template can't reach without a
+  much richer per-row template mechanism - exactly the kind of primitive
+  the plan says to build when a real page needs it, not ahead of time.
+- **Settings** stayed on its own existing generic renderer
+  (`frontend/src/kit/settings/SettingsRenderer.tsx`, already reading the
+  settings registry data-driven per docs/SETTINGS.md) rather than gaining
+  a second, competing JSON description of the same data. `settings_editor`
+  is a bare mount-point node (the same shape `message_thread` is for
+  Chat) so a schema page can still say "Settings renders here"; step 7
+  ("settings as an editor") extends that renderer directly - a tree
+  sidebar, search, scope tabs - never a UiNode rewrite of it.
+- **Chat**'s `message_thread` node was simplified to a bare mount point
+  in the same step, once step 4 (chat on assistant-ui) had already moved
+  every real concern - history loading, streaming, actions, the thread
+  list - into React (`chatModelAdapter.ts`, `chatThreadListAdapter.ts`).
+  v0's `bind`/`sender_field`/`text_field` described a generic turn-list
+  interpreter that was never built; removing them here isn't a
+  regression, it's catching the schema up to what actually shipped.
 
-## `pages/chat.json` describes the real backend, but nothing executes it yet
+`pages/chat.json` and a future `pages/settings.json` remain conformance
+fixtures ajv validates but the interpreter never receives at runtime -
+`ChatPage.tsx` and `SettingsPage.tsx` mount their own real components
+directly, keyed off the route. `pages/people.json` and
+`pages/privacy.json` don't exist; People and Privacy stay entirely
+hand-written, `docs/dev.md`'s A2UI entry has this same reasoning as the
+project's standing record of the decision.
 
-Originally written against placeholder routes (`/api/chat/turns`,
-`/api/chat/send`, `/api/chat/status`, `/api/chat/suggestions`) that never
-existed. Fixed (`home/docs/dev.md`'s shell/kit/Chat slice) to the real
-routes the backend actually serves: `message_thread` binds to
-`GET /api/conversations` (`stream: false` - the turn engine is single-shot
-JSON today, not the incremental `turn.token` delivery 7.2 describes; flip
-this back to `true` once it is), and the form's `on_submit` calls
-`POST /api/turn` with `text`, not `message`. The `progress` node's `bind`
-was dropped rather than pointed at a route: there is no separate status
-poll, a turn's in-flight state is derived from the pending request itself.
+## `list`'s one templating mechanism
 
-**`sender_field`/`text_field` are honest about what exists, not about
-what a real Chat page renders.** A first fix (caught by code review,
-2026-09-04) left them as `speaker.display_name`/`reply.text` - fields
-that describe `TurnValue`'s shape, not what `GET /api/conversations`
-actually returns. The real rows (`backend/src/wire.ts`'s
-`ConversationTurnRow`) are flat: `personId`, `userText`, `replyText`, no
-`speaker` or `reply` object anywhere. They're now `personId`/`replyText`,
-which at least resolve to real fields, but this does not make the fixture
-executable: **one `ConversationTurnRow` is a whole turn (a person's
-message and MaiPai's reply together), while `message_thread` renders one
-sender+text pair per bound item.** No field-path fix closes that gap; it
-needs either a richer schema shape (a row expanding to two rendered
-items) or a backend endpoint that already returns one entry per message.
-Neither exists, and inventing either tonight would be exactly the kind of
-generic-interpreter scope this file already defers. The frontend's real
-mapping (`frontend/src/apps/chat/mapRows.ts`, tested) does the one-row-
-to-two-messages expansion directly in code instead.
-
-This file is still only a conformance fixture (`spec/tests/ts/ui-schema.test.ts`
-validates its shape against `schema.json`), not something a renderer reads
-at runtime: the frontend's actual Chat page
-(`frontend/src/apps/chat/ChatPage.tsx`) is hand-written directly against
-the kit primitives to match this shape, because a generic `UiNode`-tree
-interpreter (bindings, conditions, the five action kinds) doesn't exist
-yet. Building one is real, separate scope - `docs/dev.md` tracks it as a
-deferred slice, the same category of gap as the turn engine's tier-2
-tool-calling deferral.
+`item_subtitle_field`, `row_action.label` and `action.confirm.prompt` all
+take a `{field}`-style template string (`frontend/src/kit/schema/
+fieldPath.ts`'s `fillTemplate`), not a bare dotted path - the same
+substitution everywhere, so a subtitle can combine more than one field
+("`{category} · {scope}`") without a second, richer per-row template
+mechanism. `{count}` is the one placeholder a confirm prompt gets that no
+single bound item's own fields could ever supply (the number of items a
+batch action is about to act on).

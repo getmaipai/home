@@ -7357,3 +7357,1200 @@ didn't say so - a future migration copying this exact shape under a
 runner that commits each statement separately would have a real,
 briefly-persisted, pattern-invalid `hlc` value. Documented the
 dependency directly in the migration file.
+## Session B: step 0, verify, pin, baseline (2026-09-05)
+
+Started `docs/plans/session-b-ui.md`, the frameworks-not-hand-rolled
+frontend rebuild. Worktree `../home-b` on branch `session-b-ui`, off
+`main` (`d93495d`), parallel to Session A's `../home-a`. Manual checks
+run against `MAIPAI_DATA_DIR=<worktree>/data-b PORT=8798` in `backend/`;
+never the shared `data/`.
+
+**Baseline, before any change:** `bun install` (370 packages, clean),
+then `scripts/check.sh` green end to end: spec typecheck/tests/ruff/
+pytest, backend 567 tests, frontend 201 tests plus a clean `vite build`,
+and `@maipai/standards` core (gitleaks, PII wordlist, prose lint, licence
+check). This is the state every later step's own green run is measured
+against.
+
+**Framework table re-verified against the live npm registry today**
+(`registry.npmjs.org/<pkg>/latest`, not `npm view` - this box has no
+`npm` binary, only `bun`), matching the plan's table exactly, nothing
+moved since it was written a few hours ago:
+
+| Package | Version | Licence |
+|---|---|---|
+| `shadcn` | 4.21.0 | MIT |
+| `lucide-react` | 1.41.0 | ISC (plan said "present"; the installed one already pins this) |
+| `@assistant-ui/react` | 0.15.18 | MIT |
+| `@assistant-ui/react-markdown` | 0.14.14 | MIT |
+| `@tanstack/react-query` | 5.102.8 | MIT |
+| `react-router` | 8.3.1 | MIT |
+| `@json-render/core` / `react` / `shadcn` | 0.20.0 | Apache-2.0 |
+| `@noriginmedia/norigin-spatial-navigation` | 3.3.0 | MIT |
+| `usehooks-ts` | 3.1.1 | MIT |
+| `vite-plugin-pwa` | 1.3.0 (+ `workbox-window` 7.4.1) | MIT |
+| `react-error-boundary` | 6.1.5 | MIT |
+| `eslint` | 10.10.0 | MIT |
+| `typescript-eslint` | 8.69.0 | MIT |
+| `eslint-plugin-react-hooks` | 7.1.1 | MIT |
+| `eslint-plugin-jsx-a11y` | 6.10.2 | MIT |
+| `eslint-plugin-better-tailwindcss` | 4.7.0 | MIT |
+| `@axe-core/playwright` | 4.13.0 | MPL-2.0 |
+| `remark-gfm` / `rehype-sanitize` / `react-markdown` | 4.0.1 / 6.0.0 / 10.1.0 | MIT (ships inside `@assistant-ui/react-markdown`, not installed directly) |
+
+MPL-2.0 (`@axe-core/playwright`) is a dev-only test dependency, never
+bundled into the shipped app, so it carries no AGPL compatibility
+question the way a runtime dependency would; still listed in `NOTICE`
+per the org rule (any third-party component gets an entry).
+
+**react-router: v8, not v7.** v8.3.1's peers are `react >=19.2.7` and
+`react-dom >=19.2.7`; both are already `^19.2.8` here, and Vite is
+already `^8.2.2` (v8 wants Vite 7+). The only real cost is `react-router-
+dom` going away (v8 folds the DOM exports into `react-router` itself,
+imported today from `react-router-dom` nowhere yet since the router
+hasn't been wired up), so there is no migration to do, only a fresh
+install choosing the current major.
+
+**`@json-render/core` peer-requires `zod ^4.0.0`.** Already the pin in
+both `backend/package.json` and `spec/package.json`, so no version
+conflict crosses the workspace. **`@a2ui/react`'s peer is `zod ^3.25.76`,
+which would conflict** - moot for now, since the plan has A2UI evaluated
+and written up (step 5), never installed as a dependency.
+
+**Nothing wrong at install time.** Every row still matches what the plan
+recorded; no fallback substitutions needed. Step 1 starts the actual
+`shadcn init` and first `bun add` calls.
+
+## Session B: step 1, the kit on shadcn, and the lint (2026-09-05)
+
+`shadcn init -t vite -b radix -p nova` (the Lucide/Geist preset, since
+Lucide is already the icon rule) against `frontend/`, generated
+components repointed to `frontend/src/kit/ui/` via `components.json`'s
+aliases (`ui`, `components`, `lib`, `hooks` all under `@/kit/*`, `utils`
+at `@/kit/utils` so generated files import the kit's existing `cn`
+instead of pulling in a second one from the `cn` npm package). 24
+components added: button, input, textarea, select, switch, checkbox,
+avatar, card, badge, skeleton, tabs, dialog, alert-dialog, sheet,
+tooltip, dropdown-menu, command, sidebar, form, sonner, scroll-area,
+separator, progress (sidebar isn't wired into the shell yet - that's
+step 2 - but the file needs to exist before `command`'s dialog wrapper
+resolves).
+
+**The token format changed, on purpose, everywhere at once.** The CLI's
+Tailwind v4 output stores a full CSS color function per variable
+(`--primary: oklch(...)`) that a generated component's `bg-primary`
+utility reads directly; the repo's existing tokens were bare HSL triples
+(`--primary: 189 94% 40%`) meant to be wrapped as `hsl(var(--primary))`
+at every call site, the Tailwind v3 convention. Tailwind v4's `@theme
+inline` does no such wrapping, so the two conventions cannot coexist:
+`tokens.css` now stores `hsl(189 94% 40%)` (same brand hue, cyan, same
+light/dark values) as a complete value, and every one of the ~30 existing
+`hsl(var(--x))` call sites across `apps/`, `shell/` and `kit/` became
+`var(--x)` (a scripted, mechanical sed pass, verified by a full rebuild
+and the existing 201-test suite staying green before any further change
+landed). Dark mode moved from a `[data-theme="dark"]` attribute to a
+`.dark` class (matching `@custom-variant dark (&:is(.dark *))`, which
+every generated component's `dark:` variant already assumes) with a
+`prefers-color-scheme` fallback guarded by `:not(.light)` - nothing
+toggles either yet (that's the appearance setting, step 2), so this is
+the mechanism landing ahead of its first real caller, the same posture
+the five missing primitives took with TV.
+
+**`kit/components/*` is gone.** `Button`, `Input`, `Switch` were direct,
+API-compatible swaps (their own comments already said as much) - deleted,
+every import repointed to `kit/ui/*`. `Card`, `Avatar`, `Select` were not:
+shadcn's generated `Card` is a padded header/content/footer container
+with no "the whole thing is one button" mode, its `Avatar` has no
+name-to-initial logic, and its `Select` has no flat `options: string[]`
+API. Each became a pattern component in `kit/primitives/` instead -
+`Card` reuses the token utilities (`bg-card`, `border-border`) rather
+than shadcn's `Card` div directly, `Avatar` wraps `AvatarFallback` with
+the initials logic, `Select` wraps the compound `SelectTrigger`/
+`SelectContent`/`SelectItem` pieces behind the same props every call site
+already used. Three consumers total needed touching for `Select` (six
+call sites), two for `Card`, four for `Avatar` - small enough that no
+call site's own logic changed, only its import.
+
+**Toast and Progress, rebuilt as the plan named them.** `Toast.tsx` now
+wraps `kit/ui/sonner.tsx` (Sonner) instead of a hand-rolled
+`@radix-ui/react-toast` provider - `useToast().push(text)` is unchanged,
+so neither of its two call sites moved. `Progress.tsx`'s determinate mode
+renders `kit/ui/progress.tsx` (Radix's Progress, generated); spinner mode
+keeps the icon-plus-`animate-spin` idiom, since no library ships a
+"spinner" component and Sonner's own loading toast uses the identical
+pattern. `Form.tsx` was already built on `kit/ui/input.tsx`/`button.tsx`
+tonight's earlier commit put there; no further change needed for step 1's
+scope.
+
+**The accessibility floor got re-applied to every generated form
+control**, because the CLI's own defaults undershoot it: default Button
+height is 32px (`h-8`) against the kit's 48px floor, Input/Textarea/
+Select all demote to `md:text-sm` (14px) on desktop against the 16px
+floor. Fixed centrally in the five touched `kit/ui/*` files rather than
+per call site - `default`/`lg`/`icon` sizes now clear 48px directly;
+`xs`/`sm`/`icon-xs`/`icon-sm` stay visually compact (desktop/mouse-only,
+matching the Button's own pre-existing "never the only way to reach an
+action" rule) but get the same transparent-pseudo-element 48px hit area
+the accessibility audit already established for Switch and the
+select-mode checkbox - now built into Switch and Checkbox's own generated
+files too, not just Button's.
+
+**`kit/icons.ts` gained `Inbox`** (`AsyncState`'s default empty icon;
+nothing had claimed it yet).
+
+**The two missing primitives, both with tests.** `AsyncState` (loading
+skeleton via `kit/ui/skeleton.tsx`, error with retry, empty via the
+existing `EmptyState`) - its error branch shows `ApiError.message`
+directly rather than looking up `spec/errors/errors.json` itself: the
+backend already resolves a failure's catalogue `ui_message` into that
+field before the frontend ever sees it, and `spec/errors/` isn't a file
+this session owns. `BatchBar`/`SelectModeToggle` (the count, the caller's
+own action buttons, Done) - `PeoplePage.tsx`'s hand-rolled select-mode
+bar is now built on it (the plan's own instruction: "lift it from
+PeoplePage.tsx"), the first real consumer; Memory becomes the second
+when its own batch actions land (`docs/BACKLOG.md`). 20 new tests across
+both.
+
+**The ESLint flat config**, scoped deliberately narrower than "install
+the recommended preset" in two places, both recorded rather than silently
+decided: `eslint-plugin-react-hooks@7`'s "recommended" is the full React
+Compiler rule set (`static-components`, `set-state-in-effect`,
+`immutability`...), which flagged 23 findings against this codebase's
+existing hand-written data-fetching (a `useEffect` calling `setState`) -
+exactly the shape step 3's TanStack Query migration replaces on its own
+schedule. Only `rules-of-hooks` (error) and `exhaustive-deps` (warn) are
+enabled; the rest is worth adopting once step 3 lands, not ahead of it.
+Same reasoning for `eslint-plugin-better-tailwindcss`: only the three
+correctness rules the plan names (`no-unknown-classes`,
+`no-conflicting-classes`, `no-restricted-classes`) - its "recommended"
+also pulls in stylistic auto-formatting rules that would rewrite every
+className's order and line-wrapping as a side effect of adding a lint,
+a much bigger diff than this step asked for.
+
+One rule is hand-written, not a plugin option: `local/hover-needs-focus`
+(docs/UI.md: a hover-only control is unreachable by keyboard, touch, or a
+TV remote) reads a JSX `className` literal or template string for
+`hover:` without any `focus`, skipping capitalized (component) tags since
+the kit's own components already pair their internal hover and focus
+states centrally. Best-effort by construction, same limitation
+`no-restricted-classes` has: a class string built by concatenating two
+`cn()` calls is invisible to either.
+
+**What the lint actually found**, fixed rather than suppressed except
+where noted: two raw `<button>`s in Chat (`ChatPage.tsx`'s "Think
+longer" pill, `WakeWordToggle.tsx`'s own pill) and two in Settings
+(`ModelsSection.tsx`'s disclosure, `VoiceCatalogSection.tsx`'s "Browse
+the catalog" link) became `Button` with a matching variant; one raw
+`<input type="checkbox">` in `PeoplePage.tsx`'s select mode became
+`kit/ui/checkbox.tsx`'s `Checkbox` (closing `docs/BACKLOG.md`'s own
+"People uses a raw input" gap in the same pass). **A real rules-of-hooks
+bug**, not a style nit: `ModelsSection.tsx`'s `ChatModelCard` called
+`useDownloadRate` after two early returns (`fits === null`, then an empty
+filtered list) - on those renders the hook silently never ran, which
+`tsc`-only linting could never catch since hook ordering isn't a type
+error. Moved the hook (and the `activeJobOf` call it depends on) above
+both returns; no behavior change since `job` (unlike `fits`) is always
+available. `SignIn.tsx`'s PIN-prompt `autoFocus` and `DetailPane.tsx`'s
+keyboard-scroll `tabIndex={0}` are both real, already-justified
+exceptions (a single-purpose screen, WCAG 2.1.1's keyboard-scrollable-
+region requirement) - scoped `eslint-disable` comments, not rule changes.
+`kit/ui/input-group.tsx`'s click-to-focus convenience handler
+(jsx-a11y's `click-events-have-key-events`) is vendored shadcn code, not
+authored here - `src/kit/ui/**` is exempted from that specific pair of
+rules rather than hand-patched, the same posture as the icon-import
+exemption. Two brand-logo classes (real CSS, not Tailwind utilities)
+needed `no-unknown-classes`'s own `ignore` list. Three pre-existing
+`exhaustive-deps` warnings (not errors - `check.sh` doesn't fail on them)
+are left as found, each already carrying its own reasoning comment about
+why the "missing" dependency is deliberate; re-litigating three
+concurrency guards to satisfy a warning wasn't this step's job.
+
+**Verified against the running app, not just the test suite**: a
+throwaway Playwright harness (deleted after use, the same posture the
+five-primitives entry took) drove Chat, People, Memory, Privacy and
+Settings at phone (390) and desktop (1280), light and dark, plus the
+People select-mode bar with a real selection, the Settings advanced-
+settings disclosure expanded, and the signed-out profile picker -
+screenshots opened and read, not assumed. `scripts/check.sh` green
+(backend 567, frontend 221, the new `bun run lint` step, the build,
+`@maipai/standards` core).
+
+**Dependency accounting.** Added: `shadcn` (dev), `radix-ui`,
+`class-variance-authority`, `cmdk`, `sonner`, `tw-animate-css` (all MIT).
+Removed: the four individual `@radix-ui/react-{avatar,select,slot,switch}`
+packages (superseded by the consolidated `radix-ui` import the generated
+components use) and the `cn`/`@fontsource-variable/geist` packages a
+default `shadcn add` pulled in that this repo doesn't need (its own `cn`
+already existed; the Nova preset's Geist font would have changed the
+product's look, which this step's own acceptance bar rules out). NOTICE
+updated for everything now bundled into the shipped frontend.
+
+**Code review pass (medium effort, multi-agent), findings and what came
+of each.** Two flagged as app-breaking - Switch and Checkbox's checked
+state supposedly never painting, since Radix emits `data-state="checked"`
+and the classes read `data-checked:` - turned out to be false positives
+on live verification: `shadcn/tailwind.css` (imported by `tokens.css`)
+declares `@custom-variant data-checked { &:where([data-state="checked"]),
+&:where([data-checked]...) }`, so `data-checked:` already matches Radix's
+real attribute. Checked directly in a real browser rather than taking
+either the finding or this rebuttal on faith: a toggled Switch's
+`getComputedStyle().backgroundColor` is `rgb(44, 208, 237)`, exactly
+`--primary`'s `#2cd0ed`, both before and after this paragraph was written.
+The five real findings, fixed: `Avatar`'s initials silently ignored every
+caller's text size (`kit/ui/avatar.tsx`'s generated `AvatarFallback`
+hardcodes its own `text-sm`, so nothing the caller passed the root ever
+reached it - `text-[length:inherit]` on the fallback is the actual fix,
+verified live: the sign-in picker's avatar now measures 20px, the header's
+14px, matching their respective `text-xl`/`text-sm` callers); Sonner's
+toast duration silently dropped from the deleted provider's explicit 6s to
+Sonner's ~4s default (restored); two more raw `<button>`s outside the
+lint's `src/apps` scope (`SettingField.tsx`'s "Reset to default",
+`SettingsRenderer.tsx`'s "Show N advanced settings") became `Button`;
+`PeoplePage.tsx`'s select-mode checkbox had a redundant 48px-hit-area
+wrapper div around a `Checkbox` that already provides its own. One
+finding was a real observation but not a bug to fix: the destructive
+confirmation staying an inline card rather than the suggested
+`AlertDialog` is docs/UI.md's own explicit, deliberate decision
+("PeoplePage's existing Remove pattern... is the model, not an exception
+to standardize away"), recorded the same night this session started.
+
+## Session B: step 2, the shell (2026-09-05)
+
+Every piece docs/UI.md's shell contract names, built for real: a
+data-driven nav (`shell/nav.ts`, five entries today, matching a new
+`nav_entry` def in `spec/ui/schema.json`), shadcn's `Sidebar` on tablet
+and desktop, a five-entry bottom bar on phone (`shell/PhoneNav.tsx`), the
+same Sidebar again on TV driven by real arrow-key/remote focus, a header
+profile switcher replacing sign-out as the primary action, and the
+appearance setting (`ui.appearance`, `backend/src/settings/uiKeys.ts`)
+actually applied.
+
+**`useSurface()` (`kit/useSurface.ts`).** `{ pointer, hover, input, far }`:
+`pointer`/`hover` from `usehooks-ts`'s `useMediaQuery` (capability),
+`input`/`far` from a hand-written keydown/pointerdown/gamepadconnected
+listener (what's actually in use) plus a webOS/Tizen/Fire TV user-agent
+check for `far` - arrow keys alone are indistinguishable from a keyboard's
+on a real TV browser, the exact gap the framework table's own note named.
+7 tests, mocking `matchMedia` directly rather than relying on happy-dom's
+real CSS evaluation (it doesn't implement `pointer`/`hover` media
+features).
+
+**The layout bug only a real browser caught.** The first draft put the
+header outside the Sidebar/SidebarInset pair shadcn's own components
+expect as direct `SidebarProvider` children (its `Sidebar` positions
+itself with `fixed inset-y-0`, viewport-relative, regardless of DOM
+nesting) - the header rendered, looked fine in a screenshot taken before
+any interaction, and was completely unclickable near the trigger, because
+the sidebar's fixed layer sat on top of it. jsdom never lays anything out,
+so no test could have caught this; a Playwright click on the real trigger
+did, immediately. Fixed by moving the header inside `SidebarInset`, the
+structure shadcn's own examples use.
+
+**`useIsMobile` (`kit/hooks/use-mobile.ts`) repointed from 768px to the
+kit's own 640px tablet breakpoint** (`kit/responsive.ts`'s
+`SURFACE_MIN_WIDTH_PX.tablet`), and every `md:` class inside the generated
+`kit/ui/sidebar.tsx` changed to `sm:` to match - without this, the
+Sidebar's internal mobile/Sheet cutover (768px) would have disagreed with
+where `PhoneNav`'s own `sm:hidden` takes over (640px), producing a dead
+zone between the two widths where neither nav rendered anything. Verified
+at exactly 800px (tablet): the real Sidebar, not a Sheet.
+
+**The accessibility floor, reapplied a second time.** Step 1 fixed the
+generated form controls; this step found the same undershoot in
+`SidebarMenuButton` (`h-8`/`text-sm`, 32px/14px against the 48px/16px
+floor) and fixed it the same way (default/lg sizes raised, even
+icon-collapsed forced to an important-modifier `size-12` rather than the
+generated `size-8`, since the shell's own nav is the sole way to reach
+every page on desktop). **A
+second real bug the size change itself introduced**, caught by Jesse
+watching a screenshot live, not by any test: raising icon-collapsed from
+32px to 48px left just enough room for a clipped sliver of the label's
+first letter to peek through (`[&>span:last-child]:truncate` only
+truncates overflow, it doesn't hide it, and at the smaller original size
+the icon and padding alone already overflowed completely, hiding the text
+by accident rather than by a real rule). Fixed with an explicit
+`group-data-[collapsible=icon]:[&>span:last-child]:hidden`, verified with
+a 1-second-settled screenshot after the collapse animation, not the
+300ms first check that still showed the sliver.
+
+**TV nav, really working, not just wired up.** `shell/tvNav.ts` calls
+`@noriginmedia/norigin-spatial-navigation`'s `init()` once, the first time
+`useSurface().far` is true; each nav row calls `useFocusable()`
+unconditionally (rules of hooks) and only lets its `focused` state affect
+styling when `far` - a mouse/touch/keyboard surface never notices the
+library is loaded. The library's own docs are explicit that "set the
+initial focus" is the app's job, not automatic - missed on the first pass
+(arrow keys did nothing at all), fixed with `forceFocus` on the first nav
+item when `far`. Verified with real simulated key events against a
+`Web0S` user agent: `ArrowDown` moves a `ring-2` class between "Chat" and
+"People" in the real DOM, and `Enter` on "People" navigates to `/people`
+- not asserted from reading the code, executed. Radix's Popover-based
+NotificationBell and ProfileSwitcher call a new `pauseTvNavForOverlay()`
+on open/close so a remote navigating a menu never also drives the rail
+underneath it (a no-op on every other surface, and before `far` has ever
+initialized the service).
+
+**The profile switcher (`shell/ProfileSwitcher.tsx`).** A Popover, not a
+Dialog or the generated DropdownMenu - matching NotificationBell's own
+"never blocks the rest of the page" precedent rather than inventing a
+second small-panel pattern. Lists every other household member, PIN
+prompt inline for secured ones (`api.select`/`api.verifySecret`, the same
+routes `SignIn.tsx`'s picker already calls, since the backend's session-
+cookie model needs no separate "switch profile" endpoint), sign-out moved
+inside as the last item. The PIN auto-submit-on-4-digits behavior is
+duplicated in small form from `SignIn.tsx` rather than extracted - an
+accepted, recorded tradeoff given this session's time budget, not an
+oversight.
+
+**The appearance setting, applied not just declared.**
+`backend/src/settings/uiKeys.ts`: `ui.appearance` (system/light/dark) and
+`ui.pinned_apps` (a JSON-array-in-a-`text`-selector stand-in - no real
+list selector exists in the Home Assistant vocabulary docs/SETTINGS.md
+uses; `level: "expert"` since the real editing UI is a pin/unpin gesture,
+step 6, not a JSON text box), registered in `backend/scripts/gen-
+settings-registry.ts` (a "one-line registration" the plan explicitly
+grants across the ownership boundary). `shell/useAppearance.ts` reads it
+once per person and applies a `.dark`/`.light` class plus the
+`theme-color` meta tag; the generic `SettingsRenderer` already renders it
+as a real "select" control with zero bespoke UI, exactly the declarative
+settings system doing its job. `prefers-reduced-motion` is one global CSS
+rule in `tokens.css` rather than a per-component check.
+
+**Deferred, matching the plan's own "don't invent ahead of need" rule
+rather than a gap found late:** the "Search, Home, then Your apps, then
+More" fixed-row structure the plan describes presupposes a Home page and
+a pinned-apps UI that don't exist until step 6 - today's sidebar and
+bottom bar show the five real pages directly, with the mechanism (nav.ts,
+PhoneNav's overflow branch) already shaped for when Search/Home/pinning
+land. Auto-collapse in consumption modes has no real consumer yet either
+(no media package exists).
+
+Verified against the running app: phone (390), tablet (800, the exact
+breakpoint boundary), desktop (1280) and a 1920×1080 `far` emulation
+(webOS user agent) of Chat, the sidebar collapsed to icons, the profile
+switcher open, and real keyboard-driven TV navigation - screenshots
+opened and read, the TV focus mechanism verified by script rather than by
+eye (a `ring-2` class moving between DOM nodes on `ArrowDown`, a real
+route change on `Enter`). 20 new tests (`useSurface` 7, `PhoneNav` 5,
+`ProfileSwitcher` 4, `useAppearance` 4). `scripts/check.sh` green
+(backend 567, frontend 241, lint, build, `@maipai/standards` core).
+
+**Dependencies added:** `usehooks-ts`, `@noriginmedia/norigin-spatial-
+navigation` (MIT both).
+
+**Code review pass (medium effort), two real findings, both fixed.**
+Collapsing the sidebar to icons hides each nav link's label with CSS
+(the fix for the clipped-sliver bug above), and a `display:none` element
+contributes nothing to a link's accessible name - unnaming every nav
+link the moment someone actually uses the collapse-to-icons feature this
+step makes newly discoverable, the exact class of bug the 2026-09-05
+accessibility pass already fixed once on the pre-shadcn rail. Fixed with
+an explicit `aria-label` on the `NavLink`, verified live (collapsed the
+sidebar, read every button's computed accessible name back out of the
+DOM: all five present). Separately, `pauseTvNavForOverlay`'s pause/resume
+was a plain boolean toggle with no reference count - harmless while only
+one overlay existed, a real bug the moment a second one could be open at
+the same time (closing the second-opened overlay would resume the TV nav
+rail while the first was still on screen). Fixed with a count; two new
+regression tests using `spyOn` on the library's own exported `pause`/
+`resume` functions (Bun's live ES module bindings make this work even
+though `tvNav.ts` imports and calls them directly, unlike the fetch-stub
+approach files touching `@/lib/api` need for the same reason).
+
+## Session B: step 3, the data layer (2026-09-05)
+
+TanStack Query replaces the hand-rolled load/error/retry triad in every
+page that had one: Chat (the initial history fetch only - a live turn
+still mutates `messages` as local state token by token, which doesn't fit
+a query's cache; rebuilding that as part of the runtime is step 4's job,
+not this one's), Memory, Privacy, People, and the settings renderer.
+NotificationBell's own hand-rolled `setInterval` poll became
+`refetchInterval`. One `QueryClient` (`src/lib/queryClient.ts`'s
+`createQueryClient()`, not a bare `new QueryClient()` at every call site):
+`retry: false`, because the hub is a local machine on the household's own
+network, not a flaky public API - TanStack Query's default of three
+silent retries with backoff before a query ever reports `isError` was
+just delaying `AsyncState`'s own retry UI by several seconds, found live
+in a browser check (a stubbed 500 response took the "Try again" button
+several seconds to appear).
+
+**A real simplification, not just a migration.** `SettingsRenderer.tsx`
+had a hand-rolled module-level `Promise` cache (`cachedRegistry`) purely
+to stop two `SettingsRenderer` instances on the same page (household,
+person scope) from each independently fetching the identical settings
+registry - exactly what a query cache already does for free. Deleted,
+along with the `__resetSettingsRegistryCacheForTests` escape hatch its
+own tests needed (module state surviving between tests); every test that
+rendered a migrated page now gets its own fresh `QueryClient` instead,
+via `createQueryClient()`, and `staleTime: Infinity` on the registry
+query replicates the "cached for the page session" behavior the old
+promise cache existed for. `PrivacyPage.tsx` had its own hand-rolled
+requestId race guard (a code review, 2026-09-04, found the retry button
+made a slower stale response overwrite a newer one) - TanStack Query
+already guarantees only the latest request's result is ever committed,
+so that guard is gone too.
+
+**A real bug a live browser check caught, not a test.** `NavItem`'s
+`useFocusable()` (step 2's TV nav) is called on every render regardless
+of surface; `@noriginmedia/norigin-spatial-navigation`'s service sets up
+its `layoutAdapter` only inside `init()`, which step 2 only ever called
+when `useSurface().far` was true - so on every OTHER surface, a
+focusable component still tried to register itself against a
+`layoutAdapter` that was never created, throwing "Cannot read properties
+of undefined (reading 'measureLayout')" on every single page, on every
+surface, caught only because this step's own verification attached a
+`page.on("pageerror")` listener step 2's screenshots-only pass never
+did. Unconditionally calling `init()` on every surface was considered
+and rejected: the library's key listener calls `preventDefault()`/
+`stopPropagation()` on any mapped key globally with no awareness of the
+event's target, which would have broken arrow-key text editing in every
+input and textarea on every non-TV surface. Fixed by splitting the
+component instead of branching inside it: `NavItem` (plain, no norigin)
+and `TvNavItem` (calls `useFocusable`, only rendered once `far` is true)
+are two separate components, and `SidebarMenu` is keyed by
+`far ? "tv" : "standard"` so switching between them is a clean remount
+rather than one component conditionally calling a hook - React's rules
+of hooks forbid the latter. A second, related ordering bug: calling
+`ensureTvNavInit()` from a `useEffect` in `Shell` raced against
+`TvNavItem`'s own mount-time registration, since React fires a child's
+effects before its parent's - moved to a plain, idempotent call during
+render instead.
+
+**A test-design bug of this session's own making, not a code bug.** The
+new `MemoryPage.test.tsx`'s archive test hung for the full suite timeout
+on first write: mutating via `invalidateQueries` means the test's own
+fetch stub has to actually reflect the archive in its next GET response,
+or the list a query refetches is identical to the one before and the
+assertion waiting for the item to disappear can never pass. Fixed with a
+small stateful stub (an `archived` flag flipped by the archive call,
+read by the list response) rather than a fixed fixture - the same
+"stateful stub, not a static fixture" pattern `PeoplePage.test.tsx`'s own
+`stubApi` already uses for its batch-delete outcomes.
+
+Every migrated page's existing test file needed a `QueryClientProvider`
+wrapper (a fresh `createQueryClient()` per render, so no test's cache
+bleeds into another's) - `PeoplePage.test.tsx`, `PrivacyPage.test.tsx`,
+`ChatPage.test.tsx`, `SettingsPage.test.tsx`. `MemoryPage.test.tsx` and
+`NotificationBell.test.tsx` are new; neither page had any test before
+tonight.
+
+Verified against the running app: every migrated page's real fetch,
+People's add-a-person flow round-tripping through the new query layer
+without a full reload, and a real network failure (an aborted `/api/
+memory` request) showing `AsyncState`'s retry button and actually
+recovering once the network came back - not just a screenshot, a
+scripted click-and-recover. 27 new/updated tests. `scripts/check.sh`
+green (backend 567, frontend 251, lint, build, `@maipai/standards`
+core).
+
+**Dependency added:** `@tanstack/react-query` (MIT).
+
+**Code review pass (medium effort), six real findings, all fixed.**
+`ChatPage.tsx` initialized `messages` to `null` rather than `undefined` -
+`AsyncState`'s contract treats `null` as a confirmed-empty result, so
+every single mount showed "Nothing here yet. Say hello." instead of the
+loading skeleton until the history query actually resolved. Fixed (the
+sentinel is `undefined` now; a real loaded-but-empty conversation is `[]`,
+which `MessageThread`'s own `emptyState` prop already renders) and
+covered by a new regression test that freezes the history fetch mid-
+flight and asserts the skeleton, not the empty state, is what's on
+screen. Separately, `AsyncState` checked `error` before `data ===
+undefined`, so a query's `isError` staying true until a retry actually
+settles (TanStack Query's own behavior) made `onRetry` look unresponsive:
+the identical stale error screen stayed up with no visual change for
+however long the retry took. Fixed with a new `isFetching` prop, checked
+first, threaded through every migrated page's `AsyncState` call.
+
+`NotificationBell.tsx`'s dismiss was a bare optimistic `setQueryData` plus
+a hand-rolled try/catch - the one write among the migrated pages not
+already using a mutation, and a real race with its own `refetchInterval`
+poll (a tick landing between the optimistic removal and the dismiss
+actually reaching the server could bring a just-dismissed notification
+back). Rebuilt as a real `useMutation` (`onMutate` cancels any poll
+already in flight and snapshots the previous list for rollback,
+`onSettled` always reconciles with a real refetch), the standard
+TanStack optimistic-update pattern. `MemoryPage.tsx`'s memories and
+people fetch were bundled under one `["memories"]` query key, so
+archiving a memory (invalidating that key) also forced a redundant
+`GET /api/people` refetch every time, with no cache sharing against
+`PeoplePage.tsx`'s own separate `["people"]` query for the same roster -
+split into two independent queries, the people one now using the exact
+same key so the two pages actually share a cache. `SettingsRenderer.tsx`
+refetched both the registry and values queries on retry regardless of
+which one actually failed; now retries only the one that did.
+
+Last, six test files (`ChatPage`, `MemoryPage`, `PeoplePage`,
+`PrivacyPage`, `SettingsPage`, `NotificationBell`) each hand-rolled the
+identical `QueryClientProvider`-plus-fresh-`createQueryClient()` wrapper.
+Extracted to `tests/renderWithQueryClient.tsx`, used from all six -
+a future change to how tests provision a client happens once.
+
+A test-design bug of the fix's own making, same shape as the earlier
+archive-test one: `NotificationBell.test.tsx`'s dismiss test needed its
+own stateful stub once the mutation started reconciling with a real
+refetch on `onSettled` - a fixed fixture would have undone the optimistic
+removal the instant that refetch landed. Fixed the same way (a `dismissed`
+flag flipped by the stubbed dismiss call, read by the list response).
+
+## Session B: step 4, chat on assistant-ui (2026-09-05)
+
+ChatPage.tsx rebuilt on `@assistant-ui/react` (0.15.18) plus its own
+shadcn-compatible registry (`src/kit/assistant-ui/`, relocated there from
+a flat `src/kit/` after finding the registry's own generated files
+reference nested `assistant-ui/elements/...` import paths the CLI didn't
+actually create - fixed once at the source rather than per-file). The
+delicate think-tag-stripping/sentence-chunked-TTS/error-handling logic
+that used to live directly in `handleSend` ported into
+`chatModelAdapter.ts`'s `ChatModelAdapter.run()`, an async generator that
+yields the CUMULATIVE visible text on every delta (the runtime replaces a
+running message's content with each yield, not merge-appends it) while
+the same think-tag resolution and TTS scheduling keep running as side
+effects hung off the same deltas - unchanged in substance, every one of
+its own code-review paper trail comments carried over verbatim.
+
+Session A's real per-thread conversation routes (`docs/plans/
+session-a-intelligence.md`'s contract: `turn_meta`, `GET /api/
+conversations` returning distinct threads, batch delete, clear-all)
+haven't landed yet, so `chatThreadListAdapter.ts` mocks a single thread
+("main") and `chatHistoryAdapter.ts` reads the EXISTING, pre-Session-A
+`GET /api/conversations` (still the flat turn list) through
+`ExportedMessageRepository.fromArray()`, stamping each message's
+`metadata.custom.turnId` with the row's real id - the seam "remember
+this"/"forget this" (below) and the memory-updated chip need, already
+shaped so swapping in Session A's real routes later is a one-file
+change (`chatThreadListAdapter.ts`), not a redesign.
+
+**New, real features, not just a migration.** Listen (a per-message TTS
+replay, `chatListenStore.ts`, a Zustand store since each message now
+mounts its own action-bar instance rather than one page-wide render).
+Remember this/forget this (`chatMemoryActions.ts`, `chatActionBar.tsx`):
+writes a real `POST /api/memory` record attributed to the message's own
+turn id, disabled on a live-session message that has no turn id yet
+(honest about the gap, not a broken button). A day divider and per-
+message timestamp (`chatDayDivider.tsx`) that assistant-ui's own
+generated Thread has neither of - computed once per messages-array
+change via a `DayBoundaryContext` (a code review, 2026-09-05, caught the
+first version scanning the full thread array inside EVERY message's own
+component instance: O(n) per message times N mounted messages, O(n^2)
+per render pass with nothing bounding N). A "memory updated" chip
+(`chatMemoryChip.tsx`) reading `NotificationDeliveryView` defensively for
+a `payload` field Session A's contract doesn't actually promise the
+delivery view itself will carry - the chip stays dark until it does,
+which is today's honest state since the notification type doesn't exist
+yet either. `MemoryPage.tsx` gained a `?ids=` filter as the chip's deep
+link target.
+
+**A real, live-caught environment gap, not a code bug.**
+`@happy-dom/global-registrator`'s `ReadableStream`/`WritableStream`/
+`TransformStream` are incomplete (no real `getReader()`-backed piping) -
+harmless for `@testing-library/react`'s DOM needs, but `assistant-stream`
+(pulled in by the thread-list adapter's `generateTitle()`) needs the real
+web-streams spec and threw `TypeError: stream.getReader is not a
+function` the moment a test actually iterated one. Fixed once, for every
+test in the suite: `tests/preload.ts` now captures Bun's native
+implementations before `GlobalRegistrator.register()` runs and restores
+them immediately after.
+
+**Code review pass (medium effort), seven findings, all fixed or
+verified as already covered.** `MemoryPage.tsx`'s `isEmpty` checked the
+unfiltered list while the `?ids=` render branch filtered separately - a
+chip linking to already-archived or unreadable ids showed "Showing 0
+memory updates" over a blank list instead of the real empty state; both
+now share one `visibleMemories()` helper. The remembered-turn-to-memory-
+id map (`chatMemoryActions.ts`) was in-memory only, losing which turns
+were already remembered on every reload (`chatHistoryAdapter.ts`'s own
+`load()` runs on every mount) even though the memory record itself was
+still real - persisted to `localStorage` now, per-browser rather than
+per-household (the real fix waits on Session A's per-turn `memory_ids`).
+`chatListenStore.ts`'s superseded-request guard stopped updating state
+for an old "Listen" click but never actually cancelled its in-flight
+`/api/tts` fetch - `api.streamSpeech()` gained an optional `AbortSignal`
+parameter, wired to an `AbortController` the store now aborts on every
+new click. Three new/updated test files (`chatHistoryAdapter.test.ts`
+gained back two regression tests `mapRows.test.ts`'s deletion had
+dropped: empty history mapping to an empty thread, and a safety-refused
+turn still rendering both sides) plus a fixture-naming fix
+(`chatHistoryAdapter.test.ts`/`chatThreadListAdapter.test.ts`/
+`ChatPage.test.tsx` used "Jesse" as a generic household-member name
+instead of the persona roster `.github/CLAUDE.md` requires for fixture
+data - "Jesse" stays the one allowed exception for author identity, not
+test data). The eslint exemption extending `src/kit/ui/**`'s "generated,
+not authored" carve-out to `src/kit/assistant-ui/**` is file-glob-wide
+even though `thread.aui.tsx` in that same directory was hand-edited to
+wire in real app components - a real, but today inert, gap (none of the
+hand-added lines actually trip the exempted rules), left as-is,
+consistent with the identical structural gap `src/kit/ui/**`'s own
+hand-fixed files (`button.tsx`, `switch.tsx`...) already have. Not
+pursued further: an automated click-through test for "Remember this"/
+"Forget this" through assistant-ui's `ActionBarMorePrimitive` dropdown -
+confirmed live in the running app, but the dropdown's content never
+actually opens under happy-dom no matter how it's triggered (unlike
+`NotificationBell.tsx`'s simpler `RadixPopover`, which does), a real
+environment gap rather than something worth chasing further given the
+underlying functions are unit-tested directly.
+
+Verified against the running app (backend on the stub model): a real
+message streams in, sentence-by-sentence TTS fires automatically as it
+does, "Listen" replays an earlier reply, "Remember this" creates a real
+memory record visible on the Memory page, a page reload correctly shows
+"Remembered"/"Forget this" (the turn id landing from history) where a
+live-session message correctly showed the disabled "available once
+saved" state first, and no console errors across the whole flow.
+
+## Session B: step 5, schema pages (2026-09-05)
+
+The generic `UiNode` interpreter v0's own README called "real, separate
+scope, deferred" now exists: `frontend/src/kit/schema/` (`SchemaPage`,
+`NodeRenderer`, `binding.ts` wrapping TanStack Query per `{source,
+path}`, `actions.ts` dispatching all five declared actions including a
+real confirm dialog, `condition.ts`'s minimal three-form evaluator,
+`fieldPath.ts`'s `{field}`/`{count}` templating). `schema.json` gained
+`list`, `card_grid`, `media_shelf`, `detail_pane`, `split_view` (the
+platform plan's five named primitives kit/primitives/ already had built
+- 2026-09-05's "five missing kit primitives" - just not wired to the
+schema yet) and a `batch_action` shape (`scope: "selected" | "all"`, the
+backlog's named "clear-all where the whole list is disposable" rule).
+`message_thread` simplified to a bare mount point now that step 4 moved
+every real Chat concern into React; a new `settings_editor` node plays
+the identical role for Settings' own existing generic renderer.
+
+**What actually converted, and the recorded decision on what didn't**
+(`spec/ui/README.md` has the full reasoning per-page). Memory converted
+for real (`spec/ui/pages/memory.json`, `MemoryPage.tsx` is now a thin
+mount) - the one page genuinely shaped the way the interpreter handles
+well. People and Privacy stayed hand-written React: People's batch-
+select sits on a permission matrix plus inline per-row edit and a
+write-only secret field, none of which the schema's `action`/`condition`
+vocabulary reaches without inventing a permission-predicate system and an
+inline-edit node kind nothing else needs yet; Privacy's one list has a
+rich multi-field row template plus grammar-aware conditional prose
+(`joinNames`) `list`'s single-field-per-row template can't express
+without a much richer per-row template mechanism. Settings kept its own
+existing generic renderer (`SettingsRenderer.tsx`, already registry-
+driven per docs/SETTINGS.md) rather than gaining a second, competing JSON
+description of the same data - step 7 ("settings as an editor") extends
+that renderer directly, never a UiNode rewrite. This is exactly the
+platform plan's own "time-box the hard pages, don't invent primitives
+ahead of need" methodology (6.2, aimed at Chat/Videos/Music), turning out
+to apply to two pages that looked simple until actually inspected closely.
+
+**Three real, live-caught CSS bugs in shared kit code, none specific to
+Memory's own new page.** None of People, Privacy, Chat or Settings had
+ever rendered a `renderItem` string long enough to expose them - Memory's
+own stub-model canned reply ("[stub model: no real model loaded, this is
+a canned reply] ...") was the first content anywhere in the app long
+enough to. `<main data-slot="sidebar-inset">` (`kit/ui/sidebar.tsx`, a
+shadcn-generated file, hand-fixed here the same way step 1's accessibility
+floor fixes were) had no `min-w-0` - a flex item next to the shadcn
+Sidebar in the outer row, its own `flex-1` still respected the row's
+default `min-width: auto` (its content's own min-content width) with
+nothing to override it, so ONE unwrapped, un-truncatable string deep
+inside was enough to push the entire main content column past the
+viewport, `document.body.scrollWidth` (1012px) exceeding `window.
+innerWidth` (800px) with no visible horizontal scrollbar to even hint at
+it. `Page.tsx`'s own inner wrapper had the identical gap one level down.
+And `BatchBar.tsx`'s `SelectModeToggle` - a bare `<Button>` with no row
+of its own - silently stretched to its flex-column caller's full cross-
+axis width under the default `align-items: stretch` (a lone "Select
+memories" button rendering as a giant, wrongly-centered heading instead
+of a compact left-aligned control); fixed with `self-start` on both it
+and `BatchBar`'s own root, so neither component depends on every future
+caller remembering `items-start`.
+
+Tests: `catalog.test.ts` (the schema/catalog agreement check, both
+directions - every schema.json `$def`'s `type` const has a NODE_TYPES
+entry and vice versa), `fieldPath.test.ts`, `condition.test.ts`,
+`NodeRenderer.test.tsx` (a full render-and-interact suite against
+synthetic list fixtures: row rendering, the empty state, a row_action's
+real fetch call, a batch action over selected items, a batch action with
+`scope: "all"` ignoring selection entirely, cancelling a confirm running
+nothing), `MemoryPage.test.tsx` rewritten for the thin mount (the one
+real behavior change - raw scope instead of a resolved name - is now
+what it asserts), plus `spec/tests/ts/ui-schema.test.ts` gained coverage
+for every new node kind and the now-bare `message_thread`/
+`settings_editor` shapes. Verified against the running app: Memory's
+list, per-row archive (no confirm, matching the pre-conversion
+behavior), entering select mode, "Archive selected" and "Clear all"'s
+confirm dialogs (both interpolating `{count}` correctly), the empty state
+after clearing, and - after the sidebar/Page/BatchBar fixes -
+re-confirmed Chat, People, Privacy and Settings all still render
+correctly with no new console errors, on the same running backend.
+
+**Dependency added:** `zod` (MIT) to the frontend directly (previously
+only `spec`'s own dependency); `assistant-stream` (MIT) as a direct
+frontend dependency too, for `chatThreadListAdapter.ts`'s
+`createAssistantStream()` - it was already a transitive dependency of
+`@assistant-ui/react`, just never imported directly before this session's
+`generateTitle()` implementation.
+
+## Session B: step 5 review fixes (2026-09-05)
+
+Step 5's own commit landed without the org's usual pre-commit code review
+(caught after the fact, not before) - run retroactively against the
+already-committed diff instead of skipped. Five real findings, all fixed
+here:
+
+1. **`actions.ts`'s batch loop only invalidated schema-bound queries on
+   full success.** A partial failure (item 2 of 3 rejects) left the item
+   that DID mutate stuck in the stale list forever, and the rejection
+   itself was unhandled - no user-visible error, just a console warning.
+   Wrapped the loop in try/finally so invalidation always runs, and added
+   a `lastError` string surfaced next to the list for a non-confirm
+   dispatch (a confirmed one already had `pendingConfirm.error` for this).
+2. **A list's select mode exited the instant a batch action was clicked**,
+   clearing the selection before the confirm dialog it opened had even
+   been answered - cancelling then lost the selection for nothing, and a
+   confirmed one that later failed left the household member staring at a
+   list that had silently left select mode underneath them. `dispatch()`
+   gained an `onSettled` callback, fired only once the action actually
+   finishes (success or failure), never on a plain cancel;
+   `NodeRenderer.tsx`'s batch button now passes its `exitSelectMode`
+   through that instead of calling it synchronously on click.
+3. **`{count}`'s substitution order let a bound item's own `count` field
+   win the race.** `fillTemplate` ran before `fillCount`, so an item
+   shaped like `{ count: 999, ... }` had its own field's value silently
+   fill `{count}` in the confirm prompt first, leaving fillCount's later
+   pass nothing to replace. Swapped the order: `{count}` resolves to the
+   true selection size before `fillTemplate` ever runs.
+4. **`condition.ts` fell through silently on any operator it didn't
+   recognize** (a not-equal check, a greater-than check, a logical AND,
+   ...), treating the whole expression string as a bare truthy path -
+   which never matches a real field, so the condition just always
+   evaluated to `false` with nothing pointing at the actual mistake.
+   Added a guard that throws naming the unsupported expression instead.
+5. **The batch bar (select toggle + actions) rendered even when the
+   bound list was empty** - a "Select" button with nothing to select.
+   Gated on the list actually having rows.
+
+The regression that took the longest to run down wasn't in any of the
+five: the new "partial batch failure surfaces an error" test kept failing
+even after fix #1, with the archive calls firing correctly (confirmed by
+the DOM: "First" gone, "Second" still there) but the error text nowhere
+in the document. Root cause was in `ConfirmDialog.tsx`, not `actions.ts`:
+its "Confirm" button was `kit/ui/alert-dialog.tsx`'s `AlertDialogAction`,
+a thin wrapper over Radix's own `AlertDialogPrimitive.Action` - and Radix
+closes the dialog itself the instant that's clicked, via its own internal
+`onOpenChange(false)`, independent of whatever `onClick` handler rides
+along with it. Since `ConfirmDialog`'s `onOpenChange` treated any
+`open === false` as a cancel, clicking Confirm on a batch action that
+takes real time to run (or fails) closed the dialog and nulled the
+pending-confirm state before the async operation's own success/failure
+ever got a dialog left to render into. Fixed by replacing
+`AlertDialogAction` with a plain `Button`: only `pendingConfirm`'s own
+`busy`/`error` state now decides when the dialog closes, Radix's
+auto-close never enters into it. `AlertDialogCancel` stays as-is
+(cancelling has no async result to wait for, so Radix closing it
+immediately is exactly right).
+
+A second, unrelated pre-existing bug turned up while verifying the fix
+live: `kit/ui/switch.tsx` and `kit/ui/checkbox.tsx` (both from step 1's
+shadcn regen) style their checked state on a bare `data-checked`/
+`data-unchecked` Tailwind variant, but Radix's own root only ever sets
+`data-state="checked"|"unchecked"` - never a literal `data-checked`
+attribute - so the checked-state fill and the switch thumb's slide never
+rendered; a toggle worked (`onCheckedChange` still fired) but looked
+permanently off. `tokens.css` already had this exact shape solved once,
+for `data-open`/`data-closed` (mapping Radix's `data-state` there too);
+added the matching `data-checked`/`data-unchecked` custom variants rather
+than hand-patching the two component files, so any future shadcn
+component with the same checked/unchecked shape picks it up for free.
+Verified by fetching the dev server's own compiled CSS and confirming
+`data-checked:bg-primary` compiled to
+`:where([data-state="checked"], [data-checked]:not([data-checked="false"]))`
+- a real selector match against Radix's actual output, not just
+plausible-looking source.
+
+Two other angle-review findings from the same pass turned out to already
+be fixed by an earlier fix cycle in this same step: the Sonner toast's
+6-second duration (dropped to Sonner's ~4s default when the hand-rolled
+Toast was deleted in step 1) already carries an explicit
+`duration={6000}` with a comment recording why; `chatListenStore.ts`'s
+stale-request handling already wires an `AbortController` all the way
+into the fetch, not just the player. Left as-is - re-fixing something
+already fixed is its own kind of regression.
+
+A second review pass, run against this fix round's own diff (the org's
+usual pre-commit review, this time run before rather than after), found
+three more real issues, all in the same fix's own blast radius:
+
+1. **`condition.ts`'s new throw had no containment.** `SectionNodeView`
+   calls `evaluateCondition` directly in render, and the app has no
+   `ErrorBoundary` anywhere - so a schema page with one badly-written
+   condition would have unmounted the *entire* page for every household
+   member, not just hidden the one section. `SectionNodeView` now catches
+   the throw itself, logs it to the console (still loud for whoever is
+   authoring the page), and treats the section as hidden rather than
+   crashing the page underneath it.
+2. **`lastError` (the banner a failed non-confirm dispatch, like a
+   row_action, leaves under the list) was never cleared by any later
+   confirm-based action** - success or failure - so it could sit there
+   indefinitely once set, even after the household member successfully
+   ran something else entirely. Cleared as soon as a new confirm dialog
+   opens, the same "starting fresh" moment `pendingConfirm.error` already
+   gets cleared at.
+3. **Radix's default Escape-to-dismiss wasn't gated on `busy`** the way
+   the visible Cancel/Confirm buttons already were. Pressing Escape
+   mid-confirm hid the dialog via `cancel()` while the request it started
+   kept running in the background; once that request resolved, its own
+   `onSettled` callback (a batch action's `exitSelectMode`) still fired -
+   a side effect landing after the household member believed they'd
+   backed out. `ConfirmDialog`'s `AlertDialogContent` now blocks Escape
+   the same way while `busy`, via `onEscapeKeyDown`'s `preventDefault()`.
+
+The regression test for #3 caught a real testing-library subtlety along
+the way: Radix marks everything outside an open modal `aria-hidden` (so
+assistive tech ignores it while blocked), and testing-library's
+role-based queries correctly refuse to find `aria-hidden` content - so a
+first draft of the test that tried to assert the list's own checkbox was
+still checked *while the dialog was still open* failed for the right
+reason, not the wrong one. The real proof that Escape did nothing (that
+the dialog stayed open, and that the list underneath only changed once
+the action actually finished and the dialog legitimately closed) doesn't
+need to reach behind the modal at all.
+
+Tests: five new `NodeRenderer.test.tsx` cases (cancelling a
+`scope: "selected"` batch action preserves selection and select mode;
+select mode only exits once the action actually confirms and runs; the
+select toggle and batch bar are hidden on an empty list; a stale
+row_action error clears once a new confirm dialog opens; Escape neither
+dismisses the dialog nor runs its `onSettled` while an action is still in
+flight), one new `condition.test.ts` case (not-equal, greater-than, and
+logical-AND operators all throw), and the partial-batch-failure case that
+caught the Radix auto-close bug live. 21/21 passing across both files
+(the full suite re-run 3x consecutively with no flakiness). Verified
+against the running app (backend :8798, frontend :5173, household member
+Nova): re-fetched the dev server's compiled CSS directly to confirm the
+`data-checked`/`data-unchecked` selectors match Radix's real output.
+
+## Session B: step 6, home and unified search (2026-09-05)
+
+Home moved to `/` (a real page now, not Chat with a different nav
+highlight); Chat moved to `/chat`. `HomePage.tsx`: a time-of-day greeting,
+"who is here" (the household roster - no presence/session infrastructure
+exists yet, so this is who lives here, not who's home right now, a real
+distinction recorded rather than glossed over), two "today" cards
+(weather through the real turn route with a fixed utterance, cached 30
+minutes so opening Home repeatedly doesn't create a new turn every time;
+recent memories, client-side sorted/sliced since `GET /api/memory?since=`
+isn't on `main` yet - the same "local mock until Session A's route
+lands" pattern the conversations adapter already used in step 4), a
+pinned-apps strip (`usePinnedApps.ts`, TanStack Query with an optimistic
+write), and a prompt box.
+
+The prompt box and the search palette's final "Ask MaiPai: <text>" row
+both wanted to open Chat with the typed text already sent. Assistant-ui's
+public API has no documented way to append a message from outside the
+runtime tree - digging into it found only internal/legacy paths, not
+anything stable enough to build on (org principle 6: use the framework as
+intended, don't reach past its real API). Landed smaller instead: the
+text arrives as `location.state.initialText`, and `chatSuggestionAdapter`
+renders it as the one starter suggestion instead of the usual routing-
+example list - a real, one-tap "send this" affordance, not a silent drop
+and not a fragile auto-click hack. Recorded as a genuine gap, not a
+finished feature.
+
+Search: `shell/search/providers.ts` runs six independent, best-effort
+providers (pages, people, memories, conversations, settings, commands),
+each catching its own failure, "last token prefix-matched" against label/
+help text. `CommandPalette.tsx` (shadcn `Command`, `shouldFilter={false}`
+since the providers already filter) is Cmd/Ctrl+K and the new "Search"
+nav row on phone/tablet/desktop; `far` has no free text entry beyond the
+remote's keyboard, so there it's a real page (`SearchPage.tsx`) instead
+of a modal over a ten-foot, remote-navigated surface - same providers,
+laid out as a scrollable list. Three of six providers (people, settings,
+commands) have no per-item deep link yet and just open their page
+generically - honest interim state, matching the conversations
+provider's own "one real destination, not a list of fabricated
+conversations" restraint.
+
+`NAV_ENTRIES` gained a sixth entry (Home); `PhoneNav.tsx`'s overflow
+mechanism - built "ahead of the day a sixth page registers" back in step
+2 - fired for real for the first time (four entries direct, two behind
+"More"), and its own tests needed a real update to match, not just a
+number bump.
+
+**A design review, live in the running app (2026-09-05), Jesse in the
+loop throughout, found the visual result "amateurish" against a modern
+reference:** real bugs (a raw `profile.appearance` settings-section key
+leaking into the UI; "Notifications" rendering as two identical, back-
+to-back section headers with no way to tell the household-scope one from
+the person-scope one; "En-US" instead of a real language name), a
+structural gap (Settings had no visible title, no search, no way to jump
+to a section on a long page), and a real permissions bug found along the
+way: household-scope settings are readable by anyone signed in but
+writable only by owner/admin (`backend/src/lib/settings.ts`'s
+`assertCanAccessScope`) - the page never reflected that, so a non-admin
+would have seen live-looking Household controls that silently 403 on
+every change.
+
+Fixed together, ahead of its own step 7 turn: `SettingsPage.tsx` gained
+Household/Me tabs (URL-bound, and hidden entirely for non-admins - `tab`
+is forced to `"me"` server-side-permission-aware, not just client-side
+cosmetics), a tree sidebar scoped per tab (hidden below `lg`/1024px -
+the tree plus the shell's own global sidebar left the content column
+badly squeezed narrower than that, found live at an 800px viewport), a
+search box filtering label/help text across `SettingsRenderer`'s
+generic rows (surfacing a folded "advanced" match directly rather than
+leaving it hidden), and an IntersectionObserver-driven scrollspy
+highlighting the tree entry nearest the top of the scroll pane. `Page.tsx`
+gained a real visible title (was `sr-only`, `hideTitle` is the escape
+hatch - Home uses it, since its own greeting already gives the page an
+identity a second generic label would only repeat). `Section.tsx`
+(shared by Settings and Memory's schema pages both) gained a real card
+surface plus a thin accent-colored left rule on its heading, replacing an
+11px grey label with a 1px rule that gave the eye nothing to anchor on.
+`SettingField.tsx`'s generic option-label title-caser mishandled BCP-47
+locale codes (`core.locale`'s "en-US" splitting only on `_`, coming out
+"En-US") - fixed once as a shape-guessing heuristic inside the shared
+titleCaseOption, then re-scoped to a `localeDisplayName` helper used only
+at the one call site that actually renders `core.locale`, after a second
+review caught `Intl.DisplayNames` being lenient enough to also mislabel
+a future dashed voice-collection name that happened to look locale-
+shaped (`VoiceCatalogSection.tsx` shares the same generic title-caser).
+
+Two token-level fixes, each applying everywhere at once rather than as
+one-off patches: `--sidebar-accent`/`--sidebar-accent-foreground` went
+from a plain neutral gray (the same color an unpressed button's hover
+state already used - "the brand blue appears in exactly one spot,"
+Jesse's own words) to the sidebar's own primary color outright, with the
+matching foreground token - a fully solid, saturated active-nav pill
+rather than a light tint, landed after two independent design references
+Jesse pointed to both favored the same solid-pill treatment over a
+subtle wash. Separately, `Shell.tsx`'s sidebar menu had zero gap between
+rows and no group padding (shadcn's own usual `SidebarGroup` nesting
+supplies that; this file skips it) - Jesse, comparing against a sibling
+product's own sidebar: "even the bot had better spacing." Fixed with
+`gap-1`/`p-2` at the one call site rather than touching the generated
+component's own defaults.
+
+A follow-up code review on this whole round found four more: the tree
+sidebar's scrollspy `IntersectionObserver` ran once at mount, before
+`SettingsRenderer`'s own network-backed queries had resolved - none of
+its section elements existed yet, and neither of its dependencies
+changes once they actually appear, so the highlight was silently dead on
+first load. Fixed with a `MutationObserver` that re-syncs the
+`IntersectionObserver`'s observed targets on any DOM change under the
+scroll container (a tab switch, a search keystroke, an advanced-fold
+toggle, or the data simply arriving late), rather than trying to track
+every trigger by hand. Also caught: `PERSON_TREE`'s own hardcoded
+"Notifications" label had already drifted from `groupSettings.ts`'s
+freshly-renamed "My notifications" heading - the exact class of
+duplicate-heading confusion this whole round was fixing, reappearing in
+miniature; and the Household/Me tab bodies were close enough to
+duplicated that the drift above was able to happen at all - pulled the
+one truly shared shape (a section, hidden while search is active, in its
+own stack) into `ExtraSections`, left the genuinely different content
+(different components, different props, an owner/admin gate only one
+branch needs) inline rather than forcing a generic list-of-components
+abstraction over it.
+
+Tests: `PhoneNav.test.tsx` rewritten for the six-entry overflow (five
+top-level items, the rest behind "More", verified reachable once opened);
+`SettingsPage.test.tsx` gained a Household -> Me tab-switch registry-
+cache-reuse test (replacing a simultaneous-render assumption the tabs
+made obsolete) and a scrollspy regression test (a stubbed
+`IntersectionObserver` recording what it's asked to observe, proving a
+section is (re-)observed once it actually mounts, not just checked once
+against an empty page - would have failed under the pre-fix version).
+303/303 passing. Verified against the running app (backend :8798,
+frontend :5173, household member Nova): Home's greeting/who's-here/today
+cards/pinned strip/prompt box all render and the weather card round-
+trips through the real (stub) model; Settings' tabs, tree, search filter,
+and scrollspy highlight all confirmed at an 800px viewport (this
+session's own tooling ceiling - the `lg`/1024px tree-visible breakpoint
+itself is unverified live, a disclosed gap, not a silent one); the
+Checkbox/Switch fill and the solid active-nav pill both confirmed by
+screenshot.
+
+## Session B: a sitewide scroll bug, and a dropped glass experiment (2026-09-05)
+
+Two pieces: a real, sitewide layout bug found while Jesse kept reviewing the app live, and a visual direction tried and explicitly dropped.
+
+**The scroll bug.** Jesse: "the settings sidebar and header shouldn't
+scroll away" - they were structurally already siblings of the one
+`overflow-y-auto` region, which should have kept them pinned. Tracing it
+live (`document.body.scrollHeight` exceeding `window.innerHeight`)
+found the real cause one level up: `kit/ui/sidebar.tsx`'s
+`SidebarProvider` wrapper used shadcn's own default `min-h-svh` - a
+*minimum* height, which lets any child grow the wrapper past the
+viewport instead of ever activating its own inner scroll region. Every
+page's `flex-1 min-h-0 overflow-y-auto` chain (`SidebarInset`, every
+`Page.tsx`) was built assuming a hard viewport boundary existed above
+it; `min-h-svh` never provided one. Changed to `h-svh` - a real, sitewide
+fix (every page's own long-content scroll behavior, not just Settings',
+depended on this), verified by confirming `document.body.scrollHeight`
+now equals `window.innerHeight` exactly and that scrolling the inner
+region no longer moves the page's own fixed chrome.
+
+**Glass, tried and dropped.** Jesse asked for a translucent,
+frosted-glass surface treatment as an opt-in, per-person setting
+("people can turn that off if they don't like it"). Built it, then
+rebuilt it three more times chasing his live feedback on each attempt
+(a first pass that read as "3D with gradients, not glass"; a second,
+research-grounded pass matching a real shipped component library's
+minimal recipe, correct for that library's own purposes but not what he
+wanted; a third matching a concrete reference generator's CSS output
+literally, which still read as flat gray because tinting a near-black
+card background with white at any real opacity has no depth cue to
+read as translucency; a fourth with the tint and blur both turned down
+and the three values - blur, opacity, depth - exposed as tunable
+settings). Verified live end to end (all three sliders render, persist,
+and update the page instantly with no reload), and still Jesse's
+verdict on seeing it was final: "looks like a glow instead of glass" -
+dropped entirely rather than keep tuning. The settings keys, the hook,
+and the CSS were all removed before committing; nothing shipped.
+Two real CSS gotchas surfaced along the way and are worth keeping even
+though the feature isn't: a bare `.glass` class selector loses to a
+dark-mode default living behind `:root:not(.light)` inside a media
+query (specificity 0,2,0 beats 0,1,0) - matching selector specificity,
+not just adding a class, is what wins; and a custom property that
+references itself within the same rule that defines it
+(`--x: color-mix(..., var(--x), ...)`) is a genuine CSS cycle, treated
+as invalid rather than "the value before this rule," which silently
+breaks everything else in that rule too. Both will bite the next
+translucency or theming attempt if forgotten.
+
+The visual direction going forward instead: spacing, typography, and
+card styling modeled on well-designed native mobile apps Jesse pointed
+to directly, kept out of this file and out of commit messages by name
+per his standing rule against naming other products in our own code and
+history.
+
+## Session B: global tokens, chat toolbar relocation, secret write flow (2026-09-06)
+
+Three pieces, all from direct live feedback on the running app.
+
+**Global tokens.** `--radius` (`tokens.css`) bumped from shadcn's own
+0.75rem default to 1rem - every card, button, input, and popover reads
+rounder as one token change. `Page.tsx`'s title went from `text-2xl
+font-semibold` to `text-3xl font-bold`; `Section.tsx`'s heading matched
+it (`text-base font-semibold` -> `text-lg font-bold`), both modeled on
+well-designed native mobile apps Jesse pointed to directly (kept out of
+this file and every commit by name, per his standing rule against
+naming other products in our own history). Verified across every page
+(Home, Chat, People, Privacy, Memory, Settings, the command palette) -
+consistent everywhere without further per-page fixes needed.
+
+**Chat's toolbar, twice corrected.** The wake-word and "think longer"
+toggles were full-size (48px) solid-gray pills in their own row above
+the page title - Jesse: "looks ugly and probably not modern style."
+Rebuilt as compact `size="sm"` icon chips (mic, brain), `outline`
+variant when off instead of a heavy solid fill. Still wrong: "its
+placement / location is also odd" - floating above the whole message
+history reads as page chrome, not what it actually is, a pair of
+per-turn behavior toggles that affect the next message someone sends.
+The vendored `Thread` component (`thread.aui.tsx`) owns its own
+composer with no extension point, so it gained one:
+`composerToolbar?: ReactNode`, rendered directly above `<Composer>`
+inside `ThreadPrimitive.ViewportFooter`. `ChatPage.tsx` now passes the
+two toggles through that prop instead of rendering them as page header
+content. Same pass fixed the thread-list column's own missing padding
+(`New Thread`/search/rows sat flush against the column edge with no
+breathing room, unlike the rest of the app's consistent `p-4`) - a
+plain `p-2` on the `<aside>` wrapper.
+
+**The generic settings editor's write-only secret flow.** Checking
+`notifications.telegram.bot_token` live found it had no way to be set
+at all: a plain `secret: true` registry key with no dedicated backend
+route the way `voice.hf_token` needed one for (restarting pocket-tts
+after a save), so `SettingField.tsx`'s secret branch - a static
+"Set"/"Not set" status, unchanged since the key was declared - was a
+dead end. A household literally could not configure Telegram
+notifications through the running app. Added the paste-and-confirm
+flow the code's own comment had named as the real fix a session ago: a
+"Set"/"Change" button reveals a masked input plus Save/Cancel; the
+value is never read back from the server (`resolveForResponse` on the
+backend already enforces that), so a rejected save just leaves the
+typed draft in place for another try rather than reverting to a
+"previous value" that was never sent to the client to begin with.
+Clearing a secret reuses the field's existing "Reset to default"
+action (every secret key's own default is `""`) rather than a second
+control. Verified live end to end against the real Telegram key: Set,
+shows Set/Change, Reset to default clears it back to Not set, no test
+artifact left in the household's data.
+
+A code review on this diff caught a real regression before it shipped:
+the new flow made `voice.hf_token` writable a SECOND way, through the
+same generic row `HuggingFaceTokenSection.tsx` was built specifically
+to bypass (the generic PUT this flow calls has no hook to restart
+pocket-tts, so a save through the wrong row would succeed while voice
+cloning silently kept failing). Confirmed live - the "AI model tuning"
+section's folded advanced settings really did include a second, fully
+working "Hugging Face token" row once the generic secret flow went in,
+right next to the correct dedicated section further down the same
+page. Fixed by excluding that one key by name
+(`SECRETS_WITH_DEDICATED_FLOWS`) rather than inventing a general "does
+this key have a dedicated section" mechanism nothing else needs yet -
+the same narrow, key-specific shape `household.locale`'s own display
+fix already uses in this file. A regression test pins it: rendering
+`voice.hf_token` through `SettingField` directly must show only the
+static status, never a Set/Change control. The same review also
+flagged the new password input missing `autoComplete`, letting a
+browser's own password manager offer to save an API token outside the
+app's encrypted keystore - added `autoComplete="off"` (the dedicated
+HF token input has the identical, older gap, out of scope for this
+diff to touch).
+
+Tests: 19 in `SettingField.test.tsx` (5 new for the write flow, 1 for
+the `voice.hf_token` exclusion). Full `check.sh` green throughout,
+verified live in the browser at every step rather than trusted from
+the diff alone - the switch/checkbox "fix" earlier this session (see
+the prior entry) was exactly the kind of change that looks obviously
+correct and was not.
+
+## Session B step 7: Models/Backups/Voices/Commands become their own routes (2026-09-06)
+
+The plan's own words: "sections that are real management surfaces
+rather than settings (models, backups, voices, commands) become their
+own schema pages linked from the tree." Checked `kit/schema`'s actual
+interpreter capability before committing to that literally, rather
+than assuming it: `FormNode` (`kit/schema/types.ts`) is a flat field
+list with no conditional visibility between fields - `CommandsSection`'s
+own create form branches its entire second half by action kind (reply
+vs. a Home Assistant service call), which a schema form can't express.
+Its selector enum mirrors the settings registry's own
+(number/select/text/boolean/duration/time/entity/area/person/media) -
+nothing for a local file, which both `BackupsSection`'s restore flow
+and `ClonedVoicesSection`'s upload need. `ProgressNode` binds one value,
+not a live per-item download job the way `ModelsSection` needs.
+Converting these honestly would mean designing and building several
+new interpreter primitives nothing else in the app needs yet - the
+same "stays hand-written" verdict `docs/dev.md`'s A2UI entry already
+recorded for People, Privacy and Settings itself, not a new one invented
+for this.
+
+Built the part that's actually achievable: each section moved off the
+single long Settings scroll onto its own route (`/settings/models`,
+`/backups`, `/voices`, `/commands`), still reachable from the tree
+sidebar, but a real navigation instead of a scroll anchor
+(`TreeEntry.to`, checked first in the tree's onClick). Voice catalog
+and cloned voices combine into one "Voices" page - step 7 names them
+as a single item, "voices," not two. Each new page gates its own
+access (`AdminGatedPage.tsx`, shared by Models and Backups - both
+already required `canManageBackups` inline; Voices and Commands need
+no gate, matching their existing visibility) rather than trusting a
+caller to remember an inline `? : null`, since nothing else stands
+between a direct navigation and a route.
+
+A code review on this diff caught two real issues before they shipped.
+First: the same pass's own copy fix on `ClonedVoicesSection` ("Requires
+a Hugging Face token, set in Settings > Hugging Face token") pointed a
+non-admin at a destination gated to owner/admin only, while uploading a
+cloned voice itself carries no such gate - a non-admin reading that
+instruction would go looking for a section they can never reach.
+Reworded to state the requirement without asserting a specific path:
+"which an owner or admin can set in Settings." Second: `ModelsPage.tsx`
+and `BackupsPage.tsx` first shipped with the exact same gate + fallback
+block duplicated verbatim - pulled into `AdminGatedPage.tsx` instead,
+matching the org's "one definition, one implementation" standard.
+
+Tests: 6 new/updated (`ModelsPage.test.tsx`, `BackupsPage.test.tsx` -
+each proving the gate and its absence; `SettingsPage.test.tsx` gained
+a navigable-tree-entry test per moved section, not just the first one
+a reviewer caught missing coverage on - each in its own render, since
+`to` navigation resets the URL's query string and would otherwise wipe
+the `?tab=me` a chained sequence needs for Voices/Commands). Verified
+live for all four routes plus the main Settings page afterward
+(nothing left behind: no `section-models`/`section-backups`/
+`section-voice-catalog`/`section-cloned-voices`/`section-commands` id
+still exists in the DOM on the main page).

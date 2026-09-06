@@ -2,6 +2,7 @@ import type { SafetyResult } from "@maipai/spec/gen/ts/safety-result.js";
 import type { SettingsKey } from "@maipai/spec/gen/ts/settings-key.js";
 import type { Person } from "@maipai/spec/gen/ts/person.js";
 import type { MemoryRecord } from "@maipai/spec/gen/ts/memory-record.js";
+import type { PackageManifest } from "@maipai/spec/gen/ts/manifest.js";
 import type {
   Roster,
   TurnValue,
@@ -46,6 +47,7 @@ export type Role = Person["role"];
 // place.
 export type { Roster, TurnValue, TurnStreamEvent, ConversationTurnRow, ResolvedSetting, BackupInfo, HardwareInfo, ModelFit, ModelJob, EngineStatus, EngineStatsSample, ClonedVoiceInfo, RoutingStats, PrivacyConnection, PendingRestore, CommandRow, CommandAction, NotificationDeliveryView };
 export type { MemoryRecord };
+export type { PackageManifest };
 export { isOwnerOrAdminRole };
 // SettingsKey is spec-generated (@maipai/spec), not backend-only, so it's
 // imported directly rather than through @/wire.
@@ -99,7 +101,12 @@ function isAbortError(err: unknown): boolean {
 // serveStatic in prod: vite.config.ts and app.ts) with the session
 // cookie included: there is no header-based auth path at all
 // (middleware/auth.ts), so `credentials: "include"` is not optional.
-async function request<T>(path: string, init?: RequestInit & { timeoutMs?: number }): Promise<T> {
+// Exported for the schema interpreter (kit/schema/binding.ts, step 5):
+// a `route`-sourced binding or a `call` action target a JSON page
+// authors is just a path string, not one of the named methods below, so
+// the interpreter needs the same request plumbing (credentials,
+// timeout, error shape) directly rather than duplicating it.
+export async function request<T>(path: string, init?: RequestInit & { timeoutMs?: number }): Promise<T> {
   const { timeoutMs, ...rest } = init ?? {};
   const { signal, clear } = withTimeout(timeoutMs);
   try {
@@ -144,13 +151,25 @@ async function request<T>(path: string, init?: RequestInit & { timeoutMs?: numbe
 // timeout handling in here had silently replaced its specific "Timed out
 // waiting for voice" with this generic text, a real if minor UX
 // regression from the refactor.
+//
+// `externalSignal` (step 4, chat on assistant-ui): the runtime's own
+// abortSignal for a stopped run, merged with the timeout's signal via the
+// standard `AbortSignal.any` rather than hand-rolling a second listener -
+// whichever fires first aborts the fetch, and `isAbortError` below can't
+// tell the two apart anyway (neither needs to; a stopped run and a timed-
+// out one both just end the stream).
 async function rawStreamPost(
   path: string,
   body: unknown,
   timeoutMs: number,
   timeoutMessage = "Timed out waiting for a response",
+  externalSignal?: AbortSignal,
 ): Promise<Response> {
-  const { signal, clear } = withTimeout(timeoutMs);
+  const { signal: timeoutSignal, clear } = withTimeout(timeoutMs);
+  const signal =
+    timeoutSignal && externalSignal
+      ? AbortSignal.any([timeoutSignal, externalSignal])
+      : (timeoutSignal ?? externalSignal);
   try {
     const res = await fetch(path, {
       method: "POST",
@@ -309,6 +328,26 @@ export const api = {
   memories: () => request<MemoryRecord[]>("/api/memory"),
   archiveMemory: (id: string) =>
     request<MemoryRecord>(`/api/memory/${encodeURIComponent(id)}/archive`, { method: "POST" }),
+  // POST /api/memory (backend/src/lib/memory.ts's remember(), already on
+  // main) backs the chat "remember this" action (step 4). Its real input
+  // type (RememberInput) lives in backend/src/wire.ts, a file Session A
+  // owns (docs/plans/session-a-intelligence.md's "Files you own") - this
+  // repeats only the fields "remember this" actually sends, rather than
+  // touching that file to export one more type.
+  remember: (input: {
+    text: string;
+    category: MemoryRecord["category"];
+    tier: MemoryRecord["tier"];
+    scope: MemoryRecord["scope"];
+    person?: string | null;
+    source: string;
+    importance: number;
+  }) => request<MemoryRecord>("/api/memory", { method: "POST", body: JSON.stringify(input) }),
+  // GET /api/plugins (already on main): every installed package's
+  // manifest, `routing.examples` included - the chat composer's empty-
+  // state suggested prompts (step 4) are drawn from these rather than
+  // invented, so they're always real things MaiPai can actually do.
+  plugins: () => request<PackageManifest[]>("/api/plugins"),
   hardware: () => request<HardwareInfo>("/api/host/hardware"),
   models: (role: string) => request<ModelFit[]>(`/api/host/models?role=${encodeURIComponent(role)}`),
   modelSelection: () => request<{ modelId: string | null }>("/api/host/models/selection"),
@@ -322,12 +361,20 @@ export const api = {
   // safety net (a dead connection the server never sees), never races a
   // legitimate server-side response that's about to arrive.
   restartEngine: () => request<EngineStatus>("/api/host/engine/restart", { method: "POST", timeoutMs: 100_000 }),
-  // Returns the raw Response so the caller (sentenceSpeechScheduler.ts)
-  // can read the streamed audio/wav body directly. 185s: a first spawn of
-  // the Pocket TTS sidecar can take a while (ttsSupervisor.ts's 180s
-  // health wait); only bounds waiting for the response to begin, per
-  // rawStreamPost's own doc comment.
-  streamSpeech: (text: string) => rawStreamPost("/api/tts", { text }, 185_000, "Timed out waiting for voice"),
+  // Returns the raw Response so the caller (sentenceSpeechScheduler.ts,
+  // chatListenStore.ts) can read the streamed audio/wav body directly.
+  // 185s: a first spawn of the Pocket TTS sidecar can take a while
+  // (ttsSupervisor.ts's 180s health wait); only bounds waiting for the
+  // response to begin, per rawStreamPost's own doc comment. `signal`
+  // (step 4, a code review 2026-09-05): chatListenStore.ts's own
+  // requestId guard stops updating state for a superseded "Listen"
+  // click, but never actually cancelled the earlier click's in-flight
+  // fetch/reader loop - it kept running in the background until it
+  // finished or timed out. Optional so sentenceSpeechScheduler.ts's
+  // existing calls (which have no per-sentence abort concept) are
+  // unaffected.
+  streamSpeech: (text: string, signal?: AbortSignal) =>
+    rawStreamPost("/api/tts", { text }, 185_000, "Timed out waiting for voice", signal),
   // Real token-by-token streaming (2026-09-04): the reply text arrives as
   // it's generated instead of all at once, the prerequisite for speaking
   // it sentence by sentence as it's typed (spec/voice/README.md's "what
@@ -336,6 +383,10 @@ export const api = {
   // has to tolerate, and routes/turn.ts has no server-side bound on it
   // either - a hung stream is a real, separate gap to close later, not
   // guessed at with an arbitrary number here.
-  streamTurn: (text: string, thinking?: boolean) =>
-    rawStreamPost("/api/turn/stream", { surface: "chat", text, thinking }, 0),
+  // `signal` (step 4): the assistant-ui runtime's own abortSignal for a
+  // stopped run, so a user-initiated "stop" actually cancels the fetch
+  // instead of leaving the browser's request racing pointlessly against
+  // work nothing will read the result of.
+  streamTurn: (text: string, thinking?: boolean, signal?: AbortSignal) =>
+    rawStreamPost("/api/turn/stream", { surface: "chat", text, thinking }, 0, undefined, signal),
 };

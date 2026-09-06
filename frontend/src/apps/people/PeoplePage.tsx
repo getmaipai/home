@@ -1,12 +1,15 @@
-import { useEffect, useState, type FormEvent } from "react";
+import { useState, type FormEvent } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Page } from "@/kit/primitives/Page";
 import { Section } from "@/kit/primitives/Section";
 import { List } from "@/kit/primitives/List";
-import { Progress } from "@/kit/primitives/Progress";
-import { Avatar } from "@/kit/components/Avatar";
-import { Input } from "@/kit/components/Input";
-import { Select } from "@/kit/components/Select";
-import { Button } from "@/kit/components/Button";
+import { AsyncState } from "@/kit/primitives/AsyncState";
+import { Avatar } from "@/kit/primitives/Avatar";
+import { Input } from "@/kit/ui/input";
+import { Select } from "@/kit/primitives/Select";
+import { Button } from "@/kit/ui/button";
+import { Checkbox } from "@/kit/ui/checkbox";
+import { BatchBar, SelectModeToggle } from "@/kit/primitives/BatchBar";
 import { api, ApiError, type PersonRosterEntry, type Role, type Roster } from "@/lib/api";
 import {
   ROLE_LABELS,
@@ -31,8 +34,16 @@ interface PeoplePageProps {
 // confirmation that names them and says what goes, never a bare button,
 // and the batch version names the count.
 export function PeoplePage({ person }: PeoplePageProps) {
-  const [roster, setRoster] = useState<PersonRosterEntry[] | null>(null);
-  const [loadError, setLoadError] = useState(false);
+  const queryClient = useQueryClient();
+  const rosterQuery = useQuery<PersonRosterEntry[]>({
+    queryKey: ["people"],
+    queryFn: () => api.people(),
+  });
+  const roster = rosterQuery.data;
+  function invalidateRoster() {
+    return queryClient.invalidateQueries({ queryKey: ["people"] });
+  }
+
   const [displayName, setDisplayName] = useState("");
   const [role, setRole] = useState<Role>("adult");
   const [secret, setSecret] = useState("");
@@ -52,16 +63,6 @@ export function PeoplePage({ person }: PeoplePageProps) {
   const actorRole = person.role as Role;
   const canManage = canManagePeople(actorRole);
   const roleOptions = canManage ? creatableRoles(actorRole) : [];
-
-  function load() {
-    setLoadError(false);
-    api
-      .people()
-      .then(setRoster)
-      .catch(() => setLoadError(true));
-  }
-
-  useEffect(load, []);
 
   const deletable = (roster ?? []).filter((p) =>
     canDeletePerson(actorRole, person.id, { id: p.id, role: p.role as Role }),
@@ -94,7 +95,7 @@ export function PeoplePage({ person }: PeoplePageProps) {
       });
       setDisplayName("");
       setSecret("");
-      load();
+      await invalidateRoster();
     } catch (err) {
       setFormError(err instanceof ApiError ? err.message : "Could not add that person.");
     } finally {
@@ -115,7 +116,7 @@ export function PeoplePage({ person }: PeoplePageProps) {
         role: target && editRole !== target.role ? editRole : undefined,
       });
       setEditingId(null);
-      load();
+      await invalidateRoster();
     } catch (err) {
       setActionError(err instanceof ApiError ? err.message : "Could not save those changes.");
     } finally {
@@ -129,7 +130,7 @@ export function PeoplePage({ person }: PeoplePageProps) {
     try {
       await api.deletePerson(id);
       setConfirmingDelete(null);
-      load();
+      await invalidateRoster();
     } catch (err) {
       setActionError(err instanceof ApiError ? err.message : "Could not remove that person.");
     } finally {
@@ -151,7 +152,7 @@ export function PeoplePage({ person }: PeoplePageProps) {
         setActionError(`${names.join(", ")} could not be removed: ${refused[0]?.reason ?? "not allowed"}`);
       }
       leaveSelectMode();
-      load();
+      await invalidateRoster();
     } catch (err) {
       setActionError(err instanceof ApiError ? err.message : "Could not remove those people.");
     } finally {
@@ -162,53 +163,40 @@ export function PeoplePage({ person }: PeoplePageProps) {
   return (
     <Page title="People">
       <div className="flex flex-1 flex-col gap-6 overflow-y-auto p-4">
-        {actionError ? <p className="text-base text-[hsl(var(--destructive))]">{actionError}</p> : null}
+        {actionError ? <p className="text-base text-[var(--destructive)]">{actionError}</p> : null}
 
-        {loadError ? (
-          <div className="flex flex-1 flex-col items-center justify-center gap-3 p-8 text-center">
-            <p className="text-base text-[hsl(var(--destructive))]">Could not load the household.</p>
-            <Button variant="secondary" onClick={load}>
-              Try again
-            </Button>
-          </div>
-        ) : roster === null ? (
-          <div className="flex flex-1 items-center justify-center">
-            <Progress mode="spinner" label="Loading household" />
-          </div>
-        ) : (
+        <AsyncState
+          data={roster}
+          error={rosterQuery.isError}
+          isFetching={rosterQuery.isFetching}
+          onRetry={() => rosterQuery.refetch()}
+          errorMessage="Could not load the household."
+          loadingLabel="Loading household"
+        >
+          {(loadedRoster) => (
           <Section heading="Household">
             {canManage && deletable.length > 0 ? (
-              <div className="flex flex-wrap items-center gap-2">
-                {selectMode ? (
-                  <>
-                    <span className="text-base text-[hsl(var(--muted-foreground))]">
-                      {selected.size} selected
-                    </span>
-                    <Button
-                      variant="destructive"
-                      disabled={selected.size === 0}
-                      onClick={() => setConfirmingDelete("batch")}
-                    >
-                      Remove selected
-                    </Button>
-                    <Button variant="ghost" onClick={leaveSelectMode}>
-                      Done
-                    </Button>
-                  </>
-                ) : (
-                  <Button variant="ghost" onClick={() => setSelectMode(true)}>
-                    Select people
+              selectMode ? (
+                <BatchBar count={selected.size} onExit={leaveSelectMode}>
+                  <Button
+                    variant="destructive"
+                    disabled={selected.size === 0}
+                    onClick={() => setConfirmingDelete("batch")}
+                  >
+                    Remove selected
                   </Button>
-                )}
-              </div>
+                </BatchBar>
+              ) : (
+                <SelectModeToggle label="Select people" onClick={() => setSelectMode(true)} />
+              )
             ) : null}
 
             {confirmingDelete === "batch" ? (
-              <div className="flex flex-col gap-2 rounded-[var(--radius)] border border-[hsl(var(--destructive))] p-3">
+              <div className="flex flex-col gap-2 rounded-[var(--radius)] border border-[var(--destructive)] p-3">
                 <p className="text-base font-medium">
                   Remove {selected.size} {selected.size === 1 ? "person" : "people"} from your household?
                 </p>
-                <p className="text-base text-[hsl(var(--muted-foreground))]">
+                <p className="text-base text-[var(--muted-foreground)]">
                   Everything MaiPai remembers about them, every conversation they had, their settings and any voice
                   they recorded will be deleted. This cannot be undone.
                 </p>
@@ -224,7 +212,7 @@ export function PeoplePage({ person }: PeoplePageProps) {
             ) : null}
 
             <List
-              items={roster}
+              items={loadedRoster}
               getKey={(p) => p.id}
               label="Household"
               renderItem={(p) => {
@@ -253,7 +241,7 @@ export function PeoplePage({ person }: PeoplePageProps) {
                   return (
                     <div className="flex min-w-0 flex-1 flex-col gap-2 py-1">
                       <p className="text-base font-medium">Remove {p.display_name} from your household?</p>
-                      <p className="text-base text-[hsl(var(--muted-foreground))]">
+                      <p className="text-base text-[var(--muted-foreground)]">
                         Everything MaiPai remembers about {p.display_name}, every conversation they had, their
                         settings and any voice they recorded will be deleted. This cannot be undone.
                       </p>
@@ -263,24 +251,23 @@ export function PeoplePage({ person }: PeoplePageProps) {
                 return (
                   <div className="flex min-w-0 flex-1 items-center gap-3">
                     {selectMode && canDeletePerson(actorRole, person.id, { id: p.id, role: p.role as Role }) ? (
-                      // The box stays 20px; the label around it is the
-                      // 48px tap area (docs/UI.md's floor). A code review
-                      // (2026-09-05) caught this as the only way to
-                      // multi-select on a phone, at 20px square.
-                      <label className="-m-3 flex min-h-12 min-w-12 shrink-0 cursor-pointer items-center justify-center p-3">
-                        <input
-                          type="checkbox"
-                          checked={selected.has(p.id)}
-                          onChange={() => toggle(p.id)}
-                          aria-label={`Select ${p.display_name}`}
-                          className="h-5 w-5 accent-[hsl(var(--primary))]"
-                        />
-                      </label>
+                      // The box stays its designed 16px; `kit/ui/checkbox.tsx`
+                      // already carries its own 48px hit area (docs/UI.md's
+                      // floor - the fix a code review (2026-09-05) applied
+                      // here before Checkbox existed, now the kit's own), so
+                      // no wrapping div is needed to reach it (a second code
+                      // review, same night, caught one left behind here).
+                      <Checkbox
+                        checked={selected.has(p.id)}
+                        onCheckedChange={() => toggle(p.id)}
+                        aria-label={`Select ${p.display_name}`}
+                        className="shrink-0"
+                      />
                     ) : null}
                     <Avatar name={p.display_name} className="h-10 w-10 shrink-0" />
                     <div className="flex min-w-0 flex-col">
                       <span className="truncate text-base">{p.display_name}</span>
-                      <span className="text-sm text-[hsl(var(--muted-foreground))]">{ROLE_LABELS[p.role]}</span>
+                      <span className="text-sm text-[var(--muted-foreground)]">{ROLE_LABELS[p.role]}</span>
                     </div>
                   </div>
                 );
@@ -343,7 +330,8 @@ export function PeoplePage({ person }: PeoplePageProps) {
               }}
             />
           </Section>
-        )}
+          )}
+        </AsyncState>
 
         {canManage ? (
           <Section heading="Add someone">
@@ -373,7 +361,7 @@ export function PeoplePage({ person }: PeoplePageProps) {
                   required
                 />
               ) : null}
-              {formError ? <p className="text-base text-[hsl(var(--destructive))]">{formError}</p> : null}
+              {formError ? <p className="text-base text-[var(--destructive)]">{formError}</p> : null}
               <Button type="submit" disabled={submitting}>
                 {submitting ? "Adding…" : "Add to household"}
               </Button>

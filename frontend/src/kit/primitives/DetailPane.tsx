@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { Button } from "@/kit/components/Button";
+import { Button } from "@/kit/ui/button";
 import { getIcon } from "@/kit/icons";
 import { cn, FOCUS_RING } from "@/kit/utils";
 
@@ -32,16 +32,16 @@ export function DetailPane({ title, subtitle, onClose, closeLabel = "Back", acti
 
   return (
     <div className="flex h-full min-h-0 min-w-0 flex-col">
-      <div className="flex shrink-0 items-start gap-2 border-b border-[hsl(var(--border))] p-3">
+      <div className="flex shrink-0 items-start gap-2 border-b border-[var(--border)] p-3">
         {onClose ? (
           <Button variant="ghost" size="icon" onClick={onClose} aria-label={closeLabel} className="shrink-0">
             <BackIcon className="h-5 w-5" aria-hidden />
           </Button>
         ) : null}
         <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-          <h2 className="text-base font-semibold text-[hsl(var(--foreground))]">{title}</h2>
+          <h2 className="text-base font-semibold text-[var(--foreground)]">{title}</h2>
           {subtitle ? (
-            <p className="text-sm text-[hsl(var(--muted-foreground))]">{subtitle}</p>
+            <p className="text-sm text-[var(--muted-foreground)]">{subtitle}</p>
           ) : null}
         </div>
         {actions ? <div className="flex shrink-0 items-center gap-2">{actions}</div> : null}
@@ -52,6 +52,7 @@ export function DetailPane({ title, subtitle, onClose, closeLabel = "Back", acti
           here - does not make keyboard-scrollable containers focusable
           by itself the way Chrome and Firefox now do. Same reasoning as
           MediaShelf's rail. */}
+      {/* eslint-disable-next-line jsx-a11y/no-noninteractive-tabindex -- see the comment above: a keyboard-scrollable region, not a widget. */}
       <div tabIndex={0} className={cn("min-h-0 flex-1 overflow-y-auto p-4", FOCUS_RING)}>
         {children}
       </div>

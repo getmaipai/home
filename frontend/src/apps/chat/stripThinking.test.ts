@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { stripThinking } from "@/apps/chat/ChatPage";
+import { stripThinking } from "@/apps/chat/chatModelAdapter";
 
 describe("stripThinking", () => {
   test("removes a <think> block ahead of the real answer", () => {

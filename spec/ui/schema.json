@@ -2,15 +2,21 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://getmaipai.github.io/home/spec/ui/schema.json",
   "title": "UiNode",
-  "description": "v0 of the declared UI schema (platform plan 6.2): a page is a tree of these nodes, rendered natively by React (web shell, PWA) today and by SwiftUI (iPhone, Apple TV) later. v0 covers only what the Chat page needs, the first of the plan's three hardest pages; List, CardGrid, MediaShelf, DetailPane, SplitView, and the Videos/Music pattern components are added when those pages are tackled, not invented ahead of need.",
+  "description": "The declared UI schema (platform plan 6.2): a page is a tree of these nodes, rendered natively by React (web shell, PWA) today and by SwiftUI (iPhone, Apple TV) later. Session B step 5 adds List, CardGrid, MediaShelf, DetailPane and SplitView (platform plan 6.2's named generic primitives) alongside v0's Chat-only set; see docs/dev.md's 'A2UI' entry for exactly which pages this session converted to real schema pages and which stayed hand-written React, and why.",
   "type": "object",
   "oneOf": [
     { "$ref": "#/$defs/page" },
     { "$ref": "#/$defs/section" },
     { "$ref": "#/$defs/message_thread" },
+    { "$ref": "#/$defs/settings_editor" },
     { "$ref": "#/$defs/form" },
     { "$ref": "#/$defs/empty_state" },
-    { "$ref": "#/$defs/progress" }
+    { "$ref": "#/$defs/progress" },
+    { "$ref": "#/$defs/list" },
+    { "$ref": "#/$defs/card_grid" },
+    { "$ref": "#/$defs/media_shelf" },
+    { "$ref": "#/$defs/detail_pane" },
+    { "$ref": "#/$defs/split_view" }
   ],
   "$defs": {
     "binding": {
@@ -46,8 +52,16 @@
           "additionalProperties": false,
           "required": ["target"],
           "properties": {
-            "target": { "type": "string", "description": "A route or host.* method." },
-            "args": { "type": "object", "additionalProperties": true }
+            "target": {
+              "type": "string",
+              "description": "A route or host.* method. May contain a `{field}` placeholder (a bound list item's own field, substituted per item/per selected item by a list's row_action or batch action)."
+            },
+            "method": { "type": "string", "enum": ["POST", "PATCH", "DELETE"], "default": "POST" },
+            "args": {
+              "type": "object",
+              "additionalProperties": true,
+              "description": "String values may contain `{field}` placeholders, resolved the same way as `target`."
+            }
           }
         },
         "play": {
@@ -61,7 +75,10 @@
           "additionalProperties": false,
           "required": ["prompt", "on_confirm"],
           "properties": {
-            "prompt": { "type": "string" },
+            "prompt": {
+              "type": "string",
+              "description": "May contain `{field}`/`{count}` placeholders, resolved against the same item(s) `on_confirm` will act on."
+            },
             "on_confirm": { "$ref": "#/$defs/action" }
           }
         },
@@ -112,15 +129,19 @@
     "message_thread": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["type", "bind", "sender_field", "text_field"],
-      "description": "The Chat pattern component (6.2 names Chat as one of the three hardest pages to express; this is the pattern component that resulted, not one of the plan's named generic primitives). A scrolling list of turns, newest last, that appends in place as bind.stream delivers tokens.",
+      "required": ["type"],
+      "description": "The Chat pattern component (6.2 names Chat as one of the three hardest pages to express; this is the pattern component that resulted, not one of the plan's named generic primitives). Session B step 4 rebuilt Chat on @assistant-ui/react, which owns its own history loading, streaming, thread list and message actions entirely inside React (chatModelAdapter.ts, chatThreadListAdapter.ts) - v0's bind/sender_field/text_field described a generic turn-list interpreter never built (see git history on this file); this node is now just a mount point, the same role `settings_editor` plays for Settings.",
       "properties": {
-        "type": { "const": "message_thread" },
-        "bind": { "$ref": "#/$defs/binding" },
-        "sender_field": { "type": "string", "description": "Dotted path within one turn to who sent it." },
-        "text_field": { "type": "string", "description": "Dotted path within one turn to its display text." },
-        "speech_hint_field": { "type": "string", "description": "Dotted path to a spoken-form hint, if different from text_field." },
-        "empty_state": { "$ref": "#/$defs/empty_state" }
+        "type": { "const": "message_thread" }
+      }
+    },
+    "settings_editor": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type"],
+      "description": "Mounts the kit's own settings renderer (frontend/src/kit/settings/SettingsRenderer.tsx), which already reads the settings registry generically (docs/SETTINGS.md's 'one definition, the generic renderer') - a second, JSON-authored description of the same data would be a competing source of truth, not a schema page in the sense the other nodes here are. Session B step 7 ('settings as an editor') extends that renderer directly (a tree sidebar, search, scope tabs); this node's own shape never changes.",
+      "properties": {
+        "type": { "const": "settings_editor" }
       }
     },
     "form": {
@@ -168,6 +189,136 @@
         "type": { "const": "progress" },
         "mode": { "type": "string", "enum": ["spinner", "determinate"] },
         "bind": { "$ref": "#/$defs/binding" }
+      }
+    },
+    "batch_action": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["label", "scope", "action"],
+      "properties": {
+        "label": { "type": "string" },
+        "scope": {
+          "type": "string",
+          "enum": ["selected", "all"],
+          "description": "selected: the interpreter loops `action` once per currently-selected item, substituting `{field}` placeholders from that item. all: loops over every currently-loaded item regardless of selection (docs/BACKLOG.md's 'clear-all where the whole list is disposable')."
+        },
+        "variant": { "type": "string", "enum": ["default", "destructive"], "default": "default" },
+        "action": { "$ref": "#/$defs/action" }
+      }
+    },
+    "list": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "bind", "item_key_field", "item_label_field"],
+      "description": "The kit's List primitive (frontend/src/kit/primitives/List.tsx), bound to one route that returns an array. Content-agnostic like the primitive it wraps: a row shows item_label_field as its title and, when given, item_subtitle_field/item_badge_field underneath - a single-line-per-field template, not a full custom renderItem (a page needing richer per-row layout than that stays hand-written React; docs/plans/session-b-ui.md step 5's recorded decision on People and Privacy).",
+      "properties": {
+        "type": { "const": "list" },
+        "bind": { "$ref": "#/$defs/binding" },
+        "item_key_field": { "type": "string" },
+        "item_label_field": { "type": "string" },
+        "item_subtitle_field": {
+          "type": "string",
+          "description": "A `{field}` template string (the same substitution as action.call's target/args), not a bare dotted path - lets a row's subtitle combine more than one field ('{category} · {scope}') without a richer per-row template mechanism."
+        },
+        "item_badge_field": { "type": "string", "description": "Dotted path to a boolean; true shows a small badge (item_badge_label) next to the subtitle." },
+        "item_badge_label": { "type": "string" },
+        "row_action": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["icon", "label", "action"],
+          "properties": {
+            "icon": { "type": "string" },
+            "label": { "type": "string", "description": "May contain `{field}` placeholders." },
+            "action": { "$ref": "#/$defs/action" }
+          }
+        },
+        "batch": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["actions"],
+          "properties": {
+            "select_label": { "type": "string", "default": "Select" },
+            "actions": {
+              "type": "array",
+              "minItems": 1,
+              "items": { "$ref": "#/$defs/batch_action" }
+            }
+          }
+        },
+        "empty_state": { "$ref": "#/$defs/empty_state" }
+      }
+    },
+    "card_grid": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "bind", "item_key_field", "item_label_field"],
+      "description": "The kit's CardGrid primitive (frontend/src/kit/primitives/CardGrid.tsx). No page uses this yet (platform plan 6.2: Videos/Music, not in this session's scope) - added now for catalog/schema completeness (docs/plans/session-b-ui.md step 5's own agreement test), same minimal single-field-per-card shape as `list`.",
+      "properties": {
+        "type": { "const": "card_grid" },
+        "bind": { "$ref": "#/$defs/binding" },
+        "item_key_field": { "type": "string" },
+        "item_label_field": { "type": "string" },
+        "on_select": { "$ref": "#/$defs/action" },
+        "empty_state": { "$ref": "#/$defs/empty_state" }
+      }
+    },
+    "media_shelf": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "bind", "item_key_field", "item_label_field", "item_media_field"],
+      "description": "The kit's MediaShelf primitive (frontend/src/kit/primitives/MediaShelf.tsx). Not used by any page this session builds; added for catalog/schema completeness, same reasoning as `card_grid`.",
+      "properties": {
+        "type": { "const": "media_shelf" },
+        "bind": { "$ref": "#/$defs/binding" },
+        "item_key_field": { "type": "string" },
+        "item_label_field": { "type": "string" },
+        "item_media_field": { "type": "string", "description": "Dotted path to the tile's image/poster URL." },
+        "aspect": { "type": "string", "enum": ["wide", "square", "poster"], "default": "wide" },
+        "on_select": { "$ref": "#/$defs/action" },
+        "empty_state": { "$ref": "#/$defs/empty_state" }
+      }
+    },
+    "detail_pane": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "title", "body"],
+      "description": "The kit's DetailPane primitive (frontend/src/kit/primitives/DetailPane.tsx): the 'one thing, in full' half of a SplitView. Not used by any page this session builds; added for catalog/schema completeness.",
+      "properties": {
+        "type": { "const": "detail_pane" },
+        "title": { "type": "string" },
+        "subtitle": { "type": "string" },
+        "body": {
+          "type": "array",
+          "items": { "$ref": "#" },
+          "minItems": 1
+        }
+      }
+    },
+    "split_view": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "list", "detail"],
+      "description": "The kit's SplitView primitive (frontend/src/kit/primitives/SplitView.tsx). Not used by any page this session builds; added for catalog/schema completeness.",
+      "properties": {
+        "type": { "const": "split_view" },
+        "list": {
+          "oneOf": [
+            { "$ref": "#/$defs/list" },
+            { "$ref": "#/$defs/card_grid" }
+          ]
+        },
+        "detail": { "$ref": "#/$defs/detail_pane" }
+      }
+    },
+    "nav_entry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["to", "icon", "label"],
+      "description": "One row in the shell's nav (docs/plans/session-b-ui.md step 2, frontend/src/shell/nav.ts). Not part of the root `oneOf` above: a nav entry is never a page-body node a page's `body`/`children` array renders - it describes the shell's own chrome, the same distinction `page` (a route) already draws from `section`/`form` (page content). A package's manifest `contributes.pages` field will emit this shape once packages exist; core's own pages declare it by hand in nav.ts today.",
+      "properties": {
+        "to": { "type": "string", "minLength": 1, "description": "A route path, matching a `page.id`'s route." },
+        "icon": { "type": "string", "description": "A lucide icon name (docs/UI.md > Icons)." },
+        "label": { "type": "string", "minLength": 1 }
       }
     }
   }

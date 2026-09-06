@@ -1,6 +1,7 @@
 import { describe, expect, test, mock, afterEach } from "bun:test";
-import { render, cleanup, waitFor } from "@testing-library/react";
+import { cleanup, waitFor } from "@testing-library/react";
 import { PrivacyPage, joinNames } from "@/apps/privacy/PrivacyPage";
+import { renderWithQueryClient } from "../../../tests/renderWithQueryClient";
 import type { PrivacyConnection } from "@/lib/api";
 
 afterEach(cleanup);
@@ -8,6 +9,10 @@ afterEach(cleanup);
 // Every query comes from render()'s own returned queries, never the
 // global `screen` singleton - ChatPage.test.tsx's header comment
 // documents why that singleton is unusable under bun's preload.
+
+function renderPrivacyPage() {
+  return renderWithQueryClient(<PrivacyPage />);
+}
 
 function connection(over: Partial<PrivacyConnection> = {}): PrivacyConnection {
   return {
@@ -46,7 +51,7 @@ describe("the privacy page", () => {
   test("answers all four questions for each connection", async () => {
     const restore = stubPrivacy({ connections: [connection()], offlinePlugins: [] });
     try {
-      const { findByText, getByText } = render(<PrivacyPage />);
+      const { findByText, getByText } = renderPrivacyPage();
       await findByText("Open-Meteo (open-meteo.com), a free public weather API");
       expect(getByText(/each time the family asks for the weather/)).toBeInTheDocument();
       expect(getByText(/the place name spoken in the request/)).toBeInTheDocument();
@@ -72,7 +77,7 @@ describe("the privacy page", () => {
       offlinePlugins: [],
     });
     try {
-      const { findByLabelText } = render(<PrivacyPage />);
+      const { findByLabelText } = renderPrivacyPage();
       const list = await findByLabelText("Outbound connections");
       expect(list.querySelectorAll("li")).toHaveLength(2);
       expect(list.textContent).toContain("MaiPai Home itself");
@@ -88,7 +93,7 @@ describe("the privacy page", () => {
       offlinePlugins: [],
     });
     try {
-      const { findByText } = render(<PrivacyPage />);
+      const { findByText } = renderPrivacyPage();
       expect(await findByText("What leaves your house (2)")).toBeInTheDocument();
     } finally {
       restore();
@@ -100,7 +105,7 @@ describe("the privacy page", () => {
   test("names the packages that connect to nothing at all", async () => {
     const restore = stubPrivacy({ connections: [connection()], offlinePlugins: ["Remember", "Recall"] });
     try {
-      const { findByText } = render(<PrivacyPage />);
+      const { findByText } = renderPrivacyPage();
       expect(await findByText(/Remember and Recall work entirely on this computer/)).toBeInTheDocument();
     } finally {
       restore();
@@ -110,7 +115,7 @@ describe("the privacy page", () => {
   test("omits the never-leaves section rather than showing an empty one", async () => {
     const restore = stubPrivacy({ connections: [connection()], offlinePlugins: [] });
     try {
-      const { findByText, queryByText } = render(<PrivacyPage />);
+      const { findByText, queryByText } = renderPrivacyPage();
       await findByText("What leaves your house (1)");
       expect(queryByText("Never leaves your house")).toBeNull();
     } finally {
@@ -121,7 +126,7 @@ describe("the privacy page", () => {
   test("states the zero-phone-home promise in plain words", async () => {
     const restore = stubPrivacy({ connections: [connection()], offlinePlugins: [] });
     try {
-      const { findByText } = render(<PrivacyPage />);
+      const { findByText } = renderPrivacyPage();
       expect(
         await findByText(/We do not collect usage information, crash reports, or statistics/),
       ).toBeInTheDocument();
@@ -136,7 +141,7 @@ describe("the privacy page", () => {
       Promise.resolve(new Response(JSON.stringify({ error: "nope" }), { status: 500 })),
     ) as unknown as typeof fetch;
     try {
-      const { findByRole } = render(<PrivacyPage />);
+      const { findByRole } = renderPrivacyPage();
       expect(await findByRole("button", { name: "Try again" })).toBeInTheDocument();
     } finally {
       globalThis.fetch = original;
@@ -146,8 +151,11 @@ describe("the privacy page", () => {
   test("is readable while it loads instead of flashing an empty table", async () => {
     const restore = stubPrivacy({ connections: [], offlinePlugins: [] });
     try {
-      const { getByRole } = render(<PrivacyPage />);
-      expect(getByRole("status")).toHaveTextContent("Loading the privacy page");
+      const { getByRole } = renderPrivacyPage();
+      // AsyncState's loading state is a skeleton, not visible spinner
+      // text - the label is an aria-label for screen readers, not
+      // rendered text content.
+      expect(getByRole("status", { name: "Loading the privacy page" })).toBeInTheDocument();
       await waitFor(() => {});
     } finally {
       restore();
@@ -166,7 +174,7 @@ describe("privacy page copy details", () => {
       offlinePlugins: [],
     });
     try {
-      const { findByLabelText } = render(<PrivacyPage />);
+      const { findByLabelText } = renderPrivacyPage();
       const list = await findByLabelText("Outbound connections");
       expect(list.textContent).toContain("MaiPai Home itself");
       expect(list.textContent).not.toContain("only if you turn it on");
@@ -178,7 +186,7 @@ describe("privacy page copy details", () => {
   test("a package row still shows whether it is opt-in", async () => {
     const restore = stubPrivacy({ connections: [connection({ optIn: true })], offlinePlugins: [] });
     try {
-      const { findByLabelText } = render(<PrivacyPage />);
+      const { findByLabelText } = renderPrivacyPage();
       const list = await findByLabelText("Outbound connections");
       expect(list.textContent).toContain("Weather · only if you turn it on");
     } finally {

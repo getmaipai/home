@@ -1,7 +1,7 @@
 import { useState, type FormEvent } from "react";
 import { Section } from "@/kit/primitives/Section";
-import { Input } from "@/kit/components/Input";
-import { Button } from "@/kit/components/Button";
+import { Input } from "@/kit/ui/input";
+import { Button } from "@/kit/ui/button";
 import { api, ApiError, type Roster } from "@/lib/api";
 
 interface ChangeSecretSectionProps {
@@ -63,7 +63,7 @@ export function ChangeSecretSection({ person, onChanged }: ChangeSecretSectionPr
             required
           />
         ) : (
-          <p className="text-base text-[hsl(var(--muted-foreground))]">
+          <p className="text-base text-[var(--muted-foreground)]">
             Your profile doesn't have one yet. Add one below.
           </p>
         )}
@@ -83,8 +83,8 @@ export function ChangeSecretSection({ person, onChanged }: ChangeSecretSectionPr
           disabled={submitting}
           required
         />
-        {error ? <p className="text-base text-[hsl(var(--destructive))]">{error}</p> : null}
-        {success ? <p className="text-base text-[hsl(var(--primary))]">Done.</p> : null}
+        {error ? <p className="text-base text-[var(--destructive)]">{error}</p> : null}
+        {success ? <p className="text-base text-[var(--primary)]">Done.</p> : null}
         <Button type="submit" disabled={submitting} className="w-fit">
           {submitting ? "Saving…" : person.hasSecret ? "Change it" : "Set it"}
         </Button>

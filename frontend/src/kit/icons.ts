@@ -18,6 +18,15 @@ import {
   Lock,
   X,
   Bell,
+  Inbox,
+  MoreHorizontal,
+  PanelLeft,
+  Home,
+  Pin,
+  PinOff,
+  Search,
+  Sparkles,
+  Mic,
   type LucideIcon,
 } from "lucide-react";
 
@@ -45,6 +54,15 @@ const REGISTRY: Record<string, LucideIcon> = {
   lock: Lock,
   x: X,
   bell: Bell,
+  inbox: Inbox,
+  "more-horizontal": MoreHorizontal,
+  "panel-left": PanelLeft,
+  home: Home,
+  pin: Pin,
+  "pin-off": PinOff,
+  search: Search,
+  sparkles: Sparkles,
+  mic: Mic,
 };
 
 export function getIcon(name: string): LucideIcon {

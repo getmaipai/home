@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { Card } from "@/kit/components/Card";
+import { Card } from "@/kit/primitives/Card";
 import { EmptyState } from "@/kit/primitives/EmptyState";
 import { GRID_COLUMNS, type Density } from "@/kit/responsive";
 import { cn } from "@/kit/utils";

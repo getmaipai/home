@@ -3,8 +3,10 @@ node_modules/
 .venv/
 
 # Local data, never committed (org rule: nothing under data/ ever enters git).
-# data-*/ covers a parallel session's own worktree data dir (e.g. data-a,
-# data-b), same rule, never the shared data/.
+# data-a/, data-b/, ...: each parallel worktree session's own data
+# directory (session-a-intelligence.md / session-b-ui.md's "own data
+# directory and port" rule) - the same real household-shaped data as
+# data/ itself, just per-worktree instead of shared.
 data/
 data-*/
 
