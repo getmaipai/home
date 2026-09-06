@@ -2,6 +2,7 @@ import { describe, expect, test, beforeEach, mock } from "bun:test";
 import { TestClient } from "./client";
 import { resetDb } from "./reset-db";
 import { __resetThrottleForTests } from "@/lib/secretThrottle";
+import { __resetRateLimiterForTests } from "@/lib/rateLimiter";
 import { setHouseholdSettingValue } from "@/lib/settings";
 import { trigger, listPending, listHistory, markRead, dismiss } from "@/lib/notifications";
 import { runTurn } from "@/lib/turnEngine";
@@ -13,6 +14,7 @@ import type { PersonRow } from "@/types";
 beforeEach(() => {
   resetDb();
   __resetThrottleForTests();
+  __resetRateLimiterForTests();
 });
 
 async function owner(): Promise<{ client: TestClient; row: PersonRow }> {

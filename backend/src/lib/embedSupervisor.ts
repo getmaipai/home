@@ -25,6 +25,7 @@
 import { detectHardware } from "@/lib/hardware";
 import { engineBinaryPath } from "@/lib/llmSupervisor";
 import { spawnAndWaitHealthy } from "@/lib/sidecars";
+import { assertNotInCrashBootHold } from "@/lib/dirtyBoot";
 import { embedModelPath, ensureEmbedModel } from "@/lib/embedAssets";
 import { LlamaServerClient } from "@maipai/spec/llm/ts/client.js";
 import { startStubLlmServer } from "@maipai/spec/llm/ts/stubServer.js";
@@ -76,6 +77,10 @@ async function startEmbedBackend(): Promise<EmbedBackend> {
   const hw = await detectHardware();
   const binPath = engineBinaryPath(hw);
   if (binPath) {
+    // The crash-boot hold (lib/dirtyBoot.ts, session-f-platform-and-trust.md
+    // step 3): only gates a real spawn, the same "tier 1 and the stub are
+    // unaffected" carve-out llmSupervisor.ts's identical check makes.
+    assertNotInCrashBootHold();
     return spawnEmbedServer(binPath);
   }
 

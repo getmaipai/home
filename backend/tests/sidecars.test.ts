@@ -7,6 +7,7 @@ import {
   stopSidecar,
   spawnAndWaitHealthy,
   freePort,
+  sweepOrphanProcesses,
   registerGracefulExit,
   __resetSidecarsForTests,
   __setSidecarTimingForTestsOnly,
@@ -383,4 +384,47 @@ describe("freePort", () => {
       decoy.kill();
     }
   }, 10_000);
+});
+
+describe("sweepOrphanProcesses", () => {
+  // A unique marker embedded in the script text itself (part of `ps
+  // aux`'s own argv output for a `bun -e <script>` invocation) stands in
+  // for a real installed engine's absolute path - the actual match
+  // target in production (lib/llmSupervisor.ts's sweepOrphanEngineProcesses()
+  // matches on `enginesDir`).
+  test("kills every process whose command line contains the match string, and returns the count", async () => {
+    const marker = `maipai-orphan-test-${crypto.randomUUID()}`;
+    const orphan = Bun.spawn(["bun", "-e", `/* ${marker} */ setTimeout(() => {}, 60000);`], { stdout: "ignore", stderr: "ignore" });
+    try {
+      // Give `ps aux` a moment to actually see the new process.
+      await new Promise((r) => setTimeout(r, 200));
+      const killed = await sweepOrphanProcesses(marker);
+      expect(killed).toBe(1);
+
+      // `.exited` (not the `.exitCode` property, which Bun doesn't
+      // always populate for a death it didn't itself initiate via
+      // `.kill()`) is what actually confirms the OS process is gone.
+      const exitSignal = await Promise.race([
+        orphan.exited,
+        new Promise<null>((resolve) => setTimeout(() => resolve(null), 3_000)),
+      ]);
+      expect(exitSignal).not.toBeNull();
+    } finally {
+      orphan.kill();
+    }
+  }, 10_000);
+
+  test("a match string nothing's command line contains kills nothing", async () => {
+    const killed = await sweepOrphanProcesses(`maipai-orphan-test-nothing-matches-${crypto.randomUUID()}`);
+    expect(killed).toBe(0);
+  });
+
+  // Deliberately NOT tested with a broad pattern like the current
+  // process's own binary name ("bun"): on this machine, several other
+  // sessions' real bun processes are commonly running at the same time,
+  // and `ps aux` matching that loosely would SIGKILL them too - the self-
+  // exclusion (`pid !== process.pid` in the implementation) only protects
+  // against matching this exact pid, not every process sharing a runtime.
+  // The two tests above already prove targeted, marker-based matching
+  // kills exactly (and only) what it should.
 });
