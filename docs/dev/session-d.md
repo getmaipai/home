@@ -1174,7 +1174,7 @@ surface `websearch`'s own prompt-hardening only mitigates, not closes.
 Worth a real design pass (does every plugin reply need this, or only
 ones built from untrusted input) before a second such package ships.
 
-## Step 8: lists, reminders and timers (`home-d@<pending>`)
+## Step 8: lists, reminders and timers (`home-d@4b07407`)
 
 The plan's own text names one `lists` package covering four behaviors
 ("add milk to the shopping list", "what's on my list", "remind me at 6
