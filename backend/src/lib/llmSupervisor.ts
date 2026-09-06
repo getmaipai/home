@@ -39,6 +39,8 @@ import { runPostLoadCheck, type PostLoadCheckResult } from "@/lib/enginePostLoad
 import { getHouseholdSettingValue } from "@/lib/settings";
 import { spawnAndWaitHealthy, freePort, sweepOrphanProcesses } from "@/lib/sidecars";
 import { assertNotInCrashBootHold } from "@/lib/dirtyBoot";
+import { startResourceGovernor } from "@/lib/resourceGovernor";
+import { resolveIssue } from "@/lib/issues";
 
 export type BackendKind = "url" | "override" | "selection" | "stub";
 
@@ -207,6 +209,19 @@ async function trySpawnFromSelection(): Promise<ChatBackend | null> {
     backend.stop();
     throw err;
   }
+  // A fresh, healthy real spawn clears any resource-governor issue a prior
+  // backend's restart may have raised - symmetric with how sidecars.ts
+  // resolves its own crash issues on a healthy restart.
+  resolveIssue("resource-governor", "chat");
+  startResourceGovernor({
+    pid: backend.pid!,
+    hasCuda: hw.cudaDevices.length > 0,
+    // Prefer the real measured footprint over the pure formula estimate -
+    // enginePostLoadCheck.ts's own doc comment notes the formula can drift;
+    // actualBytes is a null fallback (unmeasurable on this platform), not a
+    // routine case.
+    ceilingBaselineBytes: lastPostLoadCheck.actualBytes ?? lastPostLoadCheck.estimatedBytes,
+  });
   return backend;
 }
 
@@ -226,7 +241,14 @@ async function startChatBackend(): Promise<ChatBackend> {
     // tier 1 (a bare URL, nothing spawned) and tier 4's stub are meant to
     // bypass this.
     assertNotInCrashBootHold();
-    return spawnLlamaServer(bin, modelPath, "override");
+    const backend = await spawnLlamaServer(bin, modelPath, "override");
+    // No model metadata on this tier (a bare env-var override, no catalog
+    // entry) to size a process ceiling against - system-memory protection
+    // only (resourceGovernor.ts's trigger A), matching this tier's existing
+    // "unchanged since this pass" scope.
+    const hw = await detectHardware();
+    startResourceGovernor({ pid: backend.pid!, hasCuda: hw.cudaDevices.length > 0, ceilingBaselineBytes: null });
+    return backend;
   }
 
   const selected = await trySpawnFromSelection();
