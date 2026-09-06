@@ -2,7 +2,7 @@ import { describe, expect, test, beforeEach } from "bun:test";
 import { TestClient } from "./client";
 import { resetDb } from "./reset-db";
 import { __resetThrottleForTests } from "@/lib/secretThrottle";
-import { listPackageIds, loadPackage } from "@/lib/plugins";
+import { listPackageIds, loadPackage, registerAllPackageNotificationTypes } from "@/lib/plugins";
 
 beforeEach(() => {
   resetDb();
@@ -221,5 +221,11 @@ describe("POST /api/plugins/recall/run", () => {
     const client = await owner();
     const res = await client.post("/api/plugins/recall/run", {});
     expect(res.status).toBe(400);
+  });
+});
+
+describe("registerAllPackageNotificationTypes", () => {
+  test("the boot-time pass over every bundled package's manifest never throws", () => {
+    expect(() => registerAllPackageNotificationTypes()).not.toThrow();
   });
 });

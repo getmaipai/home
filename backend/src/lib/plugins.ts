@@ -19,6 +19,7 @@ import { Recipe } from "@maipai/spec/gen/ts/recipe.js";
 import { runRecipe, type PluginResult } from "@maipai/spec/interpreters/ts/recipe-interpreter.js";
 import { HostError } from "@maipai/spec/emulators/ts/host-emulator.js";
 import { createHost } from "@/lib/packageHost";
+import { registerPackageNotificationTypes } from "@/lib/notificationTypes";
 import { ROLE_LADDER, type Role } from "@/middleware/auth";
 import type { PersonRow } from "@/types";
 
@@ -106,6 +107,19 @@ export function loadPackage(id: string): PluginOpResult<LoadedPackage> {
     return { ok: false, status: 400, error: `package ${id}'s recipe failed validation: ${recipeParsed.error.message}` };
   }
   return { ok: true, value: { manifest: manifestParsed.data, recipe: recipeParsed.data } };
+}
+
+/** Called once at boot (index.ts): every bundled package's own manifest
+ * `notifications[]` becomes a real dispatchable type in F's shared
+ * registry (lib/notificationTypes.ts). A package with no manifest yet
+ * (an interrupted install) is skipped rather than failing the whole
+ * pass, the same "one bad package can't take down boot" posture
+ * lib/smoke.ts's own runAllSmokeTests() already has. */
+export function registerAllPackageNotificationTypes(): void {
+  for (const id of listPackageIds()) {
+    const loaded = loadManifestOnly(id);
+    if (loaded.ok) registerPackageNotificationTypes(loaded.value);
+  }
 }
 
 export function meetsMinRole(actorRole: string, minRole: string): boolean {

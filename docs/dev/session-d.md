@@ -243,3 +243,105 @@ What's left for whom: `remember`/`recall` need the identical
 `quality_scale.yaml`/`README.md`/`CHANGELOG.md`/`tests/smoke.json`/
 manifest `smoke` field treatment from C. The Tier 1 `deno_test` smoke
 kind is step 5's to implement.
+
+## Step 2: the manifest catches up with the plan
+
+Spec first, `spec/schemas/manifest.schema.json`, regenerated
+(`bun run gen:ts`, `bash scripts/gen-py.sh`), fixture updated
+(`spec/fixtures/records/manifest.example.json`), a new
+`spec/tests/ts/manifest-fields.test.ts` proving each new shape
+round-trips (and rejects an invalid one) since no bundled package
+exercises most of these yet:
+
+- **`cache`**: real properties now (`key_template`, `ttl_s`,
+  `stale_ok_s`, `max_bytes`), replacing the fully-open placeholder
+  object Wave 1 left. `additionalProperties: true` stays - a call site
+  can still attach its own extra hints - but `lib/packageCache.ts`
+  (step 3) has a real contract to read.
+- **`warm`**: `schedule` (the scheduler's own `every:<n><m|h|d>`
+  grammar, `lib/scheduler.ts`) and `keys` (recipe inputs to warm with,
+  resolved at warm time against household state, never literal values
+  in the manifest).
+- **`warm_on`** (new): setting-key ids whose change should trigger an
+  immediate warm outside `warm.schedule` - e.g. `weather` re-warming
+  the moment `household.home_place` changes, instead of waiting for
+  the next scheduled tick. Not in `wave-2.md`'s own contract text in
+  full detail; this shape (an array of `spec/settings/keys.json` ids)
+  is the smallest one that answers "warm on what" without inventing a
+  new event-bus concept step 3 doesn't need yet.
+- **`contributes`**: changed from an array to an object
+  (`additionalProperties: true`, so nav/pages/panels/etc. from plan
+  6.1 can still land later without another schema change) with one
+  real sub-shape today: **`contributes.widgets[]`**
+  (`{ id, title, size: "card" | "row", refresh_s, inputs }`), the
+  contract `wave-2.md`'s "D to E: the store, widgets, lists" section
+  names. Every bundled package's `"contributes": []` became `{}` (11
+  manifests, D-owned and not: `contributes` was an unconsumed
+  placeholder everywhere - `grep` found zero real readers beyond a
+  `nav.ts` comment describing a future reader - so this is a type
+  correction with no behavior to preserve, not a breaking change to
+  anything live).
+- **`exposes.queries[]`** (C's contract): `{ id, description, args,
+  returns }`, typed read queries a package offers beyond its own
+  recipe for C's Tier 2 tool-calling router. No package populates this
+  yet; C's own step wires the router side.
+- **`smoke`**: tightened from a fully-open object to
+  `{ kind: "static" | "recipe_fixture" | "deno_test", fixture? }`
+  matching what `lib/smoke.ts` (step 1) actually reads, `kind`
+  required once `smoke` is present at all.
+- **`channel`**: `"stable" | "beta"`, default `"stable"` - the
+  publisher's declaration of what a manifest *version* is, not a
+  household's own per-package channel choice (that's store-side state,
+  step 6).
+- **`notifications[]`**: was a bare array of id strings with nowhere
+  real to register them; now the same shape as F's own
+  `NotificationType` (`id`, `level`, `audience`, `template`,
+  `configurable`, `default_channels`), snake_cased per the spec's own
+  convention. `id` is namespaced by convention
+  (`weather.severe_alert`) so two packages' ids can never collide.
+- **`platforms`**: `weather`, `define`, `joke`, `trivia` now declare
+  `["home", "bot"]` (previously `home`-only) per the plan's own
+  instruction - these four Tier 0 recipes have nothing hub-specific in
+  them, so the robot can run them once it has its own interpreter and
+  packages directory (not this wave's build, just the manifest fact).
+
+**`registerPackageNotificationTypes`** lands in F's
+`backend/src/lib/notificationTypes.ts` as one additive export, per
+`wave-2.md`'s own instruction ("the function lands as an additive
+export you add in one commit that touches only that export, rebased
+first"): a `Map` alongside the existing `NOTIFICATION_TYPES` const
+(never mutating that array - it's core's own hand-written literal),
+`getNotificationType()` checks both, a package can never shadow a core
+id. `lib/plugins.ts` gets the one caller,
+`registerAllPackageNotificationTypes()`, run once at boot
+(`index.ts`, right before the smoke pass) over every bundled package's
+manifest. No bundled package declares a real one yet, so this is
+wiring proven by `backend/tests/notificationTypes.test.ts` (a
+synthetic package registering, colliding with a core id and losing,
+double-registering idempotently) and one boot-safety assertion in
+`plugins.test.ts`, not yet by anything visible in the running app.
+
+A code review before this commit caught a real type mismatch here: the
+manifest's own `notifications[]` is snake_cased (`default_channels`,
+matching every other manifest field's convention) but `NotificationType`
+is camelCase (`defaultChannels`) - the first version imported
+`NotificationType` for the manifest side too, which passed `bun test`
+(no type-checking at runtime) but failed `bunx tsc --noEmit`, and would
+have thrown inside `lib/notifications.ts`'s `trigger()` the moment any
+package populated this for real (`type.defaultChannels` reading
+`undefined` off an object that only ever had `default_channels`). Fixed
+with a dedicated `ManifestNotificationType` interface and an explicit
+field rename at the one registration point, not by changing either
+existing convention.
+
+Tests: `spec/tests/ts/manifest-fields.test.ts` (9 cases),
+`backend/tests/notificationTypes.test.ts` (4 cases),
+`backend/tests/plugins.test.ts` (1 new boot-safety case). Every
+`spec`/`backend` stage of `scripts/check.sh` is green (the pre-existing
+frontend gap noted in step 1 is unchanged - still Session E's, still
+unrelated to this diff).
+
+What's left for whom: C populates `exposes.queries[]` on the packages
+it routes to as a Tier 2 tool; step 3 is the first real reader of
+`cache`/`warm`/`warm_on`; step 9 is the first real writer of
+`contributes.widgets[]`.

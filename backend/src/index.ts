@@ -1,6 +1,6 @@
 import { app } from "@/app";
 import { ensureCoreJob, runDueJobs } from "@/lib/scheduler";
-import { runPlugin } from "@/lib/plugins";
+import { runPlugin, registerAllPackageNotificationTypes } from "@/lib/plugins";
 import { cleanupStaleSnapshots } from "@/lib/backup";
 import { sampleEngineStats } from "@/lib/engineStats";
 import { startAllSidecars, registerGracefulExit } from "@/lib/sidecars";
@@ -46,6 +46,10 @@ ensureCoreJob("backup.run", "every:1d");
 // in for "at install" until then; this daily job is the real "on a
 // schedule" half.
 ensureCoreJob("packages.smoke", "every:1d");
+// Step 2: every bundled package's own declared notification types become
+// real, dispatchable ones in F's registry before the first turn or
+// scheduled job could ever try to trigger() one.
+registerAllPackageNotificationTypes();
 void runAllSmokeTests().then(({ ran, failed }) => {
   if (failed > 0) console.error(`[smoke] ${failed}/${ran} bundled package(s) failed their smoke test at boot`);
 });

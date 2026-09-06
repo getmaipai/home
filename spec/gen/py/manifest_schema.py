@@ -51,6 +51,134 @@ class Companion(BaseModel):
     filler_density: Literal['none', 'light', 'frequent']
 
 
+class Notification(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    id: constr(pattern=r'^[a-z0-9_.-]+$') = Field(
+        ...,
+        description="Namespaced by the package's own id (e.g. `weather.severe_alert`) so two packages can never collide in F's shared registry.",
+    )
+    level: Literal['immediate', 'time_sensitive', 'passive']
+    audience: Literal['person', 'household', 'adults']
+    template: constr(min_length=1) = Field(
+        ..., description='`{var}`-interpolated, per docs/NOTIFICATIONS.md.'
+    )
+    configurable: bool
+    default_channels: list[Literal['in_app', 'telegram']] = Field(..., min_length=1)
+
+
+class Cache(BaseModel):
+    """
+    How lib/packageCache.ts (session-d-packages-and-store.md step 3) keys and bounds this package's own cache. `additionalProperties: true` on purpose: a package's `host.fetch` call sites decide their own extra per-entry hints (4.10), this just fixes the ones the cache mechanism itself reads.
+    """
+
+    model_config = ConfigDict(
+        extra='allow',
+    )
+    key_template: constr(min_length=1) | None = Field(
+        None,
+        description='A `{arg}`-interpolated template (e.g. `weather:{place}`) naming one cache entry per distinct call.',
+    )
+    ttl_s: conint(ge=1) | None = Field(
+        None,
+        description='Fresh for this long; served straight from cache with no fetch.',
+    )
+    stale_ok_s: conint(ge=0) | None = Field(
+        None,
+        description='Beyond ttl_s but within this, served immediately while a revalidation fetch runs in the background (stale-while-revalidate).',
+    )
+    max_bytes: conint(ge=1) | None = Field(
+        None,
+        description='Per-entry size ceiling; a fetch response over this is never cached.',
+    )
+
+
+class Warm(BaseModel):
+    """
+    A scheduled job that pre-populates this package's cache before anyone asks, so a common answer (the household's own weather) never waits on a live fetch.
+    """
+
+    model_config = ConfigDict(
+        extra='allow',
+    )
+    schedule: constr(pattern=r'^every:[0-9]+(m|h|d)$') | None = Field(
+        None,
+        description="The same `every:<n><m|h|d>` grammar lib/scheduler.ts's core jobs already use.",
+    )
+    keys: list[dict[str, Any]] | None = Field(
+        None,
+        description='The recipe inputs to warm with, one object per cache entry (e.g. `[{ "place": "household\'s home place" }]`); resolved against household settings/state at warm time, not stored as literal values here.',
+    )
+
+
+class Widget(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    id: constr(min_length=1)
+    title: constr(min_length=1, max_length=40)
+    size: Literal['card', 'row']
+    refresh_s: conint(ge=1) = Field(
+        ...,
+        description="How often Home should re-fetch this widget's data; the data itself still only ever comes from lib/packageCache.ts (step 3's own rule: never a live fetch in the request path).",
+    )
+    inputs: dict[str, Any] | None = Field(
+        None,
+        description='Resolved the same way `warm.keys` are - against household settings/state, not literal values in the manifest.',
+    )
+
+
+class Contributes(BaseModel):
+    """
+    Shell blueprints (6.1): nav entries, pages, right-pane panels, settings sections, commands, quick actions, player hooks, admin sections. `additionalProperties: true` since most of 6.1's own blueprint kinds have no bundled package using them yet (Wave 1's `contributes: []` was a placeholder no package had populated); `widgets` below is the one sub-field session-d-packages-and-store.md step 2 fixes a real shape for, since step 9 ships packages that populate it.
+    """
+
+    model_config = ConfigDict(
+        extra='allow',
+    )
+    widgets: list[Widget] | None = Field(
+        None,
+        description="wave-2.md's D-to-E contract: `GET /api/widgets` and `GET /api/widgets/:package/:id/data` list and serve these.",
+    )
+
+
+class Smoke(BaseModel):
+    """
+    The smoke test entry, run at install, update, and on a schedule (lib/smoke.ts). `kind: "static"` (loads only), `"recipe_fixture"` + `fixture` (a Tier 0 plugin's own recipe run against a fixture-seeded HostEmulator), or `"deno_test"` (Tier 1, session-d step 5).
+    """
+
+    model_config = ConfigDict(
+        extra='allow',
+    )
+    kind: Literal['static', 'recipe_fixture', 'deno_test']
+    fixture: constr(min_length=1) | None = Field(
+        None,
+        description='Path, relative to the package\'s own directory, to its smoke fixture. Required when kind is "recipe_fixture".',
+    )
+
+
+class Query(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    id: constr(min_length=1)
+    description: constr(min_length=1, max_length=200)
+    args: Any = Field(..., description="A JSON Schema for this query's arguments.")
+    returns: Any = Field(..., description="A JSON Schema for this query's result.")
+
+
+class Exposes(BaseModel):
+    """
+    wave-2.md's C-to-D contract: typed read queries a package offers beyond its own recipe, for C's Tier 2 tool-calling router to call directly rather than routing a whole turn through this package's `handle`.
+    """
+
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    queries: list[Query] | None = None
+
+
 class Source(BaseModel):
     """
     For a package that graduated to its own repo (5.1).
@@ -142,22 +270,27 @@ class PackageManifest(BaseModel):
         None,
         description='From the fixed permissions enum (spec/vocab/permissions.json).',
     )
-    notifications: list[str] | None = Field(
+    notifications: list[Notification] | None = Field(
         None,
-        description='Notification ids this package declares, per docs/NOTIFICATIONS.md.',
+        description="Notification types this package declares, per docs/NOTIFICATIONS.md - registered into home/backend/src/lib/notificationTypes.ts's shared registry at load (registerPackageNotificationTypes()).",
     )
-    cache: dict[str, Any] | None = Field(
+    cache: Cache | None = Field(
         None,
-        description='key_template, ttl_s, stale_ok_s, max_bytes, max_age_s, scope, platform overrides (4.10).',
+        description="How lib/packageCache.ts (session-d-packages-and-store.md step 3) keys and bounds this package's own cache. `additionalProperties: true` on purpose: a package's `host.fetch` call sites decide their own extra per-entry hints (4.10), this just fixes the ones the cache mechanism itself reads.",
     )
-    warm: dict[str, Any] | None = Field(
-        None, description='schedule, keys, warm_on (4.10).'
+    warm: Warm | None = Field(
+        None,
+        description="A scheduled job that pre-populates this package's cache before anyone asks, so a common answer (the household's own weather) never waits on a live fetch.",
+    )
+    warm_on: list[constr(min_length=1)] | None = Field(
+        None,
+        description='Setting keys (spec/settings/keys.json ids) whose change should trigger an immediate warm outside `warm.schedule` - e.g. `household.home_place` changing re-warms `weather` right away instead of waiting for the next scheduled tick.',
     )
     backup: Literal['hot', 'cold', 'exclude'] | None = None
     background: bool | None = False
-    contributes: list[dict[str, Any]] | None = Field(
+    contributes: Contributes | None = Field(
         None,
-        description='Shell blueprints (6.1): nav entries, pages, right-pane panels, settings sections, commands, quick actions, player hooks, admin sections.',
+        description="Shell blueprints (6.1): nav entries, pages, right-pane panels, settings sections, commands, quick actions, player hooks, admin sections. `additionalProperties: true` since most of 6.1's own blueprint kinds have no bundled package using them yet (Wave 1's `contributes: []` was a placeholder no package had populated); `widgets` below is the one sub-field session-d-packages-and-store.md step 2 fixes a real shape for, since step 9 ships packages that populate it.",
     )
     pages: list[str] | None = Field(
         None, description='Ids of UI schema page documents this package ships (6.2).'
@@ -187,11 +320,19 @@ class PackageManifest(BaseModel):
     tier: Literal[0, 1] = Field(
         ..., description='0: declarative (a recipe or prompt body). 1: Deno code.'
     )
-    smoke: dict[str, Any] | None = Field(
+    smoke: Smoke | None = Field(
         None,
-        description='The smoke test entry, run at install, update, and on a schedule.',
+        description='The smoke test entry, run at install, update, and on a schedule (lib/smoke.ts). `kind: "static"` (loads only), `"recipe_fixture"` + `fixture` (a Tier 0 plugin\'s own recipe run against a fixture-seeded HostEmulator), or `"deno_test"` (Tier 1, session-d step 5).',
+    )
+    exposes: Exposes | None = Field(
+        None,
+        description="wave-2.md's C-to-D contract: typed read queries a package offers beyond its own recipe, for C's Tier 2 tool-calling router to call directly rather than routing a whole turn through this package's `handle`.",
     )
     quality_scale: Literal['bronze', 'silver', 'gold'] | None = None
+    channel: Literal['stable', 'beta'] | None = Field(
+        'stable',
+        description="The release channel this manifest version was published under (session-d step 6's store). A household's own per-package channel *choice* is store-side state, not this field - this is the publisher's declaration of what the version itself is.",
+    )
     content_sha256: constr(pattern=r'^[a-f0-9]{64}$') | None = None
     signature: str | None = None
     signer: str | None = None

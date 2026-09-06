@@ -138,18 +138,77 @@
     },
     "notifications": {
       "type": "array",
-      "items": { "type": "string" },
-      "description": "Notification ids this package declares, per docs/NOTIFICATIONS.md."
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "level", "audience", "template", "configurable", "default_channels"],
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[a-z0-9_.-]+$",
+            "description": "Namespaced by the package's own id (e.g. `weather.severe_alert`) so two packages can never collide in F's shared registry."
+          },
+          "level": { "type": "string", "enum": ["immediate", "time_sensitive", "passive"] },
+          "audience": { "type": "string", "enum": ["person", "household", "adults"] },
+          "template": { "type": "string", "minLength": 1, "description": "`{var}`-interpolated, per docs/NOTIFICATIONS.md." },
+          "configurable": { "type": "boolean" },
+          "default_channels": {
+            "type": "array",
+            "items": { "type": "string", "enum": ["in_app", "telegram"] },
+            "minItems": 1
+          }
+        }
+      },
+      "description": "Notification types this package declares, per docs/NOTIFICATIONS.md - registered into home/backend/src/lib/notificationTypes.ts's shared registry at load (registerPackageNotificationTypes())."
     },
     "cache": {
       "type": "object",
       "additionalProperties": true,
-      "description": "key_template, ttl_s, stale_ok_s, max_bytes, max_age_s, scope, platform overrides (4.10)."
+      "description": "How lib/packageCache.ts (session-d-packages-and-store.md step 3) keys and bounds this package's own cache. `additionalProperties: true` on purpose: a package's `host.fetch` call sites decide their own extra per-entry hints (4.10), this just fixes the ones the cache mechanism itself reads.",
+      "properties": {
+        "key_template": {
+          "type": "string",
+          "minLength": 1,
+          "description": "A `{arg}`-interpolated template (e.g. `weather:{place}`) naming one cache entry per distinct call."
+        },
+        "ttl_s": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Fresh for this long; served straight from cache with no fetch."
+        },
+        "stale_ok_s": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Beyond ttl_s but within this, served immediately while a revalidation fetch runs in the background (stale-while-revalidate)."
+        },
+        "max_bytes": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Per-entry size ceiling; a fetch response over this is never cached."
+        }
+      }
     },
     "warm": {
       "type": "object",
       "additionalProperties": true,
-      "description": "schedule, keys, warm_on (4.10)."
+      "description": "A scheduled job that pre-populates this package's cache before anyone asks, so a common answer (the household's own weather) never waits on a live fetch.",
+      "properties": {
+        "schedule": {
+          "type": "string",
+          "pattern": "^every:[0-9]+(m|h|d)$",
+          "description": "The same `every:<n><m|h|d>` grammar lib/scheduler.ts's core jobs already use."
+        },
+        "keys": {
+          "type": "array",
+          "items": { "type": "object" },
+          "description": "The recipe inputs to warm with, one object per cache entry (e.g. `[{ \"place\": \"household's home place\" }]`); resolved against household settings/state at warm time, not stored as literal values here."
+        }
+      }
+    },
+    "warm_on": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 },
+      "description": "Setting keys (spec/settings/keys.json ids) whose change should trigger an immediate warm outside `warm.schedule` - e.g. `household.home_place` changing re-warms `weather` right away instead of waiting for the next scheduled tick."
     },
     "backup": {
       "type": "string",
@@ -157,9 +216,35 @@
     },
     "background": { "type": "boolean", "default": false },
     "contributes": {
-      "type": "array",
-      "items": { "type": "object" },
-      "description": "Shell blueprints (6.1): nav entries, pages, right-pane panels, settings sections, commands, quick actions, player hooks, admin sections."
+      "type": "object",
+      "additionalProperties": true,
+      "description": "Shell blueprints (6.1): nav entries, pages, right-pane panels, settings sections, commands, quick actions, player hooks, admin sections. `additionalProperties: true` since most of 6.1's own blueprint kinds have no bundled package using them yet (Wave 1's `contributes: []` was a placeholder no package had populated); `widgets` below is the one sub-field session-d-packages-and-store.md step 2 fixes a real shape for, since step 9 ships packages that populate it.",
+      "properties": {
+        "widgets": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["id", "title", "size", "refresh_s"],
+            "properties": {
+              "id": { "type": "string", "minLength": 1 },
+              "title": { "type": "string", "minLength": 1, "maxLength": 40 },
+              "size": { "type": "string", "enum": ["card", "row"] },
+              "refresh_s": {
+                "type": "integer",
+                "minimum": 1,
+                "description": "How often Home should re-fetch this widget's data; the data itself still only ever comes from lib/packageCache.ts (step 3's own rule: never a live fetch in the request path)."
+              },
+              "inputs": {
+                "type": "object",
+                "additionalProperties": true,
+                "description": "Resolved the same way `warm.keys` are - against household settings/state, not literal values in the manifest."
+              }
+            }
+          },
+          "description": "wave-2.md's D-to-E contract: `GET /api/widgets` and `GET /api/widgets/:package/:id/data` list and serve these."
+        }
+      }
     },
     "pages": {
       "type": "array",
@@ -203,11 +288,47 @@
     "smoke": {
       "type": "object",
       "additionalProperties": true,
-      "description": "The smoke test entry, run at install, update, and on a schedule."
+      "description": "The smoke test entry, run at install, update, and on a schedule (lib/smoke.ts). `kind: \"static\"` (loads only), `\"recipe_fixture\"` + `fixture` (a Tier 0 plugin's own recipe run against a fixture-seeded HostEmulator), or `\"deno_test\"` (Tier 1, session-d step 5).",
+      "required": ["kind"],
+      "properties": {
+        "kind": { "type": "string", "enum": ["static", "recipe_fixture", "deno_test"] },
+        "fixture": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Path, relative to the package's own directory, to its smoke fixture. Required when kind is \"recipe_fixture\"."
+        }
+      }
+    },
+    "exposes": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "wave-2.md's C-to-D contract: typed read queries a package offers beyond its own recipe, for C's Tier 2 tool-calling router to call directly rather than routing a whole turn through this package's `handle`.",
+      "properties": {
+        "queries": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["id", "description", "args", "returns"],
+            "properties": {
+              "id": { "type": "string", "minLength": 1 },
+              "description": { "type": "string", "minLength": 1, "maxLength": 200 },
+              "args": { "description": "A JSON Schema for this query's arguments." },
+              "returns": { "description": "A JSON Schema for this query's result." }
+            }
+          }
+        }
+      }
     },
     "quality_scale": {
       "type": "string",
       "enum": ["bronze", "silver", "gold"]
+    },
+    "channel": {
+      "type": "string",
+      "enum": ["stable", "beta"],
+      "default": "stable",
+      "description": "The release channel this manifest version was published under (session-d step 6's store). A household's own per-package channel *choice* is store-side state, not this field - this is the publisher's declaration of what the version itself is."
     },
     "content_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
     "signature": { "type": "string" },
