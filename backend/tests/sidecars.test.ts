@@ -316,10 +316,11 @@ describe("freePort", () => {
   test("kills a real process bound to the port and frees it for a new listener", async () => {
     const port = 39172; // arbitrary, unlikely to collide with anything else in CI
     // Trailing "--port <N>" args (unused by the script itself) are still
-    // part of the OS-level argv `ps aux` shows - freePort matches on
-    // exactly that substring, the same shape a real sidecar spawn always
-    // has, so this exercises the real matching logic rather than a
-    // differently-shaped stand-in for it.
+    // part of the OS-level argv the SEC-9 user-scoped `ps -u <uid> -o
+    // pid=,command=` shows - freePort matches on exactly that substring,
+    // the same shape a real sidecar spawn always has, so this exercises
+    // the real matching logic rather than a differently-shaped stand-in
+    // for it.
     const child = Bun.spawn(
       ["bun", "-e", `Bun.serve({ port: ${port}, fetch: () => new Response("ok") });`, "--port", String(port)],
       { stdout: "ignore", stderr: "ignore" },
@@ -396,7 +397,7 @@ describe("sweepOrphanProcesses", () => {
     const marker = `maipai-orphan-test-${crypto.randomUUID()}`;
     const orphan = Bun.spawn(["bun", "-e", `/* ${marker} */ setTimeout(() => {}, 60000);`], { stdout: "ignore", stderr: "ignore" });
     try {
-      // Give `ps aux` a moment to actually see the new process.
+      // Give `ps` a moment to actually see the new process.
       await new Promise((r) => setTimeout(r, 200));
       const killed = await sweepOrphanProcesses(marker);
       expect(killed).toBe(1);
@@ -422,7 +423,7 @@ describe("sweepOrphanProcesses", () => {
   // Deliberately NOT tested with a broad pattern like the current
   // process's own binary name ("bun"): on this machine, several other
   // sessions' real bun processes are commonly running at the same time,
-  // and `ps aux` matching that loosely would SIGKILL them too - the self-
+  // and matching that loosely would SIGKILL them too - the self-
   // exclusion (`pid !== process.pid` in the implementation) only protects
   // against matching this exact pid, not every process sharing a runtime.
   // The two tests above already prove targeted, marker-based matching
