@@ -36,6 +36,7 @@ import {
   backupHealth,
   backupTargets,
   receivedBackups,
+  nasMounts,
 } from "@/db/schema";
 
 // All test files in one `bun test` run share the same imported `@/db`
@@ -60,6 +61,7 @@ export function resetDb(): void {
   db.delete(receivedBackups).run();
   db.delete(backupHealth).run();
   db.delete(backupTargets).run();
+  db.delete(nasMounts).run();
   db.delete(deviceTokens).run();
   db.delete(devices).run();
   db.delete(passkeyCredentials).run();

@@ -15,6 +15,7 @@ import { HOME_ASSISTANT_SETTINGS_KEYS } from "../src/settings/homeAssistantKeys.
 import { NOTIFICATION_SETTINGS_KEYS } from "../src/settings/notificationKeys.js";
 import { UI_SETTINGS_KEYS } from "../src/settings/uiKeys.js";
 import { ALLOWANCE_SETTINGS_KEYS } from "../src/settings/allowanceKeys.js";
+import { STORAGE_SETTINGS_KEYS } from "../src/settings/storageKeys.js";
 
 const outPath = join(import.meta.dir, "..", "..", "spec", "settings", "keys.json");
 
@@ -28,6 +29,7 @@ const sorted = [
   ...NOTIFICATION_SETTINGS_KEYS,
   ...UI_SETTINGS_KEYS,
   ...ALLOWANCE_SETTINGS_KEYS,
+  ...STORAGE_SETTINGS_KEYS,
 ].sort((a, b) => a.key.localeCompare(b.key));
 writeFileSync(outPath, JSON.stringify(sorted, null, 2) + "\n");
 console.log(`Wrote ${sorted.length} settings key(s) to ${outPath}`);

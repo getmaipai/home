@@ -602,6 +602,42 @@ describe("what a restore refuses to do", () => {
     }
   });
 
+  // A code review (2026-09-06): a crash right after renaming hub.db to
+  // hub.db.pre-restore, but before its own -wal/-shm got the same
+  // treatment, leaves the main file at the pre-restore slot with its
+  // journal still sitting under the OLD hub.db-wal name. A naive retry
+  // archived that lone main file away (nothing else was at the
+  // pre-restore slot to associate the straggling journal with), then
+  // separately moved the straggler onto the now-empty slot it left
+  // behind - splitting a database from its own journal. This simulates
+  // exactly that crash point.
+  test("a crash between renaming the main file and its own WAL/SHM does not split them on retry", async () => {
+    await owner();
+    const info = runBackup();
+    const dir = mkdtempSync(join(tmpdir(), "maipai-restore-crash-"));
+    try {
+      stageRestore(info.filename, "person-123", dir);
+
+      // State left behind by a crashed first application attempt: the
+      // main file already renamed to the pre-restore slot, its own -wal
+      // not yet moved when the crash happened.
+      writeFileSync(join(dir, "hub.db.pre-restore"), Buffer.from("main file from the crashed attempt"));
+      writeFileSync(join(dir, "hub.db-wal"), Buffer.from("its own wal, not yet moved when the crash happened"));
+
+      applyPendingRestore(dir);
+
+      const files = new Set(readdirSync(dir).filter((f) => f.startsWith("hub.db.pre-restore")));
+      for (const f of files) {
+        if (f.endsWith("-wal")) expect(files.has(f.slice(0, -"-wal".length))).toBe(true);
+      }
+      for (const f of files) {
+        if (!f.endsWith("-wal") && !f.endsWith("-shm")) expect(files.has(`${f}-wal`)).toBe(true);
+      }
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
   // In WAL mode a committed transaction lives in the journal until a
   // checkpoint. Deleting it emptied the one undo a family has.
   test("the replaced database keeps its journal, so the undo copy is complete", async () => {

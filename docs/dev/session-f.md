@@ -1268,3 +1268,148 @@ that one call site only - the regular scheduled run still catches up
 normally. A regression test (`backup.test.ts`) backdates the target
 backup into today's bucket and confirms it survives; verified to fail
 without the fix by temporarily reverting it and re-running.
+
+## Step 9: storage, quotas, uninstall, factory reset, diagnostics
+
+**"Caches first" turned out to already exist.** Before writing anything,
+`lib/packageCache.ts` (D's file) was checked for what a disk-full policy
+would need - and its own `writeEntry()` already calls real free-disk
+checks (`statfsSync`) and evicts its own oldest entries before every
+write, entirely automatically. This step's actual job is the second half
+of "caches first, then a Repairs item": `storage.check_disk_full` (an
+hourly core job) raises a Repairs item only once free space is STILL
+below the household's own threshold after caches have done everything
+they can - real household data (people, memories, conversations, cloned
+voices, models) cannot shrink itself the way a cache can, so a Repairs
+item is the honest response left, never a crash.
+
+**`GET /api/storage`.** Every area `lib/paths.ts` already names, sized
+by walking the real directories (`database`, `models`, `engines`,
+`voice_wakewords`, `voice_stt`, `voice_cloned`, `cache`, `backups`,
+`received_backups`), plus D's `getCacheStats()` per package, plus real
+free/total disk space. `data/`'s formal layout from plan 4.15 (a `db/`
+subdirectory holding `hub.db`) was deliberately NOT done: `hub.db` stays
+where every prior step already left it, at `dataDir`'s own root - moving
+the live database's actual file path is a real migration with real
+downtime risk, and nothing surfaced a concrete need for it yet. Recorded
+in `docs/BACKLOG.md`, not silently skipped.
+
+**Per-person quotas: the mechanism, not the wiring.** The one per-person
+upload with a tracked byte count today is cloned voices
+(`cloned_voices.bytes`, C's table). `checkPersonQuota()` sums it against
+a person-scoped `storage.person_quota_gb` setting (default 0, unlimited)
+and refuses if a proposed upload would go over. `routes/voice.ts` (also
+C's file) is the expected caller, not built here - the same "mechanism
+here, wiring there" cross-session split step 7's `ctx.allowance` already
+uses for exactly this kind of boundary.
+
+**NAS mounts: declaration only.** `nasMounts` mirrors `backup_targets`'
+own posture - never an SMB client, just a directory path an admin has
+already mounted at the OS level, validated the same way. No media-
+library scanner exists yet to walk `scanPaths`, so nothing reads them
+today; this is real, useful storage for whenever that feature lands, not
+a guessed shape that will need to change when it does.
+
+**Factory reset: staged, the same shape restore already uses.**
+"Behind a typed confirmation and a fresh backup" (2.5) - typing
+`"DELETE EVERYTHING"` exactly, a real backup taken first (the whole
+reset is refused if that backup fails - a reset with no way back is not
+what this button is for), then staged as a marker file consumed at the
+next boot, applied by `db/index.ts` right alongside `applyPendingRestore()`
+- the one moment in the hub's life with no open handle and no request in
+flight. The live database is renamed aside, never deleted outright, the
+identical "moved aside, not destroyed" reasoning `hub.db.pre-restore`
+already established: a factory reset triggered by mistake (or by a
+child who found the button) is still recoverable by hand, on top of the
+fresh backup already taken.
+
+**Redacted diagnostics, built structurally.** `spec/diagnostics/
+to-redact.json` names every excluded category and why (family names,
+birthdate, hub endpoint addresses, the hub's own admin-typable display
+name, any settings value the registry marks `secret: true`, and every
+person-scoped settings value wholesale); `generateDiagnostics()` is the
+one place that list is enforced, by never including an excluded field in
+the first place rather than scrubbing a fuller dump with pattern-matching
+after the fact - a regex-based scrub over free text can always miss a
+name it has never seen before; simply never reading the field cannot.
+
+**The uninstaller, for a service that doesn't exist yet.**
+`scripts/uninstall.sh` handles "no service is registered" gracefully
+(step 11 is the actual service installer, still ahead of this step) -
+it detects a systemd unit or launchd agent by name and removes it if
+present, says so plainly if not, and always ends with the keep-or-wipe
+choice for `data/` (typed confirmation, default keep). Real and useful
+today even before step 11 lands a service to register in the first
+place.
+
+**A circular-import bug caught while writing this diff, before any
+review:** `db/index.ts` imports `lib/factoryReset.ts`'s
+`applyPendingFactoryReset()` at the top of the file, before `db` itself
+is exported - the first version of `factoryReset.ts` had a static,
+top-of-file `import { runBackupAndMirror } from "@/lib/backup"`, and
+`lib/backup.ts` itself imports the live `db`/`sqlite` handle. The result
+was a real boot-time crash (`ReferenceError: Cannot access 'db' before
+initialization`), caught by the full test suite going from 1266 passing
+to 69 failures the moment `checkDiskFull()`'s own scheduler wiring
+pulled `lib/storage.ts` into the same import graph. Fixed the same way
+`restoreStaging.ts`'s own header already documents for the identical
+hazard: `stageFactoryReset()` (called only from a route, long after
+`db` exists) imports `lib/backup.ts` dynamically, inside the function
+body, never at module load time; `applyPendingFactoryReset()` (the one
+`db/index.ts` actually calls) stays free of any import that could reach
+back to `@/db`.
+
+**A code review (2026-09-06) found four issues, all fixed:**
+
+1. **`applyPendingFactoryReset()`'s crash-ordering fix (above) turned out
+   to be incomplete on its own first pass, caught by the review's own
+   regression test.** The review's suggested fix ("move a main file and
+   its -wal/-shm together, as one call") is necessary but not sufficient
+   for the exact crash point it names: a crash right after the main file
+   is renamed to the pre-reset slot, but before its own -wal/-shm follow
+   it, leaves those journal files still sitting under the OLD (live-path)
+   name - genuinely invisible to a check keyed on the NEW (pre-reset)
+   name, no matter how that check is written. A retry's archive step
+   then still separates them: the lone main file gets archived away
+   (nothing else is at the pre-reset slot to associate the stragglers
+   with), and the later "move the current live set" step relocates the
+   orphaned journal onto the now-empty slot the main file just vacated.
+   Fixed with a second, narrower check (`partialMoveInProgress()`,
+   `lib/restoreStaging.ts`): a main file already at the destination with
+   no main file left at the source, but the source's own -wal/-shm still
+   there, is the ONLY partially-moved state `moveDbSet()`'s own
+   main-then-journal order can ever produce - detected explicitly, so a
+   retry finishes reuniting that exact pair instead of archiving them
+   apart. Applied to both `lib/factoryReset.ts` and, since `lib/
+   restoreStaging.ts`'s `applyPendingRestore()` had the textually
+   identical original bug (found while fixing the first one, not by the
+   review pass itself), to restore too - both now share `moveDbSet()`/
+   `dbSetExists()`/`partialMoveInProgress()` from one place rather than
+   two copies that could drift. Both new regression tests were verified
+   to fail without their respective fix.
+2. **`scripts/uninstall.sh`'s own header claimed deleting `data/` covered
+   "people, memories, conversations, models and backups," but backups
+   live in `data/`'s sibling directories (`backupDir`/
+   `receivedBackupsDir`, deliberately never nested inside `data/` -
+   step 8's own fix for exactly this kind of hazard) and the script never
+   touched or even mentioned them - a household member confirming "yes,
+   delete everything" got two of three data directories wiped with no
+   indication the third was left behind.** Fixed: all three directories
+   are found and offered together under one confirmation.
+3. **The same script hardcoded `$ROOT/data`, ignoring the
+   `MAIPAI_DATA_DIR`/`MAIPAI_BACKUP_DIR` overrides the backend itself
+   honors** - an install that relocated its data directory (a second
+   disk, a different mount) got a false "nothing found here" instead of
+   the real directory elsewhere. Fixed to check the same environment
+   variables first, falling back to the documented defaults.
+4. **`generateDiagnostics()`'s issue mapping included `title`, with no
+   redaction allowlist check the way `people`/`settings` both have** -
+   every current `raiseIssue()` call site only ever puts internal ids and
+   fixed strings there today, so no leak exists yet, but nothing
+   structural would stop or even flag the next call that embeds an
+   admin-typed value (a NAS mount's label, a hub endpoint's name) from
+   flowing straight into a report meant to be safe to hand to support.
+   Fixed by dropping `title` (and `detail`, never included) entirely -
+   `source`/`key` alone already identify what's broken, and are safe by
+   construction regardless of what a future issue's free text contains.
+   Added as its own category to `spec/diagnostics/to-redact.json`.

@@ -38,6 +38,7 @@ import { runRetention } from "@/lib/conversationHistory";
 import { runBackupAndMirror } from "@/lib/backup";
 import { checkLeafExpiry } from "@/lib/householdCa";
 import { disableExpiredGuests, applyAgeBandChanges } from "@/lib/personLifecycle";
+import { checkDiskFull } from "@/lib/storage";
 import type { PluginOpResult } from "@/lib/plugins";
 import type { PluginResult } from "@maipai/spec/interpreters/ts/recipe-interpreter.js";
 import type { PersonRow } from "@/types";
@@ -192,6 +193,9 @@ const CORE_JOBS: Record<string, CoreJobHandler> = {
   },
   "backup.run": async () => {
     await runBackupAndMirror();
+  },
+  "storage.check_disk_full": () => {
+    checkDiskFull();
   },
   "memory.embedding_retry": async () => {
     await drainPendingEmbeddings();
