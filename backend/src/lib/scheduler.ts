@@ -35,7 +35,7 @@ import { isOwnerOrAdmin } from "@/lib/access";
 import { runMaintenance, drainPendingEmbeddings } from "@/lib/memory";
 import { runJudgeBatch, runConsolidation } from "@/lib/memoryJudge";
 import { runRetention } from "@/lib/conversationHistory";
-import { runBackup, pruneBackups } from "@/lib/backup";
+import { runBackupAndMirror } from "@/lib/backup";
 import { checkLeafExpiry } from "@/lib/householdCa";
 import { disableExpiredGuests, applyAgeBandChanges } from "@/lib/personLifecycle";
 import type { PluginOpResult } from "@/lib/plugins";
@@ -190,9 +190,8 @@ const CORE_JOBS: Record<string, CoreJobHandler> = {
   "conversation.retention": () => {
     runRetention();
   },
-  "backup.run": () => {
-    runBackup();
-    pruneBackups();
+  "backup.run": async () => {
+    await runBackupAndMirror();
   },
   "memory.embedding_retry": async () => {
     await drainPendingEmbeddings();

@@ -1108,3 +1108,163 @@ Jesse's, not research questions this session could answer on its own.
    `lib/permissions.ts` rather than redefined - a future change to
    validity semantics now has one place to land instead of two that can
    silently drift apart.
+
+## Step 8: backups to somewhere else, the emergency kit, the restore drill
+
+**`local` retention already existed** (2026-09-04: `runBackup()`/
+`pruneBackups()`, a grandfather-father-son scheme - seven daily, four
+weekly, three monthly, each tier owning a real non-overlapping time
+window rather than a bucket-count fallback - plus a size cap enforced
+after the tiers, never instead of them). This step is the rest of 2.5:
+health tracking, the `smb` and `hub` targets, the emergency kit, partial
+restore, and the restore drill.
+
+**Health tracking, per target (`backup_health` table).** "A failure
+raises a Repairs item and two in a row notify admins" (2.5) - tracked
+separately for `local` and `smb` so a failing NAS mount can never mask,
+or get masked by, the local target still working fine. A single failure
+is raised at `severity: "warning"` - `Issue`'s own schema comment already
+says only `error` auto-fires the `repairs.new` notification, and a lone
+miss shouldn't page anyone. The second consecutive failure escalates the
+same issue to `error` AND fires a dedicated `backups.target_failing`
+notification by hand: `raiseIssue()`'s own "new open error" gate only
+checks whether a row was previously absent or resolved, not whether its
+severity just changed, so the escalation would silently never fire if
+left to that gate alone.
+
+**The `smb` target: this hub is never an SMB client.** The admin mounts
+their NAS share at the OS level the same way plan 4.15's own NAS mounts
+for storage are "declared with scan paths" rather than dialed by this
+app - `PUT /api/backups/targets/smb` takes a plain directory path,
+validated against the real filesystem (exists, is a directory) before
+`enabled: true` is accepted. Every backup local retention keeps gets
+mirrored there; a mirror failure is tracked and reported the same way a
+local failure is, but never blocks or fails the local backup that
+already succeeded.
+
+**The `hub` target: "the interface a robot will use."** A paired device
+pushes its own already-encrypted archive to `POST /api/backups/received`
+(multipart, device ownership checked against the caller's own session -
+`device.personId` must match the actor). Stored in its own subdirectory
+per device (`received_backups` table + `receivedBackupsDir`), cold
+storage only: this hub never holds the sending device's backup key, so a
+received archive is never listed alongside, decrypted with, or
+restorable through this hub's own `local`/`smb` backups.
+`receivedBackupsDir` is deliberately a *sibling* of `backupDir`, not a
+subdirectory inside it - nesting it broke in practice, not just in
+principle: a first version nested the two, and `tests/backup.test.ts`'s
+own pre-existing cleanup helper (a plain, non-recursive `rmSync` over
+every entry in `backupDir`) started throwing the moment a directory
+showed up where it had only ever seen flat `.db.enc` files, caught while
+running the full suite together for the first time. Kept as a sibling
+rather than just fixing that one test's helper, since the same flat-
+directory assumption is what `lib/backup.ts`'s own `listBackups()`/
+`pruneBackups()` make about `backupDir` too.
+
+**The emergency kit, finally shown.** `lib/backupCrypto.ts`'s own header
+had been waiting for this since 2026-09-04 ("2.5's real design prints
+this key as part of an 'emergency kit' at setup... until then it lives
+in the same keystore the pepper does... just not yet shown to anyone").
+`GET /api/backups/emergency-kit` returns the backup encryption key plus
+the hub's name and instance id - owner-only, and deliberately NOT
+wrapped in `requireRoleOrGrant`: every other backups route lets a grant
+widen who may reach it, but handing back the actual plaintext key is a
+different order of sensitivity than "who may click run a backup now."
+Safe to call more than once: "shown once" in the plan's own text
+describes a wizard step happening once at setup (E's UI, not built
+here), not a hard one-time API lock - an owner permanently locked out of
+their own key after an accidental page refresh would be a real
+usability disaster, and re-viewing an unchanged key is not the risky
+operation (rotating it would be, and nothing here does that).
+
+**Partial restore of one person's data.** Full restore (`restoreStaging.
+ts`) replaces the whole household database and needs a restart; this is
+the same-request, no-restart version - one person's memories,
+conversation history and settings come back from an old backup while
+everyone else's live data is untouched. Deliberately narrow in what it
+touches: never credentials, sessions, passkeys, device tokens, grants,
+or role - reintroducing an old password hash or a since-revoked grant
+from a stale backup would be a security regression wearing a recovery
+feature's clothes. `ATTACH DATABASE` against the decrypted backup file,
+with every copied table's column list read fresh from `PRAGMA
+table_info()` rather than hand-typed, so a backup old enough to predate
+a since-added column fails that one table with a clear SQL error instead
+of a silent partial write. Embeddings are never restored (memory-record's
+own "embeddings never sync" rule already covers this) - every restored
+memory is queued in `pending_embeddings` instead, so the already-
+scheduled `memory.embedding_retry` core job (every minute) re-embeds it
+for real, reusing existing infrastructure rather than inventing a second
+embed path. Every insert is `INSERT OR IGNORE`: safe to run twice on the
+same backup, never a duplicate or an error.
+
+**"Before every update and restore."** Restoring now takes a fresh,
+best-effort safety backup of the CURRENT state immediately before
+staging - real, retained, and mirrored off-machine if `smb` is
+configured, on top of (not instead of) `applyPendingRestore()`'s own
+existing "rename the live database aside" safety net. Updating gets no
+equivalent hook: no update system exists yet (that's step 10), and
+wiring a hook to nothing would be exactly the kind of unverifiable,
+undocumented gap this org's standards warn against - recorded in
+`docs/BACKLOG.md` as deferred, not silently skipped.
+
+**The restore drill.** `backend/scripts/restore-drill.ts` (+ a thin
+top-level `scripts/restore-drill.sh` wrapper, matching `scripts/
+check.sh`'s own "cd here, then bun run" shape): finds the latest real
+backup, decrypts it into a throwaway data directory, spawns a real hub
+process against that directory on a private port, and confirms `GET
+/api/auth/profiles` - the actual, public sign-in picker - answers with
+real people in it. Deliberately does not attempt a full PIN/password
+ceremony: that needs a real secret this script has no business knowing,
+and an unattended release run has nobody to type one in anyway;
+confirming the picker itself renders the restored household is the
+honest stopping point, since it proves every layer below the secret
+check (decrypt, schema-version check, boot, roster) genuinely works.
+Verified by hand against a real backup before landing (not just
+"compiles"). The release skill that calls this lives in the separate,
+org-level `getmaipai/.github` repo - out of this session's scope to
+touch - so this script is the contract that skill is expected to call,
+the same way `scripts/check.sh` is a contract other tooling calls rather
+than something this session invented a second copy of.
+
+**A code review (2026-09-06) found three issues, all fixed:**
+
+1. **`received_backups.device_id` references `devices.id` with no
+   cascade, and nothing cleaned it up before a device row could be
+   deleted** - revoking a device (`lib/devices.ts`'s `deleteDevice()`) or
+   deleting/memorializing its owner (`lib/personLifecycle.ts`'s
+   `revokeAllCredentialsAndSessions()`) threw an uncaught
+   `SQLITE_CONSTRAINT_FOREIGNKEY` the moment that device had ever pushed
+   one backup via `POST /api/backups/received` - reproduced directly by
+   the review, and by two new regression tests here (verified to fail
+   without the fix, not just added and trusted). Fixed with
+   `deleteReceivedBackupsForDevice()` (removes both the rows and the
+   files), called from both sites before the `devices` delete.
+2. **`storeReceivedBackup()`'s filename sanitizing only stripped slashes**
+   - a filename of exactly `".."` has no slash to strip, so `join()`
+   resolved it to the device directory's own *parent* rather than a file
+   inside it, and `writeFileSync` threw an uncaught `EISDIR` instead of a
+   clean refusal. Fixed by rejecting `""`, `"."` and `".."` outright
+   before any path is built; the route now catches the new
+   `ReceivedBackupRefused` and returns 400.
+3. **The received-backup upload buffered the whole file into memory
+   before writing it to disk**, at a cap of 10 GB + 64 KiB - the same
+   real memory-pressure shape `routes/voice.ts`'s own cloned-voice
+   upload already accepts, but at an order of magnitude larger ceiling.
+   True streaming would mean bypassing Hono's `parseBody()` multipart
+   parsing for a raw request-stream reader, a bigger rearchitecture than
+   this route justifies alone; the cap is a real 2 GB instead - a
+   household's own backup is text (memories, conversations, settings),
+   never media, so this stays generous while actually bounding peak
+   memory use rather than leaving it open to whatever a device claims to
+   be sending.
+
+A fourth issue was self-caught while writing this diff, before any
+review pass: the "before every update and restore" safety backup's own
+`pruneBackups()` call could evict the very backup an admin was in the
+middle of restoring, if its retention bucket (same calendar day) was
+already spent by the brand-new safety backup. Fixed by giving
+`runBackupAndMirror()` a `prune: false` option and skipping retention for
+that one call site only - the regular scheduled run still catches up
+normally. A regression test (`backup.test.ts`) backdates the target
+backup into today's bucket and confirms it survives; verified to fail
+without the fix by temporarily reverting it and re-running.

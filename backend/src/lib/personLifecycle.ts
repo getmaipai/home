@@ -45,6 +45,7 @@ import {
 import { clonedVoicesDir } from "@/lib/paths";
 import { nextHlc } from "@/lib/hlc";
 import { TOMBSTONE_TEXT } from "@/lib/memory";
+import { deleteReceivedBackupsForDevice } from "@/lib/receivedBackups";
 import { ROLE_LADDER, invalidateSessionCacheForPerson, type Role } from "@/middleware/auth";
 import { trigger } from "@/lib/notifications";
 import type { PersonRow } from "@/types";
@@ -390,7 +391,14 @@ function revokeAllCredentialsAndSessions(personId: string): void {
   db.delete(personCredentials).where(eq(personCredentials.personId, personId)).run();
   db.delete(passkeyCredentials).where(eq(passkeyCredentials.personId, personId)).run();
   const ownDevices = db.select({ id: devices.id }).from(devices).where(eq(devices.personId, personId)).all();
-  for (const device of ownDevices) db.delete(deviceTokens).where(eq(deviceTokens.deviceId, device.id)).run();
+  for (const device of ownDevices) {
+    db.delete(deviceTokens).where(eq(deviceTokens.deviceId, device.id)).run();
+    // Step 8: same foreign-key gap a code review (2026-09-06) found in
+    // lib/devices.ts's deleteDevice() - received_backups.device_id has
+    // no cascade, so the devices delete below would throw for any
+    // device that had ever pushed a backup (POST /api/backups/received).
+    deleteReceivedBackupsForDevice(device.id);
+  }
   db.delete(devices).where(eq(devices.personId, personId)).run();
   db.delete(sessions).where(eq(sessions.personId, personId)).run();
   db.delete(totpSecrets).where(eq(totpSecrets.personId, personId)).run();

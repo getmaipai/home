@@ -3238,6 +3238,362 @@
         }
       }
     },
+    "/api/backups/targets": {
+      "get": {
+        "tags": [
+          "Backups"
+        ],
+        "summary": "Configured backup targets and their health",
+        "responses": {
+          "200": {
+            "description": "smb is null if never configured.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "local": {
+                      "type": "object",
+                      "nullable": true,
+                      "properties": {
+                        "consecutiveFailures": {
+                          "type": "number"
+                        },
+                        "lastFailureAt": {
+                          "type": "string",
+                          "nullable": true
+                        },
+                        "lastFailureMessage": {
+                          "type": "string",
+                          "nullable": true
+                        },
+                        "lastSuccessAt": {
+                          "type": "string",
+                          "nullable": true
+                        }
+                      },
+                      "required": [
+                        "consecutiveFailures",
+                        "lastFailureAt",
+                        "lastFailureMessage",
+                        "lastSuccessAt"
+                      ]
+                    },
+                    "smb": {
+                      "type": "object",
+                      "nullable": true,
+                      "properties": {
+                        "path": {
+                          "type": "string"
+                        },
+                        "enabled": {
+                          "type": "boolean"
+                        },
+                        "health": {
+                          "type": "object",
+                          "nullable": true,
+                          "properties": {
+                            "consecutiveFailures": {
+                              "type": "number"
+                            },
+                            "lastFailureAt": {
+                              "type": "string",
+                              "nullable": true
+                            },
+                            "lastFailureMessage": {
+                              "type": "string",
+                              "nullable": true
+                            },
+                            "lastSuccessAt": {
+                              "type": "string",
+                              "nullable": true
+                            }
+                          },
+                          "required": [
+                            "consecutiveFailures",
+                            "lastFailureAt",
+                            "lastFailureMessage",
+                            "lastSuccessAt"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "path",
+                        "enabled",
+                        "health"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "local",
+                    "smb"
+                  ]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not owner/admin",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/backups/targets/smb": {
+      "put": {
+        "tags": [
+          "Backups"
+        ],
+        "summary": "Configure the smb (NAS) backup target - a share already mounted at the OS level",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "path": {
+                    "type": "string"
+                  },
+                  "enabled": {
+                    "type": "boolean",
+                    "default": true
+                  }
+                },
+                "required": [
+                  "path"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Saved.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    }
+                  },
+                  "required": [
+                    "success"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The path is empty, or (if enabled) does not exist / is not a directory",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not owner/admin",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Backups"
+        ],
+        "summary": "Remove the smb backup target",
+        "responses": {
+          "200": {
+            "description": "Removed. Existing mirrored files on the share are left alone.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    }
+                  },
+                  "required": [
+                    "success"
+                  ]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not owner/admin",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/backups/emergency-kit": {
+      "get": {
+        "tags": [
+          "Backups"
+        ],
+        "summary": "The backup encryption key and hub identity, for the printable emergency kit",
+        "responses": {
+          "200": {
+            "description": "Safe to call again later - re-viewing an unchanged key is not the risky action here.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "hubName": {
+                      "type": "string"
+                    },
+                    "hubInstanceId": {
+                      "type": "string"
+                    },
+                    "backupKeyHex": {
+                      "type": "string"
+                    },
+                    "generatedAt": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "hubName",
+                    "hubInstanceId",
+                    "backupKeyHex",
+                    "generatedAt"
+                  ]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Owner only",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/backups/{filename}/restore-person/{personId}": {
+      "post": {
+        "tags": [
+          "Backups"
+        ],
+        "summary": "Restore one person's memories, conversation history and settings from an old backup",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "filename",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "personId",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "What came back.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "memories": {
+                      "type": "number"
+                    },
+                    "conversations": {
+                      "type": "number"
+                    },
+                    "conversationThreads": {
+                      "type": "number"
+                    },
+                    "settings": {
+                      "type": "number"
+                    }
+                  },
+                  "required": [
+                    "memories",
+                    "conversations",
+                    "conversationThreads",
+                    "settings"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The archive is refused, or does not contain this person",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not owner/admin",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such backup, or no such living person",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/repairs": {
       "get": {
         "tags": [

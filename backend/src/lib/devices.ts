@@ -9,6 +9,7 @@ import { db } from "@/db";
 import { devices, deviceTokens } from "@/db/schema";
 import { newDeviceId } from "@/lib/id";
 import { nextHlc } from "@/lib/hlc";
+import { deleteReceivedBackupsForDevice } from "@/lib/receivedBackups";
 
 export type DeviceKind = "robot" | "pod" | "tv" | "phone" | "desktop" | "browser";
 
@@ -84,6 +85,12 @@ export function deleteDevice(id: string, personId: string): boolean {
   const row = db.select({ personId: devices.personId }).from(devices).where(eq(devices.id, id)).get();
   if (!row || row.personId !== personId) return false;
   db.delete(deviceTokens).where(eq(deviceTokens.deviceId, id)).run();
+  // Step 8: received_backups.device_id references this row with no
+  // cascade - a code review (2026-09-06) found the delete below throwing
+  // a foreign-key violation the moment a device that had ever pushed a
+  // backup (POST /api/backups/received) was revoked, since nothing
+  // cleared this table first.
+  deleteReceivedBackupsForDevice(id);
   db.delete(devices).where(eq(devices.id, id)).run();
   return true;
 }

@@ -111,3 +111,9 @@ export function newGrantId(): string {
 export function newApprovalId(): string {
   return `approval-${randomSuffix(10)}`;
 }
+
+// Not a spec-shaped id (received_backups is hub-internal, the same
+// reason scheduledJobs/commands/issues are).
+export function newReceivedBackupId(): string {
+  return `recvbak-${randomSuffix(10)}`;
+}

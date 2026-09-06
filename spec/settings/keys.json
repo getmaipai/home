@@ -298,6 +298,19 @@
     ]
   },
   {
+    "key": "notifications.backups.target_failing.telegram",
+    "scope": "person",
+    "selector": "boolean",
+    "default": false,
+    "label": "Telegram me when backups start failing",
+    "level": "basic",
+    "secret": false,
+    "lives_in": "person.notifications",
+    "honoured_by": [
+      "home"
+    ]
+  },
+  {
     "key": "notifications.model.download_failed.telegram",
     "scope": "person",
     "selector": "boolean",
