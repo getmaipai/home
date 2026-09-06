@@ -1250,3 +1250,90 @@ matching how every other check in this file already visits pages one at
 a time. `bun test` (437 passing), `bunx tsc --noEmit` clean, `lint`
 clean, `scripts/check.sh` green end to end. Ran the code-review skill on
 the full diff before committing.
+
+A code review on this step found more real issues before it was
+committed: `checkKeyboardTrap`'s `MAX_PERIOD` (4) couldn't detect the
+function's own motivating example, a 5-9 element modal trap; raised to
+10, still safely under the nav rail's own ~12-element floor.
+`el.className` is a plain string on an `HTMLElement` but an
+`SVGAnimatedString` object on an SVG element, collapsing every icon
+button's fingerprint to the same useless string - switched to
+`el.getAttribute("class")`, which works uniformly on both. `Shell.tsx`'s
+tooltip called the bare `i18n._()` singleton directly (computed once,
+never updates on a later `activateLocale()`) instead of the reactive
+`<Trans>` its own sibling label uses - fixed via `useLingui()` in the
+calling component. `App.tsx`'s household-locale fetch duplicated
+`useAppearance.ts`/`usePinnedApps.ts`'s own established "fetch scope,
+find key, silently ignore failure" shape instead of reusing it, and
+re-fired on every `[person]` object-identity change (any unrelated
+profile edit), not just the first sign-in - extracted into
+`shell/useHouseholdLocale.ts` matching that precedent, gated on
+`person != null` rather than the object reference. `i18n.ts`'s own
+`SUPPORTED_LOCALES` was a third hand-maintained copy of the same locale
+list already declared in `coreKeys.ts` and `lingui.config.ts` - now
+derived from the `CATALOGS` map instead (two copies is the real floor,
+not three: `lingui.config.ts` genuinely needs its own for extraction
+tooling to run independent of any app code). Added `i18n.test.tsx`, the
+regression test this step's own real production bug (see above) had
+none of - renders `<Trans>`/`i18n._()` through a real `I18nProvider`
+(a throwaway `setupI18n()` instance, not `@/i18n` itself: `bun test`
+has no `.po`-file loader, only Vite does, so importing `@/i18n` would
+fail here for an unrelated reason). Re-verified everything (full
+`bun test`, `tsc`, `lint`, `check.sh`, and an untruncated `bun run a11y`)
+after all of it before committing.
+
+## Step 9: user docs
+
+Nine real pages under `docs/user/`, one per feature Session E actually
+built and can verify works: `getting-started.md` (the setup wizard),
+`home.md`, `chat.md` (folding in Conversations as a short section, not
+its own page - the session plan names "chat and talking to it" as one
+item), `people.md` (People and parental controls), `memory.md`,
+`notifications.md`, `privacy.md`, `settings.md`, `fix-a-problem.md`.
+Written to `docs/STYLE.md`'s tier-1 rules from a cold read of that file
+(grade 6-8, one task per page, "what you see and tap" steps named in
+bold, no route paths or system-internal nouns, no "simply"/"just" -
+checked afterward with a grep across every new page and fixed the two
+real hits), plain Markdown with `title`/`description` front matter so
+it drops into F's Astro Starlight site with no further conversion.
+
+**The session plan's own step 9 list names two things this session
+deliberately did not write pages for**: "the store" and "update."
+Checked first, rather than assuming: grepped for a package-install UI
+(none - `docs/BACKLOG.md`'s own "store host on the hub" item, D's, is
+still open) and for any real update-check/install flow anywhere in the
+app (none exists at all). Writing a user-tier page for either would
+describe a change that never happened, which is the same "docs update
+in the same commit" rule this org holds for the opposite direction (a
+change shipping with stale docs) applied here to the more basic case:
+no docs for a feature with no change to describe yet.
+
+**Every embedded screenshot was opened and looked at before use, not
+assumed correct from its filename** (the org's own hard rule): five
+pages got one (Home, Privacy, Settings, the Users section, Repairs),
+each confirmed showing real content, no spinner, no wrong route.
+Chat, Memory, and Notifications stayed text-only, not from skipping the
+review but because of what that review actually found: Chat's only
+available capture showed the same stub-model weather reply repeated
+four times in a row - a real, already-tracked bug (`WeatherCard` shares
+`POST /api/turn/stream` with real Chat history, so every Home visit
+silently pollutes it, found and documented back in step 5) - and using
+that screenshot in a public-facing doc would have shown it as if it
+were normal chat behavior; Memory and Notifications both only had
+genuinely empty-state captures (a demo household that never
+accumulated either), which `getmaipai/.github/docs/STYLE.md`'s own
+screenshot rule already rules out ("no spinner, skeleton, empty state").
+Regenerated the full screenshot matrix fresh for this step (a separate
+commit from Step 9's own doc content, since it's an unrelated
+byproduct: current post-Step-7/Step-8 app state, not new content) and
+reviewed the hero shot and every embedded page's own source image
+directly before writing the paragraph that cites it, not the other way
+around.
+
+Verified: every new file's word count checked against the tier's own
+~300-word-per-page guidance (all nine land at or near it), every
+embedded image path confirmed to resolve to a real file,
+`bash scripts/check.sh` green (prose lint, PII wordlist, licence check,
+the full frontend suite - none of this step touches frontend code, so
+this is confirming nothing else regressed, not testing the docs
+themselves, which have no automated check of their own content).

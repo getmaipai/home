@@ -1291,6 +1291,39 @@ this file's earlier note), not something to build against today.
       `/setup` redirects to Home before the wizard's own accessibility
       tree can ever be captured; verifying it would need a second,
       unseeded backend run, not done here.
+- [x] **User-tier docs (`docs/user/`), for the screens Session E built,
+      done** (session E step 9, 2026-09-06) - nine pages, one per real,
+      working feature: getting started (the setup wizard), Home, Chat
+      and talking to it (folding in Conversations, a short section
+      rather than its own page), People and parental controls, Memory,
+      Notifications, Privacy, Settings, and Fix a problem. Written to
+      `docs/STYLE.md`'s tier-1 rules (grade 6-8, one task per page,
+      "what you see and tap" steps, no route paths or system-internal
+      nouns as instructions) with plain Markdown front matter (`title`/
+      `description`) so it drops into F's docs site directly. Screenshots
+      embedded only where a real, non-empty state existed to show (five
+      pages: Home, Privacy, Settings, Users, Repairs) - every one opened
+      and looked at before use, per the org's own screenshot rule; the
+      others (Chat, Memory, Notifications) stayed text-only rather than
+      embedding a misleading image, for two different reasons: Chat's
+      only available capture showed the same canned reply repeated four
+      times (the WeatherCard/Chat-history-pollution bug this file already
+      tracks elsewhere, not something to paper over by cropping it out),
+      and Memory/Notifications' captures are both genuinely empty states
+      (a fresh demo household that never accumulated either) - the org's
+      "no spinner, skeleton, empty state" screenshot rule ruled both out,
+      not a shortcut.
+
+      **Deliberately not documented, because neither is built yet**:
+      "the store" (plan 4.10's package-install UI - `docs/BACKLOG.md`'s
+      own "store host on the hub" item is still open) and "update"
+      (no real update-check/install flow exists anywhere in the app -
+      grepped for one, found none). The session plan's own step 9 list
+      named both; writing a user-tier page for a feature nobody can
+      actually use would violate "docs update in the same commit as the
+      change they describe" in the specific direction of describing a
+      change that never happened. Both get their own page once D's store
+      work and a real update flow exist.
 - [ ] Onboarding beyond the one-time initial household setup (M)
 - [x] Accessibility audit (M) - done 2026-09-05, driven against the
       running app at phone and desktop, not read off the source: 142
