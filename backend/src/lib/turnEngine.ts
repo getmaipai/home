@@ -70,6 +70,24 @@ export type TurnFailure = { ok: false; status: 400 | 503; code: "unsupported_sur
 
 export type TurnOpResult = { ok: true; value: TurnValue } | TurnFailure;
 
+/** Shared by runTurn() and runTurnStream() (a review, 2026-09-06, found
+ * this exact trio of checks copy-pasted between them - the same
+ * duplication class this file's own notifyIfFlagged() extraction just
+ * fixed for the notify_parent blocks). Both callers' own failure shape is
+ * this identical TurnFailure, so one function serves either. */
+function validateTurnInput(surface: Surface, text: string): TurnFailure | null {
+  if (!IMPLEMENTED_SURFACES.has(surface)) {
+    return { ok: false, status: 400, code: "unsupported_surface", error: `the ${surface} surface is not implemented on this host build yet (4.5)` };
+  }
+  if (typeof text !== "string" || text.trim().length === 0) {
+    return { ok: false, status: 400, code: "invalid_input", error: "text is required" };
+  }
+  if (text.length > MAX_TURN_TEXT_LENGTH) {
+    return { ok: false, status: 400, code: "invalid_input", error: `text must be ${MAX_TURN_TEXT_LENGTH} characters or fewer` };
+  }
+  return null;
+}
+
 /** logTurn (conversationHistory.ts) is a real DB write, so it can fail on
  * its own (disk pressure, a lock) even after a completely correct
  * generation. A code review (2026-09-04) found every real caller below
@@ -1202,20 +1220,8 @@ export async function runTurn(
   text: string,
   opts: { thinking?: boolean; conversationId?: string } = {},
 ): Promise<TurnOpResult> {
-  if (!IMPLEMENTED_SURFACES.has(surface)) {
-    return {
-      ok: false,
-      status: 400,
-      code: "unsupported_surface",
-      error: `the ${surface} surface is not implemented on this host build yet (4.5)`,
-    };
-  }
-  if (typeof text !== "string" || text.trim().length === 0) {
-    return { ok: false, status: 400, code: "invalid_input", error: "text is required" };
-  }
-  if (text.length > MAX_TURN_TEXT_LENGTH) {
-    return { ok: false, status: 400, code: "invalid_input", error: `text must be ${MAX_TURN_TEXT_LENGTH} characters or fewer` };
-  }
+  const invalid = validateTurnInput(surface, text);
+  if (invalid) return invalid;
 
   // Resolved before prepareTurn() runs (step 3's contract: "conversation_id
   // absent means the actor's open conversation for that surface, created
@@ -1483,20 +1489,8 @@ export async function runTurnStream(
   text: string,
   opts: { thinking?: boolean; conversationId?: string } = {},
 ): Promise<TurnStreamResult> {
-  if (!IMPLEMENTED_SURFACES.has(surface)) {
-    return {
-      ok: false,
-      status: 400,
-      code: "unsupported_surface",
-      error: `the ${surface} surface is not implemented on this host build yet (4.5)`,
-    };
-  }
-  if (typeof text !== "string" || text.trim().length === 0) {
-    return { ok: false, status: 400, code: "invalid_input", error: "text is required" };
-  }
-  if (text.length > MAX_TURN_TEXT_LENGTH) {
-    return { ok: false, status: 400, code: "invalid_input", error: `text must be ${MAX_TURN_TEXT_LENGTH} characters or fewer` };
-  }
+  const invalid = validateTurnInput(surface, text);
+  if (invalid) return invalid;
 
   const conversationResult = resolveOrCreateConversation(actor, surface, opts.conversationId);
   if (!conversationResult.ok) {

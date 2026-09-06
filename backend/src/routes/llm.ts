@@ -55,6 +55,27 @@ export function clampMaxTokens(requested: number | undefined): number {
   return Math.min(requested, MAX_CHAT_TOKENS);
 }
 
+/** Shared by /chat's messages[] and /embed's texts[] (a review, 2026-09-06,
+ * found the count-cap-plus-per-item-length-cap shape copy-pasted between
+ * them with different constant names): `null` means within bounds,
+ * otherwise the exact error string+code pair the route should 400 with.
+ * `texts` is already the plain strings to measure - each route extracts
+ * its own item's text (a message's `.content`, or the text itself) before
+ * calling this, since the two shapes otherwise have nothing in common. */
+function boundsError(
+  itemCount: number,
+  maxCount: number,
+  texts: readonly (string | undefined)[],
+  maxChars: number,
+  itemNoun: string,
+): { error: string; code: "invalid_input" } | null {
+  if (itemCount > maxCount) return { error: `${itemNoun} must be ${maxCount} or fewer`, code: "invalid_input" };
+  if (texts.some((t) => typeof t === "string" && t.length > maxChars)) {
+    return { error: `each entry in ${itemNoun} must be ${maxChars} characters or fewer`, code: "invalid_input" };
+  }
+  return null;
+}
+
 llmRoutes.post("/chat", requireRole("owner", "admin"), bodyLimit({ maxSize: 256 * 1024 }), async (c) => {
   const actor = c.get("person");
   if (!personWithinTurnBudget(actor.id)) {
@@ -67,14 +88,8 @@ llmRoutes.post("/chat", requireRole("owner", "admin"), bodyLimit({ maxSize: 256 
     max_tokens?: number;
   };
   const messages = Array.isArray(body.messages) ? body.messages : [];
-  if (messages.length > MAX_CHAT_MESSAGES) {
-    return c.json({ error: `messages must be ${MAX_CHAT_MESSAGES} or fewer`, code: "invalid_input" }, 400);
-  }
-  for (const message of messages) {
-    if (message && typeof message.content === "string" && message.content.length > MAX_CHAT_MESSAGE_CHARS) {
-      return c.json({ error: `each message's content must be ${MAX_CHAT_MESSAGE_CHARS} characters or fewer`, code: "invalid_input" }, 400);
-    }
-  }
+  const messagesBoundsError = boundsError(messages.length, MAX_CHAT_MESSAGES, messages.map((m) => m?.content), MAX_CHAT_MESSAGE_CHARS, "messages");
+  if (messagesBoundsError) return c.json(messagesBoundsError, 400);
   const role = (body.role ?? "chat") as LlmRole;
   const band = speakerAgeBand(actor, new Date());
   // Every message's content, regardless of role - the floor categories
@@ -121,12 +136,8 @@ llmRoutes.post("/embed", requireRole("owner", "admin"), bodyLimit({ maxSize: 256
   }
   const body = (await c.req.json().catch(() => ({}))) as { texts?: string[] };
   const texts = Array.isArray(body.texts) ? body.texts : [];
-  if (texts.length > MAX_EMBED_TEXTS) {
-    return c.json({ error: `texts must be ${MAX_EMBED_TEXTS} or fewer`, code: "invalid_input" }, 400);
-  }
-  if (texts.some((t) => typeof t === "string" && t.length > MAX_EMBED_TEXT_CHARS)) {
-    return c.json({ error: `each text must be ${MAX_EMBED_TEXT_CHARS} characters or fewer`, code: "invalid_input" }, 400);
-  }
+  const textsBoundsError = boundsError(texts.length, MAX_EMBED_TEXTS, texts, MAX_EMBED_TEXT_CHARS, "texts");
+  if (textsBoundsError) return c.json(textsBoundsError, 400);
   const result = await embed(texts);
   if (!result.ok) {
     return c.json({ error: result.error, code: result.code }, result.status);
