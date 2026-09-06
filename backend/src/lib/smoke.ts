@@ -161,11 +161,27 @@ async function runRecipeFixtureSmoke(id: string, fixturePath: string): Promise<S
 // Deno resolver limitation with versioned npm subpath specifiers
 // (`npm:@modelcontextprotocol/sdk@1.30.0/server/mcp.js`) that only
 // affects the type-checking pass, not execution.
-async function runDenoTestSmoke(id: string): Promise<SmokeResult> {
-  const dir = join(PACKAGES_DIR, id);
+// COR-2 (code review, 2026-09-06): this had no timeout at all - a Tier 1
+// package's own deno_test hanging (at boot, via runAllSmokeTests(), or on
+// the daily packages.smoke core job) used to hang whichever caller
+// awaited this forever, right along with it (the core job case doubles
+// as scheduler.ts's own COR-2 fix - a timeout here means that job can
+// itself eventually time out instead of wedging the scheduler). Bun's
+// own `timeout` spawn option (ms) sends `killSignal` (SIGTERM, the
+// default) once exceeded - exitCode is then non-zero, so this reports as
+// an ordinary smoke failure, not a special case.
+const DENO_TEST_TIMEOUT_MS = 60_000;
+
+// Takes `dir` directly, not a package id (a review, 2026-09-06, needed
+// this to write a real timeout test against a disposable temp directory
+// - the exact same "never a real bundled package under PACKAGES_DIR"
+// posture lib/denoHost.ts's own real-spawn permission tests already take,
+// denoHost.test.ts's own header explains why).
+export async function runDenoTestSmoke(dir: string, timeoutMs: number = DENO_TEST_TIMEOUT_MS): Promise<SmokeResult> {
   const proc = Bun.spawn(["deno", "test", "--no-check", `--allow-read=${dir}`, "--cached-only", dir], {
     stdout: "pipe",
     stderr: "pipe",
+    timeout: timeoutMs,
   });
   const [stdout, stderr, exitCode] = await Promise.all([
     new Response(proc.stdout).text(),
@@ -173,6 +189,9 @@ async function runDenoTestSmoke(id: string): Promise<SmokeResult> {
     proc.exited,
   ]);
   if (exitCode === 0) return { ok: true, message: "deno test passed" };
+  if (proc.signalCode) {
+    return { ok: false, message: `deno test timed out after ${timeoutMs}ms and was killed (${proc.signalCode})` };
+  }
   return { ok: false, message: `deno test failed (exit ${exitCode}): ${(stderr || stdout).slice(0, 500)}` };
 }
 
@@ -224,7 +243,7 @@ export async function runSmoke(id: string): Promise<SmokeResult> {
   }
 
   if (smoke.kind === "deno_test") {
-    return recordResult(id, await runDenoTestSmoke(id));
+    return recordResult(id, await runDenoTestSmoke(join(PACKAGES_DIR, id)));
   }
 
   return recordResult(id, { ok: false, message: `unrecognized smoke.kind: ${smoke.kind}` });

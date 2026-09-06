@@ -145,4 +145,114 @@ describe("LlamaServerClient against the stub server", () => {
       server.stop(true);
     }
   });
+
+  // COR-2 (code review, 2026-09-06): neither call had any timeout - a
+  // wedged llama-server meant these waited forever, which meant the
+  // scheduler's own per-tick in-flight guard (backend/src/lib/
+  // scheduler.ts) never freed up either. Uses a tiny overridden timeout
+  // (the constructor's own opts, not the real 120s/30s defaults) so this
+  // proves the behavior in milliseconds, not by waiting out the default.
+  describe("timeouts", () => {
+    function neverRespondingServer() {
+      return Bun.serve({ port: 0, fetch: () => new Promise<Response>(() => {}) });
+    }
+
+    test("chatComplete times out rather than hanging forever", async () => {
+      const server = neverRespondingServer();
+      try {
+        const client = new LlamaServerClient(`http://127.0.0.1:${server.port}`, { chatTimeoutMs: 50 });
+        await expect(client.chatComplete({ model: "chat", messages: [{ role: "user", content: "hi" }] })).rejects.toThrow(/timed out/);
+      } finally {
+        server.stop(true);
+      }
+    });
+
+    test("embed times out rather than hanging forever", async () => {
+      const server = neverRespondingServer();
+      try {
+        const client = new LlamaServerClient(`http://127.0.0.1:${server.port}`, { embedTimeoutMs: 50 });
+        await expect(client.embed({ model: "embed", input: ["hi"] })).rejects.toThrow(/timed out/);
+      } finally {
+        server.stop(true);
+      }
+    });
+
+    test("a fast server well under the timeout is unaffected", async () => {
+      handle = startStubLlmServer();
+      const client = new LlamaServerClient(handle.url, { chatTimeoutMs: 50, embedTimeoutMs: 50 });
+      const response = await client.chatComplete({ model: "chat", messages: [{ role: "user", content: "hi" }] });
+      expect(response.choices.length).toBeGreaterThan(0);
+    });
+
+    // A review, 2026-09-06, found chatCompleteStream() was the one method
+    // on this client still missing a timeout after its two siblings got
+    // one - the streaming path a live conversation turn actually uses.
+    test("chatCompleteStream times out rather than hanging forever", async () => {
+      const server = neverRespondingServer();
+      try {
+        const client = new LlamaServerClient(`http://127.0.0.1:${server.port}`, { chatTimeoutMs: 50 });
+        const drain = async () => {
+          for await (const _ of client.chatCompleteStream({ model: "chat", messages: [{ role: "user", content: "hi" }] })) {
+            // never reached - the server never responds at all
+          }
+        };
+        await expect(drain()).rejects.toThrow(LlmClientError);
+      } finally {
+        server.stop(true);
+      }
+    });
+
+    // A second review pass found the first fix used a flat deadline (the
+    // same shape chatComplete()/embed() correctly use for a single
+    // request/response) rather than an idle timeout - verified this
+    // proves the distinction: total stream time here (three ~80ms gaps)
+    // comfortably exceeds the 150ms budget, but no SINGLE gap does, so
+    // only a real idle timeout (reset on each chunk received) lets it
+    // finish; a flat deadline would abort mid-stream around the 150ms
+    // mark.
+    test("a slow-but-actively-streaming reply survives well past a single flat timeout window", async () => {
+      const words = ["hello", "there", "friend"];
+      const server = Bun.serve({
+        port: 0,
+        fetch: () => {
+          const encoder = new TextEncoder();
+          const body = new ReadableStream<Uint8Array>({
+            async start(controller) {
+              for (const word of words) {
+                await new Promise((resolve) => setTimeout(resolve, 80));
+                controller.enqueue(
+                  encoder.encode(
+                    `data: ${JSON.stringify({ id: "x", model: "chat", choices: [{ index: 0, delta: { content: word }, finish_reason: null }] })}\n\n`,
+                  ),
+                );
+              }
+              controller.enqueue(encoder.encode("data: [DONE]\n\n"));
+              controller.close();
+            },
+          });
+          return new Response(body, { headers: { "content-type": "text/event-stream" } });
+        },
+      });
+      try {
+        const client = new LlamaServerClient(`http://127.0.0.1:${server.port}`, { chatTimeoutMs: 150 });
+        const deltas: string[] = [];
+        for await (const delta of client.chatCompleteStream({ model: "chat", messages: [{ role: "user", content: "hi" }] })) {
+          deltas.push(delta);
+        }
+        expect(deltas).toEqual(words);
+      } finally {
+        server.stop(true);
+      }
+    }, 15_000);
+
+    test("a fast streaming server well under the timeout is unaffected", async () => {
+      handle = startStubLlmServer();
+      const client = new LlamaServerClient(handle.url, { chatTimeoutMs: 50 });
+      const deltas: string[] = [];
+      for await (const delta of client.chatCompleteStream({ model: "chat", messages: [{ role: "user", content: "hi" }] })) {
+        deltas.push(delta);
+      }
+      expect(deltas.length).toBeGreaterThan(0);
+    });
+  });
 });

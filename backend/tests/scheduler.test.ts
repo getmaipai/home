@@ -8,6 +8,7 @@ import { db } from "@/db";
 import { people, scheduledJobs, pendingEmbeddings, memoryEmbeddings } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { remember } from "@/lib/memory";
+import { listIssues } from "@/lib/issues";
 
 beforeEach(() => {
   resetDb();
@@ -277,6 +278,80 @@ describe("runDueJobs", () => {
 
     const row = db.select().from(scheduledJobs).where(eq(scheduledJobs.id, scheduled.value.id)).get()!;
     expect(row.status).toBe("done"); // not somehow re-queued by the second, overlapping call
+  });
+});
+
+function insertHangingCoreJob(id: string, job: string): void {
+  db.insert(scheduledJobs)
+    .values({
+      id,
+      kind: "core",
+      packageId: "core",
+      job,
+      inputs: "{}",
+      when: "every:1d",
+      recurring: true,
+      nextRunAt: new Date(0).toISOString(),
+      status: "pending",
+      createdAt: new Date().toISOString(),
+    })
+    .run();
+}
+
+// COR-2 (code review, 2026-09-06): one hung job used to wedge this
+// file's own single `inFlight` promise forever - every OTHER due job
+// silently never ran again until the process restarted, with nothing
+// raising a Repairs issue for it. `jobTimeoutMs` (runDueJobs' own 4th
+// param, defaulting to the real 120s budget every other test in this
+// file relies on implicitly) lets these prove the fix in milliseconds.
+describe("runDueJobs timeouts (COR-2)", () => {
+  test("a hung core job times out instead of wedging every other due job", async () => {
+    ensureCoreJob("memory.maintenance", "every:1d");
+    db.update(scheduledJobs).set({ nextRunAt: new Date(0).toISOString() }).run();
+    insertHangingCoreJob("job-hangs", "test.hangs");
+
+    const result = await runDueJobs(runPlugin, new Date(), { "test.hangs": () => new Promise(() => {}) }, 50);
+    expect(result.ran).toBe(1); // memory.maintenance still ran
+    expect(result.errors).toBe(1); // the hung one counted as a failure, not a wedge
+
+    const hungRow = db.select().from(scheduledJobs).where(eq(scheduledJobs.id, "job-hangs")).get()!;
+    expect(hungRow.lastError).toContain("exceeded its");
+
+    const issue = listIssues().find((i) => i.source === "scheduler" && i.key === "test.hangs");
+    expect(issue).toBeDefined();
+    expect(issue?.severity).toBe("error");
+  });
+
+  test("a hung plugin job also times out and is attributed by package id, not just job label", async () => {
+    const { row: ownerRow } = await owner();
+    const scheduled = scheduleJob(ownerRow, "remember", "remember", "2099-01-01T00:00:00.000Z", { fact: "x" });
+    if (!scheduled.ok) throw new Error("setup failed");
+    db.update(scheduledJobs).set({ nextRunAt: new Date(0).toISOString() }).where(eq(scheduledJobs.id, scheduled.value.id)).run();
+
+    const neverResolves = () => new Promise<Awaited<ReturnType<typeof runPlugin>>>(() => {});
+    const result = await runDueJobs(neverResolves, new Date(), {}, 50);
+    expect(result.ran).toBe(0);
+    expect(result.errors).toBe(1);
+
+    const issue = listIssues().find((i) => i.source === "scheduler" && i.key === "remember:remember");
+    expect(issue).toBeDefined();
+  });
+
+  test("a job that later succeeds resolves the previously-raised timeout issue", async () => {
+    insertHangingCoreJob("job-flaky", "test.flaky");
+    await runDueJobs(runPlugin, new Date(), { "test.flaky": () => new Promise(() => {}) }, 50);
+    expect(listIssues().find((i) => i.source === "scheduler" && i.key === "test.flaky")).toBeDefined();
+
+    db.update(scheduledJobs).set({ nextRunAt: new Date(0).toISOString() }).where(eq(scheduledJobs.id, "job-flaky")).run();
+    await runDueJobs(runPlugin, new Date(), { "test.flaky": () => {} }, 50);
+    expect(listIssues().find((i) => i.source === "scheduler" && i.key === "test.flaky")).toBeUndefined();
+  });
+
+  test("a job that finishes comfortably inside its budget is unaffected", async () => {
+    insertHangingCoreJob("job-fast", "test.fast");
+    const result = await runDueJobs(runPlugin, new Date(), { "test.fast": () => {} }, 5_000);
+    expect(result.ran).toBe(1);
+    expect(result.errors).toBe(0);
   });
 });
 
