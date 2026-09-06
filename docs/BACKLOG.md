@@ -1259,6 +1259,169 @@ otherwise be lost with the mirror.
   (LICENSE/NOTICE/README, standards pin).
 - **`go`** (Apple TV/iPhone client) - marketing copy only, no real app yet.
 
+## Wave 2 additions (2026-09-06)
+
+Jesse asked for the backlog to be filled out to "a fully working app" and
+split into four sessions that never collide. The split is in
+`docs/plans/wave-2.md` (ownership, shared-file protocol, contracts) and
+one work order per session (`session-c-brain-and-voice.md`,
+`session-d-packages-and-store.md`, `session-e-ui-and-docs.md`,
+`session-f-platform-and-trust.md`). This section lists only what the
+2026-09-06 review found missing from this file; everything already
+listed above is assigned in the plans, not repeated here. The review
+read the platform plan's chapters 4, 5, 7, 12 and 13 against the code
+on `main` plus the Wave 1 worktrees, the org standards, and the legacy
+mirror's module list and header comments. Each item names the session
+that owns it.
+
+**First run and the household lifecycle**
+
+- [ ] **The first-run wizard, end to end** (M, E for the screens, F for
+      the routes) - plan 12 in full: language, locale and time zone,
+      household name; the owner with a passkey or password; the
+      AI-outputs disclaimer and the one-time adult acknowledgment; hardware
+      detection and the model set that fits, with the first download's
+      size and time shown; "trust this hub"; the default package set;
+      Tailscale as an optional step; the emergency kit shown once; a
+      backup target; done with "what to try"; restore always the second
+      screen. Only `POST /api/auth/setup` (the owner) exists today. Legacy
+      `SetupWizard.tsx` had welcome, profile, PIN, consent, area,
+      components and download steps; its consent step (uncensored,
+      internet, companions, liability) is superseded by the org's
+      acknowledgment and privacy rules, kept as a reference only.
+- [ ] **A family member joins, a kid profile, a guest** (S-M, E and F) -
+      the QR from the admin's screen carrying the address and the CA, the
+      picker, PIN or passkey; birthdate in, band out, presets shown to
+      the parent with what they will see; a guest with an expiry and no
+      memory (plan 12, 7.4).
+- [ ] **Lifecycle events** (S-M, F) - `enabled` on Person, guest expiry
+      removal, memorialise (read-only profile, PIN cleared, sessions
+      revoked, export offered), the band change on a birthday with a
+      passive notification to parents (plan 7.4). None exist.
+- [ ] **Sessions per device with revoke, optional TOTP for owner and
+      admin** (S-M, F) - plan 4.1; the identity slice deferred both.
+- [ ] **Time allowances and schedules per category** (M, F backend, E
+      controls page) - plan 4.2 names them as household settings enforced
+      in the turn engine and package host; nothing exists.
+
+**Health, updates, storage, install**
+
+- [ ] **The sidecar contract** (M, F) - plan 4.12: one supervisor for
+      llama-server, the voice programs, SearXNG and later Kiwix and
+      ComfyUI, with declared startup order, health URL, ports, mounts,
+      backup mode and exclude patterns. Today `llmSupervisor.ts`,
+      `embedSupervisor.ts` and `ttsSupervisor.ts` are three copies of the
+      same shape.
+- [ ] **Storage: layout, quotas, disk-full policy, NAS mounts** (M, F) -
+      plan 4.15's `data/` layout, per-person quotas, caches-first
+      eviction then a Repairs item, media libraries as declared mount
+      points; a Storage page (E). Only "storage locations" appears above,
+      as a legacy feature awaiting a verdict.
+- [ ] **Uninstall, factory reset, hub migration, two hubs** (S-M, F) -
+      plan 4.15; none exist. Migration keeps the instance id and CA so
+      pinned clients survive; two hubs are two instance ids and a client
+      remembers its choice.
+- [ ] **Redacted diagnostics with a `TO_REDACT` list in the spec** (S,
+      F) - plan 4.13; a test that no secret, address or family name
+      survives the download.
+- [ ] **Service install and the one-line installer** (M, F) - a Windows
+      service, launchd, systemd, the GPU power ordering legacy `run.ps1`
+      learned, port-conflict detection; `install.sh`/`install.ps1`
+      checking out the latest tag, never `main` (legacy had both under
+      `docs/public/`).
+- [ ] **The Windows self-update rules as tests** (S, F, with self-update)
+      - Defender holds `dist/` handles past 3 s; untracked files are not
+      dirty; an unresolvable upstream never reads "up to date". Listed
+      above under "Lessons to record"; now a build item, not a note.
+- [ ] **Performance budgets measured** (S-M, F) - ENGINEERING.md names
+      budgets and plan 4.11 says the archived latency numbers gate the
+      first release (legacy `chat-latency.md`: 200 to 900 ms warm first
+      token after six fixes, each documented); no bench measures first
+      token, page open or cold start here.
+- [ ] **Web push as a notification channel** (S-M, F backend, E opt-in)
+      - the PWA exists after Wave 1, so the "no such clients yet" note
+      above no longer holds; legacy `push.ts` (VAPID keys generated once,
+      never a manual step) is the reference.
+- [ ] **A `Device` record** (S spec, F) - plan 7.1's device kind, name,
+      area, capabilities, token, watermarks; needed by device tokens and
+      Quick Connect now and by the link later. `deviceId.ts` is a plain
+      file stand-in.
+
+**Packages**
+
+- [ ] **The Tier 1 host under Deno, and the MCP spike** (M-L, D) - Hub
+      v0.1 scope ("the Deno process host and the MCP spike"); not a line
+      of it exists, so no code package can run. The knowledge lookup is
+      the first Tier 1 package, proving the sandbox.
+- [ ] **The store host on the hub** (M-L, D) - plan 4.10: install from
+      the signed index, verify twice, unpack per version, smoke before
+      enable, per-package channel, rollback, the permission prompt, the
+      tamper suite. The item above ("catalog browsing and install")
+      covers only the page.
+- [ ] **The catalog tooling and the signed index** (M, D) - lint, pack,
+      sign, index, scorecard, the `check` CLI, TUF-shaped root, targets
+      and timestamp, the second signer, the public CI; the catalog repo
+      has none of it. The bundled default set moves there and `home`
+      keeps a signed copy.
+- [ ] **`ask` continuation, `confirm`, `end_conversation` from a result**
+      (S-M, D produces, C consumes) - `result.schema.json` has them;
+      `runRecipe` never sets `ask`, and the turn engine reads none of
+      them. A lookup cannot ask "which Springfield" deterministically.
+- [ ] **Consequential packages need a confirmation at run time** (S, C)
+      - `consequential: true` exists in the manifest and raises nothing;
+      the security-domain check happens at command creation only.
+- [ ] **A `compute` recipe step** (S, D, both interpreters) - math and
+      unit conversion need no network; a safe expression library beats a
+      model doing arithmetic.
+- [ ] **Audit `host.*` against plan 4.9** (S, D) - `host.log`,
+      `host.config.get`, `host.data.forget`, `host.diagnostics` and the
+      emulator twins are missing or unverified.
+- [ ] **Package-declared notification types** (S, D and F) - the
+      manifest's `notifications[]` is read by nothing (noted above under
+      the notification system, now assigned).
+- [ ] **Almanac: date, time, holidays, moon phase, on-this-day as one
+      package** (S, D) - legacy shipped five tools for this.
+- [ ] **The speech lint on every package `speech` string** (S, C
+      defines, D runs) - `PACKAGES.md` requires it; nothing checks
+      `speech` templates for the housemate test's mechanical half.
+
+**Intelligence and voice**
+
+- [ ] **A naturalness bench** (S-M, C) - plan 4.5's paired robotic and
+      natural phrasings corpus scoring a model and prompt before it
+      becomes a default; the framing example pairs (time as a fragment,
+      yes/no as a fragment, a list as a sentence) joining the stable
+      prefix. Neither exists.
+- [ ] **Spoken numbers by library, in both languages** (S, C) -
+      `normalizeForSpeech.ts` hand-rolls `numberToWords` (principle 6 says
+      a library: `to-words` on the hub, `num2words` on the robot, licences
+      checked), with the clock-time and unit ruleset beside it and one
+      fixture set for both; the Python twin does not exist.
+- [ ] **STT on the hub** (M, C) - no STT engine, route or session exists;
+      push-to-talk (listed above under Chat surface) is blocked on it.
+      sherpa-onnx with Moonshine is the robot's choice and should be the
+      hub's too (one runtime, both products).
+- [ ] **Import from the legacy hub** (M, C) - Hub v0.2 scope: people,
+      memories and conversations from the legacy data directory into
+      spec-shaped records with provenance, run once, dry run first,
+      backup required. Without it the family starts from zero.
+- [ ] **Routing embeddings persisted per package** (S, C, with Tier 1) -
+      re-embed only when an example changes; a cold boot must not
+      re-embed sixty packages.
+
+**Deferred to Wave 3, recorded so it is not lost**
+
+- The link transport, the oplog and sync engine, pairing over the
+  network, the Python ports of the memory store, the Robots page: one
+  session after the four merge, because it touches every record table.
+  Wave 2 lays what it needs (Device, device tokens, Quick Connect, HLC
+  everywhere, the never-sync allowlist as a spec test).
+- Media: the player runtime (plan 4.8), Videos, Music and Podcasts
+  rebuilt after their verdicts, the wall and budget layer before the
+  first of them. Hub v0.2 scope; the lookups ship first by the rule at
+  the top of this file.
+- Generation (image, video), the Desktop shell, pods on ESPHome, Go.
+
 ## How to use this file
 
 - Check an item off only when it's shipped and verified (per
