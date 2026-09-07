@@ -34,7 +34,7 @@ import {
   type PendingAsk,
 } from "@/lib/conversationHistory";
 import { pickRefusalVariant, varyKnownConstant } from "@/lib/replyVariation";
-import { markTurnStarted } from "@/lib/turnActivity";
+import { markTurnStarted, DEFAULT_IDLE_WINDOW_MS } from "@/lib/turnActivity";
 import { normalizeForSpeech } from "@maipai/spec/voice/ts/normalizeForSpeech.js";
 import { nextSentenceBoundary } from "@maipai/spec/safety/ts/sentenceChunker.js";
 import { getPersonSettingValue, getHouseholdSettingValue } from "@/lib/settings";
@@ -111,9 +111,68 @@ function logTurnSafely(actor: PersonRow, surface: Surface, userText: string, val
   // Never awaited and never allowed to affect the turn's own outcome,
   // the same posture safety.flagged_turn's notification already takes
   // just above prepareTurn() in this file.
-  maybeRefreshConversationSummary(value.conversation_id).catch((err: unknown) =>
-    console.error(`[turn] conversation summary refresh failed: ${(err as Error).message}`),
-  );
+  //
+  // Issue #45: unlike memoryJudge.ts's scheduler-tick jobs, this can't
+  // just check turnActiveWithin() and skip - it only ever runs INLINE,
+  // right after the very turn that would make that check true, so a
+  // naive gate would permanently disable the feature. Delayed instead,
+  // via a real per-conversation debounce (a code review of the first cut
+  // found it scheduling one independent setTimeout per turn instead -
+  // a chatty burst left N live timers instead of one, and comparing
+  // against turnActiveWithin()'s own shared timestamp at fire time had a
+  // real boundary case where a newer turn starting at exactly the
+  // scheduled instant wasn't detected as newer): scheduleSummaryRefresh()
+  // below cancels any still-pending timer for this conversation before
+  // scheduling a fresh one, so only the LAST turn in a burst ever has a
+  // timer survive to fire - no activity check needed at fire time, since
+  // cancellation already guarantees nothing newer exists by construction.
+  scheduleSummaryRefresh(value.conversation_id);
+}
+
+// One pending timer per conversation, not one per turn - see
+// logTurnSafely()'s own comment for the bug this fixes. Exported only for
+// __clearPendingSummaryRefreshesForTests() below.
+const pendingSummaryRefreshes = new Map<string, ReturnType<typeof setTimeout>>();
+
+function scheduleSummaryRefresh(conversationId: string): void {
+  const existing = pendingSummaryRefreshes.get(conversationId);
+  if (existing) clearTimeout(existing);
+  const timer = setTimeout(() => {
+    pendingSummaryRefreshes.delete(conversationId);
+    maybeRefreshConversationSummary(conversationId).catch((err: unknown) =>
+      console.error(`[turn] conversation summary refresh failed: ${(err as Error).message}`),
+    );
+  }, summaryRefreshDelayMs);
+  pendingSummaryRefreshes.set(conversationId, timer);
+}
+
+// Test-only override for the debounce delay above - a real setTimeout()
+// proves the actual cascade (a newer turn cancels an older turn's own
+// pending timer) deterministically and fast, the same "real timer, sped
+// way up" shape lib/sidecars.ts's __setSidecarTimingForTestsOnly()
+// already uses, rather than mocking setTimeout itself or waiting out the
+// real 20s.
+let summaryRefreshDelayMs: number = DEFAULT_IDLE_WINDOW_MS;
+export function __setSummaryRefreshDelayForTests(ms: number | null): void {
+  summaryRefreshDelayMs = ms ?? DEFAULT_IDLE_WINDOW_MS;
+}
+
+/** Test-only: cancels every pending debounced summary-refresh timer
+ * without letting it fire. A code review found every test file calling
+ * runTurn() (memoryJudge.test.ts, notifications.test.ts, safety.test.ts,
+ * tier2.test.ts, turnEngine.test.ts itself, and more) leaves one of these
+ * timers outstanding at DEFAULT_IDLE_WINDOW_MS (20s) - most test files
+ * finish well before that, so the timer fires later, against whatever the
+ * NEXT test's resetDb() has already replaced the database with (a
+ * different conversationId - maybeRefreshConversationSummary()'s own
+ * not-found guard makes this harmless today, but it is still real
+ * background work racing against unrelated tests for no reason). Wired
+ * into resetDb() (tests/reset-db.ts) rather than into every individual
+ * test file, so every file already calling resetDb() in its own
+ * beforeEach gets this for free. */
+export function __clearPendingSummaryRefreshesForTests(): void {
+  for (const timer of pendingSummaryRefreshes.values()) clearTimeout(timer);
+  pendingSummaryRefreshes.clear();
 }
 
 const CRISIS_RESOURCES_TEXT =
@@ -442,6 +501,30 @@ function companionReanchorLine(persona: Persona): string {
 // companion state beyond what step 8 will add; context needs the
 // ambient-context wiring the robot side already has but the hub
 // doesn't yet - both real gaps, not silently skipped.
+/** The stable-prefix half of buildSystemPrompt() below (step 4:
+ * "identity and companion, information policy, standing skills") -
+ * factored out (issue #15, session-f-platform-and-trust.md step 3) so a
+ * FUTURE engine warm-up in llmSupervisor.ts can prime a freshly-spawned
+ * chat backend's prefix cache with EXACTLY what a real turn will send.
+ * No warm-up call site exists yet (that's Session F's own separate,
+ * not-yet-built step - this issue's own scope was only the export and
+ * the drift test below, "not blocking Session F's other step 3 work,
+ * which proceeds without this piece until it lands"). Archived legacy's
+ * own chat-latency numbers (200-900ms first-token warm) depend on the
+ * prefix cache actually hitting once that warm-up exists, which needs
+ * byte-for-byte identity between the warm-up call and the real one - any
+ * drift (a plugins-list change, a companion-section edit) would silently
+ * reintroduce a cold prefix on every real turn. Called by
+ * buildSystemPrompt() itself below, never reimplemented, so the two can
+ * never drift apart by construction whenever that warm-up does land. */
+export function buildStablePrefix(persona: Persona = DEFAULT_PERSONA, loaded: LoadedManifest[] = loadAllManifests()): string {
+  const companionSection = capSection(composePersonaPrompt(persona), MAX_COMPANION_SECTION_CHARS);
+  const rulesSection = capSection(INFORMATION_HANDLING_POLICY, MAX_RULES_SECTION_CHARS);
+  const naturalnessSection = capSection(NATURALNESS_POLICY, MAX_NATURALNESS_SECTION_CHARS);
+  const pluginsSection = capSection(pluginsListLine(loaded), MAX_PLUGINS_SECTION_CHARS);
+  return `${identityLine(persona)} ${STABLE_SYSTEM_SUFFIX} ${companionSection} ${rulesSection} ${naturalnessSection}${pluginsSection}`;
+}
+
 export function buildSystemPrompt(
   actor: PersonRow,
   text: string,
@@ -460,11 +543,7 @@ export function buildSystemPrompt(
 
   // ── Stable prefix (step 4: "identity and companion, information
   // policy, standing skills") ──
-  const companionSection = capSection(composePersonaPrompt(persona), MAX_COMPANION_SECTION_CHARS);
-  const rulesSection = capSection(INFORMATION_HANDLING_POLICY, MAX_RULES_SECTION_CHARS);
-  const naturalnessSection = capSection(NATURALNESS_POLICY, MAX_NATURALNESS_SECTION_CHARS);
-  const pluginsSection = capSection(pluginsListLine(loaded), MAX_PLUGINS_SECTION_CHARS);
-  const stablePrefix = `${identityLine(persona)} ${STABLE_SYSTEM_SUFFIX} ${companionSection} ${rulesSection} ${naturalnessSection}${pluginsSection}`;
+  const stablePrefix = buildStablePrefix(persona, loaded);
 
   // ── Volatile zone (step 4: "household, speaker, memory, summary, time
   // last"; matched skills sit here too - utterance-dependent, so never

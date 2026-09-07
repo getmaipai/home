@@ -2951,19 +2951,23 @@ it stays visible on the dashboard, not just in the tracker.
       No migration path was added for already-existing secret-free adult
       profiles in a running household - not yet a real-world concern
       pre-0.x, worth a BACKLOG item if it becomes one after release.
-- [ ] **Background LLM work has no idle gate against foreground turns**
-      (S, `getmaipai/home#45`) - `conversationHistory.ts`'s
-      `maybeRefreshConversationSummary()` runs post-turn with no check
-      for whether the household is mid-conversation right now, so a
-      summary refresh can start generating on the shared chat engine
-      slot just as someone sends their next message, queuing it behind
-      a background job. Mirror the idle-gate shape already used
-      elsewhere for background jobs sharing the same engine (see
-      `docs/dev.md`'s notes on the chat engine's single generation
-      slot). Acceptance: a foreground turn never waits behind a summary
-      refresh that could have been delayed. Exit check: a regression
-      test proving a summary refresh yields to an in-flight foreground
-      turn.
+- [x] **Background LLM work has no idle gate against foreground turns**
+      (S, done 2026-09-06, `getmaipai/home#33`, `getmaipai/home#45`) -
+      `memoryJudge.ts`'s judge/consolidation jobs already gated on
+      `turnActiveWithin()` before this review cycle; `conversationHistory.ts`'s
+      `maybeRefreshConversationSummary()` was the one path left, and
+      couldn't just reuse the same boolean gate as-is (it only ever runs
+      INLINE right after the turn that would make that check true, so a
+      naive gate would permanently disable the feature). Fixed by
+      delaying it instead: `turnEngine.ts`'s post-turn hook now schedules
+      a check `DEFAULT_IDLE_WINDOW_MS` later (a new shared constant,
+      `lib/turnActivity.ts`, also now used by memoryJudge.ts instead of
+      its own private copy) and only actually runs the refresh if no
+      newer turn landed in that window - a rapid back-and-forth schedules
+      one of these per turn, and only the last one (nothing newer to
+      defer to) ever fires. Regression test in
+      `tests/conversationHistory.test.ts` proves both halves with a real,
+      sped-up timer (`__setSummaryRefreshDelayForTests()`).
 - [ ] **Backups block the event loop** (M, `getmaipai/home#46`) -
       `lib/backup.ts`'s `runBackup()` runs SQLite's `VACUUM INTO` and
       `backupCrypto.ts`'s whole-file AES encrypt/decrypt synchronously,

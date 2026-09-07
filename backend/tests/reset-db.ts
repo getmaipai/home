@@ -2,6 +2,7 @@ import { db } from "@/db";
 import { __resetSettingsCacheForTests } from "@/lib/settings";
 import { __resetCommandsCacheForTests } from "@/lib/commands";
 import { __resetTurnActivityForTests } from "@/lib/turnActivity";
+import { __clearPendingSummaryRefreshesForTests } from "@/lib/turnEngine";
 import { __resetPackageCachesForTests } from "@/lib/plugins";
 import { __resetSkillCacheForTests } from "@/lib/skills";
 import {
@@ -104,6 +105,17 @@ export function resetDb(): void {
   // memoryJudge.test.ts one in the same process would otherwise cause a
   // real, order-dependent test failure, not just stale data.
   __resetTurnActivityForTests();
+  // turnEngine.ts's own debounced post-turn summary refresh (issue #45):
+  // a code review found every test file calling runTurn() left one of
+  // these timers outstanding at DEFAULT_IDLE_WINDOW_MS (20s) - most
+  // finish well before that, so it fires later against whatever the NEXT
+  // test's own resetDb() call has already replaced the database with.
+  // Harmless today (maybeRefreshConversationSummary()'s own not-found
+  // guard), but still real background work racing unrelated tests for no
+  // reason - cleared here so every file already calling resetDb() in its
+  // own beforeEach gets this for free, matching __resetTurnActivityForTests()
+  // just above for the identical reason.
+  __clearPendingSummaryRefreshesForTests();
   // lib/plugins.ts's/lib/skills.ts's own mtime-keyed manifest/recipe/skill
   // caches (same pass): no test writes a bundled package's files today,
   // but they're cleared here too on the same "don't rely on that staying

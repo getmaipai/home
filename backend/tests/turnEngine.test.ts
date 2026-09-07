@@ -9,6 +9,7 @@ import {
   gateOutputSafety,
   StreamSafetyRefusal,
   buildSystemPrompt,
+  buildStablePrefix,
   matchPattern,
   capSection,
   route,
@@ -826,6 +827,23 @@ describe("buildSystemPrompt() stable-first order and budgets (step 4)", () => {
     expect(memoryIdx).toBeLessThan(reanchorIdx);
     expect(reanchorIdx).toBeLessThan(summaryIdx);
     expect(summaryIdx).toBeLessThan(timeIdx);
+  });
+
+  // Issue #15 (session-f-platform-and-trust.md step 3): llmSupervisor.ts's
+  // engine warm-up primes a freshly-spawned chat backend's prefix cache
+  // with buildStablePrefix()'s own output - the chat-latency win only
+  // exists if that's byte-for-byte identical to what buildSystemPrompt()
+  // actually sends on a real turn. Since buildSystemPrompt() calls
+  // buildStablePrefix() itself (never a second, hand-copied
+  // implementation), this can never drift by construction - but the
+  // point of a test here is to fail loudly if a future edit changes that
+  // and reintroduces the drift, not to prove something already
+  // structurally guaranteed.
+  test("buildStablePrefix() is a literal prefix of buildSystemPrompt()'s own output, for the same inputs", () => {
+    const persona = resolvePersona("tutor");
+    const stable = buildStablePrefix(persona);
+    const full = buildSystemPrompt(fakeActor(), "hi there", [], undefined, persona);
+    expect(full.startsWith(stable)).toBe(true);
   });
 
   test("the companion re-anchor names the active persona, unconditionally (even with no memory matches)", () => {

@@ -11,6 +11,16 @@
 // nothing yet to protect against right after a boot.
 let lastTurnStartedAt = 0;
 
+/** The shared "household is mid-conversation" window every background
+ * caller gates on - memoryJudge.ts's runJudgeBatch()/runConsolidation()
+ * (already using this exact value before it was pulled out here) and
+ * conversationHistory.ts's maybeRefreshConversationSummary() (issue #45)
+ * both want the identical answer to "did a real turn happen recently
+ * enough that background work would contend with it," so one constant,
+ * not a value quietly re-typed at each call site risking drift. 20s per
+ * the 2026-09-06 latency review's own "no turn in the last ~20s."  */
+export const DEFAULT_IDLE_WINDOW_MS = 20_000;
+
 /** Called once at the top of turnEngine.ts's prepareTurn() - the one
  * point every real turn (chat, and eventually every other surface) passes
  * through before it can ever reach the chat engine. */

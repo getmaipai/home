@@ -3,7 +3,7 @@ import { TestClient } from "./client";
 import { resetDb } from "./reset-db";
 import { __resetThrottleForTests } from "@/lib/secretThrottle";
 import { __resetLlmSupervisorForTests } from "@/lib/llmSupervisor";
-import { runTurn } from "@/lib/turnEngine";
+import { runTurn, __setSummaryRefreshDelayForTests } from "@/lib/turnEngine";
 import {
   list,
   exportPerson,
@@ -709,6 +709,74 @@ describe("maybeRefreshConversationSummary() (step 3: runs when due, not before)"
     expect(row.value.summary).not.toBeNull();
     expect(row.value.summary_through_turn).not.toBeNull();
   });
+
+  // Issue #45: runTurn()'s own post-turn hook used to call this
+  // synchronously, right after the exact turn that made the household
+  // "active" - contending for the single chat engine slot with whatever
+  // the household sends next. Delayed instead (turnEngine.ts's own
+  // summaryRefreshDelayMs), and skipped if a NEWER turn lands before the
+  // delay elapses. __setSummaryRefreshDelayForTests() sped-up real timer,
+  // the same shape lib/sidecars.ts's own timing override uses, proves
+  // both halves for real rather than asserting on the logic in isolation.
+  test("runTurn() delays the refresh instead of running it synchronously, and a newer turn defers it", async () => {
+    const { actor } = await owner();
+    const conv = resolveOrCreateConversation(actor, "chat");
+    if (!conv.ok) throw new Error(conv.error);
+    for (let i = 0; i < 8; i++) {
+      logTurn(actor, "chat", `msg ${i}`, { reply: { text: `reply ${i}` }, source: "model", safety: SAFE, conversation_id: conv.value.id, turn_id: `turn-delay${i}` });
+    }
+
+    const { startStubLlmServer } = await import("@maipai/spec/llm/ts/stubServer.js");
+    const stub = startStubLlmServer();
+    process.env.MAIPAI_LLAMA_SERVER_URL = stub.url;
+    // A generous delay and generous margins around it, the same "jitter
+    // margin two orders of magnitude wider than a real test runner ever
+    // needs" philosophy tests/rateLimiter.test.ts's own issue #13 fix
+    // documents - a code review of the first cut of this test (30ms
+    // delay, a 15ms "still null" check) found it could flake under the
+    // full suite's real CPU contention for the identical reason.
+    const DELAY_MS = 200;
+    __setSummaryRefreshDelayForTests(DELAY_MS);
+    try {
+      const result = await runTurn(actor, "chat", "one more, still active");
+      expect(result.ok).toBe(true);
+
+      // Immediately after runTurn() resolves: the household is still
+      // "active" (this very turn), so no refresh has run yet.
+      const immediately = getConversation(actor, conv.value.id);
+      if (!immediately.ok) throw new Error(immediately.error);
+      expect(immediately.value.summary).toBeNull();
+
+      // A second, NEWER turn lands well before the first one's delay
+      // elapses - the real fix (turnEngine.ts's scheduleSummaryRefresh(),
+      // a per-conversation debounce) cancels the first turn's own pending
+      // timer outright and schedules a fresh one, rather than comparing
+      // timestamps at fire time.
+      await runTurn(actor, "chat", "and one more right behind it");
+
+      await new Promise((r) => setTimeout(r, DELAY_MS / 4));
+      const stillActive = getConversation(actor, conv.value.id);
+      if (!stillActive.ok) throw new Error(stillActive.error);
+      expect(stillActive.value.summary).toBeNull();
+
+      // Once genuinely idle (the second turn's own fresh timer has had
+      // time to fire, with nothing newer to cancel it), the refresh runs.
+      await new Promise((r) => setTimeout(r, DELAY_MS * 3));
+      const row = getConversation(actor, conv.value.id);
+      if (!row.ok) throw new Error(row.error);
+      expect(row.value.summary).not.toBeNull();
+    } finally {
+      __setSummaryRefreshDelayForTests(null);
+      stub.stop();
+    }
+  });
+
+  // Defense in depth alongside the `finally` above (a try/finally already
+  // runs on a thrown assertion failure too, but a review flagged the risk
+  // of relying on that alone) - guarantees no other test in this file
+  // could ever inherit a shortened delay if that assumption were ever
+  // wrong.
+  afterEach(() => __setSummaryRefreshDelayForTests(null));
 });
 
 describe("conversation window feeds the prior exchange into the next turn (step 3 acceptance)", () => {

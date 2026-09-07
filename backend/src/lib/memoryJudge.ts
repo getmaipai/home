@@ -74,7 +74,7 @@ import {
 import { trigger } from "@/lib/notifications";
 import { sanitizeForPrompt } from "@/lib/promptSanitize";
 import { nextHlc } from "@/lib/hlc";
-import { turnActiveWithin } from "@/lib/turnActivity";
+import { turnActiveWithin, DEFAULT_IDLE_WINDOW_MS } from "@/lib/turnActivity";
 import type { ConversationTurnRow } from "@/wire";
 import type { PersonRow } from "@/types";
 
@@ -498,7 +498,7 @@ export interface JudgeBatchResult {
 // ran, so a skipped batch simply gets picked up a minute later, same as
 // any other late tick; MAX_TURNS_PER_RUN's own oldest-first ordering
 // already handles a backlog from several skipped ticks in a row.
-const JUDGE_IDLE_WINDOW_MS = 20_000;
+const JUDGE_IDLE_WINDOW_MS = DEFAULT_IDLE_WINDOW_MS;
 
 /** The core job's own entry point (scheduler.ts's "memory.judge",
  * every:1m): picks up to MAX_TURNS_PER_RUN still-unjudged model turns,
