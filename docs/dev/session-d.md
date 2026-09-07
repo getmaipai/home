@@ -1414,3 +1414,101 @@ widget's own `inputs` (like `weather`'s `{place: "Seattle"}`) are still
 literal manifest placeholders, not resolved against real household
 settings - a real per-household weather widget is settings-resolution
 work this step's own "prove the contract" scope didn't need.
+
+## Step 10: wrap up
+
+All ten steps of `docs/plans/session-d-packages-and-store.md` are
+shipped, in order, each verified and committed on its own before the
+next began: bronze and quality (1), the manifest catching up with the
+plan (2), the package cache and warming (3), recipes reaching further
+(4), the Tier 1 host under Deno (5), the store host and catalog
+tooling (6), the lookups (7), lists/reminders/timers (8), home control
+packages and widgets (9), and this wrap-up (10).
+
+**The rebase discipline did not hold, and catching up cost real time.**
+This branch cut from `main` at step 0 and never rebased again until
+step 10 - every other Wave 2 session's own wrap-up entry describes
+rebasing "before every commit"; this one did not, and the gap showed.
+By the time this step started, `main` had advanced 22 commits past this
+branch's own fork point: Sessions C, E, and F all merged, followed by
+two full rounds of a security/correctness review pass (SEC-1 through
+SEC-11, COR-1 through COR-9) landing directly on `main`. Catching up
+took three separate merge passes rather than one, as `main` kept moving
+underneath this branch while each pass was being verified:
+
+- **Pass 1** (`4395a03`): the bulk of the gap - Sessions C/E/F plus
+  SEC-1 through SEC-7 and COR-1 through COR-4. Real conflicts, not just
+  textual ones: `lib/plugins.ts`/`lib/skills.ts`'s new mtime-based
+  manifest cache (a `main`-side perf feature) computed its existence
+  check against the raw bundled `PACKAGES_DIR` path, while this
+  branch's own `resolvePackageDir()` (step 6) only fixed the actual
+  file reads - combined, a package installed ONLY via the store always
+  404'd, caught by `tests/store.test.ts` failing after the first pass
+  and fixed by routing the cache-key path through `resolvePackageDir()`
+  too. `lib/scheduler.ts`'s widened `CoreJobHandler(row)` (step 8)
+  needed reconciling with `main`'s own `withJobTimeout()` wrapper
+  (COR-2). Migrations: this branch's own numbered migration
+  (`package_installs`, `store_index_state`, `lists`) collided with
+  `main`'s own - discarded and regenerated fresh via `drizzle-kit`,
+  never hand-merged, per the org's own migration rule.
+- **A follow-up review of that merge** found a second, adjacent gap in
+  this branch's own `lib/store.ts`: `install`/`rollback`/`uninstall`/
+  `setChannel` all trusted a raw route-param package id straight into
+  filesystem paths - including `uninstall`'s own recursive `rmSync` -
+  with no `isValidPackageId()` check, the same SEC-2 class of bug
+  closed elsewhere in this exact step's own earlier work, just never
+  applied to the store's own install path. Fixed with a direct
+  regression test (`tests/store.test.ts`'s own SEC-2-class describe
+  block).
+- **The same review** also cleared a real blocker Session E had flagged
+  directly to D: `manifest.schema.json`'s `contributes` became a
+  properly typed object keyed by blueprint kind (`widgets[]`, now also
+  `pages[]`), and the redundant top-level `pages: string[]` field was
+  dropped - fixed at the actual source (this branch's own schema file),
+  with the two catalog-canonical packages' own manifests fixed in the
+  sibling `catalog` checkout rather than hand-edited in `home`'s
+  hash-pinned mirror (`catalog@0fd7be0`).
+- **Pass 2** (`cb8802e`, 8 more commits) and **Pass 3** (`ab3cf61`, 7
+  more): `main` kept advancing while pass 1 was being verified. Pass 2
+  found a real bug on `main` itself, independent of this branch -
+  confirmed by reproducing it in a disposable detached worktree at
+  `main`'s own tip before touching anything: a circular import
+  (`persona.ts` -> `plugins.ts` -> `packageHost.ts` -> `scheduler.ts` ->
+  `memoryJudge.ts` -> `turnEngine.ts` -> `persona.ts`), introduced when
+  a SEC-8 fix had `memoryJudge.ts` import `sanitizeForPrompt` from
+  `turnEngine.ts` directly. Whenever the module graph resolved
+  `memoryJudge.ts` before `plugins.ts`'s own module body had finished
+  running, `persona.ts`'s eager, load-time `PERSONAS` catalog build
+  crashed with "Cannot access 'manifestCache' before initialization."
+  Fixed by giving `sanitizeForPrompt` its own dependency-free leaf
+  module (`lib/promptSanitize.ts`) both files import directly - the
+  "one definition, shared" intent the original SEC-8 fix's own comment
+  already stated, just placed somewhere with too many of its own
+  dependencies to be a safe shared leaf. Pass 3 hit SEC-11 (a
+  credential now required for role `adult`, closing `POST /api/auth/
+  select` for any credential-free profile): this branch's own
+  `lists.test.ts` had a test written before SEC-11 existed that created
+  a credential-free adult and signed in through the now-closed path -
+  fixed to match the pattern every other already-updated test in the
+  repo uses (a `secret` at creation, then `POST /api/auth/verify-
+  secret`), not a workaround around the fix.
+
+`docs/BACKLOG.md`: every item this session owns checked off with real
+detail (the store host, the catalog tooling, the compute step, the
+almanac split, package-declared notification types, the speech lint,
+the widgets data contract) or left open with an honest note (the
+`host.*` audit against plan 4.9, the `ask`-continuation gap - both
+real, unreached this wave, not silently dropped). `docs/dev.md` gets
+this session's own Wave 2 index line.
+
+`scripts/check.sh` is green on the final state, verified twice: once on
+this branch before the merge, and again fresh in the `home` worktree
+after it, with `bun install` re-run there for the two new dependencies
+(`chrono-node`, `tar`) this session's own steps 7 and 6 added. Full
+spec (TS + Python), backend, and frontend suites all pass both times.
+
+Merged into `main` (`648ca22`) and the `home-d` worktree deleted at the
+end of this step, per the plan's own closing line. Not pushed: pushing
+is Jesse's call, per `getmaipai/.github/CLAUDE.md`'s own git workflow
+rule ("push at natural boundaries... or when Jesse says ship"), not an
+automatic consequence of a local merge landing clean.
