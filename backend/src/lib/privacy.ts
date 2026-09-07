@@ -175,6 +175,7 @@ function row(
     // really declares it.
     optIn: true,
     retention: THIRD_PARTY_RETENTION,
+    direction: "outbound",
   };
 }
 
@@ -208,6 +209,7 @@ export function pluginConnections(manifests = loadedManifests()): PrivacyConnect
         who: source.who,
         optIn: source.opt_in,
         retention: source.retention,
+        direction: "outbound",
       });
     }
   }
@@ -262,6 +264,7 @@ function inboundConnections(): PrivacyConnection[] {
       who: "whichever app or device holds the token an adult generated",
       optIn: true,
       retention: "no separate record kept beyond the normal conversation history any chat turn already creates",
+      direction: "inbound",
     },
   ];
 }

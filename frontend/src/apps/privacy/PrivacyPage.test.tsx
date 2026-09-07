@@ -25,6 +25,7 @@ function connection(over: Partial<PrivacyConnection> = {}): PrivacyConnection {
     who: "Open-Meteo",
     optIn: true,
     retention: "unknown, see Open-Meteo's own policy",
+    direction: "outbound",
     ...over,
   };
 }
@@ -82,6 +83,57 @@ describe("the privacy page", () => {
       expect(list.querySelectorAll("li")).toHaveLength(2);
       expect(list.textContent).toContain("MaiPai Home itself");
       expect(list.textContent).toContain("Weather");
+    } finally {
+      restore();
+    }
+  });
+
+  // Issue #12 (Jesse's feedback: the page read like a flat technical
+  // connection log, organized by hostname instead of what a parent
+  // actually wants to know). The inbound row (issue #12's own new
+  // `direction` field) gets pulled into its own clearly-labeled section
+  // instead of sitting in the same list as every outbound download.
+  test("gives the inbound connection its own section, separate from outbound", async () => {
+    const restore = stubPrivacy({
+      connections: [
+        connection({ id: "platform:inbound-api", direction: "inbound", destination: "nothing leaves the house for this row" }),
+        connection(),
+      ],
+      offlinePlugins: [],
+    });
+    try {
+      const { findByLabelText, findByText } = renderPrivacyPage();
+      await findByText("Can someone reach into your house?");
+      const inboundList = await findByLabelText("Inbound connections");
+      expect(inboundList.textContent).toContain("nothing leaves the house for this row");
+
+      const outboundList = await findByLabelText("Outbound connections");
+      expect(outboundList.querySelectorAll("li")).toHaveLength(1);
+      expect(outboundList.textContent).not.toContain("nothing leaves the house for this row");
+    } finally {
+      restore();
+    }
+  });
+
+  test("omits the inbound section entirely when there's no inbound connection", async () => {
+    const restore = stubPrivacy({ connections: [connection()], offlinePlugins: [] });
+    try {
+      const { findByText, queryByText } = renderPrivacyPage();
+      await findByText("What leaves your house (1)");
+      expect(queryByText("Can someone reach into your house?")).toBeNull();
+    } finally {
+      restore();
+    }
+  });
+
+  test("leads with the question a parent actually asks, answered plainly", async () => {
+    const restore = stubPrivacy({ connections: [connection()], offlinePlugins: [] });
+    try {
+      const { findByText } = renderPrivacyPage();
+      expect(await findByText("Can someone outside see what we say to MaiPai?")).toBeInTheDocument();
+      expect(
+        await findByText(/No\. Everything you say to MaiPai, everything it remembers/),
+      ).toBeInTheDocument();
     } finally {
       restore();
     }

@@ -128,6 +128,20 @@ describe("the hub's own connections", () => {
     expect(row!.what.toLowerCase()).toMatch(/inbound|reverse|reaches in|send text or audio to the hub/);
   });
 
+  // Issue #12: PrivacyPage.tsx gives this row its own clearly-labeled
+  // section ("can someone reach into your house?") instead of leaving a
+  // parent to notice the reversed direction buried in prose - it needs a
+  // real field to key on, not an id string the frontend would otherwise
+  // have to hardcode and could silently drift from.
+  test("direction structurally marks the one inbound row - every other row is outbound", () => {
+    const rows = privacyConnections();
+    const inbound = rows.filter((r) => r.direction === "inbound");
+    expect(inbound.map((r) => r.id)).toEqual(["platform:inbound-api"]);
+    for (const row of rows) {
+      if (row.id !== "platform:inbound-api") expect(row.direction).toBe("outbound");
+    }
+  });
+
   test("none of them carries anything the family said or saved", () => {
     for (const row of platformConnections()) {
       expect(row.what.toLowerCase()).toMatch(/nothing anyone in the house said|no recording/);

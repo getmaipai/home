@@ -269,6 +269,13 @@ export interface PrivacyConnection {
    * family started; nothing here is a background phone-home. */
   optIn: boolean;
   retention: string;
+  /** Issue #12: which way this row runs. Every row is "outbound" (the
+   * house reaching a third party) except lib/privacy.ts's own
+   * inboundConnections() - a real, structural distinction ("can
+   * something reach INTO my house" is a different question from "does
+   * something leave it"), not something PrivacyPage.tsx should have to
+   * infer from an id string. */
+  direction: "outbound" | "inbound";
 }
 
 /** A restore that is staged and waiting for the hub's next restart
