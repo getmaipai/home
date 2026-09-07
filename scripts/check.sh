@@ -84,16 +84,8 @@ if [ -d frontend/src ]; then
   echo "== frontend: build (includes typecheck)"
   (cd frontend && bun run build >/dev/null)
 
-  # E's a11y matrix (scripts/screenshot.ts --a11y-only, wired as the root
-  # `a11y` script) is real and otherwise solid - a live axe-core scan
-  # against a throwaway backend + built frontend, self-contained (builds
-  # its own frontend, spawns its own backend, tears both down). NOT
-  # wired in as a hard gate yet: it found a real, pre-existing
-  # color-contrast failure on the chat page (desktop/light) that isn't
-  # this step's to fix and isn't fixed yet (getmaipai/home#43) - the
-  # same "don't block every commit over something this session doesn't
-  # own" reasoning already applied to the reading-level lint below. Add
-  # `bun run a11y` back here once #43 is fixed.
+  echo "== docs: reading-level lint"
+  bun run scripts/reading-level.ts
 fi
 
 if [ ! -d "$STANDARDS_DIR/standards" ]; then

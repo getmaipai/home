@@ -3,24 +3,26 @@ title: What MaiPai remembers
 description: See, export, or forget what MaiPai has remembered from your conversations.
 ---
 
-As you talk with MaiPai, it remembers useful details, like your preferences, so you don't have to repeat yourself. Everything it remembers is stored on your hub, never sent anywhere else.
+As you talk with MaiPai, it remembers useful details. Things like your favorite foods, or your kid's allergy. This way, you don't have to repeat yourself.
+
+Everything it remembers stays on your hub. It never goes anywhere else.
 
 ## See what's remembered
 
-Open **Memory** in the sidebar. Each entry shows something MaiPai picked up from a conversation.
+Open **Memory** in the sidebar. Each entry shows one thing MaiPai learned from a conversation.
 
 ## Forget something
 
-Find the memory you want gone and tap **Forget**. It's removed right away and MaiPai won't use it again.
+Find the memory you want gone. Tap **Forget**. It's gone right away, and MaiPai won't use it again.
 
 ## Export your memories
 
-Tap **Export** to download everything MaiPai remembers about you as a file you can keep or move elsewhere.
+Tap **Export**. This downloads everything MaiPai remembers about you. Keep the file, or move it somewhere else.
 
 ## Check a child's memories
 
-As an owner or admin, use the person picker at the top of the page to switch to another household member's memories. You can view and forget entries there, the same way, to help manage what MaiPai keeps about a child.
+Are you an owner or admin? Use the person picker at the top of the page to switch to another household member. You'll see their memories the same way. You can view or forget entries there too, to help manage what MaiPai keeps about a child.
 
 ## Still need help?
 
-If Memory looks empty when you expect entries, or Forget doesn't seem to work, see [Fix a problem](fix-a-problem.md).
+Does Memory look empty when you expect entries? Does Forget not seem to work? See [Fix a problem](fix-a-problem.md).

@@ -18,7 +18,7 @@ Tap the microphone icon next to the message box and start speaking. MaiPai liste
 
 ## Wake word (experimental)
 
-The **Wake word** button above the message box turns on listening for MaiPai's name. This is an early, experimental feature: MaiPai can hear its wake word today, but it can't act on it yet. That's coming soon.
+The **Wake word** button above the message box turns on listening for MaiPai's name. This is an early, experimental feature. MaiPai can hear its wake word today, but it can't act on it yet. That's coming soon.
 
 ## More on a message
 
@@ -42,8 +42,8 @@ Every conversation is saved. Open **Conversations** in the sidebar to see them a
 - Tap **Delete** to remove one you don't need.
 - Tap **Select conversations** to choose several at once, or **Clear all** to remove everything.
 
-If you're an owner or admin, you can also switch to view another household member's conversations from the same page, for parental oversight.
+Are you an owner or admin? You can also switch to view another household member's conversations from this same page. This helps with parental oversight.
 
 ## Still need help?
 
-If Chat won't send a message or load a reply, see [Fix a problem](fix-a-problem.md).
+Does Chat not send a message or load a reply? See [Fix a problem](fix-a-problem.md).

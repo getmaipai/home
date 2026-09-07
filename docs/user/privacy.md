@@ -3,25 +3,25 @@ title: Privacy
 description: See exactly what, if anything, leaves your house.
 ---
 
-Everything you say to MaiPai, everything it remembers, and everyone in your household stays on this computer. It's never sent to us. MaiPai doesn't run a server your family's information passes through, and nothing reports back to us about how you use it.
+Everything stays on this computer: everything you say to MaiPai, everything it remembers, and everyone in your household. It's never sent to us. MaiPai doesn't run a server that your family's information passes through. Nothing reports back to us about how you use it.
 
 ## See what leaves your house
 
-Open **Privacy** in the sidebar. It lists every single outbound connection MaiPai can make, and for each one:
+Open **Privacy** in the sidebar. It lists every outbound connection MaiPai can make. For each one, you'll see:
 
 - **When** it happens
 - **What it sends**
 - **Who receives it**
 - **How long they keep it**
 
-If something isn't on this list, it doesn't happen. Most entries only occur when an adult chooses to download a model or a voice in Settings, or when your household turns on an optional feature like weather or trivia.
+Is something not on this list? Then it doesn't happen. Most entries only happen when an adult chooses to download a model or a voice in Settings. The rest happen when your household turns on an optional feature, like weather or trivia.
 
 ## What never leaves your house
 
-Your conversations, everything MaiPai remembers, and every profile in your household stay entirely on this computer. MaiPai doesn't collect usage statistics or crash reports, and nothing your family says is ever used to train anything.
+Your conversations stay on this computer. So does everything MaiPai remembers, and every profile in your household. MaiPai doesn't collect usage stats or crash reports. Nothing your family says is ever used to train anything.
 
 ![The Privacy page, listing every outbound connection MaiPai can make](../assets/screens/privacy-desktop-light.png)
 
 ## Still need help?
 
-If something on this page looks unfamiliar or you're not sure why a connection is listed, see [Fix a problem](fix-a-problem.md).
+Does something on this page look unfamiliar? Not sure why a connection is listed? See [Fix a problem](fix-a-problem.md).
