@@ -13,7 +13,7 @@
 // request's shape (a batch of plain strings) have nothing in common, so
 // forcing embed through validate()'s chat-shaped checks would be the
 // wrong kind of code reuse, not real sharing.
-import { getChatClient, restartChatBackend } from "@/lib/llmSupervisor";
+import { getChatClient, reportChatBackendUnreachable } from "@/lib/llmSupervisor";
 import { getEmbedClient } from "@/lib/embedSupervisor";
 import { tryConsume } from "@/lib/rateLimiter";
 import { LlmClientError } from "@maipai/spec/llm/ts/client.js";
@@ -229,9 +229,15 @@ function validate(role: LlmRole, messages: LlmMessage[]): LlmValidationError | n
 // reaches here, headers may already be committed - but clearing the
 // stale reference means the household's NEXT message spawns a fresh
 // backend instead of repeating the same dead one.
+// Since the auto-heal (docs/dev.md, "What was actually killing the chat
+// engine"), this hands the failure to llmSupervisor.ts's own watch rather
+// than calling restartChatBackend() directly: a code review (2026-09-07)
+// found the direct restart read as a DELIBERATE stop to the exit watcher,
+// so an engine dying mid-request was dropped with no log line and no
+// Repairs issue - the exact case this exists for.
 function recoverFromDeadBackend(err: unknown): void {
   if (err instanceof LlmClientError && err.message.startsWith("could not reach ")) {
-    void restartChatBackend();
+    reportChatBackendUnreachable(err.message);
   }
 }
 
@@ -328,7 +334,12 @@ export async function startCompleteStream(
         yield delta;
       }
     } catch (err) {
-      recoverFromDeadBackend(err);
+      // A request the caller itself cancelled (the person closed the tab
+      // before the first byte) surfaces as the same "could not reach"
+      // as a dead engine (spec/llm/ts/client.ts wraps every pre-header
+      // rejection that way) - a code review (2026-09-07) caught that
+      // reporting it would kill a healthy engine for everyone else.
+      if (!signal?.aborted) recoverFromDeadBackend(err);
       const message = err instanceof LlmClientError ? err.message : (err as Error).message;
       throw new Error(`chat model unavailable: ${message}`);
     }

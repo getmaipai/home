@@ -7,6 +7,7 @@ Settings are split into two tabs at the top of the page. **Household** holds sha
 
 ## Household settings
 
+- **Health**: the first thing on the page. It tells you whether MaiPai's brain, understanding, and voice are running right now, checked live. If one has stopped, MaiPai starts it again on its own. If it keeps stopping, a note appears in Repairs. The Restart server button is here too.
 - **System**: your household's language and region. Also how long backups and conversation history are kept.
 - **AI model tuning**, **Integrations**, **Notifications**, **Hugging Face token**: advanced options for MaiPai's models and connections.
 - **Users**: add, edit, or remove household members. See [People and parental controls](people.md).

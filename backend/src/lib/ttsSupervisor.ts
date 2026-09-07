@@ -25,7 +25,7 @@ const execFileAsync = promisify(execFile);
 import { PocketTtsClient } from "@maipai/spec/voice/ts/client.js";
 import { startStubTtsServer } from "@maipai/spec/voice/ts/stubServer.js";
 import { getHouseholdSettingValue } from "@/lib/settings";
-import { spawnAndWaitHealthy } from "@/lib/sidecars";
+import { spawnAndWaitHealthy, watchEngine, probeAlive, engineHealthKind, cancelEngineRespawn, type EngineHealth } from "@/lib/sidecars";
 import { hotReloadState } from "@/lib/hotReloadState";
 import { assertNotInCrashBootHold } from "@/lib/dirtyBoot";
 
@@ -130,7 +130,24 @@ export async function spawnPocketTts(): Promise<TtsBackend> {
     timeoutMs: 180_000,
     label: "pocket-tts",
   });
-  return { client, stop: () => proc.kill(), pid: proc.pid, kind: "spawned", startedAt: new Date().toISOString() };
+  // The auto-heal, llmSupervisor.ts's spawnLlamaServer() shape for this
+  // role: sidecars.ts's watchEngine() owns the exit watch, the health poll
+  // and the backoff respawn; this only says what to drop and how to start.
+  const watch = watchEngine({
+    proc,
+    role: "tts",
+    label: "the speech engine",
+    healthCheck: () => client.health(),
+    drop: () => void restartTtsBackend(),
+    respawn: () => getTtsClient(),
+    title: "MaiPai's voice stopped unexpectedly",
+  });
+  return { client, stop: watch.stop, pid: proc.pid, kind: "spawned", startedAt: new Date().toISOString() };
+}
+
+/** For GET /api/health: the kind plus a real probe of the process. */
+export async function probeTtsEngine(): Promise<EngineHealth> {
+  return { kind: engineHealthKind("tts", getTtsBackendKind()), pid: state.ttsBackend?.pid ?? null, alive: await probeAlive(state.ttsBackend?.client) };
 }
 
 async function startTtsBackend(): Promise<TtsBackend> {
@@ -215,6 +232,7 @@ export function getTtsLivePid(): number | null {
  * with the old value (or none) - the already-running process never
  * re-reads the setting on its own. */
 export async function restartTtsBackend(): Promise<void> {
+  cancelEngineRespawn("tts");
   state.generation++;
   state.ttsBackend?.stop();
   state.ttsBackend = null;
@@ -225,6 +243,7 @@ export async function restartTtsBackend(): Promise<void> {
  * client, the same reset-between-test-files shape as
  * __resetLlmSupervisorForTests. */
 export function __resetTtsSupervisorForTests(): void {
+  cancelEngineRespawn("tts");
   state.generation++;
   state.ttsBackend?.stop();
   state.ttsBackend = null;

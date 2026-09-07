@@ -5,6 +5,7 @@
 import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { installTestIsolationGuard } from "./isolation";
 
 process.env.MAIPAI_DATA_DIR = mkdtempSync(join(tmpdir(), "maipai-home-test-"));
 // Its own, independent throwaway directory, not a sibling derived from
@@ -30,3 +31,13 @@ process.env.MAIPAI_LLAMA_SERVER_PORT = "48788";
 // real HF-cached model into what must stay a deterministic, offline
 // suite (.github/CLAUDE.md > Testing standards).
 process.env.MAIPAI_TTS_DISABLE_SPAWN = "1";
+
+// Everything above is only a guarantee while it stays set. Found live
+// 2026-09-07: a test file's own afterEach deleted MAIPAI_LLAMA_SERVER_PORT
+// to tidy up, and every later spawning test then killed the real dev
+// hub's chat engine exactly the way the comment above warns about, on
+// every suite run, for days, with nothing failing. tests/isolation.ts
+// re-checks these after every test in every file (and puts them back)
+// so that class of leak fails the offending test by name instead. The
+// snapshot is taken inside this call, after every assignment above.
+installTestIsolationGuard();

@@ -1,12 +1,18 @@
 import { describe, expect, test, afterEach } from "bun:test";
-import { getChatClient, restartChatBackend, stopChatBackend, getEngineStatus, getChatLivePid, sweepOrphanEngineProcesses, __resetLlmSupervisorForTests } from "@/lib/llmSupervisor";
+import { getChatClient, restartChatBackend, stopChatBackend, getEngineStatus, getChatLivePid, sweepOrphanEngineProcesses, reportChatBackendUnreachable, __resetLlmSupervisorForTests } from "@/lib/llmSupervisor";
 import { enginesDir } from "@/lib/paths";
 import { setHouseholdSettingValue } from "@/lib/settings";
 import { __setCrashBootHoldForTests } from "@/lib/dirtyBoot";
 import { listIssues } from "@/lib/issues";
+import { __resetSidecarsForTests, __setSidecarTimingForTestsOnly } from "@/lib/sidecars";
+import { join } from "node:path";
+import { resetDb } from "./reset-db";
 
 afterEach(() => {
   __resetLlmSupervisorForTests();
+  // Also clears any engine watch timer and the respawn history a death
+  // test left behind, and restores the real backoff.
+  __resetSidecarsForTests();
   __setCrashBootHoldForTests(null);
   delete process.env.MAIPAI_LLAMA_SERVER_BIN;
   delete process.env.MAIPAI_CHAT_MODEL_PATH;
@@ -140,6 +146,82 @@ describe("llmSupervisor tier 3: the household's selected chat model", () => {
     __setCrashBootHoldForTests(Date.now() + 60_000);
     await expect(getChatClient()).rejects.toThrow(/recovered from an unexpected shutdown/);
   });
+});
+
+// The 2026-09-07 incident's actual failure mode (docs/dev.md, "What was
+// actually killing the chat engine"): a spawned engine SIGKILLed from
+// outside, with the supervisor still holding its client. Before this,
+// nothing observed the exit - every turn repeated "could not reach" until
+// someone restarted the whole hub. Real tier-2 spawn of the fake engine
+// (resourceGovernor.test.ts's own fixture), a real SIGKILL, no mocks.
+describe("llmSupervisor: an engine that dies out from under it", () => {
+  const FAKE_BIN = join(import.meta.dir, "fixtures", "fakeLlamaServer.ts");
+
+  async function waitUntil(check: () => boolean, timeoutMs = 5_000): Promise<void> {
+    const deadline = Date.now() + timeoutMs;
+    while (Date.now() < deadline) {
+      if (check()) return;
+      await new Promise((r) => setTimeout(r, 50));
+    }
+    throw new Error("waitUntil() timed out");
+  }
+
+  async function spawnFakeEngine(): Promise<number> {
+    resetDb();
+    process.env.MAIPAI_LLAMA_SERVER_BIN = FAKE_BIN;
+    process.env.MAIPAI_CHAT_MODEL_PATH = "/dev/null";
+    const client = await getChatClient();
+    expect(await client.health()).toBe(true);
+    const pid = getEngineStatus().pid!;
+    expect(pid).toBeGreaterThan(0);
+    return pid;
+  }
+
+  test("a killed engine is noticed and started again on its own: status drops it, Repairs says how it died, then clears once it is back", async () => {
+    __setSidecarTimingForTestsOnly({ backoffMs: [50] });
+    const pid = await spawnFakeEngine();
+
+    process.kill(pid, "SIGKILL");
+    await waitUntil(() => getEngineStatus().pid !== pid);
+    const issue = listIssues({ includeResolved: true }).find((i) => i.source === "chat-engine" && i.key === "died");
+    expect(issue).toBeDefined();
+    expect(issue!.title).toBe("MaiPai's AI stopped unexpectedly");
+    expect(issue!.detail).toContain("SIGKILL");
+
+    // No request needed: a fresh process comes up by itself and the
+    // issue closes.
+    await waitUntil(() => getEngineStatus().pid !== null && getEngineStatus().pid !== pid);
+    const client = await getChatClient();
+    expect(await client.health()).toBe(true);
+    await waitUntil(() => !listIssues().some((i) => i.source === "chat-engine" && i.key === "died"));
+  }, 15_000);
+
+  // The code-review finding on this fix's first cut: a death DURING a
+  // request reached llm.ts's "could not reach" handler first, which
+  // restarted the backend and so made the exit look deliberate - no log,
+  // no Repairs, in the one case that matters most.
+  test("a death seen first by a failing request is still a death: reported and started again", async () => {
+    __setSidecarTimingForTestsOnly({ backoffMs: [50] });
+    const pid = await spawnFakeEngine();
+    process.kill(pid, "SIGKILL");
+    reportChatBackendUnreachable("could not reach http://127.0.0.1:48788");
+    await waitUntil(() => getEngineStatus().pid !== null && getEngineStatus().pid !== pid);
+    // Whichever signal won the race (the request's own failure, or the
+    // exit itself), it was reported as a death and healed.
+    const issue = listIssues({ includeResolved: true }).find((i) => i.source === "chat-engine" && i.key === "died");
+    expect(issue?.detail).toMatch(/stopped answering|SIGKILL/);
+  }, 15_000);
+
+  test("a deliberate stop is never reported as a death", async () => {
+    const pid = await spawnFakeEngine();
+    stopChatBackend();
+    // Long enough for the killed process's exit to be observed if it were
+    // going to be mistaken for one.
+    await new Promise((r) => setTimeout(r, 500));
+    expect(getEngineStatus().kind).toBe("stopped");
+    expect(listIssues().some((i) => i.source === "chat-engine" && i.key === "died")).toBe(false);
+    expect(pid).toBeGreaterThan(0);
+  }, 10_000);
 });
 
 // freePort()'s own tests moved to tests/sidecars.test.ts (Session F, step

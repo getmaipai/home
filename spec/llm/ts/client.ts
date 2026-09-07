@@ -64,7 +64,11 @@ export class LlamaServerClient {
    * ever needs "can I send a completion request right now." */
   async health(): Promise<boolean> {
     try {
-      const res = await fetch(`${this.baseUrl}/health`);
+      // Bounded (2026-09-07): a live-but-hung server must read as
+      // unhealthy, not hold every caller's poll open forever - the hub's
+      // engine auto-heal (home's sidecars.ts) counts misses to decide a
+      // process is wedged, and an unbounded fetch never misses.
+      const res = await fetch(`${this.baseUrl}/health`, { signal: AbortSignal.timeout(3_000) });
       if (!res.ok) return false;
       const body = (await res.json()) as { status?: string };
       return body.status === "ok";

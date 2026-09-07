@@ -8,6 +8,10 @@ import {
   spawnAndWaitHealthy,
   freePort,
   sweepOrphanProcesses,
+  watchEngine,
+  probeAlive,
+  cancelEngineRespawn,
+  engineRespawnState,
   registerGracefulExit,
   __resetSidecarsForTests,
   __setSidecarTimingForTestsOnly,
@@ -15,6 +19,8 @@ import {
 import { listIssues, fixIssue, __resetFixHandlersForTests } from "@/lib/issues";
 import { resetDb } from "./reset-db";
 import { TestClient } from "./client";
+import { join } from "node:path";
+import { getChatClient, getChatLivePid, __resetLlmSupervisorForTests } from "@/lib/llmSupervisor";
 
 beforeEach(() => {
   resetDb();
@@ -301,9 +307,296 @@ describe("GET /api/health", () => {
     registerSidecar({ id: "reported", command: ["true"], port: 12345, startupOrder: 1 });
     const res = await client.get("/api/health");
     expect(res.status).toBe(200);
-    const body = (await res.json()) as { sidecars: unknown[] };
+    const body = (await res.json()) as { sidecars: unknown[]; ok: boolean; engines: Record<string, { kind: string; alive: boolean | null }> };
     expect(body.sidecars).toEqual([{ id: "reported", status: "stopped", baseUrl: "http://127.0.0.1:12345" }]);
+    // Nothing has been asked to start yet, so there is nothing to probe
+    // and nothing wrong: `alive` is null (not false) and the page reads ok.
+    expect(body.ok).toBe(true);
+    expect(body.engines.chat!.alive).toBeNull();
   });
+
+  // The Health page kept saying fine while the chat engine was dead
+  // (2026-09-07): it showed the engine's configured kind, never a probe.
+  test("reports a dead chat engine as not alive and the hub as not ok", async () => {
+    const client = new TestClient();
+    await client.post("/api/auth/setup", { displayName: "Sage", secret: "correcthorse" });
+    process.env.MAIPAI_LLAMA_SERVER_BIN = join(import.meta.dir, "fixtures", "fakeLlamaServer.ts");
+    process.env.MAIPAI_CHAT_MODEL_PATH = "/dev/null";
+    try {
+      await getChatClient();
+      const up = (await (await client.get("/api/health")).json()) as { ok: boolean; engines: { chat: { alive: boolean | null; pid: number | null } } };
+      expect(up.ok).toBe(true);
+      expect(up.engines.chat.alive).toBe(true);
+
+      // Kill it and wait for the watch's own drop to land - a fixed sleep
+      // here flaked under load (a code review, 2026-09-07): too short and
+      // the exit hadn't been observed yet, too long and the default
+      // backoff timer could already have fired.
+      process.kill(up.engines.chat.pid!, "SIGKILL");
+      await waitUntil(() => engineRespawnState("chat") === "pending");
+      const down = (await (await client.get("/api/health")).json()) as { ok: boolean; engines: { chat: { kind: string; alive: boolean | null } } };
+      // The watch has already dropped the dead backend by now and is in
+      // its backoff: the route says so by name, never "not started yet".
+      expect(down.ok).toBe(false);
+      expect(down.engines.chat.kind).toBe("restarting");
+    } finally {
+      __resetLlmSupervisorForTests();
+      delete process.env.MAIPAI_LLAMA_SERVER_BIN;
+      delete process.env.MAIPAI_CHAT_MODEL_PATH;
+    }
+  }, 15_000);
+});
+
+describe("probeAlive (what the Health page asks)", () => {
+  // The 2026-09-07 Health-page bug in one assertion: a cached client to a
+  // process that has since died must probe false, not read as fine.
+  test("a stale client to a killed process probes false", async () => {
+    process.env.MAIPAI_LLAMA_SERVER_BIN = join(import.meta.dir, "fixtures", "fakeLlamaServer.ts");
+    process.env.MAIPAI_CHAT_MODEL_PATH = "/dev/null";
+    try {
+      const staleClient = await getChatClient();
+      expect(await probeAlive(staleClient)).toBe(true);
+      const pid = getChatLivePid()!;
+      process.kill(pid, "SIGKILL");
+      await waitUntil(async () => (await probeAlive(staleClient)) === false);
+    } finally {
+      __resetLlmSupervisorForTests();
+      delete process.env.MAIPAI_LLAMA_SERVER_BIN;
+      delete process.env.MAIPAI_CHAT_MODEL_PATH;
+    }
+  }, 10_000);
+
+  test("nothing to probe is null, not a failure", async () => {
+    expect(await probeAlive(null)).toBeNull();
+  });
+});
+
+describe("watchEngine (the engines' auto-heal)", () => {
+  // Real child processes, real SIGKILLs, real health fetches - the same
+  // "no mocked child_process" rule the rest of this file follows. A
+  // watched process is one of this suite's own throwaway servers, and
+  // `respawn` here records the call and spawns a replacement the way a
+  // supervisor's get*Client() would.
+  // One port per test: these servers carry no `--port` flag for
+  // freePort() to match, so a process from the previous test that has
+  // not finished exiting yet would otherwise still hold the port.
+  let port = 39240;
+  beforeEach(() => {
+    port++;
+  });
+  function serve(): Promise<Bun.Subprocess> {
+    const p = port;
+    return spawnAndWaitHealthy({
+      command: ["bun", "-e", `Bun.serve({ port: ${p}, fetch: () => Response.json({ status: "ok" }) });`],
+      healthCheck: () => fetch(`http://127.0.0.1:${p}`).then((r) => r.ok, () => false),
+      label: "watched server",
+    });
+  }
+  const health = () => fetch(`http://127.0.0.1:${port}`, { signal: AbortSignal.timeout(500) }).then((r) => r.ok, () => false);
+
+  test("a SIGKILLed engine is dropped, reported on Repairs, and started again on its own", async () => {
+    __setSidecarTimingForTestsOnly({ backoffMs: [50] });
+    const proc = await serve();
+    let dropped = 0;
+    const replacement: { proc: Bun.Subprocess | null } = { proc: null };
+    watchEngine({
+      proc,
+      role: "test",
+      label: "the test engine",
+      healthCheck: health,
+      drop: () => void dropped++,
+      // A supervisor's real respawn spawns AND watches the replacement;
+      // the watch on the new process is what closes out the death.
+      respawn: async () => {
+        replacement.proc = await serve();
+        watchEngine({ proc: replacement.proc, role: "test", label: "the test engine", healthCheck: health, drop: () => {}, respawn: async () => {}, title: "Test engine stopped" });
+      },
+      title: "Test engine stopped",
+    });
+    try {
+      process.kill(proc.pid, "SIGKILL");
+      await waitUntil(() => replacement.proc !== null);
+      expect(dropped).toBe(1);
+      // The issue was raised with how it died, then resolved by the respawn.
+      await waitUntil(() => !listIssues().some((i) => i.source === "test-engine"));
+      const all = listIssues({ includeResolved: true }).find((i) => i.source === "test-engine" && i.key === "died");
+      expect(all?.detail).toContain("SIGKILL");
+      expect(all?.detail).toContain("starting it again");
+    } finally {
+      replacement.proc?.kill();
+      await replacement.proc?.exited;
+    }
+  }, 10_000);
+
+  test("a deliberate stop is never reported or respawned", async () => {
+    __setSidecarTimingForTestsOnly({ backoffMs: [50] });
+    const proc = await serve();
+    let respawns = 0;
+    const watch = watchEngine({ proc, role: "test", label: "the test engine", healthCheck: health, drop: () => {}, respawn: async () => void respawns++, title: "Test engine stopped" });
+    watch.stop();
+    await proc.exited;
+    await new Promise((r) => setTimeout(r, 300));
+    expect(respawns).toBe(0);
+    expect(listIssues().some((i) => i.source === "test-engine")).toBe(false);
+  });
+
+  test("markDown() on an engine that is really dead, and the exit that follows, count as one death, not two", async () => {
+    __setSidecarTimingForTestsOnly({ backoffMs: [50] });
+    const proc = await serve();
+    let dropped = 0;
+    let respawns = 0;
+    const watch = watchEngine({ proc, role: "test", label: "the test engine", healthCheck: health, drop: () => void dropped++, respawn: async () => void respawns++, title: "Test engine stopped" });
+    process.kill(proc.pid, "SIGKILL");
+    watch.markDown("stopped answering (could not reach it)");
+    await proc.exited;
+    await waitUntil(() => respawns === 1);
+    await new Promise((r) => setTimeout(r, 300));
+    expect(dropped).toBe(1);
+    expect(respawns).toBe(1);
+  });
+
+  // A code review (2026-09-07): a client that disconnected before the
+  // engine answered fails with the same "could not reach" a dead engine
+  // does. On that word alone, the engine must not be killed for everyone.
+  test("markDown() on an engine that still answers health checks is ignored", async () => {
+    __setSidecarTimingForTestsOnly({ backoffMs: [50] });
+    const proc = await serve();
+    let dropped = 0;
+    const watch = watchEngine({ proc, role: "test", label: "the test engine", healthCheck: health, drop: () => void dropped++, respawn: async () => {}, title: "Test engine stopped" });
+    try {
+      watch.markDown("stopped answering (could not reach it)");
+      await new Promise((r) => setTimeout(r, 300));
+      expect(dropped).toBe(0);
+      expect(proc.exitCode).toBeNull();
+      expect(listIssues().some((i) => i.source === "test-engine")).toBe(false);
+    } finally {
+      watch.stop();
+      await proc.exited;
+    }
+  });
+
+  // A code review (2026-09-07): an admin's stop landing inside the
+  // backoff window used to let the armed respawn fire anyway, count its
+  // own "it is stopped" rejection as a crash, and walk the role to
+  // "gave up" for an action that was never a failure.
+  test("a deliberate stop inside the backoff window cancels the armed respawn", async () => {
+    __setSidecarTimingForTestsOnly({ backoffMs: [200] });
+    const proc = await serve();
+    let respawns = 0;
+    watchEngine({ proc, role: "test", label: "the test engine", healthCheck: health, drop: () => {}, respawn: async () => void respawns++, title: "Test engine stopped" });
+    process.kill(proc.pid, "SIGKILL");
+    await proc.exited;
+    await waitUntil(() => engineRespawnState("test") === "pending");
+    cancelEngineRespawn("test"); // what stopChatBackend()/restartChatBackend() call
+    await new Promise((r) => setTimeout(r, 400));
+    expect(respawns).toBe(0);
+    expect(engineRespawnState("test")).toBeNull();
+  });
+
+  test("a respawn that fails is not retried on a timer: the issue says why and keeps the Start-it-again fix", async () => {
+    __setSidecarTimingForTestsOnly({ backoffMs: [20] });
+    const proc = await serve();
+    let respawns = 0;
+    watchEngine({
+      proc,
+      role: "test",
+      label: "the test engine",
+      healthCheck: health,
+      drop: () => {},
+      respawn: async () => {
+        respawns++;
+        throw new Error("the test engine is stopped - restart it from Household");
+      },
+      title: "Test engine stopped",
+    });
+    process.kill(proc.pid, "SIGKILL");
+    await waitUntil(() => engineRespawnState("test") === "gave_up");
+    await new Promise((r) => setTimeout(r, 200));
+    expect(respawns).toBe(1);
+    const issue = listIssues().find((i) => i.source === "test-engine")!;
+    expect(issue.detail).toContain("could not: the test engine is stopped");
+    expect(issue.fix?.action).toBe("restart_engine:test");
+  });
+
+  test("a fresh healthy spawn clears a prior gave-up state and its issue, whoever started it", async () => {
+    __setSidecarTimingForTestsOnly({ backoffMs: [20] });
+    const first = await serve();
+    watchEngine({ proc: first, role: "test", label: "the test engine", healthCheck: health, drop: () => {}, respawn: async () => { throw new Error("no"); }, title: "Test engine stopped" });
+    process.kill(first.pid, "SIGKILL");
+    await waitUntil(() => engineRespawnState("test") === "gave_up");
+    // An admin restart, say: a new healthy process, watched again.
+    const second = await serve();
+    const watch = watchEngine({ proc: second, role: "test", label: "the test engine", healthCheck: health, drop: () => {}, respawn: async () => {}, title: "Test engine stopped" });
+    try {
+      expect(engineRespawnState("test")).toBeNull();
+      expect(listIssues().some((i) => i.source === "test-engine")).toBe(false);
+    } finally {
+      watch.stop();
+      await second.exited;
+    }
+  });
+
+  test("a live process that stops answering health checks is treated as down and killed", async () => {
+    __setSidecarTimingForTestsOnly({ healthPollMs: 30, backoffMs: [50] });
+    const proc = await serve();
+    let healthy = true;
+    let respawns = 0;
+    watchEngine({ proc, role: "test", label: "the test engine", healthCheck: async () => healthy, drop: () => {}, respawn: async () => void respawns++, title: "Test engine stopped" });
+    healthy = false;
+    await waitUntil(() => respawns === 1);
+    await proc.exited;
+    expect(proc.exitCode ?? proc.signalCode).not.toBeNull();
+    const issue = listIssues({ includeResolved: true }).find((i) => i.source === "test-engine");
+    expect(issue?.detail).toContain("health checks");
+  });
+
+  test("a crash loop stops after five respawns in ten minutes and leaves a one-click fix", async () => {
+    __setSidecarTimingForTestsOnly({ backoffMs: [10] });
+    let respawns = 0;
+    let testActive = true;
+    const procs: Bun.Subprocess[] = [];
+    // Each respawn hands back a process that dies at once, watched again -
+    // the shape a supervisor's get*Client() produces for a binary that
+    // keeps crashing. The fix handler below calls this fresh with an
+    // empty history, so it genuinely crash-loops again if the underlying
+    // command is still broken - correct auto-heal behavior, but a code
+    // review (2026-09-07) found the ORIGINAL version of this test let
+    // that second loop keep spawning real processes past the test's own
+    // lifetime. `testActive` is this test's own teardown flag, not
+    // anything sidecars.ts exposes: once false, a respawn already
+    // in flight becomes a no-op instead of starting another cycle.
+    async function crashy(): Promise<void> {
+      if (!testActive) return;
+      respawns++;
+      const proc = Bun.spawn(["bun", "-e", "process.exit(1)"]);
+      procs.push(proc);
+      watchEngine({ proc, role: "loop", label: "the looping engine", healthCheck: async () => true, drop: () => {}, respawn: crashy, title: "Looping engine stopped" });
+    }
+    const first = Bun.spawn(["bun", "-e", "process.exit(1)"]);
+    procs.push(first);
+    watchEngine({ proc: first, role: "loop", label: "the looping engine", healthCheck: async () => true, drop: () => {}, respawn: crashy, title: "Looping engine stopped" });
+    try {
+      await waitUntil(() => listIssues().some((i) => i.source === "loop-engine" && i.fix !== null), 10_000);
+      const count = respawns;
+      await new Promise((r) => setTimeout(r, 300));
+      expect(respawns).toBe(count); // no longer trying on its own
+      expect(respawns).toBe(5);
+      const issue = listIssues().find((i) => i.source === "loop-engine")!;
+      expect(issue.detail).toContain("keeps stopping");
+      expect(issue.fix?.action).toBe("restart_engine:loop");
+      // The fix is a real respawn, counted fresh.
+      const fixed = await fixIssue(issue.id);
+      expect(fixed.ok).toBe(true);
+      expect(respawns).toBe(6);
+    } finally {
+      testActive = false;
+      cancelEngineRespawn("loop");
+      for (const proc of procs) {
+        proc.kill();
+        await proc.exited;
+      }
+    }
+  }, 15_000);
 });
 
 describe("freePort", () => {

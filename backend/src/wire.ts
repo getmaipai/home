@@ -193,6 +193,14 @@ export interface ModelJob {
 // ModelFit/BackupInfo above).
 export type EngineKind = "url" | "override" | "selection" | "stub" | "stopped" | "starting" | "none";
 
+/** The three kinds an engine's Repairs-page auto-heal can add on top of
+ * a supervisor's own EngineKind - "spawned" is ttsSupervisor.ts's/
+ * embedSupervisor.ts's own literal, not in EngineKind above (that union
+ * predates them). Declared once here (2026-09-07) so app.ts's schema,
+ * sidecars.ts's engineHealthKind(), and HealthSection.tsx's badge all
+ * draw from the same three literals instead of hand-repeating them. */
+export type EngineHealthKind = EngineKind | "spawned" | "restarting" | "failed";
+
 export interface EngineStatus {
   kind: EngineKind;
   modelId: string | null;
@@ -217,9 +225,21 @@ export interface SidecarStatusEntry {
   baseUrl: string | null;
 }
 
+export interface EngineHealthEntry {
+  kind: EngineHealthKind;
+  pid: number | null;
+  /** A real probe of the process: true/false when something is supposed
+   * to be up, null when there is nothing to probe yet. */
+  alive: boolean | null;
+}
+
 export interface HealthStatus {
   brain: string;
   voice: string;
+  /** False when any engine that should be up is not answering, or a
+   * sidecar is unhealthy/crashed. */
+  ok: boolean;
+  engines: { chat: EngineHealthEntry; embed: EngineHealthEntry; voice: EngineHealthEntry };
   uptimeSeconds: number;
   sidecars: SidecarStatusEntry[];
 }

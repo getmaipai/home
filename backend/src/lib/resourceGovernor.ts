@@ -16,7 +16,7 @@
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import os from "node:os";
-import { getEngineStatus, restartChatBackend } from "@/lib/llmSupervisor";
+import { getEngineStatus, restartChatBackend, getChatClient } from "@/lib/llmSupervisor";
 import { measureProcessMemoryBytes } from "@/lib/enginePostLoadCheck";
 import { raiseIssue } from "@/lib/issues";
 
@@ -143,6 +143,17 @@ export function startResourceGovernor(opts: ResourceGovernorOptions): void {
       detail,
     });
     await restartChatBackend();
+    // Proactive, not lazy (a second code review, 2026-09-07): every other
+    // auto-heal path (a SIGKILL, a wedged health check) respawns on its
+    // own; this one used to only clear the cache and wait for the next
+    // chat message, during which GET /api/health saw an empty backend
+    // (kind "none", alive null) and reported the hub as fine seconds
+    // after this trip killed the engine mid-reply. Fire-and-forget, the
+    // same shape index.ts's own boot warm-up uses - a failure here is
+    // exactly the failure the next real chat message would have hit
+    // anyway, and trySpawnFromSelection()'s own issue-raising already
+    // covers it.
+    void getChatClient().catch((err: unknown) => console.error(`[resource-governor] chat engine did not come back: ${(err as Error).message}`));
   }
 
   async function tick(): Promise<void> {

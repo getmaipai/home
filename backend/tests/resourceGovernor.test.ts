@@ -21,6 +21,16 @@ import { resetDb } from "./reset-db";
 // measurement, a deliberately chosen ceiling, never a mocked one.
 const FAKE_BIN = join(import.meta.dir, "fixtures", "fakeLlamaServer.ts");
 
+// tests/preload.ts's isolated chat port, captured so afterEach can put it
+// BACK rather than delete it. The original `delete` here was the live
+// bug behind "the chat engine dies silently" (docs/dev.md, "What was
+// actually killing the chat engine", 2026-09-07): with the variable
+// gone, a later test file's spawn resolved llmSupervisor.ts's default
+// port 8788 and freePort() SIGKILLed the real dev hub's engine on this
+// same machine. tests/isolation.ts now fails any test that leaves it
+// unset; this is the fix at the source.
+const ISOLATED_CHAT_PORT = process.env.MAIPAI_LLAMA_SERVER_PORT;
+
 beforeEach(() => {
   resetDb();
   __resetFixHandlersForTests();
@@ -44,7 +54,7 @@ afterEach(async () => {
   __resetGovernorTuningForTests();
   delete process.env.MAIPAI_LLAMA_SERVER_BIN;
   delete process.env.MAIPAI_CHAT_MODEL_PATH;
-  delete process.env.MAIPAI_LLAMA_SERVER_PORT;
+  process.env.MAIPAI_LLAMA_SERVER_PORT = ISOLATED_CHAT_PORT;
   delete process.env.FAKE_LLAMA_INFLATE_MB;
 });
 

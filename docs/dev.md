@@ -9390,18 +9390,66 @@ reach" a dead engine does; llm.ts also skips recovery when the request's
 own signal was aborted. A respawn that rejects (the engine deliberately
 stopped, a crash-boot hold, a model not downloaded) never produced a
 process, so it is not retried on a timer: the issue says why and keeps
-the "Start it again" button, which each supervisor registers at module
-load (`registerEngineRespawn()`) so it still works after a hub restart.
-A crash-loop cap stops after five respawns in ten minutes, leaves the
-Repairs issue open with the same fix, and says so in plain words; the
-count survives a hot reload. A fresh healthy spawn, whoever started it,
-clears the prior death's issue and state, since a watched process is
-healthy by construction. Both spec clients' `health()` calls are now
-bounded (3 s), so a live-but-hung engine reads as unhealthy instead of
-holding every poll open forever. `GET /api/health` now carries `ok` and a per-engine
-`{kind, pid, alive}` from a real probe (the page had been printing the
-configured kind, "selection", which does not change when the process
-dies), and Health is the first entry under Settings -> Household.
+the "Start it again" button. A crash-loop cap stops after five respawns
+in ten minutes, leaves the Repairs issue open with the same fix, and
+says so in plain words; the count survives a hot reload. A fresh healthy
+spawn, whoever started it, clears the prior death's issue and state,
+since a watched process is healthy by construction. Both spec clients'
+`health()` calls are now bounded (3 s), so a live-but-hung engine reads
+as unhealthy instead of holding every poll open forever. `GET
+/api/health` now carries `ok` and a per-engine `{kind, pid, alive}` from
+a real probe (the page had been printing the configured kind,
+"selection", which does not change when the process dies), and Health is
+the first entry under Settings -> Household.
+
+**A second review pass (same day) found four more real gaps**, each
+fixed rather than left as a caveat:
+
+- A respawn timer that had already FIRED and was awaiting a real spawn
+  (20-60s) when a deliberate stop landed had nothing left for
+  `cancelEngineRespawn()` to cancel, so the in-flight respawn's own "it
+  is stopped" rejection was counted as a crash. Fixed with a generation
+  counter (`respawnGeneration`, bumped by every `cancelEngineRespawn()`
+  and every `watchEngine()` call): a settling respawn only acts if the
+  role's generation hasn't moved since it was scheduled.
+- The Repairs "Start it again" fix action was registered with
+  `registerFixHandler()` once, at each supervisor's module load - which
+  runs exactly once per `bun test` process, so any test file's
+  `__resetFixHandlersForTests()` (several already call it in their own
+  `beforeEach`) wiped it for good and poisoned every later test that
+  raised that role's "died" issue. Moved into `watchEngine()` itself, so
+  it re-registers with every real spawn - the same pattern
+  `registerSidecar()` already uses for its own declared sidecars. The
+  narrow gap this leaves (a crash-looping engine that has never once
+  become healthy since the last process restart has no fix button yet)
+  is recorded here rather than solved with a persisted-handler
+  rehydration mechanism.
+- `pendingRespawnTimers` was module-local, so a `bun --hot` reload gave a
+  fresh module instance an empty Map and its `cancelEngineRespawn()`
+  could never find (or clear) a timer the previous instance armed - the
+  same "reload wipes tracking a live child still needs" class of bug Fix
+  A exists to prevent everywhere else in this file. Moved onto
+  `hotReloadState`, alongside the generation counter above.
+- The resource governor's own `trip()` (a real, separate auto-heal path:
+  it kills the chat engine itself when the machine is genuinely under
+  memory pressure) called `restartChatBackend()` and stopped there,
+  clearing the cache but never respawning - so `GET /api/health` saw an
+  empty backend (`kind: "none"`, `alive: null`, both read as fine) and
+  reported the hub as healthy seconds after this exact path killed the
+  engine mid-reply, for as long as it took the next real chat message to
+  arrive. Now proactively calls `getChatClient()` right after the
+  restart, the same fire-and-forget shape `index.ts`'s own boot warm-up
+  uses.
+
+Two more from that pass, in `llmSupervisor.ts`: `spawnLlamaServer()` used
+to attach the watch (and so start counting deaths) before tier 3's own
+post-load memory check ran, so a process that died DURING that check -
+the OOM case it exists to catch - was already being treated as a crash,
+respawning (and reloading the whole model) up to five times against a
+model that had just proven it doesn't fit, instead of failing once with
+the check's own clear reason. Split into `spawnLlamaServer()` (spawns,
+returns unwatched) and `attachChatWatch()` (arms the watch), with the
+watch attached only after `runPostLoadCheck()` succeeds.
 
 Two side lessons from the diagnosis. `bun test --preload <file>` on
 the command line REPLACES bunfig's preload list, it does not add to it:

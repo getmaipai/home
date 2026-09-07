@@ -24,7 +24,7 @@
 //      server. Real code path, canned deterministic vectors.
 import { detectHardware } from "@/lib/hardware";
 import { engineBinaryPath } from "@/lib/llmSupervisor";
-import { spawnAndWaitHealthy } from "@/lib/sidecars";
+import { spawnAndWaitHealthy, watchEngine, probeAlive, engineHealthKind, cancelEngineRespawn, type EngineHealth } from "@/lib/sidecars";
 import { hotReloadState } from "@/lib/hotReloadState";
 import { assertNotInCrashBootHold } from "@/lib/dirtyBoot";
 import { embedModelPath, ensureEmbedModel } from "@/lib/embedAssets";
@@ -83,7 +83,36 @@ async function spawnEmbedServer(binPath: string): Promise<EmbedBackend> {
     timeoutMs: 60_000,
     label: "llama-server (embed)",
   });
-  return { client, stop: () => proc.kill(), pid: proc.pid, kind: "spawned", startedAt: new Date().toISOString() };
+  // The auto-heal, llmSupervisor.ts's spawnLlamaServer() shape for this
+  // role: sidecars.ts's watchEngine() owns the exit watch, the health poll
+  // and the backoff respawn; this only says what to drop and how to start.
+  const watch = watchEngine({
+    proc,
+    role: "embed",
+    label: "the text-understanding engine",
+    healthCheck: () => client.health(),
+    drop: () => void restartEmbedBackend(),
+    respawn: () => getEmbedClient(),
+    title: "MaiPai's text-understanding engine stopped unexpectedly",
+  });
+  return { client, stop: watch.stop, pid: proc.pid, kind: "spawned", startedAt: new Date().toISOString() };
+}
+
+/** Stops whatever backend is running (if any) and clears the cache, so
+ * the next getEmbedClient() call re-resolves from scratch - the same
+ * shape as llmSupervisor.ts's restartChatBackend(), now that the
+ * auto-heal needs a real caller for it here too. */
+export async function restartEmbedBackend(): Promise<void> {
+  cancelEngineRespawn("embed");
+  state.generation++;
+  state.embedBackend?.stop();
+  state.embedBackend = null;
+  state.startingPromise = null;
+}
+
+/** For GET /api/health: the kind plus a real probe of the process. */
+export async function probeEmbedEngine(): Promise<EngineHealth> {
+  return { kind: engineHealthKind("embed", getEmbedBackendKind()), pid: state.embedBackend?.pid ?? null, alive: await probeAlive(state.embedBackend?.client) };
 }
 
 async function startEmbedBackend(): Promise<EmbedBackend> {
@@ -166,8 +195,5 @@ export function getEmbedLivePid(): number | null {
  * client, the same reset-between-test-files shape as
  * __resetTtsSupervisorForTests. */
 export function __resetEmbedSupervisorForTests(): void {
-  state.generation++;
-  state.embedBackend?.stop();
-  state.embedBackend = null;
-  state.startingPromise = null;
+  void restartEmbedBackend();
 }

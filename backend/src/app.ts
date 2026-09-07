@@ -42,8 +42,9 @@ import { storeRoutes } from "@/routes/store";
 import { listsRoutes } from "@/routes/lists";
 import { widgetsRoutes } from "@/routes/widgets";
 import { requireAuth } from "@/middleware/auth";
-import { getEngineStatus } from "@/lib/llmSupervisor";
-import { getTtsBackendKind } from "@/lib/ttsSupervisor";
+import { getEngineStatus, probeChatEngine } from "@/lib/llmSupervisor";
+import { getTtsBackendKind, probeTtsEngine } from "@/lib/ttsSupervisor";
+import { probeEmbedEngine } from "@/lib/embedSupervisor";
 import { listSidecars } from "@/lib/sidecars";
 
 // Session F, step 4: every route file converts to @hono/zod-openapi
@@ -66,9 +67,27 @@ export const app = apiRouter();
 // unlike Repairs (owner/admin, remedial actions), Health is informational
 // and every signed-in household member can see it.
 const SidecarStatusSchema = z.enum(["stopped", "starting", "running", "unhealthy", "crashed"]);
+// One engine as the Health page sees it (2026-09-07, "why didn't our
+// health page show bad health when these are down" - Jesse): `kind` is
+// what the supervisor is configured to run, `alive` is a real probe of
+// the process behind it - true/false when something is supposed to be
+// up, null when there is nothing to probe (not started yet, starting,
+// stopped). `brain`/`voice` below stay exactly what they were (a kind
+// label; the chat page's ready-to-send gate reads them) - additive, per
+// the org's API compatibility rule.
+const ENGINE_HEALTH_KINDS = ["url", "override", "selection", "stub", "stopped", "starting", "none", "spawned", "restarting", "failed"] as const;
+const EngineHealthSchema = z.object({
+  kind: z.enum(ENGINE_HEALTH_KINDS),
+  pid: z.number().nullable(),
+  alive: z.boolean().nullable(),
+});
 const HealthResponseSchema = z.object({
   brain: z.string(),
   voice: z.string(),
+  /** False when any engine that should be up is not answering, or any
+   * registered sidecar is unhealthy/crashed. The Health page's headline. */
+  ok: z.boolean(),
+  engines: z.object({ chat: EngineHealthSchema, embed: EngineHealthSchema, voice: EngineHealthSchema }),
   // Settings -> Household -> Health (2026-09-07): the plainest single
   // signal of "is the app actually up," next to which that page puts the
   // restart control (routes/host.ts's POST /api/host/restart).
@@ -101,9 +120,14 @@ const healthRoute = createRoute({
 // schemas (200 vs 401) this call was for, and it type-checked the
 // response body against BOTH - a real error caught while converting
 // routes/repairs.ts to the identical pattern, fixed here too.
-app.openapi(healthRoute, (c) =>
-  c.json({ sidecars: listSidecars(), brain: getEngineStatus().kind, voice: getTtsBackendKind(), uptimeSeconds: process.uptime() }, 200),
-);
+app.openapi(healthRoute, async (c) => {
+  const [chat, embed, voice] = await Promise.all([probeChatEngine(), probeEmbedEngine(), probeTtsEngine()]);
+  const sidecars = listSidecars();
+  const ok =
+    [chat, embed, voice].every((e) => e.alive !== false && e.kind !== "failed" && e.kind !== "restarting") &&
+    sidecars.every((s) => s.status !== "unhealthy" && s.status !== "crashed");
+  return c.json({ sidecars, brain: getEngineStatus().kind, voice: getTtsBackendKind(), ok, engines: { chat, embed, voice }, uptimeSeconds: process.uptime() }, 200);
+});
 
 // /api/docs: the Scalar API reference reading the generated document
 // below. docs/api/ (a script check.sh runs and diffs, per this step's

@@ -22,7 +22,9 @@ export class PocketTtsClient {
    * "can I use this right now" contract. */
   async health(): Promise<boolean> {
     try {
-      const res = await fetch(`${this.baseUrl}/health`);
+      // Bounded, same reason as spec/llm/ts/client.ts's health(): a hung
+      // server must read as unhealthy rather than hang the caller.
+      const res = await fetch(`${this.baseUrl}/health`, { signal: AbortSignal.timeout(3_000) });
       if (!res.ok) return false;
       const body = (await res.json()) as TtsHealthResponse;
       return body.status === "healthy";

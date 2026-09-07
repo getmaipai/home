@@ -41,6 +41,118 @@
                     "voice": {
                       "type": "string"
                     },
+                    "ok": {
+                      "type": "boolean"
+                    },
+                    "engines": {
+                      "type": "object",
+                      "properties": {
+                        "chat": {
+                          "type": "object",
+                          "properties": {
+                            "kind": {
+                              "type": "string",
+                              "enum": [
+                                "url",
+                                "override",
+                                "selection",
+                                "stub",
+                                "stopped",
+                                "starting",
+                                "none",
+                                "spawned",
+                                "restarting",
+                                "failed"
+                              ]
+                            },
+                            "pid": {
+                              "type": "number",
+                              "nullable": true
+                            },
+                            "alive": {
+                              "type": "boolean",
+                              "nullable": true
+                            }
+                          },
+                          "required": [
+                            "kind",
+                            "pid",
+                            "alive"
+                          ]
+                        },
+                        "embed": {
+                          "type": "object",
+                          "properties": {
+                            "kind": {
+                              "type": "string",
+                              "enum": [
+                                "url",
+                                "override",
+                                "selection",
+                                "stub",
+                                "stopped",
+                                "starting",
+                                "none",
+                                "spawned",
+                                "restarting",
+                                "failed"
+                              ]
+                            },
+                            "pid": {
+                              "type": "number",
+                              "nullable": true
+                            },
+                            "alive": {
+                              "type": "boolean",
+                              "nullable": true
+                            }
+                          },
+                          "required": [
+                            "kind",
+                            "pid",
+                            "alive"
+                          ]
+                        },
+                        "voice": {
+                          "type": "object",
+                          "properties": {
+                            "kind": {
+                              "type": "string",
+                              "enum": [
+                                "url",
+                                "override",
+                                "selection",
+                                "stub",
+                                "stopped",
+                                "starting",
+                                "none",
+                                "spawned",
+                                "restarting",
+                                "failed"
+                              ]
+                            },
+                            "pid": {
+                              "type": "number",
+                              "nullable": true
+                            },
+                            "alive": {
+                              "type": "boolean",
+                              "nullable": true
+                            }
+                          },
+                          "required": [
+                            "kind",
+                            "pid",
+                            "alive"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "chat",
+                        "embed",
+                        "voice"
+                      ]
+                    },
                     "uptimeSeconds": {
                       "type": "number"
                     },
@@ -78,6 +190,8 @@
                   "required": [
                     "brain",
                     "voice",
+                    "ok",
+                    "engines",
                     "uptimeSeconds",
                     "sidecars"
                   ]
@@ -8623,6 +8737,12 @@
                           "title"
                         ]
                       }
+                    },
+                    "degraded": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
                     }
                   },
                   "required": [

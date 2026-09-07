@@ -37,7 +37,7 @@ import { modelsDir, enginesDir } from "@/lib/paths";
 import { resolveLaunchFlags, launchFlagsToArgs, type LaunchFlags, type LaunchFlagOverrides } from "@/lib/engineAutotune";
 import { runPostLoadCheck, type PostLoadCheckResult } from "@/lib/enginePostLoadCheck";
 import { getHouseholdSettingValue } from "@/lib/settings";
-import { spawnAndWaitHealthy, freePort, sweepOrphanProcesses } from "@/lib/sidecars";
+import { spawnAndWaitHealthy, freePort, sweepOrphanProcesses, watchEngine, probeAlive, engineHealthKind, cancelEngineRespawn, type EngineWatch, type EngineHealth } from "@/lib/sidecars";
 import { hotReloadState } from "@/lib/hotReloadState";
 import { assertNotInCrashBootHold } from "@/lib/dirtyBoot";
 import { startResourceGovernor } from "@/lib/resourceGovernor";
@@ -51,6 +51,11 @@ interface ChatBackend {
   /** Only set for a backend this module actually spawned (tiers 2-3): the
    * child's pid, for enginePostLoadCheck.ts's real memory measurement. */
   pid?: number;
+  /** Only for a spawned backend: sidecars.ts's watchEngine(), the
+   * auto-heal (exit watch, health poll, backoff respawn) and the thing
+   * `stop` is routed through so a deliberate stop is never mistaken for
+   * a death. */
+  watch?: EngineWatch;
   kind: BackendKind;
   modelId?: string;
   startedAt: string;
@@ -159,13 +164,31 @@ export async function sweepOrphanEngineProcesses(extraLivePids: readonly (number
   return sweepOrphanProcesses(enginesDir, { excludePids });
 }
 
+/** A spawned, healthy llama-server, not yet watched. Split from
+ * attachChatWatch() below (a second code review, 2026-09-07): tier 3
+ * (trySpawnFromSelection) still has a whole post-load memory check left
+ * to run after this returns, and attaching the auto-heal's watch before
+ * that finishes meant a process that died DURING the check (the exact
+ * OOM case the check exists to catch) was already being counted as a
+ * crash by watchEngine's own exit handler, so it got auto-respawned
+ * (and the full model reload retried) up to five times against a model
+ * that had just proven it doesn't fit, instead of failing once with the
+ * check's own clear reason. */
+interface SpawnedLlamaServer {
+  proc: Bun.Subprocess;
+  client: LlamaServerClient;
+  pid: number;
+  kind: BackendKind;
+  modelId?: string;
+}
+
 async function spawnLlamaServer(
   bin: string,
   modelPath: string,
   kind: BackendKind,
   launchFlags?: LaunchFlags,
   modelId?: string,
-): Promise<ChatBackend> {
+): Promise<SpawnedLlamaServer> {
   // One fixed port: this pass supervises exactly one chat process, not a
   // pool, so there's nothing to pick a free port among yet. A second role
   // (e.g. router) would need real port allocation, deferred with the rest
@@ -189,7 +212,48 @@ async function spawnLlamaServer(
     timeoutMs: 60_000,
     label: "llama-server",
   });
-  return { client, stop: () => proc.kill(), pid: proc.pid, kind, modelId, startedAt: new Date().toISOString() };
+  return { proc, client, pid: proc.pid, kind, modelId };
+}
+
+// The auto-heal (docs/dev.md, "What was actually killing the chat
+// engine", 2026-09-07): before this, nothing observed a spawned engine's
+// exit at all, so a SIGKILLed process left every turn repeating "could
+// not reach" against this cached client until someone restarted the
+// whole hub. `drop` is the same restartChatBackend() a manual restart
+// uses (which routes back through `watch.stop()`, by then a no-op),
+// `respawn` the same lazy start the first message uses.
+function attachChatWatch(spawned: SpawnedLlamaServer): ChatBackend {
+  const watch = watchEngine({
+    proc: spawned.proc,
+    role: "chat",
+    label: "the chat engine",
+    healthCheck: () => spawned.client.health(),
+    drop: () => void restartChatBackend(),
+    respawn: () => getChatClient(),
+    title: "MaiPai's AI stopped unexpectedly",
+  });
+  return { client: spawned.client, stop: watch.stop, watch, pid: spawned.pid, kind: spawned.kind, modelId: spawned.modelId, startedAt: new Date().toISOString() };
+}
+
+/** llm.ts's recoverFromDeadBackend() lands here when a request failed
+ * with "could not reach": a spawned engine goes straight to its watch's
+ * own down path (log, Repairs, respawn), without waiting for the exit or
+ * the next health poll and without ever being read as a deliberate stop;
+ * the URL tier (a process this hub does not own) can only be dropped so
+ * the next call re-resolves. */
+export function reportChatBackendUnreachable(message: string): void {
+  const backend = state.chatBackend;
+  if (!backend) return;
+  if (backend.watch) backend.watch.markDown(`stopped answering (${message})`);
+  else void restartChatBackend();
+}
+
+/** For GET /api/health: the configured kind plus a real probe of the
+ * process behind it, so a dead engine reads as down rather than as its
+ * kind label. */
+export async function probeChatEngine(): Promise<EngineHealth> {
+  const status = getEngineStatus();
+  return { kind: engineHealthKind("chat", status.kind), pid: status.pid, alive: await probeAlive(state.chatBackend?.client) };
 }
 
 /** Null unless the engine is genuinely fully installed - both the binary
@@ -254,15 +318,19 @@ async function trySpawnFromSelection(): Promise<ChatBackend | null> {
     kvCache: getHouseholdSettingValue("chat.kv_cache_override") as LaunchFlagOverrides["kvCache"],
   };
   const flags = resolveLaunchFlags(model, hw, overrides);
-  const backend = await spawnLlamaServer(binPath, modelPath, "selection", flags, modelId);
+  const spawned = await spawnLlamaServer(binPath, modelPath, "selection", flags, modelId);
 
   try {
-    const result = await runPostLoadCheck(backend.client, backend.pid!, model, flags, hw);
+    const result = await runPostLoadCheck(spawned.client, spawned.pid, model, flags, hw);
     state.lastPostLoadCheck = { modelId, ...result };
   } catch (err) {
-    backend.stop();
+    spawned.proc.kill();
     throw err;
   }
+  // The auto-heal's watch attaches only now, after the post-load check
+  // has already proven the process survives it - see SpawnedLlamaServer's
+  // own doc comment for the crash-loop this ordering was found to cause.
+  const backend = attachChatWatch(spawned);
   // A fresh, healthy real spawn clears any resource-governor issue a prior
   // backend's restart may have raised - symmetric with how sidecars.ts
   // resolves its own crash issues on a healthy restart.
@@ -295,7 +363,8 @@ async function startChatBackend(): Promise<ChatBackend> {
     // tier 1 (a bare URL, nothing spawned) and tier 4's stub are meant to
     // bypass this.
     assertNotInCrashBootHold();
-    const backend = await spawnLlamaServer(bin, modelPath, "override");
+    const spawned = await spawnLlamaServer(bin, modelPath, "override");
+    const backend = attachChatWatch(spawned);
     // No model metadata on this tier (a bare env-var override, no catalog
     // entry) to size a process ceiling against - system-memory protection
     // only (resourceGovernor.ts's trigger A), matching this tier's existing
@@ -407,6 +476,7 @@ export async function getChatClient(): Promise<LlamaServerClient> {
  * this once a fresh download's checksum verifies, right before the
  * select job's own "loading"/"testing" phases exercise the new spawn. */
 export async function restartChatBackend(): Promise<void> {
+  cancelEngineRespawn("chat");
   state.manuallyStopped = false;
   state.generation++;
   state.chatBackend?.stop();
@@ -420,6 +490,7 @@ export async function restartChatBackend(): Promise<void> {
  * a fresh model select, which calls that) runs. Safe to call with nothing
  * running (a stopped stub, or nothing started yet). */
 export function stopChatBackend(): void {
+  cancelEngineRespawn("chat");
   state.manuallyStopped = true;
   state.generation++;
   state.chatBackend?.stop();
@@ -464,6 +535,7 @@ export function getChatLivePid(): number | null {
  * server) and clear the cached client, the same reset-between-test-files
  * shape as resetDb()/__clearSessionCacheForTests. */
 export function __resetLlmSupervisorForTests(): void {
+  cancelEngineRespawn("chat");
   state.generation++;
   state.chatBackend?.stop();
   state.chatBackend = null;

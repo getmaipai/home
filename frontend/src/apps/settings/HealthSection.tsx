@@ -6,6 +6,7 @@ import { Button } from "@/kit/ui/button";
 import { Badge } from "@/kit/ui/badge";
 import { useToast } from "@/kit/primitives/Toast";
 import { api, ApiError, type HealthStatus, type Roster } from "@/lib/api";
+import type { EngineHealthEntry } from "@/lib/api";
 
 interface HealthSectionProps {
   person: Roster;
@@ -18,6 +19,33 @@ const SIDECAR_VARIANT: Record<HealthStatus["sidecars"][number]["status"], "outli
   unhealthy: "destructive",
   crashed: "destructive",
 };
+
+// Dad-language state for one engine, from a real probe (app.ts's
+// healthRoute): before 2026-09-07 this page printed the engine's
+// configured kind ("selection"), which stayed the same after the process
+// behind it had died - "why didn't our health page show bad health when
+// these are down" (Jesse). `alive` is the answer to that: true/false when
+// something should be up, null when nothing is (yet).
+function engineState(engine: EngineHealthEntry): { label: string; variant: "secondary" | "destructive" | "outline" } {
+  // The built-in stand-in (no model chosen yet, or no speech program
+  // installed) answers health checks fine but is not the real thing, and
+  // this page must not call it "Running" - the chat dock's own pill
+  // already calls it demo mode.
+  if (engine.kind === "stub") return { label: "Demo mode", variant: "outline" };
+  if (engine.alive === true) return { label: "Running", variant: "secondary" };
+  if (engine.alive === false) return { label: "Not answering", variant: "destructive" };
+  if (engine.kind === "restarting") return { label: "Restarting", variant: "destructive" };
+  if (engine.kind === "failed") return { label: "Keeps stopping", variant: "destructive" };
+  if (engine.kind === "starting") return { label: "Starting", variant: "outline" };
+  if (engine.kind === "stopped") return { label: "Stopped", variant: "outline" };
+  return { label: "Starts when needed", variant: "outline" };
+}
+
+const ENGINE_ROWS: Array<{ key: keyof HealthStatus["engines"]; label: string; hint: string }> = [
+  { key: "chat", label: "Brain", hint: "Answers your conversations." },
+  { key: "embed", label: "Understanding", hint: "Matches what you say to skills and memories." },
+  { key: "voice", label: "Voice", hint: "Speaks replies out loud." },
+];
 
 function formatUptime(seconds: number): string {
   const days = Math.floor(seconds / 86_400);
@@ -70,19 +98,30 @@ export function HealthSection({ person }: HealthSectionProps) {
       >
         {(health) => (
           <div className="flex flex-col gap-4">
-            <div className="flex flex-wrap items-center gap-x-6 gap-y-2 text-base">
+            <div className="flex flex-wrap items-center gap-x-6 gap-y-2 text-base" role="status">
+              <span className="font-medium">{health.ok ? "Everything is running." : "Something is not answering."}</span>
               <span>
-                <span className="text-[var(--muted-foreground)]">Uptime: </span>
+                <span className="text-[var(--muted-foreground)]">Up for: </span>
                 {formatUptime(health.uptimeSeconds)}
               </span>
-              <span>
-                <span className="text-[var(--muted-foreground)]">Brain: </span>
-                {health.brain}
-              </span>
-              <span>
-                <span className="text-[var(--muted-foreground)]">Voice: </span>
-                {health.voice}
-              </span>
+            </div>
+            {!health.ok ? (
+              <p className="text-base text-[var(--muted-foreground)]">MaiPai restarts a stopped engine on its own. If one keeps stopping, Repairs has a button to start it again, or restart the server below.</p>
+            ) : null}
+
+            <div className="flex flex-col divide-y divide-[var(--border)]">
+              {ENGINE_ROWS.map((row) => {
+                const state = engineState(health.engines[row.key]);
+                return (
+                  <div key={row.key} className="flex items-center justify-between gap-3 py-2 text-base">
+                    <span className="flex flex-col">
+                      <span>{row.label}</span>
+                      <span className="text-sm text-[var(--muted-foreground)]">{row.hint}</span>
+                    </span>
+                    <Badge variant={state.variant}>{state.label}</Badge>
+                  </div>
+                );
+              })}
             </div>
 
             {health.sidecars.length > 0 ? (
