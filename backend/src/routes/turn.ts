@@ -117,6 +117,17 @@ export async function* streamTurnEvents(
     const value = result.finalize(fullText, current.value);
     yield { type: "done", value };
   } catch (err) {
+    // This catch had no server-side log at all (a live incident,
+    // 2026-09-07: the real reason only ever left the process as
+    // `event.error` on the wire, and the frontend collapses every
+    // "error" event's code to the same generic banner regardless -
+    // chatModelAdapter.ts always throws `code: "unavailable"` here, so
+    // the actual message was undiagnosable without this). Kept as a
+    // permanent log line, not a one-off: llm.ts's recoverFromDeadBackend()
+    // now self-heals the one cause found so far (a dead backend process),
+    // but this catch is the generic "something failed mid-turn" case and
+    // will keep catching failures that fix doesn't cover.
+    console.error("[turn/stream] failed mid-stream:", err);
     // Headers (and a 200 status) are already committed by the time
     // generation can fail here - an HTTP error status is no longer
     // possible, so the failure has to travel as its own event instead

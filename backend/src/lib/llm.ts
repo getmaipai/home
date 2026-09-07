@@ -13,7 +13,7 @@
 // request's shape (a batch of plain strings) have nothing in common, so
 // forcing embed through validate()'s chat-shaped checks would be the
 // wrong kind of code reuse, not real sharing.
-import { getChatClient } from "@/lib/llmSupervisor";
+import { getChatClient, restartChatBackend } from "@/lib/llmSupervisor";
 import { getEmbedClient } from "@/lib/embedSupervisor";
 import { tryConsume } from "@/lib/rateLimiter";
 import { LlmClientError } from "@maipai/spec/llm/ts/client.js";
@@ -213,6 +213,28 @@ function validate(role: LlmRole, messages: LlmMessage[]): LlmValidationError | n
   return null;
 }
 
+// A live incident (2026-09-07): Fix A keeps a spawned chat backend's
+// client cached on `globalThis` across a hot reload (llmSupervisor.ts),
+// but nothing ever re-validates that its underlying process is still
+// alive. That process can die out from under it - observed twice in one
+// night, no crash report, no resource-governor trip, chat's own port
+// simply stopped answering - and without this, every subsequent turn
+// repeats the identical "could not reach" failure forever: only an
+// explicit stop/restart action ever clears `state.chatBackend`, and
+// nothing was calling one. `LlamaServerClient`'s own `timeoutError()`
+// (spec/llm/ts/client.ts) gives the unreachable case this exact message
+// prefix, distinct from a timeout (a slow/wedged process that may still
+// be alive, and shouldn't be killed out from under a request that might
+// still complete). This turn still fails - by the time a stream failure
+// reaches here, headers may already be committed - but clearing the
+// stale reference means the household's NEXT message spawns a fresh
+// backend instead of repeating the same dead one.
+function recoverFromDeadBackend(err: unknown): void {
+  if (err instanceof LlmClientError && err.message.startsWith("could not reach ")) {
+    void restartChatBackend();
+  }
+}
+
 export async function complete(
   role: LlmRole,
   messages: LlmMessage[],
@@ -248,6 +270,7 @@ export async function complete(
     const tool_calls = tools && tools.length > 0 ? parseToolCalls(choice.message.content, tools, tool_choice ?? "auto") : undefined;
     return { ok: true, value: { text: choice.message.content, model: response.model, ...(tool_calls !== undefined ? { tool_calls } : {}) } };
   } catch (err) {
+    recoverFromDeadBackend(err);
     const message = err instanceof LlmClientError ? err.message : (err as Error).message;
     return { ok: false, status: 503, code: "unavailable", error: `chat model unavailable: ${message}` };
   }
@@ -305,6 +328,7 @@ export async function startCompleteStream(
         yield delta;
       }
     } catch (err) {
+      recoverFromDeadBackend(err);
       const message = err instanceof LlmClientError ? err.message : (err as Error).message;
       throw new Error(`chat model unavailable: ${message}`);
     }
