@@ -7,6 +7,7 @@ import {
   runTurn,
   runTurnStream,
   gateOutputSafety,
+  gateGuards,
   StreamSafetyRefusal,
   buildSystemPrompt,
   buildStablePrefix,
@@ -19,6 +20,7 @@ import {
   type TurnStreamResult,
 } from "@/lib/turnEngine";
 import { streamTurnEvents } from "@/routes/turn";
+import { guardReply } from "@/lib/guards";
 import { PERSON_TURN_BUDGET } from "@/lib/llm";
 import { __resetRateLimiterForTests } from "@/lib/rateLimiter";
 import { remember, recall, PROFILE_SOURCE } from "@/lib/memory";
@@ -514,6 +516,143 @@ describe("lib/turnEngine.ts runTurnStream() output-safety gate (step 9)", () => 
       expect(value.safety.action).toBe("allow_with_resources");
       expect(value.crisis_resources).toContain("988");
     });
+  });
+});
+
+// Fix C (docs/dev.md's "Chat reliability: the 2026-09-07 incident and the
+// five fixes", getmaipai/home#62): direct unit tests for gateGuards()
+// itself - no prior test file exercised this function at all before this
+// fix, despite it being the exact mechanism the incident's own
+// self-contradicting reply came from. gateOutputSafety()'s own direct
+// tests above (`oneBigDelta()`) are the precedent this mirrors.
+//
+// A code review on this fix's first cut (2026-09-07) caught a real
+// divergence from guardReply() (guards.ts:510-527, the non-streaming
+// path): that first cut dropped just a CUTTABLE sentence and kept
+// streaming later ones, while guardReply() itself, for the identical
+// input, STOPS at the first flagged sentence every time - there is no
+// fall-through to a later sentence once one has fired, cuttable or not.
+// Every test below is now written against guardReply()'s REAL three
+// branches (guards.ts:517-526), not the mistaken "drop just this one
+// sentence" shape the first cut assumed.
+describe("lib/turnEngine.ts gateGuards() matches guardReply()'s real branches (Fix C)", () => {
+  async function* fromSentences(...sentences: string[]): AsyncGenerator<string, SafetyResult | undefined, void> {
+    for (const s of sentences) yield `${s} `;
+    return undefined;
+  }
+
+  test("non-cuttable (capability_claim): replaces the FIRST sentence and stops - the model's own next sentence is never spoken", async () => {
+    // guardReply()'s own branch: reason is non-cuttable, kept.length is
+    // irrelevant - always `return { reply: replacementFor(reason, ...), reason }`.
+    // No "?" anywhere in the reply: guardCapabilityClaim's own "never
+    // guard a question" exemption (2026-09-06 code review fix) looks at
+    // the WHOLE reply, not just the flagged sentence - a reply ending in
+    // a real question would exempt sentence 1 too, which is a different
+    // guard behavior this test isn't the one to prove.
+    const ctx = { utterance: "can you text Nadia that I'm running late" };
+    const nonStreaming = guardReply("Sure, I've sent it. I'll follow up later.", { ...ctx, personId: "person-1" });
+    expect(nonStreaming.reason).toBe("capability_claim");
+    expect(nonStreaming.reply).not.toContain("sent it");
+    expect(nonStreaming.reply).not.toContain("follow up later");
+
+    const gated = gateGuards(fromSentences("Sure, I've sent it.", "I'll follow up later."), ctx, "person-1");
+    const delivered: string[] = [];
+    for await (const chunk of gated) delivered.push(chunk);
+    const text = delivered.join("");
+    expect(text).not.toContain("sent it");
+    expect(text).not.toContain("follow up later");
+    expect(text.trim().length).toBeGreaterThan(0); // the honest CANNOT_DO line still stands
+  });
+
+  test("cuttable (invention) with NOTHING kept before it: replaces the WHOLE reply and stops - the getmaipai/home#62 regression itself", async () => {
+    // The exact shape of the incident: a fabricated third-party fact
+    // ("Nadia lives in Portland" - nothing in this turn's utterance,
+    // sources, or history grounds it) as the FIRST sentence, followed by
+    // an honest, unrelated one. Before this fix, the first sentence was
+    // REPLACED with an honest line and the second sentence still
+    // streamed right after it, producing a reply that read as
+    // self-contradicting (e.g. "That's not something I've been told. You
+    // should definitely check it out."). guardReply()'s own real
+    // behavior for this exact shape - nothing kept yet when the cuttable
+    // reason fires - is guards.ts:524's fallback: replace the WHOLE
+    // reply, same as a non-cuttable reason, dropping the second sentence
+    // along with the first. gateGuards() now matches that exactly,
+    // rather than the (incorrect) "just drop sentence one, keep
+    // streaming" shape this fix's own first cut assumed.
+    const ctx = { utterance: "hi" };
+    const nonStreaming = guardReply("Nadia lives in Portland. It's a nice day today.", { ...ctx, personId: "person-1" });
+    expect(nonStreaming.reason).toBe("invention");
+    expect(nonStreaming.reply).not.toContain("Portland");
+    expect(nonStreaming.reply).not.toContain("nice day"); // guardReply() drops sentence 2 too - nothing was kept before the cut
+
+    const gated = gateGuards(fromSentences("Nadia lives in Portland.", "It's a nice day today."), ctx, "person-1");
+    const delivered: string[] = [];
+    for await (const chunk of gated) delivered.push(chunk);
+    const text = delivered.join("");
+    expect(text).not.toContain("Portland");
+    expect(text).not.toContain("nice day today"); // matches guardReply(): the whole reply is replaced, not just sentence 1
+    expect(text.trim().length).toBeGreaterThan(0); // the honest line still stands
+  });
+
+  test("cuttable (invention) with an honest sentence ALREADY kept: keeps only the prefix, no honest line at all, and stops", async () => {
+    // guardReply()'s own OTHER cuttable branch (guards.ts:521-523):
+    // `kept.length > 0 && CUTTABLE.has(reason)` returns `kept.join(" ")`
+    // - the prefix that already stood, with NO honest line appended and
+    // nothing after the cut point either.
+    const ctx = { utterance: "hi" };
+    const nonStreaming = guardReply("Good morning. Nadia lives in Portland.", { ...ctx, personId: "person-1" });
+    expect(nonStreaming.reason).toBe("invention");
+    expect(nonStreaming.reply).toBe("Good morning.");
+
+    const gated = gateGuards(fromSentences("Good morning.", "Nadia lives in Portland."), ctx, "person-1");
+    const delivered: string[] = [];
+    for await (const chunk of gated) delivered.push(chunk);
+    const text = delivered.join("").trim();
+    expect(text).toBe("Good morning.");
+    expect(text).not.toContain("Portland");
+  });
+
+  test("a fully honest, multi-sentence reply streams every sentence through untouched - never flagged, never stopped early", async () => {
+    const ctx = { utterance: "hi" };
+    const gated = gateGuards(fromSentences("Good morning.", "It's sunny out today.", "Have a great day!"), ctx, "person-1");
+    const delivered: string[] = [];
+    for await (const chunk of gated) delivered.push(chunk);
+    const text = delivered.join("");
+    expect(text).toContain("Good morning");
+    expect(text).toContain("sunny out today");
+    expect(text).toContain("Have a great day");
+  });
+
+  test("onGuardHit fires exactly once for the sentence that stopped the reply, and the underlying stream's own SafetyResult still reaches the caller", async () => {
+    const flaggedReasons: string[] = [];
+    const safetyFlag: SafetyResult = {
+      flagged: true,
+      categories: [],
+      action: "allow_with_resources",
+      notify_parent: false,
+      matched_signals: [],
+      checked_at: "2026-09-07T00:00:00.000Z",
+    };
+    async function* withSafetyReturn(): AsyncGenerator<string, SafetyResult | undefined, void> {
+      yield "Sure, I've sent it. ";
+      yield "a sentence nobody should ever see. ";
+      return safetyFlag;
+    }
+    const gated = gateGuards(
+      withSafetyReturn(),
+      { utterance: "can you text Nadia that I'm running late" },
+      "person-1",
+      (reason) => flaggedReasons.push(reason),
+    );
+    const delivered: string[] = [];
+    let step = await gated.next();
+    while (!step.done) {
+      delivered.push(step.value);
+      step = await gated.next();
+    }
+    expect(flaggedReasons).toEqual(["capability_claim"]);
+    expect(delivered.join("")).not.toContain("nobody should ever see");
+    expect(step.value?.action).toBe("allow_with_resources");
   });
 });
 

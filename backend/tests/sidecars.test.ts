@@ -420,6 +420,25 @@ describe("sweepOrphanProcesses", () => {
     expect(killed).toBe(0);
   });
 
+  // Fix A2 (docs/dev.md's 2026-09-07 incident note): a matching process
+  // whose pid is explicitly excluded survives - the mechanism that keeps
+  // a `bun --hot` reload's own re-run of this exact sweep from SIGKILLing
+  // its own still-healthy chat/embed/tts engines, which is what let ten
+  // reloads in one evening respawn qwen3-8b eleven times and kill a reply
+  // mid-turn.
+  test("excludePids protects a matching process from being killed", async () => {
+    const marker = `maipai-orphan-test-${crypto.randomUUID()}`;
+    const survivor = Bun.spawn(["bun", "-e", `/* ${marker} */ setTimeout(() => {}, 60000);`], { stdout: "ignore", stderr: "ignore" });
+    try {
+      await new Promise((r) => setTimeout(r, 200));
+      const killed = await sweepOrphanProcesses(marker, { excludePids: [survivor.pid] });
+      expect(killed).toBe(0);
+      expect(survivor.exitCode).toBeNull();
+    } finally {
+      survivor.kill();
+    }
+  }, 10_000);
+
   // Deliberately NOT tested with a broad pattern like the current
   // process's own binary name ("bun"): on this machine, several other
   // sessions' real bun processes are commonly running at the same time,

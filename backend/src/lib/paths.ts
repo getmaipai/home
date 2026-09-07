@@ -76,6 +76,13 @@ export const receivedBackupsDir = resolve(backupDir, "..", "received-backups");
 export const modelsDir = resolve(dataDir, "models");
 export const enginesDir = resolve(dataDir, "engines");
 
+// Fix A5 (docs/dev.md's 2026-09-07 incident note): the hub's own
+// structured logs (lib/log.ts), rotated by size and days. Not synced or
+// backed up - operational history, not household data - so this stays a
+// plain subdirectory of dataDir rather than getting its own env-var
+// override the way modelsDir/enginesDir's genuinely large downloads do.
+export const logsDir = resolve(dataDir, "logs");
+
 // The wake-word pipeline's shared feature models (melspectrogram +
 // embedding) plus per-phrase detectors (2026-09-04, the wake-word plan
 // in docs/dev.md): same shape as models/engines above, `voice/wakewords`

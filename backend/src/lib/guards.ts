@@ -146,6 +146,39 @@ function groundedWords(ctx: GuardContext): Set<string> {
   return tokenize([ctx.utterance, ...(ctx.sources ?? []), ...(ctx.history ?? [])].join(" "));
 }
 
+// Fix C (docs/dev.md's "Chat reliability: the 2026-09-07 incident and the
+// five fixes", getmaipai/home#62): tokenize() splits on hyphens (they're
+// not in its `[a-z0-9']` character class), so "Spider-Man" (a reply's own
+// hyphenated spelling) and "Spiderman" (a household member's own plain
+// spelling, from the utterance) tokenize to different shapes
+// ("spider"+"man" vs "spiderman") even though they name the identical
+// thing. Live bench, 2026-09-07: "I might go see the new Spiderman
+// movie" -> a reply mentioning "Spider-Man" got its own "Spider" piece
+// (the only one PROPER_NOUN_RE can ever capture from a hyphenated
+// compound - the hyphen itself breaks its lookbehind before "Man")
+// flagged as an ungrounded name. Deliberately NOT fixed inside
+// tokenize() itself: memory.ts's own recall() keyword fallback and
+// routing.ts's example-match scoring share that function, and neither
+// wants hyphen-collapsing folded into their own matching - this stays a
+// guards.ts-local fix instead.
+const HYPHEN_COMPOUND_RE = /\b([A-Za-z]+(?:-[A-Za-z]+)+)\b/g;
+
+/** Every piece of a hyphenated compound IN `sentence` whose collapsed
+ * (dehyphenated) form is already grounded - if "Spider-Man" collapses to
+ * "spiderman" and that's grounded, "spider" and "man" both count as
+ * grounded too, so guardInvention()'s own candidate loop doesn't flag a
+ * name the household already used, just spelled differently. */
+function hyphenGroundedPieces(sentence: string, grounded: Set<string>): Set<string> {
+  const pieces = new Set<string>();
+  for (const m of sentence.matchAll(HYPHEN_COMPOUND_RE)) {
+    const collapsed = m[1]!.toLowerCase().replace(/-/g, "");
+    if (grounded.has(collapsed)) {
+      for (const piece of m[1]!.split("-")) pieces.add(piece.toLowerCase());
+    }
+  }
+  return pieces;
+}
+
 // Three narrow, specific invention SHAPES beyond a bare proper noun/
 // number/date - each ported directly from a guards.py regex of the same
 // name, kept narrow on purpose (a real pattern, not "any ungrounded
@@ -160,8 +193,36 @@ function groundedWords(ctx: GuardContext): Set<string> {
 // "I think you're talking about a sedan, right?" - a guess about the
 // household's own business is an invention however politely it is
 // hedged; the PATTERN itself is the tell, no grounding check needed.
+//
+// Fix C (docs/dev.md's "Chat reliability: the 2026-09-07 incident and the
+// five fixes", getmaipai/home#62): this used to also match
+// `\bsounds like (?:a|an)\b` - a real English idiom for reacting to
+// something the PERSON just said ("that sounds like a fun night out",
+// "sounds like a long day"), not a guess about the household's own
+// facts. Live bench, 2026-09-07: "I might go see the new Spiderman
+// movie" -> "That sounds like a fun night out! You should definitely
+// check it out." got its opening sentence replaced with "That's not
+// something I've been told" - an honest line answering a QUESTION nobody
+// asked, spliced in front of the model's own next sentence, which read
+// as flatly self-contradicting. Removed rather than narrowed to an
+// allowlist of "safe" words after "sounds like a/an": the bare-candidate
+// check just below this function (a genuinely invented proper noun,
+// date, or number - "the sea", "75 degrees") still catches a REAL
+// fabrication sitting inside the same sentence, so nothing about
+// removing this one idiom-match opens a hole for actual invention to
+// slip through unflagged - it only stops flagging the idiom's own
+// phrasing, which was never the tell in the first place.
+//
+// `\bprobably (?:a|an|the)\b` deliberately stays (a code review,
+// 2026-09-07, caught the first cut of this fix removing it too, with no
+// incident evidence and no corpus row justifying it): "That's probably a
+// delivery driver." answering "who's at the door" is a genuine invented
+// guess, not a reaction idiom - "sounds like a/an X" only ever reacts to
+// something the PERSON already said, while "probably a/an X" states a
+// new, unhedged claim about a THING or PERSON the household asked about,
+// exactly the pattern this guard exists to catch.
 const GUESSING_RE =
-  /\bi think you(?:'re| are)? (?:talking about|referring to|means?)\b|\byou must mean\b|\bi(?:'m| am) guessing\b|\bprobably (?:a|an|the)\b|\bsounds like (?:a|an)\b|\bmy guess is\b/i;
+  /\bi think you(?:'re| are)? (?:talking about|referring to|means?)\b|\byou must mean\b|\bi(?:'m| am) guessing\b|\bprobably (?:a|an|the)\b|\bmy guess is\b/i;
 
 // "he drives a black BMW i3", "she lives in the kitchen": a third-party
 // pronoun given a concrete trait or place. Narrow on purpose (a pronoun
@@ -243,12 +304,13 @@ function guardInvention(sentence: string, ctx: GuardContext): GuardReason | null
     if (unclaimedWords(sentence, grounded).some((w) => !scaffold.has(w))) return "invention";
   }
 
+  const hyphenGrounded = hyphenGroundedPieces(sentence, grounded);
   const candidates = new Set<string>();
   for (const m of sentence.matchAll(PROPER_NOUN_RE)) if (!NOT_NAMES.has(m[1]!.toLowerCase())) candidates.add(m[1]!);
   for (const m of sentence.matchAll(DATE_WORD_RE)) candidates.add(m[0]!);
   for (const m of sentence.matchAll(BARE_NUMBER_RE)) candidates.add(m[0]!);
   for (const c of candidates) {
-    if (!grounded.has(c.toLowerCase())) return "invention";
+    if (!grounded.has(c.toLowerCase()) && !hyphenGrounded.has(c.toLowerCase())) return "invention";
   }
   return null;
 }
@@ -381,6 +443,14 @@ function guardExampleParrot(sentence: string, ctx: GuardContext): GuardReason | 
 // `_CUTTABLE`: the sentence was padding, not the answer). Everything
 // else replaces the whole reply - the sentence WAS the reply's thesis.
 const CUTTABLE: ReadonlySet<GuardReason> = new Set(["invention", "unrelated_recall"]);
+
+/** Exported so turnEngine.ts's streaming path (`gateGuards()`) makes the
+ * SAME cut-vs-replace-the-rest distinction guardReply() does below - one
+ * definition of "which reasons are padding vs the reply's own thesis,"
+ * never a second copy re-guessed at the call site. */
+export function isCuttable(reason: GuardReason): boolean {
+  return CUTTABLE.has(reason);
+}
 
 // Per-reason lines, not one generic fallback - bot-legacy's own
 // guard_reply picks between cannot_do/not_told/dont_know/chat_loop the

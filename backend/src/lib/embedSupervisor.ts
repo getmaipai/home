@@ -25,6 +25,7 @@
 import { detectHardware } from "@/lib/hardware";
 import { engineBinaryPath } from "@/lib/llmSupervisor";
 import { spawnAndWaitHealthy } from "@/lib/sidecars";
+import { hotReloadState } from "@/lib/hotReloadState";
 import { assertNotInCrashBootHold } from "@/lib/dirtyBoot";
 import { embedModelPath, ensureEmbedModel } from "@/lib/embedAssets";
 import { LlamaServerClient } from "@maipai/spec/llm/ts/client.js";
@@ -35,18 +36,35 @@ export type EmbedBackendKind = "url" | "spawned" | "stub";
 interface EmbedBackend {
   client: LlamaServerClient;
   stop: () => void;
+  /** Only set for a backend this module actually spawned ("spawned") -
+   * llmSupervisor.ts's `ChatBackend.pid` precedent, needed here too for
+   * Fix A2's own orphan-sweep exclusion (see `getEmbedLivePid()` below). */
+  pid?: number;
   kind: EmbedBackendKind;
   startedAt: string;
 }
 
-let embedBackend: EmbedBackend | null = null;
-let startingPromise: Promise<EmbedBackend> | null = null;
-// Bumped on every restart/reset - guards the exact race a code review
-// (2026-09-04) found and fixed in ttsSupervisor.ts's identical shape: a
-// spawn already in flight when a restart lands must never re-populate
-// the cache afterward. See that file's own comment for the full
-// reasoning; applied here from the start rather than re-discovered later.
-let generation = 0;
+// Fix A (docs/dev.md, "Chat reliability: the 2026-09-07 incident"):
+// `lib/hotReloadState.ts`'s shared helper - a `bun --hot` reload resets a
+// module-level `let` to its initializer, but `globalThis` survives (same
+// process, same heap), so this module's spawned embed server stops
+// looking orphaned to the fresh module instance that reload just created.
+interface EmbedSupervisorState {
+  embedBackend: EmbedBackend | null;
+  startingPromise: Promise<EmbedBackend> | null;
+  // Bumped on every restart/reset - guards the exact race a code review
+  // (2026-09-04) found and fixed in ttsSupervisor.ts's identical shape: a
+  // spawn already in flight when a restart lands must never re-populate
+  // the cache afterward. See that file's own comment for the full
+  // reasoning; applied here from the start rather than re-discovered later.
+  generation: number;
+}
+
+const state = hotReloadState<EmbedSupervisorState>("embedSupervisor", () => ({
+  embedBackend: null,
+  startingPromise: null,
+  generation: 0,
+}));
 
 // Session F, step 2: the spawn+freePort+health-wait shape this module
 // used to hand-roll (a near-duplicate of llmSupervisor.ts's own, per that
@@ -65,7 +83,7 @@ async function spawnEmbedServer(binPath: string): Promise<EmbedBackend> {
     timeoutMs: 60_000,
     label: "llama-server (embed)",
   });
-  return { client, stop: () => proc.kill(), kind: "spawned", startedAt: new Date().toISOString() };
+  return { client, stop: () => proc.kill(), pid: proc.pid, kind: "spawned", startedAt: new Date().toISOString() };
 }
 
 async function startEmbedBackend(): Promise<EmbedBackend> {
@@ -94,12 +112,12 @@ async function startEmbedBackend(): Promise<EmbedBackend> {
  * llmSupervisor.ts's getChatClient() and ttsSupervisor.ts's
  * getTtsClient() already carry. */
 export async function getEmbedClient(): Promise<LlamaServerClient> {
-  if (embedBackend) return embedBackend.client;
-  if (!startingPromise) {
-    const myGeneration = generation;
-    startingPromise = startEmbedBackend()
+  if (state.embedBackend) return state.embedBackend.client;
+  if (!state.startingPromise) {
+    const myGeneration = state.generation;
+    state.startingPromise = startEmbedBackend()
       .then(async (backend): Promise<EmbedBackend> => {
-        if (myGeneration !== generation) {
+        if (myGeneration !== state.generation) {
           // A reset landed while this spawn was still starting. Simply
           // returning the (now-stopped) `backend` here would be a second
           // bug, not a fix: a code review (2026-09-04) found that the
@@ -115,31 +133,41 @@ export async function getEmbedClient(): Promise<LlamaServerClient> {
           backend.stop();
           return { ...backend, client: await getEmbedClient() };
         }
-        embedBackend = backend;
+        state.embedBackend = backend;
         return backend;
       })
       .catch((err) => {
-        if (myGeneration === generation) startingPromise = null;
+        if (myGeneration === state.generation) state.startingPromise = null;
         throw err;
       });
   }
-  return (await startingPromise).client;
+  return (await state.startingPromise).client;
 }
 
 /** Which backend (if any) is currently serving `embed` - "none" before
  * the first embed call in this process's lifetime. */
 export function getEmbedBackendKind(): EmbedBackendKind | "starting" | "none" {
-  if (embedBackend) return embedBackend.kind;
-  if (startingPromise) return "starting";
+  if (state.embedBackend) return state.embedBackend.kind;
+  if (state.startingPromise) return "starting";
   return "none";
+}
+
+/** The embed backend's own pid, when one is genuinely spawned and running
+ * - Fix A2 (docs/dev.md's incident note): index.ts passes this to
+ * llmSupervisor.ts's `sweepOrphanEngineProcesses()` so a `bun --hot`
+ * reload's own re-run of the boot-time orphan sweep never kills this
+ * still-healthy process out from under the fresh module instance that's
+ * about to reuse it. */
+export function getEmbedLivePid(): number | null {
+  return state.embedBackend?.pid ?? null;
 }
 
 /** Test-only: stop whatever backend is running and clear the cached
  * client, the same reset-between-test-files shape as
  * __resetTtsSupervisorForTests. */
 export function __resetEmbedSupervisorForTests(): void {
-  generation++;
-  embedBackend?.stop();
-  embedBackend = null;
-  startingPromise = null;
+  state.generation++;
+  state.embedBackend?.stop();
+  state.embedBackend = null;
+  state.startingPromise = null;
 }

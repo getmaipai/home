@@ -38,6 +38,7 @@ import { resolveLaunchFlags, launchFlagsToArgs, type LaunchFlags, type LaunchFla
 import { runPostLoadCheck, type PostLoadCheckResult } from "@/lib/enginePostLoadCheck";
 import { getHouseholdSettingValue } from "@/lib/settings";
 import { spawnAndWaitHealthy, freePort, sweepOrphanProcesses } from "@/lib/sidecars";
+import { hotReloadState } from "@/lib/hotReloadState";
 import { assertNotInCrashBootHold } from "@/lib/dirtyBoot";
 import { startResourceGovernor } from "@/lib/resourceGovernor";
 import { raiseIssue, resolveIssue } from "@/lib/issues";
@@ -67,26 +68,52 @@ export interface EngineStatus {
   startedAt: string | null;
 }
 
-let chatBackend: ChatBackend | null = null;
-let startingPromise: Promise<ChatBackend> | null = null;
-let lastPostLoadCheck: (PostLoadCheckResult & { modelId: string }) | null = null;
-// COR-1 (code review, 2026-09-06): embedSupervisor.ts's identical shape
-// already carried this generation guard "from the start" (its own
-// comment cites the 2026-09-04 review that found and fixed the race here
-// first) - this module never got the same fix. Bumped by every
-// stopChatBackend()/restartChatBackend() call; getChatClient()'s own
-// in-flight spawn checks it before ever assigning to `chatBackend`, so a
-// stop/restart that lands mid-spawn can't have that spawn silently
-// resurrect the very state it just cleared. See getChatClient()'s own
-// comment for the exact race this closes.
-let generation = 0;
-// Set only by stopChatBackend() (an explicit "pause/stop" action, engine
-// control's other real ask alongside "see if it's running... restart");
-// distinct from chatBackend being merely null (not started YET, which
-// still auto-spawns on the next getChatClient() call) - a manual stop
-// must stay stopped until a manual start/restart, or "stop" would do
-// nothing observable beyond one killed process.
-let manuallyStopped = false;
+// Fix A (docs/dev.md, "Chat reliability: the 2026-09-07 incident"):
+// `bun --hot` gives every reload a FRESH module instance - a top-level
+// `let` resets to its initializer - but the same OS process, same heap,
+// so `globalThis` survives (`wyomingServer.ts`'s own
+// `__maipaiWyomingBoundPorts` set this precedent first). Before this fix,
+// a source save during development made the fresh module instance
+// believe no chat backend existed, so the next chat message spawned a
+// second llama-server on the same port - which `spawnAndWaitHealthy()`'s
+// own `freePort()` call kills the FIRST, still-perfectly-healthy one to
+// make room for - costing a multi-second model reload, and killing any
+// reply already in flight against the one just SIGKILLed. Keeping this
+// state on `globalThis` instead means every module instance across every
+// reload reads and writes the identical object: an in-flight spawn's
+// `.then()`/`.catch()` closures (captured by the pre-reload module
+// instance) keep resolving against the SAME state a post-reload caller
+// also sees, so nothing is silently discarded or duplicated either.
+interface LlmSupervisorState {
+  chatBackend: ChatBackend | null;
+  startingPromise: Promise<ChatBackend> | null;
+  lastPostLoadCheck: (PostLoadCheckResult & { modelId: string }) | null;
+  // COR-1 (code review, 2026-09-06): embedSupervisor.ts's identical shape
+  // already carried this generation guard "from the start" (its own
+  // comment cites the 2026-09-04 review that found and fixed the race here
+  // first) - this module never got the same fix. Bumped by every
+  // stopChatBackend()/restartChatBackend() call; getChatClient()'s own
+  // in-flight spawn checks it before ever assigning to `chatBackend`, so a
+  // stop/restart that lands mid-spawn can't have that spawn silently
+  // resurrect the very state it just cleared. See getChatClient()'s own
+  // comment for the exact race this closes.
+  generation: number;
+  // Set only by stopChatBackend() (an explicit "pause/stop" action, engine
+  // control's other real ask alongside "see if it's running... restart");
+  // distinct from chatBackend being merely null (not started YET, which
+  // still auto-spawns on the next getChatClient() call) - a manual stop
+  // must stay stopped until a manual start/restart, or "stop" would do
+  // nothing observable beyond one killed process.
+  manuallyStopped: boolean;
+}
+
+const state = hotReloadState<LlmSupervisorState>("llmSupervisor", () => ({
+  chatBackend: null,
+  startingPromise: null,
+  lastPostLoadCheck: null,
+  generation: 0,
+  manuallyStopped: false,
+}));
 
 // Session F, step 2: freePort() and the spawn+health-wait loop this
 // function used to hand-roll both moved to lib/sidecars.ts as
@@ -105,14 +132,31 @@ export { freePort };
  * EXACT port a fresh spawn is about to claim; this catches one sitting
  * anywhere else - a leftover from a since-changed
  * MAIPAI_LLAMA_SERVER_PORT/MAIPAI_EMBED_PORT, or any other stray engine
- * process this codebase spawned before a crash or a dev-mode reload wiped
- * the tracking that would have stopped it. Matches on `enginesDir` (every
- * real spawn - chat and embed both - invokes the binary by its absolute
- * path under here, per selectEngineBinary()'s own pin), so this covers
- * both roles with one call. Meant to run once at boot (index.ts), before
- * anything real spawns. */
-export async function sweepOrphanEngineProcesses(): Promise<number> {
-  return sweepOrphanProcesses(enginesDir);
+ * process this codebase spawned before a real crash. Matches on
+ * `enginesDir` (every real spawn - chat and embed both - invokes the
+ * binary by its absolute path under here, per selectEngineBinary()'s own
+ * pin), so this covers both roles with one call. Meant to run once at
+ * boot (index.ts), before anything real spawns.
+ *
+ * `extraLivePids` (Fix A2, docs/dev.md's 2026-09-07 incident note):
+ * index.ts calls this on every `bun --hot` reload too (it re-runs the
+ * whole module top level), not just a genuine process boot. Before Fix A,
+ * that meant every reload swept up and SIGKILLed its own still-healthy
+ * engines, because a fresh module instance's own tracking had just been
+ * reset - the exact "dev-mode reload wiped the tracking" case this
+ * function used to be the (destructive) answer to. Fix A1 keeps chat's
+ * own state on `globalThis` (see the `state` object above), so this
+ * module already knows its own chat backend's pid is still genuinely
+ * alive and excludes it; `extraLivePids` lets the caller (index.ts) pass
+ * embed's and tts's own live pids from their own registries the same
+ * way, without this module importing either (avoiding a three-way
+ * circular import between the engine supervisors). A real orphan - one
+ * NO registry claims, chat, embed, or tts - is still swept exactly as
+ * before, including at a genuine fresh boot, when every registry is
+ * empty and nothing is excluded. */
+export async function sweepOrphanEngineProcesses(extraLivePids: readonly (number | null)[] = []): Promise<number> {
+  const excludePids = [state.chatBackend?.pid ?? null, ...extraLivePids].filter((pid): pid is number => typeof pid === "number");
+  return sweepOrphanProcesses(enginesDir, { excludePids });
 }
 
 async function spawnLlamaServer(
@@ -214,7 +258,7 @@ async function trySpawnFromSelection(): Promise<ChatBackend | null> {
 
   try {
     const result = await runPostLoadCheck(backend.client, backend.pid!, model, flags, hw);
-    lastPostLoadCheck = { modelId, ...result };
+    state.lastPostLoadCheck = { modelId, ...result };
   } catch (err) {
     backend.stop();
     throw err;
@@ -230,7 +274,7 @@ async function trySpawnFromSelection(): Promise<ChatBackend | null> {
     // enginePostLoadCheck.ts's own doc comment notes the formula can drift;
     // actualBytes is a null fallback (unmeasurable on this platform), not a
     // routine case.
-    ceilingBaselineBytes: lastPostLoadCheck.actualBytes ?? lastPostLoadCheck.estimatedBytes,
+    ceilingBaselineBytes: state.lastPostLoadCheck.actualBytes ?? state.lastPostLoadCheck.estimatedBytes,
   });
   return backend;
 }
@@ -277,15 +321,15 @@ async function startChatBackend(): Promise<ChatBackend> {
  * failure (a briefly-wrong model path, a taken port, a slow first load
  * past the health timeout) until the whole process restarted. */
 export async function getChatClient(): Promise<LlamaServerClient> {
-  if (manuallyStopped) {
+  if (state.manuallyStopped) {
     throw new Error("the chat engine is stopped - restart it from Household → AI models");
   }
-  if (chatBackend) return chatBackend.client;
-  if (!startingPromise) {
-    const myGeneration = generation;
-    startingPromise = startChatBackend()
+  if (state.chatBackend) return state.chatBackend.client;
+  if (!state.startingPromise) {
+    const myGeneration = state.generation;
+    state.startingPromise = startChatBackend()
       .then(async (backend): Promise<ChatBackend> => {
-        if (myGeneration !== generation) {
+        if (myGeneration !== state.generation) {
           // A stop/restart landed while this spawn was still starting
           // (COR-1): a real, 20-60s window on an actual model. Assigning
           // to `chatBackend` here regardless would resurrect exactly the
@@ -308,11 +352,11 @@ export async function getChatClient(): Promise<LlamaServerClient> {
           // embedSupervisor's own spawn never had). Nulled rather than
           // left stale; the recursive getChatClient() call below sets a
           // fresh one if the new generation also reaches tier 3.
-          if (backend.kind === "selection") lastPostLoadCheck = null;
+          if (backend.kind === "selection") state.lastPostLoadCheck = null;
           backend.stop();
           return { ...backend, client: await getChatClient() };
         }
-        chatBackend = backend;
+        state.chatBackend = backend;
         // A genuinely healthy spawn closes out any earlier failure -
         // same "a fresh success clears a prior fault" posture
         // resourceGovernor's own resolveIssue("resource-governor", "chat")
@@ -321,7 +365,7 @@ export async function getChatClient(): Promise<LlamaServerClient> {
         return backend;
       })
       .catch((err) => {
-        if (myGeneration === generation) startingPromise = null;
+        if (myGeneration === state.generation) state.startingPromise = null;
         // Found live 2026-09-07: a genuine chat-engine spawn failure had
         // no Repairs-page visibility at all - only found by a household
         // member happening to check Settings -> AI models themselves.
@@ -341,7 +385,7 @@ export async function getChatClient(): Promise<LlamaServerClient> {
         // it AFTER the new generation's own resolveIssue() already
         // cleared it, leaving a phantom issue stuck open while the engine
         // is actually running fine.
-        if (myGeneration === generation) {
+        if (myGeneration === state.generation) {
           void raiseIssue({
             source: "chat-engine",
             key: "spawn",
@@ -353,7 +397,7 @@ export async function getChatClient(): Promise<LlamaServerClient> {
         throw err;
       });
   }
-  return (await startingPromise).client;
+  return (await state.startingPromise).client;
 }
 
 /** Stops whatever backend is currently running (if any) and clears the
@@ -363,11 +407,11 @@ export async function getChatClient(): Promise<LlamaServerClient> {
  * this once a fresh download's checksum verifies, right before the
  * select job's own "loading"/"testing" phases exercise the new spawn. */
 export async function restartChatBackend(): Promise<void> {
-  manuallyStopped = false;
-  generation++;
-  chatBackend?.stop();
-  chatBackend = null;
-  startingPromise = null;
+  state.manuallyStopped = false;
+  state.generation++;
+  state.chatBackend?.stop();
+  state.chatBackend = null;
+  state.startingPromise = null;
 }
 
 /** Engine control's "stop/pause": kills the running backend (if any) and,
@@ -376,25 +420,25 @@ export async function restartChatBackend(): Promise<void> {
  * a fresh model select, which calls that) runs. Safe to call with nothing
  * running (a stopped stub, or nothing started yet). */
 export function stopChatBackend(): void {
-  manuallyStopped = true;
-  generation++;
-  chatBackend?.stop();
-  chatBackend = null;
-  startingPromise = null;
+  state.manuallyStopped = true;
+  state.generation++;
+  state.chatBackend?.stop();
+  state.chatBackend = null;
+  state.startingPromise = null;
 }
 
 /** Real-time engine status for the Household → AI models page: is
  * anything running, what kind (a real spawned model vs. the stub vs. a
  * developer's MAIPAI_LLAMA_SERVER_URL override), which model, since when. */
 export function getEngineStatus(): EngineStatus {
-  if (manuallyStopped) {
+  if (state.manuallyStopped) {
     const modelId = (getHouseholdSettingValue("chat.model_id") as string) || null;
     return { kind: "stopped", modelId, pid: null, startedAt: null };
   }
-  if (chatBackend) {
-    return { kind: chatBackend.kind, modelId: chatBackend.modelId ?? null, pid: chatBackend.pid ?? null, startedAt: chatBackend.startedAt };
+  if (state.chatBackend) {
+    return { kind: state.chatBackend.kind, modelId: state.chatBackend.modelId ?? null, pid: state.chatBackend.pid ?? null, startedAt: state.chatBackend.startedAt };
   }
-  if (startingPromise) return { kind: "starting", modelId: null, pid: null, startedAt: null };
+  if (state.startingPromise) return { kind: "starting", modelId: null, pid: null, startedAt: null };
   return { kind: "none", modelId: null, pid: null, startedAt: null };
 }
 
@@ -402,17 +446,28 @@ export function getEngineStatus(): EngineStatus {
  * eventually a status view) to report alongside "ready" - null before any
  * real (non-stub, non-URL-configured) spawn has ever completed one. */
 export function getLastPostLoadCheck(): (PostLoadCheckResult & { modelId: string }) | null {
-  return lastPostLoadCheck;
+  return state.lastPostLoadCheck;
+}
+
+/** The chat backend's own pid, when one is genuinely spawned and running
+ * (never for a URL override or the stub, neither of which this process
+ * owns) - Fix A2 (docs/dev.md's incident note): index.ts's boot-time
+ * `sweepOrphanEngineProcesses()` excludes this from the processes it
+ * kills, so a `bun --hot` reload's own re-run of that sweep never SIGKILLs
+ * the still-healthy engine this same registry (see the `state` object
+ * above) is about to hand right back to the fresh module instance. */
+export function getChatLivePid(): number | null {
+  return state.chatBackend?.pid ?? null;
 }
 
 /** Test-only: stop whatever backend is running (spawned process or stub
  * server) and clear the cached client, the same reset-between-test-files
  * shape as resetDb()/__clearSessionCacheForTests. */
 export function __resetLlmSupervisorForTests(): void {
-  generation++;
-  chatBackend?.stop();
-  chatBackend = null;
-  startingPromise = null;
-  lastPostLoadCheck = null;
-  manuallyStopped = false;
+  state.generation++;
+  state.chatBackend?.stop();
+  state.chatBackend = null;
+  state.startingPromise = null;
+  state.lastPostLoadCheck = null;
+  state.manuallyStopped = false;
 }

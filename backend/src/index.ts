@@ -6,8 +6,8 @@ import { sampleEngineStats } from "@/lib/engineStats";
 import { startAllSidecars, registerGracefulExit } from "@/lib/sidecars";
 import { initCrashBootHold } from "@/lib/dirtyBoot";
 import { sweepOrphanEngineProcesses, getChatClient } from "@/lib/llmSupervisor";
-import { getEmbedClient } from "@/lib/embedSupervisor";
-import { getTtsClient } from "@/lib/ttsSupervisor";
+import { getEmbedClient, getEmbedLivePid } from "@/lib/embedSupervisor";
+import { getTtsClient, getTtsLivePid } from "@/lib/ttsSupervisor";
 import { runAllSmokeTests } from "@/lib/smoke";
 import { startIdleSweep, registerDenoHostGracefulExit } from "@/lib/denoHost";
 import { hasHouseholdLeaf, getHouseholdLeafForServer, checkLeafExpiry, onLeafRenewed, registerRenewFixHandler } from "@/lib/householdCa";
@@ -129,7 +129,14 @@ registerDenoHostGracefulExit();
 // health-poll loop, not a one-shot check with a real finish line, and
 // nothing registers a sidecar yet (D's SearXNG and C's voice programs are
 // the first real registrants).
-await sweepOrphanEngineProcesses();
+// Fix A2 (docs/dev.md's 2026-09-07 incident note): this runs on every
+// `bun --hot` reload too, not just a real process boot - passing embed's
+// and tts's own live pids alongside chat's (llmSupervisor.ts's own
+// `state.chatBackend`, checked inside sweepOrphanEngineProcesses() itself)
+// keeps a reload from SIGKILLing its own still-healthy engines, the
+// concrete fix for the incident that respawned qwen3-8b eleven times in
+// one evening and killed a reply mid-turn.
+await sweepOrphanEngineProcesses([getEmbedLivePid(), getTtsLivePid()]);
 await initCrashBootHold();
 void startAllSidecars();
 // A latency review (2026-09-06) found none of the three engines were
@@ -147,6 +154,15 @@ void startAllSidecars();
 // failure the first real request would have hit anyway - logged, not
 // fatal to boot, and the next real caller still gets the same clear
 // error getChatClient()/getEmbedClient()/getTtsClient() always throw.
+//
+// Fix A3 (docs/dev.md's 2026-09-07 incident note): "spawns lazily on
+// FIRST USE" above is only true the first time a process ever calls
+// this. After a `bun --hot` reload, each getXClient() call here reads
+// its own module's globalThis-backed state (Fix A1) and, when a healthy
+// backend is already sitting there from before the reload, returns it
+// synchronously with no spawn, no health-timeout wait, and no line in
+// the log below - already "warm" by construction, nothing further to do
+// here.
 void getChatClient().catch((err: unknown) => console.error(`[boot] chat engine warm-up: ${(err as Error).message}`));
 void getEmbedClient().catch((err: unknown) => console.error(`[boot] embed engine warm-up: ${(err as Error).message}`));
 void getTtsClient().catch((err: unknown) => console.error(`[boot] TTS engine warm-up: ${(err as Error).message}`));

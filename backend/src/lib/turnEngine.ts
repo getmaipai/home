@@ -21,7 +21,8 @@ import { notifyIfFlagged } from "@/lib/notifications";
 import { recall, bumpUsage, getProfileParagraph, type RecallMatch } from "@/lib/memory";
 import { newConversationTurnId } from "@/lib/id";
 import { complete, startCompleteStream, type LlmMessage, type ToolSpec, type ToolCall } from "@/lib/llm";
-import { guardReply, guardSentence, replacementFor, type GuardContext } from "@/lib/guards";
+import { guardReply, guardSentence, replacementFor, isCuttable, type GuardContext, type GuardReason } from "@/lib/guards";
+import { appendLogLine } from "@/lib/log";
 import { tokenize } from "@/lib/text";
 import { sanitizeForPrompt } from "@/lib/promptSanitize";
 import {
@@ -100,12 +101,66 @@ function validateTurnInput(surface: Surface, text: string): TurnFailure | null {
  * already fully, correctly rendered to the household. There is nothing
  * useful left to retract at that point; the failure is real but belongs
  * in the server log, not in the household's chat thread. */
-function logTurnSafely(actor: PersonRow, surface: Surface, userText: string, value: TurnValue): void {
+// Fix A4 (docs/dev.md's "Chat reliability: the 2026-09-07 incident and
+// the five fixes"): before this, the turn pipeline logged nothing at all
+// - the only hub-originated lines in a real run's own log were
+// `[enginePostLoadCheck]` and `[wyoming]`, so this incident's own
+// diagnosis had to be rebuilt from `conversation_turns` rows and
+// llama-server's own slot timings instead of a straightforward grep.
+// Never the utterance or reply text, unconditionally - no debug escape
+// hatch either (a code review, 2026-09-07, caught a first cut's own
+// `MAIPAI_TURN_DEBUG=1` env var writing the raw utterance to this line:
+// a plain env var is not the admin-toggled, auto-reverting debug
+// mechanism getmaipai/.github's docs/ENGINEERING.md Logging section
+// actually specifies, and this line is unconditionally persisted to disk
+// - see log.ts's own header for where). `guard` carries real reasons
+// (Fix C, shipped in the same change as this line: guards.ts's
+// `guardReply()` for the non-streaming path, `gateGuards()`'s own
+// `onGuardHit` callback for the streaming path).
+interface TurnLogRecord {
+  turn_id: string;
+  conversation_id: string;
+  surface: Surface;
+  source: TurnValue["source"];
+  plugin_id?: string;
+  command_id?: string;
+  routing?: { tier: "pattern" | "embedding" | "keyword"; score: number };
+  guard: GuardReason[];
+  safety_action: string;
+  duration_ms: number;
+}
+
+function logTurnLine(surface: Surface, value: TurnValue, startedAt: number, guardHits: readonly GuardReason[]): void {
+  const record: TurnLogRecord = {
+    turn_id: value.turn_id,
+    conversation_id: value.conversation_id,
+    surface,
+    source: value.source,
+    ...(value.plugin_id ? { plugin_id: value.plugin_id } : {}),
+    ...(value.command_id ? { command_id: value.command_id } : {}),
+    ...(value.routing ? { routing: value.routing } : {}),
+    guard: [...guardHits],
+    safety_action: value.safety.action,
+    duration_ms: Date.now() - startedAt,
+  };
+  const line = `[turn] ${JSON.stringify(record)}`;
+  console.log(line);
+  appendLogLine(line);
+}
+
+function logTurnSafely(
+  actor: PersonRow,
+  surface: Surface,
+  userText: string,
+  value: TurnValue,
+  meta: { startedAt: number; guardHits: readonly GuardReason[] },
+): void {
   try {
     logTurn(actor, surface, userText, value);
   } catch (err) {
     console.error(`[turn] logTurn failed for an otherwise-successful turn: ${(err as Error).message}`);
   }
+  logTurnLine(surface, value, meta.startedAt, meta.guardHits);
   // Post-turn, fire-and-forget (step 3: "it never runs in the request
   // path"): whether this conversation's rolling summary needs a refresh.
   // Never awaited and never allowed to affect the turn's own outcome,
@@ -1356,6 +1411,11 @@ export async function runTurn(
   text: string,
   opts: { thinking?: boolean; conversationId?: string } = {},
 ): Promise<TurnOpResult> {
+  // Fix A4 (docs/dev.md's 2026-09-07 incident note): measured from the
+  // very top, so `duration_ms` in the `[turn]` log line reflects the
+  // whole turn (routing, any plugin call, the model round trip), not
+  // just the model's own generation time.
+  const startedAt = Date.now();
   const invalid = validateTurnInput(surface, text);
   if (invalid) return invalid;
 
@@ -1374,6 +1434,7 @@ export async function runTurn(
   const prepared = await prepareTurn(actor, surface, text, loaded, conversation);
 
   let value: TurnValue;
+  const guardHits: GuardReason[] = [];
   if (prepared.kind === "immediate") {
     value = prepared.value;
   } else {
@@ -1395,39 +1456,42 @@ export async function runTurn(
     // evaluateSafety() call) - purely additive.
     const outputSafety = evaluateSafety(completion.value.text, speakerAgeBand(actor, new Date()));
     notifyIfFlagged(actor, outputSafety, "[turn]");
-    value =
-      outputSafety.action === "refuse"
-        ? {
-            // A non-streaming reply is atomic - nothing was ever shown to
-            // the caller before this point, so replacing the WHOLE reply
-            // with a canned refusal (finalizeReply()'s own existing
-            // "safety_refuse" handling, unchanged) is exactly as clean
-            // here as it is for an input-side refusal, unlike
-            // runTurnStream()'s own partial-delivery case above.
-            reply: { text: "" },
-            source: "safety_refuse",
-            safety: outputSafety,
-            crisis_resources: prepared.crisisResources,
-            conversation_id: conversation.id,
-            turn_id: prepared.turnId,
-          }
-        : {
-            // Session C step 3: guards run AFTER the safety floor, never
-            // instead of it - a refused reply above never reaches this
-            // branch at all, and nothing here can turn a safe reply back
-            // into a refusal (guards.ts's own reasons are all honesty
-            // fixes, never a safety category).
-            reply: { text: guardReply(completion.value.text, { ...prepared.guardContext, personId: actor.id }).reply },
-            source: "model",
-            safety: outputSafety.flagged ? outputSafety : prepared.safety,
-            crisis_resources: outputSafety.flagged ? deriveCrisisResources(outputSafety) : prepared.crisisResources,
-            conversation_id: conversation.id,
-            turn_id: prepared.turnId,
-          };
+    if (outputSafety.action === "refuse") {
+      value = {
+        // A non-streaming reply is atomic - nothing was ever shown to
+        // the caller before this point, so replacing the WHOLE reply
+        // with a canned refusal (finalizeReply()'s own existing
+        // "safety_refuse" handling, unchanged) is exactly as clean
+        // here as it is for an input-side refusal, unlike
+        // runTurnStream()'s own partial-delivery case above.
+        reply: { text: "" },
+        source: "safety_refuse",
+        safety: outputSafety,
+        crisis_resources: prepared.crisisResources,
+        conversation_id: conversation.id,
+        turn_id: prepared.turnId,
+      };
+    } else {
+      // Session C step 3: guards run AFTER the safety floor, never
+      // instead of it - a refused reply above never reaches this
+      // branch at all, and nothing here can turn a safe reply back
+      // into a refusal (guards.ts's own reasons are all honesty
+      // fixes, never a safety category).
+      const guarded = guardReply(completion.value.text, { ...prepared.guardContext, personId: actor.id });
+      if (guarded.reason) guardHits.push(guarded.reason); // Fix A4: fed into the `[turn]` log's own `guard` array below
+      value = {
+        reply: { text: guarded.reply },
+        source: "model",
+        safety: outputSafety.flagged ? outputSafety : prepared.safety,
+        crisis_resources: outputSafety.flagged ? deriveCrisisResources(outputSafety) : prepared.crisisResources,
+        conversation_id: conversation.id,
+        turn_id: prepared.turnId,
+      };
+    }
   }
 
   value = finalizeReply(actor, value);
-  logTurnSafely(actor, surface, text, value);
+  logTurnSafely(actor, surface, text, value, { startedAt, guardHits });
   return { ok: true, value };
 }
 
@@ -1579,32 +1643,81 @@ export async function* gateOutputSafety(
  * one already-complete sentence at a time - the exact "the streaming
  * path calls guard_sentence per sentence BEFORE the hand-off to the
  * speaker" this step's own text and bot-legacy's guards.py docstring
- * both ask for. A flagged sentence is REPLACED with its honest line
- * (guards.ts's own `replacementFor`) rather than cut - unlike
- * guardReply()'s whole-reply cut/keep decision, a sentence already
- * queued for the speaker has no "earlier sentences" to fall back to; it
- * simply becomes the honest sentence instead. Composed as its own
- * wrapper rather than folded into gateOutputSafety() itself: that
- * function's own comment already documents two real, subtle bugs
- * (batched sentences dropping an earlier one, whitespace fidelity) this
- * change has no reason to risk re-introducing by editing it directly.
- * Propagates the wrapped generator's own return value (its `SafetyResult`
- * flag) unchanged - guards never affect what streamTurnEvents()'s
- * `finalize()` sees for safety. */
+ * both ask for. Composed as its own wrapper rather than folded into
+ * gateOutputSafety() itself: that function's own comment already
+ * documents two real, subtle bugs (batched sentences dropping an earlier
+ * one, whitespace fidelity) this change has no reason to risk
+ * re-introducing by editing it directly. Propagates the wrapped
+ * generator's own return value (its `SafetyResult` flag) unchanged -
+ * guards never affect what streamTurnEvents()'s `finalize()` sees for
+ * safety.
+ *
+ * Fix C (docs/dev.md's "Chat reliability: the 2026-09-07 incident and the
+ * five fixes"): this used to REPLACE every flagged sentence in place and
+ * keep streaming whatever came after it unguarded - a real bug, not a
+ * documented trade-off: "I might go see the new Spiderman movie" got
+ * "That sounds like a fun night out! You should definitely check it
+ * out." back, its first sentence replaced with "That's not something
+ * I've been told" (an honest answer to a QUESTION nobody asked) spliced
+ * directly in front of the model's own next sentence, reading as flatly
+ * self-contradicting.
+ *
+ * Now genuinely matches guardReply()'s own decision (guards.ts:510-527),
+ * not an approximation of it - a code review on this fix's first cut
+ * (2026-09-07) caught a real divergence: that first cut dropped just the
+ * cuttable sentence and kept streaming later ones, while guardReply()
+ * itself, for the identical input, STOPS at the first flagged sentence
+ * every time (`return` on both its CUTTABLE and non-cuttable branches -
+ * there is no fall-through to check a later sentence once one has
+ * fired). The two paths producing materially different household-facing
+ * replies for the same model completion was exactly the kind of
+ * guardReply()/gateGuards() drift this whole fix exists to close, so
+ * this rewrite mirrors guardReply()'s real branches one-for-one: a
+ * CUTTABLE reason (guards.ts's own `isCuttable()`) with something
+ * already spoken keeps only what was already spoken and stops (no
+ * honest line at all, matching `return { reply: kept.join(" "), reason
+ * }`); a CUTTABLE reason with NOTHING spoken yet, or any non-cuttable
+ * reason, replaces with the honest line and stops (matching `return {
+ * reply: replacementFor(reason, ...), reason }`) - draining (never
+ * yielding) whatever the underlying stream still has left either way, so
+ * the model's own remaining words are never spoken after this function
+ * has already decided the reply, while still returning whatever
+ * SafetyResult the drained stream resolves to unchanged. */
 export async function* gateGuards(
   tokens: AsyncGenerator<string, SafetyResult | undefined, void>,
   ctx: Omit<GuardContext, "personId">,
   personId: string,
+  // Fix A4 (docs/dev.md's 2026-09-07 incident note): optional, so every
+  // existing caller (and every existing test) is unaffected. Lets
+  // runTurnStream() collect which reason stopped the reply, for the
+  // `[turn]` log line's own `guard` array - this generator's per-sentence
+  // internals have no other channel back to whoever is draining it.
+  onGuardHit?: (reason: GuardReason) => void,
 ): AsyncGenerator<string, SafetyResult | undefined, void> {
   const iterator = tokens[Symbol.asyncIterator]();
   let step = await iterator.next();
   let isFirstSentence = true;
+  let spokeAnything = false;
   while (!step.done) {
     const rawSpan = step.value;
     const trimmed = rawSpan.trim();
     const reason = trimmed ? guardSentence(trimmed, { ...ctx, personId }, isFirstSentence) : null;
     if (trimmed) isFirstSentence = false;
-    yield reason ? `${replacementFor(reason, personId)} ` : rawSpan;
+    if (reason) {
+      onGuardHit?.(reason);
+      // guards.ts:521's own gate, exactly: `kept.length > 0 &&
+      // CUTTABLE.has(reason)` keeps the prefix and drops the rest with
+      // no honest line; anything else (non-cuttable, or cuttable with
+      // nothing kept yet) replaces with the honest line.
+      if (!isCuttable(reason) || !spokeAnything) {
+        yield `${replacementFor(reason, personId)} `;
+      }
+      let rest = await iterator.next();
+      while (!rest.done) rest = await iterator.next();
+      return rest.value;
+    }
+    spokeAnything = true;
+    yield rawSpan;
     step = await iterator.next();
   }
   return step.value;
@@ -1632,6 +1745,11 @@ export async function runTurnStream(
   // time.
   opts: { thinking?: boolean; conversationId?: string; signal?: AbortSignal } = {},
 ): Promise<TurnStreamResult> {
+  // Fix A4 (docs/dev.md's 2026-09-07 incident note): matches runTurn()'s
+  // own placement - measured from the top so the streamed path's
+  // `duration_ms` covers routing and the model round trip too, not just
+  // the time spent inside finalize().
+  const startedAt = Date.now();
   const invalid = validateTurnInput(surface, text);
   if (invalid) return invalid;
 
@@ -1646,7 +1764,7 @@ export async function runTurnStream(
 
   if (prepared.kind === "immediate") {
     const value = finalizeReply(actor, prepared.value);
-    logTurnSafely(actor, surface, text, value);
+    logTurnSafely(actor, surface, text, value, { startedAt, guardHits: [] });
     return { ok: true, kind: "immediate", value };
   }
 
@@ -1660,12 +1778,18 @@ export async function runTurnStream(
     return { ok: false, status: 503, code: "unavailable", error: started.error };
   }
 
+  // Fix A4: collected by gateGuards()'s own onGuardHit callback as the
+  // stream runs, read back once finalize() builds the log line below -
+  // the stream itself has no other channel back to this closure's own
+  // scope (a generator's per-sentence internals are otherwise opaque to
+  // whoever is draining it).
+  const guardHits: GuardReason[] = [];
   return {
     ok: true,
     kind: "stream",
     conversationId: conversation.id,
     turnId: prepared.turnId,
-    tokens: gateGuards(gateOutputSafety(started.tokens, actor), prepared.guardContext, actor.id),
+    tokens: gateGuards(gateOutputSafety(started.tokens, actor), prepared.guardContext, actor.id, (reason) => guardHits.push(reason)),
     finalize: (replyText: string, outputSafety?: SafetyResult): TurnValue => {
       // A safety cut with nothing safe delivered before it (the very
       // first sentence was itself the unsafe one, replyText === "") gets
@@ -1705,7 +1829,7 @@ export async function runTurnStream(
         conversation_id: conversation.id,
         turn_id: prepared.turnId,
       });
-      logTurnSafely(actor, surface, text, value);
+      logTurnSafely(actor, surface, text, value, { startedAt, guardHits });
       return value;
     },
   };

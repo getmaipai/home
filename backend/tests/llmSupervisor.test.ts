@@ -1,5 +1,5 @@
 import { describe, expect, test, afterEach } from "bun:test";
-import { getChatClient, restartChatBackend, stopChatBackend, getEngineStatus, sweepOrphanEngineProcesses, __resetLlmSupervisorForTests } from "@/lib/llmSupervisor";
+import { getChatClient, restartChatBackend, stopChatBackend, getEngineStatus, getChatLivePid, sweepOrphanEngineProcesses, __resetLlmSupervisorForTests } from "@/lib/llmSupervisor";
 import { enginesDir } from "@/lib/paths";
 import { setHouseholdSettingValue } from "@/lib/settings";
 import { __setCrashBootHoldForTests } from "@/lib/dirtyBoot";
@@ -155,5 +155,53 @@ describe("sweepOrphanEngineProcesses", () => {
   test("resolves with 0 when nothing matches enginesDir, without throwing", async () => {
     expect(enginesDir.length).toBeGreaterThan(0); // sanity: a real path, not an empty match-everything string
     await expect(sweepOrphanEngineProcesses()).resolves.toBe(0);
+  });
+
+  // Fix A2 (docs/dev.md's 2026-09-07 incident note): the chat backend's
+  // own live pid is excluded automatically (no caller needs to pass it),
+  // and whatever extraLivePids the caller supplies (index.ts passes
+  // embed's and tts's) are excluded too - proven directly against
+  // sidecars.ts's real sweepOrphanProcesses() rather than re-mocked here,
+  // since that is what actually decides who dies.
+  test("excludes the chat backend's own live pid and any extraLivePids given", async () => {
+    // `stop: () => {}` matters here: afterEach's own __resetLlmSupervisorForTests()
+    // calls `state.chatBackend?.stop()` unconditionally on cleanup, and a
+    // fake object missing it would throw "stop is not a function" instead
+    // of this test's own assertions ever being reached.
+    (globalThis as { __maipai_llmSupervisor?: { chatBackend: { pid: number; stop: () => void } } }).__maipai_llmSupervisor!.chatBackend = {
+      pid: 999_001,
+      stop: () => {},
+    } as unknown as never;
+    expect(getChatLivePid()).toBe(999_001);
+
+    // No real process to kill under `enginesDir` here (a test environment
+    // never spawns one) - sweeping still resolves to 0, but the point is
+    // this call reaches sidecars.ts's sweepOrphanProcesses() with the
+    // right excludePids, not that anything real gets protected in this
+    // unit test; tests/sidecars.test.ts proves the exclusion itself kills
+    // nothing against a real spawned process.
+    await expect(sweepOrphanEngineProcesses([999_002, null])).resolves.toBe(0);
+  });
+});
+
+// Fix A1 (docs/dev.md's 2026-09-07 incident note): a `bun --hot` reload
+// gives every module a FRESH top-level scope, but the same OS process and
+// heap - so this module's own state lives on `globalThis` instead of a
+// plain `let`, the same shape wyomingServer.ts's `__maipaiWyomingBoundPorts`
+// already established. A real reload can't be produced inside one bun
+// test process (the module graph is cached for the run), so this proves
+// the actual mechanism directly: whatever sits at `globalThis`'s own
+// `__maipai_llmSupervisor` key is what getChatClient() consults - exactly
+// what a freshly re-evaluated module reading the identical key would see,
+// since `??=` finds the object already there rather than replacing it.
+describe("state survives on globalThis (the hot-reload mechanism)", () => {
+  test("a backend placed directly on the shared state object is returned without spawning anything", async () => {
+    const fakeClient = { health: async () => true } as unknown as Awaited<ReturnType<typeof getChatClient>>;
+    const shared = (globalThis as { __maipai_llmSupervisor?: Record<string, unknown> }).__maipai_llmSupervisor!;
+    shared.chatBackend = { client: fakeClient, stop: () => {}, kind: "url", startedAt: new Date().toISOString() };
+
+    const client = await getChatClient();
+    expect(client).toBe(fakeClient);
+    expect(getEngineStatus().kind).toBe("url");
   });
 });

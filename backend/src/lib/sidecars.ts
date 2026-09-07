@@ -230,10 +230,21 @@ export async function freePort(port: number): Promise<void> {
  * at boot (session-f-platform-and-trust.md step 3's own "max-resident
  * models policy with an orphan sweep"), before anything real spawns.
  * Best-effort like freePort() (no-op if `ps` is missing); returns how
- * many processes it killed. */
-export async function sweepOrphanProcesses(matchSubstring: string): Promise<number> {
+ * many processes it killed.
+ *
+ * `excludePids` (Fix A2, docs/dev.md's 2026-09-07 incident note): pids a
+ * caller's own registry already knows are genuinely alive and owned -
+ * llmSupervisor.ts's `sweepOrphanEngineProcesses()` is the real caller,
+ * passing its own chat backend's pid plus embed's and tts's. Without
+ * this, a `bun --hot` reload (which re-runs this same boot-time sweep on
+ * every module reload, not just a real process start) would kill every
+ * matching process regardless of whether something still holds it,
+ * because a substring match on `enginesDir` can't tell a genuine orphan
+ * apart from a backend this exact process is still using. */
+export async function sweepOrphanProcesses(matchSubstring: string, opts: { excludePids?: readonly number[] } = {}): Promise<number> {
+  const exclude = new Set(opts.excludePids ?? []);
   const pattern = new RegExp(matchSubstring.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"));
-  const pids = (await findPidsMatching(pattern)).filter((pid) => pid !== process.pid);
+  const pids = (await findPidsMatching(pattern)).filter((pid) => pid !== process.pid && !exclude.has(pid));
   for (const pid of pids) {
     try {
       process.kill(pid, "SIGKILL");

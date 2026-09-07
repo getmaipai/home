@@ -26,6 +26,7 @@ import { PocketTtsClient } from "@maipai/spec/voice/ts/client.js";
 import { startStubTtsServer } from "@maipai/spec/voice/ts/stubServer.js";
 import { getHouseholdSettingValue } from "@/lib/settings";
 import { spawnAndWaitHealthy } from "@/lib/sidecars";
+import { hotReloadState } from "@/lib/hotReloadState";
 import { assertNotInCrashBootHold } from "@/lib/dirtyBoot";
 
 export type TtsBackendKind = "url" | "spawned" | "stub";
@@ -33,22 +34,39 @@ export type TtsBackendKind = "url" | "spawned" | "stub";
 interface TtsBackend {
   client: PocketTtsClient;
   stop: () => void;
+  /** Only set for a backend this module actually spawned ("spawned") -
+   * llmSupervisor.ts's `ChatBackend.pid` precedent, needed here too for
+   * Fix A2's own orphan-sweep exclusion (see `getTtsLivePid()` below). */
+  pid?: number;
   kind: TtsBackendKind;
   startedAt: string;
 }
 
-let ttsBackend: TtsBackend | null = null;
-let startingPromise: Promise<TtsBackend> | null = null;
-// Bumped by restartTtsBackend()/__resetTtsSupervisorForTests(): a code
-// review (2026-09-04) found a real race those two functions left open -
-// clearing `ttsBackend`/`startingPromise` does nothing to the in-flight
-// startTtsBackend() promise a concurrent getTtsClient() call is still
-// awaiting, so that spawn's own `.then()` later re-installs the stale
-// (pre-restart) backend into `ttsBackend`, clobbering the fresh state a
-// restart exists to produce. Each spawn attempt captures the generation
-// it started under; if a restart bumped it before the spawn resolves,
-// the stale backend stops itself instead of being cached.
-let generation = 0;
+// Fix A (docs/dev.md, "Chat reliability: the 2026-09-07 incident"):
+// `lib/hotReloadState.ts`'s shared helper - a `bun --hot` reload resets a
+// module-level `let` to its initializer, but `globalThis` survives (same
+// process, same heap), so this module's spawned Pocket TTS process stops
+// looking orphaned to the fresh module instance that reload just created.
+interface TtsSupervisorState {
+  ttsBackend: TtsBackend | null;
+  startingPromise: Promise<TtsBackend> | null;
+  // Bumped by restartTtsBackend()/__resetTtsSupervisorForTests(): a code
+  // review (2026-09-04) found a real race those two functions left open -
+  // clearing `ttsBackend`/`startingPromise` does nothing to the in-flight
+  // startTtsBackend() promise a concurrent getTtsClient() call is still
+  // awaiting, so that spawn's own `.then()` later re-installs the stale
+  // (pre-restart) backend into `ttsBackend`, clobbering the fresh state a
+  // restart exists to produce. Each spawn attempt captures the generation
+  // it started under; if a restart bumped it before the spawn resolves,
+  // the stale backend stops itself instead of being cached.
+  generation: number;
+}
+
+const state = hotReloadState<TtsSupervisorState>("ttsSupervisor", () => ({
+  ttsBackend: null,
+  startingPromise: null,
+  generation: 0,
+}));
 
 async function commandExists(bin: string): Promise<boolean> {
   try {
@@ -112,7 +130,7 @@ export async function spawnPocketTts(): Promise<TtsBackend> {
     timeoutMs: 180_000,
     label: "pocket-tts",
   });
-  return { client, stop: () => proc.kill(), kind: "spawned", startedAt: new Date().toISOString() };
+  return { client, stop: () => proc.kill(), pid: proc.pid, kind: "spawned", startedAt: new Date().toISOString() };
 }
 
 async function startTtsBackend(): Promise<TtsBackend> {
@@ -136,12 +154,12 @@ async function startTtsBackend(): Promise<TtsBackend> {
  * carries for the same class of bug (a stale rejected promise permanently
  * wedging the role after one transient failure). */
 export async function getTtsClient(): Promise<PocketTtsClient> {
-  if (ttsBackend) return ttsBackend.client;
-  if (!startingPromise) {
-    const myGeneration = generation;
-    startingPromise = startTtsBackend()
+  if (state.ttsBackend) return state.ttsBackend.client;
+  if (!state.startingPromise) {
+    const myGeneration = state.generation;
+    state.startingPromise = startTtsBackend()
       .then(async (backend): Promise<TtsBackend> => {
-        if (myGeneration !== generation) {
+        if (myGeneration !== state.generation) {
           // A restart landed while this spawn was still starting.
           // Simply returning the (now-stopped) `backend` here would be a
           // second bug, not a fix: a code review (2026-09-04, found while
@@ -159,23 +177,33 @@ export async function getTtsClient(): Promise<PocketTtsClient> {
           backend.stop();
           return { ...backend, client: await getTtsClient() };
         }
-        ttsBackend = backend;
+        state.ttsBackend = backend;
         return backend;
       })
       .catch((err) => {
-        if (myGeneration === generation) startingPromise = null;
+        if (myGeneration === state.generation) state.startingPromise = null;
         throw err;
       });
   }
-  return (await startingPromise).client;
+  return (await state.startingPromise).client;
 }
 
 /** Which backend (if any) is currently serving `tts` - "none" before the
  * first synthesize call in this process's lifetime. */
 export function getTtsBackendKind(): TtsBackendKind | "starting" | "none" {
-  if (ttsBackend) return ttsBackend.kind;
-  if (startingPromise) return "starting";
+  if (state.ttsBackend) return state.ttsBackend.kind;
+  if (state.startingPromise) return "starting";
   return "none";
+}
+
+/** The TTS backend's own pid, when one is genuinely spawned and running -
+ * Fix A2 (docs/dev.md's incident note): index.ts passes this to
+ * llmSupervisor.ts's `sweepOrphanEngineProcesses()` so a `bun --hot`
+ * reload's own re-run of the boot-time orphan sweep never kills this
+ * still-healthy process out from under the fresh module instance that's
+ * about to reuse it. */
+export function getTtsLivePid(): number | null {
+  return state.ttsBackend?.pid ?? null;
 }
 
 /** Stops whatever's running (if any) and clears the cache, so the next
@@ -187,18 +215,18 @@ export function getTtsBackendKind(): TtsBackendKind | "starting" | "none" {
  * with the old value (or none) - the already-running process never
  * re-reads the setting on its own. */
 export async function restartTtsBackend(): Promise<void> {
-  generation++;
-  ttsBackend?.stop();
-  ttsBackend = null;
-  startingPromise = null;
+  state.generation++;
+  state.ttsBackend?.stop();
+  state.ttsBackend = null;
+  state.startingPromise = null;
 }
 
 /** Test-only: stop whatever backend is running and clear the cached
  * client, the same reset-between-test-files shape as
  * __resetLlmSupervisorForTests. */
 export function __resetTtsSupervisorForTests(): void {
-  generation++;
-  ttsBackend?.stop();
-  ttsBackend = null;
-  startingPromise = null;
+  state.generation++;
+  state.ttsBackend?.stop();
+  state.ttsBackend = null;
+  state.startingPromise = null;
 }
