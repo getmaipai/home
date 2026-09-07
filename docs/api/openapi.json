@@ -35,6 +35,12 @@
                 "schema": {
                   "type": "object",
                   "properties": {
+                    "brain": {
+                      "type": "string"
+                    },
+                    "voice": {
+                      "type": "string"
+                    },
                     "sidecars": {
                       "type": "array",
                       "items": {
@@ -67,6 +73,8 @@
                     }
                   },
                   "required": [
+                    "brain",
+                    "voice",
                     "sidecars"
                   ]
                 }

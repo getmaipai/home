@@ -9,6 +9,7 @@ import { loadInstalledWakewords, DEFAULT_WAKE_WORD_MODEL_ID } from "@/lib/voice/
 const MicIcon = getIcon("mic");
 
 interface WakeWordToggleProps {
+  onStatusChange?: (status: "idle" | "starting" | "listening" | "error", error: string | null) => void;
   onWakeDetected: (event: WakeDetectedEvent) => void;
 }
 
@@ -21,10 +22,11 @@ interface WakeWordToggleProps {
 // trained yet. A MaiPai-trained "hey maipai" detector is a later phase,
 // gated on real household recordings for validation this session cannot
 // fabricate.
-export function WakeWordToggle({ onWakeDetected: onWake }: WakeWordToggleProps) {
+export function WakeWordToggle({ onWakeDetected: onWake, onStatusChange }: WakeWordToggleProps) {
   const [enabled, setEnabled] = useState(false);
   const [status, setStatus] = useState<"idle" | "starting" | "listening" | "error">("idle");
   const [error, setError] = useState<string | null>(null);
+  useEffect(() => { onStatusChange?.(status, error); }, [status, error, onStatusChange]);
   const micRef = useRef<MicCaptureHandle | null>(null);
   const loopRef = useRef<WakeWordLoop | null>(null);
   // Guards every async continuation below against a superseded toggle:

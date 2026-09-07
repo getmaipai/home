@@ -42,6 +42,8 @@ export interface ChatModelAdapterDeps {
   // did in handleSend's own `finally` block, just consumed here since the
   // adapter (created once via useMemo) has no per-run finally of its own
   // to hang that reset off.
+  onReplyState?(state: "waiting" | "responding" | "ready" | "error" | "idle"): void;
+  onSpeechError?(): void;
   consumeThinking(): boolean;
   // 4.3: "offer, never block" - a crisis-resources banner rides alongside
   // the reply, not as part of the message content assistant-ui renders.
@@ -92,6 +94,7 @@ export function createChatModelAdapter(deps: ChatModelAdapterDeps): ChatModelAda
       const scheduler = new SentenceSpeechScheduler();
       deps.turnSchedulerRef.current = scheduler;
       scheduler.onFirstAudio = () => deps.onSpeakingChange?.(true);
+      scheduler.onError = () => deps.onSpeechError?.();
       scheduler.onEnded = () => deps.onSpeakingChange?.(false);
 
       // `raw` is every byte received so far, unstripped. `visible` is the
@@ -187,6 +190,7 @@ export function createChatModelAdapter(deps: ChatModelAdapterDeps): ChatModelAda
         }
       }
 
+      deps.onReplyState?.("waiting");
       try {
         const response = await api.streamTurn(text, deps.consumeThinking(), abortSignal);
         for await (const event of readTurnStream(response)) {
@@ -201,6 +205,7 @@ export function createChatModelAdapter(deps: ChatModelAdapterDeps): ChatModelAda
             continue;
           }
           if (event.type === "delta") {
+            deps.onReplyState?.("responding");
             raw += event.text;
             resolveRaw();
             // Only yield once there's something to show. A delta that lands
@@ -238,6 +243,7 @@ export function createChatModelAdapter(deps: ChatModelAdapterDeps): ChatModelAda
             // that ended mid-block, or any other edge case all resolve
             // correctly here, the same stripThinking() fallback the old
             // non-streaming path already relied on.
+            deps.onReplyState?.("ready");
             const finalText = stripThinking(event.value.reply.text);
             const trailing = finalText.slice(spokenLength).trim();
             if (trailing) {
@@ -287,6 +293,7 @@ export function createChatModelAdapter(deps: ChatModelAdapterDeps): ChatModelAda
         }
       } catch (e) {
         if (abortSignal.aborted) {
+          deps.onReplyState?.("idle");
           // The runtime's own stop button (ComposerPrimitive.Cancel):
           // rawStreamPost merges this same abortSignal into the fetch's
           // own via AbortSignal.any, so the abort surfaces here as
@@ -307,6 +314,7 @@ export function createChatModelAdapter(deps: ChatModelAdapterDeps): ChatModelAda
           deps.onSpeakingChange?.(false); // stop() never fires onEnded itself
           throw new DOMException("The run was stopped.", "AbortError");
         }
+        deps.onReplyState?.("error");
         scheduler.finish(); // a genuine failure, not a user stop - let whatever already started speaking finish naturally, enqueue nothing more
         // turnEngine.ts's "unavailable" code covers every real down-state
         // (still downloading, crashed, never selected): one friendly,

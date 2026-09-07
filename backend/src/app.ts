@@ -42,6 +42,8 @@ import { storeRoutes } from "@/routes/store";
 import { listsRoutes } from "@/routes/lists";
 import { widgetsRoutes } from "@/routes/widgets";
 import { requireAuth } from "@/middleware/auth";
+import { getEngineStatus } from "@/lib/llmSupervisor";
+import { getTtsBackendKind } from "@/lib/ttsSupervisor";
 import { listSidecars } from "@/lib/sidecars";
 
 // Session F, step 4: every route file converts to @hono/zod-openapi
@@ -65,6 +67,8 @@ export const app = apiRouter();
 // and every signed-in household member can see it.
 const SidecarStatusSchema = z.enum(["stopped", "starting", "running", "unhealthy", "crashed"]);
 const HealthResponseSchema = z.object({
+  brain: z.string(),
+  voice: z.string(),
   sidecars: z.array(
     z.object({
       id: z.string(),
@@ -93,7 +97,7 @@ const healthRoute = createRoute({
 // schemas (200 vs 401) this call was for, and it type-checked the
 // response body against BOTH - a real error caught while converting
 // routes/repairs.ts to the identical pattern, fixed here too.
-app.openapi(healthRoute, (c) => c.json({ sidecars: listSidecars() }, 200));
+app.openapi(healthRoute, (c) => c.json({ sidecars: listSidecars(), brain: getEngineStatus().kind, voice: getTtsBackendKind() }, 200));
 
 // /api/docs: the Scalar API reference reading the generated document
 // below. docs/api/ (a script check.sh runs and diffs, per this step's

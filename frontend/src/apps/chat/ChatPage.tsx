@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useRef, useState, type MutableRefObject } from "react";
+import { SensesDock, type ReplyState, type EarState } from "./SensesDock";
+import { useCallback, useEffect, useMemo, useRef, useState, type MutableRefObject } from "react";
 import { useLocation } from "react-router-dom";
 import { AssistantRuntimeProvider, useAui, useLocalRuntime, useRemoteThreadListRuntime } from "@assistant-ui/react";
 import { Page } from "@/kit/primitives/Page";
@@ -95,6 +96,11 @@ export function ChatPage({ person }: ChatPageProps) {
   // onSpeakingChange, wired to the scheduler's onFirstAudio/onEnded) so
   // a dedicated control can cover it.
   const [isSpeaking, setIsSpeaking] = useState(false);
+  const [reply, setReply] = useState<ReplyState>("idle");
+  const [speechError, setSpeechError] = useState(false);
+  const [ears, setEars] = useState<EarState>("idle");
+  const [earError, setEarError] = useState<string | null>(null);
+  const onEarStatus = useCallback((state: EarState, error: string | null) => { setEars(state); setEarError(error); }, []);
 
   const chatModelAdapter = useMemo(
     () =>
@@ -107,7 +113,9 @@ export function ChatPage({ person }: ChatPageProps) {
         },
         onCrisisResources: setBanner,
         turnSchedulerRef,
-        onSpeakingChange: setIsSpeaking,
+        onSpeakingChange: (value) => { setIsSpeaking(value); if (value) setSpeechError(false); },
+        onReplyState: (state) => { setReply(state); if (state === "waiting") setSpeechError(false); },
+        onSpeechError: () => setSpeechError(true),
       }),
     [],
   );
@@ -153,7 +161,11 @@ export function ChatPage({ person }: ChatPageProps) {
     <ChatActorContext.Provider value={person.id}>
       <AssistantRuntimeProvider runtime={runtime}>
         <SttAutoSend sendRef={sttAutoSendRef} />
-        <Page title="Chat">
+        <Page title="Chat" hideTitle>
+          <div className="flex items-center justify-between gap-3 px-4 pt-4 pb-2">
+            <h2 className="text-3xl font-bold tracking-tight">Chat</h2>
+            <SensesDock reply={reply} speaking={isSpeaking} speechError={speechError} ears={ears} earError={earError} />
+          </div>
           {banner ? (
             <div className="mx-4 mb-2 rounded-[var(--radius)] bg-[var(--muted)] px-3 py-2 text-base">{banner}</div>
           ) : null}
@@ -189,6 +201,7 @@ export function ChatPage({ person }: ChatPageProps) {
                         engineering note, not something a parent watching over a
                         kid's shoulder should have to parse. */}
                     <WakeWordToggle
+                      onStatusChange={onEarStatus}
                       onWakeDetected={() =>
                         setBanner("MaiPai heard its wake word. It can't act on it yet - that's coming soon.")
                       }

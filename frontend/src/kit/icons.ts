@@ -8,6 +8,9 @@ import {
   HelpCircle,
   Settings,
   Brain,
+  Ear,
+  Eye,
+  Speech,
   Archive,
   CheckCircle2,
   ChevronDown,
@@ -40,6 +43,9 @@ import {
 // imports lucide-react directly. Grows as pages need more; nothing here
 // is speculative.
 const REGISTRY: Record<string, LucideIcon> = {
+  ear: Ear,
+  eye: Eye,
+  speech: Speech,
   "message-circle": MessageCircle,
   send: Send,
   "log-out": LogOut,

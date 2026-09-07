@@ -486,6 +486,7 @@ export const api = {
   modelSelection: () => request<{ modelId: string | null }>("/api/host/models/selection"),
   selectModel: (id: string) => request<ModelJob>(`/api/host/models/${encodeURIComponent(id)}/select`, { method: "POST" }),
   modelSelectStatus: (id: string) => request<ModelJob>(`/api/host/models/${encodeURIComponent(id)}/select-status`),
+  senses: () => request<{ brain: string; voice: string }>("/api/health", { timeoutMs: 8_000 }),
   engineStatus: () => request<EngineStatus>("/api/host/engine/status"),
   engineStats: () => request<EngineStatsSample[]>("/api/host/engine/stats"),
   stopEngine: () => request<EngineStatus>("/api/host/engine/stop", { method: "POST", timeoutMs: 15_000 }),

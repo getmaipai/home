@@ -58,6 +58,7 @@ export class SentenceSpeechScheduler {
   /** Fires once every enqueued sentence has finished playing AND finish()
    * has been called (no more sentences are coming). */
   onEnded?: () => void;
+  onError?: () => void;
 
   constructor() {
     // Created synchronously by the caller, in the same click/submit
@@ -108,6 +109,7 @@ export class SentenceSpeechScheduler {
       fixWavHeaderSize(bytes);
       audioBuffer = await this.audioContext.decodeAudioData(bytes.buffer as ArrayBuffer);
     } catch {
+      if (!this.stopped) this.onError?.();
       // A failed sentence just doesn't speak - the reply's TEXT already
       // rendered regardless of TTS (ChatPage.tsx treats them as
       // independent), so one bad sentence never blocks or breaks the rest
