@@ -10,6 +10,7 @@
 // 4.3: "harvest the real failures and train on those" (borrowed from the
 // wake-word training rule, CLAUDE.md) applies here too, the corpus in
 // spec/safety/corpus/ is expected to grow as real misses turn up.
+import remove from "confusables";
 
 export interface SafetyContext {
   /** Is the speaker a minor (role teen or child)? Grooming detection is
@@ -23,8 +24,51 @@ export interface CategorySignals {
   matched: string[];
 }
 
+// Issue #10: this used to be a bare toLowerCase(), so seven of the eight
+// 4.3 categories (everything but csam, which had its own separate
+// csamNormalize below) had no obfuscation resistance at all - including
+// prompt_injection and jailbreak, which are adversarial by definition.
+// Reproduced live: a Cyrillic "о" or Greek omicron standing in for a
+// Latin "o" (or a zero-width space inside a word) walked straight past
+// every detector, since NFKD has no compatibility mapping for a
+// genuinely different character that merely LOOKS like Latin - that's a
+// confusables (skeleton) problem, a different mechanism from the
+// separator/diacritic obfuscation csamNormalize's own NFKD step defeats.
+//
+// One shared pipeline every detector now inherits, rather than a second
+// hand-written homoglyph list beside csamNormalize's own: strip Unicode
+// format characters (zero-width space/joiners, RTL/LTR overrides) first,
+// fold confusables to their Latin skeleton via the `confusables` package
+// (the actual Unicode confusables table, not a hand-rolled list - the
+// org's own "a maintained library... beats hand-rolled logic doing the
+// identical job" rule), then lowercase.
+//
+// The folded string is a MATCHING COPY ONLY: never stored, logged,
+// forwarded to a model, or shown to a person. Folding is lossy by design
+// (it exists to catch obfuscated ASCII lookalikes, not to transliterate
+// real non-Latin text) - i18n will eventually bring genuine non-Latin
+// household text through here, and this must never corrupt or replace
+// what a person actually typed, only decide whether the FLOOR fires.
+// Single-slot memo, not a bigger cache: classifier.ts's checkSafety()
+// calls up to eight detectors back-to-back, every one of them normalizing
+// the IDENTICAL `text` argument independently - a code review of the
+// confusables fix (2026-09-06) found this had gone from a bare
+// toLowerCase() to real per-codepoint work (the confusables package's own
+// regex passes plus a table lookup per character), turning what used to
+// be negligible into up to 8x redundant work on a hot path this file's
+// own classifier.ts header calls out as running "before any model, and
+// again on every streamed sentence." Safe as a single JS-thread-only
+// slot: norm() has no `await` inside it, so nothing can interleave a
+// second call between checking and setting these two variables.
+let lastNormInput: string | undefined;
+let lastNormOutput: string | undefined;
 function norm(text: string): string {
-  return text.toLowerCase();
+  if (text === lastNormInput && lastNormOutput !== undefined) return lastNormOutput;
+  const noFormatChars = text.replace(/\p{Cf}/gu, "");
+  const result = remove(noFormatChars).toLowerCase();
+  lastNormInput = text;
+  lastNormOutput = result;
+  return result;
 }
 
 function anyMatch(text: string, patterns: RegExp[]): RegExp | null {
@@ -225,12 +269,15 @@ const SEXUAL_TERMS = [
 ];
 
 // Normalize to defeat naive separator obfuscation (l.o.l.i, l-o-l-i,
-// l_o_l_i): strip combining marks, then produce two forms. `compact`
+// l_o_l_i) ON TOP of norm()'s own confusables/format-character folding
+// (issue #10: this used to duplicate norm()'s lowercase step with no
+// confusables handling of its own - a second, incomplete copy of the
+// same idea): strip combining marks, then produce two forms. `compact`
 // collapses separator runs to a single space (for multi-word phrases like
 // "school girl"). `tight` removes separators entirely, concatenating
 // letters (for standalone terms like "loli" split with punctuation).
 function csamNormalize(text: string): { compact: string; tight: string } {
-  const stripped = text.toLowerCase().normalize("NFKD").replace(/[̀-ͯ]/g, "");
+  const stripped = norm(text).normalize("NFKD").replace(/[̀-ͯ]/g, "");
   return {
     compact: stripped.replace(/[\s._\-*]+/g, " "),
     tight: stripped.replace(/[\s._\-*]+/g, ""),

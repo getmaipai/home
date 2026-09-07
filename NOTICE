@@ -22,6 +22,7 @@ a retroactive audit of every backend package already in bun.lock/uv.lock.
 - onnxruntime-web (MIT) - https://github.com/microsoft/onnxruntime (runs the downloaded Silero VAD model, `backend/src/lib/sileroVad.ts`)
 - to-words (MIT) - https://github.com/mastermunj/to-words (spoken number-to-words, `spec/voice/ts/normalizeForSpeech.ts`)
 - num2words (LGPL-2.1) - https://github.com/savoirfairelinux/num2words (the Python twin, `spec/voice/py/normalize_for_speech.py`; an LGPL dependency per the org's own third-party-code rule, never vendored)
+- confusables (MIT) - https://github.com/gc/confusables (Unicode confusables skeleton folding for the safety floor's shared normalization, `spec/safety/ts/signals.ts`)
 
 When another component lands, its attribution goes here, per
 docs/PACKAGES.md in getmaipai/.github.

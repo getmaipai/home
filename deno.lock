@@ -109,6 +109,7 @@
             "npm:@types/he@^1.2.3",
             "npm:ajv-formats@^3.0.1",
             "npm:ajv@^8.20.0",
+            "npm:confusables@^1.1.1",
             "npm:he@^1.2.0",
             "npm:json-schema-to-zod@^2.6.1",
             "npm:mathjs@^15.2.0",
