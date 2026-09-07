@@ -1,6 +1,6 @@
 import { APP_CATALOG, favoriteApps } from "@/shell/appCatalog";
 import { useEffect, useState, type ReactNode } from "react";
-import { NavLink, useLocation, useNavigate } from "react-router-dom";
+import { Link, NavLink, useLocation, useNavigate } from "react-router-dom";
 import { Trans, useLingui } from "@lingui/react";
 import { useFocusable } from "@noriginmedia/norigin-spatial-navigation";
 import {
@@ -258,7 +258,13 @@ export function Shell({ person, onSignOut, onPersonChange, children }: ShellProp
           live, 2026-09-06, by the new screenshot/a11y matrix. */}
       <Sidebar collapsible="icon" className="hidden sm:flex" role="navigation" aria-label="Main navigation">
         <SidebarHeader className="h-16 justify-center border-b border-sidebar-border/60 px-4 group-data-[collapsible=icon]:px-2">
-          <span className="text-sm font-semibold tracking-tight group-data-[collapsible=icon]:hidden">Your space<span className="ml-1 text-primary">.</span></span>
+          <Link to="/" aria-label="MaiPai Home" className="flex min-h-10 items-center gap-2.5 rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+            <span className="flex size-8 shrink-0 items-center justify-center">
+              <img src="/brand/maipai-home-icon-light.png" alt="" className="size-8 object-contain brand-logo-light" />
+              <img src="/brand/maipai-home-icon-dark.png" alt="" className="size-8 object-contain brand-logo-dark" />
+            </span>
+            <span className="text-base font-semibold tracking-tight group-data-[collapsible=icon]:hidden">MaiPai <span className="text-primary">Home</span></span>
+          </Link>
         </SidebarHeader>
         {/* `p-2` + the menu's own `gap-1`: shadcn's own usual nesting
             (SidebarGroup > SidebarGroupContent) is what supplies this
@@ -301,8 +307,10 @@ export function Shell({ person, onSignOut, onPersonChange, children }: ShellProp
                 default (docs/plans/session-b-ui.md step 2) - this is that
                 choice's one control. Phone has no sidebar to collapse. */}
             <SidebarTrigger className="hidden sm:inline-flex" />
-            <img src="/brand/maipai-home-logo-light.png" alt="MaiPai Home" className="h-7 w-auto brand-logo-light" />
-            <img src="/brand/maipai-home-logo-dark.png" alt="MaiPai Home" className="h-7 w-auto brand-logo-dark" />
+            <Link to="/" aria-label="MaiPai Home" className="rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:hidden">
+              <img src="/brand/maipai-home-logo-light.png" alt="" className="h-7 w-auto brand-logo-light" />
+              <img src="/brand/maipai-home-logo-dark.png" alt="" className="h-7 w-auto brand-logo-dark" />
+            </Link>
           </div>
           <div className="flex items-center gap-1">
             <PinToggle person={person} />

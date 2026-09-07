@@ -38,6 +38,8 @@ const SCREENS_DIR = join(ROOT, "docs", "assets", "screens");
 const HERO_PATH = join(ROOT, "docs", "assets", "hero.png");
 
 const a11yOnly = process.argv.includes("--a11y-only");
+// Focused review retains the same seeded data, readiness, and a11y checks.
+const settingsReview = process.argv.includes("--settings-review");
 
 interface RouteSpec {
   slug: string;
@@ -201,7 +203,7 @@ async function visitRoute(context: BrowserContext, route: RouteSpec, viewport: V
     const axe = await new AxeBuilder({ page })
       .withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa", "best-practice"])
       .analyze();
-    const violations = axe.violations.map((v) => `${v.id} (${v.impact ?? "unknown"}): ${v.nodes.length} node(s) - ${v.help}`);
+    const violations = axe.violations.map((v) => `${v.id} (${v.impact ?? "unknown"}): ${v.nodes.length} node(s) - ${v.help}: ${v.nodes.map((node) => node.target.join(" ")).join("; ")}`);
 
     if (saveScreenshot) {
       mkdirSync(SCREENS_DIR, { recursive: true });
@@ -390,7 +392,7 @@ async function main() {
   const backend = Bun.spawn({
     cmd: ["bun", "run", "src/index.ts"],
     cwd: join(ROOT, "backend"),
-    env: { ...process.env, PORT: String(PORT), MAIPAI_DATA_DIR: DATA_DIR },
+    env: { ...process.env, PORT: String(PORT), MAIPAI_DATA_DIR: DATA_DIR, MAIPAI_WYOMING_PORT: "0" },
     stdout: "ignore",
     stderr: "inherit",
   });
@@ -407,9 +409,9 @@ async function main() {
 
     browser = await chromium.launch();
 
-    if (!a11yOnly) await captureHero(browser, sessionValue);
+    if (!a11yOnly && !settingsReview) await captureHero(browser, sessionValue);
 
-    const combos = a11yOnly
+    const combos = a11yOnly || settingsReview
       ? A11Y_ONLY_COMBOS
       : VIEWPORTS.flatMap((v) => THEMES.map((t) => ({ viewport: v.slug, theme: t })));
 
@@ -419,7 +421,7 @@ async function main() {
       if (!viewport) throw new Error(`unknown viewport ${combo.viewport}`);
       const context = await newContext(browser, viewport, combo.theme, sessionValue);
       try {
-        for (const route of ROUTES) {
+        for (const route of (settingsReview ? ROUTES.filter((entry) => entry.slug === "settings" || entry.slug === "settings-models") : ROUTES)) {
           console.log(`${route.slug} @ ${viewport.slug}/${combo.theme}...`);
           // A hard ceiling around the whole visit, not just Playwright's
           // own actions inside it: `AxeBuilder#analyze()` runs its

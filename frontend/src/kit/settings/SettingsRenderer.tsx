@@ -121,7 +121,7 @@ export function SettingsRenderer({ scope, scopeValue, filter }: SettingsRenderer
   // all: the actual page-level container SettingsPage.tsx renders it
   // inside already provides the real scrolling.
   return (
-    <div className="flex flex-col gap-6 p-4">
+    <div className="flex flex-col gap-4">
       {writeError ? (
         <div className="rounded-lg bg-muted px-3 py-2 text-base text-destructive">{writeError}</div>
       ) : null}

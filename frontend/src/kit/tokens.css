@@ -85,7 +85,7 @@
   --sidebar-primary-foreground: hsl(0 0% 100%);
   /* Quiet selection keeps primary actions visually dominant. */
   --sidebar-accent: color-mix(in srgb, var(--sidebar-primary) 12%, var(--sidebar));
-  --sidebar-accent-foreground: var(--sidebar-primary);
+  --sidebar-accent-foreground: var(--foreground);
   --sidebar-border: hsl(240 6% 90%);
   --sidebar-ring: hsl(189 94% 29%);
   --chart-1: hsl(189 94% 40%);
@@ -119,7 +119,7 @@
     --sidebar-primary: hsl(189 84% 55%);
     --sidebar-primary-foreground: hsl(240 10% 6%);
     --sidebar-accent: color-mix(in srgb, var(--sidebar-primary) 12%, var(--sidebar));
-    --sidebar-accent-foreground: var(--sidebar-primary);
+    --sidebar-accent-foreground: var(--foreground);
     --sidebar-border: hsl(240 6% 18%);
     --sidebar-ring: hsl(189 84% 55%);
   }
@@ -148,7 +148,7 @@
   --sidebar-primary: hsl(189 84% 55%);
   --sidebar-primary-foreground: hsl(240 10% 6%);
   --sidebar-accent: color-mix(in srgb, var(--sidebar-primary) 12%, var(--sidebar));
-  --sidebar-accent-foreground: var(--sidebar-primary);
+  --sidebar-accent-foreground: var(--foreground);
   --sidebar-border: hsl(240 6% 18%);
   --sidebar-ring: hsl(189 84% 55%);
 }

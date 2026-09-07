@@ -455,7 +455,7 @@ describe("SettingsPage tree - tab stays in sync with the route, not just ?tab=",
       // there) - not HOUSEHOLD_TREE, which doesn't contain "Voices" at all.
       expect(await findByRole("button", { name: "Commands" })).toBeTruthy();
       expect(queryByRole("button", { name: "AI models" })).toBeNull();
-      expect(await findByRole("button", { name: "Me" })).toHaveClass("bg-muted");
+      expect(await findByRole("button", { name: "Me" })).toHaveAttribute("aria-pressed", "true");
     } finally {
       restore();
     }
@@ -491,7 +491,7 @@ describe("SettingsPage tree - tab stays in sync with the route, not just ?tab=",
 
       expect(await findByRole("button", { name: "AI models" })).toBeTruthy();
       expect(queryByRole("button", { name: "Voices" })).toBeNull();
-      expect(await findByRole("button", { name: "Household" })).toHaveClass("bg-muted");
+      expect(await findByRole("button", { name: "Household" })).toHaveAttribute("aria-pressed", "true");
     } finally {
       restore();
     }
@@ -542,7 +542,7 @@ describe("SettingsPage tree - tab stays in sync with the route, not just ?tab=",
         [{ isIntersecting: true, target: fakeEl, boundingClientRect: { top: 0 } } as unknown as IntersectionObserverEntry],
         {} as IntersectionObserver,
       );
-      expect(await findByRole("button", { name: "AI model tuning" })).toHaveClass("bg-muted");
+      expect(await findByRole("button", { name: "AI model tuning" })).toHaveClass("bg-primary/10");
       // A scroll-anchor entry (no `to`) is selected, not navigated to -
       // List.tsx's own convention for that ("true"), not "page" (a code
       // review, 2026-09-06, caught a flat "page" applied to both kinds).
@@ -552,9 +552,9 @@ describe("SettingsPage tree - tab stays in sync with the route, not just ?tab=",
 
       // The stale scroll highlight must be gone now that we've left the
       // page it applied to - only the routed entry should be active.
-      expect(await findByRole("button", { name: "AI model tuning" })).not.toHaveClass("bg-muted");
+      expect(await findByRole("button", { name: "AI model tuning" })).not.toHaveClass("bg-primary/10");
       expect(await findByRole("button", { name: "AI model tuning" })).not.toHaveAttribute("aria-current");
-      expect(await findByRole("button", { name: "AI models" })).toHaveClass("bg-muted");
+      expect(await findByRole("button", { name: "AI models" })).toHaveClass("bg-primary/10");
       // A routed entry is a real navigation, so it gets "page" - the
       // same signal the shell's own main nav rail already gets from
       // `NavLink` for free.
@@ -576,7 +576,7 @@ describe("SettingsPage tree - tab stays in sync with the route, not just ?tab=",
 // actually has something to render, proving the shell survives the
 // navigation rather than just proving the URL changed.
 describe("SettingsPage nested routes keep the shell mounted", () => {
-  test("navigating into a nested route keeps the rail, tab switcher, and search box on screen", async () => {
+  test("navigating into a nested route keeps navigation and offers a working return link", async () => {
     const person = makePerson("owner");
     const originalFetch = globalThis.fetch;
     globalThis.fetch = mock((input: RequestInfo | URL) => {
@@ -614,7 +614,7 @@ describe("SettingsPage nested routes keep the shell mounted", () => {
     }) as unknown as typeof fetch;
 
     try {
-      const { findByRole, findByText, findByLabelText } = renderWithQueryClient(
+      const { findByRole, findByText } = renderWithQueryClient(
         <MemoryRouter initialEntries={["/settings"]}>
           <Routes>
             <Route path="/settings" element={<SettingsPage person={person} onPersonChange={() => {}} />}>
@@ -632,11 +632,8 @@ describe("SettingsPage nested routes keep the shell mounted", () => {
       // gone because SettingsPage unmounted.
       expect(await findByRole("button", { name: "AI models" })).toBeTruthy();
       expect(await findByRole("button", { name: "Household" })).toBeTruthy();
-      // Still on screen, but disabled (a code review, 2026-09-06, found it
-      // stayed enabled here even though nothing on this route reads what's
-      // typed into it) - found by its stable aria-label, not the
-      // placeholder text, which changes to say so once disabled.
-      expect(await findByLabelText("Search settings")).toBeDisabled();
+      // Subpages offer a working way back instead of a disabled search.
+      expect(await findByRole("link", { name: "← All household settings" })).toHaveAttribute("href", "/settings?tab=household");
     } finally {
       globalThis.fetch = originalFetch;
     }
@@ -662,4 +659,32 @@ describe("SettingsPage nested routes keep the shell mounted", () => {
       restore();
     }
   });
+});
+
+test("a section selected from a settings subpage opens its settings and scrolls after loading", async () => {
+  const restore = stubSettingsFetch();
+  const originalScroll = HTMLElement.prototype.scrollIntoView;
+  const scrolled: string[] = [];
+  HTMLElement.prototype.scrollIntoView = function () { scrolled.push(this.id); };
+  try {
+    const view = renderWithQueryClient(
+      <MemoryRouter initialEntries={["/settings/models"]}>
+        <Routes>
+          <Route path="/settings" element={<SettingsPage person={makePerson("owner")} onPersonChange={() => {}} />}>
+            <Route path="models" element={<div>Model settings</div>} />
+          </Route>
+        </Routes>
+      </MemoryRouter>,
+    );
+    expect(view.queryByRole("textbox", { name: "Search settings" })).toBeNull();
+    expect(view.getByRole("combobox", { name: "Settings section" })).toBeTruthy();
+    fireEvent.click(view.getByRole("button", { name: "System" }));
+    await view.findByText("Language and region");
+    await waitFor(() => expect(scrolled).toContain("settings-household.system"));
+    expect(view.getByRole("textbox", { name: "Search settings" })).toBeTruthy();
+    expect(view.getByRole("link", { name: /AI models Choose/ })).toHaveAttribute("href", "/settings/models");
+  } finally {
+    restore();
+    HTMLElement.prototype.scrollIntoView = originalScroll;
+  }
 });

@@ -1,5 +1,7 @@
-import { useEffect, useRef, useState, type ReactNode } from "react";
-import { Outlet, useLocation, useNavigate, useSearchParams } from "react-router-dom";
+import { Select } from "@/kit/primitives/Select";
+import { getIcon } from "@/kit/icons";
+import { useEffect, useRef, useState, Fragment, type ReactNode } from "react";
+import { Link, Outlet, useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { Page } from "@/kit/primitives/Page";
 import { SettingsRenderer } from "@/kit/settings/SettingsRenderer";
 import { Input } from "@/kit/ui/input";
@@ -24,6 +26,9 @@ interface SettingsPageProps {
 interface TreeEntry {
   id: string;
   label: string;
+  group: string;
+  icon: string;
+  description?: string;
   /** Session B step 7: a real management surface (its own route, its
    * own page - ModelsPage.tsx and friends) rather than a scroll anchor
    * on this page. Set, this entry navigates instead of scrolling and is
@@ -32,38 +37,27 @@ interface TreeEntry {
 }
 
 const HOUSEHOLD_TREE: TreeEntry[] = [
-  { id: "settings-household.system", label: "System" },
-  { id: "settings-household.ai", label: "AI model tuning" },
-  { id: "settings-household.integrations", label: "Integrations" },
-  { id: "settings-household.notifications", label: "Notifications" },
-  { id: "section-hf-token", label: "Hugging Face token" },
-  // Jesse, 2026-09-06: "people should be under settings | household
-  // since it's an admin thing" - roster management (add/edit/remove an
-  // account) moved here from the standalone /people page, which is now
-  // a plain, everyone-readable directory with none of this
-  // (PeoplePage.tsx, UsersSection.tsx).
-  { id: "users-page-link", label: "Users", to: "/settings/users" },
-  { id: "models-page-link", label: "AI models", to: "/settings/models" },
-  { id: "backups-page-link", label: "Backups", to: "/settings/backups" },
-  { id: "repairs-page-link", label: "Repairs", to: "/settings/repairs" },
-  { id: "section-routing", label: "Plugin routing" },
+  { id: "settings-household.system", label: "System", group: "General", icon: "settings" },
+  { id: "users-page-link", label: "Users", to: "/settings/users", group: "General", icon: "users", description: "Manage the people in your household." },
+  { id: "settings-household.notifications", label: "Notifications", group: "General", icon: "bell" },
+  { id: "models-page-link", label: "AI models", to: "/settings/models", group: "AI & connections", icon: "brain", description: "Choose the brain behind your conversations." },
+  { id: "settings-household.integrations", label: "Integrations", group: "AI & connections", icon: "layout-grid" },
+  { id: "backups-page-link", label: "Backups", to: "/settings/backups", group: "Maintenance", icon: "archive", description: "Keep your household’s data backed up." },
+  { id: "repairs-page-link", label: "Repairs", to: "/settings/repairs", group: "Maintenance", icon: "shield-check", description: "Check issues that need your attention." },
+  { id: "settings-household.ai", label: "AI model tuning", group: "Advanced", icon: "brain" },
+  { id: "section-hf-token", label: "Hugging Face token", group: "Advanced", icon: "lock" },
+  { id: "section-routing", label: "Plugin routing", group: "Advanced", icon: "layout-grid" },
 ];
 
 const PERSON_TREE: TreeEntry[] = [
-  { id: "settings-profile.appearance", label: "Appearance" },
-  { id: "settings-person.persona", label: "Personality" },
-  { id: "settings-person.voice", label: "Voice" },
-  // Matches groupSettings.ts's SECTION_TITLES entry for this same
-  // section exactly, not just "close enough" - a code review, 2026-09-05,
-  // found this hardcoded copy had already drifted from that rename
-  // ("Notifications" here, "My notifications" on the actual card),
-  // reintroducing a smaller version of the duplicate-heading confusion
-  // this whole tree/tabs round was built to fix.
-  { id: "settings-person.notifications", label: "My notifications" },
-  { id: "voices-page-link", label: "Voices", to: "/settings/voices" },
-  { id: "section-change-secret", label: "PIN / password" },
-  { id: "commands-page-link", label: "Commands", to: "/settings/commands" },
-  { id: "devices-page-link", label: "Devices & sessions", to: "/settings/devices" },
+  { id: "settings-profile.appearance", label: "Appearance", group: "Your experience", icon: "sparkles" },
+  { id: "settings-person.persona", label: "Personality", group: "Your experience", icon: "user" },
+  { id: "settings-person.voice", label: "Voice", group: "Your experience", icon: "volume-2" },
+  { id: "settings-person.notifications", label: "My notifications", group: "Your experience", icon: "bell" },
+  { id: "voices-page-link", label: "Voices", to: "/settings/voices", group: "Make it yours", icon: "volume-2", description: "Find a voice you enjoy listening to." },
+  { id: "commands-page-link", label: "Commands", to: "/settings/commands", group: "Make it yours", icon: "sparkles", description: "Create shortcuts for everyday requests." },
+  { id: "devices-page-link", label: "Devices & sessions", to: "/settings/devices", group: "Account", icon: "shield-check", description: "See where you’re signed in." },
+  { id: "section-change-secret", label: "PIN / password", group: "Account", icon: "lock" },
 ];
 
 // A code review (2026-09-06) found `tab` deriving from `?tab=` alone once
@@ -172,6 +166,13 @@ export function SettingsPage({ person, onPersonChange }: SettingsPageProps) {
   }
 
   const tree = tab === "household" ? HOUSEHOLD_TREE : PERSON_TREE;
+  function openEntry(entry: TreeEntry) {
+    if (entry.to) { navigate(entry.to); return; }
+    setSearch("");
+    navigate(`/settings?tab=${tab}#${entry.id}`);
+    if (isDefaultRoute) scrollToSection(entry.id);
+  }
+  const shortcuts = tree.filter((entry) => entry.to && (!search.trim() || `${entry.label} ${entry.description}`.toLowerCase().includes(search.trim().toLowerCase())));
 
   // The tree highlights whichever section is scrolled near the top of
   // the content pane, the same "scrollspy" VS Code's own Settings editor
@@ -205,7 +206,13 @@ export function SettingsPage({ person, onPersonChange }: SettingsPageProps) {
     // switch, on a search keystroke, and on the advanced-settings fold
     // toggle alike, so nothing else has to know or track exactly when
     // section elements come and go.
+    let jumped = false;
     function resync() {
+      const target = tree.find((entry) => `#${entry.id}` === location.hash);
+      if (!jumped && target && document.getElementById(target.id)) {
+        scrollToSection(target.id);
+        jumped = true;
+      }
       observer.disconnect();
       for (const entry of tree) {
         const el = document.getElementById(entry.id);
@@ -219,11 +226,15 @@ export function SettingsPage({ person, onPersonChange }: SettingsPageProps) {
       observer.disconnect();
       mutationObserver.disconnect();
     };
-  }, [tree]);
+  }, [tree, location.hash, location.pathname]);
 
   return (
-    <Page title="Settings">
-      <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-hidden px-4 pb-4">
+    <Page title="Settings" hideTitle>
+      <div className="mx-auto flex min-h-0 w-full max-w-7xl flex-1 flex-col gap-5 overflow-hidden px-4 py-5 sm:px-6">
+        <div>
+          <h2 className="text-3xl font-semibold tracking-tight">Settings</h2>
+          <p className="mt-1 text-sm text-muted-foreground">{tab === "household" ? "Manage your shared home, AI, and connected services." : "Your voice, your preferences, your MaiPai."}</p>
+        </div>
         {/* Household/Me is the primary scope switcher, not a nice-to-have
             nav aid - it stays visible and reachable at every width, even
             once the tree sidebar below hides for lack of room. A design
@@ -234,13 +245,14 @@ export function SettingsPage({ person, onPersonChange }: SettingsPageProps) {
             owner/admin: a non-admin has nothing to switch to (see `tab`
             above) - there is no tab bar to render for one destination. */}
         {canManageBackups ? (
-          <div className="flex w-full max-w-xs gap-1 rounded-lg border border-border p-1 text-sm">
+          <div className="flex w-full max-w-xs gap-1 rounded-xl bg-muted/60 p-1 text-sm">
             <Button
               type="button"
               variant="ghost"
               size="sm"
+              aria-pressed={tab === "household"}
               onClick={() => setTab("household")}
-              className={cn("h-auto flex-1 rounded-md px-2 py-1.5", tab === "household" ? "bg-muted font-medium" : "text-muted-foreground")}
+              className={cn("h-auto flex-1 rounded-md px-2 py-1.5", tab === "household" ? "bg-background font-medium shadow-sm" : "text-muted-foreground")}
             >
               Household
             </Button>
@@ -248,15 +260,19 @@ export function SettingsPage({ person, onPersonChange }: SettingsPageProps) {
               type="button"
               variant="ghost"
               size="sm"
+              aria-pressed={tab === "me"}
               onClick={() => setTab("me")}
-              className={cn("h-auto flex-1 rounded-md px-2 py-1.5", tab === "me" ? "bg-muted font-medium" : "text-muted-foreground")}
+              className={cn("h-auto flex-1 rounded-md px-2 py-1.5", tab === "me" ? "bg-background font-medium shadow-sm" : "text-muted-foreground")}
             >
               Me
             </Button>
           </div>
         ) : null}
 
-        <div className="flex min-h-0 flex-1 gap-4 overflow-hidden">
+        <div className="lg:hidden">
+          <Select aria-label="Settings section" value={tree.find((entry) => entry.to === location.pathname)?.id ?? activeId ?? tree[0]!.id} options={tree.map((entry) => entry.id)} getLabel={(id) => tree.find((entry) => entry.id === id)?.label ?? id} onValueChange={(id) => { const entry = tree.find((item) => item.id === id); if (entry) openEntry(entry); }} />
+        </div>
+        <div className="flex min-h-0 flex-1 gap-6 overflow-hidden">
           {/* The tree sidebar: a second, page-local sidebar alongside the
               shell's own global one (VS Code's own settings editor is the
               same idea - its own tree lives inside the editor tab, not in
@@ -267,8 +283,9 @@ export function SettingsPage({ person, onPersonChange }: SettingsPageProps) {
               an 800px viewport - a settings row wrapped into a near-
               vertical stack of single words). Below that width, the tree
               hides and the content gets the full column back. */}
-          <aside className="hidden w-48 shrink-0 flex-col gap-0.5 lg:flex">
-            {tree.map((entry) => {
+          <aside aria-label="Settings navigation" className="hidden w-52 shrink-0 flex-col gap-1 overflow-y-auto pe-2 lg:flex">
+            {tree.map((entry, index) => {
+              const Icon = getIcon(entry.icon);
               // A routed entry (`to`) is active by URL match, not scroll
               // position - it has no in-page anchor for the scrollspy
               // IntersectionObserver above to ever find. `activeId` only
@@ -280,12 +297,13 @@ export function SettingsPage({ person, onPersonChange }: SettingsPageProps) {
               // routed entry - two entries lit up at once.
               const isActive = entry.to ? location.pathname === entry.to : isDefaultRoute && activeId === entry.id;
               return (
+                <Fragment key={entry.id}>
+                {index === 0 || tree[index - 1]?.group !== entry.group ? <p className="px-3 pt-4 pb-1 text-xs font-medium text-muted-foreground">{entry.group}</p> : null}
                 <Button
-                  key={entry.id}
                   type="button"
                   variant="ghost"
                   size="sm"
-                  onClick={() => (entry.to ? navigate(entry.to) : scrollToSection(entry.id))}
+                  onClick={() => openEntry(entry)}
                   // A screen-reader read-through (2026-09-06) found the
                   // active tree entry only ever signaled by color/weight
                   // (`bg-muted font-medium`) - real for a sighted user,
@@ -300,31 +318,27 @@ export function SettingsPage({ person, onPersonChange }: SettingsPageProps) {
                   // same signal to both kinds of entry.
                   aria-current={isActive ? (entry.to ? "page" : "true") : undefined}
                   className={cn(
-                    "h-auto justify-start rounded-md px-2 py-1.5 text-left font-normal",
-                    isActive ? "bg-muted font-medium text-foreground" : "text-muted-foreground",
+                    "h-auto min-h-10 justify-start gap-2.5 rounded-xl px-3 py-2 text-left font-normal",
+                    isActive ? "bg-primary/10 font-medium text-foreground" : "text-muted-foreground",
                   )}
                 >
-                  {entry.label}
+                  <Icon aria-hidden className="size-4" />{entry.label}
                 </Button>
+                </Fragment>
               );
             })}
           </aside>
 
           <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-4">
-            <Input
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              // Only filters this page's own SettingsRenderer content - a
-              // code review (2026-09-06) found it stayed enabled and
-              // focusable on Models/Backups/Voices/Commands too, where
-              // typing into it silently did nothing (nothing downstream
-              // of <Outlet/> reads `search` at all).
-              disabled={!isDefaultRoute}
-              placeholder={isDefaultRoute ? "Search settings" : "Search (not available here)"}
-              aria-label="Search settings"
-            />
+            {isDefaultRoute ? <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search settings" aria-label="Search settings" className="h-11 rounded-xl bg-card" /> : <Link to={`/settings?tab=${tab}`} className={cn("w-fit rounded-lg py-2 text-sm text-muted-foreground hover:text-foreground focus-visible:text-foreground", FOCUS_RING)}>← All {tab === "me" ? "personal" : "household"} settings</Link>}
             {/* eslint-disable-next-line jsx-a11y/no-noninteractive-tabindex -- a keyboard-scrollable region, not a widget (DetailPane.tsx's own precedent). */}
             <div ref={scrollRef} tabIndex={0} className={cn("flex min-h-0 flex-1 flex-col gap-6 overflow-y-auto", FOCUS_RING)}>
+              {isDefaultRoute && shortcuts.length > 0 ? <div className="grid gap-3 sm:grid-cols-2">
+                {shortcuts.map((entry) => { const Icon = getIcon(entry.icon); return <Link key={entry.id} to={entry.to!} className={cn("flex items-start gap-3 rounded-2xl border border-border/60 bg-card p-4 transition-colors hover:border-primary/40 focus-visible:border-primary/40", FOCUS_RING)}>
+                  <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary"><Icon aria-hidden className="size-4" /></span>
+                  <span><span className="block text-sm font-semibold">{entry.label}</span><span className="mt-1 block text-xs leading-relaxed text-muted-foreground">{entry.description}</span></span>
+                </Link>; })}
+              </div> : null}
               {!isDefaultRoute ? (
                 // Models/Backups/Voices/Commands (App.tsx's nested routes) -
                 // rendered right here so the rail/tab switcher/search above
