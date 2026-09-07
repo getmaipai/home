@@ -40,6 +40,7 @@ function SttAutoSend({ sendRef }: { sendRef: MutableRefObject<(() => void) | nul
   return null;
 }
 
+const HistoryIcon = getIcon("history");
 const BrainIcon = getIcon("brain");
 const VolumeXIcon = getIcon("volume-x");
 
@@ -96,6 +97,7 @@ export function ChatPage({ person }: ChatPageProps) {
   // onSpeakingChange, wired to the scheduler's onFirstAudio/onEnded) so
   // a dedicated control can cover it.
   const [isSpeaking, setIsSpeaking] = useState(false);
+  const [threadsOpen, setThreadsOpen] = useState(false);
   const [reply, setReply] = useState<ReplyState>("idle");
   const [speechError, setSpeechError] = useState(false);
   const [ears, setEars] = useState<EarState>("idle");
@@ -163,21 +165,28 @@ export function ChatPage({ person }: ChatPageProps) {
         <SttAutoSend sendRef={sttAutoSendRef} />
         <Page title="Chat" hideTitle>
           <div className="flex items-center justify-between gap-3 px-4 pt-4 pb-2">
-            <h2 className="text-3xl font-bold tracking-tight">Chat</h2>
+            <div className="flex items-center gap-2">
+              <h2 className="text-2xl font-semibold tracking-tight">Chat</h2>
+              <Button variant="ghost" size="icon" aria-label={threadsOpen ? "Hide threads" : "Show threads"} aria-expanded={threadsOpen} aria-controls="chat-threads" onClick={() => setThreadsOpen((open) => !open)}>
+                <HistoryIcon className="size-4" />
+              </Button>
+            </div>
             <SensesDock reply={reply} speaking={isSpeaking} speechError={speechError} ears={ears} earError={earError} />
           </div>
           {banner ? (
             <div className="mx-4 mb-2 rounded-[var(--radius)] bg-[var(--muted)] px-3 py-2 text-base">{banner}</div>
           ) : null}
-          <div className="flex min-h-0 flex-1">
+          <div className="relative flex min-h-0 flex-1">
             {/* Threads (step 4): mocked to one conversation until Session
                 A's per-thread routes land (chatThreadListAdapter.ts) -
                 hidden below lg since there is, today, nothing to switch
                 between. */}
             <aside
+              id="chat-threads"
+              hidden={!threadsOpen}
               // eslint-disable-next-line jsx-a11y/no-noninteractive-tabindex -- a keyboard-scrollable region, not a widget (DetailPane.tsx's own precedent).
               tabIndex={0}
-              className={cn("hidden w-64 shrink-0 overflow-y-auto border-e border-border p-2 lg:block", FOCUS_RING)}
+              className={cn("absolute inset-y-0 start-0 z-20 w-full shrink-0 overflow-y-auto border-e border-border/60 bg-background p-2 sm:static sm:w-60", !threadsOpen && "hidden", FOCUS_RING)}
             >
               <ThreadList />
             </aside>

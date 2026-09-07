@@ -132,3 +132,17 @@ describe("ChatPage", () => {
     }
   });
 });
+
+test("thread history can be opened and closed without removing the composer", async () => {
+  const restore = stubFetch();
+  try {
+    const view = renderWithQueryClient(<MemoryRouter><ChatPage person={makePerson()} /></MemoryRouter>);
+    await waitFor(() => expect(view.getByRole("textbox", { name: "Message input" })).toBeTruthy());
+    const toggle = view.getByRole("button", { name: "Show threads" });
+    expect(toggle.getAttribute("aria-expanded")).toBe("false");
+    fireEvent.click(toggle);
+    expect(view.getByRole("button", { name: "Hide threads" }).getAttribute("aria-expanded")).toBe("true");
+    fireEvent.click(view.getByRole("button", { name: "Hide threads" }));
+    expect(view.getByRole("textbox", { name: "Message input" })).toBeTruthy();
+  } finally { restore(); }
+});

@@ -1,3 +1,4 @@
+import { AppsPage } from "@/apps/library/AppsPage";
 import { useEffect, useState } from "react";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
@@ -99,6 +100,7 @@ export function App() {
                       >
                         <Routes>
                           <Route path="/" element={<HomePage person={person} />} />
+                          <Route path="/apps" element={<AppsPage person={person} />} />
                           <Route path="/chat" element={<ChatPage person={person} />} />
                           <Route path="/conversations" element={<ConversationsPage person={person} />} />
                           <Route path="/notifications" element={<NotificationsPage />} />

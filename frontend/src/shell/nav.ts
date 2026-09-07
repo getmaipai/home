@@ -19,6 +19,7 @@ export interface NavEntry {
 // simply shows different, better content now.
 export const NAV_ENTRIES: readonly NavEntry[] = [
   { to: "/", icon: "home", label: "Home" },
+  { to: "/apps", icon: "layout-grid", label: "Apps" },
   { to: "/chat", icon: "message-circle", label: "Chat" },
   { to: "/conversations", icon: "history", label: "Conversations" },
   { to: "/people", icon: "users", label: "People" },

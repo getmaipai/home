@@ -47,8 +47,8 @@ describe("PhoneNav", () => {
   });
 
   test("marks the active entry for the current route", () => {
-    const { getByRole } = renderAt("/people");
-    expect(getByRole("link", { name: "People" })).toHaveAttribute("aria-current", "page");
+    const { getByRole } = renderAt("/conversations");
+    expect(getByRole("link", { name: "Conversations" })).toHaveAttribute("aria-current", "page");
     expect(getByRole("link", { name: "Chat" })).not.toHaveAttribute("aria-current");
   });
 

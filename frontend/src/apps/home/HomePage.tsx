@@ -1,3 +1,4 @@
+import { favoriteApps } from "@/shell/appCatalog";
 import { useState, type FormEvent, type ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
 import { Trans } from "@lingui/react";
@@ -17,7 +18,6 @@ import { api, type Roster, type PersonRosterEntry } from "@/lib/api";
 import { greetingFor } from "@/apps/home/greeting";
 import { runFixedTurn } from "@/apps/home/runFixedTurn";
 import { usePinnedApps } from "@/shell/usePinnedApps";
-import { NAV_ENTRIES } from "@/shell/nav";
 
 // The one widget_card instance Home mounts (docs/plans/session-e-ui-and-
 // docs.md step 2). Home is still hand-written React, not a JSON page, so
@@ -122,7 +122,7 @@ function WhoIsHere({ selfId }: { selfId: string }) {
 function PinnedAppsStrip({ person }: { person: Roster }) {
   const navigate = useNavigate();
   const { pinned } = usePinnedApps(person.id);
-  const entries = NAV_ENTRIES.filter((e) => pinned.includes(e.to));
+  const entries = favoriteApps(pinned);
   return (
     <CardGrid
       label="Pinned apps"
@@ -130,7 +130,7 @@ function PinnedAppsStrip({ person }: { person: Roster }) {
       getKey={(e) => e.to}
       getLabel={(e) => e.label}
       onSelect={(e) => navigate(e.to)}
-      emptyState={{ icon: "pin", text: "Pin an app from its header to see it here." }}
+      emptyState={{ icon: "pin", text: "Pin your go-to apps from the app library." }}
       renderItem={(e) => {
         const Icon = getIcon(e.icon);
         return (
@@ -163,20 +163,21 @@ export function HomePage({ person }: HomePageProps) {
   return (
     <Page title="Home" hideTitle>
       {/* eslint-disable-next-line jsx-a11y/no-noninteractive-tabindex -- a keyboard-scrollable region, not a widget (DetailPane.tsx's own precedent). */}
-      <div tabIndex={0} className={cn("flex min-h-0 flex-1 flex-col gap-6 overflow-y-auto p-4", FOCUS_RING)}>
+      <div tabIndex={0} className={cn("mx-auto flex min-h-0 w-full max-w-6xl flex-1 flex-col gap-8 overflow-y-auto px-4 py-6 sm:px-8", FOCUS_RING)}>
         <div>
-          <h2 className="text-2xl font-semibold">{greetingFor(new Date(), person.display_name)}</h2>
+          <p className="mb-2 text-xs font-medium tracking-widest text-primary uppercase">Made for your everyday</p>
+          <h2 className="text-3xl font-semibold tracking-tight sm:text-4xl">{greetingFor(new Date(), person.display_name)}</h2>
         </div>
 
         <WhoIsHere selfId={person.id} />
 
-        <form onSubmit={submitPrompt} className="flex gap-2">
+        <form onSubmit={submitPrompt} className="flex gap-2 rounded-2xl border border-border/70 bg-card p-2 shadow-sm focus-within:ring-2 focus-within:ring-ring/30">
           <Input
             value={prompt}
             onChange={(e) => setPrompt(e.target.value)}
             placeholder="Ask MaiPai anything..."
             aria-label="Ask MaiPai"
-            className="flex-1"
+            className="flex-1 border-0 bg-transparent shadow-none focus-visible:ring-0"
           />
           <Button type="submit">Ask</Button>
         </form>
@@ -200,7 +201,10 @@ export function HomePage({ person }: HomePageProps) {
         </div>
 
         <div>
-          <h3 className="mb-2 text-sm font-medium text-muted-foreground">Your apps</h3>
+          <div className="mb-3 flex items-center justify-between">
+            <h3 className="text-sm font-medium text-muted-foreground">Favorites</h3>
+            <Button variant="ghost" size="sm" onClick={() => navigate("/apps")}>Browse apps →</Button>
+          </div>
           <PinnedAppsStrip person={person} />
         </div>
       </div>

@@ -1,0 +1,25 @@
+import { afterEach, expect, test } from "bun:test";
+import { cleanup, fireEvent, waitFor } from "@testing-library/react";
+import { MemoryRouter } from "react-router-dom";
+import { renderWithQueryClient } from "../../../tests/renderWithQueryClient";
+import { api, type Roster } from "@/lib/api";
+import { AppsPage } from "./AppsPage";
+const read = api.settingsValues;
+const write = api.setSetting;
+afterEach(() => { cleanup(); api.settingsValues = read; api.setSetting = write; });
+test("search, launch links, and favorites work together", async () => {
+  let pins = "[]";
+  api.settingsValues = async () => [{ key: "ui.pinned_apps", value: pins }] as Awaited<ReturnType<typeof api.settingsValues>>;
+  api.setSetting = async (_scope, _key, value) => { pins = String(value); return {} as Awaited<ReturnType<typeof api.setSetting>>; };
+  const view = renderWithQueryClient(<MemoryRouter><AppsPage person={{ id: "test" } as Roster} /></MemoryRouter>);
+  await waitFor(() => expect(view.getByRole("button", { name: "Pin Chat" }).hasAttribute("disabled")).toBe(false));
+  fireEvent.click(view.getByRole("button", { name: "Pin Chat" }));
+  await waitFor(() => expect(pins).toBe('["/chat"]'));
+  fireEvent.click(view.getByRole("button", { name: "Favorites" }));
+  expect(view.getAllByRole("link")).toHaveLength(1);
+  expect(view.getAllByRole("link")[0]!.getAttribute("href")).toBe("/chat");
+  fireEvent.change(view.getByRole("searchbox"), { target: { value: "missing" } });
+  expect(view.getByText("No matching apps")).toBeTruthy();
+  fireEvent.click(view.getByRole("button", { name: "Browse all apps" }));
+  expect(view.getAllByRole("link")).toHaveLength(6);
+});

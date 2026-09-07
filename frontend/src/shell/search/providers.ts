@@ -1,3 +1,4 @@
+import { APP_CATALOG, filterApps } from "@/shell/appCatalog";
 import { api } from "@/lib/api";
 import { NAV_ENTRIES } from "@/shell/nav";
 
@@ -46,7 +47,7 @@ function pagesProvider(query: string): SearchGroup {
   // the palette is just an app switcher (the nav note's "search plus
   // launcher" combination), which only makes sense if the plain page list
   // shows up before a single keystroke.
-  const items = NAV_ENTRIES.filter((e) => e.to !== "/" && (query.trim() === "" || matchesQuery(query, e.label))).map(
+  const items = NAV_ENTRIES.filter((e) => (e.to === "/apps") && (query.trim() === "" || matchesQuery(query, e.label))).map(
     (e) => ({ id: `page:${e.to}`, label: e.label, icon: e.icon, to: e.to }),
   );
   return { heading: "Pages", items: items.slice(0, RESULTS_PER_PROVIDER) };
@@ -134,6 +135,7 @@ async function commandsProvider(query: string): Promise<SearchGroup> {
  * an empty group would just be a heading with nothing under it. */
 export async function runSearchProviders(query: string): Promise<SearchGroup[]> {
   const groups = await Promise.all([
+    Promise.resolve({ heading: "Apps", items: filterApps(APP_CATALOG, query).slice(0, RESULTS_PER_PROVIDER).map((app) => ({ id: `app:${app.to}`, label: app.label, sublabel: app.description, icon: app.icon, to: app.to })) }),
     Promise.resolve(pagesProvider(query)),
     peopleProvider(query),
     memoriesProvider(query),

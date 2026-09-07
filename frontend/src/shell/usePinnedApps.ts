@@ -1,4 +1,4 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useIsMutating, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 
 // `ui.pinned_apps` (person scope, backend/src/settings/uiKeys.ts): a JSON
@@ -25,6 +25,8 @@ export function usePinnedApps(personId: string): {
   isPinned: (navTo: string) => boolean;
   togglePin: (navTo: string) => void;
   isLoading: boolean;
+  isSaving: boolean;
+  error: string | null;
 } {
   const queryClient = useQueryClient();
 
@@ -36,7 +38,10 @@ export function usePinnedApps(personId: string): {
     },
   });
 
+  const mutationKey = queryKey(personId);
+  const savingCount = useIsMutating({ mutationKey });
   const mutation = useMutation({
+    mutationKey,
     mutationFn: (next: string[]) => api.setSetting(`person:${personId}`, "ui.pinned_apps", JSON.stringify(next)),
     // Optimistic: a pin toggle is a light, frequent, low-stakes action
     // (unlike a destructive batch action, which waits for the real
@@ -50,7 +55,7 @@ export function usePinnedApps(personId: string): {
       return { previous };
     },
     onError: (_err, _next, context) => {
-      if (context?.previous) queryClient.setQueryData(queryKey(personId), context.previous);
+      if (context) queryClient.setQueryData(queryKey(personId), context.previous ?? []);
     },
     onSettled: () => queryClient.invalidateQueries({ queryKey: queryKey(personId) }),
   });
@@ -62,8 +67,9 @@ export function usePinnedApps(personId: string): {
   }
 
   function togglePin(navTo: string): void {
+    if (query.isLoading || savingCount > 0) return;
     mutation.mutate(isPinned(navTo) ? pinned.filter((id) => id !== navTo) : [...pinned, navTo]);
   }
 
-  return { pinned, isPinned, togglePin, isLoading: query.isLoading };
+  return { pinned, isPinned, togglePin, isLoading: query.isLoading, isSaving: savingCount > 0, error: query.isError ? "Could not load your favorites. Refresh to try again." : mutation.isError ? "Could not save your favorites. Please try again." : null };
 }

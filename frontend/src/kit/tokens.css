@@ -83,20 +83,9 @@
   --sidebar-foreground: hsl(240 10% 4%);
   --sidebar-primary: hsl(189 94% 29%); /* same contrast fix as --primary above */
   --sidebar-primary-foreground: hsl(0 0% 100%);
-  /* A design review (2026-09-05) on the running app: "the brand blue
-   * appears in exactly one spot" - the active nav item used the same
-   * neutral gray as an unpressed button's hover state, so the one place
-   * a household member looks at constantly (which page is this) carried
-   * no brand color at all. A first pass tinted it lightly; Jesse's own
-   * design references (2026-09-05) both favored a fully solid, saturated
-   * active pill over a light wash, so this is the sidebar's own primary
-   * color outright, not a mix - `--sidebar-primary-foreground` (already
-   * the readable-on-solid-primary color everywhere else it's used) is
-   * the matching foreground. One token change here, not a one-off:
-   * every surface that reads `--sidebar-accent` (the phone/TV nav rails
-   * included) gets it for free. */
-  --sidebar-accent: var(--sidebar-primary);
-  --sidebar-accent-foreground: var(--sidebar-primary-foreground);
+  /* Quiet selection keeps primary actions visually dominant. */
+  --sidebar-accent: color-mix(in srgb, var(--sidebar-primary) 12%, var(--sidebar));
+  --sidebar-accent-foreground: var(--sidebar-primary);
   --sidebar-border: hsl(240 6% 90%);
   --sidebar-ring: hsl(189 94% 29%);
   --chart-1: hsl(189 94% 40%);
@@ -129,8 +118,8 @@
     --sidebar-foreground: hsl(0 0% 96%);
     --sidebar-primary: hsl(189 84% 55%);
     --sidebar-primary-foreground: hsl(240 10% 6%);
-    --sidebar-accent: var(--sidebar-primary);
-    --sidebar-accent-foreground: var(--sidebar-primary-foreground);
+    --sidebar-accent: color-mix(in srgb, var(--sidebar-primary) 12%, var(--sidebar));
+    --sidebar-accent-foreground: var(--sidebar-primary);
     --sidebar-border: hsl(240 6% 18%);
     --sidebar-ring: hsl(189 84% 55%);
   }
@@ -158,8 +147,8 @@
   --sidebar-foreground: hsl(0 0% 96%);
   --sidebar-primary: hsl(189 84% 55%);
   --sidebar-primary-foreground: hsl(240 10% 6%);
-  --sidebar-accent: var(--sidebar-primary);
-  --sidebar-accent-foreground: var(--sidebar-primary-foreground);
+  --sidebar-accent: color-mix(in srgb, var(--sidebar-primary) 12%, var(--sidebar));
+  --sidebar-accent-foreground: var(--sidebar-primary);
   --sidebar-border: hsl(240 6% 18%);
   --sidebar-ring: hsl(189 84% 55%);
 }

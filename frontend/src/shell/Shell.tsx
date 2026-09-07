@@ -1,3 +1,4 @@
+import { APP_CATALOG, favoriteApps } from "@/shell/appCatalog";
 import { useEffect, useState, type ReactNode } from "react";
 import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import { Trans, useLingui } from "@lingui/react";
@@ -7,6 +8,7 @@ import {
   Sidebar,
   SidebarContent,
   SidebarHeader,
+  SidebarFooter,
   SidebarInset,
   SidebarMenu,
   SidebarMenuItem,
@@ -113,8 +115,8 @@ function TvNavItem({ entry, isFirst }: { entry: NavEntry; isFirst: boolean }) {
  * destination, not an entry in it. */
 function PinToggle({ person }: { person: Roster }) {
   const location = useLocation();
-  const { isPinned, togglePin, isLoading } = usePinnedApps(person.id);
-  const entry = NAV_ENTRIES.find((e) => e.to !== "/" && isActivePath(location.pathname, e.to));
+  const { isPinned, togglePin, isLoading, isSaving } = usePinnedApps(person.id);
+  const entry = APP_CATALOG.find((e) => e.to !== "/" && isActivePath(location.pathname, e.to));
   if (!entry || isLoading) return null;
   const pinned = isPinned(entry.to);
   const Icon = getIcon(pinned ? "pin-off" : "pin");
@@ -123,6 +125,7 @@ function PinToggle({ person }: { person: Roster }) {
       type="button"
       variant="ghost"
       size="icon"
+      disabled={isSaving}
       aria-pressed={pinned}
       aria-label={pinned ? `Unpin ${entry.label}` : `Pin ${entry.label}`}
       onClick={() => togglePin(entry.to)}
@@ -208,6 +211,8 @@ function TvSearchNavItem() {
 // built - see `CommandPalette`/`SearchNavItem` below.
 export function Shell({ person, onSignOut, onPersonChange, children }: ShellProps) {
   const surface = useSurface();
+  const { pinned } = usePinnedApps(person.id);
+  const favorites = favoriteApps(pinned).filter((app) => app.to !== "/chat" && app.to !== "/settings" && app.to !== "/privacy").slice(0, 6);
   const navigate = useNavigate();
   useAppearance(person.id);
 
@@ -252,7 +257,9 @@ export function Shell({ person, onSignOut, onPersonChange, children }: ShellProp
           landmark, axe's `region` rule on the desktop sidebar - found
           live, 2026-09-06, by the new screenshot/a11y matrix. */}
       <Sidebar collapsible="icon" className="hidden sm:flex" role="navigation" aria-label="Main navigation">
-        <SidebarHeader />
+        <SidebarHeader className="h-16 justify-center border-b border-sidebar-border/60 px-4 group-data-[collapsible=icon]:px-2">
+          <span className="text-sm font-semibold tracking-tight group-data-[collapsible=icon]:hidden">Your space<span className="ml-1 text-primary">.</span></span>
+        </SidebarHeader>
         {/* `p-2` + the menu's own `gap-1`: shadcn's own usual nesting
             (SidebarGroup > SidebarGroupContent) is what supplies this
             spacing normally - this file renders SidebarMenu directly
@@ -269,14 +276,26 @@ export function Shell({ person, onSignOut, onPersonChange, children }: ShellProp
           <SidebarMenu key={surface.far ? "tv" : "standard"} className="gap-1">
             {surface.far ? <TvSearchNavItem /> : <SearchNavItem onOpen={() => setPaletteOpen(true)} />}
             {surface.far
-              ? NAV_ENTRIES.map((entry) => <TvNavItem key={entry.to} entry={entry} isFirst={false} />)
-              : NAV_ENTRIES.map((entry) => <NavItem key={entry.to} entry={entry} />)}
+              ? NAV_ENTRIES.filter((entry) => ["/", "/apps", "/chat"].includes(entry.to)).map((entry) => <TvNavItem key={entry.to} entry={entry} isFirst={false} />)
+              : NAV_ENTRIES.filter((entry) => ["/", "/apps", "/chat"].includes(entry.to)).map((entry) => <NavItem key={entry.to} entry={entry} />)}
           </SidebarMenu>
+          <div className="mt-6 px-2 text-xs font-medium text-muted-foreground group-data-[collapsible=icon]:hidden">Favorites</div>
+          <SidebarMenu>
+            {favorites.map((entry) => surface.far ? <TvNavItem key={entry.to} entry={entry} isFirst={false} /> : <NavItem key={entry.to} entry={entry} />)}
+          </SidebarMenu>
+          {favorites.length === 0 ? <p className="px-2 text-xs leading-relaxed text-muted-foreground group-data-[collapsible=icon]:hidden">Pin your go-to apps from the app library.</p> : null}
         </SidebarContent>
+        <SidebarFooter className="border-t border-sidebar-border/60 p-2">
+          <SidebarMenu>
+            {NAV_ENTRIES.filter((entry) => entry.to === "/privacy" || entry.to === "/settings").map((entry) => surface.far
+              ? <TvNavItem key={entry.to} entry={entry} isFirst={false} />
+              : <NavItem key={entry.to} entry={entry} />)}
+          </SidebarMenu>
+        </SidebarFooter>
         <SidebarRail />
       </Sidebar>
       <SidebarInset className={cn(surface.far && "surface-far")}>
-        <header className="flex h-16 shrink-0 items-center justify-between border-b border-border px-4">
+        <header className="flex h-16 shrink-0 items-center justify-between border-b border-border/60 px-4">
           <div className="flex items-center gap-3">
             {/* Collapsing to icons is the person's own choice, never the
                 default (docs/plans/session-b-ui.md step 2) - this is that
@@ -306,7 +325,7 @@ export function Shell({ person, onSignOut, onPersonChange, children }: ShellProp
         <div className="flex min-h-0 min-w-0 flex-1 flex-col pb-16 sm:pb-0">{children}</div>
         <PhoneNav />
       </SidebarInset>
-      <CommandPalette open={paletteOpen} onOpenChange={setPaletteOpen} />
+      <CommandPalette personId={person.id} open={paletteOpen} onOpenChange={setPaletteOpen} />
     </SidebarProvider>
   );
 }

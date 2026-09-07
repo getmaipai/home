@@ -221,10 +221,7 @@ const ThreadRoot: FC<{
           >
             <ThreadScrollToBottom />
             <ThreadFollowupSuggestions />
-            {composerToolbar ? (
-              <div className="flex flex-wrap items-center justify-end gap-2">{composerToolbar}</div>
-            ) : null}
-            <Composer autoFocus={autoFocus} />
+            <Composer autoFocus={autoFocus} toolbar={composerToolbar} />
             <AuiIf condition={(s) => isNewChatView(s) && s.composer.isEmpty}>
               <ThreadSuggestions />
             </AuiIf>
@@ -300,7 +297,7 @@ const ThreadSuggestionItem: FC = () => {
   );
 };
 
-const Composer: FC<{ autoFocus: boolean }> = ({ autoFocus }) => {
+const Composer: FC<{ autoFocus: boolean; toolbar?: ReactNode }> = ({ autoFocus, toolbar }) => {
   return (
     <ComposerPrimitive.Root className="aui-composer-root relative flex w-full flex-col">
       <ComposerPrimitive.AttachmentDropzone asChild>
@@ -317,6 +314,7 @@ const Composer: FC<{ autoFocus: boolean }> = ({ autoFocus }) => {
             enterKeyHint="send"
             aria-label="Message input"
           />
+          {toolbar ? <div className="flex flex-wrap items-center gap-1 border-t border-border/50 pt-2 [&_button]:h-8 [&_button]:text-xs">{toolbar}</div> : null}
           <ComposerAction />
         </div>
       </ComposerPrimitive.AttachmentDropzone>
@@ -496,10 +494,10 @@ const AssistantMessage: FC = () => {
                 return (
                   <span
                     data-slot="aui_assistant-message-indicator"
-                    className="animate-pulse font-sans"
+                    className="inline-flex items-center gap-2 text-sm text-muted-foreground motion-safe:animate-pulse"
                     aria-label="Assistant is working"
                   >
-                    {"●"}
+                    <><span aria-hidden="true">●</span> Thinking…</>
                   </span>
                 );
               default:
