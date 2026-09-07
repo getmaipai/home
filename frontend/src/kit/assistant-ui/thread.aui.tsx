@@ -107,6 +107,11 @@ export type ThreadProps = {
    * next message a person sends (Jesse, 2026-09-06: "its placement /
    * location is also odd"). */
   composerToolbar?: ReactNode | undefined;
+  /** When set, the composer's input and send control are disabled (the
+   * model isn't ready to receive a turn) and this explains why - e.g.
+   * "MaiPai's AI is starting up." (useEngineHealth.ts's `brainBlockReason`). */
+  composerDisabled?: boolean | undefined;
+  composerDisabledReason?: string | undefined;
 };
 
 const EMPTY_COMPONENTS: ThreadComponents = {};
@@ -152,6 +157,8 @@ export const Thread: FC<ThreadProps> = ({
   components = EMPTY_COMPONENTS,
   autoFocus = true,
   composerToolbar,
+  composerDisabled,
+  composerDisabledReason,
 }) => {
   const isEmpty = useAuiState(isNewChatView);
 
@@ -161,6 +168,8 @@ export const Thread: FC<ThreadProps> = ({
         isEmpty={isEmpty}
         autoFocus={autoFocus}
         composerToolbar={composerToolbar}
+        composerDisabled={composerDisabled}
+        composerDisabledReason={composerDisabledReason}
       />
     </ThreadComponentsContext.Provider>
   );
@@ -170,7 +179,9 @@ const ThreadRoot: FC<{
   isEmpty: boolean;
   autoFocus: boolean;
   composerToolbar?: ReactNode;
-}> = ({ isEmpty, autoFocus, composerToolbar }) => {
+  composerDisabled?: boolean;
+  composerDisabledReason?: string;
+}> = ({ isEmpty, autoFocus, composerToolbar, composerDisabled, composerDisabledReason }) => {
   const { Welcome = ThreadWelcome } = useContext(ThreadComponentsContext);
 
   return (
@@ -221,7 +232,7 @@ const ThreadRoot: FC<{
           >
             <ThreadScrollToBottom />
             <ThreadFollowupSuggestions />
-            <Composer autoFocus={autoFocus} toolbar={composerToolbar} />
+            <Composer autoFocus={autoFocus} toolbar={composerToolbar} disabled={composerDisabled} disabledReason={composerDisabledReason} />
             <AuiIf condition={(s) => isNewChatView(s) && s.composer.isEmpty}>
               <ThreadSuggestions />
             </AuiIf>
@@ -297,7 +308,7 @@ const ThreadSuggestionItem: FC = () => {
   );
 };
 
-const Composer: FC<{ autoFocus: boolean; toolbar?: ReactNode }> = ({ autoFocus, toolbar }) => {
+const Composer: FC<{ autoFocus: boolean; toolbar?: ReactNode; disabled?: boolean; disabledReason?: string }> = ({ autoFocus, toolbar, disabled, disabledReason }) => {
   return (
     <ComposerPrimitive.Root className="aui-composer-root relative flex w-full flex-col">
       <ComposerPrimitive.AttachmentDropzone asChild>
@@ -307,22 +318,23 @@ const Composer: FC<{ autoFocus: boolean; toolbar?: ReactNode }> = ({ autoFocus, 
         >
           <ComposerAttachments />
           <ComposerPrimitive.Input
-            placeholder="Send a message..."
-            className="aui-composer-input caret-primary placeholder:text-muted-foreground/60 max-h-48 min-h-10 w-full resize-none bg-transparent px-2.5 py-1 text-base leading-6 outline-none"
+            placeholder={disabled ? (disabledReason ?? "MaiPai's AI isn't ready yet.") : "Send a message..."}
+            disabled={disabled}
+            className="aui-composer-input caret-primary placeholder:text-muted-foreground/60 max-h-48 min-h-10 w-full resize-none bg-transparent px-2.5 py-1 text-base leading-6 outline-none disabled:cursor-not-allowed"
             rows={1}
             autoFocus={autoFocus}
             enterKeyHint="send"
             aria-label="Message input"
           />
           {toolbar ? <div className="flex flex-wrap items-center gap-1 border-t border-border/50 pt-2 [&_button]:h-8 [&_button]:text-xs">{toolbar}</div> : null}
-          <ComposerAction />
+          <ComposerAction disabled={disabled} disabledReason={disabledReason} />
         </div>
       </ComposerPrimitive.AttachmentDropzone>
     </ComposerPrimitive.Root>
   );
 };
 
-const ComposerAction: FC = () => {
+const ComposerAction: FC<{ disabled?: boolean; disabledReason?: string }> = ({ disabled, disabledReason }) => {
   return (
     <div className="aui-composer-action-wrapper relative flex items-center justify-between">
       <ComposerAddAttachment />
@@ -359,34 +371,57 @@ const ComposerAction: FC = () => {
             </ComposerPrimitive.StopDictation>
           </AuiIf>
         </AuiIf>
-        <AuiIf condition={(s) => !s.thread.isRunning}>
-          <ComposerPrimitive.Send asChild>
-            <TooltipIconButton
-              tooltip="Send message"
-              side="bottom"
-              type="button"
-              variant="default"
-              size="icon"
-              className="aui-composer-send size-7 rounded-full"
-              aria-label="Send message"
-            >
-              <ArrowUpIcon className="aui-composer-send-icon size-4" />
-            </TooltipIconButton>
-          </ComposerPrimitive.Send>
-        </AuiIf>
-        <AuiIf condition={(s) => s.thread.isRunning}>
-          <ComposerPrimitive.Cancel asChild>
-            <Button
-              type="button"
-              variant="default"
-              size="icon"
-              className="aui-composer-cancel size-7 rounded-full"
-              aria-label="Stop generating"
-            >
-              <SquareIcon className="aui-composer-cancel-icon size-3.5 fill-current" />
-            </Button>
-          </ComposerPrimitive.Cancel>
-        </AuiIf>
+        {disabled ? (
+          // The model isn't ready for a turn (useEngineHealth.ts) - a
+          // plain disabled button, not the AuiIf/isRunning switch below,
+          // since assistant-ui's own send-disabled logic (empty composer,
+          // thread already running) knows nothing about backend
+          // readiness and would otherwise leave this enabled the moment
+          // there's text to send.
+          <TooltipIconButton
+            tooltip={disabledReason ?? "MaiPai's AI isn't ready yet."}
+            side="bottom"
+            type="button"
+            variant="default"
+            size="icon"
+            disabled
+            className="aui-composer-send size-7 rounded-full"
+            aria-label="Send message"
+          >
+            <ArrowUpIcon className="aui-composer-send-icon size-4" />
+          </TooltipIconButton>
+        ) : (
+          <>
+            <AuiIf condition={(s) => !s.thread.isRunning}>
+              <ComposerPrimitive.Send asChild>
+                <TooltipIconButton
+                  tooltip="Send message"
+                  side="bottom"
+                  type="button"
+                  variant="default"
+                  size="icon"
+                  className="aui-composer-send size-7 rounded-full"
+                  aria-label="Send message"
+                >
+                  <ArrowUpIcon className="aui-composer-send-icon size-4" />
+                </TooltipIconButton>
+              </ComposerPrimitive.Send>
+            </AuiIf>
+            <AuiIf condition={(s) => s.thread.isRunning}>
+              <ComposerPrimitive.Cancel asChild>
+                <Button
+                  type="button"
+                  variant="default"
+                  size="icon"
+                  className="aui-composer-cancel size-7 rounded-full"
+                  aria-label="Stop generating"
+                >
+                  <SquareIcon className="aui-composer-cancel-icon size-3.5 fill-current" />
+                </Button>
+              </ComposerPrimitive.Cancel>
+            </AuiIf>
+          </>
+        )}
       </div>
     </div>
   );

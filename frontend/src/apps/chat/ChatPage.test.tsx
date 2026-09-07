@@ -34,10 +34,11 @@ function makePerson(): Roster {
 
 const SAFETY = { flagged: false, categories: [], action: "allow" as const, notify_parent: false, matched_signals: [], checked_at: "2026-09-04T00:00:00.000Z" };
 
-function stubFetch(options: { ttsCalls?: string[] } = {}): () => void {
+function stubFetch(options: { ttsCalls?: string[]; brain?: string } = {}): () => void {
   const original = globalThis.fetch;
   globalThis.fetch = mock((input: RequestInfo | URL, init?: RequestInit) => {
     const url = typeof input === "string" ? input : input.toString();
+    if (url.includes("/api/health")) return Promise.resolve(new Response(JSON.stringify({ brain: options.brain ?? "llama-server", voice: "none" }), { status: 200 }));
     if (url.includes("/api/conversations")) return Promise.resolve(new Response(JSON.stringify([]), { status: 200 }));
     if (url.includes("/api/plugins")) return Promise.resolve(new Response(JSON.stringify([]), { status: 200 }));
     if (url.includes("/api/notifications")) return Promise.resolve(new Response(JSON.stringify([]), { status: 200 }));
@@ -131,6 +132,24 @@ describe("ChatPage", () => {
       restore();
     }
   });
+});
+
+test("the composer is disabled while the model is starting, matching the Brain pill", async () => {
+  const restore = stubFetch({ brain: "starting" });
+  try {
+    const view = renderWithQueryClient(<MemoryRouter><ChatPage person={makePerson()} /></MemoryRouter>);
+    const input = (await view.findByLabelText("Message input")) as HTMLTextAreaElement;
+    // A real `disabled` textarea can't be focused or typed into by an
+    // actual person - that's what keeps a turn from ever starting, not
+    // an onClick guard, so this asserts the attribute itself rather than
+    // simulating a send (`fireEvent`, unlike a real keystroke, can still
+    // set a disabled textarea's value directly in this test environment).
+    await waitFor(() => expect(input.disabled).toBe(true));
+    expect((view.getByLabelText("Send message") as HTMLButtonElement).disabled).toBe(true);
+    await waitFor(() => expect(view.getByRole("button", { name: "Brain: Starting" })).toBeTruthy());
+  } finally {
+    restore();
+  }
 });
 
 test("thread history can be opened and closed without removing the composer", async () => {

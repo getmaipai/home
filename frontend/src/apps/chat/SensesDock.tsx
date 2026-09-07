@@ -1,9 +1,9 @@
 import { useEffect, useState } from "react";
 import * as Popover from "@radix-ui/react-popover";
 import { Button } from "@/kit/ui/button";
-import { api } from "@/lib/api";
 import { getIcon } from "@/kit/icons";
 import { useChatListenStore } from "./chatListenStore";
+import type { EngineHealth } from "./useEngineHealth";
 import { cn, FOCUS_RING } from "@/kit/utils";
 
 export type ReplyState = "idle" | "waiting" | "responding" | "ready" | "error";
@@ -48,21 +48,9 @@ function SenseButton({ sense }: { sense: Sense }) {
   );
 }
 
-export function SensesDock({ reply, speaking, speechError, ears, earError }: { reply: ReplyState; speaking: boolean; speechError: boolean; ears: EarState; earError: string | null }) {
-  const [health, setHealth] = useState<{ brain: string; voice: string }>();
+export function SensesDock({ health, reply, speaking, speechError, ears, earError }: { health: EngineHealth | undefined; reply: ReplyState; speaking: boolean; speechError: boolean; ears: EarState; earError: string | null }) {
   const [slow, setSlow] = useState(false);
   const replay = useChatListenStore();
-  useEffect(() => {
-    let active = true;
-    let timer: ReturnType<typeof setTimeout>;
-    async function poll() {
-      try { const result = await api.senses(); if (active) setHealth(result); }
-      catch { if (active) setHealth({ brain: "unreachable", voice: "unreachable" }); }
-      if (active) timer = setTimeout(() => void poll(), 10_000);
-    }
-    void poll();
-    return () => { active = false; clearTimeout(timer); };
-  }, []);
   useEffect(() => {
     setSlow(false);
     if (reply !== "waiting" && reply !== "responding") return;

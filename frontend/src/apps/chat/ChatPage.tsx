@@ -11,6 +11,7 @@ import { getIcon } from "@/kit/icons";
 import { createChatModelAdapter } from "@/apps/chat/chatModelAdapter";
 import { createChatThreadListAdapter } from "@/apps/chat/chatThreadListAdapter";
 import { createChatSuggestionAdapter } from "@/apps/chat/chatSuggestionAdapter";
+import { brainBlockReason, useEngineHealth } from "@/apps/chat/useEngineHealth";
 import { createSttDictationAdapter } from "@/lib/voice/sttDictationAdapter";
 import { createSttSocket } from "@/lib/voice/sttSocket";
 import { ChatActorContext } from "@/apps/chat/chatMemoryActions";
@@ -104,6 +105,24 @@ export function ChatPage({ person }: ChatPageProps) {
   const [earError, setEarError] = useState<string | null>(null);
   const onEarStatus = useCallback((state: EarState, error: string | null) => { setEars(state); setEarError(error); }, []);
 
+  // Single source for the model's lifecycle state (SensesDock's pill and
+  // the composer's ready-to-send gate below both read this, so they can
+  // never again disagree the way the pill and an always-enabled Send
+  // button just did (Jesse, 2026-09-06: "Starting…" shown while chat
+  // still accepted prompts).
+  const health = useEngineHealth();
+  const composerDisabledReason = brainBlockReason(health?.brain);
+  // Read inside `onFinalReady` below (dictationAdapter is `useMemo`'d
+  // once, same reason `thinkingRef` exists): dictation's auto-send calls
+  // `aui.composer.send()` straight through the assistant-ui runtime,
+  // bypassing the rendered composer's `disabled` textarea/button
+  // entirely - a code review, 2026-09-06, caught that a wake-word or
+  // mic-button turn still went out while the model was starting, the
+  // exact bug this whole gate exists to close, just through voice
+  // instead of the keyboard.
+  const composerDisabledRef = useRef<string | undefined>(undefined);
+  composerDisabledRef.current = composerDisabledReason;
+
   const chatModelAdapter = useMemo(
     () =>
       createChatModelAdapter({
@@ -139,7 +158,13 @@ export function ChatPage({ person }: ChatPageProps) {
         // exercises instead, deterministically.
         createSocket: createSttSocket,
         turnSchedulerRef,
-        onFinalReady: () => sttAutoSendRef.current?.(),
+        // The transcript itself already landed in the composer
+        // (speech.notify() above, in sttDictationAdapter.ts) - skipping
+        // the send here just leaves it sitting there, same as typed text,
+        // for the household member to send once the model's ready.
+        onFinalReady: () => {
+          if (composerDisabledRef.current === undefined) sttAutoSendRef.current?.();
+        },
       }),
     [],
   );
@@ -171,7 +196,7 @@ export function ChatPage({ person }: ChatPageProps) {
                 <HistoryIcon className="size-4" />
               </Button>
             </div>
-            <SensesDock reply={reply} speaking={isSpeaking} speechError={speechError} ears={ears} earError={earError} />
+            <SensesDock health={health} reply={reply} speaking={isSpeaking} speechError={speechError} ears={ears} earError={earError} />
           </div>
           {banner ? (
             <div className="mx-4 mb-2 rounded-[var(--radius)] bg-[var(--muted)] px-3 py-2 text-base">{banner}</div>
@@ -192,6 +217,8 @@ export function ChatPage({ person }: ChatPageProps) {
             </aside>
             <div className="min-w-0 flex-1">
               <Thread
+                composerDisabled={composerDisabledReason !== undefined}
+                composerDisabledReason={composerDisabledReason}
                 composerToolbar={
                   // Per-turn behavior toggles, not page chrome - moved off
                   // the header (Jesse, 2026-09-06: "its placement / location
