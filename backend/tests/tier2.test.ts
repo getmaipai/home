@@ -1,13 +1,19 @@
-// Session C step 2: Tier 2 native tool calling, the consequential
-// confirmation gate, and ask/confirm continuation. Exercises
-// lib/turnEngine.ts's attemptTier2Tools()/resolvePendingAsk()/
-// pendingAskFromPluginResult() directly (all exported for exactly this,
-// matchPattern()/route()'s own precedent) rather than through a full
-// runTurn(): a `consequential` fixture manifest needs no file on disk
-// (the confirmation path never reaches runPlugin() at all), and no
-// bundled recipe can produce `confirm`/`ask` yet (spec/interpreters/**'s
-// `Step` union has no op for it - Session D's file), so that half is
-// tested against a hand-built PluginResult.
+// Fix E (docs/dev.md's "Chat reliability" - native tool calling, one
+// round trip): Tier 2's own consequential confirmation gate and
+// ask/confirm continuation, plus the model's native tool_calls decision
+// itself. resolveToolCalls() (Session C step 2's attemptTier2Tools(),
+// rewritten) takes the model's ALREADY-DECIDED ToolCall[] directly now -
+// no scripted stub needed to exercise it at all, since it no longer
+// makes its own completion call (that round trip is gone; the SAME
+// completion that would have answered in plain text now carries the
+// tool decision, read back by runTurn()/runTurnStream() before this
+// function ever runs). resolvePendingAsk()/pendingAskFromPluginResult()
+// are exported for the identical reason matchPattern()/route() are: a
+// `consequential` fixture manifest needs no file on disk (the
+// confirmation path never reaches runPlugin() at all), and no bundled
+// recipe can produce `confirm`/`ask` yet (spec/interpreters/**'s `Step`
+// union has no op for it - Session D's file), so that half is tested
+// against a hand-built PluginResult.
 import { describe, expect, test, beforeEach, afterEach } from "bun:test";
 import { db } from "@/db";
 import { people } from "@/db/schema";
@@ -17,12 +23,15 @@ import { __resetThrottleForTests } from "@/lib/secretThrottle";
 import { __resetLlmSupervisorForTests } from "@/lib/llmSupervisor";
 import { TestClient } from "./client";
 import {
-  attemptTier2Tools,
+  resolveToolCalls,
   resolvePendingAsk,
   pendingAskFromPluginResult,
+  runTurn,
+  runTurnStream,
   type RankedCandidate,
   type PluginResultWithConfirmAsk,
 } from "@/lib/turnEngine";
+import type { ToolCall } from "@/lib/llm";
 import { resolveOrCreateConversation, getPendingAsk, setPendingAsk } from "@/lib/conversationHistory";
 import type { ChatCompletionRequest } from "@maipai/spec/llm/ts/types.js";
 import type { PersonRow } from "@/types";
@@ -49,13 +58,23 @@ async function owner() {
 
 const SAFE: SafetyResult = { flagged: false, categories: [], action: "allow", notify_parent: false, matched_signals: [], checked_at: "2026-01-01T00:00:00.000Z" };
 
-async function withScriptedToolCall<T>(reply: (request: ChatCompletionRequest) => string, fn: () => Promise<T>): Promise<T> {
+/** Fix E: points the chat backend at a fresh stub scripted to answer a
+ * request with a REAL tool_calls reply (spec/llm/ts/stubServer.ts's own
+ * scriptedToolCalls option) - only needed by the runTurn()/
+ * runTurnStream() integration tests below, which exercise the whole
+ * native-tool-calling round trip end to end; resolveToolCalls() itself
+ * needs no model at all anymore. */
+async function withScriptedToolCalls<T>(
+  calls: (request: ChatCompletionRequest) => { id: string; name: string; args: string }[] | undefined,
+  fn: () => Promise<T>,
+): Promise<T> {
   __resetLlmSupervisorForTests();
   const { startStubLlmServer } = await import("@maipai/spec/llm/ts/stubServer.js");
   const stub = startStubLlmServer(0, {
-    scriptedChatReply: (request) => {
-      if (request.response_format?.type !== "json_schema" || request.response_format.json_schema.name !== "tool_calls") return undefined;
-      return reply(request);
+    scriptedToolCalls: (request) => {
+      if (!request.tools || request.tools.length === 0) return undefined;
+      const scripted = calls(request);
+      return scripted?.map((c) => ({ id: c.id, type: "function" as const, function: { name: c.name, arguments: c.args } }));
     },
   });
   process.env.MAIPAI_LLAMA_SERVER_URL = stub.url;
@@ -89,87 +108,84 @@ const CONSEQUENTIAL_CANDIDATE: RankedCandidate = {
   manifest: { id: "lock-front-door", version: "0.1.0", kind: "plugin", category: "home", display: "Lock the front door", description: "lock the front door", consequential: true, args: {} } as never,
 };
 
-describe("attemptTier2Tools()", () => {
-  test("a scripted valid tool-call reply runs the real package with validated args", async () => {
+/** Every test below offers exactly the candidates it ranks, matching
+ * real production behavior when the ranked list is no longer than
+ * MAX_TIER2_TOOLS_OFFERED - the one test that deliberately does NOT do
+ * this (a real 4th+ candidate that's ranked but never offered) builds
+ * its own narrower `offeredIds` explicitly. */
+function offeredFrom(ranked: RankedCandidate[]): Set<string> {
+  return new Set(ranked.map((r) => r.id));
+}
+
+describe("resolveToolCalls() (Fix E: the model's own native tool_calls decision, resolved)", () => {
+  test("a real tool call runs the package with validated args", async () => {
     const { actor } = await owner();
-    const value = await withScriptedToolCall(
-      () => JSON.stringify([{ tool: "remember", args: { fact: "Friday is pizza night" } }]),
-      () => attemptTier2Tools("remember Friday is pizza night", actor, [REMEMBER_CANDIDATE], [{ role: "user", content: "remember Friday is pizza night" }], "turn-1", "conv-1", SAFE, undefined),
-    );
+    const calls: ToolCall[] = [{ tool: "remember", args: { fact: "Friday is pizza night" } }];
+    const ranked = [REMEMBER_CANDIDATE];
+    const value = await resolveToolCalls(calls, offeredFrom(ranked), ranked, actor, "conv-1", "turn-1", SAFE, undefined);
     expect(value?.source).toBe("plugin");
     expect(value?.plugin_id).toBe("remember");
-    expect(value?.routing?.tier).toBe("embedding");
+    expect(value?.routing?.tier).toBe("tool");
   });
 
-  test("two independent candidates both offered can both run and their replies combine", async () => {
+  test("two independent calls both run and their replies combine", async () => {
     const { actor } = await owner();
-    const value = await withScriptedToolCall(
-      () => JSON.stringify([{ tool: "remember", args: { fact: "the wifi password is on the fridge" } }, { tool: "recall", args: { topic: "pizza night" } }]),
-      () =>
-        attemptTier2Tools(
-          "remember the wifi password and what do you know about pizza night",
-          actor,
-          [REMEMBER_CANDIDATE, RECALL_CANDIDATE],
-          [{ role: "user", content: "remember the wifi password and what do you know about pizza night" }],
-          "turn-1",
-          "conv-1",
-          SAFE,
-          undefined,
-        ),
-    );
+    const calls: ToolCall[] = [
+      { tool: "remember", args: { fact: "the wifi password is on the fridge" } },
+      { tool: "recall", args: { topic: "pizza night" } },
+    ];
+    const ranked = [REMEMBER_CANDIDATE, RECALL_CANDIDATE];
+    const value = await resolveToolCalls(calls, offeredFrom(ranked), ranked, actor, "conv-1", "turn-1", SAFE, undefined);
     expect(value?.source).toBe("plugin");
     expect(value?.plugin_id).toBe("remember+recall");
   });
 
   test("an invalid call (fails the package's own args schema) is 'ask again' - null, never a silent drop", async () => {
     const { actor } = await owner();
-    const value = await withScriptedToolCall(
-      () => JSON.stringify([{ tool: "remember", args: {} }]), // missing required `fact`
-      () => attemptTier2Tools("remember this", actor, [REMEMBER_CANDIDATE], [{ role: "user", content: "remember this" }], "turn-1", "conv-1", SAFE, undefined),
-    );
+    const calls: ToolCall[] = [{ tool: "remember", args: {} }]; // missing required `fact`
+    const ranked = [REMEMBER_CANDIDATE];
+    const value = await resolveToolCalls(calls, offeredFrom(ranked), ranked, actor, "conv-1", "turn-1", SAFE, undefined);
     expect(value).toBeNull();
   });
 
-  test("a parse-failure reply (not the requested shape) is also null, not a crash", async () => {
+  test("a call naming a tool that isn't a real candidate at all is dropped, not trusted", async () => {
     const { actor } = await owner();
-    const value = await withScriptedToolCall(
-      () => "I'm thinking about it.",
-      () => attemptTier2Tools("hi", actor, [REMEMBER_CANDIDATE], [{ role: "user", content: "hi" }], "turn-1", "conv-1", SAFE, undefined),
-    );
+    const calls: ToolCall[] = [{ tool: "not-offered", args: {} }];
+    const ranked = [REMEMBER_CANDIDATE];
+    const value = await resolveToolCalls(calls, offeredFrom(ranked), ranked, actor, "conv-1", "turn-1", SAFE, undefined);
     expect(value).toBeNull();
   });
 
-  test("an empty array (the model found nothing worth calling) is null", async () => {
+  // A code review (2026-09-07) found the first cut of this function
+  // validated a call's id against the FULL `ranked` list (every Tier 1
+  // candidate), not the actually-offered subset (prepareTurn()'s own
+  // `tools`, capped at MAX_TIER2_TOOLS_OFFERED) - a call naming a real,
+  // ranked-but-unoffered candidate (the 4th-ranked one, say) passed the
+  // old check and ran anyway, including reaching the confirm gate for a
+  // `consequential` package that was never actually shown to the model.
+  test("a call naming a real candidate that WAS ranked but was never actually offered is dropped, not run", async () => {
     const { actor } = await owner();
-    const value = await withScriptedToolCall(
-      () => "[]",
-      () => attemptTier2Tools("hi there", actor, [REMEMBER_CANDIDATE], [{ role: "user", content: "hi there" }], "turn-1", "conv-1", SAFE, undefined),
-    );
+    const calls: ToolCall[] = [{ tool: "recall", args: { topic: "pizza night" } }];
+    // recall is a genuine candidate (present in `ranked`), but this
+    // turn's own `offeredIds` (what prepareTurn() actually sent as
+    // `tools`) only ever included remember - the exact "offered top few,
+    // not the whole ranked list" gap the fix above closes.
+    const value = await resolveToolCalls(calls, offeredFrom([REMEMBER_CANDIDATE]), [REMEMBER_CANDIDATE, RECALL_CANDIDATE], actor, "conv-1", "turn-1", SAFE, undefined);
     expect(value).toBeNull();
   });
 
-  test("no ranked candidates at all skips Tier 2 entirely - null, no model call made", async () => {
+  test("an empty calls array is null (nothing to resolve)", async () => {
     const { actor } = await owner();
-    const value = await attemptTier2Tools("hi", actor, [], [{ role: "user", content: "hi" }], "turn-1", "conv-1", SAFE, undefined);
+    const ranked = [REMEMBER_CANDIDATE];
+    const value = await resolveToolCalls([], offeredFrom(ranked), ranked, actor, "conv-1", "turn-1", SAFE, undefined);
     expect(value).toBeNull();
   });
 
   test("a consequential package proposed by the model waits for confirmation instead of running", async () => {
     const { actor, conversationId } = await owner();
-    const value = await withScriptedToolCall(
-      () => JSON.stringify([{ tool: "lock-front-door", args: {} }]),
-      () =>
-        attemptTier2Tools(
-          "lock the front door",
-          actor,
-          [CONSEQUENTIAL_CANDIDATE],
-          [{ role: "user", content: "lock the front door" }],
-          "turn-1",
-          conversationId,
-          SAFE,
-          undefined,
-        ),
-    );
+    const calls: ToolCall[] = [{ tool: "lock-front-door", args: {} }];
+    const ranked = [CONSEQUENTIAL_CANDIDATE];
+    const value = await resolveToolCalls(calls, offeredFrom(ranked), ranked, actor, conversationId, "turn-1", SAFE, undefined);
     expect(value?.source).toBe("confirm");
     expect(value?.plugin_id).toBe("lock-front-door");
     expect(value?.reply.text).toContain("lock the front door");
@@ -181,22 +197,91 @@ describe("attemptTier2Tools()", () => {
 
   test("a consequential proposal alongside a non-consequential one in the same batch: the consequential one wins the turn, the other is dropped (documented simplification)", async () => {
     const { actor, conversationId } = await owner();
-    const value = await withScriptedToolCall(
-      () => JSON.stringify([{ tool: "lock-front-door", args: {} }, { tool: "remember", args: { fact: "pizza night is Friday" } }]),
-      () =>
-        attemptTier2Tools(
-          "lock the door and remember pizza night is Friday",
-          actor,
-          [CONSEQUENTIAL_CANDIDATE, REMEMBER_CANDIDATE],
-          [{ role: "user", content: "lock the door and remember pizza night is Friday" }],
-          "turn-1",
-          conversationId,
-          SAFE,
-          undefined,
-        ),
-    );
+    const calls: ToolCall[] = [
+      { tool: "lock-front-door", args: {} },
+      { tool: "remember", args: { fact: "pizza night is Friday" } },
+    ];
+    const ranked = [CONSEQUENTIAL_CANDIDATE, REMEMBER_CANDIDATE];
+    const value = await resolveToolCalls(calls, offeredFrom(ranked), ranked, actor, conversationId, "turn-1", SAFE, undefined);
     expect(value?.source).toBe("confirm");
     expect(value?.plugin_id).toBe("lock-front-door");
+  });
+});
+
+describe("runTurn()/runTurnStream() with native tool calling end to end (Fix E)", () => {
+  test("runTurn(): a real tool call, scripted through the stub, runs the real package - one completion call, no separate grammar round trip", async () => {
+    const { actor } = await owner();
+    const result = await withScriptedToolCalls(
+      () => [{ id: "call-1", name: "remember", args: '{"fact":"Friday is pizza night"}' }],
+      // Deliberately NOT starting with "remember" (see the retry test's
+      // own comment below) - this utterance must reach Tier 2 (offered
+      // as a tool) rather than winning Tier 0's own literal pattern
+      // outright, or the scripted tool_calls reply above would never
+      // actually be exercised.
+      () => runTurn(actor, "chat", "Friday is pizza night, please remember"),
+    );
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.value.source).toBe("plugin");
+    expect(result.value.plugin_id).toBe("remember");
+    // The real proof this went through native tool calling, not a Tier 0
+    // pattern win that happens to name the same package: only
+    // resolveToolCalls() ever sets routing.tier "tool".
+    expect(result.value.routing?.tier).toBe("tool");
+  });
+
+  test("runTurn(): every proposed call failing falls back to a second, plain completion - never a fabricated success", async () => {
+    const { actor } = await owner();
+    const result = await withScriptedToolCalls(
+      () => [{ id: "call-1", name: "remember", args: "{}" }], // missing required `fact`
+      // Deliberately NOT starting with "remember" - remember's own
+      // `routing.patterns` ("remember *") would win Tier 0 outright on
+      // any utterance that does, bypassing Tier 2 (and this test)
+      // entirely. Shares enough vocabulary with the package's own
+      // routing.examples ("please remember our wifi password is on the
+      // fridge") for the stub's bag-of-words scorer to still offer it.
+      () => runTurn(actor, "chat", "our wifi password is on the fridge, please remember"),
+    );
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.value.source).toBe("model"); // the retry's own plain reply, not a plugin result
+  });
+
+  test("runTurnStream(): a real tool call resolves as an immediate reply - the stream never starts typing before falling back to a plugin answer", async () => {
+    const { actor } = await owner();
+    const result = await withScriptedToolCalls(
+      () => [{ id: "call-1", name: "remember", args: '{"fact":"Friday is pizza night"}' }],
+      // Not starting with "remember" - see the runTurn() version of this
+      // exact test for why (remember's own "remember *" pattern would
+      // win Tier 0 outright otherwise, and this test would pass for the
+      // wrong reason).
+      () => runTurnStream(actor, "chat", "Friday is pizza night, please remember"),
+    );
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.kind).toBe("immediate");
+    if (result.kind !== "immediate") return;
+    expect(result.value.source).toBe("plugin");
+    expect(result.value.plugin_id).toBe("remember");
+    expect(result.value.routing?.tier).toBe("tool"); // the real proof, not just a same-shaped Tier 0 win
+  });
+
+  test("runTurnStream(): an ordinary reply (tools offered, model answers in plain text) streams normally, first delta included", async () => {
+    const { actor } = await owner();
+    // Same non-"remember"-prefixed shape as the two tests above, so this
+    // utterance genuinely reaches Tier 2 (offered as a tool) rather than
+    // winning Tier 0's own literal pattern outright - the scripted stub
+    // has no scriptedToolCalls at all here, so it always falls through
+    // to its default echo reply, exactly like a real model that looked
+    // at the offered tools and answered in plain text instead.
+    const result = await runTurnStream(actor, "chat", "Friday is pizza night, please remember - and tell me a bit about your day too");
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.kind).toBe("stream"); // proves this did NOT resolve as a tool call
+    if (result.kind !== "stream") return;
+    const deltas: string[] = [];
+    for await (const delta of result.tokens) deltas.push(delta);
+    expect(deltas.length).toBeGreaterThan(0);
   });
 });
 

@@ -138,6 +138,14 @@ export function launchFlagsToArgs(flags: LaunchFlags): string[] {
     String(ubatchSize),
     "--no-webui",
     "--metrics",
+    // Fix E (docs/dev.md's "Chat reliability" - native tool calling):
+    // llama-server parses Qwen3's Hermes-style tool calls only through
+    // its Jinja chat template. The pinned b10797 binary already defaults
+    // this on (confirmed live, 2026-09-07: tool calling round-tripped
+    // correctly even before this flag was added) - passed explicitly so
+    // a spawn never silently depends on that default surviving a future
+    // binary upgrade.
+    "--jinja",
   ];
   if (flags.kvCacheQuantized) args.push("-ctk", "q8_0", "-ctv", "q8_0");
   return args;

@@ -131,8 +131,8 @@ describe("routingStats()", () => {
     // affected by embeddings, so this stays deterministic.
     expect(stats.byPlugin).toEqual(
       expect.arrayContaining([
-        { pluginId: "remember", count: 1, tier: { pattern: 1, embedding: 0, keyword: 0 }, avgScore: 1 },
-        { pluginId: "recall", count: 1, tier: { pattern: 1, embedding: 0, keyword: 0 }, avgScore: 1 },
+        { pluginId: "remember", count: 1, tier: { pattern: 1, embedding: 0, keyword: 0, tool: 0 }, avgScore: 1 },
+        { pluginId: "recall", count: 1, tier: { pattern: 1, embedding: 0, keyword: 0, tool: 0 }, avgScore: 1 },
       ]),
     );
   });

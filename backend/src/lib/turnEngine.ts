@@ -124,7 +124,7 @@ interface TurnLogRecord {
   source: TurnValue["source"];
   plugin_id?: string;
   command_id?: string;
-  routing?: { tier: "pattern" | "embedding" | "keyword"; score: number };
+  routing?: { tier: "pattern" | "embedding" | "keyword" | "tool"; score: number };
   guard: GuardReason[];
   safety_action: string;
   duration_ms: number;
@@ -781,9 +781,10 @@ interface RoutedPlugin {
 // Session C step 2's own pre-filter sizes: "offer only the top few Tier 1
 // candidates as tools" (a small, tunable number of candidates shown to
 // the model, not the whole catalog) and "capped at two calls per turn"
-// (the model's own decision, enforced independently of the grammar's
-// own maxItems - lib/llm.ts's parseToolCalls() already refuses more than
-// two, this is belt-and-suspenders at the call site too).
+// (the model's own decision - native tool calling, Fix E, has no
+// grammar-side limit to lean on anymore, so resolveToolCalls()'s own
+// `.slice(0, MAX_TIER2_CALLS_PER_TURN)` is the one place this is
+// actually enforced).
 const MAX_TIER2_TOOLS_OFFERED = 3;
 const MAX_TIER2_CALLS_PER_TURN = 2;
 
@@ -911,6 +912,22 @@ type PreparedTurn =
        * already has all of it in scope) rather than re-derived at each
        * of runTurn()/runTurnStream()'s two call sites. */
       guardContext: Omit<GuardContext, "personId">;
+      /** Fix E (docs/dev.md's "Chat reliability" - native tool calling,
+       * one round trip): offered to the SAME completion call that
+       * answers the turn (runTurn()/runTurnStream()), replacing the
+       * deleted attemptTier2Tools()'s own separate, up-front `complete()`
+       * call. Empty when `ranked` never cleared TIER2_AMBIGUOUS_FLOOR -
+       * never sent as `[]` (llm.ts's own `offering` check), so an
+       * ordinary turn's prompt-cache hit rate is unaffected by Tier 2
+       * ever existing. */
+      tools: ToolSpec[];
+      /** The exact candidates `tools` was built from - resolveToolCalls()
+       * needs each call's own manifest (a `consequential` check) and
+       * score (the routing field on a real answer), the same `ranked`
+       * route() already computed; kept alongside `tools` rather than
+       * re-derived from it, since `ToolSpec` itself has no score or
+       * manifest left in it once flattened. */
+      ranked: RankedCandidate[];
     };
 
 // Session C step 2: a plain word-list, not a model call - a pendingAsk
@@ -1243,38 +1260,47 @@ async function prepareTurn(
     ...window.messages,
     { role: "user", content: text },
   ];
-  // Session C step 2: Tier 2, native tool calling. Only reached when
-  // Tier 0/1 found no winner - `ranked` (route()'s own Tier 1 scoring)
-  // is the pre-filter this step's own text asks for ("offer only the
-  // top few Tier 1 candidates as tools"). Extracted as its own function
-  // (rather than inlined here) specifically so it's directly unit-
-  // testable without a full runTurn() and a fixture package on disk -
-  // see its own comment.
-  const tier2 = await attemptTier2Tools(text, actor, ranked, messages, turnId, conversation.id, safety, crisisResources);
-  if (tier2) return { kind: "immediate", value: tier2, turnId };
+  // Fix E (docs/dev.md's "Chat reliability" - native tool calling, one
+  // round trip): `ranked` (route()'s own Tier 1 scoring) below
+  // TIER2_AMBIGUOUS_FLOOR means nothing plausible enough to ask the
+  // model about at all - `tools` stays empty and runTurn()/
+  // runTurnStream() never send a `tools` field on this turn's completion
+  // call, exactly as if Tier 2 didn't exist (an ordinary chat request's
+  // own prompt-cache hit rate is unaffected). Above the floor, offered
+  // to the SAME completion call that answers the turn - no separate,
+  // up-front `complete()` call anymore (attemptTier2Tools()'s own deleted
+  // one, a whole extra model round trip on every turn that reached
+  // here); the model's own tool_calls decision (or lack of one) is read
+  // back from that one call by runTurn()/runTurnStream() and handed to
+  // resolveToolCalls() below.
+  const tools: ToolSpec[] =
+    ranked.length > 0 && ranked[0]!.score >= TIER2_AMBIGUOUS_FLOOR
+      ? ranked.slice(0, MAX_TIER2_TOOLS_OFFERED).map((r) => ({ id: r.id, description: r.manifest.description, args: r.manifest.args }))
+      : [];
 
   const guardContext: Omit<GuardContext, "personId"> = {
     utterance: text,
     history: window.messages.filter((m) => m.role === "user").map((m) => m.content),
     sources: memoryMatches.map((m) => m.record.text),
-    actionsRan: false, // this IS the model fallback - by construction no plugin ran this turn
+    // Fix E: a code review on B3 (docs/dev.md's "Chat reliability")
+    // established this field means "a real tool/plugin action ran this
+    // turn" - by construction, prepareTurn() itself never runs one
+    // (a Tier 0/1 winner returns "immediate" above and never reaches
+    // here); a Tier 2 tool call, if the model proposes one once the real
+    // completion runs, is handled entirely inside runTurn()/
+    // runTurnStream() after this guardContext is already built, so it
+    // stays false here regardless of `tools` being offered - offering a
+    // tool isn't the same as one having run.
+    actionsRan: false,
     personaExamples: persona.examples,
   };
-  return { kind: "model", messages, safety, crisisResources, turnId, guardContext };
+  return { kind: "model", messages, safety, crisisResources, turnId, guardContext, tools, ranked };
 }
 
-/** Session C step 2's Tier 2: offers `ranked`'s top few candidates
- * (including `consequential` ones - the model may PROPOSE one, gated on
- * confirmation before it runs) as tools, and either runs what it
- * proposes, asks for confirmation, or returns null to fall through to
- * the ordinary conversational reply using the SAME `messages` already
- * built (no separate retry call, no second grammar attempt) - the exact
- * "ask again, never a silent drop" contract for an unparseable or fully-
- * invalid proposal. Extracted as its own function so it's testable
- * directly: `ranked` can be a hand-built list (a `consequential` fixture
- * manifest needs no file on disk - the confirmation path never reaches
- * runPlugin() at all), while the "a proposed call actually runs" path
- * exercises a real bundled package. */
+// This floor's own gate now lives in prepareTurn() (Fix E moved the
+// tool-offering decision there, ahead of the single completion call that
+// answers the turn either way) - kept here, with the constant, since the
+// tuning history below is unchanged by where the gate itself executes.
 // A latency review (2026-09-06) found this step running its full,
 // non-streaming, grammar-constrained `complete()` call before EVERY
 // streamed turn that reaches here, because `ranked.length > 0` is true
@@ -1315,31 +1341,52 @@ async function prepareTurn(
 // this floor either way, so raising it costs neither case anything.
 export const TIER2_AMBIGUOUS_FLOOR = 0.68;
 
-export async function attemptTier2Tools(
-  text: string,
-  actor: PersonRow,
+/** Fix E (docs/dev.md's "Chat reliability" - native tool calling, one
+ * round trip): given the model's OWN already-decided `calls` (read off
+ * the SAME completion call that would otherwise have answered the turn
+ * in plain text - runTurn()/runTurnStream(), never a separate call this
+ * function makes itself, unlike the deleted attemptTier2Tools()), runs
+ * them the same way Tier 2 always has: a `consequential` proposal asks
+ * for confirmation instead of running (4.9's "raises the routing bar" -
+ * the turn engine itself asks first, the identical PendingAsk flow a
+ * recipe's own `confirm` field feeds; any OTHER call proposed in the
+ * same batch is dropped, one confirmation question at a time), two
+ * independent calls run in parallel - never chained (a result feeding
+ * another is a recipe, not this step's job) - and every call failing
+ * falls through to `null`, the exact "ask again, never a silent drop"
+ * contract the deleted grammar-based parseToolCalls() used to enforce
+ * for a different reason (an unparseable reply) - here it's runPlugin()
+ * itself rejecting bad args or hitting a real error, but the caller's
+ * own response is identical: fall through to a second completion
+ * without tools, never fabricate a plugin success. `ranked` is only
+ * used to resolve each call's own manifest (the `consequential` check)
+ * and score (the routing field on a real answer) - which tools to call
+ * and with what args is the model's native decision now, never
+ * re-derived here. A call naming a tool that wasn't actually offered
+ * (not present in `ranked`) is silently dropped rather than trusted -
+ * the one thing this function still doesn't take on faith. */
+export async function resolveToolCalls(
+  calls: ToolCall[],
+  // The exact candidates actually SENT to the model as `tools`
+  // (prepared.tools, ToolSpec.id) - a code review (2026-09-07) found
+  // this function used to validate a call's id against `ranked` (every
+  // Tier 1 candidate, only the top MAX_TIER2_TOOLS_OFFERED of which is
+  // ever offered), so a call naming a real but UN-offered candidate
+  // (the 4th-ranked one, say) passed this check and ran - including,
+  // for a `consequential` package, reaching the confirm gate as if it
+  // had genuinely been offered. `ranked` is still needed too (for each
+  // ACCEPTED call's own manifest/score), so both are taken now.
+  offeredIds: ReadonlySet<string>,
   ranked: RankedCandidate[],
-  messages: LlmMessage[],
-  turnId: string,
+  actor: PersonRow,
   conversationId: string,
+  turnId: string,
   safety: SafetyResult,
   crisisResources: string | undefined,
 ): Promise<TurnValue | null> {
-  if (ranked.length === 0) return null; // nothing here has any routing.examples at all - nothing to offer
-  if (ranked[0]!.score < TIER2_AMBIGUOUS_FLOOR) return null; // nothing plausible enough to ask the model about
-
-  const offered: ToolSpec[] = ranked.slice(0, MAX_TIER2_TOOLS_OFFERED).map((r) => ({ id: r.id, description: r.manifest.description, args: r.manifest.args }));
-  const toolResult = await complete("chat", messages, { tools: offered, tool_choice: "auto" });
-  const calls = toolResult.ok ? toolResult.value.tool_calls : undefined;
-  // `undefined` (a reply that didn't parse as the requested shape at all
-  // - lib/llm.ts's own "ask again, never a silent drop" contract) and
-  // `[]` (the model looked and genuinely found nothing worth calling)
-  // both fall straight through to null (the caller's normal
-  // conversational reply).
-  if (!calls || calls.length === 0) return null;
-
-  const capped = calls.slice(0, MAX_TIER2_CALLS_PER_TURN);
   const rankedById = new Map(ranked.map((r) => [r.id, r]));
+  const capped = calls.filter((c) => offeredIds.has(c.tool) && rankedById.has(c.tool)).slice(0, MAX_TIER2_CALLS_PER_TURN);
+  if (capped.length === 0) return null;
   // A `consequential` proposal never runs on the model's say-so alone
   // (4.9: "raises the routing bar") - the turn engine itself asks first,
   // the identical PendingAsk flow a recipe's own `confirm` field feeds.
@@ -1397,7 +1444,11 @@ export async function attemptTier2Tools(
     plugin_id: pluginIds,
     safety,
     crisis_resources: crisisResources,
-    routing: { tier: "embedding", score: bestScore },
+    // Fix E: "tool" (additive to the wire enum, TurnValue.routing.tier)
+    // - a real Tier 2 native tool call is its own routing kind now,
+    // distinct from "embedding" (a Tier 0/1 winner scored via cosine
+    // similarity, never a model decision at all).
+    routing: { tier: "tool", score: bestScore },
     conversation_id: conversationId,
     turn_id: turnId,
   };
@@ -1500,49 +1551,42 @@ export async function runTurn(
   if (prepared.kind === "immediate") {
     value = prepared.value;
   } else {
-    const completion = await complete("chat", prepared.messages, { thinking: opts.thinking });
-    if (!completion.ok) {
-      markTurnFinished(); // getmaipai/home#63: prepareTurn() above already called markTurnStarted() - an engine-down failure is still a real, finished turn, not a leaked in-flight count
-      return { ok: false, status: 503, code: "unavailable", error: completion.error };
-    }
     // Step 9's own principle (spec/safety/ts/classifier.ts's promise to
     // run "again on every streamed sentence") applied to this function's
     // non-streaming twin: a completed reply here always arrives as one
     // atomic block, so a single whole-text check is exactly as strong as
-    // per-sentence checking and needs no chunker at all - the plan's own
-    // text names runTurnStream specifically, but leaving this function
-    // with literally no output-side check at all (worse than
-    // runTurnStream had before this step: at least that one only lacked
-    // the PER-SENTENCE granularity) would be a real, undocumented
-    // asymmetry between the two callers of the exact same model role.
-    // Never weakens the INPUT check above (prepareTurn()'s own
-    // evaluateSafety() call) - purely additive.
-    const outputSafety = evaluateSafety(completion.value.text, speakerAgeBand(actor, new Date()));
-    notifyIfFlagged(actor, outputSafety, "[turn]");
-    if (outputSafety.action === "refuse") {
-      value = {
+    // per-sentence checking and needs no chunker at all. Shared by both
+    // the ordinary reply and Fix E's own retry-without-tools path below
+    // (a tool_calls reply that produced no successful call still needs
+    // this exact same safety/guard treatment for the plain-text answer
+    // that replaces it) - one definition, not two copies drifting apart.
+    const answerWithSafetyAndGuards = (text: string): TurnValue => {
+      const outputSafety = evaluateSafety(text, speakerAgeBand(actor, new Date()));
+      notifyIfFlagged(actor, outputSafety, "[turn]");
+      if (outputSafety.action === "refuse") {
         // A non-streaming reply is atomic - nothing was ever shown to
         // the caller before this point, so replacing the WHOLE reply
         // with a canned refusal (finalizeReply()'s own existing
         // "safety_refuse" handling, unchanged) is exactly as clean
         // here as it is for an input-side refusal, unlike
         // runTurnStream()'s own partial-delivery case above.
-        reply: { text: "" },
-        source: "safety_refuse",
-        safety: outputSafety,
-        crisis_resources: prepared.crisisResources,
-        conversation_id: conversation.id,
-        turn_id: prepared.turnId,
-      };
-    } else {
+        return {
+          reply: { text: "" },
+          source: "safety_refuse",
+          safety: outputSafety,
+          crisis_resources: prepared.crisisResources,
+          conversation_id: conversation.id,
+          turn_id: prepared.turnId,
+        };
+      }
       // Session C step 3: guards run AFTER the safety floor, never
       // instead of it - a refused reply above never reaches this
       // branch at all, and nothing here can turn a safe reply back
       // into a refusal (guards.ts's own reasons are all honesty
       // fixes, never a safety category).
-      const guarded = guardReply(completion.value.text, { ...prepared.guardContext, personId: actor.id });
+      const guarded = guardReply(text, { ...prepared.guardContext, personId: actor.id });
       if (guarded.reason) guardHits.push(guarded.reason); // Fix A4: fed into the `[turn]` log's own `guard` array below
-      value = {
+      return {
         reply: { text: guarded.reply },
         source: "model",
         safety: outputSafety.flagged ? outputSafety : prepared.safety,
@@ -1550,6 +1594,53 @@ export async function runTurn(
         conversation_id: conversation.id,
         turn_id: prepared.turnId,
       };
+    };
+
+    // Fix E (docs/dev.md's "Chat reliability" - native tool calling, one
+    // round trip): `tools` rides on the SAME completion call that would
+    // otherwise answer in plain text - no separate up-front call, unlike
+    // the deleted attemptTier2Tools(). `prepared.tools` is empty
+    // whenever nothing cleared TIER2_AMBIGUOUS_FLOOR, so this sends no
+    // `tools` field at all on an ordinary turn (llm.ts's own `offering`
+    // check).
+    const offeringTools = prepared.tools.length > 0;
+    const offeredIds = new Set(prepared.tools.map((t) => t.id));
+    const completion = await complete("chat", prepared.messages, {
+      thinking: opts.thinking,
+      ...(offeringTools ? { tools: prepared.tools, tool_choice: "auto" as const } : {}),
+    });
+    if (!completion.ok) {
+      markTurnFinished(); // getmaipai/home#63: prepareTurn() above already called markTurnStarted() - an engine-down failure is still a real, finished turn, not a leaked in-flight count
+      return { ok: false, status: 503, code: "unavailable", error: completion.error };
+    }
+
+    if (offeringTools && completion.value.tool_calls && completion.value.tool_calls.length > 0) {
+      const resolved = await resolveToolCalls(
+        completion.value.tool_calls,
+        offeredIds,
+        prepared.ranked,
+        actor,
+        conversation.id,
+        prepared.turnId,
+        prepared.safety,
+        prepared.crisisResources,
+      );
+      if (resolved) {
+        value = resolved;
+      } else {
+        // Every proposed call failed (bad args, a real runtime error, or
+        // named a tool that wasn't actually offered) - the exact "ask
+        // again, never a silent drop" contract: one retry, this time
+        // without tools, answered as an ordinary reply.
+        const retry = await complete("chat", prepared.messages, { thinking: opts.thinking });
+        if (!retry.ok) {
+          markTurnFinished();
+          return { ok: false, status: 503, code: "unavailable", error: retry.error };
+        }
+        value = answerWithSafetyAndGuards(retry.value.text);
+      }
+    } else {
+      value = answerWithSafetyAndGuards(completion.value.text);
     }
   }
 
@@ -1651,7 +1742,15 @@ export class StreamSafetyRefusal extends Error {
  * be judged safe before it's complete, so it can't be delivered before
  * that either. */
 export async function* gateOutputSafety(
-  tokens: AsyncGenerator<string, void, void>,
+  // Fix E: `tokens`' own return value is `ToolCall[] | undefined` now
+  // (llm.ts's startCompleteStream(), the model's own tool-calling
+  // decision) - this function's `for await` loop already discards
+  // whatever a wrapped generator returns (it only ever reads yielded
+  // deltas), so widening the type costs no behavior change; a
+  // tool-calling turn is intercepted before it ever reaches this
+  // function at all (runTurnStream()'s own peek), so in practice this
+  // only ever actually returns `undefined` here.
+  tokens: AsyncGenerator<string, ToolCall[] | undefined, void>,
   actor: PersonRow,
 ): AsyncGenerator<string, SafetyResult | undefined, void> {
   let pending = "";
@@ -1833,81 +1932,182 @@ export async function runTurnStream(
     return { ok: true, kind: "immediate", value };
   }
 
-  const started = await startCompleteStream("chat", prepared.messages, { thinking: opts.thinking }, opts.signal);
-  if (!started.ok) {
-    markTurnFinished(); // getmaipai/home#63: an engine-down failure here is still a real, finished turn, not a leaked in-flight count
-    // Collapsed to "unavailable", the same as runTurn()'s own handling of
-    // complete()'s failure: llm.ts's own "unsupported_role"/"invalid_input"
-    // codes describe a role/messages problem this function's own prior
-    // validation already ruled out for `chat` - by the time startCompleteStream
-    // fails, it's a real down-engine case, not a request-shape one.
-    return { ok: false, status: 503, code: "unavailable", error: started.error };
+  // Fix E (docs/dev.md's "Chat reliability" - native tool calling, one
+  // round trip): shared by every branch below that ends up with a real
+  // (possibly already-partially-consumed) token generator to stream -
+  // the ordinary no-tools-offered case, the tools-offered-but-declined-
+  // with-real-text case (via replay(), below), and the tools-offered-
+  // then-all-failed retry case all build their own `TurnStreamResult`
+  // through this one closure rather than three copies of the same
+  // gateGuards()/finalize() wiring.
+  const buildStreamResult = (tokens: AsyncGenerator<string, ToolCall[] | undefined, void>): TurnStreamResult => {
+    // Fix A4: collected by gateGuards()'s own onGuardHit callback as the
+    // stream runs, read back once finalize() builds the log line below -
+    // the stream itself has no other channel back to this closure's own
+    // scope (a generator's per-sentence internals are otherwise opaque to
+    // whoever is draining it). Fresh per call, never shared across the
+    // two starts a retry can produce.
+    const guardHits: GuardReason[] = [];
+    return {
+      ok: true,
+      kind: "stream",
+      conversationId: conversation.id,
+      turnId: prepared.turnId,
+      tokens: gateGuards(gateOutputSafety(tokens, actor), prepared.guardContext, actor.id, (reason) => guardHits.push(reason)),
+      finalize: (replyText: string, outputSafety?: SafetyResult): TurnValue => {
+        // A safety cut with nothing safe delivered before it (the very
+        // first sentence was itself the unsafe one, replyText === "") gets
+        // treated as a real safety_refuse, the same clean "nothing shown
+        // yet, replace the whole thing with a canned refusal"
+        // finalizeReply() already gives an input-side refusal - runTurn()'s
+        // own non-streaming twin makes the identical call. A cut with real
+        // partial content already streamed stays source: "model" so that
+        // content survives in the log rather than being erased by a canned
+        // phrase the household never actually heard replace it.
+        const refusedWithNothingDelivered = outputSafety?.action === "refuse" && replyText === "";
+        // A review (2026-09-05) found this always used prepared.crisis
+        // Resources (the INPUT check's own derivation) even when
+        // `outputSafety` was the one actually flagged - so a self_harm
+        // mention in the MODEL's own words (never a refuse, so it never
+        // threw and reached this function only via gateOutputSafety()'s
+        // own return value) got `value.safety.action ===
+        // "allow_with_resources"` with no `crisis_resources` attached at
+        // all, the exact silent drop CLAUDE.md's non-configurable "offer,
+        // never block" invariant exists to prevent. A second review pass
+        // found the first fix then dropped the INPUT's own crisis
+        // resources whenever `outputSafety` was present at all, even an
+        // output refusal for a category that has nothing to do with
+        // self-harm: a message that itself mentioned self-harm
+        // (`prepared.crisisResources` set) whose reply then got cut for an
+        // unrelated refuse category lost the 988 text entirely.
+        // `?? prepared.crisisResources` keeps the input's own resources as
+        // the fallback whenever the output side isn't itself the
+        // allow_with_resources case, matching runTurn()'s own refuse
+        // branch, which never had this bug.
+        const crisisResources = (outputSafety && deriveCrisisResources(outputSafety)) ?? prepared.crisisResources;
+        const value: TurnValue = finalizeReply(actor, {
+          reply: { text: replyText },
+          source: refusedWithNothingDelivered ? "safety_refuse" : "model",
+          safety: outputSafety ?? prepared.safety,
+          crisis_resources: crisisResources,
+          conversation_id: conversation.id,
+          turn_id: prepared.turnId,
+        });
+        // getmaipai/home#63: the real completion point for the streaming
+        // path - the one call site matching prepareTurn()'s own
+        // markTurnStarted() when the stream runs to a normal finish. A
+        // stream a client disconnects from before finalize() ever runs
+        // (routes/turn.ts's own ReadableStream.cancel()) leaks the
+        // in-flight count on THIS path specifically - turnActivity.ts's
+        // own MAX_TURN_DURATION_MS safety valve is what bounds that case,
+        // not a call here that would never run.
+        markTurnFinished();
+        logTurnSafely(actor, surface, text, value, { startedAt, guardHits });
+        return value;
+      },
+    };
+  };
+
+  const offeringTools = prepared.tools.length > 0;
+  const offeredIds = new Set(prepared.tools.map((t) => t.id));
+  if (!offeringTools) {
+    const started = await startCompleteStream("chat", prepared.messages, { thinking: opts.thinking }, opts.signal);
+    if (!started.ok) {
+      markTurnFinished(); // getmaipai/home#63: an engine-down failure here is still a real, finished turn, not a leaked in-flight count
+      // Collapsed to "unavailable", the same as runTurn()'s own handling of
+      // complete()'s failure: llm.ts's own "unsupported_role"/"invalid_input"
+      // codes describe a role/messages problem this function's own prior
+      // validation already ruled out for `chat` - by the time startCompleteStream
+      // fails, it's a real down-engine case, not a request-shape one.
+      return { ok: false, status: 503, code: "unavailable", error: started.error };
+    }
+    return buildStreamResult(started.tokens);
   }
 
-  // Fix A4: collected by gateGuards()'s own onGuardHit callback as the
-  // stream runs, read back once finalize() builds the log line below -
-  // the stream itself has no other channel back to this closure's own
-  // scope (a generator's per-sentence internals are otherwise opaque to
-  // whoever is draining it).
-  const guardHits: GuardReason[] = [];
-  return {
-    ok: true,
-    kind: "stream",
-    conversationId: conversation.id,
-    turnId: prepared.turnId,
-    tokens: gateGuards(gateOutputSafety(started.tokens, actor), prepared.guardContext, actor.id, (reason) => guardHits.push(reason)),
-    finalize: (replyText: string, outputSafety?: SafetyResult): TurnValue => {
-      // A safety cut with nothing safe delivered before it (the very
-      // first sentence was itself the unsafe one, replyText === "") gets
-      // treated as a real safety_refuse, the same clean "nothing shown
-      // yet, replace the whole thing with a canned refusal"
-      // finalizeReply() already gives an input-side refusal - runTurn()'s
-      // own non-streaming twin makes the identical call. A cut with real
-      // partial content already streamed stays source: "model" so that
-      // content survives in the log rather than being erased by a canned
-      // phrase the household never actually heard replace it.
-      const refusedWithNothingDelivered = outputSafety?.action === "refuse" && replyText === "";
-      // A review (2026-09-05) found this always used prepared.crisis
-      // Resources (the INPUT check's own derivation) even when
-      // `outputSafety` was the one actually flagged - so a self_harm
-      // mention in the MODEL's own words (never a refuse, so it never
-      // threw and reached this function only via gateOutputSafety()'s
-      // own return value) got `value.safety.action ===
-      // "allow_with_resources"` with no `crisis_resources` attached at
-      // all, the exact silent drop CLAUDE.md's non-configurable "offer,
-      // never block" invariant exists to prevent. A second review pass
-      // found the first fix then dropped the INPUT's own crisis
-      // resources whenever `outputSafety` was present at all, even an
-      // output refusal for a category that has nothing to do with
-      // self-harm: a message that itself mentioned self-harm
-      // (`prepared.crisisResources` set) whose reply then got cut for an
-      // unrelated refuse category lost the 988 text entirely.
-      // `?? prepared.crisisResources` keeps the input's own resources as
-      // the fallback whenever the output side isn't itself the
-      // allow_with_resources case, matching runTurn()'s own refuse
-      // branch, which never had this bug.
-      const crisisResources = (outputSafety && deriveCrisisResources(outputSafety)) ?? prepared.crisisResources;
-      const value: TurnValue = finalizeReply(actor, {
-        reply: { text: replyText },
-        source: refusedWithNothingDelivered ? "safety_refuse" : "model",
-        safety: outputSafety ?? prepared.safety,
-        crisis_resources: crisisResources,
-        conversation_id: conversation.id,
-        turn_id: prepared.turnId,
-      });
-      // getmaipai/home#63: the real completion point for the streaming
-      // path - the one call site matching prepareTurn()'s own
-      // markTurnStarted() when the stream runs to a normal finish. A
-      // stream a client disconnects from before finalize() ever runs
-      // (routes/turn.ts's own ReadableStream.cancel()) leaks the
-      // in-flight count on THIS path specifically - turnActivity.ts's
-      // own MAX_TURN_DURATION_MS safety valve is what bounds that case,
-      // not a call here that would never run.
-      markTurnFinished();
-      logTurnSafely(actor, surface, text, value, { startedAt, guardHits });
-      return value;
-    },
-  };
+  // Fix E: `tools` rides on the SAME completion call that would
+  // otherwise stream the answer in plain text - peeked here (one
+  // `.next()` call, before this function commits to a response shape)
+  // rather than blindly wrapped in gateGuards()/gateOutputSafety(),
+  // because a tool-calling reply is not text at all: confirmed live
+  // against a real engine, 2026-09-07, its `content` stays empty/null
+  // throughout, so it yields ZERO deltas and the peek's own `.next()`
+  // call resolves as `{ done: true, value: ToolCall[] }` immediately -
+  // the household never sees a "thinking" indicator for a turn that's
+  // about to answer as a plugin instead.
+  const started = await startCompleteStream(
+    "chat",
+    prepared.messages,
+    { thinking: opts.thinking, tools: prepared.tools, tool_choice: "auto" },
+    opts.signal,
+  );
+  if (!started.ok) {
+    markTurnFinished();
+    return { ok: false, status: 503, code: "unavailable", error: started.error };
+  }
+  const first = await started.tokens.next();
+
+  if (first.done) {
+    const rawCalls = first.value ?? [];
+    if (rawCalls.length > 0) {
+      const resolved = await resolveToolCalls(rawCalls, offeredIds, prepared.ranked, actor, conversation.id, prepared.turnId, prepared.safety, prepared.crisisResources);
+      if (resolved) {
+        const value = finalizeReply(actor, resolved);
+        markTurnFinished();
+        logTurnSafely(actor, surface, text, value, { startedAt, guardHits: [] });
+        return { ok: true, kind: "immediate", value };
+      }
+      // Every proposed call failed - the exact "ask again, never a
+      // silent drop" contract: a genuinely second completion, this time
+      // without tools, streamed normally through the SAME gate every
+      // ordinary reply goes through.
+      const retry = await startCompleteStream("chat", prepared.messages, { thinking: opts.thinking }, opts.signal);
+      if (!retry.ok) {
+        markTurnFinished();
+        return { ok: false, status: 503, code: "unavailable", error: retry.error };
+      }
+      return buildStreamResult(retry.tokens);
+    }
+    // No tool call was ever proposed AND no text streamed either (a
+    // genuinely empty reply) - stream what's left of an already-finished
+    // generator through the normal gate; the loop inside it simply never
+    // iterates. Not a retry case: the model was never asked to try
+    // again for THIS shape, only for a real failed proposal.
+    return buildStreamResult(started.tokens);
+  }
+
+  // The first real step was text, not a tool call - replay it, then
+  // continue draining the SAME generator normally. `yield*` propagates
+  // whatever `rest` itself eventually returns (always `undefined` here
+  // in practice: a reply that starts with real prose never pivots into a
+  // tool call partway through, confirmed live, 2026-09-07), so this
+  // generator's own declared return type stays accurate without needing
+  // to special-case it. Captured into plain locals before the closure -
+  // TS doesn't carry `first`/`started`'s own narrowing (done: false,
+  // ok: true) into a nested generator function's body.
+  const firstText: string = first.value;
+  const rest: AsyncGenerator<string, ToolCall[] | undefined, void> = started.tokens;
+  async function* replay(): AsyncGenerator<string, ToolCall[] | undefined, void> {
+    yield firstText;
+    const trailingCalls = yield* rest;
+    // A code review (2026-09-07) correctly flagged that "never happens"
+    // above is an empirical observation, not a wire-contract guarantee -
+    // gateOutputSafety() (this generator's real caller, via
+    // buildStreamResult()) only ever forwards yielded text and discards
+    // whatever its wrapped generator returns, so a reply that started
+    // with prose and THEN pivoted into a tool call would silently lose
+    // that call today: nothing would run it, and nothing would say so.
+    // Full handling would mean re-threading a return value through
+    // gateOutputSafety()/gateGuards() for a currently-unobserved case;
+    // this is the cheap half instead - a loud, real signal the moment it
+    // ever actually happens, rather than a silent drop.
+    if (trailingCalls && trailingCalls.length > 0) {
+      console.error(
+        `[turn] a streamed reply yielded real text before proposing tool_calls (${trailingCalls.map((c) => c.tool).join(", ")}) - dropped, never run; this contradicts what this engine build has always done and needs a real fix, not just a log line`,
+      );
+    }
+    return undefined;
+  }
+  return buildStreamResult(replay());
 }
 
 // Not built this pass, deliberately (see docs/dev.md):

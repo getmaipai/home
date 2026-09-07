@@ -17,7 +17,7 @@ import { getChatClient, reportChatBackendUnreachable } from "@/lib/llmSupervisor
 import { getEmbedClient } from "@/lib/embedSupervisor";
 import { tryConsume } from "@/lib/rateLimiter";
 import { LlmClientError } from "@maipai/spec/llm/ts/client.js";
-import type { ChatRole, ChatCompletionRequest } from "@maipai/spec/llm/ts/types.js";
+import type { ChatRole, ChatCompletionRequest, ToolDefinition, ToolCallWire } from "@maipai/spec/llm/ts/types.js";
 
 // Session C step 0 (wave-2.md): a person every couple of seconds, burst
 // of a few - Session A's own per-person limit (its step 11) hadn't
@@ -71,22 +71,23 @@ export interface LlmCompleteOptions {
    * intelligence.md): passed straight through to client.chatComplete()
    * (already spreads its whole request object, so no other change is
    * needed here or in client.ts itself). The memory judge
-   * (lib/memoryJudge.ts) is the first real caller. Ignored (overridden)
-   * when `tools` is also set below - offering tools always wins. */
+   * (lib/memoryJudge.ts) is the first real caller. Never combined with
+   * `tools` below by any real caller today (native tool calling has no
+   * use for a `response_format` grammar), so no precedence rule between
+   * them is needed. */
   response_format?: ChatCompletionRequest["response_format"];
-  /** Tier 2 native tool calling (step 2, session-c-brain-and-voice.md).
-   * Offering `tools` builds its OWN `response_format` grammar (a JSON
-   * array of `{tool, args}`, `args` shaped by the tool's own schema) -
-   * llama-server compiles any JSON Schema to GBNF, so the model's own
-   * tool-calling ability matters less than the grammar making its call
-   * valid by construction (docs/dev.md's own words on this). Capped at
-   * two calls per turn (turnEngine.ts's own pre-filter picks which
-   * candidates to offer at all) - two independent calls, never a
-   * chained pipeline. */
+  /** Fix E (docs/dev.md's "Chat reliability" - native tool calling, one
+   * round trip): offering `tools` lets llama-server's own function-
+   * calling support decide and call, replacing the deleted grammar-
+   * forced JSON-array mechanism (`toolCallSchema()`/`parseToolCalls()`,
+   * a real, measured problem of their own - see this fix's docs/dev.md
+   * writeup for why). Capped at two calls per turn (turnEngine.ts's own
+   * pre-filter picks which candidates to offer at all) - two independent
+   * calls, never a chained pipeline. */
   tools?: ToolSpec[];
-  /** "required" disallows an empty array (the model MUST propose
-   * something from `tools`); "auto" (the default) allows one, meaning
-   * "none of these fit, answer normally instead." */
+  /** "required" disallows the model declining (used only by
+   * enginePostLoadCheck.ts's own capability probe); "auto" (the
+   * default) lets it answer normally instead when nothing offered fits. */
   tool_choice?: "auto" | "required";
 }
 
@@ -94,7 +95,8 @@ export interface LlmCompleteOptions {
  * a package) offered as a Tier 2 candidate. `args` is that candidate's
  * own JSON Schema (manifest.args unchanged - the exact shape
  * `runPlugin()` already validates against, reused here, not
- * reinvented). */
+ * reinvented; mapped to `ToolDefinition.function.parameters` verbatim by
+ * toToolDefinition() below, no reshaping). */
 export interface ToolSpec {
   id: string;
   description: string;
@@ -106,73 +108,37 @@ export interface ToolCall {
   args: unknown;
 }
 
-/** A JSON array, one entry per proposed call, `args` constrained by
- * WHICHEVER tool's schema `tool` names (a discriminated `oneOf`, not a
- * single flat shape - each candidate's own `args` schema can differ
- * completely, and llama-server's grammar compiler handles `oneOf` fine).
- * `minItems: 0` under "auto" is what actually lets the model decline: an
- * empty array is a valid, complete reply under this grammar, not an
- * error. */
-function toolCallSchema(tools: readonly ToolSpec[], toolChoice: "auto" | "required"): Record<string, unknown> {
-  return {
-    type: "array",
-    minItems: toolChoice === "required" ? 1 : 0,
-    maxItems: 2,
-    items: {
-      oneOf: tools.map((t) => ({
-        type: "object",
-        additionalProperties: false,
-        required: ["tool", "args"],
-        properties: { tool: { const: t.id }, args: t.args },
-      })),
-    },
-  };
+function toToolDefinition(spec: ToolSpec): ToolDefinition {
+  return { type: "function", function: { name: spec.id, description: spec.description, parameters: spec.args } };
 }
 
-/** Never trusts the grammar blindly (llama.cpp's lazy grammars still let
- * a malformed call through on recent Qwen builds, upstream issue 24807 -
- * this step's own text names it): `undefined` means the reply didn't
- * parse as SOME array of `{tool, args}` objects naming one of the
- * offered ids at all - a caller treats that as "ask again," never as an
- * empty (= "no tool needed") decision, and never runs anything from it.
- * A tool's OWN `args` shape is deliberately NOT re-validated here -
- * `runPlugin()` already does that with the real ajv-compiled schema
- * (the exact mechanism `deterministicArgs()` can't reuse, and the one
- * "verify every call... before acting" is really asking for); catching
- * the same class of error twice, differently, would be the second,
- * worse copy of that check, not real defense in depth. */
-function parseToolCalls(raw: string, tools: readonly ToolSpec[], toolChoice: "auto" | "required"): ToolCall[] | undefined {
-  const knownIds = new Set(tools.map((t) => t.id));
-  let parsed: unknown;
+/** The model's own JSON-encoded `arguments` string, parsed once here so
+ * every caller works with the same `unknown` shape `runPlugin()`'s real
+ * ajv-compiled schema already validates for real - a parse failure (the
+ * model emitted something that isn't valid JSON, rare but real for a
+ * small model) becomes `args: undefined`, which `runPlugin()`'s own
+ * `validateArgs()` then rejects the normal way (a required-property
+ * miss), not a second, different error path for the identical class of
+ * problem. */
+function toolCallFromWire(wire: ToolCallWire): ToolCall {
+  let args: unknown;
   try {
-    parsed = JSON.parse(raw);
+    args = JSON.parse(wire.function.arguments);
   } catch {
-    return undefined;
+    args = undefined;
   }
-  if (!Array.isArray(parsed) || parsed.length > 2) return undefined;
-  // A code review (2026-09-06) found this didn't re-check `required`'s
-  // own minItems:1 - the exact "don't trust the grammar blindly" gap
-  // this function's own header warns about, just for the other bound
-  // instead of the array-length ceiling: an empty array under
-  // `tool_choice: "required"` would have been accepted as a real "no
-  // tool needed" decision, which "required" specifically forbids.
-  if (parsed.length === 0 && toolChoice === "required") return undefined;
-  const calls: ToolCall[] = [];
-  for (const entry of parsed) {
-    if (!entry || typeof entry !== "object" || typeof (entry as { tool?: unknown }).tool !== "string") return undefined;
-    const tool = (entry as { tool: string }).tool;
-    if (!knownIds.has(tool)) return undefined;
-    calls.push({ tool, args: (entry as { args?: unknown }).args });
-  }
-  return calls;
+  return { tool: wire.function.name, args };
 }
 
 export interface LlmCompleteValue {
   text: string;
   model: string;
-  /** Only set (even to `[]`) when `tools` was offered for this call -
-   * see parseToolCalls()'s own comment for what `undefined` vs `[]`
-   * means. */
+  /** Only set (even to `[]`) when `tools` was offered for this call.
+   * `undefined` means tools weren't offered at all; `[]` is the model's
+   * own real decision that nothing offered fit - both `complete()` and
+   * `startCompleteStream()` preserve this distinction explicitly (see
+   * each one's own `offering` check) rather than letting an absent
+   * field and an empty array read as the same thing. */
   tool_calls?: ToolCall[];
 }
 
@@ -258,22 +224,32 @@ export async function complete(
 
   try {
     const { thinking, tools, tool_choice, ...rest } = opts;
-    const response_format =
-      tools && tools.length > 0
-        ? { type: "json_schema" as const, json_schema: { name: "tool_calls", schema: toolCallSchema(tools, tool_choice ?? "auto") } }
-        : rest.response_format;
+    const offering = !!tools && tools.length > 0;
     const response = await client.chatComplete({
       model: "chat",
       messages,
       ...rest,
-      response_format,
+      // A code review (2026-09-07) found `...rest` above still carries a
+      // caller-supplied `response_format` through with nothing stopping
+      // it from being sent alongside `tools` in the same request - no
+      // real caller does both today, but nothing enforced that. Explicit
+      // now, matching this option's own doc comment: offering tools
+      // always wins.
+      response_format: offering ? undefined : rest.response_format,
+      tools: offering ? tools!.map(toToolDefinition) : undefined,
+      tool_choice: offering ? (tool_choice ?? "auto") : undefined,
       chat_template_kwargs: { enable_thinking: !!thinking },
     });
     const choice = response.choices[0];
     if (!choice) {
       return { ok: false, status: 503, code: "unavailable", error: "chat model returned no choices" };
     }
-    const tool_calls = tools && tools.length > 0 ? parseToolCalls(choice.message.content, tools, tool_choice ?? "auto") : undefined;
+    // `[]` (the model looked and genuinely found nothing worth calling)
+    // and a real, non-empty array are both real decisions the caller
+    // (turnEngine.ts) branches on; only `undefined` means "tools weren't
+    // offered on this call at all," never conflated with "offered, and
+    // declined."
+    const tool_calls = offering ? (choice.message.tool_calls ?? []).map(toolCallFromWire) : undefined;
     return { ok: true, value: { text: choice.message.content, model: response.model, ...(tool_calls !== undefined ? { tool_calls } : {}) } };
   } catch (err) {
     recoverFromDeadBackend(err);
@@ -283,7 +259,7 @@ export async function complete(
 }
 
 export type LlmStreamStartResult =
-  | { ok: true; tokens: AsyncGenerator<string, void, void> }
+  | { ok: true; tokens: AsyncGenerator<string, ToolCall[] | undefined, void> }
   | { ok: false; status: 400 | 503; code: "unsupported_role" | "invalid_input" | "unavailable"; error: string };
 
 /** Real token-by-token streaming (2026-09-04): validates and resolves a
@@ -319,20 +295,33 @@ export async function startCompleteStream(
     return { ok: false, status: 503, code: "unavailable", error: `chat model unavailable: ${(err as Error).message}` };
   }
 
-  const { thinking, ...rest } = opts;
-  async function* tokens(): AsyncGenerator<string, void, void> {
+  const { thinking, tools, tool_choice, ...rest } = opts;
+  const offering = !!tools && tools.length > 0;
+  // Fix E: `yield*` delegation both forwards every text delta the inner
+  // generator yields AND evaluates to its own return value once it ends
+  // (spec/llm/ts/client.ts's own chatCompleteStream(), assembled from
+  // `delta.tool_calls` fragments) - the same pattern turnEngine.ts's
+  // gateGuards()/gateOutputSafety() already use for propagating a
+  // return value through a wrapping generator, just via `yield*` instead
+  // of a manual per-item loop, since nothing here needs to inspect or
+  // transform an individual delta the way those two do.
+  async function* tokens(): AsyncGenerator<string, ToolCall[] | undefined, void> {
     try {
-      for await (const delta of client!.chatCompleteStream(
+      const wireToolCalls = yield* client!.chatCompleteStream(
         {
           model: "chat",
           messages,
           ...rest,
+          // Same explicit precedence as complete()'s own fix: offering
+          // tools always wins over a caller-supplied response_format.
+          response_format: offering ? undefined : rest.response_format,
+          tools: offering ? tools!.map(toToolDefinition) : undefined,
+          tool_choice: offering ? (tool_choice ?? "auto") : undefined,
           chat_template_kwargs: { enable_thinking: !!thinking },
         },
         signal,
-      )) {
-        yield delta;
-      }
+      );
+      return offering && wireToolCalls && wireToolCalls.length > 0 ? wireToolCalls.map(toolCallFromWire) : undefined;
     } catch (err) {
       // A request the caller itself cancelled (the person closed the tab
       // before the first byte) surfaces as the same "could not reach"

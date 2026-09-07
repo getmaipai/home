@@ -9,7 +9,7 @@
 // model loaded, this is a canned reply]", mirroring the emulator's own
 // llm.complete wording, so a canned answer can never be mistaken for a
 // real one downstream.
-import type { ChatCompletionRequest, ChatCompletionResponse, EmbeddingRequest, EmbeddingResponse } from "./types.js";
+import type { ChatCompletionRequest, ChatCompletionResponse, EmbeddingRequest, EmbeddingResponse, ToolCallWire } from "./types.js";
 
 export interface StubLlmServerHandle {
   url: string;
@@ -65,6 +65,45 @@ function streamChatCompletion(request: ChatCompletionRequest, text: string = stu
         controller.enqueue(sseLine({ index: 0, delta: { content }, finish_reason: null }));
       });
       controller.enqueue(sseLine({ index: 0, delta: {}, finish_reason: "stop" }));
+      controller.enqueue(encoder.encode("data: [DONE]\n\n"));
+      controller.close();
+    },
+  });
+}
+
+/** Fix E: the streaming shape of a scripted tool_calls reply, fragmented
+ * across at least two chunks per call (an id+name-only fragment, then
+ * the whole arguments string) so a test genuinely exercises
+ * client.ts's own per-index concatenation rather than handing it one
+ * already-complete call - matches what a real engine actually does
+ * (confirmed live, 2026-09-07: id/name arrive once, arguments streams in
+ * pieces), just coarser-grained than character-by-character since the
+ * accumulation logic under test doesn't care how many pieces arrived,
+ * only that they're in order per index. `content` stays empty
+ * throughout, the same as a real tool-calling reply. */
+function streamToolCallsCompletion(request: ChatCompletionRequest, toolCalls: ToolCallWire[]): ReadableStream<Uint8Array> {
+  const id = `stub-${Date.now()}`;
+  const model = request.model || "stub-chat";
+  const encoder = new TextEncoder();
+  const sseLine = (choice: unknown) =>
+    encoder.encode(`data: ${JSON.stringify({ id, model, choices: [choice] })}\n\n`);
+
+  return new ReadableStream<Uint8Array>({
+    start(controller) {
+      controller.enqueue(sseLine({ index: 0, delta: { role: "assistant", content: null }, finish_reason: null }));
+      toolCalls.forEach((call, index) => {
+        controller.enqueue(
+          sseLine({
+            index: 0,
+            delta: { tool_calls: [{ index, id: call.id, type: "function", function: { name: call.function.name } }] },
+            finish_reason: null,
+          }),
+        );
+        controller.enqueue(
+          sseLine({ index: 0, delta: { tool_calls: [{ index, function: { arguments: call.function.arguments } }] }, finish_reason: null }),
+        );
+      });
+      controller.enqueue(sseLine({ index: 0, delta: {}, finish_reason: "tool_calls" }));
       controller.enqueue(encoder.encode("data: [DONE]\n\n"));
       controller.close();
     },
@@ -155,6 +194,17 @@ export interface StubLlmServerOptions {
    * that genuinely differs from the input - the default echo can never
    * produce that by construction. */
   scriptedChatReply?: (request: ChatCompletionRequest) => unknown;
+  /** Fix E: a scripted tool_calls reply, checked BEFORE scriptedChatReply
+   * on any request - returning a non-empty array makes this request
+   * answer as a real tool-calling reply (empty content, `finish_reason:
+   * "tool_calls"`, both non-streaming and streaming - the exact shape
+   * confirmed live against a real engine, 2026-09-07), the only way a
+   * test can exercise turnEngine.ts's own tool-calling path without a
+   * real model. Returning `undefined` (or omitting this option) falls
+   * through to scriptedChatReply/the default echo, unaffected - a test
+   * that only cares about ordinary replies never has to know this
+   * option exists. */
+  scriptedToolCalls?: (request: ChatCompletionRequest) => ToolCallWire[] | undefined;
 }
 
 /** port 0 lets the OS assign a free port, avoiding a fixed-port clash
@@ -174,6 +224,20 @@ export function startStubLlmServer(port = 0, opts: StubLlmServerOptions = {}): S
         const body = (await req.json().catch(() => null)) as ChatCompletionRequest | null;
         if (!body || !Array.isArray(body.messages)) {
           return Response.json({ error: "messages is required" }, { status: 400 });
+        }
+        const toolCalls = opts.scriptedToolCalls?.(body);
+        if (toolCalls && toolCalls.length > 0) {
+          if (body.stream) {
+            return new Response(streamToolCallsCompletion(body, toolCalls), {
+              headers: { "content-type": "text/event-stream" },
+            });
+          }
+          return Response.json({
+            id: `stub-${Date.now()}`,
+            model: body.model || "stub-chat",
+            choices: [{ index: 0, message: { role: "assistant", content: "", tool_calls: toolCalls }, finish_reason: "tool_calls" }],
+            usage: { prompt_tokens: 0, completion_tokens: 0, total_tokens: 0 },
+          });
         }
         const scripted = opts.scriptedChatReply?.(body);
         const scriptedContent = scripted !== undefined ? (typeof scripted === "string" ? scripted : JSON.stringify(scripted)) : undefined;

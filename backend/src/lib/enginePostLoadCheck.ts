@@ -26,6 +26,15 @@ export interface PostLoadCheckResult {
   estimatedBytes: number;
   actualBytes: number | null;
   driftPct: number | null;
+  /** Fix E (docs/dev.md's "Chat reliability" - native tool calling):
+   * whether this exact spawn can answer with a real `tool_calls` reply
+   * when offered one. Unlike `replyOk`, never gates the spawn - Jesse,
+   * 2026-09-07: chat is the core capability a household picked this
+   * model for, tool calling is a Tier 2 extra on top of it, so a model
+   * that can chat but not tool-call still gets to serve the household;
+   * `false` here is logged as a warning (see below), the same posture
+   * this file's own drift check already takes for a lesser mismatch. */
+  toolCallingOk: boolean;
 }
 
 // Above this, the drift is logged as a warning (a real sizing-formula
@@ -90,14 +99,58 @@ export async function runPostLoadCheck(
   flags: LaunchFlags,
   hw: HardwareInfo,
 ): Promise<PostLoadCheckResult> {
-  const response = await client.chatComplete({
-    model: "chat",
-    messages: [{ role: "user", content: "Reply with just the word OK." }],
-    max_tokens: 16,
-  });
+  // The reply check and the tool-calling probe are two independent
+  // requests to the same fresh spawn - run together (a code review,
+  // 2026-09-07, found these serial: on a slow/CPU-bound host, every
+  // fresh selection and every auto-heal restart was paying roughly
+  // double the real model latency here for no reason, since neither
+  // result depends on the other).
+  const [response, toolCallingOk] = await Promise.all([
+    client.chatComplete({
+      model: "chat",
+      messages: [{ role: "user", content: "Reply with just the word OK." }],
+      max_tokens: 16,
+    }),
+    // Fix E: one canned tool-calling round trip, `tool_choice: "required"`
+    // so a genuine capability gap (declines every time) can't be
+    // confused with "this particular trivial question didn't need a
+    // tool" the way "auto" would leave ambiguous. Never throws - see
+    // PostLoadCheckResult.toolCallingOk's own comment for why this is a
+    // warning, not a spawn-blocking gate.
+    // A hand-built ToolDefinition literal, not llm.ts's own
+    // toToolDefinition() helper: that module imports llmSupervisor.ts,
+    // which imports THIS file (llmSupervisor.ts's own runPostLoadCheck()
+    // call) - reusing it here would close a real import cycle for one
+    // literal this file can already build itself, the same call this
+    // session already made for conversationHistory.ts/lib/commands.ts.
+    client
+      .chatComplete({
+        model: "chat",
+        messages: [{ role: "user", content: "What is 2 plus 2?" }],
+        max_tokens: 64,
+        tools: [
+          {
+            type: "function",
+            function: {
+              name: "add",
+              description: "Adds two numbers and returns their sum.",
+              parameters: { type: "object", required: ["a", "b"], properties: { a: { type: "number" }, b: { type: "number" } } },
+            },
+          },
+        ],
+        tool_choice: "required",
+      })
+      .then((toolResponse) => (toolResponse.choices[0]?.message.tool_calls?.length ?? 0) > 0)
+      .catch(() => false),
+  ]);
   const text = response.choices[0]?.message.content;
   if (!text || !text.trim()) {
     throw new Error("post-load check: the model loaded but returned no reply text");
+  }
+  if (!toolCallingOk) {
+    console.warn(
+      `[enginePostLoadCheck] ${model.id}: this spawn did not answer a canned request with a real tool_calls reply - Tier 2 tool calling will be unavailable for this model; chat itself is unaffected`,
+    );
   }
 
   if (model.sizing.kind !== "transformer_gguf") {
@@ -118,5 +171,5 @@ export async function runPostLoadCheck(
     console.log(`[enginePostLoadCheck] ${model.id}: estimated ${gib(estimatedBytes)}GB, actual ${gib(actualBytes)}GB (${(driftPct! * 100).toFixed(0)}% drift)`);
   }
 
-  return { replyOk: true, estimatedBytes, actualBytes, driftPct };
+  return { replyOk: true, estimatedBytes, actualBytes, driftPct, toolCallingOk };
 }

@@ -519,8 +519,9 @@ describe("lib/turnEngine.ts runTurnStream() output-safety gate (step 9)", () => 
   // batching), just not through this test suite's usual stub.
   test("gateOutputSafety() delivers an earlier sentence even when a LATER sentence in the same raw delta refuses", async () => {
     const { childRow } = await ownerAndChild();
-    async function* oneBigDelta(): AsyncGenerator<string, void, void> {
+    async function* oneBigDelta(): AsyncGenerator<string, undefined, void> {
       yield `${SAFE_SENTENCE} ${UNSAFE_SENTENCE}`;
+      return undefined;
     }
 
     const gated = gateOutputSafety(oneBigDelta(), childRow);

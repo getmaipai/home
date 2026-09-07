@@ -10,6 +10,7 @@ import type {
   ModelInfo,
   EmbeddingRequest,
   EmbeddingResponse,
+  ToolCallWire,
 } from "./types.js";
 import { readTextLines } from "../../streaming/ts/lineReader.js";
 
@@ -145,7 +146,17 @@ export class LlamaServerClient {
    * torn down needs a real signal reaching this fetch, not just "stop
    * iterating." Composed with the internal idle-timeout controller
    * below, not replacing it - either one firing ends the stream. */
-  async *chatCompleteStream(request: ChatCompletionRequest, externalSignal?: AbortSignal): AsyncGenerator<string, void, void> {
+  /** Fix E's own return value (docs/dev.md, "native tool calling, one
+   * round trip"): `undefined` for an ordinary reply (every text delta
+   * already yielded is the whole answer); a non-empty array when the
+   * model proposed a tool call instead - confirmed live, 2026-09-07,
+   * that a tool-calling reply's `content` stays empty/null throughout
+   * (no interleaved prose), so a caller never has to guess which shape
+   * it's getting until the stream itself ends. Assembled from
+   * `delta.tool_calls` fragments accumulated per `index` as they arrive,
+   * the identical concatenation this method already does for plain text
+   * content, just keyed by call instead of by nothing. */
+  async *chatCompleteStream(request: ChatCompletionRequest, externalSignal?: AbortSignal): AsyncGenerator<string, ToolCallWire[] | undefined, void> {
     // A review, 2026-09-06, found this was the one method on this client
     // still missing a timeout after chatComplete()/embed() got theirs -
     // the exact "wedged llama-server" failure mode is just as reachable
@@ -206,6 +217,20 @@ export class LlamaServerClient {
     // cause. This method only owns what's specific to SSE: the `data:`
     // framing and the `[DONE]` sentinel.
     const reader = res.body.getReader();
+    // Fix E: accumulated across every chunk, keyed by the wire's own
+    // `index` - built up here the same way `content` is concatenated by
+    // the CALLER (this method just yields each piece), but tool_calls
+    // has no caller-visible per-fragment shape worth yielding (a partial
+    // JSON-argument string fragment means nothing on its own), so the
+    // assembly happens inside this method instead, surfaced once, whole,
+    // as the generator's own return value.
+    const toolCallsByIndex = new Map<number, { id: string; name: string; args: string }>();
+    const assembleToolCalls = (): ToolCallWire[] | undefined =>
+      toolCallsByIndex.size === 0
+        ? undefined
+        : [...toolCallsByIndex.entries()]
+            .sort(([a], [b]) => a - b)
+            .map(([, call]) => ({ id: call.id, type: "function" as const, function: { name: call.name, arguments: call.args } }));
     try {
       for await (const line of readTextLines(reader)) {
         armIdleTimer(); // real activity - push the deadline back out
@@ -222,7 +247,7 @@ export class LlamaServerClient {
           // reject, never worth surfacing over the real generation this
           // call already succeeded at.
           reader.cancel().catch(() => {});
-          return;
+          return assembleToolCalls();
         }
         if (!data) continue;
         let chunk: ChatCompletionChunk;
@@ -238,13 +263,22 @@ export class LlamaServerClient {
         // before the `?.` ever applied, killing the whole generation
         // instead of skipping the one frame, unlike the malformed-JSON
         // case two lines up, which already degrades gracefully.
-        const content = chunk.choices?.[0]?.delta?.content;
+        const delta = chunk.choices?.[0]?.delta;
+        const content = delta?.content;
         if (content) yield content;
+        for (const fragment of delta?.tool_calls ?? []) {
+          const existing = toolCallsByIndex.get(fragment.index) ?? { id: "", name: "", args: "" };
+          if (fragment.id) existing.id = fragment.id;
+          if (fragment.function?.name) existing.name = fragment.function.name;
+          if (fragment.function?.arguments) existing.args += fragment.function.arguments;
+          toolCallsByIndex.set(fragment.index, existing);
+        }
       }
     } catch (err) {
       throw new LlmClientError(`stream from ${this.baseUrl} broke`, err);
     } finally {
       clearTimeout(idleTimer);
     }
+    return assembleToolCalls(); // the stream ended without a [DONE] line (a clean close is still possible without it)
   }
 }

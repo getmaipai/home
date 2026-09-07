@@ -9316,6 +9316,173 @@ from this incident answered by the model itself, with the `[turn]` line
 showing no tool offered for turns 2 and 3 and no call chosen for any of
 them.
 
+**Fix E as built (2026-09-07): shipped per plan, with one real design
+decision made along the way and one significant streaming-path
+divergence the plan's own words didn't anticipate.**
+
+Before writing any code, the whole mechanism was proven live against the
+household's own already-running chat engine (curl, both `stream: false`
+and `stream: true`, single and multi-tool-call requests) - real,
+measured wire shapes, not assumed from documentation:
+non-streaming gives `message.tool_calls: [{ id, type: "function",
+function: { name, arguments } }]` with `finish_reason: "tool_calls"` and
+empty `content`; streaming gives the identical shape fragmented per
+`delta.tool_calls[].index` (`id`/`function.name` once, `function.
+arguments` in pieces), `content` staying null/empty throughout. This
+confirmed two things before any risk was taken: the pinned engine binary
+supports native tool calling with zero flag changes (`--jinja` was
+already its own default - `--jinja, --no-jinja ... (default: enabled)`
+in its own `--help`), and a tool-calling reply never interleaves real
+prose with a tool decision, which is what makes E3's streaming design
+below sound.
+
+E1/E2 shipped exactly as planned: `spec/llm/ts/types.ts` gained
+`ToolDefinition`/`ToolCallWire`/`ToolCallDelta` and the request/message/
+chunk-delta fields; `client.ts`'s `chatCompleteStream()` accumulates
+`delta.tool_calls` fragments per index and returns the assembled
+`ToolCallWire[]` (or `undefined`) as the generator's own return value;
+`stubServer.ts` gained `scriptedToolCalls` (checked before
+`scriptedChatReply`) so every test stays offline, fragmenting each
+scripted call across two chunks (id+name, then the whole arguments
+string) so a test genuinely exercises the accumulation, not just hands
+it something pre-assembled. `engineAutotune.ts` passes `--jinja`
+explicitly. `enginePostLoadCheck.ts` sends one canned `tool_choice:
+"required"` request and records `toolCallingOk` - **one real design
+decision, asked of Jesse rather than assumed**: the plan's own words
+("caught at spawn") read as a hard gate, but this check runs on every
+real household spawn, not just a catalog-curation pass, and the
+catalog has exactly one real chat model today; failing the WHOLE spawn
+over a Tier 2-only capability gap would mean a household loses chat
+entirely because tool calling specifically didn't work. Jesse's call,
+2026-09-07: warning only, chat unaffected - matches this same file's
+own existing drift-check precedent for a lesser mismatch. Proven with a
+real stub-backed test (`tests/enginePostLoadCheck.test.ts`, new), not
+just read.
+
+E3 is where the plan's own prose ("the same completion call... `tools`
+is `ranked.slice(...)`... `runTurn()` and `runTurnStream()` pass
+`tools`... when the stream returns `tool_calls`...") undersold how much
+the STREAMING half actually needed, because a stream is not a value you
+can inspect before deciding what to do with it - by the time you know
+whether the model called a tool, you've already started receiving
+bytes. The design that emerged, not written down anywhere before this
+pass: `runTurnStream()` starts the completion exactly like today, then
+peeks its very first real step with one manual `.next()` call (never
+`for await`, which would commit to treating everything as text). Since
+a tool-calling reply's `content` stays empty throughout (proven live,
+above), that peek resolves as `{ done: true, value: ToolCall[] }`
+immediately for a tool call, or `{ done: false, value: "first real
+text" }` for an ordinary reply - the household never sees a "thinking"
+indicator for a turn about to answer as a plugin instead. A real text
+first step is replayed (`yield firstText; return yield* rest;`) into
+the SAME `gateGuards()`/`gateOutputSafety()` pipeline every reply
+already goes through, unchanged; the pipeline's own generic input type
+just widened from `AsyncGenerator<string, void, void>` to
+`AsyncGenerator<string, ToolCall[] | undefined, void>` (a `for await`
+loop already discards a wrapped generator's return value, so this cost
+zero behavior change, only a type annotation). `resolveToolCalls()` (the
+old `attemptTier2Tools()`, its own up-front `complete()` call deleted -
+Fix E's whole point) now takes the model's ALREADY-DECIDED `ToolCall[]`
+directly and additionally drops any call naming a tool that wasn't
+actually offered (not present in `ranked`) - the one thing the old
+function's own header called out ("never trusts the grammar blindly")
+that still has a real native-tool-calling equivalent worth keeping: a
+model can still hallucinate a name, even one it was never offered.
+Every proposed call failing (bad args, a real runtime error, or an
+un-offered name) still falls through to a second, genuinely separate
+completion without `tools` - the exact "ask again, never a silent drop"
+contract, now literally two round trips only in that one specific
+failure case, never on the ordinary path.
+
+`routing.tier` gained `"tool"` (additive: `backend/src/wire.ts`,
+`conversationHistory.ts`'s `routingStats()` pluginTierCounts, this
+file's own `TurnLogRecord`) - a real Tier 2 native call is its own
+routing kind, distinct from "embedding" (a Tier 0/1 cosine winner, never
+a model decision).
+
+E4: `tests/tier2.test.ts` rewritten - `resolveToolCalls()`'s own tests
+need no stub at all anymore (it takes `ToolCall[]` directly), and four
+new `runTurn()`/`runTurnStream()` integration tests prove the WHOLE
+mechanism end to end through the stub's `scriptedToolCalls`, including
+one real bug caught while writing them: an utterance starting with
+"remember" wins Tier 0's own literal `"remember *"` pattern outright,
+so the FIRST draft of these tests "passed" while actually exercising
+the wrong code path entirely (a Tier 0 pattern win, not Tier 2 native
+tool calling) - caught by adding a `routing.tier === "tool"` assertion
+(only `resolveToolCalls()` ever sets it) and rephrasing every test
+utterance to not start with the trigger word. `tests/toolCallCorpus.test.ts`
+rewritten against `scriptedToolCalls`, covering the corpus's own
+positive (multi-call) rows only - a negative row scripted to return no
+calls would trivially pass regardless of whether the real accumulation
+plumbing works, so those stay the real bench's job. `tests/llm.test.ts`'s
+own "complete() with tools" and "startCompleteStream()" suites rewritten
+for the native shape, including a real proof the streaming `yield*`
+delegation chain actually propagates a return value (an easy seam to
+silently break: a `for await` loop over the inner generator would
+discard it with no test failure to catch it).
+
+`scripts/bench/tool-calling.ts` needed no logic changes - `complete()`'s
+own `tools`/`tool_choice` surface stayed identical, only the mechanism
+underneath it did - but a code review caught the script's own hardcoded
+tool descriptions had drifted from the real bundled manifests (`recall`'s
+real description is "Tells you what it remembers about something you
+ask," not the paraphrase "recall what's known about a topic" this
+script had been saying), which the script's own header comment already
+promised not to do. Fixed to load real manifests via `loadManifestOnly()`.
+Also extended to run `MAIPAI_BENCH_REPEATS` (default 5) repeats per row
+and report a real false-call rate on the negative rows specifically,
+per this fix's own exit criterion.
+
+**Measured against the real engine, live** (`MAIPAI_LLAMA_SERVER_URL`
+pointed at the household's own already-running chat engine, port 8788 -
+never spawned a second one, which would have called `freePort()` against
+the exact live process this whole incident write-up is about protecting):
+before the manifest-description fix, 5/25 (20.0%) false-call rate on the
+corpus's negative rows, entirely from one row - "what's the latest
+Stephen king novel" called `recall` 5/5 times, the bench's own paraphrased
+description ("recall what's known about a topic") reading to the model
+as a green light for a general-knowledge question. After the fix (the
+real manifest description instead): **40/40 (100%) across all 8 rows,
+5 repeats each, 0% false-call rate** - including "should I dye my hair
+black," the exact utterance this whole incident started from (the old
+grammar mechanism picked `music` for it; native tool calling correctly
+proposes nothing, every one of 5 repeats). Well under the fix's own 2%
+bar, so no further corpus/floor tuning was needed.
+
+Then verified one more level up, past what any bench measures: a live,
+isolated-DB (never the real household's `hub.db`) script drove the real
+`runTurn()`/`runTurnStream()` functions themselves against the real
+engine. "What's the latest stephen king novel" answered as `source:
+"model"`, no plugin, no fabricated tool call. "Friday is pizza night,
+please remember" scored 0.727 against `remember` (matching the bench's
+own number for the same utterance), got offered as a Tier 2 tool,
+the model natively chose to call it, `remember`'s real recipe actually
+ran (a real row written, confirmed in the `[turn]` log), and the turn
+came back `source: "plugin", routing: { tier: "tool" }` - proof the
+peek/replay streaming design, `resolveToolCalls()`, and the whole
+prepareTurn()-to-finalize() chain work correctly against a real model,
+not just a scripted one.
+
+Not done, stated: `docs/BACKLOG.md`'s Tier 2 items still need their own
+pass marking this shipped (tracked there, not restated here).
+
+**Post-implementation code review, 2026-09-07, before landing:** one
+real correctness bug found and fixed - `resolveToolCalls()` validated a
+proposed call's id against the full `ranked` list (every Tier 1
+candidate) rather than the actually-offered subset (`prepared.tools`),
+so a call naming a real but never-offered candidate passed and ran.
+Fixed by threading the offered id set through explicitly; a new
+regression test confirmed to fail without the fix. Five smaller findings
+also fixed (parallelizing `enginePostLoadCheck.ts`'s two independent
+completion calls, explicit `tools`-over-`response_format` precedence,
+the bench's `MAIPAI_BENCH_REPEATS` NaN handling, a wire.ts doc
+correction, a loud log instead of a silent drop for the
+never-observed-but-not-impossible "text then a tool call" streaming
+edge case). One finding filed as its own follow-up rather than fixed
+here (a pre-existing pattern Fix E only added a 4th value to, not
+something this fix introduced): the routing-tier union duplicated
+inline across three files instead of one shared type - `docs/BACKLOG.md`.
+
 ### What was actually killing the chat engine (found 2026-09-07, 04:30)
 
 The self-heal commit earlier the same night (`8b6caa9`, llm.ts's

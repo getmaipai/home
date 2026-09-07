@@ -212,3 +212,32 @@ still open:
   only ever runs because a signed-in owner/admin clicked "Use this" (or,
   this session, because Jesse explicitly authorized autonomous
   verification overnight - see docs/dev.md).
+
+## Tools: real, native, both request shapes (2026-09-07, Fix E)
+
+The "non-streaming only... none of tools" line near the top of this file
+is now historical, not current: Fix E (docs/dev.md's "Chat reliability:
+the 2026-09-07 incident and the five fixes") added `types.ts`'s
+`ToolDefinition`/`ToolCallWire`/`ToolCallDelta` and `ChatCompletionRequest`'s
+`tools`/`tool_choice`, matching llama-server's own OpenAI-compatible
+function-calling shape exactly - confirmed live against a real spawn
+(the pinned b10797 binary, Qwen3 8B Instruct) for both request shapes:
+`chatComplete()`'s `message.tool_calls` and `chatCompleteStream()`'s
+per-index `delta.tool_calls` fragments, concatenated and returned as the
+streaming generator's own return value once the reply ends (`content`
+stays empty/null throughout a tool-calling reply - never interleaved
+with real prose in any of the requests this pass sent). No JSON-schema/
+grammar mechanism was needed for this: `--jinja` (`engineAutotune.ts`,
+`launchFlagsToArgs()`) is what makes llama-server parse Qwen3's own
+Hermes-style tool-call format through its chat template - already the
+pinned binary's own default, passed explicitly here so a spawn never
+silently depends on that default surviving a future upgrade.
+`backend/src/lib/llm.ts`'s `complete()`/`startCompleteStream()` are the
+real consumers; `backend/src/lib/turnEngine.ts`'s `resolveToolCalls()`
+(the old grammar-era `attemptTier2Tools()`, rewritten) runs whatever the
+model natively decided.
+
+The grammar-based mechanism this replaced (a JSON-array `response_format`
+this file never actually documented, since it was Tier 2's own construct
+in `llm.ts`, not part of this wire contract) is gone entirely - deleted,
+not deprecated.

@@ -1101,7 +1101,7 @@ export function routingStats(): RoutingStats {
   let model = 0;
   let safetyRefuse = 0;
   const pluginCounts = new Map<string, number>();
-  const pluginTierCounts = new Map<string, { pattern: number; embedding: number; keyword: number }>();
+  const pluginTierCounts = new Map<string, { pattern: number; embedding: number; keyword: number; tool: number }>();
   const pluginScoreSums = new Map<string, { sum: number; n: number }>();
   const commandCounts = new Map<string, number>();
 
@@ -1111,8 +1111,8 @@ export function routingStats(): RoutingStats {
         plugin++;
         if (row.pluginId) {
           pluginCounts.set(row.pluginId, (pluginCounts.get(row.pluginId) ?? 0) + 1);
-          if (row.routingTier === "pattern" || row.routingTier === "embedding" || row.routingTier === "keyword") {
-            const tiers = pluginTierCounts.get(row.pluginId) ?? { pattern: 0, embedding: 0, keyword: 0 };
+          if (row.routingTier === "pattern" || row.routingTier === "embedding" || row.routingTier === "keyword" || row.routingTier === "tool") {
+            const tiers = pluginTierCounts.get(row.pluginId) ?? { pattern: 0, embedding: 0, keyword: 0, tool: 0 };
             tiers[row.routingTier]++;
             pluginTierCounts.set(row.pluginId, tiers);
           }
@@ -1150,7 +1150,7 @@ export function routingStats(): RoutingStats {
       return {
         pluginId,
         count,
-        tier: pluginTierCounts.get(pluginId) ?? { pattern: 0, embedding: 0, keyword: 0 },
+        tier: pluginTierCounts.get(pluginId) ?? { pattern: 0, embedding: 0, keyword: 0, tool: 0 },
         avgScore: agg ? agg.sum / agg.n : null,
       };
     })

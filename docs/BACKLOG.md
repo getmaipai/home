@@ -577,29 +577,112 @@ verified against D's numbers.
       removes an example from a fixture manifest, calls
       `ensureRoutingEmbeddings()` again, and asserts the old row is gone
       from the table.
-- [ ] **Fix E: native tool calling, one round trip** (M-L) - objective:
-      the model is offered the top candidates through llama-server's own
-      `tools`/`tool_choice` (spawned with `--jinja`) and either answers in
-      text or calls, in one request; the grammar-forced JSON array and
-      its separate `complete()` call are deleted. Spec first:
-      `spec/llm/ts/types.ts` (`ToolDefinition`, `tools`, `tool_choice`,
-      `tool_calls` on message and chunk delta, `finish_reason:
-      "tool_calls"`), `spec/llm/ts/client.ts` (`chatCompleteStream()`
-      returns `{ tool_calls }` as its generator return value),
-      `spec/llm/ts/stubServer.ts` (scripted `tool_calls`). Then
-      `backend/src/lib/engineAutotune.ts` (`--jinja`),
-      `backend/src/lib/enginePostLoadCheck.ts` (one canned tools request
-      asserted at spawn), `backend/src/lib/llm.ts` (delete
-      `toolCallSchema`/`parseToolCalls`), `backend/src/lib/turnEngine.ts`
-      (`prepareTurn()` returns `tools`; the consequential-confirmation and
-      `PendingAsk` code moves out of `attemptTier2Tools()` into a function
-      over `ToolCall[]`; `routing.tier: "tool"`, additive). Mirror:
-      `tests/tier2.test.ts`, `tests/toolCallCorpus.test.ts`, rewritten
-      against the stub. Acceptance: the four incident messages answered by
-      the model with no call chosen; bench false-call rate recorded, and
-      if above 2 percent the fix is the floor or the corpus, never the
-      grammar. Out of scope: a second completion to phrase a tool result;
-      any agent loop. Exit: `scripts/check.sh` plus the tool-calling bench.
+- [x] **Fix E: native tool calling, one round trip** (M-L) - shipped
+      2026-09-07. Built per plan: `spec/llm/ts/types.ts` gained
+      `ToolDefinition`/`ToolCallWire`/`ToolCallDelta` and the request/
+      message/chunk-delta fields; `client.ts`'s `chatCompleteStream()`
+      accumulates `delta.tool_calls` per index and returns the assembled
+      calls as its own generator return value; `stubServer.ts` gained
+      `scriptedToolCalls`; `engineAutotune.ts` passes `--jinja` explicitly
+      (already the pinned binary's own default, confirmed live);
+      `llm.ts`'s `complete()`/`startCompleteStream()` use native
+      `tools`/`tool_choice` end to end, `toolCallSchema()`/
+      `parseToolCalls()` deleted; `turnEngine.ts`'s `resolveToolCalls()`
+      (renamed from `attemptTier2Tools()`, its own separate `complete()`
+      call deleted) takes the model's already-decided `ToolCall[]`
+      directly; `routing.tier` gained `"tool"` (additive, wire.ts +
+      `routingStats()`). One real design decision asked of Jesse rather
+      than assumed: `enginePostLoadCheck.ts`'s own tool-calling check
+      warns (`toolCallingOk`), never hard-fails the spawn - it runs on
+      every real household spawn, not just catalog curation, and the
+      plan's literal "caught at spawn" wording would have blocked chat
+      entirely over a Tier 2-only gap. One real streaming-path design the
+      plan's own prose didn't spell out: `runTurnStream()` peeks the
+      completion's first real step with one manual `.next()` (a
+      tool-calling reply's `content` stays empty throughout, confirmed
+      live) rather than blindly streaming, so the household never sees a
+      typing indicator for a turn about to answer as a plugin instead; a
+      real first text step is replayed into the SAME
+      `gateGuards()`/`gateOutputSafety()` pipeline unchanged. Full "as
+      built" writeup, including the exact live-verified wire shapes and
+      the peek/replay design, in `docs/dev.md`'s Fix E section.
+      **Measured, not assumed** (`scripts/bench/tool-calling.ts`, real
+      engine, `MAIPAI_LLAMA_SERVER_URL` pointed at the household's own
+      already-running process - never spawned a second one): 40/40
+      (100%) across all 8 corpus rows, 5 repeats each, 0% false-call rate,
+      well under the 2% bar - including "should I dye my hair black," the
+      exact utterance that started this whole incident (the old grammar
+      mechanism picked `music`; native tool calling correctly proposes
+      nothing, 5/5). One real bug the bench itself had, caught along the
+      way: its own hardcoded tool descriptions had drifted from the real
+      bundled manifests, which single-handedly produced a 20% false-call
+      rate on one row before the fix (a paraphrased "recall what's known
+      about a topic" reading as a green light for a general-knowledge
+      question) - fixed to load real manifests via `loadManifestOnly()`.
+      Verified past what any bench measures too: a live, isolated-DB
+      script drove `runTurn()`/`runTurnStream()` themselves against the
+      real engine - a natural question answered with no call, and
+      "Friday is pizza night, please remember" was offered as a tool,
+      natively called, and `remember`'s real recipe actually ran (a real
+      row written, confirmed in the `[turn]` log). `tests/tier2.test.ts`/
+      `tests/toolCallCorpus.test.ts`/`tests/llm.test.ts` all rewritten
+      against the native shape - one real test-quality bug caught while
+      writing the new `tier2.test.ts` integration cases: an utterance
+      starting with "remember" wins Tier 0's own literal pattern outright,
+      so a first draft of "prove native tool calling runs the package"
+      silently exercised the WRONG code path and still passed; fixed with
+      a `routing.tier === "tool"` assertion (the one signal only
+      `resolveToolCalls()` sets) plus rephrased utterances. Out of scope,
+      unchanged from the plan: a second completion to phrase a tool
+      result in the persona's voice; any agent loop.
+
+      Code review (2026-09-07), fixed before landing: **a real
+      correctness bug** - `resolveToolCalls()` validated a proposed
+      call's id against the full `ranked` (every Tier 1 candidate)
+      instead of the actually-offered subset (`prepared.tools`, capped
+      at `MAX_TIER2_TOOLS_OFFERED`), so a call naming a real but
+      un-offered candidate passed and ran - including reaching the
+      confirm gate for a `consequential` package the model was never
+      shown. Fixed by passing the offered id set explicitly; proven with
+      a new regression test, confirmed to fail without the fix. Also
+      fixed: `enginePostLoadCheck.ts`'s two independent completion calls
+      now run via `Promise.all` instead of serially (roughly halves the
+      added spawn latency); `complete()`/`startCompleteStream()` now
+      explicitly null out a caller-supplied `response_format` whenever
+      `tools` is offered, instead of relying only on a comment for a
+      combination no real caller makes today;
+      `scripts/bench/tool-calling.ts`'s `MAIPAI_BENCH_REPEATS` override
+      falls back to the real default on an invalid (NaN) value instead
+      of silently running zero repeats and reporting a false "0/0 (0.0%)"
+      pass; `wire.ts`'s own doc comment corrected (`routing.score` for
+      `tier: "tool"` is the pre-existing Tier 1 ranking score, not a
+      measure of the model's own confidence, which nothing here
+      measures); `runTurnStream()`'s `replay()` (the documented, tested,
+      currently-never-observed edge case of a streamed reply pivoting
+      from real text into a tool call partway through) now logs loudly
+      if that ever actually happens instead of silently dropping the
+      call, rather than the full return-value re-threading a real fix
+      would need for a case never yet observed. Not fixed, filed below:
+      the `"pattern" | "embedding" | "keyword" | "tool"` routing-tier
+      union is a pre-existing duplicated inline literal across three
+      files (Fix E only added the 4th value to an already-3x-duplicated
+      pattern), a genuine but separate consolidation task.
+- [ ] **One named, exported `RoutingTier` type, instead of the same
+      inline union duplicated three times** (S) - found by a Fix E code
+      review, 2026-09-07 (not introduced by it - the pattern predates
+      Fix E, which just added a 4th value to it). `backend/src/wire.ts`'s
+      `TurnValue.routing.tier`, `turnEngine.ts`'s `TurnLogRecord.routing.
+      tier`, and `conversationHistory.ts`'s `pluginTierCounts`/`RoutingStats.
+      byPlugin[].tier` object shape are three independent, hand-kept
+      copies of `"pattern" | "embedding" | "keyword" | "tool"` - adding a
+      routing tier means finding and editing all three by hand, and a
+      missed one is a silent type mismatch or a routingStats() bucket
+      that quietly drops the new tier's counts. Objective: one exported
+      `RoutingTier` type (`backend/src/lib/routing.ts` is the natural
+      home - it's not a wire/spec type, so `wire.ts` doesn't need to be
+      the source), imported everywhere the union is checked today. Exit:
+      `scripts/check.sh`; a test proving the compiler catches a routing
+      tier used somewhere that doesn't import the shared type.
 - [ ] Real multi-source, multi-skill answers (L) - see `docs/dev.md`'s
       2026-09-04 tier 2 note and the 2026-09-05 stress-test against it.
       Explicitly NOT an open agentic loop by design; the current best

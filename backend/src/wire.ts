@@ -60,9 +60,13 @@ export interface TurnValue {
   /** Session C step 1: only present for `source: "plugin"` - which tier
    * of route()'s decision fired it and its own score (1.0 for
    * "pattern"; the real cosine, or the keyword-overlap fallback score,
-   * for "embedding"/"keyword"). conversationHistory.ts's routingStats()
-   * aggregates this from the logged turn, not from here directly. */
-  routing?: { tier: "pattern" | "embedding" | "keyword"; score: number };
+   * for "embedding"/"keyword"; for "tool" - Fix E, native tool calling -
+   * the SAME Tier 1 ranking score `resolveToolCalls()` looked up for the
+   * called candidate, not a measure of the model's own confidence in its
+   * choice, which nothing here measures). conversationHistory.ts's
+   * routingStats() aggregates this from the logged turn, not from here
+   * directly. */
+  routing?: { tier: "pattern" | "embedding" | "keyword" | "tool"; score: number };
 }
 
 export type ConversationTurnRow = typeof conversationTurns.$inferSelect;

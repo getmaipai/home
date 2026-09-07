@@ -88,4 +88,13 @@ describe("launchFlagsToArgs", () => {
     const full = launchFlagsToArgs(resolveLaunchFlags(qwen3_8b, hw({}), { kvCache: "full" }));
     expect(full).not.toContain("-ctk");
   });
+
+  // Fix E (docs/dev.md's "Chat reliability" - native tool calling): every
+  // spawn passes --jinja explicitly, never left to the binary's own
+  // default - llama-server parses Qwen3's Hermes-style tool calls only
+  // through its Jinja chat template.
+  test("always passes --jinja, for the chat template's own tool-call parsing", () => {
+    const args = launchFlagsToArgs(resolveLaunchFlags(qwen3_8b, hw({})));
+    expect(args).toContain("--jinja");
+  });
 });
