@@ -344,7 +344,7 @@ function ChatModelCard({
         </div>
 
         {isSelected && (isRunning || isStopped || isStarting) ? (
-          <div className="flex gap-2">
+          <div className="flex items-center gap-2">
             {isRunning ? (
               <>
                 <Button variant="secondary" onClick={onRestart}>Restart</Button>
@@ -353,7 +353,17 @@ function ChatModelCard({
             ) : isStopped ? (
               <Button variant="secondary" onClick={onRestart}>Start</Button>
             ) : (
-              <Progress mode="spinner" label="Starting…" />
+              // Found live 2026-09-06: "starting" had no way out - a
+              // household member watching a spinner with no escape hatch
+              // if it never resolves (a hung spawn, an interrupted
+              // hot-reload mid-start on a dev box). Stop is always safe to
+              // call here: stopChatBackend() unconditionally clears
+              // startingPromise, so it abandons a stuck attempt exactly
+              // the same way it stops a healthy running one.
+              <>
+                <Progress mode="spinner" label="Starting…" />
+                <Button variant="ghost" onClick={onStop}>Stop</Button>
+              </>
             )}
           </div>
         ) : null}

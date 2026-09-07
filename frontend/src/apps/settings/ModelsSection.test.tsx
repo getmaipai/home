@@ -154,6 +154,38 @@ describe("ModelsSection", () => {
     }
   });
 
+  // Found live 2026-09-06: "starting" had no way out - just a bare
+  // spinner, no button - so a household member watching a hung spawn
+  // (a dev-box hot-reload interrupting an in-flight start, in this case)
+  // had no recourse but to wait indefinitely. Stop is safe to offer here:
+  // stopChatBackend() unconditionally clears the in-flight promise, the
+  // same way it stops an already-running one.
+  test("a stuck 'starting' state still offers Stop, not just a bare spinner", async () => {
+    const restore = stubFetch({
+      "/api/host/hardware": HARDWARE,
+      "role=chat": [chatFit({ fits: true })],
+      "role=image": [],
+      "role=video": [],
+      "/models/selection": { modelId: "qwen3-8b-instruct-q4-k-m" },
+      "/engine/status": { kind: "starting", modelId: null, pid: null, startedAt: null },
+      "/engine/stop": { kind: "stopped", modelId: "qwen3-8b-instruct-q4-k-m", pid: null, startedAt: null },
+    });
+    try {
+      // "Starting…" legitimately appears twice (a status badge above,
+      // the spinner's own label below) - findAllByText, not findByText,
+      // avoids the ambiguous-match error that shape causes.
+      const { findAllByText, findByText, getByText } = render(<ModelsSection />);
+      await findAllByText("Starting…");
+      await findByText("Stop");
+      await act(async () => {
+        fireEvent.click(getByText("Stop"));
+      });
+      await findByText("Stopped");
+    } finally {
+      restore();
+    }
+  });
+
   test("a planned role (image/video) with no real backend yet is one honest line, not a pros/cons dump", async () => {
     const restore = stubFetch({
       "/api/host/hardware": HARDWARE,
