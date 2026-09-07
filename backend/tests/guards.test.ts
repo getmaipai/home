@@ -86,6 +86,48 @@ describe("near-echo (social.py's own bench case: 'I play it on the ps5' -> 'Okay
   });
 });
 
+describe("near-echo does not fire on a plain greeting reciprocation (Jesse, live-found 2026-09-07)", () => {
+  test("'good morning' answered 'Good morning!' is not a stall", () => {
+    const g = guardReply("Good morning!", ctx({ utterance: "good morning" }));
+    expect(g.reason).toBeNull();
+  });
+
+  // Each pair below fully echoes the utterance's own (post-stopword)
+  // word pool, so without the fix every one of these is genuinely
+  // flagged near_echo - not just trivially null via the pre-existing
+  // `words.length < 2` short-circuit, which a code review (2026-09-07)
+  // found the original single-word forms ("Morning!", "Hey!") were
+  // quietly passing through regardless of whether the fix was even
+  // present.
+  test("other greeting shapes ('hi there', 'hey there', 'good night') are exempted the same way", () => {
+    expect(guardReply("Hi there!", ctx({ utterance: "hi there" })).reason).toBeNull();
+    expect(guardReply("Hey there!", ctx({ utterance: "hey there" })).reason).toBeNull();
+    expect(guardReply("Good night!", ctx({ utterance: "good night" })).reason).toBeNull();
+  });
+
+  // The everyday compound case a code review (2026-09-07) found still
+  // broken in the first cut of this fix: the utterance carries MORE
+  // than just the greeting, but "how are you"/"are"/"you" are all
+  // stopwords, so the reply's own bare "Good morning!" still fully
+  // echoes what's left of the utterance's word pool once they're
+  // dropped - genuinely flagged without the fix, same as the plain
+  // "good morning" case above.
+  test("a greeting stitched onto a real follow-on question still gets its reciprocation through - 'good morning, how are you'", () => {
+    const g = guardReply("Good morning!", ctx({ utterance: "good morning, how are you" }));
+    expect(g.reason).toBeNull();
+  });
+
+  test("a greeting stitched onto an unrelated statement doesn't smuggle in the exemption - the REPLY has to be a bare reciprocation, not just the utterance a greeting", () => {
+    const g = guardReply("Okay, playing it on the ps5.", ctx({ utterance: "good morning, I play it on the ps5" }));
+    expect(g.reason).toBe("near_echo");
+  });
+
+  test("the ps5 bench case is still caught - the exemption is scoped to greetings, not to every short utterance", () => {
+    const g = guardReply("Okay, playing it on the ps5.", ctx({ utterance: "I play it on the ps5" }));
+    expect(g.reason).toBe("near_echo");
+  });
+});
+
 describe("medication doses: never stated as a number", () => {
   test("a numeric dose is flagged, tight-written ('400mg')", () => {
     const g = guardReply("You could take 400mg of ibuprofen.", ctx({ utterance: "how much ibuprofen can I take" }));

@@ -9568,6 +9568,65 @@ real pipeline, not hypothetical; and a full production-path test
 event's own final text is a closed sentence. All three confirmed to
 fail without the fix.
 
+### near_echo false-flagged plain greetings (self-found while wrapping up, 2026-09-07)
+
+Found while doing final live verification of the two fixes above, not
+from a Jesse report this time: "good morning" got `near_echo`-guarded
+into "I don't know, sorry." Confirmed pre-existing via `git stash`/`git
+stash pop` against the last committed state (`a7df33c`) - unrelated to
+either fix above, just never noticed until this session's live testing
+got this thorough.
+
+Root cause: `guardNearEcho()` (`guards.ts`, ported from bot-legacy's
+`social.py` bench case "I play it on the ps5" -> "Okay, playing it on
+the ps5.") flags a reply when every one of its words already appears in
+the utterance - the right test for "the model just parroted the claim
+back instead of answering," but a correct greeting reciprocation IS
+exactly that: the utterance "good morning" has a two-word vocabulary, so
+almost any short, natural reply to it ("Good morning!") trivially draws
+every word from that same tiny pool. The check has no way to tell a
+stall from the one utterance shape where echoing the words back is
+genuinely the right thing to say.
+
+Fixed with a short, bounded, well-known greeting vocabulary (good
+morning/afternoon/evening/night, hello, hi, hey, howdy, greetings, yo,
+what's up) - matching `ACK_LEAD_RE`'s own precedent two lines above it
+(a small enumerable set, not an open-ended semantic judgment), split
+into two regexes: `GREETING_ONLY_RE` (anchored both ends, allowing a
+"there"/"to you"/"too" tail) checks whether the REPLY's own sentence is
+nothing but a bare reciprocation; `GREETING_ANYWHERE_RE` (unanchored)
+checks whether the utterance carries a greeting anywhere in it.
+
+A code review (2026-09-07) caught the first cut wrong before it landed:
+it anchored the exemption to the WHOLE utterance being nothing but the
+greeting, which missed the everyday compound case "good morning, how
+are you" -> "Good morning!" (still flagged - "how"/"are"/"you" are all
+stopwords, so the leftover pool is just "good"/"morning" and the
+original mechanism flags it exactly like the plain case). The two-regex
+split fixes that: the reply's own bare reciprocation is what actually
+needs checking, not the utterance's total content. The review also
+caught two of the five original tests silently passing whether or not
+the fix was even present ("Morning!" and "Hey!" alone tokenize to a
+single word, so they'd already return early via the checker's
+pre-existing `words.length < 2` guard, fix or no fix) - replaced with
+"hi there"/"hey there" pairs that fully echo their own utterance and so
+are genuinely caught without the fix. The ps5 bench case, and a real
+echo stitched onto a greeting-carrying utterance ("good morning, I play
+it on the ps5" -> "Okay, playing it on the ps5."), both stay caught:
+neither reply is a bare greeting reciprocation itself.
+
+Proven with six tests in `guards.test.ts`: the exact live-found case,
+two 2-word greeting-pair shapes ("hi there"/"hey there") plus "good
+night", the compound-utterance case the review caught, the mixed-
+utterance non-exemption case, and a re-assertion of the original ps5
+bench case - all six confirmed to fail without the fix via a stash/
+restore cycle (including, this time, the compound-utterance case,
+proving it's a real regression and not just defensive test coverage),
+and the full `bun test` suite (1778 pass, one flake in
+`backup.test.ts`'s GCM auth-tag restore test that passes clean when run
+alone - a shared-state flake with zero connection to `guards.ts`, not a
+regression from this change) and `tsc --noEmit` both clean afterward.
+
 ### What was actually killing the chat engine (found 2026-09-07, 04:30)
 
 The self-heal commit earlier the same night (`8b6caa9`, llm.ts's

@@ -314,6 +314,22 @@ frequently a hard prerequisite, not just a preference.
       (`turnEngine.ts`) closes it into a real sentence, scoped to exactly
       that cause (a real guard cut happened this turn). Full writeup in
       `docs/dev.md`.
+- [x] **near_echo false-flagged plain greetings** - self-found while
+      wrapping up the websearch/comma fixes above, 2026-09-07, pre-
+      existing (confirmed via `git stash` against `a7df33c`, unrelated to
+      either fix): a plain "good morning" got `near_echo`-guarded into "I
+      don't know, sorry." `guardNearEcho()` (`guards.ts`) now exempts a
+      reply that's a bare greeting reciprocation ("Good morning!", "Hi
+      there!") when the utterance carries a greeting anywhere in it -
+      echoing a greeting back is the correct answer, not a stall. Caught
+      and fixed in two passes: the first cut anchored the exemption to the
+      whole utterance being nothing but the greeting, which a code review
+      found still missed the everyday compound case ("good morning, how
+      are you" -> "Good morning!"); the reply's own bare reciprocation is
+      the real signal, not the utterance's total content. The ps5 bench
+      case it was ported to protect stays caught, including inside a
+      greeting-carrying utterance ("good morning, I play it on the ps5" ->
+      "Okay, playing it on the ps5."). Full writeup in `docs/dev.md`.
 - [ ] Music / media search (S-M) - "what's this song," "who sings X,"
       show/movie info and availability. A pure lookup against a
       catalog/metadata API - explicitly NOT the same skill as playing

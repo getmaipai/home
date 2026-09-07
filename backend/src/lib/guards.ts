@@ -345,6 +345,37 @@ function guardUnrelatedRecall(sentence: string, ctx: GuardContext): GuardReason 
 
 const ACK_LEAD_RE = /^(?:okay|ok|alright|right|sure|yeah|yes|oh|ah|so|got it|nice|cool|mm-?hmm|mm)\b[\s,.!-]*/i;
 
+// Live-found 2026-09-07, Jesse: "good morning" -> "Good morning!" was
+// getting flagged near_echo too. The check below works by asking whether
+// every word of the reply's first sentence already appears in the
+// utterance - which is exactly what a correct greeting reciprocation
+// does (it's the same two or three words, on purpose), so a bare
+// greeting exchange leaves the check no way to tell "stalled, just
+// echoed the claim back" from "said good morning back, which is the
+// right thing to say." A greeting reciprocation is the one reply shape
+// where echoing the words back *is* the answer, so it's exempted here -
+// a short, bounded, well-known vocabulary (matching ACK_LEAD_RE's own
+// precedent just above), not an open-ended judgment call.
+//
+// A code review (2026-09-07) caught the first cut of this anchoring the
+// exemption to the WHOLE utterance being nothing but the greeting -
+// which missed the everyday compound case "good morning, how are you"
+// -> "Good morning!" (still flagged, since the utterance carries more
+// than just the greeting). The reply's OWN first sentence is what
+// actually needs to be a bare reciprocation (GREETING_ONLY_RE, anchored
+// both ends); the utterance only needs to contain a greeting somewhere
+// in it (GREETING_ANYWHERE_RE, unanchored) for that reciprocation to
+// make sense. This still leaves the ps5 bench case caught: its
+// utterance carries no greeting at all, so GREETING_ANYWHERE_RE never
+// matches. And it still leaves a REAL echo caught even inside a
+// greeting-carrying utterance ("good morning, I play it on the ps5" ->
+// "Okay, playing it on the ps5.") - that reply's own sentence isn't a
+// bare greeting, so GREETING_ONLY_RE doesn't match it either.
+const GREETING_ONLY_RE =
+  /^(?:(?:good\s+)?(?:morning|afternoon|evening|night)|hello|hi|hey|howdy|greetings|yo|what'?s up)\b(?:\s+(?:there|to you|too))*[\s!.,?]*$/i;
+const GREETING_ANYWHERE_RE =
+  /\b(?:good\s+(?:morning|afternoon|evening|night)|hello|hi|hey|howdy|greetings|yo|what'?s up)\b/i;
+
 function wordMatches(word: string, pool: readonly string[]): boolean {
   for (const other of pool) {
     if (word === other) return true;
@@ -356,6 +387,7 @@ function wordMatches(word: string, pool: readonly string[]): boolean {
 
 function guardNearEcho(sentence: string, ctx: GuardContext): GuardReason | null {
   const stripped = sentence.replace(ACK_LEAD_RE, "");
+  if (GREETING_ONLY_RE.test(stripped.trim()) && GREETING_ANYWHERE_RE.test(ctx.utterance)) return null;
   const words = [...tokenize(stripped)];
   const pool = [...tokenize(ctx.utterance)];
   if (words.length < 2 || pool.length === 0) return null;
