@@ -277,10 +277,11 @@ frequently a hard prerequisite, not just a preference.
 
 **Priority 1 - lookups (read-only, no external device/playback surface):**
 
-- [ ] Web search (S-M) - already decided as "permitted and required"
-      (`docs/dev.md`'s 2026-09-04 tier 2 note); the highest-value single
-      lookup missing, and the one most likely to replace a real fall-
-      through-to-model miss today.
+- [x] Web search (S-M) - shipped 2026-09-06 (`ff8585e`): `websearch`
+      package + SearXNG integration (`backend/src/lib/packageHost.ts`),
+      offered via Tier 1 routing and Tier 2 native tool-calling in
+      `turnEngine.ts`. Not yet verified against a real running SearXNG
+      instance (tests use a local mock server only).
 - [ ] Music / media search (S-M) - "what's this song," "who sings X,"
       show/movie info and availability. A pure lookup against a
       catalog/metadata API - explicitly NOT the same skill as playing
