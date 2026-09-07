@@ -10,6 +10,7 @@ import type {
   TurnValue,
   TurnStreamEvent,
   ConversationTurnRow,
+  ConversationTurnWithMemoryIds,
   ConversationSummary,
   ResolvedSetting,
   BackupInfo,
@@ -48,7 +49,7 @@ export type Role = Person["role"];
 // depends on @maipai/home-backend as a workspace package for this;
 // re-export the types here so the rest of the frontend imports from one
 // place.
-export type { Roster, TurnValue, TurnStreamEvent, ConversationTurnRow, ConversationSummary, ResolvedSetting, BackupInfo, HardwareInfo, ModelFit, ModelJob, EngineStatus, EngineStatsSample, ClonedVoiceInfo, RoutingStats, PrivacyConnection, PendingRestore, CommandRow, CommandAction, NotificationDeliveryView };
+export type { Roster, TurnValue, TurnStreamEvent, ConversationTurnRow, ConversationTurnWithMemoryIds, ConversationSummary, ResolvedSetting, BackupInfo, HardwareInfo, ModelFit, ModelJob, EngineStatus, EngineStatsSample, ClonedVoiceInfo, RoutingStats, PrivacyConnection, PendingRestore, CommandRow, CommandAction, NotificationDeliveryView };
 export type { MemoryRecord };
 export type { PackageManifest };
 export type { Issue };
@@ -305,7 +306,7 @@ export const api = {
   // call (and chatHistoryAdapter.ts's own ConversationTurnRow-shaped
   // read of it) was never updated - every Chat page load was fetching
   // the wrong shape and rendering undefined user/assistant text.
-  conversations: () => request<ConversationTurnRow[]>("/api/conversations/turns"),
+  conversations: () => request<ConversationTurnWithMemoryIds[]>("/api/conversations/turns"),
   // GET /api/conversations' real, current shape (the thread list) -
   // `person` for the parental view (an owner/admin listing a child's own
   // threads; the route's own list() enforces that access check server-

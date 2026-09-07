@@ -35,7 +35,7 @@ import {
   type PendingAsk,
 } from "@/lib/conversationHistory";
 import { pickRefusalVariant, varyKnownConstant } from "@/lib/replyVariation";
-import { markTurnStarted, DEFAULT_IDLE_WINDOW_MS } from "@/lib/turnActivity";
+import { markTurnStarted, markTurnFinished, DEFAULT_IDLE_WINDOW_MS } from "@/lib/turnActivity";
 import { normalizeForSpeech } from "@maipai/spec/voice/ts/normalizeForSpeech.js";
 import { nextSentenceBoundary } from "@maipai/spec/safety/ts/sentenceChunker.js";
 import { getPersonSettingValue, getHouseholdSettingValue } from "@/lib/settings";
@@ -1440,6 +1440,7 @@ export async function runTurn(
   } else {
     const completion = await complete("chat", prepared.messages, { thinking: opts.thinking });
     if (!completion.ok) {
+      markTurnFinished(); // getmaipai/home#63: prepareTurn() above already called markTurnStarted() - an engine-down failure is still a real, finished turn, not a leaked in-flight count
       return { ok: false, status: 503, code: "unavailable", error: completion.error };
     }
     // Step 9's own principle (spec/safety/ts/classifier.ts's promise to
@@ -1491,6 +1492,7 @@ export async function runTurn(
   }
 
   value = finalizeReply(actor, value);
+  markTurnFinished(); // getmaipai/home#63: the one match for prepareTurn()'s own markTurnStarted() on this function's normal, successful path
   logTurnSafely(actor, surface, text, value, { startedAt, guardHits });
   return { ok: true, value };
 }
@@ -1764,12 +1766,14 @@ export async function runTurnStream(
 
   if (prepared.kind === "immediate") {
     const value = finalizeReply(actor, prepared.value);
+    markTurnFinished(); // getmaipai/home#63: prepareTurn() above already called markTurnStarted(), even for a kind that never touches the chat engine
     logTurnSafely(actor, surface, text, value, { startedAt, guardHits: [] });
     return { ok: true, kind: "immediate", value };
   }
 
   const started = await startCompleteStream("chat", prepared.messages, { thinking: opts.thinking }, opts.signal);
   if (!started.ok) {
+    markTurnFinished(); // getmaipai/home#63: an engine-down failure here is still a real, finished turn, not a leaked in-flight count
     // Collapsed to "unavailable", the same as runTurn()'s own handling of
     // complete()'s failure: llm.ts's own "unsupported_role"/"invalid_input"
     // codes describe a role/messages problem this function's own prior
@@ -1829,6 +1833,15 @@ export async function runTurnStream(
         conversation_id: conversation.id,
         turn_id: prepared.turnId,
       });
+      // getmaipai/home#63: the real completion point for the streaming
+      // path - the one call site matching prepareTurn()'s own
+      // markTurnStarted() when the stream runs to a normal finish. A
+      // stream a client disconnects from before finalize() ever runs
+      // (routes/turn.ts's own ReadableStream.cancel()) leaks the
+      // in-flight count on THIS path specifically - turnActivity.ts's
+      // own MAX_TURN_DURATION_MS safety valve is what bounds that case,
+      // not a call here that would never run.
+      markTurnFinished();
       logTurnSafely(actor, surface, text, value, { startedAt, guardHits });
       return value;
     },

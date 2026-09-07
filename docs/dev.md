@@ -9100,3 +9100,58 @@ exclusion stands). No second completion to phrase a tool result in the
 persona's voice (the synthesis step the Tier 2 note defers; a package
 still answers the turn outright). No change to the memory or persona
 judges' grammar-constrained calls. No new logging framework.
+
+## Memory diagnosis and two fixes (2026-09-07, getmaipai/home#63/#64)
+
+A separate diagnosis from the same night, run against this same dev
+hub: Jesse asked why memory wasn't working. The judge/embed/recall
+pipeline itself was verified working directly against the running
+engines (extraction returns correct facts in 2.5 to 3.5 s; recall
+cosines for related pairs land 0.58 to 0.72, above both floors), so the
+household's own database simply hadn't accumulated any durable facts
+yet. Two real bugs sat behind the *feeling* that memory was broken,
+both filed and fixed; full implementation detail lives in
+`docs/BACKLOG.md`'s "Memory in the chat UI" and latency-review entries,
+not repeated here.
+
+**#63: the judge contends with a live turn on the shared chat engine.**
+Direct measurement against the dev engine: a chat reply alone answers
+in 0.8 s; with one memory-judge extraction call running concurrently,
+2.8 s; with two, 4.5 s. `lib/turnActivity.ts`'s own idle gate
+(`turnActiveWithin()`) already existed for exactly this reason (a prior
+latency review), but checked only once at the top of a ten-turn batch,
+and measured "recently active" only from a turn's START, never its END
+- a reply that streamed past the 20 s window looked idle before it had
+even finished. Fixed by tracking turns actually in flight
+(`markTurnStarted()`/`markTurnFinished()`, a plain counter plus the
+real completion time), dropping `memoryJudge.ts`'s `MAX_TURNS_PER_RUN`
+from 10 to 1, re-checking before every fact's own embed/dedupe call
+inside `judgeTurn()` (not just once per batch), and sorting
+`reminders.fire`/`timers.fire` ahead of the memory jobs in the same
+scheduler tick (`scheduler.ts`'s `sortDueJobsForPriority()`). A turn
+interrupted mid-fact-loop is left unjudged for the next tick rather
+than marked done; anything it already wrote becomes a real dedupe
+candidate the resumed pass supersedes onto, never duplicates - proven
+directly in `tests/memoryJudge.test.ts`'s own interrupt-then-resume
+test. Deferred, not done here: a second, dedicated small model for
+extraction/dedupe so the judge never touches the chat engine's VRAM or
+slot at all (`docs/BACKLOG.md`'s own "memory judge on its own small
+model" item, already listed as future work by the earlier latency
+review).
+
+**#64: the chat's own "memory updated" chip had never once rendered.**
+It read a `memory.updated` notification's `payload.turn_id`/
+`memory_ids`, but `NotificationDeliveryView` (`backend/src/wire.ts`)
+has no `payload` field on `main` at all - the chip's own code comment
+already said as much ("today's honest state, where this chip never
+shows"). The real data was sitting one call away the whole time:
+`listConversationTurns()` already joined `memory_ids` per turn from
+`memory_records.source`; `list()` (the FLAT, cross-conversation route
+`chatHistoryAdapter.ts` actually loads through, confirmed by reading
+the adapter directly, not the per-conversation route the chip's own
+stale comment assumed) did not. Extracted the join into a shared
+`memoryIdsByTurn()` in `conversationHistory.ts`, used by both `list()`
+and `listConversationTurns()`; `chatHistoryAdapter.ts` puts the result
+on the assistant message's `metadata.custom.memoryIds`;
+`chatMemoryChip.tsx` reads it straight off the rendered message. No
+poll, no separate query, no notification payload ever needed.

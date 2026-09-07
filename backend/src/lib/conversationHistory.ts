@@ -402,6 +402,27 @@ export function getConversation(actor: PersonRow, id: string): ConversationOpRes
   return { ok: true, value: toConversationRecord(row) };
 }
 
+/** Every memory record whose provenance (memoryJudge.ts's and the
+ * `remember` package's own `source: turn.id`) names one of `turnIds`,
+ * batched in one query rather than one per turn - shared by
+ * `listConversationTurns()` and `list()` below so a turn's memory_ids are
+ * computed the identical way regardless of which list a client asked
+ * for (getmaipai/home#64: the chat memory chip reads whichever of these
+ * a given caller actually fetches). */
+function memoryIdsByTurn(turnIds: readonly string[]): Map<string, string[]> {
+  const memRows =
+    turnIds.length > 0
+      ? db.select({ id: memoryRecords.id, source: memoryRecords.source }).from(memoryRecords).where(inArray(memoryRecords.source, turnIds)).all()
+      : [];
+  const byTurn = new Map<string, string[]>();
+  for (const m of memRows) {
+    const ids = byTurn.get(m.source) ?? [];
+    ids.push(m.id);
+    byTurn.set(m.source, ids);
+  }
+  return byTurn;
+}
+
 /** GET /api/conversations/:id/turns?since=<turn_id> (step 3's contract):
  * oldest first, each with `memory_ids` - every memory record whose
  * provenance (step 2's `source` field) names this exact turn, batched in
@@ -447,17 +468,7 @@ export function listConversationTurns(
     if (idx >= 0) rows = rows.slice(idx + 1);
   }
 
-  const turnIds = rows.map((r) => r.id);
-  const memRows =
-    turnIds.length > 0
-      ? db.select({ id: memoryRecords.id, source: memoryRecords.source }).from(memoryRecords).where(inArray(memoryRecords.source, turnIds)).all()
-      : [];
-  const byTurn = new Map<string, string[]>();
-  for (const m of memRows) {
-    const ids = byTurn.get(m.source) ?? [];
-    ids.push(m.id);
-    byTurn.set(m.source, ids);
-  }
+  const byTurn = memoryIdsByTurn(rows.map((r) => r.id));
 
   return { ok: true, value: rows.map((r) => ({ ...r, memory_ids: byTurn.get(r.id) ?? [] })) };
 }
@@ -711,13 +722,21 @@ const LIST_CAP = 200;
  * canAccessPerson's own comment already named as this file's rule),
  * applied here for the same reason. An actor with no access gets an empty
  * list, not an error: matches how a caller would ask "show me this
- * person's conversations" and simply see nothing, not be told why. */
-export function list(actor: PersonRow, personId?: string): ConversationTurnRow[] {
+ * person's conversations" and simply see nothing, not be told why.
+ *
+ * Carries `memory_ids` the same way `listConversationTurns()` does
+ * (getmaipai/home#64): the chat history adapter (frontend's
+ * chatHistoryAdapter.ts) loads through THIS flat, cross-conversation
+ * route, not the per-conversation one, so the chat's own "memory
+ * updated" chip has no other real source for it today. */
+export function list(actor: PersonRow, personId?: string): ConversationTurnWithMemoryIds[] {
   const target = personId ?? actor.id;
   if (!canAccessPerson(actor, target)) return [];
   const rows = db.select().from(conversationTurns).where(eq(conversationTurns.personId, target)).all();
   rows.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
-  return rows.slice(0, LIST_CAP);
+  const capped = rows.slice(0, LIST_CAP);
+  const byTurn = memoryIdsByTurn(capped.map((r) => r.id));
+  return capped.map((r) => ({ ...r, memory_ids: byTurn.get(r.id) ?? [] }));
 }
 
 /** The full per-person archive (4.14: "export per person is one

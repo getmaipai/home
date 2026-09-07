@@ -85,7 +85,15 @@ const MAX_FACTS_PER_TURN = 12;
 // One core-job tick processes a bounded batch, not the whole backlog at
 // once - the same "amortize over ticks, never monopolize the model"
 // discipline legacy's own consolidate.ts used (MAX_MERGES_PER_RUN).
-const MAX_TURNS_PER_RUN = 10;
+// getmaipai/home#63: was 10 - a live diagnosis (2026-09-07) measured a
+// single extraction call alone adding 2 to 4.7 seconds to a chat reply
+// that started mid-batch, and runJudgeBatch()'s own idle check only ran
+// ONCE per batch, at the top. One turn per tick keeps a batch's worst-
+// case engine time to a single judgeTurn() call (bounded further inside
+// it, see that function's own mid-turn idle check below); the backlog
+// still drains at one turn per minute, faster than any real household
+// produces model turns.
+const MAX_TURNS_PER_RUN = 1;
 
 const CATEGORY_VALUES = [
   "person",
@@ -392,6 +400,18 @@ export async function judgeTurn(turn: ConversationTurnRow): Promise<JudgeTurnRes
   let written = 0;
   const writtenTexts: string[] = [];
   for (const fact of facts) {
+    // getmaipai/home#63: a fact-heavy turn can still hold the chat engine
+    // for several embed+dedupe calls even with MAX_TURNS_PER_RUN at 1 -
+    // re-checked before EACH fact, not just once at runJudgeBatch()'s own
+    // top, exactly like runConsolidation()'s own per-pair check already
+    // does. `judgeStatus` is deliberately left unset (not "done") when
+    // this trips: the next tick re-extracts and re-judges this same
+    // turn from scratch, and any fact already written here is now a
+    // candidate `decideDedupe()` will find and SUPERSEDE onto rather
+    // than duplicate.
+    if (turnActiveWithin(JUDGE_IDLE_WINDOW_MS)) {
+      return { ok: true, factsWritten: written };
+    }
     const embedded = await embed([fact.text]);
     const vector = embedded.ok ? new Float32Array(embedded.value.vectors[0]!) : undefined;
     const candidates = vector

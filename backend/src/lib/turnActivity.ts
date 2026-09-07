@@ -10,6 +10,23 @@
 // activity remembered), which is the correct, safe default - there is
 // nothing yet to protect against right after a boot.
 let lastTurnStartedAt = 0;
+// getmaipai/home#63: `lastTurnStartedAt` alone only measures from a
+// turn's START - a live diagnosis (2026-09-07) measured the judge's own
+// extraction call adding 2 to 4.7 seconds to a chat reply that started
+// WHILE the judge was mid-batch, because `runJudgeBatch()` checked
+// idleness once at the top of a ten-turn batch and never again. Tracking
+// completions too lets the gate measure quiet time from when the
+// household's own reply actually finished, not just from when it began -
+// a voice answer that streams for longer than the window would otherwise
+// look "idle" before it is even done.
+let lastTurnFinishedAt = 0;
+let inFlightTurns = 0;
+// A turn still "in flight" this long after it started is treated as
+// abandoned, not as still running forever - an unbounded counter would
+// let one leaked increment (an unhandled exception, or a stream aborted
+// by a client disconnect before its own finalize() runs) permanently
+// starve the judge. No real turn takes anywhere near this long.
+const MAX_TURN_DURATION_MS = 120_000;
 
 /** The shared "household is mid-conversation" window every background
  * caller gates on - memoryJudge.ts's runJudgeBatch()/runConsolidation()
@@ -26,15 +43,37 @@ export const DEFAULT_IDLE_WINDOW_MS = 20_000;
  * through before it can ever reach the chat engine. */
 export function markTurnStarted(): void {
   lastTurnStartedAt = Date.now();
+  inFlightTurns++;
 }
 
-/** True when a real household turn started within `windowMs` of now.
- * `false` forever after a restart until the first real turn happens - see
- * this module's own header comment for why that's the safe default. */
+/** Called at every real finalize point a turn that called
+ * markTurnStarted() can reach (turnEngine.ts's runTurn() return and
+ * runTurnStream()'s own finalize() closure, both paths) - getmaipai/home
+ * #63's other half: without this, `turnActiveWithin()` had no way to
+ * know a turn had ENDED, only that one had started sometime in the last
+ * `windowMs`. */
+export function markTurnFinished(): void {
+  if (inFlightTurns > 0) inFlightTurns--;
+  lastTurnFinishedAt = Date.now();
+}
+
+/** True when a real household turn is still running, finished within
+ * `windowMs`, or (the pre-existing fallback, kept for any path that
+ * calls markTurnStarted() without a matching markTurnFinished()) started
+ * within `windowMs`. A turn actively in flight blocks background work
+ * regardless of `windowMs` - there is no reading of "the house is quiet"
+ * under which a reply is still streaming. `false` forever after a
+ * restart until the first real turn happens - see this module's own
+ * header comment for why that's the safe default. */
 export function turnActiveWithin(windowMs: number): boolean {
-  return lastTurnStartedAt !== 0 && Date.now() - lastTurnStartedAt < windowMs;
+  const now = Date.now();
+  if (inFlightTurns > 0 && now - lastTurnStartedAt < MAX_TURN_DURATION_MS) return true;
+  if (lastTurnFinishedAt !== 0 && now - lastTurnFinishedAt < windowMs) return true;
+  return lastTurnStartedAt !== 0 && now - lastTurnStartedAt < windowMs;
 }
 
 export function __resetTurnActivityForTests(): void {
   lastTurnStartedAt = 0;
+  lastTurnFinishedAt = 0;
+  inFlightTurns = 0;
 }

@@ -23,6 +23,7 @@ import { streamTurnEvents } from "@/routes/turn";
 import { guardReply } from "@/lib/guards";
 import { PERSON_TURN_BUDGET } from "@/lib/llm";
 import { __resetRateLimiterForTests } from "@/lib/rateLimiter";
+import { turnActiveWithin } from "@/lib/turnActivity";
 import { remember, recall, PROFILE_SOURCE } from "@/lib/memory";
 import { listPending } from "@/lib/notifications";
 import { REFUSAL_FIRST, REFUSAL_REPEAT, REMEMBER_CONFIRM_VARIANTS } from "@/lib/replyVariation";
@@ -300,6 +301,52 @@ describe("lib/turnEngine.ts runTurnStream()", () => {
     expect(result.ok).toBe(false);
     if (result.ok) return;
     expect(result.code).toBe("invalid_input");
+  });
+});
+
+// getmaipai/home#63: a code review of the judge-contention fix found
+// markTurnStarted() called (inside prepareTurn()) with NOTHING calling
+// its own new markTurnFinished() counterpart anywhere in production
+// code - turnActiveWithin() would have stayed permanently true (for
+// MAX_TURN_DURATION_MS after every single turn), which is worse than
+// the bug it was meant to fix. These prove the real wiring end to end,
+// through the actual runTurn()/runTurnStream() call sites, not just the
+// turnActivity.ts primitive in isolation (tests/turnActivity.test.ts's
+// own job).
+describe("runTurn()/runTurnStream() actually clear turnActiveWithin() when they finish (getmaipai/home#63)", () => {
+  test("runTurn()'s successful model path calls markTurnFinished()", async () => {
+    const { actor } = await owner();
+    const result = await runTurn(actor, "chat", "good morning");
+    expect(result.ok).toBe(true);
+    expect(turnActiveWithin(0)).toBe(false);
+  });
+
+  test("runTurn()'s immediate (plugin) path also calls markTurnFinished() - prepareTurn() starts a turn regardless of kind", async () => {
+    const { actor } = await owner();
+    const result = await runTurn(actor, "chat", "remember that the wifi password is on the fridge");
+    expect(result.ok).toBe(true);
+    expect(turnActiveWithin(0)).toBe(false);
+  });
+
+  test("runTurnStream()'s immediate (plugin) path calls markTurnFinished()", async () => {
+    const { actor } = await owner();
+    const result = await runTurnStream(actor, "chat", "remember that the wifi password is on the fridge");
+    expect(result.ok).toBe(true);
+    expect(turnActiveWithin(0)).toBe(false);
+  });
+
+  test("runTurnStream()'s own finalize() calls markTurnFinished() - the turn is still 'in flight' until finalize runs, not the instant tokens starts yielding", async () => {
+    const { actor } = await owner();
+    const result = await runTurnStream(actor, "chat", "good morning");
+    expect(result.ok).toBe(true);
+    if (!result.ok || result.kind !== "stream") return;
+
+    let fullText = "";
+    for await (const delta of result.tokens) fullText += delta;
+    expect(turnActiveWithin(0)).toBe(true); // draining tokens is not finishing the turn
+
+    result.finalize(fullText);
+    expect(turnActiveWithin(0)).toBe(false);
   });
 });
 

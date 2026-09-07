@@ -376,17 +376,34 @@ export function runDueJobs(
   return inFlight;
 }
 
+// getmaipai/home#63: memory.judge/memory.consolidate can each hold the
+// shared chat engine for real time (a judge tick's own extraction call
+// alone measured 2 to 4.7 seconds of contention with a live turn) - a
+// household's own reminder or timer firing in the SAME tick must never
+// wait behind that. A stable sort (Array.prototype.sort's own guarantee)
+// moves just those two jobs to the end, leaving every other pair's
+// relative order (including two reminders due at once) exactly as the
+// query returned it. A plain, exported function (not inlined into
+// runDueJobsUnguarded below) so the ordering rule itself is directly
+// testable without running real jobs.
+const LOW_PRIORITY_CORE_JOBS = new Set(["memory.judge", "memory.consolidate"]);
+export function sortDueJobsForPriority<T extends { job: string }>(rows: readonly T[]): T[] {
+  return [...rows].sort((a, b) => Number(LOW_PRIORITY_CORE_JOBS.has(a.job)) - Number(LOW_PRIORITY_CORE_JOBS.has(b.job)));
+}
+
 async function runDueJobsUnguarded(
   runPluginFn: RunPluginFn,
   now: Date,
   extraCoreJobs: Record<string, CoreJobHandler>,
   jobTimeoutMs: number,
 ): Promise<{ ran: number; errors: number }> {
-  const due = db
-    .select()
-    .from(scheduledJobs)
-    .where(and(eq(scheduledJobs.status, "pending"), lte(scheduledJobs.nextRunAt, now.toISOString())))
-    .all();
+  const due = sortDueJobsForPriority(
+    db
+      .select()
+      .from(scheduledJobs)
+      .where(and(eq(scheduledJobs.status, "pending"), lte(scheduledJobs.nextRunAt, now.toISOString())))
+      .all(),
+  );
 
   let ran = 0;
   let errors = 0;

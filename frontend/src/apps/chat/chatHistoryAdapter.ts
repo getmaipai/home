@@ -1,5 +1,5 @@
 import { ExportedMessageRepository, type ThreadHistoryAdapter, type ThreadMessageLike } from "@assistant-ui/react";
-import { api, type ConversationTurnRow } from "@/lib/api";
+import { api, type ConversationTurnWithMemoryIds } from "@/lib/api";
 
 // ConversationTurnRow is one row per turn (userText+replyText pair);
 // assistant-ui wants one message per sender, so each row becomes two
@@ -18,7 +18,16 @@ import { api, type ConversationTurnRow } from "@/lib/api";
 // yet). A message from the CURRENT live session has no turnId until a
 // reload re-fetches it from here - those two actions disable themselves
 // on such a message rather than guessing at an id (chatActionBar.tsx).
-export function rowsToThreadMessages(rows: ConversationTurnRow[], selfName: string): ThreadMessageLike[] {
+//
+// `metadata.custom.memoryIds` (getmaipai/home#64) carries whatever the
+// row's own `memory_ids` says - every memory record whose provenance
+// names this turn, on the assistant message only (chatMemoryChip.tsx
+// renders per assistant message, and one `conversation_turns` row is one
+// whole exchange, so there is nothing separate to attribute to the user
+// half). Real data from list()'s own join
+// (backend/src/lib/conversationHistory.ts), not a notification payload
+// that was never actually sent (the bug this replaces).
+export function rowsToThreadMessages(rows: ConversationTurnWithMemoryIds[], selfName: string): ThreadMessageLike[] {
   const out: ThreadMessageLike[] = [];
   for (const row of [...rows].reverse()) {
     const createdAt = new Date(row.createdAt);
@@ -35,7 +44,7 @@ export function rowsToThreadMessages(rows: ConversationTurnRow[], selfName: stri
       content: row.replyText,
       createdAt,
       status: { type: "complete", reason: "stop" },
-      metadata: { custom: { turnId: row.id } },
+      metadata: { custom: { turnId: row.id, memoryIds: row.memory_ids } },
     });
   }
   return out;

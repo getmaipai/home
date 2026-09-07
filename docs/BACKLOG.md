@@ -923,9 +923,21 @@ into a conversation with someone who knows who is talking.
       (`GET /api/memory?person=`), and can export
       (`GET /api/memory/export`) or forget everything
       (`POST /api/memory/forget`) about them - both real routes with no
-      frontend caller before this. "What changed since" from `?since=`
-      (this step's own brief) is still not built: `GET /api/memory` has
-      no `?since=` handling at all server-side (confirmed by reading
+      frontend caller before this. **The chip is fixed** (2026-09-07,
+      getmaipai/home#64): it had never once rendered - it read a
+      `memory.updated` notification's `payload.turn_id`/`memory_ids`,
+      and `NotificationDeliveryView` has no `payload` field on `main` at
+      all. Repointed to real data instead: `conversationHistory.ts`'s
+      `list()` (the flat route `chatHistoryAdapter.ts` actually loads
+      through, not the per-conversation one) now carries `memory_ids`
+      the same way `listConversationTurns()` already did, via a shared
+      `memoryIdsByTurn()` join; `chatHistoryAdapter.ts` puts them on the
+      assistant message's `metadata.custom.memoryIds`; the chip
+      (`chatMemoryChip.tsx`) reads that directly off the rendered
+      message, no query or poll at all. Still open: per-message
+      "remember this"/"forget this", and "what changed since" from
+      `?since=` (this step's own brief) - `GET /api/memory` has no
+      `?since=` handling at all server-side (confirmed by reading
       `parseListOptions` in `backend/src/routes/memory.ts` - it only
       reads `scope`/`person`), unlike Conversations' `GET /:id/turns`,
       which already supports a real `since`.
@@ -2801,7 +2813,24 @@ that owns it.
       boot instead of on a household's first message, and idle-gating
       the memory judge's per-minute tick so it skips a batch while a
       real turn is active instead of contending for the shared chat
-      slot. Still open, each needing the harness above (or, for the STT
+      slot - **tightened 2026-09-07** (getmaipai/home#63, a live
+      diagnosis: one extraction call alone measured adding 2 to 4.7
+      seconds to a chat reply started mid-batch) - the gate only checked
+      once at the top of a ten-turn batch, and a turn's own 20 s idle
+      window only ever measured from when it STARTED, so a reply
+      streaming past that window looked idle before it was even done.
+      `lib/turnActivity.ts` now tracks turns actually in flight and the
+      real end of the last one (`markTurnFinished()`, called from both
+      of `turnEngine.ts`'s finalize paths); `memoryJudge.ts`'s
+      `MAX_TURNS_PER_RUN` dropped from 10 to 1, and `judgeTurn()` itself
+      re-checks before every fact's own embed/dedupe call, not just once
+      per batch, stopping cleanly mid-turn (the turn stays unjudged for
+      the next tick, and anything already written becomes a dedupe
+      candidate the resumed pass supersedes onto rather than
+      duplicates); `scheduler.ts`'s `sortDueJobsForPriority()` moves
+      `memory.judge`/`memory.consolidate` after every other due job in
+      the same tick, so a reminder or timer never queues behind one.
+      Still open, each needing the harness above (or, for the STT
       items, a wired frontend client) to land safely rather than guessed
       at blind:
       - **Multi-slot separation for the chat engine** (`-np 2` +

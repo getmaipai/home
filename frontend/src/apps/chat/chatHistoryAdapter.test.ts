@@ -1,8 +1,8 @@
 import { describe, expect, test, mock } from "bun:test";
 import { createChatHistoryAdapter, rowsToThreadMessages } from "@/apps/chat/chatHistoryAdapter";
-import type { ConversationTurnRow } from "@/lib/api";
+import type { ConversationTurnWithMemoryIds } from "@/lib/api";
 
-function makeRow(id: string, replyText: string): ConversationTurnRow {
+function makeRow(id: string, replyText: string, memoryIds: string[] = []): ConversationTurnWithMemoryIds {
   return {
     id,
     personId: "person-abc123",
@@ -16,7 +16,8 @@ function makeRow(id: string, replyText: string): ConversationTurnRow {
     safetyAction: "allow",
     minorSpeaker: false,
     createdAt: "2026-09-04T00:00:00.000Z",
-  } as ConversationTurnRow;
+    memory_ids: memoryIds,
+  } as ConversationTurnWithMemoryIds;
 }
 
 describe("rowsToThreadMessages", () => {

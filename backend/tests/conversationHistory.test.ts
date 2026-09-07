@@ -246,6 +246,25 @@ describe("list()", () => {
 
     expect(list(teen, child.id)).toEqual([]);
   });
+
+  // getmaipai/home#64: the chat history adapter loads through THIS flat
+  // route (/api/conversations/turns), not the per-conversation one, so
+  // the chat's own "memory updated" chip has no other real source for
+  // memory_ids - it must carry them the same way listConversationTurns()
+  // already does.
+  test("each turn carries memory_ids for records provenanced to it, same as listConversationTurns()", async () => {
+    const { client } = await owner();
+    await client.post("/api/turn", { text: "remember that trash day is Tuesday" });
+    await client.post("/api/turn", { text: "good morning" });
+
+    const actor = db.select().from(people).where(eq(people.displayName, "Sage")).get()!;
+    const rows = list(actor);
+    expect(rows).toHaveLength(2);
+    const rememberRow = rows.find((r) => r.userText.includes("trash day"))!;
+    const otherRow = rows.find((r) => r.userText === "good morning")!;
+    expect(rememberRow.memory_ids.length).toBe(1);
+    expect(otherRow.memory_ids.length).toBe(0);
+  });
 });
 
 describe("exportPerson()", () => {

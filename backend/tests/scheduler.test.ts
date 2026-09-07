@@ -2,7 +2,7 @@ import { describe, expect, test, beforeEach } from "bun:test";
 import { TestClient } from "./client";
 import { resetDb } from "./reset-db";
 import { __resetThrottleForTests } from "@/lib/secretThrottle";
-import { parseWhen, scheduleJob, scheduleCoreJob, ensureCoreJob, listJobs, cancelJob, runDueJobs } from "@/lib/scheduler";
+import { parseWhen, scheduleJob, scheduleCoreJob, ensureCoreJob, listJobs, cancelJob, runDueJobs, sortDueJobsForPriority } from "@/lib/scheduler";
 import { runPlugin, registerAllPackageNotificationTypes } from "@/lib/plugins";
 import { db } from "@/db";
 import { people, scheduledJobs, pendingEmbeddings, memoryEmbeddings } from "@/db/schema";
@@ -106,6 +106,27 @@ describe("scheduleJob / listJobs / cancelJob", () => {
     const cancelled = cancelJob(ownerRow, scheduled.value.id);
     expect(cancelled.ok).toBe(false);
     expect(listJobs(ownerRow).find((j) => j.id === scheduled.value.id)?.status).toBe("done"); // unchanged
+  });
+});
+
+// getmaipai/home#63: a live diagnosis (2026-09-07) measured a memory
+// judge tick alone adding 2 to 4.7 seconds of contention to a chat
+// reply on the shared engine - a reminder or timer due in the same
+// scheduler tick must never queue behind it.
+describe("sortDueJobsForPriority()", () => {
+  test("moves memory.judge and memory.consolidate after everything else due in the same tick", () => {
+    const rows = [{ job: "memory.judge" }, { job: "reminders.fire" }, { job: "memory.consolidate" }, { job: "timers.fire" }];
+    expect(sortDueJobsForPriority(rows).map((r) => r.job)).toEqual(["reminders.fire", "timers.fire", "memory.judge", "memory.consolidate"]);
+  });
+
+  test("a stable sort: jobs sharing a priority tier keep their original relative order", () => {
+    const rows = [{ job: "memory.maintenance" }, { job: "memory.judge" }, { job: "reminders.fire" }, { job: "memory.consolidate" }];
+    expect(sortDueJobsForPriority(rows).map((r) => r.job)).toEqual(["memory.maintenance", "reminders.fire", "memory.judge", "memory.consolidate"]);
+  });
+
+  test("nothing due in the low-priority set is left untouched", () => {
+    const rows = [{ job: "reminders.fire" }, { job: "backup.run" }, { job: "timers.fire" }];
+    expect(sortDueJobsForPriority(rows).map((r) => r.job)).toEqual(["reminders.fire", "backup.run", "timers.fire"]);
   });
 });
 
