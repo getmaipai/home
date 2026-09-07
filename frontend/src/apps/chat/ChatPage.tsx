@@ -1,11 +1,14 @@
 import { SensesDock, type ReplyState, type EarState } from "./SensesDock";
 import { useCallback, useEffect, useMemo, useRef, useState, type MutableRefObject } from "react";
-import { useLocation } from "react-router-dom";
+import { useLocation, useSearchParams } from "react-router-dom";
 import { AssistantRuntimeProvider, useAui, useLocalRuntime, useRemoteThreadListRuntime } from "@assistant-ui/react";
 import { Page } from "@/kit/primitives/Page";
 import { Button } from "@/kit/ui/button";
 import { Thread } from "@/kit/assistant-ui/thread.aui";
-import { ThreadList } from "@/kit/assistant-ui/thread-list.aui";
+import { ThreadList, ThreadListNew } from "@/kit/assistant-ui/thread-list.aui";
+import * as Popover from "@radix-ui/react-popover";
+import { TooltipIconButton } from "@/kit/assistant-ui/tooltip-icon-button";
+import { api } from "@/lib/api";
 import { WakeWordToggle } from "@/apps/chat/WakeWordToggle";
 import { getIcon } from "@/kit/icons";
 import { createChatModelAdapter } from "@/apps/chat/chatModelAdapter";
@@ -44,20 +47,12 @@ function SttAutoSend({ sendRef }: { sendRef: MutableRefObject<(() => void) | nul
 const HistoryIcon = getIcon("history");
 const BrainIcon = getIcon("brain");
 const VolumeXIcon = getIcon("volume-x");
+const OptionsIcon = getIcon("sliders-horizontal");
 
 interface ChatPageProps {
   person: Roster;
 }
 
-// The real Chat page (spec/ui/pages/chat.json), hand-built against
-// @assistant-ui/react (docs/plans/session-b-ui.md step 4) rather than
-// executed by a generic UiNode interpreter (none exists yet, home/docs/
-// dev.md documents that as a deferred slice). The streaming/TTS/think-
-// tag logic itself lives in chatModelAdapter.ts, ported unchanged from
-// the pre-assistant-ui version; this file wires that adapter, the
-// (mocked, pending Session A) thread-list adapter, and the composer-area
-// controls that have no equivalent in the framework (wake word, "think
-// longer").
 export function ChatPage({ person }: ChatPageProps) {
   // Home's prompt box and the search palette's "Ask MaiPai" row both
   // navigate here with `state: { initialText }` (step 6) - read once,
@@ -65,6 +60,7 @@ export function ChatPage({ person }: ChatPageProps) {
   // second navigation to /chat (the nav link, "Chat" in the palette)
   // should land on a plain empty composer, not replay a stale prompt.
   const location = useLocation();
+  const [searchParams, setSearchParams] = useSearchParams();
   const initialText =
     typeof (location.state as { initialText?: unknown } | null)?.initialText === "string"
       ? (location.state as { initialText: string }).initialText
@@ -123,23 +119,6 @@ export function ChatPage({ person }: ChatPageProps) {
   const composerDisabledRef = useRef<string | undefined>(undefined);
   composerDisabledRef.current = composerDisabledReason;
 
-  const chatModelAdapter = useMemo(
-    () =>
-      createChatModelAdapter({
-        consumeThinking: () => {
-          const value = thinkingRef.current;
-          thinkingRef.current = false;
-          setThinking(false);
-          return value;
-        },
-        onCrisisResources: setBanner,
-        turnSchedulerRef,
-        onSpeakingChange: (value) => { setIsSpeaking(value); if (value) setSpeechError(false); },
-        onReplyState: (state) => { setReply(state); if (state === "waiting") setSpeechError(false); },
-        onSpeechError: () => setSpeechError(true),
-      }),
-    [],
-  );
   const suggestionAdapter = useMemo(() => createChatSuggestionAdapter(initialText), [initialText]);
   // Set by `SttAutoSend` once it mounts inside `AssistantRuntimeProvider`
   // (below); `onFinalReady` below just calls whatever's there.
@@ -147,15 +126,6 @@ export function ChatPage({ person }: ChatPageProps) {
   const dictationAdapter = useMemo(
     () =>
       createSttDictationAdapter({
-        // The real `WS /api/stt/stream` (createSttSocket, sttSocket.ts),
-        // not a fixture-replaying mock: C's route doesn't exist yet
-        // (confirmed 2026-09-06), so pressing the mic button today fails
-        // fast and honestly (the adapter's own onError path) rather than
-        // faking a transcript nothing the household actually said -
-        // the same "a failed card is a quiet gap, never fake data" rule
-        // Steps 2/3's widgets and Repairs already followed. The mock
-        // fixture the plan names is what sttDictationAdapter.test.ts
-        // exercises instead, deterministically.
         createSocket: createSttSocket,
         turnSchedulerRef,
         // The transcript itself already landed in the composer
@@ -176,12 +146,41 @@ export function ChatPage({ person }: ChatPageProps) {
   // themselves - naming it this way is what lets react-hooks/rules-of-hooks
   // recognize that instead of flagging a bare arrow function calling a hook.
   function useChatRuntimeHook() {
+    const aui = useAui();
+    const chatModelAdapter = useMemo(
+    () =>
+      createChatModelAdapter({
+        getConversationId: async () => {
+          const { remoteId } = await aui.threadListItem().initialize();
+          await api.resumeConversation(remoteId);
+          return remoteId;
+        },
+        consumeThinking: () => {
+          const value = thinkingRef.current;
+          thinkingRef.current = false;
+          setThinking(false);
+          return value;
+        },
+        onCrisisResources: setBanner,
+        turnSchedulerRef,
+        onSpeakingChange: (value) => { setIsSpeaking(value); if (value) setSpeechError(false); },
+        onReplyState: (state) => { setReply(state); if (state === "waiting") setSpeechError(false); },
+        onSpeechError: () => setSpeechError(true),
+      }),
+    [aui],
+  );
+
     return useLocalRuntime(chatModelAdapter, { adapters: { suggestion: suggestionAdapter, dictation: dictationAdapter } });
   }
 
   const runtime = useRemoteThreadListRuntime({
     runtimeHook: useChatRuntimeHook,
     adapter: threadListAdapter,
+    threadId: searchParams.get("conversation") ?? undefined,
+    onThreadIdChange: (id) => {
+      setSearchParams(id ? { conversation: id } : {}, { replace: true });
+      setThreadsOpen(false);
+    },
   });
 
   return (
@@ -189,92 +188,45 @@ export function ChatPage({ person }: ChatPageProps) {
       <AssistantRuntimeProvider runtime={runtime}>
         <SttAutoSend sendRef={sttAutoSendRef} />
         <Page title="Chat" hideTitle>
-          <div className="flex items-center justify-between gap-3 px-4 pt-4 pb-2">
-            <div className="flex items-center gap-2">
-              <h2 className="text-2xl font-semibold tracking-tight">Chat</h2>
+          <div className="flex items-center justify-between gap-3 px-4 py-2">
+            <div className="flex items-center gap-1">
               <Button variant="ghost" size="icon" aria-label={threadsOpen ? "Hide threads" : "Show threads"} aria-expanded={threadsOpen} aria-controls="chat-threads" onClick={() => setThreadsOpen((open) => !open)}>
                 <HistoryIcon className="size-4" />
               </Button>
+              <h2 className="text-base font-semibold">Chat</h2>
+              <ThreadListNew aria-label="New chat" className="size-9 justify-center p-0" labelClassName="sr-only" />
             </div>
-            <SensesDock health={health} reply={reply} speaking={isSpeaking} speechError={speechError} ears={ears} earError={earError} />
+            <SensesDock health={health} reply={reply} speaking={isSpeaking} speechError={speechError} ears={ears} earError={earError}>
+              <WakeWordToggle onStatusChange={onEarStatus} onWakeDetected={() => setBanner("MaiPai heard its wake word. It can't act on it yet - that's coming soon.")} />
+            </SensesDock>
           </div>
-          {banner ? (
-            <div className="mx-4 mb-2 rounded-[var(--radius)] bg-[var(--muted)] px-3 py-2 text-base">{banner}</div>
-          ) : null}
+          {banner ? <div className="mx-4 mb-2 rounded-[var(--radius)] bg-[var(--muted)] px-3 py-2 text-base">{banner}</div> : null}
           <div className="relative flex min-h-0 flex-1">
-            {/* Threads (step 4): mocked to one conversation until Session
-                A's per-thread routes land (chatThreadListAdapter.ts) -
-                hidden below lg since there is, today, nothing to switch
-                between. */}
-            <aside
-              id="chat-threads"
-              hidden={!threadsOpen}
-              // eslint-disable-next-line jsx-a11y/no-noninteractive-tabindex -- a keyboard-scrollable region, not a widget (DetailPane.tsx's own precedent).
+            <aside id="chat-threads" hidden={!threadsOpen}
+              // eslint-disable-next-line jsx-a11y/no-noninteractive-tabindex -- keyboard-scrollable conversation navigation.
               tabIndex={0}
-              className={cn("absolute inset-y-0 start-0 z-20 w-full shrink-0 overflow-y-auto border-e border-border/60 bg-background p-2 sm:static sm:w-60", !threadsOpen && "hidden", FOCUS_RING)}
-            >
+              className={cn("absolute inset-y-0 start-0 z-20 w-full shrink-0 overflow-y-auto border-e border-border/60 bg-background p-2 sm:static sm:w-60", !threadsOpen && "hidden", FOCUS_RING)}>
               <ThreadList />
             </aside>
             <div className="min-w-0 flex-1">
-              <Thread
-                composerDisabled={composerDisabledReason !== undefined}
-                composerDisabledReason={composerDisabledReason}
-                composerToolbar={
-                  // Per-turn behavior toggles, not page chrome - moved off
-                  // the header (Jesse, 2026-09-06: "its placement / location
-                  // is also odd") to sit right above the composer they
-                  // actually affect, the same way a modern chat app's mode
-                  // switches live next to the input, not floating above the
-                  // whole conversation.
-                  <>
-                    {/* Phase 1 of the wake-word plan (docs/dev.md, 2026-09-04):
-                        "infrastructure proof, no custom model yet" - fires on
-                        openWakeWord's stock "hey jarvis" phrase, not a MaiPai-trained
-                        one. Still no auto-listen wiring (BACKLOG.md's hands-free
-                        item): a real detection only shows a banner proving the
-                        mechanism. Reworded for a family, step 4: the earlier
-                        text ("infrastructure proof", "demo only") read like an
-                        engineering note, not something a parent watching over a
-                        kid's shoulder should have to parse. */}
-                    <WakeWordToggle
-                      onStatusChange={onEarStatus}
-                      onWakeDetected={() =>
-                        setBanner("MaiPai heard its wake word. It can't act on it yet - that's coming soon.")
-                      }
-                    />
-                    {/* Covers the gap the composer's own Send/Stop toggle
-                        can't: text generation finishing doesn't mean the
-                        reply is done being SPOKEN. Only shown while that's
-                        actually true, so it never sits there as dead
-                        chrome the rest of the time. */}
-                    {isSpeaking ? (
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant="outline"
-                        onClick={() => {
-                          turnSchedulerRef.current?.stop();
-                          setIsSpeaking(false);
-                        }}
-                        className="rounded-full"
-                      >
-                        <VolumeXIcon />
-                        Stop speaking
-                      </Button>
-                    ) : null}
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant={thinking ? "default" : "outline"}
-                      onClick={() => setThinking((v) => !v)}
-                      aria-pressed={thinking}
-                      className="rounded-full"
-                    >
-                      <BrainIcon />
-                      {thinking ? "Thinking on for next message" : "Think longer"}
-                    </Button>
-                  </>
-                }
+              <Thread composerDisabled={composerDisabledReason !== undefined} composerDisabledReason={composerDisabledReason}
+                composerToolbar={<>
+                  <Popover.Root>
+                    <Popover.Trigger asChild>
+                      <TooltipIconButton tooltip={thinking ? "Chat options: thinking on" : "Chat options"} className={cn("size-9 rounded-full", thinking && "bg-primary text-primary-foreground")}><OptionsIcon className="size-4" /></TooltipIconButton>
+                    </Popover.Trigger>
+                    <Popover.Portal>
+                      <Popover.Content side="top" align="start" sideOffset={8} className="z-50 rounded-xl border bg-popover p-2 text-popover-foreground shadow-lg">
+                        <Button type="button" variant="ghost" onClick={() => setThinking((value) => !value)} aria-pressed={thinking}>
+                          <BrainIcon />Think longer{thinking ? " (on)" : ""}
+                        </Button>
+                        <p className="px-3 pb-2 text-xs text-muted-foreground">For your next message only.</p>
+                      </Popover.Content>
+                    </Popover.Portal>
+                  </Popover.Root>
+
+                  {isSpeaking ? <TooltipIconButton tooltip="Stop speaking" className="size-9 rounded-full" onClick={() => { turnSchedulerRef.current?.stop(); setIsSpeaking(false); }}><VolumeXIcon className="size-4" /></TooltipIconButton> : null}
+                </>}
               />
             </div>
           </div>

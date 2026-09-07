@@ -1065,3 +1065,51 @@ describe("GET /api/conversations/:id/turns (step 3: memory_ids, since)", () => {
     expect(result.value.map((t) => t.id)).toEqual(["turn-tie-2", "turn-tie-3"]);
   });
 });
+
+describe("resume a saved chat explicitly", () => {
+  test("returning to an earlier chat preserves its title and context and routes the next message there", async () => {
+    const { client, actor } = await owner();
+    const first = await runTurn(actor, "chat", "help me plan a garden");
+    if (!first.ok) throw new Error("first turn failed");
+    const id = first.value.conversation_id;
+    await client.request(`/api/conversations/${id}`, { method: "PATCH", body: { title: "Garden" } });
+    const second = await (await client.post("/api/conversations", {})).json() as { id: string };
+    const resumed = await client.post(`/api/conversations/${id}/resume`, {});
+    expect(resumed.status).toBe(200);
+    expect(await resumed.json()).toMatchObject({ id, title: "Garden", status: "open" });
+    expect(getConversation(actor, second.id)).toMatchObject({ ok: true, value: { status: "closed" } });
+    const next = await runTurn(actor, "chat", "and some herbs", { conversationId: id });
+    expect(next).toMatchObject({ ok: true, value: { conversation_id: id } });
+    const saved = await (await client.get(`/api/conversations/${id}/turns`)).json() as Array<{ userText: string }>;
+    expect(saved.map((turn) => turn.userText)).toEqual(["help me plan a garden", "and some herbs"]);
+    const record = getConversation(actor, id);
+    if (!record.ok) throw new Error(record.error);
+    expect(buildConversationWindow(record.value).messages.some((message) => message.content.includes("plan a garden"))).toBe(true);
+  });
+
+  test("resuming cannot revive an old pending confirmation and an open chat is idempotent", async () => {
+    const { client } = await owner();
+    const first = await (await client.post("/api/conversations", {})).json() as { id: string };
+    db.update(conversations).set({ pendingAsk: JSON.stringify({ kind: "confirm", prompt: "old confirmation" }) }).where(eq(conversations.id, first.id)).run();
+    await client.post("/api/conversations", {});
+    expect((await client.post(`/api/conversations/${first.id}/resume`, {})).status).toBe(200);
+    expect(db.select().from(conversations).where(eq(conversations.id, first.id)).get()!.pendingAsk).toBeNull();
+    const before = db.select().from(conversations).where(eq(conversations.id, first.id)).get()!;
+    await client.post(`/api/conversations/${first.id}/resume`, {});
+    expect(db.select().from(conversations).where(eq(conversations.id, first.id)).get()!.hlc).toBe(before.hlc);
+  });
+
+  test("foreign, deleted and unknown chats cannot change the active chat", async () => {
+    const { client, actor } = await owner();
+    const child = await addPerson(client, "Nova", "child");
+    const foreign = resolveOrCreateConversation(child, "chat");
+    if (!foreign.ok) throw new Error(foreign.error);
+    const removed = await (await client.post("/api/conversations", {})).json() as { id: string };
+    await client.request(`/api/conversations/${removed.id}`, { method: "DELETE" });
+    const active = await (await client.post("/api/conversations", {})).json() as { id: string };
+    for (const id of [foreign.value.id, removed.id, "conv-unknown123"]) {
+      expect((await client.post(`/api/conversations/${id}/resume`, {})).status).toBe(404);
+      expect(getConversation(actor, active.id)).toMatchObject({ ok: true, value: { status: "open" } });
+    }
+  });
+});

@@ -31,8 +31,45 @@ export interface RoutingCandidate {
   examples: readonly string[] | undefined;
 }
 
+// Fix D (docs/dev.md's "Chat reliability: the 2026-09-07 incident and the
+// five fixes"): nomic-embed-text-v1.5's own model card documents an
+// asymmetric "search_query: "/"search_document: " task-prefix convention
+// - the model's own trained scheme, not a house style choice.
+// `routing.examples` are always the DOCUMENT side (a package's own
+// canonical phrasing, embedded once and stored); prefixing just that
+// side is the one live-measured change here, against the real GGUF this
+// hub actually spawns, not the model card's own claim about the
+// original HF weights (`bun run scripts/bench/routing.ts`,
+// docs/dev/session-c.md carries the recorded numbers). The utterance
+// side (embedUtterance(), below) is deliberately left UNPREFIXED, and
+// that is the measured answer, not a shortcut: this file's own vector is
+// ALSO reused as recall()'s own query vector (turnEngine.ts's
+// prepareTurn(), "embedded once here... reused below as recall()'s own
+// queryVector" - a 2026-09-06 review's fix for a real duplicate-HTTP-
+// round-trip cost), and memory.ts's own stored document vectors are not
+// prefixed (a real household's already-written memories need an actual
+// re-embedding migration to move safely, not a hash bump - see that
+// file's own `embedQueryForRecall()` comment and docs/BACKLOG.md's
+// follow-up item) - so a query-side prefix here would silently mismatch
+// every memory recall's own document side. Measured head to head on the
+// real corpus rather than assumed: document-only prefixing scored the
+// SAME true-positive rate as no prefixing at all (68/71) while cutting
+// the null-row noise floor's own top wrong-package score from p90 1.00
+// to p90 0.86; prefixing BOTH sides, the model card's own default
+// recipe, actually scored WORSE on this corpus (66/71) - a real,
+// measured case where "do what the shared vector already constrains you
+// to do" and "do what scores best" turned out to be the identical
+// answer, not a compromise between two different ones.
+const NOMIC_DOCUMENT_PREFIX = "search_document: ";
+
+// Hashes the STRING ACTUALLY SENT to the embedder (prefixed), not the
+// bare example - self-invalidating by construction: a stored row's hash
+// stops matching the moment either the example's own words OR this
+// file's own prefix scheme changes, so ensureRoutingEmbeddings() below
+// re-embeds automatically either way, with no separate version counter
+// to remember to bump.
 function hashExample(example: string): string {
-  return createHash("sha256").update(example).digest("hex");
+  return createHash("sha256").update(`${NOMIC_DOCUMENT_PREFIX}${example}`).digest("hex");
 }
 
 /** At first load of each package (turnEngine.ts's own `loadAllManifests()`
@@ -72,7 +109,7 @@ export async function ensureRoutingEmbeddings(candidates: readonly RoutingCandid
 
   let result;
   try {
-    result = await embed(pending.map((p) => p.example));
+    result = await embed(pending.map((p) => `${NOMIC_DOCUMENT_PREFIX}${p.example}`));
   } catch (err) {
     console.error(`[routing] embed-on-load failed, Tier 1 falls back to keyword overlap this turn: ${(err as Error).message}`);
     return;
@@ -138,11 +175,41 @@ export function scoreByEmbedding(utteranceVector: Float32Array, candidateIds: re
   return scores;
 }
 
-// Start values (this step's own text: "measure on the corpus before
-// trusting either"); the routing-corpus bench script
-// (backend/scripts/bench/routing.ts) is what actually measures them -
-// these are the numbers it started from, not a claim they are final.
-export const TIER1_THRESHOLD = 0.62;
+// Fix D (docs/dev.md's "Chat reliability: the 2026-09-07 incident and
+// the five fixes"): measured against the real embed backend
+// (`bun run scripts/bench/routing.ts`, numbers recorded in
+// docs/dev/session-c.md), not the start values this step's own text
+// asked for. 32 genuinely ordinary conversational negatives (excluding a
+// handful of corpus rows deliberately DESIGNED to score high - a
+// consequential package's own trigger phrase, and the "remember"/
+// "recall" near-misses meant for Tier 2, never Tier 1) scored
+// p50=0.610 p90=0.660 p95=0.740 max=0.800 against SOME wrong package.
+// The weakest genuine Tier 1 positive in the corpus ("tell me a bedtime
+// story about a fox" -> storytime-style) scores 0.770 - the two
+// distributions genuinely overlap at the edges (a real greeting can
+// outscore a real match for a DIFFERENT utterance), so no single
+// threshold cleanly separates every case; 0.75 sits just above the
+// measured p95 while still clearing every real positive in the corpus.
+// One real, confirmed false WIN this measurement caught and fixed here:
+// "I can't decide what to wear today" scored 0.74 against `list-view`
+// (margin 0.08 over the runner-up, right at the old bar) and won Tier 1
+// outright at the OLD 0.62 threshold - a genuine, deterministic misroute
+// with no model in the loop to catch it. Gone at 0.75.
+//
+// A second thing this measurement found is NOT the same class of bug,
+// worth naming so it isn't rediscovered as one: "good morning" scores
+// 0.80 against `translate` (one of its OWN routing.examples used to be
+// "translate good morning into french" - replaced in translate/
+// manifest.json with a non-greeting example anyway, real hygiene, just
+// not a fix for a live misroute) but can never actually WIN Tier 1
+// regardless of score - `translate` requires one arg (`expression`) and
+// `deterministicArgs()` only ever binds that from a literal pattern's
+// own wildcard capture, never a fuzzy Tier 1 score, so `canFire()`
+// rejects it unconditionally for every fuzzy match. It only ever reaches
+// Tier 2 as an OFFERED candidate (gated by TIER2_AMBIGUOUS_FLOOR,
+// below), where a real model - not a deterministic threshold - decides
+// whether to actually call it.
+export const TIER1_THRESHOLD = 0.75;
 export const TIER1_MARGIN = 0.08;
 
 export interface Tier1Score {

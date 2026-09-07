@@ -81,9 +81,19 @@ async function main() {
     return s;
   }
 
+  // Fix D (docs/dev.md's "Chat reliability: the 2026-09-07 incident and
+  // the five fixes"): TIER1_THRESHOLD/TIER2_AMBIGUOUS_FLOOR were both
+  // start values, never measured against a real embedder - this is that
+  // measurement. `nullTopScores` is the number that actually matters for
+  // setting them: for every corpus row that should route NOWHERE, how
+  // close did the single best-scoring (wrong) candidate come to firing
+  // anyway. A threshold below this distribution's own p95 fires on
+  // ordinary conversation; one above every positive row's own score
+  // never fires on anything real either.
+  const nullTopScores: number[] = [];
   let pass = 0;
   for (const row of corpus) {
-    const { winner: routed } = await route(row.utterance, actor, loaded);
+    const { winner: routed, ranked } = await route(row.utterance, actor, loaded);
     const skillMatches = matchingSkills(row.utterance, skills);
     const routedId = routed ? routed.id : (skillMatches[0]?.skill.manifest.id ?? null);
 
@@ -96,7 +106,12 @@ async function main() {
     }
     if (routedId && routedId !== row.expect) statsFor(routedId).falsePositives++;
 
-    console.log(`${ok ? "PASS" : "FAIL"}  "${row.utterance}" -> expected ${row.expect ?? "null"}, got ${routedId ?? "null"}`);
+    const top3 = ranked
+      .slice(0, 3)
+      .map((r) => `${r.id}:${r.score.toFixed(2)}`)
+      .join(" ");
+    if (row.expect === null && ranked[0]) nullTopScores.push(ranked[0].score);
+    console.log(`${ok ? "PASS" : "FAIL"}  "${row.utterance}" -> expected ${row.expect ?? "null"}, got ${routedId ?? "null"}${top3 ? `  [${top3}]` : ""}`);
   }
 
   console.log(`\n${pass}/${corpus.length} passed\n`);
@@ -107,6 +122,14 @@ async function main() {
     console.log(
       `  ${id.padEnd(20)} precision=${precision === null ? "n/a" : precision.toFixed(2)}  recall=${recall === null ? "n/a" : recall.toFixed(2)}  (tp=${s.truePositives} fp=${s.falsePositives} fn=${s.falseNegatives})`,
     );
+  }
+
+  if (nullTopScores.length > 0) {
+    const sorted = [...nullTopScores].sort((a, b) => a - b);
+    const quantile = (p: number) => sorted[Math.min(sorted.length - 1, Math.floor(p * (sorted.length - 1)))]!.toFixed(3);
+    console.log(`\nNull-row noise floor (${sorted.length} rows, top wrong-package score):`);
+    console.log(`  p50=${quantile(0.5)} p90=${quantile(0.9)} p95=${quantile(0.95)} max=${sorted[sorted.length - 1]!.toFixed(3)}`);
+    console.log(`  TIER1_THRESHOLD/TIER2_AMBIGUOUS_FLOOR should sit at or above p95 of this distribution.`);
   }
 }
 

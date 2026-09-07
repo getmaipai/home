@@ -244,17 +244,8 @@ export function resolveOrCreateConversation(
     // for a "tv" turn, silently attaching a tv-surface turn under a
     // chat-surface conversation and desyncing the two.
     //
-    // A second code review (2026-09-06, Session C step 9's own
-    // auto-close work) found this only ever rejected "deleted," not
-    // "closed" - so a client holding a stale conversationId for a
-    // thread runRetention() had already auto-closed (every one of its
-    // turns aged out) could still attach a brand new turn to it here,
-    // growing turn_count on a conversation whose own status claims
-    // there's nothing left in it, forever. "Closed" is meant as a real
-    // terminal state the same way "deleted" already is - a client
-    // resuming with a closed conversation's own id falls through to
-    // starting a fresh conversation instead, exactly like it already
-    // does for a deleted one.
+    // Closed conversations require the explicit resume operation. A stale
+    // turn request must never silently undo retention or reactivate a chat.
     if (!row || row.personId !== actor.id || row.status !== "open" || row.surface !== surface) {
       return { ok: false, status: 400, error: `conversation not found: ${conversationId}` };
     }
@@ -339,6 +330,25 @@ export function createConversation(
     .run();
   return { ok: true, value: insertNewConversation(actor, surface, opts.companionId) };
 }
+
+/** Explicitly continue an owned saved conversation. Reading a thread does
+ * not call this. Preserve the stale-ID guard in resolveOrCreateConversation. */
+export const resumeConversation = sqlite.transaction((actor: PersonRow, id: string): ConversationOpResult<Conversation> => {
+  const row = db.select().from(conversations).where(eq(conversations.id, id)).get();
+  if (!row || row.personId !== actor.id || row.status === "deleted") {
+    return { ok: false, status: 404, error: "conversation not found" };
+  }
+  if (row.status === "open") return { ok: true, value: toConversationRecord(row) };
+  const now = new Date().toISOString();
+  db.update(conversations)
+    .set({ status: "closed", updatedAt: now, hlc: nextHlc() })
+    .where(and(eq(conversations.personId, actor.id), eq(conversations.surface, row.surface), eq(conversations.status, "open")))
+    .run();
+  const updated = db.update(conversations)
+    .set({ status: "open", pendingAsk: null, updatedAt: now, hlc: nextHlc() })
+    .where(eq(conversations.id, id)).returning().get()!;
+  return { ok: true, value: toConversationRecord(updated) };
+});
 
 function toConversationSummary(row: ConversationRow, turnCount: number, lastTurnAt: string | null): ConversationSummary {
   return {

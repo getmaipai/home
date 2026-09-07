@@ -11,10 +11,10 @@
   "routing": {
     "examples": [
       "translate hello to spanish",
-      "translate good morning into french",
+      "translate happy birthday into french",
       "translate thank you to japanese",
-      "translate how are you into german",
-      "translate good night to italian"
+      "translate excuse me into german",
+      "translate congratulations to italian"
     ],
     "patterns": ["translate *"]
   },

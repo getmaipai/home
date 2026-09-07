@@ -8,7 +8,6 @@
 // could leak into.
 
 import {
-  ComposerAddAttachment,
   ComposerAttachments,
   UserMessageAttachments,
 } from "@/kit/assistant-ui/attachment.aui";
@@ -314,19 +313,19 @@ const Composer: FC<{ autoFocus: boolean; toolbar?: ReactNode; disabled?: boolean
       <ComposerPrimitive.AttachmentDropzone asChild>
         <div
           data-slot="aui_composer-shell"
-          className="border-border/60 data-[dragging=true]:border-ring focus-within:border-border dark:border-muted-foreground/15 dark:focus-within:border-muted-foreground/30 flex w-full cursor-text flex-col gap-2 rounded-(--composer-radius) border bg-(--composer-bg) p-(--composer-padding) transition-[border-color] data-[dragging=true]:border-dashed data-[dragging=true]:bg-[color-mix(in_oklab,var(--color-accent)_50%,var(--color-background))]"
+          className="border-border/60 data-[dragging=true]:border-ring focus-within:border-border dark:border-muted-foreground/15 dark:focus-within:border-muted-foreground/30 flex w-full cursor-text items-end gap-1 rounded-(--composer-radius) border bg-(--composer-bg) p-(--composer-padding) transition-[border-color] data-[dragging=true]:border-dashed data-[dragging=true]:bg-[color-mix(in_oklab,var(--color-accent)_50%,var(--color-background))]"
         >
           <ComposerAttachments />
+          {toolbar ? <div className="flex shrink-0 items-center gap-1">{toolbar}</div> : null}
           <ComposerPrimitive.Input
             placeholder={disabled ? (disabledReason ?? "MaiPai's AI isn't ready yet.") : "Send a message..."}
             disabled={disabled}
-            className="aui-composer-input caret-primary placeholder:text-muted-foreground/60 max-h-48 min-h-10 w-full resize-none bg-transparent px-2.5 py-1 text-base leading-6 outline-none disabled:cursor-not-allowed"
+            className="aui-composer-input caret-primary placeholder:text-muted-foreground/60 max-h-48 min-h-9 min-w-0 flex-1 resize-none bg-transparent px-1 py-1.5 text-base leading-6 outline-none disabled:cursor-not-allowed"
             rows={1}
             autoFocus={autoFocus}
             enterKeyHint="send"
             aria-label="Message input"
           />
-          {toolbar ? <div className="flex flex-wrap items-center gap-1 border-t border-border/50 pt-2 [&_button]:h-8 [&_button]:text-xs">{toolbar}</div> : null}
           <ComposerAction disabled={disabled} disabledReason={disabledReason} />
         </div>
       </ComposerPrimitive.AttachmentDropzone>
@@ -336,8 +335,7 @@ const Composer: FC<{ autoFocus: boolean; toolbar?: ReactNode; disabled?: boolean
 
 const ComposerAction: FC<{ disabled?: boolean; disabledReason?: string }> = ({ disabled, disabledReason }) => {
   return (
-    <div className="aui-composer-action-wrapper relative flex items-center justify-between">
-      <ComposerAddAttachment />
+    <div className="aui-composer-action-wrapper relative flex shrink-0 items-center">
       <div className="flex items-center gap-1.5">
         <AuiIf condition={(s) => s.thread.capabilities.dictation}>
           <AuiIf condition={(s) => s.composer.dictation == null}>
@@ -348,7 +346,7 @@ const ComposerAction: FC<{ disabled?: boolean; disabledReason?: string }> = ({ d
                 type="button"
                 variant="ghost"
                 size="icon"
-                className="aui-composer-dictate text-muted-foreground hover:text-foreground size-7 rounded-full"
+                className="aui-composer-dictate text-muted-foreground hover:text-foreground size-9 rounded-full"
                 aria-label="Start voice input"
               >
                 <MicIcon className="aui-composer-dictate-icon size-4" />
@@ -363,7 +361,7 @@ const ComposerAction: FC<{ disabled?: boolean; disabledReason?: string }> = ({ d
                 type="button"
                 variant="ghost"
                 size="icon"
-                className="aui-composer-stop-dictation text-destructive size-7 rounded-full"
+                className="aui-composer-stop-dictation text-destructive size-9 rounded-full"
                 aria-label="Stop voice input"
               >
                 <SquareIcon className="aui-composer-stop-dictation-icon size-3.5 animate-pulse fill-current" />
@@ -385,7 +383,7 @@ const ComposerAction: FC<{ disabled?: boolean; disabledReason?: string }> = ({ d
             variant="default"
             size="icon"
             disabled
-            className="aui-composer-send size-7 rounded-full"
+            className="aui-composer-send size-9 rounded-full"
             aria-label="Send message"
           >
             <ArrowUpIcon className="aui-composer-send-icon size-4" />
@@ -400,7 +398,7 @@ const ComposerAction: FC<{ disabled?: boolean; disabledReason?: string }> = ({ d
                   type="button"
                   variant="default"
                   size="icon"
-                  className="aui-composer-send size-7 rounded-full"
+                  className="aui-composer-send size-9 rounded-full"
                   aria-label="Send message"
                 >
                   <ArrowUpIcon className="aui-composer-send-icon size-4" />
@@ -413,7 +411,7 @@ const ComposerAction: FC<{ disabled?: boolean; disabledReason?: string }> = ({ d
                   type="button"
                   variant="default"
                   size="icon"
-                  className="aui-composer-cancel size-7 rounded-full"
+                  className="aui-composer-cancel size-9 rounded-full"
                   aria-label="Stop generating"
                 >
                   <SquareIcon className="aui-composer-cancel-icon size-3.5 fill-current" />

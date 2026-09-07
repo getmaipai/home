@@ -26,6 +26,7 @@
 // "far" (TV) is a user-agent, not a viewport (frontend/src/kit/
 // useSurface.ts's own TV_USER_AGENT) - the far entry below sets one.
 import { chromium, type Browser, type BrowserContext } from "playwright";
+import { startStubLlmServer } from "../spec/llm/ts/stubServer";
 import AxeBuilder from "@axe-core/playwright";
 import { rmSync, mkdirSync, existsSync } from "node:fs";
 import { join } from "node:path";
@@ -39,6 +40,7 @@ const HERO_PATH = join(ROOT, "docs", "assets", "hero.png");
 
 const a11yOnly = process.argv.includes("--a11y-only");
 // Focused review retains the same seeded data, readiness, and a11y checks.
+const chatReview = process.argv.includes("--chat-review");
 const settingsReview = process.argv.includes("--settings-review");
 
 interface RouteSpec {
@@ -154,7 +156,7 @@ async function seedHousehold(): Promise<string> {
   return sessionValue;
 }
 
-const PAGE_VISIT_TIMEOUT_MS = 30000;
+const PAGE_VISIT_TIMEOUT_MS = chatReview ? 90000 : 30000;
 
 async function newContext(browser: Browser, viewport: ViewportSpec, theme: "light" | "dark", sessionValue: string): Promise<BrowserContext> {
   const context = await browser.newContext({
@@ -190,6 +192,13 @@ async function visitRoute(context: BrowserContext, route: RouteSpec, viewport: V
     // loading" - the whole point of waiting for the real shell first.
     await page.locator('[role="status"]').first().waitFor({ state: "detached", timeout: 5000 }).catch(() => {});
 
+    if (chatReview && route.slug === "chat") {
+      const cleared = await page.request.post(`${BASE_URL}/api/conversations/clear`, { data: {} });
+      if (!cleared.ok()) throw new Error("Could not reset demo chats");
+      await page.reload();
+      await exerciseChat(page, viewport, theme);
+    }
+
     const overflow = await page.evaluate(
       () => document.documentElement.scrollWidth > document.documentElement.clientWidth + 1,
     );
@@ -205,6 +214,7 @@ async function visitRoute(context: BrowserContext, route: RouteSpec, viewport: V
       .analyze();
     const violations = axe.violations.map((v) => `${v.id} (${v.impact ?? "unknown"}): ${v.nodes.length} node(s) - ${v.help}: ${v.nodes.map((node) => node.target.join(" ")).join("; ")}`);
 
+    if (chatReview) await settleChat(page);
     if (saveScreenshot) {
       mkdirSync(SCREENS_DIR, { recursive: true });
       await page.screenshot({ path: join(SCREENS_DIR, `${route.slug}-${viewport.slug}-${theme}.png`), fullPage: true });
@@ -214,6 +224,66 @@ async function visitRoute(context: BrowserContext, route: RouteSpec, viewport: V
   } finally {
     await page.close();
   }
+}
+
+// Same seeded browser pipeline, with a scripted offline model. These shots
+// illustrate demo conversations; the assertions exercise real HTTP persistence.
+async function settleChat(page: import("playwright").Page) {
+  await page.evaluate(async () => {
+    await Promise.all(document.getAnimations().filter((animation) => animation.effect?.getTiming().iterations !== Infinity).map((animation) => animation.finished.catch(() => {})));
+  });
+}
+
+async function exerciseChat(page: import("playwright").Page, viewport: ViewportSpec, theme: string) {
+  const send = async (text: string) => {
+    await page.getByRole("textbox", { name: "Message input" }).fill(text);
+    await page.getByRole("button", { name: "Send message", exact: true }).click();
+    await page.getByRole("button", { name: "Stop generating", exact: true }).waitFor({ state: "hidden" });
+    await page.getByRole("button", { name: "Refresh", exact: true }).last().waitFor();
+  };
+  await page.getByRole("textbox", { name: "Message input" }).waitFor();
+  mkdirSync(SCREENS_DIR, { recursive: true });
+  await settleChat(page);
+  await page.screenshot({ path: join(SCREENS_DIR, `chat-empty-${viewport.slug}-${theme}.png`) });
+  await send("Help me plan a small garden");
+  await page.getByText("Start with a sunny spot and a few easy plants.", { exact: false }).waitFor();
+  const firstUrl = page.url();
+  if (!new URL(firstUrl).searchParams.get("conversation")) throw new Error("Chat did not persist its conversation id in the URL");
+  await page.reload();
+  await page.locator('[data-role="user"]').getByText("Help me plan a small garden", { exact: true }).waitFor();
+  await page.getByRole("button", { name: "New chat", exact: true }).click();
+  await send("Help me choose a book");
+  if (page.url() === firstUrl) throw new Error("New chat reused the previous conversation");
+  if (await page.locator('[data-role="user"]').getByText("Help me plan a small garden", { exact: true }).count()) throw new Error("New chat contains another conversation's messages");
+  await page.goto(firstUrl);
+  await page.locator('[data-role="user"]').getByText("Help me plan a small garden", { exact: true }).waitFor();
+  if (await page.locator('[data-role="user"]').getByText("Help me choose a book", { exact: true }).count()) throw new Error("Reopened chat contains another conversation's messages");
+  await send("And some herbs for cooking");
+  await page.reload();
+  await page.getByText("And some herbs for cooking", { exact: true }).waitFor();
+  await page.getByRole("button", { name: "Show threads" }).click();
+  const item = page.locator('[data-slot="aui_thread-list-item"]').filter({ has: page.getByRole("button", { name: "Help me plan a small garden", exact: true }) });
+  await item.getByRole("button", { name: "More options" }).click();
+  await page.getByRole("menuitem", { name: "Rename", exact: true }).click();
+  await page.getByRole("textbox", { name: "Rename thread" }).fill("Garden plans");
+  await page.getByRole("textbox", { name: "Rename thread" }).press("Enter");
+  await page.getByRole("button", { name: "Garden plans", exact: true }).waitFor();
+  await page.reload();
+  await page.getByRole("button", { name: "Show threads" }).click();
+  await page.getByRole("button", { name: "Garden plans", exact: true }).waitFor();
+  await settleChat(page);
+  await page.screenshot({ path: join(SCREENS_DIR, `chat-history-${viewport.slug}-${theme}.png`) });
+  const other = page.locator('[data-slot="aui_thread-list-item"]').filter({ has: page.getByRole("button", { name: "Help me choose a book", exact: true }) }).last();
+  await other.getByRole("button", { name: "More options" }).click();
+  await page.getByRole("menuitem", { name: "Delete", exact: true }).click();
+  await page.getByRole("button", { name: "Delete chat", exact: true }).click();
+  await page.getByRole("dialog").waitFor({ state: "hidden" });
+  await page.reload();
+  await page.getByRole("button", { name: "Show threads" }).click();
+  await page.getByRole("button", { name: "Garden plans", exact: true }).waitFor();
+  if (await page.getByRole("button", { name: "Help me choose a book", exact: true }).count()) throw new Error("Deleted chat returned after reload");
+  await page.getByRole("button", { name: "Hide threads" }).click();
+  await page.getByText("And some herbs for cooking", { exact: true }).waitFor();
 }
 
 async function captureHero(browser: Browser, sessionValue: string): Promise<void> {
@@ -389,10 +459,16 @@ async function main() {
   mkdirSync(DATA_DIR, { recursive: true });
 
   console.log("Starting a throwaway backend on a temp data dir...");
+  const chatModel = chatReview ? startStubLlmServer(0, { scriptedChatReply: (request) => {
+    const text = [...request.messages].reverse().find((message) => message.role === "user")?.content ?? "";
+    if (text.includes("herbs")) return "Basil, parsley, and chives are useful kitchen herbs. Keep mint in its own pot so it does not spread.";
+    if (text.includes("book")) return "What kind of story would you enjoy: a mystery, an adventure, or something funny?";
+    return "Start with a sunny spot and a few easy plants.\n\n- Grow lettuce in a shallow container.\n- Give tomatoes a larger pot and a support.\n- Water when the top layer of soil feels dry.\n\nHow much space do you have?";
+  } }) : undefined;
   const backend = Bun.spawn({
     cmd: ["bun", "run", "src/index.ts"],
     cwd: join(ROOT, "backend"),
-    env: { ...process.env, PORT: String(PORT), MAIPAI_DATA_DIR: DATA_DIR, MAIPAI_WYOMING_PORT: "0" },
+    env: { ...process.env, PORT: String(PORT), MAIPAI_DATA_DIR: DATA_DIR, MAIPAI_WYOMING_PORT: "0", ...(chatModel ? { MAIPAI_LLAMA_SERVER_URL: chatModel.url, MAIPAI_EMBED_SERVER_URL: chatModel.url } : {}) },
     stdout: "ignore",
     stderr: "inherit",
   });
@@ -409,9 +485,9 @@ async function main() {
 
     browser = await chromium.launch();
 
-    if (!a11yOnly && !settingsReview) await captureHero(browser, sessionValue);
+    if (!a11yOnly && !settingsReview && !chatReview) await captureHero(browser, sessionValue);
 
-    const combos = a11yOnly || settingsReview
+    const combos = a11yOnly || settingsReview || chatReview
       ? A11Y_ONLY_COMBOS
       : VIEWPORTS.flatMap((v) => THEMES.map((t) => ({ viewport: v.slug, theme: t })));
 
@@ -421,7 +497,7 @@ async function main() {
       if (!viewport) throw new Error(`unknown viewport ${combo.viewport}`);
       const context = await newContext(browser, viewport, combo.theme, sessionValue);
       try {
-        for (const route of (settingsReview ? ROUTES.filter((entry) => entry.slug === "settings" || entry.slug === "settings-models") : ROUTES)) {
+        for (const route of (chatReview ? ROUTES.filter((entry) => entry.slug === "chat") : settingsReview ? ROUTES.filter((entry) => entry.slug === "settings" || entry.slug === "settings-models") : ROUTES)) {
           console.log(`${route.slug} @ ${viewport.slug}/${combo.theme}...`);
           // A hard ceiling around the whole visit, not just Playwright's
           // own actions inside it: `AxeBuilder#analyze()` runs its
@@ -479,6 +555,7 @@ async function main() {
   } finally {
     await browser?.close();
     backend.kill();
+    chatModel?.stop();
     await backend.exited;
     rmSync(DATA_DIR, { recursive: true, force: true });
   }

@@ -1249,9 +1249,26 @@ async function prepareTurn(
 // WINS Tier 1 by design (route()'s own `canFire`) and still needs to
 // reach here, and a candidate that lost only on Tier 1's margin check
 // (a close runner-up) is exactly the "ambiguous" case worth a real model
-// look. Start value, same "measure on the corpus before trusting it"
-// posture as TIER1_THRESHOLD/TIER1_MARGIN.
-export const TIER2_AMBIGUOUS_FLOOR = 0.45;
+// look.
+//
+// Fix D (docs/dev.md's "Chat reliability: the 2026-09-07 incident and
+// the five fixes"): measured, not a start value anymore
+// (`bun run scripts/bench/routing.ts`, docs/dev/session-c.md). At 0.45,
+// 32/32 genuinely ordinary conversational corpus rows AND all 8 live
+// incident probe phrases cleared this floor, meaning Tier 2's own
+// grammar-forced model call ran on nearly every real turn regardless of
+// whether anything plausible was ever in contention - exactly the
+// review comment above this constant was trying to prevent, just set
+// too low to actually prevent it. Raised to sit above the measured
+// ordinary-negative noise floor (p90=0.660, p95=0.740) while staying
+// comfortably below every case that genuinely needs to reach Tier 2: a
+// `consequential` package (routes.ts's own `lock-doors`, 1.00 in the
+// corpus - it can never WIN Tier 1 by design, but must still be
+// OFFERED) and a real near-miss meant for Tier 2 ("what have I told you
+// to remember about pizza night", 1.00 against `recall` - a genuine
+// runner-up Tier 1 can't bind, not ordinary chat) both score far above
+// this floor either way, so raising it costs neither case anything.
+export const TIER2_AMBIGUOUS_FLOOR = 0.68;
 
 export async function attemptTier2Tools(
   text: string,

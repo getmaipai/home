@@ -45,6 +45,7 @@ export interface ChatModelAdapterDeps {
   onReplyState?(state: "waiting" | "responding" | "ready" | "error" | "idle"): void;
   onSpeechError?(): void;
   consumeThinking(): boolean;
+  getConversationId?(): Promise<string>;
   // 4.3: "offer, never block" - a crisis-resources banner rides alongside
   // the reply, not as part of the message content assistant-ui renders.
   onCrisisResources(resources: string): void;
@@ -192,7 +193,9 @@ export function createChatModelAdapter(deps: ChatModelAdapterDeps): ChatModelAda
 
       deps.onReplyState?.("waiting");
       try {
-        const response = await api.streamTurn(text, deps.consumeThinking(), abortSignal);
+        const conversationId = await deps.getConversationId?.();
+        abortSignal.throwIfAborted();
+        const response = await api.streamTurn(text, deps.consumeThinking(), abortSignal, conversationId);
         for await (const event of readTurnStream(response)) {
           if (event.type === "turn_meta") {
             // The contract's first line on every turn (routes/turn.ts).

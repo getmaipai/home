@@ -1,63 +1,44 @@
-import type { RemoteThreadListAdapter } from "@assistant-ui/react";
+import { useMemo } from "react";
+import { useAui, type RemoteThreadListAdapter } from "@assistant-ui/react";
 import { createAssistantStream } from "assistant-stream";
 import { createChatHistoryAdapter } from "@/apps/chat/chatHistoryAdapter";
 import { messageText } from "@/apps/chat/chatMessageText";
-
-// Mocked (docs/plans/session-b-ui.md step 4): the backend has exactly one
-// conversation per person today (lib/conversationHistory.ts's flat turn
-// list, GET /api/conversations) - session-a-intelligence.md's contract
-// adds the real per-thread CRUD routes (list/create/patch/delete/batch-
-// delete/clear) this adapter is meant to call, not yet merged to `main`.
-// Everything here maps onto that one real conversation; "new"/rename/
-// archive/delete are accepted but don't yet do anything a reload would
-// notice. Swap the bodies below for real `api.*` calls once Session A's
-// routes land (rebase and check) - the shape (RemoteThreadListAdapter)
-// and the call sites (chatThreadListAdapter.ts is the only file that
-// needs to change) stay the same either way.
-const MAIN_THREAD_ID = "main";
+import { api } from "@/lib/api";
 
 export function createChatThreadListAdapter(selfName: string): RemoteThreadListAdapter {
-  let title: string | undefined;
-
   return {
     async list() {
-      return {
-        threads: [
-          {
-            status: "regular",
-            remoteId: MAIN_THREAD_ID,
-            title: title ?? "Chat",
-          },
-        ],
-      };
+      const rows = await api.conversationList();
+      return { threads: rows.filter((row) => row.surface === "chat").map((row) => ({
+        status: "regular" as const,
+        remoteId: row.id,
+        title: row.title ?? undefined,
+        lastMessageAt: new Date(row.last_turn_at ?? row.created_at),
+      })) };
     },
-    async rename(_remoteId, newTitle) {
-      title = newTitle;
-    },
-    async archive() {},
-    async unarchive() {},
-    async delete() {},
+    async rename(remoteId, title) { await api.renameConversation(remoteId, title); },
+    // The shared record has no archive state. Do not expose an action
+    // that silently deletes a conversation or disappears on reload.
+    async archive() { throw new Error("Archiving conversations is not supported."); },
+    async unarchive() { throw new Error("Archiving conversations is not supported."); },
+    async delete(remoteId) { await api.deleteConversation(remoteId); },
     async initialize() {
-      // Every local thread maps onto the one real conversation until
-      // Session A's per-thread routes exist - there is nowhere else for a
-      // "new" thread to go yet.
-      return { remoteId: MAIN_THREAD_ID };
+      const row = await api.createConversation();
+      return { remoteId: row.id };
     },
-    async fetch() {
-      return { status: "regular", remoteId: MAIN_THREAD_ID, title: title ?? "Chat" };
+    async fetch(remoteId) {
+      const row = await api.conversation(remoteId);
+      if (row.surface !== "chat") throw new Error("This conversation is not a chat.");
+      return { status: "regular", remoteId: row.id, title: row.title ?? undefined };
     },
-    // No model call: a real auto-generated title (summarizing via the chat
-    // model) is real future scope once thread creation itself is real: for
-    // now this just reads the first line of the first thing the household
-    // member said, which is what "Chat" would otherwise sit as forever.
-    async generateTitle(_remoteId, messages) {
-      const firstUser = messages.find((m) => m.role === "user");
-      const text = messageText(firstUser).trim();
-      const derived = text.length > 0 ? text.slice(0, 60) : "Chat";
-      return createAssistantStream((controller) => {
-        controller.appendText(derived);
-      });
+    async generateTitle(remoteId, messages) {
+      const title = messageText(messages.find((message) => message.role === "user")).trim().slice(0, 60) || "New chat";
+      await api.renameConversation(remoteId, title);
+      return createAssistantStream((controller) => { controller.appendText(title); });
     },
-    unstable_useAdapters: () => ({ history: createChatHistoryAdapter(selfName) }),
+    unstable_useAdapters: function useChatAdapters() {
+      const aui = useAui();
+      return useMemo(() => ({ history: createChatHistoryAdapter(selfName, () => aui.threadListItem().getState().remoteId) }), [aui]);
+    },
   };
 }

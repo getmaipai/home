@@ -249,7 +249,7 @@ export function ConversationsPage({ person }: ConversationsPageProps) {
                       />
                     ) : null}
                     <div className="flex min-w-0 flex-col">
-                      <span className="truncate text-base">{c.title ?? "Untitled conversation"}</span>
+                      {viewingSelf && !selectMode && c.surface === "chat" ? <a href={`/chat?conversation=${encodeURIComponent(c.id)}`} className={cn("truncate rounded text-base hover:underline", FOCUS_RING)}>{c.title ?? "Untitled conversation"}</a> : <span className="truncate text-base">{c.title ?? "Untitled conversation"}</span>}
                       <span className="text-sm text-muted-foreground">
                         {c.turn_count} {c.turn_count === 1 ? "message" : "messages"} · {whenText(c.last_turn_at)}
                       </span>

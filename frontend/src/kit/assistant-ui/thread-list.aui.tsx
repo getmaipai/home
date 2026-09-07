@@ -1,5 +1,8 @@
 "use client";
 
+import { toast } from "sonner";
+import { Dialog, DialogContent, DialogTitle, DialogDescription } from "@/kit/ui/dialog";
+import { DestructiveConfirm } from "@/kit/primitives/DestructiveConfirm";
 import { Button } from "@/kit/ui/button";
 import { Input } from "@/kit/ui/input";
 import { Skeleton } from "@/kit/ui/skeleton";
@@ -13,7 +16,6 @@ import {
   useAuiState,
 } from "@assistant-ui/react";
 import {
-  ArchiveIcon,
   Loader2Icon,
   MoreHorizontalIcon,
   PencilIcon,
@@ -65,8 +67,8 @@ export const ThreadListSearch = forwardRef<
         type="search"
         value={value}
         onChange={(event) => onValueChange(event.target.value)}
-        aria-label="Search threads"
-        placeholder="Search threads"
+        aria-label="Search chats"
+        placeholder="Search chats"
         className={cn("h-8 ps-8 text-sm", className)}
         {...props}
       />
@@ -185,7 +187,7 @@ const ThreadListItemGroups: FC<{ searchQuery?: string }> = ({
         data-slot="aui_thread-list-empty"
         className="text-muted-foreground px-2.5 py-4 text-sm"
       >
-        No threads found
+        No chats found
       </div>
     );
   }
@@ -245,7 +247,7 @@ export const ThreadListNew = forwardRef<
               data-slot="aui_thread-list-new-label"
               className={cn("whitespace-nowrap", labelClassName)}
             >
-              New Thread
+              New chat
             </span>
           </>
         )}
@@ -280,6 +282,16 @@ const ThreadListSkeleton: FC = () => {
 export const ThreadListItem: FC = () => {
   const isRunning = useAuiState((s) => s.threadListItem.isRunning);
   const [isRenaming, setIsRenaming] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const aui = useAui();
+  const title = useAuiState((s) => s.threadListItem.title) ?? "New chat";
+  async function deleteThread() {
+    setDeleting(true);
+    try { await aui.threadListItem().delete(); setConfirmDelete(false); }
+    catch { toast.error("Could not delete this chat. Try again."); }
+    finally { setDeleting(false); }
+  }
   const triggerRef = useRef<HTMLButtonElement>(null);
   const restoreFocusRef = useRef(false);
 
@@ -323,7 +335,14 @@ export const ThreadListItem: FC = () => {
           {isRunning && <span className="sr-only">Running</span>}
         </ThreadListItemPrimitive.Trigger>
       )}
-      <ThreadListItemMore onRename={() => setIsRenaming(true)} />
+      <ThreadListItemMore onRename={() => setIsRenaming(true)} onDelete={() => setConfirmDelete(true)} />
+      <Dialog open={confirmDelete} onOpenChange={setConfirmDelete}>
+        <DialogContent>
+          <DialogTitle>Delete chat</DialogTitle>
+          <DialogDescription>This removes the messages in this chat. Saved memories remain.</DialogDescription>
+          <DestructiveConfirm message={`Delete “${title}”?`} confirmLabel="Delete chat" busyLabel="Deleting…" busy={deleting} onConfirm={() => void deleteThread()} onCancel={() => setConfirmDelete(false)} />
+        </DialogContent>
+      </Dialog>
     </ThreadListItemPrimitive.Root>
   );
 };
@@ -357,6 +376,7 @@ const ThreadListItemRename: FC<{
       .then(
         () => onDone(restoreFocus),
         () => {
+          toast.error("Could not rename this chat. Try again.");
           settledRef.current = false;
           if (restoreFocus) inputRef.current?.focus();
         },
@@ -392,7 +412,7 @@ const ThreadListItemRename: FC<{
   );
 };
 
-const ThreadListItemMore: FC<{ onRename: () => void }> = ({ onRename }) => {
+const ThreadListItemMore: FC<{ onRename: () => void; onDelete: () => void }> = ({ onRename, onDelete }) => {
   return (
     <ThreadListItemMorePrimitive.Root sharedFocusGroup>
       <ThreadListItemMorePrimitive.Trigger asChild>
@@ -421,24 +441,14 @@ const ThreadListItemMore: FC<{ onRename: () => void }> = ({ onRename }) => {
           <PencilIcon className="size-4" />
           Rename
         </ThreadListItemMorePrimitive.Item>
-        <ThreadListItemPrimitive.Archive asChild>
           <ThreadListItemMorePrimitive.Item
             data-slot="aui_thread-list-item-more-item"
-            className="hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground flex cursor-pointer items-center gap-2 rounded-lg px-2.5 py-1.5 text-sm outline-none select-none"
-          >
-            <ArchiveIcon className="size-4" />
-            Archive
-          </ThreadListItemMorePrimitive.Item>
-        </ThreadListItemPrimitive.Archive>
-        <ThreadListItemPrimitive.Delete asChild>
-          <ThreadListItemMorePrimitive.Item
-            data-slot="aui_thread-list-item-more-item"
+            onSelect={onDelete}
             className="text-destructive hover:bg-destructive/10 hover:text-destructive focus:bg-destructive/10 focus:text-destructive flex cursor-pointer items-center gap-2 rounded-lg px-2.5 py-1.5 text-sm outline-none select-none"
           >
             <TrashIcon className="size-4" />
             Delete
           </ThreadListItemMorePrimitive.Item>
-        </ThreadListItemPrimitive.Delete>
       </ThreadListItemMorePrimitive.Content>
     </ThreadListItemMorePrimitive.Root>
   );

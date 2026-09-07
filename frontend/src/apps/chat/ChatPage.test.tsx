@@ -39,6 +39,7 @@ function stubFetch(options: { ttsCalls?: string[]; brain?: string } = {}): () =>
   globalThis.fetch = mock((input: RequestInfo | URL, init?: RequestInit) => {
     const url = typeof input === "string" ? input : input.toString();
     if (url.includes("/api/health")) return Promise.resolve(new Response(JSON.stringify({ brain: options.brain ?? "llama-server", voice: "none" }), { status: 200 }));
+    if (url.includes("/api/conversations") && init?.method === "POST") return Promise.resolve(Response.json({ id: "conv-example123", status: "open", surface: "chat" }));
     if (url.includes("/api/conversations")) return Promise.resolve(new Response(JSON.stringify([]), { status: 200 }));
     if (url.includes("/api/plugins")) return Promise.resolve(new Response(JSON.stringify([]), { status: 200 }));
     if (url.includes("/api/notifications")) return Promise.resolve(new Response(JSON.stringify([]), { status: 200 }));
@@ -146,7 +147,7 @@ test("the composer is disabled while the model is starting, matching the Brain p
     // set a disabled textarea's value directly in this test environment).
     await waitFor(() => expect(input.disabled).toBe(true));
     expect((view.getByLabelText("Send message") as HTMLButtonElement).disabled).toBe(true);
-    await waitFor(() => expect(view.getByRole("button", { name: "Brain: Starting" })).toBeTruthy());
+    await waitFor(() => expect(view.getByRole("button", { name: "Chat status: Starting" })).toBeTruthy());
   } finally {
     restore();
   }
@@ -163,5 +164,38 @@ test("thread history can be opened and closed without removing the composer", as
     expect(view.getByRole("button", { name: "Hide threads" }).getAttribute("aria-expanded")).toBe("true");
     fireEvent.click(view.getByRole("button", { name: "Hide threads" }));
     expect(view.getByRole("textbox", { name: "Message input" })).toBeTruthy();
+  } finally { restore(); }
+});
+
+test("reopening a saved chat loads only its history and sends the next message to the same conversation", async () => {
+  (globalThis as unknown as { AudioContext: unknown }).AudioContext = FakeAudioContext;
+  const restore = stubFetch();
+  const fallback = globalThis.fetch;
+  const calls: string[] = [];
+  const turnBodies: Array<{ surface: string; text: string; thinking: boolean; conversation_id?: string }> = [];
+  globalThis.fetch = mock(async (input: RequestInfo | URL, init?: RequestInit) => {
+    const url = String(input);
+    calls.push(`${init?.method ?? "GET"} ${url}`);
+    if (url === "/api/conversations/conv-garden123/turns") return Response.json([
+      { id: "turn-garden123", userText: "Help me plan a small garden", replyText: "Start with a sunny spot.", createdAt: "2026-09-07T00:00:00Z", memory_ids: [] },
+    ]);
+    if (url === "/api/conversations/conv-garden123") return Response.json({ id: "conv-garden123", surface: "chat", title: "Garden plans" });
+    if (url === "/api/conversations/conv-garden123/resume") return Response.json({ id: "conv-garden123", status: "open" });
+    if (url === "/api/conversations") return Response.json([{ id: "conv-garden123", title: "Garden plans", surface: "chat", created_at: "2026-09-07T00:00:00Z" }]);
+    if (url === "/api/turn/stream") turnBodies.push(JSON.parse(String(init?.body)));
+    return fallback(input, init);
+  }) as unknown as typeof fetch;
+  try {
+    const view = renderWithQueryClient(<MemoryRouter initialEntries={["/chat?conversation=conv-garden123"]}><ChatPage person={makePerson()} /></MemoryRouter>);
+    await view.findByText("Start with a sunny spot.");
+    fireEvent.change(await view.findByLabelText("Message input"), { target: { value: "And some herbs for cooking" } });
+    const send = await view.findByLabelText("Send message") as HTMLButtonElement;
+    await waitFor(() => expect(send.disabled).toBe(false));
+    fireEvent.click(send);
+    await view.findByText("A canned reply.");
+    expect(turnBodies).toEqual([{ surface: "chat", text: "And some herbs for cooking", thinking: false, conversation_id: "conv-garden123" }]);
+    expect(calls.indexOf("POST /api/conversations/conv-garden123/resume")).toBeLessThan(calls.indexOf("POST /api/turn/stream"));
+    expect(calls).not.toContain("GET /api/conversations/turns");
+    expect(calls).not.toContain("POST /api/conversations");
   } finally { restore(); }
 });

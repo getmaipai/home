@@ -22,7 +22,7 @@ function makeRow(id: string, replyText: string, memoryIds: string[] = []): Conve
 
 describe("rowsToThreadMessages", () => {
   test("one row becomes a user message and a reply message, oldest first", () => {
-    const rows = [makeRow("row-2", "second reply"), makeRow("row-1", "first reply")]; // newest first, like the real route
+    const rows = [makeRow("row-1", "first reply"), makeRow("row-2", "second reply")]; // per-thread route is oldest first
     const messages = rowsToThreadMessages(rows, "Nova");
     expect(messages.map((m) => m.id)).toEqual(["row-1-user", "row-1-reply", "row-2-user", "row-2-reply"]);
     expect(messages[0]).toMatchObject({ role: "user", content: "question row-1" });
@@ -47,7 +47,7 @@ describe("rowsToThreadMessages", () => {
 });
 
 describe("createChatHistoryAdapter", () => {
-  test("load() builds an ExportedMessageRepository from GET /api/conversations/turns", async () => {
+  test("load() builds an ExportedMessageRepository from GET /api/conversations/conv-example123/turns", async () => {
     // Asserts the real path, not just "any fetch resolves" - a code
     // review-adjacent finding (session E step 5, 2026-09-06): the
     // previous version of this mock matched every URL unconditionally,
@@ -58,11 +58,11 @@ describe("createChatHistoryAdapter", () => {
     const originalFetch = globalThis.fetch;
     globalThis.fetch = mock((input: RequestInfo | URL) => {
       const url = typeof input === "string" ? input : input.toString();
-      if (!url.endsWith("/api/conversations/turns")) throw new Error(`unexpected fetch: ${url}`);
+      if (!url.endsWith("/api/conversations/conv-example123/turns")) throw new Error(`unexpected fetch: ${url}`);
       return Promise.resolve(new Response(JSON.stringify([makeRow("row-1", "a reply")]), { status: 200 }));
     }) as unknown as typeof fetch;
     try {
-      const adapter = createChatHistoryAdapter("Nova");
+      const adapter = createChatHistoryAdapter("Nova", () => "conv-example123");
       const repo = await adapter.load();
       expect(repo.messages.map(({ message }) => message.id)).toEqual(["row-1-user", "row-1-reply"]);
     } finally {
@@ -70,10 +70,17 @@ describe("createChatHistoryAdapter", () => {
     }
   });
 
-  test("append/update/delete are safe no-ops - the backend already persists every turn", async () => {
-    const adapter = createChatHistoryAdapter("Nova");
+  test("append is a no-op - the backend already persists every turn", async () => {
+    const adapter = createChatHistoryAdapter("Nova", () => "conv-example123");
     await expect(adapter.append({ parentId: null } as never)).resolves.toBeUndefined();
-    await expect(adapter.update!({ parentId: null } as never)).resolves.toBeUndefined();
-    await expect(adapter.delete!([])).resolves.toBeUndefined();
+
   });
+});
+
+test("a new unsaved chat starts empty without reading any other conversation", async () => {
+  const original = globalThis.fetch;
+  globalThis.fetch = mock(() => { throw new Error("New chat must not fetch history"); }) as unknown as typeof fetch;
+  try {
+    expect((await createChatHistoryAdapter("Nova", () => undefined).load()).messages).toEqual([]);
+  } finally { globalThis.fetch = original; }
 });

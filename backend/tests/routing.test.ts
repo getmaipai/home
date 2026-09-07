@@ -78,14 +78,28 @@ describe("embedUtterance()", () => {
 });
 
 describe("scoreByEmbedding()", () => {
-  test("scores an unambiguous match near 1.0 and an unrelated candidate low", async () => {
+  test("scores an unambiguous match well above an unrelated candidate", async () => {
     await ensureRoutingEmbeddings([
       { id: "weather-like", examples: ["what's the weather in Seattle", "weather in Denver"] },
       { id: "joke-like", examples: ["tell me a dad joke", "got any jokes"] },
     ]);
     const v = await embedUtterance("what's the weather in Seattle");
     const scores = scoreByEmbedding(v!, ["weather-like", "joke-like"]);
-    expect(scores.get("weather-like")!).toBeCloseTo(1.0, 1);
+    // Fix D (docs/dev.md's 2026-09-07 incident note): ensureRoutingEmbeddings()
+    // now prefixes the STORED (document) side with "search_document: ";
+    // embedUtterance()'s own query side is deliberately left unprefixed
+    // (that file's own header comment has the measured reasoning). Real
+    // asymmetric-prefix models are trained so the two still align well
+    // despite the mismatch - the stub's own bag-of-words scorer isn't:
+    // "search"/"document" are two extra tokens diluting the stored
+    // vector's sum that the plain query text never had to begin with, so
+    // an identical phrase on both sides no longer lands as close to 1.0
+    // as it did when both sides were the same literal string. The real
+    // behavior this test cares about - a genuine match reads far higher
+    // than an unrelated one - is exactly what the second assertion below
+    // still proves; `toBeCloseTo(1.0, 1)` was asserting the stub's own
+    // exact-string-match artifact, not real routing behavior.
+    expect(scores.get("weather-like")!).toBeGreaterThan(0.8);
     expect(scores.get("weather-like")!).toBeGreaterThan(scores.get("joke-like") ?? 0);
   });
 
@@ -121,8 +135,8 @@ describe("pickTier1Winner()", () => {
 
   test("fires for the top candidate once the margin is real", () => {
     const scores = [
-      { id: "joke", score: 0.65 },
-      { id: "storytime-style", score: 0.65 + TIER1_MARGIN + 0.01 },
+      { id: "joke", score: TIER1_THRESHOLD },
+      { id: "storytime-style", score: TIER1_THRESHOLD + TIER1_MARGIN + 0.01 },
     ];
     expect(pickTier1Winner(scores)?.id).toBe("storytime-style");
   });
@@ -141,11 +155,11 @@ describe("pickTier1WinnerAmong()", () => {
   // trivia, a skill) that had also cleared the bar.
   test("skips a winner that can't fire and picks the next candidate that can, same as the old per-candidate loop", () => {
     const scored = [
-      { id: "needs-arg", score: 0.9 }, // scores highest, but can never bind
-      { id: "no-arg", score: 0.65 }, // clears the threshold on its own, once needs-arg is out of the way
+      { id: "needs-arg", score: 0.99 }, // scores highest, but can never bind
+      { id: "no-arg", score: TIER1_THRESHOLD }, // clears the threshold on its own, once needs-arg is out of the way
     ];
     const winner = pickTier1WinnerAmong(scored, (id) => id === "no-arg");
-    expect(winner).toEqual({ id: "no-arg", score: 0.65 });
+    expect(winner).toEqual({ id: "no-arg", score: TIER1_THRESHOLD });
   });
 
   test("still returns null when nothing left can fire", () => {

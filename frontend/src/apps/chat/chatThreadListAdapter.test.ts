@@ -1,69 +1,58 @@
-import { describe, expect, test } from "bun:test";
+import { afterEach, describe, expect, mock, test } from "bun:test";
 import { createChatThreadListAdapter } from "@/apps/chat/chatThreadListAdapter";
 import type { ThreadMessage } from "@assistant-ui/react";
 
-function fakeUserMessage(text: string): ThreadMessage {
-  return {
-    id: "msg-1",
-    createdAt: new Date("2026-09-05T00:00:00.000Z"),
-    role: "user",
-    content: [{ type: "text", text }],
-    attachments: [],
-    metadata: { custom: {} },
-  };
-}
+const originalFetch = globalThis.fetch;
+afterEach(() => { globalThis.fetch = originalFetch; });
 
-// Mocked (docs/plans/session-b-ui.md step 4): the backend has exactly one
-// conversation per person until Session A's per-thread routes land, so
-// this adapter maps everything onto that one thread rather than real
-// CRUD - these tests check the mock's own contract (a stable remoteId,
-// rename/fetch reflecting it back), not real persistence.
-describe("createChatThreadListAdapter", () => {
-  test("list() returns exactly one thread", async () => {
+describe("saved conversations", () => {
+  test("new chats have distinct persistent ids, titles survive remount, and deletion survives reload", async () => {
+    const saved = new Map<string, { id: string; title: string | null; surface: string; created_at: string }>();
+    let sequence = 0;
+    globalThis.fetch = mock(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const path = String(input);
+      const method = init?.method ?? "GET";
+      const id = path.split("/").pop()!;
+      if (path === "/api/conversations" && method === "POST") {
+        const row = { id: `conv-example${++sequence}`, title: null, surface: "chat", created_at: "2026-09-07T00:00:00Z" };
+        saved.set(row.id, row);
+        return Response.json(row, { status: 201 });
+      }
+      if (path === "/api/conversations") return Response.json([...saved.values()]);
+      const row = saved.get(id);
+      if (!row) return Response.json({ error: "conversation not found" }, { status: 404 });
+      if (method === "PATCH") row.title = JSON.parse(String(init?.body)).title;
+      if (method === "DELETE") saved.delete(id);
+      return Response.json(row);
+    }) as unknown as typeof fetch;
     const adapter = createChatThreadListAdapter("Nova");
-    const { threads } = await adapter.list();
-    expect(threads).toHaveLength(1);
-    expect(threads[0]!.title).toBe("Chat");
+    const a = await adapter.initialize("local-a");
+    const b = await adapter.initialize("local-b");
+    expect(a.remoteId).not.toBe(b.remoteId);
+    await adapter.rename(a.remoteId, "Garden");
+    const reloaded = createChatThreadListAdapter("Nova");
+    expect((await reloaded.fetch(a.remoteId)).title).toBe("Garden");
+    expect((await reloaded.list()).threads.map((row) => row.remoteId)).toEqual([a.remoteId, b.remoteId]);
+    await reloaded.delete(b.remoteId);
+    expect((await createChatThreadListAdapter("Nova").list()).threads.map((row) => row.remoteId)).toEqual([a.remoteId]);
   });
 
-  test("initialize() and fetch() agree on the same remoteId - there is nowhere else for a thread to go yet", async () => {
-    const adapter = createChatThreadListAdapter("Nova");
-    const { remoteId } = await adapter.initialize("local-thread-1");
-    const fetched = await adapter.fetch(remoteId);
-    expect(fetched.remoteId).toBe(remoteId);
+  test("automatic titles are saved before being displayed", async () => {
+    let savedTitle = "";
+    globalThis.fetch = mock(async (_input: RequestInfo | URL, init?: RequestInit) => {
+      expect(init?.method).toBe("PATCH");
+      savedTitle = JSON.parse(String(init?.body)).title;
+      return Response.json({});
+    }) as unknown as typeof fetch;
+    const message: ThreadMessage = { id: "msg-1", createdAt: new Date(), role: "user", content: [{ type: "text", text: "Plan a garden" }], attachments: [], metadata: { custom: {} } };
+    await createChatThreadListAdapter("Nova").generateTitle("conv-example123", [message]);
+    expect(savedTitle).toBe("Plan a garden");
   });
 
-  test("rename() is reflected by a later list()/fetch()", async () => {
+  test("server failures reject rename and delete instead of pretending to persist", async () => {
+    globalThis.fetch = mock(async () => Response.json({ error: "Cannot save" }, { status: 500 })) as unknown as typeof fetch;
     const adapter = createChatThreadListAdapter("Nova");
-    await adapter.rename("main", "Weekend plans");
-    const { threads } = await adapter.list();
-    expect(threads[0]!.title).toBe("Weekend plans");
-    expect((await adapter.fetch("main")).title).toBe("Weekend plans");
-  });
-
-  test("archive/unarchive/delete are safe no-ops on the one real conversation", async () => {
-    const adapter = createChatThreadListAdapter("Nova");
-    await expect(adapter.archive("main")).resolves.toBeUndefined();
-    await expect(adapter.unarchive("main")).resolves.toBeUndefined();
-    await expect(adapter.delete("main")).resolves.toBeUndefined();
-  });
-
-  test("generateTitle() derives a title from the first user message, no model call", async () => {
-    const adapter = createChatThreadListAdapter("Nova");
-    const stream = await adapter.generateTitle("main", [fakeUserMessage("What's the weather in Boston?")]);
-    let text = "";
-    // ReadableStream isn't typed as AsyncIterable in lib.dom.d.ts even
-    // though every real engine (including Bun) implements it - a known
-    // TS/DOM-lib gap, not a real type mismatch.
-    for await (const chunk of stream as unknown as AsyncIterable<{ type: string; textDelta?: string }>) {
-      if (chunk.type === "text-delta" && chunk.textDelta) text += chunk.textDelta;
-    }
-    expect(text).toBe("What's the weather in Boston?");
-  });
-
-  test("unstable_useAdapters supplies the real history adapter for the one thread", () => {
-    const adapter = createChatThreadListAdapter("Nova");
-    const adapters = adapter.unstable_useAdapters!();
-    expect(adapters?.history).toBeDefined();
+    await expect(adapter.rename("conv-example123", "Garden")).rejects.toThrow();
+    await expect(adapter.delete("conv-example123")).rejects.toThrow();
   });
 });

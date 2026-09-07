@@ -1,9 +1,13 @@
-import { Hono, type Context } from "hono";
+import { type Context } from "hono";
+import { createRoute } from "@hono/zod-openapi";
+import { apiRouter, errorResponses, idParamSchema } from "@/lib/openapi";
+import { Conversation } from "@maipai/spec/gen/ts/conversation.js";
 import { requireAuth } from "@/middleware/auth";
 import {
   list,
   exportPerson,
   listConversations,
+  resumeConversation,
   createConversation,
   getConversation,
   listConversationTurns,
@@ -16,7 +20,7 @@ import {
 import type { AppEnv } from "@/types";
 import type { Surface } from "@/lib/turnEngine";
 
-export const conversationsRoutes = new Hono<AppEnv>();
+export const conversationsRoutes = apiRouter();
 
 // Matches every sibling route file's own fail() (memory.ts, commands.ts,
 // notifications.ts, scheduler.ts, settings.ts) - a code review,
@@ -114,4 +118,22 @@ conversationsRoutes.delete("/:id", requireAuth, async (c) => {
   const result = deleteConversationById(actor, c.req.param("id"));
   if (!result.ok) return fail(c, result);
   return c.json({ ok: true });
+});
+
+const resumeRoute = createRoute({
+  method: "post",
+  path: "/{id}/resume",
+  tags: ["Conversations"],
+  summary: "Continue my saved conversation",
+  middleware: [requireAuth] as const,
+  request: { params: idParamSchema("id", "conv-example123") },
+  responses: {
+    200: { content: { "application/json": { schema: Conversation } }, description: "Active conversation, with history preserved." },
+    ...errorResponses({ 401: "Sign in first", 404: "Conversation not found" }),
+  },
+});
+conversationsRoutes.openapi(resumeRoute, (c) => {
+  const result = resumeConversation(c.get("person"), c.req.valid("param").id);
+  if (!result.ok) return c.json({ error: result.error }, 404);
+  return c.json(result.value, 200);
 });

@@ -10,5 +10,26 @@
   {
     "utterance": "give me a trivia question and what do you remember about pizza night",
     "expect_calls": ["trivia", "recall"]
+  },
+  {
+    "utterance": "should I dye my hair black",
+    "expect_calls": [],
+    "note": "Fix D (docs/dev.md's 2026-09-07 incident note): getmaipai/home#62's own live incident - the grammar-forced Tier 2 mechanism this corpus tested picked the music tool for this utterance. A negative row for Fix E's own native-tool-calling replacement to measure its false-call rate against."
+  },
+  {
+    "utterance": "I might go see the new Spiderman movie",
+    "expect_calls": []
+  },
+  {
+    "utterance": "what's the latest Stephen king novel",
+    "expect_calls": []
+  },
+  {
+    "utterance": "good morning",
+    "expect_calls": []
+  },
+  {
+    "utterance": "I'm feeling kind of down",
+    "expect_calls": []
   }
 ]

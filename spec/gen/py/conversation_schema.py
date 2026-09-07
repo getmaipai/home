@@ -33,7 +33,10 @@ class Conversation(BaseModel):
         None,
         description='Household-editable; null until set (PATCH /api/conversations/:id).',
     )
-    status: Literal['open', 'closed', 'deleted']
+    status: Literal['open', 'closed', 'deleted'] = Field(
+        ...,
+        description='Open is active for this person and surface. Closed is inactive and requires an explicit resume before another turn. Deleted is terminal. Resuming closes other open conversations on that surface and clears stale pending confirmations; reading never resumes.',
+    )
     summary: str | None = Field(
         None,
         description="The rolling summary of turns that have fallen out of the prompt window (step 3's window/summary rule).",

@@ -9112,6 +9112,95 @@ margin re-checked against the paraphrase positives.
 Exit: numbers recorded; corpus tests green against the stub; the
 thresholds' comments cite the run.
 
+**Fix D as built (2026-09-07), corrected from D1-D3 above in three real
+ways found while implementing, not assumed going in.** Full numbers:
+`docs/dev/session-c.md`.
+
+**D1's real scope.** No `kind` param on `lib/llm.ts`'s shared `embed()` -
+unnecessary once the prefix change stayed local to `routing.ts`'s own two
+call sites (`ensureRoutingEmbeddings()` prefixes, `embedUtterance()`
+doesn't). `memory.ts`'s embeddings do NOT get prefixed - a real
+constraint D1 didn't account for: `turnEngine.ts`'s `prepareTurn()`
+embeds the utterance ONCE and reuses that identical vector for both
+`route()` and `recall()` (a 2026-09-06 review fix avoiding a duplicate
+HTTP round trip), so prefixing `embedUtterance()`'s query side would
+silently mismatch `recall()`'s own unprefixed document side (`memory.ts`'s
+stored `memoryEmbeddings`) - a real regression, not a hypothetical one.
+Measured head to head rather than assumed: `search_document:`-only
+prefixing scored the SAME 68/71 true-positive rate as no prefixing at
+all while cutting the null-row noise ceiling from p90 1.00 to p90 0.86;
+prefixing BOTH sides (the model card's own default recipe) scored WORSE,
+66/71 - the shared-vector constraint and the empirically best answer
+turned out to be the identical one. Memory's own migration is filed as
+its own follow-up (`docs/BACKLOG.md`, "Chat, memory and persona") since
+it needs a real re-embedding pass over a household's existing memories,
+not a hash bump the way routing's freely-rebuildable store could take.
+Hash invalidation itself: `hashExample()` now hashes the STRING ACTUALLY
+SENT to the embedder (prefixed), not the bare example - self-invalidating
+by construction whenever either the example's own words or the prefix
+scheme changes, no manual version counter needed.
+
+**D2's real scope.** The planned "two paraphrase positives per package"
+never landed: `routing-corpus.json` is ALSO
+`tests/routingCorpus.test.ts`'s stub-embedder regression suite (a
+bag-of-words scorer, no real semantic generalization at all), and every
+one of 20 tried paraphrases failed outright against the stub even though
+they'd plausibly work against the real model - a paraphrase's whole
+point (low shared vocabulary with the canonical example) is exactly what
+a bag-of-words model can't recognize. Reverted; a genuine semantic
+paraphrase test belongs in a live bench probe, not this shared,
+stub-gated file. What landed instead: 32 real conversational negatives
+(not 50 - a real, sufficient, non-padded set covering greetings,
+feelings, opinions, plans, open questions, the six live incident probe
+phrases among them), each one chosen to hold under BOTH the stub and the
+real embedder. `tool-call-corpus.json` gained 5 negatives for Fix E's own
+future false-call measurement, as planned.
+
+**D3's real scope, plus what the run actually found.**
+`scripts/bench/routing.ts` now prints each row's top three scores and a
+null-row percentile summary with a recommended-floor line, as planned;
+`scripts/bench/tool-calling.ts` is untouched (Fix E's own scope, not
+reached this pass). The real run: 32 ordinary negatives (excluding a
+handful of corpus rows deliberately DESIGNED to score high - a
+`consequential` package's own trigger phrase, and the `remember`/
+`recall` near-misses meant for Tier 2, never Tier 1) scored p50=0.610
+p90=0.660 p95=0.740 max=0.800; the weakest genuine Tier 1 positive in
+the whole corpus ("tell me a bedtime story about a fox" ->
+storytime-style) scores 0.770 - the two distributions genuinely overlap
+at the edges (a real greeting can outscore a real match for a DIFFERENT
+utterance), so no single threshold cleanly separates every case.
+`TIER1_THRESHOLD` moved 0.62 -> 0.75 (just above the measured p95, still
+clearing every real positive); `TIER2_AMBIGUOUS_FLOOR` moved 0.45 ->
+0.68. One real, confirmed deterministic misroute the measurement caught
+and this threshold now closes: "I can't decide what to wear today" won
+Tier 1 outright against `list-view` at the old 0.62 bar (score 0.74,
+margin 0.08) - a real, model-free misroute, now gone. A second finding
+from the same run is NOT the same class of bug, worth naming so it isn't
+rediscovered as one: "good morning" scores 0.80 against `translate`
+(historically one of its own routing.examples, "translate good morning
+into french" - swapped for non-greeting phrasing in `translate/
+manifest.json` anyway, real hygiene) but can never actually WIN Tier 1
+regardless of score, because `translate` requires an arg only a literal
+pattern's own wildcard capture can bind - `canFire()` already rejects
+every fuzzy match for it unconditionally. It only ever reaches Tier 2 as
+an offered candidate, where a real model - not a deterministic threshold
+- decides whether to call it.
+
+A separate, pre-existing gap surfaced by this measurement, filed but not
+fixed here (`docs/BACKLOG.md`, "Chat, memory and persona"):
+`ensureRoutingEmbeddings()` only ever ADDS embeddings for a package's
+CURRENT `routing.examples` - an example removed from a manifest (exactly
+what the translate fix above just did) leaves its own orphaned embedding
+row in `routing_embeddings` forever, still included in every future
+`scoreByEmbedding()` comparison with nothing to distinguish it from a
+live one.
+
+Verified: full backend suite green (1712 tests) with three OTHER live
+sessions editing this same checkout concurrently throughout; `tsc
+--noEmit` clean; `routingCorpus.test.ts` 108/108 against the stub;
+`scripts/bench/routing.ts` 108/108 against the real embed backend with
+zero false positives (one, before the threshold fix).
+
 **Fix E: native tool calling, one round trip.**
 
 E1. Spec first, `spec/llm/ts/types.ts`: `ToolDefinition`
@@ -9232,3 +9321,39 @@ and `listConversationTurns()`; `chatHistoryAdapter.ts` puts the result
 on the assistant message's `metadata.custom.memoryIds`;
 `chatMemoryChip.tsx` reads it straight off the rendered message. No
 poll, no separate query, no notification payload ever needed.
+
+
+## Chat composer and saved conversations (2026-09-07)
+
+Chat now uses a single input row that grows with text. Think longer is
+in Chat options; Brain, Mouth, Ears, and Eyes remain in Chat status.
+The wake-word control stays mounted inside the closed status panel so
+closing it does not stop the microphone. The existing assistant-ui
+components remain the chat foundation.
+
+The thread adapter now uses conversation CRUD, per-conversation history,
+and persistent titles. A new chat receives its server id before its
+first turn. The selected id lives in the URL and accompanies every send.
+The Conversations management page links to owned chat threads; its bulk
+and parental controls remain there. Archive is not offered because the
+shared record has no archive state. Delete uses the existing confirmation
+component and reports failures.
+
+The design resolver found that creating a conversation closes the old
+one, while stale turn requests must not reopen closed records. The spec
+now distinguishes explicit resume from a stale request. The additive
+`POST /api/conversations/:id/resume` operation atomically closes other
+open conversations for the same person and surface, reopens the owned
+record, and clears pending confirmations on that transition. Reading is
+read-only, deleted records cannot resume, and parental read access does
+not grant permission to resume another person's chat. No shape migration
+is needed. The existing retention regression remains in place.
+
+Regression tests cover ownership, context, title preservation, stale
+confirmation removal, per-thread loading, and outgoing conversation ids.
+`scripts/screenshot.ts --chat-review` uses the existing offline scripted
+model and a throwaway demo household. It creates two chats, reloads,
+returns to the first, continues, renames it, deletes the second, and
+reloads again at phone and desktop sizes. These are demo conversations,
+not claims about live model quality. Persistent edit/regenerate branches,
+attachments, and continuous voice remain separate backlog work.

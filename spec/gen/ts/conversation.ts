@@ -58,7 +58,13 @@ export const Conversation = z
         "Household-editable; null until set (PATCH /api/conversations/:id).",
       )
       .default(null),
-    status: z.enum(["open", "closed", "deleted"]).default("open"),
+    /**Open is active for this person and surface. Closed is inactive and requires an explicit resume before another turn. Deleted is terminal. Resuming closes other open conversations on that surface and clears stale pending confirmations; reading never resumes.*/
+    status: z
+      .enum(["open", "closed", "deleted"])
+      .describe(
+        "Open is active for this person and surface. Closed is inactive and requires an explicit resume before another turn. Deleted is terminal. Resuming closes other open conversations on that surface and clears stale pending confirmations; reading never resumes.",
+      )
+      .default("open"),
     /**The rolling summary of turns that have fallen out of the prompt window (step 3's window/summary rule).*/
     summary: z
       .union([

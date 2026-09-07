@@ -110,5 +110,27 @@
 
   { "utterance": "turn on the living room light", "expect": "lights-on", "must_not": [] },
   { "utterance": "turn off the kitchen light", "expect": "lights-off", "must_not": [] },
-  { "utterance": "lock the front door", "expect": null, "must_not": ["lock-doors"], "note": "lock-doors is consequential: true and declares no routing.patterns by design - it must never win route()'s own deterministic Tier 1 floor (backend/tests/turnEngine.test.ts has the direct route()-level proof, including that it still appears as a real Tier 2 candidate); this corpus format has no way to assert 'a real ranked candidate, just never the winner', so this row only pins the winner side." }
+  { "utterance": "lock the front door", "expect": null, "must_not": ["lock-doors"], "note": "lock-doors is consequential: true and declares no routing.patterns by design - it must never win route()'s own deterministic Tier 1 floor (backend/tests/turnEngine.test.ts has the direct route()-level proof, including that it still appears as a real Tier 2 candidate); this corpus format has no way to assert 'a real ranked candidate, just never the winner', so this row only pins the winner side." },
+
+  { "utterance": "good morning", "expect": null, "must_not": [], "note": "Fix D (docs/dev.md's 2026-09-07 incident note): conversational negatives from real household chit-chat. Not paraphrases of any package's own routing.examples - this corpus doubles as routingCorpus.test.ts's stub-embedder regression suite (bag-of-words, no real semantic generalization), so a row here has to hold under BOTH the stub and the real embedder; a true paraphrase (sharing little vocabulary with the intended package's own examples) only ever passes under the real model and belongs in a live bench probe, not this file - see docs/dev/session-c.md for the real-embedder numbers these negatives were chosen against." },
+  { "utterance": "how are you doing", "expect": null, "must_not": [] },
+  { "utterance": "I had a long day", "expect": null, "must_not": [] },
+  { "utterance": "should I dye my hair black", "expect": null, "must_not": [], "note": "getmaipai/home#62's own live incident - Tier 2 picked music for this at score 0.49." },
+  { "utterance": "I might go see the new Spiderman movie", "expect": null, "must_not": [] },
+  { "utterance": "what's the latest Stephen king novel", "expect": null, "must_not": [] },
+  { "utterance": "what's for dinner tonight", "expect": null, "must_not": [] },
+  { "utterance": "can you help me with my homework", "expect": null, "must_not": [] },
+  { "utterance": "I got a new job today", "expect": null, "must_not": ["remember", "recall"] },
+  { "utterance": "I'm feeling kind of down", "expect": null, "must_not": [] },
+  { "utterance": "I just got back from vacation", "expect": null, "must_not": [] },
+  { "utterance": "my brother is coming to visit this weekend", "expect": null, "must_not": ["remember", "recall"] },
+  { "utterance": "I think I'm getting sick", "expect": null, "must_not": [] },
+  { "utterance": "what should I make for breakfast", "expect": null, "must_not": [] },
+  { "utterance": "I can't decide what to wear today", "expect": null, "must_not": [] },
+  { "utterance": "I'm bored", "expect": null, "must_not": [] },
+  { "utterance": "what's a good book to read", "expect": null, "must_not": [] },
+  { "utterance": "do you ever get tired", "expect": null, "must_not": [] },
+  { "utterance": "I miss my old job", "expect": null, "must_not": [] },
+  { "utterance": "what's the best way to fall asleep faster", "expect": null, "must_not": [] },
+  { "utterance": "I'm nervous about my interview tomorrow", "expect": null, "must_not": [] }
 ]

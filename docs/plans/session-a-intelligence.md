@@ -121,6 +121,10 @@ Existing events stay: `spoken_cue`, `delta`, `done`, `error`. New:
 - `GET /:id` returns the record; `GET /:id/turns?since=<turn_id>`
   returns its turns oldest first, each with `memory_ids: string[]`
   (empty until the judge runs).
+- `POST /:id/resume` explicitly resumes an owned, non-deleted record.
+  It closes other open conversations for the same person and surface in
+  one transaction, preserves history and clears pending confirmations
+  when reopening. Reading stays read-only; stale turn IDs still fail.
 - `PATCH /:id` sets `title`. `DELETE /:id` deletes one. `POST
   /batch-delete` with `{ ids }`. `POST /clear` deletes all of the
   actor's conversations (the batch-actions rule).

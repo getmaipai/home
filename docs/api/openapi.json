@@ -41,6 +41,9 @@
                     "voice": {
                       "type": "string"
                     },
+                    "uptimeSeconds": {
+                      "type": "number"
+                    },
                     "sidecars": {
                       "type": "array",
                       "items": {
@@ -75,6 +78,7 @@
                   "required": [
                     "brain",
                     "voice",
+                    "uptimeSeconds",
                     "sidecars"
                   ]
                 }
@@ -2963,6 +2967,191 @@
           },
           "404": {
             "description": "No such notification",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/conversations/{id}/resume": {
+      "post": {
+        "tags": [
+          "Conversations"
+        ],
+        "summary": "Continue my saved conversation",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "conv-example123"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Active conversation, with history preserved.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "pattern": "^conv-[a-z0-9]{6,}$"
+                    },
+                    "person": {
+                      "type": "string",
+                      "pattern": "^person-[a-z0-9]{6,}$",
+                      "description": "Whose conversation this is. A conversation is never shared across people."
+                    },
+                    "surface": {
+                      "type": "string",
+                      "enum": [
+                        "chat",
+                        "overlay",
+                        "pod",
+                        "robot",
+                        "tv",
+                        "phone"
+                      ],
+                      "description": "Matches turnEngine.ts's Surface (4.5): a person may hold one open conversation per surface at a time."
+                    },
+                    "companion_id": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "description": "The companion persona active when this conversation was created (5.4); null before companions exist as packages (step 8)."
+                        },
+                        {
+                          "nullable": true,
+                          "description": "The companion persona active when this conversation was created (5.4); null before companions exist as packages (step 8)."
+                        },
+                        {
+                          "nullable": true
+                        }
+                      ],
+                      "default": null,
+                      "description": "The companion persona active when this conversation was created (5.4); null before companions exist as packages (step 8)."
+                    },
+                    "title": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "maxLength": 200,
+                          "description": "Household-editable; null until set (PATCH /api/conversations/:id)."
+                        },
+                        {
+                          "nullable": true,
+                          "description": "Household-editable; null until set (PATCH /api/conversations/:id)."
+                        },
+                        {
+                          "nullable": true
+                        }
+                      ],
+                      "default": null,
+                      "description": "Household-editable; null until set (PATCH /api/conversations/:id)."
+                    },
+                    "status": {
+                      "type": "string",
+                      "enum": [
+                        "open",
+                        "closed",
+                        "deleted"
+                      ],
+                      "default": "open",
+                      "description": "Open is active for this person and surface. Closed is inactive and requires an explicit resume before another turn. Deleted is terminal. Resuming closes other open conversations on that surface and clears stale pending confirmations; reading never resumes."
+                    },
+                    "summary": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "description": "The rolling summary of turns that have fallen out of the prompt window (step 3's window/summary rule)."
+                        },
+                        {
+                          "nullable": true,
+                          "description": "The rolling summary of turns that have fallen out of the prompt window (step 3's window/summary rule)."
+                        },
+                        {
+                          "nullable": true
+                        }
+                      ],
+                      "default": null,
+                      "description": "The rolling summary of turns that have fallen out of the prompt window (step 3's window/summary rule)."
+                    },
+                    "summary_through_turn": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "description": "The last conversation_turns id folded into `summary`, so the refresh job knows what's new since then."
+                        },
+                        {
+                          "nullable": true,
+                          "description": "The last conversation_turns id folded into `summary`, so the refresh job knows what's new since then."
+                        },
+                        {
+                          "nullable": true
+                        }
+                      ],
+                      "default": null,
+                      "description": "The last conversation_turns id folded into `summary`, so the refresh job knows what's new since then."
+                    },
+                    "source": {
+                      "type": "string",
+                      "enum": [
+                        "hub",
+                        "local"
+                      ],
+                      "description": "hub: authoritative on the hub. local: begun on a robot, not yet synced (4.14: 'a chat begun on the robot appears on the phone through the hub... robot turns sync as conversation records'). Mirrors person.schema.json's own source field."
+                    },
+                    "hlc": {
+                      "type": "string",
+                      "pattern": "^[0-9]+:[0-9]+:[a-z0-9]{6,}$",
+                      "description": "Hybrid logical clock: wall_ms:counter:node (7.3)."
+                    },
+                    "created_at": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "updated_at": {
+                      "type": "string",
+                      "format": "date-time"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "person",
+                    "surface",
+                    "source",
+                    "hlc",
+                    "created_at",
+                    "updated_at"
+                  ],
+                  "additionalProperties": false,
+                  "description": "One chat thread, per person and per surface (platform plan 4.14). Its turns live separately (hub-internal, conversation_turns); this record is the thread itself: title, rolling summary, and lifecycle. See session-a-intelligence.md step 3."
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Sign in first",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Conversation not found",
             "content": {
               "application/json": {
                 "schema": {

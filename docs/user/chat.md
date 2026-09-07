@@ -18,7 +18,13 @@ Tap the microphone icon next to the message box and start speaking. MaiPai liste
 
 ## Wake word (experimental)
 
-The **Wake word** button above the message box turns on listening for MaiPai's name. This is an early, experimental feature. MaiPai can hear its wake word today, but it can't act on it yet. That's coming soon.
+Open **Chat status**, then tap **Wake word** to turn on the wake-word listener. This is an early, experimental feature. MaiPai can hear its wake word today, but it can't act on it yet. That's coming soon.
+
+## Chat options and status
+
+The small message box grows as you type. Open **Chat options** beside it to turn on **Think longer** for your next message.
+
+Open **Chat status** to see the Brain, Mouth, Ears, and Eyes indicators. Each shows what is ready and what needs attention. Eyes is marked **Coming soon** until vision is available.
 
 ## More on a message
 
@@ -31,13 +37,17 @@ Each of MaiPai's replies has a few small buttons under it:
 
 ## Start a new conversation
 
-Tap **New Thread** at the top of the thread list to start fresh.
+Tap the **+** button beside Chat to start fresh. A new chat is saved when you send its first message.
 
 ## Your conversation history
 
-Every conversation is saved. Open **Conversations** in the sidebar to see them all:
+Tap the history button beside Chat to see your saved chats. Pick one to read it and keep talking. Reloading the page keeps that chat open.
 
-- Tap a conversation to reopen it.
+Open **More options** beside a chat to rename or delete it. Deleting asks you to confirm first.
+
+Open **Conversations** from navigation for bulk actions and parental oversight:
+
+- Tap one of your chat titles to reopen it.
 - Tap **Rename** to give it a clearer title.
 - Tap **Delete** to remove one you don't need.
 - Tap **Select conversations** to choose several at once, or **Clear all** to remove everything.

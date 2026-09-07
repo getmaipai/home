@@ -34,6 +34,9 @@ import {
   LayoutGrid,
   Grid2x2,
   History,
+  Activity,
+  Info,
+  SlidersHorizontal,
   type LucideIcon,
 } from "lucide-react";
 
@@ -77,6 +80,9 @@ const REGISTRY: Record<string, LucideIcon> = {
   "layout-grid": LayoutGrid,
   "grid-2x2": Grid2x2,
   history: History,
+  activity: Activity,
+  info: Info,
+  "sliders-horizontal": SlidersHorizontal,
 };
 
 export function getIcon(name: string): LucideIcon {

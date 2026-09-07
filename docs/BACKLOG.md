@@ -496,25 +496,84 @@ every conversational turn with a sampled choice among irrelevant tools.
 The two items below are that note's fixes D and E; do D first, E is
 verified against D's numbers.
 
-- [ ] **Fix D: measure routing on the real embedder, add nomic prefixes,
-      widen the corpora** (M) - objective: thresholds set from a recorded
-      run, not start values. Files: `backend/src/lib/llm.ts` (`embed()`
-      gains `kind: "query" | "document"` and the `search_query: ` /
-      `search_document: ` prefixes nomic-embed-text-v1.5 requires; bump
-      the stored `space` so old rows re-embed), `backend/src/lib/routing.ts`,
-      `backend/src/lib/memory.ts` (callers), `spec/llm/routing-corpus.json`
-      (two paraphrase positives per package, fifty-plus conversational
-      negatives), `spec/llm/tool-call-corpus.json` (the same negatives as
-      `expect_calls: []`), `backend/scripts/bench/routing.ts` (per-row top
-      three, null-row percentiles), `backend/scripts/bench/tool-calling.ts`
-      (real package descriptions, top three by similarity, five repeats,
-      false-call rate). Mirror: `tests/routingCorpus.test.ts`'s row shape.
-      Acceptance: numbers recorded in `docs/dev/session-c.md` next to the
-      "not yet measured" notes; `TIER1_THRESHOLD` and the Tier 2 floor at
-      or above p95 of the null rows' top wrong score, comments citing the
-      run. Out of scope: any change to what routing does with the scores.
-      Exit: `scripts/check.sh`, plus both benches run against the real
-      engines with output pasted into session-c.md.
+- [x] **Fix D: measure routing on the real embedder, add nomic prefixes,
+      widen the corpora** (M) - shipped 2026-09-07. As built, corrected
+      from the plan below in three real ways - see `docs/dev/session-c.md`
+      for the full numbers and `docs/dev.md`'s Fix D "as built" note for
+      the reasoning behind each correction:
+      (1) `routing.ts`'s own `ensureRoutingEmbeddings()`/`embedUtterance()`
+      get the `search_document:`/no-prefix split directly (no `kind`
+      param on `lib/llm.ts`'s shared `embed()` - unnecessary once the
+      change stayed routing-only); `memory.ts`'s embeddings deliberately
+      do NOT get a prefix yet (filed as its own follow-up item above -
+      `embedUtterance()`'s vector is reused for both `route()` and
+      `recall()` to avoid a duplicate HTTP round trip, so a query prefix
+      here would need a real re-embedding migration for memory's own
+      stored vectors first, not a hash bump like routing's own store
+      could take). Measured head to head, not assumed: document-only
+      prefixing scored the SAME 68/71 true-positive rate as no prefixing
+      while cutting the null-row noise ceiling from p90 1.00 to p90 0.86;
+      prefixing BOTH sides (the model card's own default) scored WORSE,
+      66/71 - confirming the shared-vector constraint and the empirically
+      best answer were the identical one, not a compromise.
+      (2) The corpus widening dropped 20 planned "paraphrase positive"
+      rows entirely: `spec/llm/routing-corpus.json` is ALSO
+      `tests/routingCorpus.test.ts`'s stub-embedder regression suite
+      (bag-of-words, no real semantic generalization), and a genuine
+      paraphrase only ever passes under the real model - all 20 failed
+      the stub outright when tried. Landed instead: 32 real conversational
+      negatives (the six live incident probe phrases among them) that
+      hold under both the stub and the real embedder, plus 5 negatives in
+      `spec/llm/tool-call-corpus.json` for Fix E's own future false-call
+      measurement.
+      (3) `TIER1_THRESHOLD` 0.62 -> 0.75 and `TIER2_AMBIGUOUS_FLOOR`
+      0.45 -> 0.68, both set from the measured null-row distribution
+      (p50=0.610 p90=0.660 p95=0.740 max=0.800 over 32 ordinary
+      negatives, excluding rows deliberately designed to score high - a
+      `consequential` package's own trigger phrase and the `remember`/
+      `recall` near-misses meant for Tier 2). One real, confirmed
+      deterministic misroute this caught and fixed: "I can't decide what
+      to wear today" won Tier 1 outright against `list-view` at the old
+      0.62 threshold (score 0.74, margin 0.08) - gone at 0.75. `translate`
+      manifest.json's own routing.examples swapped "translate good
+      morning into french"/"...good night to italian" for non-greeting
+      phrasing (real hygiene - "good morning" alone scored 0.80 against
+      translate - though confirmed NOT a live misroute: `translate`
+      requires an arg only a literal pattern's own wildcard capture can
+      bind, so `canFire()` already rejected it from ever WINNING Tier 1
+      regardless of score; it only ever reached Tier 2 as an offered
+      candidate for the model itself to decide on). `backend/scripts/
+      bench/routing.ts` now prints each row's top three scores and a
+      null-row percentile summary with a recommended-floor line.
+      A separate, pre-existing gap found while measuring, NOT fixed here
+      (filed below): `ensureRoutingEmbeddings()` only ever ADDS missing
+      embeddings for a package's CURRENT `routing.examples` - an example
+      REMOVED from a manifest (exactly what the translate fix just did)
+      leaves its own old, orphaned embedding row in `routing_embeddings`
+      forever, still compared in every future `scoreByEmbedding()` call.
+      Verified: full backend suite green (1712 tests), `tsc --noEmit`
+      clean, `routingCorpus.test.ts` 108/108 against the stub,
+      `scripts/bench/routing.ts` 108/108 against the real embedder with
+      zero false positives (down from one).
+- [ ] **Prune orphaned `routing_embeddings` rows for examples no longer
+      declared** (S) - found live during Fix D's own measurement
+      (above), not fixed there to keep that fix's own diff scoped to
+      what it set out to change. `ensureRoutingEmbeddings()`
+      (`backend/src/lib/routing.ts`) only ever inserts embeddings for
+      examples CURRENTLY in a package's own `routing.examples` - an
+      example a package author removes (translate's own Fix D swap is a
+      real instance) leaves its old embedding row behind forever,
+      indistinguishable from a live one to `scoreByEmbedding()`, which
+      selects every stored row for a candidate package with no filter
+      against what that package currently declares. For a package with
+      no required args this could let a stale, no-longer-real example
+      win Tier 1 outright. Fix: after the existing insert loop, delete
+      any `routingEmbeddings` row for a `packageId` in this call's own
+      `candidates` list whose `exampleHash` isn't among the hashes just
+      computed from that package's CURRENT `examples`. Exit: a test that
+      removes an example from a fixture manifest, calls
+      `ensureRoutingEmbeddings()` again, and asserts the old row is gone
+      from the table.
 - [ ] **Fix E: native tool calling, one round trip** (M-L) - objective:
       the model is offered the top candidates through llama-server's own
       `tools`/`tool_choice` (spawned with `--jinja`) and either answers in
@@ -704,6 +763,37 @@ into a conversation with someone who knows who is talking.
 
 **Conversation and context**
 
+- [ ] **Migrate memory.ts's stored embeddings to nomic's `search_document:`
+      prefix, to match routing.ts's own Fix D change** (M) - deferred
+      2026-09-07 from Fix D (`docs/dev.md`'s "Chat reliability: the
+      2026-09-07 incident" note), see `lib/memory.ts`'s own
+      `embedQueryForRecall()` comment for the full reasoning it was
+      deferred. Objective: `memoryEmbeddings` rows carry the same
+      `search_document:`-prefixed vectors `routingEmbeddings` now does,
+      without ever comparing a prefixed vector against a stale unprefixed
+      one mid-migration. Real constraint routing.ts's own fix didn't have:
+      `memoryEmbeddings` has no hash/staleness concept at all (one row per
+      memory, always overwritten in place) and no cheap way to tell "this
+      row is pre- or post-migration" apart - a hash bump alone (routing's
+      own trick) does nothing for rows that already exist. Needs: (1) a
+      real migration path - a `space` value that encodes the prefix
+      scheme (not just `result.value.model`) so a query can filter for
+      compatible rows, plus a maintenance-job pass (`lib/memory.ts`'s
+      existing `runMaintenance()`/`pending_embeddings` retry machinery is
+      the precedent to extend, not reinvent) that re-embeds every
+      pre-migration row in the background; (2) `embedQueryForRecall()`
+      gains the `search_query:` prefix only once writes are prefixed too
+      - a query-side-only change first would be worse than doing nothing,
+      confirmed live (Fix D's own measurement: prefixing only one side
+      scored WORSE than neither on the routing corpus); (3)
+      `turnEngine.ts`'s `prepareTurn()` reuses ONE utterance vector for
+      both `route()` and `recall()` (a 2026-09-06 review fix avoiding a
+      duplicate HTTP round trip) - since routing.ts's own query side
+      stays unprefixed (Fix D's real, measured answer there), this item's
+      own query prefix would need its OWN separate embed call, reopening
+      that round-trip cost; measure whether the recall-quality gain is
+      worth it before assuming it is. Out of scope until then: don't
+      prefix memory.ts's writes alone.
 - [ ] **Fix B: a package failure is a failure, canned text is never the
       model's voice, the UI shows who answered** (M) - from `docs/dev.md`'s
       "Chat reliability: the 2026-09-07 incident" note. Objective: a Tier 1
@@ -1823,17 +1913,35 @@ future session now that F's hub half exists.
       (six kinds, nothing rendered) is corrected here rather than left to
       mislead the next reader; the `app`-kind re-decision it named is its
       own item above, resolved 2026-09-06.
-- [ ] **Chat surface, the missing basics** (M total) - markdown via a
-      maintained renderer (react-markdown plus rehype-sanitize; bubbles
-      are `whitespace-pre-wrap` today so a list shows raw asterisks); a
-      multi-line Textarea composer; stop generating (no abort exists,
-      Send is just disabled); copy and regenerate; suggested prompts on
-      the empty state; timestamps and day dividers; `aria-live` on the
-      streaming bubble (a screen reader hears nothing during a reply);
-      a resume cursor on the stream (legacy's `since=` auto-resume was
-      added after a truncated reply was reported as success). **Done**:
-      the "demo only" wake banner is reworded for a family (session E
-      step 4, 2026-09-06).
+- [x] **Compact chat composer and status panel** (S, 2026-09-07) -
+      `ChatPage.tsx`, `thread.aui.tsx`, and `SensesDock.tsx`: one input
+      row that grows with text; Think longer in Chat options; Brain,
+      Mouth, Ears, and Eyes in Chat status. Wake word stays mounted
+      when the status panel closes. Verified by the seeded screenshot
+      flow at phone/dark and desktop/light.
+- [x] **Chat uses real saved conversations** (M, 2026-09-07) -
+      `chatThreadListAdapter.ts`, `chatHistoryAdapter.ts`, and
+      `chatModelAdapter.ts` use the existing per-conversation API.
+      New chats get distinct ids; selected history and outgoing turns
+      use that id; titles and confirmed deletion persist across reloads.
+      The URL keeps the selected chat, and Conversations links to it.
+      Spec-first `POST /api/conversations/:id/resume` explicitly reopens
+      owned chats before sending, without weakening stale-ID rejection.
+      Mirror the existing `Conversation` lifecycle and assistant-ui
+      adapters. Acceptance: create two, reload, continue the first,
+      rename, delete the second, reload again. Out of scope: persistent
+      branches, attachments, and continuous voice. Exit checks:
+      `bash scripts/check.sh`, `bun run screenshots --chat-review`.
+- [ ] **Chat stream reconnection and persistent message branches** (M) -
+      `chatModelAdapter.ts`, `chatHistoryAdapter.ts`, and the turn API.
+      Markdown, multiline input, stop, copy, suggestions, timestamps,
+      day dividers, and streaming announcements already exist; the old
+      missing-basics list was stale. Mirror the existing turn stream
+      and history fixtures. Acceptance: an interrupted stream resumes
+      without duplicate text; edits and regenerated alternatives survive
+      reload with the chosen history. Spec-first design before changing
+      persisted shapes. Out of scope: projects and attachments. Exit:
+      `bash scripts/check.sh` plus new stream/branch regression tests.
 - [x] **Conversations as records** (M, spec first) - done, session A step
       3 (backend: a real `Conversation` shape, `GET /api/conversations`
       as a real thread list, rename/delete/batch-delete/clear-all) plus
