@@ -14,7 +14,12 @@
       "search online for tonight's game score",
       "search the web for the weather forecast",
       "search the web for the closest pharmacy",
-      "search online for today's headlines"
+      "search online for today's headlines",
+      "what's the latest book by my favorite author",
+      "when does the new season come out",
+      "is the hardware store open right now",
+      "what's the current price of that",
+      "has there been any news about that lately"
     ],
     "patterns": ["search the web for *", "search online for *"]
   },

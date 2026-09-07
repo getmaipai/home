@@ -9459,6 +9459,54 @@ the real household's data, checked against `hub.db` afterwards). And a
 shell whose own command line contains `--port 8788` (a heredoc, an
 inline canary) is itself a match for `freePort()`.
 
+### websearch had no natural-question coverage at all (live-found 2026-09-07, 09:22)
+
+Jesse asked the live dev hub "what's the latest stephen king novel," got
+a guard-caught "I don't have access to real-time information" (Fix C
+working exactly as designed - the model guessed a title, the guard
+caught the invention and gave an honest line instead), then asked it to
+"look it up" and got told, correctly, that nothing had searched anything.
+Pulled the real `[turn]` log and `conversation_turns` from the live
+household db (`data/hub.db`, read-only): all three turns were
+`source: "model"`, no plugin ever offered, let alone called.
+
+Root cause, not a routing bug: `websearch`'s own `routing.examples`
+(`backend/packages/websearch/manifest.json`) were all five literal
+"search the web/online for X" commands, mirroring its `routing.patterns`
+- nothing shaped like an ordinary question, so a natural "what's the
+latest X" never scored anywhere close to it. Fixed by adding five
+natural-question examples ("what's the latest book by my favorite
+author," "when does the new season come out," "is the hardware store
+open right now," "what's the current price of that," "has there been
+any news about that lately") alongside the existing five, keeping the
+literal patterns unchanged. `search.searxng_url` is genuinely configured
+on this household, so this isn't a dead end - a query that clears the
+bar now gets a real answer.
+
+Measured against the real embedder (`scripts/bench/routing.ts`, pointed
+at the household's own already-running embed server via
+`MAIPAI_EMBED_URL=http://127.0.0.1:8794` - never spawned a second one,
+which would have called `freePort()` against the live process the same
+way the incident above did to chat), not assumed: the exact live
+utterance itself now scores `websearch:0.66`, its new top candidate (was
+not competitive at all before), but still under both `TIER2_AMBIGUOUS_
+FLOOR` (0.68) and `TIER1_THRESHOLD` (0.75) - a real, measured
+improvement, not a full fix. A cleanly-phrased sibling
+("when does the new season of the show come out") scores `0.86`, a
+clean Tier 1 win. Tried adding both as `routing-corpus.json` regression
+rows; both failed the stub-embedder's bag-of-words matching (the exact
+"paraphrase positive rows don't survive the stub" finding from this
+session's own Fix D work) and were reverted rather than forced in -
+`routingCorpus.test.ts` stays 107/107, `scripts/bench/routing.ts` stays
+100% precision/recall on the existing corpus.
+
+Deliberately not chased further: hand-tuning examples one utterance at a
+time to inch a specific phrase over a threshold is the same whack-a-mole
+this session already learned to distrust (Fix D's own paraphrase-corpus
+reversion). The real fix for "the model should just be able to decide to
+search" is Fix E (native tool calling) - once it ships, the model's own
+judgment replaces this narrow five-example similarity match entirely.
+
 ### Not in scope, stated
 
 No autonomous plan/call/observe loop (the 2026-09-04 note's explicit
