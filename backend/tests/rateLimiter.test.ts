@@ -21,32 +21,30 @@ describe("tryConsume", () => {
     expect(tryConsume("host-b", opts)).toBe(true); // host-b's own bucket is untouched
   });
 
-  test("refills over real time, up to the capacity ceiling", async () => {
+  test("refills over time, up to the capacity ceiling", () => {
     const opts = { capacity: 1, refillPerSecond: 20 }; // one token every 50ms
-    expect(tryConsume("host-c", opts)).toBe(true);
-    expect(tryConsume("host-c", opts)).toBe(false);
-    await new Promise((r) => setTimeout(r, 80));
-    expect(tryConsume("host-c", opts)).toBe(true);
+    const t0 = 1_000_000;
+    expect(tryConsume("host-c", opts, t0)).toBe(true);
+    expect(tryConsume("host-c", opts, t0)).toBe(false);
+    expect(tryConsume("host-c", opts, t0 + 80)).toBe(true); // 80ms elapsed, well past one refill
   });
 
-  // Observed flaky (2026-09-06) when the full suite runs under real
-  // system load (many other files' real subprocess-spawning tests
-  // competing for CPU at the same time): the original version used
-  // refillPerSecond: 1000 (one token every 1ms), so as little as a few
-  // milliseconds of scheduling jitter between the four tryConsume() calls
-  // below could tip the bucket over into an accidental 3rd token,
-  // failing the final assertion despite the clamp logic itself being
-  // correct. Slower rate (50ms/token) and a longer sleep give the same
-  // proof - "would refill way past capacity if unclamped" - with a
-  // jitter margin two orders of magnitude wider than a real test runner
-  // ever needs.
-  test("never refills past capacity even after a long idle gap", async () => {
+  // Issue #13: the original version waited on a REAL setTimeout() and
+  // asserted an exact token count afterward - under the full suite's
+  // real load (scheduler jitter, CPU contention from every other file's
+  // own timing), actual elapsed time past the wait could run long enough
+  // to refill an extra token before the final tryConsume() call,
+  // flaking roughly 1 in 4 full-suite runs. tryConsume()'s own `nowMs`
+  // parameter (added for this fix) makes elapsed time exact and
+  // deterministic instead - no real timer, no possible jitter, and no
+  // margin to guess at.
+  test("never refills past capacity even after a long idle gap", () => {
     const opts = { capacity: 2, refillPerSecond: 20 }; // would refill ~10 tokens in 500ms if unclamped
-    expect(tryConsume("host-d", opts)).toBe(true);
-    expect(tryConsume("host-d", opts)).toBe(true);
-    await new Promise((r) => setTimeout(r, 500));
-    expect(tryConsume("host-d", opts)).toBe(true); // capped at capacity=2, not the unclamped ~10
-    expect(tryConsume("host-d", opts)).toBe(true); // the 2nd of exactly 2 available tokens
-    expect(tryConsume("host-d", opts)).toBe(false); // and no 3rd - proves the cap, not just "some refill happened"
+    const t0 = 1_000_000;
+    expect(tryConsume("host-d", opts, t0)).toBe(true);
+    expect(tryConsume("host-d", opts, t0)).toBe(true);
+    expect(tryConsume("host-d", opts, t0 + 500)).toBe(true); // capped at capacity=2, not the unclamped ~10
+    expect(tryConsume("host-d", opts, t0 + 500)).toBe(true); // the 2nd of exactly 2 available tokens
+    expect(tryConsume("host-d", opts, t0 + 500)).toBe(false); // and no 3rd - proves the cap, not just "some refill happened"
   });
 });

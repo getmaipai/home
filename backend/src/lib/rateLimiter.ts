@@ -45,18 +45,25 @@ function refill(bucket: Bucket, opts: TokenBucketOptions, nowMs: number): void {
  * false (consuming nothing) otherwise. Never blocks or queues - a
  * caller over budget gets told no immediately, the same "back off on the
  * first signal" posture the household would want from any of its own
- * integrations, rather than a request silently piling up. */
-export function tryConsume(key: string, opts: TokenBucketOptions): boolean {
-  const now = Date.now();
+ * integrations, rather than a request silently piling up.
+ *
+ * `nowMs` defaults to Date.now() for every real caller - it exists so a
+ * test can inject an exact elapsed time instead of a real setTimeout()
+ * plus an exact post-wait assertion (issue #13: under full-suite load,
+ * scheduler jitter could refill an extra token before a real 50ms wait
+ * actually elapsed, flaking roughly 1 in 4 full-suite runs). Same
+ * "explicit `now` parameter, default real time" shape scheduler.ts's own
+ * runDueJobs() already uses. */
+export function tryConsume(key: string, opts: TokenBucketOptions, nowMs: number = Date.now()): boolean {
   let bucket = buckets.get(key);
   if (!bucket) {
     if (buckets.size >= MAX_BUCKETS) {
-      for (const [k, v] of buckets) if (now - v.lastRefillMs > STALE_MS) buckets.delete(k);
+      for (const [k, v] of buckets) if (nowMs - v.lastRefillMs > STALE_MS) buckets.delete(k);
     }
-    bucket = { tokens: opts.capacity, lastRefillMs: now };
+    bucket = { tokens: opts.capacity, lastRefillMs: nowMs };
     buckets.set(key, bucket);
   }
-  refill(bucket, opts, now);
+  refill(bucket, opts, nowMs);
   if (bucket.tokens < 1) return false;
   bucket.tokens -= 1;
   return true;
