@@ -490,6 +490,54 @@ alongside the first sourced skill, not before it.
 
 ## Advanced tool calling (Tier 2)
 
+The 2026-09-07 incident (`docs/dev.md`, "Chat reliability: the
+2026-09-07 incident and the five fixes") found today's Tier 2 firing on
+every conversational turn with a sampled choice among irrelevant tools.
+The two items below are that note's fixes D and E; do D first, E is
+verified against D's numbers.
+
+- [ ] **Fix D: measure routing on the real embedder, add nomic prefixes,
+      widen the corpora** (M) - objective: thresholds set from a recorded
+      run, not start values. Files: `backend/src/lib/llm.ts` (`embed()`
+      gains `kind: "query" | "document"` and the `search_query: ` /
+      `search_document: ` prefixes nomic-embed-text-v1.5 requires; bump
+      the stored `space` so old rows re-embed), `backend/src/lib/routing.ts`,
+      `backend/src/lib/memory.ts` (callers), `spec/llm/routing-corpus.json`
+      (two paraphrase positives per package, fifty-plus conversational
+      negatives), `spec/llm/tool-call-corpus.json` (the same negatives as
+      `expect_calls: []`), `backend/scripts/bench/routing.ts` (per-row top
+      three, null-row percentiles), `backend/scripts/bench/tool-calling.ts`
+      (real package descriptions, top three by similarity, five repeats,
+      false-call rate). Mirror: `tests/routingCorpus.test.ts`'s row shape.
+      Acceptance: numbers recorded in `docs/dev/session-c.md` next to the
+      "not yet measured" notes; `TIER1_THRESHOLD` and the Tier 2 floor at
+      or above p95 of the null rows' top wrong score, comments citing the
+      run. Out of scope: any change to what routing does with the scores.
+      Exit: `scripts/check.sh`, plus both benches run against the real
+      engines with output pasted into session-c.md.
+- [ ] **Fix E: native tool calling, one round trip** (M-L) - objective:
+      the model is offered the top candidates through llama-server's own
+      `tools`/`tool_choice` (spawned with `--jinja`) and either answers in
+      text or calls, in one request; the grammar-forced JSON array and
+      its separate `complete()` call are deleted. Spec first:
+      `spec/llm/ts/types.ts` (`ToolDefinition`, `tools`, `tool_choice`,
+      `tool_calls` on message and chunk delta, `finish_reason:
+      "tool_calls"`), `spec/llm/ts/client.ts` (`chatCompleteStream()`
+      returns `{ tool_calls }` as its generator return value),
+      `spec/llm/ts/stubServer.ts` (scripted `tool_calls`). Then
+      `backend/src/lib/engineAutotune.ts` (`--jinja`),
+      `backend/src/lib/enginePostLoadCheck.ts` (one canned tools request
+      asserted at spawn), `backend/src/lib/llm.ts` (delete
+      `toolCallSchema`/`parseToolCalls`), `backend/src/lib/turnEngine.ts`
+      (`prepareTurn()` returns `tools`; the consequential-confirmation and
+      `PendingAsk` code moves out of `attemptTier2Tools()` into a function
+      over `ToolCall[]`; `routing.tier: "tool"`, additive). Mirror:
+      `tests/tier2.test.ts`, `tests/toolCallCorpus.test.ts`, rewritten
+      against the stub. Acceptance: the four incident messages answered by
+      the model with no call chosen; bench false-call rate recorded, and
+      if above 2 percent the fix is the floor or the corpus, never the
+      grammar. Out of scope: a second completion to phrase a tool result;
+      any agent loop. Exit: `scripts/check.sh` plus the tool-calling bench.
 - [ ] Real multi-source, multi-skill answers (L) - see `docs/dev.md`'s
       2026-09-04 tier 2 note and the 2026-09-05 stress-test against it.
       Explicitly NOT an open agentic loop by design; the current best
@@ -656,6 +704,62 @@ into a conversation with someone who knows who is talking.
 
 **Conversation and context**
 
+- [ ] **Fix B: a package failure is a failure, canned text is never the
+      model's voice, the UI shows who answered** (M) - from `docs/dev.md`'s
+      "Chat reliability: the 2026-09-07 incident" note. Objective: a Tier 1
+      handler that cannot answer reports a typed error; the turn engine
+      speaks the manifest's `fallback_reply` from one place and Tier 2
+      treats it as "answer normally"; non-model turns enter the prompt
+      window as `system` notes; the bubble says "via Music Lookup". Spec
+      first: `spec/schemas/result.schema.json` gains optional `error`
+      (`code` from `spec/errors/errors.json`, `message`), regenerate
+      `gen/ts` and `gen/py`. Files: the seven handlers that hand-copy "I
+      couldn't look that up right now." (`backend/packages/{almanac-holiday,
+      almanac-onthisday,currency,knowledge,music,news,sports}/handler.ts`),
+      `backend/src/lib/denoHost.ts` (`parseHandleResult()` maps `error`;
+      `callTier1Handle()` returns it without a strike; `fallbackResult()`
+      stays the one place `fallback_reply` is applied),
+      `backend/src/lib/plugins.ts` (`runPlugin()` returns `{ ok: false,
+      status: 502, error, fallback_reply }`), `backend/src/lib/turnEngine.ts`
+      (pattern branch speaks the fallback as `plugin_error`; Tier 2 falls
+      through), `backend/src/lib/conversationHistory.ts`
+      (`buildConversationWindow()` pushes `system` for every non-model
+      source, display name from `loadManifestOnly()`),
+      `frontend/src/apps/chat/chatModelAdapter.ts` and the bubble (caption
+      from `done.value.source`/`plugin_id`, display name via the
+      manifests `chatSuggestionAdapter.ts` already fetches). Mirror:
+      `runPlugin()`'s existing `HostError` mapping; `tests/tier2.test.ts`.
+      Acceptance: "should I dye my hair black" answered by the model even
+      when a plugin is chosen and fails; a MusicBrainz 503 three times does
+      not disable the package; a plugin turn appears in the window as
+      `system`; the caption renders. Out of scope: rephrasing a plugin
+      reply in the persona's voice. Exit: `scripts/check.sh` plus new
+      tests in `tests/tier2.test.ts`, `tests/conversationHistory.test.ts`,
+      and one frontend test for the caption.
+- [ ] **Fix C: guards narrow to household claims, cut instead of splice,
+      proven by a corpus** (M) - same note. Objective: ordinary small talk
+      ("That sounds like a fun night out!", "Sounds like a long day.", <!-- prose-lint: allow -->
+      "Spider-Man") passes; a household claim ("he drives a black BMW",
+      "your dentist is on Thursday at four" with no source) is still
+      caught; a flagged sentence is dropped from a stream, never replaced
+      mid-reply. Files: `backend/src/lib/guards.ts` (delete the
+      `PROPER_NOUN_RE`/`DATE_WORD_RE`/`BARE_NUMBER_RE` loop and the
+      `probably (a|an|the)` / `sounds like (a|an)` alternations of
+      `GUESSING_RE`; add the narrow household schedule-claim shape),
+      `backend/src/lib/text.ts` (`tokenize()` also indexes the joined form
+      of a hyphenated word), `backend/src/lib/turnEngine.ts`
+      (`gateGuards()`: CUTTABLE drops and continues, non-cuttable yields
+      the replacement once and ends, an empty reply yields it once),
+      `spec/llm/guard-corpus.json` (new; rows `{utterance, reply, sources,
+      history, expect}`, seeded per the note), `backend/tests/guardCorpus.test.ts`
+      (new, mirrors `tests/routingCorpus.test.ts`, in `check.sh`).
+      Standing rule: every guard false positive seen in the house gets a
+      corpus row before it is fixed. Acceptance: the twelve probe replies
+      in the note pass untouched; "It's sunny and about 75 degrees today."
+      answering a weather question is still caught; no reply ever
+      contains a canned line followed by the model's own sentence. Out of
+      scope: a model-based grounding judge. Exit: `scripts/check.sh` with
+      the guard corpus green.
 - [x] **Send prior turns to the model** (S-M) - shipped, Session A step 3
       (2026-09-05): `buildConversationWindow()` in `lib/conversationHistory.ts`,
       newest 4 turns always kept verbatim, older ones added
@@ -1994,6 +2098,34 @@ on a spec tag that was never cut.
 
 ## Cross-cutting
 
+- [ ] **Fix A: engines survive `bun --hot`, and the turn pipeline logs**
+      (M) - from `docs/dev.md`'s "Chat reliability: the 2026-09-07
+      incident" note; do this first. Objective: a backend source save
+      never costs a model reload or a dead reply (ten reloads in one
+      night respawned qwen3-8b eleven times and killed a reply
+      mid-stream), and every completed turn leaves one structured line
+      saying what routed, what was offered, what ran, and what the guards
+      cut. Files: `backend/src/lib/llmSupervisor.ts`,
+      `backend/src/lib/embedSupervisor.ts`, `backend/src/lib/ttsSupervisor.ts`
+      (module-level state moves to one `globalThis.__maipaiEngines`
+      registry; a fresh module instance health-checks and reuses the
+      running backend), `backend/src/lib/sidecars.ts`
+      (`sweepOrphanProcesses()` and `freePort()` skip registered pids),
+      `backend/src/index.ts` (warm-up skips a healthy registered role),
+      `backend/src/lib/turnEngine.ts` (one JSON `[turn]` line per turn:
+      `turn_id`, `surface`, `source`, `route`, `tier2`, `plugin`, `guard`
+      hits, `safety.action`, `duration_ms`; never utterance or reply text;
+      `MAIPAI_TURN_DEBUG=1` adds flagged sentence text), `data/logs/hub.log`
+      with size-and-days rotation. Mirror: `backend/src/lib/wyomingServer.ts`'s
+      `__maipaiWyomingBoundPorts` (the documented hot-reload pattern);
+      `docs/ENGINEERING.md`'s Logging section. Acceptance: saving a
+      backend file mid-chat does not fail the next reply and adds no
+      `[enginePostLoadCheck]` line; a test proves the same pid is reused
+      across a simulated reload; a test proves the `[turn]` line for a
+      plugin turn and a guarded model turn carries the fields and no
+      utterance text. Out of scope: a logging framework; a trace id
+      across processes (the standard's timeline view). Exit:
+      `scripts/check.sh` plus the live save-while-chatting check.
 - [ ] Cut a first real release (S, but blocking) - no tag has ever been
       made. The deploy-from-release-tag model, the clean-clone build
       check, and update delivery have never been exercised for real.

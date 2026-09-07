@@ -8724,3 +8724,379 @@ the standing decision above (Session A's model-selection wizard entry) that
 rejected a static allocation slider - the constants here are an internal
 crash-prevention safety margin, a different concern from that
 resource-allocation UX decision, not a reopening of it.
+
+## Chat reliability: the 2026-09-07 incident and the five fixes
+
+Design note first, BACKLOG items second, code third (the org's own
+rule for anything bigger than one item). Written for whichever agent
+picks the work up: every finding below was verified against the code,
+the `conversation_turns` rows, the dev server's own log, a live probe
+against the running nomic embedder, and `guards.ts` run directly. The
+implementer should not need this conversation.
+
+### What the household saw
+
+Three messages in one minute (times are the hub's local clock):
+
+| Time | Message | Reply |
+|---|---|---|
+| 01:40:37 | should I dye my hair black | I couldn't look that up right now. |
+| 01:40:49 | should I dye my hair black (repeated) | I can't look that up right now. |
+| 01:41:22 | I might go see the new Spiderman movie | That's not something I've been told. You should definitely check it out. |
+| 01:41:40 | what's the latest Stephen king novel | "MaiPai's AI isn't answering right now" banner |
+
+### What actually happened, per turn
+
+**Turn 1: Tier 2 called `music`.** The `conversation_turns` row says
+`source: plugin`, `plugin_id: music`, `routing_tier: embedding`,
+`routing_score: 0.49`. That is not a Tier 1 match (Tier 1 needs
+`TIER1_THRESHOLD` 0.62); it is `attemptTier2Tools()` stamping
+`tier: "embedding"` on whatever the model chose (`turnEngine.ts`, the
+`routing:` field of its return value). `route()` ranked
+`list-view 0.50, remind 0.49, music 0.49` for that message; all three
+cleared `TIER2_AMBIGUOUS_FLOOR` (0.45), so Qwen3-8B was handed the
+persona chat prompt plus a JSON-array grammar naming those three and
+picked `music`. llama-server's log shows the call: a 1006-token prompt,
+35 generated tokens (a tool call). The handler's MusicBrainz fetch then
+threw (nothing logged, so the cause is unknown; MusicBrainz answers the
+same query today with a band called "Black Hair"), the handler caught
+it and returned "I couldn't look that up right now." as a normal reply,
+and the turn engine reported a successful plugin turn.
+
+**Turn 2: the same prompt, a different coin flip.** `complete()` sets no
+temperature, so llama-server's default (0.8) sampled the routing
+decision. The log shows the identical prompt (1011 tokens served from
+cache) generating 10 tokens, then the 10-token reply stream. The model
+declined the tools this time and answered itself, and it answered by
+imitating the previous assistant message in its conversation window,
+which `buildConversationWindow()` had fed back as the assistant's own
+words: "I can't look that up right now."
+
+**Turn 3: a guard false positive, spliced into the stream.** The
+Tier 2 call for this message generated 80 tokens of forced JSON (the
+top offer was `remember` at 0.57) that failed validation, then the
+reply streamed (18 tokens). `guards.ts` run directly against the likely
+first sentences: "That sounds like a fun night out!" trips <!-- prose-lint: allow -->
+`GUESSING_RE` on "sounds like a"; "Sounds like a great plan." the same;
+any sentence containing "Spider-Man" trips the bare proper-noun rule
+because `tokenize()` splits the hyphen into `spider` and `man` while the
+utterance grounds only `spiderman`. `gateGuards()` replaced sentence one
+with a `NOT_TOLD` line and let sentence two through untouched, which is
+how a reply came to contradict itself. The 01:22 turn that day, "What's
+the weather like today?", got the same "That's not something I've been
+told."
+
+**Turn 4: a hot reload killed the engine mid-turn.** The dev server runs
+under `bun --hot`. Its log holds ten reload banners between 00:36 and
+01:45 (another session was committing backend changes; `bbbe9f5` landed
+at 01:40:13). Each reload re-runs `index.ts`, which calls
+`sweepOrphanEngineProcesses()` (killing the chat and embed servers the
+previous module instance owned) and then warms fresh ones:
+`[enginePostLoadCheck]` appears eleven times. Turn 4's Tier 2 call
+completed (6 tokens, an empty array); its reply stream has no timing
+line; the next log line is the reload banner. The client got
+`unavailable`, which `chatModelAdapter.ts` renders as the banner.
+
+### What the evidence says about the design
+
+- **The routing thresholds were never measured on the real embedder.**
+  Session C's own notes say so ("re-run this bench against a real
+  embedder before trusting 0.62/0.08"). Measured now, against the live
+  nomic server: raw cosine between unrelated short sentences sits at
+  0.50 to 0.66. "good morning" scores 0.80 against `translate`, "how are
+  you feeling today" 0.66 against `news`, "what's for dinner tonight"
+  0.66 against `almanac-moon`, "I'm tired" 0.61 against `remind`.
+- **The Tier 2 floor is below that noise.** 24 of 24 `expect: null`
+  corpus rows and 8 of 8 real small-talk lines have a top candidate
+  above 0.45, so every conversational turn pays a full prompt eval
+  (2.3 s on the dev machine, more on the hub) and a sampled choice
+  among three irrelevant tools before the reply starts. The latency
+  review that added the floor believed it would skip most turns; it
+  skips none.
+- **The corpora cannot see any of this.** The routing corpus's
+  positives are the `routing.examples` verbatim (68 of 71 score 1.00
+  against copies of themselves). The tool-call corpus has 3 rows and
+  zero "must not call" rows.
+- **A plugin's failure is reported as a success.** Seven Tier 1 handlers
+  (`almanac-holiday`, `almanac-onthisday`, `currency`, `knowledge`,
+  `music`, `news`, `sports`) hand-copy "I couldn't look that up right
+  now." and return it as a normal reply, so `callTier1Handle()`'s own
+  `fallbackResult()` (which applies the manifest's `fallback_reply`)
+  never runs, and Tier 2's "every proposed call failed, answer
+  normally" branch never runs either.
+- **Canned text becomes the model's voice.** Non-model turns enter the
+  window as `assistant` messages. The chat UI never shows which package
+  answered (`plugin_id` is unused in `frontend/src/apps/chat`), so a
+  misroute is invisible to the household.
+- **The invention guard bans world knowledge.** `groundedWords()` is the
+  utterance, recalled memory and this conversation; a proper noun,
+  number or date the model knows from training is "invention". That is
+  bot-legacy's rule for a robot answering questions about its own
+  household, applied on the hub to every reply including small talk,
+  with replacement lines written for questions spliced into statements.
+- **The turn pipeline logs nothing.** The only hub-originated lines in
+  the whole log are `[enginePostLoadCheck]` and `[wyoming]`: no routing
+  decision, no offered tools, no chosen call, no plugin result, no guard
+  hit. This diagnosis had to be rebuilt from `conversation_turns` and
+  llama-server slot timings.
+
+### Decisions (Jesse, 2026-09-07)
+
+1. Tool selection moves to llama-server's native tool calling, not the
+   grammar-forced JSON array. This amends the 2026-09-04 Tier 2 note's
+   "a GBNF grammar makes a small model's call valid by construction":
+   valid-by-construction turned out to mean forced-by-construction. The
+   grammar stays for the judges, where a fixed shape is the point.
+2. The invention guard narrows to household-scoped claims. The model may
+   use world knowledge.
+3. Engines survive `bun --hot` reloads; a source save must never cost a
+   model reload or a dead reply.
+
+### The fixes
+
+Ordered for the implementer: A and B are contained and need no spec
+change; C needs the guard corpus; D produces the numbers E is verified
+against. Each fix's exit check is named; `scripts/check.sh` must be
+green at every commit.
+
+**Fix A: engines survive hot reload, and the turn pipeline logs.**
+
+A1. Move each supervisor's module-level state (`llmSupervisor.ts`:
+`chatBackend`, `startingPromise`, `generation`, `manuallyStopped`,
+`lastPostLoadCheck`; the equivalents in `embedSupervisor.ts` and
+`ttsSupervisor.ts`) into one registry object on `globalThis`
+(`globalThis.__maipaiEngines ??= { chat: {...}, embed: {...}, tts: {...} }`),
+the exact pattern `wyomingServer.ts` already uses for
+`__maipaiWyomingBoundPorts` and documents ("a module-level `let` doesn't
+survive a hot reload, `globalThis` does - same process, same heap"). A
+fresh module instance after a reload finds the running backend, runs one
+`client.health()`, and reuses it; a failed health check drops the entry
+and respawns as today. The `stop` closures captured by the previous
+module instance keep working, same heap.
+
+A2. `sweepOrphanEngineProcesses()` (`llmSupervisor.ts`, delegating to
+`sidecars.ts`'s `sweepOrphanProcesses()`) and `freePort()` skip any pid
+registered in that registry. An orphan is a process under `enginesDir`
+that no live registry entry owns, never the process this same hub
+started before the last reload. Mirror the existing sweep tests in
+`backend/tests/llmSupervisor.test.ts`.
+
+A3. `index.ts`'s boot warm-up skips a role whose registry entry is
+already healthy.
+
+A4. One structured `[turn]` line per completed turn, JSON per
+`docs/ENGINEERING.md`'s logging standard: `turn_id`, `surface`,
+`source`, `route` (tier, winner, top three `{id, score}`), `tier2`
+(offered ids, chosen calls, result per call), `plugin` (id, ok, fault),
+`guard` (reason and sentence index per hit), `safety.action`,
+`duration_ms`. Never the utterance or reply text at this level (the
+standard: "a transcript never lands"); `MAIPAI_TURN_DEBUG=1` adds the
+flagged sentence text, for the dev machine only. `gateGuards()` and
+`guardReply()` report their hits into a per-turn record so this line can
+carry them. No logging framework in this item; a JSON `console.log` in
+the existing style is the whole mechanism.
+
+A5. The hub writes its own log to `data/logs/hub.log` with size-and-days
+rotation (the standard's "retention is by size and days"). Today stdout
+goes wherever the process was started, which for the dev server was a
+session scratchpad that disappears with the session.
+
+Exit: `check.sh` green; a test that reloads the supervisor module (a
+fresh `import()` after `__resetLlmSupervisorForTests()` is not enough,
+the test must simulate the registry surviving) proves the same pid is
+reused; a test asserts the `[turn]` line for a plugin turn and a guarded
+model turn carries the fields and no utterance text. Live: save a
+backend source file while chatting, the reply after the save must not
+fail and the log must show no new `[enginePostLoadCheck]`.
+
+**Fix B: a package failure is a failure; canned text is never the
+model's voice; the UI shows who answered.**
+
+B1. Spec first: `spec/schemas/result.schema.json` gains an optional
+`error` object (`code` from `spec/errors/errors.json`, `message`), so a
+handler can report a typed upstream failure without either crashing the
+sandbox or pretending to answer. Regenerate `gen/ts` and `gen/py`.
+
+B2. The seven handlers listed above stop catching and replying. A
+failed fetch returns `{ error: { code: "network_unreachable", message } }`
+(or `not_found` when the upstream answered but had nothing);
+`denoHost.ts`'s `parseHandleResult()` maps it, and `callTier1Handle()`
+returns it as a failure WITHOUT a strike (`recordFault()` stays for
+crashes and timeouts only; a MusicBrainz 503 three times in a row must
+not disable the package until reboot). `runPlugin()` returns
+`{ ok: false, status: 502, error, fallback_reply }` for it, the same
+shape a Tier 0 recipe's `HostError` already produces. `prepareTurn()`'s
+Tier 0/1 pattern branch speaks `fallback_reply` (the manifest's, applied
+in exactly one place: `denoHost.ts`'s `fallbackResult()`) with
+`source: "plugin_error"`; Tier 2 (and Fix E after it) treats it as "no
+tool answered, reply normally". Delete the seven hand-copied strings;
+the manifest `fallback_reply` is the one definition.
+
+B3. `buildConversationWindow()` (`lib/conversationHistory.ts`) pushes a
+non-model turn as a `system` message, never `assistant`:
+`[Music Lookup answered: "..."]` for `plugin`, `[Music Lookup could not
+answer.]` for `plugin_error`, `[The household's safety rules declined
+this request.]` for `safety_refuse`, `[Command "<name>" ran.]` for
+`command`. `validate()` in `lib/llm.ts` already accepts `system`
+anywhere in the array. The display name comes from the manifest
+(`loadManifestOnly(id).display`), never the id.
+
+B4. The chat bubble carries a small caption for `source: plugin`,
+`plugin_error` and `command`: "via Music Lookup". The `done` event's
+`TurnValue` already has `source` and `plugin_id`; `chatModelAdapter.ts`
+attaches them as message metadata and the bubble renders the caption
+with the display name from the manifests the chat already fetches
+(`chatSuggestionAdapter.ts`'s pattern). Kit component and copy per
+`docs/UI.md`.
+
+Exit: `check.sh` green; `tests/tier2.test.ts` gains "a package that
+fails upstream is not a Tier 2 success: the turn falls through to the
+model"; `tests/conversationHistory.test.ts` proves a plugin turn enters
+the window as `system`; a frontend test proves the caption. Live: turn
+1's message answered by the model itself.
+
+**Fix C: guards narrow to household claims, cut instead of splice, and
+are proven by a corpus.**
+
+C1. `guards.ts` `guardInvention()`: delete the bare-candidate loop
+(`PROPER_NOUN_RE`, `DATE_WORD_RE`, `BARE_NUMBER_RE`) and, from
+`GUESSING_RE`, the `probably (a|an|the)` and `sounds like (a|an)`
+alternations (conversational idiom, not a guess about the household).
+Keep `PERSON_TRAIT_RE`, `LOCATION_CLAIM_RE`, `ATTRIBUTED_QUOTE_RE`,
+`CLAIMED_EXPERIENCE_RE`, and the remaining `GUESSING_RE` shapes ("I
+think you're talking about", "you must mean", "my guess is", "I'm
+guessing"). Add one narrow shape so the ported "it's on Thursday at
+four" catch survives: a household schedule claim,
+`(your|his|her|their|the) <noun> (is|was) (on|at) <weekday|time>`, whose
+weekday/time words must be grounded. `tokenize()` additionally indexes
+the joined form of a hyphenated word (`spider-man` yields `spider`,
+`man`, `spiderman`) so a hyphenated name grounds against its plain
+spelling.
+
+C2. `gateGuards()` (`turnEngine.ts`): a sentence flagged for a
+`CUTTABLE` reason is dropped and the stream continues; a sentence
+flagged for a non-cuttable reason (capability claim, medication dose,
+like-I-said, example parrot) ends the reply: yield the replacement line
+once and return, dropping everything after it. If nothing at all was
+yielded by the end, yield the first reason's replacement once. No canned
+line is ever spliced between the model's own sentences. This is
+`guardReply()`'s cut-or-replace rule applied to a stream, so the two
+paths agree.
+
+C3. `spec/llm/guard-corpus.json`, rows `{utterance, reply, sources,
+history, expect}` (`expect` is `null` or a `GuardReason`), seeded with:
+the twelve probe cases from this incident (six small-talk replies to the
+Spiderman message, the sunny-and-75 weather invention that must still be
+caught, the honest weather decline, two hair-dye replies, "How about
+pasta?", "Sounds like a long day."), every case already in
+`tests/guards.test.ts`, and the recorded replies from turns 3 and the
+01:22 weather turn. `backend/tests/guardCorpus.test.ts` mirrors
+`routingCorpus.test.ts` (one `test()` per row) and runs in `check.sh`.
+Standing rule, same as routing: every guard false positive seen in the
+house gets a row before it is fixed.
+
+Exit: `check.sh` green with the guard corpus; the twelve probe replies
+pass untouched; the weather invention is still caught. Live: turn 3's
+message gets a reply with no honest line in it.
+
+**Fix D: measure routing on the real embedder; nomic prefixes.**
+
+D1. `lib/llm.ts` `embed()` takes `kind: "query" | "document"` and
+prefixes `search_query: ` or `search_document: ` (nomic-embed-text-v1.5's
+model card requires task prefixes; measured here they lower the
+negatives' p90 top score from 1.00 to 0.85, a correctness fix, not the
+cure). Callers: `routing.ts` `ensureRoutingEmbeddings()` (document),
+`embedUtterance()` (query), `memory.ts`'s store and recall paths
+(document, query). Bump the stored `space` string so every existing row
+re-embeds through the existing missing-hash path (routing) and the
+maintenance job (memory); nothing compares a prefixed vector against an
+unprefixed one.
+
+D2. `spec/llm/routing-corpus.json`: at least two paraphrase positives
+per package that are not its examples verbatim, and at least fifty
+conversational negatives (`expect: null, must_not: []`) in the shapes
+the house actually produces: greetings, feelings, opinions ("should I
+..."), plans ("I might ..."), open questions ("what's the latest ..."),
+plus the eight lines probed in this incident.
+`spec/llm/tool-call-corpus.json`: the same negatives as
+`expect_calls: []`.
+
+D3. `scripts/bench/routing.ts` prints each row's top three scores and,
+for the null rows, p50/p90/p95/max of the top wrong score.
+`scripts/bench/tool-calling.ts` offers the real bundled packages'
+descriptions, top three by similarity exactly as production does, five
+repeats per row, and reports the false-call rate. Both run against the
+real engines (`MAIPAI_EMBED_URL`, `MAIPAI_LLAMA_SERVER_URL`); the numbers
+go in `docs/dev/session-c.md` next to the "not yet measured" notes they
+close. `TIER1_THRESHOLD` and the Tier 2 offer floor are then set from
+the run: at or above p95 of the null rows' top wrong score, with the
+margin re-checked against the paraphrase positives.
+
+Exit: numbers recorded; corpus tests green against the stub; the
+thresholds' comments cite the run.
+
+**Fix E: native tool calling, one round trip.**
+
+E1. Spec first, `spec/llm/ts/types.ts`: `ToolDefinition`
+(`{ type: "function", function: { name, description, parameters } }`),
+`ChatCompletionRequest.tools?` and `tool_choice?: "none" | "auto" |
+"required"`, `tool_calls?` on `ChatMessage` and on the chunk delta
+(`{ index, id, type: "function", function: { name, arguments } }`, the
+arguments streamed as string fragments), `finish_reason: "tool_calls"`.
+`client.ts`'s `chatCompleteStream()` keeps yielding text deltas and
+returns `{ tool_calls }` as the generator's return value once the stream
+ends, with argument fragments concatenated per index. `stubServer.ts`
+gains a scripted `tool_calls` reply so every test stays offline.
+
+E2. `engineAutotune.ts` `launchFlagsToArgs()` adds `--jinja`
+(llama-server parses Qwen3's Hermes-style tool calls only through the
+chat template). `enginePostLoadCheck.ts` sends one canned request with a
+`tools` array and asserts a `tool_calls` reply, so a binary or model
+that cannot do this is caught at spawn, not at the first household
+message.
+
+E3. `turnEngine.ts`: delete `attemptTier2Tools()`'s separate
+`complete()` call, `toolCallSchema()` and `parseToolCalls()` in
+`lib/llm.ts`. `prepareTurn()` returns `{ kind: "model", messages, tools }`
+where `tools` is `ranked.slice(0, MAX_TIER2_TOOLS_OFFERED)` above the
+floor from D, mapped to `ToolDefinition`s (the manifest `args` schema is
+`parameters`, unchanged); below the floor, no `tools` at all, which
+keeps the prefix cache intact for ordinary chat. `runTurn()` and
+`runTurnStream()` pass `tools` with `tool_choice: "auto"`. When the
+stream returns `tool_calls`: cap at `MAX_TIER2_CALLS_PER_TURN`, validate
+through `runPlugin()` as today, keep the `consequential` confirmation
+flow and the `PendingAsk` handling by moving that code out of
+`attemptTier2Tools()` into a function that takes `ToolCall[]`, and
+answer with the package reply (a `done` event with `source: "plugin"`),
+the same "a package answers the turn outright" contract as today. A
+`tool_calls` reply that produced no successful call falls back to a
+second plain completion without tools (the one retry the old "ask
+again, never a silent drop" contract already allowed). Guard context
+`actionsRan` is true when a call ran. `routing.tier` for a tool-called
+turn becomes `"tool"` (additive to the wire enum; `routingStats()`
+gains the bucket).
+
+E4. Tests: `tests/tier2.test.ts` and `tests/toolCallCorpus.test.ts`
+rewritten against the stub's scripted `tool_calls`; the bench from D3
+records the real false-call rate at the chat temperature over five
+repeats per corpus row. If that rate is above 2 percent, the fix is a
+better floor or better negatives in the corpus, never a return to the
+grammar.
+
+E5. Docs: this section is the dated amendment to the 2026-09-04 Tier 2
+note; `spec/llm/README.md` records tools as implemented;
+`docs/BACKLOG.md`'s Tier 2 items updated. No new outbound endpoint, so
+the privacy page is unchanged.
+
+Exit: `check.sh` green; the bench numbers recorded; the four messages
+from this incident answered by the model itself, with the `[turn]` line
+showing no tool offered for turns 2 and 3 and no call chosen for any of
+them.
+
+### Not in scope, stated
+
+No autonomous plan/call/observe loop (the 2026-09-04 note's explicit
+exclusion stands). No second completion to phrase a tool result in the
+persona's voice (the synthesis step the Tier 2 note defers; a package
+still answers the turn outright). No change to the memory or persona
+judges' grammar-constrained calls. No new logging framework.
