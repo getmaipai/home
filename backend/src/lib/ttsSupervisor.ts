@@ -25,6 +25,8 @@ const execFileAsync = promisify(execFile);
 import { PocketTtsClient } from "@maipai/spec/voice/ts/client.js";
 import { startStubTtsServer } from "@maipai/spec/voice/ts/stubServer.js";
 import { getHouseholdSettingValue } from "@/lib/settings";
+import { spawnAndWaitHealthy } from "@/lib/sidecars";
+import { assertNotInCrashBootHold } from "@/lib/dirtyBoot";
 
 export type TtsBackendKind = "url" | "spawned" | "stub";
 
@@ -48,30 +50,6 @@ let startingPromise: Promise<TtsBackend> | null = null;
 // the stale backend stops itself instead of being cached.
 let generation = 0;
 
-/** `proc` is checked on every poll: a code review (2026-09-04) found the
- * original version had no visibility into whether the spawn had already
- * died (missing package, broken venv, the port already taken) and kept
- * polling `client.health()` for the full, generous 180s timeout either
- * way - a broken install failed slow instead of fast, wedging the first
- * synthesize call (and getTtsClient()'s shared startingPromise) for three
- * minutes on every restart until fixed. Bun's `Subprocess.exitCode` is
- * `null` while still running and a real number the instant it exits, no
- * extra event wiring needed. */
-// Exported for a real test (a real child process that really exits, not
-// a mock of Subprocess) - the same "prove the real mechanism" standard
-// llmSupervisor.ts's freePort() tests already hold to.
-export async function waitForHealth(client: PocketTtsClient, timeoutMs: number, proc: Bun.Subprocess): Promise<void> {
-  const deadline = Date.now() + timeoutMs;
-  while (Date.now() < deadline) {
-    if (await client.health()) return;
-    if (proc.exitCode !== null) {
-      throw new Error(`pocket-tts exited early (code ${proc.exitCode}) before becoming healthy`);
-    }
-    await new Promise((resolve) => setTimeout(resolve, 300));
-  }
-  throw new Error(`pocket-tts did not become healthy within ${timeoutMs}ms`);
-}
-
 async function commandExists(bin: string): Promise<boolean> {
   try {
     await execFileAsync(process.platform === "win32" ? "where" : "which", [bin], { timeout: 3_000 });
@@ -81,7 +59,24 @@ async function commandExists(bin: string): Promise<boolean> {
   }
 }
 
-async function spawnPocketTts(): Promise<TtsBackend> {
+// Exported for a real test of the crash-boot-hold gate below, the same
+// "export a private function for a direct real test" precedent this file
+// already used for the waitForHealth() it replaced - calling this
+// directly (rather than through startTtsBackend()'s commandExists("uvx")
+// gate) proves assertNotInCrashBootHold() throws before anything real
+// spawns, without needing uv/uvx actually installed on the machine
+// running the suite.
+export async function spawnPocketTts(): Promise<TtsBackend> {
+  // The crash-boot hold (lib/dirtyBoot.ts, session-f-platform-and-trust.md
+  // step 3): only gates a REAL spawn, never a URL override (startTtsBackend's
+  // MAIPAI_TTS_URL branch) or the stub - a household that already has TTS
+  // configured to spawn a real engine still gets a working (stubbed)
+  // voice surface immediately after a crash-boot, just not the real
+  // engine for 30 minutes, the same treatment llmSupervisor.ts/
+  // embedSupervisor.ts already give their own real-spawn paths (issue #16:
+  // this one had no equivalent gate, so TTS launched immediately after a
+  // crash-boot while chat/embed were correctly held back).
+  assertNotInCrashBootHold();
   const port = Number(process.env.MAIPAI_TTS_PORT ?? 8793);
   // Pocket TTS's own model loader (2026-09-04, voice cloning) tries the
   // real, cloning-capable checkpoint FIRST and only falls back to the
@@ -97,21 +92,26 @@ async function spawnPocketTts(): Promise<TtsBackend> {
   const hfToken = getHouseholdSettingValue("voice.hf_token") as string;
   const env: Record<string, string | undefined> = { ...process.env };
   if (hfToken) env.HF_TOKEN = hfToken;
-  const proc = Bun.spawn(["uvx", "pocket-tts", "serve", "--port", String(port), "--host", "127.0.0.1"], {
-    stdout: "inherit",
-    stderr: "inherit",
-    env,
-  });
   const client = new PocketTtsClient(`http://127.0.0.1:${port}`);
-  try {
+  // Issue #14: this used to hand-roll its own spawn+health-wait loop,
+  // the exact duplication session-f-platform-and-trust.md step 2 unified
+  // llmSupervisor.ts/embedSupervisor.ts onto spawnAndWaitHealthy() for.
+  // Issue #44: spawnAndWaitHealthy() calls freePort(port) before spawning
+  // (a code review, 2026-09-04, found an orphaned or unrelated process
+  // already squatting a fixed port silently broke a spawn with no signal
+  // anywhere a household would see) - this file previously had none of
+  // that, matching llmSupervisor.ts/embedSupervisor.ts's own real ports.
+  const proc = await spawnAndWaitHealthy({
+    command: ["uvx", "pocket-tts", "serve", "--port", String(port), "--host", "127.0.0.1"],
+    port,
+    env,
     // Generous: a cold `uv` tool cache or a first-run HF weight fetch (a
     // few hundred MB, already resident on Jesse's dev Mac from this
     // session's live listening tests) can take longer than a warm spawn.
-    await waitForHealth(client, 180_000, proc);
-  } catch (err) {
-    proc.kill();
-    throw err;
-  }
+    healthCheck: () => client.health(),
+    timeoutMs: 180_000,
+    label: "pocket-tts",
+  });
   return { client, stop: () => proc.kill(), kind: "spawned", startedAt: new Date().toISOString() };
 }
 

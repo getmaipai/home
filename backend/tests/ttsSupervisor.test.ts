@@ -1,9 +1,10 @@
 import { describe, expect, test, afterEach } from "bun:test";
-import { getTtsClient, getTtsBackendKind, waitForHealth, restartTtsBackend, __resetTtsSupervisorForTests } from "@/lib/ttsSupervisor";
-import { PocketTtsClient } from "@maipai/spec/voice/ts/client.js";
+import { getTtsClient, getTtsBackendKind, restartTtsBackend, spawnPocketTts, __resetTtsSupervisorForTests } from "@/lib/ttsSupervisor";
+import { __setCrashBootHoldForTests } from "@/lib/dirtyBoot";
 
 afterEach(() => {
   __resetTtsSupervisorForTests();
+  __setCrashBootHoldForTests(null);
   delete process.env.MAIPAI_TTS_URL;
 });
 
@@ -80,32 +81,19 @@ describe("restartTtsBackend", () => {
   });
 });
 
-describe("waitForHealth", () => {
-  // A code review (2026-09-04) found the original version had no
-  // visibility into whether the spawned process had already died,
-  // polling client.health() for the entire timeout regardless - a
-  // real, if fast, child process that genuinely exits (not a mock of
-  // Bun.Subprocess) proves the fast-fail path fires in well under the
-  // timeout, not just that the logic looks right on paper.
-  test("fails fast, not after the full timeout, once the process has already exited", async () => {
-    const proc = Bun.spawn(["sh", "-c", "exit 1"], { stdout: "ignore", stderr: "ignore" });
-    await proc.exited; // guarantee the exit has actually landed before polling starts
-    const client = new PocketTtsClient("http://127.0.0.1:1"); // never healthy
-    const started = Date.now();
-    await expect(waitForHealth(client, 60_000, proc)).rejects.toThrow(/exited early/);
-    expect(Date.now() - started).toBeLessThan(5_000);
-  });
-
-  test("still succeeds normally when the process stays alive and becomes healthy", async () => {
-    const { startStubTtsServer } = await import("@maipai/spec/voice/ts/stubServer.js");
-    const stub = startStubTtsServer();
-    const proc = Bun.spawn(["sleep", "5"], { stdout: "ignore", stderr: "ignore" });
-    try {
-      const client = new PocketTtsClient(stub.url);
-      await expect(waitForHealth(client, 5_000, proc)).resolves.toBeUndefined();
-    } finally {
-      proc.kill();
-      stub.stop();
-    }
+// Issue #16: spawnPocketTts() used to have no crash-boot-hold check at
+// all, unlike llmSupervisor.ts's/embedSupervisor.ts's own real-spawn
+// paths - a household with TTS configured to spawn a real engine got it
+// launched immediately after a crash-boot while chat/embed were
+// correctly held back. Calls spawnPocketTts() directly (not through
+// getTtsClient()/startTtsBackend(), which are gated behind
+// MAIPAI_TTS_DISABLE_SPAWN and a real `commandExists("uvx")` check every
+// test run) so this proves the hold fires before anything real spawns,
+// with no dependency on uv/uvx actually being installed on the machine
+// running the suite.
+describe("spawnPocketTts crash-boot hold", () => {
+  test("refuses to spawn a real pocket-tts process during a crash-boot hold", async () => {
+    __setCrashBootHoldForTests(Date.now() + 60_000);
+    await expect(spawnPocketTts()).rejects.toThrow(/recovered from an unexpected shutdown/);
   });
 });
