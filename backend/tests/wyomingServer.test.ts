@@ -301,4 +301,65 @@ describe("the Wyoming satellite server", () => {
     expect(messages[1]!.type).toBe("info");
     client.end();
   });
+
+  // The real incident (2026-09-06): `bun run --hot` re-runs index.ts's
+  // boot call on every backend file change without ever releasing the
+  // previous reload's listener, so every reload after the first hit an
+  // uncaught EADDRINUSE right in the middle of boot. A unit test can't
+  // literally trigger a `bun --hot` module reload, but the fix's actual
+  // mechanism (wyomingServer.ts's `hotReloadBoundPorts`, a `globalThis`
+  // set that survives a reload the way a module-level `let` can't) cares
+  // only about "did THIS process already bind this exact port," which a
+  // same-process double call exercises identically - a hot-reloaded
+  // module instance hitting Bun.listen() on that port throws the exact
+  // same EADDRINUSE Bun.listen() throws here.
+  test("binding a port this process already bound (a hot reload) does not throw, and the original listener keeps serving", async () => {
+    server = startWyomingServer(0);
+    const port = server.port;
+
+    const second = startWyomingServer(port);
+    expect(second.port).toBe(port);
+    second.stop();
+
+    // The original listener - not silently replaced or broken - is still
+    // the one answering: same auth-first rule as every other test here.
+    const client = new ScriptedWyomingClient();
+    await client.connect(port);
+    client.send({ type: "describe" });
+    expect(await client.waitForClose()).toBe(true);
+  });
+
+  // The other half of that fix (a code review, 2026-09-06, caught the
+  // first cut missing this): a port EADDRINUSE for a reason that has
+  // nothing to do with a hot reload - a stale process, a second hub
+  // instance, anything genuinely squatting on it - must still throw.
+  // Silently treating every EADDRINUSE as "just a reload" would turn a
+  // real production collision into a fake "listening" log line with zero
+  // connections ever actually served.
+  test("binding a port a stranger process holds (never bound by this process) still throws", async () => {
+    const stranger = Bun.listen({
+      hostname: "0.0.0.0",
+      port: 0,
+      socket: { open() {}, data() {}, close() {}, error() {} },
+    });
+    try {
+      let threw: unknown;
+      try {
+        startWyomingServer(stranger.port);
+      } catch (err) {
+        threw = err;
+      }
+      expect(threw).toBeInstanceOf(Error);
+      expect((threw as { code?: unknown }).code).toBe("EADDRINUSE");
+    } finally {
+      stranger.stop(true);
+    }
+  });
+
+  // A non-EADDRINUSE failure (a bad port, a permission error, anything
+  // else) must keep throwing unconditionally too - only the exact
+  // EADDRINUSE-on-a-port-we-already-own case is ever swallowed.
+  test("a non-EADDRINUSE bind failure still throws", () => {
+    expect(() => startWyomingServer(999_999)).toThrow(/range/i);
+  });
 });

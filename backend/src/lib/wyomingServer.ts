@@ -227,6 +227,26 @@ export interface WyomingServerHandle {
   port: number;
 }
 
+// `bun run --hot` (AGENTS.md's own dev command) re-executes this whole
+// module - including startWyomingServer()'s boot call - on every backend
+// file change, but a raw Bun.listen() has none of Bun.serve()'s built-in
+// hot-reload port handoff: the previous reload's listener is never
+// released first. Confirmed live (2026-09-06): every reload after the
+// first hit an uncaught EADDRINUSE right in the middle of index.ts's boot
+// sequence, destabilizing the rest of boot over it.
+//
+// A module-level `let` doesn't survive a hot reload (a fresh module
+// instance means fresh bindings), but `globalThis` does - same process,
+// same heap. This records which port THIS process has genuinely already
+// bound, so a later EADDRINUSE on that exact port can be told apart from
+// a stranger holding it: a code review (2026-09-06) caught the first cut
+// of this fix treating every EADDRINUSE as "just a hot reload," which
+// would have silently no-op'd a real production collision (a stale
+// process, a second hub instance) into a fake "listening" log line with
+// zero Wyoming connections ever actually served.
+const hotReloadBoundPorts = (globalThis as { __maipaiWyomingBoundPorts?: Set<number> }).__maipaiWyomingBoundPorts ??=
+  new Set<number>();
+
 /** Starts the real TCP listener. Exported (not auto-started) so
  * index.ts controls when it comes up, the same "boot wires it in, tests
  * start their own instance on an ephemeral port" shape every other real
@@ -235,7 +255,7 @@ export interface WyomingServerHandle {
  * wait; index.ts never passes it. */
 export function startWyomingServer(port = 0, opts: { handshakeTimeoutMs?: number } = {}): WyomingServerHandle {
   const handshakeTimeoutMs = opts.handshakeTimeoutMs ?? HANDSHAKE_TIMEOUT_MS;
-  const server = Bun.listen<ConnectionState>({
+  const listenOpts: Bun.TCPSocketListenOptions<ConnectionState> = {
     hostname: "0.0.0.0",
     port,
     socket: {
@@ -281,6 +301,31 @@ export function startWyomingServer(port = 0, opts: { handshakeTimeoutMs?: number
         clearTimeout(socket.data.handshakeTimeout);
       },
     },
-  });
-  return { stop: () => server.stop(true), port: server.port };
+  };
+  try {
+    const server = Bun.listen<ConnectionState>(listenOpts);
+    hotReloadBoundPorts.add(server.port);
+    return {
+      stop: () => {
+        hotReloadBoundPorts.delete(server.port);
+        server.stop(true);
+      },
+      port: server.port,
+    };
+  } catch (err) {
+    // Only treated as "just a hot reload" when THIS process already won
+    // the bind on this exact port once before - a fresh process hitting
+    // EADDRINUSE on its very first boot (a real stranger holding the
+    // port) always rethrows, same as before this fix existed. The prior
+    // listener (from whichever reload last won the bind) is still
+    // accepting connections fine on its own - a hot reload just can't
+    // make it run the newest code without a real process restart, the
+    // same "requires a full restart" limit `bun --hot` already has for
+    // anything it can't swap live.
+    if (port !== 0 && hotReloadBoundPorts.has(port) && err instanceof Error && "code" in err && err.code === "EADDRINUSE") {
+      console.warn(`[wyoming] port ${port} is already listening (hot reload) - keeping the existing server; restart the process to pick up code changes here`);
+      return { stop: () => {}, port };
+    }
+    throw err;
+  }
 }

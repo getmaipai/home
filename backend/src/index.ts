@@ -285,14 +285,34 @@ onLeafRenewed((leaf) => {
 // authentication gate (not "don't listen at all") is what keeps this
 // safe to have running by default, matching the plan's own "never open
 // on the LAN as admin" requirement.
-const wyomingServer = startWyomingServer(Number(process.env.MAIPAI_WYOMING_PORT ?? 10700));
-console.log(`MaiPai Home Wyoming satellite server listening on tcp://0.0.0.0:${wyomingServer.port}`);
-process.on("exit", () => wyomingServer.stop());
+// A genuine bind failure (a stale process, a second hub instance, or
+// anything else really holding this port - wyomingServer.ts's own
+// `bun --hot` self-conflict case never reaches this catch, it returns a
+// handle instead of throwing) is raised as a Repairs issue rather than
+// taking the whole boot down with it, the same COR-3 pattern the TLS
+// rebind above uses: Wyoming is a secondary protocol for satellite
+// devices, not something a chat/embed/HTTP-serving hub should die over.
+let wyomingServer: ReturnType<typeof startWyomingServer> | null = null;
+try {
+  wyomingServer = startWyomingServer(Number(process.env.MAIPAI_WYOMING_PORT ?? 10700));
+  console.log(`MaiPai Home Wyoming satellite server listening on tcp://0.0.0.0:${wyomingServer.port}`);
+} catch (err) {
+  const message = (err as Error).message;
+  console.error(`[index] Wyoming satellite server failed to start, satellite devices (Home Assistant, a voice puck) won't be reachable: ${message}`);
+  void raiseIssue({
+    source: "wyomingServer",
+    key: "bind_failed",
+    severity: "error",
+    title: "The Wyoming satellite server failed to start",
+    detail: message,
+  });
+}
+process.on("exit", () => wyomingServer?.stop());
 process.on("SIGINT", () => {
-  wyomingServer.stop();
+  wyomingServer?.stop();
   process.exit(0);
 });
 process.on("SIGTERM", () => {
-  wyomingServer.stop();
+  wyomingServer?.stop();
   process.exit(0);
 });
