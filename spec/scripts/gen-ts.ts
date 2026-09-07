@@ -1,7 +1,23 @@
 // Generates spec/gen/ts/*.ts from spec/schemas/*.schema.json.
 // Committed output, not run at build time (platform plan 3, docs/PACKAGES.md).
 // Run with: bun run gen:ts (from spec/), then commit the result.
-import { readdir, mkdir, writeFile, rm, readFile } from "node:fs/promises";
+//
+// Found live, 2026-09-07 (getmaipai/home, a session running under
+// `bun --hot`): a household chat reply failed with a transient ENOENT
+// reading `spec/gen/ts/issue.ts`, right as a concurrent `check.sh` run
+// (any session's, including this one running check.sh repeatedly) hit
+// this script. The original version `rm(OUT_DIR, {recursive: true,
+// force: true})`d the WHOLE directory up front, then rebuilt its ~20
+// files one at a time (each one a real `$RefParser.dereference()` +
+// prettier format, not instant) - for however long that took,
+// `spec/gen/ts/` was empty or half-populated, and any live process
+// importing from `@maipai/spec/gen/ts/*` during that window (the hub's
+// own `lib/issues.ts` imports `issue.ts` from exactly there) got a real,
+// reproducible crash. Per-file atomic replace below closes that window
+// for the common case (every schema that still exists): at every point
+// in time a generated file either has its old, fully-valid content or
+// its new one, never neither.
+import { readdir, mkdir, writeFile, rm, rename, readFile } from "node:fs/promises";
 import { join, basename } from "node:path";
 import $RefParser from "@apidevtools/json-schema-ref-parser";
 import { jsonSchemaToZod } from "json-schema-to-zod";
@@ -44,12 +60,26 @@ function pascalCase(id: string): string {
     .join("");
 }
 
+// Writes `content` to `outPath` via a same-directory temp file plus
+// `rename()` - a real, atomic replace on every platform this runs on
+// (POSIX rename() over an existing FILE, unlike over a non-empty
+// directory, is a single inode swap: never a moment where `outPath`
+// is missing or partially written). `process.pid` in the temp name
+// means two codegen runs racing each other (two sessions' own
+// `check.sh` at once - the exact situation the night this was found)
+// never collide on the same temp path either.
+async function writeFileAtomic(outPath: string, content: string): Promise<void> {
+  const tmpPath = `${outPath}.tmp-${process.pid}`;
+  await writeFile(tmpPath, content);
+  await rename(tmpPath, outPath);
+}
+
 async function main() {
-  await rm(OUT_DIR, { recursive: true, force: true });
   await mkdir(OUT_DIR, { recursive: true });
 
   const files = (await readdir(SCHEMAS_DIR)).filter((f) => f.endsWith(".schema.json"));
   const generated: { fileBase: string; typeName: string }[] = [];
+  const writtenFileNames = new Set<string>();
 
   for (const file of files) {
     const path = join(SCHEMAS_DIR, file);
@@ -72,7 +102,9 @@ async function main() {
 
     const header = `// GENERATED FILE. Do not edit by hand.\n// Source: spec/schemas/${file}\n// Regenerate with: cd spec && bun run gen:ts\n\n`;
     const formatted = await prettier.format(header + code + "\n", { parser: "typescript" });
-    await writeFile(join(OUT_DIR, `${fileBase}.ts`), formatted);
+    const fileName = `${fileBase}.ts`;
+    await writeFileAtomic(join(OUT_DIR, fileName), formatted);
+    writtenFileNames.add(fileName);
     generated.push({ fileBase, typeName });
   }
 
@@ -83,7 +115,30 @@ async function main() {
     ...generated.map((g) => `export * from "./${g.fileBase}.js";`),
     "",
   ];
-  await writeFile(join(OUT_DIR, "index.ts"), indexLines.join("\n"));
+  await writeFileAtomic(join(OUT_DIR, "index.ts"), indexLines.join("\n"));
+  writtenFileNames.add("index.ts");
+
+  // Prunes a file whose own .schema.json source is gone (a schema was
+  // deleted since the last run) - a plain delete, not atomic-replaced:
+  // nothing should still be importing a generated file with no schema
+  // behind it, so this carries none of the live-crash risk the loop
+  // above exists to close.
+  //
+  // A code review on this fix (2026-09-07) caught a real race THIS loop
+  // introduced: two `gen-ts.ts` runs overlapping (two sessions' own
+  // `check.sh` at once - the exact situation this file's own header
+  // documents finding the original bug in) means one process's prune
+  // pass can see the OTHER's own in-flight `*.tmp-<pid>` file (written,
+  // not yet renamed) and delete it out from under it, so the writer's
+  // own `rename()` then throws ENOENT and its whole run crashes. Every
+  // `*.tmp-*` name is skipped here unconditionally - a temp file belongs
+  // to whichever pid's name it carries, and only that process ever
+  // renames or otherwise disposes of it.
+  const existingFiles = await readdir(OUT_DIR).catch(() => [] as string[]);
+  for (const name of existingFiles) {
+    if (name.includes(".tmp-")) continue;
+    if (!writtenFileNames.has(name)) await rm(join(OUT_DIR, name)).catch(() => {});
+  }
 
   console.log(`Generated ${generated.length} schema module(s) into spec/gen/ts/.`);
 }
