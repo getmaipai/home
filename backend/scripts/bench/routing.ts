@@ -25,6 +25,16 @@ interface CorpusRow {
   expect: string | null;
   args?: Record<string, unknown>;
   must_not: string[];
+  /** Fix D (docs/dev.md's 2026-09-07 incident note; a code review on
+   * that same fix caught this file's own first cut computing the
+   * null-row noise floor over EVERY `expect: null` row, including a
+   * handful the corpus's own notes already document as deliberately
+   * scoring near 1.0 by design - a consequential package's own trigger
+   * phrase, a real Tier 2 near-miss) - true excludes a row from
+   * `nullTopScores` below, so the printed p50/p90/p95/max actually
+   * matches what routing.ts's/turnEngine.ts's own threshold comments
+   * cite, not a different, uncomputed number. */
+  noiseFloorExempt?: boolean;
   note?: string;
 }
 
@@ -110,7 +120,7 @@ async function main() {
       .slice(0, 3)
       .map((r) => `${r.id}:${r.score.toFixed(2)}`)
       .join(" ");
-    if (row.expect === null && ranked[0]) nullTopScores.push(ranked[0].score);
+    if (row.expect === null && !row.noiseFloorExempt && ranked[0]) nullTopScores.push(ranked[0].score);
     console.log(`${ok ? "PASS" : "FAIL"}  "${row.utterance}" -> expected ${row.expect ?? "null"}, got ${routedId ?? "null"}${top3 ? `  [${top3}]` : ""}`);
   }
 

@@ -179,15 +179,18 @@ export function scoreByEmbedding(utteranceVector: Float32Array, candidateIds: re
 // the five fixes"): measured against the real embed backend
 // (`bun run scripts/bench/routing.ts`, numbers recorded in
 // docs/dev/session-c.md), not the start values this step's own text
-// asked for. 32 genuinely ordinary conversational negatives (excluding a
-// handful of corpus rows deliberately DESIGNED to score high - a
-// consequential package's own trigger phrase, and the "remember"/
-// "recall" near-misses meant for Tier 2, never Tier 1) scored
-// p50=0.610 p90=0.660 p95=0.740 max=0.800 against SOME wrong package.
-// The weakest genuine Tier 1 positive in the corpus ("tell me a bedtime
-// story about a fox" -> storytime-style) scores 0.770 - the two
-// distributions genuinely overlap at the edges (a real greeting can
-// outscore a real match for a DIFFERENT utterance), so no single
+// asked for. 31 genuinely ordinary conversational negatives (the
+// script's own `noiseFloorExempt` corpus field excludes the handful of
+// rows deliberately DESIGNED to score high - a consequential package's
+// own trigger phrase, and the "remember"/"recall" near-misses meant for
+// Tier 2, never Tier 1 - a code review on this fix caught the first cut
+// computing this distribution over ALL null rows, unfiltered, which
+// would have set a threshold from noise dominated by rows that were
+// never noise) scored p50=0.607 p90=0.659 p95=0.705 max=0.798 against
+// SOME wrong package. The weakest genuine Tier 1 positive in the corpus
+// ("tell me a bedtime story about a fox" -> storytime-style) scores
+// 0.770 - the two distributions genuinely overlap at the edges (a real
+// greeting can outscore a real match for a DIFFERENT utterance), so no single
 // threshold cleanly separates every case; 0.75 sits just above the
 // measured p95 while still clearing every real positive in the corpus.
 // One real, confirmed false WIN this measurement caught and fixed here:

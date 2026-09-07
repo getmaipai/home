@@ -1254,13 +1254,16 @@ async function prepareTurn(
 // Fix D (docs/dev.md's "Chat reliability: the 2026-09-07 incident and
 // the five fixes"): measured, not a start value anymore
 // (`bun run scripts/bench/routing.ts`, docs/dev/session-c.md). At 0.45,
-// 32/32 genuinely ordinary conversational corpus rows AND all 8 live
+// every genuinely ordinary conversational corpus row AND all 8 live
 // incident probe phrases cleared this floor, meaning Tier 2's own
 // grammar-forced model call ran on nearly every real turn regardless of
 // whether anything plausible was ever in contention - exactly the
 // review comment above this constant was trying to prevent, just set
 // too low to actually prevent it. Raised to sit above the measured
-// ordinary-negative noise floor (p90=0.660, p95=0.740) while staying
+// ordinary-negative noise floor (31 rows excluding the corpus's own
+// `noiseFloorExempt` rows - a code review on this fix caught the first
+// measurement including those and so overstating the real floor;
+// p90=0.659, p95=0.705) while staying
 // comfortably below every case that genuinely needs to reach Tier 2: a
 // `consequential` package (routes.ts's own `lock-doors`, 1.00 in the
 // corpus - it can never WIN Tier 1 by design, but must still be

@@ -9158,13 +9158,17 @@ future false-call measurement, as planned.
 
 **D3's real scope, plus what the run actually found.**
 `scripts/bench/routing.ts` now prints each row's top three scores and a
-null-row percentile summary with a recommended-floor line, as planned;
-`scripts/bench/tool-calling.ts` is untouched (Fix E's own scope, not
-reached this pass). The real run: 32 ordinary negatives (excluding a
-handful of corpus rows deliberately DESIGNED to score high - a
-`consequential` package's own trigger phrase, and the `remember`/
-`recall` near-misses meant for Tier 2, never Tier 1) scored p50=0.610
-p90=0.660 p95=0.740 max=0.800; the weakest genuine Tier 1 positive in
+null-row percentile summary with a recommended-floor line, as planned -
+gated on a corpus-row `noiseFloorExempt` flag added after a code review
+on this fix caught the first cut of that script computing the null-row
+distribution over EVERY `expect: null` row, unfiltered, which would have
+set a threshold from noise dominated by the handful of rows already
+documented as deliberately scoring high by design (a `consequential`
+package's own trigger phrase, the `remember`/`recall` near-misses meant
+for Tier 2, never Tier 1). `scripts/bench/tool-calling.ts` is untouched
+(Fix E's own scope, not reached this pass). The real, corrected run: 31
+ordinary negatives scored p50=0.607 p90=0.659 p95=0.705 max=0.798; the
+weakest genuine Tier 1 positive in
 the whole corpus ("tell me a bedtime story about a fox" ->
 storytime-style) scores 0.770 - the two distributions genuinely overlap
 at the edges (a real greeting can outscore a real match for a DIFFERENT
@@ -9195,10 +9199,10 @@ row in `routing_embeddings` forever, still included in every future
 `scoreByEmbedding()` comparison with nothing to distinguish it from a
 live one.
 
-Verified: full backend suite green (1712 tests) with three OTHER live
-sessions editing this same checkout concurrently throughout; `tsc
---noEmit` clean; `routingCorpus.test.ts` 108/108 against the stub;
-`scripts/bench/routing.ts` 108/108 against the real embed backend with
+Verified: full backend suite green with two or three OTHER live sessions
+editing this same checkout concurrently throughout; `tsc --noEmit`
+clean; `routingCorpus.test.ts` 107/107 against the stub;
+`scripts/bench/routing.ts` 107/107 against the real embed backend with
 zero false positives (one, before the threshold fix).
 
 **Fix E: native tool calling, one round trip.**

@@ -173,9 +173,55 @@ recall on every package, which is expected and NOT evidence the
 0.62/0.08 thresholds are right: the stub has no real semantics, so this
 run only proves the mechanism (embedding storage, scoring, precedence,
 fallback) is wired correctly end to end, not that the numbers hold
-against a real model. **Re-run this bench against a real embedder before
-trusting 0.62/0.08 in production** - genuinely not done in this
-environment (no GGUF/llama-server available here).
+against a real model.
+
+**Re-run against a real embedder: done, Fix D, 2026-09-07** (`docs/dev.md`'s
+"Chat reliability: the 2026-09-07 incident and the five fixes",
+`docs/BACKLOG.md`'s Fix D item). The corpus grew from 49 to 107 rows (32
+real conversational negatives, the six live incident probe phrases among
+them - see that note for why the originally-planned "paraphrase
+positive" rows aren't here, and why 107, not 50+). Against nomic-embed-
+text-v1.5 GGUF on a real spawned llama-server (`MAIPAI_EMBED_URL=http://127.0.0.1:8794
+bun run backend/scripts/bench/routing.ts`):
+
+- 107/107 passed, every package precision=1.00 recall=1.00.
+- Document-side prefixing (`ensureRoutingEmbeddings()` sends
+  `search_document: <example>`, `embedUtterance()`'s query side stays
+  unprefixed - `lib/routing.ts`'s own header comment has the full
+  reasoning): measured head to head against no prefixing and against
+  prefixing both sides. Document-only matched no-prefix's own 68/71
+  true-positive rate on the corpus's positive rows while cutting the
+  null-row noise ceiling from p90 1.00 to p90 0.86; prefixing BOTH sides
+  (nomic's own documented default) scored WORSE, 66/71.
+- Null-row noise floor, 31 rows excluding the corpus's own
+  `noiseFloorExempt` rows (a `consequential` package's own trigger
+  phrase, the `remember`/`recall` near-misses meant for Tier 2): p50=0.607
+  p90=0.659 p95=0.705 max=0.798. The weakest genuine Tier 1 positive in
+  the corpus ("tell me a bedtime story about a fox" -> storytime-style)
+  scores 0.770 - genuine overlap at the edges (a real greeting can
+  outscore a real match for a different utterance), so no single
+  threshold cleanly separates every case.
+- `TIER1_THRESHOLD`: 0.62 -> **0.75**. `TIER1_MARGIN`: unchanged, 0.08 -
+  no measured evidence it needs to move. `TIER2_AMBIGUOUS_FLOOR`
+  (`turnEngine.ts`): 0.45 -> **0.68**.
+- One real, confirmed deterministic misroute this measurement caught and
+  the new threshold closes: "I can't decide what to wear today" won
+  Tier 1 outright against `list-view` at the old 0.62 bar (score 0.74,
+  margin 0.08) - no model in the loop to catch it. Gone at 0.75.
+- `translate/manifest.json`'s own routing.examples swapped "translate
+  good morning into french"/"...good night to italian" for non-greeting
+  phrasing - real hygiene ("good morning" alone scored 0.80 against
+  translate), but confirmed NOT a live misroute: `translate` requires an
+  arg only a literal pattern's own wildcard capture can bind, so
+  `canFire()` already rejected it from ever winning Tier 1 regardless of
+  score.
+- A separate, pre-existing gap this measurement surfaced, filed but not
+  fixed in Fix D (`docs/BACKLOG.md`, "Chat, memory and persona"):
+  `ensureRoutingEmbeddings()` only ever ADDS embeddings for a package's
+  CURRENT `routing.examples` - an example removed from a manifest (the
+  translate fix above is a real instance) leaves its own orphaned
+  embedding row in `routing_embeddings` forever, still compared in every
+  future `scoreByEmbedding()` call.
 
 **`RoutingStatsSection` (tier and score per decision):** `conversation_
 turns` gained nullable `routing_tier`/`routing_score` columns (schema

@@ -528,10 +528,13 @@ verified against D's numbers.
       measurement.
       (3) `TIER1_THRESHOLD` 0.62 -> 0.75 and `TIER2_AMBIGUOUS_FLOOR`
       0.45 -> 0.68, both set from the measured null-row distribution
-      (p50=0.610 p90=0.660 p95=0.740 max=0.800 over 32 ordinary
-      negatives, excluding rows deliberately designed to score high - a
-      `consequential` package's own trigger phrase and the `remember`/
-      `recall` near-misses meant for Tier 2). One real, confirmed
+      (p50=0.607 p90=0.659 p95=0.705 max=0.798 over 31 ordinary
+      negatives - a corpus-row `noiseFloorExempt` flag, added after a
+      code review caught the first cut of `scripts/bench/routing.ts`
+      computing this stat over EVERY null row unfiltered, excludes the
+      handful deliberately designed to score high: a `consequential`
+      package's own trigger phrase and the `remember`/`recall`
+      near-misses meant for Tier 2). One real, confirmed
       deterministic misroute this caught and fixed: "I can't decide what
       to wear today" won Tier 1 outright against `list-view` at the old
       0.62 threshold (score 0.74, margin 0.08) - gone at 0.75. `translate`
@@ -551,9 +554,9 @@ verified against D's numbers.
       REMOVED from a manifest (exactly what the translate fix just did)
       leaves its own old, orphaned embedding row in `routing_embeddings`
       forever, still compared in every future `scoreByEmbedding()` call.
-      Verified: full backend suite green (1712 tests), `tsc --noEmit`
-      clean, `routingCorpus.test.ts` 108/108 against the stub,
-      `scripts/bench/routing.ts` 108/108 against the real embedder with
+      Verified: full backend suite green, `tsc --noEmit`
+      clean, `routingCorpus.test.ts` 107/107 against the stub,
+      `scripts/bench/routing.ts` 107/107 against the real embedder with
       zero false positives (down from one).
 - [ ] **Prune orphaned `routing_embeddings` rows for examples no longer
       declared** (S) - found live during Fix D's own measurement
