@@ -406,6 +406,17 @@ export async function callHomeAssistantService(
 // fixable error) - Home Assistant's own `home.base_url` is the identical
 // shape (a household-configured URL to a self-hosted service) and has
 // the same latent gap, just not yet hit live the way SearXNG's was.
+//
+// Checks "is this object-shaped," not "did attemptHttpFetch's JSON.parse
+// actually succeed" (a code review, 2026-09-06, flagged the difference) -
+// attemptHttpFetch doesn't report which of its two branches produced a
+// value, so this can't tell a real API's own top-level array/string/
+// number response apart from the raw-text fallback. Both of today's
+// callers (Home Assistant's `/api/states/<id>`, SearXNG's own
+// `/search?format=json`) always answer with a top-level object, so this
+// is a real caveat for a future caller only: reaching for this helper
+// against an API whose real JSON response isn't an object needs a
+// different check, not this one.
 function expectJsonObject(value: unknown, baseUrl: string, hint: string): Record<string, unknown> {
   if (typeof value !== "object" || value === null || Array.isArray(value)) {
     throw new HostError("network_unreachable", `${baseUrl} didn't return a JSON response - ${hint}`);
