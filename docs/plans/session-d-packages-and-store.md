@@ -192,11 +192,17 @@ entry, README and changelog, a routing-corpus row set handed to C (write
 them into `spec/llm/routing-corpus.json` under your package ids; C owns
 the file's structure, you append rows):
 
-- Web search: SearXNG as a sidecar through F's `sidecars.ts` (your own
-  supervisor in the same shape until F's step 2 merges), the plugin
-  reads `search.searxng_url`; no keyless scraping of a search engine
-  from the hub's address, ever (the org's "we are the user" rule; legacy
-  `webSearch.ts`'s scraper ladder is the counterexample).
+- Web search: SearXNG, bring-your-own-instance rather than F's
+  `sidecars.ts` (Jesse's own call, 2026-09-06, after research found no
+  cross-platform, zero-dependency way to bundle SearXNG the way
+  `llama-server` is downloaded and pinned per-platform - see
+  `docs/dev/session-d.md`'s step 7 entry). The plugin reads
+  `search.searxng_url`; no keyless scraping of a search engine from the
+  hub's address as the DEFAULT or only path, ever (the org's "we are the
+  user" rule; legacy `webSearch.ts`'s scraper ladder is the
+  counterexample) - a scraping fallback was investigated for real
+  (offline robot, no SearXNG configured) and rejected after live testing
+  showed it bot-blocked on the first call, not on policy grounds alone.
 - Unit and currency conversion (`compute`, frankfurter.app for rates).
 - Math (`compute`).
 - News headlines (RSS from a household-chosen list, cached and warmed;
@@ -220,15 +226,33 @@ shopping list", "what's on my list", "remind me at 6 to call Nadia",
 store; a timer fires a `passive` notification through the declared type
 and, on the robot later, speech. E draws the list and the running timer.
 
+Built as four packages, not one - `list-add`, `list-view`, `remind`,
+`timer` (2026-09-06, `docs/dev/session-d.md`'s step 8 entry has the full
+reasoning): `deterministicArgs()`'s own one-arg-per-route limit is the
+same reason `remember`/`recall` are already two packages, not one, and
+`spec/vocab/capabilities.json` already listed `shopping_list`,
+`reminders`, `timers` as three separate grantable capabilities before
+this step touched anything. Firing a reminder/timer schedules a
+`"core"`-kind job (`lib/scheduler.ts`'s new `scheduleCoreJob`), never a
+replay of the recipe that set it - the real fix for "one recipe can't
+branch on set-vs-fire," not a workaround.
+
 ### Step 9: one real Home Assistant action, and the widgets (S-M)
 
 - A `lights` package that calls `home.call_service` (`light.turn_on`,
   `light.turn_off`, brightness) through the permission model shipped in
   Wave 1; a `consequential: true` example (`lock.lock`) proving C's
   confirm path from the package side.
-- Widgets: `weather`, `news`, `lists` and `almanac` declare
+- Widgets: `weather`, `news`, `lists` and `almanac-date` declare
   `contributes.widgets`; `GET /api/widgets` and the data route from the
-  contract, served from the cache.
+  contract, served from the cache. (Step 7's own design note: "one small
+  `almanac` package" became five - `almanac-date`, `almanac-time`,
+  `almanac-moon`, `almanac-holiday`, `almanac-onthisday` - once building
+  it revealed the router can only ever bind a package's ONE required arg
+  from a `routing.patterns` wildcard capture, with no way for a fired
+  package to learn which of several sub-questions it was actually asked;
+  see docs/dev/session-d.md's own step 7 entry for the full reasoning.
+  `almanac-date` is the one namesake widget makes the most sense for.)
 - `contributes.pages` from a manifest feeds the nav registry E built in
   Wave 1 (`GET /api/plugins` already lists packages; add the pages
   array, E reads it).

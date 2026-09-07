@@ -2,7 +2,7 @@ import { describe, expect, test, beforeEach } from "bun:test";
 import { TestClient } from "./client";
 import { resetDb } from "./reset-db";
 import { __resetThrottleForTests } from "@/lib/secretThrottle";
-import { createHost, performHttpFetch, withOneRetry, type AttemptResult } from "@/lib/packageHost";
+import { createHost, performHttpFetch, withOneRetry, formatSearxngResults, type AttemptResult } from "@/lib/packageHost";
 import { __resetRateLimiterForTests } from "@/lib/rateLimiter";
 import { cachedFetch, __resetPackageCacheForTests, __clearPackageCacheDirForTests } from "@/lib/packageCache";
 import { assertNotPrivateHost } from "@/lib/ssrfGuard";
@@ -10,12 +10,14 @@ import { setHouseholdSettingValue } from "@/lib/settings";
 import { HostError } from "@maipai/spec/emulators/ts/host-emulator.js";
 import { PackageManifest } from "@maipai/spec/gen/ts/manifest.js";
 import { db } from "@/db";
-import { people, memoryRecords } from "@/db/schema";
+import { people, memoryRecords, scheduledJobs, lists } from "@/db/schema";
 import { eq } from "drizzle-orm";
+import { __resetLlmSupervisorForTests } from "@/lib/llmSupervisor";
 
 beforeEach(() => {
   resetDb();
   __resetThrottleForTests();
+  __resetLlmSupervisorForTests();
 });
 
 function manifest(overrides: Partial<PackageManifest> = {}): PackageManifest {
@@ -789,6 +791,91 @@ describe("integration.call (session-d-packages-and-store.md step 4)", () => {
   });
 });
 
+describe("integration.call searxng (session-d-packages-and-store.md step 7, the websearch package's own case)", () => {
+  test("isn't set up yet: invalid_input, the same shape home_assistant gives", async () => {
+    const actor = await owner();
+    const host = createHost(actor, manifest({ permissions: ["integration:searxng"] }));
+    try {
+      await host.integration.call("searxng", "search", { query: "node.js" });
+      throw new Error("should have thrown");
+    } catch (err) {
+      expect((err as HostError).code).toBe("invalid_input");
+      expect((err as HostError).message).toContain("isn't set up yet");
+    }
+  });
+
+  test("search without a query raises invalid_input before any network attempt", async () => {
+    const actor = await owner();
+    const host = createHost(actor, manifest({ permissions: ["integration:searxng"] }));
+    try {
+      await host.integration.call("searxng", "search", {});
+      throw new Error("should have thrown");
+    } catch (err) {
+      expect((err as HostError).code).toBe("invalid_input");
+    }
+  });
+
+  test("a real GET to /search?q=...&format=json, formatted into a readable numbered list", async () => {
+    let seenUrl = new URL("http://placeholder.invalid");
+    const server = Bun.serve({
+      port: 0,
+      fetch: (req) => {
+        seenUrl = new URL(req.url);
+        return Response.json({
+          results: [
+            { title: "Node.js", url: "https://nodejs.org/", content: "Node.js is a JavaScript runtime." },
+            { title: "Node.js docs", url: "https://nodejs.org/docs", content: "API documentation." },
+          ],
+        });
+      },
+    });
+    try {
+      const actor = await owner();
+      setHouseholdSettingValue("search.searxng_url", `http://127.0.0.1:${server.port}`);
+      const host = createHost(actor, manifest({ permissions: ["integration:searxng"] }));
+      const result = await host.integration.call("searxng", "search", { query: "node.js runtime" });
+      expect(seenUrl.pathname).toBe("/search");
+      expect(seenUrl.searchParams.get("q")).toBe("node.js runtime");
+      expect(seenUrl.searchParams.get("format")).toBe("json");
+      expect(result).toBe(
+        "1. Node.js (https://nodejs.org/) - Node.js is a JavaScript runtime.\n2. Node.js docs (https://nodejs.org/docs) - API documentation.",
+      );
+    } finally {
+      server.stop(true);
+    }
+  });
+});
+
+describe("formatSearxngResults", () => {
+  test("reports no results found for an empty results array", () => {
+    expect(formatSearxngResults({ results: [] })).toBe("No web search results were found.");
+  });
+
+  test("reads a malformed (non-object) response as no results, not a throw", () => {
+    expect(formatSearxngResults(null)).toBe("No web search results were found.");
+  });
+
+  // The same class of gap code review found in almanac-holiday/onthisday/
+  // music: a result entry missing a usable title/url is skipped, never
+  // interpolated as "undefined".
+  test("skips a result missing a title or url rather than showing 'undefined'", () => {
+    const data = {
+      results: [
+        { title: "Real result", url: "https://example.com" },
+        { url: "https://example.com/no-title" },
+        { title: "No URL" },
+      ],
+    };
+    expect(formatSearxngResults(data)).toBe("1. Real result (https://example.com)");
+  });
+
+  test("respects the count cap", () => {
+    const data = { results: Array.from({ length: 10 }, (_, i) => ({ title: `Result ${i}`, url: `https://example.com/${i}` })) };
+    const text = formatSearxngResults(data, 2);
+    expect(text.split("\n")).toHaveLength(2);
+  });
+});
+
 describe("host.diagnostics (session-d-packages-and-store.md step 4)", () => {
   test("returns the package's own id, version, tier and declared permissions - real, not capability_missing", async () => {
     const actor = await owner();
@@ -813,22 +900,130 @@ describe("packageHost unimplemented methods", () => {
       expect((err as HostError).code).toBe("permission_denied");
     }
   });
+});
 
-  // llm.complete is a deliberate exception in this describe block: the
-  // `chat` role IS real now (lib/llm.ts), but the Host RPC boundary is
-  // synchronous and a chat completion is inherently async network I/O
-  // (see the header comment in packageHost.ts and spec/llm/README.md).
-  // This pins that the gap stays honest (capability_missing, permission
-  // checked first) rather than silently regressing to some other code.
-  test("llm.complete still reports capability_missing (sync Host boundary, async chat role)", async () => {
+// llm.complete is real now (session-d-packages-and-store.md step 7,
+// translate's own case): the Host RPC boundary is async (this file's
+// own beforeEach resets the chat supervisor so each test gets a fresh
+// stub client, the same fixture lib/llm.ts's own tests use - no live
+// model, no network, deterministic and offline). This used to only be
+// provably `capability_missing` (a synchronous boundary blocking an
+// inherently async chat completion); that gap is what step 7 closed.
+describe("packageHost llm.complete", () => {
+  test("checks permission before reaching the chat model", async () => {
+    const actor = await owner();
+    const host = createHost(actor, manifest({ permissions: [] }));
+    try {
+      await host.llm.complete({ messages: [{ role: "user", content: "hi" }] });
+      throw new Error("should have thrown");
+    } catch (err) {
+      expect((err as HostError).code).toBe("permission_denied");
+    }
+  });
+
+  test("rejects a missing or empty messages array as invalid_input, not a crash", async () => {
     const actor = await owner();
     const host = createHost(actor, manifest({ permissions: ["llm:complete"] }));
     try {
-      host.llm.complete({ messages: [{ role: "user", content: "hi" }] });
+      await host.llm.complete({});
       throw new Error("should have thrown");
     } catch (err) {
-      expect((err as HostError).code).toBe("capability_missing");
+      expect((err as HostError).code).toBe("invalid_input");
     }
+  });
+
+  test("returns a real reply from the stub chat backend (no engine configured in tests)", async () => {
+    const actor = await owner();
+    const host = createHost(actor, manifest({ permissions: ["llm:complete"] }));
+    const result = (await host.llm.complete({ messages: [{ role: "user", content: "translate hello to spanish" }] })) as { text: string };
+    expect(result.text).toContain("translate hello to spanish");
+    expect(result.text).toContain("[stub model: no real model loaded, this is a canned reply]");
+  });
+});
+
+describe("packageHost lists (session-d-packages-and-store.md step 8)", () => {
+  test("add checks permission before touching the shopping list", async () => {
+    const actor = await owner();
+    const host = createHost(actor, manifest({ permissions: [] }));
+    try {
+      host.lists.add("milk");
+      throw new Error("should have thrown");
+    } catch (err) {
+      expect((err as HostError).code).toBe("permission_denied");
+    }
+  });
+
+  test("view reports an empty shopping list plainly", async () => {
+    const actor = await owner();
+    const host = createHost(actor, manifest({ permissions: ["lists:read"] }));
+    expect(host.lists.view()).toBe("Your shopping list is empty.");
+  });
+
+  test("add then view: the real find-or-create shopping list, not a canned reply", async () => {
+    const actor = await owner();
+    const host = createHost(actor, manifest({ permissions: ["lists:write", "lists:read"] }));
+    host.lists.add("milk");
+    host.lists.add("eggs");
+    expect(host.lists.view()).toBe("milk, eggs");
+  });
+
+  test("add finds the same standing list across calls, never creating a second one", async () => {
+    const actor = await owner();
+    const host = createHost(actor, manifest({ permissions: ["lists:write"] }));
+    host.lists.add("milk");
+    host.lists.add("eggs");
+    const rows = db.select().from(lists).where(eq(lists.kind, "shopping")).all();
+    expect(rows).toHaveLength(1);
+  });
+});
+
+describe("packageHost reminders and timers (session-d-packages-and-store.md step 8)", () => {
+  test("reminders.set checks permission before parsing anything", async () => {
+    const actor = await owner();
+    const host = createHost(actor, manifest({ permissions: [] }));
+    expect(() => host.reminders.set("at 6 to call Nadia")).toThrow(HostError);
+  });
+
+  test("reminders.set schedules a real core job and returns a confirmation", async () => {
+    const actor = await owner();
+    const host = createHost(actor, manifest({ permissions: ["reminders:write"] }));
+    const result = host.reminders.set("at 6 to call Nadia");
+    expect(result.task).toBe("call Nadia");
+    const rows = db.select().from(scheduledJobs).where(eq(scheduledJobs.job, "reminders.fire")).all();
+    expect(rows).toHaveLength(1);
+    expect(rows[0]!.kind).toBe("core");
+    expect(rows[0]!.personId).toBe(actor.id);
+    expect(JSON.parse(rows[0]!.inputs)).toEqual({ task: "call Nadia" });
+  });
+
+  test("reminders.set raises invalid_input for text with no time in it", async () => {
+    const actor = await owner();
+    const host = createHost(actor, manifest({ permissions: ["reminders:write"] }));
+    try {
+      host.reminders.set("call Nadia");
+      throw new Error("should have thrown");
+    } catch (err) {
+      expect((err as HostError).code).toBe("invalid_input");
+    }
+  });
+
+  test("timers.set schedules a real core job with the exact requested duration", async () => {
+    const actor = await owner();
+    const host = createHost(actor, manifest({ permissions: ["timers:write"] }));
+    const before = Date.now();
+    const result = host.timers.set("ten minutes");
+    expect(result.label).toBe("ten minutes");
+    const rows = db.select().from(scheduledJobs).where(eq(scheduledJobs.job, "timers.fire")).all();
+    expect(rows).toHaveLength(1);
+    const nextRunAt = new Date(rows[0]!.nextRunAt).getTime();
+    expect(nextRunAt).toBeGreaterThanOrEqual(before + 600_000);
+    expect(nextRunAt).toBeLessThan(before + 601_000);
+  });
+
+  test("timers.set raises invalid_input for a duration this grammar doesn't cover", async () => {
+    const actor = await owner();
+    const host = createHost(actor, manifest({ permissions: ["timers:write"] }));
+    expect(() => host.timers.set("a while")).toThrow(HostError);
   });
 });
 

@@ -2,12 +2,13 @@ import { describe, expect, test, beforeEach } from "bun:test";
 import { TestClient } from "./client";
 import { resetDb } from "./reset-db";
 import { __resetThrottleForTests } from "@/lib/secretThrottle";
-import { parseWhen, scheduleJob, ensureCoreJob, listJobs, cancelJob, runDueJobs } from "@/lib/scheduler";
-import { runPlugin } from "@/lib/plugins";
+import { parseWhen, scheduleJob, scheduleCoreJob, ensureCoreJob, listJobs, cancelJob, runDueJobs } from "@/lib/scheduler";
+import { runPlugin, registerAllPackageNotificationTypes } from "@/lib/plugins";
 import { db } from "@/db";
 import { people, scheduledJobs, pendingEmbeddings, memoryEmbeddings } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { remember } from "@/lib/memory";
+import { listPending } from "@/lib/notifications";
 import { listIssues } from "@/lib/issues";
 
 beforeEach(() => {
@@ -278,6 +279,45 @@ describe("runDueJobs", () => {
 
     const row = db.select().from(scheduledJobs).where(eq(scheduledJobs.id, scheduled.value.id)).get()!;
     expect(row.status).toBe("done"); // not somehow re-queued by the second, overlapping call
+  });
+});
+
+// Step 8: reminders/timers fire as "core" jobs (scheduleCoreJob), never
+// a replay of the recipe that scheduled them - firing raises the
+// declared notification directly (CORE_JOBS' own reminders.fire/
+// timers.fire). Real package manifests (remind/timer), not an inline
+// fake one: registerAllPackageNotificationTypes() is the same boot-time
+// pass production runs, proving the two actually match what's declared
+// rather than a typo neither file alone would catch.
+describe("reminders.fire and timers.fire (session-d-packages-and-store.md step 8)", () => {
+  beforeEach(() => registerAllPackageNotificationTypes());
+
+  test("fires reminders.fire for real and raises a real remind.due notification", async () => {
+    const { row: ownerRow } = await owner();
+    const scheduled = scheduleCoreJob(ownerRow, "reminders.fire", "2099-01-01T00:00:00.000Z", { task: "call Nadia" });
+    if (!scheduled.ok) throw new Error("setup failed");
+    db.update(scheduledJobs).set({ nextRunAt: new Date(0).toISOString() }).where(eq(scheduledJobs.id, scheduled.value.id)).run();
+
+    const result = await runDueJobs(runPlugin);
+    expect(result.ran).toBe(1);
+    expect(result.errors).toBe(0);
+
+    const pending = listPending(ownerRow);
+    expect(pending.some((n) => n.typeId === "remind.due" && n.text.includes("call Nadia"))).toBe(true);
+  });
+
+  test("fires timers.fire for real and raises a real timer.done notification", async () => {
+    const { row: ownerRow } = await owner();
+    const scheduled = scheduleCoreJob(ownerRow, "timers.fire", "2099-01-01T00:00:00.000Z", { label: "ten minutes" });
+    if (!scheduled.ok) throw new Error("setup failed");
+    db.update(scheduledJobs).set({ nextRunAt: new Date(0).toISOString() }).where(eq(scheduledJobs.id, scheduled.value.id)).run();
+
+    const result = await runDueJobs(runPlugin);
+    expect(result.ran).toBe(1);
+    expect(result.errors).toBe(0);
+
+    const pending = listPending(ownerRow);
+    expect(pending.some((n) => n.typeId === "timer.done" && n.text.includes("ten minutes"))).toBe(true);
   });
 });
 

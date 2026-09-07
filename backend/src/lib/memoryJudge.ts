@@ -72,7 +72,7 @@ import {
   type SimilarMatch,
 } from "@/lib/memory";
 import { trigger } from "@/lib/notifications";
-import { sanitizeForPrompt } from "@/lib/turnEngine";
+import { sanitizeForPrompt } from "@/lib/promptSanitize";
 import { nextHlc } from "@/lib/hlc";
 import { turnActiveWithin } from "@/lib/turnActivity";
 import type { ConversationTurnRow } from "@/wire";

@@ -8594,6 +8594,20 @@ real detail lives in each session's own `docs/dev/session-<letter>.md`.
   release ceremony itself are deliberately deferred (docs/BACKLOG.md;
   cutting a release is always Jesse's word in the moment). Merged
   2026-09-06.
+- **Session D** (`docs/plans/session-d-packages-and-store.md`, `docs/dev/
+  session-d.md`): packages, the store, and the catalog - the Tier 1 host
+  under Deno with real MCP, the store host (verify, install, smoke,
+  rollback, channels) and the catalog's own supply-chain tooling (lint,
+  pack, sign, index, scorecard, a public CI), the almanac/math/convert/
+  news/sports/currency/translate/music/websearch/knowledge lookups,
+  lists/reminders/timers over a new scheduler core-job kind, home
+  control packages (lights, a locked-door consequential example) and the
+  D-to-E widgets contract. Two real safety gaps found and fixed at the
+  source along the way: a consequential package's own literal routing
+  pattern could bypass the confirmation gate entirely, and a
+  consequential package's `min_role` alone (not the confirm step) is the
+  real gate on who can trigger a security-domain action. Merged
+  2026-09-06.
 
 ## A resource governor for the chat engine (2026-09-06)
 

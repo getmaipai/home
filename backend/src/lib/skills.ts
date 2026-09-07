@@ -18,6 +18,7 @@ import { readFileSync, readdirSync, existsSync } from "node:fs";
 import { join } from "node:path";
 import { PackageManifest } from "@maipai/spec/gen/ts/manifest.js";
 import { PACKAGES_DIR, statMtimeMs, isValidPackageId } from "@/lib/paths";
+import { resolvePackageDir, listInstalledPackageIds } from "@/lib/packageResolve";
 
 export interface LoadedSkill {
   manifest: PackageManifest;
@@ -40,18 +41,29 @@ function stripFrontmatter(raw: string): string {
   return raw.replace(FRONTMATTER_RE, "").trim();
 }
 
-/** Every bundled skill package's id - a directory under `packages/` with
- * a `SKILL.md` file, distinguishing it from a plugin directory (which has
- * `recipe.json` instead) without needing to parse every manifest just to
- * list ids. */
+/** Every loadable skill package's id: a bundled directory under
+ * `packages/`, or a store-installed id (session-d-packages-and-store.md
+ * step 6) - either way, resolved through `lib/packageResolve.ts` and
+ * kept only if ITS OWN active directory has a `SKILL.md` file
+ * (distinguishing a skill from a plugin directory, which has
+ * `recipe.json` instead, without parsing every manifest just to list
+ * ids). A real gap found by code review: this used to read `PACKAGES_DIR`
+ * directly and never checked `lib/packageResolve.ts`'s own installed-
+ * override table at all, so a store-installed skill (new, or a store
+ * update to a bundled one) never reached `loadAllSkills()` and so never
+ * reached a chat turn's own system prompt - the one place a skill exists
+ * to be composed into. */
 export function listSkillIds(): string[] {
+  let bundledIds: string[] = [];
   try {
-    return readdirSync(PACKAGES_DIR, { withFileTypes: true })
-      .filter((e) => e.isDirectory() && existsSync(join(PACKAGES_DIR, e.name, "SKILL.md")))
+    bundledIds = readdirSync(PACKAGES_DIR, { withFileTypes: true })
+      .filter((e) => e.isDirectory())
       .map((e) => e.name);
   } catch {
-    return [];
+    bundledIds = [];
   }
+  const candidateIds = [...new Set([...bundledIds, ...listInstalledPackageIds()])];
+  return candidateIds.filter((id) => existsSync(join(resolvePackageDir(id), "SKILL.md")));
 }
 
 // mtime-keyed cache (a latency review, 2026-09-06: loadAllSkills() re-reads
@@ -80,8 +92,9 @@ export function loadSkill(id: string): LoadedSkill | null {
   // guard lib/plugins.ts's loaders and lib/denoHost.ts's callTier1Handle()
   // got - see lib/paths.ts's isValidPackageId() for the full rationale.
   if (!isValidPackageId(id)) return null;
-  const manifestPath = join(PACKAGES_DIR, id, "manifest.json");
-  const bodyPath = join(PACKAGES_DIR, id, "SKILL.md");
+  const dir = resolvePackageDir(id);
+  const manifestPath = join(dir, "manifest.json");
+  const bodyPath = join(dir, "SKILL.md");
   const manifestMtimeMs = statMtimeMs(manifestPath);
   const bodyMtimeMs = statMtimeMs(bodyPath);
   if (manifestMtimeMs === null || bodyMtimeMs === null) {

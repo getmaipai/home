@@ -1,0 +1,8 @@
+{
+  "id": "convert",
+  "inputs": [{ "name": "expression", "selector": "text" }],
+  "steps": [
+    { "op": "compute", "as": "result", "expression": "{expression}" },
+    { "op": "format", "as": "reply", "text": "{result}", "speech": "{result}" }
+  ]
+}

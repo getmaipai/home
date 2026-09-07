@@ -763,3 +763,654 @@ since step 2) for C's Tier 2 router once C wires that side; a second
 Tier 1 package would be the first real test of whether `host/fetch`'s
 one-method RPC surface needs a second method (`host/memory.recall`,
 etc.) added the identical way.
+
+## Step 6: the store host and the catalog tooling
+
+**The `catalog` repo's own tooling** (`getmaipai/catalog@454e945`):
+`tools/src/{lint,pack,sign,index-builder,scorecard,check,build-index}.ts`,
+`@maipai/catalog-tools`. `lint.ts` validates a package's manifest (and,
+for Tier 0 plugins, its recipe.json) against `schema/` (mirrored from
+`home/spec/`) plus the rest of bronze - five-plus routing examples, a
+privacy row per `net:` permission, banned trademark vocabulary, README/
+CHANGELOG/quality_scale.yaml. `pack.ts` packs a package directory into a
+deterministic gzipped tarball (`node-tar`, BlueOak-1.0.0) and refuses a
+symlink outright (found by review: a symlink would otherwise pass
+`packPackage()`'s own file check via `statSync`, which follows it, and
+node-tar preserves the symlink itself - target string and all - in the
+signed tarball; `catalog` takes community PRs, so this is a real
+attacker-reachable path). `sign.ts` is Ed25519 via native `node:crypto`.
+`index-builder.ts` builds the TUF-shaped `root`/`targets`/`timestamp`,
+each carrying a monotonic `version` (added after `build-index.ts`
+landed and a rollback-detection gap became obvious: an expiry check
+alone can't catch a validly-signed, not-yet-expired, but WITHDRAWN
+older file). `build-index.ts` ties all of it together for a real set of
+packages, generating a local dev signing keypair outside the repo
+(`~/.config/maipai/catalog-dev-signing/`, never the real maintainer
+release key, which stays offline and is Jesse's own future call).
+`check.ts` is the CLI: `bun run check` finds every package in the repo
+(a directory with its own manifest.json, one level under `plugins/` and
+`skills/`, direct under everything else) and runs lint+scorecard on
+each. `scripts/check.sh` runs the whole suite before the standards core.
+59 tests across 7 files.
+
+**The bundled packages move to `catalog` as their canonical source**
+(`getmaipai/catalog@60788f1`): `define`, `joke`, `trivia`, `weather`,
+`knowledge`, and `storytime-style` (D's own six, all bronze-complete)
+migrated to their real catalog home (`plugins/<category>/<id>/` or
+`skills/<category>/<id>/`). `recall`, `remember`, and the companion
+packages (`buddy`, `default`, `pal`, `tutor`) stay in `home` - not
+D's packages (this file's own step-0 ownership note, and Session A's
+own companion work), and not yet at bronze (no README/CHANGELOG/
+quality_scale.yaml/smoke declaration), so they don't belong in the
+public catalog yet either: bronze is the actual publish gate, not a
+courtesy. `home` keeps its own checked-in copy under `backend/packages/`
+(`scripts/refresh-bundled-packages.ts`, `home-d@fc44642`) so the
+running hub never needs a network fetch or a sibling catalog checkout
+at runtime - `lib/bundledPackages.ts`'s `hashPackageDir()` (a plain
+sha256 over sorted relative-path + content, refusing a symlink the same
+way `pack.ts` does) is what makes "the copy matches" checkable without
+`home` depending on `catalog`'s own tar-based tooling (a real cross-repo
+dependency neither repo's build supports - the same reason `schema/` is
+a copy, not a live import). `backend/packages/bundled-provenance.json`
+records each id's hash/source-commit/catalog-path;
+`tests/bundledPackages.test.ts` recomputes the hash from whatever's on
+disk right now and fails loudly the moment someone hand-edits the
+checked-in copy instead of running the refresh script. 13 tests.
+
+**`lib/storeIndex.ts` verifies the signed index** - a deliberate,
+field-for-field TWIN of `catalog`'s own `index-builder.ts` (same reason
+as the bundled-copy hash above: no cross-repo dependency, different
+trust boundary, the same reasoning MCP's own independent client/server
+implementations already carry through this file). Checks, in order:
+root's signature against the pinned trust config (a CLIENT-side
+threshold, deliberately independent of whatever root.json's own
+self-reported threshold claims - trusting a root's self-declared
+threshold to verify ITSELF would let a malicious root simultaneously
+declare and satisfy threshold 1), root's expiry and rollback version;
+targets' signature against root's OWN declared keys/threshold for that
+role, expiry, rollback version; timestamp's signature the same way,
+expiry, rollback version; and finally targets.json's actual fetched
+bytes against timestamp's own hash pointer (the freshness anchor - even
+an independently well-signed targets.json must be the SAME BYTES the
+freshest timestamp vouches for). `lib/store.ts` builds install/rollback/
+uninstall/setChannel on top: downloads and hash-verifies a package's
+tarball against its targets entry, unpacks to a staging directory,
+checks the unpacked manifest's own `id` AND `version` match what was
+asked for (version validated against a safe semver pattern before it
+ever reaches a filesystem path), makes it the active install, and runs
+its smoke test - a failure leaves it installed but disabled
+(docs/PACKAGES.md's own words), never undone. `lib/packageResolve.ts`
+is the one place a package's active directory is computed (an
+installed override or the bundled default under `PACKAGES_DIR`),
+consumed by `lib/plugins.ts`, `lib/denoHost.ts`, `lib/smoke.ts`, and
+`lib/skills.ts`.
+
+**A high-effort code review before this landed caught real security
+gaps, all fixed**: (1) `lib/paths.ts`'s `tier1PackageDataDir` used to be
+`data/packages/<id>/` directly, and the new `installedPackageVersionDir`
+nested `versions/<version>/` INSIDE that same directory - a store-
+installed Tier 1 package's own SOURCE was a subdirectory of its own
+`--allow-write` grant, silently defeating `lib/denoHost.ts`'s "can never
+write into its own source tree" the moment a Tier 1 package was store-
+installed rather than bundled. Fixed by giving `tier1PackageDataDir` its
+own `state/` subdirectory, a true sibling of `versions/`; a real `deno
+run` regression test (two genuinely separate directories, not the same
+temp dir twice like every other test in that file) now proves it.
+(2) `verifyEnvelopeSignature` only checked "did SOME authorized key
+sign this" - a threshold-1 check regardless of what root.json's own
+`roles.*.threshold` actually declares, so compromising ONE signer among
+several would have been enough to forge an update. Fixed with a real
+`countSatisfiedKeys()` that counts DISTINCT keys satisfied, enforced
+against each role's own threshold. (3) `manifest.version`, read out of
+an unpacked tarball, went straight into a filesystem path with no
+validation - a manifest declaring `"../../../etc/cron.d"` would have
+flowed through `path.resolve`'s own `..` collapsing into a write outside
+`data/packages/` entirely, gated only on a malicious catalog entry
+passing hash verification, no signature break needed. Fixed with a
+semver-shaped pattern check plus a cross-check against the target
+path's own version segment. (4) An update that WIDENS a package's
+permissions installed silently - no comparison against what was already
+granted, contradicting this step's own acceptance line ("a permission-
+changing update demoted to notify"). Fixed: `install()` diffs the new
+permission set against the active install's own BEFORE downloading
+anything, and refuses with `requiresConfirmation` until the caller
+passes `confirmed: true` - the two-call permission-prompt flow, at the
+library level (a UI-level prompt is E's own consuming work once
+`routes/store.ts` exists). (5) Reinstalling the SAME version overwrote
+`previousVersion` with itself, silently destroying the real rollback
+target - a retry after a network blip would have looked like a
+successful rollback that was actually a no-op. Fixed: `previousVersion`
+only advances when the version actually changes. (6) Two concurrent
+installs of the same id raced on the same staging directory and both
+read pre-install state before either wrote it. Fixed with a per-package-
+id lock (`withPackageLock`, the identical shared-promise shape
+`lib/denoHost.ts`'s own `startingProcesses` map already uses for a Tier
+1 package's cold start) around install/rollback/uninstall. (7)
+`lib/skills.ts` was never migrated to `packageResolve.ts` - a store-
+installed or store-updated skill package was invisible to
+`loadAllSkills()`, the one place a skill reaches a chat turn's system
+prompt. Fixed. (8) `uninstall()` deleted the WHOLE
+`data/packages/<id>/` parent, wiping a Tier 1 package's own persistent
+state even when a bundled fallback kept running right afterward. Fixed
+to remove only the store's own `versions/`/`.staging/` subdirectories.
+Three independent hand-copies of the same TUF fixture-signing logic
+across two test files were also consolidated into
+`tests/support/tufFixtures.ts`.
+
+Tests: the full tamper suite (bad hash, swapped manifest, expired
+timestamp, rolled-back index, unknown signer, and now threshold
+bypass) in `storeIndex.test.ts`; install/rollback/uninstall/channel,
+the acceptance case (installing over an already-bundled package), and
+the concurrency/permission-escalation/path-traversal/Tier-1-state
+regressions above in `store.test.ts`. `scripts/check.sh` fully green,
+921 backend tests passing.
+
+**Verified for real**, against a real signed index built by `catalog`'s
+own `bun run build-index` (not a test fixture) and a real household-
+free dev data dir: `install()` against
+`plugins/utilities/weather/0.1.0` with `catalog`'s real dev signing key
+as the pinned trust returned `{ok: true, version: "0.1.0",
+previousVersion: null, smokeOk: true}`; `resolvePackageDir("weather")`
+then resolved to the store-installed version directory, not the
+bundled copy; `runPlugin("weather", ...)` - the exact same call a real
+`POST /api/plugins/weather/run` makes - answered "It's 54.7 degrees in
+Seattle" through the real recipe, the real host, and a real live
+Open-Meteo call, all served from the just-installed copy.
+
+**`routes/store.ts`** closes out this step's own remaining pieces:
+`@hono/zod-openapi`, owner/admin only (`routes/repairs.ts`'s own gate),
+`GET/POST /api/store/installs/{id}` plus `/rollback`, `/uninstall`, and
+`/channel` - the two-call permission-prompt flow's UI-facing half (a
+409 with `requiresConfirmation` when an update adds permissions, until
+re-sent with `confirmed: true`). A medium-effort review before this
+landed caught two more real gaps: every `StoreResult` failure collapsed
+to 400 at the route layer, even "no active install for this id" (`routes/
+repairs.ts`'s own convention says 404) - fixed by giving `StoreResult`
+a real `status` field, the same shape `lib/commands.ts`'s
+`CommandOpResult` already carries. And install/uninstall/rollback had
+no coordination with a Tier 1 package's own live sandbox process -
+`lib/denoHost.ts` resolves and pins `sourceDir` once, at spawn time,
+and never re-reads it, so a live process would keep running against
+files a mutation had just deleted or replaced. Fixed with a new
+`killLiveProcessForInstallChange()` call after each mutation (a no-op
+for a package with no live process, the common case), so the next real
+call always respawns fresh against whatever `lib/packageResolve.ts`
+resolves to now.
+
+**`catalog`'s public CI workflow** (`.github/workflows/check.yml`,
+`getmaipai/catalog@2d1d37c`) closes out `catalog`'s own remaining piece:
+tag- and PR-triggered (never on every push - the org's own security
+standard, and the one carve-out for a public repo), checks out the
+pinned `std-v0.2.0` standards ref as a sibling directory (the identical
+layout `scripts/check.sh` already expects locally) and installs
+gitleaks explicitly (`check-core.sh`'s own gitleaks step only warns,
+never fails, when the binary isn't on PATH), then runs the same
+`scripts/check.sh` a contributor runs before opening a PR.
+
+Step 6 is complete. What's left for whom: the daily `catalog.check`
+core job and the full auto-update/notify flow (comparing an installed
+version against the index on a schedule, not just at an explicit
+install call) are real, deferred scope - `fetchVerifiedIndex()` is
+already exported standalone for exactly that future caller to build
+on, but the scheduled job itself, and the notification it would raise,
+don't exist yet. The fuller CI feature set docs/PACKAGES.md eventually
+wants (a permission-diff PR comment, a vendoring scan, screenshot
+generation with vision review, the CLA check) is likewise deferred - a
+maintainer-review-plus-CLA merge gate is manual until then.
+
+## Step 7: the lookups
+
+The plan's own list, one package each unless noted: web search,
+conversions, math, news, sports, translation, music and media lookup,
+and the almanac. Every package here is Tier 0 or Tier 1, bronze-complete
+(README, CHANGELOG, quality_scale.yaml, 5+ routing examples, a smoke
+declaration), with routing-corpus rows appended to
+`spec/llm/routing-corpus.json` for C as they were built.
+
+**The almanac split into five packages** (`home-d@6a0133a`): the plan
+names one `almanac` package for date, time, holidays, moon phase, and
+on-this-day, but `deterministicArgs()` (`turnEngine.ts`, 4.5) can only
+ever bind ONE captured string to ONE required arg - a single package
+covering five distinct zero-argument lookups has no way to route "what
+time is it" to the time logic and "what phase is the moon in" to the
+moon logic from inside one recipe or handler. Found by direct testing
+against the real routing engine before committing to a design, not
+assumed. Split into `almanac-date`, `almanac-time`, `almanac-moon`
+(fixed a real off-by-one: `Math.floor` on the phase fraction had a
+systematic ~1.8-day lag, should have been `Math.round`),
+`almanac-holiday` (date.nager.at, hardcoded to US - no household-country
+setting exists yet, the same honest single-market scoping every
+network-dependent package in this step ended up needing somewhere),
+and `almanac-onthisday` (Wikipedia's own REST API). All five are Tier 1,
+zero required args, so they route on a literal `routing.patterns` phrase
+alone (`deterministicArgs`'s zero-required-args short circuit) - the
+same floor `loadAllManifests()`'s own bug (below) had been silently
+breaking for every Tier 1 package until this step. Also found: a real
+embedding false positive ("what's my son's name" scored ~0.68 against
+`almanac-date`'s first-draft routing examples) - revised the examples
+and added a permanent `must_not` regression row rather than trusting it
+wouldn't recur.
+
+**Two real, pre-existing production bugs, found by being the first
+packages to actually exercise the paths**: `turnEngine.ts`'s
+`loadAllManifests()` was calling the Tier-0-only `loadPackage()`, so a
+Tier 1 package's own `routing.patterns` never reached `route()` at all -
+every almanac package (and every other Tier 1 lookup this step built)
+would have been unroutable. Fixed to `loadManifestOnly()`, tier-agnostic,
+with the two stale "Tier 0 only" comments beside it corrected in the
+same commit. Separately, `compute`'s own `ComputeError` (spec/
+interpreters/{ts,py}/recipe-interpreter.ts) was being re-wrapped as a
+bare `Error` on the way out, erasing the type `lib/plugins.ts`'s
+`runPlugin()` needs to tell "a household member's bad input" apart from
+a real bug - found while building `math`, the first package to hand a
+turn's own free-typed text straight to `compute`. Fixed in both
+interpreters and `runPlugin()`, with permanent regression tests
+asserting the exact error message, not just its HostError-ness (a code
+review finding: the first version's assertion only checked that the
+input string round-tripped into the message, which would pass even if
+`evaluateExpression`'s own message text were garbled).
+
+**`math` and `convert`** (`home-d@8fad6ad`) both reuse `compute`'s
+restricted evaluator (step 4) - standard-notation arithmetic
+(`math`) and physical-unit conversion (`convert`, "5 miles to km" via
+mathjs's own `to`/`in` syntax), empirically verified before scoping
+either package's README rather than assumed. `math`'s first-draft
+`routing.patterns` (`solve *`, `evaluate *`) were dropped after code
+review: both are generic enough to collide with everyday non-math
+speech ("solve my marriage problems"), and a literal pattern match wins
+outright over the model with no fallback (`route()`'s own header
+comment) - narrower patterns lower the collision odds, they don't
+remove them, since a required-arg package can only ever route through a
+literal wildcard today. The identical collision class recurred twice
+more this step (`music`'s "who is the artist \*", `translate` needed no
+fix but was designed with it in mind from the start) - a real, standing
+architectural gap, not one package's bug, tracked for whoever eventually
+builds pattern-match-can-decline-and-fall-through.
+
+**`currency`** (`home-d@58ff10c`): `compute` has no currency units and
+can't safely gain any (`createUnit` is disabled there on purpose), so
+this is a real Tier 1 package with its own small parser
+(`parseCurrencyExpression`, a curated word table plus bare 3-letter ISO
+codes) and `api.frankfurter.dev` (frankfurter.app 301-redirected there
+mid-session - found by testing the literal URL from memory, not
+assumed). Routing note: `convert` already owns the literal `"convert *"`
+pattern and a tie goes to whichever package sorts first by id
+("convert" before "currency") - `currency` answers to `"exchange *"`
+instead, with a routing-corpus row proving "convert 5 dollars to euros"
+really does go to `convert` (and fail there) rather than silently
+starting to work if the pattern set ever changes underneath this
+decision.
+
+**`news`** (`home-d@8fad6ad`) and **`sports`** (`home-d@693bf75`): NPR's
+own public RSS feed (`feeds.npr.org`, hand-rolled `<item>`/`<title>`
+extraction, no XML library) and MLB's own public stats API
+(`statsapi.mlb.com`), both real, documented, key-free public services -
+"prefer the front door" satisfied by construction, not worked around.
+`sports` only reports a game whose `abstractGameState` is `Live` or
+`Final`; a scheduled-but-unplayed game is left out rather than shown as
+a false 0-0. Known, documented gaps rather than silent limitations:
+`news` ships one fixed feed where the plan wants "a household-chosen
+list" - a real per-household feed choice needs a settings key a Tier 1
+package's own sandboxed process can actually read, which no package has
+a way to do today; `sports` is MLB only, the same single-market call
+`almanac-holiday` already made for holidays, for the identical reason
+(no sport/team preference setting exists yet).
+
+**`music`** (`home-d@80122b7`): MusicBrainz's own public search API,
+artists only for v0.1.0 - the plan's fuller "music and media lookup"
+also wants movie/TV metadata via a TMDB-style API "with the user's own
+key where required," which needs a household-supplied secret a Tier 1
+package can actually read at runtime, the identical settings-access gap
+`news`'s own feed choice hit. First package to override `host.fetch`'s
+default User-Agent (`opts.headers`) per MusicBrainz's own API etiquette.
+Code review caught a second instance of the routing-collision class
+above: `"who is the artist *"` is generic enough (painters, other visual
+artists) to false-positive-route an unrelated question into a
+MusicBrainz lookup that either finds nothing or - worse - a wrong
+same-sounding band via MusicBrainz's own fuzzy relevance scoring.
+Dropped; `"who is the singer *"` (kept, more narrowly musical) and
+`"look up the artist *"` remain.
+
+**`translate` and the new `llm_complete` recipe step**
+(`home-d@0434201`): the plan's own "a local model through
+`host.llm.complete` first" - a real, previously-documented gap
+(`host.llm.complete` had been `capability_missing` in `packageHost.ts`
+since the `chat` role landed, because no recipe step had ever called
+it). Closed with a new Tier 0 primitive, `spec/schemas/recipe.schema.json`'s
+`llm_complete` step: one user-role message through `host.llm.complete`,
+binding the raw `{"text": string}` reply the same way `fetch`'s own
+`as` binds - a `pick` step reads `.text` out before `format`
+interpolates it, no new binding convention invented. Both interpreters
+(kept behaviorally identical per a new conformance fixture,
+`llm-complete-lookup.json`) and both host emulators updated in lockstep
+(`llm.complete` is now `Promise`-typed, matching `fetch`/
+`home.call_service`'s own async shape - the Python emulator's own
+`_LlmNamespace.complete` had to become `async def` too, since Python
+has no "await on a plain value is a no-op" leniency the way JS does).
+`packageHost.ts`'s real implementation calls `lib/llm.ts`'s own
+`complete("chat", messages)` directly; three docs that described the
+old gap as current (`spec/llm/README.md`, `lib/llm.ts`'s header, a
+stale comparison in `turnEngine.ts`) were found stale by code review in
+the same pass and corrected. `translate` itself hands the model the
+whole captured phrase (text plus target language, in whatever order a
+person says it) in one prompt asking it to identify both, rather than
+parsing them apart first - unlike `currency`'s own small parser, that
+split is exactly the fuzzy natural-language task a model suits and
+deterministic parsing doesn't.
+
+**`websearch` and the `searxng` integration** (`home-d@ff8585e`): the
+plan calls for "SearXNG as a sidecar through F's `sidecars.ts`" - real
+research (not assumption) into a bundled, cross-platform, zero-dependency
+SearXNG the way `llama-server` is downloaded and pinned per-platform
+(the engine catalog's own precedent) found no clean path exists.
+SearXNG has no official prebuilt binary for any OS - only Docker, or a
+from-source install with real per-OS build dependencies, worse on
+Windows - and the one `searxng` package on PyPI is an unrelated
+third-party MCP wrapper by someone else, not the real project. Jesse's
+own call, given that research: bring-your-own-instance, not a bundled
+sidecar - `search.searxng_url` (`backend/src/settings/searchKeys.ts`,
+household scope, not secret, the same shape `home.base_url` already
+takes for Home Assistant) plus a second `host.integration.call` entry
+(`packageHost.ts`'s `searxngSearch`/`formatSearxngResults`, mirroring
+`homeAssistantGetState`'s own settings-lookup/rate-limit/real-call
+shape) reachable from a plain Tier 0 recipe: `integration.call` ->
+`llm_complete` (the household's own model turns raw results into a real
+answer) -> `pick` -> `format`. No sidecar registered with F's
+`lib/sidecars.ts` - there is nothing to auto-provision cross-platform
+today, so this doesn't claim to be one.
+
+A scraping fallback (`duck-duck-scrape`, npm's TypeScript-equivalent of
+Python's `ddgs`, since Tier 1 packages on the hub only run Deno) was
+seriously explored for the real cases Jesse raised - the robot offline,
+no SearXNG configured, the hub's own instance down - and rejected after
+being tested for real, not assumed to work or assumed to fail: both a
+direct request to DuckDuckGo's own HTML endpoint and the real
+`duck-duck-scrape` library's own request logic were bot-blocked on the
+very first call, cold, from a fresh IP (a CAPTCHA challenge, then "DDG
+detected an anomaly... you are likely making requests too quickly").
+This also reverses the plan's own "no keyless scraping of a search
+engine from the hub's address, ever" line's implicit assumption that
+the choice was purely a policy call - it's also, independently, a
+technique that does not currently work, evidenced live rather than
+argued. `websearch` stays SearXNG-only; unreachable or unconfigured
+reports the same honest "isn't set up yet" shape as Home Assistant.
+
+Code review found three real issues in this package before it shipped:
+a confirmed routing collision (`"look up * online"` also matched
+`music`'s own `"look up the artist *"`, and `music` wins the id-sorted
+tie - dropped, with a routing-corpus row guarding against re-adding
+it), a real prompt-injection surface (raw, household-uncontrolled
+SearXNG result text spliced into the `llm_complete` prompt with no
+delimiter or "treat as data" framing, reachable by `min_role: child`
+with no safety-classifier pass on `llm_complete`'s own output at all -
+`llm_complete` is new this step, and this is the first thing to
+surface that gap; hardened with explicit begin/end markers and a
+length cap per result field, real mitigation, not a guarantee absent a
+safety pass on this step's own output), and a doubled worst-case
+latency (`searxngSearch` retried its own GET the way
+`getHomeAssistantState` does, but a slow SearXNG round trip is a real
+answer taking a while, not the transient blip a retry is meant to
+paper over - dropped the retry).
+
+Step 7 is complete. Known, deferred gaps, each already recorded in its
+own package's CHANGELOG rather than only here: `news`'s single fixed
+feed (wants a household-chosen list), `music`'s artists-only scope
+(wants songs/albums and a TMDB-backed movie/TV lookup), `sports`'
+MLB-only scope (wants a sport/team preference), and `websearch`'s gold
+tier (wants a real running SearXNG instance to verify against - this
+dev environment has neither Docker nor a clean cross-platform way to
+stand one up). The first three share one real, unbuilt platform
+capability: a Tier 1 package's sandboxed process has no way to read a
+household setting or a household-supplied secret at runtime today -
+worth its own design pass before the next lookup package needs it
+rather than a fourth package inventing a fourth workaround. A fourth,
+cross-cutting gap `llm_complete` itself surfaces (found on `websearch`,
+but not specific to it): no `llm_complete` step's own output passes
+through the safety classifier a normal chat turn's streamed reply gets
+(`runTurn()`'s own mid-stream check) - `translate`'s input is entirely
+household-typed, low risk, but any future `llm_complete` caller that
+feeds it network-sourced content inherits the identical unguarded
+surface `websearch`'s own prompt-hardening only mitigates, not closes.
+Worth a real design pass (does every plugin reply need this, or only
+ones built from untrusted input) before a second such package ships.
+
+## Step 8: lists, reminders and timers (`home-d@4b07407`)
+
+The plan's own text names one `lists` package covering four behaviors
+("add milk to the shopping list", "what's on my list", "remind me at 6
+to call Nadia", "set a timer for ten minutes") over `host.schedule` and
+a new list store. Real research before writing any code (a dispatched
+research pass, since the obvious reading doesn't actually work) found
+the same routing-floor limit `remember`/`recall` already split on:
+`deterministicArgs()` binds at most one captured string to one required
+arg, so no single package can fan one utterance out into four different
+argument shapes at the routing layer, independent of Tier or of the
+recipe language's own lack of conditionals. Four packages, not one:
+`list-add`, `list-view`, `remind`, `timer` - `spec/vocab/capabilities.json`
+already listed `shopping_list`, `reminders`, `timers` as three separate
+grantable capabilities before this step touched anything, agreeing with
+the split before it was even proposed.
+
+**Why Tier 0, not Tier 1**: the actual hard part (parsing "at 6"
+reliably, and notifying later) isn't solved by Tier 1's real
+conditionals either - the fire-time behavior has to run off the
+scheduler with no live turn at all, which a chat-invoked Tier 1 handler
+can't do any better than a Tier 0 recipe can. Tier 1 would also need two
+new MCP bridge methods (`host/schedule`, `host/notify`) `denoHost.ts`
+doesn't have today - real, avoidable work for no benefit here.
+
+**The real fix, once "one recipe can't branch on set-vs-fire" was
+named**: don't make firing a recipe replay at all. `reminders.set`/
+`timers.set` (`packageHost.ts`) schedule a `"core"`-kind job
+(`lib/scheduler.ts`'s new `scheduleCoreJob`, parallel to `scheduleJob`'s
+existing `"plugin"`-kind one) rather than a `"plugin"`-kind one - firing
+raises the declared notification directly (`CORE_JOBS`'s new
+`"reminders.fire"`/`"timers.fire"` entries, `trigger()` from
+`lib/notifications.ts`), never re-running any recipe. `CoreJobHandler`
+widened from `() => void` to `(row: JobRow) => void` to give those two
+handlers the row's own `personId`/`inputs` - a safe, additive widen (TS
+accepts a fewer-parameter function wherever a more-parameter one is
+expected), so the nine pre-existing handlers needed no changes. No new
+`notify` recipe step: nothing today needs a *live, chat-invoked* recipe
+to raise a notification mid-turn, the only case such a step would
+actually serve.
+
+**The scheduler's own input-carrying gap, closed for real** (this
+file's step-4 entry first named it, `lib/scheduler.ts`'s own header
+carried it as a known gap since): `host.schedule(when, job)` hardcoded
+`{}` regardless of what a recipe's `schedule` step asked for, so a job
+re-firing a package lost its own input scope entirely.
+`recipe.schema.json`'s `schedule_step` gained an `inputs` field
+(interpolated the same way `integration_call_step`'s own `args`
+already is); both interpreters and `packageHost.ts`'s real
+implementation now carry it through; `bedtime-reminder.json`'s own
+fixture and both conformance test runners' `scheduled_jobs` projections
+were widened to prove it, not just assume it. A code review pass on
+this alone (before any backend wiring existed yet, spec-layer only)
+found one real, independent bug while checking it: `interpolate()`'s
+literal for a `null`-valued variable diverged between interpreters
+(JS's `String(null)` is `"null"`, Python's `str(None)` is `"None"`) -
+pre-existing in both interpreters since day one, invisible until this
+step's own optional `inputs` field became the first templated value a
+caller might plausibly pass `null` through. Fixed to match the TS
+literal exactly, with a new `null-interpolation.json` conformance
+fixture pinning it.
+
+**Time and duration parsing, two different tools for two different
+reliability needs** (`lib/reminderParsing.ts`, tested directly in
+`backend/tests/reminderParsing.test.ts`): `remind` needs genuine
+natural-language date resolution ("at 6", "tomorrow at noon", "tonight
+at 8pm") - `chrono-node` (MIT, actively maintained, real per-project
+convention for exactly this) per the org's own "prebuilt over
+hand-built" rule, verified real and current before adding it (not
+assumed) the same way `duck-duck-scrape` got verified and then rejected
+in step 7. `timer` deliberately does NOT use chrono-node, and
+deliberately does not use `llm_complete` either: "ten minutes" must
+mean exactly `now + 600000ms`, and neither a general NL date grammar
+nor a model is trustworthy for that precision - a ~15-line deterministic
+regex parser, unit-tested to assert the exact millisecond offset, not
+"close enough."
+
+**Two real routing collisions found while adding this step's own
+corpus rows** (both in `spec/llm/routing-corpus.json`, both caught by
+the deterministic stub-embedder suite before either could reach
+production): `list-view`'s own "what's on my list" (bare, no
+"shopping") scored close enough to an existing "what's my address"
+must-not-collide row to route a completely unrelated question there -
+dropped in favor of "shopping"-qualified phrasings only, the same
+revise-and-guard move `almanac-date` took in step 7. Separately,
+`remind`'s own "remind me *" pattern (unavoidably generic - a
+required-arg package can only route via a literal wildcard) now
+captures "remind me what I said about the school schedule," an
+existing corpus row that used to document a *different*, older gap
+(recall's own required arg can't be bound deterministically either).
+That row's `expect` changed from `null` to `"remind"`, reflecting the
+new, real, unavoidable fact rather than the gap it used to describe -
+`remind` 400s on it (chrono-node finds no time phrase), which is
+honest but still forecloses recall or the model for that turn. The
+actual fix is Tier 2 native tool calling, already tracked in
+`turnEngine.ts`'s own "not built this pass" list, not something this
+package's own pattern choice can solve.
+
+**`list.schema.json`** (fixtures: `list.shopping.example.json`,
+`list.todo.example.json`, `list.custom.example.json`;
+`validateList()` in `spec/records/ts/validate.ts`, TS-only like its
+sibling validators, the hub being the only writer today): the frozen
+D-to-E contract (`docs/plans/wave-2.md`, already committed before this
+step started - implemented verbatim, not renegotiated). One `hlc` for
+the whole list, not one per item - a real, deliberate v1 tradeoff (two
+people editing the same list concurrently resolve at whole-list
+granularity), matching the frozen shape exactly rather than
+re-litigating it. `lib/lists.ts` mirrors `lib/entities.ts`'s own shape
+(`toList`/`toRow`, person-scope visibility, a real cross-table
+existence check on `person`) with one addition, `findOrCreateStandingList`,
+the "exactly one shopping list, exactly one to-do list per household"
+rule `list-add`/`list-view` need and a REST-created custom list doesn't.
+`routes/lists.ts` implements the full frozen surface
+(`GET/POST /api/lists`, `PATCH/DELETE /api/lists/:id`,
+`POST /api/lists/:id/items`, `PATCH/DELETE .../items/:itemId`,
+`POST /api/lists/:id/clear`) for E's own list page; "the running timer"
+needed no route of its own - `GET /api/scheduler/jobs` already lists a
+person's own pending jobs, `reminders.fire`/`timers.fire` among them.
+
+Step 8 is complete. `backend/tests/lists.test.ts` (REST surface),
+`backend/tests/reminderParsing.test.ts` (the exact-millisecond timer
+regression test the design work called for), `backend/tests/
+packageHost.test.ts` and `plugins.test.ts` (the real
+`host.lists`/`reminders`/`timers` methods and all four packages end to
+end), and `backend/tests/scheduler.test.ts` (real `reminders.fire`/
+`timers.fire` core jobs firing real notifications, via the real
+bundled package manifests and `registerAllPackageNotificationTypes()` -
+not an inline fake manifest, so a mismatch between what's declared and
+what fires would actually be caught) all pass. Known gap, matching the
+shape step 7 already found three times over: `list-add`'s own
+`min_role: child` and `offline: full` mean any household member can add
+to the one shared shopping list with no per-person attribution kept
+beyond what `source`/creation timestamps already carry - a real "who
+added this" feature, if wanted, is `lib/lists.ts` schema work, not
+something this step's own scope needed to build speculatively.
+
+## Step 9: home control packages, and widgets (`home-d@f7473f2`)
+
+Two unrelated halves of the plan's own step 9 text, done in one pass:
+`lights-on`, `lights-off`, `lock-doors` (the plan's own `consequential:
+true` example, proving the confirm path from the package side) and the
+D-to-E widgets contract (`docs/plans/wave-2.md`: `contributes.widgets[]`,
+`GET /api/widgets`, `GET /api/widgets/:package/:id/data`).
+
+**A real, previously-unenforced safety gap, found building `lock-doors`
+and fixed at the engine level, not just documented.** `turnEngine.ts`'s
+`route()` checked a package's own `consequential` flag only on the
+fuzzy/Tier 2 path (`canFire`); the literal `routing.patterns` match
+above it had no such check, so a `consequential: true` package that
+ALSO declared a pattern would have fired immediately on a match,
+bypassing the household's confirmation entirely. `lock-doors` itself
+declares no patterns (by design), so this step's own package was never
+exposed - but the gap was real and would have bitten the next
+consequential package someone wrote without knowing this. Fixed by
+wrapping `route()`'s pattern-match loop in `if (!manifest.consequential)`;
+`spec/schemas/manifest.schema.json`'s own `consequential` field
+description now states the invariant outright; a new bronze-completeness
+check (`spec/tests/ts/package-bronze.test.ts`) refuses a manifest that
+declares both at authoring time; `backend/tests/turnEngine.test.ts` adds
+a direct regression test against the real bundled `lock-doors` package,
+not a synthetic stand-in.
+
+**A second gap, found by the code review pass on this diff, fixed the
+same way**: `lock-doors` shipped with `min_role: "child"`, but
+`consequential`'s own confirm step re-runs `runPlugin` as the *same*
+actor who said "yes" - it is not a second, higher-privileged check.
+Left at `child`, a child could ask to lock the door, confirm their own
+prompt, and `meetsMinRole(actor.role, "child")` would trivially pass
+with no adult ever in the loop. Raised to `teen`; `lock-doors/CHANGELOG.md`
+carries the reasoning for the next person who touches this package's
+`min_role` and wonders why it isn't `child` like its siblings.
+
+**`home_call_service_step` gained `target`/`data` interpolation**
+(`{room}`-style, the same convention `integration_call_step`'s own
+`args` already uses) so `lights-on`/`lights-off` can resolve
+`target: {area: "{room}"}` from the room a household member actually
+said, rather than every home-control package needing a fixed target
+like `lock-doors`'s `lock.front_door`. Verified this doesn't weaken the
+security-domain confirmation gate: `packageHost.ts`'s own check
+(`isHomeAssistantSecurityDomain(domain) && manifest.consequential !== true`)
+reads only the recipe's literal `domain` and the manifest's fixed
+`consequential` flag, never `target`'s shape - a new conformance
+fixture (`lights-on-dynamic-target.json`) proves both interpreters
+interpolate `target` identically, not just that recipes still validate.
+
+**Widgets: no new per-package data-shaping mechanism invented.**
+`lib/widgets.ts`'s `getWidgetData()` calls the exact same
+`runPlugin(packageId, actor, widget.inputs)` a live chat turn or
+`warmPackage()`'s own warm tick already calls, and wraps the reply's
+own already-tested, human-readable `text` into one `WidgetItem` - the
+package cache (`lib/packageCache.ts`) underneath `host.fetch` is what
+makes this "served from the cache" rather than a live fetch per widget
+load, exactly per the frozen contract's own wording, with no second,
+widget-specific cache-peeking path to keep in sync with the first.
+`min_role` gates both `listWidgets()` and `getWidgetData()` the same
+way `runPlugin()` itself already gates a live run. `routes/widgets.ts`
+follows `routes/lists.ts`'s own createRoute/openapi shape.
+
+`weather`, `news`, `list-view`, `almanac-date` each gained one
+`contributes.widgets` entry (current-weather card, headlines row,
+shopping-list card, today's-date card), matching the plan's own naming
+adjusted for step 7's almanac split and step 8's lists split. **A real
+process mistake, caught by `bundledPackages.test.ts` before it reached
+a commit**: `weather` is one of the six packages step 6 already moved
+to `catalog` as canonical source (`home`'s own copy under
+`backend/packages/` is a checked-in mirror, hash-pinned in
+`bundled-provenance.json`) - a first pass hand-edited `home`'s mirrored
+copy directly, exactly the anti-pattern `hashPackageDir()` exists to
+catch, and the provenance test failed immediately. Fixed properly: the
+`contributes.widgets` entry was added to `weather`'s actual canonical
+manifest in the sibling `catalog` checkout instead (`catalog@12479aa`,
+passing catalog's own lint+scorecard and full `check.sh` before that
+commit), then `scripts/refresh-bundled-packages.ts` pulled the real
+copy and regenerated the hash - `news`, `list-view`, `almanac-date`
+have no catalog counterpart yet, so their manifests were edited
+directly in `home`, correctly.
+
+**`GET /api/plugins` needed no changes for the widgets or pages
+contract**: it already spreads `...manifest` for every bundled package
+(`routes/plugins.ts`), so `contributes.widgets` and the top-level
+`pages` array both already ride along for E's own nav registry to read
+- the plan's own "GET /api/plugins already lists packages; add the
+pages array, E reads it" turned out to already be true, not a gap this
+step needed to close.
+
+Step 9 is complete. `backend/tests/turnEngine.test.ts` (the
+`consequential` bypass regression, against the real `lock-doors`
+package), `backend/tests/plugins.test.ts` (manifest validation plus
+real Bun.serve end-to-end runs of all three home-control packages
+against a stand-in Home Assistant server), `spec/tests/ts/package-bronze.test.ts`
+(the new authoring-time check), and `backend/tests/widgets.test.ts`
+(role-gated listing and data-fetching against the four real bundled
+packages, including their actual reply text - `list-view`'s own empty-
+list reply, not a canned fixture) all pass, alongside the full spec and
+backend suites and `scripts/check.sh` end to end. Known gap, the same
+shape `warm.keys` already carried before this step touched it: a
+widget's own `inputs` (like `weather`'s `{place: "Seattle"}`) are still
+literal manifest placeholders, not resolved against real household
+settings - a real per-household weather widget is settings-resolution
+work this step's own "prove the contract" scope didn't need.

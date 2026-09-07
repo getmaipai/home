@@ -28,7 +28,7 @@
       "speech": "I'll remind Riff to go to bed at 21:00."
     },
     "actions": [],
-    "scheduled_jobs": [{ "when": "21:00", "job": "bedtime-reminder" }],
+    "scheduled_jobs": [{ "when": "21:00", "job": "bedtime-reminder", "inputs": {} }],
     "home_calls": [],
     "memory_added": []
   }

@@ -1,0 +1,54 @@
+{
+  "id": "almanac-holiday",
+  "version": "0.1.0",
+  "kind": "plugin",
+  "category": "Info",
+  "display": "Next Holiday",
+  "description": "The next upcoming public holiday (2026-09-06, step 7), via date.nager.at's free public holiday API. One of the almanac's five small lookups. US only for now.",
+  "author": "MaiPai",
+  "license": "AGPL-3.0",
+  "homepage": "https://github.com/getmaipai/home",
+  "routing": {
+    "examples": [
+      "what's the next holiday",
+      "is there a holiday coming up",
+      "when's the next public holiday",
+      "what holiday is coming up next",
+      "is there a day off coming up"
+    ],
+    "patterns": ["what's the next holiday", "is there a holiday coming up"]
+  },
+  "requires": [],
+  "optional": [],
+  "platforms": ["home"],
+  "min_role": "child",
+  "consequential": false,
+  "offline": "unavailable",
+  "config": [],
+  "data_sources": [
+    {
+      "id": "nager-date",
+      "destination": "date.nager.at's free public holiday API",
+      "when": "the household asks about an upcoming holiday",
+      "what": "a two-letter country code, hardcoded to US for now",
+      "who": "Nager.Date",
+      "opt_in": true,
+      "retention": "unknown, see Nager.Date's own policy"
+    }
+  ],
+  "permissions": ["net:date.nager.at"],
+  "notifications": [],
+  "cache": { "key_template": "almanac-holiday:us", "ttl_s": 43200, "stale_ok_s": 86400, "max_bytes": 20000 },
+  "fallback_reply": {
+    "text": "Sorry, I'm having trouble looking that up right now.",
+    "speech": "Sorry, I'm having trouble looking that up right now."
+  },
+  "backup": "exclude",
+  "background": false,
+  "contributes": {},
+  "min_app": "0.1.0",
+  "timeout_ms": 8000,
+  "tier": 1,
+  "quality_scale": "bronze",
+  "smoke": { "kind": "deno_test" }
+}

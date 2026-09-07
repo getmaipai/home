@@ -18,12 +18,14 @@ import { PackageManifest } from "@maipai/spec/gen/ts/manifest.js";
 import { Recipe } from "@maipai/spec/gen/ts/recipe.js";
 import { runRecipe, type PluginResult } from "@maipai/spec/interpreters/ts/recipe-interpreter.js";
 import { HostError } from "@maipai/spec/emulators/ts/host-emulator.js";
+import { ComputeError } from "@maipai/spec/interpreters/ts/compute.js";
 import { createHost } from "@/lib/packageHost";
 import { callTier1Handle } from "@/lib/denoHost";
 import { registerPackageNotificationTypes } from "@/lib/notificationTypes";
 import { parseWhen } from "@/lib/scheduler";
 import { listActivePeople } from "@/lib/access";
 import { PACKAGES_DIR, statMtimeMs, isValidPackageId } from "@/lib/paths";
+import { resolvePackageDir, listInstalledPackageIds } from "@/lib/packageResolve";
 import { ROLE_LADDER, type Role } from "@/middleware/auth";
 import type { PersonRow } from "@/types";
 
@@ -43,15 +45,21 @@ export type PluginOpResult<T> =
   | { ok: true; value: T }
   | { ok: false; status: 400 | 403 | 404; error: string };
 
-/** Every bundled package's id, from its directory name. */
+/** Every package id this hub can load: every bundled directory name,
+ * plus any id the store has installed that was never bundled at all (a
+ * genuinely new community package). A `Set` so a package that's both
+ * bundled AND store-installed (an update to a default package, step 6's
+ * own "weather installed from the local index" case) is listed once. */
 export function listPackageIds(): string[] {
+  let bundled: string[] = [];
   try {
-    return readdirSync(PACKAGES_DIR, { withFileTypes: true })
+    bundled = readdirSync(PACKAGES_DIR, { withFileTypes: true })
       .filter((e) => e.isDirectory())
       .map((e) => e.name);
   } catch {
-    return [];
+    bundled = [];
   }
+  return [...new Set([...bundled, ...listInstalledPackageIds()])];
 }
 
 // mtime-keyed caches for loadManifestOnly()/loadPackage() (a latency
@@ -93,7 +101,7 @@ export function loadManifestOnly(id: string): PluginOpResult<PackageManifest> {
   if (!isValidPackageId(id)) {
     return { ok: false, status: 400, error: `${id} is not a valid package id` };
   }
-  const manifestPath = join(PACKAGES_DIR, id, "manifest.json");
+  const manifestPath = join(resolvePackageDir(id), "manifest.json");
   const mtimeMs = statMtimeMs(manifestPath);
   if (mtimeMs === null) {
     manifestCache.delete(id);
@@ -119,7 +127,7 @@ export function loadManifestOnly(id: string): PluginOpResult<PackageManifest> {
   try {
     manifestJson = JSON.parse(readFileSync(manifestPath, "utf-8"));
   } catch {
-    return { ok: false, status: 404, error: `no bundled package ${id}` };
+    return { ok: false, status: 404, error: `no such package ${id}` };
   }
   const manifestParsed = PackageManifest.safeParse(manifestJson);
   if (!manifestParsed.success) {
@@ -133,8 +141,9 @@ export function loadPackage(id: string): PluginOpResult<LoadedPackage> {
   if (!isValidPackageId(id)) {
     return { ok: false, status: 400, error: `${id} is not a valid package id` };
   }
-  const manifestPath = join(PACKAGES_DIR, id, "manifest.json");
-  const recipePath = join(PACKAGES_DIR, id, "recipe.json");
+  const packageDir = resolvePackageDir(id);
+  const manifestPath = join(packageDir, "manifest.json");
+  const recipePath = join(packageDir, "recipe.json");
   const manifestMtimeMs = statMtimeMs(manifestPath);
   const recipeMtimeMs = statMtimeMs(recipePath);
   if (manifestMtimeMs === null || recipeMtimeMs === null) {
@@ -157,7 +166,7 @@ export function loadPackage(id: string): PluginOpResult<LoadedPackage> {
     // every caller instead of being reported as an unloadable package -
     // which took GET /api/privacy, whose whole job is to be readable, down
     // with a 500.
-    return { ok: false, status: 404, error: `no bundled package ${id}` };
+    return { ok: false, status: 404, error: `no such package ${id}` };
   }
   const manifestParsed = PackageManifest.safeParse(manifestJson);
   if (!manifestParsed.success) {
@@ -269,6 +278,19 @@ export async function runPlugin(
     if (err instanceof HostError) {
       const status = err.code === "permission_denied" ? 403 : err.code === "not_found" ? 404 : 400;
       return { ok: false, status, error: err.message };
+    }
+    // A `compute` step's own bad input (an expression the restricted
+    // evaluator can't parse) - a real, expected, recoverable case now
+    // that `math`/`convert` (step 7) hand it a household member's own
+    // free-typed text rather than a package's own hardcoded template. A
+    // real gap found while building those: this used to have no case
+    // for it at all, so a malformed expression fell through to `throw
+    // err` below and propagated as an unhandled error all the way to
+    // POST /api/plugins/:id/run's own route handler (no try/catch of
+    // its own), instead of the clean 400 every other bad-input case
+    // here already gets.
+    if (err instanceof ComputeError) {
+      return { ok: false, status: 400, error: err.message };
     }
     throw err;
   }

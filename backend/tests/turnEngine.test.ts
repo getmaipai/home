@@ -11,6 +11,8 @@ import {
   buildSystemPrompt,
   matchPattern,
   capSection,
+  route,
+  loadAllManifests,
   PROMPT_SYSTEM_CHAR_BUDGET,
   MAX_TURN_TEXT_LENGTH,
   type TurnStreamResult,
@@ -1014,6 +1016,34 @@ describe("matchPattern()", () => {
 
   test("more than one wildcard has no single capture and doesn't match", () => {
     expect(matchPattern("set the a to b", "set the * to *")).toBeNull();
+  });
+});
+
+// A real, previously-unenforced safety gap found building `lock-doors`
+// (session-d-packages-and-store.md step 9): route()'s own literal
+// pattern-match branch never checked `manifest.consequential` at all -
+// only `canFire` (the fuzzy/Tier 2 path) did. A consequential package
+// that ALSO declared a routing.patterns entry would have fired
+// immediately on that match, bypassing confirmation entirely. This
+// tests the real bundled `lock-doors` package (consequential: true, no
+// routing.patterns by design) directly against route(), not a
+// synthetic fixture manifest - the same discipline
+// bundledPackages.test.ts already holds every other bundled-package
+// assertion to.
+describe("route() never lets a consequential package win outright (session-d-packages-and-store.md step 9)", () => {
+  test("lock-doors's own routing example never wins Tier 1, even on an exact-text match", async () => {
+    const loaded = loadAllManifests();
+    const actor = fakeActor({ role: "adult" });
+    const { winner } = await route("lock the front door", actor, loaded);
+    expect(winner?.id).not.toBe("lock-doors");
+  });
+
+  test("lock-doors still appears as a real Tier 2 candidate, just never as the deterministic winner", async () => {
+    const loaded = loadAllManifests();
+    const actor = fakeActor({ role: "adult" });
+    const { winner, ranked } = await route("lock the front door", actor, loaded);
+    expect(winner?.id).not.toBe("lock-doors");
+    expect(ranked.some((c) => c.id === "lock-doors")).toBe(true);
   });
 });
 

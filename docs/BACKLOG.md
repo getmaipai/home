@@ -1458,19 +1458,18 @@ future session now that F's hub half exists.
       `"web"`) with the loader rejecting it outright for all of Wave 2 -
       a manifest field, never a sibling node kind, since a node
       SwiftUI/Go can't render would hollow out `catalog.test.ts`'s own
-      agreement test. **Blocks on D**: `manifest.schema.json`'s
-      `contributes` is currently an untyped array plus a redundant
-      top-level `pages: string[]` - incompatible with the already-frozen
-      wave-2.md `contributes.widgets[]` object shape. Recommended fix
-      (flagged to D 2026-09-06, D's file to change): `contributes`
-      becomes an object keyed by blueprint kind (`pages[]`, `widgets[]`,
-      ...), the redundant top-level `pages` dropped - confirmed safe,
-      nothing in `backend/src`/`frontend/src` reads either field today.
-      E's own share (`PackageScopeContext`, the nav registry merge,
-      `PackagePage.tsx`) waits on D's `contributes.pages` and the new
-      pages route landing - nothing to prove it against yet
-      (`lists`, D's own first page, is step 8 of D's plan, not started
-      as of 2026-09-06).
+      agreement test. **The schema blocker on D is cleared** (Session D
+      step 10, 2026-09-06): `manifest.schema.json`'s `contributes` is now
+      an object keyed by blueprint kind, with `pages[]` typed exactly as
+      recommended above (`{id, icon, label, nav, kind: "schema"|"web",
+      module}`) alongside `widgets[]`; the redundant top-level
+      `pages: string[]` is gone, and every bundled manifest's own empty
+      `"pages": []` was dropped with it. **Still open for E**: the
+      `GET /api/plugins/:id/pages/:pageId` route itself, `PackageScopeContext`,
+      the nav-registry merge, and `PackagePage.tsx` - no package
+      populates `contributes.pages` yet (D's own `lists` didn't end up
+      needing a dedicated page this wave, so there's still nothing real
+      to prove the consuming side against).
 - [x] **Build the missing kit primitives before the first full app, not
       alongside it** (M) - done 2026-09-05. `getmaipai/.github/docs/UI.md`
       decided that apps never build their own chrome (sidebar, search,
@@ -1491,13 +1490,30 @@ future session now that F's hub half exists.
       field); core's five pages register there by hand until a package's
       manifest `contributes.pages` can feed a sixth entry in without
       editing this file. See `docs/dev.md`, "Session B: step 2".
+- [x] **The data contract half, superseded and shipped** (Session D
+      step 9, 2026-09-06): `docs/plans/wave-2.md`'s own frozen D-to-E
+      contract answered the open design questions below for real -
+      `contributes.widgets[]` (`{id, title, size: "card"|"row",
+      refresh_s, inputs?}`) is the manifest hook, `GET /api/widgets`
+      lists what a role can see, `GET /api/widgets/:package/:id/data`
+      returns `{as_of, items}` by calling the exact same `runPlugin()` a
+      live chat turn or a warm tick already calls and wrapping its
+      `reply.text` as one item - no new "structured widget data" shape
+      invented, no live fetch outside the existing package cache.
+      `weather`, `news`, `list-view`, `almanac-date` are the first four
+      real widgets. **Still open, and still Jesse's design pass, not
+      decided by this contract**: the visual card/row system itself
+      (size, density, the size slider), which packages actually surface
+      on the dashboard vs. staying chat-only, and the legacy prior art
+      below - all E's/the dashboard's own build, once picked up.
 - [ ] **Skills as home-screen widgets - cards and rows** (L, needs its own
       design pass before any code - Jesse, 2026-09-05). The idea: a
       skill's data shown on a dashboard as a card (or, for some skills, a
       horizontal row of cards) instead of only being reachable by asking
-      for it in chat. Nothing here is decided yet - the card/row system
-      itself, which skills opt in, how a manifest declares it - this is
-      a real gap, not a small addition.
+      for it in chat. The manifest hook and the data route are real now
+      (see the item above); the card/row system itself - which packages
+      opt in, size/density, refresh cadence on the actual dashboard - is
+      still undecided.
       **Real prior art from the legacy app**, kept as reference for the
       design pass, not as something to port (the org's "copy from legacy"
       allowance is for hard-won logic, never UI or feature scope - so this
@@ -1521,14 +1537,13 @@ future session now that F's hub half exists.
         the "slider to dynamically adjust card size" Jesse referenced -
         real, working code in the legacy app, a good reference point for
         a fresh implementation, not a drop-in port.
-      **What a real design pass needs to decide, not guessed at here**:
-      whether a manifest's existing `contributes`/`pages` field is the
-      right hook for "this package offers a widget," how a lookup skill's
-      recipe output (today just `reply.text`/`speech`) maps to structured
-      widget data, whether cards refresh live or only on demand, and how
-      this interacts with the proactive/caching idea noted below (a
-      widget is the most natural place a proactively-fetched fact would
-      actually surface).
+      **What a real design pass still needs to decide** (the manifest
+      hook, the data route, and the reply-text-as-widget-item mapping
+      are answered now - see the item above): the actual visual card/row
+      system on the dashboard, which packages surface there by default
+      vs. opt-in, and how this interacts with the proactive/caching idea
+      noted below (a widget is the most natural place a proactively-
+      fetched fact would actually surface).
 
 - [ ] **The home screen: keep the dashboard, make it a real home**
       (decision for Jesse, then a design pass, M) - Jesse asked
@@ -1989,9 +2004,14 @@ on a spec tag that was never cut.
       E's file to add them to), `passive`-level digest batching, browser
       push / Go / TV overlay / robot speech (no such clients exist yet),
       a real parent/guardian audience (see the Relationship/Grant work
-      above), and package-declared notification types (the manifest's
-      `notifications` field is read by nothing yet - a real, deliberately
-      deferred extension point, not forgotten).
+      above). Package-declared notification types shipped in Session D
+      step 8 (2026-09-06): `registerAllPackageNotificationTypes()`
+      (`lib/plugins.ts`) reads every bundled package's own manifest
+      `notifications[]` and registers each through F's own
+      `registerPackageNotificationTypes()` (`lib/notificationTypes.ts`)
+      at boot, proven end to end (not just wired) by the `remind`/`timer`
+      packages' real `remind.due`/`timer.done` notifications
+      (`backend/tests/scheduler.test.ts`).
 
 - [ ] **Doc drift the audit found** (S, but some of it is Jesse's call) -
       `.github/CLAUDE.md` says the rebuild follows `home/spec/design/`,
@@ -2709,16 +2729,38 @@ that owns it.
       the first Tier 1 package, verified live against a running dev
       server. `deno_test` smoke (step 1's own reserved, unbuilt kind) is
       real now too.
-- [ ] **The store host on the hub** (M-L, D) - plan 4.10: install from
-      the signed index, verify twice, unpack per version, smoke before
-      enable, per-package channel, rollback, the permission prompt, the
-      tamper suite. The item above ("catalog browsing and install")
-      covers only the page.
-- [ ] **The catalog tooling and the signed index** (M, D) - lint, pack,
-      sign, index, scorecard, the `check` CLI, TUF-shaped root, targets
-      and timestamp, the second signer, the public CI; the catalog repo
-      has none of it. The bundled default set moves there and `home`
-      keeps a signed copy.
+- [x] **The store host on the hub** (M-L, D) - shipped, Session D step 6
+      (2026-09-06): `lib/store.ts` (install/rollback/uninstall/
+      setChannel, all against a real TUF-shaped signed index via
+      `lib/storeIndex.ts`), unpack per version under
+      `data/packages/<id>/versions/<version>/`, smoke-before-enable
+      (`lib/smoke.ts`'s `runSmoke()`, real bronze gate), per-package
+      channel, rollback (the prior version's files are kept, never
+      deleted, until a newer install replaces them), `routes/store.ts`'s
+      full REST surface. `lib/packageResolve.ts`'s `resolvePackageDir()`
+      is the one place "bundled copy vs. installed override" is decided,
+      so a store install actually takes effect everywhere a package's
+      files are read from - `lib/plugins.ts`, `lib/denoHost.ts`,
+      `lib/skills.ts`, `lib/smoke.ts` all resolve through it. The
+      permission prompt and the tamper suite (bad hash, untrusted
+      signer, rollback-to-older-index) are real tests in
+      `backend/tests/store.test.ts` and `spec/tests/ts/storeIndex.test.ts`,
+      not just described.
+- [x] **The catalog tooling and the signed index** (M, D) - shipped,
+      Session D step 6 (2026-09-06): the `catalog` repo's `tools/` (lint
+      against the mirrored spec schema, pack, sign, `build-index`, the
+      scorecard, the `check` CLI running all of it against every
+      package), a TUF-shaped root/targets/timestamp with a second
+      signer, the public CI (tag- and PR-triggered, minutes are free on
+      a public repo). The bundled default set (`define`, `joke`,
+      `knowledge`, `trivia`, `weather`, `storytime-style`) moved to
+      `catalog` as canonical source; `home` keeps a checked-in,
+      hash-pinned copy (`backend/packages/bundled-provenance.json`,
+      `scripts/refresh-bundled-packages.ts`) refreshed from there rather
+      than hand-edited - proven the hard way in Session D step 9, when a
+      hand-edit to `home`'s own mirrored `weather` manifest was caught
+      immediately by `bundledPackages.test.ts`'s hash check and had to
+      be redone in `catalog` (`catalog@12479aa`) instead.
 - [ ] **`ask` continuation, `confirm`, `end_conversation` from a result**
       (S-M, D produces, C consumes) - `result.schema.json` has them;
       `runRecipe` never sets `ask`, and the turn engine reads none of
@@ -2726,20 +2768,41 @@ that owns it.
 - [ ] **Consequential packages need a confirmation at run time** (S, C)
       - `consequential: true` exists in the manifest and raises nothing;
       the security-domain check happens at command creation only.
-- [ ] **A `compute` recipe step** (S, D, both interpreters) - math and
-      unit conversion need no network; a safe expression library beats a
-      model doing arithmetic.
-- [ ] **Audit `host.*` against plan 4.9** (S, D) - `host.log`,
-      `host.config.get`, `host.data.forget`, `host.diagnostics` and the
-      emulator twins are missing or unverified.
-- [ ] **Package-declared notification types** (S, D and F) - the
-      manifest's `notifications[]` is read by nothing (noted above under
-      the notification system, now assigned).
-- [ ] **Almanac: date, time, holidays, moon phase, on-this-day as one
-      package** (S, D) - legacy shipped five tools for this.
-- [ ] **The speech lint on every package `speech` string** (S, C
-      defines, D runs) - `PACKAGES.md` requires it; nothing checks
-      `speech` templates for the housemate test's mechanical half.
+- [x] **A `compute` recipe step** (S, D, both interpreters) - shipped,
+      Session D step 7 (2026-09-06): `compute_step` in both the TS and
+      Python interpreters, a restricted `mathjs`/equivalent expression
+      evaluator (no network, no arbitrary code), backing the bundled
+      `math` and `convert` packages.
+- [ ] **Audit `host.*` against plan 4.9** (S, D) - not reached this wave.
+      `host.log`, `host.config.get`, `host.data.forget`,
+      `host.diagnostics` and the emulator twins are still missing or
+      unverified; Session D step 5-9's own package work only ever needed
+      `host.fetch`, `host.home.call_service`, `host.lists.*`,
+      `host.reminders.set`, `host.timers.set`, and `host.integration.call`
+      for real, so this audit was never forced and stayed unbuilt.
+      Genuinely open for a future session.
+- [x] **Package-declared notification types** (S, D and F) - see the
+      notification-system entry above (Cross-cutting): shipped in
+      Session D step 8.
+- [x] **Almanac: date, time, holidays, moon phase, on-this-day as one
+      package** (S, D) - shipped, Session D step 7 (2026-09-06): split
+      into five packages (`almanac-date`, `almanac-time`,
+      `almanac-holiday`, `almanac-moon`, `almanac-onthisday`) rather than
+      one, since `turnEngine.ts`'s `deterministicArgs()` can only ever
+      bind one required arg per package and each of the five is its own
+      zero-arg question - "one package" would have needed either a
+      required arg none of them actually take or five near-duplicate
+      routing patterns racing each other. `chrono-node` carries the
+      date-parsing half forward as genuinely reusable hard-won logic
+      from legacy's own `datetime.ts`/`time.ts`.
+- [x] **The speech lint on every package `speech` string** (S, C
+      defines, D runs) - already true by construction: C's
+      `lintSpeechTemplate()` is wired into
+      `spec/tests/ts/package-bronze.test.ts`, which sweeps every bundled
+      package including D's own (it found and fixed a real false
+      positive against D's `trivia` package before that package landed -
+      see docs/dev/session-c.md's step 6 entry). Nothing further for D
+      to build; the universal bronze sweep is D's own "runs" half.
 
 **Intelligence and voice**
 

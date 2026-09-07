@@ -1,0 +1,54 @@
+{
+  "id": "remind",
+  "version": "0.1.0",
+  "kind": "plugin",
+  "category": "Utilities",
+  "display": "Reminders",
+  "description": "Sets a reminder for a later time (2026-09-06, step 8) - real natural-language time parsing (chrono-node), no network, no model.",
+  "author": "MaiPai",
+  "license": "AGPL-3.0",
+  "homepage": "https://github.com/getmaipai/home",
+  "routing": {
+    "examples": [
+      "remind me at 6 to call Nadia",
+      "remind me tomorrow at noon to walk the dog",
+      "remind me tonight at 8 to take out the trash",
+      "remind me in an hour to check the oven",
+      "remind me at 9am to leave for work"
+    ],
+    "patterns": ["remind me *"]
+  },
+  "args": {
+    "type": "object",
+    "required": ["expression"],
+    "properties": {
+      "expression": { "type": "string", "minLength": 1 }
+    }
+  },
+  "requires": [],
+  "optional": [],
+  "platforms": ["home"],
+  "min_role": "child",
+  "consequential": false,
+  "offline": "full",
+  "config": [],
+  "data_sources": [],
+  "permissions": ["reminders:write"],
+  "notifications": [
+    {
+      "id": "remind.due",
+      "level": "time_sensitive",
+      "audience": "person",
+      "template": "Reminder: {task}",
+      "configurable": true,
+      "default_channels": ["in_app"]
+    }
+  ],
+  "backup": "exclude",
+  "background": false,
+  "contributes": {},
+  "min_app": "0.1.0",
+  "tier": 0,
+  "quality_scale": "bronze",
+  "smoke": { "kind": "recipe_fixture", "fixture": "tests/smoke.json" }
+}

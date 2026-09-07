@@ -1,0 +1,12 @@
+{
+  "description": "Smoke fixture for the bundled lights-off package: proves the recipe wiring (home.call_service with an interpolated target + format) executes without throwing, against lib/smoke.ts's own HostEmulator - real Home Assistant reachability needs a household's own instance, not this emulator.",
+  "inputs": { "room": "living room" },
+  "host_setup": {},
+  "expected": {
+    "reply": { "text": "Turning off the living room light.", "speech": "Turning off the living room light." },
+    "actions": [],
+    "scheduled_jobs": [],
+    "home_calls": [{ "domain": "light", "service": "turn_off", "target": { "area": "living room" }, "data": null }],
+    "memory_added": []
+  }
+}

@@ -1,0 +1,12 @@
+{
+  "description": "Smoke fixture for the bundled lock-doors package: proves the recipe wiring (home.call_service + format) executes without throwing, against lib/smoke.ts's own HostEmulator. This only exercises the recipe itself, not the confirm gate - that's a routing-layer concern (turnEngine.ts's route()), proved separately in backend/tests/turnEngine.test.ts.",
+  "inputs": {},
+  "host_setup": {},
+  "expected": {
+    "reply": { "text": "Locking the front door.", "speech": "Locking the front door." },
+    "actions": [],
+    "scheduled_jobs": [],
+    "home_calls": [{ "domain": "lock", "service": "lock", "target": { "entity_id": "lock.front_door" }, "data": null }],
+    "memory_added": []
+  }
+}

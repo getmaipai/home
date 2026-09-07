@@ -38,6 +38,9 @@ import { approvalsRoutes } from "@/routes/approvals";
 import { storageRoutes } from "@/routes/storage";
 import { updatesRoutes } from "@/routes/updates";
 import { openaiRoutes } from "@/routes/openai";
+import { storeRoutes } from "@/routes/store";
+import { listsRoutes } from "@/routes/lists";
+import { widgetsRoutes } from "@/routes/widgets";
 import { requireAuth } from "@/middleware/auth";
 import { listSidecars } from "@/lib/sidecars";
 
@@ -130,9 +133,12 @@ app.route("/api/auth/passkeys", passkeysRoutes);
 app.route("/api/auth/sessions", authSessionsRoutes);
 app.route("/api/auth/totp", totpRoutes);
 app.route("/api/entities", entitiesRoutes);
+app.route("/api/lists", listsRoutes);
+app.route("/api/widgets", widgetsRoutes);
 app.route("/api/relationships", relationshipsRoutes);
 app.route("/api/grants", grantsRoutes);
 app.route("/api/approvals", approvalsRoutes);
+app.route("/api/store", storeRoutes);
 app.route("/api/storage", storageRoutes);
 app.route("/api/updates", updatesRoutes);
 // Root-mounted, not under /api: OpenAI's own wire contract names this

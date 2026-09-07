@@ -12,6 +12,7 @@ import { VOICE_SETTINGS_KEYS } from "../src/settings/voiceKeys.js";
 import { BACKUP_SETTINGS_KEYS } from "../src/settings/backupKeys.js";
 import { PERSONA_SETTINGS_KEYS } from "../src/settings/personaKeys.js";
 import { HOME_ASSISTANT_SETTINGS_KEYS } from "../src/settings/homeAssistantKeys.js";
+import { SEARCH_SETTINGS_KEYS } from "../src/settings/searchKeys.js";
 import { NOTIFICATION_SETTINGS_KEYS } from "../src/settings/notificationKeys.js";
 import { UI_SETTINGS_KEYS } from "../src/settings/uiKeys.js";
 import { ALLOWANCE_SETTINGS_KEYS } from "../src/settings/allowanceKeys.js";
@@ -26,6 +27,7 @@ const sorted = [
   ...BACKUP_SETTINGS_KEYS,
   ...PERSONA_SETTINGS_KEYS,
   ...HOME_ASSISTANT_SETTINGS_KEYS,
+  ...SEARCH_SETTINGS_KEYS,
   ...NOTIFICATION_SETTINGS_KEYS,
   ...UI_SETTINGS_KEYS,
   ...ALLOWANCE_SETTINGS_KEYS,

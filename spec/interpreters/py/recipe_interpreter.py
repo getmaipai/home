@@ -1,6 +1,6 @@
 """Interprets a Tier 0 Recipe (spec/schemas/recipe.schema.json) natively,
 executing each step against a host (platform plan 5.2). No process, no
-eval: every step is one of the seven declared primitives. This must stay
+eval: every step is one of the sixteen declared primitives. This must stay
 behaviorally identical to spec/interpreters/ts/recipe-interpreter.ts; the
 conformance fixtures in spec/fixtures/recipes/ prove that.
 """
@@ -11,7 +11,7 @@ import html
 import re
 from typing import Any
 
-from .compute import ComputeError, evaluate_expression
+from .compute import evaluate_expression
 
 INTERP_RE = re.compile(r"\{([a-zA-Z_][a-zA-Z0-9_]*)\}")
 
@@ -37,7 +37,14 @@ def interpolate(template: str, scope: dict[str, Any]) -> str:
         name = m.group(1)
         if name not in scope:
             return m.group(0)
-        return html.unescape(str(scope[name]))
+        value = scope[name]
+        # Python's str(None) is "None"; JS's String(null) is "null" - a
+        # real cross-language divergence code review found (2026-09-06,
+        # step 8's own schedule_step.inputs is the first templated field
+        # a caller might plausibly pass a null value through): matched to
+        # the TS interpreter's own literal exactly rather than picking a
+        # third string neither side used before.
+        return html.unescape("null" if value is None else str(value))
 
     return INTERP_RE.sub(repl, template)
 
@@ -107,9 +114,12 @@ async def run_recipe(recipe: Any, inputs: dict[str, Any], host: Any) -> dict[str
             scope[step.as_] = {"text": text, "speech": speech}
             reply = {"text": text, "speech": speech}
         elif op == "home.call_service":
-            await host.home.call_service(
-                step.domain, step.service, step.target, step.data
-            )
+            # target/data interpolation (session-d-packages-and-store.md
+            # step 9). Must stay behaviorally identical to
+            # recipe-interpreter.ts's own twin case.
+            target = interpolate_deep(step.target, scope)
+            data = interpolate_deep(step.data, scope) if step.data else step.data
+            await host.home.call_service(step.domain, step.service, target, data)
         elif op == "action":
             host.action.emit(step.kind, step.payload)
             actions.append({"kind": step.kind, "payload": step.payload})
@@ -124,17 +134,59 @@ async def run_recipe(recipe: Any, inputs: dict[str, Any], host: Any) -> dict[str
                 "; ".join(m["text"] for m in top) if top else NOTHING_RECALLED
             )
         elif op == "schedule":
+            # inputs (session-d-packages-and-store.md step 8) closes a
+            # real, previously-documented gap: this used to always pass
+            # nothing, so a job scheduled from within a recipe re-fired
+            # the package with an empty input scope. Must stay
+            # behaviorally identical to recipe-interpreter.ts's own
+            # twin case.
             when = interpolate(step.when, scope)
-            host.schedule(when, step.job or recipe.id)
+            inputs = interpolate_deep(step.inputs, scope) if step.inputs else {}
+            host.schedule(when, step.job or recipe.id, inputs)
         elif op == "integration.call":
             args = interpolate_deep(step.args, scope) if step.args else None
             scope[step.as_] = await host.integration.call(step.id, step.method, args)
         elif op == "compute":
+            # evaluate_expression() already raises ComputeError for a
+            # household member's own bad input - a real, expected,
+            # recoverable case now that `math`/`convert` (step 7) hand
+            # it free-typed text. Let it propagate as-is: wrapping it in
+            # ValueError (the previous shape here) erased the type a
+            # caller needs to tell "bad input" apart from a real bug,
+            # the identical fix made on the TS interpreter's own
+            # twin case (found while building those two packages).
             expression = interpolate(step.expression, scope)
-            try:
-                scope[step.as_] = evaluate_expression(expression)
-            except ComputeError as err:
-                raise ValueError(str(err)) from err
+            scope[step.as_] = evaluate_expression(expression)
+        elif op == "llm_complete":
+            # Raw-object binding, same style as `fetch`'s own `as_` - a
+            # `pick` step reads "text" out before a `format` step
+            # interpolates it. host.llm.complete's own wire shape is a
+            # `messages` array (the real host passes it straight to
+            # lib/llm.ts's own complete()); this step's `prompt` field is
+            # wrapped into one user-role message here. Must stay
+            # behaviorally identical to recipe-interpreter.ts's own twin
+            # case.
+            prompt = interpolate(step.prompt, scope)
+            scope[step.as_] = await host.llm.complete(
+                {"messages": [{"role": "user", "content": prompt}]}
+            )
+        elif op == "list_add":
+            # Fire-and-forget, same shape `remember` already takes.
+            # Must stay behaviorally identical to recipe-interpreter.ts's
+            # own twin case.
+            text = interpolate(step.text, scope)
+            host.lists.add(text)
+        elif op == "list_view":
+            scope[step.as_] = host.lists.view()
+        elif op == "remind":
+            # Raw-object binding, same style as `llm_complete`'s own
+            # `as_`. Must stay behaviorally identical to
+            # recipe-interpreter.ts's own twin case.
+            text = interpolate(step.text, scope)
+            scope[step.as_] = host.reminders.set(text)
+        elif op == "timer":
+            text = interpolate(step.text, scope)
+            scope[step.as_] = host.timers.set(text)
         elif op == "ask":
             # Always the recipe's last meaningful step (the schema's own
             # description): nothing after it can depend on an answer that

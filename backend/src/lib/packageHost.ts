@@ -29,18 +29,29 @@
 // async the same day this landed) - `runPlugin()`/`prepareTurn()` now
 // await through to here.
 //
-// Everything else (home.call_service, integration.call, speak.sentence,
-// camera.still, ocr.read, files.*, action.emit, diagnostics) still has no
-// backing service (no Home Assistant link, no turn engine action route,
-// no package file storage) and throws `capability_missing`, checked
-// against the permission it would need first so the error is as specific
-// as it can honestly be. `llm.complete` is the same code but a different
-// reason: the `chat` role IS real (lib/llm.ts, lib/llmSupervisor.ts,
-// spec/llm/), and the interpreter can now await a host call - but no
-// recipe step calls llm.complete (recipe.schema.json has no "llm" step),
-// so there is still nothing to wire this to, a real gap independent of
-// the sync/async one that's now closed. See spec/llm/README.md and
-// docs/dev.md's Package Host section for everything else deferred and why.
+// Everything else (speak.sentence, camera.still, ocr.read, files.*,
+// action.emit, diagnostics, and integration.call for any id/method pair
+// besides home_assistant's own get_state) still has no backing service
+// (no turn engine action route, no package file storage) and throws
+// `capability_missing`, checked against the permission it would need
+// first so the error is as specific as it can honestly be. (This
+// comment previously also listed home.call_service here; it's been real
+// since session-d-packages-and-store.md step 4, and this paragraph had
+// drifted - found while touching the adjacent llm.complete case below,
+// not otherwise audited.)
+//
+// `llm.complete` is real too now (session-d-packages-and-store.md step
+// 7, translate's own case) - the same `chat` role llm.complete has
+// always been able to reach (lib/llm.ts), now that a recipe step
+// (recipe.schema.json's `llm_complete`) actually calls it. One
+// user-role completion per call, no system prompt, no conversation
+// history, no streaming, no tool calling: a lookup, not a chat turn. A
+// role other than `chat`, or a model that isn't loaded, reports
+// `model_unavailable` rather than a raw error - the same "the host
+// wraps errors so a package cannot throw an unmapped one" rule every
+// other real method here already follows. See spec/llm/README.md and
+// docs/dev.md's Package Host section for everything else deferred and
+// why.
 import type { Host, FetchOptions, MemoryRecordLike } from "@maipai/spec/emulators/ts/host-emulator.js";
 import { HostError, redactSecrets } from "@maipai/spec/emulators/ts/host-emulator.js";
 import type { PackageManifest } from "@maipai/spec/gen/ts/manifest.js";
@@ -49,8 +60,11 @@ import { assertNotPrivateHost, SsrfBlockedError } from "@/lib/ssrfGuard";
 import * as memory from "@/lib/memory";
 import * as settings from "@/lib/settings";
 import { getHouseholdSettingValue } from "@/lib/settings";
-import { scheduleJob } from "@/lib/scheduler";
+import { scheduleJob, scheduleCoreJob } from "@/lib/scheduler";
+import { findOrCreateStandingList, addItem as addListItem } from "@/lib/lists";
+import { parseReminder, parseTimerDuration } from "@/lib/reminderParsing";
 import { cachedFetch } from "@/lib/packageCache";
+import { complete as llmComplete, type LlmMessage } from "@/lib/llm";
 import type { PersonRow } from "@/types";
 
 // host.fetch's real network I/O settings (2026-09-05). Rate limit: "a
@@ -78,6 +92,19 @@ const FETCH_USER_AGENT = "MaiPai-Home/1.0 (+https://github.com/getmaipai/home)";
 const HOME_ASSISTANT_RATE_LIMIT_KEY = "home_assistant";
 const HOME_ASSISTANT_RATE_LIMIT = { capacity: 10, refillPerSecond: 0.5 };
 const HOME_ASSISTANT_TIMEOUT_MS = 5_000;
+
+// The searxng integration's own settings (session-d-packages-and-store.md
+// step 7): a household-configured SearXNG instance, the same
+// household-configured-baseUrl shape (no SSRF guard, one shared rate
+// limit) Home Assistant already established above - see
+// backend/src/settings/searchKeys.ts's own header for why this is
+// bring-your-own-instance rather than a bundled sidecar. A longer
+// timeout than Home Assistant's: SearXNG fans a query out to several
+// real search engines and waits on the slowest one, not a single LAN
+// round-trip.
+const SEARXNG_RATE_LIMIT_KEY = "searxng";
+const SEARXNG_RATE_LIMIT = { capacity: 10, refillPerSecond: 0.5 };
+const SEARXNG_TIMEOUT_MS = 10_000;
 
 // The recipe schema's own comment on `home_call_service_step`
 // ("security domains are never covered by a wildcard target") named a
@@ -430,6 +457,100 @@ export async function homeAssistantGetState(args: unknown): Promise<unknown> {
   return getHomeAssistantState(baseUrl, accessToken, entityId);
 }
 
+/** The settings lookup and rate limit for `host.integration.call("searxng",
+ * "search", ...)` - the same "isn't set up yet" shape
+ * `requireHomeAssistantSettings()` established, one setting instead of
+ * two since SearXNG's default JSON API needs no credential. */
+function requireSearxngSettings(): { baseUrl: string } {
+  const baseUrl = getHouseholdSettingValue("search.searxng_url") as string | undefined;
+  if (!baseUrl) {
+    throw new HostError("invalid_input", "Web search isn't set up yet - add a SearXNG URL in Settings first");
+  }
+  if (!tryConsume(SEARXNG_RATE_LIMIT_KEY, SEARXNG_RATE_LIMIT)) {
+    throw new HostError("rate_limited", "Web search is rate-limited - try again shortly");
+  }
+  return { baseUrl };
+}
+
+interface SearxngResult {
+  title?: unknown;
+  url?: unknown;
+  content?: unknown;
+}
+
+/** Formats SearXNG's own `/search?format=json` response into a single
+ * readable string - a numbered list, title/url/snippet per result - not
+ * the raw JSON. The recipe language has no loop or array-map primitive
+ * (the same reason `recall`'s own step resolves its top matches into one
+ * ready-to-use string at the interpreter rather than binding a raw array
+ * for a `format` step that can't iterate it), so this does the identical
+ * "resolve the list-shaped result into a string at the source" move -
+ * ready for a `llm_complete` step to summarize into a real answer, or a
+ * `format` step to show as-is. Every field type-checked (not just
+ * existence) before use - the same gap class code review found in
+ * almanac-holiday/onthisday/music: a malformed entry is skipped, never
+ * interpolated as "undefined". */
+// A code review (2026-09-06) found no cap on a result's own title/
+// content length before it lands in an `llm_complete` prompt (websearch's
+// own recipe) - a misbehaving instance or a page with a huge meta-
+// description could otherwise splice hundreds of KB of arbitrary,
+// household-uncontrolled text into a single model call. Truncated, not
+// rejected: a long real title/snippet is still useful information, only
+// an implausibly long one is actually a problem.
+const SEARXNG_FIELD_MAX_CHARS = 300;
+
+function truncate(text: string, maxChars: number): string {
+  return text.length > maxChars ? `${text.slice(0, maxChars)}...` : text;
+}
+
+export function formatSearxngResults(data: unknown, count = 5): string {
+  const results = (data as { results?: unknown } | null)?.results;
+  if (!Array.isArray(results) || results.length === 0) {
+    return "No web search results were found.";
+  }
+  const lines: string[] = [];
+  let n = 0;
+  for (const raw of results) {
+    if (n >= count) break;
+    const result = raw as SearxngResult;
+    if (typeof result?.title !== "string" || typeof result?.url !== "string") continue;
+    n += 1;
+    const title = truncate(result.title, SEARXNG_FIELD_MAX_CHARS);
+    const snippet = typeof result.content === "string" && result.content.length > 0 ? ` - ${truncate(result.content, SEARXNG_FIELD_MAX_CHARS)}` : "";
+    lines.push(`${n}. ${title} (${result.url})${snippet}`);
+  }
+  return lines.length > 0 ? lines.join("\n") : "No web search results were found.";
+}
+
+/** `host.integration.call("searxng", "search", { query })`'s real
+ * implementation - SearXNG's own `/search?q=...&format=json` (its
+ * documented JSON output format, opt-in in a household's own
+ * settings.yml the same way a Home Assistant access token is opt-in on
+ * their side). Not yet verified against a real running SearXNG instance
+ * (backend/packages/websearch/README.md's own honest gap) - this
+ * environment has no Docker and no clean cross-platform way to stand one
+ * up, see backend/src/settings/searchKeys.ts's own header. */
+export async function searxngSearch(args: unknown): Promise<unknown> {
+  const query = (args as { query?: unknown } | undefined)?.query;
+  if (typeof query !== "string" || query.length === 0) {
+    throw new HostError("invalid_input", `searxng search needs a string "query" argument`);
+  }
+  const { baseUrl } = requireSearxngSettings();
+  const url = `${baseUrl.replace(/\/+$/, "")}/search?q=${encodeURIComponent(query)}&format=json`;
+  // No retry, unlike getHomeAssistantState's own GET - a code review
+  // (2026-09-06) found the retry doubled this call's own worst case to
+  // ~20s (SEARXNG_TIMEOUT_MS twice plus the retry delay) on top of
+  // `llm_complete`'s own real inference time, still ahead of it in the
+  // same recipe. A slow SearXNG round trip (it fans out to several real
+  // engines and waits on the slowest) is a real answer taking a while,
+  // not the transient blip a retry is meant to paper over the way a
+  // flaky LAN hop to Home Assistant is - retrying it just waits twice as
+  // long for the identical result.
+  const result = await attemptHttpFetch(url, "GET", {}, undefined, SEARXNG_TIMEOUT_MS);
+  if (result.ok) return formatSearxngResults(result.value);
+  throw result.error;
+}
+
 /** The settings lookup, rate limit, and real call shared by every real
  * caller of Home Assistant - createHost()'s own call_service (permission
  * and consequential already checked by then) and lib/commands.ts's
@@ -688,16 +809,20 @@ export function createHost(actor: PersonRow, manifest: PackageManifest, secrets:
       },
     },
     integration: {
-      // Home Assistant, the first integration reachable through this
-      // generic path (session-d-packages-and-store.md step 4) - a read
-      // (get_state) rather than home.call_service's own dedicated,
-      // domain-gated write path. Every other id/method combination stays
-      // capability_missing until a second integration is actually built;
-      // this is deliberately not a registry pattern for one entry.
+      // Home Assistant (session-d-packages-and-store.md step 4) and
+      // searxng (step 7, the websearch package's own case) are the two
+      // integrations reachable through this generic path today - two
+      // reads, neither with home.call_service's own dedicated,
+      // domain-gated write shape to reuse. Every other id/method
+      // combination stays capability_missing; this is deliberately not a
+      // registry pattern for two entries.
       async call(id: string, method: string, args?: unknown): Promise<unknown> {
         requirePermission(`integration:${id}`);
         if (id === "home_assistant" && method === "get_state") {
           return homeAssistantGetState(args);
+        }
+        if (id === "searxng" && method === "search") {
+          return searxngSearch(args);
         }
         notImplemented("integration.call");
       },
@@ -709,9 +834,36 @@ export function createHost(actor: PersonRow, manifest: PackageManifest, secrets:
       },
     },
     llm: {
-      complete(_opts: unknown): unknown {
+      // The recipe interpreter's own llm_complete step (spec/interpreters/
+      // ts/recipe-interpreter.ts) is the only caller today, always with a
+      // single user-role message - but this reads whatever `messages`
+      // array it's given, the same shape lib/llm.ts's own complete()
+      // takes, so a future caller isn't boxed into a single-prompt shape.
+      async complete(opts: unknown): Promise<unknown> {
         requirePermission("llm:complete");
-        notImplemented("llm.complete");
+        const messages = (opts as { messages?: unknown } | null)?.messages;
+        // No shape check here beyond the cast: lib/llm.ts's own
+        // complete() already validates messages (non-empty array, every
+        // entry a real role/content pair) via its own validate() - a
+        // second hand-maintained copy here (a code review, 2026-09-06,
+        // found an earlier version doing exactly that) only had to drift
+        // out of sync with it, since it checked array-non-emptiness but
+        // not per-message shape the way validate() does.
+        const result = await llmComplete("chat", (messages ?? []) as LlmMessage[]);
+        if (!result.ok) {
+          // lib/llm.ts's own error codes aren't errors.json's own
+          // vocabulary - remapped to the closest real HostError code
+          // rather than leaking a foreign one past this boundary (the
+          // same "the host wraps errors" rule every other real method
+          // here follows). `invalid_input` maps directly (identical
+          // meaning); "chat" is the only role this call site ever passes
+          // and lib/llm.ts's own IMPLEMENTED_ROLES has just that one
+          // entry, so `unsupported_role` can't actually fire here today -
+          // any other failure is a model that isn't loaded, exactly
+          // errors.json's own `model_unavailable`.
+          throw new HostError(result.code === "invalid_input" ? "invalid_input" : "model_unavailable", result.error);
+        }
+        return { text: result.value.text };
       },
     },
     camera: {
@@ -738,15 +890,56 @@ export function createHost(actor: PersonRow, manifest: PackageManifest, secrets:
       },
     },
     log: logEntry,
-    // Real, but with a known gap: neither this interface nor the
-    // interpreter's schedule-step handling carries the recipe's input
-    // scope through, so the job re-fires the package with an empty
-    // input scope, not today's inputs. See lib/scheduler.ts's header.
-    schedule(when: string, job: string): string {
+    // `inputs` (step 8) closes a real, previously-documented gap: this
+    // used to always pass {}, so a job scheduled from a recipe's own
+    // `schedule` step re-fired the package with an empty input scope.
+    schedule(when: string, job: string, inputs: Record<string, unknown> = {}): string {
       requirePermission("schedule");
-      const result = scheduleJob(actor, manifest.id, job, when, {});
+      const result = scheduleJob(actor, manifest.id, job, when, inputs);
       if (!result.ok) mapWriteFailure(result.status, result.error);
       return result.value.id;
+    },
+    lists: {
+      add(text: string): void {
+        requirePermission("lists:write");
+        const list = findOrCreateStandingList("shopping");
+        const result = addListItem(actor, list.id, { text });
+        if (!result.ok) mapWriteFailure(result.status, result.error);
+      },
+      view(): string {
+        requirePermission("lists:read");
+        const list = findOrCreateStandingList("shopping");
+        const items = (JSON.parse(list.items) as { text: string; done: boolean }[]).filter((i) => !i.done);
+        return items.length > 0 ? items.map((i) => i.text).join(", ") : "Your shopping list is empty.";
+      },
+    },
+    reminders: {
+      // The real natural-language time/task extraction (reminderParsing.ts,
+      // chrono-node) and the real scheduling both happen here - a
+      // declarative recipe step can do neither for itself. Schedules a
+      // "core" job (scheduleCoreJob, lib/scheduler.ts), never a "plugin"
+      // one: firing later raises `remind.due` directly (CORE_JOBS'
+      // `reminders.fire`), it never re-runs this recipe.
+      set(text: string): { task: string; when_text: string } {
+        requirePermission("reminders:write");
+        const parsed = parseReminder(text);
+        const result = scheduleCoreJob(actor, "reminders.fire", parsed.when, { task: parsed.task });
+        if (!result.ok) mapWriteFailure(result.status, result.error);
+        return { task: parsed.task, when_text: parsed.when_text };
+      },
+    },
+    timers: {
+      // Deterministic duration parsing (reminderParsing.ts), not a
+      // language model - see that file's own header for why a timer's
+      // precision needs exact arithmetic. Same core-job shape as
+      // reminders.set above; firing raises `timer.done` directly.
+      set(text: string): { label: string; when_text: string } {
+        requirePermission("timers:write");
+        const parsed = parseTimerDuration(text);
+        const result = scheduleCoreJob(actor, "timers.fire", parsed.when, { label: parsed.label });
+        if (!result.ok) mapWriteFailure(result.status, result.error);
+        return { label: parsed.label, when_text: parsed.when_text };
+      },
     },
     files: {
       read(path: string): unknown {

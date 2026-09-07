@@ -1,0 +1,45 @@
+{
+  "id": "list-add",
+  "version": "0.1.0",
+  "kind": "plugin",
+  "category": "Utilities",
+  "display": "Add to Shopping List",
+  "description": "Adds an item to the household's own shopping list (2026-09-06, step 8) - one standing list, found or created on first use.",
+  "author": "MaiPai",
+  "license": "AGPL-3.0",
+  "homepage": "https://github.com/getmaipai/home",
+  "routing": {
+    "examples": [
+      "add milk to the shopping list",
+      "add eggs to my shopping list",
+      "put bread on the shopping list",
+      "add paper towels to the shopping list",
+      "add dog food to the shopping list"
+    ],
+    "patterns": ["add * to the shopping list", "add * to my shopping list", "put * on the shopping list"]
+  },
+  "args": {
+    "type": "object",
+    "required": ["item"],
+    "properties": {
+      "item": { "type": "string", "minLength": 1 }
+    }
+  },
+  "requires": [],
+  "optional": [],
+  "platforms": ["home"],
+  "min_role": "child",
+  "consequential": false,
+  "offline": "full",
+  "config": [],
+  "data_sources": [],
+  "permissions": ["lists:write"],
+  "notifications": [],
+  "backup": "exclude",
+  "background": false,
+  "contributes": {},
+  "min_app": "0.1.0",
+  "tier": 0,
+  "quality_scale": "bronze",
+  "smoke": { "kind": "recipe_fixture", "fixture": "tests/smoke.json" }
+}

@@ -21,6 +21,7 @@ import { join } from "node:path";
 import type { Entity } from "../../gen/ts/entity.js";
 import type { Relationship } from "../../gen/ts/relationship.js";
 import type { Grant } from "../../gen/ts/grant.js";
+import type { List } from "../../gen/ts/list.js";
 
 const VOCAB_DIR = join(import.meta.dir, "..", "..", "vocab");
 
@@ -291,4 +292,20 @@ function scopeProblems(scope: string, person: string | null | undefined): Proble
   if (scope === "person" && !person) return ["a person-scoped record must name its person"];
   if (scope !== "person" && person) return [`a ${scope}-scoped record must not name a person`];
   return [];
+}
+
+/** Step 8's own cross-field rule, the same shape Entity's place_kind
+ * check already follows: `due_at` on a list item is only meaningful for
+ * a to-do list (list.schema.json's own description) - a shopping-list
+ * "milk" with a due date, or a custom list's book with one, is a data
+ * error the schema alone can't catch. */
+export function validateList(list: List): Problems {
+  const problems: Problems = [];
+  problems.push(...scopeProblems(list.scope, list.person));
+  if (list.kind !== "todo") {
+    for (const item of list.items) {
+      if (item.due_at) problems.push(`due_at is only meaningful on a todo list item, not a ${list.kind} one ("${item.text}")`);
+    }
+  }
+  return problems;
 }

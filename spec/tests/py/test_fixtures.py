@@ -17,6 +17,7 @@ from gen.py.device_schema import Device
 from gen.py.entity_schema import Entity
 from gen.py.grant_schema import Grant
 from gen.py.issue_schema import Issue
+from gen.py.list_schema import List
 from gen.py.manifest_schema import PackageManifest
 from gen.py.memory_record_schema import MemoryRecord
 from gen.py.model_capabilities_schema import ModelCapabilities
@@ -55,6 +56,11 @@ def test_settings_key_fixture():
 @pytest.mark.parametrize("kind", ["person", "pet", "place"])
 def test_entity_fixtures(kind: str):
     Entity.model_validate(load_fixture(f"entity.{kind}.example.json"))
+
+
+@pytest.mark.parametrize("kind", ["shopping", "todo", "custom"])
+def test_list_fixtures(kind: str):
+    List.model_validate(load_fixture(f"list.{kind}.example.json"))
 
 
 # Three relationship fixtures, one per case the two-axis design exists

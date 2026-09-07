@@ -1,0 +1,12 @@
+{
+  "description": "Smoke fixture for the bundled convert package: a real compute step unit conversion, no network - checks the recipe wiring, not compute's own restricted-evaluator logic (spec/interpreters/ts/compute.ts's own tests cover that).",
+  "inputs": { "expression": "5 miles to km" },
+  "host_setup": {},
+  "expected": {
+    "reply": { "text": "8.04672 km", "speech": "8.04672 km" },
+    "actions": [],
+    "scheduled_jobs": [],
+    "home_calls": [],
+    "memory_added": []
+  }
+}

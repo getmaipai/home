@@ -1,0 +1,40 @@
+{
+  "id": "list-view",
+  "version": "0.1.0",
+  "kind": "plugin",
+  "category": "Utilities",
+  "display": "View Shopping List",
+  "description": "Reads back what's on the household's own shopping list (2026-09-06, step 8).",
+  "author": "MaiPai",
+  "license": "AGPL-3.0",
+  "homepage": "https://github.com/getmaipai/home",
+  "routing": {
+    "examples": [
+      "what's on my shopping list",
+      "what's on the shopping list",
+      "what do I need to buy",
+      "read me the shopping list",
+      "what's on my shopping list today"
+    ],
+    "patterns": ["what's on my shopping list", "what's on the shopping list", "what do i need to buy"]
+  },
+  "requires": [],
+  "optional": [],
+  "platforms": ["home"],
+  "min_role": "child",
+  "consequential": false,
+  "offline": "full",
+  "config": [],
+  "data_sources": [],
+  "permissions": ["lists:read"],
+  "notifications": [],
+  "backup": "exclude",
+  "background": false,
+  "contributes": {
+    "widgets": [{ "id": "shopping", "title": "Shopping List", "size": "card", "refresh_s": 60, "inputs": {} }]
+  },
+  "min_app": "0.1.0",
+  "tier": 0,
+  "quality_scale": "bronze",
+  "smoke": { "kind": "recipe_fixture", "fixture": "tests/smoke.json" }
+}

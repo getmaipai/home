@@ -1,0 +1,8 @@
+{
+  "id": "list-view",
+  "inputs": [],
+  "steps": [
+    { "op": "list_view", "as": "list_summary" },
+    { "op": "format", "as": "reply", "text": "{list_summary}", "speech": "{list_summary}" }
+  ]
+}

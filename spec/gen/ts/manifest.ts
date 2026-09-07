@@ -116,11 +116,11 @@ export const PackageManifest = z
     min_role: z
       .enum(["owner", "admin", "adult", "teen", "child", "guest"])
       .describe("The floor role a person needs to invoke this package."),
-    /**Raises the routing bar (4.5): a consequential plugin needs more confidence before it fires.*/
+    /**Raises the routing bar (4.5): a consequential plugin needs more confidence before it fires - the model must propose it, gated on the household's own confirmation, never a deterministic auto-fire. A consequential package must never also declare `routing.patterns`: turnEngine.ts's route() only enforces the raised bar on the fuzzy/Tier 2 path, so a literal pattern match would fire it immediately, bypassing confirmation entirely (a real gap found and fixed, session-d-packages-and-store.md step 9 - route() itself now also refuses to treat a consequential manifest's own patterns as live, so a manifest bug here can no longer be the only thing standing between a security domain and skipping confirmation, but the manifest still shouldn't declare one).*/
     consequential: z
       .boolean()
       .describe(
-        "Raises the routing bar (4.5): a consequential plugin needs more confidence before it fires.",
+        "Raises the routing bar (4.5): a consequential plugin needs more confidence before it fires - the model must propose it, gated on the household's own confirmation, never a deterministic auto-fire. A consequential package must never also declare `routing.patterns`: turnEngine.ts's route() only enforces the raised bar on the fuzzy/Tier 2 path, so a literal pattern match would fire it immediately, bypassing confirmation entirely (a real gap found and fixed, session-d-packages-and-store.md step 9 - route() itself now also refuses to treat a consequential manifest's own patterns as live, so a manifest bug here can no longer be the only thing standing between a security domain and skipping confirmation, but the manifest still shouldn't declare one).",
       ),
     /**Stated offline behavior, required at bronze.*/
     offline: z
@@ -350,7 +350,7 @@ export const PackageManifest = z
       .optional(),
     backup: z.enum(["hot", "cold", "exclude"]).optional(),
     background: z.boolean().default(false),
-    /**Shell blueprints (6.1): nav entries, pages, right-pane panels, settings sections, commands, quick actions, player hooks, admin sections. `additionalProperties: true` since most of 6.1's own blueprint kinds have no bundled package using them yet (Wave 1's `contributes: []` was a placeholder no package had populated); `widgets` below is the one sub-field session-d-packages-and-store.md step 2 fixes a real shape for, since step 9 ships packages that populate it.*/
+    /**Shell blueprints (6.1), keyed by blueprint kind: nav entries, pages, right-pane panels, settings sections, commands, quick actions, player hooks, admin sections. `additionalProperties: true` since most of 6.1's own blueprint kinds have no bundled package using them yet (Wave 1's `contributes: []` was a placeholder no package had populated); `widgets` and `pages` below are the two sub-fields session-d-packages-and-store.md steps 2/10 fix a real shape for. `pages` replaces a redundant top-level `pages: string[]` field (Session E flagged it 2026-09-06 as incompatible with this object shape and confirmed nothing in backend/src or frontend/src read it) - a package declaring a page uses `contributes.pages[]` now, never a second, competing field.*/
     contributes: z
       .object({
         /**wave-2.md's D-to-E contract: `GET /api/widgets` and `GET /api/widgets/:package/:id/data` list and serve these.*/
@@ -383,16 +383,51 @@ export const PackageManifest = z
             "wave-2.md's D-to-E contract: `GET /api/widgets` and `GET /api/widgets/:package/:id/data` list and serve these.",
           )
           .optional(),
+        /**6.2's own package-declared pages. E's PackageScopeContext and nav-registry merge (frontend/src/shell/nav.ts) are the real consumer; no package populates this yet.*/
+        pages: z
+          .array(
+            z
+              .object({
+                /**Derives this page's own route: `/apps/<package id>/<page id>`, or bare `/apps/<package id>` when this is exactly "index".*/
+                id: z
+                  .string()
+                  .min(1)
+                  .describe(
+                    'Derives this page\'s own route: `/apps/<package id>/<page id>`, or bare `/apps/<package id>` when this is exactly "index".',
+                  ),
+                icon: z.string().optional(),
+                label: z.string().min(1).max(40),
+                /**Whether this page gets its own entry in the shell's nav registry (frontend/src/shell/nav.ts), vs. being reachable only from elsewhere (e.g. a widget's own link).*/
+                nav: z
+                  .boolean()
+                  .describe(
+                    "Whether this page gets its own entry in the shell's nav registry (frontend/src/shell/nav.ts), vs. being reachable only from elsewhere (e.g. a widget's own link).",
+                  ),
+                /**"schema": spec/ui/schema.json document, rendered by the shared shell. "web" (this package's manifest must also list "web" under platforms): an escape hatch, unimplemented for all of Wave 2 - the loader refuses it outright, since a page a native Go/SwiftUI client can't render would break the platform's own "one UI schema, every client" promise.*/
+                kind: z
+                  .enum(["schema", "web"])
+                  .describe(
+                    '"schema": spec/ui/schema.json document, rendered by the shared shell. "web" (this package\'s manifest must also list "web" under platforms): an escape hatch, unimplemented for all of Wave 2 - the loader refuses it outright, since a page a native Go/SwiftUI client can\'t render would break the platform\'s own "one UI schema, every client" promise.',
+                  ),
+                /**The schema document id (kind: "schema") this page renders, served from GET /api/plugins/:id/pages/:pageId.*/
+                module: z
+                  .string()
+                  .min(1)
+                  .describe(
+                    'The schema document id (kind: "schema") this page renders, served from GET /api/plugins/:id/pages/:pageId.',
+                  ),
+              })
+              .strict(),
+          )
+          .describe(
+            "6.2's own package-declared pages. E's PackageScopeContext and nav-registry merge (frontend/src/shell/nav.ts) are the real consumer; no package populates this yet.",
+          )
+          .optional(),
       })
       .catchall(z.any())
       .describe(
-        "Shell blueprints (6.1): nav entries, pages, right-pane panels, settings sections, commands, quick actions, player hooks, admin sections. `additionalProperties: true` since most of 6.1's own blueprint kinds have no bundled package using them yet (Wave 1's `contributes: []` was a placeholder no package had populated); `widgets` below is the one sub-field session-d-packages-and-store.md step 2 fixes a real shape for, since step 9 ships packages that populate it.",
+        "Shell blueprints (6.1), keyed by blueprint kind: nav entries, pages, right-pane panels, settings sections, commands, quick actions, player hooks, admin sections. `additionalProperties: true` since most of 6.1's own blueprint kinds have no bundled package using them yet (Wave 1's `contributes: []` was a placeholder no package had populated); `widgets` and `pages` below are the two sub-fields session-d-packages-and-store.md steps 2/10 fix a real shape for. `pages` replaces a redundant top-level `pages: string[]` field (Session E flagged it 2026-09-06 as incompatible with this object shape and confirmed nothing in backend/src or frontend/src read it) - a package declaring a page uses `contributes.pages[]` now, never a second, competing field.",
       )
-      .optional(),
-    /**Ids of UI schema page documents this package ships (6.2).*/
-    pages: z
-      .array(z.string())
-      .describe("Ids of UI schema page documents this package ships (6.2).")
       .optional(),
     /**A declared setup flow, the one escape hatch beyond a plain settings form (docs/SETTINGS.md rule 1).*/
     setup: z

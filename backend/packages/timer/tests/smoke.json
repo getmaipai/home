@@ -1,0 +1,15 @@
+{
+  "description": "Smoke fixture for the bundled timer package: proves the recipe wiring (timer + pick + pick + format) executes without throwing, against lib/smoke.ts's own HostEmulator - the emulator's own canned duration-parsing reply, not a real one. Real duration parsing is backend/tests/reminderParsing.test.ts's own job (including the exact-millisecond regression test), real scheduling is packageHost.test.ts's.",
+  "inputs": { "expression": "ten minutes" },
+  "host_setup": {},
+  "expected": {
+    "reply": {
+      "text": "Timer set: ten minutes ([emulator: no real duration parsing]).",
+      "speech": "Timer set: ten minutes ([emulator: no real duration parsing])."
+    },
+    "actions": [],
+    "scheduled_jobs": [{ "when": "[emulator: no real duration parsing]", "job": "timers.fire" }],
+    "home_calls": [],
+    "memory_added": []
+  }
+}

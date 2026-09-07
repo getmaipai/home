@@ -1,0 +1,54 @@
+{
+  "id": "sports",
+  "version": "0.1.0",
+  "kind": "plugin",
+  "category": "Info",
+  "display": "Sports Scores",
+  "description": "Today's MLB scores (2026-09-06, step 7), via statsapi.mlb.com - no API key. MLB only for now, no team preference setting exists yet.",
+  "author": "MaiPai",
+  "license": "AGPL-3.0",
+  "homepage": "https://github.com/getmaipai/home",
+  "routing": {
+    "examples": [
+      "what's the score",
+      "any scores today",
+      "how are the games going",
+      "what's the baseball score",
+      "give me today's scores"
+    ],
+    "patterns": ["what's the score", "any scores today"]
+  },
+  "requires": [],
+  "optional": [],
+  "platforms": ["home"],
+  "min_role": "child",
+  "consequential": false,
+  "offline": "unavailable",
+  "config": [],
+  "data_sources": [
+    {
+      "id": "mlb-statsapi",
+      "destination": "MLB Advanced Media's own public stats API",
+      "when": "the household asks for sports scores",
+      "what": "nothing personal - a plain, unauthenticated GET for today's schedule",
+      "who": "MLB Advanced Media",
+      "opt_in": true,
+      "retention": "unknown, see MLB Advanced Media's own policy"
+    }
+  ],
+  "permissions": ["net:statsapi.mlb.com"],
+  "notifications": [],
+  "cache": { "key_template": "sports:mlb:today", "ttl_s": 300, "stale_ok_s": 900, "max_bytes": 100000 },
+  "fallback_reply": {
+    "text": "Sorry, I'm having trouble looking that up right now.",
+    "speech": "Sorry, I'm having trouble looking that up right now."
+  },
+  "backup": "exclude",
+  "background": false,
+  "contributes": {},
+  "min_app": "0.1.0",
+  "timeout_ms": 8000,
+  "tier": 1,
+  "quality_scale": "bronze",
+  "smoke": { "kind": "deno_test" }
+}

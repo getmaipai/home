@@ -6,7 +6,8 @@
   "license": "AGPL-3.0",
   "scripts": {
     "screenshots": "bun run scripts/screenshot.ts",
-    "a11y": "bun run scripts/screenshot.ts --a11y-only"
+    "a11y": "bun run scripts/screenshot.ts --a11y-only",
+    "refresh-bundled-packages": "bun run scripts/refresh-bundled-packages.ts"
   },
   "devDependencies": {
     "@axe-core/playwright": "^4.13.0",

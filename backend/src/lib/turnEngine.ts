@@ -13,7 +13,7 @@
 // read docs/dev.md's turn engine section before extending this file.
 import { evaluateSafety } from "@/lib/safety";
 import { speakerAgeBand } from "@/lib/ageBand";
-import { listPackageIds, loadPackage, meetsMinRole, runPlugin } from "@/lib/plugins";
+import { listPackageIds, loadManifestOnly, meetsMinRole, runPlugin } from "@/lib/plugins";
 import { ensureRoutingEmbeddings, embedUtterance, scoreByEmbedding, pickTier1WinnerAmong } from "@/lib/routing";
 import { loadAllSkills, type LoadedSkill } from "@/lib/skills";
 import { matchCommand, runCommand } from "@/lib/commands";
@@ -23,6 +23,7 @@ import { newConversationTurnId } from "@/lib/id";
 import { complete, startCompleteStream, type LlmMessage, type ToolSpec, type ToolCall } from "@/lib/llm";
 import { guardReply, guardSentence, replacementFor, type GuardContext } from "@/lib/guards";
 import { tokenize } from "@/lib/text";
+import { sanitizeForPrompt } from "@/lib/promptSanitize";
 import {
   logTurn,
   resolveOrCreateConversation,
@@ -170,11 +171,27 @@ export interface LoadedManifest {
 // OS-dependent enumeration order, not just "whatever order the disk
 // returns," even though only one bundled package exists to tie against
 // today.
+//
+// `loadManifestOnly()`, not `lib/plugins.ts`'s own `loadPackage()`: a
+// real bug found by code review (session-d-packages-and-store.md step
+// 7, the first time a routing-corpus row ever named a Tier 1 package) -
+// `loadPackage()` deliberately REJECTS anything but `tier: 0` (its own
+// header: "use runPlugin(), not loadPackage(), for a Tier 1 one"), so
+// every Tier 1 package (knowledge, and now every almanac-* one) was
+// silently invisible to route() and to buildSystemPrompt()'s own
+// plugins list from the day Tier 1 shipped (step 5) - nothing caught it
+// because no routing-corpus row had ever named one until now.
+// route()/buildSystemPrompt() only ever need the manifest (routing
+// examples/patterns, args, description), never the recipe -
+// loadManifestOnly() is the tier-agnostic read both actually want;
+// runPlugin() (this file's own execution call, not this listing) is
+// still what branches by tier to load the recipe or reach into
+// lib/denoHost.ts.
 export function loadAllManifests(): LoadedManifest[] {
   const out: LoadedManifest[] = [];
   for (const id of [...listPackageIds()].sort()) {
-    const loaded = loadPackage(id);
-    if (loaded.ok) out.push({ id, manifest: loaded.value.manifest });
+    const loaded = loadManifestOnly(id);
+    if (loaded.ok) out.push({ id, manifest: loaded.value });
   }
   return out;
 }
@@ -356,14 +373,11 @@ function formatLocalTime(now: Date, locale: string): string {
 // stray newline or brace in a name has no legitimate reason to reach the
 // model, so there is no case where preserving it (quoted or otherwise)
 // beats just removing it.
-// Exported (not just used locally) - a code review of this fix (2026-09-06)
-// found memoryJudge.ts interpolates the same self-editable displayName
-// into two of ITS OWN prompts (extractFacts()'s system prompt, the
-// profile-summary prompt), the identical injection vector. One
-// definition, shared, rather than a second hand-copied version there.
-export function sanitizeForPrompt(text: string): string {
-  return text.replace(/[\r\n{}]/g, " ").trim();
-}
+// sanitizeForPrompt itself now lives in lib/promptSanitize.ts (imported
+// above with the rest of this file's imports) - moved out of this file
+// when a second review found memoryJudge.ts importing it from HERE
+// closed a real cycle back through persona.ts -> plugins.ts. See that
+// module's own header for the full story.
 
 function speakerLine(actor: PersonRow, locale: string, now: Date): string {
   const nicknamePart = actor.nickname ? ` (goes by ${sanitizeForPrompt(actor.nickname)})` : "";
@@ -606,10 +620,17 @@ interface RoutedPlugin {
 // pattern match, never on a fuzzy example score, however high. A tie
 // between two pattern matches goes to whichever package sorts first by
 // id (loadAllManifests()'s deterministic order), a deliberately simple
-// tie-break, not a claim of ranking by pattern specificity. Tier 0
-// (patterns) always wins outright over Tier 1, checked first and
-// returned immediately - a real, deliberately-authored trigger phrase
-// never competes with a fuzzy score, however confident.
+// tie-break, not a claim of ranking by pattern specificity. A literal
+// `routing.patterns` match always wins outright over the fuzzy example/
+// embedding score below, checked first and returned immediately - a
+// real, deliberately-authored trigger phrase never competes with a
+// fuzzy score, however confident. This is NOT a Tier 0/Tier 1 split:
+// `loadAllManifests()` reads every package's manifest regardless of
+// tier (session-d-packages-and-store.md step 7 fix - it used to call a
+// Tier-0-only loader, so a Tier 1 package's own `routing.patterns`
+// never got a chance here at all), so a Tier 1 package with a literal
+// pattern (almanac-time's exact "what time is it") hits this identical
+// immediate-win branch too, same as any Tier 0 plugin's.
 //
 // Tier 1 (session-c-brain-and-voice.md step 1) is a real embedding
 // ranking now, not a single package's own score against a fixed bar: the
@@ -664,13 +685,30 @@ export async function route(text: string, actor: PersonRow, loaded: LoadedManife
   for (const { id, manifest } of loaded) {
     if (!meetsMinRole(actor.role, manifest.min_role)) continue;
 
-    for (const pattern of manifest.routing?.patterns ?? []) {
-      const captured = matchPattern(text, pattern);
-      if (captured === null) continue;
-      const args = deterministicArgs(manifest.args, captured);
-      if (!args) continue;
-      // Tier 0 always wins, immediately - no Tier 1 ranking to report.
-      return { winner: { id, args, score: 1, viaPattern: true, viaEmbedding: true }, ranked: [] };
+    // A real gap found building `lock-doors` (session-d-packages-and-
+    // store.md step 9): `manifest.consequential` was never checked here
+    // at all, only inside `canFire` below - a consequential package that
+    // ALSO declared a literal `routing.patterns` entry would fire
+    // immediately on that pattern match, bypassing the confirm gate
+    // `canFire`/Tier 2's own proposal-and-confirm flow exist specifically
+    // to enforce. Skipping a consequential manifest's own patterns here
+    // (never a "no patterns declared" package, since a manifest bug
+    // shouldn't be the only thing between a security domain and skipping
+    // confirmation) means it can only ever be discovered through the
+    // fuzzy/Tier 2 path below, which already refuses to let it WIN
+    // outright (`canFire`) - the model may still propose it, gated on
+    // confirmation, same as before.
+    if (!manifest.consequential) {
+      for (const pattern of manifest.routing?.patterns ?? []) {
+        const captured = matchPattern(text, pattern);
+        if (captured === null) continue;
+        const args = deterministicArgs(manifest.args, captured);
+        if (!args) continue;
+        // A literal pattern match always wins, immediately - no ranking
+        // to report - regardless of which tier this package is (see
+        // this function's own header comment above).
+        return { winner: { id, args, score: 1, viaPattern: true, viaEmbedding: true }, ranked: [] };
+      }
     }
 
     eligible.push({ id, manifest });
@@ -1604,9 +1642,8 @@ export async function runTurnStream(
 // - `ask`-continuation: PluginResult.ask exists in the spec (result.schema.json)
 //   but the recipe interpreter has no step that ever produces one
 //   (runRecipe always sets `reply`, never `ask`), an interpreter-level gap
-//   the same shape as the scheduler's input-carrying gap and
-//   host.llm.complete's sync/async gap. Nothing routes a follow-up
-//   deterministically today.
+//   the same shape as the scheduler's input-carrying gap. Nothing routes
+//   a follow-up deterministically today.
 // - A real Persona/style record: 2026-09-05 built a first, narrow slice
 //   (lib/persona.ts) - a small in-code catalog, a person-scope settings
 //   key to pick one, and composePersonaPrompt() rendering the pick into

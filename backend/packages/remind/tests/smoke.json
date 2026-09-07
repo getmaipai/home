@@ -1,0 +1,15 @@
+{
+  "description": "Smoke fixture for the bundled remind package: proves the recipe wiring (remind + pick + pick + format) executes without throwing, against lib/smoke.ts's own HostEmulator - the emulator's own canned time-parsing reply, not a real one. Real time/task extraction (chrono-node) and real scheduling are backend/tests/reminderParsing.test.ts's and packageHost.test.ts's own jobs.",
+  "inputs": { "expression": "at 6 to call Nadia" },
+  "host_setup": {},
+  "expected": {
+    "reply": {
+      "text": "Okay, I'll remind you: at 6 to call Nadia ([emulator: no real time parsing]).",
+      "speech": "Okay, I'll remind you: at 6 to call Nadia ([emulator: no real time parsing])."
+    },
+    "actions": [],
+    "scheduled_jobs": [{ "when": "[emulator: no real time parsing]", "job": "reminders.fire" }],
+    "home_calls": [],
+    "memory_added": []
+  }
+}

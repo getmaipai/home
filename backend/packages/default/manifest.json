@@ -33,7 +33,6 @@
   "backup": "exclude",
   "background": false,
   "contributes": {},
-  "pages": [],
   "min_app": "0.1.0",
   "tier": 0,
   "quality_scale": "bronze"

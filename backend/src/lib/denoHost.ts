@@ -26,7 +26,8 @@ import type { PackageManifest } from "@maipai/spec/gen/ts/manifest.js";
 import type { PluginResult } from "@maipai/spec/interpreters/ts/recipe-interpreter.js";
 import { createHost } from "@/lib/packageHost";
 import { raiseIssue, resolveIssue } from "@/lib/issues";
-import { PACKAGES_DIR, tier1PackageDataDir, ensureDataDir, isValidPackageId } from "@/lib/paths";
+import { tier1PackageDataDir, ensureDataDir, isValidPackageId } from "@/lib/paths";
+import { resolvePackageDir } from "@/lib/packageResolve";
 import type { PersonRow } from "@/types";
 
 const IDLE_TIMEOUT_MS = 10 * 60 * 1000;
@@ -80,7 +81,7 @@ const disabledUntilReboot = new Set<string>();
  * shape for every Tier 1 package keeps a package's own directory
  * self-describing without another thing to get wrong in manifest.json. */
 function entryPath(id: string): string {
-  return join(PACKAGES_DIR, id, "handler.ts");
+  return join(resolvePackageDir(id), "handler.ts");
 }
 
 const HostFetchRequestSchema = z.object({
@@ -117,7 +118,7 @@ export function buildDenoRunArgs(sourceDir: string, dataDir: string, entry: stri
 }
 
 async function startProcess(id: string, manifest: PackageManifest, actor: PersonRow): Promise<SandboxProcess> {
-  const sourceDir = join(PACKAGES_DIR, id);
+  const sourceDir = resolvePackageDir(id);
   const dataDir = tier1PackageDataDir(id);
   ensureDataDir(dataDir);
 
@@ -181,6 +182,23 @@ async function killProcess(id: string): Promise<void> {
   entry.closingDeliberately = true;
   processes.delete(id);
   await entry.client.close().catch(() => {});
+}
+
+/** Kills a package's live sandbox process, if it has one - `lib/store.ts`
+ * calls this after install/uninstall/rollback (a real gap found by code
+ * review: those functions had no production caller before this diff,
+ * so nothing previously exercised a Tier 1 package's process staying
+ * warm across a file swap. `startProcess()` resolves `sourceDir` once,
+ * at spawn time, and never re-reads it - a live sandbox would otherwise
+ * keep running against files an install/uninstall/rollback just deleted
+ * or replaced, or a later call would resume against a stale handle.
+ * Killing it here means the NEXT real call lazily respawns fresh
+ * against whatever `lib/packageResolve.ts` resolves to now. A no-op for
+ * a package with no live process (the common case: most calls happen
+ * between household use, not mid-conversation), and safe for a Tier 0
+ * package (nothing here to kill). */
+export async function killLiveProcessForInstallChange(id: string): Promise<void> {
+  await killProcess(id);
 }
 
 /** callTier1Handle()'s own fault path needs this, not killProcess(id)

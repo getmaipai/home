@@ -14,11 +14,13 @@ import {
   validateRelationship,
   validateRelationshipEndpoints,
   validateGrant,
+  validateList,
   inverseRelationship,
 } from "../../records/ts/validate.js";
 import type { Entity } from "../../gen/ts/entity.js";
 import type { Relationship } from "../../gen/ts/relationship.js";
 import type { Grant } from "../../gen/ts/grant.js";
+import type { List } from "../../gen/ts/list.js";
 
 const FIXTURES = join(import.meta.dir, "..", "..", "fixtures", "records");
 const load = <T>(name: string): T => JSON.parse(readFileSync(join(FIXTURES, name), "utf-8")) as T;
@@ -30,6 +32,9 @@ const statedRel = () => load<Relationship>("relationship.stated.example.json");
 const estrangedRel = () => load<Relationship>("relationship.estranged.example.json");
 const inferredRel = () => load<Relationship>("relationship.inferred.example.json");
 const grant = () => load<Grant>("grant.example.json");
+const shoppingList = () => load<List>("list.shopping.example.json");
+const todoList = () => load<List>("list.todo.example.json");
+const customList = () => load<List>("list.custom.example.json");
 
 describe("every shipped fixture is valid", () => {
   test("entities", () => {
@@ -40,6 +45,9 @@ describe("every shipped fixture is valid", () => {
   });
   test("grant", () => {
     expect(validateGrant(grant())).toEqual([]);
+  });
+  test("lists", () => {
+    for (const l of [shoppingList(), todoList(), customList()]) expect(validateList(l)).toEqual([]);
   });
 });
 
@@ -77,6 +85,24 @@ describe("entity rules", () => {
       expect.stringContaining("must name its person"),
     );
     expect(validateEntity({ ...person(), scope: "household", person: "person-a1b2c3" })).toContainEqual(
+      expect.stringContaining("must not name a person"),
+    );
+  });
+});
+
+describe("list rules", () => {
+  test("a due_at is only meaningful on a todo list item", () => {
+    const shopping = shoppingList();
+    expect(
+      validateList({ ...shopping, items: [{ ...shopping.items[0]!, due_at: "2026-09-08T17:00:00Z" }] }),
+    ).toContainEqual(expect.stringContaining("only meaningful on a todo list item"));
+  });
+
+  test("a person-scoped list names its person, and a household-scoped one does not", () => {
+    expect(validateList({ ...todoList(), scope: "person", person: null })).toContainEqual(
+      expect.stringContaining("must name its person"),
+    );
+    expect(validateList({ ...shoppingList(), scope: "household", person: "person-a1b2c3" })).toContainEqual(
       expect.stringContaining("must not name a person"),
     );
   });

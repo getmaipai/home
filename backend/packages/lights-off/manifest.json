@@ -1,0 +1,49 @@
+{
+  "id": "lights-off",
+  "version": "0.1.0",
+  "kind": "plugin",
+  "category": "Home",
+  "display": "Lights Off",
+  "description": "Turns off a light through the household's own Home Assistant instance (2026-09-06, step 9) - a real home.call_service action.",
+  "author": "MaiPai",
+  "license": "AGPL-3.0",
+  "homepage": "https://github.com/getmaipai/home",
+  "routing": {
+    "examples": [
+      "turn off the living room light",
+      "turn off the kitchen light",
+      "turn off the bedroom lights",
+      "turn off the porch light",
+      "turn off the hallway lights"
+    ],
+    "patterns": ["turn off the * light", "turn off the * lights"]
+  },
+  "args": {
+    "type": "object",
+    "required": ["room"],
+    "properties": {
+      "room": { "type": "string", "minLength": 1 }
+    }
+  },
+  "requires": [],
+  "optional": [],
+  "platforms": ["home"],
+  "min_role": "child",
+  "consequential": false,
+  "offline": "unavailable",
+  "config": [],
+  "data_sources": [],
+  "permissions": ["home:light"],
+  "notifications": [],
+  "fallback_reply": {
+    "text": "Sorry, I'm having trouble reaching your lights right now.",
+    "speech": "Sorry, I'm having trouble reaching your lights right now."
+  },
+  "backup": "exclude",
+  "background": false,
+  "contributes": {},
+  "min_app": "0.1.0",
+  "tier": 0,
+  "quality_scale": "bronze",
+  "smoke": { "kind": "recipe_fixture", "fixture": "tests/smoke.json" }
+}

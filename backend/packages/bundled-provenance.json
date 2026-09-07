@@ -1,0 +1,32 @@
+{
+  "define": {
+    "sha256": "ee955e3b31fcba39805024fcd713e9d825ab8f980e80b7ef65a6fa3906306f1d",
+    "source_commit": "0fd7be0b0eba0df67ae622212a9205baef2bd841",
+    "catalog_path": "plugins/utilities/define"
+  },
+  "joke": {
+    "sha256": "7ed1efa8c51a353fcaa7611b95ffdabe1bdc4c4cd357ec17cd44b19dcd9dc042",
+    "source_commit": "0fd7be0b0eba0df67ae622212a9205baef2bd841",
+    "catalog_path": "plugins/fun/joke"
+  },
+  "knowledge": {
+    "sha256": "539528cbafe8aba118b8137b0b3387a38317f88c937affcbc7a32fe0e4a4f60b",
+    "source_commit": "0fd7be0b0eba0df67ae622212a9205baef2bd841",
+    "catalog_path": "plugins/info/knowledge"
+  },
+  "storytime-style": {
+    "sha256": "a6f390fbefa068646a8617c46237bbe91c6825c1d27c64bd0c98a83b43d0b3be",
+    "source_commit": "0fd7be0b0eba0df67ae622212a9205baef2bd841",
+    "catalog_path": "skills/family/storytime-style"
+  },
+  "trivia": {
+    "sha256": "7dd8e6ea6b47190f3798a5b67e96d1a92e7dda49a9c91a0b0eb086ca73c9f729",
+    "source_commit": "0fd7be0b0eba0df67ae622212a9205baef2bd841",
+    "catalog_path": "plugins/fun/trivia"
+  },
+  "weather": {
+    "sha256": "9265d8a3e03da7d81d125b1f7099fa456ffd36e190bcd5c7c76d83bd66982f48",
+    "source_commit": "0fd7be0b0eba0df67ae622212a9205baef2bd841",
+    "catalog_path": "plugins/utilities/weather"
+  }
+}

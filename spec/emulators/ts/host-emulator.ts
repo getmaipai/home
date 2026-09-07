@@ -115,7 +115,10 @@ export interface Host {
     sentence(text: string): void;
   };
   llm: {
-    complete(opts: unknown): unknown;
+    // Promise-typed like fetch/home.call_service above: the real host
+    // (packageHost.ts, session-d-packages-and-store.md step 7) makes a
+    // real model-inference call, so callers must await it.
+    complete(opts: unknown): Promise<unknown>;
   };
   camera: {
     still(): unknown;
@@ -127,7 +130,32 @@ export interface Host {
     get(key: string): unknown;
   };
   log(level: string, message: string, fields?: Record<string, unknown>): void;
-  schedule(when: string, job: string): string;
+  /** `inputs` (session-d-packages-and-store.md step 8) closes a real,
+   * previously-documented gap: the real host used to always pass `{}`
+   * here regardless of what a recipe's own `schedule` step asked for, so
+   * a job re-firing this package lost its own input scope entirely. */
+  schedule(when: string, job: string, inputs?: Record<string, unknown>): string;
+  lists: {
+    add(text: string): void;
+    /** A ready-to-speak summary of the household's own default shopping
+     * list - the same "resolve a list-shaped result into one string at
+     * the interpreter, since the recipe language has no loop" move
+     * `memory.recall`'s own binding already makes. */
+    view(): string;
+  };
+  reminders: {
+    /** The real natural-language time/task parsing AND the real
+     * scheduling both happen here, host-side - a declarative recipe step
+     * can do neither for itself. Schedules a core-kind job (never a
+     * recipe replay): firing later raises `remind.due` directly. */
+    set(text: string): { task: string; when_text: string };
+  };
+  timers: {
+    /** Deterministic duration parsing, not a language model: a timer's
+     * whole point is exact minute-level accuracy. Schedules a core-kind
+     * job; firing later raises `timer.done` directly. */
+    set(text: string): { label: string; when_text: string };
+  };
   files: {
     read(path: string): unknown;
     write(path: string, data: unknown): void;
@@ -150,7 +178,13 @@ export class HostEmulator implements Host {
   readonly actionsLog: { kind: string; payload: unknown }[] = [];
   readonly homeCallsLog: { domain: string; service: string; target: unknown; data: unknown }[] = [];
   readonly spokenLog: string[] = [];
-  readonly scheduledJobs: { when: string; job: string; id: string }[] = [];
+  readonly scheduledJobs: { when: string; job: string; id: string; inputs: Record<string, unknown> }[] = [];
+  // {text, done} pairs, not plain strings (a code review, 2026-09-06,
+  // found the emulator had no concept of "done" at all while the real
+  // host's own lists.view() filters completed items out - a real
+  // interpreter/host divergence no fixture could have caught, since
+  // there was nothing here to seed a done item with).
+  private shoppingListState: { text: string; done: boolean }[] = [];
   readonly logs: LogEntry[] = [];
 
   // --- test setup -----------------------------------------------------
@@ -241,7 +275,7 @@ export class HostEmulator implements Host {
   };
 
   readonly llm = {
-    complete: (_opts: unknown): unknown => {
+    complete: async (_opts: unknown): Promise<unknown> => {
       return { text: "[emulator: no model loaded, this is a canned reply]" };
     },
   };
@@ -272,11 +306,53 @@ export class HostEmulator implements Host {
     });
   }
 
-  schedule(when: string, job: string): string {
+  schedule(when: string, job: string, inputs: Record<string, unknown> = {}): string {
     const id = this.genId("job");
-    this.scheduledJobs.push({ when, job, id });
+    this.scheduledJobs.push({ when, job, id, inputs });
     return id;
   }
+
+  readonly lists = {
+    add: (text: string): void => {
+      this.shoppingListState.push({ text, done: false });
+    },
+    view: (): string => {
+      const pending = this.shoppingListState.filter((i) => !i.done);
+      return pending.length > 0 ? pending.map((i) => i.text).join(", ") : "Your shopping list is empty.";
+    },
+  };
+
+  /** Test setup only: seeds the emulator's own shopping list, `done`
+   * items included, so a fixture can prove `lists.view()` really does
+   * skip them - the same "test setup" role `seedMemory()` already plays
+   * for `memory.recall`. */
+  seedShoppingList(items: { text: string; done?: boolean }[]): void {
+    for (const item of items) {
+      this.shoppingListState.push({ text: item.text, done: item.done ?? false });
+    }
+  }
+
+  // No real time-phrase or duration parsing here - deliberately canned,
+  // the same "[emulator: ...]" convention llm.complete's own stub
+  // already uses, since this emulator does no real I/O or computation.
+  // The real host (packageHost.ts) does the real parsing; a conformance
+  // fixture proves the recipe -> host -> scheduledJobs wiring, not real
+  // NL understanding.
+  readonly reminders = {
+    set: (text: string): { task: string; when_text: string } => {
+      const id = this.genId("job");
+      this.scheduledJobs.push({ when: "[emulator: no real time parsing]", job: "reminders.fire", id, inputs: { task: text } });
+      return { task: text, when_text: "[emulator: no real time parsing]" };
+    },
+  };
+
+  readonly timers = {
+    set: (text: string): { label: string; when_text: string } => {
+      const id = this.genId("job");
+      this.scheduledJobs.push({ when: "[emulator: no real duration parsing]", job: "timers.fire", id, inputs: { label: text } });
+      return { label: text, when_text: "[emulator: no real duration parsing]" };
+    },
+  };
 
   readonly files = {
     read: (path: string): unknown => {

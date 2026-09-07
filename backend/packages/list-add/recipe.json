@@ -1,0 +1,8 @@
+{
+  "id": "list-add",
+  "inputs": [{ "name": "item", "selector": "text" }],
+  "steps": [
+    { "op": "list_add", "text": "{item}" },
+    { "op": "format", "as": "reply", "text": "Added {item} to your shopping list.", "speech": "Added {item} to your shopping list." }
+  ]
+}

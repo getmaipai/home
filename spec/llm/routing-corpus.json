@@ -19,7 +19,7 @@
 
   { "utterance": "what have I told you to remember about pizza night", "expect": null, "must_not": ["remember"], "note": "recall's own routing.example, but it captures no `topic` for recall's required arg without matching one of its own patterns literally - Tier 1 alone can never bind it (deterministicArgs' documented gap); a real Tier 2 tool call (step 2) is what should eventually route this, not Tier 1." },
   { "utterance": "what do you know about my dentist appointment", "expect": null, "must_not": ["remember"], "note": "same gap as above" },
-  { "utterance": "remind me what I said about the school schedule", "expect": null, "must_not": ["remember"], "note": "same gap as above" },
+  { "utterance": "remind me what I said about the school schedule", "expect": "remind", "must_not": [], "note": "step 8's own remind package (added 2026-09-06) made this a real, different gap than the one this row used to document: \"remind me *\" is a literal pattern (a required-arg package can only ever route that way) and wins immediately over the model, so this genuinely ambiguous phrase - recall-flavored, not really a new-reminder request - now goes to remind, which will 400 (no time phrase found) rather than reach recall or the model. The underlying fix is Tier 2 native tool calling disambiguating this properly, already tracked in turnEngine.ts's own \"not built this pass\" list, not something remind's own pattern choice can solve." },
   { "utterance": "please remember our wifi password is on the fridge", "expect": null, "must_not": ["recall"], "note": "remember's own routing.example that doesn't literally start with \"remember\" - same required-arg gap, `fact` this time" },
   { "utterance": "can you remember I have a dentist appointment next week", "expect": null, "must_not": ["recall"], "note": "same gap as above" },
 
@@ -54,10 +54,61 @@
   { "utterance": "do you remember when we first met", "expect": "recall", "must_not": ["remember"], "note": "matches recall's own \"do you remember *\" pattern - a real Tier 0 fire, and the correct fix for the legacy 'recall question stored as junk memory' bug: it now retrieves, never stores." },
   { "utterance": "can you remember our first conversation", "expect": null, "must_not": ["remember"] },
 
-  { "utterance": "what's my son's name", "expect": null, "must_not": ["remember", "recall"] },
-  { "utterance": "what's my address", "expect": null, "must_not": ["remember", "recall"] },
+  { "utterance": "what's my son's name", "expect": null, "must_not": ["remember", "recall", "almanac-date", "almanac-time"], "note": "a real false positive found live: the real embedding model scored this ~0.68 against almanac-date's own routing.examples before they were revised - kept as a permanent regression guard, not just a note in a commit message." },
+  { "utterance": "what's my address", "expect": null, "must_not": ["remember", "recall", "almanac-date", "almanac-time"] },
 
-  { "utterance": "what time is it", "expect": null, "must_not": ["define", "joke", "recall", "remember", "storytime-style", "trivia", "weather"] },
   { "utterance": "how are you feeling today", "expect": null, "must_not": ["define", "joke", "recall", "remember", "storytime-style", "trivia", "weather"] },
-  { "utterance": "good morning", "expect": null, "must_not": ["define", "joke", "recall", "remember", "storytime-style", "trivia", "weather"] }
+  { "utterance": "good morning", "expect": null, "must_not": ["define", "joke", "recall", "remember", "storytime-style", "trivia", "weather"] },
+
+  { "utterance": "what's today's date", "expect": "almanac-date", "must_not": [] },
+  { "utterance": "what day of the week is it", "expect": "almanac-date", "must_not": [] },
+  { "utterance": "what time is it", "expect": "almanac-time", "must_not": [] },
+  { "utterance": "what's the next holiday", "expect": "almanac-holiday", "must_not": [] },
+  { "utterance": "is there a holiday coming up", "expect": "almanac-holiday", "must_not": [] },
+  { "utterance": "what phase is the moon in", "expect": "almanac-moon", "must_not": [] },
+  { "utterance": "what happened on this day in history", "expect": "almanac-onthisday", "must_not": [] },
+
+  { "utterance": "calculate 15 * 12", "expect": "math", "must_not": [], "note": "math has a required arg (expression), so it can only ever fire via a literal routing.patterns wildcard capture, never fuzzy scoring - this is that path." },
+  { "utterance": "compute 2^10", "expect": "math", "must_not": [] },
+  { "utterance": "what does 20 / 4 equal", "expect": "math", "must_not": [] },
+
+  { "utterance": "convert 5 miles to km", "expect": "convert", "must_not": [], "note": "convert also has a required arg, so only the literal 'convert *' pattern can fire it." },
+  { "utterance": "convert 100 fahrenheit to celsius", "expect": "convert", "must_not": [] },
+
+  { "utterance": "what's the news", "expect": "news", "must_not": [] },
+  { "utterance": "read me the headlines", "expect": "news", "must_not": [] },
+
+  { "utterance": "what's the score", "expect": "sports", "must_not": [] },
+  { "utterance": "how are the games going", "expect": "sports", "must_not": [] },
+
+  { "utterance": "exchange 100 dollars to euros", "expect": "currency", "must_not": [] },
+  { "utterance": "exchange 50 usd for gbp", "expect": "currency", "must_not": [] },
+  { "utterance": "convert 5 dollars to euros", "expect": "convert", "must_not": ["currency"], "note": "a real, documented limitation: convert already owns the literal 'convert *' pattern, so this phrasing routes to convert (then fails at runtime: dollars/euros aren't mathjs units), never to currency - currency answers to 'exchange' instead. This guards the routing decision itself against a future change that silently sends this phrasing to currency without also updating the README/CHANGELOG that describe the boundary." },
+
+  { "utterance": "who is the singer Radiohead", "expect": "music", "must_not": [] },
+  { "utterance": "look up the artist Radiohead", "expect": "music", "must_not": [] },
+  { "utterance": "who is the artist behind this painting", "expect": null, "must_not": ["music"], "note": "a real risk code review found: 'who is the artist *' was dropped from music's own routing.patterns for exactly this reason - a literal pattern match wins immediately over the model, and 'artist' alone is overloaded outside music. Kept as a permanent regression guard against re-adding that pattern." },
+  { "utterance": "tell me about the band Radiohead", "expect": "knowledge", "must_not": ["music"], "note": "a real, documented collision: knowledge's own 'tell me about *' pattern sorts before music's own patterns (loadAllManifests() is id-sorted, k before m) and a literal pattern match wins immediately - music dropped this phrasing from its own routing.patterns entirely since it could never actually fire behind knowledge's." },
+
+  { "utterance": "translate hello to spanish", "expect": "translate", "must_not": [] },
+  { "utterance": "translate good morning into french", "expect": "translate", "must_not": [] },
+
+  { "utterance": "search the web for the tallest mountain", "expect": "websearch", "must_not": [] },
+  { "utterance": "search online for today's headlines", "expect": "websearch", "must_not": [] },
+  { "utterance": "look up the artist Radiohead online", "expect": "music", "must_not": ["websearch"], "note": "a real, confirmed collision code review found: websearch's own routing.patterns originally included 'look up * online', which matches this utterance too - music's 'look up the artist *' wins the tie (sorts first by id) and captures 'Radiohead online' as a polluted artist name. Dropped 'look up * online' from websearch entirely rather than accept the collision; kept as a permanent regression guard." },
+
+  { "utterance": "add milk to the shopping list", "expect": "list-add", "must_not": [] },
+  { "utterance": "put bread on the shopping list", "expect": "list-add", "must_not": [] },
+  { "utterance": "what's on my shopping list", "expect": "list-view", "must_not": [] },
+  { "utterance": "what do I need to buy", "expect": "list-view", "must_not": [] },
+
+  { "utterance": "remind me at 6 to call Nadia", "expect": "remind", "must_not": [] },
+  { "utterance": "remind me tomorrow at noon to walk the dog", "expect": "remind", "must_not": [] },
+
+  { "utterance": "set a timer for ten minutes", "expect": "timer", "must_not": [] },
+  { "utterance": "set a timer for an hour", "expect": "timer", "must_not": [] },
+
+  { "utterance": "turn on the living room light", "expect": "lights-on", "must_not": [] },
+  { "utterance": "turn off the kitchen light", "expect": "lights-off", "must_not": [] },
+  { "utterance": "lock the front door", "expect": null, "must_not": ["lock-doors"], "note": "lock-doors is consequential: true and declares no routing.patterns by design - it must never win route()'s own deterministic Tier 1 floor (backend/tests/turnEngine.test.ts has the direct route()-level proof, including that it still appears as a real Tier 2 candidate); this corpus format has no way to assert 'a real ranked candidate, just never the winner', so this row only pins the winner side." }
 ]

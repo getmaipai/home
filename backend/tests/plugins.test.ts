@@ -2,11 +2,17 @@ import { describe, expect, test, beforeEach } from "bun:test";
 import { TestClient } from "./client";
 import { resetDb } from "./reset-db";
 import { __resetThrottleForTests } from "@/lib/secretThrottle";
+import { __resetLlmSupervisorForTests } from "@/lib/llmSupervisor";
+import { setHouseholdSettingValue } from "@/lib/settings";
 import { listPackageIds, loadPackage, loadManifestOnly, registerAllPackageNotificationTypes, warmPackage } from "@/lib/plugins";
+import { db } from "@/db";
+import { scheduledJobs } from "@/db/schema";
+import { eq } from "drizzle-orm";
 
 beforeEach(() => {
   resetDb();
   __resetThrottleForTests();
+  __resetLlmSupervisorForTests();
 });
 
 describe("the bundled remember package", () => {
@@ -118,6 +124,107 @@ describe("the bundled trivia package", () => {
     expect(loaded.value.manifest.permissions).toContain("net:opentdb.com");
     expect(loaded.value.recipe.inputs).toEqual([]);
     expect(loaded.value.recipe.steps.length).toBeGreaterThan(0);
+  });
+});
+
+// The first package to hand a household member's own free-typed text
+// straight to the `compute` step (step 7) rather than a package's own
+// hardcoded template - unlike weather/define/joke/trivia above, no
+// network call to avoid, so this one runs for real, deterministically
+// and offline, in every test run rather than only being conformance-
+// fixture-covered.
+describe("the bundled math package", () => {
+  test("is discoverable and its manifest + recipe validate against spec's schemas", () => {
+    expect(listPackageIds()).toContain("math");
+    const loaded = loadPackage("math");
+    expect(loaded.ok).toBe(true);
+    if (!loaded.ok) return;
+    expect(loaded.value.manifest.id).toBe("math");
+    expect(loaded.value.manifest.permissions).toEqual([]);
+    expect(loaded.value.recipe.steps.length).toBeGreaterThan(0);
+  });
+});
+
+describe("the bundled convert package", () => {
+  test("is discoverable and its manifest + recipe validate against spec's schemas", () => {
+    expect(listPackageIds()).toContain("convert");
+    const loaded = loadPackage("convert");
+    expect(loaded.ok).toBe(true);
+    if (!loaded.ok) return;
+    expect(loaded.value.manifest.id).toBe("convert");
+    expect(loaded.value.manifest.permissions).toEqual([]);
+    expect(loaded.value.recipe.steps.length).toBeGreaterThan(0);
+  });
+});
+
+describe("the bundled translate package", () => {
+  test("is discoverable and its manifest + recipe validate against spec's schemas", () => {
+    expect(listPackageIds()).toContain("translate");
+    const loaded = loadPackage("translate");
+    expect(loaded.ok).toBe(true);
+    if (!loaded.ok) return;
+    expect(loaded.value.manifest.id).toBe("translate");
+    expect(loaded.value.manifest.permissions).toEqual(["llm:complete"]);
+    expect(loaded.value.recipe.steps.length).toBeGreaterThan(0);
+  });
+});
+
+describe("the bundled websearch package", () => {
+  test("is discoverable and its manifest + recipe validate against spec's schemas", () => {
+    expect(listPackageIds()).toContain("websearch");
+    const loaded = loadPackage("websearch");
+    expect(loaded.ok).toBe(true);
+    if (!loaded.ok) return;
+    expect(loaded.value.manifest.id).toBe("websearch");
+    expect(loaded.value.manifest.permissions).toEqual(["integration:searxng", "llm:complete"]);
+    expect(loaded.value.recipe.steps.length).toBeGreaterThan(0);
+  });
+});
+
+describe("the bundled step-8 packages (lists, reminders, timers)", () => {
+  const cases: [string, string[]][] = [
+    ["list-add", ["lists:write"]],
+    ["list-view", ["lists:read"]],
+    ["remind", ["reminders:write"]],
+    ["timer", ["timers:write"]],
+  ];
+  for (const [id, permissions] of cases) {
+    test(`${id} is discoverable and its manifest + recipe validate against spec's schemas`, () => {
+      expect(listPackageIds()).toContain(id);
+      const loaded = loadPackage(id);
+      expect(loaded.ok).toBe(true);
+      if (!loaded.ok) return;
+      expect(loaded.value.manifest.id).toBe(id);
+      expect(loaded.value.manifest.permissions).toEqual(permissions);
+      expect(loaded.value.recipe.steps.length).toBeGreaterThan(0);
+    });
+  }
+});
+
+describe("the bundled step-9 packages (lights, lock)", () => {
+  const cases: [string, string[]][] = [
+    ["lights-on", ["home:light"]],
+    ["lights-off", ["home:light"]],
+    ["lock-doors", ["home:lock"]],
+  ];
+  for (const [id, permissions] of cases) {
+    test(`${id} is discoverable and its manifest + recipe validate against spec's schemas`, () => {
+      expect(listPackageIds()).toContain(id);
+      const loaded = loadPackage(id);
+      expect(loaded.ok).toBe(true);
+      if (!loaded.ok) return;
+      expect(loaded.value.manifest.id).toBe(id);
+      expect(loaded.value.manifest.permissions).toEqual(permissions);
+      expect(loaded.value.recipe.steps.length).toBeGreaterThan(0);
+    });
+  }
+
+  test("lock-doors declares consequential: true and no routing.patterns", () => {
+    const loaded = loadPackage("lock-doors");
+    expect(loaded.ok).toBe(true);
+    if (!loaded.ok) return;
+    expect(loaded.value.manifest.consequential).toBe(true);
+    expect(loaded.value.manifest.routing?.patterns ?? []).toEqual([]);
   });
 });
 
@@ -245,6 +352,251 @@ describe("POST /api/plugins/recall/run", () => {
     const client = await owner();
     const res = await client.post("/api/plugins/recall/run", {});
     expect(res.status).toBe(400);
+  });
+});
+
+describe("POST /api/plugins/math/run", () => {
+  test("runs the recipe end to end: a real compute step evaluation", async () => {
+    const client = await owner();
+    const res = await client.post("/api/plugins/math/run", { expression: "15 * 12" });
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { reply?: { text: string } };
+    expect(body.reply?.text).toBe("180");
+  });
+
+  // Names what this actually exercises: sqrt(), not unit conversion -
+  // real unit-conversion coverage (compute's "X unit to unit" syntax)
+  // lives in the convert package's own tests below, since that's the
+  // package scoped to that syntax.
+  test("supports sqrt(), via compute's own restricted evaluator", async () => {
+    const client = await owner();
+    const res = await client.post("/api/plugins/math/run", { expression: "sqrt(144)" });
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { reply?: { text: string } };
+    expect(body.reply?.text).toBe("12");
+  });
+
+  // A real gap found while building this package: a malformed expression
+  // (compute's own restricted evaluator can't parse "plus" as an
+  // operator) used to propagate as an unhandled error all the way past
+  // this route - runPlugin() had no case for ComputeError, only
+  // HostError, so it fell through to `throw err` and Hono's own
+  // catch-all returned a bare 500 instead of a clean, specific 400. This
+  // is the regression test for that fix (lib/plugins.ts, spec's own
+  // recipe-interpreter.ts on both TS and Python). The exact message is
+  // asserted (not just a substring that's always present because the
+  // input round-trips into it) so a regression in evaluateExpression's
+  // own message-generation logic - not just its ComputeError-ness -
+  // would fail this test too.
+  test("400s with a clear message for a malformed expression, not a 500", async () => {
+    const client = await owner();
+    const res = await client.post("/api/plugins/math/run", { expression: "15 plus 12" });
+    expect(res.status).toBe(400);
+    const body = (await res.json()) as { error?: string };
+    expect(body.error).toBe('"15 plus 12" failed to evaluate: Undefined symbol plus');
+  });
+});
+
+describe("POST /api/plugins/convert/run", () => {
+  test("runs the recipe end to end: compute's own unit-conversion syntax", async () => {
+    const client = await owner();
+    const res = await client.post("/api/plugins/convert/run", { expression: "5 miles to km" });
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { reply?: { text: string } };
+    expect(body.reply?.text).toBe("8.04672 km");
+  });
+
+  // mathjs has no currency units - this is the honest boundary
+  // documented in the package's own README, not a bug: currency needs a
+  // separate package with a real exchange-rate lookup.
+  test("400s for currency, which isn't a unit mathjs knows", async () => {
+    const client = await owner();
+    const res = await client.post("/api/plugins/convert/run", { expression: "5 dollars to euros" });
+    expect(res.status).toBe(400);
+    const body = (await res.json()) as { error?: string };
+    expect(body.error).toBe('"5 dollars to euros" failed to evaluate: Undefined symbol dollars');
+  });
+});
+
+describe("POST /api/plugins/translate/run", () => {
+  // No real chat model in tests - lib/llm.ts's own default (no engine
+  // configured) resolves to a deterministic stub client (the same one
+  // backend/tests/llm.test.ts and packageHost.test.ts use), so this
+  // proves the real recipe -> llm_complete -> host.llm.complete ->
+  // lib/llm.ts wiring end to end without needing a real model loaded,
+  // not real translation quality (that's the model's own job).
+  test("runs the recipe end to end: llm_complete through the real host, stub chat backend", async () => {
+    const client = await owner();
+    const res = await client.post("/api/plugins/translate/run", { expression: "hello world to spanish" });
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { reply?: { text: string } };
+    expect(body.reply?.text).toContain("hello world to spanish");
+    expect(body.reply?.text).toContain("[stub model: no real model loaded, this is a canned reply]");
+  });
+});
+
+describe("POST /api/plugins/websearch/run", () => {
+  // A real local SearXNG stand-in (Bun.serve) plus the stub chat backend
+  // (no real engine configured in tests) - proves the real recipe chain
+  // end to end: integration.call("searxng", "search", ...) -> the real
+  // formatted-string binding -> llm_complete interpolating it into a
+  // prompt -> pick -> format. Not real search or answer quality (that
+  // needs a real SearXNG instance and a real model, see this package's
+  // own quality_scale.yaml).
+  test("runs the recipe end to end: integration.call through to llm_complete, stub chat backend", async () => {
+    const server = Bun.serve({
+      port: 0,
+      fetch: () =>
+        Response.json({
+          results: [{ title: "Mount Everest", url: "https://example.com/everest", content: "The tallest mountain above sea level." }],
+        }),
+    });
+    try {
+      setHouseholdSettingValue("search.searxng_url", `http://127.0.0.1:${server.port}`);
+      const client = await owner();
+      const res = await client.post("/api/plugins/websearch/run", { expression: "the tallest mountain" });
+      expect(res.status).toBe(200);
+      const body = (await res.json()) as { reply?: { text: string } };
+      expect(body.reply?.text).toContain("[stub model: no real model loaded, this is a canned reply]");
+      expect(body.reply?.text).toContain("Mount Everest");
+    } finally {
+      server.stop(true);
+    }
+  });
+
+  test("400s with a clear message when SearXNG isn't set up yet", async () => {
+    const client = await owner();
+    const res = await client.post("/api/plugins/websearch/run", { expression: "the tallest mountain" });
+    expect(res.status).toBe(400);
+    const body = (await res.json()) as { error?: string };
+    expect(body.error).toContain("isn't set up yet");
+  });
+});
+
+describe("POST /api/plugins/list-add/run and list-view/run", () => {
+  test("adds an item, then view reads it back - the real shopping list, not a canned reply", async () => {
+    const client = await owner();
+    const addRes = await client.post("/api/plugins/list-add/run", { item: "milk" });
+    expect(addRes.status).toBe(200);
+    const addBody = (await addRes.json()) as { reply?: { text: string } };
+    expect(addBody.reply?.text).toBe("Added milk to your shopping list.");
+
+    const viewRes = await client.post("/api/plugins/list-view/run", {});
+    expect(viewRes.status).toBe(200);
+    const viewBody = (await viewRes.json()) as { reply?: { text: string } };
+    expect(viewBody.reply?.text).toBe("milk");
+  });
+
+  test("view reports an empty list plainly", async () => {
+    const client = await owner();
+    const res = await client.post("/api/plugins/list-view/run", {});
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { reply?: { text: string } };
+    expect(body.reply?.text).toBe("Your shopping list is empty.");
+  });
+});
+
+describe("POST /api/plugins/remind/run", () => {
+  test("runs the recipe end to end: real chrono-node parsing, a real scheduled core job", async () => {
+    const client = await owner();
+    const res = await client.post("/api/plugins/remind/run", { expression: "at 6 to call Nadia" });
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { reply?: { text: string } };
+    expect(body.reply?.text).toContain("call Nadia");
+    const rows = db.select().from(scheduledJobs).where(eq(scheduledJobs.job, "reminders.fire")).all();
+    expect(rows).toHaveLength(1);
+    expect(rows[0]!.kind).toBe("core");
+  });
+
+  test("400s with a clear message when no time phrase is found", async () => {
+    const client = await owner();
+    const res = await client.post("/api/plugins/remind/run", { expression: "call Nadia" });
+    expect(res.status).toBe(400);
+    const body = (await res.json()) as { error?: string };
+    expect(body.error).toContain("figure out when");
+  });
+});
+
+describe("POST /api/plugins/timer/run", () => {
+  test("runs the recipe end to end: exact deterministic duration parsing, a real scheduled core job", async () => {
+    const client = await owner();
+    const before = Date.now();
+    const res = await client.post("/api/plugins/timer/run", { expression: "ten minutes" });
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { reply?: { text: string } };
+    expect(body.reply?.text).toContain("ten minutes");
+    const rows = db.select().from(scheduledJobs).where(eq(scheduledJobs.job, "timers.fire")).all();
+    expect(rows).toHaveLength(1);
+    const nextRunAt = new Date(rows[0]!.nextRunAt).getTime();
+    expect(nextRunAt).toBeGreaterThanOrEqual(before + 600_000);
+    expect(nextRunAt).toBeLessThan(before + 601_000);
+  });
+
+  test("400s with a clear message for a duration this grammar doesn't cover", async () => {
+    const client = await owner();
+    const res = await client.post("/api/plugins/timer/run", { expression: "a while" });
+    expect(res.status).toBe(400);
+  });
+});
+
+describe("POST /api/plugins/lights-on and lights-off/run", () => {
+  test("runs the recipe end to end: a real POST to Home Assistant's own REST shape", async () => {
+    let seenPath = "";
+    let seenBody: unknown = null;
+    const server = Bun.serve({
+      port: 0,
+      fetch: async (req) => {
+        seenPath = new URL(req.url).pathname;
+        seenBody = await req.json();
+        return Response.json({ context: { id: "abc" } });
+      },
+    });
+    try {
+      setHouseholdSettingValue("home.base_url", `http://127.0.0.1:${server.port}`);
+      setHouseholdSettingValue("home.access_token", "test-token");
+      const client = await owner();
+      const res = await client.post("/api/plugins/lights-on/run", { room: "living room" });
+      expect(res.status).toBe(200);
+      const body = (await res.json()) as { reply?: { text: string } };
+      expect(body.reply?.text).toBe("Turning on the living room light.");
+      expect(seenPath).toBe("/api/services/light/turn_on");
+      expect(seenBody).toEqual({ area: "living room" });
+    } finally {
+      server.stop(true);
+    }
+  });
+
+  test("400s with a clear message when Home Assistant isn't set up yet", async () => {
+    const client = await owner();
+    const res = await client.post("/api/plugins/lights-off/run", { room: "kitchen" });
+    expect(res.status).toBe(400);
+    const body = (await res.json()) as { error?: string };
+    expect(body.error).toContain("isn't set up yet");
+  });
+});
+
+describe("POST /api/plugins/lock-doors/run", () => {
+  test("runs the recipe end to end: a real POST to Home Assistant's own lock.lock service", async () => {
+    let seenPath = "";
+    const server = Bun.serve({
+      port: 0,
+      fetch: async (req) => {
+        seenPath = new URL(req.url).pathname;
+        return Response.json({ context: { id: "abc" } });
+      },
+    });
+    try {
+      setHouseholdSettingValue("home.base_url", `http://127.0.0.1:${server.port}`);
+      setHouseholdSettingValue("home.access_token", "test-token");
+      const client = await owner();
+      const res = await client.post("/api/plugins/lock-doors/run", {});
+      expect(res.status).toBe(200);
+      const body = (await res.json()) as { reply?: { text: string } };
+      expect(body.reply?.text).toBe("Locking the front door.");
+      expect(seenPath).toBe("/api/services/lock/lock");
+    } finally {
+      server.stop(true);
+    }
   });
 });
 

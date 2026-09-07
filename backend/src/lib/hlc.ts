@@ -75,6 +75,7 @@ export const HLC_BEARING_TABLES = [
   "relationships",
   "grants",
   "routing_embeddings",
+  "lists",
 ] as const;
 
 /** Seeds from every hlc already on disk, across every table that stamps
@@ -87,7 +88,7 @@ export const HLC_BEARING_TABLES = [
 export function seedHlcFromDatabase(): void {
   // Every row, not a SQL-side reduction to one per table: a review,
   // 2026-09-06, named the real cost this has as data grows (a household's
-  // full history, eventually tens of thousands of rows across all 12
+  // full history, eventually tens of thousands of rows across all 13
   // tables) - genuinely O(total rows), but a one-time boot cost, not a
   // per-request one, and each row is just a string split plus a numeric
   // comparison. Revisit if boot time actually becomes visible at real

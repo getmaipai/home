@@ -1,0 +1,85 @@
+// Step 9's own widgets half (docs/plans/session-d-packages-and-store.md):
+// the frozen D-to-E contract (docs/plans/wave-2.md, "Widgets:
+// manifest gains contributes.widgets[]... GET /api/widgets lists the
+// actor's available widgets; GET /api/widgets/:package/:id/data returns
+// {as_of, items}... served from the package cache, never a live fetch
+// in the request path unless the cache is empty").
+//
+// Deliberately no new data-shaping mechanism per package: a widget's
+// `inputs` are resolved and run exactly the way `warmPackage()`
+// (lib/plugins.ts) already resolves `warm.keys` - "run the recipe with
+// realistic inputs the ordinary way." `host.fetch` is already
+// cache-aware (lib/packageCache.ts), so a package whose own warm job
+// already kept its cache fresh answers instantly here too; one that
+// hasn't warmed yet does one real fetch, matching "never a live fetch...
+// unless the cache is empty" literally rather than needing a second,
+// parallel cache-peeking code path. The reply text itself - already
+// each package's own tested, human-readable summary - becomes the
+// widget's one item; no bespoke "produce structured widget data"
+// function per package, the same "one definition, one implementation"
+// reasoning the org's own standards state outright.
+import { listPackageIds, loadManifestOnly, meetsMinRole, runPlugin } from "@/lib/plugins";
+import type { PersonRow } from "@/types";
+
+export interface WidgetDescriptor {
+  package: string;
+  id: string;
+  title: string;
+  size: "card" | "row";
+  refresh_s: number;
+}
+
+export interface WidgetItem {
+  title: string;
+  subtitle?: string;
+  value?: string;
+  icon?: string;
+  href?: string;
+  image?: string;
+}
+
+export interface WidgetData {
+  as_of: string;
+  items: WidgetItem[];
+}
+
+export type OpResult<T> = { ok: true; status: 200; value: T } | { ok: false; status: 400 | 403 | 404; error: string };
+
+/** Every widget the actor's own role clears, across every bundled or
+ * installed package - the same min_role floor `runPlugin()` itself
+ * enforces before a widget's own data route ever runs its recipe. */
+export function listWidgets(actor: { role: string }): WidgetDescriptor[] {
+  const out: WidgetDescriptor[] = [];
+  for (const id of listPackageIds()) {
+    const loaded = loadManifestOnly(id);
+    if (!loaded.ok) continue;
+    const manifest = loaded.value;
+    if (!meetsMinRole(actor.role, manifest.min_role)) continue;
+    for (const widget of manifest.contributes?.widgets ?? []) {
+      out.push({ package: id, id: widget.id, title: widget.title, size: widget.size, refresh_s: widget.refresh_s });
+    }
+  }
+  return out;
+}
+
+/** Runs the declared widget's own package recipe with its own declared
+ * `inputs` (household-resolved state today only in name - like
+ * `warm.keys` before it, a widget's own `inputs` are still literal
+ * placeholders until a real settings-resolution pass exists; a known,
+ * shared gap, not something this step invented) and wraps the resulting
+ * reply into one widget item. Never a live network call OF ITS OWN: the
+ * underlying `host.fetch` is what's cache-aware, and this is exactly the
+ * same call a live chat turn or a warm tick already makes. */
+export async function getWidgetData(actor: PersonRow, packageId: string, widgetId: string): Promise<OpResult<WidgetData>> {
+  const loaded = loadManifestOnly(packageId);
+  if (!loaded.ok) return { ok: false, status: 404, error: "no such package" };
+  const manifest = loaded.value;
+  const widget = manifest.contributes?.widgets?.find((w) => w.id === widgetId);
+  if (!widget) return { ok: false, status: 404, error: "no such widget" };
+  if (!meetsMinRole(actor.role, manifest.min_role)) return { ok: false, status: 403, error: `${packageId} needs role ${manifest.min_role} or higher` };
+
+  const result = await runPlugin(packageId, actor, (widget.inputs ?? {}) as Record<string, unknown>);
+  if (!result.ok) return { ok: false, status: result.status, error: result.error };
+  const text = result.value.reply?.text ?? "";
+  return { ok: true, status: 200, value: { as_of: new Date().toISOString(), items: [{ title: text }] } };
+}

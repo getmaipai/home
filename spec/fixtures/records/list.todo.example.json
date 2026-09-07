@@ -1,0 +1,15 @@
+{
+  "id": "list-g7h8i9",
+  "scope": "person",
+  "person": "person-a1b2c3",
+  "kind": "todo",
+  "title": "To-Do List",
+  "items": [
+    { "id": "item-j0k1l2", "text": "call the vet", "done": false, "due_at": "2026-09-08T17:00:00Z", "created_at": "2026-09-06T18:05:00Z" }
+  ],
+  "source": "hub",
+  "created_at": "2026-09-06T18:05:00Z",
+  "updated_at": "2026-09-06T18:05:00Z",
+  "deleted_at": null,
+  "hlc": "1757181900000:0:a1b2c3"
+}

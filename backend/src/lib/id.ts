@@ -118,6 +118,16 @@ export function newReceivedBackupId(): string {
   return `recvbak-${randomSuffix(10)}`;
 }
 
+/** Matches spec/schemas/list.schema.json's `^list-[a-z0-9]{6,}$`. */
+export function newListId(): string {
+  return `list-${randomSuffix(10)}`;
+}
+
+/** Matches spec/schemas/list.schema.json's own item `^item-[a-z0-9]{6,}$`. */
+export function newListItemId(): string {
+  return `item-${randomSuffix(10)}`;
+}
+
 // Not a spec-shaped id (nas_mounts is hub-internal, declaration only -
 // see db/schema.ts's own comment).
 export function newNasMountId(): string {

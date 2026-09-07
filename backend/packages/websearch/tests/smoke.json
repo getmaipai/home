@@ -1,0 +1,19 @@
+{
+  "description": "Smoke fixture for the bundled websearch package: proves the recipe wiring (integration.call + llm_complete + pick + format) executes without throwing. Both the search step and the model reply are canned by lib/smoke.ts's HostEmulator, not real search results or a real answer - lib/smoke.ts's recipe_fixture kind runs against a HostEmulator, never a real SearXNG instance or chat model.",
+  "inputs": { "expression": "the tallest mountain in the world" },
+  "host_setup": {
+    "fetch": {
+      "searxng:search": "1. Mount Everest (https://example.com/everest) - The tallest mountain above sea level."
+    }
+  },
+  "expected": {
+    "reply": {
+      "text": "[emulator: no model loaded, this is a canned reply]",
+      "speech": "[emulator: no model loaded, this is a canned reply]"
+    },
+    "actions": [],
+    "scheduled_jobs": [],
+    "home_calls": [],
+    "memory_added": []
+  }
+}

@@ -1,0 +1,39 @@
+{
+  "id": "almanac-time",
+  "version": "0.1.0",
+  "kind": "plugin",
+  "category": "Info",
+  "display": "Current Time",
+  "description": "The current time, spoken naturally (2026-09-06, step 7) - one of the almanac's five small lookups (legacy had five separate tools for this).",
+  "author": "MaiPai",
+  "license": "AGPL-3.0",
+  "homepage": "https://github.com/getmaipai/home",
+  "routing": {
+    "examples": [
+      "what time is it",
+      "what's the time",
+      "do you know what time it is",
+      "tell me the time",
+      "what time is it right now"
+    ],
+    "patterns": ["what time is it", "what's the time", "tell me the time"]
+  },
+  "requires": [],
+  "optional": [],
+  "platforms": ["home"],
+  "min_role": "child",
+  "consequential": false,
+  "offline": "full",
+  "config": [],
+  "data_sources": [],
+  "permissions": [],
+  "notifications": [],
+  "backup": "exclude",
+  "background": false,
+  "contributes": {},
+  "min_app": "0.1.0",
+  "timeout_ms": 8000,
+  "tier": 1,
+  "quality_scale": "bronze",
+  "smoke": { "kind": "deno_test" }
+}
