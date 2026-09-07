@@ -31,6 +31,7 @@ import {
 import { TooltipIconButton } from "@/kit/assistant-ui/tooltip-icon-button";
 import { ForgetThisMenuItem, ListenButton, RememberThisButton, RememberThisMenuItem } from "@/apps/chat/chatActionBar";
 import { MemoryUpdatedChip } from "@/apps/chat/chatMemoryChip";
+import { ChatSourceCaption } from "@/apps/chat/chatSourceCaption";
 import { DayBoundaryProvider, DayDivider, MessageTimestamp } from "@/apps/chat/chatDayDivider";
 import { Button } from "@/kit/ui/button";
 import { Skeleton } from "@/kit/ui/skeleton";
@@ -539,6 +540,7 @@ const AssistantMessage: FC = () => {
           }}
         </MessagePrimitive.GroupedParts>
         <MessageError />
+        <ChatSourceCaption />
         <MemoryUpdatedChip />
       </div>
 

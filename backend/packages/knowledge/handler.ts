@@ -56,14 +56,19 @@ if (import.meta.main) {
       { topic }: { topic: string },
       extra: { sendRequest: (req: unknown, schema: unknown) => Promise<{ value: unknown }> },
     ) => {
-      let reply: { text: string; speech: string };
+      // Fix B (docs/dev.md's "Chat reliability: the 2026-09-07 incident
+      // and the five fixes"): a real fetch failure is reported as a
+      // typed `error`, never a fabricated `reply` - the caller
+      // (denoHost.ts's callTier1Handle()) decides the household-facing
+      // fallback text (the manifest's own `fallback_reply`).
       try {
         const data = await hostFetch(extra, `https://en.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(topic)}`);
-        reply = summarizeWikipediaResponse(topic, data);
-      } catch {
-        reply = { text: "I couldn't look that up right now.", speech: "I couldn't look that up right now." };
+        const reply = summarizeWikipediaResponse(topic, data);
+        return { content: [{ type: "text", text: JSON.stringify({ reply, actions: [] }) }] };
+      } catch (err) {
+        const error = { code: "network_unreachable", message: err instanceof Error ? err.message : String(err) };
+        return { content: [{ type: "text", text: JSON.stringify({ error }) }] };
       }
-      return { content: [{ type: "text", text: JSON.stringify({ reply, actions: [] }) }] };
     },
   );
 

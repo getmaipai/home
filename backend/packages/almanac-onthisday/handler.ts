@@ -47,17 +47,22 @@ if (import.meta.main) {
     "handle",
     { inputSchema: {} },
     async (_args: Record<string, never>, extra: { sendRequest: (req: unknown, schema: unknown) => Promise<{ value: unknown }> }) => {
-      let reply: Reply;
+      // Fix B (docs/dev.md's "Chat reliability: the 2026-09-07 incident
+      // and the five fixes"): a real fetch failure is reported as a
+      // typed `error`, never a fabricated `reply` - the caller
+      // (denoHost.ts's callTier1Handle()) decides the household-facing
+      // fallback text (the manifest's own `fallback_reply`).
       try {
         const now = new Date();
         const month = String(now.getMonth() + 1).padStart(2, "0");
         const day = String(now.getDate()).padStart(2, "0");
         const data = await hostFetch(extra, `https://en.wikipedia.org/api/rest_v1/feed/onthisday/events/${month}/${day}`);
-        reply = summarizeOnThisDay(data);
-      } catch {
-        reply = { text: "I couldn't look that up right now.", speech: "I couldn't look that up right now." };
+        const reply = summarizeOnThisDay(data);
+        return { content: [{ type: "text", text: JSON.stringify({ reply, actions: [] }) }] };
+      } catch (err) {
+        const error = { code: "network_unreachable", message: err instanceof Error ? err.message : String(err) };
+        return { content: [{ type: "text", text: JSON.stringify({ error }) }] };
       }
-      return { content: [{ type: "text", text: JSON.stringify({ reply, actions: [] }) }] };
     },
   );
   const transport = new StdioServerTransport();

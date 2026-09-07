@@ -673,6 +673,127 @@ describe("buildConversationWindow() (step 3)", () => {
     expect(window.summaryLine).toBeDefined();
     expect(window.summaryLine as string).toContain("Riff asked about the weather earlier.");
   });
+
+  // Fix B3 (docs/dev.md's "Chat reliability: the 2026-09-07 incident and
+  // the five fixes"): live-found 2026-09-07, a Tier 1 handler's own canned
+  // failure text entered the window as `assistant`, so the model later
+  // read it as something IT had said and imitated it unprompted the very
+  // next turn. A non-model turn must never produce an `assistant` message
+  // in the window - only a `system` note describing what really happened,
+  // using the package's own manifest display name (never the bare id).
+  test("a plugin turn enters the window as a system note naming the package's display name, never as assistant", async () => {
+    const { actor } = await owner();
+    const conv = resolveOrCreateConversation(actor, "chat");
+    if (!conv.ok) throw new Error(conv.error);
+    logTurn(actor, "chat", "play some jazz", {
+      reply: { text: "Playing jazz now." },
+      source: "plugin",
+      plugin_id: "music",
+      safety: SAFE,
+      conversation_id: conv.value.id,
+      turn_id: "turn-b3-plugin",
+    });
+
+    const window = buildConversationWindow(conv.value);
+    expect(window.messages.some((m) => m.role === "assistant" && m.content === "Playing jazz now.")).toBe(false);
+    const note = window.messages.find((m) => m.role === "system" && m.content.includes("Playing jazz now."));
+    expect(note).toBeDefined();
+    expect(note!.content).toContain("Music"); // music/manifest.json's own `display`, not the bare id "music"
+  });
+
+  // A code review (2026-09-07) found this uncovered: attemptTier2Tools()
+  // (turnEngine.ts) joins two tools' own ids with "+" ("currency+weather")
+  // for a turn that called both, and that compound string is never a real
+  // package id `loadManifestOnly()` resolves on its own - the bare "+"-
+  // joined id was leaking into the window note instead of two real
+  // display names.
+  test("a plugin turn with a Tier 2 multi-tool id (\"a+b\") resolves each package's own display name, not the raw joined id", async () => {
+    const { actor } = await owner();
+    const conv = resolveOrCreateConversation(actor, "chat");
+    if (!conv.ok) throw new Error(conv.error);
+    logTurn(actor, "chat", "convert 5 dollars and check the weather", {
+      reply: { text: "5 dollars is about 4.6 euros. It's sunny." },
+      source: "plugin",
+      plugin_id: "currency+weather",
+      safety: SAFE,
+      conversation_id: conv.value.id,
+      turn_id: "turn-b3-multitool",
+    });
+
+    const window = buildConversationWindow(conv.value);
+    const note = window.messages.find((m) => m.role === "system" && m.content.includes("answered:"));
+    expect(note).toBeDefined();
+    expect(note!.content).not.toContain("currency+weather");
+    expect(note!.content).toContain("Currency"); // currency/manifest.json's own `display`
+    expect(note!.content).toContain("Weather"); // weather/manifest.json's own `display`
+  });
+
+  test("a plugin_error turn enters the window as a system note, never speaking the model's own fallback text as assistant", async () => {
+    const { actor } = await owner();
+    const conv = resolveOrCreateConversation(actor, "chat");
+    if (!conv.ok) throw new Error(conv.error);
+    logTurn(actor, "chat", "play some jazz", {
+      reply: { text: "Sorry, I couldn't do that." },
+      source: "plugin_error",
+      plugin_id: "music",
+      safety: SAFE,
+      conversation_id: conv.value.id,
+      turn_id: "turn-b3-plugin-error",
+    });
+
+    const window = buildConversationWindow(conv.value);
+    expect(window.messages.some((m) => m.role === "assistant" && m.content === "Sorry, I couldn't do that.")).toBe(false);
+    const note = window.messages.find((m) => m.role === "system" && m.content.includes("could not answer"));
+    expect(note).toBeDefined();
+  });
+
+  test("a safety_refuse turn enters the window as a system note, not as the model's own refusal text", async () => {
+    const { actor } = await owner();
+    const conv = resolveOrCreateConversation(actor, "chat");
+    if (!conv.ok) throw new Error(conv.error);
+    logTurn(actor, "chat", "something unsafe", {
+      reply: { text: "I can't help with that." },
+      source: "safety_refuse",
+      safety: SAFE,
+      conversation_id: conv.value.id,
+      turn_id: "turn-b3-safety",
+    });
+
+    const window = buildConversationWindow(conv.value);
+    expect(window.messages.some((m) => m.role === "assistant")).toBe(false);
+    expect(window.messages.some((m) => m.role === "system" && m.content.includes("safety rules declined"))).toBe(true);
+  });
+
+  test("a command turn enters the window as a system note naming the command's own trigger phrase", async () => {
+    const { actor } = await owner();
+    const conv = resolveOrCreateConversation(actor, "chat");
+    if (!conv.ok) throw new Error(conv.error);
+    const created = createCommand(actor, "good night house", "child", { kind: "reply", text: "Locking up now." });
+    if (!created.ok) throw new Error(created.error);
+    logTurn(actor, "chat", "good night house", {
+      reply: { text: "Locking up now." },
+      source: "command",
+      command_id: created.value.id,
+      safety: SAFE,
+      conversation_id: conv.value.id,
+      turn_id: "turn-b3-command",
+    });
+
+    const window = buildConversationWindow(conv.value);
+    expect(window.messages.some((m) => m.role === "assistant" && m.content === "Locking up now.")).toBe(false);
+    expect(window.messages.some((m) => m.role === "system" && m.content.includes("good night house"))).toBe(true);
+  });
+
+  test("a model turn still enters the window as assistant, unchanged", async () => {
+    const { actor } = await owner();
+    const conv = resolveOrCreateConversation(actor, "chat");
+    if (!conv.ok) throw new Error(conv.error);
+    logTurn(actor, "chat", "hi", { reply: { text: "hello there" }, source: "model", safety: SAFE, conversation_id: conv.value.id, turn_id: "turn-b3-model" });
+
+    const window = buildConversationWindow(conv.value);
+    expect(window.messages.some((m) => m.role === "assistant" && m.content === "hello there")).toBe(true);
+    expect(window.messages.some((m) => m.role === "system")).toBe(false);
+  });
 });
 
 describe("maybeRefreshConversationSummary() (step 3: runs when due, not before)", () => {

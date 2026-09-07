@@ -33,13 +33,14 @@
 // when no real model is running yet.
 import { eq, and, or, not, lt, gt, isNull, inArray, desc } from "drizzle-orm";
 import { db, sqlite } from "@/db";
-import { conversationTurns, conversations, people, memoryRecords } from "@/db/schema";
+import { conversationTurns, conversations, people, memoryRecords, commands } from "@/db/schema";
 import { newConversationTurnId, newConversationId } from "@/lib/id";
 import { canAccessPerson } from "@/lib/access";
 import { speakerAgeBand } from "@/lib/ageBand";
 import { getHouseholdSettingValue, getPersonSettingValue } from "@/lib/settings";
 import { complete, type LlmMessage } from "@/lib/llm";
 import { getEngineStatus } from "@/lib/llmSupervisor";
+import { loadManifestOnly } from "@/lib/plugins";
 import { remember } from "@/lib/memory";
 import { nextHlc } from "@/lib/hlc";
 import { Conversation } from "@maipai/spec/gen/ts/conversation.js";
@@ -587,6 +588,76 @@ export interface ConversationWindow {
   summaryLine?: string;
 }
 
+/** A household command's own trigger phrase, for the `command`/
+ * `command_error` notes below - the closest thing a CommandRow has to a
+ * display name (lib/commands.ts's own CommandRow carries no separate
+ * `name` field). Queried directly against the `commands` table rather
+ * than through lib/commands.ts's listCommands(): that module imports
+ * lib/turnEngine.ts (matchPattern), which imports THIS file, so pulling
+ * it in here would close a real import cycle for one lookup this file
+ * can already do itself with the schema it has open. */
+function commandTriggerFor(commandId: string): string | null {
+  const row = db.select({ trigger: commands.trigger }).from(commands).where(eq(commands.id, commandId)).get();
+  return row?.trigger ?? null;
+}
+
+/** A `plugin_id`'s own display name(s), never the bare id - a code review
+ * (2026-09-07) found this needed to handle more than one package: Tier 2's
+ * `attemptTier2Tools()` (turnEngine.ts) joins two tools' ids with `"+"`
+ * (`"currency+weather"`) when a turn calls both, which is not a real
+ * package id `loadManifestOnly()` will ever resolve on its own - the
+ * bare compound string was leaking straight into the window note instead
+ * of a display name. Splits on the same `"+"` and resolves each piece
+ * independently, joined with " + " for a reader (the model or a chat
+ * bubble), never the raw joined id. */
+function pluginDisplayName(pluginId: string): string {
+  return pluginId
+    .split("+")
+    .map((id) => {
+      const manifest = loadManifestOnly(id);
+      return manifest.ok ? manifest.value.display : id;
+    })
+    .join(" + ");
+}
+
+/** Fix B (docs/dev.md's "Chat reliability: the 2026-09-07 incident and
+ * the five fixes", B3): the exact wording a non-model turn enters the
+ * window as. A `plugin`/`plugin_error` turn's canned or upstream-error
+ * text used to enter the window as `assistant`, so the model read a
+ * Tier 1 handler's own failure text as words it had just said - live-
+ * found 2026-09-07, "should I dye my hair black" misrouted to `music`,
+ * which failed, and the very next turn the model said "I can't look
+ * that up right now" unprompted, imitating what it believed it had just
+ * told the household. A `system` note describes what happened instead,
+ * in nobody's voice. The manifest's own `display` name is used, never
+ * the bare package id (B3's own wording). */
+function nonModelWindowNote(t: ConversationTurnRow): string {
+  switch (t.source) {
+    case "plugin": {
+      const display = t.pluginId ? pluginDisplayName(t.pluginId) : "A package";
+      return `[${display} answered: "${t.replyText}"]`;
+    }
+    case "plugin_error": {
+      const display = t.pluginId ? pluginDisplayName(t.pluginId) : "A package";
+      return `[${display} could not answer.]`;
+    }
+    case "safety_refuse":
+      return "[The household's safety rules declined this request.]";
+    case "command": {
+      const trigger = t.commandId ? commandTriggerFor(t.commandId) : null;
+      return `[Command "${trigger ?? "unknown"}" ran.]`;
+    }
+    case "command_error": {
+      const trigger = t.commandId ? commandTriggerFor(t.commandId) : null;
+      return `[Command "${trigger ?? "unknown"}" failed to run.]`;
+    }
+    case "confirm":
+      return "[The household was asked to confirm before this action ran.]";
+    default:
+      return "[A household action ran.]";
+  }
+}
+
 /** The follow-up-turn context (step 3: "and tomorrow?" needs the prior
  * exchange in the prompt to mean anything, `turnEngine.ts` sends
  * `[system, user]` and nothing else today). The newest
@@ -632,7 +703,13 @@ export function buildConversationWindow(conversation: Conversation): Conversatio
   const messages: LlmMessage[] = [];
   for (const t of windowTurns) {
     messages.push({ role: "user", content: t.userText });
-    messages.push({ role: "assistant", content: t.replyText });
+    // A `model` turn's own reply enters the window in its own voice
+    // (`assistant`); any other source instead gets a `system` note
+    // (nonModelWindowNote(), Fix B3) describing what really happened -
+    // never BOTH, since pushing the raw canned/failure text as `assistant`
+    // too would reintroduce the exact bug B3 fixes (the model reading a
+    // Tier 1 handler's own words as something it had said itself).
+    messages.push(t.source === "model" ? { role: "assistant", content: t.replyText } : { role: "system", content: nonModelWindowNote(t) });
   }
 
   const hasUncoveredOlder = older.length - includedOlder.length > 0;

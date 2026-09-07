@@ -29,6 +29,10 @@ const WidgetItem = z.object({
 const WidgetData = z.object({
   as_of: z.string(),
   items: z.array(WidgetItem),
+  // Fix B (docs/dev.md's "Chat reliability" B2): set only when `items` is
+  // showing a Tier 1 handler's own fallback_reply text, not real data -
+  // see lib/widgets.ts's WidgetData for why this exists.
+  degraded: z.literal(true).optional(),
 });
 
 const listRoute = createRoute({

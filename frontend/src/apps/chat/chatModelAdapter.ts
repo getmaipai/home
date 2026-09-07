@@ -273,7 +273,16 @@ export function createChatModelAdapter(deps: ChatModelAdapterDeps): ChatModelAda
             // in place of it, and never suppressing anything else in the
             // thread.
             if (event.value.crisis_resources) deps.onCrisisResources(event.value.crisis_resources);
-            yield { content: [{ type: "text", text: finalText }] };
+            // Fix B4 (docs/dev.md's "Chat reliability" B4): the same
+            // metadata shape chatHistoryAdapter.ts attaches on reload, so
+            // chatSourceCaption.tsx renders identically whether a message
+            // just streamed in live or came back from GET /api/conversations/
+            // :id/turns - camelCase keys to match that adapter's row fields,
+            // even though TurnValue itself is snake_case on the wire.
+            yield {
+              content: [{ type: "text", text: finalText }],
+              metadata: { custom: { source: event.value.source, pluginId: event.value.plugin_id, commandId: event.value.command_id } },
+            };
           } else {
             sawTerminalEvent = true;
             // A code review (2026-09-04) found this thrown as a plain

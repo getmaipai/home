@@ -111,20 +111,28 @@ if (import.meta.main) {
     { inputSchema: { expression: z.string() } },
     async (args: { expression: string }, extra: { sendRequest: (req: unknown, schema: unknown) => Promise<{ value: unknown }> }) => {
       const parsed = parseCurrencyExpression(args.expression);
-      let reply: Reply;
       if (!parsed) {
+        // Not a fetch failure - a real, honest "I heard you but couldn't
+        // parse it" reply, unaffected by Fix B (docs/dev.md's "Chat
+        // reliability: the 2026-09-07 incident" note): the household
+        // gets told directly, no upstream call was ever attempted.
         const text = `I couldn't understand "${args.expression}" as an amount and two currencies.`;
-        reply = { text, speech: text };
-      } else {
-        try {
-          const url = `https://api.frankfurter.dev/v1/latest?from=${parsed.from}&to=${parsed.to}&amount=${parsed.amount}`;
-          const data = await hostFetch(extra, url);
-          reply = summarizeConversion(data, parsed);
-        } catch {
-          reply = { text: "I couldn't look that up right now.", speech: "I couldn't look that up right now." };
-        }
+        const reply: Reply = { text, speech: text };
+        return { content: [{ type: "text", text: JSON.stringify({ reply, actions: [] }) }] };
       }
-      return { content: [{ type: "text", text: JSON.stringify({ reply, actions: [] }) }] };
+      // Fix B: a real fetch failure is reported as a typed `error`, never
+      // a fabricated `reply` - the caller (denoHost.ts's
+      // callTier1Handle()) decides the household-facing fallback text
+      // (the manifest's own `fallback_reply`).
+      try {
+        const url = `https://api.frankfurter.dev/v1/latest?from=${parsed.from}&to=${parsed.to}&amount=${parsed.amount}`;
+        const data = await hostFetch(extra, url);
+        const reply = summarizeConversion(data, parsed);
+        return { content: [{ type: "text", text: JSON.stringify({ reply, actions: [] }) }] };
+      } catch (err) {
+        const error = { code: "network_unreachable", message: err instanceof Error ? err.message : String(err) };
+        return { content: [{ type: "text", text: JSON.stringify({ error }) }] };
+      }
     },
   );
   const transport = new StdioServerTransport();

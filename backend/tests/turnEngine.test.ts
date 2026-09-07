@@ -1180,6 +1180,41 @@ describe("plugin-vs-skill priority (2026-09-05, a real live-found bug)", () => {
     expect(result.value.source).toBe("plugin");
     expect(result.value.plugin_id).toBe("joke");
   });
+
+  // The real root cause, proven directly at route() rather than only
+  // through the live `storytime-style` package above: a code review found
+  // route()'s own `eligible` pool had no kind check at all, so ANY
+  // skill-kind manifest with a strong embedding match against its own
+  // routing.examples could become route()'s own `winner` outright - not
+  // merely tie with, but literally BE, the plugin decision. The
+  // `bestSkillScore > routed.score` comparison above only ever guards a
+  // DIFFERENT, weaker plugin losing to a skill sitting on the side; it does
+  // nothing when the skill itself is what won, which then crashed into
+  // plugin_error the moment runTurn() tried to runPlugin() a package with
+  // no recipe.json (skills ship none - spec/schemas/manifest.schema.json's
+  // own kind doc comment: "never runs on its own").
+  test("route() never lets a skill-kind manifest win outright, however strong its own example match", async () => {
+    const { actor } = await owner();
+    const loaded = loadAllManifests();
+    const fakeSkill = {
+      id: "test-only-fake-skill",
+      manifest: {
+        ...loaded[0]!.manifest,
+        id: "test-only-fake-skill",
+        kind: "skill" as const,
+        consequential: false,
+        // No required args (deterministicArgs(undefined, null) binds `{}`
+        // trivially) and an exact-text example match, so nothing besides
+        // the kind check below could keep this candidate from winning
+        // outright - a test that passed even with route()'s old
+        // no-kind-check behavior would prove nothing.
+        args: undefined,
+        routing: { examples: ["tell me a bedtime story about a fox", "tell a story for my kid"] },
+      },
+    };
+    const result = await route("tell me a bedtime story about a fox", actor, [...loaded, fakeSkill]);
+    expect(result.winner?.id).not.toBe("test-only-fake-skill");
+  });
 });
 
 describe("prepareTurn() persona resolution (via runTurn - prepareTurn itself isn't exported)", () => {

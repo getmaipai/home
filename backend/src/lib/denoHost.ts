@@ -249,7 +249,38 @@ function parseHandleResult(result: { content: unknown; isError?: boolean }): Plu
   const text = content.find((c) => c.type === "text")?.text;
   if (!text) throw new Error("handle returned no text content");
   const parsed = JSON.parse(text) as Partial<PluginResult>;
-  return { reply: parsed.reply, actions: parsed.actions ?? [], ...(parsed.ask ? { ask: parsed.ask } : {}) };
+  return {
+    reply: parsed.reply,
+    actions: parsed.actions ?? [],
+    ...(parsed.ask ? { ask: parsed.ask } : {}),
+    ...(parsed.error ? { error: parsed.error } : {}),
+  };
+}
+
+/** Fix B (docs/dev.md's "Chat reliability: the 2026-09-07 incident and
+ * the five fixes"): callTier1Handle()'s own return shape, distinguishing
+ * a real answer from a handler's own typed report that it couldn't
+ * answer (an upstream fetch failure it caught itself, `result.error` in
+ * `parseHandleResult()`) - a THIRD case alongside the crash/timeout path
+ * (`recordFault()`, a real strike) and a genuine success. Before this
+ * fix, callTier1Handle() only ever had two outcomes as far as any caller
+ * could tell - a real reply, or the manifest's `fallback_reply` after a
+ * strike - so a handler catching its own fetch error and returning
+ * canned "I couldn't look that up right now" text (seven Tier 1
+ * handlers hand-copied exactly that string) looked identical to a real
+ * answer to everything downstream: Tier 2's own "every call failed,
+ * answer normally" branch never ran, and the canned line even entered
+ * the model's own conversation window as if it had said it. This local
+ * type (not lib/plugins.ts's own PluginOpResult, to avoid a circular
+ * import - plugins.ts already imports this file) is what
+ * lib/plugins.ts's runPlugin() maps into its own PluginOpResult at the
+ * one real call site. */
+export type CallTier1Result =
+  | { ok: true; value: PluginResult }
+  | { ok: false; code: string; message: string; fallback: PluginResult };
+
+function upstreamFailure(manifest: PackageManifest, error: { code: string; message: string }): CallTier1Result {
+  return { ok: false, code: error.code, message: error.message, fallback: fallbackResult(manifest) };
 }
 
 /** Runs a Tier 1 package's `handle` tool for `actor` - lib/plugins.ts's
@@ -264,9 +295,9 @@ export async function callTier1Handle(
   manifest: PackageManifest,
   actor: PersonRow,
   inputs: Record<string, unknown>,
-): Promise<PluginResult> {
-  if (!isValidPackageId(id)) return fallbackResult(manifest);
-  if (disabledUntilReboot.has(id)) return fallbackResult(manifest);
+): Promise<CallTier1Result> {
+  if (!isValidPackageId(id)) return { ok: true, value: fallbackResult(manifest) };
+  if (disabledUntilReboot.has(id)) return { ok: true, value: fallbackResult(manifest) };
 
   let entry = processes.get(id);
   if (!entry) {
@@ -280,7 +311,7 @@ export async function callTier1Handle(
     try {
       entry = await starting;
     } catch (err) {
-      return recordFault(id, manifest, `failed to start: ${(err as Error).message}`);
+      return { ok: true, value: recordFault(id, manifest, `failed to start: ${(err as Error).message}`) };
     }
   }
   entry.lastUsedAt = Date.now();
@@ -304,11 +335,23 @@ export async function callTier1Handle(
   try {
     const result = await entry.client.callTool({ name: "handle", arguments: inputs }, undefined, { timeout: timeoutMs });
     if (result.isError) {
-      return recordFault(id, manifest, `handle reported an error: ${JSON.stringify(result.content)}`);
+      return { ok: true, value: recordFault(id, manifest, `handle reported an error: ${JSON.stringify(result.content)}`) };
     }
     resolveIssue(ISSUE_SOURCE, id);
     strikes.set(id, 0);
-    return parseHandleResult(result as { content: unknown; isError?: boolean });
+    const parsed = parseHandleResult(result as { content: unknown; isError?: boolean });
+    // A real, EXPECTED failure the handler caught itself (an upstream
+    // fetch that failed, say) - never a strike (the sandbox process
+    // itself is healthy; nothing about it crashed or hung) and never
+    // silently answered with fallback text as if it were a real reply
+    // either. The caller (runPlugin()) decides what "no real answer"
+    // means for this turn - Tier 2 falls through to the model instead of
+    // treating this as a successful tool call, and a deterministic
+    // Tier 0/1 pattern match speaks the fallback with source:
+    // "plugin_error", never entering the model's own conversation
+    // window as if it had said the canned line itself.
+    if (parsed.error) return upstreamFailure(manifest, parsed.error);
+    return { ok: true, value: parsed };
   } catch (err) {
     // A timeout or a transport failure both leave the process in an
     // unknown state - killed here (not left running) so a stuck process
@@ -316,7 +359,7 @@ export async function callTier1Handle(
     // killProcessIfCurrent, not killProcess(id) directly - see its own
     // header for the race this avoids.
     await killProcessIfCurrent(id, entry);
-    return recordFault(id, manifest, (err as Error).message);
+    return { ok: true, value: recordFault(id, manifest, (err as Error).message) };
   } finally {
     releaseTurn!();
   }

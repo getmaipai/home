@@ -89,15 +89,24 @@ if (import.meta.main) {
     "handle",
     { inputSchema: { query: z.string() } },
     async (args: { query: string }, extra: { sendRequest: (req: unknown, schema: unknown) => Promise<{ value: unknown }> }) => {
-      let reply: Reply;
+      // Fix B (docs/dev.md's "Chat reliability: the 2026-09-07 incident
+      // and the five fixes"): a real fetch failure is reported as a
+      // typed `error`, never as a fabricated `reply` - the caller
+      // (denoHost.ts's callTier1Handle()) is what decides the household-
+      // facing fallback text (the manifest's own `fallback_reply`),
+      // never this package pretending to have answered. A "no artist
+      // found for a real search that worked" (summarizeArtist()'s own
+      // "I couldn't find an artist named..." case) is a genuine reply,
+      // not an error - only a thrown fetch exception reaches here.
       try {
         const url = `https://musicbrainz.org/ws/2/artist/?query=${encodeURIComponent(`artist:${args.query}`)}&fmt=json&limit=1`;
         const data = await hostFetch(extra, url);
-        reply = summarizeArtist(data, args.query);
-      } catch {
-        reply = { text: "I couldn't look that up right now.", speech: "I couldn't look that up right now." };
+        const reply = summarizeArtist(data, args.query);
+        return { content: [{ type: "text", text: JSON.stringify({ reply, actions: [] }) }] };
+      } catch (err) {
+        const error = { code: "network_unreachable", message: err instanceof Error ? err.message : String(err) };
+        return { content: [{ type: "text", text: JSON.stringify({ error }) }] };
       }
-      return { content: [{ type: "text", text: JSON.stringify({ reply, actions: [] }) }] };
     },
   );
   const transport = new StdioServerTransport();

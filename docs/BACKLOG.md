@@ -797,38 +797,70 @@ into a conversation with someone who knows who is talking.
       that round-trip cost; measure whether the recall-quality gain is
       worth it before assuming it is. Out of scope until then: don't
       prefix memory.ts's writes alone.
-- [ ] **Fix B: a package failure is a failure, canned text is never the
-      model's voice, the UI shows who answered** (M) - from `docs/dev.md`'s
-      "Chat reliability: the 2026-09-07 incident" note. Objective: a Tier 1
-      handler that cannot answer reports a typed error; the turn engine
-      speaks the manifest's `fallback_reply` from one place and Tier 2
-      treats it as "answer normally"; non-model turns enter the prompt
-      window as `system` notes; the bubble says "via Music Lookup". Spec
-      first: `spec/schemas/result.schema.json` gains optional `error`
-      (`code` from `spec/errors/errors.json`, `message`), regenerate
-      `gen/ts` and `gen/py`. Files: the seven handlers that hand-copy "I
-      couldn't look that up right now." (`backend/packages/{almanac-holiday,
-      almanac-onthisday,currency,knowledge,music,news,sports}/handler.ts`),
-      `backend/src/lib/denoHost.ts` (`parseHandleResult()` maps `error`;
-      `callTier1Handle()` returns it without a strike; `fallbackResult()`
-      stays the one place `fallback_reply` is applied),
-      `backend/src/lib/plugins.ts` (`runPlugin()` returns `{ ok: false,
-      status: 502, error, fallback_reply }`), `backend/src/lib/turnEngine.ts`
-      (pattern branch speaks the fallback as `plugin_error`; Tier 2 falls
-      through), `backend/src/lib/conversationHistory.ts`
-      (`buildConversationWindow()` pushes `system` for every non-model
-      source, display name from `loadManifestOnly()`),
-      `frontend/src/apps/chat/chatModelAdapter.ts` and the bubble (caption
-      from `done.value.source`/`plugin_id`, display name via the
-      manifests `chatSuggestionAdapter.ts` already fetches). Mirror:
-      `runPlugin()`'s existing `HostError` mapping; `tests/tier2.test.ts`.
-      Acceptance: "should I dye my hair black" answered by the model even
-      when a plugin is chosen and fails; a MusicBrainz 503 three times does
-      not disable the package; a plugin turn appears in the window as
-      `system`; the caption renders. Out of scope: rephrasing a plugin
-      reply in the persona's voice. Exit: `scripts/check.sh` plus new
-      tests in `tests/tier2.test.ts`, `tests/conversationHistory.test.ts`,
-      and one frontend test for the caption.
+- [x] **Fix B: a package failure is a failure, canned text is never the
+      model's voice, the UI shows who answered** (M) - shipped 2026-09-07.
+      `docs/dev.md`'s "Chat reliability: the 2026-09-07 incident" note has
+      the full B1-B4 writeup and B3/B4 "as built" corrections. Built as
+      planned: `spec/schemas/result.schema.json`'s optional `error`
+      (regenerated `gen/ts`/`gen/py`); the seven handlers
+      (`backend/packages/{almanac-holiday,almanac-onthisday,currency,
+      knowledge,music,news,sports}/handler.ts`) report `{ error }` instead
+      of a hand-copied string; `denoHost.ts`'s `callTier1Handle()` returns
+      `CallTier1Result` (`{ok:false,...}` for a genuine upstream failure,
+      no strike); `plugins.ts`'s `runPlugin()` returns
+      `{ ok: false, status: 502, error, fallback_reply }`; `turnEngine.ts`'s
+      pattern branch speaks the fallback as `plugin_error`, Tier 2's
+      existing `oks.length === 0 → null` already fell through correctly
+      with zero changes; `conversationHistory.ts`'s
+      `nonModelWindowNote()`/`buildConversationWindow()` push a `system`
+      note (never `assistant`) for every non-model source, name resolved
+      via `loadManifestOnly()` (plugin) or a direct `commands` table query
+      (command - `lib/commands.ts` itself isn't importable here, a real
+      cycle through `turnEngine.ts`); `chatSourceCaption.tsx` (frontend)
+      renders "via Music Lookup" for `plugin`/`plugin_error`/`command`,
+      fed by `chatHistoryAdapter.ts` and `chatModelAdapter.ts` both
+      attaching the same `source`/`pluginId`/`commandId` message metadata.
+      A real, deeper bug surfaced proving B3: `route()` had no
+      `manifest.kind` check, so a skill (no `recipe.json` - never meant to
+      run on its own) could win routing outright and crash into
+      `plugin_error` every time; fixed at the root in `turnEngine.ts`'s
+      `route()`, proven by a direct unit test. Widgets picked up a real
+      typecheck regression from the 502 status widening
+      (`backend/src/lib/widgets.ts`'s `getWidgetData()`) - fixed by
+      showing the package's own `fallback_reply` text as the widget's one
+      item rather than dropping the widget. Not done: a dedicated
+      `tests/tier2.test.ts` case for a Tier 1 upstream failure inside
+      model tool-calling (see the follow-up below) - the existing suite
+      and `tsc`'s type-narrowing both confirm the code path, just not a
+      standing regression test yet.
+- [ ] **A real-Tier-1-failure regression test for the two callers that
+      still only rely on reading, not testing, a 502**: "a package that
+      fails upstream is not a Tier 2 success" (`tests/tier2.test.ts`) and
+      `POST /api/plugins/:id/run` returning `fallback_reply` alongside the
+      error (`tests/plugins.test.ts`)** (S) - deferred 2026-09-07 from Fix
+      B above. Objective: prove `attemptTier2Tools()` (`turnEngine.ts`)
+      treats a Tier 1 handler's genuine `{ ok: false, status: 502 }` the
+      same as "no tool answered" (falls through to a normal model reply),
+      not just by reading `oks.length === 0 → null`, and that
+      `routes/plugins.ts`'s direct-run route includes `fallback_reply` in
+      its JSON body for the identical failure - both currently verified
+      only by reading the code and by `tsc`'s own type-narrowing, not by a
+      standing regression test. The blocker: every one of the seven
+      packages that can produce this is Tier 1 (a real `deno run` sandbox
+      + a real network fetch), and nothing in this codebase can force a
+      deterministic, offline network failure through that path today -
+      `denoHost.test.ts`'s own timeout tests get around the equivalent
+      problem for `recordFault()` via `__setTestFetchDelayMsForTests()`,
+      but there's no matching seam for "the fetch throws." Pick one: add a
+      small `__setTestFetchFailureForTests()` knob next to the existing
+      delay one (`denoHost.ts`), or a tiny test-only Tier 1 fixture
+      package under `backend/tests/fixtures/` whose handler always
+      returns `{ error }` (mirrors the sandbox permission tests' own
+      `mkdtempSync` pattern, `denoHost.test.ts`'s second describe block).
+      One harness unlocks both test gaps. Acceptance: the tier2 test calls
+      `attemptTier2Tools()` with a candidate that fails upstream and
+      asserts the result is `null` (falls through), never a fabricated
+      `plugin` success. Exit: `scripts/check.sh`.
 - [x] **Fix C: guards narrow to household claims, cut instead of splice,
       proven by a corpus** (M) - shipped 2026-09-07 (getmaipai/home#62).
       `backend/src/lib/guards.ts`: `GUESSING_RE`'s `sounds like (a|an)`
@@ -2753,7 +2785,12 @@ that owns it.
       ComfyUI, with declared startup order, health URL, ports, mounts,
       backup mode and exclude patterns. Today `llmSupervisor.ts`,
       `embedSupervisor.ts` and `ttsSupervisor.ts` are three copies of the
-      same shape.
+      same shape. Narrowed 2026-09-07: the supervision half (exit watch,
+      health poll, backoff respawn, crash-loop cap with a Repairs fix) is
+      already one implementation, `watchEngine()` in `sidecars.ts`, used
+      by all three (`docs/dev.md`, "What was actually killing the chat
+      engine"); what remains is the declaration side (order, ports,
+      mounts, backup mode) and folding the three lazy spawns into it.
 - [x] **Storage: sizes, quotas, disk-full policy, NAS mounts, factory
       reset, diagnostics** (Session F step 9, 2026-09-06) -
       `GET /api/storage` (bytes per area - database/models/engines/voice/

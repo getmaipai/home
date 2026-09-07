@@ -36,6 +36,21 @@ class Ask(BaseModel):
     expects: str | None = None
 
 
+class Error(BaseModel):
+    """
+    Fix B (docs/dev.md's 'Chat reliability: the 2026-09-07 incident' note): a handler's own typed report that it could not answer (an upstream fetch failure, say) - never present alongside `reply`. Distinct from a thrown exception (which the Tier 1 host maps to a strike and the manifest's fallback_reply already): this is a report of an EXPECTED failure mode a handler catches itself, so the caller can answer with the household-facing fallback without treating the package's own sandbox as unhealthy.
+    """
+
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    code: str = Field(..., description="One of spec/errors/errors.json's own codes.")
+    message: str = Field(
+        ...,
+        description="Developer-facing detail, never shown to the household - the household sees the manifest's own fallback_reply or the error catalogue's spoken_fallback instead.",
+    )
+
+
 class PluginResult(BaseModel):
     """
     What a package's handle() (or a recipe's interpreted run) returns. See platform plan 4.9.
@@ -55,3 +70,7 @@ class PluginResult(BaseModel):
     )
     end_conversation: bool | None = None
     article: dict[str, Any] | None = None
+    error: Error | None = Field(
+        None,
+        description="Fix B (docs/dev.md's 'Chat reliability: the 2026-09-07 incident' note): a handler's own typed report that it could not answer (an upstream fetch failure, say) - never present alongside `reply`. Distinct from a thrown exception (which the Tier 1 host maps to a strike and the manifest's fallback_reply already): this is a report of an EXPECTED failure mode a handler catches itself, so the caller can answer with the household-facing fallback without treating the package's own sandbox as unhealthy.",
+    )

@@ -43,7 +43,17 @@ export interface LoadedPackage {
 
 export type PluginOpResult<T> =
   | { ok: true; value: T }
-  | { ok: false; status: 400 | 403 | 404; error: string };
+  | { ok: false; status: 400 | 403 | 404; error: string }
+  // Fix B (docs/dev.md's "Chat reliability: the 2026-09-07 incident and
+  // the five fixes"): a Tier 1 handler's own typed report that it
+  // couldn't answer (denoHost.ts's `CallTier1Result`, its `ok: false`
+  // branch) - distinct from 400/403/404 (the CALLER's own request was
+  // invalid) the way a real 502 is distinct from a 4xx: the request was
+  // fine, something downstream of this package failed. `fallback_reply`
+  // is the manifest's own honest line (or the generic default) for a
+  // caller to speak with `source: "plugin_error"`, never silently
+  // treated as if the package itself had said it.
+  | { ok: false; status: 502; error: string; code: string; fallback_reply: PluginResult };
 
 /** Every package id this hub can load: every bundled directory name,
  * plus any id the store has installed that was never bundled at all (a
@@ -265,7 +275,11 @@ export async function runPlugin(
   if (argsError) return { ok: false, status: 400, error: `${id}'s inputs failed validation: ${argsError}` };
 
   if (manifest.tier === 1) {
-    return { ok: true, value: await callTier1Handle(id, manifest, actor, inputs) };
+    const result = await callTier1Handle(id, manifest, actor, inputs);
+    if (!result.ok) {
+      return { ok: false, status: 502, error: result.message, code: result.code, fallback_reply: result.fallback };
+    }
+    return { ok: true, value: result.value };
   }
 
   const loaded = loadPackage(id);

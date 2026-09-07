@@ -14,7 +14,9 @@ import {
   __resetDenoHostForTests,
   __setTestFetchDelayMsForTests,
   __testCurrentActorId,
+  type CallTier1Result,
 } from "@/lib/denoHost";
+import type { PluginResult } from "@maipai/spec/interpreters/ts/recipe-interpreter.js";
 import { cachedFetch, __resetPackageCacheForTests, __clearPackageCacheDirForTests } from "@/lib/packageCache";
 import { listIssues } from "@/lib/issues";
 
@@ -51,6 +53,17 @@ function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+// Fix B (docs/dev.md's "Chat reliability" B1/B2): callTier1Handle() now
+// returns CallTier1Result, not a bare PluginResult - `ok: false` is the
+// new typed-upstream-error path (denoHost.ts's upstreamFailure()); every
+// test in this file still exercises the sandbox's OWN behavior (timeouts,
+// fault-disable, concurrent calls), never that new error path, so each
+// result here is always `ok: true`.
+function unwrap(result: CallTier1Result): PluginResult {
+  if (!result.ok) throw new Error(`expected callTier1Handle() to succeed, got upstream error: ${result.message}`);
+  return result.value;
+}
+
 function knowledgeManifest() {
   const result = loadManifestOnly("knowledge");
   if (!result.ok) throw new Error(`knowledge package failed to load: ${result.error}`);
@@ -69,7 +82,7 @@ describe("callTier1Handle (session-d-packages-and-store.md step 5)", () => {
     }));
     const actor = await owner();
     const result = await callTier1Handle("knowledge", manifest, actor, { topic: "Seattle" });
-    expect(result.reply?.text).toBe("Seattle: Seattle is a seaport city on the West Coast of the United States.");
+    expect(unwrap(result).reply?.text).toBe("Seattle: Seattle is a seaport city on the West Coast of the United States.");
   }, 15_000);
 
   // A code review (2026-09-06) caught a real race: two concurrent calls
@@ -92,8 +105,8 @@ describe("callTier1Handle (session-d-packages-and-store.md step 5)", () => {
       callTier1Handle("knowledge", manifest, actor, { topic: "Seattle" }),
       callTier1Handle("knowledge", manifest, actor, { topic: "Seattle" }),
     ]);
-    expect(first.reply?.text).toBe("Seattle: Seattle is a seaport city on the West Coast of the United States.");
-    expect(second.reply?.text).toBe(first.reply?.text);
+    expect(unwrap(first).reply?.text).toBe("Seattle: Seattle is a seaport city on the West Coast of the United States.");
+    expect(unwrap(second).reply?.text).toBe(unwrap(first).reply?.text);
 
     const psOutput = await new Response(Bun.spawn(["pgrep", "-f", "knowledge/handler.ts"], { stdout: "pipe" }).stdout).text();
     const pids = psOutput.split("\n").filter((line) => line.trim().length > 0);
@@ -132,8 +145,8 @@ describe("callTier1Handle (session-d-packages-and-store.md step 5)", () => {
     expect(__testCurrentActorId("knowledge")).toBe(ownerRow.id); // NOT clobbered by the queued second call
 
     const [firstResult, secondResult] = await Promise.all([first, second]);
-    expect(firstResult.reply?.text).toContain("Seattle");
-    expect(secondResult.reply?.text).toContain("Seattle");
+    expect(unwrap(firstResult).reply?.text).toContain("Seattle");
+    expect(unwrap(secondResult).reply?.text).toContain("Seattle");
     expect(__testCurrentActorId("knowledge")).toBe(childRow.id);
   }, 15_000);
 
@@ -146,7 +159,7 @@ describe("callTier1Handle (session-d-packages-and-store.md step 5)", () => {
     }));
     const actor = await owner();
     const result = await callTier1Handle("knowledge", manifest, actor, { topic: "Seattle" });
-    expect(result.reply?.text).toBe(manifest.fallback_reply!.text);
+    expect(unwrap(result).reply?.text).toBe(manifest.fallback_reply!.text);
   }, 15_000);
 
   test("three consecutive timeouts disable the package for the rest of this boot and raise a Repairs issue", async () => {
@@ -169,7 +182,7 @@ describe("callTier1Handle (session-d-packages-and-store.md step 5)", () => {
       extract: "should never be reached - the package is disabled",
     }));
     const result = await callTier1Handle("knowledge", manifest, actor, { topic: "Seattle" });
-    expect(result.reply?.text).toBe(manifest.fallback_reply!.text);
+    expect(unwrap(result).reply?.text).toBe(manifest.fallback_reply!.text);
   }, 30_000);
 });
 

@@ -12,6 +12,14 @@ export interface PluginResult {
   reply?: { text: string; speech?: string };
   actions: { kind: string; payload?: unknown }[];
   ask?: { prompt: string; expects?: string };
+  /** Fix B (docs/dev.md's "Chat reliability: the 2026-09-07 incident"
+   * note): a handler's own typed report that it could not answer, never
+   * alongside `reply` - see result.schema.json's own `error` field for
+   * the full reasoning. Not produced by this file's own runRecipe() (a
+   * Tier 0 recipe step failure already throws a real HostError, mapped
+   * at the route layer), only by a Tier 1 package's handle() -
+   * denoHost.ts's parseHandleResult() is the real producer. */
+  error?: { code: string; message: string };
 }
 
 type Scope = Record<string, unknown>;

@@ -8988,6 +8988,59 @@ model"; `tests/conversationHistory.test.ts` proves a plugin turn enters
 the window as `system`; a frontend test proves the caption. Live: turn
 1's message answered by the model itself.
 
+B3/B4 as built (2026-09-07): shipped as planned, plus one addition and
+one real bug found while proving it. `nonModelWindowNote()`
+(`conversationHistory.ts`) covers `plugin`/`plugin_error`/`safety_refuse`/
+`command` exactly per the wording above, plus `command_error` and
+`confirm` (not named in the original plan, but the identical risk: a
+canned or templated reply entering the window as `assistant`), and a
+`command`/`command_error` note names the command's own `trigger` (its
+only real display name - `CommandRow` has none), read with one direct
+query against the `commands` table rather than through `lib/commands.ts`
+(that module imports `turnEngine.ts`, which imports this file - a real
+cycle, avoided by reusing the schema this file already has open rather
+than pulling in a module that would close the loop). `buildConversationWindow()`
+pushes EITHER the `assistant` message OR the `system` note per turn,
+never both - a first pass pushed both, which would have kept shipping
+the exact failure text this fix exists to stop (the model still reading
+a plugin's own canned reply as something it said). B4 shipped as
+`chatSourceCaption.tsx`, mirroring `chatMemoryChip.tsx`'s
+`useAuiState`-off-`message.metadata.custom` pattern exactly; both
+`chatHistoryAdapter.ts` (reload) and `chatModelAdapter.ts` (a live
+reply) attach the same `source`/`pluginId`/`commandId` shape so the
+caption renders identically either way. Proven with real tests:
+`tests/conversationHistory.test.ts` gains five `buildConversationWindow()`
+cases (one per source, plus the model-turn control) and
+`chatSourceCaption.test.tsx` gains five (plugin/plugin_error/command
+show the caption, model/safety_refuse don't) - not yet done: the planned
+`tests/tier2.test.ts` "a package that fails upstream is not a Tier 2
+success" case (verified by reading `attemptTier2Tools()`'s existing
+`oks.length === 0 → null` branch and by `tsc`'s own type-narrowing on
+`CallTier1Result`, not by a dedicated regression test - a real Tier 1
+sandbox round trip with a deterministic, offline network failure has no
+cheap harness in this codebase yet, see the follow-up filed in
+`docs/BACKLOG.md`).
+
+A real, deeper bug surfaced while writing the B3 tests, not part of the
+original A-E plan: `route()`'s own `eligible` pool (`turnEngine.ts`) had
+no `manifest.kind` check at all, so ANY skill-kind package (plain
+instructions, no `recipe.json` - the spec's own kind doc comment: "never
+runs on its own") with a strong embedding match against its own
+`routing.examples` could become `route()`'s `winner` outright and get
+handed straight to `runPlugin()`, which then failed 100% of the time (no
+recipe to run) - `[Live-found live 2026-09-05]`'s own fix
+(`bestSkillScore > routed.score`) only ever guarded a DIFFERENT, weaker
+PLUGIN losing to a skill sitting on the side; it did nothing when the
+skill itself won, which is exactly what the bundled `storytime-style`
+skill started doing once Fix D's routing-corpus and threshold changes
+shifted the relative scores. Fixed at the root: `route()` now skips
+every non-`plugin` kind before it ever enters `eligible`, matching what
+`buildSystemPrompt()`'s separate `matchingSkills()` pool already assumed
+was true. Proven directly (not just through the live package) by a new
+`turnEngine.test.ts` case that fakes a skill-kind manifest with no
+required args and a dominant example match - confirmed to fail without
+the fix, pass with it.
+
 **Fix C: guards narrow to household claims, cut instead of splice, and
 are proven by a corpus. Shipped 2026-09-07 (getmaipai/home#62), in a
 shape that corrects a real internal contradiction the plan below
@@ -9262,6 +9315,101 @@ Exit: `check.sh` green; the bench numbers recorded; the four messages
 from this incident answered by the model itself, with the `[turn]` line
 showing no tool offered for turns 2 and 3 and no call chosen for any of
 them.
+
+### What was actually killing the chat engine (found 2026-09-07, 04:30)
+
+The self-heal commit earlier the same night (`8b6caa9`, llm.ts's
+`recoverFromDeadBackend()`) fixed the symptom, a dead engine repeated as
+"could not reach" forever, and left the cause open: "no OOM/jetsam
+trace, no crash report, not the resource governor". Found by reading the
+live hub's process tree (the hub had only its embed child left, the
+chat llama-server on port 8788 gone, nothing in its stdout, nothing in
+the unified log) and then proving the killer with a canary: a process
+whose command line merely contains `--port 8788`, started beside the
+hub, dies the moment `bun test` runs in `backend/`.
+
+**The chain.** `tests/preload.ts` sets `MAIPAI_LLAMA_SERVER_PORT=48788`
+so no test spawn can ever touch the real engine's port; its own comment
+names this exact hazard. `tests/resourceGovernor.test.ts`'s `afterEach`
+tidied up with `delete process.env.MAIPAI_LLAMA_SERVER_PORT`. bun runs
+every test file in one process, in an order that is not alphabetical
+(this run: legacyImport, scheduler, packageHost, ..., llmSupervisor),
+so from that file on the port was unset. `tests/llmSupervisor.test.ts`'s
+first test then spawns a deliberately nonexistent binary to prove a
+failed start does not wedge the role; `spawnLlamaServer()` resolved the
+port to its production default 8788, `spawnAndWaitHealthy()` called
+`freePort(8788)`, and `freePort()` did its job: `ps -u <uid>`, match
+`--port 8788`, SIGKILL. The real hub's chat engine, on the same Mac
+under the same user, matched. SIGKILL leaves no crash report, the
+engine's stdout is inherited so it prints nothing on the way out, and
+the hub never observed the child's exit, which is why every log was
+empty. Every `bun test` and every `scripts/check.sh` (which runs the
+suite before each commit, from every session) did this, which is why it
+"happened all the time": it happened whenever anyone committed.
+
+**Three fixes, all in one commit.**
+
+1. At the source: `resourceGovernor.test.ts` restores preload's value
+   instead of deleting it.
+2. Enforced, not remembered: `tests/isolation.ts` snapshots the isolation
+   env preload establishes (data dir, backup dir, keystore backend, the
+   chat port, the TTS no-spawn flag) and registers a suite-wide
+   `afterEach` from preload. Any test that leaves the chat port unset
+   or on 8788, or moves the data dir, fails by name with the reason,
+   and the value is put back before the next test can act on it (a
+   failed hook does not stop the suite, so restoring alone or failing
+   alone would each be half a fix). `tests/isolation.test.ts` pins the
+   rules against a plain object.
+3. The hub notices a death and heals it: `watchEngine()` in
+   `sidecars.ts`, attached by each supervisor (chat, embed, TTS) to every
+   spawned process once it is healthy. Detail in the auto-heal paragraph
+   below; `tests/llmSupervisor.test.ts` proves it with a real tier-2
+   spawn of the fake engine and a real SIGKILL, `tests/sidecars.test.ts`
+   pins each rule of the watch itself.
+
+**Auto-heal, as built (same day, Jesse: "even if you prevent this from
+happening in the future, I still need an autoheal for when llm, voice,
+etc are down").** Fix 3 above grew into one shared mechanism,
+`watchEngine()` in `sidecars.ts`, used by all three engine supervisors
+(a code review on the first cut found the handler hand-copied three
+times, and a race: a death during an in-flight request reached llm.ts's
+"could not reach" handler first, whose restart made the exit look
+deliberate, so exactly the mid-turn death went unreported). A watch is
+attached to every spawned engine once it is healthy and owns: the exit
+watch (how it ended, `signal SIGKILL` or `exit code 1`); a health poll
+at the registry's own cadence (three misses in a row is down, and the
+wedged process is killed); `markDown()` for a caller that saw it
+unreachable first; and the respawn, through the supervisor's own lazy
+start, with the registry's backoff. Deliberate is recorded at kill time
+(`stop()`), never inferred afterwards, and a deliberate stop or restart
+also cancels an armed respawn (`cancelEngineRespawn()`), so an admin's
+stop inside the backoff window is not counted as a crash. `markDown()`
+probes health once before believing the caller, because a client that
+disconnected before the first byte fails with the same "could not
+reach" a dead engine does; llm.ts also skips recovery when the request's
+own signal was aborted. A respawn that rejects (the engine deliberately
+stopped, a crash-boot hold, a model not downloaded) never produced a
+process, so it is not retried on a timer: the issue says why and keeps
+the "Start it again" button, which each supervisor registers at module
+load (`registerEngineRespawn()`) so it still works after a hub restart.
+A crash-loop cap stops after five respawns in ten minutes, leaves the
+Repairs issue open with the same fix, and says so in plain words; the
+count survives a hot reload. A fresh healthy spawn, whoever started it,
+clears the prior death's issue and state, since a watched process is
+healthy by construction. Both spec clients' `health()` calls are now
+bounded (3 s), so a live-but-hung engine reads as unhealthy instead of
+holding every poll open forever. `GET /api/health` now carries `ok` and a per-engine
+`{kind, pid, alive}` from a real probe (the page had been printing the
+configured kind, "selection", which does not change when the process
+dies), and Health is the first entry under Settings -> Household.
+
+Two side lessons from the diagnosis. `bun test --preload <file>` on
+the command line REPLACES bunfig's preload list, it does not add to it:
+a first tracing run did exactly that and ran the suite with no
+`MAIPAI_DATA_DIR` override (the reset-db guard held; nothing reached
+the real household's data, checked against `hub.db` afterwards). And a
+shell whose own command line contains `--port 8788` (a heredoc, an
+inline canary) is itself a match for `freePort()`.
 
 ### Not in scope, stated
 

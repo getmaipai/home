@@ -60,7 +60,15 @@ pluginsRoutes.post("/:id/run", requireAuth, async (c) => {
   const actor = c.get("person");
   const body = (await c.req.json().catch(() => ({}))) as Record<string, unknown>;
   const result = await runPlugin(id, actor, body);
-  if (!result.ok) return c.json({ error: result.error }, result.status);
+  if (!result.ok) {
+    // Fix B (docs/dev.md's "Chat reliability" B2): a code review
+    // (2026-09-07) found this route was the one caller that dropped
+    // `fallback_reply` on a genuine 502 - chat (turnEngine.ts) and
+    // widgets.ts both already speak the manifest's own honest fallback
+    // text for the identical failure; a direct test-run of a package
+    // should see the same thing, not just the raw internal error string.
+    return c.json(result.status === 502 ? { error: result.error, fallback_reply: result.fallback_reply } : { error: result.error }, result.status);
+  }
   return c.json(result.value);
 });
 

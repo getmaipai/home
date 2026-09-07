@@ -20,7 +20,11 @@ export function rowsToThreadMessages(rows: ConversationTurnWithMemoryIds[], self
       content: row.replyText,
       createdAt,
       status: { type: "complete", reason: "stop" },
-      metadata: { custom: { turnId: row.id, memoryIds: row.memory_ids } },
+      // Fix B4 (docs/dev.md's "Chat reliability" B4): chatSourceCaption.tsx
+      // reads these straight off the reloaded message to show "via <package>"
+      // for a non-model reply - the same row fields Fix B3
+      // (conversationHistory.ts's buildConversationWindow()) already uses.
+      metadata: { custom: { turnId: row.id, memoryIds: row.memory_ids, source: row.source, pluginId: row.pluginId, commandId: row.commandId } },
     });
   }
   return out;

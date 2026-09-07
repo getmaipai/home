@@ -818,6 +818,24 @@ export async function route(text: string, actor: PersonRow, loaded: LoadedManife
   const eligible: LoadedManifest[] = [];
   for (const { id, manifest } of loaded) {
     if (!meetsMinRole(actor.role, manifest.min_role)) continue;
+    // The spec's own kind doc comment (spec/schemas/manifest.schema.json):
+    // "a `skill` is plain instructions... composed into the chat model's
+    // system prompt when relevant, never runs on its own." `loaded` (from
+    // loadAllManifests()) is every installed package regardless of kind,
+    // and until this check `eligible` was too - so a skill with a strong
+    // embedding match against its own `routing.examples` (the exact
+    // relevance signal skillsSection()/matchingSkills() use it for) could
+    // WIN route() outright and get handed to runPlugin(), which then
+    // fails: a skill ships no recipe.json (skills aren't Tier 0/1
+    // handlers) so this always came back a plugin_error. The `bestSkillScore
+    // > routed.score` check below only guards a DIFFERENT package winning
+    // with a weaker score than a skill sitting on the side - it does
+    // nothing when the skill itself is what `route()` picked, which is
+    // exactly what "a weak, fuzzy-matched plugin no longer preempts a more
+    // confident skill match" (this file's own test) needs: the skill winning
+    // that comparison was never the fix, keeping skills out of this pool
+    // entirely is.
+    if (manifest.kind !== "plugin") continue;
 
     // A real gap found building `lock-doors` (session-d-packages-and-
     // store.md step 9): `manifest.consequential` was never checked here
@@ -974,7 +992,22 @@ export async function resolvePendingAsk(
       if (result.ok) {
         return { reply: result.value.reply ?? { text: "Done." }, source: "plugin", plugin_id: pending.packageId, safety, crisis_resources: crisisResources, conversation_id: conversation.id, turn_id: turnId };
       }
-      return { reply: { text: "Sorry, I couldn't do that." }, source: "plugin_error", plugin_id: pending.packageId, safety, crisis_resources: crisisResources, conversation_id: conversation.id, turn_id: turnId };
+      // Fix B (docs/dev.md's "Chat reliability" B2): the same 502 ->
+      // fallback_reply treatment as prepareTurn()'s own Tier 0/1 branch
+      // below - a code review (2026-09-07) found this confirm-continuation
+      // path was the one call site B2 didn't reach, so a household
+      // member who said "yes" to a consequential action still heard the
+      // generic apology instead of the package's own honest fallback text
+      // on a genuine upstream failure.
+      return {
+        reply: (result.status === 502 ? result.fallback_reply.reply : undefined) ?? { text: "Sorry, I couldn't do that." },
+        source: "plugin_error",
+        plugin_id: pending.packageId,
+        safety,
+        crisis_resources: crisisResources,
+        conversation_id: conversation.id,
+        turn_id: turnId,
+      };
     }
     if (NEGATIVE_RE.test(text.trim())) {
       setPendingAsk(conversation.id, null);
@@ -1145,17 +1178,26 @@ async function prepareTurn(
         routing: { tier: routed.viaPattern ? "pattern" : routed.viaEmbedding ? "embedding" : "keyword", score: routed.score },
       });
     }
-    // A pre-filtered deterministic match failing at runPlugin is a real, if
-    // rare, gap (a role change or a bad manifest between the router's
-    // check and the run); surfaced as a plain apology rather than leaking
-    // the internal error string to a household member, logged for anyone
-    // debugging it. `source: "plugin_error"` on the returned `TurnValue` is
-    // the intended way to detect it, not the top-level `ok` flag (a review,
-    // 2026-09-04, flagged this could otherwise look indistinguishable from
-    // a real success to a caller branching on `.ok` alone).
+    // Two real, different reasons runPlugin() can fail here. Fix B
+    // (docs/dev.md's "Chat reliability: the 2026-09-07 incident and the
+    // five fixes"): status 502 is a Tier 1 handler's own typed report
+    // that it genuinely tried and couldn't answer (an upstream fetch
+    // failure it caught itself) - speaks the manifest's own
+    // `fallback_reply` (denoHost.ts's fallbackResult(), the same line a
+    // crash/timeout already used) rather than a generic apology, since
+    // the package has a real, honest thing to say. Everything else
+    // (400/403/404) is the pre-existing, rarer gap this comment
+    // originally described - a role change or a bad manifest between the
+    // router's check and the run - surfaced as a plain apology rather
+    // than leaking the internal error string to a household member.
+    // `source: "plugin_error"` on the returned `TurnValue` is the
+    // intended way to detect either case, not the top-level `ok` flag (a
+    // review, 2026-09-04, flagged this could otherwise look
+    // indistinguishable from a real success to a caller branching on
+    // `.ok` alone).
     console.log(`[turn] plugin ${routed.id} matched but failed to run: ${result.error}`);
     return immediate({
-      reply: { text: "Sorry, I couldn't do that." },
+      reply: (result.status === 502 ? result.fallback_reply.reply : undefined) ?? { text: "Sorry, I couldn't do that." },
       source: "plugin_error",
       plugin_id: routed.id,
       safety,
