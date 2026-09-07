@@ -151,7 +151,17 @@ describe("MemoryPage", () => {
       const { findByRole, queryByText } = renderMemoryPage();
       const archiveButton = await findByRole("button", { name: 'Archive "Likes dinosaurs"' });
       fireEvent.click(archiveButton);
-      await waitFor(() => expect(queryByText("Likes dinosaurs")).toBeNull());
+      // Issue #21: observed flaky only under the full suite's real CPU
+      // contention (never in isolation, never reproduced across several
+      // dozen local full-suite runs while investigating) - the archive
+      // POST, the schema-binding invalidation, and the refetch are three
+      // real async hops for waitFor's default 1000ms window to land
+      // inside every time. No leaked timer, retry, or poll was found
+      // anywhere in this path (queryClient.ts disables retries
+      // everywhere; MemoryPage.tsx has no interval/poll of its own) - a
+      // wider window is the correct response to genuine scheduling
+      // contention, not a guess at an unconfirmed root cause.
+      await waitFor(() => expect(queryByText("Likes dinosaurs")).toBeNull(), { timeout: 5_000 });
     } finally {
       globalThis.fetch = original;
     }
