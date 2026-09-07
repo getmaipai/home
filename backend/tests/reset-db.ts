@@ -1,4 +1,6 @@
+import { tmpdir } from "node:os";
 import { db } from "@/db";
+import { dataDir } from "@/lib/paths";
 import { __resetSettingsCacheForTests } from "@/lib/settings";
 import { __resetCommandsCacheForTests } from "@/lib/commands";
 import { __resetTurnActivityForTests } from "@/lib/turnActivity";
@@ -58,7 +60,29 @@ import {
 // was silent; clearing it now means a future test that does assert a
 // specific id (e.g. the first record created is "mem1-...") won't have a
 // hidden dependency on what ran before it in the same process.
+// Found the hard way (2026-09-06): calling this outside `bun test` (a
+// one-off `bun run` verification script, not the test runner) skips
+// bunfig.toml's own preload.ts entirely, so MAIPAI_DATA_DIR is never
+// pointed at a throwaway directory - `dataDir` (lib/paths.ts) silently
+// falls back to the real household's own data/hub.db, and this function
+// wiped it in full: every person, session, and setting gone,
+// indistinguishable from a factory reset, with a real household's local
+// dev instance sent back to first-run setup. This is the one guard
+// standing between "a test file's beforeEach" and "delete a real
+// household forever" - refuses to run unless the resolved dataDir is
+// unmistakably the disposable one tests/preload.ts creates.
+function assertDisposableTestDataDir(): void {
+  if (!dataDir.startsWith(tmpdir()) || !dataDir.includes("maipai-home-test-")) {
+    throw new Error(
+      `resetDb() refused to run: dataDir (${dataDir}) doesn't look like a disposable test directory. ` +
+        `This almost always means it was invoked outside 'bun test' (e.g. a one-off 'bun run' script), ` +
+        `so MAIPAI_DATA_DIR was never set - proceeding would delete a real household's data.`,
+    );
+  }
+}
+
 export function resetDb(): void {
+  assertDisposableTestDataDir();
   db.delete(approvals).run();
   db.delete(grants).run();
   db.delete(relationships).run();
