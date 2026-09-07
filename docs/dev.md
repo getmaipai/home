@@ -9483,6 +9483,91 @@ here (a pre-existing pattern Fix E only added a 4th value to, not
 something this fix introduced): the routing-tier union duplicated
 inline across three files instead of one shared type - `docs/BACKLOG.md`.
 
+### websearch is now always offered, and a real dangling-comma bug fixed (Jesse, live-found 2026-09-07)
+
+Two more real, live-found fixes, tested against the real household chat
+UI Jesse was actively using while these landed.
+
+**websearch always offered.** "What's the latest stephen king novel"
+still never got offered `websearch` at all after Fix E and the earlier
+routing-examples broadening - 0.66 against a 0.68 offering floor, one
+keyword-choice away from the next miss regardless of how many examples
+`websearch`'s own manifest carried (chasing individual phrasings further
+would have been the exact whack-a-mole this session already learned to
+distrust from Fix D's own paraphrase-corpus reversion). The real fix:
+`websearch` is now always offered as a Tier 2 tool in `prepareTurn()`
+(`turnEngine.ts`), regardless of its own embedding score - never gated
+by `TIER2_AMBIGUOUS_FLOOR` at all. This is sound specifically because of
+Fix E: the floor's whole reason to exist was to skip a COSTLY separate
+model round trip (the deleted `attemptTier2Tools()`'s own up-front
+`complete()` call) on turns where nothing plausible was ever in
+contention; native tool calling folded offering into the SAME
+completion that answers the turn either way, so that cost no longer
+applies, and the model's own judgment (measured at 0% false-call rate
+across the real corpus) is a better gate than an embedding score for a
+genuinely open-ended fallback tool. Deliberately NOT a general floor
+change - lowering `TIER2_AMBIGUOUS_FLOOR` itself would need the whole
+routing corpus re-measured for noisier offers on every OTHER candidate
+too; this is scoped to the one tool this gap was actually about, with a
+small, bounded exception (+1 to `MAX_TIER2_TOOLS_OFFERED`, never
+unbounded).
+
+Verified live, with real diagnostics before writing the fix (not
+assumed): confirmed via `route()` directly that `websearch` genuinely
+scores 0.65-0.66 and IS present in `ranked` for this utterance (just
+below the floor); confirmed via a raw curl against the real engine that
+the model DOES propose calling `websearch` the moment it's actually
+offered, unprompted; confirmed the household's own `search.searxng_url`
+is configured and reachable (`curl` to it, HTTP 200) so this isn't a
+dead end. After the fix, a request-interception check against the real
+`runTurn()` call showed the model correctly proposing `{name:
+"websearch", arguments: {expression: "latest stephen king novel"}}` with
+the real, full system prompt - the isolated test env's own execution
+failure (no SearXNG configured there) triggered the "ask again, retry
+without tools" fallback exactly as designed, not a bug; Jesse's own real
+household has SearXNG configured, so the full path works there. Proven
+with a real regression test (`tests/tier2.test.ts`) using an utterance
+sharing no vocabulary with anything, confirmed to fail without the fix.
+
+**The dangling-comma bug.** Jesse noticed a live reply ending mid-
+sentence with a bare comma - "I don't have access to real-time
+information on new publications,". Root cause, found by reading the
+real mechanism rather than guessing: `spec/safety/ts/sentenceChunker.ts`'s
+own `CLAUSE_BOUNDARY` flushes a speakable chunk early, ON a comma, once
+a run-on sentence is long enough - a real, deliberate latency
+optimization (get audio started sooner) with nothing to do with safety.
+`gateOutputSafety()`'s per-chunk safety check and `gateGuards()`'s per-
+chunk honesty check both run on whatever chunk this produces, comma-
+ended or not. When the model's REAL generation continued past that
+comma into an invented claim (a fabricated book title, say),
+`guardInvention()` correctly caught it as a CUTTABLE reason on the NEXT
+chunk - and `gateGuards()`'s own correct behavior for "cuttable, with
+something already spoken" (guards.ts's real branch, matched exactly by
+Fix C) is to keep the prefix and add nothing more, stopping cleanly.
+Correct SAFETY behavior; the prefix just was never meant to stand alone
+as a complete sentence.
+
+Fixed with a new, narrowly-scoped `closeDanglingClause()` (`turnEngine.ts`):
+called only from `runTurnStream()`'s own `finalize()`, and only when
+`guardHits.length > 0` (a real guard cut happened this turn) - a normal,
+uncut reply is never touched. Strips a trailing comma/semicolon/colon/
+dash and closes it into a real sentence with a period. Scoped to the
+STREAMING path specifically: the non-streaming `guardReply()`
+(`runTurn()`'s own gate) splits on `.!?` only, never mid-sentence on a
+comma, so this exact shape can't occur there at all.
+
+Proven three ways, deepest first: a direct unit test on
+`closeDanglingClause()` itself (trailing comma/semicolon/colon/dash all
+closed; already-clean endings, empty text, and a MID-sentence comma all
+left untouched); a test exercising the REAL composition
+`runTurnStream()` itself uses (`gateGuards(gateOutputSafety(tokens,
+actor), ...)`, fed one long delta crossing the real clause-boundary
+threshold) proving the raw bug is genuinely reproducible through the
+real pipeline, not hypothetical; and a full production-path test
+(`streamTurnEvents()`, the real HTTP-level driver) proving the "done"
+event's own final text is a closed sentence. All three confirmed to
+fail without the fix.
+
 ### What was actually killing the chat engine (found 2026-09-07, 04:30)
 
 The self-heal commit earlier the same night (`8b6caa9`, llm.ts's

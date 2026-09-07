@@ -916,10 +916,14 @@ type PreparedTurn =
        * one round trip): offered to the SAME completion call that
        * answers the turn (runTurn()/runTurnStream()), replacing the
        * deleted attemptTier2Tools()'s own separate, up-front `complete()`
-       * call. Empty when `ranked` never cleared TIER2_AMBIGUOUS_FLOOR -
-       * never sent as `[]` (llm.ts's own `offering` check), so an
-       * ordinary turn's prompt-cache hit rate is unaffected by Tier 2
-       * ever existing. */
+       * call. Empty (never sent as `[]` - llm.ts's own `offering` check)
+       * only when `ranked` never cleared TIER2_AMBIGUOUS_FLOOR AND no
+       * installed package declares `routing.always_offer` (manifest.
+       * schema.json) - a package that DOES (websearch is the first) is
+       * offered on every turn regardless of the floor, so `tools` is no
+       * longer guaranteed empty on an ordinary turn once one exists; the
+       * offered SET stays identical across ordinary turns either way, so
+       * the prompt prefix is still cacheable, just no longer empty. */
       tools: ToolSpec[];
       /** The exact candidates `tools` was built from - resolveToolCalls()
        * needs each call's own manifest (a `consequential` check) and
@@ -1263,20 +1267,52 @@ async function prepareTurn(
   // Fix E (docs/dev.md's "Chat reliability" - native tool calling, one
   // round trip): `ranked` (route()'s own Tier 1 scoring) below
   // TIER2_AMBIGUOUS_FLOOR means nothing plausible enough to ask the
-  // model about at all - `tools` stays empty and runTurn()/
-  // runTurnStream() never send a `tools` field on this turn's completion
-  // call, exactly as if Tier 2 didn't exist (an ordinary chat request's
-  // own prompt-cache hit rate is unaffected). Above the floor, offered
-  // to the SAME completion call that answers the turn - no separate,
-  // up-front `complete()` call anymore (attemptTier2Tools()'s own deleted
-  // one, a whole extra model round trip on every turn that reached
-  // here); the model's own tool_calls decision (or lack of one) is read
-  // back from that one call by runTurn()/runTurnStream() and handed to
-  // resolveToolCalls() below.
-  const tools: ToolSpec[] =
-    ranked.length > 0 && ranked[0]!.score >= TIER2_AMBIGUOUS_FLOOR
-      ? ranked.slice(0, MAX_TIER2_TOOLS_OFFERED).map((r) => ({ id: r.id, description: r.manifest.description, args: r.manifest.args }))
-      : [];
+  // model about at all - offered to the SAME completion call that
+  // answers the turn either way (no separate, up-front `complete()` call
+  // anymore - attemptTier2Tools()'s own deleted one, a whole extra model
+  // round trip on every turn that reached here); the model's own
+  // tool_calls decision (or lack of one) is read back from that one call
+  // by runTurn()/runTurnStream() and handed to resolveToolCalls() below.
+  const floorCleared = ranked.length > 0 && ranked[0]!.score >= TIER2_AMBIGUOUS_FLOOR;
+  const topRanked = floorCleared ? ranked.slice(0, MAX_TIER2_TOOLS_OFFERED) : [];
+  // manifest.routing.always_offer (spec/schemas/manifest.schema.json,
+  // Fix E's own addition - a code review, 2026-09-07, found the first
+  // cut of this hardcoded a `Set(["websearch"])` in this file instead of
+  // a real manifest field, the same "declared once" asymmetry
+  // `consequential` already solved for the opposite case): a genuinely
+  // open-ended fallback package (websearch is the first) is offered on
+  // EVERY turn, never gated by TIER2_AMBIGUOUS_FLOOR at all - Jesse,
+  // 2026-09-07, live-found: "what's the latest stephen king novel"
+  // never cleared the floor (0.66 against 0.68) even after broadening
+  // websearch's own routing.examples, and a natural rephrasing of the
+  // identical question would always be one keyword away from the next
+  // miss (the exact whack-a-mole Fix D's own paraphrase-corpus reversion
+  // already learned to distrust). Sound specifically because of Fix E:
+  // the floor's whole reason to exist was to skip a COSTLY separate
+  // round trip on turns where nothing plausible was in contention;
+  // native tool calling folded offering into the one completion that
+  // answers the turn regardless, so a small, curated set of always-
+  // offered fallback tools costs a few hundred extra (cacheable) prompt
+  // tokens, not a second model call - the model's own native judgment,
+  // measured at a 0% false-call rate across the real corpus (docs/dev.md's
+  // Fix E writeup), is the real gate now. This DOES mean `tools` is no
+  // longer empty on an ordinary "good morning"-shaped turn whenever an
+  // always-offer package is installed - a real, honest change from Fix
+  // E's own original "an ordinary turn's prompt-cache hit rate is
+  // unaffected" framing, not something to pretend away: the offered set
+  // is IDENTICAL (and so still cacheable) across every ordinary turn,
+  // just no longer empty. Deliberately NOT a general floor change -
+  // lowering TIER2_AMBIGUOUS_FLOOR itself would need the whole routing
+  // corpus re-measured for noisier offers on every OTHER candidate too
+  // (Fix D's own precedent for what a threshold change costs to do
+  // safely); this stays scoped to whichever packages a package author
+  // explicitly opts in. MAX_TIER2_TOOLS_OFFERED still bounds `topRanked`
+  // - always-offered packages are added ON TOP of that cap (a package
+  // author's own explicit choice to always show up costs one more slot
+  // deliberately, not an unbounded one).
+  const topRankedIds = new Set(topRanked.map((r) => r.id));
+  const alwaysOffered = ranked.filter((r) => r.manifest.routing?.always_offer && !topRankedIds.has(r.id));
+  const tools: ToolSpec[] = [...topRanked, ...alwaysOffered].map((r) => ({ id: r.id, description: r.manifest.description, args: r.manifest.args }));
 
   const guardContext: Omit<GuardContext, "personId"> = {
     utterance: text,
@@ -1886,6 +1922,30 @@ export async function* gateGuards(
   return step.value;
 }
 
+/** Jesse, live-found 2026-09-07: gateGuards() cutting a reply after a
+ * CUTTABLE reason (see its own comment) can leave the visible text
+ * ending mid-clause - "...on new publications," full stop - because
+ * spec/safety/ts/sentenceChunker.ts's CLAUSE_BOUNDARY flushes a
+ * speakable chunk early, on a comma, purely for TTS latency, and the
+ * guard then cut the NEXT clause with nothing to replace it with (the
+ * prefix already spoken is correct to keep; it just wasn't meant to
+ * stand alone). Only ever called with `guardHits.length > 0`
+ * (runTurnStream()'s own finalize()) - a normal, uncut reply is never
+ * touched. Closes a trailing comma/semicolon/colon/dash into a real
+ * sentence; anything else (already ends `.!?`, or doesn't end in a
+ * clause connector at all) passes through unchanged. */
+export function closeDanglingClause(text: string): string {
+  const trimmed = text.trimEnd();
+  // A code review (2026-09-07) found this only stripped ONE trailing
+  // character: a doubled run some models emit for an em dash ("--")
+  // left one dash behind ("...releases-."), a visibly worse result than
+  // the dangling comma this function exists to fix. `+` strips the
+  // WHOLE trailing run of clause-connector characters, not just its
+  // last one.
+  const stripped = trimmed.replace(/\s*[,;:\-–—]+$/, "");
+  return stripped === trimmed ? text : `${stripped}.`;
+}
+
 /** Same safety-first routing and deterministic plugin floor as runTurn(),
  * but the `chat` role's own answer streams token by token instead of
  * arriving as one blocking call - the real prerequisite for speaking a
@@ -1985,8 +2045,26 @@ export async function runTurnStream(
         // allow_with_resources case, matching runTurn()'s own refuse
         // branch, which never had this bug.
         const crisisResources = (outputSafety && deriveCrisisResources(outputSafety)) ?? prepared.crisisResources;
+        // Jesse, live-found 2026-09-07: a reply cut by a CUTTABLE guard
+        // (gateGuards()) after something was already spoken can end mid-
+        // clause with a dangling comma - "I don't have access to real-
+        // time information on new publications," full stop, nothing
+        // after it. Cause: the streaming sentence chunker
+        // (spec/safety/ts/sentenceChunker.ts's CLAUSE_BOUNDARY) flushes
+        // early on a comma once a run-on sentence is long enough,
+        // purely for TTS latency; gateGuards() then caught the NEXT
+        // clause (the model's own invented continuation) and stopped
+        // without yielding anything more, per its own "cuttable with
+        // something already spoken: keep the prefix, no honest line"
+        // branch - the correct SAFETY decision, but the prefix was only
+        // ever meant to be read alongside the rest of the sentence, not
+        // stand alone. Cosmetic only, scoped to exactly this cause
+        // (`guardHits.length > 0`, never a normal reply that happens to
+        // end differently) - closes the dangling clause into a real
+        // sentence rather than leaving a floating comma/dash/colon.
+        const finalText = guardHits.length > 0 ? closeDanglingClause(replyText) : replyText;
         const value: TurnValue = finalizeReply(actor, {
-          reply: { text: replyText },
+          reply: { text: finalText },
           source: refusedWithNothingDelivered ? "safety_refuse" : "model",
           safety: outputSafety ?? prepared.safety,
           crisis_resources: crisisResources,

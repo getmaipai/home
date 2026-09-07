@@ -294,7 +294,26 @@ frequently a hard prerequisite, not just a preference.
       from the real sites - `lib/searxngHealth.ts` now checks hourly and
       raises a Repairs issue for that, an unreachable/invalid URL, or a
       non-JSON response, so the household finds out instead of concluding
-      "search doesn't work."
+      "search doesn't work." Live-found and fixed 2026-09-07 (Jesse, same
+      day as Fix E): `websearch` was still never OFFERED at all for a
+      natural question phrasing ("what's the latest stephen king novel,"
+      0.66 against the 0.68 Tier 2 offering floor) even after broadening
+      its own `routing.examples` - fixed by adding
+      `routing.always_offer: true` to its manifest (`manifest.schema.json`'s
+      new field, `turnEngine.ts`'s `prepareTurn()` reads it): a genuinely
+      open-ended fallback package is now offered on every turn regardless
+      of its own embedding score, sound specifically because Fix E folded
+      offering into the one completion that answers the turn either way
+      (no separate round trip cost to avoid anymore). Verified live end to
+      end against the real household chat, including the real
+      `search.searxng_url` config actually answering ("The latest Stephen
+      King novel is..."). A separate, unrelated bug found and fixed the
+      same session while investigating this: a CUTTABLE guard cut after
+      the streaming clause-chunker's own early comma-flush could leave a
+      reply ending mid-sentence with a bare comma - `closeDanglingClause()`
+      (`turnEngine.ts`) closes it into a real sentence, scoped to exactly
+      that cause (a real guard cut happened this turn). Full writeup in
+      `docs/dev.md`.
 - [ ] Music / media search (S-M) - "what's this song," "who sings X,"
       show/movie info and availability. A pure lookup against a
       catalog/metadata API - explicitly NOT the same skill as playing

@@ -283,6 +283,34 @@ describe("runTurn()/runTurnStream() with native tool calling end to end (Fix E)"
     for await (const delta of result.tokens) deltas.push(delta);
     expect(deltas.length).toBeGreaterThan(0);
   });
+
+  // Jesse, live-found 2026-09-07: "what's the latest stephen king novel"
+  // never got offered `websearch` at all - 0.66 against a 0.68 floor,
+  // one keyword-choice away from the next miss regardless of how many
+  // examples websearch's own manifest carries. `websearch` is now
+  // ALWAYS offered (prepareTurn(), turnEngine.ts) regardless of its own
+  // embedding score, letting the model's own native judgment decide -
+  // proven here with an utterance that shares essentially no vocabulary
+  // with anything (would score near zero under every candidate,
+  // including websearch, under the stub's own bag-of-words scorer),
+  // confirming this isn't the usual floor-clearing offer at all.
+  test("runTurn(): websearch is offered even when nothing (including websearch itself) clears the ordinary Tier 2 floor", async () => {
+    const { actor } = await owner();
+    // Recorded independently of whether websearch's own real recipe
+    // execution succeeds in this test env (no SearXNG configured) -
+    // the offer itself is what's under test, not the resolution
+    // outcome, so this can't pass or fail vacuously on that unrelated
+    // failure the way asserting on the final TurnValue alone could.
+    let sawWebsearchOffered = false;
+    await withScriptedToolCalls(
+      (request) => {
+        if (request.tools?.some((t) => t.function.name === "websearch")) sawWebsearchOffered = true;
+        return undefined; // let the stub's default echo answer either way
+      },
+      () => runTurn(actor, "chat", "good morning"),
+    );
+    expect(sawWebsearchOffered).toBe(true);
+  });
 });
 
 describe("resolvePendingAsk()", () => {

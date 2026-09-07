@@ -8,6 +8,7 @@ import {
   runTurnStream,
   gateOutputSafety,
   gateGuards,
+  closeDanglingClause,
   StreamSafetyRefusal,
   buildSystemPrompt,
   buildStablePrefix,
@@ -431,6 +432,36 @@ describe("lib/turnEngine.ts runTurnStream() output-safety gate (step 9)", () => 
     });
   });
 
+  // Jesse, live-found 2026-09-07: this is the exact live shape - not a
+  // safety refusal (StreamSafetyRefusal, above) but a CUTTABLE guard hit
+  // (invention) that stops the stream after a comma-flushed clause was
+  // already delivered, driven through the real production path
+  // (streamTurnEvents(), runTurnStream()'s own finalize()) rather than
+  // the lower-level gateOutputSafety()/gateGuards() composition the
+  // dedicated closeDanglingClause() test file section already proves
+  // directly.
+  test("a cuttable guard hit after a comma-flushed clause: the DONE event's own text is a closed sentence, not a dangling comma", async () => {
+    const { childRow } = await ownerAndChild();
+    const prefix = "I don't have access to real-time information about brand new book releases from any author right now,";
+    const invented = " but I believe the title is Winterfall's Reckoning.";
+
+    await withScriptedStream(`${prefix}${invented}`, async () => {
+      const result = await runTurnStream(childRow, "chat", "what's the latest book out there");
+      expect(result.ok).toBe(true);
+      if (!result.ok || result.kind !== "stream") return;
+
+      const events: TurnStreamEvent[] = [];
+      for await (const event of streamTurnEvents(result, childRow.id)) events.push(event);
+
+      const done = events.find((e): e is Extract<TurnStreamEvent, { type: "done" }> => e.type === "done");
+      expect(done).toBeDefined();
+      expect(done!.value.reply.text).not.toContain("Winterfall");
+      // The real proof: closed into a sentence, not left dangling.
+      expect(done!.value.reply.text.trim().endsWith(",")).toBe(false);
+      expect(done!.value.reply.text).toBe(prefix.replace(/,$/, "."));
+    });
+  });
+
   test("the notification fires: an adult in the household sees a safety.flagged_turn alert for the child's cut turn", async () => {
     const { ownerRow, childRow } = await ownerAndChild();
 
@@ -701,6 +732,93 @@ describe("lib/turnEngine.ts gateGuards() matches guardReply()'s real branches (F
     expect(flaggedReasons).toEqual(["capability_claim"]);
     expect(delivered.join("")).not.toContain("nobody should ever see");
     expect(step.value?.action).toBe("allow_with_resources");
+  });
+});
+
+describe("closeDanglingClause() (Jesse, live-found 2026-09-07)", () => {
+  test("a trailing comma is closed into a real sentence", () => {
+    expect(closeDanglingClause("I don't have access to real-time information on new publications,")).toBe(
+      "I don't have access to real-time information on new publications.",
+    );
+  });
+
+  test("a trailing semicolon, colon, or dash are all closed the same way", () => {
+    expect(closeDanglingClause("here's what I found;")).toBe("here's what I found.");
+    expect(closeDanglingClause("one thing to note:")).toBe("one thing to note.");
+    expect(closeDanglingClause("let me check that -")).toBe("let me check that.");
+    expect(closeDanglingClause("let me check that —")).toBe("let me check that.");
+  });
+
+  // A code review (2026-09-07) found the first cut only stripped ONE
+  // trailing character - a doubled run (some models emit "--" for an em
+  // dash) left one dash standing right before the added period, a
+  // visibly worse result ("...releases-.") than the dangling comma this
+  // function exists to fix in the first place.
+  test("a doubled/mixed trailing run is stripped entirely, not left half-fixed", () => {
+    expect(closeDanglingClause("brand new releases--")).toBe("brand new releases.");
+    expect(closeDanglingClause("one more thing,,")).toBe("one more thing.");
+    expect(closeDanglingClause("let me check that :-")).toBe("let me check that.");
+  });
+
+  test("a reply that already ends cleanly is never touched", () => {
+    expect(closeDanglingClause("Good morning!")).toBe("Good morning!");
+    expect(closeDanglingClause("It's sunny out today.")).toBe("It's sunny out today.");
+    expect(closeDanglingClause("Are you free later?")).toBe("Are you free later?");
+  });
+
+  test("empty text stays empty - never turned into a bare period", () => {
+    expect(closeDanglingClause("")).toBe("");
+    expect(closeDanglingClause("   ")).toBe("   ");
+  });
+
+  test("a comma mid-sentence (not trailing) is left completely alone", () => {
+    expect(closeDanglingClause("Friday is pizza night, so we'll order out.")).toBe("Friday is pizza night, so we'll order out.");
+  });
+});
+
+// The real pipeline this bug actually lives in: gateOutputSafety()'s own
+// clause-boundary chunker (spec/safety/ts/sentenceChunker.ts) flushing a
+// long run-on sentence early, ON a comma, purely for TTS latency - then
+// gateGuards() catching the NEXT clause as an invention and stopping
+// with nothing more to yield. Exercises the real composition
+// runTurnStream() itself uses (gateGuards(gateOutputSafety(tokens,
+// actor), ...)), not a hand-picked pre-split "sentence" the way the
+// gateGuards()-only tests above do - the dangling comma is a direct
+// consequence of the CHUNKER's own boundary choice, which those tests
+// never exercise at all.
+describe("the dangling-comma bug end to end (Jesse, live-found 2026-09-07)", () => {
+  test("gateOutputSafety()+gateGuards() together leave a comma-flushed prefix standing when the next clause is cut - closeDanglingClause() is what fixes it, not either gate alone", async () => {
+    // Long enough (>90 chars before the comma) that gateOutputSafety()'s
+    // own chunker flushes a real clause boundary right at the comma
+    // instead of waiting for the whole run-on sentence to finish -
+    // exactly the real live shape ("I don't have access to real-time
+    // information on new publications,"). "Winterfall's Reckoning" is
+    // an invented title (two proper nouns, grounded nowhere in this
+    // turn's utterance/sources/history), so guardInvention() catches
+    // the clause that follows.
+    const prefix = "I don't have access to real-time information about brand new book releases from any author right now,";
+    expect(prefix.length).toBeGreaterThan(90); // the exact condition this test means to exercise
+    const invented = " but I believe the title is Winterfall's Reckoning.";
+
+    async function* oneBigDelta(): AsyncGenerator<string, undefined, void> {
+      yield `${prefix}${invented}`;
+      return undefined;
+    }
+
+    const { actor } = await owner();
+    const gated = gateGuards(gateOutputSafety(oneBigDelta(), actor), { utterance: "what's the latest book out there" }, actor.id);
+    const delivered: string[] = [];
+    for await (const chunk of gated) delivered.push(chunk);
+    const rawReply = delivered.join("");
+
+    // Proves the bug is real, not hypothetical: the raw, un-fixed output
+    // of the exact real pipeline ends mid-clause.
+    expect(rawReply.trim().endsWith(",")).toBe(true);
+    expect(rawReply).not.toContain("Winterfall");
+
+    // The fix runTurnStream()'s own finalize() applies (guardHits.length
+    // > 0 - a real cut happened) turns that into a real sentence.
+    expect(closeDanglingClause(rawReply)).toBe(prefix.replace(/,$/, "."));
   });
 });
 

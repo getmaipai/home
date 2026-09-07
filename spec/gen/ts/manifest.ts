@@ -55,6 +55,13 @@ export const PackageManifest = z
           .describe("Five or more, required at bronze (docs/PACKAGES.md).")
           .optional(),
         patterns: z.array(z.string().min(1)).optional(),
+        /**Fix E (home/docs/dev.md, 'Chat reliability'): offered as a Tier 2 tool on every turn, regardless of this package's own embedding score against `examples` - never gated by the ambiguous-floor pre-filter (route()'s TIER2_AMBIGUOUS_FLOOR) that every other package still is. For a genuinely open-ended fallback capability (websearch is the first: no fixed vocabulary describes 'a question that needs a live lookup') where the pre-filter's own false negatives are common and costly, and native tool calling's own measured false-call rate (0% across the real corpus) makes the model's own judgment a better gate than a similarity score. Not a general escape from the floor: a package still needs a real role match and a manifest entry to be considered at all, and MAX_TIER2_TOOLS_OFFERED's own cap still bounds how many always-offered packages can exist before the prompt grows unbounded - use sparingly, for real fallback capabilities only, never as a way to skip tuning `examples`.*/
+        always_offer: z
+          .boolean()
+          .describe(
+            "Fix E (home/docs/dev.md, 'Chat reliability'): offered as a Tier 2 tool on every turn, regardless of this package's own embedding score against `examples` - never gated by the ambiguous-floor pre-filter (route()'s TIER2_AMBIGUOUS_FLOOR) that every other package still is. For a genuinely open-ended fallback capability (websearch is the first: no fixed vocabulary describes 'a question that needs a live lookup') where the pre-filter's own false negatives are common and costly, and native tool calling's own measured false-call rate (0% across the real corpus) makes the model's own judgment a better gate than a similarity score. Not a general escape from the floor: a package still needs a real role match and a manifest entry to be considered at all, and MAX_TIER2_TOOLS_OFFERED's own cap still bounds how many always-offered packages can exist before the prompt grows unbounded - use sparingly, for real fallback capabilities only, never as a way to skip tuning `examples`.",
+          )
+          .optional(),
       })
       .strict()
       .optional(),
