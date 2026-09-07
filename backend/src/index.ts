@@ -13,6 +13,7 @@ import { startIdleSweep, registerDenoHostGracefulExit } from "@/lib/denoHost";
 import { hasHouseholdLeaf, getHouseholdLeafForServer, checkLeafExpiry, onLeafRenewed, registerRenewFixHandler } from "@/lib/householdCa";
 import { advertiseMdns } from "@/lib/mdns";
 import { rebindWithRetry } from "@/lib/serverRebind";
+import { SERVER_IDLE_TIMEOUT_SECONDS } from "@/lib/serverConfig";
 import { raiseIssue } from "@/lib/issues";
 import { startWyomingServer } from "@/lib/wyomingServer";
 import { websocket } from "hono/bun";
@@ -214,6 +215,11 @@ console.log(`MaiPai Home hub listening on ${initialTls ? "https" : "http"}://loc
 // in-process rebind is the honest option available today, and far better
 // than either a silent no-op or exiting the process with nothing
 // configured to bring it back up.
+//
+// idleTimeout: SERVER_IDLE_TIMEOUT_SECONDS (lib/serverConfig.ts) - found
+// live 2026-09-07, Bun.serve()'s own default (10s) was silently killing
+// the connection before routes/host.ts's own 90s RESTART_TIMEOUT_MS ever
+// got a chance to respond. See that file's own header for the full story.
 let server = Bun.serve({
   port,
   fetch: app.fetch,
@@ -224,6 +230,7 @@ let server = Bun.serve({
   // only ever invokes it for a connection an upgradeWebSocket() call
   // accepted, never for a plain HTTP request.
   websocket,
+  idleTimeout: SERVER_IDLE_TIMEOUT_SECONDS,
   ...(initialTls ? { tls: initialTls } : {}),
 });
 
@@ -254,7 +261,7 @@ void advertiseMdns({ port, tls: initialTls !== null });
 // gap), but no longer a silent, uncaught exception either.
 onLeafRenewed((leaf) => {
   server.stop(true);
-  void rebindWithRetry(() => Bun.serve({ port, fetch: app.fetch, websocket, tls: { cert: leaf.certPem, key: leaf.keyPem } }))
+  void rebindWithRetry(() => Bun.serve({ port, fetch: app.fetch, websocket, idleTimeout: SERVER_IDLE_TIMEOUT_SECONDS, tls: { cert: leaf.certPem, key: leaf.keyPem } }))
     .then(({ server: newServer }) => {
       server = newServer;
       void advertiseMdns({ port, tls: true });

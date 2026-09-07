@@ -90,7 +90,12 @@ hostRoutes.post("/engine/stop", requireRole("owner", "admin"), async (c) => {
 // succeed, the next status poll picks it up; if it doesn't, the household
 // member gets a real error and a Restart button to try again rather than
 // a spinner with no way out.
-const RESTART_TIMEOUT_MS = 90_000;
+// Exported so a test can assert index.ts's own Bun.serve() idleTimeout
+// (lib/serverConfig.ts) stays comfortably above this - the exact
+// invariant a live incident (2026-09-07) found broken: Bun's connection-
+// level idle timeout doesn't know this route intends to wait this long,
+// so a shorter idleTimeout silently kills the connection first.
+export const RESTART_TIMEOUT_MS = 90_000;
 
 hostRoutes.post("/engine/restart", requireRole("owner", "admin"), async (c) => {
   await restartChatBackend();
