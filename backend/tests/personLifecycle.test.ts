@@ -175,4 +175,76 @@ describe("applyAgeBandChanges()", () => {
     expect(moved).toEqual([]);
     expect(db.select().from(people).where(eq(people.id, teen.id)).get()!.role).toBe("teen");
   });
+
+  // Issues #35/#47: a code review of that fix found this was the one
+  // path left that could produce a credential-free "adult" - neither
+  // routes/people.ts's create nor checkRoleChange's promotion guard runs
+  // here, since this write skipped both routes entirely.
+  describe("a teen turning 18 with no credential (issues #35/#47)", () => {
+    test("is held at teen, not silently promoted to a credential-free adult", async () => {
+      const owner = insertPerson({ displayName: "Sage", role: "owner" });
+      const teen = insertPerson({ displayName: "Vincent", role: "teen", birthdate: "2008-01-01" }); // 18 in 2026
+      const moved = await applyAgeBandChanges(new Date("2026-06-15T00:00:00.000Z"));
+
+      expect(moved).toEqual([]);
+      expect(db.select().from(people).where(eq(people.id, teen.id)).get()!.role).toBe("teen");
+      const pending = listPending(owner);
+      expect(pending.some((n) => n.text.includes("Vincent") && n.text.includes("PIN"))).toBe(true);
+    });
+
+    // A review of the hold above (2026-09-06) found it re-notified on
+    // EVERY run for as long as the hold lasted, unbounded spam breaking
+    // the scheduled job's own "every run is idempotent" contract.
+    test("does not re-notify on every subsequent run while still held", async () => {
+      const owner = insertPerson({ displayName: "Sage", role: "owner" });
+      insertPerson({ displayName: "Vincent", role: "teen", birthdate: "2008-01-01" });
+
+      await applyAgeBandChanges(new Date("2026-06-15T00:00:00.000Z"));
+      await applyAgeBandChanges(new Date("2026-06-16T00:00:00.000Z"));
+      await applyAgeBandChanges(new Date("2026-06-17T00:00:00.000Z"));
+
+      const matching = listPending(owner).filter((n) => n.text.includes("Vincent") && n.text.includes("PIN"));
+      expect(matching.length).toBe(1);
+    });
+
+    // A second review of the dedup above (2026-09-06) found it keyed on
+    // a LIKE match against the rendered displayName in the notification
+    // text - displayName has no uniqueness constraint anywhere, so two
+    // same-named people held in the same sweep silently suppressed each
+    // other's notification. Fixed by keying on notificationDeliveries'
+    // own subjectPersonId column instead.
+    test("two same-named held people each get their own notification, not a merged one", async () => {
+      const owner = insertPerson({ displayName: "Sage", role: "owner" });
+      insertPerson({ id: "person-vincentone", displayName: "Vincent", role: "teen", birthdate: "2008-01-01" });
+      insertPerson({ id: "person-vincenttwo", displayName: "Vincent", role: "teen", birthdate: "2008-02-01" });
+
+      await applyAgeBandChanges(new Date("2026-06-15T00:00:00.000Z"));
+
+      const matching = listPending(owner).filter((n) => n.text.includes("Vincent") && n.text.includes("PIN"));
+      expect(matching.length).toBe(2);
+    });
+
+    test("stays a candidate on the next run, and completes once a credential exists", async () => {
+      const teen = insertPerson({ displayName: "Vincent", role: "teen", birthdate: "2008-01-01" });
+      await applyAgeBandChanges(new Date("2026-06-15T00:00:00.000Z"));
+      expect(db.select().from(people).where(eq(people.id, teen.id)).get()!.role).toBe("teen");
+
+      const now = new Date().toISOString();
+      db.insert(personCredentials).values({ personId: teen.id, secretHash: await hashSecret("theirpin1"), failedAttempts: 0, createdAt: now, updatedAt: now }).run();
+
+      const moved = await applyAgeBandChanges(new Date("2026-06-16T00:00:00.000Z"));
+      expect(moved).toEqual([teen.id]);
+      expect(db.select().from(people).where(eq(people.id, teen.id)).get()!.role).toBe("adult");
+    });
+
+    test("a teen who already has a credential is promoted immediately, same as before", async () => {
+      const teen = insertPerson({ displayName: "Vincent", role: "teen", birthdate: "2008-01-01" });
+      const now = new Date().toISOString();
+      db.insert(personCredentials).values({ personId: teen.id, secretHash: await hashSecret("theirpin1"), failedAttempts: 0, createdAt: now, updatedAt: now }).run();
+
+      const moved = await applyAgeBandChanges(new Date("2026-06-15T00:00:00.000Z"));
+      expect(moved).toEqual([teen.id]);
+      expect(db.select().from(people).where(eq(people.id, teen.id)).get()!.role).toBe("adult");
+    });
+  });
 });

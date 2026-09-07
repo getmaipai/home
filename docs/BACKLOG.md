@@ -2926,19 +2926,31 @@ same sitting would have been its own separate, disruptive change - each
 is filed as a GitHub issue with the full finding and is tracked here so
 it stays visible on the dashboard, not just in the tracker.
 
-- [ ] **PIN-free adult/teen profiles are a one-tap sign-in** (S-M,
-      `getmaipai/home#47`) - `routes/auth.ts`'s `/select` issues a
-      session for any secret-free, non-deleted profile with no throttle;
-      `routes/people.ts` only forces a secret for owner/admin. Anyone on
-      the LAN gets full adult-tier chat with one tap. A real design
-      decision (a default policy change, not a bug fix), and touching it
-      breaks the sign-in convention ~15 test files rely on (bare-tap
-      `/select` for a secret-free fixture person) - needs a coordinated
-      pass across those tests, not a one-file patch. Acceptance: a new
-      adult/teen profile defaults to requiring a PIN/password/passkey
-      before `/select` will sign it in, with a migration note for
-      existing secret-free profiles. Exit check: `scripts/check.sh`
-      green with the updated test convention.
+- [x] **PIN-free adult profiles are a one-tap sign-in** (S-M, done
+      2026-09-06, `getmaipai/home#35`, `getmaipai/home#47`) -
+      `routes/auth.ts`'s `/select` issues a session for any secret-free,
+      non-deleted profile with no throttle; `routes/people.ts` only
+      forced a secret for owner/admin, so anyone on the LAN got full
+      adult-tier chat with one tap. Fixed by requiring a secret for
+      `role: "adult"` too, in both the create route and
+      `checkRoleChange`'s promotion guard - deliberately NOT by gating
+      `contentCeiling.ts`'s `hasUnrestrictedGrant()` or any ceiling
+      lookup, since that's a further, still-unwired tier past the
+      baseline adult ceiling and touching it would silently resolve the
+      still-open "unrestricted-mode age collision" question below
+      instead of fixing the actual exposure (which also includes
+      `routes/approvals.ts` and `lib/commands.ts`'s role-based adult
+      gates, untouched by any ceiling-layer fix). Scoped to `adult` only
+      - `teen`'s ceiling is already non-unrestricted and no route
+      role-gates on `teen` the way approvals/commands gate on adult.
+      Migrated the ~26 affected test files' fixture helpers to create
+      with a secret and sign in via `/api/auth/verify-secret`; two tests
+      that specifically needed a passkey-only, zero-secret profile
+      (proving a passkey alone satisfies the same guard) now construct
+      that row directly rather than through the now-gated create route.
+      No migration path was added for already-existing secret-free adult
+      profiles in a running household - not yet a real-world concern
+      pre-0.x, worth a BACKLOG item if it becomes one after release.
 - [ ] **Background LLM work has no idle gate against foreground turns**
       (S, `getmaipai/home#45`) - `conversationHistory.ts`'s
       `maybeRefreshConversationSummary()` runs post-turn with no check
@@ -2961,13 +2973,14 @@ it stays visible on the dashboard, not just in the tracker.
       handling (moved off the main thread, or chunked/async I/O).
       Exit check: a test that starts a backup and confirms an unrelated
       request completes without waiting on it.
-- [ ] **`memorializePerson()` isn't atomic** (S, `getmaipai/home#49`) -
-      the same multi-statement-with-no-transaction shape `deletePerson()`
-      had before this review's COR-5 fix (`personLifecycle.ts`), just
-      not yet applied here. Mirror COR-5's fix exactly: wrap in
-      `sqlite.transaction()`. Exit check: `tests/people.test.ts` gets a
-      concurrent-memorialize regression test matching COR-5's own
-      "two owners deleting each other" test shape.
+- [x] **`memorializePerson()` isn't atomic** (S, done 2026-09-06,
+      `getmaipai/home#49`) - had the same multi-statement-with-no-
+      transaction shape `deletePerson()` had before COR-5's fix
+      (`personLifecycle.ts`). Fixed by wrapping the write portion in a
+      named `sqlite.transaction()`, the same pattern `commitPersonUpdate()`
+      and `deletePerson()` already use. Same commit also closed
+      `getmaipai/home#37` (`deletePerson()` left passkeys, devices, device
+      tokens and the TOTP secret behind).
 
 ## How to use this file
 

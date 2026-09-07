@@ -127,6 +127,21 @@ export const NOTIFICATION_TYPES: readonly NotificationType[] = [
     configurable: true,
     defaultChannels: ["in_app"],
   },
+  // Issues #35/#47 (a code review of that fix, 2026-09-06, found this
+  // sweep was the one path that could still produce a credential-free
+  // adult - see personAuthMethods.ts's ROLE_REQUIRES_CREDENTIAL). Held at
+  // their current band rather than promoted, so this IS something an
+  // adult needs to act on (set them a PIN, password, or passkey, then
+  // promote them by hand) - `time_sensitive`, not passive, unlike
+  // person.band_changed above.
+  {
+    id: "person.adult_band_held_needs_secret",
+    level: "time_sensitive",
+    audience: "adults",
+    template: "{displayName} is old enough to be an adult, but needs a PIN, password, or passkey set before they can be promoted.",
+    configurable: true,
+    defaultChannels: ["in_app"],
+  },
   // Step 7: the approval queue (plan's "Ask to Install, Ask to Browse").
   // `time_sensitive`, not `passive`: a child or teen is waiting on this
   // decision, unlike person.band_changed above which reports something

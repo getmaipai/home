@@ -249,6 +249,12 @@ export interface SpawnAndWaitOptions {
   cwd?: string;
   /** Freed via freePort() before spawning, when given. */
   port?: number;
+  /** Bun.spawn's own env option REPLACES process.env rather than merging
+   * with it - a caller that needs to add to the environment (ttsSupervisor.ts's
+   * HF_TOKEN, say) must spread process.env into this itself. Omitted, the
+   * spawned process inherits process.env unchanged (Bun.spawn's default),
+   * exactly the prior behavior for callers that never needed this. */
+  env?: Record<string, string | undefined>;
   healthCheck: () => Promise<boolean>;
   timeoutMs?: number;
   /** Minimum time the process must stay alive (exitCode still null)
@@ -276,7 +282,7 @@ export interface SpawnAndWaitOptions {
  * build that themselves - this only proves the process is up. */
 export async function spawnAndWaitHealthy(opts: SpawnAndWaitOptions): Promise<Bun.Subprocess> {
   if (opts.port) await freePort(opts.port);
-  const proc = Bun.spawn(opts.command, { cwd: opts.cwd, stdout: "inherit", stderr: "inherit" });
+  const proc = Bun.spawn(opts.command, { cwd: opts.cwd, stdout: "inherit", stderr: "inherit", ...(opts.env ? { env: opts.env } : {}) });
   const timeoutMs = opts.timeoutMs ?? 60_000;
   const minUptimeMs = opts.minUptimeMs ?? 0;
   const spawnedAt = Date.now();

@@ -25,10 +25,19 @@ async function owner(): Promise<{ client: TestClient; row: PersonRow }> {
 }
 
 async function withRole(ownerClient: TestClient, displayName: string, role: string): Promise<{ client: TestClient; row: PersonRow }> {
-  const created = await ownerClient.post("/api/people", { displayName, role });
+  // Issues #35/#47 made a secret required for role: "adult" too
+  // (owner/admin already needed one) - a secret-holding profile also
+  // stops being a bare-/select profile, so only attach one, and sign in
+  // via verify-secret instead, for the roles that now need it.
+  const needsSecret = role === "owner" || role === "admin" || role === "adult";
+  const created = await ownerClient.post("/api/people", { displayName, role, ...(needsSecret ? { secret: "0000" } : {}) });
   const { id } = (await created.json()) as { id: string };
   const client = new TestClient();
-  await client.post("/api/auth/select", { personId: id });
+  if (needsSecret) {
+    await client.post("/api/auth/verify-secret", { personId: id, secret: "0000" });
+  } else {
+    await client.post("/api/auth/select", { personId: id });
+  }
   const row = db.select().from(people).where(eq(people.id, id)).get()! as PersonRow;
   return { client, row };
 }
@@ -91,6 +100,7 @@ describe("trigger()", () => {
     const created = await ownerClient.post("/api/people", {
       displayName: "Marlow",
       role: "adult",
+      secret: "0000",
       birthdate: fifteenYearsAgo.toISOString().slice(0, 10),
     });
     const { id } = (await created.json()) as { id: string };

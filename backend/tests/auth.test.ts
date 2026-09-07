@@ -98,16 +98,22 @@ describe("profiles picker", () => {
 describe("passkey-only profiles are not bare-tap profiles", () => {
   test("hasPasskeys is true and /select is refused once a passkey is registered, with no PIN ever set", async () => {
     const owner = new TestClient();
-    const { person } = await setUpOwner(owner);
-    const created = await owner.post("/api/people", { displayName: "Bramble", role: "adult" });
-    const passkeyOnlyPerson = (await created.json()) as { id: string };
+    await setUpOwner(owner);
+    // Issue #35/#47 made a secret required for role: "adult" through the
+    // create route itself, which is exactly the create-time credential
+    // this test needs to NOT exist - a passkey, registered directly the
+    // same way tests/passkeys.test.ts's own insertPerson() does (a full
+    // WebAuthn ceremony needs a real authenticator; this test only cares
+    // that a passkey's PRESENCE changes /select's and /profiles' behavior),
+    // is this profile's only credential, by construction, not by route.
+    const { newPersonId } = await import("@/lib/id");
+    const passkeyOnlyPerson = { id: newPersonId() };
+    const now = new Date().toISOString();
+    db.insert(people)
+      .values({ id: passkeyOnlyPerson.id, displayName: "Bramble", role: "adult", avatarSeed: passkeyOnlyPerson.id, source: "hub", createdAt: now, updatedAt: now, hlc: `${Date.now()}:0:testfix` })
+      .run();
 
-    // No PIN/password ever set for this person - directly register a
-    // passkey credential (a full ceremony needs a real authenticator,
-    // covered by tests/passkeys.test.ts; this test only cares that ITS
-    // presence changes /select's and /profiles' behavior).
     const { passkeyCredentials } = await import("@/db/schema");
-    const { db } = await import("@/db");
     db.insert(passkeyCredentials)
       .values({
         id: "cred-bramble",
@@ -130,6 +136,45 @@ describe("passkey-only profiles are not bare-tap profiles", () => {
     const client = new TestClient();
     const res = await client.post("/api/auth/select", { personId: passkeyOnlyPerson.id });
     expect(res.status).toBe(400);
+  });
+});
+
+// Issues #35/#47: a code review found this the one gap the create-route
+// and promotion-route guards didn't cover - a person who ends up
+// role: "adult" through ANY path other than those two routes (the
+// birthday age-band sweep, or simply a row like this one) with no
+// credential at all. requiresCredential() alone says false for a truly
+// credential-free profile, so without a role check /select would happily
+// bare-tap sign them in and hand them full adult-tier access.
+describe("/select refuses adult/owner/admin roles with no credential at all, not just those with one", () => {
+  test("a credential-free role: adult profile cannot bare-tap /select", async () => {
+    const owner = new TestClient();
+    await setUpOwner(owner);
+    const { newPersonId } = await import("@/lib/id");
+    const now = new Date().toISOString();
+    const adultId = newPersonId();
+    db.insert(people)
+      .values({ id: adultId, displayName: "Vincent", role: "adult", avatarSeed: adultId, source: "hub", createdAt: now, updatedAt: now, hlc: `${Date.now()}:0:testfix` })
+      .run();
+
+    const client = new TestClient();
+    const res = await client.post("/api/auth/select", { personId: adultId });
+    expect(res.status).toBe(400);
+  });
+
+  test("a credential-free child or teen can still bare-tap /select, unaffected", async () => {
+    const owner = new TestClient();
+    await setUpOwner(owner);
+    const { newPersonId } = await import("@/lib/id");
+    const now = new Date().toISOString();
+    const childId = newPersonId();
+    db.insert(people)
+      .values({ id: childId, displayName: "Bramble", role: "child", avatarSeed: childId, source: "hub", createdAt: now, updatedAt: now, hlc: `${Date.now()}:0:testfix` })
+      .run();
+
+    const client = new TestClient();
+    const res = await client.post("/api/auth/select", { personId: childId });
+    expect(res.status).toBe(200);
   });
 });
 

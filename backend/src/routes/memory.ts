@@ -10,6 +10,7 @@ import {
   forget,
   exportPerson,
   runMaintenance,
+  isPrivilegedRecordKind,
   type MemoryOpResult,
   type ListOptions,
 } from "@/lib/memory";
@@ -94,7 +95,7 @@ function sanitizedPinned(actor: PersonRow, requested: boolean | undefined): bool
 }
 
 function sanitizedRecordKind(actor: PersonRow, requested: "memory" | "entity" | "episode" | undefined): "memory" | "entity" | "episode" | undefined {
-  if (!requested || requested === "memory") return requested;
+  if (!requested || !isPrivilegedRecordKind(requested)) return requested;
   return isOwnerOrAdmin(actor) ? requested : "memory";
 }
 
@@ -207,7 +208,7 @@ memoryRoutes.post("/:id/supersede", requireAuth, async (c) => {
     // Never from the client, same as POST / above.
     source: `api:${actor.id}`,
     pinned: sanitizedPinned(actor, body.pinned),
-  });
+  }, { enforcePrivilegedRoute: true });
   if (!result.ok) return fail(c, result);
   return c.json(result.value);
 });

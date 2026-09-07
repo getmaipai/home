@@ -3,7 +3,9 @@ import { Person } from "@maipai/spec/gen/ts/person.js";
 import { TestClient } from "./client";
 import { resetDb } from "./reset-db";
 import { __resetThrottleForTests } from "@/lib/secretThrottle";
-import { sqlite } from "@/db";
+import { sqlite, db } from "@/db";
+import { passkeyCredentials, devices, deviceTokens, totpSecrets, people } from "@/db/schema";
+import { newPersonId } from "@/lib/id";
 import { remember } from "@/lib/memory";
 import { logTurn, resolveOrCreateConversation } from "@/lib/conversationHistory";
 import { setValue } from "@/lib/settings";
@@ -41,7 +43,7 @@ describe("creating people", () => {
   test("owner can create any role, including another owner", async () => {
     const owner = await ownerClient();
     for (const role of ["owner", "admin", "adult", "teen", "child", "guest"]) {
-      const needsSecret = role === "owner" || role === "admin";
+      const needsSecret = role === "owner" || role === "admin" || role === "adult";
       const res = await owner.post("/api/people", {
         displayName: `Test ${role}`,
         role,
@@ -353,9 +355,17 @@ describe("PATCH /api/people/:id", () => {
   // the lockout-only row alone (no passkey, no PIN) still does not.
   test("a passkey satisfies the promotion guard, same as a PIN/password would", async () => {
     const ownerClient = await ownerSession();
-    const adult = await addPerson(ownerClient, "Marlow", "adult");
-    const { passkeyCredentials } = await import("@/db/schema");
-    const { db } = await import("@/db");
+    // Issues #35/#47 made a secret required for role: "adult" through the
+    // create route, which is exactly the create-time credential this test
+    // needs to NOT exist - the whole point is proving a PASSKEY alone (no
+    // secret at all) satisfies the promotion guard. Inserted directly,
+    // the same way auth.test.ts's identical passkey-only scenario now
+    // does, rather than through the now-gated route.
+    const adult = { id: newPersonId() };
+    const now = new Date().toISOString();
+    db.insert(people)
+      .values({ id: adult.id, displayName: "Marlow", role: "adult", avatarSeed: adult.id, source: "hub", createdAt: now, updatedAt: now, hlc: `${Date.now()}:0:testfix` })
+      .run();
     db.insert(passkeyCredentials)
       .values({
         id: "cred-marlow",
@@ -674,6 +684,25 @@ describe("deleting a person erases what the household held about them", () => {
     const approvalRes = await personClient.post("/api/approvals", { kind: "browse_url", details: {} });
     expect(approvalRes.status).toBe(201);
 
+    // Issue #37: passkeys, paired devices, device tokens and the TOTP
+    // secret were entirely unexercised by this test too - the same
+    // trivial-pass gap the comment above already calls out for
+    // entities/relationships/grants/approvals, just never closed for
+    // these four tables. No HTTP route exercises WebAuthn registration or
+    // TOTP setup in tests, so these are inserted directly, the same way
+    // personLifecycle.test.ts's own memorializePerson() tests already do.
+    const now = new Date().toISOString();
+    db.insert(passkeyCredentials)
+      .values({ id: "cred-erasure-test", personId: person.id, publicKey: "x", counter: 0, transports: "[]", deviceType: "singleDevice", backedUp: false, name: "Bramble's iPhone", createdAt: now })
+      .run();
+    db.insert(devices)
+      .values({ id: "device-erasure-test", kind: "phone", name: "Bramble's iPhone", personId: person.id, createdAt: now, updatedAt: now, hlc: now })
+      .run();
+    db.insert(deviceTokens)
+      .values({ id: "token-erasure-test", deviceId: "device-erasure-test", personId: person.id, tokenHash: "hash", expiresAt: now, createdAt: now })
+      .run();
+    db.insert(totpSecrets).values({ personId: person.id, secretEncrypted: "enc", enabled: true, createdAt: now, updatedAt: now }).run();
+
     await owner.request(`/api/people/${person.id}`, { method: "DELETE" });
 
     const tables = sqlite
@@ -839,7 +868,7 @@ describe("POST /api/people/batch-delete", () => {
 describe("enabled and guest expiry", () => {
   test("an admin can disable a profile, and re-enable it", async () => {
     const owner = await ownerSession();
-    const adult = await addPerson(owner, "Marlow", "adult");
+    const adult = await addPerson(owner, "Marlow", "adult", "theirpin1");
 
     const disableRes = await owner.request(`/api/people/${adult.id}`, { method: "PATCH", body: { enabled: false } });
     expect(disableRes.status).toBe(200);

@@ -99,6 +99,12 @@ function resolveChannelsFor(type: NotificationType, recipient: PersonRow): Notif
 export interface TriggerOptions {
   /** Required when `type.audience === "person"`, ignored otherwise. */
   personId?: string;
+  /** Which OTHER person this notification is about, when it's about one -
+   * stored on every delivery row this call creates regardless of
+   * audience, so a caller that fires the same notification repeatedly
+   * about DIFFERENT people (personLifecycle.ts's applyAgeBandChanges(),
+   * say) can de-duplicate on this instead of matching rendered text. */
+  subjectPersonId?: string;
 }
 
 /** Renders and delivers one declared notification to its whole audience.
@@ -136,6 +142,7 @@ export async function trigger(typeId: string, vars: Record<string, string> = {},
         text,
         channels: JSON.stringify(channels),
         createdAt: new Date().toISOString(),
+        subjectPersonId: opts.subjectPersonId ?? null,
       })
       .run();
   }

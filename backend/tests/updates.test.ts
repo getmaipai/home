@@ -83,6 +83,44 @@ describe("checkForAppUpdate()", () => {
     expect(listPending(toPersonRow(person.id)).some((n) => n.text.includes("9.9.9"))).toBe(true);
   });
 
+  // Issue #40: cachedUpdateProjection() (every GET /api/updates/) called
+  // projectionFromState(row) with no assets argument, always defaulting
+  // to [] - app_update_state had no column to read real release assets
+  // back from, so they only ever existed in the immediate
+  // checkForAppUpdate() response, never on any LATER read.
+  test("real release assets persist and are readable on a later, separate read - not just the immediate response", async () => {
+    const restore = mockGitHubRelease({
+      status: 200,
+      body: {
+        tag_name: "v9.9.9",
+        html_url: "https://example.com",
+        body: "a great release",
+        assets: [
+          { name: "home-macos.zip", browser_download_url: "https://example.com/home-macos.zip", digest: "sha256:abc123" },
+          { name: "home-windows.zip", browser_download_url: "https://example.com/home-windows.zip", digest: null },
+        ],
+      },
+    });
+    try {
+      const projection = await checkForAppUpdate();
+      expect(projection.assets).toEqual([
+        { name: "home-macos.zip", url: "https://example.com/home-macos.zip", digest: "sha256:abc123" },
+        { name: "home-windows.zip", url: "https://example.com/home-windows.zip", digest: null },
+      ]);
+    } finally {
+      restore();
+    }
+
+    // The real regression: a completely separate call, simulating a
+    // later page load, with no involvement from checkForAppUpdate()'s
+    // own in-memory response at all.
+    const later = cachedUpdateProjection();
+    expect(later.assets).toEqual([
+      { name: "home-macos.zip", url: "https://example.com/home-macos.zip", digest: "sha256:abc123" },
+      { name: "home-windows.zip", url: "https://example.com/home-windows.zip", digest: null },
+    ]);
+  });
+
   test("the same still-unapplied release never notifies twice", async () => {
     const owner = new TestClient();
     const res = await owner.post("/api/auth/setup", { displayName: "Sage", secret: "correcthorse" });
@@ -215,10 +253,10 @@ describe("GET/POST /api/updates", () => {
   test("an adult without backups.run cannot force a fresh check", async () => {
     const owner = new TestClient();
     await owner.post("/api/auth/setup", { displayName: "Sage", secret: "correcthorse" });
-    const adultRes = await owner.post("/api/people", { displayName: "Marlow", role: "adult" });
+    const adultRes = await owner.post("/api/people", { displayName: "Marlow", role: "adult", secret: "0000" });
     const adult = (await adultRes.json()) as { id: string };
     const adultClient = new TestClient();
-    await adultClient.post("/api/auth/select", { personId: adult.id });
+    await adultClient.post("/api/auth/verify-secret", { personId: adult.id, secret: "0000" });
     expect((await adultClient.post("/api/updates/check", {})).status).toBe(403);
   });
 

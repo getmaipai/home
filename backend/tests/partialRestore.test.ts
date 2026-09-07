@@ -96,7 +96,7 @@ describe("restorePersonFromBackup()", () => {
     await owner.post("/api/auth/setup", { displayName: "Sage", secret: "correcthorse" });
     const aRes = await owner.post("/api/people", { displayName: "Bramble", role: "teen" });
     const a = (await aRes.json()) as { id: string };
-    const bRes = await owner.post("/api/people", { displayName: "Iris", role: "adult" });
+    const bRes = await owner.post("/api/people", { displayName: "Iris", role: "adult", secret: "0000" });
     const b = (await bRes.json()) as { id: string };
 
     remember(toPersonRow(a.id), { text: "A's memory", category: "preference", tier: "durable", scope: "person", person: a.id, source: "hub", importance: 0.5 });
@@ -185,12 +185,12 @@ describe("POST /api/backups/:filename/restore-person/:personId", () => {
   test("an adult without backups.restore is refused", async () => {
     const owner = new TestClient();
     await owner.post("/api/auth/setup", { displayName: "Sage", secret: "correcthorse" });
-    const adultRes = await owner.post("/api/people", { displayName: "Marlow", role: "adult" });
+    const adultRes = await owner.post("/api/people", { displayName: "Marlow", role: "adult", secret: "0000" });
     const adult = (await adultRes.json()) as { id: string };
     const backup = runBackup();
 
     const adultClient = new TestClient();
-    await adultClient.post("/api/auth/select", { personId: adult.id });
+    await adultClient.post("/api/auth/verify-secret", { personId: adult.id, secret: "0000" });
     const res = await adultClient.request(`/api/backups/${backup.filename}/restore-person/${adult.id}`, { method: "POST" });
     expect(res.status).toBe(403);
   });

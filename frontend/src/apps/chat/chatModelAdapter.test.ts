@@ -90,6 +90,22 @@ describe("stripThinking", () => {
     expect(result).not.toContain("<think>");
     expect(result).not.toContain("thinking forever");
   });
+
+  // Issue #20: a reply can end (stream truncated, hit a token limit, a
+  // backend crash) while still inside an UNCLOSED think block - the
+  // regex requires a matching </think>, finds none, and the raw
+  // reasoning used to be shown verbatim in the chat bubble.
+  test("an unclosed <think> block (stream cut off mid-reasoning) never leaks the raw tag or reasoning", () => {
+    const result = stripThinking("<think>reasoning about the answer here");
+    expect(result).not.toContain("<think>");
+    expect(result).not.toContain("reasoning about the answer");
+    expect(result).toBe("MaiPai thought about it but didn't give a final answer. Try asking again.");
+  });
+
+  test("real text before an unclosed <think> block is kept, only the trailing reasoning is dropped", () => {
+    const result = stripThinking("Here's what I know so far.<think>reasoning about the rest");
+    expect(result).toBe("Here's what I know so far.");
+  });
 });
 
 describe("createChatModelAdapter streaming", () => {

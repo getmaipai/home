@@ -59,19 +59,19 @@ describe("POST /api/lists", () => {
 describe("GET /api/lists", () => {
   test("a person-scoped list is invisible to someone else, visible to owner/admin", async () => {
     const owner = await ownerSession();
-    const adultRes = await owner.post("/api/people", { displayName: "Marlow", role: "adult" });
+    const adultRes = await owner.post("/api/people", { displayName: "Marlow", role: "adult", secret: "0000" });
     const adult = (await adultRes.json()) as { id: string };
     const adultClient = new TestClient();
-    await adultClient.post("/api/auth/select", { personId: adult.id });
+    await adultClient.post("/api/auth/verify-secret", { personId: adult.id, secret: "0000" });
 
     const created = await adultClient.post("/api/lists", { kind: "todo", scope: "person" });
     expect(created.status).toBe(201);
     const list = (await created.json()) as { id: string };
 
-    const owner2Res = await owner.post("/api/people", { displayName: "Iris", role: "adult" });
+    const owner2Res = await owner.post("/api/people", { displayName: "Iris", role: "adult", secret: "0000" });
     const owner2 = (await owner2Res.json()) as { id: string };
     const otherClient = new TestClient();
-    await otherClient.post("/api/auth/select", { personId: owner2.id });
+    await otherClient.post("/api/auth/verify-secret", { personId: owner2.id, secret: "0000" });
     const listAsOther = (await (await otherClient.get("/api/lists")).json()) as Array<{ id: string }>;
     expect(listAsOther.some((l) => l.id === list.id)).toBe(false);
 

@@ -12,10 +12,13 @@ async function ownerSession(): Promise<TestClient> {
 }
 
 async function makeAdult(owner: TestClient, name: string): Promise<{ id: string; client: TestClient }> {
-  const res = await owner.post("/api/people", { displayName: name, role: "adult" });
+  // Issues #35/#47 made a secret required for role: "adult" (owner/admin
+  // already needed one) - a secret-holding profile also stops being a
+  // bare-/select profile, so sign in via verify-secret instead.
+  const res = await owner.post("/api/people", { displayName: name, role: "adult", secret: "0000" });
   const { id } = (await res.json()) as { id: string };
   const client = new TestClient();
-  await client.post("/api/auth/select", { personId: id });
+  await client.post("/api/auth/verify-secret", { personId: id, secret: "0000" });
   return { id, client };
 }
 

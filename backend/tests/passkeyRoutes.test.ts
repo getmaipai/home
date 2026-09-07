@@ -61,10 +61,10 @@ describe("GET/DELETE /api/auth/passkeys", () => {
       .values({ id: "cred-1", personId: ownerPersonId, publicKey: "x", counter: 0, transports: "[]", deviceType: "singleDevice", backedUp: false, name: "Owner's passkey", createdAt: now })
       .run();
 
-    const created = await ownerClient.post("/api/people", { displayName: "Bramble", role: "adult" });
+    const created = await ownerClient.post("/api/people", { displayName: "Bramble", role: "adult", secret: "0000" });
     const other = (await created.json()) as { id: string };
     const attacker = new TestClient();
-    await attacker.post("/api/auth/select", { personId: other.id });
+    await attacker.post("/api/auth/verify-secret", { personId: other.id, secret: "0000" });
 
     const res = await attacker.request("/api/auth/passkeys/cred-1", { method: "DELETE" });
     expect(res.status).toBe(404);

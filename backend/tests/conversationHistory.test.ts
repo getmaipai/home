@@ -51,7 +51,12 @@ async function owner() {
 }
 
 async function addPerson(ownerClient: TestClient, displayName: string, role: string) {
-  const created = await ownerClient.post("/api/people", { displayName, role });
+  // Issues #35/#47 made a secret required for role: "adult" too
+  // (owner/admin already needed one) - this helper never signs in itself
+  // (callers either use the row directly or sign in separately below), so
+  // it only needs to satisfy the create route's own requirement.
+  const needsSecret = role === "owner" || role === "admin" || role === "adult";
+  const created = await ownerClient.post("/api/people", { displayName, role, ...(needsSecret ? { secret: "0000" } : {}) });
   const body = (await created.json()) as { id: string };
   return db.select().from(people).where(eq(people.id, body.id)).get()!;
 }
@@ -579,7 +584,7 @@ describe("GET /api/conversations/export", () => {
     await runTurn(teen, "chat", "hi");
 
     const adultClient = new TestClient();
-    await adultClient.post("/api/auth/select", { personId: adult.id });
+    await adultClient.post("/api/auth/verify-secret", { personId: adult.id, secret: "0000" });
     const res = await adultClient.get(`/api/conversations/export?person=${teen.id}`);
     expect(res.status).toBe(403);
   });
@@ -839,7 +844,7 @@ describe("GET/PATCH/DELETE /api/conversations/:id (step 3 CRUD)", () => {
 
     const stranger = await addPerson(client, "Marlow", "adult");
     const strangerClient = new TestClient();
-    await strangerClient.post("/api/auth/select", { personId: stranger.id });
+    await strangerClient.post("/api/auth/verify-secret", { personId: stranger.id, secret: "0000" });
     const strangerRes = await strangerClient.get(`/api/conversations/${id}`);
     expect(strangerRes.status).toBe(404);
   });

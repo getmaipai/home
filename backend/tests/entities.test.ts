@@ -62,19 +62,19 @@ describe("POST /api/entities", () => {
 describe("GET /api/entities", () => {
   test("a person-scoped entity is invisible to someone else, visible to owner/admin", async () => {
     const owner = await ownerSession();
-    const adultRes = await owner.post("/api/people", { displayName: "Marlow", role: "adult" });
+    const adultRes = await owner.post("/api/people", { displayName: "Marlow", role: "adult", secret: "0000" });
     const adult = (await adultRes.json()) as { id: string };
     const adultClient = new TestClient();
-    await adultClient.post("/api/auth/select", { personId: adult.id });
+    await adultClient.post("/api/auth/verify-secret", { personId: adult.id, secret: "0000" });
 
     const created = await adultClient.post("/api/entities", { kind: "thing", name: "Marlow's diary", scope: "person" });
     expect(created.status).toBe(201);
     const entity = (await created.json()) as { id: string };
 
-    const owner2Res = await owner.post("/api/people", { displayName: "Iris", role: "adult" });
+    const owner2Res = await owner.post("/api/people", { displayName: "Iris", role: "adult", secret: "0000" });
     const owner2 = (await owner2Res.json()) as { id: string };
     const otherClient = new TestClient();
-    await otherClient.post("/api/auth/select", { personId: owner2.id });
+    await otherClient.post("/api/auth/verify-secret", { personId: owner2.id, secret: "0000" });
     const listAsOther = (await (await otherClient.get("/api/entities")).json()) as Array<{ id: string }>;
     expect(listAsOther.some((e) => e.id === entity.id)).toBe(false);
 

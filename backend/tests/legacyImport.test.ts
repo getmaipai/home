@@ -147,7 +147,7 @@ function buildLegacyFixture(): string {
 async function ownerAndMatch(): Promise<{ ownerRow: PersonRow; willowId: string }> {
   const owner = new TestClient();
   await owner.post("/api/auth/setup", { displayName: "Sage", secret: "correcthorse" });
-  const created = await owner.post("/api/people", { displayName: "Willow Sage", role: "adult" });
+  const created = await owner.post("/api/people", { displayName: "Willow Sage", role: "adult", secret: "0000" });
   const willow = (await created.json()) as { id: string };
   const ownerRow = db.select().from(people).where(eq(people.displayName, "Sage")).get()!;
   return { ownerRow, willowId: willow.id };

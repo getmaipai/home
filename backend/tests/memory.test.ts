@@ -293,15 +293,18 @@ describe("POST /api/memory (remember)", () => {
       expect(body.created.source).toBe(`api:${childId}`);
     });
 
-    // A review (2026-09-06) found the first version of this fix forced a
-    // blocked `pinned: true` down to a hard `false`, not `undefined` -
-    // since supersede()'s own `input.pinned ?? old.pinned` treats a
-    // defined `false` as "unpin this", a non-owner explicitly sending
-    // `pinned: true` (blocked) on an ALREADY-PINNED record silently
-    // un-pinned it - a real, unrequested state change, not merely a
-    // rejected escalation.
-    test("a non-owner's blocked pinned:true on a supersede does not un-pin an already-pinned record", async () => {
-      const { owner, childClient, childId } = await ownerAndChild();
+    // Issue #27: household scope is writable by anyone (assertCanWrite has
+    // no owner/admin gate there), and sanitizedPinned's blocked-true-
+    // becomes-undefined only stopped a non-owner from UN-pinning an
+    // already-pinned record - it did nothing to stop them superseding it
+    // in the first place, so a non-owner could still rewrite the TEXT of
+    // an already-pinned household record while its pinned status (and
+    // therefore its place in every family member's system prompt) carried
+    // forward unchanged. supersede()'s enforcePrivilegedRoute option now
+    // blocks a non-owner from superseding an entity or pinned record at
+    // all, regardless of what `pinned` value they send.
+    test("a non-owner cannot supersede an already-pinned household record at all", async () => {
+      const { owner, childClient } = await ownerAndChild();
       const created = await owner.post("/api/memory", {
         text: "an already-pinned household fact",
         category: "fact",
@@ -312,15 +315,53 @@ describe("POST /api/memory (remember)", () => {
         pinned: true,
       });
       const { id } = (await created.json()) as MemoryRecord;
-      void childId;
 
       const res = await childClient.post(`/api/memory/${id}/supersede`, {
         text: "updated household fact",
         pinned: true,
       });
+      expect(res.status).toBe(403);
+
+      const stillOriginal = db.select().from(memoryRecords).where(eq(memoryRecords.id, id)).get()!;
+      expect(stillOriginal.status).toBe("active");
+      expect(stillOriginal.text).toBe("an already-pinned household fact");
+    });
+
+    test("a non-owner cannot supersede an entity record at all", async () => {
+      const { owner, childClient } = await ownerAndChild();
+      const created = await owner.post("/api/memory", {
+        record_kind: "entity",
+        text: "a household entity",
+        category: "thing",
+        tier: "durable",
+        scope: "household",
+        source: "test",
+        importance: 0.5,
+      });
+      const { id } = (await created.json()) as MemoryRecord;
+
+      const res = await childClient.post(`/api/memory/${id}/supersede`, { text: "attacker-controlled entity text" });
+      expect(res.status).toBe(403);
+    });
+
+    test("owner or admin can still supersede an already-pinned household record", async () => {
+      const { owner } = await ownerAndChild();
+      const created = await owner.post("/api/memory", {
+        text: "an already-pinned household fact",
+        category: "fact",
+        tier: "durable",
+        scope: "household",
+        source: "test",
+        importance: 0.5,
+        pinned: true,
+      });
+      const { id } = (await created.json()) as MemoryRecord;
+
+      const res = await owner.post(`/api/memory/${id}/supersede`, { text: "updated by the owner" });
       expect(res.status).toBe(200);
       const body = (await res.json()) as { created: MemoryRecord };
       expect(body.created.pinned).toBe(true);
+      expect(body.created.text).toBe("updated by the owner");
     });
 
     test("omitting pinned on a supersede still preserves the old record's pinned state", async () => {
@@ -636,6 +677,65 @@ describe("supersede and archive", () => {
 
     const row = db.select().from(memoryRecords).where(eq(memoryRecords.id, original.id)).get();
     expect(row).toBeDefined();
+  });
+
+  // A code review of the issue #27 fix (2026-09-06) found archive() had
+  // no privilege gate at all: since household scope is writable by
+  // anyone, a non-owner could tombstone (delete) an owner-pinned or
+  // entity-kind household record outright - removing it from every
+  // family member's system prompt against the owner's wishes, the same
+  // result supersede()'s own gate exists to prevent, just via deletion.
+  test("a non-owner cannot archive a pinned household record", async () => {
+    const { owner, childClient } = await ownerAndChild();
+    const created = await owner.post("/api/memory", {
+      text: "an already-pinned household fact",
+      category: "fact",
+      tier: "durable",
+      scope: "household",
+      source: "test",
+      importance: 0.5,
+      pinned: true,
+    });
+    const { id } = (await created.json()) as MemoryRecord;
+
+    const res = await childClient.post(`/api/memory/${id}/archive`, {});
+    expect(res.status).toBe(403);
+    const row = db.select().from(memoryRecords).where(eq(memoryRecords.id, id)).get()!;
+    expect(row.status).toBe("active");
+  });
+
+  test("a non-owner cannot archive an entity record", async () => {
+    const { owner, childClient } = await ownerAndChild();
+    const created = await owner.post("/api/memory", {
+      record_kind: "entity",
+      text: "a household entity",
+      category: "thing",
+      tier: "durable",
+      scope: "household",
+      source: "test",
+      importance: 0.5,
+    });
+    const { id } = (await created.json()) as MemoryRecord;
+
+    const res = await childClient.post(`/api/memory/${id}/archive`, {});
+    expect(res.status).toBe(403);
+  });
+
+  test("owner or admin can still archive a pinned household record", async () => {
+    const { owner } = await ownerAndChild();
+    const created = await owner.post("/api/memory", {
+      text: "an already-pinned household fact",
+      category: "fact",
+      tier: "durable",
+      scope: "household",
+      source: "test",
+      importance: 0.5,
+      pinned: true,
+    });
+    const { id } = (await created.json()) as MemoryRecord;
+
+    const res = await owner.post(`/api/memory/${id}/archive`, {});
+    expect(res.status).toBe(200);
   });
 });
 

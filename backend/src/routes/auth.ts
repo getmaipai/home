@@ -14,7 +14,7 @@ import { Person } from "@maipai/spec/gen/ts/person.js";
 import { apiRouter, errorResponses } from "@/lib/openapi";
 import { db, sqlite } from "@/db";
 import { people, personCredentials, passkeyCredentials, sessions } from "@/db/schema";
-import { requiresCredential, getAuthMethods } from "@/lib/personAuthMethods";
+import { requiresCredential, getAuthMethods, roleRequiresCredential } from "@/lib/personAuthMethods";
 import { isTotpEnabled } from "@/lib/totp";
 import { hashSessionToken, issueSession } from "@/lib/session";
 import { hashSecret, verifySecret } from "@/lib/secret";
@@ -232,7 +232,17 @@ auth.openapi(selectRoute, (c) => {
   // personCredentials.secretHash and passkeyCredentials, not just
   // whether a personCredentials row exists (one can now exist purely to
   // hold a passkey-only person's shared lockout counter).
-  if (requiresCredential(personId)) return c.json({ error: "This profile needs its PIN, password, or passkey" }, 400);
+  //
+  // roleRequiresCredential() (issues #35/#47 plus the review that found
+  // applyAgeBandChanges() bypassing every route-level guard) is checked
+  // here too, not just whichever credential happens to exist YET: an
+  // owner/admin/adult profile that somehow ended up with none - the
+  // exact state the age-band sweep could otherwise produce - must be
+  // refused a bare tap rather than silently getting the exact "no
+  // credential at all" treatment this route exists to gate.
+  if (requiresCredential(personId) || roleRequiresCredential(person.role)) {
+    return c.json({ error: "This profile needs its PIN, password, or passkey" }, 400);
+  }
 
   issueSession(c, personId);
   return c.json({ success: true as const }, 200);
