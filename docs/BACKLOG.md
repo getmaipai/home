@@ -288,7 +288,13 @@ frequently a hard prerequisite, not just a preference.
       fixes (svc_guard allowlist, JSON output format, bot-detection
       passlist, a dead IPv6 route, an engine-list prune to engines that
       don't block a self-hosted instance) - see
-      `~/Developer/gitea/homelab`'s `docs/services/searxng.md`.
+      `~/Developer/gitea/homelab`'s `docs/services/searxng.md`. Also found
+      (2026-09-07) an 18-month-stale SearXNG install answers real JSON but
+      returns zero results once its scraping-based engines' parsers drift
+      from the real sites - `lib/searxngHealth.ts` now checks hourly and
+      raises a Repairs issue for that, an unreachable/invalid URL, or a
+      non-JSON response, so the household finds out instead of concluding
+      "search doesn't work."
 - [ ] Music / media search (S-M) - "what's this song," "who sings X,"
       show/movie info and availability. A pure lookup against a
       catalog/metadata API - explicitly NOT the same skill as playing

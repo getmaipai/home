@@ -35,6 +35,7 @@ import { runJudgeBatch, runConsolidation } from "@/lib/memoryJudge";
 import { runRetention } from "@/lib/conversationHistory";
 import { runBackupAndMirror } from "@/lib/backup";
 import { checkLeafExpiry } from "@/lib/householdCa";
+import { checkSearxngHealth } from "@/lib/searxngHealth";
 import { disableExpiredGuests, applyAgeBandChanges } from "@/lib/personLifecycle";
 import { trigger } from "@/lib/notifications";
 import { checkDiskFull } from "@/lib/storage";
@@ -263,6 +264,15 @@ const CORE_JOBS: Record<string, CoreJobHandler> = {
   // hub's own TLS leaf certificate actually expires.
   "householdCa.check_leaf_expiry": async () => {
     await checkLeafExpiry();
+  },
+  // Jesse, 2026-09-07: "we need to be able to detect if search is down,
+  // outdated, or simply not returning results - or if the URL is
+  // invalid - and notify on all of those." lib/searxngHealth.ts's own
+  // header has the full reasoning; a no-op every tick a household hasn't
+  // configured web search at all, same posture as every other optional
+  // integration.
+  "websearch.check_searxng_health": async () => {
+    await checkSearxngHealth();
   },
   // Step 7: person.schema.json's own "past this timestamp a guest
   // profile stops signing in on its own" - daily is plenty, the same

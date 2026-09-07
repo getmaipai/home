@@ -582,12 +582,18 @@ function appendFormatted(items: unknown, count: number, n: number, lines: string
   return n;
 }
 
+// Exported (a code review, 2026-09-07, found lib/searxngHealth.ts's own
+// zero-results detection duplicating this as an inline string literal) so
+// a future reword/i18n here can't silently break that check with no test
+// pointing at the real cause.
+export const SEARXNG_NO_RESULTS_TEXT = "No web search results were found.";
+
 export function formatSearxngResults(data: unknown, count = 5): string {
   const parsed = data as { results?: unknown; infoboxes?: unknown } | null;
   const lines: string[] = [];
   const n = appendFormatted(parsed?.infoboxes, count, 0, lines, formatInfobox);
   appendFormatted(parsed?.results, count, n, lines, formatResult);
-  return lines.length > 0 ? lines.join("\n") : "No web search results were found.";
+  return lines.length > 0 ? lines.join("\n") : SEARXNG_NO_RESULTS_TEXT;
 }
 
 /** `host.integration.call("searxng", "search", { query })`'s real

@@ -30,6 +30,19 @@ nothing leaves the house for that part.
 Needs your SearXNG instance to be reachable. Says so plainly if it
 isn't set up or can't be reached.
 
+## Keeping SearXNG up to date
+
+An old SearXNG install can look like it's working - it answers, it just
+stops finding anything. Search engines change their pages over time, and
+an outdated SearXNG doesn't know how to read the new page anymore, so it
+quietly comes back empty instead of showing an error. Update SearXNG
+every so often to keep it working.
+
+MaiPai checks your SearXNG instance once an hour and will show a Repairs
+notice under Settings if it's unreachable, if the address looks wrong, or
+if it's answering but not finding anything - the same "outdated install"
+symptom above.
+
 ## License
 
 AGPL-3.0. See the repository's LICENSE.
