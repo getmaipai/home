@@ -280,8 +280,15 @@ frequently a hard prerequisite, not just a preference.
 - [x] Web search (S-M) - shipped 2026-09-06 (`ff8585e`): `websearch`
       package + SearXNG integration (`backend/src/lib/packageHost.ts`),
       offered via Tier 1 routing and Tier 2 native tool-calling in
-      `turnEngine.ts`. Not yet verified against a real running SearXNG
-      instance (tests use a local mock server only).
+      `turnEngine.ts`. Verified 2026-09-06 against Jesse's real SearXNG
+      instance - found and fixed a silent-failure bug (a URL behind SSO
+      returned its login page, read as a normal empty result) and a
+      missing-infobox gap (a direct-topic query like "Japan" answers via
+      SearXNG's `infoboxes`, not `results`); also needed homelab-side
+      fixes (svc_guard allowlist, JSON output format, bot-detection
+      passlist, a dead IPv6 route, an engine-list prune to engines that
+      don't block a self-hosted instance) - see
+      `~/Developer/gitea/homelab`'s `docs/services/searxng.md`.
 - [ ] Music / media search (S-M) - "what's this song," "who sings X,"
       show/movie info and availability. A pure lookup against a
       catalog/metadata API - explicitly NOT the same skill as playing

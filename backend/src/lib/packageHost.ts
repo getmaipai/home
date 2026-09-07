@@ -396,6 +396,23 @@ export async function callHomeAssistantService(
   }
 }
 
+// attemptHttpFetch's own fallback for a non-JSON body is the raw text (a
+// real API answering plain text/HTML is not a host.fetch failure in
+// general), but every caller here expects a real JSON object back - that
+// shape only breaks when the configured URL redirected somewhere that
+// isn't the real API at all (an SSO login page, most often). Found live
+// 2026-09-06 for SearXNG specifically (a URL behind PocketID SSO
+// silently became "No web search results were found." instead of a real,
+// fixable error) - Home Assistant's own `home.base_url` is the identical
+// shape (a household-configured URL to a self-hosted service) and has
+// the same latent gap, just not yet hit live the way SearXNG's was.
+function expectJsonObject(value: unknown, baseUrl: string, hint: string): Record<string, unknown> {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) {
+    throw new HostError("network_unreachable", `${baseUrl} didn't return a JSON response - ${hint}`);
+  }
+  return value as Record<string, unknown>;
+}
+
 /** The read half of the Home Assistant integration (session-d-packages-
  * and-store.md step 4): `GET /api/states/<entity_id>`, the first thing a
  * recipe can reach through `host.integration.call("home_assistant",
@@ -418,7 +435,7 @@ export async function getHomeAssistantState(baseUrl: string, accessToken: string
   // twice can never double-fire a real-world action, so `retryable` is
   // unconditionally true here.
   const result = await withOneRetry(() => attemptHttpFetch(url, "GET", headers, undefined, HOME_ASSISTANT_TIMEOUT_MS), true, RETRY_DELAY_MS);
-  if (result.ok) return result.value;
+  if (result.ok) return expectJsonObject(result.value, baseUrl, "check the Home Assistant URL in Settings (a URL that redirects to a login page looks like this)");
   if (result.status === 404) {
     throw new HostError("not_found", `Home Assistant returned HTTP 404 for entity ${entityId}`);
   }
@@ -478,6 +495,13 @@ interface SearxngResult {
   content?: unknown;
 }
 
+interface SearxngInfobox {
+  infobox?: unknown;
+  id?: unknown;
+  content?: unknown;
+  urls?: unknown;
+}
+
 /** Formats SearXNG's own `/search?format=json` response into a single
  * readable string - a numbered list, title/url/snippet per result - not
  * the raw JSON. The recipe language has no loop or array-map primitive
@@ -503,22 +527,55 @@ function truncate(text: string, maxChars: number): string {
   return text.length > maxChars ? `${text.slice(0, maxChars)}...` : text;
 }
 
-export function formatSearxngResults(data: unknown, count = 5): string {
-  const results = (data as { results?: unknown } | null)?.results;
-  if (!Array.isArray(results) || results.length === 0) {
-    return "No web search results were found.";
-  }
-  const lines: string[] = [];
-  let n = 0;
-  for (const raw of results) {
+// A direct-topic query ("Japan", "Grand Theft Auto VI") doesn't land in
+// SearXNG's `results` array at all - Wikipedia (and similarly
+// knowledge-panel-style engines) answers those with a single `infoboxes`
+// entry instead, which this function used to never read, so the exact
+// queries most likely to have a good one-line answer came back "No web
+// search results were found." An infobox's own `title` field is blank
+// (the real name is in `infobox`), and its primary link is `id`, not
+// `url` (that's null on an infobox) - `urls[0]` is the fallback for the
+// rare case `id` is missing.
+function formatInfobox(raw: unknown): string | null {
+  const box = raw as SearxngInfobox;
+  if (typeof box?.infobox !== "string" || box.infobox.length === 0) return null;
+  const firstUrl = Array.isArray(box.urls) ? (box.urls[0] as { url?: unknown } | undefined)?.url : undefined;
+  const url = typeof box.id === "string" ? box.id : typeof firstUrl === "string" ? firstUrl : undefined;
+  const title = truncate(box.infobox, SEARXNG_FIELD_MAX_CHARS);
+  const content = typeof box.content === "string" && box.content.length > 0 ? ` - ${truncate(box.content, SEARXNG_FIELD_MAX_CHARS)}` : "";
+  return url ? `${title} (${url})${content}` : `${title}${content}`;
+}
+
+function formatResult(raw: unknown): string | null {
+  const result = raw as SearxngResult;
+  if (typeof result?.title !== "string" || typeof result?.url !== "string") return null;
+  const title = truncate(result.title, SEARXNG_FIELD_MAX_CHARS);
+  const content = typeof result.content === "string" && result.content.length > 0 ? ` - ${truncate(result.content, SEARXNG_FIELD_MAX_CHARS)}` : "";
+  return `${title} (${result.url})${content}`;
+}
+
+// Shared by both of formatSearxngResults's passes (infoboxes first, then
+// results) - identical bounds-check/format/skip/number/push shape, only
+// the formatter and the source array differ. `n`/`lines` thread through
+// so the count cap and numbering are shared across both passes, not
+// reset per array.
+function appendFormatted(items: unknown, count: number, n: number, lines: string[], format: (raw: unknown) => string | null): number {
+  if (!Array.isArray(items)) return n;
+  for (const raw of items) {
     if (n >= count) break;
-    const result = raw as SearxngResult;
-    if (typeof result?.title !== "string" || typeof result?.url !== "string") continue;
+    const formatted = format(raw);
+    if (!formatted) continue;
     n += 1;
-    const title = truncate(result.title, SEARXNG_FIELD_MAX_CHARS);
-    const snippet = typeof result.content === "string" && result.content.length > 0 ? ` - ${truncate(result.content, SEARXNG_FIELD_MAX_CHARS)}` : "";
-    lines.push(`${n}. ${title} (${result.url})${snippet}`);
+    lines.push(`${n}. ${formatted}`);
   }
+  return n;
+}
+
+export function formatSearxngResults(data: unknown, count = 5): string {
+  const parsed = data as { results?: unknown; infoboxes?: unknown } | null;
+  const lines: string[] = [];
+  const n = appendFormatted(parsed?.infoboxes, count, 0, lines, formatInfobox);
+  appendFormatted(parsed?.results, count, n, lines, formatResult);
   return lines.length > 0 ? lines.join("\n") : "No web search results were found.";
 }
 
@@ -526,10 +583,13 @@ export function formatSearxngResults(data: unknown, count = 5): string {
  * implementation - SearXNG's own `/search?q=...&format=json` (its
  * documented JSON output format, opt-in in a household's own
  * settings.yml the same way a Home Assistant access token is opt-in on
- * their side). Not yet verified against a real running SearXNG instance
- * (backend/packages/websearch/README.md's own honest gap) - this
- * environment has no Docker and no clean cross-platform way to stand one
- * up, see backend/src/settings/searchKeys.ts's own header. */
+ * their side). Verified 2026-09-06 against a real running SearXNG
+ * instance - found and fixed two real gaps in the process (both covered
+ * below): a URL sitting behind SSO returns its login page rather than
+ * JSON, which `attemptHttpFetch` treats as a normal successful response
+ * (a real API answering plain text is not a fetch failure); and Wikipedia
+ * answers a direct-topic query via `infoboxes`, not `results` (see
+ * `formatSearxngResults`). */
 export async function searxngSearch(args: unknown): Promise<unknown> {
   const query = (args as { query?: unknown } | undefined)?.query;
   if (typeof query !== "string" || query.length === 0) {
@@ -547,7 +607,14 @@ export async function searxngSearch(args: unknown): Promise<unknown> {
   // flaky LAN hop to Home Assistant is - retrying it just waits twice as
   // long for the identical result.
   const result = await attemptHttpFetch(url, "GET", {}, undefined, SEARXNG_TIMEOUT_MS);
-  if (result.ok) return formatSearxngResults(result.value);
+  if (result.ok) {
+    const value = expectJsonObject(
+      result.value,
+      baseUrl,
+      "check the SearXNG URL in Settings (a URL that redirects to a login page, or an instance with JSON output disabled, both look like this)",
+    );
+    return formatSearxngResults(value);
+  }
   throw result.error;
 }
 

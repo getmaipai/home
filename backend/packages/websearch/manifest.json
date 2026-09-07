@@ -45,10 +45,6 @@
   ],
   "permissions": ["integration:searxng", "llm:complete"],
   "notifications": [],
-  "fallback_reply": {
-    "text": "Sorry, I'm having trouble looking that up right now.",
-    "speech": "Sorry, I'm having trouble looking that up right now."
-  },
   "backup": "exclude",
   "background": false,
   "contributes": {},

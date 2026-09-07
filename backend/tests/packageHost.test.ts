@@ -779,6 +779,31 @@ describe("integration.call (session-d-packages-and-store.md step 4)", () => {
     }
   });
 
+  // Same gap class the searxng fix above found and fixed: a
+  // `home.base_url` sitting behind an SSO proxy redirects to an HTML
+  // login page rather than JSON, and attemptHttpFetch treats "a real
+  // server answered with plain text" as success. Without this check that
+  // HTML would come back as `result` and any recipe reading `state`/
+  // `attributes` off it would silently see `undefined`.
+  test("a non-JSON response (e.g. an SSO login page) throws instead of returning HTML as if it were state", async () => {
+    const server = Bun.serve({ port: 0, fetch: () => new Response("<html><body>Log in</body></html>", { headers: { "content-type": "text/html" } }) });
+    try {
+      const actor = await owner();
+      setHouseholdSettingValue("home.base_url", `http://127.0.0.1:${server.port}`);
+      setHouseholdSettingValue("home.access_token", "test-token");
+      const host = createHost(actor, manifest({ permissions: ["integration:home_assistant"] }));
+      try {
+        await host.integration.call("home_assistant", "get_state", { entity_id: "light.porch" });
+        throw new Error("should have thrown");
+      } catch (err) {
+        expect((err as HostError).code).toBe("network_unreachable");
+        expect((err as HostError).message).toContain("didn't return a JSON response");
+      }
+    } finally {
+      server.stop(true);
+    }
+  });
+
   test("an id/method this host doesn't implement yet still reports capability_missing", async () => {
     const actor = await owner();
     const host = createHost(actor, manifest({ permissions: ["integration:spotify"] }));
@@ -844,6 +869,33 @@ describe("integration.call searxng (session-d-packages-and-store.md step 7, the 
       server.stop(true);
     }
   });
+
+  // Found live 2026-09-06 against a real household's SearXNG instance:
+  // the configured URL sat behind SSO, so every request landed on an
+  // HTML login page instead of JSON. attemptHttpFetch follows the
+  // redirect itself and treats "a real server answered with plain text"
+  // as success (correct for a generic host.fetch), so the old code
+  // handed that HTML straight to formatSearxngResults, which silently
+  // reported "No web search results were found." - a real misconfiguration
+  // with no visible error anywhere.
+  test("a non-JSON response (e.g. an SSO login page) throws instead of silently reporting no results", async () => {
+    const server = Bun.serve({ port: 0, fetch: () => new Response("<html><body>Log in</body></html>", { headers: { "content-type": "text/html" } }) });
+    try {
+      const actor = await owner();
+      setHouseholdSettingValue("search.searxng_url", `http://127.0.0.1:${server.port}`);
+      const host = createHost(actor, manifest({ permissions: ["integration:searxng"] }));
+      try {
+        await host.integration.call("searxng", "search", { query: "node.js" });
+        throw new Error("should have thrown");
+      } catch (err) {
+        expect((err as HostError).code).toBe("network_unreachable");
+        expect((err as HostError).message).toContain("didn't return a JSON response");
+        expect((err as HostError).message).toContain("SearXNG URL in Settings");
+      }
+    } finally {
+      server.stop(true);
+    }
+  });
 });
 
 describe("formatSearxngResults", () => {
@@ -873,6 +925,41 @@ describe("formatSearxngResults", () => {
     const data = { results: Array.from({ length: 10 }, (_, i) => ({ title: `Result ${i}`, url: `https://example.com/${i}` })) };
     const text = formatSearxngResults(data, 2);
     expect(text.split("\n")).toHaveLength(2);
+  });
+
+  // Found live 2026-09-06: a direct-topic query ("Japan", "Grand Theft
+  // Auto VI") gets answered by Wikipedia's `infoboxes`, not `results` -
+  // the exact shape those two real test queries returned, and the case
+  // this function silently missed entirely before.
+  test("reads an infobox's title (from `infobox`, not the blank `title`), link (from `id`), and content", () => {
+    const data = {
+      results: [],
+      infoboxes: [
+        {
+          infobox: "Japan",
+          id: "https://en.wikipedia.org/wiki/Japan",
+          content: "Japan is an island country in East Asia.",
+          title: "",
+          url: null,
+        },
+      ],
+    };
+    expect(formatSearxngResults(data)).toBe("1. Japan (https://en.wikipedia.org/wiki/Japan) - Japan is an island country in East Asia.");
+  });
+
+  test("falls back to urls[0] when an infobox has no id", () => {
+    const data = {
+      infoboxes: [{ infobox: "Japan", urls: [{ title: "Wikipedia", url: "https://en.wikipedia.org/wiki/Japan" }] }],
+    };
+    expect(formatSearxngResults(data)).toBe("1. Japan (https://en.wikipedia.org/wiki/Japan)");
+  });
+
+  test("lists an infobox ahead of regular results, sharing the same count cap", () => {
+    const data = {
+      infoboxes: [{ infobox: "Japan", id: "https://en.wikipedia.org/wiki/Japan" }],
+      results: [{ title: "Visiting Japan", url: "https://example.com/travel" }],
+    };
+    expect(formatSearxngResults(data)).toBe("1. Japan (https://en.wikipedia.org/wiki/Japan)\n2. Visiting Japan (https://example.com/travel)");
   });
 });
 
