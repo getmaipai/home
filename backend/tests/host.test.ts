@@ -68,3 +68,28 @@ describe("GET /api/host/models", () => {
     expect(fits.every((f) => f.model.implemented === false)).toBe(true);
   });
 });
+
+// Only the role gate is exercised here, the same shape as GET /api/host/
+// hardware above: an owner's real call schedules process.exit() (host.ts's
+// own comment explains why a non-zero code is required for systemd/WinSW
+// to actually restart, not just stop, the service), which would kill this
+// test run rather than the hub - the same reason POST /api/host/engine/
+// restart and /engine/stop, the two other routes that reach past this
+// process's own boundary, have no success-path test either.
+describe("POST /api/host/restart", () => {
+  test("requires sign-in", async () => {
+    const res = await new TestClient().post("/api/host/restart", {});
+    expect(res.status).toBe(401);
+  });
+
+  test("a non-admin adult is refused: restarting the whole hub is host-level, not personal", async () => {
+    const owner = await ownerClient();
+    const adultRes = await owner.post("/api/people", { displayName: "Marlow", role: "adult", secret: "0000" });
+    const adult = (await adultRes.json()) as { id: string };
+    const adultClient = new TestClient();
+    await adultClient.post("/api/auth/verify-secret", { personId: adult.id, secret: "0000" });
+
+    const res = await adultClient.post("/api/host/restart", {});
+    expect(res.status).toBe(403);
+  });
+});

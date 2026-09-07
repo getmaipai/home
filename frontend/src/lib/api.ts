@@ -26,6 +26,7 @@ import type {
   CommandRow,
   CommandAction,
   NotificationDeliveryView,
+  HealthStatus,
 } from "@maipai/home-backend/src/wire";
 import { isOwnerOrAdminRole } from "@maipai/home-backend/src/wire";
 import { readTextLines } from "@maipai/spec/streaming/ts/lineReader.js";
@@ -49,7 +50,7 @@ export type Role = Person["role"];
 // depends on @maipai/home-backend as a workspace package for this;
 // re-export the types here so the rest of the frontend imports from one
 // place.
-export type { Roster, TurnValue, TurnStreamEvent, ConversationTurnRow, ConversationTurnWithMemoryIds, ConversationSummary, ResolvedSetting, BackupInfo, HardwareInfo, ModelFit, ModelJob, EngineStatus, EngineStatsSample, ClonedVoiceInfo, RoutingStats, PrivacyConnection, PendingRestore, CommandRow, CommandAction, NotificationDeliveryView };
+export type { Roster, TurnValue, TurnStreamEvent, ConversationTurnRow, ConversationTurnWithMemoryIds, ConversationSummary, ResolvedSetting, BackupInfo, HardwareInfo, ModelFit, ModelJob, EngineStatus, EngineStatsSample, ClonedVoiceInfo, RoutingStats, PrivacyConnection, PendingRestore, CommandRow, CommandAction, NotificationDeliveryView, HealthStatus };
 export type { MemoryRecord };
 export type { PackageManifest };
 export type { Issue };
@@ -313,6 +314,10 @@ export const api = {
   // side and returns an empty list for anyone it denies, never a 403).
   conversationList: (person?: string) =>
     request<ConversationSummary[]>(`/api/conversations${person ? `?person=${encodeURIComponent(person)}` : ""}`),
+  createConversation: () => request<Conversation>("/api/conversations", { method: "POST", body: JSON.stringify({ surface: "chat" }) }),
+  resumeConversation: (id: string) => request<Conversation>(`/api/conversations/${encodeURIComponent(id)}/resume`, { method: "POST" }),
+  conversation: (id: string) => request<Conversation>(`/api/conversations/${encodeURIComponent(id)}`),
+  conversationTurns: (id: string) => request<ConversationTurnWithMemoryIds[]>(`/api/conversations/${encodeURIComponent(id)}/turns`),
   renameConversation: (id: string, title: string | null) =>
     request<Conversation>(`/api/conversations/${encodeURIComponent(id)}`, {
       method: "PATCH",
@@ -488,6 +493,11 @@ export const api = {
   selectModel: (id: string) => request<ModelJob>(`/api/host/models/${encodeURIComponent(id)}/select`, { method: "POST" }),
   modelSelectStatus: (id: string) => request<ModelJob>(`/api/host/models/${encodeURIComponent(id)}/select-status`),
   senses: () => request<{ brain: string; voice: string }>("/api/health", { timeoutMs: 8_000 }),
+  // The fuller shape of the same /api/health response, for Settings ->
+  // Household -> Health (HealthSection.tsx) - senses() above stays
+  // narrow because that's all the chat status pill (useEngineHealth.ts)
+  // has ever needed.
+  health: () => request<HealthStatus>("/api/health", { timeoutMs: 8_000 }),
   engineStatus: () => request<EngineStatus>("/api/host/engine/status"),
   engineStats: () => request<EngineStatsSample[]>("/api/host/engine/stats"),
   stopEngine: () => request<EngineStatus>("/api/host/engine/stop", { method: "POST", timeoutMs: 15_000 }),
@@ -496,6 +506,11 @@ export const api = {
   // safety net (a dead connection the server never sees), never races a
   // legitimate server-side response that's about to arrive.
   restartEngine: () => request<EngineStatus>("/api/host/engine/restart", { method: "POST", timeoutMs: 100_000 }),
+  // The whole hub, not just the chat engine - the process exits and the
+  // OS service manager brings it back (routes/host.ts's own comment has
+  // the full reasoning). A short timeout: this only waits for the "yes,
+  // I got your request" response, never for the restart itself to finish.
+  restartServer: () => request<{ ok: true; restarting: true }>("/api/host/restart", { method: "POST", timeoutMs: 15_000 }),
   // Returns the raw Response so the caller (sentenceSpeechScheduler.ts,
   // chatListenStore.ts) can read the streamed audio/wav body directly.
   // 185s: a first spawn of the Pocket TTS sidecar can take a while
@@ -522,6 +537,6 @@ export const api = {
   // stopped run, so a user-initiated "stop" actually cancels the fetch
   // instead of leaving the browser's request racing pointlessly against
   // work nothing will read the result of.
-  streamTurn: (text: string, thinking?: boolean, signal?: AbortSignal) =>
-    rawStreamPost("/api/turn/stream", { surface: "chat", text, thinking }, 0, undefined, signal),
+  streamTurn: (text: string, thinking?: boolean, signal?: AbortSignal, conversationId?: string) =>
+    rawStreamPost("/api/turn/stream", { surface: "chat", text, thinking, conversation_id: conversationId }, 0, undefined, signal),
 };

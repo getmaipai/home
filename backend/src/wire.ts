@@ -206,6 +206,24 @@ export interface EngineStatsSample {
   cpuPercent: number | null;
 }
 
+// Mirrors app.ts's GET /api/health response shape (hand-copied, same
+// reason as EngineStatus/EngineStatsSample above: app.ts pulls in "@/"-
+// aliased imports of its own).
+export type SidecarStatus = "stopped" | "starting" | "running" | "unhealthy" | "crashed";
+
+export interface SidecarStatusEntry {
+  id: string;
+  status: SidecarStatus;
+  baseUrl: string | null;
+}
+
+export interface HealthStatus {
+  brain: string;
+  voice: string;
+  uptimeSeconds: number;
+  sidecars: SidecarStatusEntry[];
+}
+
 // Mirrors lib/conversationHistory.ts's RoutingStats (hand-copied, same
 // reason as BackupInfo/ModelFit above: that file has "@/"-aliased
 // imports of its own).

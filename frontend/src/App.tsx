@@ -20,6 +20,7 @@ import { BackupsPage } from "@/apps/settings/BackupsPage";
 import { VoicesPage } from "@/apps/settings/VoicesPage";
 import { CommandsPage } from "@/apps/settings/CommandsPage";
 import { RepairsPage } from "@/apps/settings/RepairsPage";
+import { HealthSection } from "@/apps/settings/HealthSection";
 import { UsersPage } from "@/apps/settings/UsersPage";
 import { DevicesPage } from "@/apps/settings/DevicesPage";
 import { PeoplePage } from "@/apps/people/PeoplePage";
@@ -124,6 +125,13 @@ export function App() {
                             <Route path="commands" element={<CommandsPage person={person} />} />
                             <Route path="devices" element={<DevicesPage />} />
                             <Route path="repairs" element={<RepairsPage person={person} />} />
+                            {/* No AdminGatedContent wrapper, unlike its
+                                Maintenance-group siblings: Health is
+                                informational for every signed-in household
+                                member (app.ts's healthRoute is requireAuth,
+                                not requireRole), so HealthSection gates
+                                only its own restart control, not the page. */}
+                            <Route path="health" element={<HealthSection person={person} />} />
                           </Route>
                         </Routes>
                       </Shell>

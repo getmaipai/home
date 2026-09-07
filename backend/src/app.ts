@@ -69,6 +69,10 @@ const SidecarStatusSchema = z.enum(["stopped", "starting", "running", "unhealthy
 const HealthResponseSchema = z.object({
   brain: z.string(),
   voice: z.string(),
+  // Settings -> Household -> Health (2026-09-07): the plainest single
+  // signal of "is the app actually up," next to which that page puts the
+  // restart control (routes/host.ts's POST /api/host/restart).
+  uptimeSeconds: z.number(),
   sidecars: z.array(
     z.object({
       id: z.string(),
@@ -97,7 +101,9 @@ const healthRoute = createRoute({
 // schemas (200 vs 401) this call was for, and it type-checked the
 // response body against BOTH - a real error caught while converting
 // routes/repairs.ts to the identical pattern, fixed here too.
-app.openapi(healthRoute, (c) => c.json({ sidecars: listSidecars(), brain: getEngineStatus().kind, voice: getTtsBackendKind() }, 200));
+app.openapi(healthRoute, (c) =>
+  c.json({ sidecars: listSidecars(), brain: getEngineStatus().kind, voice: getTtsBackendKind(), uptimeSeconds: process.uptime() }, 200),
+);
 
 // /api/docs: the Scalar API reference reading the generated document
 // below. docs/api/ (a script check.sh runs and diffs, per this step's

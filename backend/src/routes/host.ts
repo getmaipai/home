@@ -112,3 +112,34 @@ hostRoutes.post("/engine/restart", requireRole("owner", "admin"), async (c) => {
   }
   return c.json(getEngineStatus());
 });
+
+// Restarts the whole hub process ("restart the entire server, under
+// Settings -> Household, next to the app's health" - Jesse, 2026-09-07),
+// not just the chat engine above. Every real install runs under an OS
+// service manager (scripts/install.sh's systemd unit and launchd
+// LaunchDaemon, install.ps1's WinSW service) that brings the process
+// back the moment it exits, so this route's only job is to exit and let
+// that supervisor do the actual restart - the same "process supervision
+// is the OS service manager's job, not app code" boundary docs/
+// BACKLOG.md already draws for self-update, applied here too instead of
+// reimplementing it by shelling out to systemctl/launchctl/WinSW.
+// A non-zero code, not the 0 a plain Ctrl-C/systemctl-stop uses
+// (index.ts's SIGINT/SIGTERM handlers): systemd's `Restart=on-failure`
+// and WinSW's `<onfailure>` only restart on a non-zero exit, so exit(0)
+// here would just stop the hub instead of restarting it (launchd's
+// `KeepAlive=true` restarts on any exit, so this stays correct there
+// too). The sidecar and Wyoming-server cleanup those signal handlers run
+// already fires regardless of exit code - sidecars.ts's and
+// denoHost.ts's registerGracefulExit() and index.ts's own Wyoming
+// shutdown all hook `process.on("exit", ...)`, which runs no matter how
+// the process ends - so nothing extra needs calling here.
+export const RESTART_EXIT_CODE = 75;
+
+hostRoutes.post("/restart", requireRole("owner", "admin"), async (c) => {
+  const response = c.json({ ok: true as const, restarting: true as const });
+  // Delayed past this handler's return so the response above actually
+  // reaches the browser before the process exits, the same reasoning as
+  // any "tell the client, then do the disruptive thing" action.
+  setTimeout(() => process.exit(RESTART_EXIT_CODE), 200);
+  return response;
+});

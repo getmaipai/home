@@ -44,6 +44,7 @@ const HOUSEHOLD_TREE: TreeEntry[] = [
   { id: "settings-household.integrations", label: "Integrations", group: "AI & connections", icon: "layout-grid" },
   { id: "backups-page-link", label: "Backups", to: "/settings/backups", group: "Maintenance", icon: "archive", description: "Keep your household’s data backed up." },
   { id: "repairs-page-link", label: "Repairs", to: "/settings/repairs", group: "Maintenance", icon: "shield-check", description: "Check issues that need your attention." },
+  { id: "health-page-link", label: "Health", to: "/settings/health", group: "Maintenance", icon: "activity", description: "See how MaiPai Home is running, and restart it." },
   { id: "settings-household.ai", label: "AI model tuning", group: "Advanced", icon: "brain" },
   { id: "section-hf-token", label: "Hugging Face token", group: "Advanced", icon: "lock" },
   { id: "section-routing", label: "Plugin routing", group: "Advanced", icon: "layout-grid" },
