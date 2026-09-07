@@ -5,7 +5,7 @@ import { Input } from "@/kit/ui/input";
 import { Button } from "@/kit/ui/button";
 import { Checkbox } from "@/kit/ui/checkbox";
 import { Progress } from "@/kit/primitives/Progress";
-import { describeHardware } from "@/apps/settings/ModelsSection";
+import { describeHardware, activeJobOf, ModelJobProgress } from "@/apps/settings/ModelsSection";
 import { api, ApiError, type HardwareInfo, type ModelFit, type ModelJob, type BackupInfo } from "@/lib/api";
 
 interface SetupWizardProps {
@@ -215,6 +215,13 @@ export function SetupWizard({ onDone }: SetupWizardProps) {
     if (modelJob?.status === "failed") setError(modelJob.error ?? "That model failed to set up.");
   }, [modelJob]);
 
+  // `activeJobOf` is a plain function, not a hook, so this is safe to
+  // compute here even though it's only read inside the "hardware" case
+  // below (the progress display itself is `<ModelJobProgress job=.../>`,
+  // which owns its own `useDownloadRate` call - this one is just for the
+  // per-model button label and the Continue/disabled gates).
+  const activeJob = activeJobOf(modelJob);
+
   async function loadBackupsStep() {
     setBusy(true);
     setError(null);
@@ -330,7 +337,7 @@ export function SetupWizard({ onDone }: SetupWizardProps) {
       break;
 
     case "hardware": {
-      const jobActive = modelJob !== null && !["ready", "failed", "none"].includes(modelJob.status);
+      const jobActive = activeJob !== null;
       const hasAnyFit = (modelFits ?? []).some((fit) => fit.fits);
       content = (
         <StepFields>
@@ -350,7 +357,17 @@ export function SetupWizard({ onDone }: SetupWizardProps) {
                       key={fit.model.id}
                       type="button"
                       variant="outline"
-                      disabled={!fit.fits || jobActive}
+                      // Already selected (and no job currently running for
+                      // it) needs no re-click - found live 2026-09-06:
+                      // without this, clicking an already-"Selected" model
+                      // fires a redundant re-select job whose early phases
+                      // (verifying/loading/testing an already-cached model)
+                      // have no byte count yet, and the button's own label
+                      // stayed stuck on "Selected" (checked before the
+                      // active job below), so all a household member saw
+                      // was a second, wordless spinner appear with no
+                      // explanation.
+                      disabled={!fit.fits || jobActive || selectedModelId === fit.model.id}
                       onClick={() => void selectModel(fit.model.id)}
                       className="h-auto justify-between py-3 text-left"
                     >
@@ -358,21 +375,32 @@ export function SetupWizard({ onDone }: SetupWizardProps) {
                         <span className="font-medium">{fit.model.label}</span>
                         {!fit.fits ? <span className="ml-2 text-base text-muted-foreground">doesn't fit this hardware</span> : null}
                       </span>
-                      {selectedModelId === fit.model.id ? (
+                      {activeJob?.modelId === fit.model.id ? (
+                        // The specific phase ("Downloading the model…" etc.)
+                        // is the details block below, not repeated here -
+                        // this is just "something's happening to this row."
+                        <span className="text-base text-muted-foreground">Working…</span>
+                      ) : selectedModelId === fit.model.id ? (
                         <span className="text-base text-primary">Selected</span>
-                      ) : modelJob?.modelId === fit.model.id && jobActive ? (
-                        <span className="text-base text-muted-foreground">Setting up…</span>
                       ) : null}
                     </Button>
                   ))}
                 </div>
               )}
+              <ModelJobProgress job={modelJob} />
             </>
           ) : null}
           <ErrorText error={error} />
         </StepFields>
       );
-      nextDisabled = !selectedModelId;
+      // Jesse, 2026-09-06: picking a model shouldn't force a wait on this
+      // screen for the download/verify/load/test cycle to finish - the
+      // job already runs on the server independent of which wizard step
+      // is showing, so blocking Continue on `selectedModelId` (only ever
+      // set once the job reaches "ready") added dead time to setup for no
+      // real benefit. A job in progress is enough to move on; the model
+      // keeps getting ready in the background through the rest of setup.
+      nextDisabled = !selectedModelId && !activeJob;
       skipLabel = hasAnyFit ? undefined : "Skip - choose a model later";
       onSkip = hasAnyFit ? undefined : advance;
       break;

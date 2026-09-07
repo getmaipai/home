@@ -235,6 +235,53 @@ describe("SetupWizard", () => {
       });
       await waitFor(() => expect(rendered.getByText("Selected")).toBeTruthy());
       expect(continueButton.hasAttribute("disabled")).toBe(false);
+      // Found live 2026-09-06: an already-selected model's own button
+      // wasn't disabled, so clicking it again fired a redundant re-select
+      // job whose early phases have no byte count yet - all a household
+      // member saw was a second, wordless spinner appear from nowhere.
+      const modelButton = rendered.getByText("Small Chat Model").closest("button");
+      expect(modelButton?.hasAttribute("disabled")).toBe(true);
+    } finally {
+      restore();
+    }
+  });
+
+  // Found live 2026-09-06: a real model download sat at a static "Setting
+  // up…" with no phase or percentage, indistinguishable from a genuinely
+  // stuck job - the backend already tracks a human phase and a real byte
+  // count (ModelsSection.tsx's own settings-page card already shows
+  // both), this step just never read either.
+  test("a real download job shows its phase and byte progress, not a static 'Setting up…'", async () => {
+    sessionStorage.setItem("maipai:setup-wizard-step", "3");
+    const restore = stubFetch({
+      "/api/host/models/selection": { modelId: null },
+      "/api/host/models/small-chat/select": {
+        modelId: "small-chat",
+        status: "downloading_model",
+        phase: "downloading model weights",
+        completedBytes: 1024 * 1024 * 1024,
+        totalBytes: 2 * 1024 * 1024 * 1024,
+        error: null,
+        postLoadCheck: null,
+      },
+      "/api/host/hardware": HARDWARE,
+      "/api/host/models": MODEL_FITS,
+    });
+    try {
+      const rendered = renderWizard();
+      await rendered.findByText(/Apple Silicon/);
+      const continueButton = rendered.getByRole("button", { name: "Continue" });
+      await act(async () => {
+        fireEvent.click(rendered.getByText("Small Chat Model"));
+      });
+      await waitFor(() => expect(rendered.getByText("Downloading the model…")).toBeTruthy());
+      expect(rendered.queryByText("Setting up…")).toBeNull();
+      expect(rendered.getByText(/1 GB of 2 GB/)).toBeTruthy();
+      // Jesse, 2026-09-06: picking a model shouldn't force a wait on this
+      // screen for the whole download/verify/load/test cycle - the job
+      // keeps running on the server regardless of which step the wizard
+      // is on, so Continue only needs a job in progress, not "ready".
+      expect(continueButton.hasAttribute("disabled")).toBe(false);
     } finally {
       restore();
     }

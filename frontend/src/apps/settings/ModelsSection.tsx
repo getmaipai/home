@@ -163,7 +163,7 @@ export function describeHardware(hw: HardwareInfo): string {
 // "ready" excluded alongside "none"/"failed": a completed job must stop
 // counting as "active" or the card gets stuck showing progress UI
 // forever (the same review finding).
-function activeJobOf(job: ModelJob | null): ModelJob | null {
+export function activeJobOf(job: ModelJob | null): ModelJob | null {
   return job && job.status !== "none" && job.status !== "failed" && job.status !== "ready" ? job : null;
 }
 
@@ -203,7 +203,7 @@ function deriveEngineState(
 // around. Resets whenever the phase changes (downloading_engine's small
 // archive finishing and downloading_model's much larger one starting is
 // a real, sharp rate change, not noise to smooth through).
-function useDownloadRate(completedBytes: number, totalBytes: number, status: string): { bytesPerSecond: number | null; etaSeconds: number | null } {
+export function useDownloadRate(completedBytes: number, totalBytes: number, status: string): { bytesPerSecond: number | null; etaSeconds: number | null } {
   const lastRef = useRef<{ completedBytes: number; at: number; status: string } | null>(null);
   const [bytesPerSecond, setBytesPerSecond] = useState<number | null>(null);
 
@@ -235,7 +235,7 @@ export function formatEta(seconds: number): string {
   return `about ${hours} hour${hours === 1 ? "" : "s"} left`;
 }
 
-const JOB_PHASE_LABEL: Record<string, string> = {
+export const JOB_PHASE_LABEL: Record<string, string> = {
   queued: "Getting ready…",
   downloading_engine: "Setting up the AI engine…",
   downloading_model: "Downloading the model…",
@@ -243,6 +243,44 @@ const JOB_PHASE_LABEL: Record<string, string> = {
   loading: "Starting it up…",
   testing: "Making sure it works…",
 };
+
+// Shared by ChatModelCard below and SetupWizard.tsx's hardware step - the
+// identical phase label / progress bar / byte-rate-ETA line, wherever a
+// download job needs showing (a code review, 2026-09-06, found the two
+// call sites had drifted into near-duplicate JSX). Renders nothing for a
+// job that isn't active (queued/downloading/verifying/loading/testing) -
+// null, done, or failed all show something else at the call site, not
+// this. Takes the raw `job` rather than an already-derived `activeJob` so
+// it can call `useDownloadRate` itself, unconditionally, the same "always
+// called, no-ops when there's nothing to track" shape `activeJobOf`'s own
+// comment already established for a hook that can't be called only on
+// some renders.
+export function ModelJobProgress({ job }: { job: ModelJob | null }) {
+  const activeJob = activeJobOf(job);
+  const { bytesPerSecond, etaSeconds } = useDownloadRate(activeJob?.completedBytes ?? 0, activeJob?.totalBytes ?? 0, activeJob?.status ?? "");
+  if (!activeJob) return null;
+  return (
+    <div className="flex flex-col gap-1">
+      {/* Progress's determinate mode renders no label of its own (spinner
+       * mode is the only one that does), so the phase text is its own
+       * line here rather than passed as `label` - and always present,
+       * even before a byte count exists, so a bare spinner is never
+       * shown with nothing explaining it. */}
+      <p className="text-base text-muted-foreground">{JOB_PHASE_LABEL[activeJob.status] ?? "Working…"}</p>
+      <Progress
+        mode={activeJob.totalBytes > 0 ? "determinate" : "spinner"}
+        value={activeJob.totalBytes > 0 ? (activeJob.completedBytes / activeJob.totalBytes) * 100 : undefined}
+      />
+      {activeJob.totalBytes > 0 ? (
+        <span className="text-base text-muted-foreground">
+          {formatBytes(activeJob.completedBytes)} of {formatBytes(activeJob.totalBytes)}
+          {bytesPerSecond ? ` · ${formatBytes(bytesPerSecond)}/s` : ""}
+          {etaSeconds !== null ? ` · ${formatEta(etaSeconds)}` : ""}
+        </span>
+      ) : null}
+    </div>
+  );
+}
 
 function ChatModelCard({
   fits,
@@ -271,10 +309,8 @@ function ChatModelCard({
   // either early return below - it has to: a hook called only on some
   // renders (after `fits` loads, say) breaks React's rules of hooks
   // (found by eslint-plugin-react-hooks, 2026-09-05, no live symptom yet
-  // since `fits` is only ever null on the very first render). The hook
-  // itself still no-ops whenever totalBytes is 0.
+  // since `fits` is only ever null on the very first render).
   const activeJob = activeJobOf(job);
-  const { bytesPerSecond, etaSeconds } = useDownloadRate(activeJob?.completedBytes ?? 0, activeJob?.totalBytes ?? 0, activeJob?.status ?? "");
 
   if (fits === null) return <RoleCardShell title="Chat"><Progress mode="spinner" label="Checking options" /></RoleCardShell>;
   // Only entries with a real backend can ever be offered a "Use this" -
@@ -323,23 +359,7 @@ function ChatModelCard({
         ) : null}
 
         {activeJob ? (
-          <div className="flex flex-col gap-1">
-            {/* Progress's determinate mode renders no label of its own
-             * (spinner mode is the only one that does), so the phase text
-             * is its own line here rather than passed as `label`. */}
-            <p className="text-base text-[var(--muted-foreground)]">{JOB_PHASE_LABEL[activeJob.status] ?? "Working…"}</p>
-            <Progress
-              mode={activeJob.totalBytes > 0 ? "determinate" : "spinner"}
-              value={activeJob.totalBytes > 0 ? (activeJob.completedBytes / activeJob.totalBytes) * 100 : undefined}
-            />
-            {activeJob.totalBytes > 0 ? (
-              <span className="text-base text-[var(--muted-foreground)]">
-                {formatBytes(activeJob.completedBytes)} of {formatBytes(activeJob.totalBytes)}
-                {bytesPerSecond ? ` · ${formatBytes(bytesPerSecond)}/s` : ""}
-                {etaSeconds !== null ? ` · ${formatEta(etaSeconds)}` : ""}
-              </span>
-            ) : null}
-          </div>
+          <ModelJobProgress job={job} />
         ) : failedJob ? (
           <div className="flex flex-col gap-2">
             <p className="flex items-start gap-1.5 text-base text-[var(--destructive)]">
