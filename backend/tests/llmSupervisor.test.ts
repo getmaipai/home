@@ -3,6 +3,7 @@ import { getChatClient, restartChatBackend, stopChatBackend, getEngineStatus, sw
 import { enginesDir } from "@/lib/paths";
 import { setHouseholdSettingValue } from "@/lib/settings";
 import { __setCrashBootHoldForTests } from "@/lib/dirtyBoot";
+import { listIssues } from "@/lib/issues";
 
 afterEach(() => {
   __resetLlmSupervisorForTests();
@@ -114,6 +115,20 @@ describe("llmSupervisor tier 3: the household's selected chat model", () => {
   test("a real catalog id with no downloaded GGUF yet fails with a specific reason", async () => {
     setHouseholdSettingValue("chat.model_id", "qwen3-8b-instruct-q4-k-m");
     await expect(getChatClient()).rejects.toThrow(/hasn't finished downloading yet/);
+  });
+
+  // Found live 2026-09-07: a genuine chat-engine spawn failure had no
+  // Repairs-page visibility at all - a household member would only find
+  // out by checking Settings -> AI models themselves. Every other
+  // subsystem that can fail on its own already raises an issue; this was
+  // the one gap.
+  test("a real spawn failure raises a Repairs issue, not just a rejected promise", async () => {
+    setHouseholdSettingValue("chat.model_id", "qwen3-8b-instruct-q4-k-m");
+    await expect(getChatClient()).rejects.toThrow();
+    const issue = listIssues().find((i) => i.source === "chat-engine" && i.key === "spawn");
+    expect(issue).toBeDefined();
+    expect(issue!.title).toBe("MaiPai's AI failed to start");
+    expect(issue!.detail).toContain("hasn't finished downloading yet");
   });
 
   // Session F, step 3: lib/dirtyBoot.ts's crash-boot hold. Set BEFORE the

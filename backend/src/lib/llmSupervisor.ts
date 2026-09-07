@@ -40,7 +40,7 @@ import { getHouseholdSettingValue } from "@/lib/settings";
 import { spawnAndWaitHealthy, freePort, sweepOrphanProcesses } from "@/lib/sidecars";
 import { assertNotInCrashBootHold } from "@/lib/dirtyBoot";
 import { startResourceGovernor } from "@/lib/resourceGovernor";
-import { resolveIssue } from "@/lib/issues";
+import { raiseIssue, resolveIssue } from "@/lib/issues";
 
 export type BackendKind = "url" | "override" | "selection" | "stub";
 
@@ -313,10 +313,43 @@ export async function getChatClient(): Promise<LlamaServerClient> {
           return { ...backend, client: await getChatClient() };
         }
         chatBackend = backend;
+        // A genuinely healthy spawn closes out any earlier failure -
+        // same "a fresh success clears a prior fault" posture
+        // resourceGovernor's own resolveIssue("resource-governor", "chat")
+        // call already has just above.
+        resolveIssue("chat-engine", "spawn");
         return backend;
       })
       .catch((err) => {
         if (myGeneration === generation) startingPromise = null;
+        // Found live 2026-09-07: a genuine chat-engine spawn failure had
+        // no Repairs-page visibility at all - only found by a household
+        // member happening to check Settings -> AI models themselves.
+        // Every other subsystem that can fail on its own (a Tier 1
+        // package's sandbox, TLS renewal) already raises an issue here;
+        // this was the one gap. Not raised for `manuallyStopped` (that
+        // throws before startChatBackend() is ever called, so it never
+        // reaches this catch) - only a real spawn/post-load-check
+        // failure lands here.
+        //
+        // Gated on the same myGeneration === generation check as the
+        // startingPromise clear above it (a code review, 2026-09-07,
+        // caught this was missing here): without it, a stale generation's
+        // spawn - already superseded by a deliberate stop/restart -
+        // rejecting later would raise a false "failed to start" for an
+        // admin action that was never a failure, and could even re-raise
+        // it AFTER the new generation's own resolveIssue() already
+        // cleared it, leaving a phantom issue stuck open while the engine
+        // is actually running fine.
+        if (myGeneration === generation) {
+          void raiseIssue({
+            source: "chat-engine",
+            key: "spawn",
+            severity: "error",
+            title: "MaiPai's AI failed to start",
+            detail: (err as Error).message,
+          });
+        }
         throw err;
       });
   }
