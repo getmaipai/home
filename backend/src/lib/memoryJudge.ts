@@ -69,8 +69,10 @@ import {
   supersedeInFavorOfExisting,
   list,
   PROFILE_SOURCE,
+  isPrivilegedRecordKind,
   type SimilarMatch,
 } from "@/lib/memory";
+import { isOwnerOrAdmin } from "@/lib/access";
 import { trigger } from "@/lib/notifications";
 import { sanitizeForPrompt } from "@/lib/promptSanitize";
 import { nextHlc } from "@/lib/hlc";
@@ -445,9 +447,26 @@ export async function judgeTurn(turn: ConversationTurnRow): Promise<JudgeTurnRes
         console.error(`[memoryJudge] supersede failed for turn ${turn.id}: ${result.error}`);
       }
     } else {
+      // Issue #52 (Jesse's own design call): a person is in control of
+      // their OWN memories, but a household-scope entity is shared
+      // household knowledge, the same thing routes/memory.ts's
+      // sanitizedRecordKind() already restricts to owner/admin on the
+      // direct API - this ADD path bypassed that entirely by calling
+      // remember() directly. Downgraded to a plain memory rather than
+      // blocked outright, the same "privileged field, silently
+      // downgraded rather than a 403" shape that route already uses:
+      // the FACT itself is still worth remembering (a child mentioning
+      // the family dog is real, useful context), it just doesn't get to
+      // create a shared entity record in the household's registry.
+      // person-scope entities are unaffected - that's the speaker's own
+      // memory to keep however they like.
+      let recordKind = categoryToRecordKind(fact.category);
+      if (fact.scope === "household" && isPrivilegedRecordKind(recordKind) && !isOwnerOrAdmin(speaker)) {
+        recordKind = "memory";
+      }
       const result = remember(speaker, {
         text: fact.text,
-        record_kind: categoryToRecordKind(fact.category),
+        record_kind: recordKind,
         category: fact.category,
         tier: categoryToTier(fact.category),
         scope: fact.scope,

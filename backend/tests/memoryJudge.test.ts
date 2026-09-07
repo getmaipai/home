@@ -172,6 +172,48 @@ describe("judgeTurn() - extraction and provenance", () => {
     expect(row.text).toBe("Riff is the family dog");
   });
 
+  // Issue #52 (Jesse's own design call, 2026-09-07): "users are in
+  // control of their memories and admins can set household memories" -
+  // a household-scope entity is shared household knowledge, the same
+  // thing routes/memory.ts's sanitizedRecordKind() already restricts to
+  // owner/admin on the direct API. This ADD path called remember()
+  // directly, bypassing that gate entirely.
+  test("a child's household-scope entity-shaped fact is downgraded to a plain memory, never a shared entity", async () => {
+    const { client } = await owner();
+    const childRes = await client.post("/api/people", { displayName: "Bramble", role: "child" });
+    const child = (await childRes.json()) as { id: string };
+    const childActor = db.select().from(people).where(eq(people.id, child.id)).get()!;
+
+    const turn = makeTurn(childActor, "by the way Riff is our dog", "Got it, Riff is the dog.");
+    await withScriptedJudge(
+      () => ({ facts: [{ text: "Riff is the family dog", category: "thing", scope: "household", importance: 0.6 }] }),
+      () => judgeTurn(turn),
+    );
+
+    const row = db.select().from(memoryRecords).get()!;
+    expect(row.recordKind).toBe("memory");
+    expect(row.text).toBe("Riff is the family dog");
+  });
+
+  // The same fact, scoped to the child's OWN person-scope instead of
+  // household, is unaffected - "users are in control of their own
+  // memories" per Jesse's own framing.
+  test("a child's PERSON-scope entity-shaped fact is unaffected - it's their own memory to keep", async () => {
+    const { client } = await owner();
+    const childRes = await client.post("/api/people", { displayName: "Bramble", role: "child" });
+    const child = (await childRes.json()) as { id: string };
+    const childActor = db.select().from(people).where(eq(people.id, child.id)).get()!;
+
+    const turn = makeTurn(childActor, "my best friend is Sage", "Got it.");
+    await withScriptedJudge(
+      () => ({ facts: [{ text: "Sage is Bramble's best friend", category: "person", scope: "person", importance: 0.6 }] }),
+      () => judgeTurn(turn),
+    );
+
+    const row = db.select().from(memoryRecords).get()!;
+    expect(row.recordKind).toBe("entity");
+  });
+
   test("a non-entity category (preference, relationship, ...) is still written as a plain memory record", async () => {
     const { actor } = await owner();
     const turn = makeTurn(actor, "I hate cilantro", "Noted.");
