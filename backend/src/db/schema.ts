@@ -456,6 +456,16 @@ export const notificationDeliveries = sqliteTable("notification_deliveries", {
   createdAt: text("created_at").notNull(),
   readAt: text("read_at"),
   dismissedAt: text("dismissed_at"),
+  // Nullable, most types never set it: which OTHER person this
+  // notification is about, when it's about one - distinct from
+  // recipientId (who receives it). A code review (2026-09-06) found
+  // personLifecycle.ts's applyAgeBandChanges() de-duplicating its own
+  // repeat "held, needs a credential" notification by LIKE-matching the
+  // rendered display name in `text`, which silently merges two same-
+  // named people (no uniqueness constraint on displayName anywhere) and
+  // is vulnerable to unescaped LIKE metacharacters in a name. A real
+  // column is the fix, not a smarter string match.
+  subjectPersonId: text("subject_person_id").references(() => people.id),
 });
 
 // Session F (platform and trust), step 1. Mirrors
@@ -837,4 +847,14 @@ export const appUpdateState = sqliteTable("app_update_state", {
   // once per check" discipline lib/issues.ts's raiseIssue() already
   // applies to Repairs items.
   notifiedVersion: text("notified_version"),
+  // Issue #40: cachedUpdateProjection() (every GET /api/updates/) called
+  // projectionFromState(row) with no second argument, always defaulting
+  // to assets: [] - checkForAppUpdate()'s own real release assets were
+  // only ever returned from the immediate POST /api/updates/check
+  // response, never persisted, so every LATER read told the household a
+  // new version existed with no download link for it. JSON text (a small,
+  // bounded list of {name, url, digest}), the same shape channels/
+  // watermarks already use on other tables rather than a side table for
+  // what's really one release's worth of denormalized data.
+  assetsJson: text("assets_json"),
 });

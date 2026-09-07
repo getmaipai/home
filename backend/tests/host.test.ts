@@ -23,10 +23,10 @@ describe("GET /api/host/hardware", () => {
 
   test("a non-admin adult is refused: this is host-level, not personal, data", async () => {
     const owner = await ownerClient();
-    const adultRes = await owner.post("/api/people", { displayName: "Marlow", role: "adult" });
+    const adultRes = await owner.post("/api/people", { displayName: "Marlow", role: "adult", secret: "0000" });
     const adult = (await adultRes.json()) as { id: string };
     const adultClient = new TestClient();
-    await adultClient.post("/api/auth/select", { personId: adult.id });
+    await adultClient.post("/api/auth/verify-secret", { personId: adult.id, secret: "0000" });
 
     const res = await adultClient.get("/api/host/hardware");
     expect(res.status).toBe(403);

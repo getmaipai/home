@@ -35,10 +35,10 @@ describe("POST /api/voice/hf-token", () => {
 
   test("a non-admin adult is refused: voice.hf_token is a household setting", async () => {
     const owner = await ownerClient();
-    const adultRes = await owner.post("/api/people", { displayName: "Marlow", role: "adult" });
+    const adultRes = await owner.post("/api/people", { displayName: "Marlow", role: "adult", secret: "0000" });
     const adult = (await adultRes.json()) as { id: string };
     const adultClient = new TestClient();
-    await adultClient.post("/api/auth/select", { personId: adult.id });
+    await adultClient.post("/api/auth/verify-secret", { personId: adult.id, secret: "0000" });
 
     const res = await adultClient.post("/api/voice/hf-token", { token: "hf_x" });
     expect(res.status).toBe(403);
@@ -83,10 +83,10 @@ describe("POST /api/voice/hf-token/remove", () => {
 
   test("a non-admin adult is refused", async () => {
     const owner = await ownerClient();
-    const adultRes = await owner.post("/api/people", { displayName: "Marlow", role: "adult" });
+    const adultRes = await owner.post("/api/people", { displayName: "Marlow", role: "adult", secret: "0000" });
     const adult = (await adultRes.json()) as { id: string };
     const adultClient = new TestClient();
-    await adultClient.post("/api/auth/select", { personId: adult.id });
+    await adultClient.post("/api/auth/verify-secret", { personId: adult.id, secret: "0000" });
 
     const res = await adultClient.post("/api/voice/hf-token/remove");
     expect(res.status).toBe(403);
@@ -121,10 +121,10 @@ describe("cloned voices", () => {
 
   test("uploads, lists household-wide, selects, and deletes a real cloned voice", async () => {
     const owner = await ownerClient();
-    const adultRes = await owner.post("/api/people", { displayName: "Marlow", role: "adult" });
+    const adultRes = await owner.post("/api/people", { displayName: "Marlow", role: "adult", secret: "0000" });
     const adult = (await adultRes.json()) as { id: string };
     const adultClient = new TestClient();
-    await adultClient.post("/api/auth/select", { personId: adult.id });
+    await adultClient.post("/api/auth/verify-secret", { personId: adult.id, secret: "0000" });
 
     const form = new FormData();
     form.set("label", "Dad's voice");

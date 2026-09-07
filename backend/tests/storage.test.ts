@@ -56,10 +56,10 @@ describe("GET /api/storage", () => {
 
   test("an adult without backups.run is refused", async () => {
     const { client } = await owner();
-    const adultRes = await client.post("/api/people", { displayName: "Marlow", role: "adult" });
+    const adultRes = await client.post("/api/people", { displayName: "Marlow", role: "adult", secret: "0000" });
     const adult = (await adultRes.json()) as { id: string };
     const adultClient = new TestClient();
-    await adultClient.post("/api/auth/select", { personId: adult.id });
+    await adultClient.post("/api/auth/verify-secret", { personId: adult.id, secret: "0000" });
     expect((await adultClient.get("/api/storage")).status).toBe(403);
   });
 });

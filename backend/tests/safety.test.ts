@@ -108,12 +108,13 @@ describe("POST /api/safety/check", () => {
     const created = await owner.post("/api/people", {
       displayName: "Marlow",
       role: "adult",
+      secret: "0000",
       birthdate: fifteenYearsAgo.toISOString().slice(0, 10),
     });
     const teen = (await created.json()) as { id: string };
 
     const teenClient = new TestClient();
-    await teenClient.post("/api/auth/select", { personId: teen.id });
+    await teenClient.post("/api/auth/verify-secret", { personId: teen.id, secret: "0000" });
 
     const res = await teenClient.post("/api/safety/check", {
       text: "This is our secret, don't tell your parents",
@@ -246,10 +247,10 @@ describe("the crisis overlay is not configurable", () => {
     for (const { years, role } of ages) {
       const dob = new Date();
       dob.setFullYear(dob.getFullYear() - years);
-      const created = await owner.post("/api/people", { displayName: "Marlow", role, birthdate: dob.toISOString().slice(0, 10) });
+      const created = await owner.post("/api/people", { displayName: "Marlow", role, secret: "0000", birthdate: dob.toISOString().slice(0, 10) });
       const person = (await created.json()) as { id: string };
       const client = new TestClient();
-      await client.post("/api/auth/select", { personId: person.id });
+      await client.post("/api/auth/verify-secret", { personId: person.id, secret: "0000" });
 
       const res = await client.post("/api/safety/check", { text: "I want to kill myself" });
       const body = (await res.json()) as Record<string, unknown>;

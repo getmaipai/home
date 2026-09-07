@@ -85,10 +85,10 @@ describe("POST /api/relationships", () => {
 
   test("an adult without relationships.manage cannot state one", async () => {
     const owner = await ownerSession();
-    const adultRes = await owner.post("/api/people", { displayName: "Marlow", role: "adult" });
+    const adultRes = await owner.post("/api/people", { displayName: "Marlow", role: "adult", secret: "0000" });
     const adult = (await adultRes.json()) as { id: string };
     const adultClient = new TestClient();
-    await adultClient.post("/api/auth/select", { personId: adult.id });
+    await adultClient.post("/api/auth/verify-secret", { personId: adult.id, secret: "0000" });
 
     const a = await makeEntity(owner, "person", "Sage");
     const b = await makeEntity(owner, "person", "Riff");
@@ -98,14 +98,14 @@ describe("POST /api/relationships", () => {
 
   test("a relationships.manage grant lets a non-admin adult state one", async () => {
     const owner = await ownerSession();
-    const adultRes = await owner.post("/api/people", { displayName: "Marlow", role: "adult" });
+    const adultRes = await owner.post("/api/people", { displayName: "Marlow", role: "adult", secret: "0000" });
     const adult = (await adultRes.json()) as { id: string };
 
     const grantRes = await owner.post("/api/grants", { person: adult.id, action: "relationships.manage", effect: "allow" });
     expect(grantRes.status).toBe(201);
 
     const adultClient = new TestClient();
-    await adultClient.post("/api/auth/select", { personId: adult.id });
+    await adultClient.post("/api/auth/verify-secret", { personId: adult.id, secret: "0000" });
     const a = await makeEntity(owner, "person", "Sage");
     const b = await makeEntity(owner, "person", "Riff");
     const res = await adultClient.post("/api/relationships", { type: "partner_of", from_id: a, to_id: b });

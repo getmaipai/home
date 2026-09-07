@@ -64,7 +64,7 @@ describe("parseWhen", () => {
 describe("scheduleJob / listJobs / cancelJob", () => {
   test("a scheduled job is only visible to its owner, not another non-admin person", async () => {
     const { row: ownerRow, client: ownerClient } = await owner();
-    const created = await ownerClient.post("/api/people", { displayName: "Bramble", role: "adult" });
+    const created = await ownerClient.post("/api/people", { displayName: "Bramble", role: "adult", secret: "0000" });
     const other = (await created.json()) as { id: string };
     const otherRow = db.select().from(people).where(eq(people.id, other.id)).get()!;
 
@@ -386,10 +386,10 @@ describe("HTTP: GET/POST /api/scheduler", () => {
 
   test("run-due is owner/admin only", async () => {
     const { client: ownerClient } = await owner();
-    const created = await ownerClient.post("/api/people", { displayName: "Bramble", role: "adult" });
+    const created = await ownerClient.post("/api/people", { displayName: "Bramble", role: "adult", secret: "0000" });
     const adult = (await created.json()) as { id: string };
     const adultClient = new TestClient();
-    await adultClient.post("/api/auth/select", { personId: adult.id });
+    await adultClient.post("/api/auth/verify-secret", { personId: adult.id, secret: "0000" });
     const res = await adultClient.post("/api/scheduler/run-due", {});
     expect(res.status).toBe(403);
   });

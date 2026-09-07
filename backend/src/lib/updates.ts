@@ -108,6 +108,7 @@ interface StoredState {
   latestSummary: string | null;
   error: string | null;
   notifiedVersion?: string | null;
+  assetsJson?: string | null;
 }
 
 interface UpsertFields {
@@ -116,6 +117,11 @@ interface UpsertFields {
   latestUrl: string | null;
   latestSummary: string | null;
   error: string | null;
+  /** Issue #40: persisted alongside the rest of the checked state so
+   * cachedUpdateProjection() (every GET /api/updates/) can read them
+   * back, instead of only ever existing in the transient projection
+   * built for the immediate POST /api/updates/check response. */
+  assets: UpdateAsset[];
 }
 
 /** The one write path for `app_update_state` - a code review (2026-09-06)
@@ -126,9 +132,11 @@ interface UpsertFields {
  * (never overwritten by this function itself) so a plain state update
  * never has to know or re-supply whether a notification already fired. */
 function upsertState(fields: UpsertFields): void {
+  const { assets, ...rest } = fields;
+  const values = { ...rest, assetsJson: JSON.stringify(assets) };
   db.insert(appUpdateState)
-    .values({ id: STATE_ROW_ID, ...fields })
-    .onConflictDoUpdate({ target: appUpdateState.id, set: fields })
+    .values({ id: STATE_ROW_ID, ...values })
+    .onConflictDoUpdate({ target: appUpdateState.id, set: values })
     .run();
 }
 
@@ -198,15 +206,21 @@ export async function checkForAppUpdate(): Promise<UpdateProjection> {
       // way, but the wording should say "checked, nothing published"
       // rather than imply something broke.
       const message = res.status === 404 ? "no release has been published yet" : `GitHub returned ${res.status}`;
-      upsertState({ checkedAt: now, latestVersion: null, latestUrl: null, latestSummary: null, error: message });
-      return projectionFromState({ checkedAt: now, latestVersion: null, latestUrl: null, latestSummary: null, error: message });
+      upsertState({ checkedAt: now, latestVersion: null, latestUrl: null, latestSummary: null, error: message, assets: [] });
+      return cachedUpdateProjection();
     }
     const release = (await res.json()) as GitHubRelease;
-    upsertState({ checkedAt: now, latestVersion: release.tag_name, latestUrl: release.html_url, latestSummary: release.body, error: null });
-    const projection = projectionFromState(
-      { checkedAt: now, latestVersion: release.tag_name, latestUrl: release.html_url, latestSummary: release.body, error: null },
-      release.assets,
-    );
+    const assets: UpdateAsset[] = release.assets.map((a) => ({ name: a.name, url: a.browser_download_url, digest: a.digest ?? null }));
+    upsertState({ checkedAt: now, latestVersion: release.tag_name, latestUrl: release.html_url, latestSummary: release.body, error: null, assets });
+    // Issue #40: this used to build its own transient projection here
+    // (never persisting `assets`), so it was the ONLY caller that ever
+    // saw them - every later GET /api/updates/ (cachedUpdateProjection())
+    // read the just-upserted row back with no assets column to read them
+    // from, and got assets: [] regardless of what the real release had.
+    // Reading the row that was just written, the same way every other
+    // caller does, means there is exactly one place that turns a stored
+    // state row into a projection.
+    const projection = cachedUpdateProjection();
     // Fires once per genuine transition to a new version, never once
     // per check - a code review (2026-09-06) found the original version
     // re-notifying every single day forever for the same still-
@@ -221,21 +235,34 @@ export async function checkForAppUpdate(): Promise<UpdateProjection> {
     return projection;
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
-    upsertState({ checkedAt: now, latestVersion: null, latestUrl: null, latestSummary: null, error: message });
-    return projectionFromState({ checkedAt: now, latestVersion: null, latestUrl: null, latestSummary: null, error: message });
+    upsertState({ checkedAt: now, latestVersion: null, latestUrl: null, latestSummary: null, error: message, assets: [] });
+    return cachedUpdateProjection();
   }
 }
 
-function projectionFromState(state: StoredState, assets: GitHubReleaseAsset[] = []): UpdateProjection {
+function projectionFromState(state: StoredState): UpdateProjection {
   const installed = installedVersion();
   const latest = state.latestVersion;
   const needsUpdate = latest !== null && isNewerVersion(installed, latest);
+  // Issue #40: state.assetsJson round-trips exactly what upsertState()
+  // wrote (this hub's own JSON.stringify of UpdateAsset[]) - a parse
+  // failure here would mean the row was corrupted some other way, never
+  // a real-world input to defend against, but this file's own discipline
+  // is "never throw past the scheduled job or route that calls this."
+  let assets: UpdateAsset[] = [];
+  if (state.assetsJson) {
+    try {
+      assets = JSON.parse(state.assetsJson) as UpdateAsset[];
+    } catch {
+      assets = [];
+    }
+  }
   return {
     installed,
     latest,
     summary: state.latestSummary,
     url: state.latestUrl,
-    assets: assets.map((a) => ({ name: a.name, url: a.browser_download_url, digest: a.digest ?? null })),
+    assets,
     channel: "stable",
     progress: null,
     needs: [],

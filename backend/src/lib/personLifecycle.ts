@@ -40,6 +40,7 @@ import {
   relationships,
   grants,
   approvals,
+  notificationDeliveries,
 } from "@/db/schema";
 import { clonedVoicesDir } from "@/lib/paths";
 import { nextHlc } from "@/lib/hlc";
@@ -48,6 +49,7 @@ import { invalidateScopeCache } from "@/lib/settings";
 import { deleteReceivedBackupsForDevice } from "@/lib/receivedBackups";
 import { ROLE_LADDER, invalidateSessionCacheForPerson, type Role } from "@/middleware/auth";
 import { trigger } from "@/lib/notifications";
+import { roleRequiresCredential, requiresCredential } from "@/lib/personAuthMethods";
 import type { PersonRow } from "@/types";
 import type { personToDbValues } from "@/lib/personShape";
 
@@ -152,15 +154,16 @@ export function checkRoleChange(
   }
   const lastOwnerError = lastOwnerGuardError(target.id, target.role === "owner");
   if (lastOwnerError) return lastOwnerError;
-  // routes/people.ts: "a PIN-free owner or admin profile is a one-request
-  // takeover for anyone who can reach the API." Promotion has to honour
-  // that too, or the rule is only enforced on the path that happens to
-  // create the account. Step 6: "the owner with a passkey or password"
-  // - a passkey is an equally strong credential here, so the caller
-  // passes requiresCredential(id) (lib/personAuthMethods.ts: PIN/
-  // password OR any registered passkey), not the narrower hasSecret()
+  // routes/people.ts: "a PIN-free owner, admin or adult profile is a
+  // one-request takeover / bare-tap adult-tier access for anyone who can
+  // reach the API" (issues #35/#47 added adult to that rule, 2026-09-06).
+  // Promotion has to honour that too, or the rule is only enforced on the
+  // path that happens to create the account. Step 6: "the owner with a
+  // passkey or password" - a passkey is an equally strong credential here,
+  // so the caller passes requiresCredential(id) (lib/personAuthMethods.ts:
+  // PIN/password OR any registered passkey), not the narrower hasSecret()
   // below.
-  if ((nextRole === "owner" || nextRole === "admin") && !targetHasSecret) {
+  if (roleRequiresCredential(nextRole) && !targetHasSecret) {
     return {
       ok: false,
       status: 400,
@@ -572,7 +575,11 @@ export function ageBandForBirthdate(birthdate: string, today: Date = new Date())
  * with no birthdate has nothing for this to compute against. Fires
  * exactly one notification per person actually moved, never one for a
  * birthday that happens to land on a day this runs without crossing a
- * band boundary. */
+ * band boundary. A move INTO a role roleRequiresCredential() gates
+ * (issues #35/#47: "adult") is held rather than applied when that
+ * person has no credential yet - a different, time_sensitive
+ * notification instead, and the person stays a sweep candidate on every
+ * future run until it's resolved by hand. */
 export async function applyAgeBandChanges(today: Date = new Date()): Promise<string[]> {
   const candidates = db
     .select()
@@ -585,6 +592,46 @@ export async function applyAgeBandChanges(today: Date = new Date()): Promise<str
   for (const person of candidates) {
     const nextBand = ageBandForBirthdate(person.birthdate!, today);
     if (nextBand === person.role) continue;
+    // Issues #35/#47: this write used to run unconditionally, the one
+    // path a code review (2026-09-06) found could still produce a
+    // credential-free "adult" - routes/people.ts's create and
+    // checkRoleChange's promotion guard both check this, but neither
+    // route runs here. Held at the current (safer) band rather than
+    // silently promoted: the household is notified and can promote by
+    // hand once a PIN, password, or passkey exists. This candidate stays
+    // in every future day's sweep (role never changed, so the filter
+    // above keeps matching) until that happens.
+    if (roleRequiresCredential(nextBand) && !requiresCredential(person.id)) {
+      // A review of the hold above (2026-09-06) found this re-fired on
+      // EVERY future run for as long as the hold lasts (the person's role
+      // never changes while held, so they never leave `candidates`) -
+      // unbounded daily notification/Telegram spam, breaking this
+      // scheduled job's own "every run is idempotent" contract. Skipped
+      // once an undismissed delivery for this exact person already
+      // exists; a fresh one fires again only once that's dismissed (or
+      // the hold resolves and this branch stops running for them at all).
+      //
+      // Keyed on subjectPersonId, not a LIKE match on the rendered
+      // displayName (a SECOND review, 2026-09-06, found that version
+      // silently merged two same-named people - no uniqueness constraint
+      // on displayName exists anywhere - and was vulnerable to unescaped
+      // LIKE metacharacters in a name).
+      const alreadyNotified = db
+        .select({ id: notificationDeliveries.id })
+        .from(notificationDeliveries)
+        .where(
+          and(
+            eq(notificationDeliveries.typeId, "person.adult_band_held_needs_secret"),
+            isNull(notificationDeliveries.dismissedAt),
+            eq(notificationDeliveries.subjectPersonId, person.id),
+          ),
+        )
+        .get();
+      if (!alreadyNotified) {
+        await trigger("person.adult_band_held_needs_secret", { displayName: person.displayName }, { subjectPersonId: person.id });
+      }
+      continue;
+    }
     const now = new Date().toISOString();
     db.update(people).set({ role: nextBand, updatedAt: now, hlc: nextHlc() }).where(eq(people.id, person.id)).run();
     invalidateSessionCacheForPerson(person.id);

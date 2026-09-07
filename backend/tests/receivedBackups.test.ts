@@ -50,7 +50,7 @@ describe("POST /api/backups/received", () => {
 
   test("refuses a device that isn't the caller's own", async () => {
     const client = await owner();
-    const adultRes = await client.post("/api/people", { displayName: "Marlow", role: "adult" });
+    const adultRes = await client.post("/api/people", { displayName: "Marlow", role: "adult", secret: "0000" });
     const adult = (await adultRes.json()) as { id: string };
     const theirDevice = createDevice("robot", "Their robot", adult.id);
 
@@ -94,10 +94,10 @@ describe("POST /api/backups/received", () => {
     form.append("deviceId", myDevice.id);
     await client.postForm("/api/backups/received", form);
 
-    const adultRes = await client.post("/api/people", { displayName: "Marlow", role: "adult" });
+    const adultRes = await client.post("/api/people", { displayName: "Marlow", role: "adult", secret: "0000" });
     const adult = (await adultRes.json()) as { id: string };
     const adultClient = new TestClient();
-    await adultClient.post("/api/auth/select", { personId: adult.id });
+    await adultClient.post("/api/auth/verify-secret", { personId: adult.id, secret: "0000" });
 
     const list = (await (await adultClient.get("/api/backups/received")).json()) as unknown[];
     expect(list).toHaveLength(0);
@@ -127,10 +127,10 @@ describe("DELETE /api/backups/received/:id", () => {
     form.append("deviceId", device.id);
     const created = (await (await client.postForm("/api/backups/received", form)).json()) as { id: string };
 
-    const adultRes = await client.post("/api/people", { displayName: "Marlow", role: "adult" });
+    const adultRes = await client.post("/api/people", { displayName: "Marlow", role: "adult", secret: "0000" });
     const adult = (await adultRes.json()) as { id: string };
     const adultClient = new TestClient();
-    await adultClient.post("/api/auth/select", { personId: adult.id });
+    await adultClient.post("/api/auth/verify-secret", { personId: adult.id, secret: "0000" });
 
     const del = await adultClient.request(`/api/backups/received/${created.id}`, { method: "DELETE" });
     expect(del.status).toBe(404);
@@ -154,10 +154,10 @@ describe("cleanup on device/person removal", () => {
 
   test("memorializing a person whose device pushed a backup does not throw a foreign-key error", async () => {
     const owner_ = await owner();
-    const adultRes = await owner_.post("/api/people", { displayName: "Marlow", role: "adult" });
+    const adultRes = await owner_.post("/api/people", { displayName: "Marlow", role: "adult", secret: "0000" });
     const adult = (await adultRes.json()) as { id: string };
     const adultClient = new TestClient();
-    await adultClient.post("/api/auth/select", { personId: adult.id });
+    await adultClient.post("/api/auth/verify-secret", { personId: adult.id, secret: "0000" });
 
     const device = createDevice("robot", "Marlow's phone", adult.id);
     const form = fakeArchive();

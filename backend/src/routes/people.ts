@@ -10,7 +10,7 @@ import { toRoster, parsePersonCandidate, personToDbValues, guestExpiryProblem } 
 import { listActivePeople } from "@/lib/access";
 import { validateDisplayName, validateSecret } from "@/lib/validation";
 import { canManage, checkRoleChange, commitPersonUpdate, deletePerson, deletePeople, memorializePerson, type PersonEdit } from "@/lib/personLifecycle";
-import { requiresCredential } from "@/lib/personAuthMethods";
+import { requiresCredential, roleRequiresCredential } from "@/lib/personAuthMethods";
 import { effectivePermissions } from "@/lib/permissions";
 import { apiRouter, errorResponses, idParamSchema } from "@/lib/openapi";
 import { Person } from "@maipai/spec/gen/ts/person.js";
@@ -103,7 +103,25 @@ peopleRoutes.openapi(createRoute_, async (c) => {
   // and admin both, since either can manage the household. A PIN-free
   // owner or admin profile is a one-request takeover for anyone who can
   // reach the API.
-  if ((role === "owner" || role === "admin") && !body.secret) {
+  //
+  // adult joined this list (issues #35/#47, 2026-09-06): CONTENT_CEILINGS'
+  // adult band already answers with profanity/sexual/violence
+  // unrestricted, and role: "adult" alone (no ceiling/grant check
+  // involved) already gates real authorization - routes/approvals.ts's
+  // requireRole("owner","admin","adult") and lib/commands.ts's
+  // MIN_ROLE_TO_CREATE. A secret-free adult profile was reachable by any
+  // device on the LAN with a bare tap of /api/auth/select and got all of
+  // that - exactly the "never the default for a new profile" case
+  // CLAUDE.md's Safety invariants section rules out. This is deliberately
+  // NOT fixed by touching contentCeiling.ts's hasUnrestrictedGrant() or
+  // any ceiling lookup: that gate gulf is for a further, still-unwired
+  // "unrestricted mode" tier PAST the adult ceiling (grant.schema.json's
+  // own header notes reconciling an age-blind grant system with an
+  // age-shaped safety invariant is still an open, unresolved question,
+  // docs/BACKLOG.md's "Resolve the unrestricted-mode age collision") -
+  // collapsing the two would silently resolve that open question here,
+  // and would do nothing for the approvals/commands exposure anyway.
+  if (roleRequiresCredential(role) && !body.secret) {
     return c.json({ error: `a ${role} profile requires a secret` }, 400);
   }
   let secret: string | undefined;
