@@ -42,7 +42,7 @@ Every conversation is saved. Open **Conversations** in the sidebar to see them a
 - Tap **Delete** to remove one you don't need.
 - Tap **Select conversations** to choose several at once, or **Clear all** to remove everything.
 
-Owners and admins can also switch to view another household member's conversations from this same page, for parental oversight.
+Owners and admins can also view another household member's conversations from this page. This helps with parental oversight.
 
 ## Still need help?
 

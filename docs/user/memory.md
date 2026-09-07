@@ -21,8 +21,8 @@ Tap **Export**. This downloads everything MaiPai remembers about you. Keep the f
 
 ## Check a child's memories
 
-Owners and admins can use the person picker at the top of the page to switch to another household member and see their memories the same way. You can view or forget entries there too, to help manage what MaiPai keeps about a child.
+Owners and admins can switch to another household member. Use the person picker at the top of the page. You'll see their memories the same way. You can view or forget entries there too. This helps you manage what MaiPai keeps about a child.
 
 ## Still need help?
 
-If Memory looks empty when you expect entries, or Forget doesn't seem to work, see [Fix a problem](fix-a-problem.md).
+Memory can look empty, or Forget can seem stuck. For either one, see [Fix a problem](fix-a-problem.md).
