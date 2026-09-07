@@ -736,30 +736,50 @@ into a conversation with someone who knows who is talking.
       reply in the persona's voice. Exit: `scripts/check.sh` plus new
       tests in `tests/tier2.test.ts`, `tests/conversationHistory.test.ts`,
       and one frontend test for the caption.
-- [ ] **Fix C: guards narrow to household claims, cut instead of splice,
-      proven by a corpus** (M) - same note. Objective: ordinary small talk
-      ("That sounds like a fun night out!", "Sounds like a long day.", <!-- prose-lint: allow -->
-      "Spider-Man") passes; a household claim ("he drives a black BMW",
-      "your dentist is on Thursday at four" with no source) is still
-      caught; a flagged sentence is dropped from a stream, never replaced
-      mid-reply. Files: `backend/src/lib/guards.ts` (delete the
-      `PROPER_NOUN_RE`/`DATE_WORD_RE`/`BARE_NUMBER_RE` loop and the
-      `probably (a|an|the)` / `sounds like (a|an)` alternations of
-      `GUESSING_RE`; add the narrow household schedule-claim shape),
-      `backend/src/lib/text.ts` (`tokenize()` also indexes the joined form
-      of a hyphenated word), `backend/src/lib/turnEngine.ts`
-      (`gateGuards()`: CUTTABLE drops and continues, non-cuttable yields
-      the replacement once and ends, an empty reply yields it once),
-      `spec/llm/guard-corpus.json` (new; rows `{utterance, reply, sources,
-      history, expect}`, seeded per the note), `backend/tests/guardCorpus.test.ts`
-      (new, mirrors `tests/routingCorpus.test.ts`, in `check.sh`).
-      Standing rule: every guard false positive seen in the house gets a
-      corpus row before it is fixed. Acceptance: the twelve probe replies
-      in the note pass untouched; "It's sunny and about 75 degrees today."
-      answering a weather question is still caught; no reply ever
-      contains a canned line followed by the model's own sentence. Out of
-      scope: a model-based grounding judge. Exit: `scripts/check.sh` with
-      the guard corpus green.
+- [x] **Fix C: guards narrow to household claims, cut instead of splice,
+      proven by a corpus** (M) - shipped 2026-09-07 (getmaipai/home#62).
+      `backend/src/lib/guards.ts`: `GUESSING_RE`'s `sounds like (a|an)`
+      alternation removed (a real conversational idiom reacting to
+      something the PERSON just said, not a guess about the household -
+      `probably (a|an|the)` deliberately KEPT: a code review caught a
+      first cut removing that too, with no incident evidence and no
+      corpus row justifying it, and "That's probably a delivery driver."
+      answering "who's at the door" is a genuine invented guess); the
+      bare `PROPER_NOUN_RE`/`DATE_WORD_RE`/`BARE_NUMBER_RE` candidate loop
+      kept UNCHANGED, correcting this item's own original plan (deleting
+      it wholesale would have broken "a fabricated weather stat is still
+      caught," which only that loop catches - see `docs/dev.md`'s Fix C
+      "as built" note for the full reasoning); a new `HYPHEN_COMPOUND_RE`/
+      `hyphenGroundedPieces()` pair grounds a reply's own "Spider-Man"
+      against a household's plain "Spiderman" (kept local to guards.ts,
+      not `tokenize()` - `memory.ts` recall and `routing.ts` example
+      matching share that function and neither wants hyphen-collapsing);
+      new exported `isCuttable()`, the one place CUTTABLE-ness is decided.
+      `backend/src/lib/turnEngine.ts`: `gateGuards()` rewritten to
+      genuinely match `guardReply()`'s own three real branches
+      (guards.ts:517-526) - a code review caught a first cut's own
+      mismatch: guardReply() STOPS at the first flagged sentence every
+      time (no fall-through to a later sentence, cuttable or not), while
+      the first cut dropped just a cuttable sentence and kept streaming
+      later ones, producing a different reply than the non-streaming path
+      would for the identical model completion. As built: a cuttable
+      reason with something already spoken keeps only that prefix and
+      stops (no honest line, matching `kept.join(" ")`); a cuttable reason
+      with nothing spoken yet, or any non-cuttable reason, replaces with
+      the honest line and stops (matching `replacementFor(reason, ...)`)
+      - draining, never yielding, whatever the model would have said
+      next either way. `spec/llm/guard-corpus.json` (20 rows) +
+      `backend/tests/guardCorpus.test.ts` (mirrors
+      `tests/routingCorpus.test.ts`, both the non-streaming and streaming
+      paths, in `check.sh`); direct `gateGuards()` unit tests added to
+      `tests/turnEngine.test.ts` (none existed before this fix), each
+      asserting `gateGuards()` against `guardReply()`'s own real decision
+      on the identical input, not just against a standalone expectation.
+      Verified live against all six incident probe phrases (small talk
+      passes untouched both non-streaming and streaming; the weather
+      invention is still caught) and against
+      `scripts/bench/conversation.ts` (unchanged 23/29, no regression on
+      the 5 pre-existing known gaps).
 - [x] **Send prior turns to the model** (S-M) - shipped, Session A step 3
       (2026-09-05): `buildConversationWindow()` in `lib/conversationHistory.ts`,
       newest 4 turns always kept verbatim, older ones added
@@ -2110,34 +2130,59 @@ on a spec tag that was never cut.
 
 ## Cross-cutting
 
-- [ ] **Fix A: engines survive `bun --hot`, and the turn pipeline logs**
-      (M) - from `docs/dev.md`'s "Chat reliability: the 2026-09-07
-      incident" note; do this first. Objective: a backend source save
-      never costs a model reload or a dead reply (ten reloads in one
-      night respawned qwen3-8b eleven times and killed a reply
-      mid-stream), and every completed turn leaves one structured line
-      saying what routed, what was offered, what ran, and what the guards
-      cut. Files: `backend/src/lib/llmSupervisor.ts`,
-      `backend/src/lib/embedSupervisor.ts`, `backend/src/lib/ttsSupervisor.ts`
-      (module-level state moves to one `globalThis.__maipaiEngines`
-      registry; a fresh module instance health-checks and reuses the
-      running backend), `backend/src/lib/sidecars.ts`
-      (`sweepOrphanProcesses()` and `freePort()` skip registered pids),
-      `backend/src/index.ts` (warm-up skips a healthy registered role),
-      `backend/src/lib/turnEngine.ts` (one JSON `[turn]` line per turn:
-      `turn_id`, `surface`, `source`, `route`, `tier2`, `plugin`, `guard`
-      hits, `safety.action`, `duration_ms`; never utterance or reply text;
-      `MAIPAI_TURN_DEBUG=1` adds flagged sentence text), `data/logs/hub.log`
-      with size-and-days rotation. Mirror: `backend/src/lib/wyomingServer.ts`'s
-      `__maipaiWyomingBoundPorts` (the documented hot-reload pattern);
-      `docs/ENGINEERING.md`'s Logging section. Acceptance: saving a
-      backend file mid-chat does not fail the next reply and adds no
-      `[enginePostLoadCheck]` line; a test proves the same pid is reused
-      across a simulated reload; a test proves the `[turn]` line for a
-      plugin turn and a guarded model turn carries the fields and no
-      utterance text. Out of scope: a logging framework; a trace id
-      across processes (the standard's timeline view). Exit:
-      `scripts/check.sh` plus the live save-while-chatting check.
+- [x] **Fix A: engines survive `bun --hot`, and the turn pipeline logs**
+      (M) - shipped 2026-09-07. `backend/src/lib/llmSupervisor.ts`/
+      `embedSupervisor.ts`/`ttsSupervisor.ts`: each module's own state
+      (backend, startingPromise, generation, plus llmSupervisor's
+      lastPostLoadCheck/manuallyStopped) moved off a module-level `let`
+      onto `globalThis` via a new shared `backend/src/lib/hotReloadState.ts`
+      helper (a code review caught the first cut hand-copying the same
+      globalThis-plumbing three times; one generic `hotReloadState<T>(key,
+      init)` instead - each module still owns its own state shape).
+      `backend/src/lib/sidecars.ts`'s `sweepOrphanProcesses()` takes an
+      `excludePids` option; `llmSupervisor.ts`'s
+      `sweepOrphanEngineProcesses(extraLivePids)` passes its own chat
+      backend's pid plus whatever `index.ts` forwards from
+      `getEmbedLivePid()`/`getTtsLivePid()` (kept as three small pid
+      getters stitched at the call site, not one shared process registry -
+      a real, deliberately deferred simplification if a fourth spawned
+      role is ever added). `backend/src/lib/turnEngine.ts`: one JSON
+      `[turn]` line per completed turn (`turn_id`, `conversation_id`,
+      `surface`, `source`, `plugin_id`/`command_id`, `routing`, `guard`
+      reasons, `safety_action`, `duration_ms` - never utterance or reply
+      text, unconditionally, no debug escape hatch (a code review caught
+      a first cut's own `MAIPAI_TURN_DEBUG=1` env var writing the raw
+      utterance to this line - a plain env var is not the admin-toggled,
+      auto-reverting mechanism `docs/ENGINEERING.md`'s Logging section
+      actually specifies, and the line is unconditionally persisted to
+      disk - removed rather than half-fixed). `gateGuards()` gained an
+      optional `onGuardHit` callback to feed it (a code review flagged
+      this as a side-channel a return-value shape would avoid - kept as
+      the callback anyway: the return-value alternative would have
+      widened `TurnStreamResult.tokens`'s own type and rippled into
+      `routes/turn.ts`, a bigger blast radius than the fix warranted).
+      New `backend/src/lib/log.ts`: `appendLogLine()`, a size-and-days
+      rotated append to `data/logs/hub.log` - deliberately NOT a blanket
+      `console.log`/`warn`/`error` mirror (a first cut did exactly that;
+      a code review caught it teeing all ~47 pre-existing `console.*`
+      call sites across the codebase to disk unconditionally with no
+      redaction step anywhere, a real secret/PII-surface risk the org's
+      own Logging standard forbids - removed; `logTurnLine()` is the one
+      caller today, and it already omits utterance/reply text); reuses
+      `paths.ts`'s existing `ensureDataDir()` rather than a second
+      directory-creation helper (another review catch). Tests:
+      `tests/llmSupervisor.test.ts` (the shared-state mechanism proven
+      directly, `excludePids` wiring), `tests/sidecars.test.ts`
+      (`excludePids` protects a real spawned process from a real sweep),
+      new `turnEngine.test.ts` `gateGuards()` coverage doubles as this
+      fix's own `[turn]`/guard-field proof. Verified: full backend suite
+      green (1702 tests) with `bun --hot` itself running throughout;
+      `tsc --noEmit` clean. Not independently re-verified: a live
+      save-while-chatting check against a real spawned chat engine (none
+      was running on the dev machine at fix time - only the embed
+      server) - the mechanism itself (globalThis persistence, pid
+      exclusion) is unit-tested directly, but the end-to-end "save a file,
+      the in-flight reply survives" moment hasn't been watched live.
 - [ ] Cut a first real release (S, but blocking) - no tag has ever been
       made. The deploy-from-release-tag model, the clean-clone build
       check, and update delivery have never been exercised for real.

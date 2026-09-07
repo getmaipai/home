@@ -8901,6 +8901,39 @@ rotation (the standard's "retention is by size and days"). Today stdout
 goes wherever the process was started, which for the dev server was a
 session scratchpad that disappears with the session.
 
+**A4/A5 as built (2026-09-07), corrected from the plan above.** A code
+review on this fix's first cut caught two real problems, both fixed by
+narrowing scope rather than patching around them. First, the plan's own
+`MAIPAI_TURN_DEBUG=1` idea shipped as a plain env var that wrote the raw
+utterance straight into the persisted `[turn]` line - not the
+admin-toggled, auto-reverting debug mechanism `docs/ENGINEERING.md`'s
+Logging section actually specifies, and with the line now genuinely
+persisted to disk (not just printed), that gap is real, not academic.
+Removed entirely rather than half-fixed: the `[turn]` line never carries
+utterance or reply text, no exceptions. Second, the plan's "the hub
+writes its own log" was implemented as a blanket
+`console.log`/`warn`/`error` interceptor (`installConsoleFileMirror()`),
+which the same review caught teeing all ~47 pre-existing `console.*`
+call sites across the codebase to disk unconditionally, with no
+redaction step anywhere - exactly the "a secret, token, PII value...
+never lands" guarantee the Logging standard makes, broken for every
+existing call site that was never written expecting to be durably
+persisted. Removed. **As built instead:** `lib/log.ts` exports one
+primitive, `appendLogLine(line)` - size-and-days rotated, no
+interception, no default subscribers. `turnEngine.ts`'s `logTurnLine()`
+is the one caller: it builds the `[turn]` JSON record itself (already
+excluding utterance/reply text by construction) and calls both
+`console.log()` (terminal visibility, unchanged) and `appendLogLine()`
+(persistence) directly. This is a real, narrower scope than "every
+console call now persists" - the broader ambition (every existing log
+call surviving a restart) is explicitly NOT done here; a proper version
+needs the redaction step the org's own package-level `host.log` design
+already calls for, filed as its own future item rather than claimed
+here. `tier2`/route/plugin-fault fields named in A4 above were also not
+built in this pass (Fix E replaces the tier2 mechanism this same field
+would describe - building it now would be immediately superseded);
+`route`, `plugin_id`/`command_id`, and `guard` are what actually shipped.
+
 Exit: `check.sh` green; a test that reloads the supervisor module (a
 fresh `import()` after `__resetLlmSupervisorForTests()` is not enough,
 the test must simulate the registry surviving) proves the same pid is
@@ -8956,32 +8989,76 @@ the window as `system`; a frontend test proves the caption. Live: turn
 1's message answered by the model itself.
 
 **Fix C: guards narrow to household claims, cut instead of splice, and
-are proven by a corpus.**
+are proven by a corpus. Shipped 2026-09-07 (getmaipai/home#62), in a
+shape that corrects a real internal contradiction the plan below
+originally had - see each item's own "as built" note.**
 
-C1. `guards.ts` `guardInvention()`: delete the bare-candidate loop
-(`PROPER_NOUN_RE`, `DATE_WORD_RE`, `BARE_NUMBER_RE`) and, from
-`GUESSING_RE`, the `probably (a|an|the)` and `sounds like (a|an)`
-alternations (conversational idiom, not a guess about the household).
-Keep `PERSON_TRAIT_RE`, `LOCATION_CLAIM_RE`, `ATTRIBUTED_QUOTE_RE`,
-`CLAIMED_EXPERIENCE_RE`, and the remaining `GUESSING_RE` shapes ("I
-think you're talking about", "you must mean", "my guess is", "I'm
-guessing"). Add one narrow shape so the ported "it's on Thursday at
-four" catch survives: a household schedule claim,
-`(your|his|her|their|the) <noun> (is|was) (on|at) <weekday|time>`, whose
-weekday/time words must be grounded. `tokenize()` additionally indexes
-the joined form of a hyphenated word (`spider-man` yields `spider`,
-`man`, `spiderman`) so a hyphenated name grounds against its plain
-spelling.
+C1 as planned here (below) said to delete the ENTIRE bare-candidate loop
+(`PROPER_NOUN_RE`/`DATE_WORD_RE`/`BARE_NUMBER_RE`). Implementing it
+surfaced a real conflict with this same Fix's own C3 acceptance
+criterion ("the weather invention... is still caught"): a fabricated
+"75 degrees" is caught ONLY by that loop (`BARE_NUMBER_RE`); deleting it
+wholesale would have silently broken genuine invention detection to fix
+a false-positive problem that a narrower change already solves. **As
+built** instead: only `GUESSING_RE`'s `sounds like (a|an)` alternation is
+removed (conversational idiom reacting to what the PERSON just said,
+never a guess about the household's own facts - "sounds like a fun
+night out", "sounds like a long day"). `probably (a|an|the)` deliberately
+STAYS - a second code review, after the first cut also removed it,
+caught that with no incident evidence and no corpus row justifying it:
+"That's probably a delivery driver." answering "who's at the door" is a
+genuine invented guess, not a reaction idiom - "sounds like a/an X" only
+ever reacts to something the PERSON already said, while "probably a/an
+X" states a new, unhedged claim about a thing or person the household
+asked about, exactly the pattern this guard exists to catch. The
+bare-candidate loop itself is UNCHANGED, so a real fabrication ("75
+degrees", an invented date, an invented name) is still caught exactly as
+before. `PERSON_TRAIT_RE`, `LOCATION_CLAIM_RE`,
+`ATTRIBUTED_QUOTE_RE`, `CLAIMED_EXPERIENCE_RE`, and the remaining
+`GUESSING_RE` shapes are untouched. No new "household schedule claim"
+shape was needed - keeping the bare-candidate loop already preserves the
+"it's on Thursday at four" catch, so that planned addition was dropped
+as redundant. Hyphen-grounding ("Spider-Man" in a reply grounding
+against a household's own plain "Spiderman") is fixed locally in
+`guards.ts` (a `HYPHEN_COMPOUND_RE` scan over each sentence's own
+hyphenated words, feeding a `hyphenGroundedPieces()` set the final
+candidate check also consults) rather than inside `tokenize()` itself as
+originally planned - `tokenize()` is shared by `memory.ts`'s recall
+keyword fallback and `routing.ts`'s example-match scoring, and neither
+wants hyphen-collapsing folded into its own matching; a guards.ts-local
+fix has no such blast radius.
 
-C2. `gateGuards()` (`turnEngine.ts`): a sentence flagged for a
-`CUTTABLE` reason is dropped and the stream continues; a sentence
-flagged for a non-cuttable reason (capability claim, medication dose,
-like-I-said, example parrot) ends the reply: yield the replacement line
-once and return, dropping everything after it. If nothing at all was
-yielded by the end, yield the first reason's replacement once. No canned
-line is ever spliced between the model's own sentences. This is
-`guardReply()`'s cut-or-replace rule applied to a stream, so the two
-paths agree.
+C2 as planned here (below) said a CUTTABLE reason is "dropped and the
+stream continues," differing from a non-cuttable reason only in whether
+an honest line is spoken. **As built** is stricter, because
+`guardReply()` (guards.ts:510-527) itself is stricter than that
+description: a code review on this fix's own first cut - which DID
+implement "drop and continue" literally - caught that guardReply() never
+actually continues past a flagged sentence, cuttable or not; it always
+`return`s immediately, either keeping whatever prefix already stood
+(the CUTTABLE branch, `kept.length > 0`) or replacing everything with
+the honest line (every other case, including a CUTTABLE reason with
+NOTHING kept yet). The first cut's "drop and continue" `gateGuards()`
+therefore produced a different reply than `guardReply()` would for the
+identical model completion - exactly the drift this whole fix exists to
+close, just relocated rather than fixed. `gateGuards()` now mirrors
+guardReply()'s real branches one-for-one instead: a CUTTABLE reason
+(`guards.ts`'s own new `isCuttable()` export) with something already
+spoken keeps only that prefix and stops - no honest line, matching
+`kept.join(" ")`; a CUTTABLE reason with nothing spoken yet, or any
+non-cuttable reason, yields the honest line once and stops - matching
+`replacementFor(reason, ...)`. Either way, whatever the underlying
+stream still has left is drained, never yielded (the model's own
+remaining words are never spoken after this function has already
+decided the reply), and whatever `SafetyResult` the drained stream
+resolves to is returned unchanged. No canned line is ever spliced
+between the model's own sentences. Direct unit tests for `gateGuards()`
+now exist in `turnEngine.test.ts` (there were none before this fix,
+despite this being the exact mechanism the incident's reply came from),
+each one checking `gateGuards()`'s output against `guardReply()`'s own
+real decision on the identical input, not a standalone expectation -
+the shape of check that would have caught the first cut's own mismatch
+immediately.
 
 C3. `spec/llm/guard-corpus.json`, rows `{utterance, reply, sources,
 history, expect}` (`expect` is `null` or a `GuardReason`), seeded with:
