@@ -9916,3 +9916,133 @@ returns to the first, continues, renames it, deletes the second, and
 reloads again at phone and desktop sizes. These are demo conversations,
 not claims about live model quality. Persistent edit/regenerate branches,
 attachments, and continuous voice remain separate backlog work.
+
+## Automatic web lookups instead of declining (2026-09-07, getmaipai/home#67)
+
+Jesse's own household chat (`conv-8mybzoihzl`, `conv-emfobqwawp`,
+`data/hub.db`'s `conversation_turns`): a natural follow-up about a
+movie already in the conversation ("where's it playing," "what's it
+rated," "any reviews yet") got "I don't actually have that - nobody's
+told me" or "That's not something I've been told," even though
+`websearch` (`always_offer: true`, so it's offered on nearly every
+turn) had already answered a sibling question in the SAME conversation
+a couple of turns earlier ("look it up" worked fine). The household
+had to say "look it up" outright every time - the whole point of
+wiring up web search automatically was that they shouldn't have to.
+
+Two real, separate causes, confirmed against `data/logs/hub.log`'s
+`[turn]` lines for the exact turns:
+
+1. **The system prompt only ever pointed at memory, never at tools.**
+   `STABLE_SYSTEM_SUFFIX`'s line ("if you don't know something the
+   household hasn't told you, say so instead of guessing") never
+   mentioned an offered tool at all - several of the offending turns
+   logged `guard: []`, meaning the model declined on its own, unguarded,
+   with no fabrication to catch. Reworded to name the tool path first:
+   "if a listed tool can look something up, use it before saying you
+   don't know."
+2. **A caught guess never got a second chance.** The other offending
+   turns logged `guard: ["invention"]` - the model DID try to answer,
+   offered `websearch` and never called it, guessed instead (a rating,
+   a runtime, a location nobody mentioned), and `guardReply()` correctly
+   swapped the guess for an honest `NOT_TOLD` line - but nothing then
+   gave the model a real chance to actually look it up. Fixed
+   symmetrically to the existing "every proposed call failed, retry
+   without tools" contract (Fix E, above): when the plain-text answer's
+   own FIRST sentence turns out to be an `invention`/`unrelated_recall`
+   guess (`guardSentence()` checked directly, the identical split
+   `guardReply()` itself uses - a reason on sentence 0 is exactly the
+   condition under which `guardReply()` fully replaces the reply, never
+   a later sentence's own partial cut), `runTurn()` now retries ONCE
+   with `tool_choice: "required"` before falling back to the honest
+   line - never a second silent drop if the forced call also fails to
+   resolve.
+
+   A code review (2026-09-07) on the first cut of this found a real,
+   more serious bug than the one it was fixing: that cut forced the
+   retry over the FULL offered tool set, so a caught guess could be
+   "fixed" by the model inventing a call to an unrelated action package
+   instead - `remember`, say - which `resolveToolCalls()` would then run
+   with no confirmation (`consequential: false`), writing the model's
+   OWN fabricated fact to permanent memory. Worse than the honest
+   decline it replaced, and the review's own regression test proved it
+   live. Fixed by scoping the forced retry to `routing.always_offer`
+   candidates only (websearch is the only one in the bundled catalog) -
+   the genuinely open-ended lookup fallback, never an action tool the
+   model could satisfy "required" with by inventing a call instead of a
+   fact; `resolveToolCalls()` itself is still the backstop even if a
+   model somehow proposes something else anyway (rejected as an
+   unoffered id). The same review caught two smaller issues fixed in the
+   same pass: a parent safety notification could fire on a guessed reply
+   the household never actually saw once the retry succeeded (the guess
+   text no longer reaches `notifyIfFlagged()`/`guardReply()` at all
+   unless it's the one actually kept); and a guess that only ever cut a
+   LATER sentence of an otherwise-good multi-sentence reply (an earlier
+   sentence legitimately kept) no longer triggers a retry that would
+   have discarded that good prefix - the first-sentence-only check
+   naturally excludes it, since `guardReply()` only fully replaces on a
+   sentence-0 hit.
+
+   A SECOND review pass (2026-09-07, on the fix above) found one more
+   real bug and two cleanups. The bug: the pre-check's own
+   `guardSentence()` call left `replyHasQuestion` unset, while the real
+   `guardReply()` pass a few lines later (`guards.ts`'s own
+   `fullReplyCtx`) computes it from the WHOLE reply - `guardCapabilityClaim`'s
+   own "a later sentence's `?` exempts the whole reply" exemption could
+   then disagree between the two, misreading a genuinely fabricated
+   first sentence (an accepted-sounding opener - "Sure, it's rated
+   PG-13." - followed by a real question) as a capability claim and
+   silently skipping the retry for the exact shape of turn this fix
+   exists to catch. Fixed by computing it identically
+   (`rawText.includes("?")`) in the pre-check. The two cleanups: the
+   pre-check's own sentence split was a second, independently-typed copy
+   of `guardReply()`'s regex - extracted to a shared `splitIntoSentences()`
+   in `guards.ts`, used by both; and the lookup-tools filter
+   (`ranked.filter(r => r.manifest.routing?.always_offer)`) duplicated
+   `prepareTurn()`'s own `alwaysOffered` a few dozen lines earlier -
+   `prepareTurn()` now computes and returns the full set once, as
+   `lookupTools` on its "model" result, so both places share the one
+   filter instead of two independently maintained copies. Not changed:
+   `guardSentence()` still runs twice on the same first sentence for
+   every no-tool-call turn (once in the pre-check, once again inside the
+   real `guardReply()` pass) - cheap on one short sentence, and avoiding
+   it would mean threading a precomputed result into `guardReply()`'s
+   own signature, a bigger change to a function every other guard call
+   site also uses, for a marginal saving on a path that already may cost
+   a second LLM completion.
+
+**Streaming (`runTurnStream()`, what the real chat UI actually uses)
+only got fix 1.** A first cut applied fix 2 there too - buffer the
+first sentence (the same `nextSentenceBoundary` math
+`gateOutputSafety()` already uses), judge it with `guardSentence()`,
+retry with a forced call before ever streaming a caught guess. It
+worked, but it made `runTurnStream()` itself not RETURN until a
+sentence boundary showed up: for a reply with no early punctuation,
+that's an unbounded wait in front of the very first byte, on every
+turn a tool is offered (nearly all of them). Caught immediately by
+`tests/openai.test.ts`'s own cancellation test timing out against a
+scripted server that pauses mid-reply - a real regression, not a test
+artifact, so it was reverted rather than shipped with a caveat. The
+streaming path still only has fix 1 to lean on; a guessed answer there
+still streams and still gets caught by `gateGuards()` downstream
+exactly as before this session, just without the retry. A real fix
+needs the buffering to happen lazily, inside the generator the caller
+already drains incrementally, not eagerly before `runTurnStream()` can
+even return a `"stream"` kind result - not designed here.
+
+Regression tests: `tests/tier2.test.ts`'s
+`withScriptedGuessThenForcedTool()` scripts a first completion
+(`tool_choice: "auto"`) to answer with an ungrounded guess and a forced
+retry (`tool_choice: "required"`) to answer with a real call, covering
+`runTurn()`'s forced-retry-fails fallback and `runTurnStream()`
+(documenting the still-open gap, unchanged). Separate tests cover the
+code review's own three findings directly: the forced retry's own
+`tools` request only ever names `always_offer` candidates (never
+`remember`/`recall`); a forced call naming a non-lookup tool anyway is
+rejected and writes nothing to `memory_records`; and a guess that only
+cuts a later sentence leaves an earlier honest one standing, with no
+retry at all. A fourth test covers the second review's own bug: an
+accepted-sounding opener ("Sure, ...") followed by a real fabrication
+and a genuine question still triggers the forced retry, proving
+`replyHasQuestion` is computed the same way in the pre-check as in the
+real `guardReply()` pass - confirmed to fail without that fix.

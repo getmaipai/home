@@ -718,6 +718,46 @@ verified against D's numbers.
       the source), imported everywhere the union is checked today. Exit:
       `scripts/check.sh`; a test proving the compiler catches a routing
       tier used somewhere that doesn't import the shared type.
+- [ ] **`runTurnStream()` never gets a second chance at a caught guess -
+      `runTurn()` does** (M) - found 2026-09-07 (`docs/dev.md`'s
+      "Automatic web lookups instead of declining," getmaipai/home#67).
+      `runTurn()` now retries once with `tool_choice: "required"` when
+      the model answers in plain text and `guardReply()` catches it as
+      `invention`/`unrelated_recall` (a guess instead of a real lookup) -
+      the mirror of the existing "every proposed call failed, retry
+      without tools" contract. `runTurnStream()` (`backend/src/lib/
+      turnEngine.ts` - what the real chat UI actually calls) does NOT:
+      a first cut buffered the first sentence eagerly, before the
+      function could even return, so it could hang indefinitely on a
+      reply with no early punctuation (caught by `tests/openai.test.ts`'s
+      cancellation test timing out) - reverted rather than shipped with
+      that latency risk. Today the streaming path only has the reworded
+      system prompt to lean on; a caught guess still streams and gets
+      replaced by `gateGuards()` downstream exactly as before this fix,
+      just without a retry. Objective: give the streaming path the same
+      retry, without blocking `runTurnStream()`'s own return or adding
+      latency to the ordinary (non-inventing) case. Real design needed,
+      not just porting the non-streaming code: the decision ("was the
+      first sentence a guess") has to happen LAZILY, inside the
+      generator `streamTurnEvents()` (`backend/src/routes/turn.ts`)
+      already drains incrementally sentence by sentence via
+      `gateOutputSafety()`/`gateGuards()` - not eagerly before
+      `runTurnStream()` picks `"stream"` vs `"immediate"`. One shape
+      worth trying: let `gateGuards()` itself, on catching
+      `invention`/`unrelated_recall` on the FIRST sentence with nothing
+      spoken yet, ask the caller (via its own return value or a callback)
+      whether a forced-tool retry is possible, instead of unconditionally
+      substituting the honest line - `runTurnStream()` would need to stay
+      in the loop to actually run that retry (it owns the tools/ranked
+      candidates), so this likely means threading a retry callback into
+      `gateGuards()` rather than `gateGuards()` reaching back into
+      turnEngine.ts itself. Mirror: `tests/tier2.test.ts`'s
+      `withScriptedGuessThenForcedTool()` already exists for exactly this
+      kind of test. Exit: a `runTurnStream()` regression test proving a
+      caught-guess turn resolves via the forced tool (matching `runTurn()`'s
+      own two new tests) AND `tests/openai.test.ts`'s cancellation test
+      (and the rest of `scripts/check.sh`) stays green with no added
+      first-byte latency on an ordinary reply.
 - [ ] Real multi-source, multi-skill answers (L) - see `docs/dev.md`'s
       2026-09-04 tier 2 note and the 2026-09-05 stress-test against it.
       Explicitly NOT an open agentic loop by design; the current best

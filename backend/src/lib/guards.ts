@@ -541,6 +541,16 @@ export function guardSentence(sentence: string, ctx: GuardContext, isFirstSenten
   );
 }
 
+/** The exact sentence split guardReply() itself applies below - exported
+ * so a caller that needs to check just the reply's FIRST sentence in
+ * isolation (turnEngine.ts's own invention-retry, getmaipai/home#67)
+ * uses the IDENTICAL split guardReply() will apply moments later,
+ * rather than a second, independently-typed regex that could drift from
+ * it (a code review, 2026-09-07, found a first cut doing exactly that). */
+export function splitIntoSentences(reply: string): string[] {
+  return (reply || "").trim().split(/(?<=[.!?])\s+/).filter(Boolean);
+}
+
 /** The non-streaming path: splits `reply` into sentences, guards each in
  * order, and either cuts a CUTTABLE offender (keeping whatever honest
  * sentences came before it) or replaces the whole reply the moment a
@@ -549,7 +559,7 @@ export function guardSentence(sentence: string, ctx: GuardContext, isFirstSenten
  * `speech` string - turnEngine.ts only ever runs this on `source:
  * "model"` text. */
 export function guardReply(reply: string, ctx: GuardContext): Guarded {
-  const sentences = (reply || "").trim().split(/(?<=[.!?])\s+/).filter(Boolean);
+  const sentences = splitIntoSentences(reply);
   const fullReplyCtx: GuardContext = { ...ctx, replyHasQuestion: (reply || "").includes("?") };
   const kept: string[] = [];
   for (let i = 0; i < sentences.length; i++) {

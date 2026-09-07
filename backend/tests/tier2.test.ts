@@ -16,7 +16,7 @@
 // against a hand-built PluginResult.
 import { describe, expect, test, beforeEach, afterEach } from "bun:test";
 import { db } from "@/db";
-import { people } from "@/db/schema";
+import { people, memoryRecords } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { resetDb } from "./reset-db";
 import { __resetThrottleForTests } from "@/lib/secretThrottle";
@@ -76,6 +76,33 @@ async function withScriptedToolCalls<T>(
       const scripted = calls(request);
       return scripted?.map((c) => ({ id: c.id, type: "function" as const, function: { name: c.name, arguments: c.args } }));
     },
+  });
+  process.env.MAIPAI_LLAMA_SERVER_URL = stub.url;
+  try {
+    return await fn();
+  } finally {
+    stub.stop();
+  }
+}
+
+/** getmaipai/home#67 (live-found 2026-09-07: "nobody's told me"
+ * replies to a natural follow-up the household never had to ask twice
+ * for, once they said "look it up" outright): scripts the FIRST
+ * completion (tool_choice "auto") to answer with `guessText` in plain
+ * text - no call proposed, the exact shape that let a fabricated answer
+ * reach guardReply() unguarded by any tool result - then scripts the
+ * FORCED retry (tool_choice "required", turnEngine.ts's own response to
+ * catching that guess as invention/unrelated_recall) with `forcedCalls`.
+ * `guessText` is the caller's job to make genuinely ungrounded (a proper
+ * noun, date, or number nowhere in the utterance) - this helper doesn't
+ * validate that for you, the same way withScriptedToolCalls() above
+ * doesn't validate its own scripted calls resolve. */
+async function withScriptedGuessThenForcedTool<T>(guessText: string, forcedCalls: { id: string; name: string; args: string }[], fn: () => Promise<T>): Promise<T> {
+  __resetLlmSupervisorForTests();
+  const { startStubLlmServer } = await import("@maipai/spec/llm/ts/stubServer.js");
+  const stub = startStubLlmServer(0, {
+    scriptedToolCalls: (request) => (request.tool_choice === "required" ? forcedCalls.map((c) => ({ id: c.id, type: "function" as const, function: { name: c.name, arguments: c.args } })) : undefined),
+    scriptedChatReply: () => guessText,
   });
   process.env.MAIPAI_LLAMA_SERVER_URL = stub.url;
   try {
@@ -310,6 +337,168 @@ describe("runTurn()/runTurnStream() with native tool calling end to end (Fix E)"
       () => runTurn(actor, "chat", "good morning"),
     );
     expect(sawWebsearchOffered).toBe(true);
+  });
+
+  // getmaipai/home#67, live-found 2026-09-07: "is the movie any good"
+  // -> "the odyssey ... nobody's told me" style follow-ups - the model,
+  // offered a tool, answered in plain text with a guess instead of
+  // calling it; guardReply() correctly caught the guess (an ungrounded
+  // proper noun) and replaced it with an honest decline, but nothing
+  // then gave the model a real chance to actually look it up, so the
+  // household had to say "look it up" outright to get an answer at all.
+  //
+  // A code review on the first cut of this fix (2026-09-07) found the
+  // forced retry offered the model the FULL tool set, not just lookup
+  // tools - meaning a caught guess could be "fixed" by the model
+  // inventing a call to `remember` instead, writing its own fabricated
+  // fact to permanent memory with no confirmation, a worse outcome than
+  // the honest decline it replaced. The tests below prove the corrected
+  // scoping: the forced retry only ever offers `routing.always_offer`
+  // candidates (websearch, the one bundled today), and a proposed call
+  // to anything else is rejected outright, never run.
+  test("runTurn(): forcing a tool after a guess only offers always_offer (lookup) candidates, never an action package like remember", async () => {
+    const { actor } = await owner();
+    let forcedToolNames: string[] = [];
+    __resetLlmSupervisorForTests();
+    const { startStubLlmServer } = await import("@maipai/spec/llm/ts/stubServer.js");
+    const stub = startStubLlmServer(0, {
+      scriptedToolCalls: (request) => {
+        if (request.tool_choice !== "required") return undefined;
+        forcedToolNames = request.tools?.map((t) => t.function.name) ?? [];
+        return undefined; // let the stub's default echo answer either way - only the offered set is under test here
+      },
+      scriptedChatReply: () => "It's playing at Xanadu Cinemas downtown.", // an ungrounded proper noun the invention guard has to catch
+    });
+    process.env.MAIPAI_LLAMA_SERVER_URL = stub.url;
+    try {
+      // Same non-"remember"-prefixed shape as the tests above it - must
+      // reach Tier 2 (offered as a tool, `remember` included) rather
+      // than winning Tier 0's own literal pattern outright.
+      await runTurn(actor, "chat", "our wifi password is on the fridge, please remember");
+    } finally {
+      stub.stop();
+    }
+    expect(forcedToolNames.length).toBeGreaterThan(0);
+    expect(forcedToolNames).toContain("websearch");
+    expect(forcedToolNames).not.toContain("remember");
+    expect(forcedToolNames).not.toContain("recall");
+  });
+
+  // A code review (2026-09-07) caught the invention pre-check building
+  // its own guardSentence() context WITHOUT `replyHasQuestion`, unlike
+  // the real guardReply() pass a few lines later (guards.ts's own
+  // `fullReplyCtx`) - guardCapabilityClaim's own "a later sentence's '?'
+  // exempts the whole reply" exemption could then disagree between the
+  // two checks, misreading a genuinely fabricated first sentence as a
+  // capability claim and silently skipping the retry for the exact turn
+  // this fix exists to catch.
+  test("runTurn(): the invention pre-check computes replyHasQuestion the same way guardReply() will, so an accepted-sounding opener with a real fabrication still triggers the retry", async () => {
+    const { actor } = await owner();
+    let sawForcedAttempt = false;
+    __resetLlmSupervisorForTests();
+    const { startStubLlmServer } = await import("@maipai/spec/llm/ts/stubServer.js");
+    const stub = startStubLlmServer(0, {
+      scriptedToolCalls: (request) => {
+        if (request.tool_choice === "required") sawForcedAttempt = true;
+        return undefined;
+      },
+      // Sentence 0 ("Sure, ...") matches ACCEPTS_RE with no "?" of its
+      // own; sentence 1 carries the "?" that guardReply() uses to exempt
+      // it. "13" (from "PG-13") is the ungrounded bare number the
+      // invention guard has to catch once the capability-claim exemption
+      // correctly applies.
+      scriptedChatReply: () => "Sure, it's rated PG-13. Did you want showtimes?",
+    });
+    process.env.MAIPAI_LLAMA_SERVER_URL = stub.url;
+    try {
+      // REQUEST_RE-matching ("can you ...") so guardCapabilityClaim's
+      // OTHER gate (ctx.actionsRan/utterance check) doesn't already
+      // exempt sentence 0 on its own, independent of replyHasQuestion.
+      await runTurn(actor, "chat", "can you look up the odyssey's rating");
+    } finally {
+      stub.stop();
+    }
+    expect(sawForcedAttempt).toBe(true);
+  });
+
+  test("runTurn(): a forced call to a tool that isn't a lookup candidate is rejected, never run - no fact gets written on the model's own say-so", async () => {
+    const { actor } = await owner();
+    const result = await withScriptedGuessThenForcedTool(
+      "It's playing at Xanadu Cinemas downtown.",
+      // The stub doesn't know about the fix's own scoping - scripts the
+      // forced retry proposing `remember` anyway (a model that ignored
+      // the offered set, or an older/misbehaving one) to prove
+      // resolveToolCalls() itself is the real backstop, not just the
+      // fact that websearch is what gets offered.
+      [{ id: "call-1", name: "remember", args: '{"fact":"the odyssey is rated PG-13"}' }],
+      () => runTurn(actor, "chat", "our wifi password is on the fridge, please remember"),
+    );
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    // Rejected (not offered as a lookup candidate) -> resolveToolCalls()
+    // returns null -> falls back to the honest decline, never a
+    // "plugin" result claiming remember ran.
+    expect(result.value.source).toBe("model");
+    expect(result.value.reply.text).not.toContain("Xanadu");
+    const written = db.select().from(memoryRecords).where(eq(memoryRecords.text, "the odyssey is rated PG-13")).all();
+    expect(written).toHaveLength(0);
+  });
+
+  test("runTurn(): forcing the lookup tool still fails to resolve (bad args) - falls back to the model's own honest decline, never a silent drop", async () => {
+    const { actor } = await owner();
+    const result = await withScriptedGuessThenForcedTool(
+      "It's playing at Xanadu Cinemas downtown.",
+      [{ id: "call-1", name: "websearch", args: "{}" }], // missing required `expression` - resolveToolCalls() rejects it
+      () => runTurn(actor, "chat", "our wifi password is on the fridge, please remember"),
+    );
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.value.source).toBe("model");
+    expect(result.value.reply.text).not.toContain("Xanadu"); // guardReply() still caught the original guess
+  });
+
+  test("runTurn(): a guess that only cuts a LATER sentence is never retried - the already-honest earlier sentence stands as is", async () => {
+    const { actor } = await owner();
+    // "Noted." (sentence 1, clean) then the ungrounded guess (sentence
+    // 2) - guardReply() only ever fully replaces a reply when the
+    // OFFENDING sentence is the first one; here it just cuts sentence 2
+    // and keeps sentence 1, so the forced-retry fix must never fire at
+    // all (proven by scripting NO scriptedToolCalls response, which
+    // would surface as a mismatched reply if the retry ran anyway).
+    const result = await withScriptedGuessThenForcedTool(
+      "Noted. It's playing at Xanadu Cinemas downtown.",
+      [{ id: "call-1", name: "websearch", args: '{"expression":"the odyssey showtimes"}' }],
+      () => runTurn(actor, "chat", "our wifi password is on the fridge, please remember"),
+    );
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.value.source).toBe("model");
+    expect(result.value.reply.text).toBe("Noted.");
+  });
+
+  // runTurnStream() deliberately does NOT get the retry-with-a-forced-
+  // tool-call fix above (see turnEngine.ts's own comment on the revert):
+  // buffering a whole first sentence before the function can even return
+  // would block the stream's first byte on an unbounded wait, caught
+  // live by tests/openai.test.ts's own cancellation test timing out.
+  // This documents the real, current behavior instead - the guess still
+  // streams token by token, and gateGuards() still catches it (same as
+  // before this session's fix) rather than a household ever hearing a
+  // fabricated answer.
+  test("runTurnStream(): a guessed (ungrounded) answer still streams normally - gateGuards() catches it downstream, no retry", async () => {
+    const { actor } = await owner();
+    const result = await withScriptedGuessThenForcedTool(
+      "It's playing at Xanadu Cinemas downtown.",
+      [{ id: "call-1", name: "remember", args: '{"fact":"Friday is pizza night"}' }],
+      () => runTurnStream(actor, "chat", "our wifi password is on the fridge, please remember"),
+    );
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.kind).toBe("stream");
+    if (result.kind !== "stream") return;
+    let fullText = "";
+    for await (const delta of result.tokens) fullText += delta;
+    expect(fullText).not.toContain("Xanadu"); // gateGuards() catches it before it reaches the household
   });
 });
 

@@ -21,7 +21,7 @@ import { notifyIfFlagged } from "@/lib/notifications";
 import { recall, bumpUsage, getProfileParagraph, type RecallMatch } from "@/lib/memory";
 import { newConversationTurnId } from "@/lib/id";
 import { complete, startCompleteStream, type LlmMessage, type ToolSpec, type ToolCall } from "@/lib/llm";
-import { guardReply, guardSentence, replacementFor, isCuttable, type GuardContext, type GuardReason } from "@/lib/guards";
+import { guardReply, guardSentence, replacementFor, isCuttable, splitIntoSentences, type GuardContext, type GuardReason } from "@/lib/guards";
 import { appendLogLine } from "@/lib/log";
 import { tokenize } from "@/lib/text";
 import { sanitizeForPrompt } from "@/lib/promptSanitize";
@@ -259,7 +259,18 @@ function identityLine(persona: Persona): string {
 const STABLE_SYSTEM_SUFFIX = [
   "Be warm, concise and honest. Nothing you say leaves this house.",
   "Requests already blocked by the household's safety rules never reach you; answer anything else helpfully and honestly.",
-  "If you don't know something the household hasn't told you, say so instead of guessing.",
+  // getmaipai/home#67, live-found 2026-09-07: a household member asks
+  // a natural follow-up about something already in the conversation
+  // ("where's it playing", "what's it rated") and the model declines
+  // ("nobody's told me that") instead of reaching for an offered tool
+  // (websearch is offered on nearly every turn - always_offer) - the
+  // household had to say "look it up" outright before it would actually
+  // search. The old line only ever pointed at memory ("the household
+  // hasn't told you"), never at a tool that could go find the answer
+  // itself; this one names the tool path first so declining is the LAST
+  // resort, not the default, matching what "look it up" already proved
+  // the model is perfectly capable of doing unprompted.
+  "If a listed tool can look something up, use it before saying you don't know - only say the household hasn't told you something when no tool applies.",
 ].join(" ");
 
 // The speech register is now the selected Persona (lib/persona.ts,
@@ -932,6 +943,17 @@ type PreparedTurn =
        * re-derived from it, since `ToolSpec` itself has no score or
        * manifest left in it once flattened. */
       ranked: RankedCandidate[];
+      /** getmaipai/home#67 code review: every `routing.always_offer`
+       * candidate this turn's own `ranked` produced (websearch is the
+       * only one bundled today) - the genuinely open-ended lookup
+       * fallback set, as opposed to `tools`' fuller mix of top-ranked
+       * candidates plus always-offer ones. Computed once here, alongside
+       * `tools`/`alwaysOffered` (this function's own local of the same
+       * name) which share the identical `ranked.filter(...always_offer)`
+       * expression - kept as its own field so runTurn()'s invention-
+       * retry doesn't recompute (and risk drifting from) that filter
+       * independently. */
+      lookupTools: ToolSpec[];
     };
 
 // Session C step 2: a plain word-list, not a model call - a pendingAsk
@@ -1313,6 +1335,14 @@ async function prepareTurn(
   const topRankedIds = new Set(topRanked.map((r) => r.id));
   const alwaysOffered = ranked.filter((r) => r.manifest.routing?.always_offer && !topRankedIds.has(r.id));
   const tools: ToolSpec[] = [...topRanked, ...alwaysOffered].map((r) => ({ id: r.id, description: r.manifest.description, args: r.manifest.args }));
+  // getmaipai/home#67: the FULL always-offer set (unlike `alwaysOffered`
+  // just above, which deliberately excludes a candidate already counted
+  // via `topRanked` to avoid offering it twice in `tools`) - runTurn()'s
+  // own invention-retry wants every genuinely open-ended lookup
+  // candidate this turn regardless of whether it also happened to clear
+  // the ordinary Tier 2 floor, and needs that as its own field rather
+  // than re-filtering `ranked` a second time at the call site.
+  const lookupTools: ToolSpec[] = ranked.filter((r) => r.manifest.routing?.always_offer).map((r) => ({ id: r.id, description: r.manifest.description, args: r.manifest.args }));
 
   const guardContext: Omit<GuardContext, "personId"> = {
     utterance: text,
@@ -1330,7 +1360,7 @@ async function prepareTurn(
     actionsRan: false,
     personaExamples: persona.examples,
   };
-  return { kind: "model", messages, safety, crisisResources, turnId, guardContext, tools, ranked };
+  return { kind: "model", messages, safety, crisisResources, turnId, guardContext, tools, ranked, lookupTools };
 }
 
 // This floor's own gate now lives in prepareTurn() (Fix E moved the
@@ -1650,17 +1680,17 @@ export async function runTurn(
       return { ok: false, status: 503, code: "unavailable", error: completion.error };
     }
 
+    // getmaipai/home#67 code review: this function now resolves a
+    // model's proposed calls against two different offered-id sets (the
+    // full `offeredIds` here, and the lookup-only subset the invention
+    // retry below offers) - factored out so both call sites share the
+    // one 8-argument call instead of repeating it, per that review's
+    // own duplication finding.
+    const resolveOffered = (calls: ToolCall[], ids: ReadonlySet<string>) =>
+      resolveToolCalls(calls, ids, prepared.ranked, actor, conversation.id, prepared.turnId, prepared.safety, prepared.crisisResources);
+
     if (offeringTools && completion.value.tool_calls && completion.value.tool_calls.length > 0) {
-      const resolved = await resolveToolCalls(
-        completion.value.tool_calls,
-        offeredIds,
-        prepared.ranked,
-        actor,
-        conversation.id,
-        prepared.turnId,
-        prepared.safety,
-        prepared.crisisResources,
-      );
+      const resolved = await resolveOffered(completion.value.tool_calls, offeredIds);
       if (resolved) {
         value = resolved;
       } else {
@@ -1676,7 +1706,87 @@ export async function runTurn(
         value = answerWithSafetyAndGuards(retry.value.text);
       }
     } else {
-      value = answerWithSafetyAndGuards(completion.value.text);
+      // getmaipai/home#67, live-found 2026-09-07: the model, offered
+      // websearch (always_offer) among `tools`, sometimes answers in
+      // plain text WITHOUT ever proposing a call, and that plain text
+      // turns out to be a guess guardReply() then has to catch (a proper
+      // noun, date, or number nowhere in the utterance/sources/history) -
+      // "is the movie any good" -> a confident but fabricated rating,
+      // caught and replaced with an honest "nobody's told me" line the
+      // household then had to work around by saying "look it up"
+      // themselves. The guard already proves the plain answer can't
+      // stand; before settling for the canned honest line, this gives
+      // the model ONE real chance to answer for real instead of guessing -
+      // the mirror image of the "every proposed call failed" retry just
+      // above (there: a call was proposed and didn't pan out, so retry
+      // WITHOUT tools; here: no call was ever proposed and the answer
+      // didn't pan out, so retry WITH a tool forced).
+      //
+      // A code review (2026-09-07) caught a first cut of this checking
+      // guardHits AFTER running the full guardReply() pass, which had
+      // three real bugs: (1) it forced a tool from the FULL `prepared.
+      // tools` set, so a caught guess could be "fixed" by inventing a
+      // call to an unrelated, non-consequential action tool instead
+      // (`remember`, say) - resolveToolCalls() would run it with no
+      // confirmation and write the model's OWN fabricated fact to
+      // permanent memory, a worse outcome than the honest decline it
+      // replaced; (2) it fired notifyIfFlagged() on the guessed text
+      // (inside answerWithSafetyAndGuards()) even when the retry then
+      // succeeded and the household never saw that text at all; (3) it
+      // fired the retry for ANY invention/unrelated_recall guard hit,
+      // including one guardReply() only CUT from a later sentence of an
+      // otherwise-good multi-sentence reply - discarding an already-
+      // correct kept prefix that had nothing to do with the guess.
+      //
+      // Fixed by deciding BEFORE running the real guard pass: guardSentence()
+      // on just the reply's OWN first sentence (guardReply()'s identical
+      // split, spec/safety-shaped: a cuttable reason only ever fully
+      // replaces the reply when it fires on sentence 0 with nothing kept
+      // yet - guards.ts:551-567 - so checking sentence 0 in isolation is
+      // the exact condition for "the whole reply is about to be
+      // replaced," never a later sentence's own cut). Only fires for
+      // "invention"/"unrelated_recall" specifically, by name rather than
+      // via guards.ts's exported isCuttable() - CUTTABLE happens to be
+      // exactly this same pair today, but it encodes a different axis
+      // (cut-vs-replace) than "the model stated a fact and got it
+      // wrong"; coupling this to CUTTABLE would silently start forcing a
+      // lookup for whatever unrelated reason a future guard change adds
+      // to that set. And only offers `routing.always_offer` candidates to
+      // the forced completion (websearch is the only one today) - the
+      // genuinely open-ended lookup fallback, never an action package
+      // the model could satisfy "required" with by inventing a call
+      // instead of a fact.
+      const rawText = completion.value.text;
+      // getmaipai/home#67 code review: `replyHasQuestion` must match what
+      // guardReply() itself will compute for this SAME text a few lines
+      // down (`fullReplyCtx`, guards.ts) - a first cut left it unset
+      // here, which could make guardCapabilityClaim's own "a later
+      // sentence's '?' exempts the whole reply" exemption disagree
+      // between this pre-check and the real pass, so a genuinely
+      // fabricated first sentence could be misclassified here and the
+      // retry silently skipped for the exact turn it exists to fix.
+      const firstSentence = splitIntoSentences(rawText)[0] ?? "";
+      const firstReason = firstSentence
+        ? guardSentence(firstSentence, { ...prepared.guardContext, personId: actor.id, replyHasQuestion: rawText.includes("?") }, true)
+        : null;
+      const looksInvented = firstReason === "invention" || firstReason === "unrelated_recall";
+
+      if (offeringTools && looksInvented && prepared.lookupTools.length > 0) {
+        const lookupIds = new Set(prepared.lookupTools.map((t) => t.id));
+        const forced = await complete("chat", prepared.messages, { thinking: opts.thinking, tools: prepared.lookupTools, tool_choice: "required" });
+        const resolved =
+          forced.ok && forced.value.tool_calls && forced.value.tool_calls.length > 0
+            ? await resolveOffered(forced.value.tool_calls, lookupIds)
+            : null;
+        // Only the WINNING side ever reaches answerWithSafetyAndGuards()/
+        // notifyIfFlagged() - a guess the household never sees never
+        // gets logged or flagged as one, and a resolved tool answer
+        // never re-runs guardReply() on the text it replaced, matching
+        // every other plugin reply in this function.
+        value = resolved ? resolved : answerWithSafetyAndGuards(rawText);
+      } else {
+        value = answerWithSafetyAndGuards(rawText);
+      }
     }
   }
 
@@ -2185,6 +2295,23 @@ export async function runTurnStream(
     }
     return undefined;
   }
+  // getmaipai/home#67, live-found 2026-09-07 (the same incident
+  // runTurn()'s own retry-on-invention fix addresses): a first cut of
+  // this fix tried to do the identical thing here - buffer the first
+  // sentence, judge it with guardSentence(), retry with a forced tool
+  // call before ever streaming a caught guess. Reverted: buffering a
+  // full sentence before this function can even RETURN means
+  // runTurnStream() itself doesn't resolve until a sentence boundary
+  // shows up - for a real model that free-associates a long run-on with
+  // no early punctuation, that's an unbounded wait standing in front of
+  // the very first byte, on every turn tools are offered (nearly every
+  // turn now that websearch is always_offer). Caught immediately by
+  // tests/openai.test.ts's own cancellation test timing out. The
+  // streaming path stays on the plain guardReply()/gateGuards() catch it
+  // already had (a canned honest line, no retry) until a real design for
+  // "decide whether to retry without blocking the stream" exists -
+  // STABLE_SYSTEM_SUFFIX's own fix (this same change, turnEngine.ts's
+  // system prompt) is what actually has to carry this path for now.
   return buildStreamResult(replay());
 }
 
