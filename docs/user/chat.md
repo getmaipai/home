@@ -42,8 +42,8 @@ Every conversation is saved. Open **Conversations** in the sidebar to see them a
 - Tap **Delete** to remove one you don't need.
 - Tap **Select conversations** to choose several at once, or **Clear all** to remove everything.
 
-Are you an owner or admin? You can also switch to view another household member's conversations from this same page. This helps with parental oversight.
+Owners and admins can also switch to view another household member's conversations from this same page, for parental oversight.
 
 ## Still need help?
 
-Does Chat not send a message or load a reply? See [Fix a problem](fix-a-problem.md).
+If Chat won't send a message or load a reply, see [Fix a problem](fix-a-problem.md).

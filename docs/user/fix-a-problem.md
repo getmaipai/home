@@ -24,7 +24,7 @@ Open **Settings**, then **Repairs** (under Household). MaiPai checks its own hea
 
 - Double check your PIN or password.
 - Ask an owner or admin to check your account. They can do this under **Settings** > **Users**, or reset your PIN there.
-- Are you signed in on another device that's misbehaving? Open **Settings**, then **Devices & sessions** (under Me), and sign that device out.
+- If you're signed in on another device that's misbehaving, open **Settings**, then **Devices & sessions** (under Me), and sign that device out.
 
 ## If a setting won't save
 
@@ -33,4 +33,4 @@ Open **Settings**, then **Repairs** (under Household). MaiPai checks its own hea
 
 ## Still stuck?
 
-Does Repairs show nothing wrong? Did none of the above help? The MaiPai community can help you dig deeper. Check the developer documentation for how to reach us.
+If Repairs shows nothing wrong, or none of the above helped, the MaiPai community can help you dig deeper. Check the developer documentation for how to reach us.

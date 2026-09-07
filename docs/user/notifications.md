@@ -14,7 +14,7 @@ Tap the bell icon in the header. This shows your recent notifications. You stay 
 
 ## Get notified on Telegram
 
-Want notifications on your phone too? Set up Telegram:
+To also get notifications on your phone, set up Telegram:
 
 1. Open **Settings**, then **Notifications** (under Household).
 2. An owner or admin sets this up once for the household.
@@ -22,4 +22,4 @@ Want notifications on your phone too? Set up Telegram:
 
 ## Still need help?
 
-Not seeing notifications you expect? See [Fix a problem](fix-a-problem.md).
+If you're not seeing notifications you expect, see [Fix a problem](fix-a-problem.md).

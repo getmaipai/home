@@ -12,7 +12,7 @@ Settings are split into two tabs at the top of the page. **Household** holds sha
 - **Users**: add, edit, or remove household members. See [People and parental controls](people.md).
 - **AI models**: choose which AI model MaiPai uses for chat and other tasks.
 - **Backups**: run a backup now, or see your backup history.
-- **Repairs**: MaiPai's own health check. Something need attention? It shows up here with a fix you can apply.
+- **Repairs**: MaiPai's own health check. Anything that needs attention shows up here with a fix you can apply.
 - **Plugin routing**: see how MaiPai matches your requests to its built-in skills.
 
 ## Your own settings
@@ -34,4 +34,4 @@ Use the **Search settings** box at the top of the page. It jumps you straight to
 
 ## Still need help?
 
-Does a setting not save? Can't you find one you expect? See [Fix a problem](fix-a-problem.md).
+If a setting won't save, or you can't find one you expect, see [Fix a problem](fix-a-problem.md).

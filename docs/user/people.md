@@ -30,11 +30,11 @@ Only an owner or admin can add, edit, or remove people.
 
 ## Check in on a child's activity
 
-Are you an owner or admin? You can view (never edit) what a child or teen has talked about, and what MaiPai remembers about them.
+Owners and admins can view (never edit) what a child or teen has talked about, and what MaiPai remembers about them.
 
 - On the **Conversations** page, use the person picker at the top. Switch to their conversations.
 - On the **Memory** page, do the same. You'll see what's been remembered for them. You can forget anything you'd rather MaiPai not keep.
 
 ## Still need help?
 
-Can't someone sign in? Don't you see the account options you expect? See [Fix a problem](fix-a-problem.md).
+If someone can't sign in, or you don't see the account options you expect, see [Fix a problem](fix-a-problem.md).
