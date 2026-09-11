@@ -2431,6 +2431,15 @@ on a spec tag that was never cut.
 
 ## Cross-cutting
 
+- [x] **Local source startup commands** (S): root `package.json` and
+  `scripts/app.sh` provide `bun start`, `bun stop`, and `bun restart`.
+  Restart calls stop, then start. Start builds the frontend, runs the
+  backend in the background, and prints direct and configured URLs using
+  the existing `hubEndpoints` address book. Tests:
+  `backend/tests/localApp.test.ts` and `startupUrls.test.ts`. Installed
+  services and DNS configuration are out of scope. Exit check:
+  `bash scripts/check.sh`.
+
 - [x] **Fix A: engines survive `bun --hot`, and the turn pipeline logs**
       (M) - shipped 2026-09-07. `backend/src/lib/llmSupervisor.ts`/
       `embedSupervisor.ts`/`ttsSupervisor.ts`: each module's own state

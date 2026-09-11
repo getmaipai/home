@@ -39,11 +39,49 @@ source today. With [Bun](https://bun.sh) installed:
 ```
 git clone https://github.com/getmaipai/home.git
 cd home && bun install
-cd frontend && bun run build && cd ../backend && bun run start
+bun start
 ```
 
 The hub listens on `http://localhost:8787`. The first person who signs in
 becomes the household owner.
+
+### Start, stop, and restart
+
+Run these commands inside the `home` folder created by `git clone`. This
+is the folder that contains `package.json`, `backend`, and `frontend`.
+For example, if you cloned Home inside `~/Developer`, enter:
+
+```bash
+cd ~/Developer/home
+```
+
+Start Home:
+
+```bash
+bun start
+```
+
+Stop Home:
+
+```bash
+bun stop
+```
+
+Restart Home:
+
+```bash
+bun restart
+```
+
+Start builds the frontend and runs Home in the background. Restart calls
+stop, then start, rebuilding the frontend. These commands manage the local
+source checkout; installed services use the operating system's service manager.
+Startup logs are in `data/local-app/app.log`.
+Start prints the local URL, detected LAN IP URLs, and enabled addresses
+configured in Settings. Configured vanity addresses keep their own scheme
+and port; direct URLs use the server's current HTTP or HTTPS mode.
+Running start again prints the current addresses without starting a second
+copy. It picks up changes to HTTPS and configured vanity addresses.
 
 ### Development mode
 

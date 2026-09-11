@@ -19,6 +19,7 @@ import { startWyomingServer } from "@/lib/wyomingServer";
 import { websocket } from "hono/bun";
 import { seedHlcFromDatabase } from "@/lib/hlc";
 import { recoverInterruptedJobsAtBoot } from "@/lib/modelDownloadJobs";
+import { startupUrls } from "@/lib/startupUrls";
 
 const port = Number(process.env.PORT ?? 8787);
 
@@ -217,8 +218,6 @@ registerRenewFixHandler();
 // completely unaffected.
 const initialTls = hasHouseholdLeaf() ? getHouseholdLeafForServer() : null;
 
-console.log(`MaiPai Home hub listening on ${initialTls ? "https" : "http"}://localhost:${port}`);
-
 // An explicit Bun.serve() call, not the `export default { port, fetch }`
 // shape used before this step, so a `server` handle exists to rebind
 // later. A code review (2026-09-06) first tried `server.reload({ tls })`
@@ -256,6 +255,17 @@ let server = Bun.serve({
   ...(initialTls ? { tls: initialTls } : {}),
 });
 
+let servingTls = initialTls !== null;
+function printStartupUrls(): void {
+  for (const url of startupUrls(server.port!, servingTls)) {
+    console.log(`Home URL: ${url}`);
+  }
+  console.log("Home server ready.");
+}
+// The local source launcher asks for current addresses without restarting.
+if (process.platform !== "win32") process.on("SIGUSR1", printStartupUrls);
+printStartupUrls();
+
 // mDNS advertisement (lib/mdns.ts): best-effort, never blocks boot - a
 // household on a network that filters multicast just doesn't get
 // auto-discovery, the same "never a false alarm, never a hard failure"
@@ -286,6 +296,8 @@ onLeafRenewed((leaf) => {
   void rebindWithRetry(() => Bun.serve({ port, fetch: app.fetch, websocket, idleTimeout: SERVER_IDLE_TIMEOUT_SECONDS, tls: { cert: leaf.certPem, key: leaf.keyPem } }))
     .then(({ server: newServer }) => {
       server = newServer;
+      servingTls = true;
+      printStartupUrls();
       void advertiseMdns({ port, tls: true });
     })
     .catch((err: unknown) => {

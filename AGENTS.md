@@ -23,7 +23,11 @@ Vite), `spec/` (the shared record shapes, interpreters, and fixtures that
 [STACK.md](https://github.com/getmaipai/.github/blob/main/STACK.md) in
 `.github`.
 
-Commands: `bun run dev` in `backend/` or `frontend/` for a local dev
+Commands: from the repo root (the `home/` folder containing `package.json`),
+`bun start` builds and starts the local app in the background and prints
+its URLs; `bun stop` stops it; `bun restart` calls stop, then start.
+See README.md for folder and command examples.
+`bun run dev` in `backend/` or `frontend/` runs a local dev
 server; `bun test` in `backend/`, `frontend/`, or `spec/` for that
 package's own tests; `tsc --noEmit` (backend) or `tsc --noEmit && eslint
 .` (frontend) to lint. `bash scripts/check.sh` from the repo root is the
