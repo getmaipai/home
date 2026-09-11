@@ -79,4 +79,20 @@ export const CORE_SETTINGS_KEYS: SettingsKey[] = [
     lives_in: "household.system",
     honoured_by: ["home", "bot"],
   }),
+  // Found live 2026-09-11: Home's own header hardcoded the generic
+  // tagline "Made for your everyday" with no way for a household to make
+  // the page its own. Left blank (the default) Home keeps that same
+  // generic tagline rather than showing an empty header - only a
+  // household that sets this sees anything different.
+  SettingsKey.parse({
+    key: "household.family_name",
+    scope: "household",
+    selector: "text",
+    default: "",
+    label: "Family name",
+    help: "Shown above your greeting on Home, e.g. \"Willow\" becomes \"Willow Family.\"",
+    level: "basic",
+    lives_in: "household.system",
+    honoured_by: ["home"],
+  }),
 ];

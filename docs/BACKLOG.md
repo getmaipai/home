@@ -1593,6 +1593,15 @@ future session now that F's hub half exists.
       `withHouseholdPlaceDefault` suite and `frontend/src/apps/home/
       HomePage.test.tsx`.
 
+- [x] A household-name tagline on Home (S) - done 2026-09-11. Found live
+      alongside the household-location fix above: Home's header hardcoded
+      the generic "Made for your everyday" line with no way for a
+      household to make the page its own. `household.family_name`
+      (`coreKeys.ts`, blank by default) lets a household set its own
+      name; `frontend/src/apps/home/HomePage.tsx`'s `Tagline` renders
+      "{name} Family" once set, falling back to the original generic line
+      otherwise. See `HomePage.test.tsx`'s Tagline suite.
+
 ## UI / shell
 
 - [x] Person edit and delete (M) - done 2026-09-05. `PATCH`/`DELETE`

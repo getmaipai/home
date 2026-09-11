@@ -49,22 +49,30 @@ function TodayCard({ icon, title, action, children }: { icon: string; title: str
   );
 }
 
-function WeatherCard() {
-  // Shares the Settings page's own cache entry for this scope
-  // (SettingsRenderer.tsx: `["settings-values", scopeValue]`) rather than
-  // a second fetch of the same household settings. Found live 2026-09-11:
-  // with no place in the fixed utterance below, a place-free turn left
-  // the model to guess a `place` argument on its own, which produced the
-  // literal word "here" - and Open-Meteo genuinely has a village named
-  // that. `household.home_place` (backend/src/settings/coreKeys.ts) gives
-  // this card a real place to ask about once the household has set one.
-  const settingsQuery = useQuery({
+// Shares the Settings page's own cache entry for this scope
+// (SettingsRenderer.tsx: `["settings-values", scopeValue]`) rather than a
+// second fetch of the same household settings, and shared here by
+// WeatherCard and Tagline rather than each declaring an identical
+// `useQuery` of their own (code review, 2026-09-11) - one definition, so
+// a future change to this read (staleTime, retry policy) can't drift
+// between the two call sites. A household changes its own settings
+// rarely, hence the 5-minute staleTime.
+function useHouseholdSettings() {
+  return useQuery({
     queryKey: ["settings-values", "household"],
     queryFn: () => api.settingsValues("household"),
-    // A household changes its own location rarely - no need to refetch
-    // this every time Home remounts (code review, 2026-09-11).
     staleTime: 5 * 60 * 1000,
   });
+}
+
+function WeatherCard() {
+  // Found live 2026-09-11: with no place in the fixed utterance below, a
+  // place-free turn left the model to guess a `place` argument on its
+  // own, which produced the literal word "here" - and Open-Meteo
+  // genuinely has a village named that. `household.home_place`
+  // (backend/src/settings/coreKeys.ts) gives this card a real place to
+  // ask about once the household has set one.
+  const settingsQuery = useHouseholdSettings();
   const place = settingsQuery.data?.find((s) => s.key === "household.home_place")?.value;
   const question = typeof place === "string" && place.length > 0 ? `What's the weather like in ${place} today?` : "What's the weather like today?";
   // Cached by the query layer (step 6: "calling the weather plugin
@@ -152,6 +160,17 @@ function WhoIsHere({ selfId }: { selfId: string }) {
   );
 }
 
+// Found live 2026-09-11: the header hardcoded this generic line with no
+// way for a household to make the page its own.
+const DEFAULT_TAGLINE = "Made for your everyday";
+
+function Tagline() {
+  const query = useHouseholdSettings();
+  const familyName = query.data?.find((s) => s.key === "household.family_name")?.value;
+  const text = typeof familyName === "string" && familyName.length > 0 ? `${familyName} Family` : DEFAULT_TAGLINE;
+  return <p className="mb-2 text-xs font-medium tracking-widest text-primary uppercase">{text}</p>;
+}
+
 function PinnedAppsStrip({ person }: { person: Roster }) {
   const navigate = useNavigate();
   const { pinned } = usePinnedApps(person.id);
@@ -198,7 +217,7 @@ export function HomePage({ person }: HomePageProps) {
       {/* eslint-disable-next-line jsx-a11y/no-noninteractive-tabindex -- a keyboard-scrollable region, not a widget (DetailPane.tsx's own precedent). */}
       <div tabIndex={0} className={cn("mx-auto flex min-h-0 w-full max-w-6xl flex-1 flex-col gap-8 overflow-y-auto px-4 py-6 sm:px-8", FOCUS_RING)}>
         <div>
-          <p className="mb-2 text-xs font-medium tracking-widest text-primary uppercase">Made for your everyday</p>
+          <Tagline />
           <h2 className="text-3xl font-semibold tracking-tight sm:text-4xl">{greetingFor(new Date(), person.display_name)}</h2>
         </div>
 

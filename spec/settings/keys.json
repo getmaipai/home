@@ -264,6 +264,20 @@
     ]
   },
   {
+    "key": "household.family_name",
+    "scope": "household",
+    "selector": "text",
+    "default": "",
+    "label": "Family name",
+    "help": "Shown above your greeting on Home, e.g. \"Willow\" becomes \"Willow Family.\"",
+    "level": "basic",
+    "secret": false,
+    "lives_in": "household.system",
+    "honoured_by": [
+      "home"
+    ]
+  },
+  {
     "key": "household.home_place",
     "scope": "household",
     "selector": "text",

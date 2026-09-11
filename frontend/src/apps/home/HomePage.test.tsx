@@ -37,11 +37,13 @@ function makePerson(): Roster {
 }
 
 // Stubs every endpoint HomePage's own cards touch on mount. `homePlace`
-// (household.home_place, backend/src/settings/coreKeys.ts) drives the
-// weather-turn assertion below; every other route returns an empty,
-// well-formed shape since these tests are about the weather/memories
-// cards, not the roster strip or the widget grid.
-function stubFetch(options: { homePlace?: string; turnBodies: unknown[] }): () => void {
+// (household.home_place) drives the weather-turn assertion below,
+// `familyName` (household.family_name) drives the tagline assertion;
+// every other route returns an empty, well-formed shape since these
+// tests are about the weather/memories/tagline cards, not the roster
+// strip or the widget grid. Both are declared in
+// backend/src/settings/coreKeys.ts.
+function stubFetch(options: { homePlace?: string; familyName?: string; turnBodies: unknown[] }): () => void {
   const original = globalThis.fetch;
   globalThis.fetch = mock((input: RequestInfo | URL, init?: RequestInit) => {
     const url = typeof input === "string" ? input : input.toString();
@@ -56,6 +58,14 @@ function stubFetch(options: { homePlace?: string; turnBodies: unknown[] }): () =
             value: options.homePlace ?? "",
             source: options.homePlace ? "user" : "default",
             label: "Household location",
+            level: "basic",
+            secret: false,
+          },
+          {
+            key: "household.family_name",
+            value: options.familyName ?? "",
+            source: options.familyName ? "user" : "default",
+            label: "Family name",
             level: "basic",
             secret: false,
           },
@@ -118,6 +128,32 @@ describe("HomePage - WeatherCard", () => {
       const { findByText } = renderHome();
       await findByText("It's 62 degrees in Portland, OR.");
       expect(turnBodies).toEqual([{ surface: "chat", text: "What's the weather like in Portland, OR today?" }]);
+    } finally {
+      restoreFetch();
+    }
+  });
+});
+
+// Found live 2026-09-11 alongside the weather bug: the header hardcoded
+// a generic "Made for your everyday" tagline with no way for a household
+// to make the page its own.
+describe("HomePage - Tagline", () => {
+  test("shows the generic default when no family name is set", async () => {
+    const restoreFetch = stubFetch({ turnBodies: [] });
+    try {
+      const { findByText } = renderHome();
+      await findByText("Made for your everyday");
+    } finally {
+      restoreFetch();
+    }
+  });
+
+  test("shows '<name> Family' once household.family_name is set", async () => {
+    const restoreFetch = stubFetch({ familyName: "Willow", turnBodies: [] });
+    try {
+      const { findByText, queryByText } = renderHome();
+      await findByText("Willow Family");
+      expect(queryByText("Made for your everyday")).toBeNull();
     } finally {
       restoreFetch();
     }
