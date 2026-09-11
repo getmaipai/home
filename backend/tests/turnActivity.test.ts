@@ -47,4 +47,22 @@ describe("turnActiveWithin()", () => {
     markTurnFinished();
     expect(turnActiveWithin(0)).toBe(false); // both real turns are done, nothing in flight
   });
+
+  // Found live 2026-09-11: an in-progress change added a module-level
+  // "already released" flag meant to guard one turn against a double
+  // release, but the flag was shared across every turn, not scoped to
+  // one - so after the very first turn anywhere finished, it stayed
+  // permanently set and every later turn's markTurnFinished() became a
+  // silent no-op. `inFlightTurns` grew without bound and
+  // turnActiveWithin() never returned false again, permanently starving
+  // the memory judge and summary refresh this module exists to protect.
+  // Deliberately no __resetTurnActivityForTests() between the two
+  // start/finish cycles below - production never resets either.
+  test("a second, later turn still decrements inFlightTurns after an earlier turn already finished", () => {
+    markTurnStarted(); // turn A
+    markTurnFinished(); // A finishes
+    markTurnStarted(); // turn B, well after A
+    markTurnFinished(); // B finishes
+    expect(turnActiveWithin(0)).toBe(false); // nothing left in flight
+  });
 });
