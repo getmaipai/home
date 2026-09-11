@@ -1572,17 +1572,26 @@ future session now that F's hub half exists.
       Add `duration`, `time`, `person`, `media` and a secret-entry flow,
       then re-declare the sections that only needed those.
 
-- [ ] **A household-location setting** (S-M) - found live, session-d-
-      packages-and-store.md step 3, 2026-09-06: no settings key, no
-      first-run prompt, no places picker exists anywhere for "where does
-      this household live." `weather`'s own `warm.keys` had to hardcode a
-      placeholder place (Seattle) instead of the household's real one for
-      exactly this reason, and step 0's own verdict queue separately
-      dropped `localNews.ts`/`localEvents.ts` on the identical gap. Once
-      this exists (`household.home_place` or similar, `coreKeys.ts`), any
-      package's `warm.keys` can resolve it directly with no further
-      cache/warm changes - the mechanism doesn't care what the value is,
-      only that a real one exists to resolve against.
+- [x] A household-location setting (S-M) - done 2026-09-11. Found live a
+      second time on Home itself: with no place configured, the "Today"
+      weather card asked a place-free "what's the weather like today?"
+      and left the model to guess a `place` argument on its own - it
+      guessed the literal word "here", and Open-Meteo genuinely has a
+      village named that, so the card showed a real (and very hot)
+      temperature for entirely the wrong place, right next to the
+      package-widget grid's own hardcoded "Seattle" default. `coreKeys.ts`
+      now declares `household.home_place` (a plain place-name string,
+      editable today through Settings > System via the generic renderer -
+      no dedicated first-run prompt or picker yet, still open if wanted).
+      `lib/plugins.ts`'s `withHouseholdPlaceDefault()` overrides any
+      `place` input with it (used by `warmPackage()`, replacing weather's
+      hardcoded warm key, and by `lib/widgets.ts`'s `getWidgetData()`,
+      replacing its hardcoded widget default); Home's own weather card
+      threads it into the fixed-turn question so a configured household
+      gets the reliable deterministic pattern match instead of a model
+      guess. See `backend/tests/plugins.test.ts`'s
+      `withHouseholdPlaceDefault` suite and `frontend/src/apps/home/
+      HomePage.test.tsx`.
 
 ## UI / shell
 

@@ -89,7 +89,7 @@ describe("GET /api/widgets/:package/:id/data", () => {
     expect(body.items[0]!.title).toContain("Today is");
   });
 
-  test("weather's widget resolves its declared inputs.place, not household state (no settings resolution yet - a known, shared gap)", async () => {
+  test("weather's widget resolves its declared inputs.place with no household location set (falls back to the manifest's own default)", async () => {
     const client = await owner();
     const res = await client.get("/api/widgets/weather/current/data");
     expect(res.status).toBe(200);

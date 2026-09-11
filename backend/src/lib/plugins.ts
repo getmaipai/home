@@ -24,6 +24,7 @@ import { callTier1Handle } from "@/lib/denoHost";
 import { registerPackageNotificationTypes } from "@/lib/notificationTypes";
 import { parseWhen } from "@/lib/scheduler";
 import { listActivePeople } from "@/lib/access";
+import { getHouseholdSettingValue } from "@/lib/settings";
 import { PACKAGES_DIR, statMtimeMs, isValidPackageId } from "@/lib/paths";
 import { resolvePackageDir, listInstalledPackageIds } from "@/lib/packageResolve";
 import { ROLE_LADDER, type Role } from "@/middleware/auth";
@@ -347,6 +348,23 @@ function warmActor(): PersonRow | null {
   return people[0]!;
 }
 
+/** Overrides a `place` input with `household.home_place`
+ * (backend/src/settings/coreKeys.ts) when the household has set one, so a
+ * package's own warm keys and widget defaults (a manifest literal, e.g.
+ * weather's "Seattle") answer for the household actually running it
+ * instead of the placeholder every install ships with. Only touches
+ * `place` - the one shape the setting backs today - and only inputs that
+ * already declare it, so this never runs for a package with no notion of
+ * place, and never touches a live chat turn's own explicit place (a user
+ * asking "weather in Chicago" reaches `runPlugin()` directly with that
+ * place already resolved, never through here). */
+export function withHouseholdPlaceDefault(inputs: Record<string, unknown>): Record<string, unknown> {
+  if (!("place" in inputs)) return inputs;
+  const place = getHouseholdSettingValue("household.home_place");
+  if (typeof place !== "string" || place.length === 0) return inputs;
+  return { ...inputs, place };
+}
+
 /** Runs one package's own `warm.keys` (each a recipe input object) so its
  * cache holds a fresh answer before anyone asks. Takes the manifest
  * already loaded by the caller (runDueWarmJobs() below) rather than
@@ -364,7 +382,7 @@ export async function warmPackage(id: string, manifest: PackageManifest): Promis
   if (!actor) return;
   for (const key of keys) {
     try {
-      const result = await runPlugin(id, actor, key as Record<string, unknown>);
+      const result = await runPlugin(id, actor, withHouseholdPlaceDefault(key as Record<string, unknown>));
       if (!result.ok) {
         console.error(`[warm] ${id} failed to warm key ${JSON.stringify(key)}: ${result.error}`);
       }

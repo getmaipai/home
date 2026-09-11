@@ -33,13 +33,16 @@ interface HomePageProps {
 // Home cards render its own answer, or say nothing (docs/UI.md: a failed
 // card is a quiet gap in "today", never a red error banner on the one
 // page every visit starts from).
-function TodayCard({ icon, title, children }: { icon: string; title: string; children: ReactNode }) {
+function TodayCard({ icon, title, action, children }: { icon: string; title: string; action?: ReactNode; children: ReactNode }) {
   const Icon = getIcon(icon);
   return (
     <Card label={title} className="p-4">
-      <div className="flex items-center gap-2 text-sm text-muted-foreground">
-        <Icon aria-hidden className="size-4" />
-        <span>{title}</span>
+      <div className="flex items-center justify-between gap-2">
+        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+          <Icon aria-hidden className="size-4" />
+          <span>{title}</span>
+        </div>
+        {action}
       </div>
       <div className="mt-2 text-base">{children}</div>
     </Card>
@@ -47,27 +50,49 @@ function TodayCard({ icon, title, children }: { icon: string; title: string; chi
 }
 
 function WeatherCard() {
+  // Shares the Settings page's own cache entry for this scope
+  // (SettingsRenderer.tsx: `["settings-values", scopeValue]`) rather than
+  // a second fetch of the same household settings. Found live 2026-09-11:
+  // with no place in the fixed utterance below, a place-free turn left
+  // the model to guess a `place` argument on its own, which produced the
+  // literal word "here" - and Open-Meteo genuinely has a village named
+  // that. `household.home_place` (backend/src/settings/coreKeys.ts) gives
+  // this card a real place to ask about once the household has set one.
+  const settingsQuery = useQuery({
+    queryKey: ["settings-values", "household"],
+    queryFn: () => api.settingsValues("household"),
+    // A household changes its own location rarely - no need to refetch
+    // this every time Home remounts (code review, 2026-09-11).
+    staleTime: 5 * 60 * 1000,
+  });
+  const place = settingsQuery.data?.find((s) => s.key === "household.home_place")?.value;
+  const question = typeof place === "string" && place.length > 0 ? `What's the weather like in ${place} today?` : "What's the weather like today?";
   // Cached by the query layer (step 6: "calling the weather plugin
   // through the existing turn route with a fixed utterance, cached by
   // the query layer") - a real turn through the shared engine, not a
   // separate widget backend, per the plugin model every package uses.
   // 30 minutes: often enough that "today" never looks stale, rare enough
   // that opening Home repeatedly in a session doesn't create a new turn
-  // (and a new conversation-history row) every time.
+  // (and a new conversation-history row) every time. Gated on the
+  // settings read landing first, so this never fires once with the
+  // place-free question and again once the place is known - each visit
+  // asks exactly one question.
   const query = useQuery({
-    queryKey: ["home-turn", "weather"],
-    queryFn: () => runFixedTurn("What's the weather like today?"),
+    queryKey: ["home-turn", "weather", question],
+    queryFn: () => runFixedTurn(question),
     staleTime: 30 * 60 * 1000,
     retry: false,
+    enabled: !settingsQuery.isPending,
   });
   return (
     <TodayCard icon="sparkles" title="Weather">
-      {query.isLoading ? "Checking..." : (query.data ?? "Couldn't check the weather right now.")}
+      {settingsQuery.isPending || query.isLoading ? "Checking..." : (query.data ?? "Couldn't check the weather right now.")}
     </TodayCard>
   );
 }
 
 function RecentMemoriesCard() {
+  const navigate = useNavigate();
   // The same `["schema-binding", "/api/memory"]` key MemoryPage.tsx and
   // its own actions already use (kit/schema/binding.ts's convention) -
   // one cache entry, not a second fetch, and archiving a memory anywhere
@@ -82,7 +107,15 @@ function RecentMemoriesCard() {
   });
   const recent = [...(query.data ?? [])].sort((a, b) => b.created_at.localeCompare(a.created_at)).slice(0, 3);
   return (
-    <TodayCard icon="brain" title="Recent memories">
+    <TodayCard
+      icon="brain"
+      title="Recent memories"
+      action={
+        <Button variant="ghost" size="sm" onClick={() => navigate("/memory")}>
+          View all →
+        </Button>
+      }
+    >
       {recent.length === 0 ? (
         "Nothing remembered yet."
       ) : (

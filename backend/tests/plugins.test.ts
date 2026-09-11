@@ -4,7 +4,7 @@ import { resetDb } from "./reset-db";
 import { __resetThrottleForTests } from "@/lib/secretThrottle";
 import { __resetLlmSupervisorForTests } from "@/lib/llmSupervisor";
 import { setHouseholdSettingValue } from "@/lib/settings";
-import { listPackageIds, loadPackage, loadManifestOnly, registerAllPackageNotificationTypes, warmPackage } from "@/lib/plugins";
+import { listPackageIds, loadPackage, loadManifestOnly, registerAllPackageNotificationTypes, warmPackage, withHouseholdPlaceDefault } from "@/lib/plugins";
 import { db } from "@/db";
 import { scheduledJobs } from "@/db/schema";
 import { eq } from "drizzle-orm";
@@ -603,6 +603,28 @@ describe("POST /api/plugins/lock-doors/run", () => {
 describe("registerAllPackageNotificationTypes", () => {
   test("the boot-time pass over every bundled package's manifest never throws", () => {
     expect(() => registerAllPackageNotificationTypes()).not.toThrow();
+  });
+});
+
+// Found live 2026-09-11: Home's own weather cards showed the manifest's
+// hardcoded "Seattle" widget default next to a place-free chat turn that
+// left the model to guess a `place` on its own (it guessed the literal
+// word "here" - and Open-Meteo genuinely has a village named that).
+// docs/BACKLOG.md's "A household-location setting" fixes both by giving
+// warmPackage() and getWidgetData() a real place to fall back to.
+describe("withHouseholdPlaceDefault", () => {
+  test("leaves a declared place alone when the household hasn't set a location", () => {
+    expect(withHouseholdPlaceDefault({ place: "Seattle" })).toEqual({ place: "Seattle" });
+  });
+
+  test("overrides a manifest's own declared place with the household's real one once set", () => {
+    setHouseholdSettingValue("household.home_place", "Portland, OR");
+    expect(withHouseholdPlaceDefault({ place: "Seattle" })).toEqual({ place: "Portland, OR" });
+  });
+
+  test("never adds a place to inputs that don't declare one", () => {
+    setHouseholdSettingValue("household.home_place", "Portland, OR");
+    expect(withHouseholdPlaceDefault({})).toEqual({});
   });
 });
 

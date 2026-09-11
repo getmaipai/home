@@ -58,4 +58,25 @@ export const CORE_SETTINGS_KEYS: SettingsKey[] = [
     lives_in: "household.system",
     honoured_by: ["home"],
   }),
+  // docs/BACKLOG.md's "A household-location setting": found live when
+  // Home's own weather cards showed a hardcoded "Seattle" widget default
+  // (manifest.json's warm.keys/contributes.widgets) next to a live turn
+  // asking a place-free "what's the weather like today?", which the model
+  // then answered by guessing the literal word "here" as a place name.
+  // A plain place-name string, not lat/lon: Open-Meteo (weather's own
+  // data source) already geocodes a name, so this key only needs to carry
+  // what the household would type into a "weather in ___" question
+  // themselves. lib/plugins.ts's withHouseholdPlaceDefault() and
+  // lib/widgets.ts's getWidgetData() are the two readers.
+  SettingsKey.parse({
+    key: "household.home_place",
+    scope: "household",
+    selector: "text",
+    default: "",
+    label: "Household location",
+    help: "The place MaiPai uses for weather and other location-based answers, e.g. \"Seattle, WA\".",
+    level: "basic",
+    lives_in: "household.system",
+    honoured_by: ["home", "bot"],
+  }),
 ];

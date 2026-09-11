@@ -264,6 +264,21 @@
     ]
   },
   {
+    "key": "household.home_place",
+    "scope": "household",
+    "selector": "text",
+    "default": "",
+    "label": "Household location",
+    "help": "The place MaiPai uses for weather and other location-based answers, e.g. \"Seattle, WA\".",
+    "level": "basic",
+    "secret": false,
+    "lives_in": "household.system",
+    "honoured_by": [
+      "home",
+      "bot"
+    ]
+  },
+  {
     "key": "household.locale",
     "scope": "household",
     "selector": "select",
