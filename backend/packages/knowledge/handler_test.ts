@@ -1,5 +1,14 @@
 import { assertEquals } from "jsr:@std/assert@1";
-import { summarizeWikipediaResponse } from "./handler.ts";
+import { handleKnowledge, summarizeWikipediaResponse } from "./handler.ts";
+
+Deno.test("a failed lookup returns a typed error so the host chooses the fallback", async () => {
+  const result = await handleKnowledge({ topic: "Seattle" }, {
+    sendRequest: () => Promise.reject(new Error("fetch failed")),
+  });
+  assertEquals(JSON.parse(result.content[0].text), {
+    error: { code: "network_unreachable", message: "fetch failed" },
+  });
+});
 
 Deno.test("a real Wikipedia summary shape formats as name: extract", () => {
   const result = summarizeWikipediaResponse("Seattle", {

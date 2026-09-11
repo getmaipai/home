@@ -46,30 +46,27 @@ async function hostFetch(
   return result.value;
 }
 
+export async function handleKnowledge(
+  { topic }: { topic: string },
+  extra: { sendRequest: (req: unknown, schema: unknown) => Promise<{ value: unknown }> },
+) {
+  // The host chooses the manifest's fallback for a typed fetch failure.
+  try {
+    const data = await hostFetch(extra, `https://en.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(topic)}`);
+    const reply = summarizeWikipediaResponse(topic, data);
+    return { content: [{ type: "text" as const, text: JSON.stringify({ reply, actions: [] }) }] };
+  } catch (err) {
+    const error = { code: "network_unreachable", message: err instanceof Error ? err.message : String(err) };
+    return { content: [{ type: "text" as const, text: JSON.stringify({ error }) }] };
+  }
+}
+
 if (import.meta.main) {
   const server = new McpServer({ name: "knowledge", version: "0.1.0" });
-
   server.registerTool(
     "handle",
     { inputSchema: { topic: z.string().min(1) } },
-    async (
-      { topic }: { topic: string },
-      extra: { sendRequest: (req: unknown, schema: unknown) => Promise<{ value: unknown }> },
-    ) => {
-      // Fix B (docs/dev.md's "Chat reliability: the 2026-09-07 incident
-      // and the five fixes"): a real fetch failure is reported as a
-      // typed `error`, never a fabricated `reply` - the caller
-      // (denoHost.ts's callTier1Handle()) decides the household-facing
-      // fallback text (the manifest's own `fallback_reply`).
-      try {
-        const data = await hostFetch(extra, `https://en.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(topic)}`);
-        const reply = summarizeWikipediaResponse(topic, data);
-        return { content: [{ type: "text", text: JSON.stringify({ reply, actions: [] }) }] };
-      } catch (err) {
-        const error = { code: "network_unreachable", message: err instanceof Error ? err.message : String(err) };
-        return { content: [{ type: "text", text: JSON.stringify({ error }) }] };
-      }
-    },
+    handleKnowledge,
   );
 
   const transport = new StdioServerTransport();

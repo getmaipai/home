@@ -9583,7 +9583,7 @@ the ps5.") flags a reply when every one of its words already appears in
 the utterance - the right test for "the model just parroted the claim
 back instead of answering," but a correct greeting reciprocation IS
 exactly that: the utterance "good morning" has a two-word vocabulary, so
-almost any short, natural reply to it ("Good morning!") trivially draws
+almost any short, natural reply to it (`Good morning!`) trivially draws
 every word from that same tiny pool. The check has no way to tell a
 stall from the one utterance shape where echoing the words back is
 genuinely the right thing to say.
@@ -9600,13 +9600,13 @@ checks whether the utterance carries a greeting anywhere in it.
 A code review (2026-09-07) caught the first cut wrong before it landed:
 it anchored the exemption to the WHOLE utterance being nothing but the
 greeting, which missed the everyday compound case "good morning, how
-are you" -> "Good morning!" (still flagged - "how"/"are"/"you" are all
+are you" -> `Good morning!` (still flagged - "how"/"are"/"you" are all
 stopwords, so the leftover pool is just "good"/"morning" and the
 original mechanism flags it exactly like the plain case). The two-regex
 split fixes that: the reply's own bare reciprocation is what actually
 needs checking, not the utterance's total content. The review also
 caught two of the five original tests silently passing whether or not
-the fix was even present ("Morning!" and "Hey!" alone tokenize to a
+the fix was even present (`Morning!` and `Hey!` alone tokenize to a
 single word, so they'd already return early via the checker's
 pre-existing `words.length < 2` guard, fix or no fix) - replaced with
 "hi there"/"hey there" pairs that fully echo their own utterance and so
@@ -10046,3 +10046,11 @@ accepted-sounding opener ("Sure, ...") followed by a real fabrication
 and a genuine question still triggers the forced retry, proving
 `replyHasQuestion` is computed the same way in the pre-check as in the
 real `guardReply()` pass - confirmed to fail without that fix.
+
+## Bundled knowledge provenance
+
+The knowledge fetch-failure fix now lives in the canonical catalog source.
+Refreshing with `bun run refresh-bundled-packages` preserves that behavior
+and records the catalog commit and package hash together. The copied package
+includes an offline regression for a rejected host fetch; the integrity test
+continues to verify the bundled bytes against their provenance.
