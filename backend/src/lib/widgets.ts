@@ -90,7 +90,7 @@ export async function getWidgetData(actor: PersonRow, packageId: string, widgetI
   if (!widget) return { ok: false, status: 404, error: "no such widget" };
   if (!meetsMinRole(actor.role, manifest.min_role)) return { ok: false, status: 403, error: `${packageId} needs role ${manifest.min_role} or higher` };
 
-  const result = await runPlugin(packageId, actor, withHouseholdPlaceDefault((widget.inputs ?? {}) as Record<string, unknown>));
+  const result = await runPlugin(packageId, actor, withHouseholdPlaceDefault(packageId, (widget.inputs ?? {}) as Record<string, unknown>));
   if (!result.ok) {
     // Fix B (docs/dev.md's "Chat reliability: the 2026-09-07 incident",
     // B2): a Tier 1 handler's genuine upstream failure is now a typed 502

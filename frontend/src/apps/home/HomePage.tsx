@@ -14,7 +14,7 @@ import { getIcon } from "@/kit/icons";
 import { CardSizeSlider, useCardSize, cardSizeStyle } from "@/kit/primitives/CardSizeSlider";
 import { NodeRenderer } from "@/kit/schema/NodeRenderer";
 import type { WidgetCardNode } from "@/kit/schema/types";
-import { api, type Roster, type PersonRosterEntry } from "@/lib/api";
+import { api, type Roster, type PersonRosterEntry, type ResolvedSetting } from "@/lib/api";
 import { greetingFor } from "@/apps/home/greeting";
 import { runFixedTurn } from "@/apps/home/runFixedTurn";
 import { usePinnedApps } from "@/shell/usePinnedApps";
@@ -65,6 +65,15 @@ function useHouseholdSettings() {
   });
 }
 
+// The same "find by key, only trust a non-empty string" read WeatherCard
+// and Tagline each need for their own household setting - one definition
+// (code review, 2026-09-11) rather than the identical inline find()
+// typed out twice.
+function textSetting(values: ResolvedSetting[] | undefined, key: string): string | undefined {
+  const value = values?.find((s) => s.key === key)?.value;
+  return typeof value === "string" && value.length > 0 ? value : undefined;
+}
+
 function WeatherCard() {
   // Found live 2026-09-11: with no place in the fixed utterance below, a
   // place-free turn left the model to guess a `place` argument on its
@@ -73,8 +82,8 @@ function WeatherCard() {
   // (backend/src/settings/coreKeys.ts) gives this card a real place to
   // ask about once the household has set one.
   const settingsQuery = useHouseholdSettings();
-  const place = settingsQuery.data?.find((s) => s.key === "household.home_place")?.value;
-  const question = typeof place === "string" && place.length > 0 ? `What's the weather like in ${place} today?` : "What's the weather like today?";
+  const place = textSetting(settingsQuery.data, "household.home_place");
+  const question = place ? `What's the weather like in ${place} today?` : "What's the weather like today?";
   // Cached by the query layer (step 6: "calling the weather plugin
   // through the existing turn route with a fixed utterance, cached by
   // the query layer") - a real turn through the shared engine, not a
@@ -166,8 +175,8 @@ const DEFAULT_TAGLINE = "Made for your everyday";
 
 function Tagline() {
   const query = useHouseholdSettings();
-  const familyName = query.data?.find((s) => s.key === "household.family_name")?.value;
-  const text = typeof familyName === "string" && familyName.length > 0 ? `${familyName} Family` : DEFAULT_TAGLINE;
+  const familyName = textSetting(query.data, "household.family_name");
+  const text = familyName ? `${familyName} Family` : DEFAULT_TAGLINE;
   return <p className="mb-2 text-xs font-medium tracking-widest text-primary uppercase">{text}</p>;
 }
 

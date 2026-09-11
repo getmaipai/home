@@ -348,18 +348,19 @@ function warmActor(): PersonRow | null {
   return people[0]!;
 }
 
-/** Overrides a `place` input with `household.home_place`
- * (backend/src/settings/coreKeys.ts) when the household has set one, so a
- * package's own warm keys and widget defaults (a manifest literal, e.g.
- * weather's "Seattle") answer for the household actually running it
- * instead of the placeholder every install ships with. Only touches
- * `place` - the one shape the setting backs today - and only inputs that
- * already declare it, so this never runs for a package with no notion of
- * place, and never touches a live chat turn's own explicit place (a user
- * asking "weather in Chicago" reaches `runPlugin()` directly with that
- * place already resolved, never through here). */
-export function withHouseholdPlaceDefault(inputs: Record<string, unknown>): Record<string, unknown> {
-  if (!("place" in inputs)) return inputs;
+/** Overrides `weather`'s own `place` input with `household.home_place`
+ * (backend/src/settings/coreKeys.ts) when the household has set one, so
+ * its warm keys and widget default (a manifest literal, "Seattle")
+ * answer for the household actually running it instead of the
+ * placeholder every install ships with. Scoped to `weather` by package
+ * id, not just by the presence of a `place` field (code review,
+ * 2026-09-11): a future package could declare its own unrelated `place`
+ * input (a travel planner's destination, say) that this must never
+ * silently rewrite. Never touches a live chat turn's own explicit place
+ * (a user asking "weather in Chicago" reaches `runPlugin()` directly with
+ * that place already resolved, never through here). */
+export function withHouseholdPlaceDefault(packageId: string, inputs: Record<string, unknown>): Record<string, unknown> {
+  if (packageId !== "weather" || !("place" in inputs)) return inputs;
   const place = getHouseholdSettingValue("household.home_place");
   if (typeof place !== "string" || place.length === 0) return inputs;
   return { ...inputs, place };
@@ -382,7 +383,7 @@ export async function warmPackage(id: string, manifest: PackageManifest): Promis
   if (!actor) return;
   for (const key of keys) {
     try {
-      const result = await runPlugin(id, actor, withHouseholdPlaceDefault(key as Record<string, unknown>));
+      const result = await runPlugin(id, actor, withHouseholdPlaceDefault(id, key as Record<string, unknown>));
       if (!result.ok) {
         console.error(`[warm] ${id} failed to warm key ${JSON.stringify(key)}: ${result.error}`);
       }

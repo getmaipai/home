@@ -614,17 +614,26 @@ describe("registerAllPackageNotificationTypes", () => {
 // warmPackage() and getWidgetData() a real place to fall back to.
 describe("withHouseholdPlaceDefault", () => {
   test("leaves a declared place alone when the household hasn't set a location", () => {
-    expect(withHouseholdPlaceDefault({ place: "Seattle" })).toEqual({ place: "Seattle" });
+    expect(withHouseholdPlaceDefault("weather", { place: "Seattle" })).toEqual({ place: "Seattle" });
   });
 
   test("overrides a manifest's own declared place with the household's real one once set", () => {
     setHouseholdSettingValue("household.home_place", "Portland, OR");
-    expect(withHouseholdPlaceDefault({ place: "Seattle" })).toEqual({ place: "Portland, OR" });
+    expect(withHouseholdPlaceDefault("weather", { place: "Seattle" })).toEqual({ place: "Portland, OR" });
   });
 
   test("never adds a place to inputs that don't declare one", () => {
     setHouseholdSettingValue("household.home_place", "Portland, OR");
-    expect(withHouseholdPlaceDefault({})).toEqual({});
+    expect(withHouseholdPlaceDefault("weather", {})).toEqual({});
+  });
+
+  // Code review, 2026-09-11: a future package could declare its own
+  // `place` input meaning something unrelated to the household's own
+  // location (a travel planner's destination, say) - scoped to `weather`
+  // by package id so this can never silently rewrite it.
+  test("never touches another package's own place input, even with the same field name", () => {
+    setHouseholdSettingValue("household.home_place", "Portland, OR");
+    expect(withHouseholdPlaceDefault("travel-planner", { place: "Tokyo" })).toEqual({ place: "Tokyo" });
   });
 });
 
