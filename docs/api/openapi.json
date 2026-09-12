@@ -3092,6 +3092,88 @@
         }
       }
     },
+    "/api/conversations/search": {
+      "get": {
+        "tags": [
+          "Conversations"
+        ],
+        "summary": "Search episode history across conversations",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Search query"
+            },
+            "required": true,
+            "description": "Search query",
+            "name": "q",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 20,
+              "default": 5,
+              "description": "Results to return"
+            },
+            "required": false,
+            "description": "Results to return",
+            "name": "limit",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Recalled episodes ranked by relevance.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "text": {
+                        "type": "string",
+                        "description": "Episode text (truncated to 200 chars)"
+                      },
+                      "speaker": {
+                        "type": "string",
+                        "enum": [
+                          "user",
+                          "assistant"
+                        ],
+                        "description": "Who said it"
+                      },
+                      "timeLabel": {
+                        "type": "string",
+                        "description": "Time label (e.g., 'today', '3 days ago')"
+                      }
+                    },
+                    "required": [
+                      "text",
+                      "speaker",
+                      "timeLabel"
+                    ]
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Sign in first",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/conversations/{id}/resume": {
       "post": {
         "tags": [

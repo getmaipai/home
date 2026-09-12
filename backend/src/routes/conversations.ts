@@ -1,5 +1,5 @@
 import { type Context } from "hono";
-import { createRoute } from "@hono/zod-openapi";
+import { createRoute, z } from "@hono/zod-openapi";
 import { apiRouter, errorResponses, idParamSchema } from "@/lib/openapi";
 import { Conversation } from "@maipai/spec/gen/ts/conversation.js";
 import { requireAuth } from "@/middleware/auth";
@@ -17,6 +17,7 @@ import {
   clearConversations,
   type ConversationOpResult,
 } from "@/lib/conversationHistory";
+import { recallEpisodes, formatEpisodesForPrompt } from "@/lib/recall";
 import type { AppEnv } from "@/types";
 import type { Surface } from "@/lib/turnEngine";
 
@@ -118,6 +119,38 @@ conversationsRoutes.delete("/:id", requireAuth, async (c) => {
   const result = deleteConversationById(actor, c.req.param("id"));
   if (!result.ok) return fail(c, result);
   return c.json({ ok: true });
+});
+
+const SearchQuerySchema = z.object({
+  q: z.string().min(1).describe("Search query"),
+  limit: z.coerce.number().int().min(1).max(20).default(5).describe("Results to return"),
+});
+
+const EpisodeSchema = z.object({
+  text: z.string().describe("Episode text (truncated to 200 chars)"),
+  speaker: z.enum(["user", "assistant"]).describe("Who said it"),
+  timeLabel: z.string().describe("Time label (e.g., 'today', '3 days ago')"),
+});
+
+const searchRoute = createRoute({
+  method: "get",
+  path: "/search",
+  tags: ["Conversations"],
+  summary: "Search episode history across conversations",
+  middleware: [requireAuth] as const,
+  request: { query: SearchQuerySchema },
+  responses: {
+    200: { content: { "application/json": { schema: z.array(EpisodeSchema) } }, description: "Recalled episodes ranked by relevance." },
+    ...errorResponses({ 401: "Sign in first" }),
+  },
+});
+
+conversationsRoutes.openapi(searchRoute, async (c) => {
+  const actor = c.get("person");
+  const { q, limit } = c.req.valid("query");
+  const results = await recallEpisodes(actor, q, limit);
+  const formatted = formatEpisodesForPrompt(results);
+  return c.json(formatted, 200);
 });
 
 const resumeRoute = createRoute({
