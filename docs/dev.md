@@ -10489,15 +10489,18 @@ record stands.
    idle window shortened because slot contention is gone. Dedupe calls the
    model only inside the ambiguous cosine band; near-identical and clearly
    new facts are decided without one.
-10. **One bounded read-only refinement lookup is permitted, later.** This
-    amends "two independent calls per turn remain the limit": when the
-    first lookup's result does not answer the question, the engine may run
-    exactly one more read-only lookup with a deadline before composing or
-    asking. Consequential actions stay on their validated paths; no plan
-    loop. Design and implementation belong to the block after this one,
-    with memory-first ordering (household memory, then offline reference,
-    then the web) and a maintained readability extractor for source pages
-    as part of the same item.
+10. **A bounded investigation mode, later (revised the same day, see
+    the subsection below).** This amends "two independent calls per
+    turn remain the limit" and "dependent calls belong in authored
+    recipes": when the first evidence does not settle the question, the
+    engine may run one more evidence round chosen by the model from
+    what it just learned, inside a small total budget of calls, time,
+    and tokens, then compose. Consequential actions stay on their
+    validated confirmation path; no worker models; the loop is named
+    and bounded, not open-ended. Design and implementation belong to
+    the block after this one, after CHAT-15, CHAT-16, CHAT-17 and
+    MEM-04 give it typed outcomes, native tool-result messages, the
+    streaming machine, and episode recall to stand on.
 11. **The turn gets a resolved context, later.** Referent, options the
     assistant just listed, unresolved question, pending choice, resolved
     once per turn and shared by routing, recall, and tool arguments; every
@@ -10598,6 +10601,70 @@ hold before a latency gain counts, the default outcome is "keep the 8B",
 and a recommendation is never itself a switch. The reasoning for testing
 a smaller model at all (a newer generation, a narrow job, an 8 GB card)
 is written into the item so the verdict is read against it.
+
+### Decision 10, revised: a bounded investigation mode (2026-09-12)
+
+Codex's follow-up analysis, read against Jesse's own example, changed
+the shape of decision 10 from "one additional lookup" to a named,
+bounded investigation mode. The example: "Would the science museum work
+for us Saturday, considering what we discussed last week?" A useful
+answer retrieves the earlier discussion and its constraints, checks
+Saturday's hours, checks the calendar and travel time, notices the
+planned arrival leaves too little time or that Saturday is sold out,
+looks at another time, and explains the recommendation. Step four
+changes step five. No authored recipe can cover every combination of a
+family's circumstances and a newly discovered fact, and one extra lookup
+cannot either, because the second lookup's target is only known after
+the first returns. The 2026-09-07 record's ban on a plan/call/observe
+loop was right to keep ordinary turns cheap; it was wrong to make the
+loop impossible. "Set a five-minute timer" and "good morning" still
+complete directly, with one completion or none.
+
+What the mode is, stated so it can be tested rather than felt:
+
+- **Decide, fetch, observe, decide again, compose.** The initial
+  decision is today's native tool selection over the pre-filtered list.
+  Independent evidence in a round runs concurrently (memory, episodes,
+  a calendar read, an enabled web lookup are database and network work,
+  not model work). Each result returns to the model as a compact,
+  structured observation: source, date, the relevant facts, and a
+  status of found, missing, or error, carried in native tool-result
+  messages (CHAT-16's `role: tool`), never pasted into a system
+  message. Permission checks happen before an observation is returned.
+  The model then answers, requests specific missing evidence, or asks
+  the person one necessary question.
+- **Starting limits, to be measured, not product law:** at most two
+  evidence rounds, at most four tool calls in total, read-only tools
+  only inside the loop, a wall-clock deadline of 12 seconds on voice
+  surfaces and 25 seconds on screen, and CHAT-12's output reserve. When
+  a budget runs out the engine composes the supported answer and names
+  what stayed unresolved. A consequential proposal ends the loop and
+  goes to the existing confirmation; discovering a better option never
+  silently becomes booking it.
+- **Progress reflects real work.** When a round's execution passes the
+  existing 900 ms cue threshold, the spoken line is built from the
+  tool's user-facing description ("Checking Saturday's hours"), through
+  the same cue path FAST-04 fixes, never a canned filler or narrated
+  reasoning.
+- **The fast/thoughtful split lands here.** The loop itself runs on the
+  chat model in non-thinking mode. THINK-01's gate turns thinking on for
+  the compose step only when the observations conflict or number three
+  or more, so the harder reasoning is paid for exactly when evidence
+  needs combining. Both modes see the same context and the same
+  observations.
+- **Worker models are rejected for now.** One local model plays the
+  roles in sequence. Parallel model workers on one small machine
+  compete for the same memory and compute, and Anthropic's own
+  multi-agent research write-up reports several times the token cost;
+  that is a tradeoff to measure once the single-model loop exists and
+  a real household question is shown to need it, not a pattern to copy.
+
+The work order is [INVEST-01](BACKLOG.md#invest-01). Its acceptance is
+the scenario above, driven with scripted tools: the first round's
+observations contain a conflict, the second round's request changes
+because of it, the composed answer states the conflict and the
+recommendation, and a greeting and a timer in the same suite still
+take one completion or none.
 
 ### Sources consulted
 

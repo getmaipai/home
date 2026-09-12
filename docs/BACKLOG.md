@@ -1596,7 +1596,77 @@ Track B: MEM-01, MEM-02, MEM-03, MEM-04, MEM-05. Then JOIN-01, JOIN-02.
 ### The block after this one (not scheduled; each needs its design note in dev.md first)
 
 - [ ] **TURN-01: One resolved turn context shared by routing, recall, and tool arguments** (M, after CHAT-10 and CHAT-13). Referent, options the assistant just listed, unresolved question, pending choice; every turn re-routes including follow-ups; a background-model rewrite only when a tool or retrieval will run, 1 s timeout, raw-text fallback, `replaces_previous` flag cancels an in-flight tool; clarify only on a top-two tie or a costly action, else best guess plus a one-clause hedge. Borrow the bot's subject tracker (three turns, wrong subject worse than none).
-- [ ] **LOOKUP-01: One bounded read-only refinement lookup, memory-first ordering, readable source pages** (M, after CHAT-16). Amends the two-call limit per decision 10; deadline, read-only, no consequential action; household memory, then offline reference, then the web; a maintained readability extractor turns a chosen page into compact evidence; one sentence spoken, the rest a follow-up away.
+- [ ] **INVEST-01: A bounded investigation mode inside the turn engine** (M-L; design note: dev.md "Decision 10, revised").
+
+    <a id="invest-01"></a>
+
+    Depends on: CHAT-15 (typed outcomes), CHAT-16 (native tool-result
+    messages and the shared composer), CHAT-17 (the streaming state
+    machine), JOIN-01 (episode recall in the prompt), THINK-01 for the
+    compose-step thinking gate (may land after, with the gate off).
+    Files: `backend/src/lib/turnEngine.ts` and the CHAT-17 machine,
+    `turnContext.ts`, `llm.ts`, `spec/llm/ts/types.ts` only if an
+    observation field is missing from the tool-result message shape,
+    `backend/src/routes/turn.ts` (progress text through the existing
+    cue event, additive), `backend/tests/tier2.test.ts`,
+    `turnEngine.test.ts`, `spec/llm/tool-call-corpus.json`. Mirror
+    CHAT-16's decision table and CHAT-17's phases; add a phase, do not
+    add a second machine. Read the dev.md design note first; its limits
+    are the constants here, named and tested, changed only with a
+    measurement.
+
+    Do, in this order:
+    1. Observation shape: from each `ToolExecutionOutcome`, build the
+       tool-result message content as `{ source, as_of, status:
+       found|missing|error, facts }` where `facts` is the result's
+       `data` plus `synthesis_hint`, bounded by CHAT-12's budget. Nothing
+       from a result enters a system message.
+    2. The loop: after a round executes, if the round contained no
+       consequential proposal and the round budget is not spent, run one
+       more decision completion with the observations appended as tool
+       results and the same pre-filtered read-only tool list (plus
+       always-offer). Constants: `INVESTIGATION_MAX_ROUNDS = 2`,
+       `INVESTIGATION_MAX_CALLS = 4`, `INVESTIGATION_DEADLINE_MS` of
+       12,000 for voice surfaces and 25,000 for `chat`. Calls within a
+       round run concurrently as today. A consequential proposal at any
+       point ends the loop and goes to the existing confirmation; nothing
+       else from that batch executes.
+    3. Exhaustion: when any budget is hit, compose from what is
+       supported and name what stayed unresolved in one plain sentence.
+       Never a third round, never a repeated call.
+    4. Progress: when a round's execution passes the cue threshold, the
+       cue text is derived from the executing tool's user-facing
+       description (FAST-03's sentence), for example "Checking Saturday's
+       hours." Reuse the `spoken_cue` event; add no new event type.
+    5. Thinking at compose: if THINK-01 exists, enable thinking for the
+       compose completion when observations conflict (two facts with the
+       same subject and different values) or there are three or more
+       observations; otherwise leave it off.
+    6. Tests, with scripted tool calls keyed on whether the request
+       already carries tool-result messages: the museum scenario (round
+       one: episode recall returns last week's constraints, the venue
+       tool returns hours plus "Saturday sold out"; the scripted second
+       decision asks for Sunday; round two returns it; the composed
+       answer names the conflict and recommends Sunday); a budget test
+       (a scripted model that keeps asking for more gets exactly two
+       rounds and four calls, then an answer that names the unresolved
+       part); a consequential test (a "book it" proposal in round two
+       produces the confirmation and executes nothing); a control test
+       (a greeting takes one completion and zero tool calls, a timer
+       takes zero completions); a deadline test using the existing
+       timing hooks, no real sleeps. Add the scenario rows to the
+       tool-call corpus.
+
+    Acceptance: all six tests green, both transports; live on the dev
+    machine, the museum question asked with seeded episodes and a
+    stubbed venue tool produces the conflict-aware recommendation with
+    the progress line spoken, and its total time recorded against the
+    deadline. Out of scope: worker models, a planner completion ahead
+    of ordinary turns, writes inside the loop, a readability extractor
+    for web pages (its own S item once websearch returns structured
+    data), memory-first ordering of lookups (folded into the
+    pre-filtered tool order, not a separate mechanism). Checks: the
+    named suites, then the full exit gate.
 - [ ] **VOICE-01: Interruption as a chat gate** (M). Natural spoken filler only when a tool or lookup is predicted over about a second; barge-in cancels inference and reconciles the logged reply with what was heard; a text-based end-of-turn detector on CPU unless a semantic model measures under 150 ms there; first spoken chunk gate lowered from 90 characters after FAST-04's numbers are in.
 - [ ] **ROUTE-01: The bot's shape guard and routing trace** (S). A question or first-person statement no deterministic tier can place goes to conversation, never to a plugin; log tier, winner, runner-up, and margin per decision; offer the top three tools without a similarity floor and re-measure false calls.
 - [ ] **THINK-01: A deterministic thinking gate** (S-M, after FAST-01 numbers). Multi-clause, "why", "how would", "compare", explicit "think about it", or a failed first pass turn `enable_thinking` on with a token budget; measured against always-off on the CHAT-23 corpus.
