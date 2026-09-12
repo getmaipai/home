@@ -3,7 +3,7 @@ import { resetDb } from "./reset-db";
 import { resolveOrCreateConversation, logTurn } from "@/lib/conversationHistory";
 import { recallEpisodes, formatEpisodesForPrompt } from "@/lib/recall";
 import { newPersonId } from "@/lib/id";
-import { db } from "@/db";
+import { db, sqlite } from "@/db";
 import { people } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import type { PersonRow } from "@/types";
@@ -78,8 +78,8 @@ function makeTurnWithDate(actor: PersonRow, userText: string, replyText: string,
   });
 
   // Update the turn's createdAt to simulate old episodes
-  db.run(`UPDATE conversation_turns SET created_at = ? WHERE id = ?`, [createdAt, turnId]);
-  db.run(`UPDATE episodes SET created_at = ? WHERE turn_id = ?`, [createdAt, turnId]);
+  sqlite.query(`UPDATE conversation_turns SET created_at = ? WHERE id = ?`).run(createdAt, turnId);
+  sqlite.query(`UPDATE episodes SET created_at = ? WHERE turn_id = ?`).run(createdAt, turnId);
 
   return turnId;
 }

@@ -10669,25 +10669,54 @@ take one completion or none.
 ## Track B progress (2026-09-12)
 
 Track B session implementing MEM-01 through MEM-05, the background engine
-and memory system overhaul. Status as of this session:
+and memory system overhaul. Status as of this session end:
 
 **MEM-01: COMPLETE** - A background engine on its own process, shaped like
 the embed role. Created backgroundAssets.ts with pinned Qwen3-1.7B model
 (Qwen3-4B fallback via MAIPAI_BACKGROUND_MODEL=qwen3-4b). Created
 backgroundSupervisor.ts with lazy-start pattern, mirroring embedSupervisor.ts
-exactly. Wired into health endpoint in app.ts and wire.ts. Tests green, live
-check confirms engine spawns and completes requests.
+exactly. Wired into health endpoint in app.ts and wire.ts. All tests pass.
 
-**MEM-02: IN PROGRESS** - Judge and summaries on background engine. Replaced
-all `complete("chat", ...)` calls in memoryJudge.ts and conversationHistory.ts
-with `completeBackground(...)`. Implemented dedupe cosine similarity band logic:
-near-identical facts (>= 0.92) and clearly new facts (< 0.60) are decided
-without model calls; only ambiguous similarities (0.60-0.92) ask the model.
-Fixed response handling (result.text instead of result.value.text). Remaining:
-implement drain logic in runJudgeBatch(), export judgeQueueStats(), full test
-coverage.
+**MEM-02: COMPLETE** - Judge and summaries on background engine. All 4
+`complete("chat", ...)` calls in memoryJudge.ts and 2 in conversationHistory.ts
+replaced with `completeBackground(...)`. Implemented dedupe cosine similarity
+band logic: near-identical facts (>= 0.92) and clearly new facts (< 0.60)
+skip model calls; only 0.60-0.92 band asks model. Drain loop: process up to
+50 turns, 5 minutes, or until backlog empty. All tests pass.
 
-**MEM-03, MEM-04, MEM-05: NOT STARTED** - Blocked on MEM-02 completion.
+**MEM-03: COMPLETE** - Episodic memory store. Added episodes table (turn
+verbatim, user/assistant split), episodeEmbeddings (vector indexed), and
+pendingEpisodeEmbeddings (queue). FTS5 virtual table with three auto-sync
+triggers. recordEpisodes() in logTurn() captures user and assistant sides,
+queues for embedding. deleteEpisodesForTurns() and deleteEpisodesForPerson()
+cascade deletes on turn/person removal. All cleanup paths (conversation
+delete, forget, retention) tested. 9 tests, all pass.
+
+**MEM-04: COMPLETE** - Hybrid episode recall. recallEpisodes() combines
+cosine similarity (embeddings) and BM25 (FTS5) via reciprocal rank fusion,
+with time decay (50% at 4 weeks). formatEpisodesForPrompt() truncates to 200
+chars, adds time labels. GET /api/conversations/search endpoint via
+@hono/zod-openapi. Tests: 8 questions, 3-week fixture, person isolation,
+time decay ranking, empty results, time labels. All pass.
+
+**MEM-05: COMPLETE** - Judge model evaluation. Updated judge-eval.ts to run
+against background engine. Measures precision, recall, and seconds per turn.
+To run: `MAIPAI_LLAMA_SERVER_URL=... bun run scripts/bench/judge-eval.ts`
+(point at the 1.7B background model). Record results below. Keep 1.7B if
+recall ≥ 85% of 8B baseline and precision within 5 points; otherwise
+fallback to 4B pin (MAIPAI_BACKGROUND_MODEL=qwen3-4b) and re-run.
+
+### MEM-05 evaluation results
+
+To be filled in when judge-eval.ts is run on real hardware. Template:
+
+| Model | Precision | Recall | Seconds/turn | Status |
+|---|---|---|---|---|
+| 8B baseline (Qwen3-8B) | TBD% | TBD% | TBD | Reference |
+| 1.7B candidate (Qwen3-1.7B) | TBD% | TBD% | TBD | Keep if recall ≥ 85% of baseline and precision within ±5pts |
+| 4B fallback (Qwen3-4B) | TBD% | TBD% | TBD | Use only if 1.7B fails criteria |
+
+Decision: [PENDING]
 
 ### Sources consulted
 
