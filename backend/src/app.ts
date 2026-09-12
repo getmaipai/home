@@ -45,6 +45,7 @@ import { requireAuth } from "@/middleware/auth";
 import { getEngineStatus, probeChatEngine } from "@/lib/llmSupervisor";
 import { getTtsBackendKind, probeTtsEngine } from "@/lib/ttsSupervisor";
 import { probeEmbedEngine } from "@/lib/embedSupervisor";
+import { probeBackgroundEngine } from "@/lib/backgroundSupervisor";
 import { listSidecars } from "@/lib/sidecars";
 
 // Session F, step 4: every route file converts to @hono/zod-openapi
@@ -121,12 +122,12 @@ const healthRoute = createRoute({
 // response body against BOTH - a real error caught while converting
 // routes/repairs.ts to the identical pattern, fixed here too.
 app.openapi(healthRoute, async (c) => {
-  const [chat, embed, voice] = await Promise.all([probeChatEngine(), probeEmbedEngine(), probeTtsEngine()]);
+  const [chat, embed, background, voice] = await Promise.all([probeChatEngine(), probeEmbedEngine(), probeBackgroundEngine(), probeTtsEngine()]);
   const sidecars = listSidecars();
   const ok =
-    [chat, embed, voice].every((e) => e.alive !== false && e.kind !== "failed" && e.kind !== "restarting") &&
+    [chat, embed, background, voice].every((e) => e.alive !== false && e.kind !== "failed" && e.kind !== "restarting") &&
     sidecars.every((s) => s.status !== "unhealthy" && s.status !== "crashed");
-  return c.json({ sidecars, brain: getEngineStatus().kind, voice: getTtsBackendKind(), ok, engines: { chat, embed, voice }, uptimeSeconds: process.uptime() }, 200);
+  return c.json({ sidecars, brain: getEngineStatus().kind, voice: getTtsBackendKind(), ok, engines: { chat, embed, background, voice }, uptimeSeconds: process.uptime() }, 200);
 });
 
 // /api/docs: the Scalar API reference reading the generated document

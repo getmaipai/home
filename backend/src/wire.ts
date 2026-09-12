@@ -243,7 +243,7 @@ export interface HealthStatus {
   /** False when any engine that should be up is not answering, or a
    * sidecar is unhealthy/crashed. */
   ok: boolean;
-  engines: { chat: EngineHealthEntry; embed: EngineHealthEntry; voice: EngineHealthEntry };
+  engines: { chat: EngineHealthEntry; embed: EngineHealthEntry; background: EngineHealthEntry; voice: EngineHealthEntry };
   uptimeSeconds: number;
   sidecars: SidecarStatusEntry[];
 }

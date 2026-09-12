@@ -1,0 +1,71 @@
+import { describe, expect, test, beforeEach, afterEach } from "bun:test";
+import { getBackgroundClient, getBackgroundBackendKind, __resetBackgroundSupervisorForTests } from "@/lib/backgroundSupervisor";
+import { LlamaServerClient } from "@maipai/spec/llm/ts/client.js";
+
+beforeEach(() => {
+  __resetBackgroundSupervisorForTests();
+});
+
+afterEach(() => {
+  __resetBackgroundSupervisorForTests();
+  delete process.env.MAIPAI_BACKGROUND_URL;
+});
+
+describe("backgroundSupervisor getBackgroundClient()", () => {
+  test("reports no backend until the first call", () => {
+    expect(getBackgroundBackendKind()).toBe("none");
+  });
+
+  test("falls back to the stub backend when no engine is installed", async () => {
+    const client = await getBackgroundClient();
+    expect(await client.health()).toBe(true);
+    expect(getBackgroundBackendKind()).toBe("stub");
+    const second = await getBackgroundClient();
+    expect(second).toBe(client);
+  });
+
+  test("MAIPAI_BACKGROUND_URL points the client at an already-running server without spawning anything", async () => {
+    const { startStubLlmServer } = await import("@maipai/spec/llm/ts/stubServer.js");
+    const stub = startStubLlmServer();
+    try {
+      process.env.MAIPAI_BACKGROUND_URL = stub.url;
+      const client = await getBackgroundClient();
+      expect(getBackgroundBackendKind()).toBe("url");
+      expect(await client.health()).toBe(true);
+    } finally {
+      stub.stop();
+    }
+  });
+
+  test("a caller mid-flight when a reset lands still gets back a real, live client", async () => {
+    const clientPromise = getBackgroundClient();
+    __resetBackgroundSupervisorForTests();
+    const client = await clientPromise;
+    expect(await client.health()).toBe(true);
+  });
+});
+
+describe("backgroundSupervisor completeBackground()", () => {
+  test("returns unavailable when the background URL is dead", async () => {
+    process.env.MAIPAI_BACKGROUND_URL = "http://127.0.0.1:9999";
+    const result = await import("@/lib/backgroundSupervisor").then((m) => m.completeBackground([{ role: "user", content: "hello" }]));
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.unavailable).toBe(true);
+    }
+  });
+});
+
+describe("backgroundAssets", () => {
+  test("BACKGROUND_MODEL_SHA256 is 64 hex characters", async () => {
+    const { BACKGROUND_MODEL_SHA256 } = await import("@/lib/backgroundAssets");
+    expect(BACKGROUND_MODEL_SHA256).toMatch(/^[0-9a-f]{64}$/);
+  });
+
+  test("fallback model switch selects the other file when MAIPAI_BACKGROUND_MODEL=qwen3-4b", async () => {
+    process.env.MAIPAI_BACKGROUND_MODEL = "qwen3-4b";
+    const { backgroundModelPath, BACKGROUND_MODEL_FALLBACK_FILE } = await import("@/lib/backgroundAssets");
+    const path = backgroundModelPath();
+    expect(path).toContain(BACKGROUND_MODEL_FALLBACK_FILE);
+  });
+});
