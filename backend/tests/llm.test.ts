@@ -154,7 +154,7 @@ describe("lib/llm.ts complete() with tools (Fix E: native tool calling)", () => 
     __resetLlmSupervisorForTests();
     const { startStubLlmServer } = await import("@maipai/spec/llm/ts/stubServer.js");
     const stub = startStubLlmServer(0, {
-      scriptedChatReply: (request) => {
+      scriptedChatReply: (request: ChatCompletionRequest) => {
         capturedRequest = request;
         return undefined; // fall through to the default echo
       },
@@ -164,8 +164,8 @@ describe("lib/llm.ts complete() with tools (Fix E: native tool calling)", () => 
       const result = await complete("chat", [{ role: "user", content: "test cache" }]);
       expect(result.ok).toBe(true);
       expect(capturedRequest).not.toBeNull();
-      expect(capturedRequest?.cache_prompt).toBe(true);
-      expect(capturedRequest?.id_slot).toBe(0);
+      expect(capturedRequest!.cache_prompt).toBe(true);
+      expect(capturedRequest!.id_slot).toBe(0);
     } finally {
       stub.stop();
     }
@@ -238,7 +238,7 @@ describe("lib/llm.ts startCompleteStream()", () => {
     __resetLlmSupervisorForTests();
     const { startStubLlmServer } = await import("@maipai/spec/llm/ts/stubServer.js");
     const stub = startStubLlmServer(0, {
-      scriptedChatReply: (request) => {
+      scriptedChatReply: (request: ChatCompletionRequest) => {
         capturedRequest = request;
         return undefined; // fall through to the default echo
       },
@@ -253,8 +253,8 @@ describe("lib/llm.ts startCompleteStream()", () => {
         // iterate
       }
       expect(capturedRequest).not.toBeNull();
-      expect(capturedRequest?.cache_prompt).toBe(true);
-      expect(capturedRequest?.id_slot).toBe(0);
+      expect(capturedRequest!.cache_prompt).toBe(true);
+      expect(capturedRequest!.id_slot).toBe(0);
     } finally {
       stub.stop();
     }

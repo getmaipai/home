@@ -5,6 +5,7 @@
 import { describe, expect, test, afterEach } from "bun:test";
 import { LlamaServerClient, LlmClientError } from "../../llm/ts/client.js";
 import { startStubLlmServer, type StubLlmServerHandle } from "../../llm/ts/stubServer.js";
+import type { ChatCompletionRequest } from "../../llm/ts/types.js";
 
 let handle: StubLlmServerHandle | undefined;
 
@@ -256,7 +257,7 @@ describe("LlamaServerClient against the stub server", () => {
     });
 
     test("chatComplete sends cache_prompt and id_slot in the request (FAST-01)", async () => {
-      let capturedRequest: any | null = null;
+      let capturedRequest: ChatCompletionRequest | null = null;
       handle = startStubLlmServer(0, {
         scriptedChatReply: (request) => {
           capturedRequest = request;
@@ -275,7 +276,7 @@ describe("LlamaServerClient against the stub server", () => {
     });
 
     test("chatCompleteStream sends cache_prompt and id_slot in the request (FAST-01)", async () => {
-      let capturedRequest: any | null = null;
+      let capturedRequest: ChatCompletionRequest | null = null;
       handle = startStubLlmServer(0, {
         scriptedChatReply: (request) => {
           capturedRequest = request;

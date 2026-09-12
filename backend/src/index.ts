@@ -6,7 +6,7 @@ import { sampleEngineStats } from "@/lib/engineStats";
 import { startAllSidecars, registerGracefulExit } from "@/lib/sidecars";
 import { initCrashBootHold } from "@/lib/dirtyBoot";
 import { sweepOrphanEngineProcesses, getChatClient, setWarmupPrompt } from "@/lib/llmSupervisor";
-import { buildStablePrefix } from "@/lib/persona";
+import { buildStablePrefix } from "@/lib/turnEngine";
 import { getEmbedClient, getEmbedLivePid } from "@/lib/embedSupervisor";
 import { getTtsClient, getTtsLivePid } from "@/lib/ttsSupervisor";
 import { runAllSmokeTests } from "@/lib/smoke";
@@ -26,7 +26,7 @@ const port = Number(process.env.PORT ?? 8787);
 
 // FAST-01: set up the warmup prompt provider for cache priming after engine
 // spawn
-setWarmupPrompt(() => buildStablePrefix({ household: { name: "" }, speaker: { id: "", name: "", role: "owner" }, companion: null, now: new Date(), locale: "en-US", timezone: "UTC" }));
+setWarmupPrompt(() => buildStablePrefix());
 
 // COR-6 (code review, 2026-09-06): before anything below this line can
 // possibly write a fresh hlc, recover monotonicity from every table that
