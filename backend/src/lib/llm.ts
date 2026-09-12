@@ -239,6 +239,8 @@ export async function complete(
       tools: offering ? tools!.map(toToolDefinition) : undefined,
       tool_choice: offering ? (tool_choice ?? "auto") : undefined,
       chat_template_kwargs: { enable_thinking: !!thinking },
+      cache_prompt: true,
+      id_slot: 0,
     });
     const choice = response.choices[0];
     if (!choice) {
@@ -318,6 +320,8 @@ export async function startCompleteStream(
           tools: offering ? tools!.map(toToolDefinition) : undefined,
           tool_choice: offering ? (tool_choice ?? "auto") : undefined,
           chat_template_kwargs: { enable_thinking: !!thinking },
+          cache_prompt: true,
+          id_slot: 0,
         },
         signal,
       );

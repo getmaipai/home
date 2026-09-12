@@ -103,6 +103,14 @@ export interface ChatCompletionRequest {
    * today (mirrored from the wire contract for completeness) - deferred
    * omitted, not sent, whenever `tools` itself is omitted. */
   tool_choice?: "none" | "auto" | "required";
+  /** Prompt caching (FAST-01, 2026-09-12): when true, llama.cpp's
+   * prompt cache feature caches this request's content. Works with
+   * `--cache-reuse` and `id_slot` to enable cache hits on stable prefixes
+   * across multiple turns. */
+  cache_prompt?: boolean;
+  /** Prompt cache slot (FAST-01, 2026-09-12): the llama.cpp cache slot
+   * to use (0 is reserved for the chat role). Paired with `cache_prompt`. */
+  id_slot?: number;
 }
 
 export interface JsonSchemaResponseFormat {

@@ -97,4 +97,11 @@ describe("launchFlagsToArgs", () => {
     const args = launchFlagsToArgs(resolveLaunchFlags(qwen3_8b, hw({})));
     expect(args).toContain("--jinja");
   });
+
+  test("includes --cache-reuse 256 for prompt caching (FAST-01)", () => {
+    const args = launchFlagsToArgs(resolveLaunchFlags(qwen3_8b, hw({})));
+    expect(args).toContain("--cache-reuse");
+    const idx = args.indexOf("--cache-reuse");
+    expect(args[idx + 1]).toBe("256");
+  });
 });

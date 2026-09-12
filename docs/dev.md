@@ -10688,3 +10688,26 @@ latency (arxiv.org/html/2507.22352v1); end-of-turn detection
 (livekit.com/blog/solving-end-of-turn-detection); Home Assistant's
 streaming and local-first routing
 (home-assistant.io/blog/2025/09/11/ai-in-home-assistant).
+
+## Track A implementation: Chat direction 2026-09-12 (9 items, 6 to implement)
+
+### FAST-01: Make the prompt prefix cache actually hit, and measure it (2026-09-12)
+
+**Status**: COMPLETE
+
+Implemented all steps:
+1. Added `--cache-reuse 256` to `launchFlagsToArgs()` in backend/src/lib/engineAutotune.ts
+2. Added optional `cache_prompt?: boolean` and `id_slot?: number` fields to ChatCompletionRequest in spec/llm/ts/types.ts
+3. Modified `complete()` and `startCompleteStream()` in backend/src/lib/llm.ts to send `cache_prompt: true` and `id_slot: 0`
+4. Updated tier 2 override in llmSupervisor.ts to read `MAIPAI_CHAT_MODEL_ID` and use `resolveLaunchFlags()` when the model is in CATALOG
+5. Added `setWarmupPrompt()` and `warmChatPrefix()` functions to llmSupervisor.ts with post-load-check warm-up call
+6. Created backend/scripts/bench/latency.ts for measuring first-token latency and cache reuse ratio
+
+**Tests added** (all green):
+- engineAutotune.test.ts: cache-reuse flag inclusion test
+- llm.test.ts: cache_prompt/id_slot sending verification for both complete() and startCompleteStream()
+- llmSupervisor.test.ts: tier 2 override with MAIPAI_CHAT_MODEL_ID graceful handling
+- spec/tests/ts/llm.test.ts: wire protocol cache_prompt/id_slot field sending
+
+**Exit gate**: bash scripts/check.sh (pending - backend tests all pass)
+

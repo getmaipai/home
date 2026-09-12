@@ -148,6 +148,28 @@ describe("lib/llm.ts complete() with tools (Fix E: native tool calling)", () => 
     if (!result.ok) return;
     expect(result.value.tool_calls).toBeUndefined();
   });
+
+  test("sends cache_prompt: true and id_slot: 0 on every chat request (FAST-01)", async () => {
+    let capturedRequest: ChatCompletionRequest | null = null;
+    __resetLlmSupervisorForTests();
+    const { startStubLlmServer } = await import("@maipai/spec/llm/ts/stubServer.js");
+    const stub = startStubLlmServer(0, {
+      scriptedChatReply: (request) => {
+        capturedRequest = request;
+        return undefined; // fall through to the default echo
+      },
+    });
+    process.env.MAIPAI_LLAMA_SERVER_URL = stub.url;
+    try {
+      const result = await complete("chat", [{ role: "user", content: "test cache" }]);
+      expect(result.ok).toBe(true);
+      expect(capturedRequest).not.toBeNull();
+      expect(capturedRequest?.cache_prompt).toBe(true);
+      expect(capturedRequest?.id_slot).toBe(0);
+    } finally {
+      stub.stop();
+    }
+  });
 });
 
 describe("lib/llm.ts startCompleteStream() with tools (Fix E: native tool calling)", () => {
@@ -209,6 +231,33 @@ describe("lib/llm.ts startCompleteStream()", () => {
     const started = await startCompleteStream("chat", []);
     expect(started.ok).toBe(false);
     if (!started.ok) expect(started.code).toBe("invalid_input");
+  });
+
+  test("sends cache_prompt: true and id_slot: 0 on every streamed chat request (FAST-01)", async () => {
+    let capturedRequest: ChatCompletionRequest | null = null;
+    __resetLlmSupervisorForTests();
+    const { startStubLlmServer } = await import("@maipai/spec/llm/ts/stubServer.js");
+    const stub = startStubLlmServer(0, {
+      scriptedChatReply: (request) => {
+        capturedRequest = request;
+        return undefined; // fall through to the default echo
+      },
+    });
+    process.env.MAIPAI_LLAMA_SERVER_URL = stub.url;
+    try {
+      const started = await startCompleteStream("chat", [{ role: "user", content: "test cache" }]);
+      expect(started.ok).toBe(true);
+      if (!started.ok) return;
+      // Consume the stream to trigger the request
+      for await (const _delta of started.tokens) {
+        // iterate
+      }
+      expect(capturedRequest).not.toBeNull();
+      expect(capturedRequest?.cache_prompt).toBe(true);
+      expect(capturedRequest?.id_slot).toBe(0);
+    } finally {
+      stub.stop();
+    }
   });
 
   // COR-7 (code review, 2026-09-06): a disconnected client used to leave

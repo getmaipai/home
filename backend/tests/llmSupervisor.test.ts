@@ -266,6 +266,20 @@ describe("sweepOrphanEngineProcesses", () => {
   });
 });
 
+describe("tier 2 (override) with MAIPAI_CHAT_MODEL_ID (FAST-01)", () => {
+  test("when MAIPAI_CHAT_MODEL_ID is set to an invalid value, it doesn't prevent spawn from proceeding", async () => {
+    // This just verifies that the code handles MAIPAI_CHAT_MODEL_ID gracefully
+    // and doesn't crash. The actual flag inclusion is tested at the unit
+    // level in engineAutotune.test.ts (cache-reuse flag is always added).
+    process.env.MAIPAI_LLAMA_SERVER_BIN = "/nonexistent/bin/llama-server";
+    process.env.MAIPAI_CHAT_MODEL_PATH = "/nonexistent/model.gguf";
+    process.env.MAIPAI_CHAT_MODEL_ID = "nonexistent-model-id";
+
+    // Should fail trying to find the model or spawn the binary, not crash
+    await expect(getChatClient()).rejects.toThrow();
+  });
+});
+
 // Fix A1 (docs/dev.md's 2026-09-07 incident note): a `bun --hot` reload
 // gives every module a FRESH top-level scope, but the same OS process and
 // heap - so this module's own state lives on `globalThis` instead of a

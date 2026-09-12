@@ -120,6 +120,33 @@ const state = hotReloadState<LlmSupervisorState>("llmSupervisor", () => ({
   manuallyStopped: false,
 }));
 
+let warmupPromptProvider: (() => string) | null = null;
+
+export function setWarmupPrompt(provider: () => string): void {
+  warmupPromptProvider = provider;
+}
+
+async function warmChatPrefix(client: LlamaServerClient): Promise<void> {
+  if (!warmupPromptProvider) return;
+  try {
+    const result = await client.chatComplete({
+      model: "chat",
+      messages: [
+        { role: "system", content: warmupPromptProvider() },
+        { role: "user", content: "hi" },
+      ],
+      max_tokens: 1,
+      cache_prompt: true,
+      id_slot: 0,
+      chat_template_kwargs: { enable_thinking: false },
+    });
+    // Log successful warm-up but don't fail the startup if this doesn't work
+    console.log(`[llm-supervisor] warmChatPrefix: ${result.choices[0]?.message?.content ?? "(no response)"}`);
+  } catch (err) {
+    console.log(`[llm-supervisor] warmChatPrefix failed (non-fatal): ${(err as Error).message}`);
+  }
+}
+
 // Session F, step 2: freePort() and the spawn+health-wait loop this
 // function used to hand-roll both moved to lib/sidecars.ts as
 // spawnAndWaitHealthy() - the shared primitive every process-shaped
@@ -344,6 +371,12 @@ async function trySpawnFromSelection(): Promise<ChatBackend | null> {
     // routine case.
     ceilingBaselineBytes: state.lastPostLoadCheck.actualBytes ?? state.lastPostLoadCheck.estimatedBytes,
   });
+
+  // FAST-01 (2026-09-12): warm up the prompt cache after the post-load
+  // check passes. This primes the cache slot so subsequent turns hit the
+  // cache immediately.
+  await warmChatPrefix(spawned.client);
+
   return backend;
 }
 
@@ -363,14 +396,33 @@ async function startChatBackend(): Promise<ChatBackend> {
     // tier 1 (a bare URL, nothing spawned) and tier 4's stub are meant to
     // bypass this.
     assertNotInCrashBootHold();
-    const spawned = await spawnLlamaServer(bin, modelPath, "override");
+
+    // FAST-01 (2026-09-12): when MAIPAI_CHAT_MODEL_ID names a catalog
+    // entry, use resolveLaunchFlags() like tier 3 (selection) does. Without
+    // it, keep the original flagless behavior.
+    const modelId = process.env.MAIPAI_CHAT_MODEL_ID;
+    let launchFlags: LaunchFlags | undefined;
+    let detectedModel: ModelCapabilities | undefined;
+    if (modelId) {
+      detectedModel = CATALOG.find(
+        (m) => m.id === modelId && m.role === "chat" && m.implemented && m.sizing.kind === "transformer_gguf",
+      );
+      if (detectedModel && detectedModel.sizing.kind === "transformer_gguf") {
+        const hw = await detectHardware();
+        launchFlags = resolveLaunchFlags(detectedModel, hw);
+      }
+    }
+
+    const spawned = await spawnLlamaServer(bin, modelPath, "override", launchFlags, modelId);
     const backend = attachChatWatch(spawned);
     // No model metadata on this tier (a bare env-var override, no catalog
     // entry) to size a process ceiling against - system-memory protection
     // only (resourceGovernor.ts's trigger A), matching this tier's existing
-    // "unchanged since this pass" scope.
-    const hw = await detectHardware();
-    startResourceGovernor({ pid: backend.pid!, hasCuda: hw.cudaDevices.length > 0, ceilingBaselineBytes: null });
+    // "unchanged since this pass" scope. Skip if we detected a model.
+    if (!detectedModel) {
+      const hw = await detectHardware();
+      startResourceGovernor({ pid: backend.pid!, hasCuda: hw.cudaDevices.length > 0, ceilingBaselineBytes: null });
+    }
     return backend;
   }
 

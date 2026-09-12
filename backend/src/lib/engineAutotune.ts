@@ -146,6 +146,13 @@ export function launchFlagsToArgs(flags: LaunchFlags): string[] {
     // a spawn never silently depends on that default surviving a future
     // binary upgrade.
     "--jinja",
+    // Prefix cache reuse (FAST-01, 2026-09-12): enables llama.cpp's
+    // prompt cache feature so stable system messages are not re-prefilled on
+    // every turn. Cache slot 0 is reserved for the chat role; the cache
+    // ratio measures reuse and is written to `timings.prompt_n` in
+    // responses.
+    "--cache-reuse",
+    "256",
   ];
   if (flags.kvCacheQuantized) args.push("-ctk", "q8_0", "-ctv", "q8_0");
   return args;

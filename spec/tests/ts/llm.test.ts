@@ -254,5 +254,45 @@ describe("LlamaServerClient against the stub server", () => {
       }
       expect(deltas.length).toBeGreaterThan(0);
     });
+
+    test("chatComplete sends cache_prompt and id_slot in the request (FAST-01)", async () => {
+      let capturedRequest: any | null = null;
+      handle = startStubLlmServer(0, {
+        scriptedChatReply: (request) => {
+          capturedRequest = request;
+          return undefined; // fall through to default echo
+        },
+      });
+      const client = new LlamaServerClient(handle.url);
+      await client.chatComplete({
+        model: "chat",
+        messages: [{ role: "user", content: "test" }],
+        cache_prompt: true,
+        id_slot: 0,
+      });
+      expect(capturedRequest?.cache_prompt).toBe(true);
+      expect(capturedRequest?.id_slot).toBe(0);
+    });
+
+    test("chatCompleteStream sends cache_prompt and id_slot in the request (FAST-01)", async () => {
+      let capturedRequest: any | null = null;
+      handle = startStubLlmServer(0, {
+        scriptedChatReply: (request) => {
+          capturedRequest = request;
+          return undefined;
+        },
+      });
+      const client = new LlamaServerClient(handle.url);
+      for await (const _delta of client.chatCompleteStream({
+        model: "chat",
+        messages: [{ role: "user", content: "test" }],
+        cache_prompt: true,
+        id_slot: 0,
+      })) {
+        // iterate
+      }
+      expect(capturedRequest?.cache_prompt).toBe(true);
+      expect(capturedRequest?.id_slot).toBe(0);
+    });
   });
 });
