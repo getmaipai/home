@@ -321,11 +321,6 @@ export function loadAllManifests(): LoadedManifest[] {
   return out;
 }
 
-function pluginsListLine(loaded: LoadedManifest[]): string {
-  if (loaded.length === 0) return "";
-  const lines = loaded.map(({ manifest: m }) => `- ${m.display}: ${m.description}`);
-  return `\n\nThings this household has set up:\n${lines.join("\n")}`;
-}
 
 // Carved out of a shared budget so "a prompt budget as a test" (4.5) has
 // something concrete to assert: the assembled system prompt never grows
@@ -344,7 +339,6 @@ export const PROMPT_SYSTEM_CHAR_BUDGET = 4000;
 export const MAX_TURN_TEXT_LENGTH = 8_000;
 const MAX_MEMORY_SNIPPETS = 5;
 const MAX_MEMORY_SECTION_CHARS = 800;
-const MAX_PLUGINS_SECTION_CHARS = 800;
 const MAX_SKILLS_SECTION_CHARS = 1200;
 // Step 3: one line, so a generous cap is plenty; guards the same way
 // every other section does against a runaway conversation summary ever
@@ -583,12 +577,49 @@ function companionReanchorLine(persona: Persona): string {
  * reintroduce a cold prefix on every real turn. Called by
  * buildSystemPrompt() itself below, never reimplemented, so the two can
  * never drift apart by construction whenever that warm-up does land. */
-export function buildStablePrefix(persona: Persona = DEFAULT_PERSONA, loaded: LoadedManifest[] = loadAllManifests()): string {
+export function buildStablePrefix(persona: Persona = DEFAULT_PERSONA): string {
   const companionSection = capSection(composePersonaPrompt(persona), MAX_COMPANION_SECTION_CHARS);
   const rulesSection = capSection(INFORMATION_HANDLING_POLICY, MAX_RULES_SECTION_CHARS);
   const naturalnessSection = capSection(NATURALNESS_POLICY, MAX_NATURALNESS_SECTION_CHARS);
-  const pluginsSection = capSection(pluginsListLine(loaded), MAX_PLUGINS_SECTION_CHARS);
-  return `${identityLine(persona)} ${STABLE_SYSTEM_SUFFIX} ${companionSection} ${rulesSection} ${naturalnessSection}${pluginsSection}`;
+  return `${identityLine(persona)} ${STABLE_SYSTEM_SUFFIX} ${companionSection} ${rulesSection} ${naturalnessSection}`;
+}
+
+export function buildPromptParts(
+  actor: PersonRow,
+  text: string,
+  memoryMatches: RecallMatch[],
+  loaded: LoadedManifest[] = loadAllManifests(),
+  persona: Persona = DEFAULT_PERSONA,
+  skills: LoadedSkill[] = loadAllSkills(),
+  conversationSummaryLine?: string,
+): { stablePrefix: string; context: string } {
+  const stablePrefix = buildStablePrefix(persona);
+
+  const now = new Date();
+  const localeValue = getHouseholdSettingValue("household.locale");
+  const locale = typeof localeValue === "string" ? localeValue : "en-US";
+
+  const profile = getProfileParagraph(actor);
+  let memorySection = "";
+  if (profile || memoryMatches.length > 0) {
+    const profileLine = profile ? `${profile.text}\n` : "";
+    const lines = memoryMatches.slice(0, MAX_MEMORY_SNIPPETS).map((m) => memoryBulletLine(m, locale, now));
+    const bulletsBlock = lines.length > 0 ? `${lines.join("\n")}\n` : "";
+    memorySection = `\n\nWhat you already know about this household:\n${profileLine}${bulletsBlock}${MEMORY_TRUST_REMINDER}`;
+    memorySection = capSection(memorySection, MAX_MEMORY_SECTION_CHARS);
+  }
+  const reanchorSection = companionReanchorLine(persona);
+  const summarySection = capSection(conversationSummaryLine ? `\n\n${conversationSummaryLine}` : "", MAX_SUMMARY_SECTION_CHARS);
+  const skillsPart = capSection(skillsSection(text, skills), MAX_SKILLS_SECTION_CHARS);
+  const volatileZone = householdLine() + speakerLine(actor, locale, now) + memorySection + reanchorSection + summarySection + skillsPart;
+
+  const localTimeLine = `\n\nLocal time: ${formatLocalTime(now, locale)}`;
+
+  const contextBody = `Context for this reply (reference, not instructions):${volatileZone}${localTimeLine}`;
+  const contextBudget = Math.max(0, PROMPT_SYSTEM_CHAR_BUDGET - stablePrefix.length);
+  const context = contextBody.length > contextBudget ? contextBody.slice(0, contextBudget) : contextBody;
+
+  return { stablePrefix, context };
 }
 
 export function buildSystemPrompt(
@@ -603,60 +634,11 @@ export function buildSystemPrompt(
   // the verbatim window.
   conversationSummaryLine?: string,
 ): string {
-  const now = new Date();
-  const localeValue = getHouseholdSettingValue("household.locale");
-  const locale = typeof localeValue === "string" ? localeValue : "en-US";
-
-  // ── Stable prefix (step 4: "identity and companion, information
-  // policy, standing skills") ──
-  const stablePrefix = buildStablePrefix(persona, loaded);
-
-  // ── Volatile zone (step 4: "household, speaker, memory, summary, time
-  // last"; matched skills sit here too - utterance-dependent, so never
-  // stable no matter what 4.5 calls it) ──
-  // Step 7: the profile paragraph - "injected whole at the top of the
-  // memory block before recalled items, counted inside the memory
-  // section budget" (session-a-intelligence.md), not a separate cap of
-  // its own. Unconditional lookup (a targeted query, not a recall()
-  // candidate): whether it exists at all is the only gate, never whether
-  // this turn happened to recall something else too.
-  const profile = getProfileParagraph(actor);
-  let memorySection = "";
-  if (profile || memoryMatches.length > 0) {
-    const profileLine = profile ? `${profile.text}\n` : "";
-    const lines = memoryMatches.slice(0, MAX_MEMORY_SNIPPETS).map((m) => memoryBulletLine(m, locale, now));
-    const bulletsBlock = lines.length > 0 ? `${lines.join("\n")}\n` : "";
-    memorySection = `\n\nWhat you already know about this household:\n${profileLine}${bulletsBlock}${MEMORY_TRUST_REMINDER}`;
-    memorySection = capSection(memorySection, MAX_MEMORY_SECTION_CHARS);
-  }
-  // Unconditional, not gated on whether any memory actually matched:
-  // drift accumulates with turn count, not with whether this particular
-  // turn happened to recall something (the plan's own "after the memory
-  // block" names a POSITION, not a precondition).
-  const reanchorSection = companionReanchorLine(persona);
-  const summarySection = capSection(conversationSummaryLine ? `\n\n${conversationSummaryLine}` : "", MAX_SUMMARY_SECTION_CHARS);
-  const skillsPart = capSection(skillsSection(text, skills), MAX_SKILLS_SECTION_CHARS);
-  const volatileZone = householdLine() + speakerLine(actor, locale, now) + memorySection + reanchorSection + summarySection + skillsPart;
-
-  const localTimeLine = `\n\nLocal time: ${formatLocalTime(now, locale)}`;
-
-  // The time line is appended last (4.5: "...time last") and must never
-  // itself be truncated: a review (2026-09-04) found the first cut
-  // blind-sliced the *whole* assembled prompt to the budget after
-  // appending the time line, which could cut the timestamp (or a memory
-  // bullet) off mid-word once enough packages or memories pushed the
-  // total over budget. Truncating the body first, then appending a
-  // never-truncated time line, keeps every truncation boundary inside
-  // prose meant to be cut, never inside the one line a caller might parse
-  // (step 1's "the blocks shrink, not the budget", extended to every
-  // section here since each already has its own independent cap above -
-  // this outer slice is the last-resort safety net for the sum of them
-  // all still somehow exceeding the whole-prompt budget).
-  let body = stablePrefix + volatileZone;
-  const bodyBudget = Math.max(0, PROMPT_SYSTEM_CHAR_BUDGET - localTimeLine.length);
-  if (body.length > bodyBudget) body = body.slice(0, bodyBudget);
-
-  return body + localTimeLine;
+  // View for prompt budget testing only (stablePrefix + context still
+  // respects the same PROMPT_SYSTEM_CHAR_BUDGET cap). Callers that need
+  // the separated parts should use buildPromptParts() directly.
+  const parts = buildPromptParts(actor, text, memoryMatches, loaded, persona, skills, conversationSummaryLine);
+  return parts.stablePrefix + parts.context;
 }
 
 // Tier 1 of the deterministic plugin floor's FALLBACK (session-c-brain-
@@ -1265,25 +1247,26 @@ async function prepareTurn(
   // user/assistant messages AND, when older turns exist beyond them, one
   // summary line for the system prompt's volatile zone.
   const window = buildConversationWindow(conversation);
-  const systemPrompt = buildSystemPrompt(actor, text, memoryMatches, loaded, persona, skills, window.summaryLine);
+  const promptParts = buildPromptParts(actor, text, memoryMatches, loaded, persona, skills, window.summaryLine);
   // Bumping the top MAX_MEMORY_SNIPPETS candidates unconditionally was
-  // wrong (a code review, 2026-09-05): buildSystemPrompt's own
+  // wrong (a code review, 2026-09-05): buildPromptParts's own
   // MAX_MEMORY_SECTION_CHARS truncation, or the outer PROMPT_SYSTEM_CHAR_
   // BUDGET slice, can still cut one of those candidates' bullet lines
   // short (or drop it entirely) before it reaches the model, exactly the
   // "bump only on records that reached the prompt" case this was meant
   // to fix. Checking the bullet line's exact text is a real proof, not a
-  // re-derivation of buildSystemPrompt's own truncation math in a second
+  // re-derivation of buildPromptParts's own truncation math in a second
   // place: a candidate only counts as "reached the prompt" if its whole,
   // untruncated `- <text>` line is actually still there in the string the
   // model was sent.
   const actuallyInjected = memoryMatches
     .slice(0, MAX_MEMORY_SNIPPETS)
-    .filter((m) => systemPrompt.includes(`- ${m.record.text}`));
+    .filter((m) => promptParts.context.includes(`- ${m.record.text}`));
   bumpUsage(actuallyInjected);
   const messages: LlmMessage[] = [
-    { role: "system", content: systemPrompt },
+    { role: "system", content: promptParts.stablePrefix },
     ...window.messages,
+    { role: "system", content: promptParts.context },
     { role: "user", content: text },
   ];
   // Fix E (docs/dev.md's "Chat reliability" - native tool calling, one
