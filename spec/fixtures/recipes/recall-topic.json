@@ -4,7 +4,7 @@
     "id": "recall-topic",
     "inputs": [{ "name": "topic", "selector": "text" }],
     "steps": [
-      { "op": "recall", "as": "summary", "query": "{topic}", "scope": "household" },
+      { "op": "recall", "as": "summary", "query": "{topic}" },
       { "op": "format", "as": "reply", "text": "{summary}", "speech": "{summary}" }
     ]
   },

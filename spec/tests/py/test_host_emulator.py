@@ -32,6 +32,24 @@ def test_memory_remember_then_recall_finds_it_by_substring():
     assert "oat milk" in found[0]["text"]
 
 
+def test_memory_recall_defaults_to_own_person_and_household_facts():
+    host = HostEmulator()
+    host.memory.remember("I dislike cilantro", "fact", "person", "person-a1b2c3")
+    host.memory.remember("Sprout dislikes cilantro", "fact", "person", "person-sprout")
+    host.memory.remember("The household buys cilantro on Fridays", "fact", "household")
+    found = host.memory.recall("cilantro")
+    assert [r["text"] for r in found] == [
+        "I dislike cilantro",
+        "The household buys cilantro on Fridays",
+    ]
+
+
+def test_memory_recall_refuses_another_persons_facts():
+    host = HostEmulator()
+    with pytest.raises(HostError):
+        host.memory.recall("allergies", person="person-sprout")
+
+
 def test_data_forget_removes_only_that_persons_records():
     host = HostEmulator()
     host.memory.remember("about riff", "fact", "person", "person-riff")

@@ -5,8 +5,7 @@
     {
       "op": "recall",
       "as": "summary",
-      "query": "{topic}",
-      "scope": "household"
+      "query": "{topic}"
     },
     {
       "op": "format",

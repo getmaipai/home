@@ -1802,3 +1802,17 @@ describe("step 2: usage bumps only what reached the prompt", () => {
     expect(row.uses).toBe(0);
   });
 });
+
+describe("step 2: conversational recall uses the speaker's own facts", () => {
+  test("a saved personal fact is available to Recall in a later conversation", async () => {
+    const { actor } = await owner();
+    const saved = await runTurn(actor, "chat", "remember I dislike cilantro");
+    expect(saved.ok).toBe(true);
+
+    const recalled = await runTurn(actor, "chat", "What do you remember about cilantro");
+    expect(recalled.ok).toBe(true);
+    if (!recalled.ok) return;
+    expect(recalled.value.reply.text.toLowerCase()).toContain("cilantro");
+    expect(recalled.value.reply.text.toLowerCase()).toContain("dislike");
+  });
+});

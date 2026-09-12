@@ -10047,6 +10047,251 @@ and a genuine question still triggers the forced retry, proving
 `replyHasQuestion` is computed the same way in the pre-check as in the
 real `guardReply()` pass - confirmed to fail without that fix.
 
+## Chat system optimization decisions (2026-09-07)
+
+The [dated analysis](reports/2026-09-07-chat-system-analysis.md) traced the
+chat pipeline at `02e802b`, ran 558 targeted tests, and reproduced guard
+false positives. The user requested an implementation-ready backlog, not
+implementation in this session. The executable work orders are
+[CHAT-01 through CHAT-25](BACKLOG.md#chat-system-optimization). This section
+owns the architectural decisions; the report owns the dated findings;
+BACKLOG.md alone owns completion status.
+
+### Scope and precedence
+
+Retain the existing engine, SQLite store, package host, native tools,
+recipe interpreters, companion packages, and shared speech normalization.
+Do not introduce an agent loop, graph database, second intent model, custom
+workflow framework, or new release. Two independent calls per turn remain
+the limit. Dependent calls belong in authored recipes. Any optional final
+composition has tools disabled. Its result never initiates another action.
+
+These decisions supersede older future-work wording in this file and the
+session plans where it conflicts: extraction is no longer restricted to
+model-source turns; all-failed tool execution gets an honest typed failure
+rather than a model retry without execution evidence; a bounded final
+composition may phrase structured results; and automatic capture defaults
+to person scope rather than allowing the extraction model to share facts
+with the household. These are changes to implementation policy, not claims
+that old code already implements them. Mandatory safety and credential
+rules are unchanged.
+
+The design-resolver review confirmed that platform plan 4.3 already requires
+output checks for package replies and search results as well as ordinary
+model completions. Plan 4.5 requires one turn engine, bounded tool selection,
+and stable-first prompts. The existing result schema already owns `data`
+and `synthesis_hint`. Reuse those definitions rather than adding a second
+package-result system.
+
+### One ephemeral turn context
+
+Define `TurnEvidence`, `ToolExecutionOutcome`, and `TurnContext` once in
+`backend/src/lib/turnContext.ts`. They are runtime views over existing
+records, not new database tables or replica records. Import `Surface` and
+the generated `PluginResult`; do not duplicate their definitions.
+
+`TurnEvidence` contains `id`, `kind`, `text`, optional `sourceId`, and
+`entityIds: string[]`. Kinds are `user_assertion`, `memory`, `profile`,
+`summary`, `household`, `clock`, and `package_result`. `TurnContext` contains
+`turnId`, `conversationId`, `actorId`, `surface`, `utterance`, `history`,
+`evidence`, `includedEvidenceIds`, `offeredToolIds`, and `outcomes`. Freeze
+the selected persona and age-band policy in the context for the turn.
+Evidence IDs are ephemeral, deterministic within a turn, and never a new
+source of truth. A summary is a lossy aid, not proof of an action. Assistant
+text and persona examples never become user assertions.
+
+The prompt and correctness checks consume the identical selected evidence.
+Keep personal and external data out of system-authority messages. The
+system prefix defines policy and formatting; clearly delimited context is
+reference data. Do not claim that removing braces or newlines prevents
+prompt injection. Execution still requires exact offered-ID, argument,
+permission, and confirmation checks regardless of supplied text.
+
+### Structured execution and bounded composition
+
+`ToolExecutionOutcome` has `callId`, `packageId`,
+`status: succeeded|failed|pending`, optional generated `PluginResult`,
+optional `errorCode`, and optional safe `userMessage`. Keep model call IDs
+through the existing LLM client. Developer diagnostics never enter
+`userMessage`; use the manifest fallback or error catalogue.
+
+Validate the full retained batch before executing any call. Keep the first
+two valid, offered calls in model order, and report excess proposals as
+unexecuted rather than silently claiming all requests completed. A
+consequential proposal causes one confirmation and no other execution in
+that batch. Independent non-consequential calls execute concurrently.
+Recovery never repeats a completed action.
+
+Use direct output for one successful result with `reply` and no
+`synthesis_hint`. Use one final composition for a data-only result, a result
+with `synthesis_hint`, or two outcomes with at least one success and no
+pending interaction. All failures use deterministic safe error text.
+Pending prompts remain literal and unsynthesized. Composition failure
+falls back to ordered safe replies and failure messages. A data-only
+result without a usable reply gets the fixed fallback "I found information,
+but couldn't put the answer together." It must never turn into "Done."
+
+Native tool-result messages require additive changes in
+`spec/llm/ts/types.ts`: `role: tool`, `tool_call_id`, and retained assistant
+`tool_calls`. Extend the existing wire tests first. Do not invent JSON in a
+user message as a second imitation of native tool results. Directly routed
+packages use the same internal outcomes and composer, with no fabricated
+claim that a model selected the route.
+
+The turn's model budget is one initial answer/decision and at most one
+final composition or corrective completion. Those uses share the second
+call budget. Deterministic routes need no initial model call. Web Search
+returns structured snippets and source URLs through `data` and a
+`synthesis_hint`; remove its private answer-completion step when the shared
+composer is enabled, avoiding a third call. Display sources in expandable
+source details; do not speak URLs. Package-specific factual computation
+remains a recipe responsibility.
+
+### Streaming state machine
+
+Preserve sentence streaming even when Web Search is always offered. Do not
+buffer a complete tool-offered reply before returning the stream. One
+internal machine owns deciding, executing, composing, finished, and
+cancelled phases; the blocking endpoint collects the same approved deltas.
+Manually consume the native model generator so its terminal tool-call
+return value becomes an explicit internal completion event. Keep public
+`delta`, `spoken_cue`, `done`, and `error` events compatible.
+
+During the decision phase, emit complete safety-approved sentences. Hold a
+sentence caught as an unsupported action-success claim and all later text
+until the initial model decision completes. The output-token cap bounds
+that buffer. If native calls arrive, discard held text and unfinished
+fragments, execute the validated batch, and append direct output or final
+composition. If no calls arrive, discard unsupported claims and append one
+truthful fallback. Previously emitted text remains once, never retracted.
+The composer receives that exact prefix and continues without repeating it.
+Persist the exact approved concatenation as the canonical assistant reply.
+
+A protocol failure before the terminal model event executes no accumulated
+call. Safety refusal cancels generation and executes no trailing call.
+Cancellation prevents unstarted actions, aborts cancellable work, records
+already completed outcomes, and never replays an external action. Release
+model and turn leases in `finally`. There is one terminal event while the
+client remains connected, and no terminal write after disconnect. General
+prose detection cannot prove every implied success claim; the structural
+promise applies to core statuses and the permanent action-claim corpus,
+with residual model-language risk measured by the end-to-end bench.
+
+### Grounding and memory privacy
+
+Maintain mandatory content safety and medication protections. Remove
+universal rejection based only on new capitals, digits, dates, or overlap.
+A grounded acknowledgment is valid without a durable write. A claim that a
+fact was saved requires a successful memory outcome. A successful search
+does not prove that a timer, message, or memory write succeeded. Narrow
+household-claim checks to the explicit patterns and evidence cases in the
+permanent corpus. Do not describe this as a universal semantic verifier or
+promise elimination of hallucinations.
+
+Automatic capture defaults to `scope: person, person: actor.id`, including
+facts about relatives asserted by that person. Sharing a fact is an explicit
+household-scope request through the existing memory API/UI, subject to its
+existing authorization; the judge cannot increase visibility. Sensitive
+inferences remain private. Household-facing recall reads the actor's own
+person records plus authorized household records, never another person's
+private records solely because the speaker is an admin. Admin inspection
+of child memory stays on the existing explicit management endpoints.
+
+One ingestion service owns scope, source, validation, credential exclusion,
+exact duplicate detection, persistence, and asynchronous normalization.
+Explicit saves persist the assertion before confirmation; keep it personal
+until scope is explicitly selected. Background normalization supersedes the
+same record without changing visibility. Automatic candidates require an
+exact evidence span in current user text or an explicit confirmation tied
+to the preceding assistant question; unrelated assistant claims and search
+snippets cannot become facts. Ambiguous third-person attribution is not
+stored. Never automatically assign an unrecognized name to a real Person.
+
+Credential exclusion uses the existing declared-secret mechanisms at
+structured boundaries, plus bounded detection of explicit credential
+assignments and known token formats in free text. It must reject a detected
+credential before ordinary persistence, embedding, notification, or LLM
+submission. Never enumerate the keystore to compare plaintext secrets.
+Undeclared arbitrary strings cannot be proved nonsecret by a heuristic;
+record that limit and direct credential entry to the existing credential UI.
+Use synthetic generated test values only. Detection must not reject benign
+statements about where a credential is managed. No automatic destructive
+cleanup of old household records is authorized by these work orders.
+
+Profile and summary derivation metadata lives only in the local
+`context_derivations` table: composite key `(artifact_kind, artifact_id)`,
+kind `profile|conversation_summary`, JSON `source_refs` containing
+`{kind: memory|turn, id, hlc}`, and `generated_at`. It is a local cache,
+not a new shared record. Old or replicated derived text without metadata
+is withheld and regenerated. Validate source access, status, validity, and
+HLC at both injection and refresh commit. This prevents a fact corrected
+or deleted during generation from returning through stale derived text.
+
+### Retrieval, budgets, and background work
+
+Current-fact retrieval requires `valid_from <= asOf < valid_to`, treating
+null bounds as open. Historical queries use an explicit `asOf` passed to
+the same reader, which may include superseded records valid at that time,
+but never tombstones or privacy-denied records. Retention archives are not
+automatically resurrected. Do not assign query dates through an unbounded
+model rewrite. Use the existing `chrono-node` dependency for explicit dates;
+ambiguous dates prompt clarification.
+
+Embedding identity includes model identity, dimensions, and preprocessing
+version. Query and record spaces must match before cosine comparison.
+Preserve routing's measured document-only prefix and memory's current raw
+text scheme until a held-out evaluation justifies a migration. Incompatible
+records use the existing lexical fallback while queued re-embedding runs.
+Never silently compare equal-dimensional vectors from different models.
+
+Use the running engine's actual tokenizer and effective per-request
+context limit. Reserve 512 output tokens by default, increase to 1024 only
+for an explicit detailed-answer request represented in context, and leave
+a 128-token framing margin. Do not change user-selected context settings. Add `intent` to TurnContext
+in CHAT-01 with `kind`, `query`, `subjectEntityIds`, and
+`explicitDetailedAnswer`; CHAT-13 refines it. CHAT-12 can therefore use the
+fixed detail flag without depending on later routing work.
+Trim whole optional context items in this order: unmatched package
+inventory, optional persona examples, optional skills, oldest summary
+segments, lowest-ranked memories, oldest history pairs. Preserve mandatory
+policy, current message, actor identity, selected tool schemas, pending
+interaction, and required execution results. If required content does not
+fit, return a typed input-too-large error before executing actions. Prompt
+budgeting must occur again before composition. Count the fully rendered native template, including tools, with the pinned
+engine's native rendering/tokenizer support. Cache exact counts by rendered
+prompt and complete model/template identity. If native counting is
+unavailable with no matching validated cache, return typed unavailable
+before model-dependent execution. Deterministic no-model operations remain
+available. There is no guessed byte-count fallback. If required tool
+results do not fit after actions already ran, skip composition and use
+approved direct/error fallbacks, never repeat or pretend to undo the action.
+
+All chat-engine callers share one inference arbiter with interactive and
+background FIFO queues, one active request, and the existing 20-second
+idle window for starting background work. Interactive arrivals interrupt
+background generation. Abort is a typed interruption, not engine failure.
+Partial already-persisted memory work remains idempotent on retry. A
+stream's lease lasts until exhaustion or return. The activity API returns
+an idempotent release handle; all success, error, refusal, and cancellation
+paths release it. Profile rewrites, summaries, retention summaries,
+extraction, and dedupe all use the same background classification.
+
+### Evaluation and unresolved real-world facts
+
+Work orders specify deterministic regressions and target-device experiments
+separately. Do not turn a stub into evidence of model quality. Live benches
+must refuse household data directories and must not stop a running service
+or start downloads without the experiment's explicit scope. Persist only
+synthetic transcripts, model/build IDs, metrics, and nonsecret errors.
+
+Compare candidates on the same seeded corpus, prompt, engine build, and
+hardware. Mandatory safety, privacy, and action-success assertions permit
+zero observed failures. Quality thresholds and confidence intervals are in
+CHAT-23/24. A failed gate means retain the current configuration and record
+the result, not weaken tests. A deployment, release, hardware purchase, or
+subjective final voice choice remains the owner's explicit decision; these
+items finish by producing measured recommendations, not deploying them.
+
 ## Bundled knowledge provenance
 
 The knowledge fetch-failure fix now lives in the canonical catalog source.
@@ -10054,3 +10299,314 @@ Refreshing with `bun run refresh-bundled-packages` preserves that behavior
 and records the catalog commit and package hash together. The copied package
 includes an offline regression for a rejected host fetch; the integrity test
 continues to verify the bundled bytes against their provenance.
+## CHAT-05: package recall follows the speaker (2026-09-11)
+
+Conversational package recall now uses the actor's own person-scoped memories
+and authorized household memories by default. The Recall recipe leaves scope
+unset so the host applies that policy consistently. A package may request the
+current actor explicitly, but naming another person is denied. Owner and admin
+parental inspection remains on the existing memory routes, which do not use
+the conversational `selfOnly` filter.
+
+The real package host and the shared host emulator implement the same rule.
+Backend coverage saves a personal fact, recalls it through the package path,
+and proves a child's fact stays out of an owner's conversational results.
+
+Aligned 2026-09-12 (found by the pre-commit code review): the Python
+host emulator the bot pins now applies the identical rule (actor id,
+permission error for another person, self and other-person records
+hidden) with its own tests, and the two recall recipe fixtures dropped
+the `scope: household` the shipped recipe no longer sets.
+
+## Chat direction review and the two-track plan (2026-09-12)
+
+Jesse asked whether the plan, code, and backlog would produce chat that is
+responsive, knowledgeable, and human-like on modest hardware: smart intent
+detection and routing, grounded answers, memory that persists across
+conversations, follow-ups and recall of earlier exchanges, and a possible
+split between a quick light model and a slower thoughtful one. This section
+records the review (design record, working-tree code, both backlogs, the
+bot's talk/think design, outside research, and two Codex analyses of the
+same question), the decisions it produced, and how they amend the
+[2026-09-07 decision record](#chat-system-optimization-decisions-2026-09-07).
+The executable work is [the 2026-09-12 block in
+BACKLOG.md](BACKLOG.md#chat-direction-2026-09-12-the-next-block-two-tracks).
+
+### Verdict
+
+CHAT-01 through CHAT-25 fix real defects, but they rest on three
+assumptions the code does not satisfy: that the prompt prefix is cached,
+that one 8B model can do every job if scheduled well, and that regex guards
+can stand between a small model and the person. Finishing that program as
+written yields a correct but slow assistant that remembers facts, forgets
+conversations, and cannot follow a pronoun. The fixes below are
+prerequisites for the CHAT program, not replacements for it.
+
+### What the code does today (verified in the working tree, 2026-09-12)
+
+- **The prefix cache is defeated by construction.** `buildSystemPrompt()`
+  (`backend/src/lib/turnEngine.ts`) puts the volatile zone (roster, speaker,
+  memory bullets, summary, matched skills, and a clock at minute
+  granularity) inside the one system message, ahead of the history, so
+  every turn re-prefills the whole conversation. `launchFlagsToArgs()`
+  (`engineAutotune.ts`) passes no `--cache-reuse`; nothing sends `id_slot`
+  or `cache_prompt`; `buildStablePrefix()` was exported for a warm-up that
+  was never wired. On CPU an 8B Q4 model prefills at roughly 88 tokens per
+  second, so 1,000 uncached tokens is about 11 seconds.
+- **One single-slot engine serves foreground and every background job.**
+  Reply, judge extraction, one dedupe completion per extracted fact,
+  summary refresh, retention summaries, weekly consolidation, and the
+  websearch recipe's private second completion all queue on the same
+  llama-server, gated only by a 20 s idle heuristic. That is the whole
+  0.8 s to 4.5 s contention story, and CHAT-19's arbiter cannot preempt a
+  decode already running.
+- **Two avoidable waits before the first token.** `prepareTurn()` awaits
+  `embedUtterance()` before `route()` checks literal patterns, so even
+  "remember X" pays an embed round trip. And `runTurnStream()` awaits the
+  first `.next()` on the model stream before returning, so on every turn
+  (websearch is always offered) the HTTP response and `turn_meta` wait for
+  prefill plus first token, and the 900 ms spoken-cue timer in
+  `routes/turn.ts` starts too late to fire.
+- **The invention guard fired on 19 of 44 turns in the local hub log.** The
+  2026-09-07 decision that world knowledge is allowed was recorded but not
+  built: `guardInvention()` (`guards.ts`) still flags any capitalized word,
+  bare number, or date absent from the utterance, memory, or history. Codex
+  reproduced the four canonical failures with supplied answers ("The
+  capital is Paris." rejected).
+- **The prompt carries the wrong things.** `pluginsListLine()` is capped
+  at 800 chars, so the model sees five alphabetical almanac entries, cut
+  mid-word, and never sees Weather, Web Search, Remember, or Lists. Manifest
+  `description` strings written for developers are handed to the model as
+  tool descriptions and read aloud in confirm prompts. About 1,700 chars of
+  style prose ride every turn.
+- **No conversation state and no episodic memory.** Follow-ups are embedded
+  raw, recalled raw, and left to the model with a 4-turn window; the only
+  continuation the engine understands is a yes/no regex on a pending
+  confirm. Prior conversations are not searchable, and the assistant's
+  own replies are never stored as retrievable text. The judge drains one
+  turn per minute, only when idle (`MAX_TURNS_PER_RUN = 1`).
+- **The OpenAI-compatible route drops client history** and routing sees
+  only the latest message.
+
+Numbers, all on the M4 Pro dev machine unless noted:
+
+| Measure | Value |
+|---|---|
+| Model-path turn, local `data/logs/hub.log` (44 turns) | p50 1.4 s, p90 5.1 s |
+| Plugin turn (websearch), same log | p50 4.5 s, two completions |
+| Reply alone, with one and with two concurrent extractions | 0.8 s, 2.8 s, 4.5 s |
+| Tier 2 prompt eval on a ~1,000-token prompt | 2.3 s |
+| Persona register consistency (session-c bench) | tutor 0%, default 22%, buddy 56% |
+
+### Decisions (2026-09-12)
+
+These amend the 2026-09-07 record where named; everything else in that
+record stands.
+
+1. **Fix the latency floor before adding any model.** Stable prefix first,
+   history second, volatile context last (a separate message after the
+   history), `--cache-reuse 256`, explicit `cache_prompt` and `id_slot`,
+   a warm-up of the default persona's stable prefix after every spawn,
+   literal patterns before the embed round trip, and the stream returned
+   before the first-token peek. Cache reuse is measured from the engine's
+   own `timings.prompt_n`, never inferred from a stable string; this
+   replaces CHAT-21's "cache-hit data optional" with a required number.
+   Multi-slot `-np 2` is deferred: once background work leaves the chat
+   engine, one slot is enough for a household, and the old multi-slot
+   sub-list in BACKLOG.md is superseded.
+2. **Absolute latency targets join CHAT-23's relative gate.** Warm turn,
+   no background load, on the dev machine: first approved text p50 under
+   800 ms and p95 under 1,500 ms for an ordinary chat turn; first
+   approved text under 2,500 ms p95 for a single-tool turn. A spoken cue
+   never counts as first text. The same bench runs on the hub and records
+   its numbers without a gate until the hub's hardware is fixed.
+3. **A `background` model role, on its own process, never for intent and
+   never for a user-facing reply.** This amends "do not introduce a second
+   intent model" by scope, not by reversal: the ban on a second intent
+   model stands. The background engine (a pinned Qwen3-1.7B Q8_0,
+   Qwen3-4B Q4_K_M as the measured fallback, CPU by default so the GPU
+   stays with `chat`) takes extraction, dedupe, contradiction checks,
+   profile rewrites, rolling and retention summaries, and later query
+   rewriting and importance rating. It follows the embed role's shape
+   exactly: pinned asset, no catalog entry, no household selection, URL
+   override for tests. The bot already made this split after reflection
+   blocked a live reply for 24 seconds; the hub's own 0.8 s to 4.5 s
+   numbers make the same case. CHAT-19's arbiter still governs the chat
+   engine; CHAT-24's "dedicated extraction-model condition" is
+   superseded.
+4. **The foreground stays one model in non-thinking mode, with a cheap
+   thinking gate later.** No classify completion ahead of an answer.
+   When the gate lands it is deterministic plus embedding-based (the
+   utterance vector already exists): multi-clause questions, "why", "how
+   would", "compare", explicit "think about it", or a failed first pass
+   turn thinking on with a token budget. A published router of this shape
+   measured 47% lower latency and 10 points higher accuracy on hard
+   questions than always-on reasoning. A quick-reply-then-thoughtful-reply
+   pair for the user-facing answer (the Talker/Reasoner pattern) needs a
+   fine-tuned small model and is an L research item, not a slice.
+   Draft-then-critique with a small self-verifier is rejected: it degrades
+   answers and doubles latency. Course correction follows new evidence, a
+   tool error, or a person's correction, never a second look at the same
+   input.
+5. **Guards stop rewriting.** CHAT-04's world-knowledge half ships first
+   as its own slice: the invention guard applies only to household
+   claims, the four probes become permanent tests, and every lexical
+   assertion retired gets a documented replacement. The action-claim half
+   (a claim of a completed action needs a typed outcome) stays in CHAT-04
+   because it depends on CHAT-15's outcomes.
+6. **Prompt diet, then samplers for variation.** The plugins list leaves
+   the prompt (native tools already carry descriptions for what is
+   offered). Every bundled package gets a one-sentence, imperative,
+   user-facing description that reads correctly inside "Do you want me to
+   ...?". The sentence "Never say the same thing the same way twice"
+   leaves the policy; min-p, XTC, and DRY sampling do that job. Control
+   vectors for register (the spike already measured 26% fewer prompt
+   tokens with better register) are the follow-on once the naturalness
+   bench has a stable baseline.
+7. **Verbatim turns are a first-class retrieval source beside facts.**
+   Every logged turn is stored as two episodes (the person's words and
+   the assistant's words), indexed by SQLite FTS5 and by the embed model,
+   scoped to the person, time-stamped, deleted with the turn and with a
+   forget. Retrieval is hybrid (BM25 plus cosine, fused by reciprocal
+   rank), with `chrono-node` turning "last week" into a date filter.
+   Controlled ablations put verbatim chunks at 43.9% against 28.0% for
+   extracted facts alone; facts augment, they never replace. This is how
+   "what recipe did you suggest last week" and "what did we decide" get a
+   path, and it bridges the gap before the judge has run. A recalled
+   assistant sentence is evidence of what MaiPai said, not proof it was
+   right, and is labeled as such in the prompt.
+8. **Memory is four views over the existing records, not four stores:**
+   working conversation state (the window and summary), durable personal
+   facts (memory records with provenance), conversation episodes (the
+   verbatim store above), and unfinished business (an explicit pending
+   state with expiry, the block after this one). Any memory framework
+   considered later must demonstrate per-person access rules, correction
+   and forget, the shared record shape, and local-only operation before
+   it replaces anything.
+9. **The judge drains.** One turn per minute after an idle gate never
+   catches up with an evening. The judge processes pending turns until
+   none remain, a person speaks, or a bounded budget elapses, with the
+   idle window shortened because slot contention is gone. Dedupe calls the
+   model only inside the ambiguous cosine band; near-identical and clearly
+   new facts are decided without one.
+10. **One bounded read-only refinement lookup is permitted, later.** This
+    amends "two independent calls per turn remain the limit": when the
+    first lookup's result does not answer the question, the engine may run
+    exactly one more read-only lookup with a deadline before composing or
+    asking. Consequential actions stay on their validated paths; no plan
+    loop. Design and implementation belong to the block after this one,
+    with memory-first ordering (household memory, then offline reference,
+    then the web) and a maintained readability extractor for source pages
+    as part of the same item.
+11. **The turn gets a resolved context, later.** Referent, options the
+    assistant just listed, unresolved question, pending choice, resolved
+    once per turn and shared by routing, recall, and tool arguments; every
+    turn re-routes, including follow-ups; a small-model rewrite runs only
+    when retrieval or a tool will run, under a 1 s timeout with fallback
+    to the raw text, and emits a replaces-previous flag so "actually I
+    meant" cancels the in-flight tool; a clarifying question only when the
+    router's top two tie or the action is costly, otherwise best guess
+    plus a one-clause hedge. This extends CHAT-10 and CHAT-13 and is
+    scheduled after them.
+12. **Voice interruption is a chat gate, later.** Natural spoken fillers
+    only when a tool or lookup is predicted to exceed about a second;
+    barge-in cancels inference and reconciles history with what was heard;
+    endpointing on a CPU hub uses a text-based turn detector unless a
+    measured semantic model runs under 150 ms there.
+13. **Components are evaluated one at a time, each with a baseline,
+    acceptance criteria, and a keep or drop verdict.** In order: the
+    latency floor above (its own numbers are the baseline everything else
+    is compared against); Qwen3.5-4B against the current 8B on the same
+    conversations and quantization; hybrid retrieval with the current
+    embedder; a reranker only where hybrid retrieval measurably falls
+    short; a 0.6B same-family draft model for speculative decoding on the
+    hub's actual GPU; offline prompt optimization (GEPA-style, a
+    development-only tool, never inference in a household turn) for tool
+    descriptions and extraction instructions; XState evaluated during
+    CHAT-17 against the hand-written machine; a maintained readability
+    extractor for web evidence. None of these replace the engine, the
+    store, or the speech stack, which remain justified.
+
+Rejected, with reasons: an agent loop or workflow framework (no
+dependent-call plan is needed once refinement is one bounded lookup); a
+graph memory database (the flat store with FTS5 and vectors has not
+failed yet); a fine-tuned Talker for the user-facing reply now (needs
+training data and a loop the household does not have); disfluencies in
+TTS outside filler lines (intelligibility drops and flat prosody reads as
+uncanny); Rasa-style NLU (weak at five examples per intent; the embedding
+router already covers the closed set).
+
+### Where the bot is ahead, to borrow
+
+The bot's router requires a runner-up margin and a shape guard: a
+question or a first-person statement the deterministic tiers cannot place
+goes to conversation, never to a plugin. That is exactly the "what time is
+it answered with weather" bug in Home's backlog. Its knowledge chain walks
+household memory, then an offline encyclopedia, then Wikipedia, and speaks
+one sentence with the rest a follow-up away. Its subject tracker keeps the
+last answered subject for three turns and treats a wrong subject as worse
+than none. Its routing trace logs tier, winner, runner-up, and margin. Each
+of these is named in the backlog items below rather than re-derived.
+
+### The two-track block
+
+The next block runs as two concurrent sessions with disjoint file
+ownership, so neither edits a file the other touches. Track A owns the
+foreground: engine flags and warm-up, prompt assembly, routing order,
+guards, package copy, samplers. Track B owns the background: the
+background engine, the judge and summaries on it, the episode store, and
+hybrid recall. One small join item wires B's recall into A's prompt after
+both merge. No CHAT-xx item runs concurrently with this block; the CHAT
+program resumes afterward, starting with CHAT-22.
+
+| Track A owns | Track B owns |
+|---|---|
+| `backend/src/lib/turnEngine.ts`, `routing.ts`, `guards.ts`, `persona.ts`, `llm.ts`, `llmSupervisor.ts`, `engineAutotune.ts`, `replyVariation.ts` | `backend/src/lib/memory.ts`, `memoryJudge.ts`, `conversationHistory.ts`, `scheduler.ts`, new `backgroundAssets.ts`, `backgroundSupervisor.ts`, `episodes.ts` |
+| `backend/src/routes/turn.ts`, `openai.ts` | `backend/src/routes/conversations.ts`, `memory.ts`, `host.ts` (health line only) |
+| `spec/llm/ts/types.ts`, `client.ts`, `spec/llm/*.json` corpora | `backend/src/db/schema.ts`, `schema-version.ts`, `migrations/` |
+| `backend/packages/*/manifest.json` descriptions, and their catalog sources | `backend/scripts/bench/memory/*`, `judge-eval.ts` |
+| tests: `turnEngine`, `routing`, `routingCorpus`, `tier2`, `guards`, `guardCorpus`, `llm`, `llmSupervisor`, `engineAutotune`, `persona`, `plugins` | tests: `memory`, `memoryJudge`, `conversationHistory`, `scheduler`, `embedSupervisor` (as a mirror), new `episodes`, `backgroundSupervisor` |
+| `scripts/bench/latency.ts` (new), `routing.ts`, `naturalness.ts` | `scripts/bench/memory/*`, `judge-eval.ts` |
+
+Shared rules for both tracks: each session works in its own worktree
+branched from `main` (`track-a`, `track-b`), the one case the org rule
+allows, and merges and deletes it before the session ends; each appends
+its own dated section at the end of this file and ticks only its own
+backlog boxes; a merge conflict in `dev.md` or `BACKLOG.md` keeps both
+sides. Neither track edits the frontend. Neither track points at the main
+checkout's `data/` directory: a worktree gets its own empty `data/` with
+`models` and `engines` symlinked from the main checkout so nothing is
+downloaded twice and no real database is touched. Track A spawns its own
+chat engine on port 8798 and its own backend on 8797; Track B uses the
+main checkout's running chat and embed engines by URL (8788, 8794),
+spawns its background engine on 8789, and its backend on 8807. Exact
+commands are in the backlog block's preamble.
+
+The pre-existing uncommitted tree (Codex's CHAT program docs, the CHAT-05
+implementation, and chat page changes) lands as its own commit before
+either track branches, so both tracks start from the same base and neither
+inherits someone else's dirty files. A stray local branch `main-ref-check`
+exists with no worktree and should be deleted in the same pass.
+
+### Sources consulted
+
+llama.cpp server prefix cache and `--cache-reuse`
+(github.com/ggml-org/llama.cpp/discussions/13606); speculative decoding
+measurements (github.com/ggml-org/llama.cpp/discussions/10466);
+quantization and KV cache evaluation (arxiv.org/html/2601.14277v1); Qwen3
+thinking modes (qwenlm.github.io/blog/qwen3); reasoning-need routing
+(arxiv.org/abs/2510.08731); Berkeley Function Calling Leaderboard and
+small-model tool calling (gorilla.cs.berkeley.edu/leaderboard.html,
+arxiv.org/abs/2511.22138); ConvFill Talker/Reasoner
+(arxiv.org/html/2511.07397v3); Letta sleep-time compute
+(letta.com/blog/sleep-time-compute); Mem0 extraction loop
+(arxiv.org/html/2504.19413); verbatim versus extracted memory ablation
+(arxiv.org/abs/2601.00821); LongMemEval (arxiv.org/abs/2410.10813);
+query rewriting under a timeout (elevenlabs.io/blog/engineering-rag);
+self-correction limits (arxiv.org/abs/2404.17140, arxiv.org/abs/2508.12903);
+control vectors in llama.cpp (github.com/ggml-org/llama.cpp/pull/5970);
+min-p sampling (arxiv.org/html/2407.01082v4); fillers and perceived
+latency (arxiv.org/html/2507.22352v1); end-of-turn detection
+(livekit.com/blog/solving-end-of-turn-detection); Home Assistant's
+streaming and local-first routing
+(home-assistant.io/blog/2025/09/11/ai-in-home-assistant).

@@ -13,6 +13,7 @@ import { db } from "@/db";
 import { people, memoryRecords, scheduledJobs, lists } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { __resetLlmSupervisorForTests } from "@/lib/llmSupervisor";
+import { remember } from "@/lib/memory";
 
 beforeEach(() => {
   resetDb();
@@ -46,6 +47,20 @@ async function owner() {
   await client.post("/api/auth/setup", { displayName: "Sage", secret: "correcthorse" });
   const row = db.select().from(people).where(eq(people.displayName, "Sage")).get()!;
   return row;
+}
+
+function seedMemory(actor: Awaited<ReturnType<typeof owner>>, text: string, person: string | null, scope = "person") {
+  const result = remember(actor, {
+    text,
+    category: "fact",
+    tier: "durable",
+    scope,
+    person,
+    source: "test",
+    importance: 0.5,
+  });
+  if (!result.ok) throw new Error(result.error);
+  return result.value.id;
 }
 
 describe("packageHost memory.remember", () => {
@@ -129,6 +144,28 @@ describe("packageHost memory.remember", () => {
     const id = host.memory.remember("the calendar rule about pizza night", "fact", "household");
     const row = db.select().from(memoryRecords).where(eq(memoryRecords.id, id)).get()!;
     expect(row.source).toBe("package:test-pkg");
+  });
+
+  test("memory.recall defaults to the actor's own person facts and household facts", async () => {
+    const client = new TestClient();
+    await client.post("/api/auth/setup", { displayName: "Sage", secret: "correcthorse" });
+    const actor = db.select().from(people).where(eq(people.displayName, "Sage")).get()!;
+    const childRes = await client.post("/api/people", { displayName: "Bramble", role: "child" });
+    const child = (await childRes.json()) as { id: string };
+    const own = seedMemory(actor, "I dislike cilantro", actor.id);
+    const sibling = seedMemory(actor, "Bramble dislikes cilantro", child.id);
+    const shared = seedMemory(actor, "The household buys cilantro on Fridays", null, "household");
+    const host = createHost(actor, manifest({ permissions: ["memory:read"] }));
+
+    const found = await host.memory.recall("cilantro");
+    expect(found.map((r) => r.id)).toEqual(expect.arrayContaining([own, shared]));
+    expect(found.map((r) => r.id)).not.toContain(sibling);
+  });
+
+  test("memory.recall refuses an explicit request for another person's facts", async () => {
+    const actor = await owner();
+    const host = createHost(actor, manifest({ permissions: ["memory:read"] }));
+    await expect(host.memory.recall("allergies", { person: "person-other" })).rejects.toMatchObject({ code: "permission_denied" });
   });
 });
 

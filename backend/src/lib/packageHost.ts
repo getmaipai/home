@@ -823,11 +823,21 @@ export function createHost(actor: PersonRow, manifest: PackageManifest, secrets:
       // deterministic test emulator doesn't need to change at all.
       async recall(query: string, opts?: { scope?: string; person?: string }): Promise<MemoryRecordLike[]> {
         requirePermission("memory:read");
-        const listOpts: memory.ListOptions = {};
+        // Conversational package recall is turn-scoped: a person gets their
+        // own person memories plus authorized household memories, while an
+        // owner/admin does not accidentally pull a child's private facts
+        // into ordinary chat. Explicit parental inspection uses the memory
+        // routes, not this package port.
+        const listOpts: memory.ListOptions = { selfOnly: true };
         if (opts?.scope === "household" || opts?.scope === "person" || opts?.scope === "self") {
           listOpts.scope = opts.scope;
         }
-        if (opts?.person) listOpts.person = opts.person;
+        if (opts?.person) {
+          if (opts.person !== actor.id) {
+            throw new HostError("permission_denied", "packages cannot recall another person's memories");
+          }
+          listOpts.person = actor.id;
+        }
         const queryVector = await memory.embedQueryForRecall(query);
         return memory
           .recall(actor, query, { ...listOpts, queryVector })

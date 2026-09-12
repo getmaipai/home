@@ -43,12 +43,24 @@ class _MemoryNamespace:
     def recall(
         self, query: str, scope: str | None = None, person: str | None = None
     ) -> list[dict[str, Any]]:
+        # Mirrors the TS emulator (CHAT-05, 2026-09-11): conversational
+        # package recall is turn-scoped. A package sees the actor's own
+        # person records plus household records, never another person's,
+        # and asking for another person by id is a permission error.
+        if person and person != self._host.actor_id:
+            raise HostError(
+                "permission_denied", "packages cannot recall another person's memories"
+            )
         q = query.lower()
         out = []
         for r in self._host._memory_store:
             if scope and r["scope"] != scope:
                 continue
-            if person and r["person"] != person:
+            if r["scope"] == "self":
+                continue
+            if r["scope"] == "person" and r["person"] != self._host.actor_id:
+                continue
+            if person and r["person"] != self._host.actor_id:
                 continue
             if q in r["text"].lower():
                 out.append(r)
@@ -243,7 +255,8 @@ class _DataNamespace:
 
 
 class HostEmulator:
-    def __init__(self) -> None:
+    def __init__(self, actor_id: str = "person-a1b2c3") -> None:
+        self.actor_id = actor_id
         self._fetch_responses: dict[str, Any] = {}
         self._config_values: dict[str, Any] = {}
         self._secrets: list[str] = []

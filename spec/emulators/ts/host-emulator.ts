@@ -168,6 +168,8 @@ export interface Host {
 }
 
 export class HostEmulator implements Host {
+  constructor(private readonly actorId = "person-a1b2c3") {}
+
   private fetchResponses = new Map<string, unknown>();
   private configValues = new Map<string, unknown>();
   private secrets: string[] = [];
@@ -227,10 +229,15 @@ export class HostEmulator implements Host {
 
   readonly memory = {
     recall: (query: string, opts?: { scope?: string; person?: string }): MemoryRecordLike[] => {
+      if (opts?.person && opts.person !== this.actorId) {
+        throw new HostError("permission_denied", "packages cannot recall another person's memories");
+      }
       const q = query.toLowerCase();
       return this.memoryStoreState.filter((r) => {
         if (opts?.scope && r.scope !== opts.scope) return false;
-        if (opts?.person && r.person !== opts.person) return false;
+        if (r.scope === "self") return false;
+        if (r.scope === "person" && r.person !== this.actorId) return false;
+        if (opts?.person && r.person !== this.actorId) return false;
         return r.text.toLowerCase().includes(q);
       });
     },

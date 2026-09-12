@@ -10,7 +10,1538 @@ does.
 Rough size tags: **S** (a session or less), **M** (a real slice, days),
 **L** (a platform-level capability, needs its own design pass first).
 
+## Chat system optimization
+
+The [2026-09-07 analysis](reports/2026-09-07-chat-system-analysis.md)
+records findings at `02e802b`. The
+[decision record](dev.md#chat-system-optimization-decisions-2026-09-07)
+fixes architecture and supersedes conflicting older future-work prose.
+These items are the only completion records for this program. Earlier
+entries replaced by links are historical context, not additional tasks.
+
+**Execution contract for every item:** read the decision record and named
+files, then the nearby tests before editing. Follow dependencies below.
+Work on `main`; do not create a branch unless another active session
+requires isolation under the org rule. Do not touch unrelated dirty files.
+Add a regression in the existing `bun:test`/pytest suite before each bug
+fix; use the real construction helpers and scripted engines. Do not add a
+second test runner. For shared records and native wire changes, edit the
+existing spec first, regenerate affected bindings, add round-trip fixtures,
+then implement Home; robot deployment is out of scope. Update user/dev docs
+with behavior changes, generated API docs through registered Zod/OpenAPI
+routes, and privacy tables when outbound data changes. Every item exits
+with `bash scripts/check.sh` from the repository root in addition to its
+named checks. Run the org code-review skill at medium effort or higher
+before code commits. Update this checkbox and refresh the derived dashboard
+only after the actual acceptance checks pass. A failed live gate leaves
+the item open with measured results; do not lower its threshold, invent a
+passing result, deploy, or ask the owner to run a runnable command.
+
+**Order (amended 2026-09-12):** the [2026-09-12 block](#chat-direction-2026-09-12-the-next-block-two-tracks)
+(FAST, MEM, JOIN) runs before anything below; it fixes the prefix cache,
+moves background work off the chat engine, and lets world knowledge
+through the guards, all of which the items below assume. Then: CHAT-22
+establishes safe live measurement first. Implement
+CHAT-01, CHAT-02, CHAT-03, CHAT-05, and CHAT-18 next. Then follow the
+individual dependencies. CHAT-23 is the integrated exit gate; CHAT-24
+produces recommendations only. All sizes below describe one bounded slice,
+not permission to expand scope.
+
+<a id="chat-01"></a>
+
+- [ ] **CHAT-01: Share the exact selected context with generation and guards** (M)
+
+    Depends on: none. Files: `backend/src/lib/turnEngine.ts`, new
+    `backend/src/lib/turnContext.ts`, `conversationHistory.ts`, `guards.ts`.
+    Mirror `prepareTurn`, `buildConversationWindow`, and existing
+    `turnEngine.test.ts` fake-person/context fixtures. Implement the
+    `TurnEvidence`, `ToolExecutionOutcome`, and `TurnContext` fields in the
+    decision record as ephemeral types, importing existing surface/result
+    types. Freeze persona, actor, age-band policy, and time once per turn.
+    Load history once; distinguish user assertions, assistant history,
+    summaries, profiles, roster, clock, memories, and actual package
+    outcomes. Build the prompt and guard inputs from the same selected
+    evidence IDs, never all pre-truncation retrieval candidates. Include `intent: { kind: chat|lookup|action|clarify, query,
+    subjectEntityIds, explicitDetailedAnswer }`; default kind to chat and
+    query to original text. Set the detail flag only for case-insensitive
+    `in detail`, `detailed explanation`, or `step by step`. CHAT-13 refines
+    intent. Initially preserve budgets; CHAT-12 replaces their selection policy.
+    Treat reference text as data and never put package-result text into a
+    system-authority message. Preserve the existing public turn shape.
+
+    Acceptance: an included profile/roster/clock fact passes grounding;
+    a removed memory is absent from both prompt and guard sources;
+    assistant guesses and persona examples never become assertions or
+    action-success evidence; a malicious instruction inside reference text
+    cannot authorize a tool. Assert meaningful answers using scripted
+    completions, not only object shape. Out of scope: new persistence,
+    another model pass, new UI, and a duplicate shared record system.
+    Checks: `cd backend && bun test tests/turnEngine.test.ts tests/guards.test.ts tests/conversationHistory.test.ts`, then the full exit gate.
+
+<a id="chat-02"></a>
+
+- [ ] **CHAT-02: Enforce one output safety boundary for chat and packages** (M)
+
+    Depends on: CHAT-01. Files: `backend/src/lib/turnEngine.ts`, `safety.ts`,
+    `packageHost.ts`, `notifications.ts`, `backend/tests/turnEngine.test.ts`,
+    `safety.test.ts`, and existing `spec/safety` corpus/tests. Extract the
+    current output evaluator into one reusable implementation; ordinary
+    completions, direct package replies, package-generated text, pending
+    prompts, composition, and error fallbacks must reach it before visible
+    text, audio, or the persisted assistant reply. Evaluate explicit
+    `reply.speech` independently if it differs from visible text; normalize
+    approved text only after policy succeeds. Keep core refusals out of the
+    style guards. Evaluate final fragments without punctuation and preserve
+    existing safe whitespace. Deduplicate parent notifications by turn and
+    category. A refusal cancels remaining generation and prevents pending
+    tool execution; retain crisis-resource behavior without suppressing
+    otherwise permitted help. Add no opt-out, persona exception, or manifest
+    flag. Reuse the existing safety vocabulary and age-band derivation.
+
+    Acceptance: safe input with unsafe direct package output, unsafe
+    package LLM output, unsafe speech with safe display, split-chunk unsafe
+    content, and an unsafe final fragment are stopped before exposure.
+    Streaming and direct paths make identical decisions and notify once.
+    Existing mandatory floor/ceiling fixtures remain unchanged and green.
+    Out of scope: changing content policy or replacing the deterministic
+    safety floor with model judgment. Checks: backend safety/turn suites,
+    shared safety corpus suites, and the full exit gate.
+
+<a id="chat-03"></a>
+
+- [ ] **CHAT-03: Exclude credentials from ordinary chat memory and context** (M)
+
+    Depends on: none; integrate with CHAT-06 when it lands. Files:
+    `backend/src/lib/memoryJudge.ts`, `memory.ts`, `packageHost.ts`,
+    `conversationHistory.ts`, `turnEngine.ts`, existing `secrets.ts` and
+    secret-setting declarations, `routes/memory.ts`, and `tests/memoryJudge.test.ts`,
+    `memory.test.ts`, `packageHost.test.ts`. Remove the credential-storage
+    extraction example. Implement one pure `memoryContentPolicy.ts` used
+    by all capture paths. It rejects declared credential-bearing fields,
+    bounded explicit assignments to password/token/API-key/cookie/private-key
+    labels, and recognized secret formats; use generated synthetic values in
+    tests. Never enumerate/decrypt stored credentials to build a matcher.
+    Before a supported chat capture request containing detected credentials
+    is logged, embedded, or sent to a model, return the fixed safe message
+    "Keep passwords and keys in Credentials, not in chat." Persist only a
+    redacted event marker, with no raw value. Read-side context filtering
+    excludes detected historical credential text from recall, profiles,
+    summaries, and notifications without deleting existing records.
+
+    Acceptance: both explicit saves and automatic candidates are rejected;
+    store/vector/notification/model spies receive no detected value; a
+    benign statement that a password is managed elsewhere passes. Direct
+    memory API rejection is a documented 400 with an existing-compatible
+    error shape. Record the detection limits honestly: arbitrary unlabeled
+    strings cannot be proven nonsecret. Out of scope: credential migration,
+    destructive historical cleanup, storing chat credentials in a new
+    store. Checks: named backend suites and full exit gate; update the
+    user memory/credentials explanation with the same change.
+
+<a id="chat-04"></a>
+
+- [ ] **CHAT-04: Stop rejecting valid acknowledgments and general knowledge** (M)
+
+    Depends on: CHAT-01 and CHAT-02; use CHAT-15 outcomes when available,
+    otherwise the identical type from CHAT-01. Files:
+    `backend/src/lib/guards.ts`, `turnEngine.ts`, `spec/llm/guard-corpus.json`,
+    `backend/tests/guards.test.ts`, `turnEngine.test.ts`. Replace universal
+    novelty checks for capitals, digits, and dates with narrowly scoped
+    household-claim checks. Remove overlap-only acknowledgment rejection.
+    Preserve mandatory safety, medication, impossible-experience, and
+    known unsupported-household-claim cases. Match explicit action claims
+    against successful outcomes for that action; one unrelated successful
+    tool is never sufficient. "Got it" needs no memory write, while "I
+    saved that" does. Use one sentence decision function in streaming and
+    blocking paths, with a reason indicating unsupported action text that
+    CHAT-17 can hold. No separate second-model semantic judge in this slice.
+
+    Amended 2026-09-12: FAST-05 lands the world-knowledge half of this
+    item first (bare numbers, capitals, dates, hedges, household-only
+    location claims, the four probes as permanent tests). This item keeps
+    the action-claim half, which needs CHAT-15's outcomes.
+
+    Acceptance: exact regressions include the Pippa allergy disclosure accepts "Got it,
+    Pippa is allergic to peanuts."; "It is 4." answers the arithmetic
+    question; "The capital is Paris." answers the France question; "She
+    likes painting." passes with Pippa resolved and that included memory.
+    Add negatives for unknown household whereabouts, failed saves/timers,
+    a search followed by an invented save claim, and copied persona
+    examples. Deliberately retire old lexical false-positive assertions
+    with a documented behavior replacement, never silently weaken safety
+    fixtures. Out of scope: proving all natural-language entailment or
+    eliminating hallucinations. Checks: named suites, guard corpus runner
+    already used by the repository, and full exit gate.
+
+<a id="chat-05"></a>
+
+- [x] **CHAT-05: Make explicit recall include the speaker's saved facts** (S)
+
+    Depends on: none. Files: `backend/packages/recall/recipe.json`,
+    `backend/src/lib/packageHost.ts`, `memory.ts`, `backend/tests/packageHost.test.ts`,
+    `turnEngine.test.ts`, and the matching shared recall fixtures. Remove
+    Recall's hardcoded household-only selection. The chat-facing host
+    memory reader defaults to own person records plus authorized household
+    records with `selfOnly: true`; apply this even for an owner/admin.
+    Explicit household filtering still works. Attempts to name a different
+    person through the package port are denied. Keep existing explicit
+    owner/admin management APIs for child inspection unchanged. Reuse
+    `canRead` and `canAccessPerson`; do not create a second role policy.
+    Update shared host-emulator fixtures to model the same behavior without
+    changing the record shape. Recall is currently authoritative in Home and is not listed in
+    `backend/packages/bundled-provenance.json`; edit it here. Do not migrate
+    it to Catalog in this task. For packages actually listed in provenance,
+    the existing command is `bun scripts/refresh-bundled-packages.ts` after
+    editing their catalog source; this task does not need that command.
+
+    Acceptance: drive real `runTurn` to save "I dislike cilantro", start a
+    new conversation, then ask "What do you remember about cilantro";
+    return that fact. A sibling's fact never appears, including for admin
+    conversational recall. Household shared facts still appear. Exercise
+    both turn transports and shared recipe fixtures. Out of scope:
+    automatic extraction redesign and admin permission changes. Checks:
+    named backend suites, shared recipe fixtures, affected catalog checks
+    if its source changes, and full exit gate.
+
+<a id="chat-06"></a>
+
+- [ ] **CHAT-06: Use one idempotent memory-ingestion service** (M)
+
+    Depends on: CHAT-03 and CHAT-05. Files: new
+    `backend/src/lib/memoryIngestion.ts`, existing `memory.ts`,
+    `memoryJudge.ts`, `packageHost.ts`, `routes/memory.ts`, `db/schema.ts`,
+    and their nearby tests. The service accepts actor, text, explicit or
+    automatic origin, source turn, requested scope, category, importance,
+    and validity bounds; returns saved record IDs, unchanged record IDs,
+    or a typed rejection. Validate through the existing spec and content
+    policy. Default to actor-person scope; household sharing requires
+    explicit scope from an authorized caller, never a model's inferred
+    value. Canonical duplicate comparison is Unicode NFC, trimmed and
+    collapsed whitespace, case-folded text within identical scope/person;
+    preserve original display text. Add a NOOP dedupe outcome for unchanged
+    facts. Failed model dedupe leaves work pending instead of defaulting to
+    ADD. Same-turn retries must neither duplicate nor repeatedly supersede
+    facts. Use a transaction for store writes and job bookkeeping.
+
+    Explicit requests persist the assertion before confirming; enqueue
+    normalization for that record so a later rewrite supersedes it without
+    changing visibility. Relative dates use the source turn timestamp,
+    never retry time. Reuse existing scheduler/pending mechanisms; any new
+    local queue state belongs in the existing DB with a migration, not a
+    parallel store. Acceptance: repeated save, interrupted normalization,
+    failed dedupe, and restart yield one active fact; a correction yields
+    one supersession with preserved provenance. Out of scope: merging
+    unrelated facts or changing visibility on inferred intent. Checks:
+    memory, memoryJudge, packageHost and turn suites plus full exit gate.
+
+<a id="chat-07"></a>
+
+- [ ] **CHAT-07: Capture user assertions across package and model turns** (M)
+
+    Depends on: CHAT-06. Files: `backend/src/lib/memoryJudge.ts`,
+    `conversationHistory.ts`, `db/schema.ts`, `wire.ts`, and
+    `backend/tests/memoryJudge.test.ts`, `conversationHistory.test.ts`.
+    Select eligible user-bearing model, plugin, plugin-error, command,
+    command-error, and confirmation turns regardless of answer source.
+    Exclude safety-refused turns, credential-rejected input, deleted
+    conversations, and non-user scheduler activity. Read at most two
+    preceding exchanges from the same person/conversation for attribution.
+    Current user text is the source; prior assistant text can only supply
+    the question that an explicit confirmation answers. Require extracted
+    candidates to carry a source span that is an exact substring of user
+    text; a confirmed short answer also names the prior question's turn
+    ID. Reject ambiguous references instead of inventing a Person.
+    Replace the blanket possessive rule with this source attribution.
+
+    Add optional turn-view `memory_status: pending|saved|not_saved|failed`
+    and `memory_ids`, deriving state from actual ingestion and judge
+    bookkeeping. Preserve existing fields and endpoints. Resume partial
+    progress idempotently; cancellation consumes no poison attempt.
+    Acceptance: "Search for dinner ideas. I dislike cilantro" is captured;
+    a search-result claim is not; "Yes, every Tuesday" after a trash-day
+    question is correctly attributed; third-party dialogue is not assigned
+    to the speaker; no extraction shares a fact without explicit scope.
+    Out of scope: speaker recognition and parsing arbitrary quoted
+    documents. Checks: named suites and full exit gate.
+
+<a id="chat-08"></a>
+
+- [ ] **CHAT-08: Apply memory validity at read time** (M)
+
+    Depends on: CHAT-06. Files: `backend/src/lib/memory.ts`,
+    `memoryJudge.ts`, `routes/memory.ts`, `spec/schemas/memory-record.schema.json`,
+    shared record fixtures, and `backend/tests/memory.test.ts`.
+    Add an optional `asOf` to the single internal recall reader. Default to
+    the turn's frozen time. Include only records satisfying inclusive
+    `valid_from` and exclusive `valid_to`, with null bounds open. Current
+    reads exclude superseded records; explicit historical reads may include
+    superseded records valid at that time. Never include tombstones,
+    privacy-denied records, or retention archives. Validate real calendar
+    timestamps and reject reversed intervals, not just regex-shaped dates.
+    Keep source creation time separate from fact validity in prompt labels.
+    Use the existing `chrono-node` path for explicit query dates; if a date
+    is ambiguous, ask for clarification rather than select a historical
+    window. Add optional API `as_of` through its OpenAPI schema.
+
+    Acceptance: trip ends at its stated boundary; future event is not
+    described as currently occurring; an address correction returns the
+    new fact now and the old fact for its valid historical date; leap-day
+    and timezone boundaries behave deterministically. Undated durable
+    facts remain usable. Daily maintenance is not required for expiry to
+    work. Out of scope: graph time travel, resurrection of deleted records,
+    or migration that guesses dates for existing undated facts. Checks:
+    memory/judge tests, changed shared record fixtures, full exit gate.
+
+<a id="chat-09"></a>
+
+- [ ] **CHAT-09: Version vector spaces and remove stale routing examples** (M)
+
+    Depends on: none. Files: `backend/src/lib/routing.ts`, `memory.ts`,
+    `llm.ts`, `embedSupervisor.ts`, `db/schema.ts`, `spec/llm/ts/types.ts`
+    if the embed result contract changes, and embedding/routing/memory
+    tests. Define embedding identity once as model artifact identity,
+    dimensions, and preprocessing version. Thread it with query vectors;
+    filter stored rows for exact identity before cosine scoring, including
+    dedupe and contradiction checks. Preserve current preprocessing:
+    routing document prefix with raw queries; memory raw documents/queries.
+    Do not make the previously proposed prefix migration automatically.
+    Existing unversioned rows are incompatible until re-embedded; use
+    lexical fallback and existing retry jobs during migration. Re-embedding
+    batches are bounded to 32 records and resume after interruption.
+
+    Prune routing examples absent from the current manifest even when
+    there are no missing embeddings, embedding fails, or the new examples
+    array is empty. Never delete another package's rows. Invalidate cache
+    identity on model changes, including equal-dimensional replacements.
+    Acceptance: same-dimension different models never compare; incompatible
+    records remain findable lexically; restart resumes migration; removing
+    a formerly winning example removes its influence. Out of scope: vector
+    database, ANN index, and unmeasured threshold/prefix changes. Checks:
+    `routing.test.ts`, `routingCorpus.test.ts`, `memory.test.ts`, existing
+    embed tests and full exit gate.
+
+<a id="chat-10"></a>
+
+- [ ] **CHAT-10: Resolve follow-up subjects for memory retrieval** (M)
+
+    Depends on: CHAT-01, CHAT-08, CHAT-09. Files:
+    `backend/src/lib/turnContext.ts`, `conversationHistory.ts`, `memory.ts`,
+    `entities.ts`, `relationships.ts`, and their existing tests. Build a
+    bounded retrieval query from current text plus the last two same-thread
+    user messages when the current text is a short follow-up or contains a
+    pronoun/reference. Cap added context at 600 characters at whole-message
+    boundaries. Keep original user text unchanged for display and literal
+    routing. Resolve explicit names/aliases through existing Entity and
+    Relationship readers under the actor's permissions; do not create a
+    second identity graph. A single compatible recent subject can resolve a
+    pronoun; multiple plausible subjects produce a clarification and no
+    guessed personal fact. Entity evidence uses existing IDs. Remove the
+    first-clause-of-memory-text heuristic only after its fixtures have
+    equivalent structured coverage; unlinked old records still use vectors
+    and lexical matching.
+
+    Acceptance: Pippa painting followed by "Tell me about her" retrieves
+    Pippa; two named relatives followed by an ambiguous "her" asks which
+    one; conversation switching cannot carry the old subject; a child
+    cannot resolve an inaccessible adult-private entity. Preserve relevant
+    standalone queries and current recall floors. Out of scope: new LLM
+    rewrite call, embedding-model changes, broad name extraction from
+    arbitrary documents. Checks: memory/history/entity/relationship suites,
+    turn-level follow-up regressions, and full exit gate.
+
+<a id="chat-11"></a>
+
+- [ ] **CHAT-11: Refresh profiles promptly and invalidate stale summaries** (M)
+
+    Depends on: CHAT-06, CHAT-08, CHAT-19. Files:
+    `backend/src/lib/memoryJudge.ts`, `memory.ts`, `conversationHistory.ts`,
+    `scheduler.ts`, `index.ts`, and their nearby tests. Keep one profile
+    record per person using `PROFILE_SOURCE`. After five active eligible
+    person facts exist and no profile exists, enqueue a background refresh
+    on the next idle judge opportunity; do not wait a week. Dirty profiles
+    refresh after fact correction, deletion, or expiry, with at most one
+    rewrite per person per idle batch and a five-minute successful-refresh
+    cooldown. Security/forget invalidation immediately withholds the old
+    profile regardless of cooldown. Weekly consolidation remains a fallback.
+    Add a local `context_derivations` table in the existing DB migration:
+    composite key `(artifact_kind, artifact_id)`, kind `profile|conversation_summary`,
+    `source_refs` JSON of `{kind: memory|turn, id, hlc}`, and `generated_at`.
+    No new shared record or sync fields. Missing metadata means withhold
+    and regenerate, including old/replicated profiles. Before injection and
+    refresh commit, verify source access, existence, validity, and unchanged
+    HLCs. Changed/deleted/expired sources invalidate immediately. Filter
+    credential material. No facts means no injected profile.
+
+    Rolling summaries retain covered-turn IDs and never overwrite a
+    deleted conversation after an in-flight job finishes. Retention
+    summaries preserve speaker-versus-assistant attribution and cannot
+    promote model guesses into personal facts. Acceptance: first profile
+    appears at the next eligible idle pass; corrected/forgotten facts cannot
+    survive through an old profile; two concurrent refresh requests produce
+    one active profile; all refreshes yield to chat. Out of scope: mood
+    models and cross-person profiling. Checks: memory/judge/history/scheduler
+    suites and full exit gate.
+
+<a id="chat-12"></a>
+
+- [ ] **CHAT-12: Budget complete model requests without truncating evidence** (M)
+
+    Depends on: CHAT-01 and CHAT-09. Files:
+    `backend/src/lib/turnEngine.ts`, `conversationHistory.ts`, `llm.ts`,
+    `llmSupervisor.ts`, existing engine capability/autotune readers,
+    `spec/llm/ts/client.ts` and `types.ts`, and their tests. Add a tokenizer
+    client for the pinned engine's native tokenizer and use its effective
+    per-request context capacity. Apply the decision record's 512/1024
+    output reserve, 128-token framing margin, and exact trimming order.
+    Count system context, selected history, current message, native tool
+    schemas, and later tool results. Select complete entries and history
+    pairs, not `.slice` of the assembled prompt. The newest four exchanges
+    are no longer exempt from the full-request limit. Required inputs that
+    cannot fit return typed `input_too_large` before actions. Mirror the
+    existing error catalogue and OpenAPI error response conventions.
+
+    Count the fully rendered native chat template, including tool schemas,
+    not just concatenated message text. Cache exact counts by rendered
+    prompt plus model/template identity. If native counting fails with no
+    matching validated cache, return typed unavailable before model-dependent
+    execution; deterministic no-model replies remain available. After tools
+    already ran, oversized required results skip composition and use the
+    safe direct/error fallback; never report a pre-action rejection or
+    repeat an action. There is no guessed byte-count fallback. Acceptance: large history, many tools,
+    long profile, multilingual text, emoji, and long current input stay
+    within capacity or reject before effects; required evidence never
+    silently disappears; model and guard evidence IDs match; output reserve
+    is actually sent as `max_tokens`. Out of scope: changing household
+    context settings, a second tokenizer library, or increasing prompts to
+    hide retrieval failures. Checks: turn/history/LLM/shared client suites
+    and full exit gate.
+
+<a id="chat-13"></a>
+
+- [ ] **CHAT-13: Route contextual and mixed requests without extra intent inference** (M)
+
+    Depends on: CHAT-10, CHAT-12, CHAT-15. Files:
+    `backend/src/lib/turnEngine.ts`, `routing.ts`, `turnContext.ts`,
+    `spec/llm/routing-corpus.json`, `tool-call-corpus.json`, and existing
+    routing/tier2 tests. Keep literal matching on original text. Compute
+    contextual semantic scores with the bounded query from CHAT-10, using
+    one compatible query vector shared with recall when their input and
+    space match. Never call a model solely to rewrite intent. Add an
+    `intent` object to the ephemeral context with `kind: chat|lookup|action|clarify`,
+    `query`, `subjectEntityIds`, and `explicitDetailedAnswer`; deterministic
+    evidence decides only clear cases, otherwise let native tool selection
+    decide. Explicit detail phrases are `in detail`, `detailed explanation`,
+    and `step by step`, case-insensitive. No speculative user-preference
+    classifier. Preserve current measured routing floors until CHAT-23.
+
+    A literal pattern whose captured tail contains an additional explicit
+    supported request must fall through to native tools, not execute the
+    whole tail as one argument. Detect only declared request-pattern starts
+    separated by a sentence boundary or `and`; do not split names or list
+    items. Acceptance: weather then "And tomorrow" offers weather with
+    resolved context; "search for dinner ideas; I dislike cilantro" both
+    answers and captures the disclosure; "weather and my list" runs the
+    intended two reads; casual near-matches execute nothing. Out of scope:
+    arbitrary multi-step plans and keyword rules for every possible intent.
+    Checks: routing/turn/tier2 suites and full exit gate.
+
+<a id="chat-14"></a>
+
+- [ ] **CHAT-14: Offer only ready, authorized tools within one hard cap** (M)
+
+    Depends on: CHAT-13. Files: `backend/src/lib/turnEngine.ts`,
+    `plugins.ts`, `packageHost.ts`, existing integration readiness readers,
+    `spec/schemas/manifest.schema.json` only for genuinely missing shared
+    declarations, and `backend/tests/tier2.test.ts`, `plugins.test.ts`.
+    Build one candidate-filter function using existing package kind,
+    min-role, required integrations/capabilities, and configured status.
+    Read status only; tool listing must not send network probes or resolve
+    secret values. Cap the final offered set at four, including always-offer
+    tools: reserve one slot for a ready always-offered lookup tool, fill the
+    remaining slots by score then package ID, then append any additional
+    always-offered candidate only if room remains. Preserve exact offered
+    IDs through execution and revalidate readiness/permissions at execution
+    because configuration can change. Descriptions come from manifests,
+    never copied handwritten bench strings.
+
+    If an explicit requested integration is unavailable, provide its
+    existing safe setup/error explanation rather than offer a broken tool
+    or claim the household has it configured. A general chat message gets
+    no unsolicited setup warning. Acceptance: no SearXNG means no search
+    offer; explicit search explains missing setup; four is a hard cap even
+    with many always-offer manifests; child permissions cannot be widened
+    by context; readiness changing mid-turn prevents execution.
+    Out of scope: integration installation, new network checks, or automatically
+    enabling services. Checks: named suites, package-host permission tests,
+    and full exit gate.
+
+<a id="chat-15"></a>
+
+- [ ] **CHAT-15: Retain typed outcomes for every accepted package call** (M)
+
+    Depends on: CHAT-01. Files: `backend/src/lib/llm.ts`, `turnEngine.ts`,
+    `turnContext.ts`, `plugins.ts`, `spec/llm/ts/types.ts`,
+    `spec/schemas/result.schema.json`, and their tests. Reuse existing
+    `PluginResult.data`, `reply`, `error`, `ask`, and `synthesis_hint`.
+    Retain native call IDs through parsing and store outcomes using the
+    internal type in the decision record. Expose one shared argument
+    validator from the package runner so the retained batch is validated
+    before any execution or confirmation, without reimplementing AJV.
+    Preserve model order and the two-call cap. Consequential proposals ask
+    once and execute none of the batch. Keep failed outcomes and safe
+    error-catalogue messages alongside successes. Report rejected/excess
+    proposals as unexecuted, never implied successes. Direct pattern and
+    command paths produce equivalent execution evidence.
+
+    Pending confirmations bind exact package/arguments and consume once;
+    resume/reopen clears them as today. Do not interpret an affirmative
+    prefix such as "yes, but don't do it" as unconditional consent: accept
+    only whole-message affirmative forms from the existing vocabulary,
+    optionally terminal punctuation; other text asks a clarification and
+    runs nothing. Acceptance: one success/one failure retains both; invalid
+    second arguments prevent unvalidated effects; a duplicate delivery or
+    retry cannot repeat completed calls; consequential call blocks its
+    companion; malformed JSON never reaches a host. Out of scope: general
+    agent loops or changing package side-effect semantics. Checks: tier2,
+    plugins, commands, pending-ask, shared LLM tests and full exit gate.
+
+<a id="chat-16"></a>
+
+- [ ] **CHAT-16: Compose contextual package answers through one shared path** (M)
+
+    Depends on: CHAT-02, CHAT-12, CHAT-15. Files:
+    `spec/llm/ts/types.ts`, `client.ts`, native client tests,
+    `backend/src/lib/llm.ts`, `turnEngine.ts`, `turnContext.ts`,
+    `backend/packages/websearch/recipe.json`, and chat
+    source metadata/rendering. Add native tool-result messages and retain
+    assistant call IDs in the shared wire contract first. Apply the exact
+    direct/synthesis/failure/pending decision table in dev.md. The composer
+    uses the selected persona/context plus typed results; tools are absent
+    and a turn permits at most two foreground completions total. Results
+    are data, never system instructions. Re-budget before composing. On
+    failure, emit ordered approved direct replies and safe failure messages;
+    never execute a call again. Use existing result `data` and
+    `synthesis_hint`, without a parallel schema.
+
+    Web Search is currently authoritative in Home, not a catalog-mirrored
+    package. Edit it here; catalog migration is out of scope.
+    Move Web Search's private phrasing completion into this path: return
+    bounded title/snippet/URL data, remove the private `llm_complete` recipe
+    step and its source-suppression instruction, preserve declared network
+    behavior. Show source titles and sanitized URLs using the existing
+    generic source UI pattern; do not speak URLs or send unrelated memory
+    text as a search query. Acceptance: known food preference shapes the
+    answer locally; two results read as one answer; one failure is stated;
+    timer confirmation adds no model request; malicious snippets cannot
+    enable tools; composition failure never repeats actions. Out of scope:
+    web crawling or a search-provider change. Checks: native client, tier2,
+    package recipe fixtures, frontend adapter/source tests, affected catalog
+    checks and full exit gate.
+
+<a id="chat-17"></a>
+
+- [ ] **CHAT-17: Share streaming and blocking turn execution without dropping calls** (M)
+
+    Depends on: CHAT-04, CHAT-15, CHAT-16, CHAT-18. Files:
+    `backend/src/lib/turnEngine.ts`, `llm.ts`, `routes/turn.ts`,
+    `routes/openai.ts`, `backend/tests/turnEngine.test.ts`, `tier2.test.ts`,
+    `openai.test.ts`, and frontend adapter tests. Implement one internal
+    event machine with deciding, executing, composing, finished, cancelled
+    phases. Convert the LLM generator's terminal return into an explicit
+    completed-call event using manual iterator consumption; do not discard
+    it with `for await`. Both public turn methods consume this machine;
+    blocking collects its approved deltas. Return stream setup before
+    waiting for a first token or sentence. Preserve existing public events,
+    cue delay, and ordinary sentence streaming even with search offered.
+
+    Approved prose may stream before trailing calls. Hold an unsupported
+    action-claim sentence and its remaining tail until the native decision
+    finishes; the output-token budget bounds that buffer. If calls arrive,
+    discard held text, execute the validated batch, then append its result
+    or composition. If no calls arrive, discard held claims and append one
+    truthful fallback. Composition sees the already-emitted prefix and must
+    not repeat it. Safety refusal or cancellation prevents unstarted calls.
+    Transport failure before a complete native response executes none.
+
+    Acceptance: prose-plus-tool executes, first safe sentence arrives before
+    deferred tool completion, failed timer never emits its held success
+    claim, ordinary chat uses one completion, and both transports produce
+    identical canonical text/effects for scripted events. No third model
+    call, duplicate prefix, or repeated action on failure. Out of scope:
+    claiming regex detection proves every possible implied success claim.
+    Checks: named suites and full exit gate.
+
+<a id="chat-18"></a>
+
+- [ ] **CHAT-18: Release turn activity exactly once on every exit path** (S)
+
+    Depends on: none. Files: `backend/src/lib/turnActivity.ts`,
+    `turnEngine.ts`, `routes/turn.ts`, `routes/openai.ts`,
+    `backend/tests/turnActivity.test.ts`, `turnEngine.test.ts`, `openai.test.ts`.
+    Replace unpaired global increment/decrement calls with an acquisition
+    that returns an idempotent `release()` closure. Acquire at validated
+    turn start before safety/pending/command returns can finish; invalid
+    requests acquire no lease. Blocking execution releases in `finally`.
+    Streaming transfers ownership to its generator and releases on normal
+    exhaustion, error, `return()`, and HTTP disconnect. Guard double-finalize
+    with one terminal-state flag. Finish timestamps use actual release time.
+    Keep an optional stale-task diagnostic but remove the two-minute timer
+    as the correctness mechanism; it must never decrement a different
+    active turn. An immediate refusal cannot release another user's turn.
+
+    Acceptance: overlap a long model turn with an immediate command and
+    refusal; the long turn still blocks background work. Abort before
+    first byte, fail during preparation, throw during generation, disconnect
+    after a delta, and call release twice; all leave the exact correct
+    active count and permit maintenance after 20 seconds. Use the existing
+    test timing hooks rather than real sleeps. Out of scope: inference
+    priority, new metrics page, or changing refusal semantics. Checks:
+    named suites and full exit gate.
+
+<a id="chat-19"></a>
+
+- [ ] **CHAT-19: Give interactive inference priority over all background jobs** (M)
+
+    Depends on: CHAT-06 and CHAT-18. Files: `spec/llm/ts/client.ts`, its existing
+    tests, `backend/src/lib/llm.ts`, new `inferenceScheduler.ts`,
+    `memoryJudge.ts`, `conversationHistory.ts`, `scheduler.ts`, and
+    `backend/tests/llm.test.ts`, `memoryJudge.test.ts`, `scheduler.test.ts`.
+    Add an external AbortSignal to blocking completion, composing it with
+    the existing timeout outside the JSON body. One arbiter owns the chat
+    engine: interactive/background FIFO queues, one active operation, and
+    20 seconds of idle time before background begins. All extraction,
+    dedupe, contradiction, profile, rolling-summary, and retention-summary
+    completions explicitly request background priority. Other existing
+    callers default interactive. Interactive arrivals abort active
+    background generation and wait for its lease to release; never cancel
+    another interactive request. Streaming holds the lease until exhausted
+    or returned, not until headers arrive.
+
+    Return a typed interruption distinct from unavailable; do not restart
+    the engine, consume a judge poison attempt, mark interrupted work done,
+    or auto-replay an action. Use CHAT-06 idempotence for persisted partial
+    facts. Bound each queue to 64 entries, reject excess interactive work
+    with the existing rate-limited shape, and leave excess background work
+    pending at its source. Acceptance: interrupt every background caller,
+    verify foreground first and eventual idle progress, test FIFO and
+    cancellation cleanup. Out of scope: second model or residency policy
+    (amended 2026-09-12: MEM-01 gives background work its own engine on
+    a separate process; this arbiter governs the chat engine only, and
+    the background callers listed above may already be on that engine
+    when this lands).
+    Checks: named suites, history/activity tests, shared client tests, and
+    full exit gate; contention measurements belong to CHAT-23.
+
+<a id="chat-20"></a>
+
+- [ ] **CHAT-20: Update memory state in the open chat without reloading it** (M)
+
+    Depends on: CHAT-07. Files: `backend/src/wire.ts`,
+    `routes/conversations.ts`, `lib/conversationHistory.ts`,
+    `frontend/src/apps/chat/chatModelAdapter.ts`, `chatHistoryAdapter.ts`,
+    `chatMemoryChip.tsx`, `chatMemoryActions.ts`, `ChatPage.tsx`, and their
+    existing tests. Carry real `turnId`, `memoryIds`, and `memoryStatus`
+    into both live and loaded assistant metadata. Reuse the per-conversation
+    turns endpoint to poll every five seconds only while the visible thread
+    has pending memory processing. Pause when hidden, abort on thread
+    switch/unmount, stop at terminal status, and resume pending work when
+    the thread becomes visible. After ten minutes pending, stop polling and
+    display "Still waiting to process memory" with an explicit Refresh
+    action; do not falsely mark failed. Merge metadata by stable turn ID,
+    never replace the current message repository or disrupt a running turn.
+
+    Saved shows the existing linked chip; pending says "Checking for
+    memories"; not_saved shows no chip; failed says "Memory wasn't saved"
+    with a link to the memory page. Per-message save/forget use CHAT-06 and
+    the existing memory action adapter, target exact returned IDs, and
+    invalidate that metadata after success. Never fabricate notification
+    payloads. Acceptance: deferred judge save updates the open message;
+    reload shows identical state; switched thread is untouched; no poll
+    remains when all statuses settle. Out of scope: WebSockets or a second
+    notification system. Checks: frontend adapter/chip/action tests,
+    conversation API tests, seeded browser verification, and full exit gate.
+
+<a id="chat-21"></a>
+
+- [ ] **CHAT-21: Record local stage timings and factual turn outcomes** (M)
+
+    Depends on: CHAT-01, CHAT-15, CHAT-18. Files:
+    `backend/src/lib/turnEngine.ts`, `turnContext.ts`, `engineStats.ts`,
+    `conversationHistory.ts`, `wire.ts`, `frontend/src/apps/chat/chatModelAdapter.ts`,
+    `frontend/src/lib/sentenceSpeechScheduler.ts`, and related tests. Extend
+    existing turn log/metrics plumbing rather than add telemetry. Record
+    stage durations for context, embedding, routing, queue wait, inference,
+    execution, composition, output checks, and total time; record first
+    approved text and frontend first audio separately. Include counts of
+    selected tokens/evidence, offered tools, accepted/executed calls,
+    guard reasons, typed failures, and memory queue depth/oldest age. Keep
+    actual engine cache-hit data optional; unknown is null, never inferred
+    from a stable string (amended 2026-09-12: FAST-01's latency bench
+    reads processed prompt tokens from the engine itself, so the cache
+    ratio is a measured number there; this item may reuse that reader). Centralize the existing RoutingTier union once
+    and reuse it in wire/log/stat aggregation.
+
+    No utterance, reply, memory text, credentials, raw tool arguments,
+    household hostnames, or search query in metrics. Keep production
+    high-frequency samples in the existing bounded ring buffer; aggregate
+    bench outputs use synthetic fixture IDs. Acceptance: every phase has
+    a monotonic duration; queued time is not generation time; first audio
+    comes from actual playback callback; cancellation records a cancelled
+    outcome without logging sensitive text. Out of scope: remote analytics,
+    new dashboards, or permanent raw transcript debug logs. Checks:
+    existing engineStats/turn/history/frontend adapter tests and full exit
+    gate; document metric meanings in developer docs.
+
+<a id="chat-22"></a>
+
+- [ ] **CHAT-22: Make every conversational live bench safe to run** (S)
+
+    Depends on: none; run before any new live experiment. Files:
+    `backend/scripts/bench/{routing,tool-calling,conversation,naturalness,persona-eval,judge-eval,memory-eval}.ts`,
+    `backend/scripts/bench/memory/run.ts`, and existing
+    `backend/tests/isolation.ts`, `preload.ts`, `reset-db.ts` patterns.
+    Build one bench setup helper that creates its own disposable data
+    directory before importing database modules, disables service spawning,
+    and connects only to an explicitly supplied existing inference URL.
+    Never invoke `resetDb` outside bun:test. Refuse an existing/nonempty or
+    household data directory before any mutation. Fix the current household
+    memory bench's broad cleanup by deleting only records created by that
+    bench within its isolated database; cleanup cannot stop a shared model
+    server. No auto-download or model replacement. Failed setup exits
+    nonzero; zero executed cases cannot report success.
+
+    Acceptance: add deterministic tests using a temporary sentinel directory and stub
+    HTTP server proving refusal leaves the sentinel unchanged, repeated
+    runs isolate records, and cleanup leaves the external server alive.
+    Extend bun:test; do not create a shell test harness. Output synthetic
+    transcripts and metrics only, with engine/model identity and executed
+    case count. Out of scope: running a benchmark against family history.
+    Checks: new tests colocated with existing bench-related tests, existing
+    isolation tests, one isolated stub bench invocation for each touched
+    entry point, and full exit gate.
+
+<a id="chat-23"></a>
+
+- [ ] **CHAT-23: Gate chat quality on complete conversations and measured latency** (M)
+
+    Depends on: CHAT-02 through CHAT-21 and CHAT-22. Files:
+    `spec/llm/{routing,tool-call,guard,naturalness}-corpus.json`,
+    `backend/scripts/bench/memory/{fixture,run}.ts`, existing bench runners,
+    and the corresponding backend/frontend tests. Extend current corpora
+    with stable IDs and separate deterministic control-flow fixtures from
+    semantic paraphrase live cases. Do not delete paraphrases because the
+    bag-of-words stub cannot solve them. At minimum add 40 sequences:
+    eight disclosure/search/correction/recall, eight ambiguous/pronoun
+    follow-ups, eight no-tool near-matches, eight two-tool/partial-failure/
+    confirmation cases, and eight current/historical/privacy cases. Add
+    the four report guard probes and credential/output-safety regressions
+    to permanent deterministic tests.
+
+    Acceptance: grade retrieval and capture against expected source IDs, scopes,
+    validity, and active record counts. For phrasing use a local judge with
+    explicit supported/contradicted/missing claims, retaining synthetic
+    evidence and a disagreement list; never let its grade override
+    deterministic safety/action assertions. Run each live sequence five
+    times in both transports. Require zero observed privacy, credential,
+    safety-floor, or false-success failures; at least 95% correct routing
+    and required-fact answers, at least 98% capture precision, at least
+    90% capture recall, and at most 2% false-tool calls. Report Wilson 95%
+    intervals, denominators, failures, and unavailable cases. The thresholds
+    are acceptance targets, not claims about current accuracy.
+
+    Measure at least 30 warm turns per condition with/without background
+    work: p50/p95 first text/audio, total time, cancellation, and memory
+    headroom. Require no more than 10% p95 foreground slowdown under
+    background load and no more than 10% ordinary-chat first-text regression
+    versus the same-build baseline. Failure leaves this item open with
+    findings; never weaken the gate. Out of scope: production rollout.
+    Checks: relevant deterministic suites, isolated live bench reports,
+    seeded browser/audio exercise, and full exit gate.
+
+<a id="chat-24"></a>
+
+- [ ] **CHAT-24: Compare model, voice, cache, and steering changes without deploying** (M)
+
+    Depends on: CHAT-02 through CHAT-21 implemented and CHAT-23 measurement
+    report available. CHAT-23 may remain open after a failed measurement;
+    promotion still requires every gate. Files: existing
+    `backend/scripts/bench/{persona-eval,steering-spike,tool-calling,naturalness}.ts`,
+    `backend/scripts/bench/steering/`, engine autotune/capability readers,
+    and `docs/dev.md`. Keep the current model, prompt, voice, and memory
+    engine as baseline. Compare only already-installed catalog candidates
+    on the identical CHAT-23 corpus, pinned engine/template, and hardware.
+    Check native parallel-call support explicitly in the request and wire
+    tests; do not assume it from accepting a tools field. Run warm-cache
+    and cold-cache trials and report actual engine cache data. Train a
+    second steering experiment from the selected companion's own synthetic
+    examples, retaining the existing paragraph condition. Include a
+    dedicated extraction-model condition only if CHAT-23 still fails the
+    10% contention target after scheduling fixes and an installed candidate
+    fits measured memory headroom with no swap/OOM (amended 2026-09-12:
+    superseded by MEM-01 and MEM-05, which put extraction on its own
+    engine unconditionally and gate the model choice on the judge eval).
+
+    Acceptance: promotion recommendation requires all CHAT-23 correctness floors, no
+    more than 10% p95 first-audio regression, and either at least 15% lower
+    p95 latency or at least five percentage points better factual/intent
+    quality with no other floor regression. If none qualify, recommend
+    keeping baseline. Record naturalness rubric per companion: direct
+    answer, acknowledgment fit, no repeated framing, contextual continuity,
+    and register consistency. Candidate unavailable means record not tested,
+    not a failed or passed benchmark. Out of scope: downloads, purchases,
+    default changes, release, deploy, or deciding the owner's preferred
+    final voice. Checks: existing bench test suites, isolated reports,
+    artifact inspection/listening where available, and full exit gate.
+
+<a id="chat-25"></a>
+
+- [ ] **CHAT-25: Reconcile current chat documentation and readiness claims** (S)
+
+    Depends on: CHAT-23; each earlier item still updates its own docs in
+    its implementation commit. Files: `docs/user/chat.md`, `memory.md`,
+    user privacy page, `docs/dev.md`, `spec/README.md`, `spec/llm/README.md`,
+    and comments in `backend/src/lib/turnEngine.ts`, `persona.ts`,
+    `conversationHistory.ts`. Preserve dated historical evidence but label
+    it historical. Remove current-tense claims that native tools, pending
+    asks, history, companion packages, or scheduled maintenance are absent
+    when the executable path implements them. Document the actual capture
+    delay/status, explicit versus automatic scope, expiry, sources,
+    cancellation, and failed-action behavior. User pages must explain what
+    happens and what the user can do, with no internal schema names or
+    owner-specific setup notes. API reference remains generated.
+
+    Acceptance: link the final benchmark report and distinguish measured live quality
+    from deterministic checks; list unsupported surfaces honestly. Ensure
+    the dated analysis remains a snapshot and each replaced old backlog
+    entry points to one canonical item. Verify links and regenerate any
+    affected screenshots with seeded data, inspect every image, then run
+    the existing status-dashboard parser for all four repos and update the
+    Artifact database if its tool is available. If unavailable, retain a
+    local refresh payload and state that exact publishing limitation.
+    Out of scope: marketing claims of perfect recall/safety, a dashboard
+    replacement, or undocumented release. Checks: reading-level/prose/link
+    checks, affected screenshots, full exit gate.
+
+## Chat direction 2026-09-12: the next block, two tracks
+
+The [2026-09-12 review](dev.md#chat-direction-review-and-the-two-track-plan-2026-09-12)
+found that the CHAT program above rests on three things the code does not
+do: cache the prompt prefix, keep background work off the chat engine,
+and let world knowledge through the guards. This block fixes those first,
+plus the two memory gaps no item above covers (verbatim episodes across
+conversations, and a judge that drains). It runs as two concurrent
+sessions with disjoint file ownership (the table in that dev.md section
+is the contract; if a task seems to need a file the other track owns,
+stop and record it as a JOIN item instead of editing it). The CHAT
+program resumes after this block, starting with CHAT-22. No CHAT-xx item
+runs concurrently with FAST or MEM items.
+
+**Execution contract for every item here** is the same as the CHAT
+program's above (read the named files and their tests first, regression
+test before fix, `bun:test` only, docs in the same commit, `bash
+scripts/check.sh` before every commit, code review at medium effort before
+every code commit, never lower a threshold to pass, never ask the owner
+to run a runnable command). Two additions for this block:
+
+- **Every item is written for an implementer with no conversation
+  context.** Do exactly what the item says, in the order it says. If a
+  named function or constant does not exist under that name, grep for the
+  behavior described and use what is there; do not invent a parallel one.
+- **Record numbers, never impressions.** Each live check writes its
+  before and after numbers into the track's own dated section at the end
+  of `docs/dev.md`, with the engine build, model file, and machine named.
+  "Feels faster" is not a result.
+
+**Step 0, before either track branches (one session, on `main`):** commit
+the pre-existing uncommitted tree as its own commit (the CHAT program docs,
+the CHAT-05 implementation with its tests, the chat page and screenshot
+changes) after `git status`, `git diff`, and `bash scripts/check.sh`, then
+`git branch -d main-ref-check`. Both tracks branch from that commit.
+
+**Track setup.** `$MAIN` is the main checkout of this repo. Each track
+works in its own worktree (the one case the org's branch rule allows,
+because two sessions edit the same repo at once) and never points at
+`$MAIN/data`:
+
+```
+cd $MAIN
+git worktree add ../home-track-a -b track-a main     # or track-b
+cd ../home-track-a
+mkdir -p data
+ln -s $MAIN/data/models data/models
+ln -s $MAIN/data/engines data/engines
+bun install
+```
+
+Live checks for Track A spawn their own chat engine so engine flags can
+change; run the backend from `backend/` with this environment (the engine
+binary path is whatever `find ../data/engines -name llama-server -type f`
+prints):
+
+```
+MAIPAI_LLAMA_SERVER_BIN=<that path>
+MAIPAI_CHAT_MODEL_PATH=../data/models/qwen3-8b-instruct-q4-k-m.gguf
+MAIPAI_CHAT_MODEL_ID=qwen3-8b-instruct-q4-k-m
+MAIPAI_LLAMA_SERVER_PORT=8798
+MAIPAI_EMBED_URL=http://127.0.0.1:8794
+PORT=8797
+bun run start
+```
+
+Live checks for Track B reuse the main checkout's running chat and embed
+engines by URL and spawn only the new background engine:
+
+```
+MAIPAI_LLAMA_SERVER_URL=http://127.0.0.1:8788
+MAIPAI_EMBED_URL=http://127.0.0.1:8794
+MAIPAI_BACKGROUND_PORT=8789
+PORT=8807
+bun run start
+```
+
+A fresh worktree database has no household; for a live turn through the
+API, complete first-run through the setup route (read
+`backend/src/routes/setup.ts` for the exact body) with the owner named
+`alfred`. Benches connect to engine URLs directly and never need a
+household.
+
+**Finishing a track:** `bash scripts/check.sh`, stage files by name,
+commit, then in `$MAIN` run `git merge --ff-only track-a`. If `main` has
+moved, first `git rebase main` inside the worktree, re-run `check.sh`,
+then merge. Then `git worktree remove ../home-track-a` and `git branch -d
+track-a`. Append the track's dated section at the end of `docs/dev.md`
+and tick only the track's own boxes here; on a merge conflict in either
+doc, keep both sides. JOIN items run on `main` after both tracks merge.
+
+**Order:** Track A: FAST-01, FAST-02, FAST-04, FAST-05, FAST-03, FAST-06.
+Track B: MEM-01, MEM-02, MEM-03, MEM-04, MEM-05. Then JOIN-01, JOIN-02.
+
+### Track A: the foreground
+
+<a id="fast-01"></a>
+
+- [ ] **FAST-01: Make the prompt prefix cache actually hit, and measure it** (M)
+
+    Depends on: Step 0. Files: `backend/src/lib/engineAutotune.ts`,
+    `llmSupervisor.ts`, `llm.ts`, `backend/src/index.ts`,
+    `spec/llm/ts/types.ts`, new `backend/scripts/bench/latency.ts`, and
+    `backend/tests/engineAutotune.test.ts`, `llmSupervisor.test.ts`,
+    `llm.test.ts`, the spec wire tests. Mirror `launchFlagsToArgs()`'s
+    existing flag comments, `embedSupervisor.ts`'s URL-tier shape, and
+    `scripts/bench/routing.ts`'s "connect only to a supplied URL" rule.
+
+    Do, in this order:
+    1. In `launchFlagsToArgs()` append `"--cache-reuse", "256"` after
+       `"--jinja"`, with a comment naming this item. Test: the args array
+       contains both strings in that order.
+    2. In `spec/llm/ts/types.ts` add two optional fields to the chat
+       completion request type: `cache_prompt?: boolean` and
+       `id_slot?: number`. Additive only; extend the existing wire test
+       with one request carrying both.
+    3. In `llm.ts`, both `complete()` and `startCompleteStream()` send
+       `cache_prompt: true` and `id_slot: 0` on every `chat` request.
+       Test in `llm.test.ts`: capture the request through the stub's
+       `scriptedChatReply(request)` callback and assert both fields.
+    4. In `llmSupervisor.ts`, the override tier (`MAIPAI_LLAMA_SERVER_BIN`
+       plus `MAIPAI_CHAT_MODEL_PATH`) also reads `MAIPAI_CHAT_MODEL_ID`;
+       when it names an entry in `modelCatalog.ts`'s `CATALOG`, spawn
+       with `resolveLaunchFlags(entry, hw)` exactly as
+       `trySpawnFromSelection()` does. Without it, keep today's
+       flagless behavior. Test: with the id set, the spawn command
+       includes `--cache-reuse` (assert on the command array via the
+       existing supervisor test seams; do not spawn a real binary).
+    5. Warm-up. Add `setWarmupPrompt(provider: () => string)` and
+       `warmChatPrefix(client)` to `llmSupervisor.ts`. After a spawned
+       backend passes its post-load check, call `warmChatPrefix` once:
+       one `chatComplete` with messages `[system: provider(), user:
+       "hi"]`, `max_tokens: 1`, `cache_prompt: true`, `id_slot: 0`,
+       thinking off; log the result; a failure is logged, never thrown.
+       Register the provider from `backend/src/index.ts` with
+       `setWarmupPrompt(() => buildStablePrefix())` (this avoids an
+       import cycle between `llmSupervisor.ts` and `turnEngine.ts`; do
+       not import `turnEngine.ts` from the supervisor). Test: with the
+       stub tier and a registered provider, exactly one warm-up request
+       arrives after start, none on later `getChatClient()` calls, and
+       a provider that throws leaves the client usable.
+    6. The bench. `backend/scripts/bench/latency.ts` refuses to run
+       unless `MAIPAI_LLAMA_SERVER_URL` is set, sets `MAIPAI_DATA_DIR`
+       to a fresh temp directory before any import, and never reads a
+       household database. It builds the real stable prefix with
+       `buildStablePrefix()`, a fixed synthetic six-exchange history
+       (persona-roster names only), and thirty distinct short user
+       messages. For each of the thirty turns it streams a completion,
+       records time to the first content delta and total time, and
+       reads processed prompt tokens from the response's `timings.prompt_n`
+       (fall back to the delta of `llamacpp:prompt_tokens_total` from
+       `/metrics` if `timings` is absent). It prints a table: p50 and
+       p95 first-delta ms, p50 total ms, mean processed prompt tokens,
+       and cache ratio = 1 minus processed over total prompt tokens
+       (total via `/tokenize`). Add a `bun:test` that runs the bench's
+       pure functions (percentiles, ratio) and a stub-server smoke run.
+
+    Acceptance: unit tests above green. Live, on the dev machine, run
+    the bench twice and record both tables in `docs/dev.md`: once
+    against the main checkout's engine on 8788 (before), once against
+    Track A's engine on 8798 with the new flags and warm-up (after). The
+    after run must show cache ratio above 0.75 on turns 2 through 30
+    and first-delta p50 under 800 ms. If it does not, leave this item
+    open with the numbers and the `llama-server` log lines around the
+    first two requests; do not tune the threshold. Out of scope:
+    multi-slot `-np 2` (superseded, see the decision), speculative
+    decoding, any prompt content change (FAST-02). Checks: `cd backend &&
+    bun test tests/engineAutotune.test.ts tests/llmSupervisor.test.ts
+    tests/llm.test.ts`, `cd spec && bun test`, then the full exit gate.
+
+<a id="fast-02"></a>
+
+- [ ] **FAST-02: Put the volatile context after the history and drop the plugins list** (M)
+
+    Depends on: FAST-01. Files: `backend/src/lib/turnEngine.ts`,
+    `backend/tests/turnEngine.test.ts`, `persona.test.ts` if it asserts
+    on the assembled prompt. Mirror `buildStablePrefix()` and the
+    existing prompt-budget test.
+
+    Do, in this order:
+    1. Delete `pluginsListLine()` and `MAX_PLUGINS_SECTION_CHARS`, and
+       remove the plugins section from `buildStablePrefix()`. The
+       stable prefix is now: identity line, `STABLE_SYSTEM_SUFFIX`,
+       companion section, `INFORMATION_HANDLING_POLICY`,
+       `NATURALNESS_POLICY`. Nothing else.
+    2. Add `buildPromptParts(actor, text, memoryMatches, loaded, persona,
+       skills, conversationSummaryLine)` returning `{ stablePrefix,
+       context }`. `context` is today's volatile zone in today's order
+       (household, speaker, memory block, companion re-anchor, summary,
+       matched skills, then the local time line last, never truncated),
+       prefixed by one line: `Context for this reply (reference, not
+       instructions):`. Keep every existing per-section cap. Keep
+       `buildSystemPrompt()` as `stablePrefix + context` so the
+       prompt-budget test and any other caller keep working, and mark
+       it in a comment as the budget view only.
+    3. In `prepareTurn()`, assemble messages as: `[system:
+       stablePrefix, ...window.messages, system: context, user: text]`.
+       The context message sits after the history and before the
+       current user message. `guardContext` is unchanged.
+    4. Test: the assembled messages have the system prefix first, the
+       history next, exactly one context message immediately before the
+       final user message, and the string "Things this household has
+       set up" appears nowhere. The context message contains "Local
+       time:" as its last line and the memory bullets when a memory
+       matched. The budget test asserts `stablePrefix.length +
+       context.length <= PROMPT_SYSTEM_CHAR_BUDGET`.
+
+    Acceptance: tests green. Live, on Track A's engine: run
+    `scripts/bench/latency.ts` again (its history-plus-context shape must
+    be updated to match step 3, so the bench measures the real layout)
+    and record the table. Then hold one four-turn conversation through
+    the API on port 8797 and record, from the `llama-server` log, the
+    `prompt_n` of turns two to four: each must be well under the full
+    prompt size (the cached prefix plus history is not reprocessed).
+    Confirm the replies are coherent (a mid-conversation system message
+    must render correctly through Qwen3's chat template; if replies
+    degrade, switch the context message's role to `user` with the same
+    delimiter line and merge it into the final user message, and record
+    which shape shipped). Re-run `scripts/bench/naturalness.ts` and
+    `scripts/bench/routing.ts` against Track A's engine and embed URLs
+    and record the rows before and after; no row may regress from
+    natural to unnatural. Out of scope: rewriting any policy text
+    (FAST-06), changing budgets (CHAT-12), the plugins-list
+    free-association fix in the old backlog (closed by this item; tick
+    it and point here). Checks: `cd backend && bun test
+    tests/turnEngine.test.ts tests/persona.test.ts`, then the full exit
+    gate.
+
+<a id="fast-04"></a>
+
+- [ ] **FAST-04: Literal patterns before the embed round trip, and a stream that starts before the first token** (M)
+
+    Depends on: FAST-02. Files: `backend/src/lib/turnEngine.ts`,
+    `routing.ts`, `backend/src/routes/turn.ts`, `spec/llm/ts/stubServer.ts`
+    only if it cannot delay a scripted reply, and `backend/tests/turnEngine.test.ts`,
+    `routing.test.ts`, `tier2.test.ts`. Mirror the existing
+    `streamTurnEvents()` cue race and `runTurnStream()`'s tool-call peek.
+    This is a bounded slice; CHAT-17's full event machine later replaces
+    it and must keep the public events identical.
+
+    Do, in this order:
+    1. Split `route()` into `routeLiteral(text, candidates)` (household
+       command match stays where it is; this is the `routing.patterns`
+       wildcard match that `route()` already tries first) and
+       `routeSemantic(text, actor, loaded, utteranceVector)` (everything
+       else `route()` does today, including the keyword-overlap
+       override). In `prepareTurn()`, call `routeLiteral` first; only
+       when it returns null call `embedUtterance()` and then
+       `routeSemantic`. A literal winner never embeds. Export a
+       test-only counter `__embedCallCountForTests()` plus a reset from
+       `routing.ts`, the same shape as `__resetLlmSupervisorForTests`.
+    2. In `runTurnStream()`, stop awaiting `started.tokens.next()`
+       before returning. Return `{ ok: true, kind: "stream", startedAt,
+       ... }` immediately, with a generator that performs the peek
+       itself: if the first step is done with tool calls, it runs
+       `resolveToolCalls()` exactly as today and yields the finished
+       reply's text as one delta, then finalizes; an all-failed batch
+       runs today's tool-free retry through the same gates; otherwise
+       it replays the first token into `gateOutputSafety()` and
+       `gateGuards()` unchanged. Safety refusals, commands, and Tier 0
+       and 1 winners still return `kind: "immediate"`.
+    3. In `routes/turn.ts`, `streamTurnEvents()` starts the 900 ms cue
+       timer from `startedAt` (the moment `prepareTurn()` began), not
+       from its own first `.next()`, so the cue fires 900 ms after the
+       utterance arrived when nothing has streamed yet, and never after
+       a delta.
+    4. Tests: a literal-pattern turn ("remember that I like tea") makes
+       zero embed calls and still fires the package; a tools-offered
+       turn whose scripted first token is delayed 1,200 ms yields
+       `turn_meta`, then `spoken_cue`, then deltas (if the stub cannot
+       delay a scripted reply, add an `await`-able return to
+       `scriptedChatReply` in `stubServer.ts`, additive); a scripted
+       tool-call turn yields `turn_meta` then exactly one `done` whose
+       text is the package reply; the existing output-safety cut tests
+       still pass unchanged.
+
+    Acceptance: tests green. Live on port 8797: a websearch turn
+    ("who won the 1998 world cup") shows `spoken_cue` in the NDJSON
+    before the answer; an ordinary turn shows no cue when the first
+    sentence arrives within 900 ms; `[turn]` log lines for a
+    literal-pattern turn show no embed timing. Record three timings each
+    for a pattern turn, an ordinary turn, and a tool turn. Out of scope:
+    holding action-claim sentences (CHAT-17), the forced-lookup retry on
+    the stream (CHAT-17), stage timings in metrics (CHAT-21). Checks:
+    `cd backend && bun test tests/turnEngine.test.ts tests/routing.test.ts
+    tests/tier2.test.ts`, then the full exit gate.
+
+<a id="fast-05"></a>
+
+- [ ] **FAST-05: Let world knowledge through the guards (the CHAT-04 half that needs no outcomes)** (M)
+
+    Depends on: FAST-04. Files: `backend/src/lib/guards.ts`,
+    `spec/llm/guard-corpus.json`, `backend/tests/guards.test.ts`,
+    `guardCorpus.test.ts`. Mirror the existing corpus row shape and the
+    guard test naming. CHAT-04 keeps the other half (an action claim
+    needs a typed outcome, which needs CHAT-15).
+
+    Do, in this order:
+    1. In `guardInvention()`, delete the bare-candidate loop (the
+       `PROPER_NOUN_RE`, `DATE_WORD_RE`, and `BARE_NUMBER_RE` scan and
+       `hyphenGroundedPieces()` if nothing else uses it) and the
+       `GUESSING_RE` check (a hedge is what the information policy asks
+       for, not an invention). Keep, unchanged: `PERSON_TRAIT_RE` with
+       the unclaimed-words check, `CLAIMED_EXPERIENCE_RE`,
+       `ATTRIBUTED_QUOTE_RE`, medication, `like_i_said`,
+       `example_parrot`, `capability_claim`, `near_echo`.
+    2. Narrow `LOCATION_CLAIM_RE` to household subjects: it fires only
+       when the located subject is a roster name from the guard context
+       or a second-person form ("you", "your"). "Paris is in France"
+       passes; "Pippa is at soccer practice" with no memory does not.
+    3. Fix `unrelated_recall` so a supplied memory that answers the
+       question passes: "She likes painting." with the memory "Pippa
+       likes painting" present and Pippa resolved is not unrelated.
+       Read the function's own comment on what "unrelated" means before
+       changing it; the flight-versus-dentist case must still flag.
+    4. Corpus: add the four probes as pass rows exactly as written:
+       "Got it, Pippa is allergic to peanuts." after that disclosure;
+       "It is 4." to "what is two plus two"; "The capital is Paris." to
+       "what is the capital of France"; "She likes painting." with that
+       memory. Add fail rows: "Pippa is at soccer practice right now."
+       with no memory; "Your brother said he'd be late." with no memory;
+       "I've been to Paris myself." Retire every corpus row whose only
+       basis is a bare number, capitalized word, or date; list the
+       retired row ids and the replacement behavior in the track's
+       dev.md section.
+    5. Tests: one `guards.test.ts` test per probe, named for the
+       promise ("general knowledge is not an invention"), plus the three
+       new fail cases.
+
+    Acceptance: tests and the corpus runner green. Live on port 8797:
+    run `scripts/bench/conversation.ts` against Track A's engine and
+    count guard hits from the `[turn]` log over its full script; then
+    ask, through the API, "what's the capital of France", "how many legs
+    does a spider have", and "what year did the second world war end",
+    and record the replies and any guard reason. None of the three may
+    be cut or replaced. Record before and after hit counts. Out of
+    scope: action-claim matching against outcomes (CHAT-04), replacing
+    the pooled canned lines (CHAT-04). Checks: `cd backend && bun test
+    tests/guards.test.ts tests/guardCorpus.test.ts tests/turnEngine.test.ts`,
+    then the full exit gate.
+
+<a id="fast-03"></a>
+
+- [ ] **FAST-03: Package descriptions that a person would say, in the prompt and in confirm prompts** (S-M)
+
+    Depends on: FAST-02. Files: every `backend/packages/*/manifest.json`
+    `description`, their catalog sources for mirrored packages (the
+    `catalog_path` in `backend/packages/bundled-provenance.json`, in the
+    sibling `catalog` checkout), `backend/src/lib/turnEngine.ts` (the
+    confirm prompt), `backend/tests/plugins.test.ts`, `tier2.test.ts`.
+    Read `docs/PACKAGES.md` in the org repo before writing copy.
+
+    Rule for every description: one sentence, starts with an imperative
+    verb, states what it does for the household, at most 120 characters,
+    ends with a period, no dates, no parentheses, no internal notes, no
+    platform branding (org trademark rules). Example: weather becomes
+    "Get the current weather for a named place." The same sentence is the
+    store-card copy, the native tool description, and the confirm prompt
+    body.
+
+    Do, in this order:
+    1. For packages in `bundled-provenance.json`: edit the manifest in
+       the catalog checkout, commit there with a message naming this
+       item, then run `bun run refresh-bundled-packages` here so
+       provenance records the new commit and hash. For packages not in
+       provenance (Recall, Web Search, and any other authoritative one):
+       edit here.
+    2. The confirm prompt becomes `Do you want me to <description with
+       the trailing period removed and the first letter lowercased>?`.
+    3. Test: every bundled manifest's description matches
+       `/^[A-Z][^()]{10,118}\.$/` and contains no four-digit year; the
+       confirm prompt for a consequential package reads as one
+       grammatical question.
+
+    Acceptance: tests green; `scripts/bench/tool-calling.ts` against
+    Track A's engine still reports zero false calls on its negatives and
+    all positives selected; record the run. Out of scope: renaming
+    packages, routing examples, catalog CI. Checks: `cd backend && bun
+    test tests/plugins.test.ts tests/tier2.test.ts
+    tests/bundledPackages.test.ts tests/bundledPackageHash.test.ts`,
+    then the full exit gate, plus the catalog repo's own check script
+    for its commit.
+
+<a id="fast-06"></a>
+
+- [ ] **FAST-06: Variation from samplers, not from a prompt sentence** (S)
+
+    Depends on: FAST-05. Files: `spec/llm/ts/types.ts`,
+    `backend/src/lib/llm.ts`, `persona.ts`, and `backend/tests/llm.test.ts`,
+    `persona.test.ts`, `turnEngine.test.ts` where they quote the policy.
+
+    Do, in this order:
+    1. Add optional request fields, additive: `min_p`,
+       `xtc_probability`, `xtc_threshold`, `dry_multiplier`, `dry_base`,
+       `dry_allowed_length` (all numbers). Extend the wire test.
+    2. In `llm.ts` define `CHAT_SAMPLING = { temperature: 0.7, min_p:
+       0.05, xtc_probability: 0.5, xtc_threshold: 0.1, dry_multiplier:
+       0.8, dry_base: 1.75, dry_allowed_length: 2 }` and send it from
+       `complete()` and `startCompleteStream()` only when the caller
+       passed no `response_format` and no `temperature`. A JSON-schema
+       request never gets it.
+    3. Remove the sentence beginning "Never say the same thing the same
+       way twice" from `INFORMATION_HANDLING_POLICY` in `persona.ts`,
+       and fix any test that quotes it.
+    4. Test: a plain chat request carries all seven fields; a
+       json_schema request carries none of them; a caller-supplied
+       temperature wins.
+
+    Acceptance: tests green. Live on Track A's engine: run
+    `scripts/bench/naturalness.ts` and `scripts/bench/persona-eval.ts`
+    before and after and record; no naturalness row may regress; the
+    persona-eval "repeated framing" measure must not get worse. Out of
+    scope: control vectors (an EVAL item below), persona prose
+    rewrites. Checks: `cd backend && bun test tests/llm.test.ts
+    tests/persona.test.ts tests/turnEngine.test.ts`, `cd spec && bun
+    test`, then the full exit gate.
+
+### Track B: the background
+
+<a id="mem-01"></a>
+
+- [ ] **MEM-01: A background engine on its own process, shaped like the embed role** (M)
+
+    Depends on: Step 0. Files: new `backend/src/lib/backgroundAssets.ts`,
+    new `backend/src/lib/backgroundSupervisor.ts`, `backend/src/routes/host.ts`
+    (one health field), `backend/src/wire.ts` (that field's type), new
+    `backend/tests/backgroundSupervisor.test.ts`, and the privacy page
+    under `docs/user/` ("what MaiPai downloads" gains one line). Mirror
+    `embedAssets.ts` and `embedSupervisor.ts` line for line: pinned
+    asset, no catalog entry, no household selection, URL tier, spawn
+    tier, stub tier, `hotReloadState`, `watchEngine`, generation guard.
+    Do not edit `llm.ts`, `llmSupervisor.ts`, or `modelCatalog.ts`
+    (Track A owns them); import from them freely.
+
+    Do, in this order:
+    1. `backgroundAssets.ts`: constants `BACKGROUND_MODEL_FILE =
+       "qwen3-1.7b-q8-0.gguf"`, URL
+       `https://huggingface.co/Qwen/Qwen3-1.7B-GGUF/resolve/90862c4b9d2787eaed51d12237eafdfe7c5f6077/Qwen3-1.7B-Q8_0.gguf`,
+       sha256 `061b54daade076b5d3362dac252678d17da8c68f07560be70818cace6590cb1a`,
+       bytes `1_834_426_016`; plus a fallback selected by
+       `MAIPAI_BACKGROUND_MODEL=qwen3-4b`: file `qwen3-4b-q4-k-m.gguf`,
+       URL `https://huggingface.co/Qwen/Qwen3-4B-GGUF/resolve/bc640142c66e1fdd12af0bd68f40445458f3869b/Qwen3-4B-Q4_K_M.gguf`,
+       sha256 `7485fe6f11af29433bc51cab58009521f205840f5b4ae3a32fa7f92e8534fdf5`,
+       bytes `2_497_280_256`. `ensureBackgroundModel()` uses the same
+       download-and-verify helper `ensureEmbedModel()` uses. Both are
+       Qwen's official GGUF repos at pinned revisions, the same
+       provenance rule as the chat model's catalog entry.
+    2. `backgroundSupervisor.ts`: tiers in order `MAIPAI_BACKGROUND_URL`,
+       spawn (binary from `engineBinaryPath(hw)`), stub. Spawn args:
+       `--model <path> --port <MAIPAI_BACKGROUND_PORT or 8789> --host
+       127.0.0.1 -c 8192 -ngl <MAIPAI_BACKGROUND_GPU_LAYERS or 0> -t 4
+       -fa on --reasoning off --jinja --no-webui --metrics --cache-reuse
+       256`. CPU by default on purpose: the GPU stays with the chat
+       model. Watch role `background`, label "the memory engine", title
+       "MaiPai's memory engine stopped unexpectedly". Exports:
+       `getBackgroundClient()`, `restartBackgroundBackend()`,
+       `probeBackgroundEngine()`, `getBackgroundBackendKind()`,
+       `getBackgroundLivePid()`, and `completeBackground(messages, opts:
+       { temperature?, max_tokens?, response_format? })` returning the
+       same `LlmOpResult` type `llm.ts` exports, always sending
+       `chat_template_kwargs: { enable_thinking: false }`, mapping a
+       transport failure to the same `unavailable` shape.
+    3. Health: `GET /api/health` gains `background` beside `chat` and
+       `embed`, from `probeBackgroundEngine()`.
+    4. Tests, mirroring `embedSupervisor.test.ts`: URL tier spawns
+       nothing; stub tier answers; restart bumps the generation and a
+       stale in-flight start never repopulates the cache;
+       `completeBackground` returns `unavailable` when the URL is dead.
+       Asset test: the checksum constant is 64 hex characters and the
+       fallback switch selects the other file.
+
+    Acceptance: tests green. Live on the dev machine (Track B
+    environment): the engine downloads once into the shared models
+    directory, spawns, and one `completeBackground` call with the
+    judge's extraction JSON schema returns valid JSON; record tokens per
+    second from `timings`, the process RSS, and the download time. Out
+    of scope: routing, any user-facing reply, catalog entries, the
+    orphan-sweep exclusion (JOIN-02). Checks: `cd backend && bun test
+    tests/backgroundSupervisor.test.ts tests/embedSupervisor.test.ts`,
+    then the full exit gate.
+
+<a id="mem-02"></a>
+
+- [ ] **MEM-02: Judge and summaries on the background engine, a judge that drains, and dedupe that asks the model only when unsure** (M)
+
+    Depends on: MEM-01. Files: `backend/src/lib/memoryJudge.ts`,
+    `conversationHistory.ts`, `scheduler.ts`, and `backend/tests/memoryJudge.test.ts`,
+    `conversationHistory.test.ts`, `scheduler.test.ts`. Mirror the
+    existing judge tests' stub wiring exactly.
+
+    Do, in this order:
+    1. Replace every `complete("chat", ...)` in `memoryJudge.ts`
+       (extraction, dedupe, contradiction, profile rewrite) and in
+       `conversationHistory.ts` (`maybeRefreshConversationSummary`,
+       `summarizeBeforeDelete`) with `completeBackground(...)`. Replace
+       the `getEngineStatus().kind === "stub"` skips in the summary
+       paths with `getBackgroundBackendKind() === "stub"` (same reason:
+       an echo stub must never write a summary).
+    2. Drain: replace `MAX_TURNS_PER_RUN = 1` with a loop in
+       `runJudgeBatch()` that keeps taking the oldest pending turn until
+       none remain, `turnActiveWithin(JUDGE_IDLE_WINDOW_MS)` becomes
+       true, 50 turns are processed, or 5 minutes elapse. Set
+       `JUDGE_IDLE_WINDOW_MS` to 5,000 (the 20 s window existed because
+       extraction shared the chat slot; it no longer does). Keep the
+       per-fact idle re-check inside `judgeTurn()`.
+    3. Dedupe band, in `judgeTurn()` before `decideDedupe()`: no
+       candidates, or top cosine below 0.60, means ADD with no model
+       call; top cosine at or above 0.92 means SUPERSEDE that record
+       with the new text and `contradiction: false`, no model call;
+       only 0.60 to 0.92 asks the model. Name the two constants.
+    4. Export `judgeQueueStats(): { pending: number; oldestCreatedAt:
+       string | null }` and log it at the end of every judge tick as
+       `[memory.judge] processed=N pending=M oldest_age_s=K`.
+    5. Update the `scheduler.ts` comment that still says
+       `MAX_TURNS_PER_RUN` is 10.
+    6. Tests: during a judge batch the chat stub receives zero requests
+       and the background stub receives the extraction request; five
+       seeded unjudged model turns are all judged by one
+       `runJudgeBatch()` call; the loop stops after
+       `markTurnStarted()` is called mid-batch and the remaining turns
+       stay pending, not failed; a 0.95-cosine candidate supersedes
+       with no model request; a 0.30-cosine candidate adds with no
+       model request; a 0.75-cosine candidate asks the model.
+
+    Acceptance: tests green. Live: with the background engine spawned,
+    seed twenty synthetic model turns with persona-roster names through
+    a small script under `scripts/bench/memory/` that sets
+    `MAIPAI_DATA_DIR` to a fresh temp directory before any import and
+    refuses to run without it, then record how long until
+    `judgeQueueStats().pending` is zero and how many facts were written.
+    Out of scope: which turn sources are eligible (CHAT-07), the
+    ingestion service (CHAT-06), profile timing (CHAT-11). Checks: `cd
+    backend && bun test tests/memoryJudge.test.ts
+    tests/conversationHistory.test.ts tests/scheduler.test.ts`, then the
+    full exit gate.
+
+<a id="mem-03"></a>
+
+- [ ] **MEM-03: Store every turn verbatim as searchable episodes** (M)
+
+    Depends on: MEM-01. Files: `backend/src/db/schema.ts`,
+    `schema-version.ts`, a generated file under `migrations/`, new
+    `backend/src/lib/episodes.ts`, `conversationHistory.ts`, `memory.ts`
+    (`forget()`), `scheduler.ts` (the `memory.embedding_retry` handler),
+    new `backend/tests/episodes.test.ts`, and the privacy page under
+    `docs/user/` ("what MaiPai keeps" gains one line). Mirror
+    `memoryEmbeddings`, `pendingEmbeddings`, `embedMemoryRecordSafely()`,
+    and `drainPendingEmbeddings()`. Bun's bundled SQLite has FTS5 (verified
+    2026-09-12: `bm25()` works in `bun:sqlite`).
+
+    Do, in this order:
+    1. Schema: table `episodes` with `id` (text primary key, the repo's
+       id helper with prefix `ep`), `turn_id` referencing
+       `conversation_turns.id`, `conversation_id`, `person_id`,
+       `speaker` (`user` or `assistant`), `text`, `created_at`, `hlc`;
+       indexes on `(person_id, created_at)` and `turn_id`. Tables
+       `episode_embeddings` and `pending_episode_embeddings` mirroring
+       the memory ones. Run `bun run db:generate`, then append to the
+       generated SQL file: `CREATE VIRTUAL TABLE episodes_fts USING
+       fts5(text, content='episodes', content_rowid='rowid');` and the
+       three standard external-content triggers (after insert, after
+       delete, after update on `episodes`). Bump
+       `CURRENT_SCHEMA_VERSION` to 27 in the same commit.
+    2. `episodes.ts`: `recordEpisodes(turn)` inserts one row per side
+       (skip a `safety_refuse` turn entirely, skip an empty side) and
+       queues both for embedding; `embedPendingEpisodes()` embeds up to
+       32 queued rows per call with the raw text (no prefix, matching
+       memory's current scheme) and removes them from the queue;
+       `deleteEpisodesForTurns(turnIds)`; `deleteEpisodesForPerson(personId)`;
+       `listEpisodes(actor, opts)` returning only the actor's own rows.
+    3. Call sites: `logTurn()` calls `recordEpisodes` after the turn
+       insert; `runRetention()`, `deleteConversationById()`,
+       `batchDeleteConversations()`, and `clearConversations()` call
+       `deleteEpisodesForTurns` for the turns they remove; `forget()`
+       in `memory.ts` calls `deleteEpisodesForPerson`; the
+       `memory.embedding_retry` handler also calls
+       `embedPendingEpisodes()`.
+    4. Tests: a model turn writes two episodes and two queue rows; a
+       refused turn writes none; `SELECT ... FROM episodes_fts WHERE
+       episodes_fts MATCH 'cilantro'` finds the user side after "I
+       dislike cilantro"; `forget()` leaves zero rows for that person in
+       `episodes` and zero matches in `episodes_fts`; deleting a
+       conversation removes its episodes; `listEpisodes` for one person
+       never returns another person's rows, including for an owner.
+
+    Acceptance: tests green; `bash scripts/check.sh` passes the schema
+    drift and migration steps; the privacy page line is present. Out
+    of scope: retrieval ranking (MEM-04), export, UI. Checks: `cd
+    backend && bun test tests/episodes.test.ts
+    tests/conversationHistory.test.ts tests/memory.test.ts`, then the
+    full exit gate.
+
+<a id="mem-04"></a>
+
+- [ ] **MEM-04: Hybrid, time-aware recall over episodes, and a search route** (M)
+
+    Depends on: MEM-03. Files: `backend/src/lib/episodes.ts`,
+    `backend/src/routes/conversations.ts`, `backend/tests/episodes.test.ts`,
+    `backend/scripts/bench/memory/fixture.ts` and `run.ts`. Mirror
+    `recall()` and `similarByVector()` in `memory.ts` for the vector
+    half, and any existing `@hono/zod-openapi` route in
+    `routes/conversations.ts` for the route. `chrono-node` is already a
+    dependency; use it, never a model, for dates.
+
+    Do, in this order:
+    1. `recallEpisodes(actor, query, queryVector, opts: { limit = 5,
+       excludeConversationId?, now? })` returning `EpisodeMatch[]` of
+       `{ episode, pairedText, score }` where `pairedText` is the other
+       side of the same turn. Steps inside: parse the query with
+       `chrono-node` against `now`; a date or range restricts
+       `created_at` to it (a bare day means that whole day; "last week"
+       means the seven days before the current week); lexical
+       candidates from `episodes_fts` ranked by `bm25()`, the query
+       reduced to quoted terms joined with OR, top 20; vector
+       candidates by cosine over the actor's episode embeddings, top
+       20; fuse with reciprocal rank (k = 60); drop episodes from the
+       newest four turns of `excludeConversationId` (they are already
+       in the window); keep one match per turn; return the top `limit`.
+    2. `formatEpisodesForPrompt(matches, displayName, locale, now)`:
+       header line `From earlier conversations (what was said, not
+       necessarily true):`, then one line per match, `- Sep 5 (7 days
+       ago), <displayName> said: "..."` or `- Sep 5 (7 days ago), you
+       replied: "..."`, each quote cut at 200 characters at a word
+       boundary, whole block capped at 600 characters. Not wired into
+       the prompt here (JOIN-01).
+    3. Route: `GET /api/conversations/search?q=&limit=` through
+       `@hono/zod-openapi`, actor-scoped, returning turn id,
+       conversation id, date, both texts, and score.
+    4. Bench: add eight episode questions to
+       `scripts/bench/memory/fixture.ts` (a recipe suggested a week ago,
+       what was decided about a trip, what the assistant said about a
+       named pet, which day a topic came up, one that must return
+       nothing) and score them in `run.ts` by expected turn id.
+    5. Tests, with a seeded fixture of three conversations spread over
+       three weeks: "what recipe did you suggest last week" ranks the
+       assistant episode from seven days ago first; "cilantro" matches
+       with no vectors stored at all; "last week" excludes a
+       three-week-old mention; the current conversation's newest four
+       turns are excluded; another person's episodes never appear; the
+       formatted block is at most 600 characters and labels sides
+       correctly; the route returns 401 unauthenticated and only the
+       actor's rows.
+
+    Acceptance: tests green; the bench runs against the shared embed
+    URL with a fresh `MAIPAI_DATA_DIR` and reports at least six of
+    eight expected turns found; record the table. Out of scope:
+    injecting into the prompt (JOIN-01), a reranker (EVAL-04), UI.
+    Checks: `cd backend && bun test tests/episodes.test.ts` and the
+    conversations route tests, then the full exit gate.
+
+<a id="mem-05"></a>
+
+- [ ] **MEM-05: Prove the small judge, or fall back to the 4B pin** (S)
+
+    Depends on: MEM-02. Files: `backend/scripts/bench/judge-eval.ts`
+    (read the background URL instead of the chat URL, since the judge
+    now runs there), `docs/dev.md`. Find the 8B judge baseline numbers
+    in `docs/dev/session-c.md` or the step 6 entry in `docs/dev.md`
+    before running.
+
+    Run the judge eval against the spawned background engine on the dev
+    machine and record precision, recall, and seconds per turn beside
+    the 8B baseline. Keep the 1.7B pin if recall is at least 85% of the
+    baseline and precision is within five points; otherwise switch the
+    default pin to the 4B fallback in `backgroundAssets.ts`, re-run, and
+    record both. If neither passes, leave this open with the numbers
+    and do not change the default. Out of scope: changing the
+    extraction prompt (an EVAL item does that offline). Checks: the
+    bench's own test, then the full exit gate.
+
+### After both tracks merge
+
+<a id="join-01"></a>
+
+- [ ] **JOIN-01: Recalled episodes reach the prompt and the guards** (S)
+
+    Depends on: FAST-02 and MEM-04 merged. Files:
+    `backend/src/lib/turnEngine.ts`, `backend/tests/turnEngine.test.ts`.
+    In `prepareTurn()`, after `recall()`, call `recallEpisodes(actor,
+    text, utteranceVector, { excludeConversationId: conversation.id })`
+    and append `formatEpisodesForPrompt(...)` to the context message
+    right after the memory block, inside the existing memory-section
+    budget plus 600 characters. Add each recalled episode's text to the
+    guard context's grounded sources the same way memory bullets are
+    added. Test: "my dentist is on Thursday" said in conversation one
+    and never judged, then a new conversation asking "when is my dentist
+    appointment", yields a context message containing that episode line,
+    and a reply "It's on Thursday." passes the guards. Live on `main`:
+    the same exchange through the API, recorded. Checks: `cd backend &&
+    bun test tests/turnEngine.test.ts`, then the full exit gate.
+
+<a id="join-02"></a>
+
+- [ ] **JOIN-02: The orphan sweep leaves the background engine alone** (S)
+
+    Depends on: MEM-01 merged. Files: `backend/src/lib/llmSupervisor.ts`.
+    Add `getBackgroundLivePid()` to the same exclusion the sweep already
+    applies for `getEmbedLivePid()`. Test: mirror the existing embed
+    exclusion test. Checks: `cd backend && bun test
+    tests/llmSupervisor.test.ts`, then the full exit gate.
+
+### The block after this one (not scheduled; each needs its design note in dev.md first)
+
+- [ ] **TURN-01: One resolved turn context shared by routing, recall, and tool arguments** (M, after CHAT-10 and CHAT-13). Referent, options the assistant just listed, unresolved question, pending choice; every turn re-routes including follow-ups; a background-model rewrite only when a tool or retrieval will run, 1 s timeout, raw-text fallback, `replaces_previous` flag cancels an in-flight tool; clarify only on a top-two tie or a costly action, else best guess plus a one-clause hedge. Borrow the bot's subject tracker (three turns, wrong subject worse than none).
+- [ ] **LOOKUP-01: One bounded read-only refinement lookup, memory-first ordering, readable source pages** (M, after CHAT-16). Amends the two-call limit per decision 10; deadline, read-only, no consequential action; household memory, then offline reference, then the web; a maintained readability extractor turns a chosen page into compact evidence; one sentence spoken, the rest a follow-up away.
+- [ ] **VOICE-01: Interruption as a chat gate** (M). Natural spoken filler only when a tool or lookup is predicted over about a second; barge-in cancels inference and reconciles the logged reply with what was heard; a text-based end-of-turn detector on CPU unless a semantic model measures under 150 ms there; first spoken chunk gate lowered from 90 characters after FAST-04's numbers are in.
+- [ ] **ROUTE-01: The bot's shape guard and routing trace** (S). A question or first-person statement no deterministic tier can place goes to conversation, never to a plugin; log tier, winner, runner-up, and margin per decision; offer the top three tools without a similarity floor and re-measure false calls.
+- [ ] **THINK-01: A deterministic thinking gate** (S-M, after FAST-01 numbers). Multi-clause, "why", "how would", "compare", explicit "think about it", or a failed first pass turn `enable_thinking` on with a token budget; measured against always-off on the CHAT-23 corpus.
+- [ ] **EVAL-01: Qwen3.5-4B against the current 8B** (S, after FAST-06). Same conversations, same quantization class, same engine build; latency, routing, judge, naturalness; keep or drop.
+- [ ] **EVAL-02: Speculative decoding with a 0.6B same-family draft** (S). `-md` on the hub's actual GPU; keep only if p50 total time improves at least 20% with no quality change.
+- [ ] **EVAL-03: Control vector for register** (S-M). Retrain from the selected companion's own examples; replaces `NATURALNESS_POLICY` only if the naturalness bench holds and prompt tokens fall.
+- [ ] **EVAL-04: A reranker over hybrid episode recall** (S). Only where MEM-04's bench shows misses; latency budget 100 ms on the background engine.
+- [ ] **EVAL-05: Offline prompt optimization for tool descriptions and the extraction prompt** (M). A development-only tool (GEPA-style) over held-out conversations; ships fixed reviewed text; never runs in a household turn.
+- [ ] **EVAL-06: XState against the hand-written turn machine** (S, inside CHAT-17). Compare on cancellation propagation, deadlines, exactly-once execution; adopt only if the hand-written version cannot state those invariants as tests.
+- [ ] **TALK-01: A fine-tuned quick-reply model for the user-facing answer (Talker/Reasoner)** (L). Research item: needs training data and a loop; not before the household has a stable corpus.
+
 ## The 2026-09-05 audit: where the gaps actually are
+
+Historical snapshot from 2026-09-05, not current implementation status.
+The 2026-09-07 review and work orders are under Chat system optimization.
 
 Jesse asked for an audit of goals, plans and code against what has been
 built, with online research and a comparison against the legacy repos,
@@ -593,25 +2124,8 @@ verified against D's numbers.
       clean, `routingCorpus.test.ts` 107/107 against the stub,
       `scripts/bench/routing.ts` 107/107 against the real embedder with
       zero false positives (down from one).
-- [ ] **Prune orphaned `routing_embeddings` rows for examples no longer
-      declared** (S) - found live during Fix D's own measurement
-      (above), not fixed there to keep that fix's own diff scoped to
-      what it set out to change. `ensureRoutingEmbeddings()`
-      (`backend/src/lib/routing.ts`) only ever inserts embeddings for
-      examples CURRENTLY in a package's own `routing.examples` - an
-      example a package author removes (translate's own Fix D swap is a
-      real instance) leaves its old embedding row behind forever,
-      indistinguishable from a live one to `scoreByEmbedding()`, which
-      selects every stored row for a candidate package with no filter
-      against what that package currently declares. For a package with
-      no required args this could let a stale, no-longer-real example
-      win Tier 1 outright. Fix: after the existing insert loop, delete
-      any `routingEmbeddings` row for a `packageId` in this call's own
-      `candidates` list whose `exampleHash` isn't among the hashes just
-      computed from that package's CURRENT `examples`. Exit: a test that
-      removes an example from a fixture manifest, calls
-      `ensureRoutingEmbeddings()` again, and asserts the old row is gone
-      from the table.
+Stale routing-example cleanup is tracked by [CHAT-09](#chat-09).
+
 - [x] **Fix E: native tool calling, one round trip** (M-L) - shipped
       2026-09-07. Built per plan: `spec/llm/ts/types.ts` gained
       `ToolDefinition`/`ToolCallWire`/`ToolCallDelta` and the request/
@@ -702,70 +2216,12 @@ verified against D's numbers.
       union is a pre-existing duplicated inline literal across three
       files (Fix E only added the 4th value to an already-3x-duplicated
       pattern), a genuine but separate consolidation task.
-- [ ] **One named, exported `RoutingTier` type, instead of the same
-      inline union duplicated three times** (S) - found by a Fix E code
-      review, 2026-09-07 (not introduced by it - the pattern predates
-      Fix E, which just added a 4th value to it). `backend/src/wire.ts`'s
-      `TurnValue.routing.tier`, `turnEngine.ts`'s `TurnLogRecord.routing.
-      tier`, and `conversationHistory.ts`'s `pluginTierCounts`/`RoutingStats.
-      byPlugin[].tier` object shape are three independent, hand-kept
-      copies of `"pattern" | "embedding" | "keyword" | "tool"` - adding a
-      routing tier means finding and editing all three by hand, and a
-      missed one is a silent type mismatch or a routingStats() bucket
-      that quietly drops the new tier's counts. Objective: one exported
-      `RoutingTier` type (`backend/src/lib/routing.ts` is the natural
-      home - it's not a wire/spec type, so `wire.ts` doesn't need to be
-      the source), imported everywhere the union is checked today. Exit:
-      `scripts/check.sh`; a test proving the compiler catches a routing
-      tier used somewhere that doesn't import the shared type.
-- [ ] **`runTurnStream()` never gets a second chance at a caught guess -
-      `runTurn()` does** (M) - found 2026-09-07 (`docs/dev.md`'s
-      "Automatic web lookups instead of declining," getmaipai/home#67).
-      `runTurn()` now retries once with `tool_choice: "required"` when
-      the model answers in plain text and `guardReply()` catches it as
-      `invention`/`unrelated_recall` (a guess instead of a real lookup) -
-      the mirror of the existing "every proposed call failed, retry
-      without tools" contract. `runTurnStream()` (`backend/src/lib/
-      turnEngine.ts` - what the real chat UI actually calls) does NOT:
-      a first cut buffered the first sentence eagerly, before the
-      function could even return, so it could hang indefinitely on a
-      reply with no early punctuation (caught by `tests/openai.test.ts`'s
-      cancellation test timing out) - reverted rather than shipped with
-      that latency risk. Today the streaming path only has the reworded
-      system prompt to lean on; a caught guess still streams and gets
-      replaced by `gateGuards()` downstream exactly as before this fix,
-      just without a retry. Objective: give the streaming path the same
-      retry, without blocking `runTurnStream()`'s own return or adding
-      latency to the ordinary (non-inventing) case. Real design needed,
-      not just porting the non-streaming code: the decision ("was the
-      first sentence a guess") has to happen LAZILY, inside the
-      generator `streamTurnEvents()` (`backend/src/routes/turn.ts`)
-      already drains incrementally sentence by sentence via
-      `gateOutputSafety()`/`gateGuards()` - not eagerly before
-      `runTurnStream()` picks `"stream"` vs `"immediate"`. One shape
-      worth trying: let `gateGuards()` itself, on catching
-      `invention`/`unrelated_recall` on the FIRST sentence with nothing
-      spoken yet, ask the caller (via its own return value or a callback)
-      whether a forced-tool retry is possible, instead of unconditionally
-      substituting the honest line - `runTurnStream()` would need to stay
-      in the loop to actually run that retry (it owns the tools/ranked
-      candidates), so this likely means threading a retry callback into
-      `gateGuards()` rather than `gateGuards()` reaching back into
-      turnEngine.ts itself. Mirror: `tests/tier2.test.ts`'s
-      `withScriptedGuessThenForcedTool()` already exists for exactly this
-      kind of test. Exit: a `runTurnStream()` regression test proving a
-      caught-guess turn resolves via the forced tool (matching `runTurn()`'s
-      own two new tests) AND `tests/openai.test.ts`'s cancellation test
-      (and the rest of `scripts/check.sh`) stays green with no added
-      first-byte latency on an ordinary reply.
-- [ ] Real multi-source, multi-skill answers (L) - see `docs/dev.md`'s
-      2026-09-04 tier 2 note and the 2026-09-05 stress-test against it.
-      Explicitly NOT an open agentic loop by design; the current best
-      candidate shape is a bounded `compose` recipe step (one model call,
-      author-fixed tool sequence) plus richer chained recipes. Sequencing
-      already decided: ship `embed` (real semantic routing) first, ship
-      more real skills, measure the actual fall-through rate from real
-      conversation history, then decide whether to build this at all.
+RoutingTier consolidation is tracked by [CHAT-21](#chat-21).
+
+Streaming recovery and trailing native calls are tracked by [CHAT-17](#chat-17); its fixed event-machine design supersedes the earlier retry proposal.
+
+Bounded multi-source composition is tracked by [CHAT-15](#chat-15) and [CHAT-16](#chat-16). Dependent calls remain authored recipes.
+
 - [x] **Wire the `embed` role into routing** (M) - shipped 2026-09-06,
       Session C step 1 (`lib/routing.ts`, `spec/llm/routing-corpus.json`,
       docs/dev/session-c.md). corrected 2026-09-05:
@@ -917,6 +2373,14 @@ Sources consulted (this research pass, 2026-09-05): [ChatGPT Projects guide](htt
 
 ## Chat, memory and persona (the intelligence gap)
 
+- [x] **S: Keep the shell visible when the phone composer gains focus.**
+      `frontend/src/kit/ui/sidebar.tsx` anchors the shell to the viewport,
+      matching the fixed phone navigation. The existing demo browser pipeline
+      reproduces keyboard document panning and checks the header and input
+      remain visible and tappable. Exit: `bun run scripts/screenshot.ts --chat-focus-review`;
+      add `--webkit` for Safari's engine. Physical phone deployment is unverified.
+      No message anchoring, API, or runtime changes.
+
 What "intelligent, personified, memory- and data-driven chat" needs that
 `turnEngine.ts`, `memory.ts` and `persona.ts` do not have today. Ordered
 by payoff per day of work; the first five together turn stateless Q&A
@@ -924,37 +2388,8 @@ into a conversation with someone who knows who is talking.
 
 **Conversation and context**
 
-- [ ] **Migrate memory.ts's stored embeddings to nomic's `search_document:`
-      prefix, to match routing.ts's own Fix D change** (M) - deferred
-      2026-09-07 from Fix D (`docs/dev.md`'s "Chat reliability: the
-      2026-09-07 incident" note), see `lib/memory.ts`'s own
-      `embedQueryForRecall()` comment for the full reasoning it was
-      deferred. Objective: `memoryEmbeddings` rows carry the same
-      `search_document:`-prefixed vectors `routingEmbeddings` now does,
-      without ever comparing a prefixed vector against a stale unprefixed
-      one mid-migration. Real constraint routing.ts's own fix didn't have:
-      `memoryEmbeddings` has no hash/staleness concept at all (one row per
-      memory, always overwritten in place) and no cheap way to tell "this
-      row is pre- or post-migration" apart - a hash bump alone (routing's
-      own trick) does nothing for rows that already exist. Needs: (1) a
-      real migration path - a `space` value that encodes the prefix
-      scheme (not just `result.value.model`) so a query can filter for
-      compatible rows, plus a maintenance-job pass (`lib/memory.ts`'s
-      existing `runMaintenance()`/`pending_embeddings` retry machinery is
-      the precedent to extend, not reinvent) that re-embeds every
-      pre-migration row in the background; (2) `embedQueryForRecall()`
-      gains the `search_query:` prefix only once writes are prefixed too
-      - a query-side-only change first would be worse than doing nothing,
-      confirmed live (Fix D's own measurement: prefixing only one side
-      scored WORSE than neither on the routing corpus); (3)
-      `turnEngine.ts`'s `prepareTurn()` reuses ONE utterance vector for
-      both `route()` and `recall()` (a 2026-09-06 review fix avoiding a
-      duplicate HTTP round trip) - since routing.ts's own query side
-      stays unprefixed (Fix D's real, measured answer there), this item's
-      own query prefix would need its OWN separate embed call, reopening
-      that round-trip cost; measure whether the recall-quality gain is
-      worth it before assuming it is. Out of scope until then: don't
-      prefix memory.ts's writes alone.
+Embedding compatibility is tracked by [CHAT-09](#chat-09). Preserve current preprocessing until CHAT-23 demonstrates that a migration improves held-out recall.
+
 - [x] **Fix B: a package failure is a failure, canned text is never the
       model's voice, the UI shows who answered** (M) - shipped 2026-09-07.
       `docs/dev.md`'s "Chat reliability: the 2026-09-07 incident" note has
@@ -1195,55 +2630,29 @@ into a conversation with someone who knows who is talking.
       trust-these-facts reminder. Absolute day count, not legacy's "N
       weeks ago" rounding - the plan's own text asked for "<n> days ago"
       literally.
-- [ ] **Use the bi-temporal fields, and add a clock to every memory**
-      (S in the spec, then hub) - the `hlc` half shipped, Session A step
-      10 (2026-09-05): `memory-record`/`person`/`grant` all carry `hlc`
-      now, set from `lib/hlc.ts` on every real write (`remember()`,
-      `supersede()`, `archive()`, decay, demotion, a person's own
-      create/edit/role-change/delete, `logTurn()`) - `conversation_turns`
-      and `conversations` (step 3) already had it. The `valid_from`/
-      `valid_to` half shipped earlier, Session A step 6: `remember()`/
-      `supersede()` accept and write real values (the judge sets
-      `valid_to` on a dated state and closes it on a contradiction),
-      where every write used to force both to null. **Still open**:
-      nothing READS `valid_to` yet - recall doesn't prefer currently-
-      valid facts over expired ones. "Did this change" and "we never
-      discussed that" are the two cases assistants fail most
-      (LongMemEval); the 2026 temporal-memory results say to organize by
-      when things happened, not when they were said.
-- [ ] **Schedule `runMaintenance`** (S) - decay exists and is only
-      reachable by a manual route; step 5 wires it to the scheduler.
-      (The other half of this item, `recall` bumping `uses` on 20
-      matches while 5 reach the model, shipped in Session A step 2,
-      2026-09-05: `recall()`'s new `bumpUsage` option lets the turn
-      engine bump usage only on what actually reached the prompt.)
-- [ ] **Memory in the chat UI** (S-M) - a "memory updated" chip when the
-      judge writes, per-message "remember this" and "forget this"
-      actions. **The per-person memory page is done** (session E step 5,
-      2026-09-06, `frontend/src/apps/memory/MemoryPage.tsx`'s
-      `OtherPersonMemories`): an owner/admin picks a child from the same
-      person picker Conversations uses, sees that child's real memories
-      (`GET /api/memory?person=`), and can export
-      (`GET /api/memory/export`) or forget everything
-      (`POST /api/memory/forget`) about them - both real routes with no
-      frontend caller before this. **The chip is fixed** (2026-09-07,
-      getmaipai/home#64): it had never once rendered - it read a
-      `memory.updated` notification's `payload.turn_id`/`memory_ids`,
-      and `NotificationDeliveryView` has no `payload` field on `main` at
-      all. Repointed to real data instead: `conversationHistory.ts`'s
-      `list()` (the flat route `chatHistoryAdapter.ts` actually loads
-      through, not the per-conversation one) now carries `memory_ids`
-      the same way `listConversationTurns()` already did, via a shared
-      `memoryIdsByTurn()` join; `chatHistoryAdapter.ts` puts them on the
-      assistant message's `metadata.custom.memoryIds`; the chip
-      (`chatMemoryChip.tsx`) reads that directly off the rendered
-      message, no query or poll at all. Still open: per-message
-      "remember this"/"forget this", and "what changed since" from
-      `?since=` (this step's own brief) - `GET /api/memory` has no
-      `?since=` handling at all server-side (confirmed by reading
-      `parseListOptions` in `backend/src/routes/memory.ts` - it only
-      reads `scope`/`person`), unlike Conversations' `GET /:id/turns`,
-      which already supports a real `since`.
+Memory clock stamps and validity writes already exist. The remaining temporal-read gap is tracked by [CHAT-08](#chat-08).
+
+Maintenance is already scheduled in `backend/src/index.ts`; profile freshness and unified inference scheduling are tracked by [CHAT-11](#chat-11) and [CHAT-19](#chat-19).
+
+Loaded-history chips and the memory page exist. Live status refresh and per-message actions are tracked by [CHAT-20](#chat-20).
+
+- [ ] **A memory change feed for clients** (M) - the older UI work order's
+      `GET /api/memory?since=` request remains separate from CHAT-20's
+      conversation-state polling. Files: `routes/memory.ts`, `memory.ts`,
+      `wire.ts`, and shared memory fixtures. Mirror Conversations' cursor
+      validation and memory access checks. Use an opaque cursor derived
+      from HLC plus record ID, returned by the first full authorized read;
+      accept it as optional `since`. Return changed records including
+      authorized tombstone IDs without erased text, in cursor order, capped
+      at 100 with `next_cursor` and `has_more`. Preserve the existing array
+      response when no cursor/change-feed option is requested by adding a
+      separate `/changes` endpoint instead of changing `GET /`'s shape.
+      Acceptance: a create/correction/forget appears once across paged reads,
+      identical-clock records are not skipped, and foreign-person changes
+      are excluded. Out of scope: push transport and chat chip polling.
+      Exit: existing memory/API tests extended for these behaviors and
+      `bash scripts/check.sh`.
+
 - [x] **A household memory bench** (M) - shipped, Session C step 9
       (2026-09-06): `backend/scripts/bench/memory/{fixture,run}.ts`, the
       four LongMemEval categories `scripts/bench/memory-eval.ts` (session-a
@@ -1343,13 +2752,22 @@ into a conversation with someone who knows who is talking.
 
 **Data-driven answers**
 
-- [ ] **Exposed state, the Home Assistant pattern** (M) - every package
-      declares which records and actions it exposes; the turn engine
-      builds the tool list per request (per person, device, persona),
-      capped well under the model's limit. Community measurements: about
-      thirty exposed items cost 1,300 tokens and past fifty a small model
-      forgets devices. Tier 1 (`embed` similarity over `routing.examples`)
-      is the pre-filter that keeps the offered set to a handful.
+Ready, authorized candidate selection is tracked by [CHAT-14](#chat-14); structured outcomes and composition by [CHAT-15](#chat-15) and [CHAT-16](#chat-16).
+
+- [ ] **Declare package-owned exposed records and actions** (M) - retain
+      the broader exposed-state gap beyond CHAT-14's installed-tool
+      readiness. Files: `spec/schemas/manifest.schema.json`, package host,
+      and existing entity/permission readers. Extend the manifest's
+      existing contribution declarations with typed read/action references,
+      resolve them through existing host ports, and filter per actor before
+      model context. No raw SQL or duplicated device-state store. Mirror
+      the existing manifest fixture/permission tests. Acceptance: only
+      explicitly exposed authorized records/actions reach tools; removing
+      an exposure removes it on the next turn. Scope is declaration and
+      visibility; new integration implementations remain separate packages.
+      Exit: shared manifest fixtures, host permission tests, and
+      `bash scripts/check.sh`.
+
 - [ ] **Typed query tools, never text-to-SQL** (decision, recorded) -
       each package exposes a few parameterized reads ("events between",
       "chores for person") backed by SQL we wrote. Small models fill
@@ -3211,6 +4629,13 @@ that owns it.
       Still open, each needing the harness above (or, for the STT
       items, a wired frontend client) to land safely rather than guessed
       at blind:
+      - Amended 2026-09-12: the sub-list below is superseded by the
+        [2026-09-12 block](#chat-direction-2026-09-12-the-next-block-two-tracks):
+        prefix reorder and cache are FAST-01 and FAST-02, the cue timer
+        and first chunk are FAST-04 and VOICE-01, the judge's own model
+        is MEM-01, barge-in is VOICE-01. Multi-slot `-np 2` is dropped:
+        with background work off the chat engine one slot serves a
+        household. Kept for the record only.
       - **Multi-slot separation for the chat engine** (`-np 2` +
         `id_slot` per role so the judge/summary refresh never contend
         with a live turn at the process level, not just the idle-gate
@@ -3369,7 +4794,8 @@ that owns it.
       data point, not a gate; see docs/dev/session-c.md's step 4 entry,
       including a genuine unrelated finding it helped surface (below).
 - [ ] **Short, ambiguous utterances free-associate onto the plugins
-      list** (S, C found it) - `buildSystemPrompt()`'s standing "Things
+      list** (S, C found it; amended 2026-09-12: FAST-02 removes the
+      list, tick this when FAST-02 lands) - `buildSystemPrompt()`'s standing "Things
       this household has set up" section names Weather unconditionally;
       Session C step 4's live naturalness/persona bench runs against a
       real Qwen3 8B (2026-09-06) found several completely unrelated

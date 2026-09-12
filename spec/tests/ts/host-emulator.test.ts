@@ -21,6 +21,24 @@ describe("HostEmulator", () => {
     expect(found[0].text).toContain("oat milk");
   });
 
+  test("memory.recall defaults to the actor's own person facts and household facts", () => {
+    const host = new HostEmulator();
+    host.memory.remember("I dislike cilantro", "fact", "person", "person-a1b2c3");
+    host.memory.remember("Sprout dislikes cilantro", "fact", "person", "person-sprout");
+    host.memory.remember("The household buys cilantro on Fridays", "fact", "household");
+
+    const found = host.memory.recall("cilantro");
+    expect(found.map((r) => r.text)).toEqual([
+      "I dislike cilantro",
+      "The household buys cilantro on Fridays",
+    ]);
+  });
+
+  test("memory.recall refuses an explicit request for another person's facts", () => {
+    const host = new HostEmulator();
+    expect(() => host.memory.recall("allergies", { person: "person-sprout" })).toThrow(HostError);
+  });
+
   test("data.forget removes only that person's records", () => {
     const host = new HostEmulator();
     host.memory.remember("about riff", "fact", "person", "person-riff");
