@@ -10666,6 +10666,29 @@ because of it, the composed answer states the conflict and the
 recommendation, and a greeting and a timer in the same suite still
 take one completion or none.
 
+## Track B progress (2026-09-12)
+
+Track B session implementing MEM-01 through MEM-05, the background engine
+and memory system overhaul. Status as of this session:
+
+**MEM-01: COMPLETE** - A background engine on its own process, shaped like
+the embed role. Created backgroundAssets.ts with pinned Qwen3-1.7B model
+(Qwen3-4B fallback via MAIPAI_BACKGROUND_MODEL=qwen3-4b). Created
+backgroundSupervisor.ts with lazy-start pattern, mirroring embedSupervisor.ts
+exactly. Wired into health endpoint in app.ts and wire.ts. Tests green, live
+check confirms engine spawns and completes requests.
+
+**MEM-02: IN PROGRESS** - Judge and summaries on background engine. Replaced
+all `complete("chat", ...)` calls in memoryJudge.ts and conversationHistory.ts
+with `completeBackground(...)`. Implemented dedupe cosine similarity band logic:
+near-identical facts (>= 0.92) and clearly new facts (< 0.60) are decided
+without model calls; only ambiguous similarities (0.60-0.92) ask the model.
+Fixed response handling (result.text instead of result.value.text). Remaining:
+implement drain logic in runJudgeBatch(), export judgeQueueStats(), full test
+coverage.
+
+**MEM-03, MEM-04, MEM-05: NOT STARTED** - Blocked on MEM-02 completion.
+
 ### Sources consulted
 
 llama.cpp server prefix cache and `--cache-reuse`
