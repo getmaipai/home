@@ -407,7 +407,7 @@ async function startChatBackend(): Promise<ChatBackend> {
       detectedModel = CATALOG.find(
         (m) => m.id === modelId && m.role === "chat" && m.implemented && m.sizing.kind === "transformer_gguf",
       );
-      if (detectedModel && detectedModel.sizing.kind === "transformer_gguf") {
+      if (detectedModel) {
         const hw = await detectHardware();
         launchFlags = resolveLaunchFlags(detectedModel, hw);
       }
@@ -415,14 +415,14 @@ async function startChatBackend(): Promise<ChatBackend> {
 
     const spawned = await spawnLlamaServer(bin, modelPath, "override", launchFlags, modelId);
     const backend = attachChatWatch(spawned);
-    // No model metadata on this tier (a bare env-var override, no catalog
-    // entry) to size a process ceiling against - system-memory protection
-    // only (resourceGovernor.ts's trigger A), matching this tier's existing
-    // "unchanged since this pass" scope. Skip if we detected a model.
-    if (!detectedModel) {
-      const hw = await detectHardware();
-      startResourceGovernor({ pid: backend.pid!, hasCuda: hw.cudaDevices.length > 0, ceilingBaselineBytes: null });
-    }
+
+    // FAST-01: always set up resource governor and warmup, whether a model
+    // was detected or not. Tier 3 does both; tier 2 should too for
+    // consistency.
+    const hw = await detectHardware();
+    startResourceGovernor({ pid: backend.pid!, hasCuda: hw.cudaDevices.length > 0, ceilingBaselineBytes: null });
+    await warmChatPrefix(spawned.client);
+
     return backend;
   }
 

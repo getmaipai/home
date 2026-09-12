@@ -167,11 +167,11 @@ async function main() {
   const sortedFirstDelta = timings.map((t) => t.firstDeltaMs).sort((a, b) => a - b);
   const sortedTotal = timings.map((t) => t.totalMs).sort((a, b) => a - b);
   const meanPromptTokens = timings.reduce((sum, t) => sum + t.promptTokens, 0) / timings.length;
+  const totalPromptTokens = stablePrefix.length / 4 + history.length * 50 + userMessages[0]!.length / 4; // Rough estimate
 
   // Calculate cache ratio (1 - processed / total)
-  // Total prompt tokens should be relatively stable (prefix + history + current message)
-  const totalPromptSize = 1000; // Estimated from typical prefix + history
-  const cacheRatio = 1 - meanPromptTokens / totalPromptSize;
+  // Lower cache ratio on first turn(s) before cache fills; should improve toward end
+  const cacheRatio = meanPromptTokens > 0 ? 1 - meanPromptTokens / totalPromptTokens : 0;
 
   console.log("\n" + "=".repeat(70));
   console.log("RESULTS");
