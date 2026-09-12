@@ -920,7 +920,7 @@ Track B: MEM-01, MEM-02, MEM-03, MEM-04, MEM-05. Then JOIN-01, JOIN-02.
 
 <a id="fast-01"></a>
 
-- [ ] **FAST-01: Make the prompt prefix cache actually hit, and measure it** (M)
+- [x] **FAST-01: Make the prompt prefix cache actually hit, and measure it** (M)
 
     Depends on: Step 0. Files: `backend/src/lib/engineAutotune.ts`,
     `llmSupervisor.ts`, `llm.ts`, `backend/src/index.ts`,
