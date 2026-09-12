@@ -920,7 +920,9 @@ Track B: MEM-01, MEM-02, MEM-03, MEM-04, MEM-05. Then JOIN-01, JOIN-02.
 
 <a id="fast-01"></a>
 
-- [x] **FAST-01: Make the prompt prefix cache actually hit, and measure it** (M)
+- [ ] **FAST-01: Make the prompt prefix cache actually hit, and measure it** (M)
+  
+  Status (session 2026-09-12): All code implementation and unit tests complete (1799+ tests pass, check.sh green). Three issues from code review fixed (import path, type assertions). Now requires live benchmark runs: once against main checkout's engine on 8788, once against Track A engine on 8798 with new flags and warm-up. After run must show cache ratio > 0.75 on turns 2-30 and first-delta p50 < 800ms to mark complete.
 
     Depends on: Step 0. Files: `backend/src/lib/engineAutotune.ts`,
     `llmSupervisor.ts`, `llm.ts`, `backend/src/index.ts`,
