@@ -3,6 +3,7 @@ import { TestClient } from "./client";
 import { resetDb } from "./reset-db";
 import { __resetThrottleForTests } from "@/lib/secretThrottle";
 import { __resetLlmSupervisorForTests } from "@/lib/llmSupervisor";
+import { __resetBackgroundSupervisorForTests } from "@/lib/backgroundSupervisor";
 import { runTurn, __setSummaryRefreshDelayForTests } from "@/lib/turnEngine";
 import {
   list,
@@ -41,6 +42,8 @@ beforeEach(() => {
 
 afterEach(() => {
   __resetLlmSupervisorForTests();
+  __resetBackgroundSupervisorForTests();
+  delete process.env.MAIPAI_BACKGROUND_URL;
 });
 
 async function owner() {
@@ -290,7 +293,7 @@ describe("exportPerson()", () => {
 
 describe("summarizeBeforeDelete()", () => {
   afterEach(() => {
-    delete process.env.MAIPAI_LLAMA_SERVER_URL;
+    delete process.env.MAIPAI_BACKGROUND_URL;
   });
 
   test("no-ops on an empty batch", async () => {
@@ -315,7 +318,7 @@ describe("summarizeBeforeDelete()", () => {
 
     const { startStubLlmServer } = await import("@maipai/spec/llm/ts/stubServer.js");
     const stub = startStubLlmServer();
-    process.env.MAIPAI_LLAMA_SERVER_URL = stub.url;
+    process.env.MAIPAI_BACKGROUND_URL = stub.url;
     try {
       await summarizeBeforeDelete(rows);
     } finally {
@@ -344,7 +347,7 @@ describe("summarizeBeforeDelete()", () => {
     // exercising the `!result.ok` branch, not summarizeBeforeDelete()'s
     // own outer catch (a separate, more defensive guard against
     // anything else in this loop throwing, e.g. remember() itself).
-    process.env.MAIPAI_LLAMA_SERVER_URL = "http://127.0.0.1:1"; // never reachable
+    process.env.MAIPAI_BACKGROUND_URL = "http://127.0.0.1:1"; // never reachable
     await expect(summarizeBeforeDelete(rows)).resolves.toBeUndefined();
 
     expect(db.select().from(memoryRecords).where(eq(memoryRecords.recordKind, "episode")).all().length).toBe(0);
@@ -361,14 +364,14 @@ describe("summarizeBeforeDelete()", () => {
     // The plugin floor, not a generic message: a generic one falls
     // through to the chat role during turn creation itself, which would
     // resolve (and cache) the DEFAULT test backend before this test
-    // gets a chance to point MAIPAI_LLAMA_SERVER_URL at its own stub.
+    // gets a chance to point MAIPAI_BACKGROUND_URL at its own stub.
     await runTurn(child, "chat", "remember that I like pizza");
     const rows = db.select().from(conversationTurns).where(eq(conversationTurns.personId, child.id)).all();
     db.update(people).set({ deletedAt: new Date().toISOString() }).where(eq(people.id, child.id)).run();
 
     const { startStubLlmServer } = await import("@maipai/spec/llm/ts/stubServer.js");
     const stub = startStubLlmServer();
-    process.env.MAIPAI_LLAMA_SERVER_URL = stub.url;
+    process.env.MAIPAI_BACKGROUND_URL = stub.url;
     try {
       await summarizeBeforeDelete(rows);
     } finally {
@@ -526,7 +529,7 @@ describe("runRetention()", () => {
 
     const { startStubLlmServer } = await import("@maipai/spec/llm/ts/stubServer.js");
     const stub = startStubLlmServer();
-    process.env.MAIPAI_LLAMA_SERVER_URL = stub.url;
+    process.env.MAIPAI_BACKGROUND_URL = stub.url;
     try {
       const result = runRetention();
       // The delete already happened synchronously, before any
@@ -544,7 +547,7 @@ describe("runRetention()", () => {
       expect(episodes.length).toBe(1);
     } finally {
       stub.stop();
-      delete process.env.MAIPAI_LLAMA_SERVER_URL;
+      delete process.env.MAIPAI_BACKGROUND_URL;
     }
   });
 
@@ -798,7 +801,7 @@ describe("buildConversationWindow() (step 3)", () => {
 
 describe("maybeRefreshConversationSummary() (step 3: runs when due, not before)", () => {
   afterEach(() => {
-    delete process.env.MAIPAI_LLAMA_SERVER_URL;
+    delete process.env.MAIPAI_BACKGROUND_URL;
   });
 
   test("does not run before at least 4 turns have fallen out of the window", async () => {
@@ -837,7 +840,7 @@ describe("maybeRefreshConversationSummary() (step 3: runs when due, not before)"
 
     const { startStubLlmServer } = await import("@maipai/spec/llm/ts/stubServer.js");
     const stub = startStubLlmServer();
-    process.env.MAIPAI_LLAMA_SERVER_URL = stub.url;
+    process.env.MAIPAI_BACKGROUND_URL = stub.url;
     try {
       await maybeRefreshConversationSummary(conv.value.id);
     } finally {
@@ -868,7 +871,7 @@ describe("maybeRefreshConversationSummary() (step 3: runs when due, not before)"
 
     const { startStubLlmServer } = await import("@maipai/spec/llm/ts/stubServer.js");
     const stub = startStubLlmServer();
-    process.env.MAIPAI_LLAMA_SERVER_URL = stub.url;
+    process.env.MAIPAI_BACKGROUND_URL = stub.url;
     // A generous delay and generous margins around it, the same "jitter
     // margin two orders of magnitude wider than a real test runner ever
     // needs" philosophy tests/rateLimiter.test.ts's own issue #13 fix

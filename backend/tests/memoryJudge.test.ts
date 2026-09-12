@@ -3,6 +3,7 @@ import { TestClient } from "./client";
 import { resetDb } from "./reset-db";
 import { __resetThrottleForTests } from "@/lib/secretThrottle";
 import { __resetLlmSupervisorForTests } from "@/lib/llmSupervisor";
+import { __resetBackgroundSupervisorForTests } from "@/lib/backgroundSupervisor";
 import { resolveOrCreateConversation, logTurn } from "@/lib/conversationHistory";
 import { judgeTurn, runJudgeBatch, runConsolidation } from "@/lib/memoryJudge";
 import { remember, similarByVector, PROFILE_SOURCE } from "@/lib/memory";
@@ -23,7 +24,9 @@ beforeEach(() => {
 
 afterEach(() => {
   __resetLlmSupervisorForTests();
+  __resetBackgroundSupervisorForTests();
   delete process.env.MAIPAI_LLAMA_SERVER_URL;
+  delete process.env.MAIPAI_BACKGROUND_URL;
 });
 
 async function owner(): Promise<{ client: TestClient; actor: PersonRow }> {
@@ -61,7 +64,7 @@ function makeTurn(actor: PersonRow, userText: string, replyText: string) {
   return db.select().from(conversationTurns).where(eq(conversationTurns.id, turnId)).get()!;
 }
 
-/** Points the chat backend at a fresh stub scripted to answer exactly
+/** Points the background engine at a fresh stub scripted to answer exactly
  * one extraction/dedupe/contradiction shape - stubServer.ts's own
  * scriptedChatReply option (added for this file), distinguished by the
  * request's own response_format.json_schema.name since that's the one
@@ -69,7 +72,7 @@ function makeTurn(actor: PersonRow, userText: string, replyText: string) {
  * normal turn-generation call (which never sets response_format at all
  * and so always falls through to the default echo reply here). */
 async function withScriptedJudge<T>(reply: (schemaName: string | undefined, request: ChatCompletionRequest) => unknown, fn: () => Promise<T>): Promise<T> {
-  __resetLlmSupervisorForTests();
+  __resetBackgroundSupervisorForTests();
   const { startStubLlmServer } = await import("@maipai/spec/llm/ts/stubServer.js");
   const stub = startStubLlmServer(0, {
     scriptedChatReply: (request) => {
@@ -78,7 +81,7 @@ async function withScriptedJudge<T>(reply: (schemaName: string | undefined, requ
       return reply(schemaName, request);
     },
   });
-  process.env.MAIPAI_LLAMA_SERVER_URL = stub.url;
+  process.env.MAIPAI_BACKGROUND_URL = stub.url;
   try {
     return await fn();
   } finally {

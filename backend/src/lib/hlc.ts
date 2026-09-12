@@ -66,6 +66,8 @@ export const HLC_BEARING_TABLES = [
   "people",
   "memory_records",
   "memory_embeddings",
+  "episodes",
+  "episode_embeddings",
   "settings_values",
   "conversations",
   "conversation_turns",
