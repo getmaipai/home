@@ -869,6 +869,7 @@ describe("maybeRefreshConversationSummary() (step 3: runs when due, not before)"
       logTurn(actor, "chat", `msg ${i}`, { reply: { text: `reply ${i}` }, source: "model", safety: SAFE, conversation_id: conv.value.id, turn_id: `turn-delay${i}` });
     }
 
+    __resetBackgroundSupervisorForTests();
     const { startStubLlmServer } = await import("@maipai/spec/llm/ts/stubServer.js");
     const stub = startStubLlmServer();
     process.env.MAIPAI_BACKGROUND_URL = stub.url;

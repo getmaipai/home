@@ -66,6 +66,7 @@ describe("restorePersonFromBackup()", () => {
     // Lose it all live: this is the scenario the feature exists for -
     // an accidental forget()/settings reset, not necessarily a delete.
     sqlite.query("DELETE FROM memory_records WHERE person = ?").run(person.id);
+    sqlite.query("DELETE FROM episodes WHERE person_id = ?").run(person.id); // episodes deleted with turns
     sqlite.query("DELETE FROM conversation_turns WHERE person_id = ?").run(person.id);
     sqlite.query("DELETE FROM conversations WHERE person_id = ?").run(person.id);
     sqlite.query("DELETE FROM settings_values WHERE scope = ?").run(`person:${person.id}`);
@@ -104,7 +105,9 @@ describe("restorePersonFromBackup()", () => {
 
     const backup = runBackup();
     sqlite.query("DELETE FROM memory_records WHERE person = ?").run(a.id);
+    sqlite.query("DELETE FROM episodes WHERE person_id = ?").run(a.id);
     sqlite.query("DELETE FROM memory_records WHERE person = ?").run(b.id);
+    sqlite.query("DELETE FROM episodes WHERE person_id = ?").run(b.id);
 
     restorePersonFromBackup(backup.filename, a.id);
     expect((sqlite.query("SELECT COUNT(*) AS n FROM memory_records WHERE person = ?").get(a.id) as { n: number }).n).toBe(1);

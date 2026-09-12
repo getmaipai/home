@@ -608,6 +608,7 @@ describe("deleting a person erases what the household held about them", () => {
     expect(countRows("settings_values", "scope", `person:${person.id}`)).toBe(0);
     expect(countRows("scheduled_jobs", "person_id", person.id)).toBe(0);
     expect(countRows("person_credentials", "person_id", person.id)).toBe(0);
+    expect(countRows("episodes", "person_id", person.id)).toBe(0); // episodes deleted with turns
   });
 
   // Their session dies with them: a deleted person holding a live cookie

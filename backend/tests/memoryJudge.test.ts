@@ -12,7 +12,7 @@ import { markTurnStarted, __resetTurnActivityForTests } from "@/lib/turnActivity
 import { embed } from "@/lib/llm";
 import { db } from "@/db";
 import { people, conversationTurns, memoryRecords } from "@/db/schema";
-import { eq, and } from "drizzle-orm";
+import { eq, and, inArray } from "drizzle-orm";
 import type { ChatCompletionRequest } from "@maipai/spec/llm/ts/types.js";
 import type { TurnValue } from "@/wire";
 import type { PersonRow } from "@/types";
@@ -555,7 +555,7 @@ describe("runJudgeBatch()", () => {
   // to 4.7 seconds to a chat reply started mid-batch) - a batch now
   // processes exactly one turn per tick, oldest first, and the backlog
   // drains one tick at a time rather than in a single run.
-  test("processes exactly one unjudged model turn per tick, oldest first, and skips turns already judged", async () => {
+  test("drains all pending turns in one batch, oldest first, and skips turns already judged", async () => {
     const { actor } = await owner();
     const t1 = makeTurn(actor, "I hate cilantro", "Noted.");
     const t2 = makeTurn(actor, "I love hiking", "Nice.");
@@ -573,85 +573,57 @@ describe("runJudgeBatch()", () => {
       async () => [await runJudgeBatch(), await runJudgeBatch(), await runJudgeBatch()],
     );
 
-    expect(results.map((r) => r.processed)).toEqual([1, 1, 0]); // t1, then t2, then nothing left (t3 was already done)
+    expect(results.map((r) => r.processed)).toEqual([2, 0, 0]); // drain: t1 and t2 in first batch, nothing left for second and third
     expect(results.reduce((sum, r) => sum + r.factsWritten, 0)).toBe(2);
     const t1Row = db.select().from(conversationTurns).where(eq(conversationTurns.id, t1.id)).get()!;
     const t2Row = db.select().from(conversationTurns).where(eq(conversationTurns.id, t2.id)).get()!;
-    expect(t1Row.judgeStatus).toBe("done"); // oldest first: judged on the FIRST tick
-    expect(t2Row.judgeStatus).toBe("done"); // judged on the second
+    expect(t1Row.judgeStatus).toBe("done"); // both processed in first drain batch
+    expect(t2Row.judgeStatus).toBe("done");
   });
 
-  test("a turn starting mid-judgment stops the fact loop and leaves the turn for the next tick, without duplicating what was already written", async () => {
+  test("markTurnStarted() mid-batch stops the loop with the rest left pending, not failed", async () => {
     const { actor } = await owner();
-    const turn = makeTurn(actor, "I hate cilantro and I love hiking", "Noted.");
+    const t1 = makeTurn(actor, "I hate cilantro", "Noted.");
+    const t2 = makeTurn(actor, "I love hiking", "Nice.");
 
-    // A pre-existing memory with the SAME text (a different source, so
-    // it can't be confused with what THIS turn writes) guarantees the
-    // cilantro fact below finds a real dedupe candidate:
-    // decideDedupe() skips the model call entirely when there is
-    // nothing to dedupe against, so a brand-new fact alone could never
-    // reach a scripted dedupe reply to interrupt from.
-    const seedVector = await embed(["Marlow dislikes cilantro"]);
-    remember(actor, {
-      text: "Marlow dislikes cilantro",
-      record_kind: "memory",
-      category: "preference",
-      tier: "episodic",
-      scope: "person",
-      person: actor.id,
-      source: "seed-turn",
-      importance: 0.5,
-      precomputed_embedding: seedVector.ok ? { space: seedVector.value.model, vector: seedVector.value.vectors[0]! } : undefined,
-    });
-
-    const extraction = {
-      facts: [
-        { text: "Marlow dislikes cilantro", category: "preference", scope: "person", importance: 0.7 },
-        { text: "Marlow loves hiking", category: "preference", scope: "person", importance: 0.7 },
-      ],
-    };
-
-    let dedupeCalls = 0;
-    const interrupted = await withScriptedJudge(
-      (schemaName) => {
-        if (schemaName === "memory_extraction") return extraction;
-        dedupeCalls++;
-        // Fires during the FIRST fact's own dedupe call, before the
-        // loop ever reaches the second fact.
-        if (dedupeCalls === 1) markTurnStarted();
-        return { action: "ADD" };
+    let processCount = 0;
+    const results = await withScriptedJudge(
+      (_schemaName, request) => {
+        const userText = request.messages[request.messages.length - 1]!.content;
+        if (userText.includes("cilantro")) {
+          processCount++;
+          // Fires during first turn's judgment, interrupting the batch drain
+          if (processCount === 1) markTurnStarted();
+          return { facts: [{ text: "Marlow dislikes cilantro", category: "preference", scope: "person", importance: 0.7 }] };
+        }
+        if (userText.includes("hiking")) return { facts: [{ text: "Marlow loves hiking", category: "preference", scope: "person", importance: 0.7 }] };
+        return { facts: [] };
       },
-      () => judgeTurn(turn),
+      () => runJudgeBatch(),
     );
 
-    expect(interrupted.factsWritten).toBe(1); // cilantro's own ADD landed; hiking was never looked at
-    const midRow = db.select().from(conversationTurns).where(eq(conversationTurns.id, turn.id)).get()!;
-    expect(midRow.judgeStatus).toBeNull(); // left unjudged - the next tick re-extracts and re-judges this same turn
-
-    const writtenByTurn = db.select().from(memoryRecords).where(eq(memoryRecords.source, turn.id)).all();
-    expect(writtenByTurn.map((r) => r.text)).toEqual(["Marlow dislikes cilantro"]);
-    const writtenId = writtenByTurn[0]!.id;
+    expect(results.processed).toBe(1); // only t1 judged before interrupt
+    expect(results.factsWritten).toBe(1); // cilantro fact was written
+    const t1Row = db.select().from(conversationTurns).where(eq(conversationTurns.id, t1.id)).get()!;
+    const t2Row = db.select().from(conversationTurns).where(eq(conversationTurns.id, t2.id)).get()!;
+    expect(t1Row.judgeStatus).toBe("done"); // t1 was completed before interrupt
+    expect(t2Row.judgeStatus).toBeNull(); // t2 left pending, not failed
 
     __resetTurnActivityForTests();
     const resumed = await withScriptedJudge(
-      (schemaName, request) => {
-        if (schemaName === "memory_extraction") return extraction;
-        const body = request.messages[request.messages.length - 1]!.content;
-        // The record THIS turn already wrote on the interrupted pass is
-        // now itself a dedupe candidate - superseding onto it (rather
-        // than a plain ADD) is what keeps the resumed pass from
-        // duplicating what the interrupted one already wrote.
-        if (body.includes(`[${writtenId}]`)) return { action: "SUPERSEDE", id: writtenId, merged_text: "Marlow dislikes cilantro", contradiction: false };
-        return { action: "ADD" };
+      (_schemaName, _request) => {
+        // Second batch processes the interrupted t2
+        return { facts: [{ text: "Marlow loves hiking", category: "preference", scope: "person", importance: 0.7 }] };
       },
-      () => judgeTurn(turn),
+      () => runJudgeBatch(),
     );
 
-    expect(resumed.factsWritten).toBe(2); // cilantro superseded onto its own pass-1 record, hiking newly added
-    const finalRow = db.select().from(conversationTurns).where(eq(conversationTurns.id, turn.id)).get()!;
-    expect(finalRow.judgeStatus).toBe("done");
-    const finalByTurn = db.select().from(memoryRecords).where(and(eq(memoryRecords.source, turn.id), eq(memoryRecords.status, "active"))).all();
-    expect(finalByTurn.map((r) => r.text).sort()).toEqual(["Marlow dislikes cilantro", "Marlow loves hiking"]); // one active cilantro record from this turn, not two
+    expect(resumed.processed).toBe(1); // t2 now judged in second batch
+    expect(resumed.factsWritten).toBe(1); // hiking added
+    const t2FinalRow = db.select().from(conversationTurns).where(eq(conversationTurns.id, t2.id)).get()!;
+    expect(t2FinalRow.judgeStatus).toBe("done"); // now marked done
+    const allFacts = db.select().from(memoryRecords).where(and(inArray(memoryRecords.source, [t1.id, t2.id]), eq(memoryRecords.status, "active"))).all();
+    expect(allFacts.map((r) => r.text).sort()).toEqual(["Marlow dislikes cilantro", "Marlow loves hiking"]);
   });
 });
 
