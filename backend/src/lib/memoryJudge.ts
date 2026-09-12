@@ -59,6 +59,7 @@ import { eq, and, isNull, isNotNull, ne, asc } from "drizzle-orm";
 import { db } from "@/db";
 import { conversationTurns, people, memoryRecords } from "@/db/schema";
 import { complete, embed, type LlmMessage } from "@/lib/llm";
+import { completeBackground, getBackgroundBackendKind } from "@/lib/backgroundSupervisor";
 import {
   remember,
   supersede,
@@ -282,13 +283,13 @@ async function extractFacts(speakerName: string, turn: ConversationTurnRow): Pro
     { role: "system", content: buildExtractionPrompt(speakerName, turn.createdAt) },
     { role: "user", content: `${speakerName}: ${turn.userText}\nAssistant: ${turn.replyText}` },
   ];
-  const result = await complete("chat", messages, {
+  const result = await completeBackground(messages, {
     temperature: 0.1,
     response_format: { type: "json_schema", json_schema: EXTRACTION_SCHEMA },
   });
   if (!result.ok) return null;
   try {
-    const parsed = JSON.parse(result.value.text) as { facts?: unknown };
+    const parsed = JSON.parse(result.text) as { facts?: unknown };
     if (!Array.isArray(parsed.facts)) return null;
     const facts: ExtractedFact[] = [];
     for (const raw of parsed.facts.slice(0, MAX_FACTS_PER_TURN)) {
@@ -325,16 +326,28 @@ interface DedupeDecision {
   contradiction?: boolean;
 }
 
+const DEDUPE_COSINE_BAND_LOW = 0.60;
+const DEDUPE_COSINE_BAND_HIGH = 0.92;
+
 /** Phase 2: never counts against the poison guard (see this file's own
  * header) - any failure here just defaults to ADD, the exact fallback
- * legacy's own catch block used. */
+ * legacy's own catch block used. Dedupe asks the model only for cosine
+ * similarity in the ambiguous band (0.60 to 0.92); outside that band,
+ * the decision is deterministic: near-identical is SUPERSEDE, clearly
+ * new is ADD. */
 async function decideDedupe(newText: string, candidates: SimilarMatch[]): Promise<DedupeDecision> {
   if (candidates.length === 0) return { action: "ADD" };
+  const topCandidate = candidates[0]!;
+  if (topCandidate.cosine >= DEDUPE_COSINE_BAND_HIGH) {
+    return { action: "SUPERSEDE", id: topCandidate.record.id, mergedText: newText, contradiction: false };
+  }
+  if (topCandidate.cosine < DEDUPE_COSINE_BAND_LOW) {
+    return { action: "ADD" };
+  }
   const existingList = candidates.map((c) => `[${c.record.id}] ${c.record.text} (similarity ${c.cosine.toFixed(2)})`).join("\n");
   const prompt = `New fact: "${newText}"\n\nExisting similar memories:\n${existingList}`;
   try {
-    const result = await complete(
-      "chat",
+    const result = await completeBackground(
       [
         { role: "system", content: DEDUPE_SYSTEM },
         { role: "user", content: prompt },
@@ -342,7 +355,7 @@ async function decideDedupe(newText: string, candidates: SimilarMatch[]): Promis
       { temperature: 0.1, response_format: { type: "json_schema", json_schema: DEDUPE_SCHEMA } },
     );
     if (!result.ok) return { action: "ADD" };
-    const parsed = JSON.parse(result.value.text) as { action?: unknown; id?: unknown; merged_text?: unknown; contradiction?: unknown };
+    const parsed = JSON.parse(result.text) as { action?: unknown; id?: unknown; merged_text?: unknown; contradiction?: unknown };
     if (
       parsed.action === "SUPERSEDE" &&
       typeof parsed.id === "string" &&
@@ -597,8 +610,7 @@ const CONTRA_SCHEMA = {
 
 async function checkContradiction(older: string, newer: string): Promise<boolean> {
   try {
-    const result = await complete(
-      "chat",
+    const result = await completeBackground(
       [
         {
           role: "system",
@@ -610,7 +622,7 @@ async function checkContradiction(older: string, newer: string): Promise<boolean
       { temperature: 0.1, response_format: { type: "json_schema", json_schema: CONTRA_SCHEMA } },
     );
     if (!result.ok) return false;
-    const parsed = JSON.parse(result.value.text) as { contradicts?: unknown };
+    const parsed = JSON.parse(result.text) as { contradicts?: unknown };
     return parsed.contradicts === true;
   } catch {
     return false;
@@ -656,8 +668,7 @@ async function rewriteProfileParagraph(personRow: PersonRow): Promise<boolean> {
 
   let text: string;
   try {
-    const result = await complete(
-      "chat",
+    const result = await completeBackground(
       [
         { role: "system", content: prompt },
         { role: "user", content: "Write the paragraph now." },
@@ -665,7 +676,7 @@ async function rewriteProfileParagraph(personRow: PersonRow): Promise<boolean> {
       { temperature: 0.3, response_format: { type: "json_schema", json_schema: PROFILE_SCHEMA } },
     );
     if (!result.ok) return false;
-    const parsed = JSON.parse(result.value.text) as { text?: unknown };
+    const parsed = JSON.parse(result.text) as { text?: unknown };
     if (typeof parsed.text !== "string" || !parsed.text.trim()) return false;
     const raw = parsed.text.trim();
     // A code review (2026-09-05) found a bare slice() could cut mid-word

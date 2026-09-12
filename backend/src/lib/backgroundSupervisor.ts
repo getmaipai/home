@@ -157,7 +157,7 @@ export async function completeBackground(
   opts?: {
     temperature?: number;
     max_tokens?: number;
-    response_format?: { type: "json_object"; schema?: Record<string, unknown> };
+    response_format?: { type: "json_schema"; json_schema: Record<string, unknown> } | { type: "json_object"; schema?: Record<string, unknown> };
   }
 ): Promise<{ ok: true; text: string } | { ok: false; unavailable: true }> {
   try {
@@ -167,7 +167,7 @@ export async function completeBackground(
       messages,
       temperature: opts?.temperature,
       max_tokens: opts?.max_tokens ?? 1024,
-      response_format: opts?.response_format,
+      response_format: opts?.response_format as any,
       chat_template_kwargs: { enable_thinking: false },
     });
     const choice = response.choices[0];

@@ -40,6 +40,7 @@ import { speakerAgeBand } from "@/lib/ageBand";
 import { getHouseholdSettingValue, getPersonSettingValue } from "@/lib/settings";
 import { complete, type LlmMessage } from "@/lib/llm";
 import { getEngineStatus } from "@/lib/llmSupervisor";
+import { completeBackground, getBackgroundBackendKind } from "@/lib/backgroundSupervisor";
 import { loadManifestOnly } from "@/lib/plugins";
 import { remember } from "@/lib/memory";
 import { nextHlc } from "@/lib/hlc";
@@ -770,7 +771,7 @@ export async function maybeRefreshConversationSummary(conversationId: string): P
   const priorSummary = conversation.summary ? `Prior summary: ${conversation.summary}\n\n` : "";
 
   try {
-    const result = await complete("chat", [
+    const result = await completeBackground([
       {
         role: "user",
         content:
@@ -780,13 +781,13 @@ export async function maybeRefreshConversationSummary(conversationId: string): P
       },
     ]);
     if (!result.ok) {
-      console.log(`[conversationHistory] summary refresh skipped for ${conversationId}: ${result.error}`);
+      console.log(`[conversationHistory] summary refresh skipped for ${conversationId}: unavailable`);
       return;
     }
-    if (getEngineStatus().kind === "stub") return; // resolved to the stub only just now (this process's first completion ever)
+    if (getBackgroundBackendKind() === "stub") return; // resolved to the stub only just now (this process's first completion ever)
     db.update(conversations)
       .set({
-        summary: result.value.text,
+        summary: result.text,
         summaryThroughTurn: newSinceLastSummary[newSinceLastSummary.length - 1]!.id,
         updatedAt: new Date().toISOString(),
         hlc: nextHlc(),
@@ -904,7 +905,7 @@ export async function summarizeBeforeDelete(rows: ConversationTurnRow[]): Promis
     }
 
     try {
-      const result = await complete("chat", [
+      const result = await completeBackground([
         {
           role: "user",
           content:
@@ -914,10 +915,10 @@ export async function summarizeBeforeDelete(rows: ConversationTurnRow[]): Promis
         },
       ]);
       if (!result.ok) {
-        console.log(`[conversationHistory] retention summary skipped for ${personId}: ${result.error}`);
+        console.log(`[conversationHistory] retention summary skipped for ${personId}: unavailable`);
         continue;
       }
-      if (getEngineStatus().kind === "stub") {
+      if (getBackgroundBackendKind() === "stub") {
         // Resolved to the stub for the first time just now (this
         // process's very first completion ever) - a canned reply is
         // worse than no summary; skip the rest of this batch too.
@@ -925,7 +926,7 @@ export async function summarizeBeforeDelete(rows: ConversationTurnRow[]): Promis
       }
       const written = remember(person, {
         record_kind: "episode",
-        text: result.value.text,
+        text: result.text,
         category: "event",
         tier: "durable",
         scope: "person",
