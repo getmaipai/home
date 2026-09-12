@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { cn } from "@/kit/utils";
 
 interface PageProps {
   title: string;
@@ -8,6 +9,7 @@ interface PageProps {
    * `hideTitle` is the escape hatch for a page whose own content already
    * makes the destination obvious (nothing uses it yet). */
   hideTitle?: boolean;
+  className?: string;
   children: ReactNode;
 }
 
@@ -16,9 +18,9 @@ interface PageProps {
 // container every app's page renders into, one column on phone/tablet
 // today (the kit's density budget - 1/2/3 columns phone/tablet/desktop -
 // has nothing to split into yet with exactly one page in the whole app).
-export function Page({ title, hideTitle, children }: PageProps) {
+export function Page({ title, hideTitle, className, children }: PageProps) {
   return (
-    <div className="flex h-full min-w-0 flex-col">
+    <div className={cn("flex h-full min-w-0 flex-col", className)}>
       <h1 className={hideTitle ? "sr-only" : "px-4 pt-5 pb-1 text-3xl font-bold tracking-tight"}>{title}</h1>
       <div className="flex min-h-0 min-w-0 flex-1 flex-col">{children}</div>
     </div>

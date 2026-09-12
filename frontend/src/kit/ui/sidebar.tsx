@@ -6,6 +6,7 @@ import { cn } from "@/kit/utils"
 import { Slot } from "radix-ui"
 
 import { useIsMobile } from "@/kit/hooks/use-mobile"
+import { useVisualViewportHeight } from "@/kit/useVisualViewportHeight"
 import { Button } from "@/kit/ui/button"
 import { Input } from "@/kit/ui/input"
 import { Separator } from "@/kit/ui/separator"
@@ -66,6 +67,7 @@ function SidebarProvider({
   onOpenChange?: (open: boolean) => void
 }) {
   const isMobile = useIsMobile()
+  const visualViewportHeight = useVisualViewportHeight()
   const [openMobile, setOpenMobile] = React.useState(false)
 
   // This is the internal state of the sidebar.
@@ -133,6 +135,18 @@ function SidebarProvider({
           {
             "--sidebar-width": SIDEBAR_WIDTH,
             "--sidebar-width-icon": SIDEBAR_WIDTH_ICON,
+            // `h-svh` alone is a layout-viewport unit: iOS Safari never
+            // shrinks it for the on-screen keyboard, so a phone's Chat
+            // composer opened the keyboard, the wrapper stayed full
+            // height, and assistant-ui's own top-anchor scroll math (which
+            // reads this chain's `clientHeight`) placed the reply where
+            // the *unobscured* viewport would end - behind the keyboard,
+            // invisible until a manual scroll (Jesse, 2026-09-07). An
+            // inline pixel height from `visualViewport`, when the API
+            // exists, overrides the class below and actually tracks the
+            // keyboard; `h-svh` remains the fallback everywhere else
+            // (desktop, `far`/TV, and before the first effect runs).
+            ...(visualViewportHeight !== undefined ? { height: visualViewportHeight } : {}),
             ...style,
           } as React.CSSProperties
         }
@@ -148,7 +162,9 @@ function SidebarProvider({
           // that was supposed to. A hard `h-svh` here is what the rest of
           // the shell's own `flex-1 min-h-0` chain (`SidebarInset`, every
           // `Page.tsx`) was already built assuming existed.
-          "group/sidebar-wrapper flex h-svh w-full has-data-[variant=inset]:bg-sidebar",
+          // Keep the shell anchored like PhoneNav when keyboard focus pans
+          // the document. Pages and transcripts own their internal scrolling.
+          "group/sidebar-wrapper fixed inset-x-0 top-0 flex h-svh w-full overflow-hidden has-data-[variant=inset]:bg-sidebar",
           className
         )}
         {...props}

@@ -25,7 +25,7 @@
 //
 // "far" (TV) is a user-agent, not a viewport (frontend/src/kit/
 // useSurface.ts's own TV_USER_AGENT) - the far entry below sets one.
-import { chromium, type Browser, type BrowserContext } from "playwright";
+import { chromium, webkit, type Browser, type BrowserContext } from "playwright";
 import { startStubLlmServer } from "../spec/llm/ts/stubServer";
 import AxeBuilder from "@axe-core/playwright";
 import { rmSync, mkdirSync, existsSync } from "node:fs";
@@ -40,7 +40,8 @@ const HERO_PATH = join(ROOT, "docs", "assets", "hero.png");
 
 const a11yOnly = process.argv.includes("--a11y-only");
 // Focused review retains the same seeded data, readiness, and a11y checks.
-const chatReview = process.argv.includes("--chat-review");
+const chatFocusReview = process.argv.includes("--chat-focus-review");
+const chatReview = process.argv.includes("--chat-review") || chatFocusReview;
 const settingsReview = process.argv.includes("--settings-review");
 
 interface RouteSpec {
@@ -163,6 +164,8 @@ async function newContext(browser: Browser, viewport: ViewportSpec, theme: "ligh
     viewport: { width: viewport.width, height: viewport.height },
     colorScheme: theme,
     userAgent: viewport.userAgent,
+    isMobile: viewport.slug === "phone",
+    hasTouch: viewport.slug === "phone",
   });
   await context.addCookies([{ name: "session", value: sessionValue, url: BASE_URL }]);
   return context;
@@ -245,6 +248,27 @@ async function exerciseChat(page: import("playwright").Page, viewport: ViewportS
   mkdirSync(SCREENS_DIR, { recursive: true });
   await settleChat(page);
   await page.screenshot({ path: join(SCREENS_DIR, `chat-empty-${viewport.slug}-${theme}.png`) });
+  if (viewport.slug === "phone") {
+    // Reproduce keyboard focus panning the document while fixed navigation
+    // stays visible. Retain the pre-keyboard document height during resize.
+    await page.evaluate((height) => { document.body.style.minHeight = `${height}px`; }, viewport.height);
+    await page.setViewportSize({ width: viewport.width, height: 480 });
+    await page.getByRole("textbox", { name: "Message input" }).click();
+    await page.evaluate(() => window.scrollTo(0, 300));
+    await settleChat(page);
+    const shell = await page.locator('[data-slot="sidebar-wrapper"]').boundingBox();
+    if (!shell || shell.y < -1) throw new Error("Focusing the input scrolls the app shell offscreen while navigation stays fixed");
+    const inputVisible = await page.getByRole("textbox", { name: "Message input" }).evaluate((element) => {
+      const rect = element.getBoundingClientRect();
+      return rect.top >= 0 && rect.bottom <= (window.visualViewport?.height ?? window.innerHeight)
+        && element.contains(document.elementFromPoint(rect.x + rect.width / 2, rect.y + rect.height / 2));
+    });
+    if (!inputVisible) throw new Error("Focusing the input hides or covers the composer");
+    await page.screenshot({ path: join(SCREENS_DIR, `chat-focus-${viewport.slug}-${theme}.png`) });
+    await page.evaluate(() => { document.body.style.removeProperty("min-height"); window.scrollTo(0, 0); });
+    await page.setViewportSize({ width: viewport.width, height: viewport.height });
+  }
+  if (chatFocusReview) return;
   await send("Help me plan a small garden");
   await page.getByText("Start with a sunny spot and a few easy plants.", { exact: false }).waitFor();
   const firstUrl = page.url();
@@ -483,7 +507,7 @@ async function main() {
     await waitForHealth();
     const sessionValue = await seedHousehold();
 
-    browser = await chromium.launch();
+    browser = await (process.argv.includes("--webkit") ? webkit : chromium).launch();
 
     if (!a11yOnly && !settingsReview && !chatReview) await captureHero(browser, sessionValue);
 

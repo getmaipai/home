@@ -187,7 +187,7 @@ export function ChatPage({ person }: ChatPageProps) {
     <ChatActorContext.Provider value={person.id}>
       <AssistantRuntimeProvider runtime={runtime}>
         <SttAutoSend sendRef={sttAutoSendRef} />
-        <Page title="Chat" hideTitle>
+        <Page title="Chat" hideTitle className="-mb-16 sm:mb-0">
           <div className="flex items-center justify-between gap-3 px-4 py-2">
             <div className="flex items-center gap-1">
               <Button variant="ghost" size="icon" aria-label={threadsOpen ? "Hide threads" : "Show threads"} aria-expanded={threadsOpen} aria-controls="chat-threads" onClick={() => setThreadsOpen((open) => !open)}>

@@ -200,21 +200,42 @@ const ThreadRoot: FC<{
         className="relative flex flex-1 flex-col overflow-x-auto overflow-y-scroll scroll-smooth"
       >
         <div
-          className={cn(
-            "mx-auto flex w-full max-w-(--thread-max-width) flex-1 flex-col px-4 pt-4",
-            isEmpty && "justify-center",
-          )}
+          className="mx-auto flex w-full max-w-(--thread-max-width) flex-1 flex-col px-4 pt-4"
         >
-          <AuiIf condition={isNewChatView}>
-            <Welcome />
-          </AuiIf>
-          <AuiIf condition={isHistoryLoadingView}>
-            <ThreadHistorySkeleton />
-          </AuiIf>
+          {/* Desktop centers the greeting with the composer right underneath
+              it, Claude.ai/ChatGPT-style (`sm:` and up only) - but on phone
+              that same centering left the composer floating mid-screen with
+              a dead gap below it instead of sitting at the thumb-reachable
+              bottom edge every other mobile chat surface uses (Jesse,
+              2026-09-07). Below `sm`, this wrapper takes no extra space, so
+              whichever of it/`aui_message-group` is actually showing content
+              (below) does the bottom-pinning instead. */}
+          <div className={cn("flex flex-col items-center", isEmpty && "sm:flex-1 sm:justify-center")}>
+            <AuiIf condition={isNewChatView}>
+              <Welcome />
+            </AuiIf>
+            <AuiIf condition={isHistoryLoadingView}>
+              <ThreadHistorySkeleton />
+            </AuiIf>
+          </div>
 
+          {/* `mt-auto` only once there's a real transcript: a real repro
+              (headless Chromium against a throwaway seeded backend, since
+              Chat needs a signed-in session and the live household's PIN is
+              off-limits to type - 2026-09-07) screenshotted a 2-message
+              conversation with the exchange stuck at the TOP of the screen
+              and a ~280px dead gap before the composer, because the footer's
+              own `mt-auto` (below) was doing the only bottom-pinning in the
+              whole tree - it pushed itself down, not the messages. Giving
+              the messages their own `mt-auto` instead pins THEM to sit right
+              above the composer, the same "recent turns anchored to the
+              composer, empty space floats to the top" every real chat
+              surface uses. Empty:hidden means this is a no-op (0 height, no
+              margin) in the empty-chat case, where the footer's own
+              `mt-auto` below still does the work exactly as before. */}
           <div
             data-slot="aui_message-group"
-            className="mb-14 flex flex-col gap-y-6 empty:hidden"
+            className={cn("mb-14 flex flex-col gap-y-6 empty:hidden", !isEmpty && "mt-auto")}
           >
             <DayBoundaryProvider>
               <ThreadPrimitive.Messages>
@@ -225,9 +246,8 @@ const ThreadRoot: FC<{
 
           <ThreadPrimitive.ViewportFooter
             className={cn(
-              "aui-thread-viewport-footer bg-background flex flex-col gap-4 overflow-visible pb-4 md:pb-6",
-              !isEmpty &&
-                "sticky bottom-0 mt-auto rounded-t-(--composer-radius)",
+              "aui-thread-viewport-footer bg-background flex flex-col gap-4 overflow-visible pb-0 sticky bottom-0 translate-y-9 rounded-t-(--composer-radius) sm:translate-y-0 sm:pb-6",
+              isEmpty && "mt-auto",
             )}
           >
             <ThreadScrollToBottom />
@@ -310,7 +330,7 @@ const ThreadSuggestionItem: FC = () => {
 
 const Composer: FC<{ autoFocus: boolean; toolbar?: ReactNode; disabled?: boolean; disabledReason?: string }> = ({ autoFocus, toolbar, disabled, disabledReason }) => {
   return (
-    <ComposerPrimitive.Root className="aui-composer-root relative flex w-full flex-col">
+    <ComposerPrimitive.Root className="aui-composer-root relative -mb-3 flex w-full flex-col sm:mb-0">
       <ComposerPrimitive.AttachmentDropzone asChild>
         <div
           data-slot="aui_composer-shell"
