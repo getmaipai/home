@@ -110,7 +110,7 @@ async function runBenchmark(): Promise<void> {
 
       let firstToken = true;
       for await (const delta of response) {
-        if (firstToken && delta) {
+        if (firstToken && delta && typeof delta === "string" && delta.length > 0) {
           firstDeltaMs = performance.now() - startTime;
           firstToken = false;
         }
@@ -143,7 +143,7 @@ async function runBenchmark(): Promise<void> {
   const meanPromptTokens = timings.reduce((sum, t) => sum + t.promptTokens, 0) / timings.length;
   const totalPromptTokens = stablePrefix.length / 4 + history.length * 50 + userMessages[0]!.length / 4;
 
-  const cachRatio = cacheRatio(meanPromptTokens, totalPromptTokens);
+  const cachedRatio = cacheRatio(meanPromptTokens, totalPromptTokens);
 
   console.log("\n" + "=".repeat(70));
   console.log("RESULTS");
@@ -152,7 +152,7 @@ async function runBenchmark(): Promise<void> {
   console.log(`First-token latency p95: ${percentile(sortedFirstDelta, 95)}ms`);
   console.log(`Total latency p50:       ${percentile(sortedTotal, 50)}ms`);
   console.log(`Mean processed tokens:   ${Math.round(meanPromptTokens)}`);
-  console.log(`Cache ratio:             ${(cachRatio * 100).toFixed(1)}%`);
+  console.log(`Cache ratio:             ${(cachedRatio * 100).toFixed(1)}%`);
   console.log("=".repeat(70));
 
   rmSync(tmpDir, { recursive: true, force: true });
