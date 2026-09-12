@@ -340,8 +340,8 @@ let inFlight: Promise<{ ran: number; errors: number }> | null = null;
 // Generous on purpose, not a tight leash: a background review of the
 // first version of this fix (120_000ms, the same magnitude as
 // chatComplete's own per-call timeout) found memory.judge alone can
-// legitimately issue up to MAX_TURNS_PER_RUN (10, lib/memoryJudge.ts)
-// turns' worth of sequential LLM calls in one tick, and
+// legitimately issue up to 50 turns' worth of sequential LLM calls in
+// one tick (MAX_JUDGE_BATCH_TURNS, lib/memoryJudge.ts), and
 // runAllSmokeTests's packages.smoke job runs every bundled package's
 // deno_test check (each up to 60s, lib/smoke.ts) one after another -
 // either could genuinely, healthily exceed a 120s outer budget with

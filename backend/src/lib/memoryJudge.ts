@@ -86,15 +86,12 @@ const MAX_FACTS_PER_TURN = 12;
 // One core-job tick processes a bounded batch, not the whole backlog at
 // once - the same "amortize over ticks, never monopolize the model"
 // discipline legacy's own consolidate.ts used (MAX_MERGES_PER_RUN).
-// getmaipai/home#63: was 10 - a live diagnosis (2026-09-07) measured a
-// single extraction call alone adding 2 to 4.7 seconds to a chat reply
-// that started mid-batch, and runJudgeBatch()'s own idle check only ran
-// ONCE per batch, at the top. One turn per tick keeps a batch's worst-
-// case engine time to a single judgeTurn() call (bounded further inside
-// it, see that function's own mid-turn idle check below); the backlog
-// still drains at one turn per minute, faster than any real household
-// produces model turns.
-const MAX_TURNS_PER_RUN = 1;
+// Drain logic (MEM-02, 2026-09-12): the judge now processes pending turns
+// until none remain, turnActiveWithin() becomes true, 50 turns are
+// processed, or 5 minutes elapse - whichever comes first. This replaces
+// the old MAX_TURNS_PER_RUN = 1 gate that processed one turn per minute
+// and left large backlogs. The per-turn mid-turn idle check (see
+// judgeTurn() below) still limits individual extraction calls.
 
 const CATEGORY_VALUES = [
   "person",
@@ -548,31 +545,69 @@ export interface JudgeBatchResult {
 // nothing real - scheduler.ts's own runDueJobs() computes the NEXT fire
 // from the job's recurrence interval, not from when this tick actually
 // ran, so a skipped batch simply gets picked up a minute later, same as
-// any other late tick; MAX_TURNS_PER_RUN's own oldest-first ordering
-// already handles a backlog from several skipped ticks in a row.
-const JUDGE_IDLE_WINDOW_MS = DEFAULT_IDLE_WINDOW_MS;
+// The idle window was 20s when the judge and chat engine shared a slot;
+// now that background work is on its own engine, a shorter window lets
+// the judge drain faster when idle.
+const JUDGE_IDLE_WINDOW_MS = 5_000;
+const MAX_JUDGE_BATCH_TURNS = 50;
+const MAX_JUDGE_BATCH_MS = 5 * 60 * 1000; // 5 minutes
 
-/** The core job's own entry point (scheduler.ts's "memory.judge",
- * every:1m): picks up to MAX_TURNS_PER_RUN still-unjudged model turns,
- * oldest first, and judges each in turn. */
-export async function runJudgeBatch(): Promise<JudgeBatchResult> {
-  if (turnActiveWithin(JUDGE_IDLE_WINDOW_MS)) return { processed: 0, factsWritten: 0 };
+export interface JudgeQueueStats {
+  pending: number;
+  oldestCreatedAt: string | null;
+}
 
-  const pending = db
-    .select()
+export function judgeQueueStats(): JudgeQueueStats {
+  const [oldest] = db
+    .select({ createdAt: conversationTurns.createdAt })
     .from(conversationTurns)
     .where(and(eq(conversationTurns.source, "model"), isNull(conversationTurns.judgeStatus)))
     .orderBy(asc(conversationTurns.createdAt))
-    .limit(MAX_TURNS_PER_RUN)
+    .limit(1)
     .all();
+  const all = db
+    .select({ id: conversationTurns.id })
+    .from(conversationTurns)
+    .where(and(eq(conversationTurns.source, "model"), isNull(conversationTurns.judgeStatus)))
+    .all();
+  return { pending: all.length, oldestCreatedAt: oldest?.createdAt ?? null };
+}
+
+/** The core job's own entry point (scheduler.ts's "memory.judge",
+ * every:1m): drains pending still-unjudged model turns (oldest first),
+ * bounded by time and count, until none remain, a person speaks, or
+ * limits are hit. */
+export async function runJudgeBatch(): Promise<JudgeBatchResult> {
+  if (turnActiveWithin(JUDGE_IDLE_WINDOW_MS)) return { processed: 0, factsWritten: 0 };
 
   let processed = 0;
   let factsWritten = 0;
-  for (const turn of pending) {
+  const startMs = Date.now();
+
+  while (true) {
+    if (processed >= MAX_JUDGE_BATCH_TURNS) break;
+    if (Date.now() - startMs >= MAX_JUDGE_BATCH_MS) break;
+    if (turnActiveWithin(JUDGE_IDLE_WINDOW_MS)) break;
+
+    const pending = db
+      .select()
+      .from(conversationTurns)
+      .where(and(eq(conversationTurns.source, "model"), isNull(conversationTurns.judgeStatus)))
+      .orderBy(asc(conversationTurns.createdAt))
+      .limit(1)
+      .all();
+
+    if (pending.length === 0) break;
+
+    const turn = pending[0]!;
     const result = await judgeTurn(turn);
     processed++;
     factsWritten += result.factsWritten;
   }
+
+  const stats = judgeQueueStats();
+  console.log(`[memory.judge] processed=${processed} pending=${stats.pending} oldest_age_s=${stats.oldestCreatedAt ? Math.round((Date.now() - new Date(stats.oldestCreatedAt).getTime()) / 1000) : null}`);
+
   return { processed, factsWritten };
 }
 
