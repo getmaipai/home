@@ -1523,6 +1523,76 @@ Track B: MEM-01, MEM-02, MEM-03, MEM-04, MEM-05. Then JOIN-01, JOIN-02.
     exclusion test. Checks: `cd backend && bun test
     tests/llmSupervisor.test.ts`, then the full exit gate.
 
+### Scheduled after Track A merges: the model comparison
+
+<a id="eval-01"></a>
+
+- [ ] **EVAL-01: Qwen3.5-4B against the current Qwen3-8B, measured, with a keep-or-drop verdict** (S-M)
+
+    Depends on: FAST-01 through FAST-06 merged to `main` (the fixed
+    prompt, cache, guards, and samplers are the baseline; a comparison
+    before them measures the broken prompt, not the models). Runs as its
+    own session, read-only against engine URLs; it changes no product
+    behavior. Files: `backend/src/lib/modelCatalog.ts` (one new catalog
+    entry for the candidate, pinned the way the 8B entry is: Qwen's
+    official GGUF repo, a fixed revision in the URL, the file's LFS
+    sha256, the byte count, `implemented: true`, `quality_tier`
+    "standard", no `recommended` tag), `docs/dev.md`, `docs/BACKLOG.md`,
+    and a bench only if it needs a URL flag it lacks. Read CHAT-24 first;
+    this item is CHAT-24's model condition run early, under CHAT-24's
+    own rules for what counts as a promotion recommendation.
+
+    Why it is worth running at all, stated so the verdict is honest: a
+    same-generation 8B normally beats a 4B on knowledge, instruction
+    following, and honesty (the bot measured 79% against 95% on honesty
+    traps one size down). The candidate is a newer training run, the
+    chat model's job here is narrow (phrase pre-fetched facts, pick a
+    tool, hold a persona), and on the hub's 8 GB card a 4B halves
+    prefill and decode. The default outcome is "keep the 8B"; the
+    candidate has to earn a change on the numbers below.
+
+    Do, in this order:
+    1. Add the catalog entry. Use Q4_K_M. If Qwen publishes no official
+       GGUF for the candidate at the time, record "not tested: no
+       official artifact" in dev.md and stop; do not substitute a
+       third-party quant.
+    2. Spawn the candidate with the same engine build and the same
+       launch flags the 8B gets (the override environment from the Track
+       A setup with `MAIPAI_CHAT_MODEL_ID` set to the new entry,
+       `MAIPAI_LLAMA_SERVER_PORT=8808`), and the 8B the same way on
+       8798. Both warm, both with `--cache-reuse 256`, nothing else
+       running on the machine's GPU.
+    3. Run, against each engine in turn, with identical inputs and
+       seeds: `scripts/bench/latency.ts` (30 turns; first-delta p50 and
+       p95, total p50, cache ratio), `scripts/bench/tool-calling.ts`
+       (false calls on the negatives, positives selected),
+       `scripts/bench/conversation.ts` (guard hits over its script),
+       `scripts/bench/naturalness.ts` (rows natural, ambiguous,
+       unnatural), `scripts/bench/persona-eval.ts` (register
+       consistency per companion), and the guard corpus's four
+       world-knowledge probes plus the three household negatives asked
+       live. Add one thinking-mode trial: five hard questions with
+       `thinking: true` on each model, total time and whether the
+       answer is right.
+    4. Record one table in dev.md with both columns side by side, the
+       engine build, both model files and checksums, and the machine.
+
+    Verdict rule (from CHAT-24, not softened): the candidate qualifies
+    for a promotion recommendation only if it holds every correctness
+    floor (zero false tool calls, every positive selected, guard hits
+    not higher, no naturalness row worse, register consistency not
+    lower for any companion, all four probes answered without a cut,
+    all three household negatives still caught) AND either first-delta
+    p95 improves by at least 15% or total p50 by at least 20%. Otherwise
+    the verdict is "keep the 8B", recorded with the numbers, and the
+    question is closed until a new model generation appears. A
+    recommendation is not a switch: changing the default chat model, a
+    hub deploy, or a download on the hub is the owner's explicit call.
+    Out of scope: control vectors (EVAL-03), a draft model (EVAL-02),
+    the background engine's model (MEM-05 owns it), any prompt change.
+    Checks: the benches' own tests, then the full exit gate for the
+    catalog entry.
+
 ### The block after this one (not scheduled; each needs its design note in dev.md first)
 
 - [ ] **TURN-01: One resolved turn context shared by routing, recall, and tool arguments** (M, after CHAT-10 and CHAT-13). Referent, options the assistant just listed, unresolved question, pending choice; every turn re-routes including follow-ups; a background-model rewrite only when a tool or retrieval will run, 1 s timeout, raw-text fallback, `replaces_previous` flag cancels an in-flight tool; clarify only on a top-two tie or a costly action, else best guess plus a one-clause hedge. Borrow the bot's subject tracker (three turns, wrong subject worse than none).
@@ -1530,7 +1600,7 @@ Track B: MEM-01, MEM-02, MEM-03, MEM-04, MEM-05. Then JOIN-01, JOIN-02.
 - [ ] **VOICE-01: Interruption as a chat gate** (M). Natural spoken filler only when a tool or lookup is predicted over about a second; barge-in cancels inference and reconciles the logged reply with what was heard; a text-based end-of-turn detector on CPU unless a semantic model measures under 150 ms there; first spoken chunk gate lowered from 90 characters after FAST-04's numbers are in.
 - [ ] **ROUTE-01: The bot's shape guard and routing trace** (S). A question or first-person statement no deterministic tier can place goes to conversation, never to a plugin; log tier, winner, runner-up, and margin per decision; offer the top three tools without a similarity floor and re-measure false calls.
 - [ ] **THINK-01: A deterministic thinking gate** (S-M, after FAST-01 numbers). Multi-clause, "why", "how would", "compare", explicit "think about it", or a failed first pass turn `enable_thinking` on with a token budget; measured against always-off on the CHAT-23 corpus.
-- [ ] **EVAL-01: Qwen3.5-4B against the current 8B** (S, after FAST-06). Same conversations, same quantization class, same engine build; latency, routing, judge, naturalness; keep or drop.
+- [x] **EVAL-01** is now a scheduled item with its own work order above.
 - [ ] **EVAL-02: Speculative decoding with a 0.6B same-family draft** (S). `-md` on the hub's actual GPU; keep only if p50 total time improves at least 20% with no quality change.
 - [ ] **EVAL-03: Control vector for register** (S-M). Retrain from the selected companion's own examples; replaces `NATURALNESS_POLICY` only if the naturalness bench holds and prompt tokens fall.
 - [ ] **EVAL-04: A reranker over hybrid episode recall** (S). Only where MEM-04's bench shows misses; latency budget 100 ms on the background engine.

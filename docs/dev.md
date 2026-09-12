@@ -10588,6 +10588,17 @@ either track branches, so both tracks start from the same base and neither
 inherits someone else's dirty files. A stray local branch `main-ref-check`
 exists with no worktree and should be deleted in the same pass.
 
+### EVAL-01 promoted to a scheduled item (2026-09-12)
+
+Jesse asked for the model comparison to be a real work order rather than
+a queued line. It is now [EVAL-01](BACKLOG.md#eval-01), scheduled for the
+moment Track A merges, run by its own read-only session against engine
+URLs, with CHAT-24's verdict rule unchanged: every correctness floor must
+hold before a latency gain counts, the default outcome is "keep the 8B",
+and a recommendation is never itself a switch. The reasoning for testing
+a smaller model at all (a newer generation, a narrow job, an 8 GB card)
+is written into the item so the verdict is read against it.
+
 ### Sources consulted
 
 llama.cpp server prefix cache and `--cache-reuse`
