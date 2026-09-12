@@ -14,7 +14,7 @@ Open **Privacy** in the sidebar. It lists every outbound connection MaiPai can m
 - **Who receives it**
 - **How long they keep it**
 
-Anything not on this list doesn't happen. Most entries only happen when an adult chooses to download a model or a voice in Settings. The rest happen when your household turns on an optional feature, like weather or trivia. MaiPai downloads a small 1.7-gigabyte model on its own for memory and learning tasks, the same way it downloads a voice for speaking.
+Anything not on this list doesn't happen. Most entries only happen when an adult chooses to download a model or a voice in Settings. The rest happen when your household turns on an optional feature, like weather or trivia. MaiPai downloads a small 1.7-gigabyte model on its own for memory and learning tasks: summarizing conversations, making decisions about what to remember, and finding old episodes when you ask for them, the same way it downloads a voice for speaking.
 
 An adult can also generate an API token for another app or device. This page shows that too, under its own heading. It's the one thing that goes the other way: something reaching into your house, not out of it.
 

@@ -17,6 +17,7 @@ import { isOwnerOrAdmin, rolesById, canAccessPerson } from "@/lib/access";
 import { tokenize } from "@/lib/text";
 import { embed } from "@/lib/llm";
 import { nextHlc } from "@/lib/hlc";
+import { deleteEpisodesForPerson } from "@/lib/episodes";
 import { MemoryRecord } from "@maipai/spec/gen/ts/memory-record.js";
 import type { PersonRow, MemoryRecordRow } from "@/types";
 
@@ -876,6 +877,9 @@ export function forget(actor: PersonRow, personId: string): MemoryOpResult<{ del
 }
 
 const forgetTransaction = sqlite.transaction((personId: string): number => {
+  // Delete episodes for this person before proceeding with memory deletion.
+  deleteEpisodesForPerson(personId);
+
   // Step 5: memory_embeddings/pending_embeddings both carry a real FK to
   // memory_records.id; the vector store itself isn't spec-synced
   // content (memory-record.schema.json's own comment: "the embedding

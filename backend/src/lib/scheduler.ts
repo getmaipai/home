@@ -31,6 +31,7 @@ import { scheduledJobs, people } from "@/db/schema";
 import { newJobId } from "@/lib/id";
 import { isOwnerOrAdmin } from "@/lib/access";
 import { runMaintenance, drainPendingEmbeddings } from "@/lib/memory";
+import { embedPendingEpisodes } from "@/lib/episodes";
 import { runJudgeBatch, runConsolidation } from "@/lib/memoryJudge";
 import { runRetention } from "@/lib/conversationHistory";
 import { runBackupAndMirror } from "@/lib/backup";
@@ -246,6 +247,7 @@ const CORE_JOBS: Record<string, CoreJobHandler> = {
   },
   "memory.embedding_retry": async () => {
     await drainPendingEmbeddings();
+    await embedPendingEpisodes();
   },
   // Step 6: the memory judge's own batch tick and the weekly consolidate
   // sweep (lib/memoryJudge.ts). Both real LLM-touching core jobs, unlike

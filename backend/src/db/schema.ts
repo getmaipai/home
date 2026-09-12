@@ -198,6 +198,51 @@ export const pendingEmbeddings = sqliteTable("pending_embeddings", {
   queuedAt: text("queued_at").notNull(),
 });
 
+// Episodes: every turn verbatim, one row per side (user and assistant),
+// searchable by full-text and vector. Used for hybrid recall of what was
+// said earlier, with timestamps for "last week" style queries. skipped
+// entirely for safety_refuse turns and for empty sides.
+export const episodes = sqliteTable(
+  "episodes",
+  {
+    id: text("id").primaryKey(),
+    turnId: text("turn_id")
+      .notNull()
+      .references(() => conversationTurns.id),
+    conversationId: text("conversation_id").references(() => conversations.id),
+    personId: text("person_id")
+      .notNull()
+      .references(() => people.id),
+    speaker: text("speaker").notNull(), // "user" | "assistant"
+    text: text("text").notNull(),
+    createdAt: text("created_at").notNull(),
+    hlc: text("hlc").notNull(),
+  },
+  (table) => [
+    index("episodes_person_id_created_at_idx").on(table.personId, table.createdAt),
+    index("episodes_turn_id_idx").on(table.turnId),
+  ],
+);
+
+// Episode embeddings and pending queue, mirroring memoryEmbeddings and
+// pendingEmbeddings for episodes instead of memory records.
+export const episodeEmbeddings = sqliteTable("episode_embeddings", {
+  episodeId: text("episode_id")
+    .primaryKey()
+    .references(() => episodes.id),
+  space: text("space").notNull(),
+  dims: integer("dims").notNull(),
+  vector: blob("vector", { mode: "buffer" }).notNull(),
+  hlc: text("hlc").notNull(),
+});
+
+export const pendingEpisodeEmbeddings = sqliteTable("pending_episode_embeddings", {
+  episodeId: text("episode_id")
+    .primaryKey()
+    .references(() => episodes.id),
+  queuedAt: text("queued_at").notNull(),
+});
+
 // Mirrors spec/schemas/setting-value.schema.json (4.6): one row per
 // (scope, key), scope holding the full spec string ("household",
 // "person:<id>", or "device:<id>") rather than a separate kind+id pair,

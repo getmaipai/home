@@ -15,6 +15,9 @@ import {
   memoryRecords,
   memoryEmbeddings,
   pendingEmbeddings,
+  episodes,
+  episodeEmbeddings,
+  pendingEpisodeEmbeddings,
   idSequences,
   settingsValues,
   scheduledJobs,
@@ -109,6 +112,9 @@ export function resetDb(): void {
   __resetCommandsCacheForTests();
   db.delete(scheduledJobs).run();
   db.delete(clonedVoices).run();
+  db.delete(pendingEpisodeEmbeddings).run();
+  db.delete(episodeEmbeddings).run();
+  db.delete(episodes).run();
   db.delete(conversationTurns).run();
   db.delete(conversations).run();
   db.delete(memoryEmbeddings).run();

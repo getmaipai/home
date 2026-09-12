@@ -133,3 +133,8 @@ export function newListItemId(): string {
 export function newNasMountId(): string {
   return `nasmount-${randomSuffix(10)}`;
 }
+
+// Episodes: turn verbatim records for hybrid recall (MEM-03).
+export function newEpisodeId(): string {
+  return `ep-${randomSuffix(10)}`;
+}

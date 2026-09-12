@@ -197,6 +197,13 @@
       "when": 1788742465427,
       "tag": "0027_spotty_mandarin",
       "breakpoints": true
+    },
+    {
+      "idx": 28,
+      "version": "6",
+      "when": 1789249451270,
+      "tag": "0028_parallel_living_lightning",
+      "breakpoints": true
     }
   ]
 }

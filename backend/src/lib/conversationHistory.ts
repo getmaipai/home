@@ -43,6 +43,7 @@ import { getEngineStatus } from "@/lib/llmSupervisor";
 import { completeBackground, getBackgroundBackendKind } from "@/lib/backgroundSupervisor";
 import { loadManifestOnly } from "@/lib/plugins";
 import { remember } from "@/lib/memory";
+import { recordEpisodes, deleteEpisodesForTurns } from "@/lib/episodes";
 import { nextHlc } from "@/lib/hlc";
 import { Conversation } from "@maipai/spec/gen/ts/conversation.js";
 import type { TurnValue, Surface } from "@/lib/turnEngine";
@@ -125,6 +126,7 @@ export function logTurn(actor: PersonRow, surface: Surface, userText: string, va
     hlc: nextHlc(),
   };
   insertTurnAndBumpConversation(row, value.conversation_id);
+  recordEpisodes(row);
   return row;
 }
 
@@ -521,6 +523,8 @@ export function updateConversationTitle(actor: PersonRow, id: string, title: str
 export function deleteConversationById(actor: PersonRow, id: string): ConversationOpResult<true> {
   const found = getConversation(actor, id);
   if (!found.ok) return found;
+  const turns = db.select({ id: conversationTurns.id }).from(conversationTurns).where(eq(conversationTurns.conversationId, id)).all();
+  deleteEpisodesForTurns(turns.map((t) => t.id));
   const now = new Date().toISOString();
   db.update(conversations)
     .set({ status: "deleted", title: null, summary: null, summaryThroughTurn: null, updatedAt: now, hlc: nextHlc() })
@@ -997,6 +1001,9 @@ export function runRetention(): { deleted: number } {
   // conversations retention actually touched, not every open one in the
   // household.
   const affectedConversationIds = [...new Set(expiring.map((t) => t.conversationId).filter((id): id is string => id !== null))];
+
+  // Delete episodes for expiring turns before deleting the turns themselves.
+  deleteEpisodesForTurns(expiring.map((t) => t.id));
 
   // Raw sqlite for a real affected-row count, not db.delete().run(): the
   // same escape hatch lib/memory.ts's forget() uses (Drizzle's bun-sqlite
