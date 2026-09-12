@@ -10709,5 +10709,46 @@ Implemented all steps:
 - llmSupervisor.test.ts: tier 2 override with MAIPAI_CHAT_MODEL_ID graceful handling
 - spec/tests/ts/llm.test.ts: wire protocol cache_prompt/id_slot field sending
 
-**Exit gate**: bash scripts/check.sh (pending - backend tests all pass)
+**Live acceptance, measured 2026-09-12** (M4 Pro 24 GB, llama-server
+b10797 macOS arm64, `qwen3-8b-instruct-q4-k-m.gguf`, `-c 32768 -fa on
+-ngl all -ub 1024 -ctk q8_0 -ctv q8_0`; the bench sends the real
+`buildStablePrefix()` (2,934 chars), a synthetic ten-exchange history,
+a production-shaped volatile zone with three rotating memory bullets
+and a minute-level clock, three uncounted warm-ups, then 30 turns;
+figures over turns 2 to 30; processed and cached tokens are the
+engine's own `timings.prompt_n` and `timings.cache_n`):
+
+| engine | layout | first delta p50 | first delta p95 | total p50 | processed tokens | cache ratio |
+|---|---|---|---|---|---|---|
+| main, no `--cache-reuse` | current (volatile zone before history) | 1,298 ms | 1,305 ms | 1,768 ms | 536 | 0.58 |
+| main, no `--cache-reuse` | reordered (volatile zone after history) | 400 ms | 412 ms | 864 ms | 143 | 0.89 |
+| FAST-01 flags, `--cache-reuse 256` | current | 1,282 ms | 1,303 ms | 1,697 ms | 536 | 0.58 |
+| FAST-01 flags, `--cache-reuse 256` | reordered | 394 ms | 400 ms | 847 ms | 143 | 0.89 |
+| `--cache-reuse 256`, f16 KV (control) | current | 1,260 ms | 1,270 ms | 1,692 ms | 536 | 0.58 |
+
+Two findings, both measured rather than assumed:
+
+1. **The prompt layout is the whole effect.** With today's production
+   layout the engine re-evaluates 536 tokens per turn (the volatile
+   zone plus everything after it) and the first word arrives in about
+   1.3 s; with the volatile zone moved after the history it evaluates
+   143 and the first word arrives in about 0.4 s. That is FAST-02's
+   change, and this table is its before number.
+2. **`--cache-reuse 256` is inert for this shape on this build**, with
+   quantized or f16 KV: processed tokens are identical with and without
+   it. The flag stays (harmless, and chunk reuse may matter for other
+   shapes), but nothing in this program may cite it as a win.
+
+FAST-01's own acceptance (cache ratio above 0.75 and first-delta p50
+under 800 ms on the production layout) is therefore not met by the
+engine flags alone and the item stays open; FAST-02 is expected to
+close both items with one re-run of this bench on the real
+`prepareTurn()` layout. The bench itself now reads the engine's own
+counters (its first version read a cumulative metrics total, so its
+ratio was meaningless), gates its temp-directory setup on running as
+a script (importing it must not touch the environment), takes
+`--layout=current|reordered`, and has `tests/latencyBench.test.ts`.
+
+**Exit gate**: `bash scripts/check.sh` green in the worktree after these
+changes (typecheck included).
 

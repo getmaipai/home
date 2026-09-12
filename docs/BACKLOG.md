@@ -922,7 +922,12 @@ Track B: MEM-01, MEM-02, MEM-03, MEM-04, MEM-05. Then JOIN-01, JOIN-02.
 
 - [ ] **FAST-01: Make the prompt prefix cache actually hit, and measure it** (M)
   
-  Status (session 2026-09-12): All code implementation and unit tests complete (1799+ tests pass, check.sh green). Three issues from code review fixed (import path, type assertions). Now requires live benchmark runs: once against main checkout's engine on 8788, once against Track A engine on 8798 with new flags and warm-up. After run must show cache ratio > 0.75 on turns 2-30 and first-delta p50 < 800ms to mark complete.
+  Status (2026-09-12, measured): engine flags, wire fields, warm-up, and
+  the bench are in; the live acceptance is NOT met on the production
+  prompt layout (first delta p50 1,282 ms, cache ratio 0.58 with the new
+  flags; `--cache-reuse 256` measured inert) and IS met on the reordered
+  layout (394 ms, 0.89). Tables and findings are in the Track A section
+  of dev.md. Stays open; FAST-02 closes both items with one re-run.
 
     Depends on: Step 0. Files: `backend/src/lib/engineAutotune.ts`,
     `llmSupervisor.ts`, `llm.ts`, `backend/src/index.ts`,
@@ -969,17 +974,22 @@ Track B: MEM-01, MEM-02, MEM-03, MEM-04, MEM-05. Then JOIN-01, JOIN-02.
        unless `MAIPAI_LLAMA_SERVER_URL` is set, sets `MAIPAI_DATA_DIR`
        to a fresh temp directory before any import, and never reads a
        household database. It builds the real stable prefix with
-       `buildStablePrefix()`, a fixed synthetic six-exchange history
-       (persona-roster names only), and thirty distinct short user
-       messages. For each of the thirty turns it streams a completion,
-       records time to the first content delta and total time, and
-       reads processed prompt tokens from the response's `timings.prompt_n`
-       (fall back to the delta of `llamacpp:prompt_tokens_total` from
-       `/metrics` if `timings` is absent). It prints a table: p50 and
-       p95 first-delta ms, p50 total ms, mean processed prompt tokens,
-       and cache ratio = 1 minus processed over total prompt tokens
-       (total via `/tokenize`). Add a `bun:test` that runs the bench's
-       pure functions (percentiles, ratio) and a stub-server smoke run.
+       `buildStablePrefix()`, a fixed synthetic ten-exchange history
+       (persona-roster names only), a production-shaped volatile zone
+       (rotating memory bullets, a minute-level clock), and thirty
+       distinct short user messages, in either of two layouts
+       (`--layout=current`, today's one system message with the
+       volatile zone before the history; `--layout=reordered`,
+       FAST-02's late context message). Three uncounted warm-ups, then
+       thirty streamed turns; per turn it records time to the first
+       content delta, total time, and the engine's own
+       `timings.prompt_n` and `timings.cache_n` from the final stream
+       chunk (confirmed present on the pinned build). It prints p50 and
+       p95 first-delta ms, p50 total ms, mean processed tokens, and
+       cache ratio = cached over (cached + processed), over turns 2 to
+       30. `--slot=N` picks the slot; run only against an idle engine.
+       `tests/latencyBench.test.ts` covers the math, both layouts, and
+       the wire path against a stub.
 
     Acceptance: unit tests above green. Live, on the dev machine, run
     the bench twice and record both tables in `docs/dev.md`: once
@@ -1032,8 +1042,11 @@ Track B: MEM-01, MEM-02, MEM-03, MEM-04, MEM-05. Then JOIN-01, JOIN-02.
        context.length <= PROMPT_SYSTEM_CHAR_BUDGET`.
 
     Acceptance: tests green. Live, on Track A's engine: run
-    `scripts/bench/latency.ts` again (its history-plus-context shape must
-    be updated to match step 3, so the bench measures the real layout)
+    `scripts/bench/latency.ts` again, after replacing its typed replica
+    of the volatile zone with the real assembly: `--layout=current` from
+    `buildSystemPrompt()` and `--layout=reordered` from
+    `buildPromptParts()`, each fed a synthetic actor and memory matches
+    (so the bench can never drift from what production sends)
     and record the table. Then hold one four-turn conversation through
     the API on port 8797 and record, from the `llama-server` log, the
     `prompt_n` of turns two to four: each must be well under the full

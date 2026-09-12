@@ -19,6 +19,7 @@ import { loadAllSkills } from "@/lib/skills";
 import { getEmbedBackendKind, __resetEmbedSupervisorForTests } from "@/lib/embedSupervisor";
 import { embedUtterance } from "@/lib/routing";
 import type { PersonRow } from "@/types";
+import { percentile } from "./stats";
 
 interface CorpusRow {
   utterance: string;
@@ -136,7 +137,8 @@ async function main() {
 
   if (nullTopScores.length > 0) {
     const sorted = [...nullTopScores].sort((a, b) => a - b);
-    const quantile = (p: number) => sorted[Math.min(sorted.length - 1, Math.floor(p * (sorted.length - 1)))]!.toFixed(3);
+    // One nearest-rank quantile for every bench (scripts/bench/stats.ts).
+    const quantile = (p: number) => percentile(sorted, p * 100).toFixed(3);
     console.log(`\nNull-row noise floor (${sorted.length} rows, top wrong-package score):`);
     console.log(`  p50=${quantile(0.5)} p90=${quantile(0.9)} p95=${quantile(0.95)} max=${sorted[sorted.length - 1]!.toFixed(3)}`);
     console.log(`  TIER1_THRESHOLD/TIER2_AMBIGUOUS_FLOOR should sit at or above p95 of this distribution.`);
