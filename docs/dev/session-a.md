@@ -1364,3 +1364,92 @@ complete; switching-latency acceptance outstanding (accepted
 exception, coordinator ruling 2026-09-13)" with both halves named, and
 ROUTE-03 is the open item for the quiet-box re-measure and the
 mechanism hunt, so the dashboard reads true.
+
+## CHAT-04: the action-claim half, and acknowledgments, design (2026-09-13)
+
+FAST-05 landed the world-knowledge half of this item (bare numbers,
+capitals, dates and hedges pass; only a household subject needs a
+source). What remains is the half that needs outcomes, which CHAT-01
+now carries on the turn context, plus the household-visible symptom
+#74 and #62 describe: a person tells the hub a fact, the model
+confirms it back ("Got it, Pippa is allergic to peanuts."), and
+`guardNearEcho()` replaces the confirmation with "I don't know, sorry."
+because every remaining word was already in the person's own words. The
+rule is right for a restated question and wrong for a restated
+disclosure, and the guard cannot tell them apart because it only
+counts overlap.
+
+### What changes
+
+**Acknowledgments.** `guardNearEcho()` runs only when the utterance is
+question-shaped, read with ROUTE-01's `utteranceShape()` (pure, no
+engine, the same reading the router and the trace use, never a second
+classifier): a reply that opens by restating a question answers
+nothing and is still cut; a reply that restates a statement, a
+first-person disclosure or a command back to the person is the
+acknowledgment, and passes. The overlap-only rejection is gone with
+it: no reply is cut for sharing words with what was said unless what
+was said was a question. "Got it" needs no memory write; it is a
+reply, not a claim.
+
+**Action claims.** `guardCapabilityClaim()` today switches itself off
+whenever `actionsRan` is true, so one successful tool of any kind
+licenses every claim in the reply ("I've added that to the list" after
+a websearch ran). It becomes one sentence decision over the turn's
+outcomes: the `GuardContext` carries `outcomes` (CHAT-01's
+`ToolExecutionOutcome[]`, package id and status) instead of a boolean,
+and an explicit action claim is matched to the package family its
+verb names: a save or remember claim ("I saved that", "I'll remember
+that", "noted, I'll keep that in mind") needs a succeeded `remember`
+outcome; a list claim needs `list-add`; a timer claim `timer`; a
+reminder claim `remind`; a lights claim `lights-on` or `lights-off`; a
+lock claim `lock-doors`; a lookup claim ("I looked that up", "I
+searched") a succeeded `websearch`; a claim with no package behind it
+on the hub at all (sent, texted, emailed, called, ordered, booked,
+bought, scheduled, printed, messaged) never matches. A claim whose
+family has no succeeded outcome this turn is `unsupported_action`, a
+new reason, replaced with the existing CANNOT_DO line; the old
+`capability_claim` stays for the other shape (accepting a request the
+hub cannot do: "Sure, I'll text her"), so the two reasons are distinct
+things CHAT-17 can hold differently: an unsupported action claim is
+text the streaming state machine will be able to hold back and retry,
+an accepted impossible request is a refusal. A pending outcome (a
+confirmation parked) counts as nothing ran; a failed one likewise. One
+function, `guardSentence()`, serves the blocking and the streaming
+path as today, so both decide identically.
+
+**#81, lowercase openers.** Checked in the guards and the prompt: no
+guard lowercases, and neither `INFORMATION_HANDLING_POLICY` nor
+`NATURALNESS_POLICY` asks for texting-style case; the persona's
+"casual" register asks for contractions and a natural tone, not
+lowercase. The recorded FAST-05 table shows the model's own text as
+"paris is the capital of france." on the pre-merge engine and "Paris."
+after, so the merged prompt already answers differently for those
+probes, and the report predates the restart. What is cheap and
+deterministic is a sentence-case pass on the first letter of
+`reply.text` in `finalizeReply()`, for model text only (a package's
+own reply and the speech string are left as authored), with a unit
+test; a naturalness bench row that fails on a lowercase opener is
+added to the bench's own checks. That is the fix here; the prompt is
+not touched for it.
+
+### Acceptance, as tests
+
+The guard corpus (`spec/llm/guard-corpus.json`, run by
+`guardCorpus.test.ts` on both paths) gains: the Pippa disclosure
+accepting "Got it, Pippa is allergic to peanuts." in the same turn
+(#74's exact shape, the `near_echo` row from FAST-05 kept the prior-
+turn shape and said so); the arithmetic and capital rows stay; "She
+likes painting." with Pippa resolved and that memory included; and the
+negatives: an unknown household whereabouts claim (kept from FAST-05),
+a failed save ("I saved that" with a failed `remember` outcome), a
+failed timer, a search followed by an invented save claim (a succeeded
+`websearch` and "I've added that to your list"), a copied persona
+example (kept). The corpus row format gains `outcomes`. `guards.test.ts`
+covers the family mapping and the question-shaped gate; `turnEngine.test.ts`
+proves #74 and #62's first row end to end through `runTurn()` with a
+scripted reply, and the sentence-case pass. The retired assertions
+(near-echo on a restated statement) are replaced by the new rows, each
+with a note naming the behavior that replaced them; no safety fixture
+weakens. Closes #74 and #62; #81 by the sentence-case pass and the
+bench row.
