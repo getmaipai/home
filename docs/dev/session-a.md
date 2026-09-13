@@ -874,3 +874,111 @@ punctuation is stopped; three flagged sentences notify once per
 category; a refused confirm prompt leaves no pending ask. `safety.test.ts`:
 `evaluateReply()` on text, on speech, on both. The shared safety
 corpus suites and the floor/ceiling fixtures unchanged and green.
+
+## CHAT-02: shipped (2026-09-13)
+
+As designed. `safety.ts`: `evaluateReply(reply, band)` returns the
+text result, the speech result when `reply.speech` is present and
+differs, and `effective`, the stricter of the two. `turnEngine.ts`:
+`applyOutputBoundary(actor, value)` is the first step of
+`finalizeReply()`, so a package reply from Tier 0/1, a Tier 2 resolved
+result (the FAST-04 path keeps skipping the style guards and now meets
+the safety floor before the done event, since `peekAndHandle()` builds
+its `{ resolved }` through `finalizeReply()`), a confirm or ask prompt,
+an error fallback, a command result and the model's own text all pass
+one evaluator before visible text, audio and the persisted reply; an
+input-side refusal passes through; a refusal becomes a `safety_refuse`
+value with the output result as its `safety`, the crisis text where
+the category carries it, and the canned refusal line, and a refused
+confirm prompt clears the pending ask; a resources flag attaches the
+crisis text where the value had none; normalization and the canned
+variation run after, on approved text only, and an explicit speech
+text that differs from the visible text is kept as authored once it
+has passed. `notifyOncePerTurn()` wraps the existing `notifyIfFlagged()`
+with a bounded set of turn-and-category keys (`notifications.ts` not
+edited); `gateOutputSafety()` takes the turn id and adds the
+cumulative check: each boundary also evaluates the reply delivered so
+far plus the sentence, so content safe in halves and unsafe as one
+throws `StreamSafetyRefusal` before the completing half is yielded.
+`packageHost.ts` not edited: inside a chat turn, package text reaches
+the household only through a `TurnValue`, and the boundary sits on
+that.
+
+The review, run as child-safety code, found one high and it was real:
+the classifier's own action is the input policy (self-harm never
+blocks the person, even when the same message trips another
+detector), and read as-is on output it let harmful instructions
+through whenever the reply also mentioned self-harm, in the blocking
+path as one block and in the stream through the cumulative check.
+`safety.ts` now has `forOutput()`: a reply carrying any refuse
+category is refused whatever else it carries, and the crisis text
+follows the `self_harm` category rather than the action
+(`carriesCrisisSignal()`, which `deriveCrisisResources()` reads), so a
+refused reply that also mentioned self-harm keeps its resources on
+both paths. The stream gate's per-sentence and cumulative checks and
+`runTurn()`'s whole-text check all read results through it; the input
+side is untouched. Also from the review: the claim that package text
+only reaches a person through a `TurnValue` was false outside a chat
+turn, so `POST /api/plugins/:id/run` and the dashboard widget
+(`getWidgetData()`) now pass their reply through
+`refusePackageReplyIfUnsafe()` (the same `evaluateReply()`, the canned
+line and nothing else on a refusal); `evaluateReply()`'s effective
+result merges both sides (categories, signals, notify) instead of
+picking one, so a refusal on the speech side keeps the text side's
+self-harm category; the input-side notification shares the per-turn
+dedupe; a refusal is a fresh value carrying no `plugin_id` or
+`routing`, so the logged row and `routingStats()` never count a
+canned refusal as the package's answer. One recorded: the cumulative
+check re-runs the detectors over the reply so far at each boundary,
+quadratic in sentences, fine for the regex signals and worth a note
+if the classifier ever grows a model.
+
+A delta review of those fixes confirmed the four points it was asked
+(no output path reads the input action; a self-harm-only reply stays
+allow_with_resources; a refused reply keeps the crisis text when
+self_harm is among its categories; the input side is unchanged) and
+found one medium, fixed: in the stream, a sentence that refuses on its
+own threw with that sentence's categories alone, so a self-harm
+mention delivered a sentence earlier lost its crisis text on the
+refusal; a refusal now throws with the whole reply's result whenever
+something was delivered. Also taken: `forOutput()` reads the
+classifier's own exported `REFUSE_CATEGORIES` instead of restating the
+rule; the package-run and widget boundary tells a minor's parent as a
+chat turn does and uses one fixed refusal line (a widget is re-fetched
+on every refresh, so the chat's rotating "as I said" phrasing was
+wrong there); `wire.ts`'s `crisis_resources` comment says a refusal
+can carry it. Recorded, not this item's: the streaming route emits
+the refusal as an error event and never sends the finalized value, so
+on a streamed refusal the preserved crisis text reaches the log and
+not the client (the blocking and immediate paths deliver it); that is
+a wire-contract change for the route, filed for the CHAT program's
+streaming state machine (CHAT-17) rather than slipped in here, as getmaipai/home#85. And the
+package-result shapes carry no crisis_resources field, so an
+allow_with_resources package reply outside a chat turn passes without
+the crisis text; the chat turn is where it is offered.
+
+Tests: `safety.test.ts` (eight: text alone, identical speech not
+evaluated twice, unsafe speech behind safe text, unsafe text behind
+safe speech, a resources flag on either side, the masking case refused
+with its self-harm category kept, `forOutput()` leaving a self-harm-only
+result as offer-never-block, the merged sides). `turnEngine.test.ts`,
+"one output safety boundary" (eleven, the four from the reviews: the
+masking case through the stream and through `runTurn()` with the
+crisis text kept on the refusal; the delivered-then-refused ordering
+keeping the earlier sentence's self-harm category; a refused package
+reply carrying no attribution; the direct package run for a child
+returning the canned line and no data): safe input with unsafe direct
+package output (the knowledge package answering "tell me about
+Seattle" from a cache seeded with an unsafe extract, through the real
+Deno sandbox) refused through `runTurn()` and through the streaming
+route's immediate result with the identical decision and one parent
+notification per turn; unsafe speech with safe display refused; a
+resolved package result carrying unsafe text refused and a safe one
+untouched; a refused confirm prompt leaves no pending ask; the
+split-chunk case ("How do I make." and "Step by step." delivered, "A
+pipe bomb" stopped, the whole a refusal though each part passes
+alone); an unsafe final fragment without punctuation stopped after the
+safe first sentence; three self-harm sentences in one streamed reply
+notifying once with `allow_with_resources` and the crisis text kept.
+The safety corpus suites and the floor and ceiling fixtures unchanged
+and green.

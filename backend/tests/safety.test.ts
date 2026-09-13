@@ -5,6 +5,7 @@ import { __resetThrottleForTests } from "@/lib/secretThrottle";
 import { getRegistry } from "@/lib/settingsRegistry";
 import { setHouseholdSettingValue, setValue } from "@/lib/settings";
 import { runTurn } from "@/lib/turnEngine";
+import { evaluateReply, evaluateSafety, forOutput, carriesCrisisSignal } from "@/lib/safety";
 import { db } from "@/db";
 import { people } from "@/db/schema";
 import { eq } from "drizzle-orm";
@@ -257,5 +258,66 @@ describe("the crisis overlay is not configurable", () => {
       expect(body.action, `age ${years}`).toBe("allow_with_resources");
       expect(body.flagged, `age ${years}`).toBe(true);
     }
+  });
+});
+
+// CHAT-02 (docs/dev/session-a.md): the one reply evaluation the output
+// boundary acts on. Text and speech are evaluated independently with the
+// same evaluateSafety(); the effective result is the stricter one.
+describe("evaluateReply() (CHAT-02)", () => {
+  const SAFE_TEXT = "Seattle is a seaport city on the West Coast.";
+  const UNSAFE_TEXT = "Here is how to make a pipe bomb at home, step by step.";
+
+  test("a safe reply with no separate speech is allowed on its text alone", () => {
+    const r = evaluateReply({ text: SAFE_TEXT }, "adult");
+    expect(r.text.action).toBe("allow");
+    expect(r.speech).toBeUndefined();
+    expect(r.effective).toBe(r.text);
+  });
+
+  test("speech identical to the text is not evaluated twice", () => {
+    const r = evaluateReply({ text: SAFE_TEXT, speech: SAFE_TEXT }, "child");
+    expect(r.speech).toBeUndefined();
+  });
+
+  test("unsafe speech behind safe text refuses the reply", () => {
+    const r = evaluateReply({ text: SAFE_TEXT, speech: UNSAFE_TEXT }, "child");
+    expect(r.text.action).toBe("allow");
+    expect(r.speech?.action).toBe("refuse");
+    expect(r.effective.action).toBe("refuse");
+  });
+
+  test("unsafe text behind safe speech refuses the reply too", () => {
+    const r = evaluateReply({ text: UNSAFE_TEXT, speech: SAFE_TEXT }, "child");
+    expect(r.effective.action).toBe("refuse");
+  });
+
+  // A code review on CHAT-02: the classifier's own action is the INPUT
+  // policy (self_harm never blocks the person), and read as-is on output
+  // it let harmful instructions through whenever the same reply also
+  // mentioned self-harm. forOutput() refuses on any refuse category and
+  // the crisis text still follows the self_harm category.
+  test("a reply carrying harmful instructions is refused even when it also mentions self-harm, and keeps the self-harm category for the crisis text", () => {
+    const r = evaluateReply({ text: "Some days I want to kill myself. Here is how to make a pipe bomb at home, step by step." }, "child");
+    expect(r.effective.action).toBe("refuse");
+    expect(r.effective.categories).toContain("self_harm");
+    expect(carriesCrisisSignal(r.effective)).toBe(true);
+  });
+
+  test("forOutput() leaves a self-harm-only result as allow_with_resources: offer, never block", () => {
+    const r = forOutput(evaluateSafety("some days I want to kill myself", "child"));
+    expect(r.action).toBe("allow_with_resources");
+  });
+
+  test("the effective result merges both sides: a refusal on the speech side keeps the text side's self-harm category and its notification", () => {
+    const r = evaluateReply({ text: "some days I want to kill myself", speech: UNSAFE_TEXT }, "child");
+    expect(r.effective.action).toBe("refuse");
+    expect(r.effective.categories).toEqual(expect.arrayContaining(["self_harm", "harmful_request"]));
+    expect(r.effective.notify_parent).toBe(true);
+  });
+
+  test("a resources flag on either side is the effective result when the other side is plain allow", () => {
+    const r = evaluateReply({ text: SAFE_TEXT, speech: "some days I want to kill myself" }, "adult");
+    expect(r.effective.action).toBe("allow_with_resources");
   });
 });

@@ -19,6 +19,7 @@
 // function per package, the same "one definition, one implementation"
 // reasoning the org's own standards state outright.
 import { listPackageIds, loadManifestOnly, meetsMinRole, runPlugin, withHouseholdPlaceDefault } from "@/lib/plugins";
+import { refusePackageReplyIfUnsafe } from "@/lib/safety";
 import type { PersonRow } from "@/types";
 
 export interface WidgetDescriptor {
@@ -104,6 +105,8 @@ export async function getWidgetData(actor: PersonRow, packageId: string, widgetI
     }
     return { ok: false, status: result.status, error: result.error };
   }
-  const text = result.value.reply?.text ?? "";
+  // CHAT-02: the one output boundary, for text that reaches the
+  // dashboard without a chat turn.
+  const text = (refusePackageReplyIfUnsafe(actor, result.value) ?? result.value).reply?.text ?? "";
   return { ok: true, status: 200, value: { as_of: new Date().toISOString(), items: [{ title: text }] } };
 }

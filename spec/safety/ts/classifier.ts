@@ -28,7 +28,7 @@ type Category = SafetyResult["categories"][number];
 // (2026-09-04) found this file hand-listing 7 of the 8 category strings,
 // with nothing to catch drift if a 9th category is ever added.
 const ALL_CATEGORIES = SafetyResult.shape.categories.element.options;
-const REFUSE_CATEGORIES: ReadonlySet<Category> = new Set(
+export const REFUSE_CATEGORIES: ReadonlySet<Category> = new Set(
   ALL_CATEGORIES.filter((c) => c !== "self_harm"),
 );
 

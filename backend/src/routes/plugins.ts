@@ -3,6 +3,7 @@ import { requireAuth, requireRole } from "@/middleware/auth";
 import { listPackageIds, loadPackage, runPlugin } from "@/lib/plugins";
 import { routingStats } from "@/lib/conversationHistory";
 import { allPackageStatuses, getPackageStatus, runSmoke } from "@/lib/smoke";
+import { refusePackageReplyIfUnsafe } from "@/lib/safety";
 import type { AppEnv } from "@/types";
 import type { PackageManifest } from "@maipai/spec/gen/ts/manifest.js";
 
@@ -60,6 +61,14 @@ pluginsRoutes.post("/:id/run", requireAuth, async (c) => {
   const actor = c.get("person");
   const body = (await c.req.json().catch(() => ({}))) as Record<string, unknown>;
   const result = await runPlugin(id, actor, body);
+  if (result.ok) {
+    // CHAT-02: the one output boundary. A package answer reaches a
+    // person through this route the same as through chat, so it meets
+    // the identical evaluator first; a refusal returns the canned
+    // refusal shape, never the package text.
+    const refused = refusePackageReplyIfUnsafe(actor, result.value);
+    if (refused) return c.json(refused, 200);
+  }
   if (!result.ok) {
     // Fix B (docs/dev.md's "Chat reliability" B2): a code review
     // (2026-09-07) found this route was the one caller that dropped

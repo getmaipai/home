@@ -46,9 +46,10 @@ export interface TurnValue {
   plugin_id?: string;
   command_id?: string;
   safety: SafetyResult;
-  /** 4.3: "offer, never block." Set only on allow_with_resources, kept
-   * separate from `reply` so a surface can present it alongside the
-   * answer rather than have it silently reshape the model's own words. */
+  /** 4.3: "offer, never block." Set on allow_with_resources, and (CHAT-02)
+   * on a refusal whose categories include self_harm, kept separate from
+   * `reply` so a surface can present it alongside the answer rather than
+   * have it silently reshape the model's own words. */
   crisis_resources?: string;
   /** Session A step 3 (conversations): every real turn resolves or
    * creates a conversation and mints its own turn id up front

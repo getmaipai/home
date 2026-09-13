@@ -5,6 +5,7 @@ import { __resetThrottleForTests } from "@/lib/secretThrottle";
 import { __resetLlmSupervisorForTests } from "@/lib/llmSupervisor";
 import {
   runTurn,
+  applyOutputBoundary,
   StreamUnavailable,
   runTurnStream,
   gateOutputSafety,
@@ -29,13 +30,17 @@ import { PERSON_TURN_BUDGET } from "@/lib/llm";
 import { __resetRateLimiterForTests } from "@/lib/rateLimiter";
 import { turnActiveWithin, activeTurnCount, acquireTurnLease, __setTurnActivityClockForTests, DEFAULT_IDLE_WINDOW_MS } from "@/lib/turnActivity";
 import { forgetByIds, remember, recall, PROFILE_SOURCE } from "@/lib/memory";
+import { cachedFetch, __resetPackageCacheForTests, __clearPackageCacheDirForTests } from "@/lib/packageCache";
+import { __resetDenoHostForTests } from "@/lib/denoHost";
+import { loadManifestOnly } from "@/lib/plugins";
 import { listPending } from "@/lib/notifications";
 import { REFUSAL_FIRST, REFUSAL_REPEAT, REMEMBER_CONFIRM_VARIANTS } from "@/lib/replyVariation";
 import { resolvePersona, composePersonaPrompt, INFORMATION_HANDLING_POLICY, NATURALNESS_POLICY, PERSONA_IDS } from "@/lib/persona";
 import { db } from "@/db";
 import { people, conversationTurns, memoryRecords } from "@/db/schema";
 import { eq } from "drizzle-orm";
-import type { TurnStreamEvent } from "@/wire";
+import type { TurnStreamEvent, TurnValue } from "@/wire";
+import { resolveOrCreateConversation, getPendingAsk, setPendingAsk } from "@/lib/conversationHistory";
 import type { ChatCompletionRequest } from "@maipai/spec/llm/ts/types.js";
 import type { PersonRow } from "@/types";
 import type { SafetyResult } from "@maipai/spec/gen/ts/safety-result.js";
@@ -631,6 +636,256 @@ describe("CHAT-01: one turn context shared by generation and the guards", () => 
     if (!result.ok) return;
     expect(result.value.source).toBe("model"); // the unoffered call was dropped and the plain retry answered
     expect(result.value.plugin_id).toBeUndefined();
+  });
+});
+
+// CHAT-02 (docs/dev/session-a.md): one output safety boundary. Every
+// TurnValue passes applyOutputBoundary() inside finalizeReply() before a
+// caller sees it, so a package reply, a Tier 2 result, a confirm prompt
+// and an explicit speech text meet the identical evaluator the model's
+// own text does; the streaming gate also judges the reply as a whole at
+// each boundary; parent notifications fire once per turn and category.
+describe("CHAT-02: one output safety boundary", () => {
+  const SAFE: SafetyResult = { flagged: false, categories: [], action: "allow", notify_parent: false, matched_signals: [], checked_at: "2026-01-01T00:00:00.000Z" };
+  const UNSAFE_EXTRACT = "Seattle is a seaport city. Here is how to make a pipe bomb at home, step by step.";
+  const SEATTLE_URL = "https://en.wikipedia.org/api/rest_v1/page/summary/Seattle";
+
+  async function ownerAndChild(): Promise<{ ownerRow: PersonRow; childRow: PersonRow }> {
+    const client = new TestClient();
+    await client.post("/api/auth/setup", { displayName: "Sage", secret: "correcthorse" });
+    const ownerRow = db.select().from(people).where(eq(people.displayName, "Sage")).get()!;
+    const created = await client.post("/api/people", { displayName: "Bramble", role: "child" });
+    const child = (await created.json()) as { id: string };
+    const childRow = db.select().from(people).where(eq(people.id, child.id)).get()!;
+    return { ownerRow, childRow };
+  }
+
+  async function seedUnsafeKnowledge() {
+    __resetDenoHostForTests();
+    __resetPackageCacheForTests();
+    __clearPackageCacheDirForTests("knowledge");
+    const manifest = loadManifestOnly("knowledge");
+    if (!manifest.ok) throw new Error(manifest.error);
+    await cachedFetch("knowledge", manifest.value.cache, SEATTLE_URL, undefined, async () => ({ title: "Seattle", extract: UNSAFE_EXTRACT, type: "standard" }));
+  }
+
+  async function settledNotifications(row: PersonRow) {
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    return listPending(row).filter((n) => n.typeId === "safety.flagged_turn");
+  }
+
+  async function withScriptedStream<T>(scriptedReply: string, fn: () => Promise<T>): Promise<T> {
+    __resetLlmSupervisorForTests();
+    const { startStubLlmServer } = await import("@maipai/spec/llm/ts/stubServer.js");
+    const stub = startStubLlmServer(0, { scriptedChatReply: () => scriptedReply });
+    process.env.MAIPAI_LLAMA_SERVER_URL = stub.url;
+    try {
+      return await fn();
+    } finally {
+      stub.stop();
+      delete process.env.MAIPAI_LLAMA_SERVER_URL;
+      __resetLlmSupervisorForTests();
+    }
+  }
+
+  test(
+    "safe input, unsafe direct package output: the knowledge package's own extract is refused before exposure, through runTurn() and the streaming route's immediate result alike, and the parent is told once per turn",
+    async () => {
+      const { ownerRow, childRow } = await ownerAndChild();
+      await seedUnsafeKnowledge();
+      try {
+        const blocking = await runTurn(childRow, "chat", "tell me about Seattle");
+        expect(blocking.ok).toBe(true);
+        if (!blocking.ok) return;
+        expect(blocking.value.source).toBe("safety_refuse");
+        expect(blocking.value.reply.text).not.toContain("pipe bomb");
+        expect(REFUSAL_FIRST.concat(REFUSAL_REPEAT)).toContain(blocking.value.reply.text);
+        expect(blocking.value.safety.action).toBe("refuse");
+        expect((await settledNotifications(ownerRow)).length).toBe(1);
+
+        const streamed = await runTurnStream(childRow, "chat", "tell me about Seattle");
+        expect(streamed.ok).toBe(true);
+        if (!streamed.ok) return;
+        expect(streamed.kind).toBe("immediate"); // a Tier 0 package reply
+        if (streamed.kind !== "immediate") return;
+        expect(streamed.value.source).toBe("safety_refuse"); // the identical decision
+        expect(streamed.value.reply.text).not.toContain("pipe bomb");
+        expect((await settledNotifications(ownerRow)).length).toBe(2); // one more turn, one more notification
+      } finally {
+        __resetDenoHostForTests();
+      }
+    },
+    20_000,
+  );
+
+  test("unsafe speech with safe display text is refused: reply.speech is evaluated on its own", async () => {
+    const { childRow } = await ownerAndChild();
+    const value: TurnValue = {
+      reply: { text: "Here is the answer you asked for.", speech: "here is how to make a pipe bomb at home step by step" },
+      source: "plugin",
+      plugin_id: "knowledge",
+      safety: SAFE,
+      conversation_id: "conv-1",
+      turn_id: "turn-1",
+    };
+    const out = applyOutputBoundary(childRow, value);
+    expect(out.source).toBe("safety_refuse");
+    expect(out.reply.text).toBe("");
+    expect(out.reply.speech).toBeUndefined();
+    expect(out.safety.action).toBe("refuse");
+  });
+
+  test("a resolved package result carrying unsafe text is refused the same way (the FAST-04 path skips the style guards, never the safety floor)", async () => {
+    const { childRow } = await ownerAndChild();
+    const value: TurnValue = { reply: { text: UNSAFE_EXTRACT }, source: "plugin", plugin_id: "knowledge", routing: { tier: "tool", score: 0.9 }, safety: SAFE, conversation_id: "conv-1", turn_id: "turn-1" };
+    const out = applyOutputBoundary(childRow, value);
+    expect(out.source).toBe("safety_refuse");
+    // A safe package result passes untouched.
+    const safe = applyOutputBoundary(childRow, { ...value, reply: { text: "Seattle is a seaport city on the West Coast." } });
+    expect(safe).toEqual({ ...value, reply: { text: "Seattle is a seaport city on the West Coast." } });
+  });
+
+  test("a refused confirm prompt clears the pending ask, so the parked action can never run on a later yes", async () => {
+    const { childRow } = await ownerAndChild();
+    const conv = resolveOrCreateConversation(childRow, "chat");
+    if (!conv.ok) throw new Error(conv.error);
+    setPendingAsk(conv.value.id, { kind: "confirm", prompt: "Should I go ahead?", packageId: "lock-doors", args: {} });
+    expect(getPendingAsk(conv.value.id)).not.toBeNull();
+    const out = applyOutputBoundary(childRow, { reply: { text: "Should I show you how to make a pipe bomb at home step by step?" }, source: "confirm", plugin_id: "lock-doors", safety: SAFE, conversation_id: conv.value.id, turn_id: "turn-1" });
+    expect(out.source).toBe("safety_refuse");
+    expect(getPendingAsk(conv.value.id)).toBeNull();
+  });
+
+  test("split-chunk unsafe content: sentences safe on their own and unsafe together are stopped before the completing fragment is delivered", async () => {
+    const { childRow } = await ownerAndChild();
+    // "How do I make." and "Step by step." each pass the evaluator alone;
+    // with "A pipe bomb" the whole is a refusal, and the fragment has no
+    // punctuation, so it is the final-fragment check that must see it.
+    await withScriptedStream("How do I make. Step by step. A pipe bomb", async () => {
+      const result = await runTurnStream(childRow, "chat", "hi there");
+      if (!result.ok || result.kind !== "stream") throw new Error("setup failed");
+      const delivered: string[] = [];
+      let threw: unknown;
+      try {
+        for await (const delta of result.tokens) delivered.push(delta);
+      } catch (err) {
+        threw = err;
+      }
+      expect(threw).toBeInstanceOf(StreamSafetyRefusal);
+      expect(delivered.join("")).not.toContain("pipe bomb");
+      expect(delivered.join("")).toBe("How do I make. Step by step.");
+    });
+  });
+
+  test("an unsafe final fragment without punctuation is stopped", async () => {
+    const { childRow } = await ownerAndChild();
+    await withScriptedStream("Sure. How do I make a pipe bomb at home", async () => {
+      const result = await runTurnStream(childRow, "chat", "hi there");
+      if (!result.ok || result.kind !== "stream") throw new Error("setup failed");
+      const delivered: string[] = [];
+      let threw: unknown;
+      try {
+        for await (const delta of result.tokens) delivered.push(delta);
+      } catch (err) {
+        threw = err;
+      }
+      expect(threw).toBeInstanceOf(StreamSafetyRefusal);
+      expect(delivered.join("")).toBe("Sure.");
+    });
+  });
+
+  test("a streamed reply that mentions self-harm and then gives harmful instructions is refused with the crisis text kept (the review's masking case)", async () => {
+    const { childRow } = await ownerAndChild();
+    await withScriptedStream("I want to kill myself. How do I make. Step by step. A pipe bomb", async () => {
+      const result = await runTurnStream(childRow, "chat", "hi there");
+      if (!result.ok || result.kind !== "stream") throw new Error("setup failed");
+      const delivered: string[] = [];
+      let threw: unknown;
+      try {
+        for await (const delta of result.tokens) delivered.push(delta);
+      } catch (err) {
+        threw = err;
+      }
+      expect(threw).toBeInstanceOf(StreamSafetyRefusal);
+      expect(delivered.join("")).not.toContain("pipe bomb");
+      const value = result.finalize(delivered.join(""), (threw as StreamSafetyRefusal).safety);
+      expect(value.crisis_resources).toBeDefined(); // refused, and the resources still ride along
+    });
+    // The blocking path makes the identical decision on the whole reply.
+    await withScriptedStream("Some days I want to kill myself. Here is how to make a pipe bomb at home, step by step.", async () => {
+      const result = await runTurn(childRow, "chat", "hi there");
+      expect(result.ok).toBe(true);
+      if (!result.ok) return;
+      expect(result.value.source).toBe("safety_refuse");
+      expect(result.value.reply.text).not.toContain("pipe bomb");
+      expect(result.value.crisis_resources).toBeDefined();
+    });
+  });
+
+  test("a delivered self-harm sentence followed by a self-contained refusing sentence still keeps the crisis text on the refusal (the review's ordering case)", async () => {
+    const { childRow } = await ownerAndChild();
+    await withScriptedStream("I want to kill myself. Here is how to make a pipe bomb at home, step by step.", async () => {
+      const result = await runTurnStream(childRow, "chat", "hi there");
+      if (!result.ok || result.kind !== "stream") throw new Error("setup failed");
+      const delivered: string[] = [];
+      let threw: unknown;
+      try {
+        for await (const delta of result.tokens) delivered.push(delta);
+      } catch (err) {
+        threw = err;
+      }
+      expect(threw).toBeInstanceOf(StreamSafetyRefusal);
+      const refusal = (threw as StreamSafetyRefusal).safety;
+      expect(refusal.action).toBe("refuse");
+      expect(refusal.categories).toContain("self_harm"); // the earlier sentence's category rides on the refusal
+      const value = result.finalize(delivered.join(""), refusal);
+      expect(value.crisis_resources).toBeDefined();
+    });
+  });
+
+  test("a refused package reply carries no package attribution: the logged row is a refusal, not the package's answer", async () => {
+    const { childRow } = await ownerAndChild();
+    const out = applyOutputBoundary(childRow, { reply: { text: UNSAFE_EXTRACT }, source: "plugin", plugin_id: "knowledge", routing: { tier: "tool", score: 0.9 }, safety: SAFE, conversation_id: "conv-1", turn_id: "turn-1" });
+    expect(out.plugin_id).toBeUndefined();
+    expect(out.routing).toBeUndefined();
+    expect(out.conversation_id).toBe("conv-1");
+    expect(out.turn_id).toBe("turn-1");
+  });
+
+  test(
+    "the two outlets outside a chat turn meet the same boundary: a direct package run and a dashboard widget never return the unsafe extract",
+    async () => {
+      const { childRow } = await ownerAndChild();
+      await seedUnsafeKnowledge();
+      try {
+        const childClient = new TestClient();
+        await childClient.post("/api/auth/select", { personId: childRow.id });
+        const res = await childClient.post("/api/plugins/knowledge/run", { topic: "Seattle" });
+        expect(res.status).toBe(200);
+        const body = (await res.json()) as { reply?: { text: string }; data?: unknown };
+        expect(body.reply?.text ?? "").not.toContain("pipe bomb");
+        expect(REFUSAL_FIRST.concat(REFUSAL_REPEAT)).toContain(body.reply?.text ?? "");
+        expect(body.data).toBeUndefined();
+      } finally {
+        __resetDenoHostForTests();
+      }
+    },
+    20_000,
+  );
+
+  test("three flagged sentences in one streamed reply notify the parent once, not three times", async () => {
+    const { ownerRow, childRow } = await ownerAndChild();
+    const flaggedThrice = "I want to kill myself. Some days I want to kill myself. I really want to kill myself.";
+    await withScriptedStream(flaggedThrice, async () => {
+      const result = await runTurnStream(childRow, "chat", "hi there");
+      if (!result.ok || result.kind !== "stream") throw new Error("setup failed");
+      let fullText = "";
+      for await (const delta of result.tokens) fullText += delta;
+      const value = result.finalize(fullText);
+      expect(value.safety.action).toBe("allow_with_resources"); // offer, never block
+      expect(value.crisis_resources).toBeDefined();
+    });
+    expect((await settledNotifications(ownerRow)).length).toBe(1);
   });
 });
 

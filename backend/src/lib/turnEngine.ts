@@ -11,7 +11,7 @@
 //
 // What's deferred, and why, is repeated at the point it matters below;
 // read docs/dev.md's turn engine section before extending this file.
-import { evaluateSafety } from "@/lib/safety";
+import { evaluateSafety, evaluateReply, forOutput, carriesCrisisSignal } from "@/lib/safety";
 import { speakerAgeBand } from "@/lib/ageBand";
 import { listPackageIds, loadManifestOnly, meetsMinRole, runPlugin } from "@/lib/plugins";
 import { ensureRoutingEmbeddings, embedUtterance, scoreByEmbedding, pickTier1Winner, pickTier1WinnerAmong, utteranceShape, commandOpenersFrom, type UtteranceShape } from "@/lib/routing";
@@ -249,7 +249,10 @@ const CRISIS_RESOURCES_TEXT =
  * identical silent-drop bug the review's other finding had just fixed
  * in the stream. */
 function deriveCrisisResources(safety: SafetyResult): string | undefined {
-  return safety.action === "allow_with_resources" ? CRISIS_RESOURCES_TEXT : undefined;
+  // CHAT-02: the crisis text follows the self_harm category, not only the
+  // allow_with_resources action, so a refused reply that also mentioned
+  // self-harm keeps its resources ("offer, never block").
+  return carriesCrisisSignal(safety) ? CRISIS_RESOURCES_TEXT : undefined;
 }
 
 // Step 4: "identity and companion" are the first thing in the stable
@@ -1359,7 +1362,7 @@ async function prepareTurn(
   // (allow_with_resources and refuse can both flag a minor's turn), and
   // BEFORE the refuse branch below returns, so a refused turn still
   // notifies.
-  notifyIfFlagged(actor, safety, "[turn]");
+  notifyOncePerTurn(actor, safety, turnId, "[turn]"); // CHAT-02: the input side shares the per-turn dedupe with the output side
   if (safety.action === "refuse") {
     // The text here is never actually seen: finalizeReply() unconditionally
     // replaces it via pickRefusalVariant() for every `safety_refuse`
@@ -1876,8 +1879,79 @@ export async function resolveToolCalls(
  * non-refusal source, so a model reply that happened to say "Done." or
  * "I don't remember anything about that." in its own words got silently
  * swapped for an unrelated pool phrase. */
-function finalizeReply(actor: PersonRow, value: TurnValue): TurnValue {
+// CHAT-02: parent notifications once per turn and category. The
+// streaming gate evaluates every sentence and the cumulative reply, and
+// the boundary below evaluates the whole reply again at the end, so one
+// unsafe stretch would otherwise notify several times. Bounded: the
+// last few hundred turns' keys, oldest dropped.
+const notifiedThisTurn = new Set<string>();
+const NOTIFIED_KEYS_MAX = 512;
+function notifyOncePerTurn(actor: PersonRow, safety: SafetyResult, turnId: string | undefined, logPrefix: string): void {
+  if (!safety.notify_parent) return;
+  if (!turnId) {
+    notifyIfFlagged(actor, safety, logPrefix);
+    return;
+  }
+  const fresh = safety.categories.filter((c) => !notifiedThisTurn.has(`${turnId}:${c}`));
+  if (fresh.length === 0) return;
+  for (const c of fresh) {
+    notifiedThisTurn.add(`${turnId}:${c}`);
+    if (notifiedThisTurn.size > NOTIFIED_KEYS_MAX) {
+      const oldest = notifiedThisTurn.values().next().value;
+      if (oldest !== undefined) notifiedThisTurn.delete(oldest);
+    }
+  }
+  notifyIfFlagged(actor, { ...safety, categories: fresh }, logPrefix);
+}
+export function __resetOutputNotificationsForTests(): void {
+  notifiedThisTurn.clear();
+}
+
+/** CHAT-02 (docs/dev/session-a.md): the one output safety boundary. Runs
+ * as the first step of finalizeReply(), the point every TurnValue passes
+ * before a caller sees it, so a package reply, a Tier 2 resolved result,
+ * a confirm or ask prompt, an error fallback, a command result and the
+ * model's own text all meet the identical evaluator before visible text,
+ * audio (`reply.speech`) and the persisted reply. `reply.speech` is
+ * evaluated on its own when it differs from `reply.text`. A refusal
+ * becomes a safety_refuse value (finalizeReply()'s existing branch then
+ * speaks the canned line) and clears a pending ask the refused prompt
+ * had parked, so the action can never run on a later "yes"; a
+ * resources flag attaches the crisis text where the value had none. An
+ * input-side refusal is already a refusal and passes through. The style
+ * guards (guards.ts) are a different gate and are not touched here. */
+export function applyOutputBoundary(actor: PersonRow, value: TurnValue): TurnValue {
+  if (value.source === "safety_refuse") return value;
+  const band = speakerAgeBand(actor, new Date());
+  const evaluation = evaluateReply(value.reply, band);
+  const safety = evaluation.effective;
+  notifyOncePerTurn(actor, safety, value.turn_id, "[turn]");
+  if (safety.action === "refuse") {
+    if (value.source === "confirm" && value.conversation_id) setPendingAsk(value.conversation_id, null);
+    // A fresh value, not the refused one with fields swapped: the
+    // package's own attribution (plugin_id, routing) must not ride on a
+    // refusal (a code review: the logged row and routingStats() would
+    // count the canned line as the package's answer).
+    return {
+      reply: { text: "" },
+      source: "safety_refuse",
+      safety,
+      crisis_resources: deriveCrisisResources(safety) ?? value.crisis_resources,
+      conversation_id: value.conversation_id,
+      turn_id: value.turn_id,
+    };
+  }
+  if (safety.flagged && !value.safety.flagged) {
+    return { ...value, safety, crisis_resources: value.crisis_resources ?? deriveCrisisResources(safety) };
+  }
+  return value;
+}
+
+function finalizeReply(actor: PersonRow, rawValue: TurnValue): TurnValue {
+  const value = applyOutputBoundary(actor, rawValue);
   const { text, speech } = value.reply;
+  // An explicit speech text that differs from the visible text is kept
+  // as authored (already evaluated above); nothing here re-normalizes it.
   if (speech !== undefined && speech !== text) return value;
 
   // Resolved fresh here rather than threaded in from prepareTurn(): an
@@ -1978,8 +2052,8 @@ async function runTurnHoldingLease(
     // this exact same safety/guard treatment for the plain-text answer
     // that replaces it) - one definition, not two copies drifting apart.
     const answerWithSafetyAndGuards = (text: string): TurnValue => {
-      const outputSafety = evaluateSafety(text, speakerAgeBand(actor, new Date()));
-      notifyIfFlagged(actor, outputSafety, "[turn]");
+      const outputSafety = forOutput(evaluateSafety(text, speakerAgeBand(actor, new Date())));
+      notifyOncePerTurn(actor, outputSafety, prepared.turnId, "[turn]");
       if (outputSafety.action === "refuse") {
         // A non-streaming reply is atomic - nothing was ever shown to
         // the caller before this point, so replacing the WHOLE reply
@@ -1991,7 +2065,9 @@ async function runTurnHoldingLease(
           reply: { text: "" },
           source: "safety_refuse",
           safety: outputSafety,
-          crisis_resources: prepared.crisisResources,
+          // CHAT-02: the output's own self-harm category keeps its crisis
+          // text on a refusal, the same as the streaming path's finalize().
+          crisis_resources: deriveCrisisResources(outputSafety) ?? prepared.crisisResources,
           conversation_id: conversation.id,
           turn_id: prepared.turnId,
         };
@@ -2280,6 +2356,9 @@ export async function* gateOutputSafety(
   // drives the iterator by hand instead of `for await`.
   tokens: AsyncGenerator<string, ToolCall[] | undefined | { resolved: TurnValue }, void>,
   actor: PersonRow,
+  // CHAT-02: the turn, so parent notifications fire once per turn and
+  // category across every sentence and the final whole-reply check.
+  turnId?: string,
 ): AsyncGenerator<string, StreamOutcome, void> {
   let pending = "";
   let isFirstChunk = true;
@@ -2289,12 +2368,26 @@ export async function* gateOutputSafety(
   // function of `actor` + "now" that would just recompute the identical
   // answer on every one of a reply's sentences.
   const band = speakerAgeBand(actor, new Date());
+  // CHAT-02: what has been yielded so far, so each boundary can also
+  // judge the reply as a whole: content that is safe in two halves and
+  // unsafe as one is stopped before the second half is delivered.
+  let delivered = "";
 
+  // CHAT-02: the OUTPUT reading of every result (safety.ts's
+  // forOutput()): a refuse category refuses the sentence whatever else
+  // it carries; the crisis text follows the self_harm category.
   const checkAndNotify = (chunk: string): SafetyResult => {
-    const safety = evaluateSafety(chunk, band);
-    notifyIfFlagged(actor, safety, "[turn]");
+    const safety = forOutput(evaluateSafety(chunk, band));
+    notifyOncePerTurn(actor, safety, turnId, "[turn]");
     if (safety.flagged) lastFlagged = safety;
     return safety;
+  };
+  const wholeRefusal = (next: string): SafetyResult | null => {
+    if (!delivered) return null;
+    const whole = forOutput(evaluateSafety(`${delivered}${next}`, band));
+    if (whole.action !== "refuse") return null;
+    notifyOncePerTurn(actor, whole, turnId, "[turn]");
+    return whole;
   };
 
   const iterator = tokens[Symbol.asyncIterator]();
@@ -2311,7 +2404,13 @@ export async function* gateOutputSafety(
       const trimmed = rawSpan.trim();
       if (!trimmed) continue; // a boundary with nothing but whitespace before it - nothing to check or yield
       const safety = checkAndNotify(trimmed);
-      if (safety.action === "refuse") throw new StreamSafetyRefusal(safety);
+      // A refusal throws with the WHOLE reply's result when something was
+      // already delivered, so an earlier sentence's self-harm category
+      // (and its crisis text) rides on the refusal (a code review).
+      if (safety.action === "refuse") throw new StreamSafetyRefusal(wholeRefusal(rawSpan) ?? safety);
+      const whole = wholeRefusal(rawSpan);
+      if (whole) throw new StreamSafetyRefusal(whole);
+      delivered += rawSpan;
       yield rawSpan;
     }
     step = await iterator.next();
@@ -2329,7 +2428,9 @@ export async function* gateOutputSafety(
   const remainder = pending.trim();
   if (remainder) {
     const safety = checkAndNotify(remainder);
-    if (safety.action === "refuse") throw new StreamSafetyRefusal(safety);
+    if (safety.action === "refuse") throw new StreamSafetyRefusal(wholeRefusal(pending) ?? safety);
+    const whole = wholeRefusal(pending);
+    if (whole) throw new StreamSafetyRefusal(whole);
     yield pending;
   }
 
@@ -2593,7 +2694,7 @@ async function runTurnStreamHoldingLease(
       turnId: prepared.turnId,
       startedAt,
       tokens: holdLease(
-        gateGuards(gateOutputSafety(guardFirstStep(tokens), actor), prepared.guardContext, actor.id, (reason, replaced) => {
+        gateGuards(gateOutputSafety(guardFirstStep(tokens), actor, prepared.turnId), prepared.guardContext, actor.id, (reason, replaced) => {
           guardHits.push(reason);
           if (replaced) guardReplaced = true;
         }),

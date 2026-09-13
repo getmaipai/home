@@ -87,7 +87,16 @@ not permission to expand scope.
 
 <a id="chat-02"></a>
 
-- [ ] **CHAT-02: Enforce one output safety boundary for chat and packages** (M)
+- [x] **CHAT-02: Enforce one output safety boundary for chat and packages** (M)
+
+    Status (2026-09-13, closed): `evaluateReply()` (text and speech
+    independently, the stricter wins) behind `applyOutputBoundary()` as the
+    first step of `finalizeReply()`, so package replies, Tier 2 results,
+    confirm prompts, fallbacks, commands and model text all pass one
+    evaluator before text, audio and persistence; a refusal clears a
+    pending ask; notifications once per turn and category; the streaming
+    gate judges the cumulative reply at each boundary. Details in
+    docs/dev/session-a.md.
 
     Depends on: CHAT-01. Files: `backend/src/lib/turnEngine.ts`, `safety.ts`,
     `packageHost.ts`, `notifications.ts`, `backend/tests/turnEngine.test.ts`,
