@@ -35,6 +35,9 @@ export interface TurnObserved {
   totalMs: number;
   /** The turn was aborted on purpose (the interruption row). */
   interrupted?: boolean;
+  /** The model's raw text for the turn's last completion, before any
+   * guard (the recording proxy's tee), when a model call was made. */
+  rawModelText?: string | null;
 }
 
 export interface Check {
@@ -179,7 +182,7 @@ export function renderTable(scores: readonly TurnScore[]): string {
       s.humanVerdict && s.checks.length === 0
         ? `"${cell(s.observed.reply)}"`
         : failed.length
-          ? `${failed.map((c) => `${c.name}: ${c.detail}`).join("; ")}; "${cell(s.observed.reply)}"`
+          ? `${failed.map((c) => `${c.name}: ${c.detail}`).join("; ")}; "${cell(s.observed.reply)}"${s.observed.guardReplaced && s.observed.rawModelText ? ` (the model said "${cell(s.observed.rawModelText)}")` : ""}`
           : s.humanVerdict
             ? `ok; "${cell(s.observed.reply)}"`
             : "ok";

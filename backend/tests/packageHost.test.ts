@@ -368,6 +368,23 @@ describe("performHttpFetch (the real HTTP mechanics, no SSRF/permission/rate-lim
     }
   });
 
+  test("a 404 is the typed not_found, never network_unreachable: the host answered and the resource does not exist (#92)", async () => {
+    const server = Bun.serve({ port: 0, fetch: (req) => new Response("nope", { status: new URL(req.url).pathname === "/gone" ? 410 : 404 }) });
+    try {
+      for (const path of ["/missing", "/gone"]) {
+        try {
+          await performHttpFetch(`http://127.0.0.1:${server.port}${path}`);
+          throw new Error("should have thrown");
+        } catch (err) {
+          expect(err).toBeInstanceOf(HostError);
+          expect((err as HostError).code).toBe("not_found");
+        }
+      }
+    } finally {
+      server.stop(true);
+    }
+  });
+
   test("an oversized response raises HostError rather than being silently truncated", async () => {
     const oversized = "x".repeat(2_100_000);
     const server = Bun.serve({ port: 0, fetch: () => new Response(oversized) });

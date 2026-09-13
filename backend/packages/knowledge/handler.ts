@@ -25,12 +25,16 @@ import { z } from "npm:zod@4.5.4";
 // test` (lib/smoke.ts's `deno_test` smoke kind) can exercise the actual
 // formatting logic without needing a live MCP round-trip, which a bare
 // `deno test` has no host to answer anyway.
-export function summarizeWikipediaResponse(topic: string, data: unknown): { text: string; speech: string } {
+// #92: a page with no extract, or a disambiguation page, is a miss, not
+// an answer. It is reported as the typed `not_found` (below), never
+// spoken as "I couldn't find a clear answer": the hub's turn engine
+// treats a Tier 0 pattern winner's `not_found` as "no package answered"
+// and lets the model answer from its own knowledge or the household's
+// memory, which "what is two plus two" and "what is Pippa allergic to"
+// both need.
+export function summarizeWikipediaResponse(topic: string, data: unknown): { text: string; speech: string } | null {
   const summary = data as { title?: string; extract?: string; type?: string } | null;
-  if (!summary?.extract || summary.type === "disambiguation") {
-    const text = `I couldn't find a clear answer about ${topic}.`;
-    return { text, speech: text };
-  }
+  if (!summary?.extract || summary.type === "disambiguation") return null;
   const text = `${summary.title ?? topic}: ${summary.extract}`;
   return { text, speech: `${summary.title ?? topic}. ${summary.extract}` };
 }
@@ -50,13 +54,21 @@ export async function handleKnowledge(
   { topic }: { topic: string },
   extra: { sendRequest: (req: unknown, schema: unknown) => Promise<{ value: unknown }> },
 ) {
-  // The host chooses the manifest's fallback for a typed fetch failure.
+  // The host chooses the manifest's fallback for a typed fetch failure;
+  // a `not_found` (the host's own code for a 404, carried in the MCP
+  // error's data, or a page with nothing to say) is the miss the turn
+  // engine hands to the model.
   try {
     const data = await hostFetch(extra, `https://en.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(topic)}`);
     const reply = summarizeWikipediaResponse(topic, data);
+    if (!reply) {
+      return { content: [{ type: "text" as const, text: JSON.stringify({ error: { code: "not_found", message: `no summary for ${topic}` } }) }] };
+    }
     return { content: [{ type: "text" as const, text: JSON.stringify({ reply, actions: [] }) }] };
   } catch (err) {
-    const error = { code: "network_unreachable", message: err instanceof Error ? err.message : String(err) };
+    const data = (err as { data?: { code?: unknown } }).data;
+    const code = typeof data?.code === "string" ? data.code : "network_unreachable";
+    const error = { code, message: err instanceof Error ? err.message : String(err) };
     return { content: [{ type: "text" as const, text: JSON.stringify({ error }) }] };
   }
 }

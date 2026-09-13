@@ -657,3 +657,44 @@ describe("action-claim families, the fourth review's cases", () => {
     expect(guardReply("Got it, Pippa is allergic to peanuts.", ctx({ utterance: "Pippa is allergic to peanuts" })).reason).toBeNull();
   });
 });
+
+// #92: the window describes a non-model turn as a bracketed system note;
+// a model that says the note back has said nothing ("[Knowledge could
+// not answer.]" was spoken aloud in the baseline bench's reader's rows).
+describe("placeholder_echo (#92)", () => {
+  test("a bracketed note alone is replaced with the honest line; with other sentences it is cut and the rest stands", () => {
+    const alone = guardReply("[Knowledge could not answer.]", ctx({ utterance: "where does Marlow work" }));
+    expect(alone.reason).toBe("placeholder_echo");
+    expect(alone.replaced).toBe(true);
+    expect(alone.reply).not.toContain("[");
+    expect(alone.reply).toMatch(/don't know|not sure|don't have an answer/);
+    // On a disclosure the replacement is the acknowledgment it deserved (a bench run said "I'm not sure about that." to "and that he likes chocolate cake").
+    const statement = guardReply('[Remember answered: "Okay, noted."]', ctx({ utterance: "and that he likes chocolate cake" }));
+    expect(statement.reason).toBe("placeholder_echo");
+    expect(["Okay.", "Got it.", "Noted."]).toContain(statement.reply);
+    const tail = guardReply("I don't have that one. [The household was asked to confirm before this action ran.]", ctx({ utterance: "where does Marlow work" }));
+    expect(tail.reason).toBe("placeholder_echo");
+    expect(tail.reply).toBe("I don't have that one.");
+    // A note with words after it has said something: the stub model's own echo opens with a bracketed tag.
+    expect(guardSentence("[stub model: no real model loaded, this is a canned reply] good morning", ctx({ utterance: "good morning" }))).toBeNull();
+  });
+
+  test("a multi-sentence note split by the sentence splitter is caught in both halves (a review)", () => {
+    const g = guardReply('[Weather answered: "It\'s 72 and sunny. Tomorrow looks clear."]', ctx({ utterance: "how's the weather" }));
+    expect(g.reason).toBe("placeholder_echo");
+    expect(g.reply).not.toContain("[");
+    expect(g.reply).not.toContain("]");
+    expect(guardSentence('Tomorrow looks clear."]', ctx({ utterance: "x" }))).toBe("placeholder_echo");
+  });
+
+  test("brackets inside ordinary prose are not a note", () => {
+    expect(guardReply("The recipe [from the card] needs two eggs.", ctx({ utterance: "what does the recipe need" })).reason).toBeNull();
+    expect(guardReply("Sure [1].", ctx({ utterance: "ok" })).reason).toBeNull();
+  });
+
+  test("a failed knowledge lookup on the turn narrates a lookup claim (#92 rides on the turn as an outcome)", () => {
+    const g = guardReply("I looked that up: it's in Peru.", ctx({ utterance: "where is Machu Picchu", outcomes: [{ packageId: "knowledge", status: "failed" }] }));
+    expect(g.reason).toBe("unsupported_action");
+    expect(g.reply).toBe("That lookup didn't work.");
+  });
+});

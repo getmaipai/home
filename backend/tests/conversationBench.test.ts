@@ -222,6 +222,7 @@ describe("the runner against the stub (control-flow rows)", () => {
       const { scores } = await runConversation(byId("greeting-and-thanks"), deps);
       expect(scores[0]?.observed.contextMessage ?? "").toContain("Sage");
       expect(scores[0]?.observed.offeredTools).toContain("websearch");
+      expect(scores[0]?.observed.rawModelText).toBe("Okay."); // the teed reply, before any guard
       expect(scores[0]?.observed.firstDeltaMs).not.toBeNull();
       expect(scores[0]?.observed.totalMs).toBeGreaterThan(0);
     });

@@ -2990,3 +2990,176 @@ describe("CHAT-04: acknowledgments pass, action claims need their outcome, opene
     });
   });
 });
+
+// #92 (docs/plans/baseline-fixes-2026-09-13.md item 1): a Tier 0 pattern
+// winner whose run reports the typed "not found" is not a reply; the
+// turn goes on to the model with the miss on its TurnContext. And a
+// literal pattern of an outside-looking package yields on a household
+// name or an arithmetic capture, so "what is Pippa allergic to" reaches
+// memory and "what is two plus two" reaches the model.
+describe("#92: a lookup miss falls through to the model, and a literal pattern yields on a household subject", () => {
+  async function withScripted<T>(reply: string, fn: () => Promise<T>): Promise<T> {
+    __resetLlmSupervisorForTests();
+    const { startStubLlmServer } = await import("@maipai/spec/llm/ts/stubServer.js");
+    const stub = startStubLlmServer(0, { scriptedChatReply: () => reply });
+    process.env.MAIPAI_LLAMA_SERVER_URL = stub.url;
+    try {
+      return await fn();
+    } finally {
+      stub.stop();
+      delete process.env.MAIPAI_LLAMA_SERVER_URL;
+      __resetLlmSupervisorForTests();
+    }
+  }
+
+  test("routeLiteral(): the knowledge pattern yields on a roster name and on arithmetic, and a household action package never yields", async () => {
+    const { actor } = await owner();
+    const { routeLiteral, literalYield, isArithmeticExpression } = await import("@/lib/turnEngine");
+    const loaded = loadAllManifests();
+    const yields: { id: string; reason: string }[] = [];
+    expect(routeLiteral("what is Pippa allergic to", actor, loaded, ["Sage", "Pippa"], (y) => yields.push(y))).toBeNull();
+    expect(yields).toEqual([{ id: "knowledge", reason: "household_subject" }]);
+    expect(routeLiteral("what is two plus two", actor, loaded, ["Sage"])?.winner ?? null).toBeNull();
+    expect(routeLiteral("what is 12 * 4?", actor, loaded, ["Sage"])?.winner ?? null).toBeNull();
+    expect(routeLiteral("what is photosynthesis", actor, loaded, ["Sage", "Pippa"])?.winner?.id).toBe("knowledge");
+    expect(routeLiteral("add Pippa's game to the shopping list", actor, loaded, ["Sage", "Pippa"])?.winner?.id).toBe("list-add");
+    expect(routeLiteral("remember that Pippa is allergic to peanuts", actor, loaded, ["Sage", "Pippa"])?.winner?.id).toBe("remember");
+    expect(isArithmeticExpression("two plus two")).toBe(true);
+    expect(isArithmeticExpression("10 - 3")).toBe(true);
+    expect(isArithmeticExpression("the capital of France")).toBe(false);
+    expect(isArithmeticExpression("2")).toBe(false); // a bare number is a topic ("what is 42")
+    expect(isArithmeticExpression("9/11")).toBe(false); // a date, not a division (a review)
+    expect(isArithmeticExpression("twenty-one")).toBe(false); // a number word, not a subtraction
+    const knowledge = loaded.find((l) => l.id === "knowledge")!;
+    // A Unicode name is a whole word too (a review): "José" is not caught by \b.
+    expect(literalYield("knowledge", knowledge.manifest, "what is José allergic to", { topic: "José allergic to" }, ["José"])?.reason).toBe("household_subject");
+    expect(literalYield("knowledge", knowledge.manifest, "what is Pippa allergic to", { topic: "Pippa allergic to" }, ["Pippa"])?.reason).toBe("household_subject");
+    expect(literalYield("knowledge", knowledge.manifest, "what is a pip", { topic: "a pip" }, ["Pippa"])).toBeNull(); // whole word only
+  });
+
+  test("runTurn(): a knowledge miss reaches the model, the reply is the model's, and the miss is on the turn as a failed outcome", async () => {
+    const { actor } = await owner();
+    const plugins = await import("@/lib/plugins");
+    const spy = spyOn(plugins, "runPlugin").mockImplementation(async (id: string) => {
+      expect(id).toBe("knowledge");
+      return { ok: false as const, status: 502 as const, error: "no summary for the capital of France", code: "not_found", fallback_reply: { reply: { text: "Sorry, I'm having trouble looking that up right now." }, actions: [] } };
+    });
+    let sawTools: string[] = [];
+    const { startStubLlmServer } = await import("@maipai/spec/llm/ts/stubServer.js");
+    __resetLlmSupervisorForTests();
+    const stub = startStubLlmServer(0, {
+      scriptedChatReply: (request) => {
+        sawTools = (request.tools ?? []).map((t) => t.function.name);
+        return "Paris.";
+      },
+    });
+    process.env.MAIPAI_LLAMA_SERVER_URL = stub.url;
+    try {
+      const result = await runTurn(actor, "chat", "what is the capital of France");
+      expect(spy).toHaveBeenCalledTimes(1);
+      expect(result.ok).toBe(true);
+      if (!result.ok) return;
+      expect(result.value.source).toBe("model");
+      expect(result.value.reply.text).toBe("Paris.");
+      expect(result.value.plugin_id).toBeUndefined();
+      expect(sawTools).toContain("websearch"); // the ordinary Tier 2 offer, as on any model turn
+    } finally {
+      spy.mockRestore();
+      stub.stop();
+      delete process.env.MAIPAI_LLAMA_SERVER_URL;
+      __resetLlmSupervisorForTests();
+    }
+  });
+
+  test("runTurn(): the loader's own 404 and a household package's not_found keep the plugin_error reply: only an outside lookup's miss falls through", async () => {
+    const { actor } = await owner();
+    const plugins = await import("@/lib/plugins");
+    // The loader's 404 (a half-written recipe) has no HostError code.
+    const broken = spyOn(plugins, "runPlugin").mockImplementation(async () => ({ ok: false as const, status: 404 as const, error: "no bundled package knowledge" }));
+    try {
+      await withScripted("never asked", async () => {
+        const result = await runTurn(actor, "chat", "what is the capital of France");
+        expect(result.ok).toBe(true);
+        if (!result.ok) return;
+        expect(result.value.source).toBe("plugin_error");
+      });
+    } finally {
+      broken.mockRestore();
+    }
+    // A household package's typed not_found (no such list) is not a lookup miss: list-view has no net: permission.
+    const noList = spyOn(plugins, "runPlugin").mockImplementation(async () => ({ ok: false as const, status: 404 as const, error: "no such list", code: "not_found" }));
+    try {
+      await withScripted("never asked", async () => {
+        const result = await runTurn(actor, "chat", "what's on my shopping list");
+        expect(result.ok).toBe(true);
+        if (!result.ok) return;
+        expect(result.value.source).toBe("plugin_error");
+        expect(result.value.plugin_id).toBe("list-view");
+      });
+    } finally {
+      noList.mockRestore();
+    }
+  });
+
+  test("runTurn(): a lookup claim after the miss is narrated from the outcome, and any other package failure still ends the turn as plugin_error", async () => {
+    const { actor } = await owner();
+    const plugins = await import("@/lib/plugins");
+    const spy = spyOn(plugins, "runPlugin").mockImplementation(async () => ({ ok: false as const, status: 502 as const, error: "gone", code: "not_found", fallback_reply: { reply: { text: "Sorry." }, actions: [] } }));
+    try {
+      await withScripted("I looked that up: it's Paris.", async () => {
+        const result = await runTurn(actor, "chat", "what is the capital of France");
+        expect(result.ok).toBe(true);
+        if (!result.ok) return;
+        expect(result.value.reply.text).toBe("That lookup didn't work.");
+      });
+    } finally {
+      spy.mockRestore();
+    }
+    const failing = spyOn(plugins, "runPlugin").mockImplementation(async () => ({ ok: false as const, status: 502 as const, error: "fetch failed", code: "network_unreachable", fallback_reply: { reply: { text: "Sorry, I'm having trouble looking that up right now." }, actions: [] } }));
+    try {
+      await withScripted("never asked", async () => {
+        const result = await runTurn(actor, "chat", "what is the capital of France");
+        expect(result.ok).toBe(true);
+        if (!result.ok) return;
+        expect(result.value.source).toBe("plugin_error");
+        expect(result.value.plugin_id).toBe("knowledge");
+      });
+    } finally {
+      failing.mockRestore();
+    }
+  });
+
+  test("runTurn(): 'what is Pippa allergic to' never reaches the knowledge package; the model answers with the household's memory in context", async () => {
+    const { client, actor } = await owner();
+    // Pippa on the roster: the household list is what the yield reads.
+    const added = await client.post("/api/people", { displayName: "Pippa", role: "child" });
+    expect(added.status).toBe(201);
+    const plugins = await import("@/lib/plugins");
+    const spy = spyOn(plugins, "runPlugin");
+    let context = "";
+    const { startStubLlmServer } = await import("@maipai/spec/llm/ts/stubServer.js");
+    __resetLlmSupervisorForTests();
+    const stub = startStubLlmServer(0, {
+      scriptedChatReply: (request) => {
+        context = request.messages.filter((m) => m.role === "system").map((m) => m.content).join("\n");
+        return "Peanuts.";
+      },
+    });
+    process.env.MAIPAI_LLAMA_SERVER_URL = stub.url;
+    try {
+      const saved = remember(actor, { text: "Pippa is allergic to peanuts", category: "fact", tier: "durable", scope: "household", source: "test", importance: 0.9 });
+      expect(saved.ok).toBe(true);
+      const result = await runTurn(actor, "chat", "what is Pippa allergic to");
+      expect(result.ok).toBe(true);
+      if (!result.ok) return;
+      expect(spy.mock.calls.map((c) => c[0])).not.toContain("knowledge");
+      expect(result.value.source).toBe("model");
+      expect(context).toContain("Pippa is allergic to peanuts");
+    } finally {
+      spy.mockRestore();
+      stub.stop();
+      delete process.env.MAIPAI_LLAMA_SERVER_URL;
+      __resetLlmSupervisorForTests();
+    }
+  });
+});

@@ -140,7 +140,7 @@ async function main(): Promise<{ executed: number; engine: string }> {
       scores.push(...run.scores);
       // One JSON line per turn for a later reading of the run (the
       // reply, the checks, the timings), beside the table.
-      for (const sc of run.scores) console.log(`[bench-turn] ${JSON.stringify({ conversation: sc.conversationId, turn: sc.turnIndex + 1, said: sc.say, pass: sc.pass, checks: sc.checks, reply: sc.observed.reply, source: sc.observed.source, pluginId: sc.observed.pluginId, guardHits: sc.observed.guardHits, memoryRows: sc.observed.memoryRows, offeredTools: sc.observed.offeredTools, firstDeltaMs: sc.observed.firstDeltaMs, totalMs: sc.observed.totalMs })}`);
+      for (const sc of run.scores) console.log(`[bench-turn] ${JSON.stringify({ conversation: sc.conversationId, turn: sc.turnIndex + 1, said: sc.say, pass: sc.pass, checks: sc.checks, reply: sc.observed.reply, source: sc.observed.source, pluginId: sc.observed.pluginId, guardHits: sc.observed.guardHits, rawModelText: sc.observed.rawModelText ?? null, memoryRows: sc.observed.memoryRows, offeredTools: sc.observed.offeredTools, firstDeltaMs: sc.observed.firstDeltaMs, totalMs: sc.observed.totalMs })}`);
     }
   } finally {
     log.stop();

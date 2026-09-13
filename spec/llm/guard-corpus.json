@@ -341,5 +341,12 @@
     ],
     "expect": "unsupported_action",
     "note": "CHAT-04: one succeeded outcome of another family (websearch) never licenses a list claim; the family has to match (list-add)."
+  },
+  {
+    "id": "placeholder-note-echoed",
+    "utterance": "where does Marlow work",
+    "reply": "[Knowledge could not answer.]",
+    "expect": "placeholder_echo",
+    "note": "getmaipai/home#92: the window's bracketed system note for an earlier package failure, said back as the reply (the baseline bench's reader's rows, 2026-09-13). A note is nobody's words; replaced with the honest line."
   }
 ]

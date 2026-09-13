@@ -12691,6 +12691,11 @@ other's section once (147cd28, f4779a6).
   turn engine, state-read outcomes, frozen header, hard rows) and its
   first run's table and ranking: [docs/dev/session-a.md](dev/session-a.md)
   (2026-09-13).
+- #92, a lookup miss is not a reply: the typed not_found end to end, a
+  Tier 0 miss falling through to the model with the outcome on the
+  TurnContext, a literal pattern yielding on a household name or
+  arithmetic, the placeholder_echo guard; three bench runs recorded:
+  [docs/dev/session-a.md](dev/session-a.md) (2026-09-13).
 - Lane 5 item 3, Home's weather card writing a fake turn into real chat
   history (an additive `ephemeral` flag on `POST /api/turn/stream`):
   [docs/dev/session-b.md](dev/session-b.md) (2026-09-13).

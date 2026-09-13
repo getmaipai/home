@@ -263,11 +263,18 @@ async function attemptHttpFetch(
         continue;
       }
       if (!response.ok) {
+        // #92: a 404 (or a 410) is the typed "not found" of
+        // spec/errors/errors.json, not an unreachable network: the host
+        // answered and the resource does not exist. A Tier 0 pattern
+        // winner reporting it falls through to the model
+        // (turnEngine.ts's prepareTurn()); every other status stays the
+        // upstream failure it is.
+        const code = response.status === 404 || response.status === 410 ? "not_found" : "network_unreachable";
         return {
           ok: false,
           networkFailure: false,
           status: response.status,
-          error: new HostError("network_unreachable", `${url} returned HTTP ${response.status}`),
+          error: new HostError(code, `${url} returned HTTP ${response.status}`),
         };
       }
       const text = await readBodyWithLimit(response, currentUrl);

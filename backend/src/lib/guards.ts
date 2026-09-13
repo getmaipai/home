@@ -40,7 +40,11 @@ export type GuardReason =
    * back and retry, where an accepted impossible request is a refusal. */
   | "unsupported_action"
   | "like_i_said"
-  | "example_parrot";
+  | "example_parrot"
+  /** #92: a sentence that is nothing but a bracketed system note ("[Knowledge
+   * could not answer.]"), the window's own description of an earlier
+   * non-model turn, echoed back as if it were a reply. */
+  | "placeholder_echo";
 
 export interface GuardContext {
   utterance: string;
@@ -144,6 +148,11 @@ const CHAT_LOOP = [
   "Hmm, I'm going in circles. Try me a different way?",
   "I'm stuck on that one, sorry. Ask me again some other way?",
 ];
+// #92: a placeholder echo on a statement (the model said a bracketed
+// note back after a disclosure) is replaced with the acknowledgment the
+// disclosure deserved, never "I don't know" about something the person
+// just said; on a question the DONT_KNOW line is the honest one.
+const ACKNOWLEDGE = ["Okay.", "Got it.", "Noted."];
 const MED_CAUTION = [
   "I'm not able to give medication amounts - check with a pharmacist or the label.",
   "I can't advise on doses - a pharmacist or doctor is the safe call there.",
@@ -668,7 +677,9 @@ const ACTION_FAMILIES: readonly ActionFamily[] = [
     // not a web lookup.
     exclude: /\b(?:in|through) (?:your|my|the) (?:notes|memory|memories|history)\b/i,
     onQuestion: true,
-    packages: ["websearch"],
+    // #92: a Tier 0 knowledge miss rides on the turn as a failed outcome,
+    // so a lookup claim after it narrates "That lookup didn't work."
+    packages: ["websearch", "knowledge"],
     none: "I didn't look that up.",
     failed: "That lookup didn't work.",
   }),
@@ -832,13 +843,29 @@ function guardExampleParrot(sentence: string, ctx: GuardContext): GuardReason | 
   return ctx.personaExamples.some((ex) => normalizeForCompare(ex) === normalized) ? "example_parrot" : null;
 }
 
+// #92: the window describes a non-model turn to the model as a bracketed
+// system note ("[Knowledge could not answer.]", "[The household was asked
+// to confirm before this action ran.]"); a model that says one back has
+// said nothing. Cuttable: the rest of a reply stands; alone, it is
+// replaced with the honest line.
+// The whole sentence is the note, or a piece of one: the splitters break
+// a multi-sentence note ("[Weather answered: "It's sunny. Tomorrow looks
+// clear."]") after the first period, so an opened-and-never-closed
+// bracket and a closed-and-never-opened one are its halves (a review).
+// Not a prefix with words after it: the stub model's own echo reply
+// opens with a bracketed tag and real words after it.
+const PLACEHOLDER_NOTE_RE = /^\s*\[[^\]]{3,}\]\s*$|^\s*\[[^\]]{3,}$|^[^[\]]{3,}\]\s*$/;
+function guardPlaceholderEcho(sentence: string): GuardReason | null {
+  return PLACEHOLDER_NOTE_RE.test(sentence) ? "placeholder_echo" : null;
+}
+
 // ==== Composition ====
 
 // Reasons that cut just the offending sentence, leaving an otherwise
 // honest reply's earlier sentences standing (bot-legacy's own
 // `_CUTTABLE`: the sentence was padding, not the answer). Everything
 // else replaces the whole reply - the sentence WAS the reply's thesis.
-const CUTTABLE: ReadonlySet<GuardReason> = new Set(["invention", "unrelated_recall"]);
+const CUTTABLE: ReadonlySet<GuardReason> = new Set(["invention", "unrelated_recall", "placeholder_echo"]);
 
 /** Exported so turnEngine.ts's streaming path (`gateGuards()`) makes the
  * SAME cut-vs-replace-the-rest distinction guardReply() does below - one
@@ -861,6 +888,7 @@ const REPLACEMENT_FOR: Record<GuardReason, readonly string[]> = {
   unsupported_action: CANNOT_DO,
   like_i_said: CHAT_LOOP,
   example_parrot: DONT_KNOW,
+  placeholder_echo: DONT_KNOW,
 };
 
 /** The honest line a guard hit replaces text with, for a given reason -
@@ -871,6 +899,7 @@ const REPLACEMENT_FOR: Record<GuardReason, readonly string[]> = {
  * family and the turn's outcomes (CHAT-04) when both are given. */
 export function replacementFor(reason: GuardReason, personId: string, flagged?: { sentence: string; ctx: GuardContext }): string {
   if (reason === "unsupported_action" && flagged) return unsupportedActionLine(flagged.sentence, { ...flagged.ctx, personId });
+  if (reason === "placeholder_echo" && flagged && shapeOf(flagged.ctx) !== "question") return honest(personId, reason, ACKNOWLEDGE);
   return honest(personId, reason, REPLACEMENT_FOR[reason]);
 }
 
@@ -899,6 +928,7 @@ export function guardSentence(sentence: string, ctx: GuardContext, isFirstSenten
   const s = sentence.trim();
   if (!s) return null;
   return (
+    guardPlaceholderEcho(s) ??
     guardUnsupportedAction(s, ctx) ??
     guardCapabilityClaim(s, ctx) ??
     guardMedicationDose(s) ??

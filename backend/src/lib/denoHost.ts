@@ -19,6 +19,8 @@
 // instead of an error. Three strikes disables the package until reboot
 // and raises a Repairs item (lib/issues.ts).
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
+import { McpError, ErrorCode } from "@modelcontextprotocol/sdk/types.js";
+import { HostError } from "@maipai/spec/emulators/ts/host-emulator.js";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
 import { z } from "zod";
 import { join } from "node:path";
@@ -160,8 +162,16 @@ async function startProcess(id: string, manifest: PackageManifest, actor: Person
     const delay = testFetchDelayMs;
     if (delay !== null) await new Promise((resolve) => setTimeout(resolve, delay));
     const host = createHost(entry.currentActor, manifest);
-    const value = await host.fetch(req.params.url, req.params.opts);
-    return { value };
+    try {
+      const value = await host.fetch(req.params.url, req.params.opts);
+      return { value };
+    } catch (err) {
+      // #92: the typed code crosses the sandbox boundary in the MCP
+      // error's `data`, so a handler can report `not_found` as what it
+      // is instead of relabeling every failure `network_unreachable`.
+      if (err instanceof HostError) throw new McpError(ErrorCode.InternalError, err.message, { code: err.code });
+      throw err;
+    }
   });
 
   client.onclose = () => {

@@ -44,7 +44,10 @@ export interface LoadedPackage {
 
 export type PluginOpResult<T> =
   | { ok: true; value: T }
-  | { ok: false; status: 400 | 403 | 404; error: string }
+  // `code` (#92): the HostError code a recipe step raised, when one did,
+  // so a caller can tell a fetch's typed not_found from the loader's own
+  // 404 ("no such package") without parsing the message.
+  | { ok: false; status: 400 | 403 | 404; error: string; code?: string }
   // Fix B (docs/dev.md's "Chat reliability: the 2026-09-07 incident and
   // the five fixes"): a Tier 1 handler's own typed report that it
   // couldn't answer (denoHost.ts's `CallTier1Result`, its `ok: false`
@@ -292,7 +295,7 @@ export async function runPlugin(
   } catch (err) {
     if (err instanceof HostError) {
       const status = err.code === "permission_denied" ? 403 : err.code === "not_found" ? 404 : 400;
-      return { ok: false, status, error: err.message };
+      return { ok: false, status, error: err.message, code: err.code };
     }
     // A `compute` step's own bad input (an expression the restricted
     // evaluator can't parse) - a real, expected, recoverable case now

@@ -981,12 +981,19 @@ function logRoute(
    * bedtime-story rule above): still a placement, traced so the
    * fallthrough arithmetic does not count it as "nothing placed". */
   outscoredBySkill: string | null = null,
+  /** #92: a literal pattern that yielded (a household subject or an
+   * arithmetic capture), and a Tier 0 winner whose run found nothing,
+   * both traced so the fallthrough reads as what it was. */
+  yielded: LiteralYield | null = null,
+  tier0Miss: string | null = null,
 ): void {
   const round = (n: number) => Math.round(n * 1000) / 1000;
   const top = ranked[0] ? { id: ranked[0].id, score: round(ranked[0].score) } : null;
   const runnerUp = ranked[1] ? { id: ranked[1].id, score: round(ranked[1].score) } : null;
   const margin = ranked[0] && ranked[1] ? round(ranked[0].score - ranked[1].score) : null;
-  console.log(`[route] ${JSON.stringify({ turn_id: turnId, tier, shape, winner, top, runner_up: runnerUp, margin, offered, ...(outscoredBySkill ? { outscored_by_skill: outscoredBySkill } : {}) })}`);
+  console.log(
+    `[route] ${JSON.stringify({ turn_id: turnId, tier, shape, winner, top, runner_up: runnerUp, margin, offered, ...(outscoredBySkill ? { outscored_by_skill: outscoredBySkill } : {}), ...(yielded ? { yielded: yielded.id, yield_reason: yielded.reason } : {}), ...(tier0Miss ? { tier0_miss: tier0Miss } : {}) })}`,
+  );
 }
 
 /** The installed packages' own command verbs for the shape guard
@@ -1029,7 +1036,47 @@ export interface RouteResult {
  * are (prepareTurn()'s matchCommand(), ahead of this). Returns null when
  * no pattern binds; the caller then embeds once and calls
  * routeSemantic(). */
-export function routeLiteral(text: string, actor: PersonRow, loaded: LoadedManifest[]): RouteResult | null {
+// #92: a literal pattern of a package that looks OUTSIDE the house (a
+// `net:` permission) yields when the utterance names a household member
+// or its capture is arithmetic: the world knows nothing about Pippa,
+// and "what is two plus two" is not a topic. A household action package
+// (list-add, remember, timer) keeps its patterns whatever the capture
+// holds: "add Pippa's game to the shopping list" must still win. The
+// rule lives here rather than in a narrowed manifest pattern because a
+// pattern cannot say "not a household name", and the next package with
+// a wildcard would need the same rule.
+// An operator is a symbol, or a word with spaces around it; "-" and "/"
+// count only with spaces around them, so "twenty-one" and "9/11" stay
+// topics (a review).
+const ARITHMETIC_RE = /^\s*(?:[\d.,]+|(?:zero|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|twenty|thirty|forty|fifty|hundred|thousand))(?:(?:\s*[+*x×÷^]\s*|\s+[-/]\s+|\s+(?:plus|minus|times|divided by|over|to the power of)\s+)(?:[\d.,]+|(?:zero|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|twenty|thirty|forty|fifty|hundred|thousand)))+\s*[?.!]?\s*$/i;
+
+export function isArithmeticExpression(text: string): boolean {
+  return ARITHMETIC_RE.test(text);
+}
+
+export function looksOutsideTheHouse(manifest: PackageManifest): boolean {
+  return (manifest.permissions ?? []).some((p) => p.startsWith("net:"));
+}
+
+// A whole word by a Unicode letter boundary ("José", "Zoë"; \b stops at
+// ASCII). A roster name that is also a dictionary word (Sage, Iris,
+// Atlas) yields on the word too: the household's name wins over the
+// herb, a stated limit.
+function namesHouseholdMember(text: string, roster: readonly string[]): boolean {
+  return roster.some((name) => name.length > 1 && new RegExp(`(?<![\\p{L}\\p{N}])${name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}(?![\\p{L}\\p{N}])`, "iu").test(text));
+}
+
+/** The literal yield's own reason, for the `[route]` line. */
+export type LiteralYield = { id: string; reason: "household_subject" | "arithmetic" };
+
+export function literalYield(id: string, manifest: PackageManifest, text: string, args: Record<string, unknown>, roster: readonly string[]): LiteralYield | null {
+  if (!looksOutsideTheHouse(manifest)) return null;
+  if (namesHouseholdMember(text, roster)) return { id, reason: "household_subject" };
+  if (Object.values(args).some((v) => typeof v === "string" && isArithmeticExpression(v))) return { id, reason: "arithmetic" };
+  return null;
+}
+
+export function routeLiteral(text: string, actor: PersonRow, loaded: LoadedManifest[], roster: readonly string[] = [], onYield?: (y: LiteralYield) => void): RouteResult | null {
   for (const { id, manifest } of loaded) {
     if (!meetsMinRole(actor.role, manifest.min_role)) continue;
     // The spec's own kind doc comment (spec/schemas/manifest.schema.json):
@@ -1070,6 +1117,12 @@ export function routeLiteral(text: string, actor: PersonRow, loaded: LoadedManif
         if (captured === null) continue;
         const args = deterministicArgs(manifest.args, captured);
         if (!args) continue;
+        // #92: the yield above; the turn goes on as if nothing matched.
+        const yielded = literalYield(id, manifest, text, args, roster);
+        if (yielded) {
+          onYield?.(yielded);
+          continue;
+        }
         // A literal pattern match always wins, immediately - no ranking
         // to report - regardless of which tier this package is (see
         // this function's own header comment above).
@@ -1481,7 +1534,13 @@ async function prepareTurn(
   // embedQueryForRecall() stays in memory.ts for its other real caller
   // (packageHost.ts's Host.memory.recall).
   let utteranceVector: Float32Array | undefined;
-  let { winner: routed, ranked }: RouteResult = routeLiteral(text, actor, loaded) ?? { winner: null, ranked: [] };
+  // #92: the roster is read here, before routing, so a literal pattern
+  // of an outside-looking package can yield on a household name; the
+  // same list feeds the prompt and the guards below.
+  const household = listActivePeople();
+  const rosterNames = household.flatMap((p) => (p.nickname ? [p.displayName, p.nickname] : [p.displayName]));
+  let literalYielded: LiteralYield | null = null;
+  let { winner: routed, ranked }: RouteResult = routeLiteral(text, actor, loaded, rosterNames, (y) => (literalYielded = y)) ?? { winner: null, ranked: [] };
   if (!routed) {
     utteranceVector = await embedUtterance(text);
     ({ winner: routed, ranked } = await routeSemantic(text, actor, loaded, utteranceVector));
@@ -1502,10 +1561,27 @@ async function prepareTurn(
   const bestSkillScore = routedViaFuzzyMatch ? (matchingSkills(text, skills)[0]?.score ?? 0) : 0;
   const shape = utteranceShape(text, commandOpeners(loaded));
   const outscoredBySkill = routed && routedViaFuzzyMatch && bestSkillScore > routed.score ? routed.id : null;
+  // #92: a Tier 0 pattern winner that reports the typed "not found"
+  // (a summary 404, a page with nothing to say, a recipe's not_found)
+  // is not a reply: the turn goes on down the model path as if nothing
+  // had matched, and the miss rides on the TurnContext as a failed
+  // outcome so the guards and the [turn] line see it.
+  let tier0Miss: { packageId: string; error: string } | null = null;
   if (routed && !outscoredBySkill) {
     logRoute(turnId, routed.viaPattern ? "pattern" : routed.viaEmbedding ? "embedding" : "keyword", shape, routed.id, ranked, []);
     const result = await runPlugin(routed.id, actor, routed.args, turnId);
-    if (result.ok) {
+    // The miss is a lookup's: a pattern winner of an outside-looking
+    // package whose run raised the typed not_found (a recipe fetch's, or
+    // a Tier 1 handler's). The loader's own 404 ("no such package", a
+    // half-written recipe) and a household package's not_found ("no
+    // such list", an unknown entity) keep the plugin_error reply, so a
+    // broken install is never silently answered by the model (a review).
+    const missManifest = loaded.find((l) => l.id === routed.id)?.manifest;
+    const lookupMiss = !result.ok && result.code === "not_found" && routed.viaPattern && missManifest !== undefined && looksOutsideTheHouse(missManifest);
+    if (!result.ok && lookupMiss) {
+      console.log(`[turn] plugin ${routed.id} found nothing: ${result.error}`);
+      tier0Miss = { packageId: routed.id, error: result.error };
+    } else if (result.ok) {
       const pending = pendingAskFromPluginResult(routed.id, routed.args, result.value as PluginResultWithConfirmAsk, conversation.id);
       if (pending) {
         return immediate({ reply: { text: pending.prompt }, source: "confirm", plugin_id: routed.id, safety, crisis_resources: crisisResources });
@@ -1519,7 +1595,7 @@ async function prepareTurn(
         crisis_resources: crisisResources,
         routing: { tier: routed.viaPattern ? "pattern" : routed.viaEmbedding ? "embedding" : "keyword", score: routed.score },
       });
-    }
+    } else {
     // Two real, different reasons runPlugin() can fail here. Fix B
     // (docs/dev.md's "Chat reliability: the 2026-09-07 incident and the
     // five fixes"): status 502 is a Tier 1 handler's own typed report
@@ -1536,15 +1612,25 @@ async function prepareTurn(
     // intended way to detect either case, not the top-level `ok` flag (a
     // review, 2026-09-04, flagged this could otherwise look
     // indistinguishable from a real success to a caller branching on
-    // `.ok` alone).
-    console.log(`[turn] plugin ${routed.id} matched but failed to run: ${result.error}`);
-    return immediate({
-      reply: (result.status === 502 ? result.fallback_reply.reply : undefined) ?? { text: "Sorry, I couldn't do that." },
-      source: "plugin_error",
-      plugin_id: routed.id,
-      safety,
-      crisis_resources: crisisResources,
-    });
+    // `.ok` alone). The typed miss (a recipe's 404, a Tier 1 handler's
+    // `not_found`) is handled above (#92) and never reaches this branch.
+      console.log(`[turn] plugin ${routed.id} matched but failed to run: ${result.error}`);
+      return immediate({
+        reply: (result.status === 502 ? result.fallback_reply.reply : undefined) ?? { text: "Sorry, I couldn't do that." },
+        source: "plugin_error",
+        plugin_id: routed.id,
+        safety,
+        crisis_resources: crisisResources,
+      });
+    }
+  }
+  if (tier0Miss && !utteranceVector) {
+    // The literal winner skipped the embed; the model path needs it for
+    // recall and the Tier 2 ranking, exactly as a miss would have. The
+    // package that just missed is not offered again on the same turn.
+    utteranceVector = await embedUtterance(text);
+    ({ ranked } = await routeSemantic(text, actor, loaded, utteranceVector));
+    ranked = ranked.filter((r) => r.id !== tier0Miss?.packageId);
   }
 
   // selfOnly: true (step 2's privacy fix) - a person's own turn must
@@ -1571,7 +1657,6 @@ async function prepareTurn(
   // user/assistant messages AND, when older turns exist beyond them, one
   // summary line for the system prompt's volatile zone.
   const window = buildConversationWindow(conversation, { supersedes });
-  const household = listActivePeople();
   const promptParts = buildPromptParts(actor, text, memoryMatches, loaded, persona, skills, window.summaryLine, household, episodeMatches, frozen);
   // Bumping the top MAX_MEMORY_SNIPPETS candidates unconditionally was
   // wrong (a code review, 2026-09-05): buildPromptParts's own
@@ -1614,13 +1699,14 @@ async function prepareTurn(
     evidence,
     includedEvidenceIds: [],
     offeredToolIds: [],
-    outcomes: [],
+    // #92: a Tier 0 lookup that found nothing is this turn's first outcome.
+    outcomes: tier0Miss ? [{ callId: `tier0:${tier0Miss.packageId}`, packageId: tier0Miss.packageId, status: "failed", errorCode: "not_found" }] : [],
     intent: intentFor(text, shape),
     persona: { id: persona.id, displayName: persona.display_name, examples: persona.examples ?? [] },
     ageBand,
     now: frozen.now,
     locale: frozen.locale,
-    roster: household.flatMap((p) => (p.nickname ? [p.displayName, p.nickname] : [p.displayName])),
+    roster: rosterNames,
     shape,
   };
   markIncluded(turnContext, promptParts.context);
@@ -1649,7 +1735,7 @@ async function prepareTurn(
   // its reasoning (the offer costs prompt tokens, not a round trip; the
   // model's own judgment is the gate) is what ROUTE-01 generalized.
   const tools = selectOfferedTools(ranked, shape, ordinaryToolIdsForInstalled(loaded));
-  logRoute(turnId, "tier2", shape, null, ranked, tools.map((t) => t.id), outscoredBySkill);
+  logRoute(turnId, "tier2", shape, null, ranked, tools.map((t) => t.id), outscoredBySkill, literalYielded, tier0Miss?.packageId ?? null);
   // manifest.routing.always_offer (spec/schemas/manifest.schema.json,
   // Fix E's own addition - a code review, 2026-09-07, found the first
   // cut of this hardcoded a `Set(["websearch"])` in this file instead of

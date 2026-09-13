@@ -237,6 +237,7 @@ export async function runConversation(conv: BenchConversation, deps: RunDeps): P
     deps.proxy?.reset();
     const before = new Set(deps.log.turns.keys());
     const driven = await driveTurn(actor, turn.say, { conversationId, supersedes, interrupt: turn.interrupt });
+    await deps.proxy?.settled(); // the teed reply text lands a tick after the client's read
     const turnId = driven.value?.turn_id ?? [...deps.log.turns.keys()].find((id) => !before.has(id)) ?? null;
     if (turnId) turnIds[i] = turnId;
     const line = turnId ? deps.log.turns.get(turnId) : undefined;
@@ -265,6 +266,7 @@ export async function runConversation(conv: BenchConversation, deps: RunDeps): P
       firstSentenceMs: driven.timings.firstSentenceMs,
       totalMs: driven.timings.totalMs,
       interrupted: driven.interrupted,
+      rawModelText: requests.length ? (requests[requests.length - 1]?.responseText ?? null) : null,
     };
     if (driven.error) observed.reply = `[error: ${driven.error}]`;
     scores.push(scoreTurn(conv, i, turn, observed));

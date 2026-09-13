@@ -1964,3 +1964,146 @@ with no subject must supersede the fact it corrects, on the
 conversation's own window) with the judge's subject resolution. The
 bench is the regression suite for each: rerun `--live` after the fix
 and compare the rows, across at least two repeats.
+
+## #92: a lookup miss is not a reply, and a literal pattern must not claim a household question, design (2026-09-13)
+
+Item 1 of `docs/plans/baseline-fixes-2026-09-13.md`. Two halves.
+
+**The typed miss.** A Wikipedia summary 404 reaches the hub today as
+`HostError("network_unreachable", "... returned HTTP 404")` from
+`performHttpFetch()`, and the knowledge handler, which only sees an
+MCP error string across the sandbox boundary, relabels every failure
+`network_unreachable`. Two changes make the miss typed end to end:
+`performHttpFetch()` reports a 404 or 410 as `HostError("not_found")`
+(`spec/errors/errors.json`'s own code: "the requested record, package,
+or resource does not exist"), and the host's `host/fetch` handler
+rethrows a `HostError` as an `McpError` carrying `{ code }` in its
+`data`, which the knowledge handler passes through instead of
+guessing. A recipe's `fetch` step already surfaces a `HostError` code
+as the run's status (`not_found` is 404), so both tiers agree.
+
+**The fall-through.** In `prepareTurn()`, a Tier 0 pattern winner whose
+run reports `not_found` no longer ends the turn as `plugin_error`. The
+turn continues down the model path exactly as if no pattern had
+matched (recall, episodes, the window, the prompt), and the miss is
+pushed onto the `TurnContext` as a failed outcome (`packageId`, `status:
+"failed"`, `errorCode: "not_found"`), so CHAT-04's lookup family
+(`knowledge` joins `websearch` in it) narrates "That lookup didn't
+work." if the model claims a lookup, and the `[turn]` line records it.
+Nothing about the miss is put in the prompt: the model answers from
+its own knowledge ("Paris") or from the household's memory ("peanuts",
+recalled by the same path every model turn takes). Any other failure
+(a real network error, a permission fault, a crash) keeps today's
+`plugin_error` reply: the package genuinely tried and the household
+should hear that, not a silent switch to the model.
+
+**The placeholder.** "[Knowledge could not answer.]" was spoken aloud
+because the previous turn's `plugin_error` entered the window as a
+bracketed system note (Fix B3) and the model echoed it. With the miss
+falling through, that note no longer exists for a not-found; for the
+notes that remain (a real failure, a refusal, a confirmation), a
+sentence that is nothing but a bracketed note is a new guard reason,
+`placeholder_echo`, cut when other sentences stand and replaced with
+the DONT_KNOW line when it is the whole reply, on both paths, with a
+corpus row.
+
+**The literal yield.** The manifest's `what is *` cannot say "not a
+household name" and "not arithmetic"; narrowing it would only move the
+problem to `tell me about *`, `define *`, `who is the singer *` and the
+next package with a wildcard. The rule that generalizes is routing's:
+a Tier 0 literal pattern yields (the turn goes on to Tier 2 as if no
+pattern matched) when the package looks outside the house (a `net:`
+permission in its manifest) and the utterance names a household member
+(a display name or nickname from the roster, as a whole word) or the
+captured wildcard is an arithmetic expression (digits and operators,
+or number words joined by plus, minus, times, divided by). A household
+action package (list-add, remember, timer) keeps its patterns whatever
+the capture holds: "add Pippa's game to the shopping list" must still
+win. The yield is logged on the `[route]` line as the tier "pattern"
+with `winner: null` and a `yielded` field, so the trace shows why.
+
+**Acceptance.** The two #92 conversations pass three identical bench
+runs; "what is the capital of France" answers "Paris"; the placeholder
+string appears in no reply in the bench or the guard corpus; the
+tool-calling bench unchanged; the three totals recorded (the shipped
+section below).
+
+## #92 shipped: the typed miss falls through, the literal pattern yields (2026-09-13)
+
+Built as designed. `performHttpFetch()` reports a 404 or 410 as
+`HostError("not_found")`; the sandbox host's `host/fetch` handler
+rethrows a `HostError` as an `McpError` with `{ code }` in its data and
+the knowledge handler passes that code through (its
+`summarizeWikipediaResponse()` returns null for a page with no extract
+or a disambiguation, reported as `not_found` instead of the spoken "I
+couldn't find a clear answer"). In `prepareTurn()` a Tier 0 winner
+whose run is a recipe 404 or a Tier 1 `not_found` sets `tier0Miss`
+and the turn continues down the model path: the embed and the Tier 2
+ranking that the literal winner had skipped are done then, and the
+miss is the `TurnContext`'s first outcome (`status: "failed"`,
+`errorCode: "not_found"`); `knowledge` joined the guards' lookup
+family, so "I looked that up" after a miss narrates "That lookup
+didn't work." Every other failure keeps the `plugin_error` reply.
+The handler change went through the catalog first (its canonical
+source, catalog c69f2cb, per FAST-03's procedure) and
+`refresh-bundled-packages` re-recorded the copy's hash and source
+commit in `bundled-provenance.json`. `routeLiteral()` takes the roster and yields a pattern of a package
+with a `net:` permission when the utterance names a household member
+(whole word) or the capture is arithmetic (`isArithmeticExpression()`:
+digits or number words joined by operators; a bare number is a topic);
+the `[route]` line carries `yielded` and `yield_reason`, or
+`tier0_miss`. The new guard reason `placeholder_echo` cuts a sentence
+that is nothing but a bracketed note (replaced with the DONT_KNOW line
+when it is the whole reply); a note with words after it stands, since
+the stub model's own echo opens with a bracketed tag. Tests:
+`packageHost.test.ts` (404 and 410 typed), the knowledge package's
+`deno test` (a miss is `not_found`; the host's code passes through),
+`guards.test.ts` and a corpus row (the placeholder), `turnEngine.test.ts`
+(the yield on a roster name and on arithmetic with the action packages
+never yielding; a knowledge miss reaching the model with `websearch`
+offered and the reply the model's; a lookup claim after the miss
+narrated; a real failure still `plugin_error`; "what is Pippa allergic
+to" never reaching the package and the memory in the model's context).
+
+**Acceptance: three identical runs on the final code** (bench pids
+86226, 86775, 87073; the same frozen header as the baseline's, commit
+f504e0e plus this commit; 2026-09-13). Every #92 row passed in all
+three: "what is Pippa allergic to" answered "Pippa is allergic to
+peanuts." from memory (a model turn, no package); "what is two plus
+two" answered "Four."; "what is the capital of France" answered
+"Paris."; "what year did the second world war end" answered "1945.";
+the abstention row's "what is Bramble's favorite color" reached the
+model and got "I don't have that information"; the placeholder string
+appeared in no reply. Totals 59, 59 and 59 of 60 (the baseline: 54,
+54, 56), one conversation broken per run, a different one each time:
+the spoken correction ("The dentist is on Thursday at four." after
+"no, I meant Friday", item 3's), the pronoun follow-up answered by the
+recall tool with unrelated memories ("Rover is Sage's dog; Sage loves
+painting; Pippa loves painting", #93 and item 3's), and "Pippa has
+soccer practice on Tuesdays" answered "Got it, added to the list."
+(the persona's own example line, said back; CHAT-04 replaced it with
+"I haven't added anything to your list.", and the bench now prints
+the model's raw words beside a replaced reply). Latency unchanged:
+median first delta 735, 760, 778 ms; median total 881, 939, 943 ms.
+The tool-calling bench at 10 repeats, rerun with the fix in place, is
+identical to ROUTE-02's record (0/10, 8/10, 6/10 on the compound rows,
+10/10 on the rest, 0/50 false calls outside the always-offer set).
+
+A code review before the commit tightened five things: the fall-through
+is a lookup's miss only (a pattern winner of an outside-looking package
+whose run raised the typed `not_found`; the loader's own 404 and a
+household package's "no such list" keep the `plugin_error` reply, so a
+broken install is never silently answered by the model), the missed
+package is not offered again on the same turn, the roster match is a
+Unicode word boundary ("José"), "9/11" and "twenty-one" are topics
+rather than arithmetic, and a multi-sentence bracketed note split by
+the sentence splitter is caught in both halves. Recorded as a limit: a
+roster name that is also a dictionary word (Sage, Iris, Atlas) yields
+on the word too; the household's name wins over the herb.
+
+Two things learned on the way, both recorded elsewhere: the bench's
+proxy now keeps the model's raw reply through a transform on the one
+stream (a tee crashed the interruption row), and the hub's background
+engine had grown to 11 GB over the day (#97, with the growth rate
+measured on its respawn: 3.5 GB to 9.4 GB across these three runs).
+Closes #92.
