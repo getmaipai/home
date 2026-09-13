@@ -12691,3 +12691,7 @@ other's section once (147cd28, f4779a6).
 - #90, Firefox still got precache interception despite sw.ts's own
   claim otherwise: [docs/dev/session-b.md](dev/session-b.md)
   (2026-09-13).
+- MEM-05, the judge eval on the 1.7B, 4B and 8B with the real scorer
+  (ruling: pin stays the 1.7B, n=2 too small to switch):
+  [docs/dev/session-b.md](dev/session-b.md) (2026-09-13). #93 (a
+  recall-side abstention defect) filed from the same run.

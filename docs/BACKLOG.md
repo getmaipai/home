@@ -1565,11 +1565,21 @@ Track B: MEM-01, MEM-02, MEM-03, MEM-04, MEM-05. Then JOIN-01, JOIN-02.
 
 - [ ] **MEM-05: Prove the small judge, or fall back to the 4B pin** (S)
 
-    Status (2026-09-12, measured, left open): on the two-case judge eval
-    the 8B passes 1 of 2, the 1.7B pin 0 of 2, the 4B fallback 0 of 2 at
-    four times the time and memory; the corpus is too small to apply the
-    85-percent rule, so the 1.7B stays the default and the verdict waits
-    for CHAT-23's corpus. Table in the Track B section of dev.md.
+    Status (2026-09-13, measured with the real scorer, left open): the
+    1.7B (a5015c1's own number), the 4B, and the 8B baseline all now run
+    through the repaired extraction scorer (judgeScore.ts, #87) rather
+    than the old two-case pass/fail. 1.7B: precision 66.7%, recall 100%,
+    retrieval 0/2, 2.59s/turn. 4B: precision 100%, recall 100%,
+    retrieval 0/2, 7.005s/turn. 8B (baseline): precision 100%, recall
+    100%, retrieval 1/2, 3.552s/turn. Rule outcome: switch to the 4B on
+    n=2 (the 1.7B's precision misses the five-point band against the 8B
+    baseline by 33.3 points; the 4B matches the baseline on both
+    figures). Not applied: a two-case corpus is too small to move the
+    household's default background model on, and the 4B costs 2.7x per
+    judged turn - a recommendation is not a switch. Re-run on the
+    baseline bench's disclosure rows once they exist (measure-first
+    step 2), then Jesse decides. Table and reasoning in
+    `docs/dev/session-b.md`.
 
     Depends on: MEM-02. Files: `backend/scripts/bench/judge-eval.ts`
     (read the background URL instead of the chat URL, since the judge

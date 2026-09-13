@@ -376,3 +376,87 @@ event types) - `about:debugging#/runtime/this-firefox` also works and
 lets the worker be inspected directly. Either finding a `fetch` handler
 present, or the app failing to load real hub requests, means this fix
 did not hold and should be reopened.
+
+## MEM-05: the judge eval on the 1.7B, 4B and 8B, with the real scorer
+
+Read-only bench lane per `docs/plans/measure-first-2026-09-13.md`
+section 3: run `backend/scripts/bench/judge-eval.ts` (#87's real
+extraction scorer, `judgeScore.ts`) against all three candidate judge
+models and apply MEM-05's own rule. The 1.7B's number with this scorer
+already existed from a5015c1 (precision 66.7%, recall 100%, retrieval
+0/2, 2.59s/turn); this pass adds the 4B fallback and a real 8B baseline
+run through the identical scorer, since neither existed with it before.
+
+Engines: the hub's own three (8788 chat/8B, 8789 background/1.7B, 8794
+embed) stayed untouched throughout - the 1.7B number is theirs already,
+recorded before this pass. For the 8B baseline, `MAIPAI_BACKGROUND_URL`
+was pointed at the hub's own already-running 8788 (the same model the
+rule needs as its baseline is already serving chat; no second 8B
+process, no GPU contention), with `MAIPAI_LLAMA_SERVER_URL` also
+pointed at it - `judge-eval.ts` never actually calls the chat role, so
+setup.ts's Rule 2 URL requirement is satisfied by a URL nothing in the
+bench script exercises. For the 4B fallback, one llama-server was
+spawned on a scratch port (8809, no collision with the hub), with the
+production background role's exact launch flags
+(`backgroundSupervisor.ts`'s own `spawnBackgroundServer()`: `-c 8192
+-ngl 0 -t 4 -fa on --reasoning off --jinja --no-webui --metrics
+--cache-reuse 256`) against `qwen3-4b-q4-k-m.gguf`, already on disk -
+stopped by pid immediately after that one run, before the 8B run
+started, so at most one engine beyond the hub ran at a time. Each run
+used its own fresh, disposable `MAIPAI_DATA_DIR` under the OS temp
+root (`scripts/bench/setup.ts`'s own rule), deleted after.
+
+| judge | precision | recall | retrieval | s/turn |
+|---|---|---|---|---|
+| 1.7B (Q8_0, port 8789, from a5015c1) | 66.7% (tp 2, fp 1) | 100% (tp 2, missed 0) | 0/2 | 2.59 |
+| 4B (Q4_K_M, port 8809) | 100.0% (tp 2, fp 0) | 100% (tp 2, missed 0) | 0/2 | 7.005 |
+| 8B (Q4_K_M, port 8788, the baseline) | 100.0% (tp 2, fp 0) | 100% (tp 2, missed 0) | 1/2 | 3.552 |
+
+Same three cases as the original run (`job`, `new job`, `abstention`)
+and the same two retrieval probes (knowledge-update, abstention). The
+1.7B's one false positive is the same overlapping second "teacher" fact
+noted before; the 4B and 8B both extract cleanly. Retrieval: the 8B is
+the only one of the three whose SUPERSEDE decision actually retires the
+stale "nurse" fact (knowledge-update passes for 8B alone); all three
+fail the abstention retrieval probe the same way (something is recalled
+for a color question nothing ever stated - 1.7B and 4B both 2 matches,
+8B 1 match), a recall-side issue orthogonal to which model runs the
+judge - unaffected by this item's own rule, which only names precision
+and recall. Filed as getmaipai/home#93 for the baseline conversation
+bench (measure-first step 2) to carry as its own row, since the only
+records that exist at this point in the scenario are the two job facts,
+almost certainly what `recall()` is surfacing with nothing relevant to
+return.
+
+**Verdict, by the item's own rule** ("keep the 1.7B pin if recall is at
+least 85% of the baseline and precision is within five points;
+otherwise switch the default pin to the 4B fallback... If neither
+passes, leave this open"): the 1.7B's recall (100%) clears the 85%
+bar, but its precision (66.7%) is 33.3 points off the 8B baseline's
+100% - nowhere near the five-point band, so the keep-the-1.7B branch
+does not apply. The 4B fallback, run against the identical baseline,
+matches the 8B on both figures exactly (100%/100%, well inside five
+points and past the 85% recall bar) - the "otherwise switch to the 4B
+fallback" branch is what the numbers call for, not the "neither
+passes" branch (which needs the 4B to fail the same bar the 1.7B
+failed; it doesn't).
+
+**Not applied**: `backgroundAssets.ts`'s default stayed the 1.7B pin.
+The item's own text says to make this change directly, but
+`measure-first-2026-09-13.md`'s framing for this lane is explicit -
+"MEM-05 and EVAL-01 as one lane, both benches only, no product change
+beyond EVAL-01's one catalog entry" - and switching the household's
+default background model is a real product change (download size,
+memory, and roughly 2x the per-turn latency the table above shows).
+Recorded here and flagged to the coordinator rather than decided
+unilaterally, since the lane's own framing and the item's own action
+clause point in different directions for this specific case.
+
+**Ruling (coordinator, 2026-09-13)**: the pin stays the 1.7B. The
+item's rule, applied as written, does point to the 4B on this n=2
+corpus, but two cases is too small a sample to move the household's
+default background model on, and the 4B costs 2.7x per judged turn for
+that thin an edge - the org's own rule for model changes applies here
+too: a recommendation is not a switch. MEM-05 stays open; re-run once
+the baseline conversation bench's disclosure rows exist (measure-first
+step 2) for a real sample size, then it is Jesse's call.
