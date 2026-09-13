@@ -12766,6 +12766,10 @@ other's section once (147cd28, f4779a6).
   clearance Shell.tsx already reserves for it), proven to fail then
   fixed with a real-layout check in scripts/screenshot.ts:
   [docs/dev/session-b.md](dev/session-b.md) (2026-09-13).
+- #102, a Home card's ephemeral turn draws from its own per-person
+  bucket (capacity 2, the chat budget's refill), never from the chat
+  budget, so neither starves the other:
+  [docs/dev/session-a.md](dev/session-a.md) (2026-09-13).
 - Seventeen bench conversations for the competencies the checklist
   marks missing (A2, A4, A6, B3, B6, B7, D2, D3, E3, F1, F2, G1 to G5,
   step 3a's Quill row), written to fail, with what one live run showed

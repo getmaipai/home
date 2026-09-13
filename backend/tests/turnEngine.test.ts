@@ -2386,6 +2386,29 @@ describe("POST /api/turn/stream", () => {
       expect(db.select().from(conversationTurns).all().length).toBe(before);
     });
 
+    // getmaipai/home#102: several Home tabs loading at once 429'd the
+    // weather card, and a person's own chat paid from the same bucket.
+    // An ephemeral turn draws from its own small per-person bucket,
+    // never from the chat budget, so neither can starve the other.
+    test("an ephemeral turn draws from its own per-person bucket, never the chat budget (#102)", async () => {
+      const { client } = await owner();
+      const { PERSON_TURN_BUDGET, EPHEMERAL_TURN_BUDGET } = await import("@/lib/llm");
+      const card = { text: "What's the weather like today?", ephemeral: true };
+      // The chat budget spent: the card's question still answers.
+      for (let i = 0; i < PERSON_TURN_BUDGET.capacity; i++) expect((await client.post("/api/turn", { text: "hi" })).status).toBe(200);
+      expect((await client.post("/api/turn", { text: "hi" })).status).toBe(429);
+      expect((await client.post("/api/turn/stream", card)).status).toBe(200);
+      // The card's bucket spent: the chat budget is untouched by it.
+      __resetRateLimiterForTests();
+      for (let i = 0; i < EPHEMERAL_TURN_BUDGET.capacity; i++) expect((await client.post("/api/turn/stream", card)).status).toBe(200);
+      expect((await client.post("/api/turn/stream", card)).status).toBe(429);
+      expect((await client.post("/api/turn", { text: "hi" })).status).toBe(200);
+      // A claimed flag on ordinary text is a chat turn and pays as one.
+      __resetRateLimiterForTests();
+      for (let i = 0; i < PERSON_TURN_BUDGET.capacity; i++) expect((await client.post("/api/turn", { text: "hi" })).status).toBe(200);
+      expect((await client.post("/api/turn/stream", { text: "remember that the wifi password is on the fridge", ephemeral: true })).status).toBe(429);
+    });
+
     test("an arbitrary sentence with the flag set is logged normally, not skipped", async () => {
       const { client } = await owner();
       const before = db.select().from(conversationTurns).all().length;

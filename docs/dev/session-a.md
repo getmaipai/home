@@ -2777,3 +2777,27 @@ pronoun; and the Cobra runtime rubric (the G5 setup) accepts the
 common phrasings of 87 minutes. The plain-words promise row costs the
 live run about twelve seconds of waiting for a delivery that never
 comes today; noted, and worth it for the row.
+
+## #102: a Home card's ephemeral turn pays from its own bucket (2026-09-13)
+
+Session B found the weather card 429'd when the screenshot pipeline
+opened several Home tabs within a couple of seconds: the card's
+ephemeral fixed question drew from `PERSON_TURN_BUDGET` (capacity 5,
+one token every two seconds), the same bucket a person's own chat
+pays from, so the Home page and the chat could starve each other. The
+ruling: an ephemeral turn, already gated to the fixed-question
+allowlist by #91, draws from its own small bucket per person
+(`EPHEMERAL_TURN_BUDGET`, capacity 2, the same refill), never from the
+chat budget. `POST /api/turn/stream` reads the body before the budget
+now, since which bucket pays depends on the validated flag: a claimed
+`ephemeral` on ordinary text is a chat turn and pays as one, as before.
+The test spends the chat budget and shows the card still answers,
+spends the card's bucket and shows a chat turn still answers, and
+spends the chat budget and shows the claimed flag is refused with it.
+A review noted two limits, both accepted: with capacity 2, a third
+Home surface mounting within two seconds still gets a 429 (the
+screenshot matrix's eight contexts keep their wait-and-reload in
+`scripts/screenshot.ts`, whose comment still describes the old shared
+budget and is Session B's to update with that file), and a flagged
+request now costs the settings read behind `isFixedHomeCardQuery()`
+before its refusal, bounded by the body limit.

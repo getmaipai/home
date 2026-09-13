@@ -3,7 +3,7 @@ import { bodyLimit } from "hono/body-limit";
 import { requireAuth } from "@/middleware/auth";
 import { runTurn, runTurnStream, StreamSafetyRefusal, StreamUnavailable, type Surface, type TurnStreamResult } from "@/lib/turnEngine";
 import { pickThinkingCue } from "@/lib/replyVariation";
-import { personWithinTurnBudget } from "@/lib/llm";
+import { personWithinTurnBudget, personWithinEphemeralBudget } from "@/lib/llm";
 import { isFixedHomeCardQuery } from "@/lib/homeCardQueries";
 import type { TurnStreamEvent } from "@/wire";
 import type { AppEnv } from "@/types";
@@ -192,9 +192,6 @@ export async function* streamTurnEvents(
 // event kinds. Same auth posture as POST /api/turn above.
 turnRoutes.post("/stream", requireAuth, bodyLimit({ maxSize: TURN_BODY_LIMIT }), async (c) => {
   const actor = c.get("person");
-  if (!personWithinTurnBudget(actor.id)) {
-    return c.json(RATE_LIMIT_RESPONSE, 429);
-  }
   const body = (await c.req.json().catch(() => ({}))) as {
     surface?: string;
     text?: string;
@@ -218,6 +215,12 @@ turnRoutes.post("/stream", requireAuth, bodyLimit({ maxSize: TURN_BODY_LIMIT }),
   const ephemeral = requestedEphemeral && isFixedHomeCardQuery(body.text ?? "");
   if (requestedEphemeral && !ephemeral) {
     console.warn(`[turn/stream] ephemeral requested for a non-widget utterance from ${actor.id}; logging it normally`);
+  }
+  // getmaipai/home#102: the budget is read after the body, since the
+  // card's own question (the validated flag, never the claimed one)
+  // pays from its own bucket and everything else from the chat budget.
+  if (ephemeral ? !personWithinEphemeralBudget(actor.id) : !personWithinTurnBudget(actor.id)) {
+    return c.json(RATE_LIMIT_RESPONSE, 429);
   }
   // COR-7 (code review, 2026-09-06): a disconnected client used to leave
   // generation running with nothing reading it - this controller's

@@ -28,12 +28,25 @@ import type { ChatRole, ChatCompletionRequest, ToolDefinition, ToolCallWire } fr
 // import (one HTTP handler reaching into another's module) would be the
 // wrong shape for what is really a shared policy on this port.
 export const PERSON_TURN_BUDGET = { capacity: 5, refillPerSecond: 0.5 };
+// getmaipai/home#102: a Home card's ephemeral fixed question (routes/
+// turn.ts, gated to the allowlist by #91) used to draw from the chat
+// budget above, so several tabs loading Home at once 429'd the card and
+// a person's own chat and the Home page paid from one bucket. An
+// ephemeral turn draws from its own small bucket per person, same
+// refill, so neither can starve the other.
+export const EPHEMERAL_TURN_BUDGET = { capacity: 2, refillPerSecond: PERSON_TURN_BUDGET.refillPerSecond };
 
 /** True (and consumes a token) if `personId` is still within budget;
  * false if the caller should get back spec/errors/errors.json's
  * "turn_rate_limited" instead. */
 export function personWithinTurnBudget(personId: string): boolean {
   return tryConsume(`turn:${personId}`, PERSON_TURN_BUDGET);
+}
+
+/** The same, for a Home card's own ephemeral turn (#102): its own
+ * bucket, never the chat budget's. */
+export function personWithinEphemeralBudget(personId: string): boolean {
+  return tryConsume(`ephemeral:${personId}`, EPHEMERAL_TURN_BUDGET);
 }
 
 export type LlmRole =
