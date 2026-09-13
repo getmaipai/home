@@ -12688,3 +12688,6 @@ other's section once (147cd28, f4779a6).
 - #91, `ephemeral` needs a trust boundary, not just a flag (a code
   review's own follow-up to lane 5 item 3 above):
   [docs/dev/session-b.md](dev/session-b.md) (2026-09-13).
+- #90, Firefox still got precache interception despite sw.ts's own
+  claim otherwise: [docs/dev/session-b.md](dev/session-b.md)
+  (2026-09-13).

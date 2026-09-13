@@ -290,3 +290,89 @@ a dead port for whichever test runs right after it). Also hoisted the
 route's twice-evaluated `body.ephemeral === true` into one
 `requestedEphemeral` (a smaller finding from the same pass). Closes
 getmaipai/home#91.
+
+## getmaipai/home#90: Firefox still got precache interception
+
+`sw.ts`'s own header comment claimed Firefox was "passed through
+entirely (no fetch interception at all)", but that gate
+(`PASSTHROUGH`) only wrapped the CALLBACK of the navigate-handling
+listener, not the `self.addEventListener("fetch", ...)` call that
+registered it - the listener existed either way, it just always
+returned early on Firefox. Worse, `precacheAndRoute()` a few lines
+below registered its OWN separate 'fetch' listener (workbox's routing
+system, via `addFetchListener()`) completely unconditionally, so
+Firefox was still getting real precache interception for every JS/CSS/
+font/icon request - exactly the thing the comment said wasn't
+happening. Fixed by moving both under the SAME `if (!PASSTHROUGH)`
+block - the navigate listener's own `self.addEventListener` call and
+`precacheAndRoute()` both live inside it now, one guard instead of two
+textually separate ones (a first draft gated them as two independent
+`if` blocks, which a second review pass flagged as the identical
+"gated the first site, missed the second" shape that caused this bug
+in the first place - a future third registration has to either join
+this one block or sit visibly outside it, not silently slip through a
+second copy of the check). `cleanupOutdatedCaches()` stays OUTSIDE the
+block, unconditional, on the same review's finding: it only registers
+an `'activate'` listener that deletes stale `-precache-` caches, and a
+Firefox household that hit this exact bug before the fix shipped may
+still be carrying a real leftover precache entry from when Firefox
+wrongly had one - gating cleanup too would leave that stuck forever.
+Firefox now registers zero 'fetch' listeners of any kind, matching the
+comment literally instead of only in spirit.
+
+**Verification note.** The acceptance for this item called for
+checking the built worker in a real Firefox via Playwright's firefox
+project. That build cannot start on this machine: `firefox.launch()`
+in headless mode fails immediately with "Could not find profile
+folder" (tried twice, once with `TMPDIR` pointed at a fresh writable
+directory instead of the system default, same result both times - not
+a permissions issue on one specific path). A non-headless attempt was
+made once, which opened a REAL, visible Firefox window - a hard rule
+from this incident: a session never launches a browser with a visible
+window (a window on the machine's desktop is a machine change), and a
+headless engine that cannot start after one retry is the finding,
+recorded, not a reason to fall back to non-headless. No further
+Firefox launches were attempted after that rule was set.
+
+What was actually proven instead: `src/sw.test.ts` loads the real
+built `sw.ts` module (not a reimplementation of its logic) with a
+faked `self` global under two user agents - a real Firefox one and a
+real Chromium one, in that order within one test so the ordering is
+guaranteed rather than an accident of file layout - and counts how many
+`'fetch'` listeners each registers. Firefox: zero. Chromium: at least
+one (the exact count depends on `workbox-precaching`'s own internal
+registration, not something this test pins to a specific number). This
+exercises the real code path `precacheAndRoute()`/`cleanupOutdatedCaches()`
+run through against real `workbox-precaching`, just outside a real
+browser's `ServiceWorkerGlobalScope`.
+
+The compiled `dist/sw.js` was also read directly after a real `bun run
+build`, not grepped for a line or occurrence count (a first draft's own
+`grep -c` on a single minified line always returns 1 regardless of how
+many times the pattern actually occurs - a code review caught that it
+could never fail, proving nothing). Reading the actual substring around
+the navigate listener's call site shows the real gating survived
+minification intact: `` /\bFirefox\//.test(self.navigator?.userAgent??``)||(self.addEventListener(`fetch`,e=>{...}),`` -
+one short-circuited `||` covering both the listener registration and,
+immediately after it in the same expression, `precacheAndRoute()`'s own
+call, exactly matching the source's single `if (!PASSTHROUGH) { ... }`
+block. The OTHER occurrence of the literal string `` addEventListener(`fetch`) ``
+in the bundle is workbox-routing's own `addFetchListener()` METHOD
+DEFINITION (library code, always present in the bundle whether or not
+it's ever invoked) - a bare occurrence count can't distinguish "defined"
+from "called," which is exactly why this is read directly rather than
+grepped for a number.
+
+**What still needs a real Firefox, and how to check it**: this repo's
+own environment cannot start one, so this is a check for whoever next
+has a working Firefox (Jesse, or a session on a different machine).
+Two steps: (1) load the app in Firefox pointed at the real LAN hub
+(not `localhost` - the bug this passthrough exists for is specifically
+about a LAN hostname) and confirm pages load and the app works,
+matching a healthy `localhost`/Chromium session; (2) open
+`about:serviceworkers`, find this worker, and confirm it has no
+`fetch` handler listed at all (Firefox's own devtools show registered
+event types) - `about:debugging#/runtime/this-firefox` also works and
+lets the worker be inspected directly. Either finding a `fetch` handler
+present, or the app failing to load real hub requests, means this fix
+did not hold and should be reopened.
