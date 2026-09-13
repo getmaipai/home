@@ -27,16 +27,42 @@ export function joinNames(names: string[]): string {
   return `${names.slice(0, -1).join(", ")}, and ${names[names.length - 1]}`;
 }
 
+/** Just the name, no noun. "The Weather skill" would now be wrong (a
+ * `skill` is a different package kind since the 2026-09-05 rename) and
+ * "plugin" is jargon on a page written for a parent. */
+function sourceName(row: PrivacyConnection): string {
+  return row.sourceKind === "platform" ? "MaiPai Home itself" : row.source;
+}
+
 /** One connection row's own four-question disclosure (destination, when,
  * what, who, retention) - shared by every group below so the org's own
  * "each outbound connection... when it happens, what it carries, and who
  * receives it" requirement is answered identically regardless of which
  * heading a row sits under (issue #12's reorganization changes WHICH
- * section a row appears in, never what it says about itself). */
+ * section a row appears in, never what it says about itself).
+ *
+ * `direction === "inbound"` (backend/src/lib/privacy.ts's own comment:
+ * "destination"/"who" are repurposed to describe the CALLER, not a host
+ * the hub reaches out to") needs different field-to-slot mapping, not
+ * just different data: `destination` holds a scope description ("your
+ * own network only...") for that row, not a name fit for a bold heading -
+ * found live (2026-09-12) rendering it that way, with the real source
+ * name left dangling as a bare, unlabeled line at the bottom. Inbound
+ * rows use the source name as the heading instead (the same name every
+ * other row already shows at the bottom) and show the former heading as
+ * a labeled "Scope" field alongside When/What/Who/How long; the bottom
+ * source line is dropped for inbound rows since it would just repeat the
+ * heading. */
 function ConnectionRow({ row }: { row: PrivacyConnection }) {
+  const isInbound = row.direction === "inbound";
   return (
     <div className="flex min-w-0 flex-col gap-1 py-1">
-      <span className="text-base font-medium">{row.destination}</span>
+      <span className="text-base font-medium">{isInbound ? sourceName(row) : row.destination}</span>
+      {isInbound ? (
+        <p className="text-base text-muted-foreground">
+          <span className="text-foreground">Scope:</span> {row.destination}
+        </p>
+      ) : null}
       <p className="text-base text-muted-foreground">
         <span className="text-foreground">When:</span> {row.when}
       </p>
@@ -49,22 +75,18 @@ function ConnectionRow({ row }: { row: PrivacyConnection }) {
       <p className="text-base text-muted-foreground">
         <span className="text-foreground">How long they keep it:</span> {row.retention}
       </p>
-      <p className="text-base text-muted-foreground">
-        {/* Just the name, no noun. "The Weather skill" would
-            now be wrong (a `skill` is a different package kind
-            since the 2026-09-05 rename) and "plugin" is jargon
-            on a page written for a parent. */}
-        {/* The opt-in line is only shown for packages, where a
-            manifest really declares it. The hub's own downloads
-            have no per-connection toggle to point at, and
-            labelling them "only if you turn it on" was telling
-            families about a switch that does not exist (code
-            review, 2026-09-05); their "When" line already says
-            exactly what triggers each one. */}
-        {row.sourceKind === "platform"
-          ? "MaiPai Home itself"
-          : `${row.source}${row.optIn ? " · only if you turn it on" : " · part of how the hub runs"}`}
-      </p>
+      {isInbound ? null : (
+        <p className="text-base text-muted-foreground">
+          {/* The opt-in line is only shown for packages, where a
+              manifest really declares it. The hub's own downloads
+              have no per-connection toggle to point at, and
+              labelling them "only if you turn it on" was telling
+              families about a switch that does not exist (code
+              review, 2026-09-05); their "When" line already says
+              exactly what triggers each one. */}
+          {row.sourceKind === "platform" ? sourceName(row) : `${row.source}${row.optIn ? " · only if you turn it on" : " · part of how the hub runs"}`}
+        </p>
+      )}
     </div>
   );
 }

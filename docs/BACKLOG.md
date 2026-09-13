@@ -3358,6 +3358,22 @@ future session now that F's hub half exists.
     webkit-subdirectory path and leaves `git status` on `docs/assets/`
     clean; a plain Chromium run confirms the published path is unchanged.
 
+- [x] **Privacy page: the inbound row rendered its fields in the wrong slots** (S, Session B, 2026-09-12)
+
+    Renderer bug, not a data bug: `backend/src/lib/privacy.ts` deliberately
+    repurposes `destination`/`who` for the one inbound row (there's no real
+    "host the hub reaches out to" for a connection running the other way,
+    its own comment explains this), but `ConnectionRow`
+    (`PrivacyPage.tsx`) rendered every row identically regardless of
+    `direction`, putting a scope sentence in bold as the heading with the
+    real source name dangling unlabeled at the bottom. Fixed: inbound rows
+    use the source name as the heading and show the scope description as
+    a labeled "Scope:" field instead; outbound rows unchanged. Full story:
+    docs/dev.md's "Lane 3 item 2" entry. Files: `frontend/src/apps/
+    privacy/PrivacyPage.tsx` (+ test). Checks: `bunx tsc --noEmit`,
+    `bunx eslint`, full `bun test` suite (484 pass), the regenerated
+    screenshot opened and read.
+
 - [x] **#66: Hardcoded "unavailable" error code masked safety refusals** (S, 2026-09-12)
 
     Fixed: pass event.code through; show generic banner only for "unavailable";

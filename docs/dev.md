@@ -11232,3 +11232,44 @@ no `bunx tsc`/`eslint` config covers this root-level script.
 
 Closes #76.
 
+**Lane 3 item 2: the Privacy page's inbound row rendered its fields in
+the wrong slots.** In the regenerated `privacy-desktop-light.png`, the
+"Can someone reach into your house?" row showed a bold heading of "your
+own network only - nothing leaves the house for this row" (a scope
+description) with the real source name, "MaiPai Home itself", left
+dangling as a bare, unlabeled line at the bottom. Read `backend/src/lib/
+privacy.ts`'s `inboundConnections()`: its own comment explains this is
+deliberate - `PrivacyConnection`'s fields (`destination`, `who`) were
+designed for outbound rows (a host the hub reaches OUT to), and are
+repurposed for the one inbound row to describe the CALLER instead, with
+"the reversal spelled out in `what`." That's a reasonable data-shape
+choice given a schema built for one direction; the bug is that
+`ConnectionRow` in `frontend/src/apps/privacy/PrivacyPage.tsx` rendered
+every row identically regardless of `direction`, using `destination` as
+the bold heading unconditionally - correct for a real hostname, wrong for
+a repurposed scope sentence. A renderer fix, not a data fix.
+
+Fixed: `ConnectionRow` now branches on `row.direction === "inbound"`. For
+inbound rows, the heading is the source name (the same `sourceKind ===
+"platform" ? "MaiPai Home itself" : row.source` logic every row already
+used at the bottom, pulled into a shared `sourceName()` helper), and the
+former heading value renders as a labeled "Scope:" field alongside
+When/What/Who/How long. The bottom source line is dropped for inbound
+rows since it would just repeat the heading. Outbound rows are
+unchanged - the same code path exists, but `isInbound` is `false` for
+every existing row.
+
+Added a test (`PrivacyPage.test.tsx`) asserting the inbound row's field
+order directly: the heading text is the source name, "Scope:" appears as
+a labeled field carrying the description, and no bare unlabeled repeat of
+the source name exists at the bottom. Regenerated `privacy-desktop-
+light.png` and opened it: "MaiPai Home itself" is now the row's own bold
+heading, "Scope: your own network only - nothing leaves the house for
+this row" reads as an ordinary labeled field. Full `bun test` suite (484
+pass, `bunx tsc --noEmit` and `bunx eslint` on the changed file both
+clean).
+
+Files: `frontend/src/apps/privacy/PrivacyPage.tsx`,
+`frontend/src/apps/privacy/PrivacyPage.test.tsx`,
+`docs/assets/screens/privacy-desktop-light.png`.
+

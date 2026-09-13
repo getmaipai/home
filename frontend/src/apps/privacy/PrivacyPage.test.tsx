@@ -115,6 +115,50 @@ describe("the privacy page", () => {
     }
   });
 
+  // Found live (2026-09-12) in the regenerated privacy screenshot: the
+  // inbound row's `destination` field is a scope description, not a name
+  // (backend/src/lib/privacy.ts's own comment explains why - `destination`/
+  // `who` are repurposed for the one inbound row, since there's no real
+  // "host the hub reaches out to" for a connection running the other way).
+  // Rendering it in the same slot as an outbound row's real hostname put
+  // that scope sentence in bold as the row's heading, with the actual
+  // source name ("MaiPai Home itself") left dangling as a bare, unlabeled
+  // line at the bottom - the opposite of what a parent needs to read
+  // first. The heading should be the source, and the scope description a
+  // regular, labeled field like every other question this row answers.
+  test("the inbound row reads with the source as its heading and the scope as a labeled field", async () => {
+    const restore = stubPrivacy({
+      connections: [
+        connection({
+          id: "platform:inbound-api",
+          direction: "inbound",
+          source: "MaiPai Home",
+          sourceKind: "platform",
+          destination: "your own network only - nothing leaves the house for this row",
+        }),
+      ],
+      offlinePlugins: [],
+    });
+    try {
+      const { findByLabelText } = renderPrivacyPage();
+      const list = await findByLabelText("Inbound connections");
+      const row = list.querySelector("li");
+      expect(row).not.toBeNull();
+      // The heading (first line) names the source, not the scope sentence.
+      const heading = row!.querySelector(".font-medium");
+      expect(heading?.textContent).toBe("MaiPai Home itself");
+      // The scope sentence still appears, but as a labeled field.
+      expect(row!.textContent).toContain("Scope:");
+      expect(row!.textContent).toContain("your own network only - nothing leaves the house for this row");
+      // No bare, unlabeled repeat of the source name at the bottom - the
+      // heading already said it once.
+      const paragraphs = Array.from(row!.querySelectorAll("p"));
+      expect(paragraphs.some((p) => p.textContent === "MaiPai Home itself")).toBe(false);
+    } finally {
+      restore();
+    }
+  });
+
   test("omits the inbound section entirely when there's no inbound connection", async () => {
     const restore = stubPrivacy({ connections: [connection()], offlinePlugins: [] });
     try {
