@@ -285,13 +285,9 @@ export function createChatModelAdapter(deps: ChatModelAdapterDeps): ChatModelAda
             };
           } else {
             sawTerminalEvent = true;
-            // A code review (2026-09-04) found this thrown as a plain
-            // Error, which the catch block below's `e instanceof ApiError
-            // && e.code === "unavailable"` check can never match - a
-            // mid-stream engine crash always fell through to the generic
-            // "Could not reach the hub" message instead of the intended,
-            // more actionable one.
-            throw new ApiError(event.error, 503, "unavailable");
+            // Pass event.code through (e.g., "safety_refused" from backend)
+            // so error handling can distinguish coded errors from generic ones.
+            throw new ApiError(event.error, 503, event.code || "unavailable");
           }
         }
         if (!sawTerminalEvent && !abortSignal.aborted) {
@@ -328,11 +324,8 @@ export function createChatModelAdapter(deps: ChatModelAdapterDeps): ChatModelAda
         }
         deps.onReplyState?.("error");
         scheduler.finish(); // a genuine failure, not a user stop - let whatever already started speaking finish naturally, enqueue nothing more
-        // turnEngine.ts's "unavailable" code covers every real down-state
-        // (still downloading, crashed, never selected): one friendly,
-        // actionable message rather than the developer-facing reason string
-        // (e.g. "llama-server did not become healthy within 60000ms")
-        // leaking straight into the household's chat thread.
+        // Show the generic banner for generic "unavailable" code; pass backend's
+        // message for specific codes (e.g., "safety_refused" from the safety layer).
         throw new Error(
           e instanceof ApiError && e.code === "unavailable"
             ? "MaiPai's AI isn't answering right now. If you just picked a new AI model it may still be getting ready - check Household → AI models, then try again."

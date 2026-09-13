@@ -489,4 +489,20 @@ describe("createChatModelAdapter errors", () => {
       env.restore();
     }
   });
+
+  // A coded error (e.g., "safety_refused" from the backend) surfaces the
+  // backend's own message, not the generic "AI isn't answering" banner.
+  test("a safety_refused error surfaces the backend's message, not the generic banner", async () => {
+    const env = stubEnvironment(
+      ndjsonStream([{ type: "delta", text: "Partial reply" }, { type: "error", error: "That response violated our safety policy", code: "safety_refused" }]),
+    );
+    try {
+      const { error } = await collect([fakeUserMessage("hi")]);
+      expect(error).toBeInstanceOf(Error);
+      expect((error as Error).message).toBe("That response violated our safety policy");
+      expect((error as Error).message).not.toMatch(/check Household/);
+    } finally {
+      env.restore();
+    }
+  });
 });
