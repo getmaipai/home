@@ -12753,6 +12753,12 @@ other's section once (147cd28, f4779a6).
   common abbreviations never numerals, the Python twin and the shared
   fixture rows added): [docs/dev/session-a.md](dev/session-a.md)
   (2026-09-13).
+- The conversation bench's ten weak rows rewritten to the effect
+  standard (records and their status, the pending ask, the lists and
+  jobs tables, a fake Home Assistant's call count, the proxy's abort
+  flag, the scheduler's later delivery, the entity registry seeded for
+  the household subjects), two rows added (a cancel, a promise):
+  [docs/dev/session-a.md](dev/session-a.md) (2026-09-13).
 - Lane 7, the screenshot-matrix BACKLOG item reconciled against
   docs/UI.md and docs/STYLE.md, a per-shot manifest.json added, and
   #75 fixed (a phone chat with real history sat the composer 27px

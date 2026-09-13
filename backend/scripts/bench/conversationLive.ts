@@ -120,6 +120,7 @@ async function main(): Promise<{ executed: number; engine: string }> {
 
   const log = runner.captureTurnLog();
   const people = runner.createBenchPeople();
+  const homeAssistant = runner.startFakeHomeAssistant();
   const scores: Awaited<ReturnType<typeof runner.runConversation>>["scores"] = [];
   const started = Date.now();
   try {
@@ -131,6 +132,7 @@ async function main(): Promise<{ executed: number; engine: string }> {
         log,
         drainJudge,
         backdate: (days, turnIds) => runner.backdateBenchRows(people, days, turnIds),
+        homeAssistant,
       }).catch((err: Error) => {
         // A conversation that throws (a seed or conversation-create
         // failure) is a failing row, never a lost table.
@@ -144,6 +146,7 @@ async function main(): Promise<{ executed: number; engine: string }> {
     }
   } finally {
     log.stop();
+    homeAssistant.stop();
   }
 
   console.log("\n## Table\n");

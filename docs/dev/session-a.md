@@ -2569,3 +2569,119 @@ eighteen cases, Codex's and the review's, are rows in
 `spec/voice/fixtures/normalize-for-speech.json`, and the Python twin
 has the same pass in the same place in its pipeline. Committed by name
 with Codex as the author of the change.
+
+## The bench's ten weak rows, rewritten to the effect standard (2026-09-13)
+
+The competencies review (`docs/plans/conversation-competencies-2026-09-13.md`,
+"Bench-row rule") found ten rows in the conversation bench that can
+pass while the thing they stand for is broken, because they read the
+reply's words. Design, before the change: a row proves a competency
+by observing the effect, and the runner gains exactly the observations
+the ten rows need, each read from the system's own state after the
+turn, never inferred from the reply.
+
+- A correction (A3, `correction-then-recall`, `edit-then-recall`):
+  the person's and the household's memory records with their status;
+  the row requires a record matching the old fact to be retired
+  (`superseded` or `archived`) and one matching the new fact active,
+  besides the reply. Read from `memory_records` after the judge ran.
+- A cancel (A4): a new conversation, `never-mind-cancels`, parks a
+  consequential call on a confirmation, says "never mind", and the row
+  requires the conversation's pending ask to be gone and the package's
+  own effect count to stay at zero through a later "yes". The old
+  never-mind turn in `abstention` had nothing pending; it is now a
+  plain closing line, the reader's row. Read from
+  `getPendingAsk()` and the fake Home Assistant below.
+- A compound request (A5, `compound-request`): both packages ran in
+  the turn (`toolsRan`, the turn's own plugin ids), the list holds the
+  item (the `lists` table) and the timer is a pending `timers.fire`
+  job (the `scheduled_jobs` table), never the reply's words.
+- A household subject (B4, the three `household-subject-*`
+  conversations): the fact is seeded in the entity registry (an entity
+  row with a description; for the person, a relationship from the
+  owner's own entity) and never said in the transcript; the question
+  is answered only if the registry's fact reached the model's context
+  and the reply. Fails today by design: nothing reads the registry
+  into a turn until CHAT-13.
+- A privacy row (B5, `cross-person-recall`): the other person's key
+  facts are absent from the owner's context and reply as stems, in any
+  paraphrase (dark, light, lamp, scared, afraid, fear, fright), not
+  only the seeded phrase.
+- A lookup (C2, the film's premise, rating and runtime rows, the
+  city's distance row): the rubric said "from knowledge or through a
+  lookup"; the 8B does not know these, so the row requires a lookup
+  package to have run and a source URL to have reached the model
+  (the recording proxy reads the URLs in the messages the lookup's own
+  completion carried). Fails today by design, twice over: the model
+  does not call the lookup, and the bench's disposable household has
+  no search service configured; the program (CHAT-15, CHAT-16) owns
+  both. A row that the 8B answers from knowledge (the band's year, the
+  crew of Apollo 11) keeps the fact rubric.
+- "Have you heard of it" (C3, five rows): no experience claim in the
+  reply, as a regex over first-person experience verbs
+  (`EXPERIENCE_CLAIM`), beside the absent honesty line.
+- A consequential action (E2, `consequential-once`): the package's own
+  effect, counted by a fake Home Assistant the bench starts on port 0
+  and points `home.base_url` at: zero lock calls after the ask, one
+  after "yes", still one after "did you lock it". The turn-row count
+  stays as a second reading.
+- An interruption (E4, `interruption`): inference stopped (the proxy
+  records that the client's abort reached the upstream completion
+  before it finished) and the turn reconciled (a turn row holding
+  what was delivered). The second half fails today by design: the
+  chat route finalizes nothing for a reply nobody read, and that is
+  CHAT-17's item.
+- A promise (F2, a new conversation `promise-delivered`): "set a timer
+  for five seconds", the job pending, then the runner waits for the
+  due time, ticks the scheduler as the hub does every minute, and
+  reads the person's pending notifications for `timer.done`. The
+  plain-words promise row comes with the missing-competency rows and
+  reuses this observation.
+
+The fixture's `TurnExpectation` gains one field per observation
+(`recordActive`, `recordRetired`, `pendingAsk`, `toolsRan`,
+`listHas`, `jobScheduled`, `homeCalls`, `lookupWithSource`,
+`inferenceStopped`, `reconciled`, `delivered`), a conversation gains
+`seedEntities`, the runner's deps gain the fake Home Assistant and the
+scheduler tick, and `tests/conversationBench.test.ts` proves each new
+check against the stub, including the ones that fail on purpose.
+
+**Two live runs on the rewritten fixture** (30 conversations, 104
+scored turns; engines and header as in item 1b): 85 then 91 of 104.
+The first run found two things the stub could not: the fake Home
+Assistant's count is per run, so the second lock conversation read the
+first one's call (now the delta since the conversation started), and
+an edit's retracted turn is never extracted at all (#88 hides it from
+the judge), so "record retired" now passes on no active record with
+the old fact, whether superseded, archived or never written. The
+second run's thirteen misses: the eleven rows that fail by design
+(the four lookup rows, "no lookup ran"; the six registry rows,
+"missing four-year-old ..." in the context; the interruption's
+"reconciled") and the board's two known rows (the spoken correction
+lost by the judge, with the Thursday record still active, which is
+what the new check shows; "Got it, added to the list." to a
+disclosure). `never-mind-cancels` passes live: the confirmation is
+parked, "never mind" clears it, "yes" calls nothing, the lock service
+sees zero calls. `promise-delivered` passes live: the five-second
+timer's job is pending and `timer.done` reaches the person's pending
+notifications after the runner's tick. `consequential-once` passes
+with the lock service's own count (0, 1, 1) beside the turn rows.
+Found on the way and filed as #101: the film's opening reply "Cobra's
+a good one, lots of action and some solid stunts. You enjoying it?"
+was replaced by the invention guard's honesty line in the first run,
+since `PERSON_TRAIT_RE` matches "good one" with no subject at all.
+
+A review of the patch found six things, all taken: the jobs, the list
+items and the deliveries a row reads are the ones added since the
+turn (jobs, deliveries) or the conversation (items) started, never the
+household's whole table, so an earlier conversation's ten-minute timer
+cannot satisfy a later promise row and a tick that fires it does not
+count as the five-second timer's delivery; the privacy row's stems
+became the phrases that carry the seeded facts ("the dark",
+"darkness", "night light", "lamp", "a light on") and, for the yes/no
+question, a confirmation, so an honest reply that echoes the question
+("I don't know what he's afraid of") is not a miss on a hard row; the
+experience-claim regex lets knowledge phrasing through ("I've read
+it's about a cop", "I saw that it came out in 1986", "I've seen it
+described as a cult film"); and the test that the seeded fact is never
+said in the transcript is a real assertion now.

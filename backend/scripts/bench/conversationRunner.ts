@@ -9,16 +9,22 @@
 // drives the same functions against the stub, so the control flow
 // (abort, confirmation, credential, cross-person, scoring) is proven
 // offline before a live run.
-import { eq, and } from "drizzle-orm";
+import { eq, and, or, isNull } from "drizzle-orm";
 import { db, sqlite } from "@/db";
-import { conversationTurns, memoryRecords, people } from "@/db/schema";
+import { conversationTurns, memoryRecords, people, lists, entities, relationships } from "@/db/schema";
 import { runTurnStream, type TurnStreamResult } from "@/lib/turnEngine";
-import { createConversation } from "@/lib/conversationHistory";
+import { createConversation, getPendingAsk } from "@/lib/conversationHistory";
 import { activeTurnCount } from "@/lib/turnActivity";
 import { remember } from "@/lib/memory";
 import { deleteEpisodesForPerson } from "@/lib/episodes";
 import { newPersonId, randomSuffix } from "@/lib/id";
 import { nextHlc } from "@/lib/hlc";
+import { createEntity } from "@/lib/entities";
+import { createRelationship } from "@/lib/relationships";
+import { listJobs, runDueJobs } from "@/lib/scheduler";
+import { runPlugin, registerAllPackageNotificationTypes } from "@/lib/plugins";
+import { listPending } from "@/lib/notifications";
+import { setHouseholdSettingValue } from "@/lib/settings";
 import type { PersonRow } from "@/types";
 import type { TurnValue } from "@/wire";
 import type { BenchConversation, Speaker } from "./conversationFixture";
@@ -99,6 +105,46 @@ export function createBenchPeople(): BenchPeople {
   return { owner: insert("Sage", "owner"), child: insert("Bramble", "child") };
 }
 
+// ==== The fake Home Assistant (E2, A4) ====
+
+export interface FakeHomeAssistant {
+  url: string;
+  /** Calls received, by "domain.service". */
+  calls: Record<string, number>;
+  stop(): void;
+}
+
+/** A Bun.serve() on port 0 that answers Home Assistant's service-call
+ * endpoint and counts each call: the package's own effect, counted
+ * where it lands, never inferred from turn rows. Points the household's
+ * `home.base_url` and `home.access_token` at itself (the bench's
+ * disposable database). */
+export function startFakeHomeAssistant(): FakeHomeAssistant {
+  const calls: Record<string, number> = {};
+  const server = Bun.serve({
+    port: 0,
+    hostname: "127.0.0.1",
+    fetch(req) {
+      const m = /^\/api\/services\/([^/]+)\/([^/]+)$/.exec(new URL(req.url).pathname);
+      if (req.method === "POST" && m) {
+        const key = `${decodeURIComponent(m[1]!)}.${decodeURIComponent(m[2]!)}`;
+        calls[key] = (calls[key] ?? 0) + 1;
+        return Response.json([]);
+      }
+      return new Response("not found", { status: 404 });
+    },
+  });
+  const url = `http://127.0.0.1:${server.port}`;
+  for (const [key, value] of [
+    ["home.base_url", url],
+    ["home.access_token", "bench-token"],
+  ] as const) {
+    const set = setHouseholdSettingValue(key, value);
+    if (!set.ok) throw new Error(`the fake Home Assistant could not set ${key}: ${set.error}`);
+  }
+  return { url, calls, stop: () => server.stop(true) };
+}
+
 export interface RunDeps {
   people: BenchPeople;
   /** The recording proxy, when the run has one (the live run does; the
@@ -110,7 +156,25 @@ export interface RunDeps {
   /** Backdate everything the bench wrote for these people, and the
    * memory rows written from these turns, by N days. */
   backdate: (days: number, turnIds: readonly string[]) => void;
+  /** The fake Home Assistant counting the lock package's own calls. */
+  homeAssistant: FakeHomeAssistant | null;
+  /** Fire the due scheduled jobs, as the hub's own minute tick does;
+   * the default runs the real scheduler with the real package runner. */
+  tickScheduler?: (now: Date) => Promise<void>;
 }
+
+// The hub registers every package's notification types at boot
+// (index.ts); the bench runs turns in process and a fired timer's
+// `timer.done` is declared by the timer package, so the same
+// registration runs once here before the first tick (idempotent).
+let notificationTypesRegistered = false;
+const defaultTick = async (now: Date) => {
+  if (!notificationTypesRegistered) {
+    registerAllPackageNotificationTypes();
+    notificationTypesRegistered = true;
+  }
+  await runDueJobs(runPlugin, now);
+};
 
 const SENTENCE_END = /[.!?]["')\]]?(\s|$)/;
 
@@ -205,6 +269,81 @@ function attemptsIn(conversationId: string): Record<string, number> {
   return counts;
 }
 
+/** The person's and the household's memory records with their status
+ * (A3: a correction retires the old record and activates the new one). */
+function recordsFor(actor: PersonRow): { text: string; status: string }[] {
+  return db
+    .select({ text: memoryRecords.text, status: memoryRecords.status })
+    .from(memoryRecords)
+    .where(or(eq(memoryRecords.person, actor.id), eq(memoryRecords.scope, "household")))
+    .all()
+    .filter((r) => r.text.length > 0);
+}
+
+/** Every item on the household's lists by id (A5, the list-add effect). */
+function listItemsNow(): Map<string, string> {
+  return new Map(
+    db
+      .select({ items: lists.items })
+      .from(lists)
+      .where(isNull(lists.deletedAt))
+      .all()
+      .flatMap((r) => (JSON.parse(r.items) as { id: string; text: string }[]).map((i) => [i.id, i.text] as const)),
+  );
+}
+
+/** What a map gained since an earlier reading: a row reads only the
+ * effects since its own start, never an earlier conversation's (a
+ * review: the second lock conversation read the first one's call, and
+ * a ten-minute timer from one conversation would satisfy the next). */
+function since<T>(before: ReadonlyMap<string, T>, now: ReadonlyMap<string, T>): T[] {
+  return [...now.entries()].filter(([id]) => !before.has(id)).map(([, v]) => v);
+}
+
+/** Seeds a conversation's entities in the household registry (B4),
+ * with a relationship from the owner's own entity when asked; the
+ * owner's entity is created once per run. */
+const seededEntityIds = new Set<string>();
+function seedEntities(conv: BenchConversation, owner: PersonRow): void {
+  if (!conv.seedEntities?.length) return;
+  for (const e of conv.seedEntities) {
+    const created = createEntity(owner, { kind: e.kind, name: e.name, aliases: [...(e.aliases ?? [])], description: e.description, scope: "household" });
+    if (!created.ok || !created.value) throw new Error(`seeding entity ${e.name} for ${conv.id}: ${created.ok ? "no value" : created.error}`);
+    seededEntityIds.add(created.value.id);
+    if (e.relationshipFromOwner) {
+      let self = db.select({ id: entities.id }).from(entities).where(and(eq(entities.accountPersonId, owner.id), isNull(entities.deletedAt))).get();
+      if (!self) {
+        const made = createEntity(owner, { kind: "person", name: owner.displayName, account_person_id: owner.id, scope: "household" });
+        if (!made.ok || !made.value) throw new Error(`seeding the owner's entity for ${conv.id}: ${made.ok ? "no value" : made.error}`);
+        self = { id: made.value.id };
+        seededEntityIds.add(self.id);
+      }
+      const rel = createRelationship(owner, { type: e.relationshipFromOwner, from_id: self.id, to_id: created.value.id, scope: "household" });
+      if (!rel.ok) throw new Error(`seeding the relationship ${e.relationshipFromOwner} for ${conv.id}: ${rel.error}`);
+    }
+  }
+}
+
+/** Waits for the due time, ticks the scheduler the way the hub does
+ * every minute, and returns the notification types delivered to the
+ * person since the turn started (F2: the scheduler's own later
+ * delivery, observed; an earlier conversation's timer firing in the
+ * same tick does not count). Polls every half second up to
+ * `withinMs`, so a job due in five seconds is seen in about five. */
+async function observeDelivery(actor: PersonRow, notification: string, withinMs: number, tick: (now: Date) => Promise<void>, before: ReadonlySet<string>): Promise<string[]> {
+  const deadline = Date.now() + withinMs;
+  for (;;) {
+    await tick(new Date());
+    const delivered = listPending(actor)
+      .filter((n) => !before.has(n.id))
+      .map((n) => n.typeId);
+    if (delivered.includes(notification) || Date.now() >= deadline) return delivered;
+    await new Promise((resolve) => setTimeout(resolve, 500));
+  }
+}
+
+const jobsNow = (actor: PersonRow) => new Map(listJobs(actor).map((j) => [j.id, { job: j.job, status: j.status }] as const));
+
 export interface ConversationRun {
   scores: TurnScore[];
   /** The turn ids in order, for the caller's own cleanup or backdating. */
@@ -220,6 +359,19 @@ export async function runConversation(conv: BenchConversation, deps: RunDeps): P
     const seeded = remember(deps.people.child, { text: conv.seedPrivateForChild, category: "fact", tier: "durable", scope: "person", person: deps.people.child.id, source: `bench:${conv.id}`, importance: 0.8 });
     if (!seeded.ok) throw new Error(`seeding ${conv.id}: ${seeded.error}`);
   }
+  seedEntities(conv, deps.people.owner);
+  const tick = deps.tickScheduler ?? defaultTick;
+  // The fake Home Assistant counts for the whole run; a row reads the
+  // calls this conversation made (the live run found the second lock
+  // conversation reading the first one's call).
+  const homeCallsAtStart = { ...(deps.homeAssistant?.calls ?? {}) };
+  const listItemsAtStart = listItemsNow();
+  const homeCallsSince = (): Record<string, number> => {
+    const now = deps.homeAssistant?.calls ?? {};
+    const delta: Record<string, number> = {};
+    for (const [service, count] of Object.entries(now)) delta[service] = count - (homeCallsAtStart[service] ?? 0);
+    return delta;
+  };
   for (let i = 0; i < conv.turns.length; i++) {
     const turn = conv.turns[i]!;
     const speaker: Speaker = turn.as ?? "owner";
@@ -236,9 +388,14 @@ export async function runConversation(conv: BenchConversation, deps: RunDeps): P
     const supersedes = turn.supersedesTurn !== undefined ? turnIds[turn.supersedesTurn] : undefined;
     deps.proxy?.reset();
     const before = new Set(deps.log.turns.keys());
+    const beforeRoutes = new Set(deps.log.routes.keys());
+    const jobsBefore = jobsNow(actor);
+    const deliveriesBefore = new Set(listPending(actor).map((n) => n.id));
     const driven = await driveTurn(actor, turn.say, { conversationId, supersedes, interrupt: turn.interrupt });
     await deps.proxy?.settled(); // the teed reply text lands a tick after the client's read
-    const turnId = driven.value?.turn_id ?? [...deps.log.turns.keys()].find((id) => !before.has(id)) ?? null;
+    // An interrupted turn logs no [turn] line today (nothing is
+    // finalized for a reply nobody read); its id is on the [route] line.
+    const turnId = driven.value?.turn_id ?? [...deps.log.turns.keys()].find((id) => !before.has(id)) ?? [...deps.log.routes.keys()].find((id) => !beforeRoutes.has(id)) ?? null;
     if (turnId) turnIds[i] = turnId;
     const line = turnId ? deps.log.turns.get(turnId) : undefined;
     const route = turnId ? deps.log.routes.get(turnId) : undefined;
@@ -246,7 +403,15 @@ export async function runConversation(conv: BenchConversation, deps: RunDeps): P
     const requests = deps.proxy?.requests ?? [];
     // A row that reads memory (written, or nothing written) is read
     // after the judge has had its turn, so the judge's own rows count.
-    if (turn.expect.memoryWritten || turn.expect.storesNothing) await deps.drainJudge();
+    if (turn.expect.memoryWritten || turn.expect.storesNothing || turn.expect.recordActive || turn.expect.recordRetired) await deps.drainJudge();
+    // The jobs this turn scheduled, read before the delivery wait: a
+    // promise row sees its own job pending, then the scheduler's own
+    // delivery of it.
+    const jobs = since(jobsBefore, jobsNow(actor));
+    const deliveries = turn.expect.delivered ? await observeDelivery(actor, turn.expect.delivered.notification, turn.expect.delivered.withinMs, tick, deliveriesBefore) : [];
+    // The turn's own completions: the interrupted one is the first
+    // (a summary refresh may follow it on the same proxy).
+    const own = requests[0];
     const observed: TurnObserved = {
       reply: driven.value?.reply.text ?? driven.text,
       source: driven.value?.source ?? row?.source ?? null,
@@ -267,6 +432,15 @@ export async function runConversation(conv: BenchConversation, deps: RunDeps): P
       totalMs: driven.timings.totalMs,
       interrupted: driven.interrupted,
       rawModelText: requests.length ? (requests[requests.length - 1]?.responseText ?? null) : null,
+      records: recordsFor(actor),
+      pendingAsk: getPendingAsk(conversationId)?.kind ?? null,
+      listItems: since(listItemsAtStart, listItemsNow()),
+      jobs,
+      homeCalls: homeCallsSince(),
+      sourceUrls: requests.flatMap((r) => r.sourceUrls),
+      inferenceStopped: own ? own.aborted && !own.completed : null,
+      reconciledRow: row !== undefined && row.replyText.trim().length > 0,
+      deliveries,
     };
     if (driven.error) observed.reply = `[error: ${driven.error}]`;
     scores.push(scoreTurn(conv, i, turn, observed));
@@ -288,8 +462,17 @@ export function cleanupBenchPeople(peopleRows: BenchPeople): void {
 }
 
 function cleanupBenchPeopleStrict(peopleRows: BenchPeople): void {
+  // The registry rows the household-subject conversations seeded (B4),
+  // before the people they reference.
+  for (const id of seededEntityIds) {
+    sqlite.query("DELETE FROM relationships WHERE from_id = ? OR to_id = ?").run(id, id);
+    sqlite.query("DELETE FROM entities WHERE id = ?").run(id);
+  }
+  seededEntityIds.clear();
   for (const person of [peopleRows.owner, peopleRows.child]) {
     sqlite.query("DELETE FROM lists WHERE person = ?").run(person.id); // list-add's own rows
+    sqlite.query("DELETE FROM notification_deliveries WHERE recipient_id = ?").run(person.id);
+    sqlite.query("DELETE FROM scheduled_jobs WHERE person_id = ?").run(person.id);
     sqlite.query("DELETE FROM memory_embeddings WHERE memory_id IN (SELECT id FROM memory_records WHERE person = ?)").run(person.id);
     sqlite.query("DELETE FROM pending_embeddings WHERE memory_id IN (SELECT id FROM memory_records WHERE person = ?)").run(person.id);
     sqlite.query("DELETE FROM memory_records WHERE person = ?").run(person.id);

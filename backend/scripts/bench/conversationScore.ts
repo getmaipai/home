@@ -38,6 +38,30 @@ export interface TurnObserved {
   /** The model's raw text for the turn's last completion, before any
    * guard (the recording proxy's tee), when a model call was made. */
   rawModelText?: string | null;
+  // The effect standard's observations (conversationFixture.ts's own
+  // comment on the matching expectations).
+  /** The person's and the household's memory records with their status. */
+  records: readonly { text: string; status: string }[];
+  /** The conversation's pending ask after the turn. */
+  pendingAsk: "confirm" | "ask" | null;
+  /** The item texts the household's lists gained since the
+   * conversation started. */
+  listItems: readonly string[];
+  /** The scheduled jobs this turn added. */
+  jobs: readonly { job: string; status: string }[];
+  /** The fake Home Assistant's call counts by "domain.service". */
+  homeCalls: Readonly<Record<string, number>>;
+  /** URLs that reached the model in this turn's completions, outside
+   * the system prompt (a lookup's evidence). */
+  sourceUrls: readonly string[];
+  /** The interrupted turn's upstream completion: true when the abort
+   * cancelled it before it finished; null when no completion was made. */
+  inferenceStopped: boolean | null;
+  /** A turn row exists for this turn and holds a delivered reply. */
+  reconciledRow: boolean;
+  /** Notification type ids delivered to the person since the turn
+   * started, after the wait. */
+  deliveries: readonly string[];
 }
 
 export interface Check {
@@ -86,9 +110,24 @@ export function describeExpectation(e: TurnExpectation): string {
   if (e.attemptsAtMost) parts.push(`${e.attemptsAtMost.packageId} at most ${e.attemptsAtMost.count}`);
   if (e.answered) parts.push("answered");
   if (e.leaseReleased) parts.push("lease released");
+  if (e.recordRetired) parts.push(`record retired ${e.recordRetired.map((k) => k.join("+")).join(", ")}`);
+  if (e.recordActive) parts.push(`record active ${e.recordActive.map((k) => k.join("+")).join(", ")}`);
+  if (e.pendingAsk !== undefined) parts.push(e.pendingAsk === null ? "nothing pending" : `pending ${e.pendingAsk}`);
+  if (e.toolsRan) parts.push(`tools ${e.toolsRan.join("+")}`);
+  if (e.listHas) parts.push(`list has ${e.listHas.join(", ")}`);
+  if (e.jobScheduled) parts.push(`job ${e.jobScheduled} pending`);
+  if (e.homeCalls) parts.push(`${e.homeCalls.service} called ${e.homeCalls.count}x`);
+  if (e.lookupWithSource) parts.push("lookup with a source");
+  if (e.inferenceStopped) parts.push("inference stopped");
+  if (e.reconciled) parts.push("reconciled");
+  if (e.delivered) parts.push(`${e.delivered.notification} delivered within ${e.delivered.withinMs} ms`);
   if (e.humanVerdict) parts.push("(reader's verdict)");
   return parts.join("; ");
 }
+
+/** The lookup packages whose run counts as "looked it up" (C2). */
+export const LOOKUP_PACKAGES = new Set(["websearch", "knowledge"]);
+const RETIRED = new Set(["superseded", "archived"]);
 
 export function scoreTurn(conversation: BenchConversation, turnIndex: number, turn: BenchTurn, observed: TurnObserved): TurnScore {
   const e = turn.expect;
@@ -151,6 +190,54 @@ export function scoreTurn(conversation: BenchConversation, turnIndex: number, tu
   }
   if (e.answered) checks.push({ name: "answered", pass: observed.answered, detail: observed.answered ? "a reply arrived" : "no reply" });
   if (e.leaseReleased) checks.push({ name: "lease released", pass: observed.leaseCount === 0, detail: `${observed.leaseCount} lease(s) held` });
+  if (e.recordRetired) {
+    // The effect a person cares about: the old fact cannot come back.
+    // A record that was written and then superseded or archived passes;
+    // so does an edit whose retracted turn was never extracted at all
+    // (#88 hides it from the judge); an active record with the old
+    // fact fails, whatever the reply said.
+    for (const keywords of e.recordRetired) {
+      const matching = observed.records.filter((r) => keywords.every((k) => has(r.text, k)));
+      const active = matching.filter((r) => !RETIRED.has(r.status));
+      const pass = active.length === 0;
+      checks.push({ name: "record retired", pass, detail: pass ? (matching.length === 0 ? `no record with ${keywords.join("+")}` : `${matching.map((r) => r.status).join(",")}: ${matching[0]!.text}`) : `still ${active.map((r) => `${r.status}: ${r.text}`).join(" | ")}` });
+    }
+  }
+  if (e.recordActive) {
+    for (const keywords of e.recordActive) {
+      const hit = observed.records.find((r) => r.status === "active" && keywords.every((k) => has(r.text, k)));
+      checks.push({ name: "record active", pass: hit !== undefined, detail: hit ? `active: ${hit.text}` : `no active record with ${keywords.join("+")}` });
+    }
+  }
+  if (e.pendingAsk !== undefined) checks.push({ name: "pending ask", pass: observed.pendingAsk === e.pendingAsk, detail: observed.pendingAsk ? `pending ${observed.pendingAsk}` : "nothing pending" });
+  if (e.toolsRan) {
+    const ran = observed.pluginId ? observed.pluginId.split("+") : [];
+    const missing = e.toolsRan.filter((t) => !ran.includes(t));
+    checks.push({ name: "tools ran", pass: missing.length === 0, detail: missing.length === 0 ? `ran ${ran.join("+")}` : `missing ${missing.join(", ")} (ran ${ran.join("+") || "none"})` });
+  }
+  if (e.listHas) {
+    const missing = e.listHas.filter((k) => !observed.listItems.some((item) => has(item, k)));
+    checks.push({ name: "list has", pass: missing.length === 0, detail: missing.length === 0 ? `items: ${observed.listItems.join(", ")}` : `missing ${missing.join(", ")} (items: ${observed.listItems.join(", ") || "none"})` });
+  }
+  if (e.jobScheduled) {
+    const job = observed.jobs.find((j) => j.job === e.jobScheduled && j.status === "pending");
+    checks.push({ name: "job scheduled", pass: job !== undefined, detail: job ? `${job.job} pending` : `no pending ${e.jobScheduled} (jobs: ${observed.jobs.map((j) => `${j.job}:${j.status}`).join(", ") || "none"})` });
+  }
+  if (e.homeCalls) {
+    const n = observed.homeCalls[e.homeCalls.service] ?? 0;
+    checks.push({ name: "home calls", pass: n === e.homeCalls.count, detail: `${e.homeCalls.service} called ${n} time(s)` });
+  }
+  if (e.lookupWithSource) {
+    const ran = (observed.pluginId ? observed.pluginId.split("+") : []).filter((id) => LOOKUP_PACKAGES.has(id));
+    const pass = ran.length > 0 && observed.sourceUrls.length > 0;
+    checks.push({ name: "lookup with source", pass, detail: ran.length === 0 ? `no lookup ran (source ${observed.source ?? "none"}, ran ${observed.pluginId ?? "none"})` : observed.sourceUrls.length === 0 ? `${ran.join("+")} ran, no source reached the model` : `${ran.join("+")}: ${observed.sourceUrls[0]}` });
+  }
+  if (e.inferenceStopped) checks.push({ name: "inference stopped", pass: observed.inferenceStopped === true, detail: observed.inferenceStopped === null ? "no completion was made" : observed.inferenceStopped ? "the upstream completion was cancelled" : "the upstream completion ran to its end" });
+  if (e.reconciled) checks.push({ name: "reconciled", pass: observed.reconciledRow, detail: observed.reconciledRow ? "a turn row holds what was delivered" : "no turn row for the interrupted turn" });
+  if (e.delivered) {
+    const hit = observed.deliveries.includes(e.delivered.notification);
+    checks.push({ name: "delivered", pass: hit, detail: hit ? `${e.delivered.notification} delivered` : `${e.delivered.notification} not delivered within ${e.delivered.withinMs} ms (pending: ${observed.deliveries.join(", ") || "none"})` });
+  }
   const pass = checks.length === 0 ? null : checks.every((c) => c.pass);
   return {
     conversationId: conversation.id,

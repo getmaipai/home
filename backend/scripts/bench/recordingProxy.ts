@@ -14,6 +14,16 @@ export interface RecordedRequest {
    * content, or the non-streamed message), before any guard: what a
    * replaced reply actually said. */
   responseText: string;
+  /** URLs in a one-shot completion with no system message (a recipe's
+   * own `llm_complete`, the shape the websearch package uses to read
+   * its results): a lookup's evidence reaching the model, never a URL
+   * the person typed into the turn's own prompt (the effect standard's
+   * C2 row). */
+  sourceUrls: string[];
+  /** The upstream reply was read to its end (its stream flushed). */
+  completed: boolean;
+  /** The client aborted the request before the upstream reply ended. */
+  aborted: boolean;
 }
 
 export interface RecordingProxy {
@@ -77,6 +87,11 @@ export function startRecordingProxy(upstream: string): RecordingProxy {
             tools: (parsed.tools ?? []).map((t) => t.function?.name ?? "?"),
             messages: parsed.messages?.length ?? 0,
             responseText: "",
+            sourceUrls: (parsed.messages ?? []).some((m) => m.role === "system")
+              ? []
+              : (parsed.messages ?? []).filter((m) => typeof m.content === "string").flatMap((m) => m.content.match(/https?:\/\/[^\s"'<>)\]]+/g) ?? []),
+            completed: false,
+            aborted: false,
           };
           requests.push(recorded);
         } catch {
@@ -122,6 +137,7 @@ export function startRecordingProxy(upstream: string): RecordingProxy {
         },
         flush() {
           record.responseText = streamed ? text + extractModelText(tail) : extractModelText(nonStream);
+          record.completed = true;
           finish();
         },
       });
@@ -129,7 +145,17 @@ export function startRecordingProxy(upstream: string): RecordingProxy {
       // a flush, and an upstream body that errors mid-stream flushes
       // nothing either: the abort signal and a bounded wait in settled()
       // keep the bench from hanging on the record.
-      req.signal.addEventListener("abort", () => finish(), { once: true });
+      req.signal.addEventListener(
+        "abort",
+        () => {
+          // The same signal is the upstream fetch's, so the engine's
+          // completion is cancelled with the client's read (E4's
+          // "inference stopped", read from this flag, never assumed).
+          if (!record.completed) record.aborted = true;
+          finish();
+        },
+        { once: true },
+      );
       return new Response(res.body.pipeThrough(recordingStream), { status: res.status, headers: res.headers });
     },
   });

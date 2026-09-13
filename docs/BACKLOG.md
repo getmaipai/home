@@ -784,12 +784,18 @@ not permission to expand scope.
     the same inputs at 54, 54 and 56. The gate below (the
     forty sequences, five repeats, both transports, the thresholds)
     stays open; the next items come from the bench's ranking.
-    Status (2026-09-13, later): the fixture is 28 conversations (the
+    Status (2026-09-13, later): the fixture is 30 conversations (the
     Cobra film set, four other-kind subjects, three household
-    subjects, item 1b of `docs/plans/baseline-fixes-2026-09-13.md`)
-    and its table is the chat regression suite: every item that
-    touches a turn reports its three runs against it, the latest
-    series at 91, 91 and 85 of 98 scored turns.
+    subjects, item 1b of `docs/plans/baseline-fixes-2026-09-13.md`;
+    a cancel row and a promise row from the effect standard of
+    `docs/plans/conversation-competencies-2026-09-13.md`, with ten
+    rows rewritten to observe the effect rather than the reply's
+    words) and its table is the chat regression suite: every item that
+    touches a turn reports its three runs against it. The last series
+    on the 28-conversation fixture was 91, 91 and 85 of 98 scored
+    turns; the rewritten rows that need unbuilt pieces (the registry
+    read into a turn, a reconciled interruption, a lookup with a
+    source) fail on purpose until their items land.
 
     Depends on: CHAT-02 through CHAT-21 and CHAT-22. Files:
     `spec/llm/{routing,tool-call,guard,naturalness}-corpus.json`,
