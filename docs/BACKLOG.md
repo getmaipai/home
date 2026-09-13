@@ -4129,6 +4129,30 @@ future session now that F's hub half exists.
       `docs/plans/wave-2.md`'s "F to E" section, and the frontend side of
       each is a small schema or hand-written page against a real
       `GET`, the same size of work Repairs just was.
+- [ ] **A shared horizontal-rail primitive for `WhoIsHere` and
+      `MediaShelf`** (S) - found in a code review, 2026-09-13, fixing a
+      real layout bug: an `overflow-x-auto` element also computes
+      `overflow-y` to `auto` (CSS spec), which zeroes a flex item's own
+      automatic minimum size and collapses it to zero height inside a
+      `flex-col` ancestor. `MediaShelf.tsx`'s scroll rail (`kit/
+      primitives/MediaShelf.tsx`) already works around this with padding
+      (2026-09-05, a different symptom there - focus-ring clipping, not a
+      height collapse); `HomePage.tsx`'s `WhoIsHere` avatar row hit the
+      height-collapse version live (every name clipped at the top of its
+      letters in the published Home screenshot) and was fixed with
+      `min-h-16 shrink-0` (2026-09-13). Two different techniques for the
+      one underlying quirk, in two files, with nothing centralizing it.
+      Not unified in either fixup pass (bigger than either pass's own
+      scope, and `MediaShelf`'s rail isn't confirmed to hit the
+      height-collapse symptom anywhere it's mounted today, only
+      theoretically capable of it). Acceptance: one shared horizontal-
+      rail primitive (or a documented, reusable class/utility) that both
+      `WhoIsHere` and `MediaShelf` build on, so the fix for this quirk
+      lives in one place; `scripts/screenshot.ts`'s own `clippedStrips`
+      check (added the same commit as the `WhoIsHere` fix) is the
+      regression backstop either way - keep it passing. Out of scope:
+      redesigning either component's visual layout, only the shared
+      scroll-rail mechanics.
 
 ## Proactive / ambient intelligence
 

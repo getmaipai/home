@@ -12730,3 +12730,10 @@ other's section once (147cd28, f4779a6).
   half, the doc-drift plain corrections and BACKLOG split, the
   reader's-row issue check, and the privacy page's service-worker
   sentence: [docs/dev/session-b.md](dev/session-b.md) (2026-09-13).
+- Lane 6 follow-up 2, the Home weather card made offline
+  (`packageCache.ts`'s own fetch-cache seam, seeded from
+  `scripts/screenshot.ts`, zero changes to `packageHost.ts`) and two
+  real bugs found chasing it: #98 (the fixed home-card question's
+  pattern capture includes a trailing "today") and #99 (a blank line in
+  any reply silently disappears through the output safety gate):
+  [docs/dev/session-b.md](dev/session-b.md) (2026-09-13).

@@ -737,3 +737,96 @@ anywhere it's mounted today, only theoretically capable of it), but
 cross-referenced in both files so a third instance is easier to find,
 and the `clippedStrips` check itself is the real backstop regardless of
 which files ever get a from-scratch fix.
+
+## Lane 6 follow-up 2: make the weather card offline, and two real bugs
+found chasing it
+
+The coordinator's last open item on lane 6: the Home weather card
+(`home-desktop-light.png`) showed "Couldn't check the weather right
+now." - a real error in a doc screenshot, caused by the pipeline
+calling the real open-meteo endpoints (subject to rate limits and the
+network, the prior pass's own finding, accepted then as "not a product
+bug" but rejected this time as "a scripted doc run must be offline and
+deterministic, the same rule the benches follow"). Also asked: fix a
+missing-space nit in the scripted garden reply
+("feels dry.How much space"), and file (not fix) the "one CSS quirk,
+two fixes" finding as a BACKLOG item.
+
+**The weather card, made offline.** `backend/src/lib/packageHost.ts`
+has the fetch seam the coordinator pointed at, but Session A had it
+open with uncommitted changes for #92 the whole time this ran, so
+touching it was off the table under this session's own shared-checkout
+rule. Used the seam one layer down instead:
+`backend/src/lib/packageCache.ts`'s file-based fetch cache
+(`cachedFetch()`) returns a cached value without ever calling the real
+network when the entry is fresh, and its on-disk layout
+(`<MAIPAI_DATA_DIR>/cache/<packageId>/<sha256-of-method+url+headers+body>.json`)
+is entirely derivable from outside that file. `scripts/screenshot.ts`'s
+new `seedWeatherCache()` writes two geocode fixtures and one forecast
+fixture into that layout before the backend spawns - zero changes to
+`packageHost.ts` or `packageCache.ts`. Verified in isolation first (a
+standalone spawned backend, same env `screenshot.ts` uses, no real
+network reachable) before trusting it in the real pipeline.
+
+**Bug 1, filed as [getmaipai/home#98](https://github.com/getmaipai/home/issues/98):**
+even with `household.home_place` correctly set to "Seattle, WA" (the
+prior pass's own fix), the weather card kept failing. Traced to
+`weatherCardQuestion("Seattle, WA")` producing "What's the weather like
+in Seattle, WA today?", and `weather/manifest.json`'s routing pattern
+`"what's the weather like in *"` having nothing after the `*` to anchor
+against - `matchPattern()` captures everything to the end of the
+sentence, so the place argument the weather package actually receives
+is "Seattle, WA today", not "Seattle, WA". Confirmed directly by
+calling `matchPattern()` against that exact question. The same shape as
+#92 (a literal pattern claiming more than its intended argument). Not
+fixed here (`backend/src/lib/turnEngine.ts` was also mid-edit
+elsewhere in the checkout the whole time); the fixture is seeded under
+BOTH the buggy captured place and the plain one (coordinator's own
+call, so the screenshot stays correct whether or not #98 gets fixed).
+
+**Bug 2, filed as [getmaipai/home#99](https://github.com/getmaipai/home/issues/99):**
+the "missing space" in the garden reply wasn't missing from the source
+string at all - `"...feels dry.\n\nHow much space...?"` parses to two
+clean markdown blocks (checked directly with `remark-parse` +
+`remark-gfm`). Chased three wrong theories before finding the real one:
+not a CSS/paragraph-spacing issue (the two blocks were fully MERGED
+into one `<li>` in the live DOM, not just visually adjacent); not the
+typewriter "smooth" reveal lagging behind stream completion (added a
+wait on `MarkdownTextPrimitive`'s own `data-status="running"` attribute
+to rule this out - the attribute was already `"complete"`, so that fix
+was reverted); not even a frontend rendering bug at all - `GET
+/api/conversations/:id/turns` already returns `replyText` with the
+blank line missing, so it disappears before storage. Root cause:
+`gateOutputSafety()` (`backend/src/lib/turnEngine.ts`) streams replies
+through a per-sentence safety gate using
+`spec/safety/ts/sentenceChunker.ts`'s `nextSentenceBoundary()`, whose
+boundary regex treats a blank line (`\n{2,}`) as a match in its own
+right, separate from its sentence-terminator alternative. When a blank
+line lands as the very start of the gate's `pending` buffer, the
+resulting span is nothing but that whitespace - the gate's `if
+(!trimmed) continue` (meant only to skip running the safety classifier
+on it) also skips yielding it, so the blank line never reaches the
+caller. That only happens when the sentence before the blank line ends
+in `.`/`!`/`?` and the text right after it starts with an uppercase
+letter or digit (the terminator regex's own lookahead) - in this
+reply, "dry." before "How" hits it, while the earlier "plants." before
+a lowercase "- Grow" does not, and survives. This is a real production
+bug, not a screenshot-only one (any real model reply whose paragraph
+break happens to fall on that same shape would lose it identically) -
+filed with the exact fix needed (forward the raw span, skip only the
+classifier call). Not fixed here for the same reason as bug 1
+(`turnEngine.ts` mid-edit elsewhere). Worked around in
+`scripts/screenshot.ts`'s own scripted reply: a single `\n` instead of
+a blank line never matches the regex's blank-line alternative, survives
+the gate intact, and renders as a plain space - the real paragraph
+break this reply originally intended still needs #99's actual fix.
+
+Both `home-desktop-light.png` and `chat-desktop-light.png` regenerated
+and opened after these two fixes: the weather card shows "It's 57.3
+degrees in Seattle." on both the Today card and the widget grid, and
+the garden reply reads correctly ("...feels dry. How much space do you
+have?", a real space, on one line inside the last bullet). Every image
+a user page embeds (`home`, `privacy`, `settings`, `settings-repairs`,
+`settings-users`) opened again too - all correct. Added the "shared
+horizontal-rail primitive" BACKLOG item under UI / shell (S, not fixed,
+per the coordinator's own instruction).

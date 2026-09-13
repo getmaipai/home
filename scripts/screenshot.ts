@@ -35,7 +35,8 @@
 import { chromium, webkit, type Browser, type BrowserContext } from "playwright";
 import { startStubLlmServer } from "../spec/llm/ts/stubServer";
 import AxeBuilder from "@axe-core/playwright";
-import { rmSync, mkdirSync, existsSync } from "node:fs";
+import { rmSync, mkdirSync, existsSync, writeFileSync } from "node:fs";
+import { createHash } from "node:crypto";
 import { dirname, join } from "node:path";
 
 const PORT = 8799;
@@ -172,6 +173,88 @@ async function waitForHealth(timeoutMs = 15000): Promise<void> {
   throw new Error("backend did not become healthy within " + timeoutMs + "ms");
 }
 
+// The Home page's weather widget - "Your packages > Weather" (the
+// widget grid, WidgetCardNode) - resolves its `place` input via
+// `withHouseholdPlaceDefault()` (backend/src/lib/plugins.ts), straight
+// from `household.home_place`, so this literal has to match
+// `seedHousehold()`'s own PUT of that setting below (both point back to
+// this one constant now, so there's only one place to change).
+const WEATHER_HOUSEHOLD_PLACE = "Seattle, WA";
+
+// The exact "place" the weather package's deterministic floor captures
+// out of the Home page's OTHER weather touchpoint, its fixed question
+// (`TodayCard`'s "Weather"), found live (2026-09-13) while chasing why
+// that card still failed with a real `household.home_place` seeded:
+// `weatherCardQuestion("Seattle, WA")` (backend/src/homeCardQuestions.ts)
+// reads "What's the weather like in Seattle, WA today?", and
+// weather/manifest.json's own routing pattern ("what's the weather like
+// in *") has nothing after the `*` to anchor against, so
+// `matchPattern()` (backend/src/lib/turnEngine.ts) captures everything
+// to the end of the sentence - "Seattle, WA today", trailing "today" and
+// all, not "Seattle, WA" - confirmed by calling that exact function
+// against that exact question. Filed as getmaipai/home#98 (the same
+// shape as #92, a literal pattern claiming more than its argument; out
+// of this lane's scope to fix). Derived from `WEATHER_HOUSEHOLD_PLACE`
+// rather than a second hand-typed literal (a code review, 2026-09-13,
+// caught the first draft risking the two drifting apart), and kept as
+// its OWN cache key below rather than folded into that one, so this
+// fixture matches today's real, buggy capture; kept alongside the plain
+// key, not instead of it, so the fixture still answers once #98 is
+// fixed and the capture goes back to the plain place.
+const WEATHER_CAPTURED_PLACE = `${WEATHER_HOUSEHOLD_PLACE} today`;
+
+// Matches backend/src/lib/packageCache.ts's own cacheKey(): sha256 of
+// `${method}\n${url}\n${headers}\n${body}`, GET with no headers/body
+// (the recipe's fetch steps set neither) hashing to `GET\n<url>\n\n`.
+// Duplicated here rather than imported - that module lives behind
+// backend's own "@/*" alias, and pulling in packageCache.ts (and its own
+// imports of paths.ts, the generated manifest schema) just for one pure
+// hash function is more coupling than a five-line duplicate.
+function weatherCacheKey(url: string): string {
+  return createHash("sha256").update(`GET\n${url}\n\n`).digest("hex");
+}
+
+// Pre-seeds backend/src/lib/packageCache.ts's file-based fetch cache with
+// canned geocode/forecast responses for both weather touchpoints on Home
+// (`WEATHER_CAPTURED_PLACE`, `WEATHER_HOUSEHOLD_PLACE`), so the weather
+// package's `host.fetch` calls (weather/recipe.json's two `fetch` steps)
+// are answered from disk and never reach the real network -
+// getmaipai/.github/CLAUDE.md's testing standard ("deterministic and
+// offline by default") extended to this scripted doc run the same way
+// the benches already are. Zero changes to packageHost.ts or
+// packageCache.ts themselves: this only writes files under the cache
+// layout they already read (backend/src/lib/paths.ts's `cacheDir`,
+// keyed off MAIPAI_DATA_DIR), which is the one seam this lane can use
+// without touching a file Session A is concurrently editing
+// (packageHost.ts, per its own dev doc entry). Must run before the
+// backend process (which reads this cache on first request) spawns.
+function seedWeatherCache(dataDir: string): void {
+  const cacheDir = join(dataDir, "cache", "weather");
+  mkdirSync(cacheDir, { recursive: true });
+
+  const geocodeValue = {
+    results: [{ id: 5809844, name: "Seattle", latitude: 47.60621, longitude: -122.33207, country: "United States" }],
+  };
+  // latitude/longitude interpolate into the forecast URL via `String()`
+  // (spec/interpreters/ts/recipe-interpreter.ts's `interpolate()`), so
+  // every geocode fixture below has to agree on the exact digits here,
+  // byte for byte, or its forecast fetch misses this entry and falls
+  // through to the real network. Both places geocode to the same real
+  // Seattle coordinates, so one forecast entry covers both.
+  const forecastUrl = "https://api.open-meteo.com/v1/forecast?latitude=47.60621&longitude=-122.33207&current=temperature_2m&temperature_unit=fahrenheit";
+  const forecastValue = { current: { time: new Date().toISOString().slice(0, 16), temperature_2m: 57.3 } };
+
+  const entries: Array<[string, unknown]> = [
+    [`https://geocoding-api.open-meteo.com/v1/search?count=1&name=${WEATHER_CAPTURED_PLACE}`, geocodeValue],
+    [`https://geocoding-api.open-meteo.com/v1/search?count=1&name=${WEATHER_HOUSEHOLD_PLACE}`, geocodeValue],
+    [forecastUrl, forecastValue],
+  ];
+  for (const [url, value] of entries) {
+    const entry = { url, method: "GET", fetchedAt: new Date().toISOString(), value };
+    writeFileSync(join(cacheDir, `${weatherCacheKey(url)}.json`), JSON.stringify(entry));
+  }
+}
+
 async function seedHousehold(): Promise<string> {
   // Seed through Bun's native fetch, not Playwright's own context.request:
   // playwright-core's APIRequestContext throws ("cannot be parsed as a
@@ -210,7 +293,10 @@ async function seedHousehold(): Promise<string> {
   // (getmaipai/home BACKLOG's own household-location item); "Seattle,
   // WA" also matches the widget grid's own already-seeded default
   // (`Your packages > Weather`), so both weather cards on this same
-  // page now agree instead of naming two different cities.
+  // page now agree instead of naming two different cities. This literal
+  // "Seattle, WA" is `seedWeatherCache()`'s own `WEATHER_HOUSEHOLD_PLACE`
+  // above (and, with " today" appended, its `WEATHER_CAPTURED_PLACE` too)
+  // - change this and change those.
   const place = await fetch(`${BASE_URL}/api/settings`, {
     method: "PUT",
     headers: { "Content-Type": "application/json", Cookie: `session=${sessionValue}` },
@@ -670,6 +756,7 @@ async function main() {
 
   if (existsSync(DATA_DIR)) rmSync(DATA_DIR, { recursive: true, force: true });
   mkdirSync(DATA_DIR, { recursive: true });
+  seedWeatherCache(DATA_DIR);
 
   console.log("Starting a throwaway backend on a temp data dir...");
   // Not gated on `chatReview` (it used to be) - Home's own WeatherCard
@@ -692,7 +779,34 @@ async function main() {
     if (text.includes("herbs")) return "Basil, parsley, and chives are useful kitchen herbs. Keep mint in its own pot so it does not spread.";
     if (text.includes("book")) return "What kind of story would you enjoy: a mystery, an adventure, or something funny?";
     if (text.includes("weather like")) return "It's a clear, mild day - around 62°F with a light breeze.";
-    return "Start with a sunny spot and a few easy plants.\n\n- Grow lettuce in a shallow container.\n- Give tomatoes a larger pot and a support.\n- Water when the top layer of soil feels dry.\n\nHow much space do you have?";
+    // A single "\n" before the closing question, not a blank line -
+    // getmaipai/home#99 (found live, 2026-09-13, chasing exactly this
+    // reply): `gateOutputSafety()`'s per-sentence safety gate
+    // (backend/src/lib/turnEngine.ts) uses spec/safety/ts/
+    // sentenceChunker.ts's `nextSentenceBoundary()`, whose boundary
+    // regex treats a blank line (`\n{2,}`) as its own match, separate
+    // from `[.!?]+`'s own; when that match lands as the very start of
+    // the gate's `pending` buffer, the resulting span is whitespace
+    // only, the gate's own `if (!trimmed) continue` skips yielding it,
+    // and the blank line is silently dropped from the delivered reply.
+    // That only happens when the sentence before the blank line ends in
+    // `.`/`!`/`?` AND the text right after the blank line starts with an
+    // uppercase letter or digit (the terminator regex's own lookahead,
+    // `(?=\s+[A-Z0-9]|\s*$)`) - exactly "dry." before "How" here, which
+    // is why THIS reply's first blank line (after "plants.", before a
+    // lowercase-led "- Grow") survives untouched and only the second one
+    // (before "How") is lost. Confirmed against `GET /api/conversations/
+    // :id/turns`'s own stored `replyText`, which already has no blank
+    // line before "How" in it; nothing downstream (streaming, storage,
+    // the frontend's markdown rendering) loses anything else.
+    // Out of scope to fix here (backend/src/lib/turnEngine.ts is mid-edit
+    // elsewhere in this checkout); a single "\n" never matches that
+    // regex's blank-line alternative, so it survives the gate intact and
+    // reads as a plain space once rendered - not the separate paragraph
+    // this reply originally intended, but a real space, matching what
+    // shipped before this bug was found (see #99 for the paragraph break
+    // once the gate itself is fixed).
+    return "Start with a sunny spot and a few easy plants.\n\n- Grow lettuce in a shallow container.\n- Give tomatoes a larger pot and a support.\n- Water when the top layer of soil feels dry.\nHow much space do you have?";
   } });
   // Occupies REPAIR_SEED_PORT ourselves before the backend starts, so its
   // own Wyoming satellite server (backend/src/index.ts) fails to bind and
