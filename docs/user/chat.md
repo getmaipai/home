@@ -12,6 +12,19 @@ Chat is where you talk to MaiPai, by typing or by voice.
 
 MaiPai's answer appears right below your message.
 
+## What MaiPai can look up
+
+Ask MaiPai to look something up and you get a real answer, not a guess. Just ask it directly, for example:
+
+- "What's the weather in Seattle?"
+- "What does curious mean?"
+- "Who directed Cobra?"
+- "Search the web for tonight's game score"
+
+Weather, word meanings, trivia, and film lookups work right away. Web search takes one more step. An adult sets it up first, in **Settings**.
+
+See the [Privacy](privacy.md) page for what each one sends, and to whom.
+
 ## Talk instead of type
 
 Tap the microphone icon next to the message box and start speaking. MaiPai listens, turns your words into text, and sends it once you stop talking.

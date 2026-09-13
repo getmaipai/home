@@ -1424,3 +1424,37 @@ a reload, stops polling once everything resolves) and the rewritten
 `chatMemoryChip.test.tsx` (all four states, a manual save always
 outranking a pending/not_saved judge status, forgetting a saved
 message turning its chip off). `bun run build` clean.
+
+## Lane 8 item 3: what MaiPai can look up
+
+A short "What MaiPai can look up" section in `docs/user/chat.md`,
+placed right after "Send a message" (the natural next question once a
+reader knows how to send one). Checked what's actually installed and
+real, not assumed from `docs/user/privacy.md`'s own outbound
+description: `backend/packages/` today ships weather, a dictionary
+definition, trivia, a joke, general knowledge, a film or TV lookup,
+news headlines, a music-artist lookup, MLB scores, and web search
+(the last one opt-in: `checkSearxngHealth()`'s own "not configured is
+not a fault" treats an empty `search.searxng_url` as normal, not an
+error, and `docs/user/privacy.md`'s own phrasing already calls it
+"through your own search server"). Kept the section itself short and
+representative (weather, a definition, trivia, a film lookup, web
+search) rather than enumerating all ten - the plan's own "one short
+section" and CLAUDE.md's dad test both argue against a full package
+list here; the [Privacy](../user/privacy.md) page's own table is where
+someone goes for the complete, current list and what each one sends.
+
+Phrased as "ask it to look something up" throughout (an example
+question per lookup, imperative), never "it looks things up on its
+own" - CHAT-16 (the composer unifying deterministic-lookup results
+into companion-voiced replies) hasn't landed, so today a lookup only
+answers when the message matches its own routing pattern directly;
+nothing implies MaiPai decides mid-conversation to go look something
+up unprompted. No screenshot: a docs-only change to `docs/user/`
+prose, no new or changed app screen for the pipeline to capture.
+
+**Verified**: `bun run scripts/reading-level.ts` - `chat.md: grade 7.8
+(max 8) ok` (the first draft scored 8.3, TOO HARD; shortened the
+lookup-vs-search sentence and swapped a shorter example word before it
+passed). Read the rendered section back for the dad test and for
+honesty against what's actually shipped, per-package, above.

@@ -12822,3 +12822,10 @@ other's section once (147cd28, f4779a6).
   and embed engines: a chip appearing on a live reply, "Remember this"
   and "Forget this" both updating the open message with no reload:
   [docs/dev/session-b.md](dev/session-b.md) (2026-09-13).
+- Lane 8 item 3, closing lane 8: a "What MaiPai can look up" section in
+  docs/user/chat.md, checked against what's actually installed
+  (weather, a definition, trivia, a joke, general knowledge, a film or
+  TV lookup, news, a music-artist lookup, MLB scores, and web search,
+  the last opt-in) rather than assumed from privacy.md, phrased as
+  "ask it to look something up" since CHAT-16 hasn't landed:
+  [docs/dev/session-b.md](dev/session-b.md) (2026-09-13).
