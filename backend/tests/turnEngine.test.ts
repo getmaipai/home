@@ -444,7 +444,7 @@ describe("lib/turnEngine.ts runTurnStream() output-safety gate (step 9)", () => 
   test("a cuttable guard hit after a comma-flushed clause: the DONE event's own text is a closed sentence, not a dangling comma", async () => {
     const { childRow } = await ownerAndChild();
     const prefix = "I don't have access to real-time information about brand new book releases from any author right now,";
-    const invented = " but I believe the title is Winterfall's Reckoning.";
+    const invented = " but your brother said the title is Winterfall's Reckoning.";
 
     await withScriptedStream(`${prefix}${invented}`, async () => {
       const result = await runTurnStream(childRow, "chat", "what's the latest book out there");
@@ -659,7 +659,9 @@ describe("lib/turnEngine.ts gateGuards() matches guardReply()'s real branches (F
     // along with the first. gateGuards() now matches that exactly,
     // rather than the (incorrect) "just drop sentence one, keep
     // streaming" shape this fix's own first cut assumed.
-    const ctx = { utterance: "hi" };
+    // FAST-05: Nadia is on the roster, so this is a household location
+    // claim (the shape the guard still owns).
+    const ctx = { utterance: "hi", roster: ["Nadia"] };
     const nonStreaming = guardReply("Nadia lives in Portland. It's a nice day today.", { ...ctx, personId: "person-1" });
     expect(nonStreaming.reason).toBe("invention");
     expect(nonStreaming.reply).not.toContain("Portland");
@@ -679,7 +681,7 @@ describe("lib/turnEngine.ts gateGuards() matches guardReply()'s real branches (F
     // `kept.length > 0 && CUTTABLE.has(reason)` returns `kept.join(" ")`
     // - the prefix that already stood, with NO honest line appended and
     // nothing after the cut point either.
-    const ctx = { utterance: "hi" };
+    const ctx = { utterance: "hi", roster: ["Nadia"] };
     const nonStreaming = guardReply("Good morning. Nadia lives in Portland.", { ...ctx, personId: "person-1" });
     expect(nonStreaming.reason).toBe("invention");
     expect(nonStreaming.reply).toBe("Good morning.");
@@ -793,13 +795,16 @@ describe("the dangling-comma bug end to end (Jesse, live-found 2026-09-07)", () 
     // own chunker flushes a real clause boundary right at the comma
     // instead of waiting for the whole run-on sentence to finish -
     // exactly the real live shape ("I don't have access to real-time
-    // information on new publications,"). "Winterfall's Reckoning" is
-    // an invented title (two proper nouns, grounded nowhere in this
-    // turn's utterance/sources/history), so guardInvention() catches
-    // the clause that follows.
+    // information on new publications,"). The clause that follows puts
+    // an invented title in a family member's mouth (an attributed quote
+    // grounded nowhere in this turn's utterance/sources/history), so
+    // guardInvention() catches it. FAST-05: it used to be "but I
+    // believe the title is Winterfall's Reckoning", caught by the bare
+    // proper-noun scan that no longer exists; a household claim is the
+    // shape the guard still owns.
     const prefix = "I don't have access to real-time information about brand new book releases from any author right now,";
     expect(prefix.length).toBeGreaterThan(90); // the exact condition this test means to exercise
-    const invented = " but I believe the title is Winterfall's Reckoning.";
+    const invented = " but your brother said the title is Winterfall's Reckoning.";
 
     async function* oneBigDelta(): AsyncGenerator<string, undefined, void> {
       yield `${prefix}${invented}`;
@@ -1836,11 +1841,13 @@ describe("FAST-04: literal patterns before the embed, a stream that starts befor
   test("a resolved package reply is never cut by the guards: '72 degrees in Boston' with no grounding in the utterance arrives intact", async () => {
     const { actor, client } = await owner();
     // Stored where the turn's own recall() will NOT find it (no shared
-    // words with the utterance below), so the guard context has neither
-    // the number nor the proper noun: streamed as model text this would
-    // be an invention-guard cut. The `recall` package's own recipe finds
-    // it by topic and returns it as the reply.
-    const stored = remember(actor, { text: "It is 72 degrees in Boston", category: "fact", tier: "durable", scope: "person", person: actor.id, source: "test", importance: 0.8 });
+    // words with the utterance below), so the guard context grounds none
+    // of it; the sentence is an attributed quote (FAST-05: the household
+    // shape the invention guard still owns; a bare number or place name
+    // alone no longer counts), so streamed as model text it would be an
+    // invention-guard cut. The `recall` package's own recipe finds it by
+    // topic and returns it as the reply.
+    const stored = remember(actor, { text: "Your brother said it is 72 degrees in Boston", category: "fact", tier: "durable", scope: "person", person: actor.id, source: "test", importance: 0.8 });
     expect(stored.ok).toBe(true);
     // Close to recall's own routing.examples (so the stub's scorer offers
     // it as a Tier 2 tool) without matching its literal patterns, and
@@ -1850,7 +1857,7 @@ describe("FAST-04: literal patterns before the embed, a stream that starts befor
       {
         scriptedToolCalls: (request) =>
           request.tools?.some((t) => t.function.name === "recall")
-            ? [{ id: "call-1", type: "function", function: { name: "recall", arguments: '{"topic":"Boston"}' } }]
+            ? [{ id: "call-1", type: "function", function: { name: "recall", arguments: '{"topic":"brother Boston"}' } }]
             : undefined,
       },
       async () => {
@@ -1869,7 +1876,7 @@ describe("FAST-04: literal patterns before the embed, a stream that starts befor
         // The same sentence, streamed as model text against the same
         // context, IS cut - the proof the resolved path skipped a gate
         // that would otherwise have fired, not that the gate is lax.
-        const guarded = guardReply("It is 72 degrees in Boston.", { utterance, personId: actor.id });
+        const guarded = guardReply(value.reply.text, { utterance, personId: actor.id });
         expect(guarded.reason).toBe("invention");
       },
     );

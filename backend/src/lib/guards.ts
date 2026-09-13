@@ -53,6 +53,12 @@ export interface GuardContext {
   /** The active persona's own few-shot voice lines (persona.ts's
    * `Persona.examples`) - borrowed for TONE, never handed back verbatim. */
   personaExamples?: readonly string[];
+  /** FAST-05: the household's own people (display names and nicknames),
+   * so a location claim can tell a household subject ("Pippa is at
+   * soccer practice", which needs a source) from the world ("Paris is
+   * in France", which needs none). Empty or absent means only the
+   * second person ("you", "your brother") counts as household. */
+  roster?: readonly string[];
   /** Rotates the honest replacement line so the same household doesn't
    * hear the identical guard line every time (replyVariation.ts's own
    * `pickVariant`, reused rather than a second rotation mechanism). */
@@ -110,29 +116,32 @@ function honest(personId: string, reason: GuardReason, pool: readonly string[]):
   return pickVariant(personId, `guard:${reason}`, pool);
 }
 
-// ==== Invention: a proper noun, number or date not grounded anywhere ====
+// ==== Invention: a claim about the household with nothing behind it ====
 // bot-legacy's guards.py: "unsupported_claim"/"invented_location" -
 // several narrow sub-shapes there (a third party's traits, a place for a
-// person, a guess hedged politely); this is the plan's own single,
-// general rule - a candidate fact-word that appears nowhere in the
-// utterance, the sources, or the conversation's own history is invented.
+// person, a quote put in someone's mouth, a sensory experience this hub
+// cannot have). Each one is a SHAPE, not a word check.
+//
+// FAST-05 (docs/dev.md, "Chat direction review and the two-track plan",
+// decision 5): until 2026-09-12 this guard also ran a bare-candidate
+// scan, flagging any mid-sentence capitalised word, four-digit-or-less
+// number, or day/month name that appeared nowhere in the utterance, the
+// sources, or the history. That was the 2026-09-07 record's "world
+// knowledge is allowed" decision, recorded but never built: it rejected
+// "The capital is Paris.", "It is 4.", and "how often do those need
+// watering" answered with a number, and fired on 19 of 44 turns in the
+// hub's own log. The scan is gone, together with the `GUESSING_RE`
+// hedge check ("probably a", "I'm guessing": a hedge is exactly what
+// INFORMATION_HANDLING_POLICY asks for when the model is unsure, not an
+// invention). What remains is the household-claim half, kept unchanged:
+// a trait or place for a person here, a quote attributed to someone, a
+// first-person experience. General knowledge passes; a claim about the
+// people in this house still needs a source. The four probes and the
+// three household negatives live in spec/llm/guard-corpus.json and
+// tests/guards.test.ts as permanent regression rows.
 
 const DECLINE_RE =
   /\b(?:i (?:don't|do not|didn't|did not|can't|cannot|haven't|have not|never|wasn't|was not) (?:know|remember|recall|have|hear|heard|see|saw|think|catch))\b|\bnot sure\b|\bno idea\b/i;
-
-// Capitalised mid-sentence (never the sentence's own first word, which is
-// capitalised by grammar alone, not because it names something): the
-// same safe direction bot-legacy's own `_NAME_IN_QUESTION` comment
-// argues for.
-const PROPER_NOUN_RE = /(?<!^)(?<=[a-z]\s|[a-z][.!?]\s)\b([A-Z][a-z]{2,})\b/g;
-const NOT_NAMES = new Set(
-  "I You We He She They The A An Is Are Was Were Do Does Did Can Could Would Will What When Where Who Why How Which Sunday Monday Tuesday Wednesday Thursday Friday Saturday January February March April May June July August September October November December MaiPai OK Okay"
-    .split(" ")
-    .map((w) => w.toLowerCase()),
-);
-const BARE_NUMBER_RE = /\b\d{1,4}\b/g;
-const DATE_WORD_RE =
-  /\b(?:monday|tuesday|wednesday|thursday|friday|saturday|sunday|january|february|march|april|may|june|july|august|september|october|november|december)\b/gi;
 
 // A code review (2026-09-06) found this returning a plain joined STRING,
 // checked with `.includes()` - a real word-boundary bug, not just an
@@ -146,83 +155,14 @@ function groundedWords(ctx: GuardContext): Set<string> {
   return tokenize([ctx.utterance, ...(ctx.sources ?? []), ...(ctx.history ?? [])].join(" "));
 }
 
-// Fix C (docs/dev.md's "Chat reliability: the 2026-09-07 incident and the
-// five fixes", getmaipai/home#62): tokenize() splits on hyphens (they're
-// not in its `[a-z0-9']` character class), so "Spider-Man" (a reply's own
-// hyphenated spelling) and "Spiderman" (a household member's own plain
-// spelling, from the utterance) tokenize to different shapes
-// ("spider"+"man" vs "spiderman") even though they name the identical
-// thing. Live bench, 2026-09-07: "I might go see the new Spiderman
-// movie" -> a reply mentioning "Spider-Man" got its own "Spider" piece
-// (the only one PROPER_NOUN_RE can ever capture from a hyphenated
-// compound - the hyphen itself breaks its lookbehind before "Man")
-// flagged as an ungrounded name. Deliberately NOT fixed inside
-// tokenize() itself: memory.ts's own recall() keyword fallback and
-// routing.ts's example-match scoring share that function, and neither
-// wants hyphen-collapsing folded into their own matching - this stays a
-// guards.ts-local fix instead.
-const HYPHEN_COMPOUND_RE = /\b([A-Za-z]+(?:-[A-Za-z]+)+)\b/g;
-
-/** Every piece of a hyphenated compound IN `sentence` whose collapsed
- * (dehyphenated) form is already grounded - if "Spider-Man" collapses to
- * "spiderman" and that's grounded, "spider" and "man" both count as
- * grounded too, so guardInvention()'s own candidate loop doesn't flag a
- * name the household already used, just spelled differently. */
-function hyphenGroundedPieces(sentence: string, grounded: Set<string>): Set<string> {
-  const pieces = new Set<string>();
-  for (const m of sentence.matchAll(HYPHEN_COMPOUND_RE)) {
-    const collapsed = m[1]!.toLowerCase().replace(/-/g, "");
-    if (grounded.has(collapsed)) {
-      for (const piece of m[1]!.split("-")) pieces.add(piece.toLowerCase());
-    }
-  }
-  return pieces;
-}
-
-// Three narrow, specific invention SHAPES beyond a bare proper noun/
-// number/date - each ported directly from a guards.py regex of the same
-// name, kept narrow on purpose (a real pattern, not "any ungrounded
-// word") so this stays a precise catch rather than a blunt content
-// filter that would flag ordinary, harmless conversational words too.
-// Found live via this step's own conversation bench
-// (backend/scripts/bench/conversation.ts): a bare proper-noun/number/
-// date check alone missed most of the 34 real scenarios, which invent
-// lowercase nouns ("gallery", "sedan", "kitchen") a name/number check
-// can't see at all.
-
-// "I think you're talking about a sedan, right?" - a guess about the
-// household's own business is an invention however politely it is
-// hedged; the PATTERN itself is the tell, no grounding check needed.
-//
-// Fix C (docs/dev.md's "Chat reliability: the 2026-09-07 incident and the
-// five fixes", getmaipai/home#62): this used to also match
-// `\bsounds like (?:a|an)\b` - a real English idiom for reacting to
-// something the PERSON just said ("that sounds like a fun night out",
-// "sounds like a long day"), not a guess about the household's own
-// facts. Live bench, 2026-09-07: "I might go see the new Spiderman
-// movie" -> "That sounds like a fun night out! You should definitely
-// check it out." got its opening sentence replaced with "That's not
-// something I've been told" - an honest line answering a QUESTION nobody
-// asked, spliced in front of the model's own next sentence, which read
-// as flatly self-contradicting. Removed rather than narrowed to an
-// allowlist of "safe" words after "sounds like a/an": the bare-candidate
-// check just below this function (a genuinely invented proper noun,
-// date, or number - "the sea", "75 degrees") still catches a REAL
-// fabrication sitting inside the same sentence, so nothing about
-// removing this one idiom-match opens a hole for actual invention to
-// slip through unflagged - it only stops flagging the idiom's own
-// phrasing, which was never the tell in the first place.
-//
-// `\bprobably (?:a|an|the)\b` deliberately stays (a code review,
-// 2026-09-07, caught the first cut of this fix removing it too, with no
-// incident evidence and no corpus row justifying it): "That's probably a
-// delivery driver." answering "who's at the door" is a genuine invented
-// guess, not a reaction idiom - "sounds like a/an X" only ever reacts to
-// something the PERSON already said, while "probably a/an X" states a
-// new, unhedged claim about a THING or PERSON the household asked about,
-// exactly the pattern this guard exists to catch.
-const GUESSING_RE =
-  /\bi think you(?:'re| are)? (?:talking about|referring to|means?)\b|\byou must mean\b|\bi(?:'m| am) guessing\b|\bprobably (?:a|an|the)\b|\bmy guess is\b/i;
+// Narrow, specific invention SHAPES - each ported directly from a
+// guards.py regex of the same name, kept narrow on purpose (a real
+// pattern, not "any ungrounded word") so this stays a precise catch
+// rather than a blunt content filter that would flag ordinary, harmless
+// conversational words too. Found live via this step's own conversation
+// bench (backend/scripts/bench/conversation.ts): the 34 real scenarios
+// invent lowercase nouns ("gallery", "sedan", "kitchen") a name/number
+// check could never see, which is why the shapes carry the guard.
 
 // "he drives a black BMW i3", "she lives in the kitchen": a third-party
 // pronoun given a concrete trait or place. Narrow on purpose (a pronoun
@@ -239,17 +179,87 @@ const PERSON_TRAIT_RE = /\b(?:he|she|they)(?:'s| is| are)?\s+(?:drives?|owns?|ha
 const CLAIMED_EXPERIENCE_RE =
   /\bi(?:'m| am| was|'ve| have|'d| had)?(?: just| also| even| already| actually)? (?:watch(?:ing|ed)|see(?:ing|n)|saw|play(?:ing|ed)|read(?:ing)?|binge\w*|eat(?:ing)?|ate|drink(?:ing)?|drank|cook(?:ing|ed)|went|visit(?:ing|ed)|been to|waiting for|sleep(?:ing)?|slept|dream(?:ing|ed|t)|tried|tasted|bought|drove|driving)\b/i;
 
-// "Rover lives in the kitchen.", "He's in the kitchen." - a location for
-// a person, the one shape guards.py's own comment calls out by name
-// ("the robot has exactly one source for it: somebody told it - its OWN
-// situation is not that source").
-const LOCATION_CLAIM_RE = /\b(?:he|she|they|[A-Z][a-z]{2,})(?:'s|\s+(?:is|was|lives?|lived|stays?|staying|works?|sits?|sleeps?))\s+(?:currently\s+|probably\s+|still\s+)?(?:in|at|on|near|by|inside)\s+(?:the|a|an|his|her|their)\s+([a-z][\w'-]{2,20})\b/i;
+// "Pippa is at soccer practice right now.", "You're at the office." - a
+// location for a person in THIS household, the one shape guards.py's own
+// comment calls out by name ("the robot has exactly one source for it:
+// somebody told it - its OWN situation is not that source"). FAST-05
+// narrowed the subject: it used to be any word of three letters or more
+// (the /i flag made `[A-Z][a-z]{2,}` match "paris" and "dinner" alike),
+// so "Paris is in France" and "Dinner is on the table" were inventions.
+// Now the subject must be a roster name (`ctx.roster`), a second-person
+// form, or a third-person pronoun; the world's own geography needs no
+// source. The article after the preposition became optional so "at
+// soccer practice" is caught, not just "at the office"; the medium code
+// review on this diff then found that the wider subject and the
+// optional article together turned everyday idioms into cuts ("You're
+// in luck", "They're on their way", "He's in a good mood"), so the word
+// after the preposition is checked against LOCATION_IDIOM_WORDS first.
+// Every clause is checked (matchAll), not just the first: "Dinner is on
+// the table and Pippa is at the shops" has its household claim second.
+const LOCATION_CLAIM_RE =
+  /\b(he|she|they|you|your\s+\p{L}+|\p{L}[\p{L}'-]+)(?:'s|'re|\s+(?:is|are|was|were|lives?|lived|stays?|staying|works?|sits?|sleeps?))\s+(?:currently\s+|probably\s+|still\s+)?(?:in|at|on|near|by|inside)\s+(?:(?:the|a|an|his|her|their|your|my|its)\s+)?([\p{L}][\p{L}\d'-]{1,20})\b/giu;
+
+// Words that follow "in/on/at" in an idiom about a state, not a place.
+// "You're in luck", "on the right track", "in a good mood", "on their
+// way", "in season", "in charge", "in touch": none of these puts anyone
+// anywhere, and every one is ordinary assistant phrasing.
+const LOCATION_IDIOM_WORDS = new Set(
+  "luck track way season mood charge trouble board fire time touch love hurry doubt risk odds shape stock control danger fact general particular order business middle meantime addition case spite favor favour need pain sync line tune edge rush awe vain common private public total turn use question effect right good bad same new old best big little great high low top front back side own other".split(" "),
+);
+
+/** A roster name (its first word, so "Pippa" matches a "Pippa Jones"
+ * display name), the second person, or a third-person pronoun: "He's in
+ * the kitchen" (the conversation bench's own live-found shape) can only
+ * ever be about a person in this conversation, never about the world,
+ * the same reading PERSON_TRAIT_RE already takes of he/she/they. "It's
+ * in the kitchen" is a thing, and passes. */
+function isHouseholdSubject(subject: string, ctx: GuardContext): boolean {
+  const lower = subject.toLowerCase();
+  if (lower === "he" || lower === "she" || lower === "they" || lower === "you" || lower.startsWith("your ")) return true;
+  return (ctx.roster ?? []).some((name) => {
+    const first = name.trim().toLowerCase().split(/\s+/)[0];
+    return first === lower || name.trim().toLowerCase() === lower;
+  });
+}
+
+/** True when some clause of `sentence` puts a household subject at an
+ * ungrounded place. */
+function claimsUngroundedHouseholdLocation(sentence: string, ctx: GuardContext, grounded: Set<string>): boolean {
+  for (const m of sentence.matchAll(LOCATION_CLAIM_RE)) {
+    const place = m[2]!.toLowerCase();
+    if (LOCATION_IDIOM_WORDS.has(place)) continue;
+    if (!isHouseholdSubject(m[1]!, ctx)) continue;
+    if (!grounded.has(place)) return true;
+  }
+  return false;
+}
 
 // "Nadia said she'd like pasta tonight." - speech attributed to a named
 // person, where the CONTENT of the quote isn't anything the sources
 // actually hold. A real quote the robot holds ("Bramble said he wants
 // pizza") is grounded and stands; an invented one is not.
-const ATTRIBUTED_QUOTE_RE = /\b(?:[A-Z][a-z]{2,}|your (?:brother|sister|mother|mom|father|dad))\s+(?:said|says|told|mentioned)\b/i;
+//
+// FAST-05, live-found 2026-09-12 on the Track A engine: this carried the
+// /i flag, so its `[A-Z][a-z]{2,}` name branch matched any three-letter
+// word and "That's not something I've been told." (the hub's own
+// honest line, parroted back by the model from earlier in the
+// conversation) read as "<Name> told" and was cut as an invention. The
+// name branch is case-sensitive now (a capitalised name), with the
+// relation and pronoun forms spelled out; "been told", "was told" and
+// "just mentioned" are no longer attributions. A capitalised word that
+// names no person ("Legend says", "History says", "Research says") is
+// a world-knowledge framing, not a quote, and is excluded by name.
+const ATTRIBUTED_QUOTE_RE = /\b([A-Z][a-z]{2,}|[Yy]our (?:brother|sister|mother|mom|father|dad)|[Hh]e|[Ss]he|[Tt]hey)\s+(?:said|says|told|mentioned)\b/g;
+const NOT_A_SPEAKER = new Set(
+  "legend history science research studies experts people everyone everybody nobody someone anyone rumor rumour tradition folklore wikipedia google reports sources data evidence".split(" "),
+);
+
+function attributesToAPerson(sentence: string): boolean {
+  for (const m of sentence.matchAll(ATTRIBUTED_QUOTE_RE)) {
+    if (!NOT_A_SPEAKER.has(m[1]!.toLowerCase())) return true;
+  }
+  return false;
+}
 
 // Words a sentence may use about anybody without having been grounded in
 // them - the machinery of a sentence, pronouns, and the honest moves
@@ -288,13 +298,11 @@ function guardInvention(sentence: string, ctx: GuardContext): GuardReason | null
 
   if (declines) return null; // an honest "I don't know" is never itself an invention, for everything else below
 
-  if (GUESSING_RE.test(sentence)) return "invention";
   if (CLAIMED_EXPERIENCE_RE.test(sentence)) return "invention";
 
-  const locationMatch = sentence.match(LOCATION_CLAIM_RE);
-  if (locationMatch && !grounded.has(locationMatch[1]!.toLowerCase())) return "invention";
+  if (claimsUngroundedHouseholdLocation(sentence, ctx, grounded)) return "invention";
 
-  if (ATTRIBUTED_QUOTE_RE.test(sentence)) {
+  if (attributesToAPerson(sentence)) {
     // The name/relation word and the speech verb itself are never the
     // invented part - only what comes AFTER "said" is the quote's own
     // content, so a plain re-check of every content word (minus a small
@@ -304,14 +312,6 @@ function guardInvention(sentence: string, ctx: GuardContext): GuardReason | null
     if (unclaimedWords(sentence, grounded).some((w) => !scaffold.has(w))) return "invention";
   }
 
-  const hyphenGrounded = hyphenGroundedPieces(sentence, grounded);
-  const candidates = new Set<string>();
-  for (const m of sentence.matchAll(PROPER_NOUN_RE)) if (!NOT_NAMES.has(m[1]!.toLowerCase())) candidates.add(m[1]!);
-  for (const m of sentence.matchAll(DATE_WORD_RE)) candidates.add(m[0]!);
-  for (const m of sentence.matchAll(BARE_NUMBER_RE)) candidates.add(m[0]!);
-  for (const c of candidates) {
-    if (!grounded.has(c.toLowerCase()) && !hyphenGrounded.has(c.toLowerCase())) return "invention";
-  }
   return null;
 }
 
@@ -321,18 +321,33 @@ function guardInvention(sentence: string, ctx: GuardContext): GuardReason | null
 // line, just not one that answers what was asked. Recognised by the
 // sentence's content words being (nearly) all inside ONE source line,
 // while the sentence shares NO content word with the question itself.
+//
+// FAST-05: "the question itself" is the question in its conversation.
+// "what does she like" after "tell me about Pippa" is a question about
+// Pippa, so the source line "Pippa likes painting" answering it with
+// "She likes painting." is related, not a wrong memory said back: the
+// person's last two turns (`ctx.history`, enough to resolve a pronoun,
+// not the whole window, which would let any topic mentioned earlier in
+// a long conversation excuse the wrong memory) count as part of what
+// was asked, and a shared stem counts as a shared word (near-echo's own
+// `wordMatches`, one rule, not a second one). The flight-versus-dentist
+// case still flags: nothing in "when is my eye exam" shares a stem with
+// "dentist", "thursday", "four".
+
+const RECENT_TURNS_FOR_RECALL = 2;
 
 function guardUnrelatedRecall(sentence: string, ctx: GuardContext): GuardReason | null {
   const said = tokenize(sentence);
   if (said.size < 2) return null;
-  const asked = tokenize(ctx.utterance);
+  const recent = (ctx.history ?? []).slice(-RECENT_TURNS_FOR_RECALL);
+  const asked = [...tokenize([ctx.utterance, ...recent].join(" "))];
   for (const line of ctx.sources ?? []) {
     const have = tokenize(line);
     if (have.size === 0) continue;
     const overlap = [...said].filter((w) => have.has(w)).length;
     if (overlap < Math.max(2, Math.floor(0.8 * said.size))) continue;
-    const sharesWithQuestion = [...asked].some((w) => have.has(w));
-    return sharesWithQuestion ? null : "unrelated_recall";
+    const havePool = [...have];
+    return asked.some((w) => wordMatches(w, havePool)) ? null : "unrelated_recall";
   }
   return null;
 }

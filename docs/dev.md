@@ -10933,7 +10933,7 @@ need watering", was answered "That's not something I've been told.":
 that is the invention guard rejecting general knowledge, FAST-05's
 target, recorded here as a live example of it.
 
-### FAST-04: literal patterns before the embed, a stream that starts before the first token (2026-09-13)
+### FAST-04: literal patterns before the embed, a stream that starts before the first token (2026-09-12)
 
 What changed, and why each piece is shaped the way it is:
 
@@ -10997,7 +10997,7 @@ What changed, and why each piece is shaped the way it is:
    context returns `invention`; the all-failed retry emitting
    `code: "unavailable"` with `turnActiveWithin(0)` false afterwards.
 
-**Live acceptance, measured 2026-09-13** on the M4 Pro 24 GB dev
+**Live acceptance, measured 2026-09-12** on the M4 Pro 24 GB dev
 machine, backend on port 8797 in the `home-track-a` worktree with its
 own data directory, chat engine llama-server b10797 macOS arm64 on
 8798 spawned by the backend from the catalog flags
@@ -11079,6 +11079,156 @@ getmaipai/home#72.
 
 **Exit gate**: `bash scripts/check.sh` green in the worktree (spec 514,
 backend 1,847, frontend 476 tests; standards core passed).
+
+### FAST-05: world knowledge through the guards (2026-09-12)
+
+The invention guard (`backend/src/lib/guards.ts`, `guardInvention()`)
+now applies only to claims about the household, which is decision 5 of
+the 2026-09-12 review built. What changed:
+
+1. **The bare-candidate scan is gone.** `PROPER_NOUN_RE`,
+   `DATE_WORD_RE`, `BARE_NUMBER_RE`, `NOT_NAMES`, `HYPHEN_COMPOUND_RE`
+   and `hyphenGroundedPieces()` are deleted, and so is `GUESSING_RE`
+   (a hedge is what `INFORMATION_HANDLING_POLICY` asks for, not an
+   invention). Kept unchanged: `PERSON_TRAIT_RE` with the
+   unclaimed-words check, `CLAIMED_EXPERIENCE_RE`, the medication,
+   `like_i_said`, `example_parrot`, `capability_claim` and `near_echo`
+   guards.
+2. **`LOCATION_CLAIM_RE` fires only for a household subject.** Its
+   subject used to be `[A-Z][a-z]{2,}` under the `/i` flag, which is
+   any word of three letters or more, so "Paris is in France" and
+   "Dinner is on the table" were inventions. `GuardContext` gains
+   `roster` (display names and nicknames, from the one
+   `listActivePeople()` call `prepareTurn()` now shares with
+   `householdLine()`), and the subject must be a roster name (matched
+   on its first word, so a "Pippa Jones" display name still guards
+   "Pippa is at the shops"; two-letter and accented names match too),
+   the second person ("you", "your brother"), or a third-person
+   pronoun. The pronoun case is a resolved ambiguity, not in the item's
+   two examples: the conversation bench's own live-found rows are "He's
+   in the kitchen" and "Rover lives in the kitchen", a pronoun can only
+   refer to a person in the conversation and never to the world's
+   geography, and `PERSON_TRAIT_RE` already reads he/she/they as
+   household third parties. The article after the preposition became
+   optional so "at soccer practice" is caught, not only "at the
+   office". The medium code review on this diff then found two things
+   the first cut got wrong and one it inherited: the wider subject plus
+   the optional article turned everyday idioms into cuts ("You're in
+   luck", "They're on their way", "He's in a good mood", "on the right
+   track", "in season", "on its way"), so the word after the
+   preposition is checked against a short idiom list first; only the
+   first location clause was checked, so "Dinner is on the table and
+   Pippa is at the shops" passed (every clause is checked now); and
+   the subject pattern could not capture a two-letter or accented name.
+   Each is a test in `guards.test.ts`. One consequence worth naming:
+   "She's at home." with no source is now caught (the old regex needed
+   an article), which is right, since the hub has no presence signal.
+3. **`unrelated_recall` reads the question in its conversation.**
+   `guardUnrelatedRecall()` compares the source line against the
+   utterance plus the person's last two turns (`ctx.history`; enough to
+   resolve "she" after "tell me about Pippa", and no more, because the
+   whole window would let any topic mentioned earlier in a long
+   conversation excuse the wrong memory, the review's point), and a
+   shared stem counts as a shared word using near-echo's own
+   `wordMatches()` rather than a second stem rule. "She likes
+   painting." from the source "Pippa likes painting" answering "what
+   does she like" after "tell me about Pippa" is related. The
+   flight-versus-dentist case still flags: nothing in "when is my eye
+   exam" shares a stem with the dentist line, and "when is the dentist"
+   three turns back does not change that.
+4. **`ATTRIBUTED_QUOTE_RE`, one deviation from "keep unchanged", with
+   live evidence.** The live check below cut "what year did the second
+   world war end" on one run of two even after the scan was gone. The
+   sentence the guard saw was `That's not something I've been told.`,
+   the hub's own honest line, parroted back by the model from earlier
+   in a long test conversation, and the attributed-quote regex had the
+   same `/i` looseness as the location one: its name branch read "been
+   told" as "<Name> told" and the quote check found unclaimed words.
+   The name branch is case-sensitive now (a capitalised name), with
+   "your <relation>" and he/she/they spelled out, and a capitalised
+   non-person before "says" ("Legend says", "History says", "Research
+   says", the review's example) is excluded by name as a world-
+   knowledge framing. "Nadia said she'd like pasta tonight", "She said
+   she'd be late" and "your brother said he'd be late" still flag; "I
+   was told the shop closes at nine" and the parroted honest line do
+   not. Recorded as its own corpus row.
+5. **Corpus** (`spec/llm/guard-corpus.json`, 29 rows, was 20). Retired,
+   because their only basis was the scan: `weather-invention-still-
+   caught` ("It's sunny and about 75 degrees today.", a bare number),
+   `ungrounded-name-guess` ("That's probably Marlow.", a bare name),
+   `ungrounded-date-invention` ("It's on Thursday at four.", a day
+   name). Their replacement behaviour: a bare number or day name is
+   general knowledge at the guard (new pass rows
+   `bare-number-is-not-invention`, `bare-date-is-not-invention`); a
+   weather figure or an appointment stated with no tool result or
+   memory behind it is CHAT-04's action-claim half (a claimed outcome
+   needs a typed outcome, which needs CHAT-15) and the memory sources,
+   not this guard; a guess at who is at the door is the information
+   policy's job (ask, or say so) and CHAT-04's. Added as permanent
+   rows: the four probes (`world-knowledge-arithmetic`,
+   `world-knowledge-capital`, `disclosure-acknowledged`,
+   `recalled-fact-answers-pronoun-question`), the three household
+   negatives (`household-location-needs-a-source`,
+   `attributed-quote-needs-a-source`, `claimed-experience-is-
+   invention`), `world-location-needs-no-source`, `world-knowledge-
+   year`, and `own-honest-line-is-not-an-attribution`.
+   `invented-third-party-trait` (the carbarn substring trap) gains
+   `roster: ["Rover"]` so it stays a household claim. The corpus
+   runner passes `roster` through. One probe shape is recorded rather
+   than fixed: "Got it, Pippa is allergic to peanuts." in the SAME turn
+   as the disclosure is cut by `near_echo` (restating the person's own
+   words), which this item keeps unchanged; the row uses the
+   prior-turn shape, and the same-turn case is getmaipai/home#74.
+6. **Tests.** `tests/guards.test.ts` replaces the "proper noun, number
+   or date grounded nowhere" block with one test per probe (named for
+   the promise) and one per household negative; `turnEngine.test.ts`
+   and `tier2.test.ts` rows that used a bare proper noun as their
+   invention trigger ("Winterfall's Reckoning", "Xanadu Cinemas",
+   "PG-13", my own "72 degrees in Boston" control) now use an
+   attributed quote or a roster location, the shapes the guard still
+   owns; `scripts/bench/conversation.ts` passes its header's roster.
+
+**Offline guards bench** (`bun run scripts/bench/conversation.ts`, 29
+graded turns, the recorded failing replies from bot-legacy's live
+scenarios): before 23/29, after 21/29. Every delta is one scenario,
+`a-car-it-was-never-told-about` ("what type of car needs to be
+charged" answered "I think you're talking about a sedan, right?"),
+which `GUESSING_RE` caught and nothing catches now. That is the
+prescribed deletion doing what it says; it is also a guess about the
+household's own car, not a hedge on world knowledge, so it is raised
+in the done report as a question (a narrowed "you're talking about /
+you must mean / my guess is" shape would be a household-guess check,
+not a hedge check) rather than quietly reinstated. Two other scenarios
+(`brother-in-the-kitchen`, `a-bare-who`) fell out on a first cut and
+came back with the roster and the pronoun subjects above.
+
+**Live, measured 2026-09-12** on the same machine, engine build, model
+file and flags as the FAST-04 section (Track A backend on 8797, its
+own engine on 8798, owner `alfred`). "Before" is the same backend with
+the pre-FAST-05 `guards.ts` swapped in; "after" is this commit. The
+first question, "what's the capital of France", matches the
+`knowledge` package's literal pattern `what's the capital of *` and
+answers as a plugin before any model or guard runs, so a pattern-free
+phrasing was asked as well.
+
+| question | before (old guards, long conversation) | after, long conversation | after, fresh conversation |
+|---|---|---|---|
+| "what's the capital of France" | `knowledge` plugin, France summary, no guard | same | same |
+| "which city is the capital of France" | "paris is the capital of france." (passed: lowercase, the scan never saw it) | "paris is the capital of france." | "Paris." |
+| "how many legs does a spider have" | "spiders have eight legs." (passed: the number is a word) | "spiders have eight legs." | "Eight." |
+| "what year did the second world war end" | cut, `guard: ["invention"]`, spoken as "That's not something I've been told." | "the second world war ended in 1945." on 3 of 3 runs after the attributed-quote fix (1 of 2 cut before it, see point 4) | "1945." |
+| "how often do tomato plants need watering" (the FAST-02 section's live cut) | | "tomato plants usually need watering about once a week, but it depends on the weather and how dry the soil gets." | "Once a week, but it depends on the weather and how dry the soil gets." |
+
+Guard hits over those turns: before 1 of 3 questions cut; after 0 of 4
+in the fresh conversation and 0 of 4 in the long one (once point 4 was
+in). The review's fixes above changed no live reply: the guards and
+corpus suites and the offline bench were re-run after them (21/29). The same replies through the old and new `guardReply()` offline:
+"1945." old `invention`, new null; "the second world war ended in
+1945." old `invention`, new null; "That's not something I've been
+told." old `invention`, new null; "Paris.", "Eight." and the watering
+line null under both.
+
+**Exit gate**: `bash scripts/check.sh` green in the worktree.
 
 ## Session B follow-up: chat frontend bugs - second and third pass (2026-09-12)
 

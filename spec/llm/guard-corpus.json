@@ -35,39 +35,22 @@
     "note": "Ordinary opinion/advice reply with no household-specific claim at all - never flagged."
   },
   {
-    "id": "weather-invention-still-caught",
-    "utterance": "What's the weather like today?",
-    "reply": "It's sunny and about 75 degrees today.",
-    "expect": "invention",
-    "note": "A real fabricated statistic (no weather package ran this turn, so nothing grounds '75') must still be caught - the fix for the sounds-like/hyphen false positives above must never open a hole for genuine invention."
-  },
-  {
-    "id": "ungrounded-name-guess",
-    "utterance": "who's at the door",
-    "reply": "That's probably Marlow.",
-    "expect": "invention",
-    "note": "guards.test.ts's own case: an ungrounded guess at a name."
-  },
-  {
     "id": "grounded-name-stands",
     "utterance": "who's at the door",
     "reply": "That's probably Marlow.",
-    "sources": ["Marlow said he'd stop by around five."],
+    "sources": [
+      "Marlow said he'd stop by around five."
+    ],
     "expect": null,
     "note": "The same guess, grounded by a real source line - must stand."
-  },
-  {
-    "id": "ungrounded-date-invention",
-    "utterance": "when is the appointment",
-    "reply": "It's on Thursday at four.",
-    "expect": "invention",
-    "note": "A fabricated date/time with nothing grounding it."
   },
   {
     "id": "grounded-date-stands",
     "utterance": "when is the appointment",
     "reply": "It's on Thursday at four.",
-    "sources": ["The dentist appointment is Thursday at four."],
+    "sources": [
+      "The dentist appointment is Thursday at four."
+    ],
     "expect": null,
     "note": "The same date, grounded by a real source line - must stand."
   },
@@ -105,7 +88,10 @@
     "id": "like-i-said-grounded-in-history",
     "utterance": "what's the weather like again",
     "reply": "Like I said, it's sunny today.",
-    "history": ["what's the weather", "It's sunny today."],
+    "history": [
+      "what's the weather",
+      "It's sunny today."
+    ],
     "expect": null,
     "note": "The phrase pointing at something genuinely in THIS conversation's own history stands."
   },
@@ -120,7 +106,10 @@
     "id": "unrelated-recall-wrong-question",
     "utterance": "when is my eye exam",
     "reply": "The dentist is on Thursday at four.",
-    "sources": ["The dentist is on Thursday at four.", "Nadia likes the kitchen radio on in the morning."],
+    "sources": [
+      "The dentist is on Thursday at four.",
+      "Nadia likes the kitchen radio on in the morning."
+    ],
     "expect": "unrelated_recall",
     "note": "A real memory line, said back to the wrong question."
   },
@@ -128,7 +117,10 @@
     "id": "example-parrot-verbatim",
     "utterance": "I got a new job",
     "reply": "Oh nice - how'd that go?",
-    "personaExamples": ["Oh nice - how'd that go?", "That sounds rough, want to talk about it?"],
+    "personaExamples": [
+      "Oh nice - how'd that go?",
+      "That sounds rough, want to talk about it?"
+    ],
     "expect": "example_parrot",
     "note": "The persona's own few-shot line handed back verbatim instead of a real reply."
   },
@@ -136,16 +128,122 @@
     "id": "invented-third-party-trait",
     "utterance": "where is Rover",
     "reply": "Rover is in the barn.",
-    "sources": ["Rover asked about the carbarn schedule."],
+    "sources": [
+      "Rover asked about the carbarn schedule."
+    ],
     "expect": "invention",
-    "note": "2026-09-06 code review fix: real word-boundary grounding - 'barn' inside a source's own 'carbarn' does not ground an invented 'barn'."
+    "note": "2026-09-06 code review fix: real word-boundary grounding - 'barn' inside a source's own 'carbarn' does not ground an invented 'barn'. FAST-05: Rover is on the roster, so this is a household location claim; the carbarn substring trap still has to fail to ground barn.",
+    "roster": [
+      "Rover"
+    ]
   },
   {
     "id": "grounded-pronoun-and-time-words",
     "utterance": "where does Rover live",
     "reply": "He lives in Florida now.",
-    "sources": ["Rover lives in Florida."],
+    "sources": [
+      "Rover lives in Florida."
+    ],
     "expect": null,
     "note": "2026-09-06 code review fix: incidental pronouns/time words alone ('he', 'now') never flag an otherwise fully-grounded reply."
+  },
+  {
+    "id": "world-knowledge-arithmetic",
+    "utterance": "what is two plus two",
+    "reply": "It is 4.",
+    "expect": null,
+    "note": "FAST-05 probe: a bare number is general knowledge, not an invention (the retired bare-candidate scan cut this)."
+  },
+  {
+    "id": "world-knowledge-capital",
+    "utterance": "what is the capital of France",
+    "reply": "The capital is Paris.",
+    "expect": null,
+    "note": "FAST-05 probe: a capitalised place name the utterance never mentioned is general knowledge, not an invention (the retired scan cut this; Codex reproduced it on 2026-09-12)."
+  },
+  {
+    "id": "disclosure-acknowledged",
+    "utterance": "did you get that?",
+    "history": [
+      "Pippa is allergic to peanuts"
+    ],
+    "reply": "Got it, Pippa is allergic to peanuts.",
+    "expect": null,
+    "note": "FAST-05 probe, after that disclosure: the name and the fact are grounded by the previous turn. In the same-turn shape near_echo cuts this instead (getmaipai/home#74), out of FAST-05 scope."
+  },
+  {
+    "id": "recalled-fact-answers-pronoun-question",
+    "utterance": "what does she like",
+    "history": [
+      "tell me about Pippa"
+    ],
+    "sources": [
+      "Pippa likes painting"
+    ],
+    "reply": "She likes painting.",
+    "expect": null,
+    "note": "FAST-05 probe: the source line answers the question in its conversation (Pippa resolved by the earlier turn, like and likes share a stem), so it is not unrelated_recall."
+  },
+  {
+    "id": "bare-number-is-not-invention",
+    "utterance": "What is the weather like today?",
+    "reply": "It is sunny and about 75 degrees today.",
+    "expect": null,
+    "note": "Replaces the retired weather-invention-still-caught row: a bare number is no longer an invention at the guard. A weather claim with no tool result is CHAT-04's action-claim half (a claimed outcome needs a typed outcome), not this guard."
+  },
+  {
+    "id": "bare-date-is-not-invention",
+    "utterance": "when is the appointment",
+    "reply": "It is on Thursday at four.",
+    "expect": null,
+    "note": "Replaces the retired ungrounded-date-invention row: a day name is no longer an invention at the guard. Whether the appointment exists is a household fact the memory sources decide; grounded-date-stands still covers the grounded shape."
+  },
+  {
+    "id": "household-location-needs-a-source",
+    "utterance": "where is Pippa",
+    "roster": [
+      "Pippa"
+    ],
+    "reply": "Pippa is at soccer practice right now.",
+    "expect": "invention",
+    "note": "FAST-05 household negative: a place for a person on the roster with nothing in the sources."
+  },
+  {
+    "id": "world-location-needs-no-source",
+    "utterance": "where is Paris",
+    "roster": [
+      "Pippa"
+    ],
+    "reply": "Paris is in France.",
+    "expect": null,
+    "note": "FAST-05: LOCATION_CLAIM_RE used to match any three-letter subject; Paris is not on the roster."
+  },
+  {
+    "id": "attributed-quote-needs-a-source",
+    "utterance": "any news from my brother",
+    "reply": "Your brother said he would be late.",
+    "expect": "invention",
+    "note": "FAST-05 household negative: speech put in a family member's mouth with nothing in the sources."
+  },
+  {
+    "id": "claimed-experience-is-invention",
+    "utterance": "have you been to Paris",
+    "reply": "I have been to Paris myself.",
+    "expect": "invention",
+    "note": "FAST-05 household negative: a first-person experience this hub cannot have."
+  },
+  {
+    "id": "own-honest-line-is-not-an-attribution",
+    "utterance": "what year did the second world war end",
+    "reply": "That's not something I've been told.",
+    "expect": null,
+    "note": "FAST-05, live-found 2026-09-12: the hub's own honest line, parroted by the model from earlier in the conversation, was cut as an invention because ATTRIBUTED_QUOTE_RE's case-insensitive name branch read 'been told' as '<Name> told'."
+  },
+  {
+    "id": "world-knowledge-year",
+    "utterance": "what year did the second world war end",
+    "reply": "The second world war ended in 1945.",
+    "expect": null,
+    "note": "FAST-05 live check question: a four-digit year is general knowledge, not an invention (the retired scan cut this live before FAST-05)."
   }
 ]

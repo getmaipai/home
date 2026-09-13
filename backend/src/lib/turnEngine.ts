@@ -507,8 +507,7 @@ function speakerLine(actor: PersonRow, locale: string, now: Date): string {
 // "Presence unknown for now" (step 1): no presence signal exists on the
 // hub yet (that's the robot/ambient-context side, 4.16, not built here),
 // so this lists who lives here, never who's home right now.
-function householdLine(): string {
-  const household = listActivePeople();
+function householdLine(household: PersonRow[]): string {
   if (household.length === 0) return "";
   const lines = household.map((p) => `- ${sanitizeForPrompt(p.displayName)} (${p.role})`);
   return `\n\nWho lives here:\n${lines.join("\n")}`;
@@ -592,6 +591,10 @@ export function buildPromptParts(
   persona: Persona = DEFAULT_PERSONA,
   skills: LoadedSkill[] = loadAllSkills(),
   conversationSummaryLine?: string,
+  // FAST-05: fetched once per turn by prepareTurn(), which also derives
+  // the guard context's roster from it (a code review found the same
+  // rows queried twice in one turn).
+  household: PersonRow[] = listActivePeople(),
 ): { stablePrefix: string; context: string } {
   const stablePrefix = buildStablePrefix(persona);
 
@@ -611,7 +614,7 @@ export function buildPromptParts(
   const reanchorSection = companionReanchorLine(persona);
   const summarySection = capSection(conversationSummaryLine ? `\n\n${conversationSummaryLine}` : "", MAX_SUMMARY_SECTION_CHARS);
   const skillsPart = capSection(skillsSection(text, skills), MAX_SKILLS_SECTION_CHARS);
-  const volatileZone = householdLine() + speakerLine(actor, locale, now) + memorySection + reanchorSection + summarySection + skillsPart;
+  const volatileZone = householdLine(household) + speakerLine(actor, locale, now) + memorySection + reanchorSection + summarySection + skillsPart;
 
   const localTimeLine = `\n\nLocal time: ${formatLocalTime(now, locale)}`;
 
@@ -871,7 +874,7 @@ export function routeLiteral(text: string, actor: PersonRow, loaded: LoadedManif
  * has returned null. Never embeds on its own: `utteranceVector` is the
  * one embed the caller already made, and `undefined` means that embed
  * failed and every candidate falls back to keyword overlap (a code
- * review, 2026-09-13, caught a `?? embedUtterance()` here that would
+ * review, 2026-09-12, caught a `?? embedUtterance()` here that would
  * have paid a second 30 s timeout on a down sidecar). */
 export async function routeSemantic(
   text: string,
@@ -1291,7 +1294,8 @@ async function prepareTurn(
   // user/assistant messages AND, when older turns exist beyond them, one
   // summary line for the system prompt's volatile zone.
   const window = buildConversationWindow(conversation);
-  const promptParts = buildPromptParts(actor, text, memoryMatches, loaded, persona, skills, window.summaryLine);
+  const household = listActivePeople();
+  const promptParts = buildPromptParts(actor, text, memoryMatches, loaded, persona, skills, window.summaryLine, household);
   // Bumping the top MAX_MEMORY_SNIPPETS candidates unconditionally was
   // wrong (a code review, 2026-09-05): buildPromptParts's own
   // MAX_MEMORY_SECTION_CHARS truncation, or the outer PROMPT_SYSTEM_CHAR_
@@ -1386,6 +1390,10 @@ async function prepareTurn(
     // tool isn't the same as one having run.
     actionsRan: false,
     personaExamples: persona.examples,
+    // FAST-05: who counts as "household" for a location claim (guards.ts's
+    // LOCATION_CLAIM_RE): the same roster householdLine() puts in the
+    // prompt, names and nicknames.
+    roster: household.flatMap((p) => (p.nickname ? [p.displayName, p.nickname] : [p.displayName])),
   };
   return { kind: "model", messages, safety, crisisResources, turnId, guardContext, tools, ranked, lookupTools };
 }
@@ -2196,7 +2204,7 @@ export async function runTurnStream(
     // carried. Everything the inner generator does before its first
     // yield (the tool-call peek, resolveToolCalls(), the retry's own
     // first step) runs inside that first `.next()`, so one guard covers
-    // all three sites (a code review, 2026-09-13, found the retry site
+    // all three sites (a code review, 2026-09-12, found the retry site
     // alone was covered). A failure after real text has streamed is
     // the route's catch and finalize() as before.
     async function* guardFirstStep(inner: AsyncGenerator<string, ToolCall[] | undefined | { resolved: TurnValue }, void>) {

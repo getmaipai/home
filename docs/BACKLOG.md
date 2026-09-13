@@ -1069,7 +1069,7 @@ Track B: MEM-01, MEM-02, MEM-03, MEM-04, MEM-05. Then JOIN-01, JOIN-02.
 
 - [x] **FAST-04: Literal patterns before the embed round trip, and a stream that starts before the first token** (M)
 
-    Status (2026-09-13, measured and closed): pattern turns answer in 9
+    Status (2026-09-12, measured and closed): pattern turns answer in 9
     to 17 ms with zero embed calls; the spoken cue lands at 906 to 910 ms
     on every turn whose first sentence takes longer, and stays silent on
     ordinary turns whose first sentence arrives at 736 to 769 ms; a
@@ -1134,7 +1134,17 @@ Track B: MEM-01, MEM-02, MEM-03, MEM-04, MEM-05. Then JOIN-01, JOIN-02.
 
 <a id="fast-05"></a>
 
-- [ ] **FAST-05: Let world knowledge through the guards (the CHAT-04 half that needs no outcomes)** (M)
+- [x] **FAST-05: Let world knowledge through the guards (the CHAT-04 half that needs no outcomes)** (M)
+
+    Status (2026-09-12, measured and closed): the bare-candidate scan and
+    the hedge check are gone, location and attributed-quote claims fire
+    only for household subjects, and `unrelated_recall` reads the
+    question in its conversation. Live, "1945.", "Paris.", "Eight." and
+    the watering answer all arrive uncut (the year was cut before);
+    corpus 29 rows with the four probes and three household negatives;
+    offline guards bench 23/29 to 21/29, the whole delta being the
+    prescribed GUESSING_RE deletion (raised as a question). Details in
+    the Track A section of dev.md.
 
     Depends on: FAST-04. Files: `backend/src/lib/guards.ts`,
     `spec/llm/guard-corpus.json`, `backend/tests/guards.test.ts`,

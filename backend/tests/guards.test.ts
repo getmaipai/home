@@ -33,25 +33,35 @@ describe("capability claims (bot-legacy: claimed_action/accepted_request)", () =
   });
 });
 
-describe("invention: a proper noun, number or date grounded nowhere", () => {
-  test("an ungrounded name is flagged - 'that's probably Marlow' when nobody said so", () => {
-    const g = guardReply("That's probably Marlow.", ctx({ utterance: "who's at the door" }));
-    expect(g.reason).toBe("invention");
+// FAST-05 (docs/BACKLOG.md's 2026-09-12 chat block): the invention guard
+// applies only to claims about the household. The bare-candidate scan
+// (any ungrounded capitalised word, number, or day name) and the hedge
+// check are gone; the four probes the 2026-09-12 review named are the
+// permanent proof, and the three household negatives prove the guard
+// still guards.
+describe("invention: general knowledge is not an invention (FAST-05)", () => {
+  test("arithmetic is not an invention - 'It is 4.' to 'what is two plus two'", () => {
+    expect(guardReply("It is 4.", ctx({ utterance: "what is two plus two" })).reason).toBeNull();
   });
 
-  test("the same name stands once a source actually grounds it", () => {
-    const g = guardReply("That's probably Marlow.", ctx({ utterance: "who's at the door", sources: ["Marlow said he'd stop by around five."] }));
-    expect(g.reason).toBeNull();
+  test("a capital city is not an invention - 'The capital is Paris.' with no Paris anywhere in the context", () => {
+    expect(guardReply("The capital is Paris.", ctx({ utterance: "what is the capital of France" })).reason).toBeNull();
   });
 
-  test("an ungrounded date/time is flagged - 'it's on Thursday at four' with no source for it", () => {
-    const g = guardReply("It's on Thursday at four.", ctx({ utterance: "when is the appointment" }));
-    expect(g.reason).toBe("invention");
+  test("acknowledging a disclosure is not an invention - 'Got it, Pippa is allergic to peanuts.' after that disclosure", () => {
+    expect(guardReply("Got it, Pippa is allergic to peanuts.", ctx({ utterance: "did you get that?", history: ["Pippa is allergic to peanuts"] })).reason).toBeNull();
   });
 
-  test("the same date stands once a source grounds it", () => {
-    const g = guardReply("It's on Thursday at four.", ctx({ utterance: "when is the appointment", sources: ["The dentist appointment is Thursday at four."] }));
-    expect(g.reason).toBeNull();
+  test("a recalled fact answering a pronoun question is not unrelated - 'She likes painting.' with 'Pippa likes painting' supplied and Pippa resolved", () => {
+    expect(guardReply("She likes painting.", ctx({ utterance: "what does she like", history: ["tell me about Pippa"], sources: ["Pippa likes painting"] })).reason).toBeNull();
+  });
+
+  test("a bare day name is not an invention - 'It's on Thursday at four' with no source", () => {
+    expect(guardReply("It's on Thursday at four.", ctx({ utterance: "when is the appointment" })).reason).toBeNull();
+  });
+
+  test("a hedged name is not an invention - 'That's probably Marlow' (the retired GUESSING_RE and name scan both used to fire)", () => {
+    expect(guardReply("That's probably Marlow.", ctx({ utterance: "who's at the door" })).reason).toBeNull();
   });
 
   test("a real decline is never itself an invention", () => {
@@ -60,11 +70,78 @@ describe("invention: a proper noun, number or date grounded nowhere", () => {
   });
 });
 
+describe("invention: a claim about the household still needs a source (FAST-05)", () => {
+  test("a place for a person on the roster with no memory is an invention - 'Pippa is at soccer practice right now.'", () => {
+    expect(guardReply("Pippa is at soccer practice right now.", ctx({ utterance: "where is Pippa", roster: ["Pippa"] })).reason).toBe("invention");
+  });
+
+  test("the same place stands once a source grounds it", () => {
+    expect(guardReply("Pippa is at soccer practice right now.", ctx({ utterance: "where is Pippa", roster: ["Pippa"], sources: ["Pippa has soccer practice on Tuesdays."] })).reason).toBeNull();
+  });
+
+  test("a place for the person themselves counts as household - 'You're at the office.'", () => {
+    expect(guardReply("You're at the office.", ctx({ utterance: "where am I" })).reason).toBe("invention");
+  });
+
+  test("a place for the world is not - 'Paris is in France.' (the old LOCATION_CLAIM_RE matched any three-letter subject)", () => {
+    expect(guardReply("Paris is in France.", ctx({ utterance: "where is Paris", roster: ["Pippa"] })).reason).toBeNull();
+  });
+
+  test("speech put in a family member's mouth with no memory is an invention - 'Your brother said he'd be late.'", () => {
+    expect(guardReply("Your brother said he'd be late.", ctx({ utterance: "any news from my brother" })).reason).toBe("invention");
+  });
+
+  test("a first-person experience is an invention - 'I've been to Paris myself.'", () => {
+    expect(guardReply("I've been to Paris myself.", ctx({ utterance: "have you been to Paris" })).reason).toBe("invention");
+  });
+});
+
+// A medium code review on FAST-05's first cut found the wider location
+// subject (you, pronouns) plus the optional article turned everyday
+// idioms into cuts, only the first location clause was checked, and a
+// roster entry that is a full name never matched. Each test is that
+// exact repro.
+describe("invention: the location guard's edges (FAST-05 code review)", () => {
+  test("an idiom after in/on/at is not a place - 'You're in luck', 'on their way', 'in a good mood', 'on the right track'", () => {
+    for (const reply of ["You're in luck, that recipe is easy.", "They're on their way.", "He's in a good mood today.", "You're on the right track.", "They are in season right now.", "Your order is on its way."]) {
+      expect(guardReply(reply, ctx({ utterance: "hi", roster: ["Pippa"] })).reason).toBeNull();
+    }
+  });
+
+  test("every clause is checked, not just the first - a world claim ahead of the household one does not shadow it", () => {
+    expect(guardReply("Dinner is on the table and Pippa is at the shops.", ctx({ utterance: "where is everyone", roster: ["Pippa"] })).reason).toBe("invention");
+  });
+
+  test("a roster entry that is a full name still matches its first name, and short or accented names match too", () => {
+    expect(guardReply("Pippa is at the shops.", ctx({ utterance: "where is Pippa", roster: ["Pippa Jones"] })).reason).toBe("invention");
+    expect(guardReply("Bo is at the shops.", ctx({ utterance: "where is Bo", roster: ["Bo"] })).reason).toBe("invention");
+    expect(guardReply("José is at the shops.", ctx({ utterance: "where is José", roster: ["José"] })).reason).toBe("invention");
+  });
+
+  test("a capitalised non-person before 'says' is a world-knowledge framing, not a quote - 'Legend says the city was founded in 753 BC.'", () => {
+    expect(guardReply("Legend says the city was founded in 753 BC.", ctx({ utterance: "tell me about rome" })).reason).toBeNull();
+  });
+
+  test("the hub's own honest line, parroted by the model, is never an attribution - 'That's not something I've been told.'", () => {
+    expect(guardReply("That's not something I've been told.", ctx({ utterance: "what year did the second world war end" })).reason).toBeNull();
+  });
+});
+
 describe("unrelated recall (bot-legacy's own test: eye exam answered from the dentist line)", () => {
   const SOURCES = ["The dentist is on Thursday at four.", "Nadia likes the kitchen radio on in the morning."];
 
   test("a real memory line said back to the WRONG question is caught", () => {
     const g = guardReply("The dentist is on Thursday at four.", ctx({ utterance: "when is my eye exam", sources: SOURCES }));
+    expect(g.reason).toBe("unrelated_recall");
+  });
+
+  test("a pronoun question resolved by the previous turn is the RIGHT question - 'what does she like' after 'tell me about Pippa'", () => {
+    const g = guardReply("She likes painting.", ctx({ utterance: "what does she like", history: ["tell me about Pippa"], sources: ["Pippa likes painting"] }));
+    expect(g.reason).toBeNull();
+  });
+
+  test("only the last two turns count as context: a topic mentioned three turns ago does not excuse the wrong memory", () => {
+    const g = guardReply("The dentist is on Thursday at four.", ctx({ utterance: "when is my eye exam", history: ["when is the dentist", "thanks", "ok"], sources: SOURCES }));
     expect(g.reason).toBe("unrelated_recall");
   });
 
@@ -174,7 +251,9 @@ describe("the attractor rule: the reply IS one of the persona's own few-shot lin
 
 describe("guardReply(): cutting padding vs replacing the whole reply", () => {
   test("a CUTTABLE reason (invention) cuts just that sentence, keeping an honest one before it", () => {
-    const g = guardReply("I don't know, sorry. That's probably Marlow though.", ctx({ utterance: "who's at the door" }));
+    // FAST-05: the invented sentence is a household location claim now
+    // (a bare name no longer counts), the cut behaviour is unchanged.
+    const g = guardReply("I don't know, sorry. Marlow is at the shops though.", ctx({ utterance: "who's at the door", roster: ["Marlow"] }));
     expect(g.reason).toBe("invention");
     expect(g.reply).toBe("I don't know, sorry.");
   });
@@ -215,7 +294,7 @@ describe("replacement lines rotate per person (replyVariation.ts's pickVariant, 
 // test below is that exact repro, now passing.
 describe("code review fixes (2026-09-06)", () => {
   test("groundedness is real word-boundary matching, not a substring scan - 'barn' inside a source's own 'carbarn' does not ground an invented 'barn'", () => {
-    const g = guardReply("Rover is in the barn.", ctx({ utterance: "where is Rover", sources: ["Rover asked about the carbarn schedule."] }));
+    const g = guardReply("Rover is in the barn.", ctx({ utterance: "where is Rover", roster: ["Rover"], sources: ["Rover asked about the carbarn schedule."] }));
     expect(g.reason).toBe("invention");
   });
 

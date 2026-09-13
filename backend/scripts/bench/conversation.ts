@@ -43,6 +43,8 @@
 // Usage: bun run scripts/bench/conversation.ts
 import { guardReply, type GuardContext } from "@/lib/guards";
 
+const BENCH_ROSTER = ["Marlow", "Riff", "Rover", "Nadia"];
+
 interface BenchTurn {
   say: string;
   /** The reply the model actually gave when this scenario broke -
@@ -290,6 +292,10 @@ function main(): void {
         history: [...history],
         actionsRan: false,
         personaExamples: [],
+        // FAST-05: the household this bench runs against (the file
+        // header's own roster), so a location claim about one of them is
+        // a household claim, the way prepareTurn() passes the real one.
+        roster: BENCH_ROSTER,
         personId: "bench",
       };
       const guarded = guardReply(turn.model, ctx);

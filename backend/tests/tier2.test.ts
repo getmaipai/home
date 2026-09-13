@@ -93,10 +93,12 @@ async function withScriptedToolCalls<T>(
  * reach guardReply() unguarded by any tool result - then scripts the
  * FORCED retry (tool_choice "required", turnEngine.ts's own response to
  * catching that guess as invention/unrelated_recall) with `forcedCalls`.
- * `guessText` is the caller's job to make genuinely ungrounded (a proper
- * noun, date, or number nowhere in the utterance) - this helper doesn't
- * validate that for you, the same way withScriptedToolCalls() above
- * doesn't validate its own scripted calls resolve. */
+ * `guessText` is the caller's job to make a genuine household invention
+ * (FAST-05: a claim about a person here with nothing behind it, such as
+ * words put in a family member's mouth; a bare proper noun, date, or
+ * number is general knowledge now and no longer counts) - this helper
+ * doesn't validate that for you, the same way withScriptedToolCalls()
+ * above doesn't validate its own scripted calls resolve. */
 async function withScriptedGuessThenForcedTool<T>(guessText: string, forcedCalls: { id: string; name: string; args: string }[], fn: () => Promise<T>): Promise<T> {
   __resetLlmSupervisorForTests();
   const { startStubLlmServer } = await import("@maipai/spec/llm/ts/stubServer.js");
@@ -407,7 +409,7 @@ describe("runTurn()/runTurnStream() with native tool calling end to end (Fix E)"
         forcedToolNames = request.tools?.map((t) => t.function.name) ?? [];
         return undefined; // let the stub's default echo answer either way - only the offered set is under test here
       },
-      scriptedChatReply: () => "It's playing at Xanadu Cinemas downtown.", // an ungrounded proper noun the invention guard has to catch
+      scriptedChatReply: () => "Your brother said it's playing at Xanadu Cinemas downtown.", // an ungrounded attributed quote the invention guard has to catch
     });
     process.env.MAIPAI_LLAMA_SERVER_URL = stub.url;
     try {
@@ -444,10 +446,11 @@ describe("runTurn()/runTurnStream() with native tool calling end to end (Fix E)"
       },
       // Sentence 0 ("Sure, ...") matches ACCEPTS_RE with no "?" of its
       // own; sentence 1 carries the "?" that guardReply() uses to exempt
-      // it. "13" (from "PG-13") is the ungrounded bare number the
-      // invention guard has to catch once the capability-claim exemption
-      // correctly applies.
-      scriptedChatReply: () => "Sure, it's rated PG-13. Did you want showtimes?",
+      // it. The attributed quote ("your brother said", grounded nowhere)
+      // is the household invention the guard has to catch once the
+      // capability-claim exemption correctly applies (FAST-05: this used
+      // to be "13" from "PG-13", a bare number the retired scan caught).
+      scriptedChatReply: () => "Sure, your brother said it's rated PG-13. Did you want showtimes?",
     });
     process.env.MAIPAI_LLAMA_SERVER_URL = stub.url;
     try {
@@ -464,7 +467,7 @@ describe("runTurn()/runTurnStream() with native tool calling end to end (Fix E)"
   test("runTurn(): a forced call to a tool that isn't a lookup candidate is rejected, never run - no fact gets written on the model's own say-so", async () => {
     const { actor } = await owner();
     const result = await withScriptedGuessThenForcedTool(
-      "It's playing at Xanadu Cinemas downtown.",
+      "Your brother said it's playing at Xanadu Cinemas downtown.",
       // The stub doesn't know about the fix's own scoping - scripts the
       // forced retry proposing `remember` anyway (a model that ignored
       // the offered set, or an older/misbehaving one) to prove
@@ -487,7 +490,7 @@ describe("runTurn()/runTurnStream() with native tool calling end to end (Fix E)"
   test("runTurn(): forcing the lookup tool still fails to resolve (bad args) - falls back to the model's own honest decline, never a silent drop", async () => {
     const { actor } = await owner();
     const result = await withScriptedGuessThenForcedTool(
-      "It's playing at Xanadu Cinemas downtown.",
+      "Your brother said it's playing at Xanadu Cinemas downtown.",
       [{ id: "call-1", name: "websearch", args: "{}" }], // missing required `expression` - resolveToolCalls() rejects it
       () => runTurn(actor, "chat", "our wifi password is on the fridge, please remember"),
     );
@@ -506,7 +509,7 @@ describe("runTurn()/runTurnStream() with native tool calling end to end (Fix E)"
     // all (proven by scripting NO scriptedToolCalls response, which
     // would surface as a mismatched reply if the retry ran anyway).
     const result = await withScriptedGuessThenForcedTool(
-      "Noted. It's playing at Xanadu Cinemas downtown.",
+      "Noted. Your brother said it's playing at Xanadu Cinemas downtown.",
       [{ id: "call-1", name: "websearch", args: '{"expression":"the odyssey showtimes"}' }],
       () => runTurn(actor, "chat", "our wifi password is on the fridge, please remember"),
     );
@@ -528,7 +531,7 @@ describe("runTurn()/runTurnStream() with native tool calling end to end (Fix E)"
   test("runTurnStream(): a guessed (ungrounded) answer still streams normally - gateGuards() catches it downstream, no retry", async () => {
     const { actor } = await owner();
     const { result, deltas } = await withScriptedGuessThenForcedTool(
-      "It's playing at Xanadu Cinemas downtown.",
+      "Your brother said it's playing at Xanadu Cinemas downtown.",
       [{ id: "call-1", name: "remember", args: '{"fact":"Friday is pizza night"}' }],
       async () => drainStream(await runTurnStream(actor, "chat", "our wifi password is on the fridge, please remember")),
     );
