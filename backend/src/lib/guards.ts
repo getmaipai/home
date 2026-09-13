@@ -140,6 +140,12 @@ function honest(personId: string, reason: GuardReason, pool: readonly string[]):
 // three household negatives live in spec/llm/guard-corpus.json and
 // tests/guards.test.ts as permanent regression rows.
 
+/** How many of the person's earlier turns count as "the question in its
+ * conversation": enough to resolve a pronoun or a possessive ("my car"
+ * two turns back), not the whole window. Shared by the household guess
+ * and unrelated-recall checks. */
+const RECENT_TURNS_FOR_RECALL = 2;
+
 const DECLINE_RE =
   /\b(?:i (?:don't|do not|didn't|did not|can't|cannot|haven't|have not|never|wasn't|was not) (?:know|remember|recall|have|hear|heard|see|saw|think|catch))\b|\bnot sure\b|\bno idea\b/i;
 
@@ -163,6 +169,48 @@ function groundedWords(ctx: GuardContext): Set<string> {
 // bench (backend/scripts/bench/conversation.ts): the 34 real scenarios
 // invent lowercase nouns ("gallery", "sedan", "kitchen") a name/number
 // check could never see, which is why the shapes carry the guard.
+
+// "I think you're talking about a sedan, right?" answering "what type of
+// car needs to be charged" after "my car needs to be charged": a guess
+// about the household's own business is an invented household fact
+// wearing a hedge. FAST-05b (the coordinator's ruling after FAST-05
+// deleted the old GUESSING_RE outright and the conversation bench lost
+// this exact row): the guess phrases stay, household-scoped. They fire
+// only when the subject is household-owned (a first- or second-person
+// possessive in the utterance, the person's last two turns, or the
+// guessed clause itself, or a roster name in any of them) AND the
+// guessed clause carries a word nothing in the sources grounds. "I
+// think you're talking about Paris" to a France question is the
+// world-knowledge hedge INFORMATION_HANDLING_POLICY asks for and
+// passes; "my guess is your dentist is Thursday" passes with the
+// memory present and flags without it. "probably a" and "I'm guessing"
+// (the old regex's other two shapes) stay deleted: they hedge, they do
+// not point at what the household meant.
+const HOUSEHOLD_GUESS_RE = /\bi think you(?:'re| are)? (?:talking about|referring to|means?)\b|\byou must mean\b|\bmy guess is\b/i;
+const OWNED_BY_HOUSEHOLD_RE = /\b(?:my|our|your|mine|ours|yours)\b/i;
+
+// A confirmation tag after the guess ("..., right?", "correct?") is
+// not part of what was guessed.
+const TAG_QUESTION_RE = /[,\s]*\b(?:right|correct|yeah|yes|no|ok|okay|isn't it|is that it)\b\s*\??\s*$/i;
+
+function guessesAboutHousehold(sentence: string, ctx: GuardContext, grounded: Set<string>): boolean {
+  const guess = sentence.match(HOUSEHOLD_GUESS_RE);
+  if (!guess) return false;
+  const guessed = sentence.slice(guess.index! + guess[0].length).replace(TAG_QUESTION_RE, "");
+  const recent = (ctx.history ?? []).slice(-RECENT_TURNS_FOR_RECALL);
+  // The guessed CLAUSE, never the whole sentence: "my guess is" carries
+  // "my" and would otherwise own itself (a code review on this diff).
+  const scope = [ctx.utterance, ...recent, guessed].join(" ");
+  // Letter lookarounds, not `\b`: "José's" has no ASCII word boundary
+  // between the é and the apostrophe. Raw text, not tokenize(), so
+  // "Pippa's practice" still counts.
+  const namesFirstWord = (ctx.roster ?? []).map((name) => name.trim().split(/\s+/)[0]!).filter(Boolean);
+  const householdOwned =
+    OWNED_BY_HOUSEHOLD_RE.test(scope) ||
+    namesFirstWord.some((first) => new RegExp(`(?<!\\p{L})${first.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}(?!\\p{L})`, "iu").test(scope));
+  if (!householdOwned) return false;
+  return unclaimedWords(guessed, grounded).length > 0;
+}
 
 // "he drives a black BMW i3", "she lives in the kitchen": a third-party
 // pronoun given a concrete trait or place. Narrow on purpose (a pronoun
@@ -299,6 +347,7 @@ function guardInvention(sentence: string, ctx: GuardContext): GuardReason | null
   if (declines) return null; // an honest "I don't know" is never itself an invention, for everything else below
 
   if (CLAIMED_EXPERIENCE_RE.test(sentence)) return "invention";
+  if (guessesAboutHousehold(sentence, ctx, grounded)) return "invention";
 
   if (claimsUngroundedHouseholdLocation(sentence, ctx, grounded)) return "invention";
 
@@ -333,8 +382,6 @@ function guardInvention(sentence: string, ctx: GuardContext): GuardReason | null
 // `wordMatches`, one rule, not a second one). The flight-versus-dentist
 // case still flags: nothing in "when is my eye exam" shares a stem with
 // "dentist", "thursday", "four".
-
-const RECENT_TURNS_FOR_RECALL = 2;
 
 function guardUnrelatedRecall(sentence: string, ctx: GuardContext): GuardReason | null {
   const said = tokenize(sentence);

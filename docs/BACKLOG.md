@@ -1144,7 +1144,11 @@ Track B: MEM-01, MEM-02, MEM-03, MEM-04, MEM-05. Then JOIN-01, JOIN-02.
     corpus 29 rows with the four probes and three household negatives;
     offline guards bench 23/29 to 21/29, the whole delta being the
     prescribed GUESSING_RE deletion (raised as a question). Details in
-    the Track A section of dev.md.
+    the Track A section of dev.md. FAST-05b (2026-09-12, the answer to
+    that question): the guess phrases are back, household-scoped (a
+    possessive or roster name in the question, the last two turns, or
+    the guessed clause, plus an ungrounded word in the guess); the
+    sedan bench row flags again, bench 22/29.
 
     Depends on: FAST-04. Files: `backend/src/lib/guards.ts`,
     `spec/llm/guard-corpus.json`, `backend/tests/guards.test.ts`,

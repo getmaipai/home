@@ -96,6 +96,58 @@ describe("invention: a claim about the household still needs a source (FAST-05)"
   });
 });
 
+// FAST-05b: the guess phrases came back household-scoped, after the
+// conversation bench lost its "sedan" row to FAST-05's deletion of the
+// old GUESSING_RE. A guess about what the household meant is an
+// invented household fact wearing a hedge; a guess about the world is
+// the hedge the information policy asks for.
+describe("invention: a guess about the household's own business (FAST-05b)", () => {
+  test("the bench row flags again - 'I think you're talking about a sedan, right?' after 'my car needs to be charged'", () => {
+    const g = guardReply("I think you're talking about a sedan, right?", ctx({ utterance: "what type of car needs to be charged", history: ["my car needs to be charged"] }));
+    expect(g.reason).toBe("invention");
+  });
+
+  test("a guess about the world passes - 'I think you're talking about Paris' to a France question", () => {
+    expect(guardReply("I think you're talking about Paris.", ctx({ utterance: "what is the capital of France" })).reason).toBeNull();
+  });
+
+  test("'my guess is your dentist is Thursday' passes with the memory present and flags without it", () => {
+    const withMemory = guardReply("My guess is your dentist is Thursday.", ctx({ utterance: "when is my dentist", sources: ["The dentist appointment is Thursday at four."] }));
+    expect(withMemory.reason).toBeNull();
+    const without = guardReply("My guess is your dentist is Thursday.", ctx({ utterance: "when is my dentist" }));
+    expect(without.reason).toBe("invention");
+  });
+
+  test("a roster name makes the guess household-owned too - 'you must mean the Tuesday one' about Pippa's practice", () => {
+    expect(guardReply("You must mean the Tuesday practice.", ctx({ utterance: "when is Pippa's practice", roster: ["Pippa"] })).reason).toBe("invention");
+    expect(guardReply("You must mean the Tuesday practice.", ctx({ utterance: "when is Pippa's practice", roster: ["Pippa"], sources: ["Pippa has soccer practice on Tuesday."] })).reason).toBeNull();
+  });
+
+  // A medium code review on this diff found three holes in the first
+  // cut, each a repro below: "my guess is" owned itself through its own
+  // "my"; a confirmation tag ("right?") counted as an ungrounded word;
+  // and `\b` never matched a name ending in a non-ASCII letter.
+  test("'my guess is' does not own itself - 'My guess is Paris' to a France question passes", () => {
+    expect(guardReply("My guess is Paris.", ctx({ utterance: "what is the capital of France" })).reason).toBeNull();
+    expect(guardReply("My guess is 1945.", ctx({ utterance: "when did the second world war end" })).reason).toBeNull();
+  });
+
+  test("a confirmation tag is not part of the guess - a grounded guess ending in 'right?' passes", () => {
+    expect(guardReply("I think you mean your dentist appointment, right?", ctx({ utterance: "when is it again", sources: ["The dentist appointment is Thursday at four."] })).reason).toBeNull();
+    expect(guardReply("I think you're talking about your car, correct?", ctx({ utterance: "what type needs charging", history: ["my car needs to be charged"] })).reason).toBeNull();
+  });
+
+  test("an accented roster name still counts - José's and Zoë's practice", () => {
+    expect(guardReply("You must mean the Tuesday practice.", ctx({ utterance: "when is José's practice", roster: ["José"] })).reason).toBe("invention");
+    expect(guardReply("You must mean the Tuesday practice.", ctx({ utterance: "when is Zoë's practice", roster: ["Zoë"], sources: ["Zoë has practice on Tuesday."] })).reason).toBeNull();
+  });
+
+  test("the plain hedges stay out - 'probably a' and 'I'm guessing' are not guesses about what the household meant", () => {
+    expect(guardReply("That's probably a delivery driver.", ctx({ utterance: "who's at my door" })).reason).toBeNull();
+    expect(guardReply("I'm guessing a sedan.", ctx({ utterance: "what type of car needs to be charged", history: ["my car needs to be charged"] })).reason).toBeNull();
+  });
+});
+
 // A medium code review on FAST-05's first cut found the wider location
 // subject (you, pronouns) plus the optional article turned everyday
 // idioms into cuts, only the first location clause was checked, and a

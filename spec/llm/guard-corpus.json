@@ -245,5 +245,32 @@
     "reply": "The second world war ended in 1945.",
     "expect": null,
     "note": "FAST-05 live check question: a four-digit year is general knowledge, not an invention (the retired scan cut this live before FAST-05)."
+  },
+  {
+    "id": "household-guess-is-invention",
+    "utterance": "what type of car needs to be charged",
+    "history": [
+      "my car needs to be charged"
+    ],
+    "reply": "I think you're talking about a sedan, right?",
+    "expect": "invention",
+    "note": "FAST-05b: the conversation bench's own row. A guess about the household's own car (possessive in the previous turn, 'sedan' grounded nowhere) is an invented household fact wearing a hedge."
+  },
+  {
+    "id": "world-guess-is-a-hedge",
+    "utterance": "what is the capital of France",
+    "reply": "I think you're talking about Paris.",
+    "expect": null,
+    "note": "FAST-05b: a guess about the world is the hedge the information policy asks for; nothing household-owned in the question or the clause."
+  },
+  {
+    "id": "household-guess-grounded-by-memory",
+    "utterance": "when is my dentist",
+    "sources": [
+      "The dentist appointment is Thursday at four."
+    ],
+    "reply": "My guess is your dentist is Thursday.",
+    "expect": null,
+    "note": "FAST-05b: household-owned, but every word of the guess is in the memory, so it stands."
   }
 ]

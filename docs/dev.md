@@ -11293,6 +11293,47 @@ belongs to CHAT-23's corpus work, not this item.
 **Exit gate**: `bash scripts/check.sh` green in the worktree, plus the
 catalog checkout's own `scripts/check.sh` for both commits there.
 
+### FAST-05b: a guess about the household's own business is still an invention (2026-09-12)
+
+The coordinator's ruling on the question FAST-05 raised: the rule the
+review set is "invention guard household-only", so a guess about the
+household's own car is an invented household fact wearing a hedge,
+while "I think you're talking about Paris" is the world-knowledge
+hedge the information policy asks for. `guards.ts` gains
+`HOUSEHOLD_GUESS_RE` ("I think you're talking about / referring to /
+mean", "you must mean", "my guess is"; the old regex's "probably a"
+and "I'm guessing" stay deleted, they hedge without pointing at what
+the household meant) and `guessesAboutHousehold()`: the phrase fires
+only when the subject is household-owned (a first- or second-person
+possessive in the utterance, the person's last two turns, or the
+guessed clause itself, or a roster name in any of them, matched on the
+raw text so "Pippa's practice" counts) and the guessed clause carries
+a word nothing in the sources grounds. Tests in `guards.test.ts`: the
+bench's sedan row flags again ("my car needs to be charged" two turns
+back is the possessive); "I think you're talking about Paris" to a
+France question passes; "my guess is your dentist is Thursday" passes
+with the memory present and flags without it; a roster name makes the
+guess household-owned; "probably a" and "I'm guessing" stay out. Three
+corpus rows added (32 now).
+
+The medium code review on this diff (targeted at the worktree) found
+three holes in the first cut, each confirmed by running it and each
+now a test: "my guess is" owned itself (its own "my" was in the scope,
+so "My guess is Paris." flagged), fixed by scoping to the guessed
+clause; a confirmation tag ("..., right?") counted as an ungrounded
+word, fixed by stripping the tag; and the roster match used `\b`,
+which never matches a name ending in a non-ASCII letter ("José's"),
+fixed with letter lookarounds.
+
+**Offline guards bench**: 22/29, from FAST-05's 21/29; the row that
+came back is `a-car-it-was-never-told-about`. The five still failing
+(`a-person-is-not-filled-in`, `a-brother-nobody-mentioned`,
+`a-question-answered-sure`, `chest-pain-urges-help`,
+`no-oh-nice-opener`) were failing before FAST-05 too and are not
+invention-guard rows.
+
+**Exit gate**: `bash scripts/check.sh` green in the worktree.
+
 ## Session B follow-up: chat frontend bugs - second and third pass (2026-09-12)
 
 **#71 rework** (reopened twice: first for insufficient verification and six
