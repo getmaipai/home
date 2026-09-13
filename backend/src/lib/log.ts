@@ -16,6 +16,7 @@
 // real caller today, and it already omits the utterance and reply text.
 import { appendFileSync, readdirSync, renameSync, statSync, unlinkSync } from "node:fs";
 import { join } from "node:path";
+import { format } from "node:util";
 import { logsDir, ensureDataDir } from "@/lib/paths";
 
 const LOG_FILE = "hub.log";
@@ -92,4 +93,32 @@ export function appendLogLine(line: string): void {
   } catch {
     // best-effort - see this function's own doc comment
   }
+}
+
+type ConsoleMirrorState = { installed: boolean; originals: Partial<Record<"log" | "info" | "warn" | "error" | "debug", (...args: unknown[]) => void>> };
+const mirrorState = (globalThis as typeof globalThis & { __maipaiConsoleMirror?: ConsoleMirrorState }).__maipaiConsoleMirror ??= { installed: false, originals: {} };
+
+/** Install once for the process. globalThis survives Bun hot reloads. */
+export function installConsoleFileMirror(): void {
+  if (mirrorState.installed) return;
+  mirrorState.installed = true;
+  for (const method of ["log", "info", "warn", "error", "debug"] as const) {
+    const original = console[method].bind(console) as (...args: unknown[]) => void;
+    mirrorState.originals[method] = original;
+    console[method] = (...args: unknown[]) => { original(...args); appendLogLine(format(...args)); };
+  }
+}
+
+/** Keep terminal-fatal errors in the log before the process exits. */
+export function installFatalErrorHandlers(): void {
+  const state = globalThis as typeof globalThis & { __maipaiFatalHandlers?: boolean };
+  if (state.__maipaiFatalHandlers) return;
+  state.__maipaiFatalHandlers = true;
+  const exitAfterLogging = (kind: string, error: unknown): void => {
+    appendLogLine(`[fatal] ${kind}: ${error instanceof Error ? error.stack ?? error.message : format(error)}`);
+    appendLogLine("hub exiting");
+    process.exit(1);
+  };
+  process.on("uncaughtException", (error) => exitAfterLogging("uncaughtException", error));
+  process.on("unhandledRejection", (error) => exitAfterLogging("unhandledRejection", error));
 }

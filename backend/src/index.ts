@@ -23,8 +23,11 @@ import { websocket } from "hono/bun";
 import { seedHlcFromDatabase } from "@/lib/hlc";
 import { recoverInterruptedJobsAtBoot } from "@/lib/modelDownloadJobs";
 import { startupUrls } from "@/lib/startupUrls";
+import { installConsoleFileMirror, installFatalErrorHandlers } from "@/lib/log";
 
 const port = Number(process.env.PORT ?? 8787);
+installConsoleFileMirror();
+installFatalErrorHandlers();
 
 // FAST-01: set up the warmup prompt provider for cache priming after engine
 // spawn. ROUTE-02: with the ordinary tool block, the same one every
