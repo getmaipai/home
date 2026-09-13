@@ -16,8 +16,11 @@ The first time you open MaiPai Home, it walks you through a short setup wizard. 
 2. **Create your own profile.** Enter your name and choose a PIN or password. As the owner, you'll have full access to settings and everyone else's account.
 3. **Read the one-time safety notice.** MaiPai's answers come from AI models you choose to download. They can be wrong, and they're never medical, legal, or professional advice. You'll only see this once.
 4. **Choose an AI model.** MaiPai checks your hub's hardware and shows you which models will run well on it. Tap one to select it.
-5. **Run your first backup.** Tap **Run a backup now** so your household's data is saved from the start. You can set up a regular schedule later in Settings.
-6. **You're done.** MaiPai shows you a few things to try first, like asking a question in Chat.
+5. **Set up security certificate.** This step isn't built yet - you can set it up later once it's ready.
+6. **Set up packages.** The package store isn't built yet - once it is, you'll be able to browse and choose what your household uses here.
+7. **Set up remote access.** You can optionally set up secure remote access to your hub away from home. This isn't built yet - skip it for now.
+8. **Run your first backup.** Tap **Run a backup now** so your household's data is saved from the start. You can set up a regular schedule later in Settings.
+9. **You're done.** MaiPai shows you a few things to try first, like asking a question in Chat.
 
 You'll know it worked when MaiPai greets you by name on the Home screen.
 

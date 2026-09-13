@@ -7,10 +7,10 @@ MaiPai can let you know about things worth your attention. You'll see these righ
 
 ## See your notifications
 
-Tap the bell icon in the header. This shows your recent notifications. You stay on the page you're on. Open **Notifications** in the sidebar for the full history. It goes back 30 days.
+Tap the bell icon in the header. This shows your recent notifications. You stay on the page you're on. Tap "View history" in the popover for the full history. It goes back 30 days.
 
 - Tap a notification to open what it's about.
-- Tap **Clear all** to remove everything from the list.
+- Tap **Dismiss** to remove individual notifications from the list.
 
 ## Get notified on Telegram
 
