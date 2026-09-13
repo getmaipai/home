@@ -21,6 +21,9 @@ interface CorpusRow {
   personaExamples?: string[];
   /** FAST-05: household names, for guards.ts's LOCATION_CLAIM_RE. */
   roster?: string[];
+  /** CHAT-04: the turn's tool outcomes, package id and status, for the
+   * per-family action-claim match. */
+  outcomes?: { packageId: string; status: "succeeded" | "failed" | "pending" }[];
   expect: GuardReason | null;
   /** True only for a row that depends on the whole-reply lookahead
    * guardReply() has and gateGuards() (the streaming path) genuinely
@@ -34,7 +37,7 @@ interface CorpusRow {
 const corpus: CorpusRow[] = JSON.parse(readFileSync(join(import.meta.dir, "..", "..", "spec", "llm", "guard-corpus.json"), "utf-8"));
 
 function ctxFor(row: CorpusRow): Omit<GuardContext, "personId"> {
-  return { utterance: row.utterance, sources: row.sources ?? [], history: row.history ?? [], personaExamples: row.personaExamples, roster: row.roster };
+  return { utterance: row.utterance, sources: row.sources ?? [], history: row.history ?? [], personaExamples: row.personaExamples, roster: row.roster, outcomes: row.outcomes };
 }
 
 async function* sentenceStream(reply: string): AsyncGenerator<string, undefined, void> {

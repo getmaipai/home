@@ -1453,3 +1453,177 @@ scripted reply, and the sentence-case pass. The retired assertions
 with a note naming the behavior that replaced them; no safety fixture
 weakens. Closes #74 and #62; #81 by the sentence-case pass and the
 bench row.
+
+## CHAT-04 shipped: acknowledgments pass, action claims need their outcome (2026-09-13)
+
+Built as designed above, with two refinements found while building.
+
+**What landed.** `guardNearEcho()` runs only when
+`utteranceShape(ctx.utterance) === "question"`; the shape block moved
+out of `routing.ts` into a pure module, `backend/src/lib/utteranceShape.ts`
+(`routing.ts` re-exports it unchanged), so `guards.ts` reads the same
+shape without pulling routing's engine and database imports.
+`GuardContext.actionsRan` is gone; `outcomes` (package id and status,
+from CHAT-01's `ToolExecutionOutcome`) replaces it in `guardContextFrom()`,
+the corpus row format and the conversation bench. An explicit
+completed-action claim is matched to its family (`ACTION_FAMILIES` in
+`guards.ts`: save, list, timer, reminder, lights, lock, lookup, and the
+verbs with no package behind them); a family with no succeeded outcome
+this turn is the new reason `unsupported_action`, non-cuttable, decided
+in `guardSentence()` for both paths. `capability_claim` stays for an
+accepted impossible request ("Sure, I'll text her"), and it no longer
+switches off on any success: only a success of the claim's own family
+counts.
+
+**Refinement one: the replacement is narrated, not pooled.** The
+FAST-05 item left "replacing the pooled canned lines" to this item.
+For `unsupported_action` the line now comes from what the family's
+package actually reported this turn: nothing ran ("I haven't saved that
+as a memory.", "I haven't set a timer."), the call failed ("That didn't
+get saved.", "The timer didn't get set."), or the call is parked on a
+confirmation ("That's waiting on your confirmation."); a verb with no
+package behind it says so ("I can't send messages, make calls, or order
+anything from here."). `replacementFor()` takes the flagged sentence
+and context for this, on both paths; the CANNOT_DO pool remains for
+`capability_claim` and as the fallback for a caller with no sentence.
+A pooled "I can't do that" after a failed save would have been a second
+wrong claim.
+
+**Refinement two: remembering is never a claim.** The design listed
+"I'll remember that" and "noted" as save claims needing a `remember`
+outcome. Built that way, the live 8B's own reply to "Pippa is allergic
+to peanuts" ("Remembered. I'll make sure to keep that in mind.", no
+tool call, see the probe below) would have been cut and replaced with
+"I haven't saved that as a memory.", which is false in the household's
+terms: the memory judge extracts a disclosed fact on its own, with no
+tool call. So the save family matches the write verbs only (saved,
+stored, logged, written down); "noted", "remembered", "I'll remember
+that", "I'll keep that in mind" are acknowledgments and pass with no
+outcome. "I saved that to your memory" still needs a succeeded
+`remember` outcome: it names a write that did not happen.
+
+**The review's three findings, fixed before the commit.** (1) The
+first cut's family regexes matched non-claims: a third-person report
+("Yes, Bruno added eggs to the list earlier"), "Here's what I've
+written for you", "I've ordered them by priority", a timer or light
+status answering a question. Each family now has two shapes: `claim`,
+first-person and completion-shaped ("I've added ...", "I set a ..."),
+on any utterance; and `status`, the state statement a model gives
+after doing something ("Timer's set.", "Lights are off."), only when
+the utterance is a command (the router's shape, or `REQUEST_RE`'s
+fixed verb list). "Written" needs "down"; "ordered" and "called"
+followed by "it/them/that" are idioms, not actions. The six replies
+are permanent tests. (2) The streaming path guarded with a
+prepare-time snapshot of the context whose `outcomes` were empty, so
+after every proposed call failed and the no-tools retry claimed the
+save, the stream narrated "nothing ran" where the blocking path said
+"failed". `gateGuards()` now takes a getter and reads
+`guardContextFrom(turnContext)` per sentence; the prepare-time
+`guardContext` field is gone. A tier2 test proves both paths say
+"That didn't get saved." (3) The guard read the shape with no command
+openers while the router reads it with the installed packages', so a
+package-declared opener could be a command to one and a question to
+the other. `TurnContext.shape` now carries the router's reading and
+`GuardContext.shape` receives it; the guard computes its own only when
+none is given (the corpus and unit tests).
+
+A second review round found the claim shapes still too wide, fixed the
+same way: no action-claim shape runs on a question-shaped utterance
+("did you set my timer" answered "Yes, I set a timer for eight." is a
+true answer about an earlier turn, and only this turn's outcomes are
+known), except the lookup family, whose claim is about the answer
+being given; the bare list status form ("Added milk to your list.")
+matches only at the sentence's start, never inside a third-person
+report; the timer status is `set|started`, not `running`; "logged in"
+is not a save; "ordered the list by priority" is not an order; and
+every matching family is checked, with a chained form ("I've added
+milk to your list and set a timer") read after a command so a sentence
+carrying two claims needs both outcomes. Each is a permanent test.
+
+A third round, on the families alone, found eleven more shapes and
+they are fixed the same way, each a test: "scheduled a reminder"
+belongs to the reminder family, not the no-package list; the chained
+form is read only past an earlier first-person claim in the sentence,
+so advice to the person ("Boil the water, then set a timer") is never
+a claim; the bare status forms with no copula ("Timer set for ten
+minutes.", "Done, saved.", "Lights off.", "Milk added to your list.",
+"Milk is on your list now.") are claims after a command; "called them"
+and "ordered them for you" are the claim, the sorting sense (a "by" or
+a list in the clause) and the naming sense (a pronoun, a name, a
+reason) are not; "looked up the pool hours" and "googled" are lookups,
+a search described "in your notes" is not; "logged into", "locked in
+Friday", "locked myself out" and "I have saved recipes" are not
+actions. One known limit, recorded rather than handled: a command-
+shaped request for a past fact ("remind me what you know about Pippa"
+answered "I saved that last week: ...") is still read as a claim about
+this turn, since only this turn's outcomes are known; the question
+skip covers question openers and a trailing "?", not a "remind me"
+opener.
+
+A fourth round, the last: a bare completion word after a command
+("Done.", "All set.") is a claim about whatever was asked and is
+narrated from the turn's failed or pending outcome, or replaced with
+"I haven't actually done that." when nothing ran (a request to
+remember is the exception: the judge remembers, so "Done." after
+"remember that X" is the acknowledgment unless a remember call failed);
+the chained form also stands behind a first-person opener after a
+command ("I went ahead and added milk", "I checked and set a timer");
+the lookup claim takes every first-person form ("I've looked it up",
+"I just looked it up"); a short noun phrase may precede the family
+noun ("Ten-minute timer set.", "Front door locked.", "Kitchen lights
+off."), a room may follow on/off ("Lights are off in the kitchen
+now."), a contraction may carry the list noun ("Milk's on your list
+now."), a named object is a save ("I've saved Pippa's allergy"), and a
+status form is a claim on anything but a question, so "Saved." and "I
+saved that." agree on a disclosure. `guardCapabilityClaim()` keeps its
+`REQUEST_RE` gate rather than the router's shape on purpose: a
+router-shaped "remember what I said" answered "Okay, ..." would
+otherwise read as accepting an impossible request. Recorded, not
+handled: "I ordered the pizza, arriving by six" on a router-shaped
+command outside `REQUEST_RE` reads "by six" as the sorting sense. The
+matcher is a bounded regex family, not a parser; the baseline
+conversation bench (measure-first, section 2) is where the shapes it
+still misses will show up, as rows, before any fifth round.
+
+**#81.** No guard or policy lowercases anything (checked; see the
+design). `sentenceCaseOpener()` in `turnEngine.ts` capitalizes the
+first letter of a "model" reply's text in `finalizeReply()`, and
+`sentenceCaseStream()` applies the same rule to the first chunk that
+carries a letter on the streaming path, so the opener a client already
+rendered and the logged reply agree. A package's own reply, a command
+reply, a refusal and the speech string are left as authored; a first
+word with an interior capital ("iPhone") is left alone. The naturalness
+bench gains the `sentence_case_opener` row (case-sensitive regexes on
+purpose), which fails only if the pass is gone or bypassed.
+
+**Tests.** `guards.test.ts`: the question gate (a restated question is
+cut, the same disclosure said back passes, the retired ps5 statement
+passes), the family mapping (failed, pending, none, unrelated success,
+no-package verbs, a question is never a claim), the narrated lines, and
+both paths deciding identically; the two retired near-echo-on-statement
+assertions are replaced with notes naming the behavior. The guard
+corpus gains six rows (`disclosure-acknowledged-same-turn`,
+`restated-disclosure-with-source`, `save-claim-with-failed-remember`,
+`save-claim-with-succeeded-remember`, `timer-claim-with-failed-timer`,
+`search-then-invented-list-claim`) and rewrites `near-echo-restates-the-
+question` to a question; `capability-claim-on-request` now expects
+`unsupported_action`. `turnEngine.test.ts`: #74's shape through
+`runTurn()` and `runTurnStream()` with a scripted reply, the save claim
+narrated, and the sentence-case pass on both paths. `turnContext.test.ts`
+reads `outcomes`.
+
+**Live probe** (spare-port backend from this working tree, household
+chat engine by URL: llama-server b10797, qwen3-8b-instruct-q4-k-m,
+Apple Silicon laptop, 2026-09-13): "Pippa is allergic to peanuts" ->
+"Remembered. I'll make sure to keep that in mind." (source model,
+guard `[]`, 3.2 s); "I play it on the ps5" -> "I think you mean you
+play a game on the PS5. Let me know what game..." (guard `[]`; near-echo
+used to be the risk here); "remember that Pippa is allergic to peanuts"
+-> the remember package (Tier 0); "add milk to my list" -> the list-add
+package through a tool call. One finding outside this item: "what is
+the capital of france" matches the knowledge package's pattern with the
+topic "the capital of france" and the summary lookup returns 404, so the
+turn ends in `plugin_error` before any model text; filed as #92.
+
+Closes #74 and #62 (the same-turn disclosure and the near-echo cut
+behind both); #81 by the sentence-case pass and the bench row.

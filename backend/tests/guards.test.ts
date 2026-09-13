@@ -4,17 +4,17 @@
 // 2026-09-03), adapted to this hub's context shape (sources/history as
 // plain strings, no robot-specific Iterable-of-tuples).
 import { describe, expect, test } from "bun:test";
-import { guardReply, guardSentence, type GuardContext } from "@/lib/guards";
+import { guardReply, guardSentence, replacementFor, type GuardContext } from "@/lib/guards";
 
 function ctx(overrides: Partial<GuardContext> = {}): GuardContext {
   return { utterance: "", personId: "person-test", ...overrides };
 }
 
 describe("capability claims (bot-legacy: claimed_action/accepted_request)", () => {
-  test("a claimed action on a request is replaced - 'I've added milk to your list'", () => {
+  test("a claimed action on a request is replaced - 'I've added milk to your list' (CHAT-04: a completed claim with no list-add outcome is unsupported_action)", () => {
     const g = guardReply("I've added milk to your list.", ctx({ utterance: "add milk to my list on my phone" }));
-    expect(g.reason).toBe("capability_claim");
-    expect(g.reply).not.toContain("added");
+    expect(g.reason).toBe("unsupported_action");
+    expect(g.reply).toBe("I haven't added anything to your list."); // narrated from the outcome (none), not a pool
   });
 
   test("a promise is a claim too - 'I'll text Nadia now'", () => {
@@ -22,8 +22,8 @@ describe("capability claims (bot-legacy: claimed_action/accepted_request)", () =
     expect(g.reason).toBe("capability_claim");
   });
 
-  test("a claim stands when an action actually ran", () => {
-    const g = guardReply("Done, timer's set.", ctx({ utterance: "set a timer", actionsRan: true }));
+  test("a claim stands when the action's own package actually ran", () => {
+    const g = guardReply("Done, timer's set.", ctx({ utterance: "set a timer", outcomes: [{ packageId: "timer", status: "succeeded" }] }));
     expect(g.reason).toBeNull();
   });
 
@@ -218,14 +218,36 @@ describe("unrelated recall (bot-legacy's own test: eye exam answered from the de
   });
 });
 
-describe("near-echo (social.py's own bench case: 'I play it on the ps5' -> 'Okay, playing it on the ps5.')", () => {
-  test("restating the person's own words behind an acknowledgment is not an answer", () => {
-    const g = guardReply("Okay, playing it on the ps5.", ctx({ utterance: "I play it on the ps5" }));
+// CHAT-04 (#74, #62): the near-echo guard is a question guard now. The
+// social.py bench case ("I play it on the ps5" -> "Okay, playing it on
+// the ps5.") used to be near_echo; a statement said back behind an
+// acknowledgment is the acknowledgment, and the same overlap rule was
+// cutting "Got it, Pippa is allergic to peanuts." in the turn the
+// person disclosed it. Only a restated QUESTION is a non-answer.
+describe("near-echo is a question guard (CHAT-04 replaced the statement echo)", () => {
+  test("a restated question behind an acknowledgment answers nothing and is cut", () => {
+    const g = guardReply("Okay, what game do you play on the ps5.", ctx({ utterance: "what game do you play on the ps5" }));
     expect(g.reason).toBe("near_echo");
+  });
+
+  test("a disclosure said back in the same turn is the acknowledgment (#74's exact shape)", () => {
+    const g = guardReply("Got it, Pippa is allergic to peanuts.", ctx({ utterance: "Pippa is allergic to peanuts" }));
+    expect(g.reason).toBeNull();
+    expect(g.reply).toBe("Got it, Pippa is allergic to peanuts.");
+  });
+
+  test("a first-person statement said back is left alone (the retired ps5 bench case)", () => {
+    const g = guardReply("Okay, playing it on the ps5.", ctx({ utterance: "I play it on the ps5" }));
+    expect(g.reason).toBeNull();
   });
 
   test("a reply that adds real content is left alone", () => {
     const g = guardReply("Nice, the ps5 version has better load times.", ctx({ utterance: "I play it on the ps5" }));
+    expect(g.reason).toBeNull();
+  });
+
+  test("a question answered with real content is left alone", () => {
+    const g = guardReply("The ps5, mostly.", ctx({ utterance: "what game do you play on the ps5" }));
     expect(g.reason).toBeNull();
   });
 });
@@ -261,13 +283,13 @@ describe("near-echo does not fire on a plain greeting reciprocation (Jesse, live
     expect(g.reason).toBeNull();
   });
 
-  test("a greeting stitched onto an unrelated statement doesn't smuggle in the exemption - the REPLY has to be a bare reciprocation, not just the utterance a greeting", () => {
-    const g = guardReply("Okay, playing it on the ps5.", ctx({ utterance: "good morning, I play it on the ps5" }));
-    expect(g.reason).toBe("near_echo");
-  });
-
-  test("the ps5 bench case is still caught - the exemption is scoped to greetings, not to every short utterance", () => {
-    const g = guardReply("Okay, playing it on the ps5.", ctx({ utterance: "I play it on the ps5" }));
+  // CHAT-04 retired the two assertions that stood here ("a greeting
+  // stitched onto an unrelated statement doesn't smuggle in the
+  // exemption" and "the ps5 bench case is still caught"): both expected
+  // near_echo on a restated STATEMENT, which the guard no longer reads
+  // as a stall. The exemption's scope is proven on a question instead.
+  test("a greeting stitched onto a restated question doesn't smuggle in the exemption - the REPLY has to be a bare reciprocation", () => {
+    const g = guardReply("Okay, what game do you play on the ps5.", ctx({ utterance: "good morning, what game do you play on the ps5" }));
     expect(g.reason).toBe("near_echo");
   });
 });
@@ -340,16 +362,21 @@ describe("guardReply(): cutting padding vs replacing the whole reply", () => {
 
 describe("guardSentence(): the streaming half (one sentence at a time, before hand-off)", () => {
   test("checks a single sentence in isolation, same rules as guardReply", () => {
-    expect(guardSentence("I've added milk to your list.", ctx({ utterance: "add milk to my list" }))).toBe("capability_claim");
+    expect(guardSentence("I've added milk to your list.", ctx({ utterance: "add milk to my list" }))).toBe("unsupported_action"); // CHAT-04: a completed claim, no list-add outcome
     expect(guardSentence("Sure, what's the address?", ctx({ utterance: "text Nadia" }))).toBeNull();
   });
 });
 
 describe("replacement lines rotate per person (replyVariation.ts's pickVariant, reused)", () => {
+  // CHAT-04 moved the completed-action claim to a narrated line (one
+  // true sentence per outcome state, no rotation); the pooled rotation
+  // is proven on an accepted impossible request, which still draws from
+  // CANNOT_DO.
   test("the same guard reason for the same person doesn't always return the identical line", () => {
     const seen = new Set<string>();
     for (let i = 0; i < 6; i++) {
-      const g = guardReply("I've added milk to your list.", ctx({ utterance: "add milk to my list", personId: "person-rotate" }));
+      const g = guardReply("Sure, I'll text her now.", ctx({ utterance: "text Nadia that I'm late", personId: "person-rotate" }));
+      expect(g.reason).toBe("capability_claim");
       seen.add(g.reply);
     }
     expect(seen.size).toBeGreaterThan(1);
@@ -373,5 +400,260 @@ describe("code review fixes (2026-09-06)", () => {
   test("a capability claim's 'never guard a question' exemption looks at the WHOLE reply, not just the current sentence - 'Sure! What do you have in the fridge?' is an honest clarifying question, not a false claim", () => {
     const g = guardReply("Sure! What do you have in the fridge?", ctx({ utterance: "can you help me plan dinner" }));
     expect(g.reason).toBeNull();
+  });
+});
+
+// CHAT-04 (docs/dev/session-a.md): an explicit action claim is matched
+// to the package family its verb names, over the turn's own outcomes.
+// One unrelated success never licenses every claim in the reply, and a
+// pending or failed outcome counts as nothing ran.
+describe("action claims are matched per package family (CHAT-04)", () => {
+  const succeeded = (packageId: string) => [{ packageId, status: "succeeded" as const }];
+
+  test("a completed save claim with no remember outcome is unsupported_action, replaced with the narrated line (nothing ran)", () => {
+    const g = guardReply("I saved that.", ctx({ utterance: "Pippa is allergic to peanuts" }));
+    expect(g.reason).toBe("unsupported_action");
+    expect(g.replaced).toBe(true);
+    expect(g.reply).toBe("I haven't saved that as a memory.");
+  });
+
+  test("a save claim with a failed remember outcome is unsupported, and the line narrates the failure, never a pooled cannot-do", () => {
+    const g = guardReply("I've saved that to your memory.", ctx({ utterance: "remember that Pippa is allergic to peanuts", outcomes: [{ packageId: "remember", status: "failed" }] }));
+    expect(g.reason).toBe("unsupported_action");
+    expect(g.reply).toBe("That didn't get saved.");
+  });
+
+  test("the replacement is narrated from the typed outcome per family: failed, pending and none each say what happened", () => {
+    expect(guardReply("Timer's set.", ctx({ utterance: "set a timer", outcomes: [{ packageId: "timer", status: "failed" }] })).reply).toBe("The timer didn't get set.");
+    expect(guardReply("Timer's set.", ctx({ utterance: "set a timer" })).reply).toBe("I haven't set a timer.");
+    expect(guardReply("I've locked the doors.", ctx({ utterance: "lock the doors", outcomes: [{ packageId: "lock-doors", status: "pending" }] })).reply).toBe("That's waiting on your confirmation.");
+    expect(guardReply("I've added that to your list.", ctx({ utterance: "add milk", outcomes: [{ packageId: "websearch", status: "succeeded" }] })).reply).toBe("I haven't added anything to your list.");
+    expect(guardReply("I've texted Nadia.", ctx({ utterance: "text Nadia" })).reply).toBe("I can't send messages, make calls, or order anything from here.");
+    // replacementFor() with no flagged sentence keeps the pooled line, so an
+    // older caller cannot produce an empty replacement.
+    expect(replacementFor("unsupported_action", "person-test")).toMatch(/can't|not able|not something/i);
+  });
+
+  test("a save claim with a succeeded remember outcome stands", () => {
+    const g = guardReply("I saved that.", ctx({ utterance: "remember that Pippa is allergic to peanuts", outcomes: succeeded("remember") }));
+    expect(g.reason).toBeNull();
+  });
+
+  test("future intent and remembering are acknowledgments, not claims: 'I'll remember that', 'Remembered.', 'Noted' pass with no outcome (the judge remembers on its own)", () => {
+    expect(guardReply("I'll remember that.", ctx({ utterance: "Pippa is allergic to peanuts" })).reason).toBeNull();
+    expect(guardReply("Noted, I'll keep that in mind.", ctx({ utterance: "Pippa is allergic to peanuts" })).reason).toBeNull();
+    expect(guardReply("Remembered. I'll make sure to keep that in mind.", ctx({ utterance: "Pippa is allergic to peanuts" })).reason).toBeNull(); // the live 8B's own reply, 2026-09-13
+    expect(guardReply("Got it, noted.", ctx({ utterance: "Pippa is allergic to peanuts" })).reason).toBeNull();
+  });
+
+  test("a search that ran does not license an invented list claim: the family has to match", () => {
+    const g = guardReply("I've added that to your list.", ctx({ utterance: "look up the pasta recipe and add it to my list", outcomes: succeeded("websearch") }));
+    expect(g.reason).toBe("unsupported_action");
+  });
+
+  test("a timer claim with a failed timer outcome is unsupported; with a succeeded one it stands", () => {
+    expect(guardReply("Timer's set for ten minutes.", ctx({ utterance: "set a ten minute timer", outcomes: [{ packageId: "timer", status: "failed" }] })).reason).toBe("unsupported_action");
+    expect(guardReply("Timer's set for ten minutes.", ctx({ utterance: "set a ten minute timer", outcomes: succeeded("timer") })).reason).toBeNull();
+  });
+
+  test("a pending outcome (a confirmation parked) counts as nothing ran", () => {
+    const g = guardReply("I've locked the doors.", ctx({ utterance: "lock the doors", outcomes: [{ packageId: "lock-doors", status: "pending" }] }));
+    expect(g.reason).toBe("unsupported_action");
+    expect(guardReply("Doors are locked.", ctx({ utterance: "lock the doors", outcomes: succeeded("lock-doors") })).reason).toBeNull();
+  });
+
+  test("lights, reminders and lookups match their own families", () => {
+    expect(guardReply("Lights are off.", ctx({ utterance: "turn off the lights", outcomes: succeeded("lights-off") })).reason).toBeNull();
+    expect(guardReply("I turned off the lights.", ctx({ utterance: "turn off the lights", outcomes: succeeded("timer") })).reason).toBe("unsupported_action");
+    expect(guardReply("I set a reminder for eight.", ctx({ utterance: "remind me at eight", outcomes: succeeded("remind") })).reason).toBeNull();
+    expect(guardReply("I set a reminder for eight.", ctx({ utterance: "remind me at eight" })).reason).toBe("unsupported_action");
+    expect(guardReply("I looked that up: it opens at nine.", ctx({ utterance: "when does the pool open", outcomes: succeeded("websearch") })).reason).toBeNull();
+    expect(guardReply("I looked that up: it opens at nine.", ctx({ utterance: "when does the pool open" })).reason).toBe("unsupported_action");
+  });
+
+  test("a verb with no package behind it never matches an outcome, whatever ran", () => {
+    expect(guardReply("I've texted Nadia.", ctx({ utterance: "text Nadia I'm late", outcomes: succeeded("remember") })).reason).toBe("unsupported_action");
+    expect(guardReply("I emailed the school.", ctx({ utterance: "tell the school Pippa is sick" })).reason).toBe("unsupported_action");
+  });
+
+  test("a claim inside a question is not a claim", () => {
+    expect(guardReply("Want me to add that to your list, or have I saved it already?", ctx({ utterance: "milk" })).reason).toBeNull();
+  });
+
+  test("both paths decide identically: guardSentence() gives the streaming path the same reason", () => {
+    const c = ctx({ utterance: "Pippa is allergic to peanuts" });
+    expect(guardSentence("I saved that.", c)).toBe("unsupported_action");
+    expect(guardSentence("Got it, Pippa is allergic to peanuts.", c)).toBeNull();
+  });
+});
+
+// A code review of CHAT-04 (2026-09-13) found the first cut's family
+// regexes replacing honest answers: third-person "added ... to the list",
+// "I've written" with no "down", "I've ordered them by", a timer or light
+// STATUS answering a question. Each stood on the previous HEAD and stays
+// standing.
+describe("action-claim families only match a claim (the CHAT-04 review's regressions)", () => {
+  test("a third-person report, a poem written, a list ordered by priority, a timer status, a light's location: all stand", () => {
+    expect(guardReply("Yes, Bruno added eggs to the shopping list earlier today.", ctx({ utterance: "did bruno add eggs to the list", shape: "question" })).reason).toBeNull();
+    expect(guardReply("Here's what I've written for you.", ctx({ utterance: "write me a poem about the dog" })).reason).toBeNull();
+    expect(guardReply("Here they are; I've ordered them by priority.", ctx({ utterance: "what's on my list" })).reason).toBeNull();
+    expect(guardReply("I called it a day after that.", ctx({ utterance: "how was your afternoon" })).reason).toBeNull();
+    expect(guardReply("Your timer is running, about four minutes left.", ctx({ utterance: "is my timer still going", shape: "question" })).reason).toBeNull();
+    expect(guardReply("The porch light is on the panel by the door.", ctx({ utterance: "which switch is the porch light", shape: "question" })).reason).toBeNull();
+  });
+
+  test("the same status words after a command are a claim: 'Timer's set.' on 'set a timer' with nothing run", () => {
+    expect(guardReply("Timer's set.", ctx({ utterance: "set a timer" })).reason).toBe("unsupported_action");
+    expect(guardReply("Timer's set.", ctx({ utterance: "start the pasta", shape: "command" })).reason).toBe("unsupported_action");
+    expect(guardReply("Lights are off now.", ctx({ utterance: "turn off the lights" })).reason).toBe("unsupported_action");
+    expect(guardReply("Lights are off now.", ctx({ utterance: "turn off the lights", outcomes: [{ packageId: "lights-off", status: "succeeded" }] })).reason).toBeNull();
+  });
+
+  test("the guard reads the router's shape when given, so a package-declared opener the guard cannot know still counts as a command", () => {
+    // With no shape passed, "queue the pasta timer?" is a question to the guard (a trailing "?", no opener known); the router, which knows the opener, says command.
+    expect(guardReply("Timer's set.", ctx({ utterance: "queue the pasta timer?" })).reason).toBeNull();
+    expect(guardReply("Timer's set.", ctx({ utterance: "queue the pasta timer?", shape: "command" })).reason).toBe("unsupported_action");
+    // And near-echo: a trailing "?" the guard alone would read as a question is a command to the router.
+    expect(guardReply("Okay, remember what I said about the ps5.", ctx({ utterance: "remember what I said about the ps5?" })).reason).toBe("near_echo");
+    expect(guardReply("Okay, remember what I said about the ps5.", ctx({ utterance: "remember what I said about the ps5?", shape: "command" })).reason).toBeNull();
+  });
+});
+
+// The second review round (2026-09-13): a true answer about an earlier
+// turn, a third-person report after a command, a sorted list, a running
+// timer on a stop command, "logged in", and a sentence carrying two claims.
+describe("action-claim families, the second review's cases", () => {
+  test("a question about the past is answered, never denied: only this turn's outcomes are known", () => {
+    expect(guardReply("Yes, I set a timer for eight.", ctx({ utterance: "did you set my timer" })).reason).toBeNull();
+    expect(guardReply("Yes, I saved that earlier.", ctx({ utterance: "did you save that" })).reason).toBeNull();
+    expect(guardReply("I added them to the list yesterday.", ctx({ utterance: "what did you do with the eggs" })).reason).toBeNull();
+    // A polite request with a "?" is still a command (the courtesy prefix), so a claim on it is still checked.
+    expect(guardReply("I've added milk to your list.", ctx({ utterance: "can you add milk to my list?" })).reason).toBe("unsupported_action");
+  });
+
+  test("a third-person report after a command stands; the bare status form only at the sentence's start", () => {
+    expect(guardReply("Bruno already added eggs to the list, so I only need milk.", ctx({ utterance: "add milk to my list" })).reason).toBeNull();
+    expect(guardReply("Added milk to your shopping list.", ctx({ utterance: "add milk to my list" })).reason).toBe("unsupported_action");
+    expect(guardReply("Added milk to your shopping list.", ctx({ utterance: "add milk to my list", outcomes: [{ packageId: "list-add", status: "succeeded" }] })).reason).toBeNull();
+  });
+
+  test("sorting a list, a running timer on a stop command and logging in are not actions", () => {
+    expect(guardReply("I've ordered the list by priority.", ctx({ utterance: "sort my list" })).reason).toBeNull();
+    expect(guardReply("Your timer is running with four minutes left, want me to stop it now.", ctx({ utterance: "stop the timer" })).reason).toBeNull();
+    expect(guardReply("Okay, I logged in too.", ctx({ utterance: "I logged in to the router" })).reason).toBeNull();
+    expect(guardReply("I've ordered a pizza for you.", ctx({ utterance: "order a pizza" })).reason).toBe("unsupported_action");
+  });
+
+  test("a sentence carrying two claims needs both outcomes, and the narration names the one that is missing", () => {
+    const both = "I've added milk to your list and set a timer for ten minutes.";
+    expect(guardReply(both, ctx({ utterance: "add milk and set a timer", outcomes: [{ packageId: "list-add", status: "succeeded" }] })).reply).toBe("I haven't set a timer.");
+    expect(guardReply(both, ctx({ utterance: "add milk and set a timer", outcomes: [{ packageId: "list-add", status: "succeeded" }, { packageId: "timer", status: "succeeded" }] })).reason).toBeNull();
+    // The chained form ("and set a timer") is read only after a command, where the subject can only be the hub.
+    expect(guardReply("Bruno came home and set a timer for the pasta.", ctx({ utterance: "Bruno is cooking tonight" })).reason).toBeNull();
+  });
+
+  test("a lookup claim is about the answer being given, so it is checked on a question too", () => {
+    expect(guardReply("I looked that up: it opens at nine.", ctx({ utterance: "when does the pool open" })).reason).toBe("unsupported_action");
+    expect(guardReply("I looked that up: it opens at nine.", ctx({ utterance: "when does the pool open", outcomes: [{ packageId: "websearch", status: "succeeded" }] })).reason).toBeNull();
+  });
+});
+
+// The third review round (2026-09-13): a reminder scheduled with the
+// remind package having run, advice to the person after a command, the
+// bare status forms with no copula, "called them", "looked up the pool
+// hours", a memory search described honestly, and the idioms.
+describe("action-claim families, the third review's cases", () => {
+  const ran = (packageId: string) => [{ packageId, status: "succeeded" as const }];
+
+  test("'I scheduled a reminder' with the remind package run stands; 'I've scheduled the appointment' is impossible", () => {
+    expect(guardReply("I scheduled a reminder for eight.", ctx({ utterance: "remind me at eight", outcomes: ran("remind") })).reason).toBeNull();
+    expect(guardReply("I've scheduled the appointment for you.", ctx({ utterance: "book the dentist", outcomes: ran("remind") })).reason).toBe("unsupported_action");
+  });
+
+  test("an instruction to the person after a command is advice, not a chained claim", () => {
+    expect(guardReply("Boil the water, then set a timer for ten minutes.", ctx({ utterance: "start the pasta", shape: "command" })).reason).toBeNull();
+    expect(guardReply("Put it on the calendar and set a reminder so you don't forget.", ctx({ utterance: "set up the dentist visit" })).reason).toBeNull();
+    expect(guardReply("Check the fridge and put milk on the list if you're out.", ctx({ utterance: "put together a shopping plan" })).reason).toBeNull();
+    expect(guardReply("I've added milk to your list and set a timer for ten minutes.", ctx({ utterance: "add milk and set a timer", outcomes: ran("list-add") })).reply).toBe("I haven't set a timer.");
+  });
+
+  test("the bare status with no copula is a claim after a command: 'Timer set for ten minutes.', 'Saved.', 'Lights off.', 'Milk added to your list.'", () => {
+    expect(guardReply("Timer set for ten minutes.", ctx({ utterance: "set a timer for ten minutes" })).reason).toBe("unsupported_action");
+    expect(guardReply("Reminder set for eight.", ctx({ utterance: "remind me at eight" })).reason).toBe("unsupported_action");
+    expect(guardReply("Done, saved.", ctx({ utterance: "remember that Pippa is allergic to peanuts", shape: "command" })).reason).toBe("unsupported_action");
+    expect(guardReply("Door's locked.", ctx({ utterance: "lock the door" })).reason).toBe("unsupported_action");
+    expect(guardReply("Lights off.", ctx({ utterance: "turn off the lights" })).reason).toBe("unsupported_action");
+    expect(guardReply("Milk added to your list.", ctx({ utterance: "add milk to my list" })).reason).toBe("unsupported_action");
+    expect(guardReply("Milk is on your list now.", ctx({ utterance: "add milk to my list" })).reason).toBe("unsupported_action");
+    expect(guardReply("Milk is on your list now.", ctx({ utterance: "add milk to my list", outcomes: ran("list-add") })).reason).toBeNull();
+  });
+
+  test("'called them' and 'ordered them for you' are the claim; the sorting and naming senses are not", () => {
+    expect(guardReply("I called them and set a reminder for six.", ctx({ utterance: "call the plumber and remind me at six", outcomes: ran("remind") })).reason).toBe("unsupported_action");
+    expect(guardReply("I ordered them for you.", ctx({ utterance: "get the groceries delivered", shape: "command" })).reason).toBe("unsupported_action");
+    expect(guardReply("I ordered them by priority.", ctx({ utterance: "sort my list" })).reason).toBeNull();
+    expect(guardReply("I called him Rover because he loves to wander.", ctx({ utterance: "the dog is named rover" })).reason).toBeNull();
+    expect(guardReply("I called it a day after that.", ctx({ utterance: "how was your afternoon", shape: "statement" })).reason).toBeNull();
+  });
+
+  test("a lookup without a pronoun is a lookup; a memory search described honestly is not", () => {
+    expect(guardReply("I looked up the pool hours: it opens at nine.", ctx({ utterance: "when does the pool open" })).reason).toBe("unsupported_action");
+    expect(guardReply("I searched for that in your notes but there's nothing saved.", ctx({ utterance: "what's the wifi password" })).reason).toBeNull();
+  });
+
+  test("'logged into', 'locked in Friday', 'locked myself out' and 'I have saved recipes' are not actions", () => {
+    expect(guardReply("Okay, I logged into the router too.", ctx({ utterance: "I logged in to the router" })).reason).toBeNull();
+    expect(guardReply("I've locked in Friday for the recital.", ctx({ utterance: "Pippa's recital is friday" })).reason).toBeNull();
+    expect(guardReply("I've locked myself out before too.", ctx({ utterance: "I locked myself out" })).reason).toBeNull();
+    expect(guardReply("I have saved recipes I can suggest.", ctx({ utterance: "I'm bored of pasta" })).reason).toBeNull();
+  });
+});
+
+// The fourth review round (2026-09-13): a bare completion word after a
+// command, "went ahead and", the lookup in every first-person form, a
+// noun phrase before the family noun, a room after on/off, a
+// contraction on the list noun, a status on a disclosure, a named save.
+describe("action-claim families, the fourth review's cases", () => {
+  const failed = (packageId: string) => [{ packageId, status: "failed" as const }];
+
+  test("'All set.' and 'Done.' after a command are claims about what was asked: narrated from the outcome, or 'nothing ran'", () => {
+    expect(guardReply("All set.", ctx({ utterance: "remember that Pippa is allergic to peanuts", shape: "command", outcomes: failed("remember") })).reply).toBe("That didn't get saved.");
+    expect(guardReply("Done.", ctx({ utterance: "set a timer for ten minutes", outcomes: failed("timer") })).reply).toBe("The timer didn't get set.");
+    expect(guardReply("Done, locked.", ctx({ utterance: "lock the doors", outcomes: failed("lock-doors") })).reply).toBe("The lock didn't respond.");
+    expect(guardReply("Done.", ctx({ utterance: "lock the doors", outcomes: [{ packageId: "lock-doors", status: "pending" }] })).reply).toBe("That's waiting on your confirmation.");
+    expect(guardReply("Done.", ctx({ utterance: "set a timer for ten minutes" })).reply).toBe("I haven't actually done that.");
+    expect(guardReply("Done.", ctx({ utterance: "set a timer for ten minutes", outcomes: [{ packageId: "timer", status: "succeeded" }] })).reason).toBeNull();
+    expect(guardReply("Done.", ctx({ utterance: "I finished the puzzle" })).reason).toBeNull(); // not a command: an acknowledgment
+    expect(guardReply("Done.", ctx({ utterance: "remember that Pippa is allergic to peanuts", shape: "command" })).reason).toBeNull(); // remembering needs no outcome
+  });
+
+  test("'went ahead and', 'checked and' after a command are claims; the chained form needs a first-person opener, not any 'and'", () => {
+    expect(guardReply("I went ahead and added milk to your list.", ctx({ utterance: "add milk" })).reason).toBe("unsupported_action");
+    expect(guardReply("I've gone ahead and saved that.", ctx({ utterance: "remember that Pippa is allergic to peanuts", shape: "command" })).reason).toBe("unsupported_action");
+    expect(guardReply("Okay, I checked and set a timer for ten minutes.", ctx({ utterance: "set a timer" })).reason).toBe("unsupported_action");
+    expect(guardReply("Boil the water, then set a timer for ten minutes.", ctx({ utterance: "start the pasta", shape: "command" })).reason).toBeNull();
+  });
+
+  test("a lookup in every first-person form needs the websearch outcome", () => {
+    for (const reply of ["I've looked it up and it opens at nine.", "I just looked it up: it opens at nine.", "Okay, I've looked it up: nine."]) {
+      expect(guardReply(reply, ctx({ utterance: "when does the pool open" })).reason).toBe("unsupported_action");
+    }
+  });
+
+  test("a noun phrase before the family noun, a room after on/off, a contraction on the list noun", () => {
+    expect(guardReply("Ten-minute timer set.", ctx({ utterance: "set a ten minute timer" })).reason).toBe("unsupported_action");
+    expect(guardReply("Front door locked.", ctx({ utterance: "lock the front door" })).reason).toBe("unsupported_action");
+    expect(guardReply("Kitchen lights off.", ctx({ utterance: "turn off the kitchen lights" })).reason).toBe("unsupported_action");
+    expect(guardReply("Lights are off in the kitchen now.", ctx({ utterance: "turn off the kitchen lights" })).reason).toBe("unsupported_action");
+    expect(guardReply("The lights in the kitchen are off.", ctx({ utterance: "turn off the kitchen lights" })).reason).toBe("unsupported_action");
+    expect(guardReply("The porch light is on the panel by the door.", ctx({ utterance: "which switch is the porch light", shape: "question" })).reason).toBeNull();
+    expect(guardReply("Milk's on your list now.", ctx({ utterance: "add milk to my list" })).reason).toBe("unsupported_action");
+  });
+
+  test("a status on a disclosure agrees with the first-person form: 'Saved.' and 'I saved that.' are the same claim", () => {
+    expect(guardReply("Saved.", ctx({ utterance: "Pippa is allergic to peanuts" })).reason).toBe("unsupported_action");
+    expect(guardReply("Got it, saved.", ctx({ utterance: "Pippa is allergic to peanuts" })).reason).toBe("unsupported_action");
+    expect(guardReply("I've saved Pippa's allergy to your memory.", ctx({ utterance: "Pippa is allergic to peanuts" })).reason).toBe("unsupported_action");
+    expect(guardReply("Got it, Pippa is allergic to peanuts.", ctx({ utterance: "Pippa is allergic to peanuts" })).reason).toBeNull();
   });
 });

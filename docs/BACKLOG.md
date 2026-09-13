@@ -163,7 +163,18 @@ not permission to expand scope.
 
 <a id="chat-04"></a>
 
-- [ ] **CHAT-04: Stop rejecting valid acknowledgments and general knowledge** (M)
+- [x] **CHAT-04: Stop rejecting valid acknowledgments and general knowledge** (M)
+
+    Shipped 2026-09-13 (the action-claim half; FAST-05 shipped the
+    world-knowledge half 2026-09-12): near-echo is a question guard
+    (`utteranceShape()` from the new pure `lib/utteranceShape.ts`),
+    `GuardContext.outcomes` replaces `actionsRan`, completed action
+    claims are matched per package family to a succeeded outcome
+    (`unsupported_action`, narrated from the outcome, never a pooled
+    line), remembering and future intent are acknowledgments, and the
+    #81 sentence-case pass runs on both paths. Design and the shipped
+    record in [docs/dev/session-a.md](dev/session-a.md). Closes #74,
+    #62; #81 by the pass and a naturalness bench row.
 
     Depends on: CHAT-01 and CHAT-02; use CHAT-15 outcomes when available,
     otherwise the identical type from CHAT-01. Files:

@@ -57,3 +57,10 @@ Each item's acceptance in BACKLOG is the contract. Where an item names
 a live check, run it on a spare-port backend against the household
 engines by URL and record the numbers in `session-a.md`. Where a
 measured result misses, record it and stop; never lower a threshold.
+
+## Order after CHAT-04 (2026-09-13)
+
+CHAT-04 closed the correctness boundary. The queue from here is
+[measure-first-2026-09-13.md](measure-first-2026-09-13.md): the
+block-end `check.sh` on bare `main`, then the baseline conversation
+bench, then items chosen from its table.

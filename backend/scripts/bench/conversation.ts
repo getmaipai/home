@@ -290,7 +290,7 @@ function main(): void {
         utterance: turn.say,
         sources: scenario.memory,
         history: [...history],
-        actionsRan: false,
+        outcomes: [],
         personaExamples: [],
         // FAST-05: the household this bench runs against (the file
         // header's own roster), so a location claim about one of them is

@@ -25,6 +25,7 @@ function context(overrides: Partial<TurnContext> = {}): TurnContext {
     now: new Date("2026-09-13T15:00:00Z"),
     locale: "en-US",
     roster: ["Sage", "Pippa"],
+    shape: "question",
     ...overrides,
   };
 }
@@ -84,12 +85,12 @@ describe("guardContextFrom(): the guard input from the included evidence alone",
     expect(JSON.stringify([guard.sources, guard.grounding, guard.episodes])).not.toContain("zoo");
   });
 
-  test("actionsRan is a succeeded outcome and nothing else: not a failed call, not a pending confirmation, not a summary that mentions an action", () => {
+  test("outcomes carry package id and status, and a summary that mentions an action is never one (CHAT-04 replaced actionsRan)", () => {
     const summary = evidence("summary:conv-1", "summary", "Earlier: MaiPai set a timer for the pasta.");
-    expect(guardContextFrom(context({ evidence: [summary], includedEvidenceIds: ["summary:conv-1"] })).actionsRan).toBe(false);
-    expect(guardContextFrom(context({ outcomes: [{ callId: "c1", packageId: "timer", status: "failed", errorCode: "400" }] })).actionsRan).toBe(false);
-    expect(guardContextFrom(context({ outcomes: [{ callId: "c1", packageId: "lock-doors", status: "pending" }] })).actionsRan).toBe(false);
-    expect(guardContextFrom(context({ outcomes: [{ callId: "c1", packageId: "timer", status: "succeeded" }] })).actionsRan).toBe(true);
+    expect(guardContextFrom(context({ evidence: [summary], includedEvidenceIds: ["summary:conv-1"] })).outcomes).toEqual([]);
+    expect(guardContextFrom(context({ outcomes: [{ callId: "c1", packageId: "timer", status: "failed", errorCode: "400" }] })).outcomes).toEqual([{ packageId: "timer", status: "failed" }]);
+    expect(guardContextFrom(context({ outcomes: [{ callId: "c1", packageId: "lock-doors", status: "pending" }] })).outcomes).toEqual([{ packageId: "lock-doors", status: "pending" }]);
+    expect(guardContextFrom(context({ outcomes: [{ callId: "c1", packageId: "timer", status: "succeeded" }] })).outcomes).toEqual([{ packageId: "timer", status: "succeeded" }]);
   });
 });
 

@@ -11,6 +11,7 @@ import {
   gateOutputSafety,
   gateGuards,
   closeDanglingClause,
+  sentenceCaseOpener,
   StreamSafetyRefusal,
   buildSystemPrompt,
   buildStablePrefix,
@@ -1269,7 +1270,7 @@ describe("lib/turnEngine.ts gateGuards() matches guardReply()'s real branches (F
     return undefined;
   }
 
-  test("non-cuttable (capability_claim): replaces the FIRST sentence and stops - the model's own next sentence is never spoken", async () => {
+  test("non-cuttable (unsupported_action; capability_claim before CHAT-04 split the completed claim out): replaces the FIRST sentence and stops - the model's own next sentence is never spoken", async () => {
     // guardReply()'s own branch: reason is non-cuttable, kept.length is
     // irrelevant - always `return { reply: replacementFor(reason, ...), reason }`.
     // No "?" anywhere in the reply: guardCapabilityClaim's own "never
@@ -1279,7 +1280,7 @@ describe("lib/turnEngine.ts gateGuards() matches guardReply()'s real branches (F
     // guard behavior this test isn't the one to prove.
     const ctx = { utterance: "can you text Nadia that I'm running late" };
     const nonStreaming = guardReply("Sure, I've sent it. I'll follow up later.", { ...ctx, personId: "person-1" });
-    expect(nonStreaming.reason).toBe("capability_claim");
+    expect(nonStreaming.reason).toBe("unsupported_action");
     expect(nonStreaming.reply).not.toContain("sent it");
     expect(nonStreaming.reply).not.toContain("follow up later");
 
@@ -1289,7 +1290,7 @@ describe("lib/turnEngine.ts gateGuards() matches guardReply()'s real branches (F
     const text = delivered.join("");
     expect(text).not.toContain("sent it");
     expect(text).not.toContain("follow up later");
-    expect(text.trim().length).toBeGreaterThan(0); // the honest CANNOT_DO line still stands
+    expect(text.trim()).toBe(nonStreaming.reply); // the same narrated line on both paths (CHAT-04)
   });
 
   test("cuttable (invention) with NOTHING kept before it: replaces the WHOLE reply and stops - the getmaipai/home#62 regression itself", async () => {
@@ -1380,7 +1381,7 @@ describe("lib/turnEngine.ts gateGuards() matches guardReply()'s real branches (F
       delivered.push(step.value);
       step = await gated.next();
     }
-    expect(flaggedReasons).toEqual(["capability_claim"]);
+    expect(flaggedReasons).toEqual(["unsupported_action"]); // CHAT-04: "I've sent it" is a completed claim with no package behind it
     expect(delivered.join("")).not.toContain("nobody should ever see");
     expect(step.value && "action" in step.value ? step.value.action : undefined).toBe("allow_with_resources");
   });
@@ -2899,5 +2900,93 @@ describe("step 2: conversational recall uses the speaker's own facts", () => {
     if (!recalled.ok) return;
     expect(recalled.value.reply.text.toLowerCase()).toContain("cilantro");
     expect(recalled.value.reply.text.toLowerCase()).toContain("dislike");
+  });
+});
+
+// CHAT-04 (docs/dev/session-a.md): the household-visible symptom behind
+// getmaipai/home#74 and #62, end to end through the real turn engine
+// with a scripted model reply: a person tells the hub a fact and the
+// model confirms it back in the same turn. near_echo used to replace
+// that confirmation with "I don't know, sorry." because every remaining
+// word was the person's own; it is a question guard now. Plus #81's
+// sentence-case pass on the model's opener, on both paths.
+describe("CHAT-04: acknowledgments pass, action claims need their outcome, openers are sentence-cased", () => {
+  async function withScriptedReply<T>(reply: string, fn: () => Promise<T>): Promise<T> {
+    __resetLlmSupervisorForTests();
+    const { startStubLlmServer } = await import("@maipai/spec/llm/ts/stubServer.js");
+    const stub = startStubLlmServer(0, { scriptedChatReply: () => reply });
+    process.env.MAIPAI_LLAMA_SERVER_URL = stub.url;
+    try {
+      return await fn();
+    } finally {
+      stub.stop();
+      delete process.env.MAIPAI_LLAMA_SERVER_URL;
+      __resetLlmSupervisorForTests();
+    }
+  }
+
+  test("runTurn(): 'Got it, Pippa is allergic to peanuts.' in the turn it was said reaches the person untouched (#74, #62)", async () => {
+    const { actor } = await owner();
+    await withScriptedReply("Got it, Pippa is allergic to peanuts.", async () => {
+      const result = await runTurn(actor, "chat", "Pippa is allergic to peanuts");
+      expect(result.ok).toBe(true);
+      if (!result.ok) return;
+      expect(result.value.source).toBe("model");
+      expect(result.value.reply.text).toBe("Got it, Pippa is allergic to peanuts.");
+    });
+  });
+
+  test("runTurnStream(): the same acknowledgment streams through whole", async () => {
+    const { actor } = await owner();
+    await withScriptedReply("Got it, Pippa is allergic to peanuts.", async () => {
+      const result = await runTurnStream(actor, "chat", "Pippa is allergic to peanuts");
+      expect(result.ok).toBe(true);
+      if (!result.ok || result.kind !== "stream") return;
+      let fullText = "";
+      for await (const delta of result.tokens) fullText += delta;
+      expect(fullText.trim()).toBe("Got it, Pippa is allergic to peanuts.");
+      const value = result.finalize(fullText);
+      expect(value.reply.text.trim()).toBe("Got it, Pippa is allergic to peanuts.");
+    });
+  });
+
+  test("runTurn(): a completed save claim with nothing having run is replaced, never spoken as if the write happened", async () => {
+    const { actor } = await owner();
+    await withScriptedReply("I saved that to your memory.", async () => {
+      const result = await runTurn(actor, "chat", "Pippa is allergic to peanuts");
+      expect(result.ok).toBe(true);
+      if (!result.ok) return;
+      expect(result.value.reply.text).toBe("I haven't saved that as a memory."); // narrated from the outcome (nothing ran), not a pooled line
+    });
+  });
+
+  test("#81: a lowercase model opener is sentence-cased on the blocking path, and only the model's text (a package reply and speech are left as authored)", async () => {
+    const { actor } = await owner();
+    await withScriptedReply("pretty good, thanks for asking.", async () => {
+      const result = await runTurn(actor, "chat", "how's your day going");
+      expect(result.ok).toBe(true);
+      if (!result.ok) return;
+      expect(result.value.source).toBe("model");
+      expect(result.value.reply.text).toBe("Pretty good, thanks for asking.");
+    });
+    expect(sentenceCaseOpener("iPhone is fine")).toBe("iPhone is fine");
+    expect(sentenceCaseOpener("  \"hello there\"")).toBe("  \"Hello there\"");
+    expect(sentenceCaseOpener("4 pm works.")).toBe("4 pm works.");
+    expect(sentenceCaseOpener("")).toBe("");
+  });
+
+  test("#81: the streamed opener a client renders is sentence-cased too, so the stream and the logged reply agree", async () => {
+    const { actor } = await owner();
+    await withScriptedReply("pretty good, thanks for asking.", async () => {
+      const result = await runTurnStream(actor, "chat", "how's your day going");
+      expect(result.ok).toBe(true);
+      if (!result.ok || result.kind !== "stream") return;
+      const deltas: string[] = [];
+      for await (const delta of result.tokens) deltas.push(delta);
+      const fullText = deltas.join("");
+      expect(fullText.trim()).toBe("Pretty good, thanks for asking.");
+      expect(deltas.find((d) => /[A-Za-z]/.test(d))).toMatch(/^[\s"'(\[]*P/);
+      expect(result.finalize(fullText).reply.text.trim()).toBe("Pretty good, thanks for asking.");
+    });
   });
 });

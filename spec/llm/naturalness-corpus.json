@@ -78,5 +78,15 @@
     "robotic_re": "(?i)i do not have enough information|at this time",
     "natural_re": "(?i)not sure|no idea|don'?t know",
     "note": "'I don't know' is a real answer, under five words, unapologetic - not a hedge about the limits of the assistant's knowledge."
+  },
+  {
+    "id": "sentence_case_opener",
+    "category": "case",
+    "utterance": "how's your day going",
+    "robotic": "pretty good, thanks for asking.",
+    "natural": "Pretty good, thanks for asking.",
+    "robotic_re": "^[\\s\"'(\\[]*[a-z]",
+    "natural_re": "^[\\s\"'(\\[]*[A-Z0-9]",
+    "note": "getmaipai/home#81 (CHAT-04): a reply that opens in texting case reads as a slip, not a register. The engine's sentenceCaseOpener() pass in finalizeReply() capitalizes the model's first letter on both paths, so this row fails only if that pass is gone or bypassed; the regexes are case-sensitive on purpose."
   }
 ]

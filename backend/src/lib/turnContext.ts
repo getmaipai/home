@@ -89,6 +89,10 @@ export interface TurnContext {
   /** Display names and nicknames of the household, for the guard's
    * household-subject test. */
   roster: string[];
+  /** ROUTE-01's shape of the utterance as the router read it (with the
+   * installed packages' command openers), so the guards read the same
+   * shape and never recompute it with a different opener set (CHAT-04). */
+  shape: UtteranceShape;
 }
 
 const DETAIL_PHRASES = [/\bin detail\b/i, /\bdetailed explanation\b/i, /\bstep by step\b/i];
@@ -120,9 +124,10 @@ export function includedEvidence(ctx: TurnContext): TurnEvidence[] {
  * memory lines and package results (the `unrelated_recall` candidates);
  * `episodes` the recalled lines the prompt showed; `grounding` the
  * profile, summary, roster and clock facts the prompt showed; `history`
- * the window's user lines; `actionsRan` a succeeded outcome and nothing
- * else (a summary is a lossy aid, never proof of an action; an assistant
- * line and a persona example never become one). */
+ * the window's user lines; `outcomes` the turn's tool outcomes, package
+ * id and status, so an action claim is matched to the package family its
+ * verb names (CHAT-04; a summary is a lossy aid, never proof of an
+ * action; an assistant line and a persona example never become one). */
 export function guardContextFrom(ctx: TurnContext): Omit<GuardContext, "personId"> {
   const included = includedEvidence(ctx);
   const ofKind = (...kinds: EvidenceKind[]) => included.filter((e) => kinds.includes(e.kind)).map((e) => e.text);
@@ -132,8 +137,9 @@ export function guardContextFrom(ctx: TurnContext): Omit<GuardContext, "personId
     sources: ofKind("memory", "package_result"),
     episodes: ofKind("episode"),
     grounding: ofKind("profile", "summary", "household", "clock"),
-    actionsRan: ctx.outcomes.some((o) => o.status === "succeeded"),
+    outcomes: ctx.outcomes.map((o) => ({ packageId: o.packageId, status: o.status })),
     personaExamples: ctx.persona.examples,
     roster: ctx.roster,
+    shape: ctx.shape,
   };
 }

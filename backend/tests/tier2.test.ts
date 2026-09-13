@@ -467,7 +467,7 @@ describe("runTurn()/runTurnStream() with native tool calling end to end (Fix E)"
     process.env.MAIPAI_LLAMA_SERVER_URL = stub.url;
     try {
       // REQUEST_RE-matching ("can you ...") so guardCapabilityClaim's
-      // OTHER gate (ctx.actionsRan/utterance check) doesn't already
+      // OTHER gate (ctx.outcomes/utterance check) doesn't already
       // exempt sentence 0 on its own, independent of replyHasQuestion.
       await runTurn(actor, "chat", "can you look up the odyssey's rating");
     } finally {
@@ -853,5 +853,48 @@ describe("ROUTE-02: a stable ordinary tool set", () => {
     expect(ids).toContain("websearch");
     expect(ids).toContain("remember"); // the default order on a household with no usage yet
     expect(ids).toEqual([...ids].sort());
+  });
+});
+
+// CHAT-04 (a code review): the streaming path guards each sentence with
+// a context read at the moment of the check, so an outcome pushed by
+// resolveToolCalls() inside the stream (every proposed call failed, then
+// the no-tools retry) reaches the action-claim guard. A prepare-time
+// snapshot carried empty outcomes and narrated "nothing ran" where the
+// blocking path said "failed"; both paths now say the same thing.
+describe("CHAT-04: a failed tool call inside the stream reaches the action-claim guard on both paths", () => {
+  async function withFailedRememberThenClaim<T>(fn: () => Promise<T>): Promise<T> {
+    __resetLlmSupervisorForTests();
+    const { startStubLlmServer } = await import("@maipai/spec/llm/ts/stubServer.js");
+    const stub = startStubLlmServer(0, {
+      scriptedToolCalls: (request) => {
+        if (!request.tools || request.tools.length === 0) return undefined;
+        return [{ id: "call-1", type: "function" as const, function: { name: "remember", arguments: "{}" } }]; // missing required `fact`: fails
+      },
+      scriptedChatReply: () => "I saved that to your memory.",
+    });
+    process.env.MAIPAI_LLAMA_SERVER_URL = stub.url;
+    try {
+      return await fn();
+    } finally {
+      stub.stop();
+      delete process.env.MAIPAI_LLAMA_SERVER_URL;
+      __resetLlmSupervisorForTests();
+    }
+  }
+  const UTTERANCE = "our wifi password is on the fridge, please remember this";
+
+  test("runTurnStream(): the retry's save claim is narrated as the failure the remember call reported, never as 'nothing ran'", async () => {
+    const { actor } = await owner();
+    const { deltas } = await withFailedRememberThenClaim(async () => drainStream(await runTurnStream(actor, "chat", UTTERANCE)));
+    expect(deltas.join("").trim()).toBe("That didn't get saved.");
+  });
+
+  test("runTurn(): the blocking path says the same", async () => {
+    const { actor } = await owner();
+    const result = await withFailedRememberThenClaim(() => runTurn(actor, "chat", UTTERANCE));
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.value.reply.text).toBe("That didn't get saved.");
   });
 });

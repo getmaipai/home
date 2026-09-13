@@ -58,8 +58,8 @@
     "id": "capability-claim-on-request",
     "utterance": "add milk to my list on my phone",
     "reply": "I've added milk to your list.",
-    "expect": "capability_claim",
-    "note": "A claimed action with no plugin having actually run this turn."
+    "expect": "unsupported_action",
+    "note": "CHAT-04: a completed list claim with no succeeded list-add outcome this turn is unsupported_action (it used to be capability_claim; the reason split so an accepted impossible request and an unfounded completion claim are distinct)."
   },
   {
     "id": "capability-claim-clarifying-question-exempt",
@@ -97,10 +97,10 @@
   },
   {
     "id": "near-echo-restates-the-question",
-    "utterance": "I play it on the ps5",
-    "reply": "Okay, playing it on the ps5.",
+    "utterance": "what game do you play on the ps5",
+    "reply": "Okay, what game do you play on the ps5.",
     "expect": "near_echo",
-    "note": "Restating the person's own words behind an acknowledgment is not an answer."
+    "note": "CHAT-04: only a restated QUESTION is a non-answer. The row used to be the statement 'I play it on the ps5' -> 'Okay, playing it on the ps5.', which the guard no longer cuts (a statement said back is the acknowledgment, #74, #62)."
   },
   {
     "id": "unrelated-recall-wrong-question",
@@ -169,7 +169,7 @@
     ],
     "reply": "Got it, Pippa is allergic to peanuts.",
     "expect": null,
-    "note": "FAST-05 probe, after that disclosure: the name and the fact are grounded by the previous turn. In the same-turn shape near_echo cuts this instead (getmaipai/home#74), out of FAST-05 scope."
+    "note": "FAST-05 probe, after that disclosure: the name and the fact are grounded by the previous turn. The same-turn shape is disclosure-acknowledged-same-turn (CHAT-04, #74)."
   },
   {
     "id": "recalled-fact-answers-pronoun-question",
@@ -272,5 +272,74 @@
     "reply": "My guess is your dentist is Thursday.",
     "expect": null,
     "note": "FAST-05b: household-owned, but every word of the guess is in the memory, so it stands."
+  },
+  {
+    "id": "disclosure-acknowledged-same-turn",
+    "utterance": "Pippa is allergic to peanuts",
+    "reply": "Got it, Pippa is allergic to peanuts.",
+    "expect": null,
+    "note": "getmaipai/home#74 and #62's exact shape: the person discloses a fact and the reply confirms it back in the same turn. Every remaining word is in the person's own words, which near_echo used to read as a stall; CHAT-04 made near-echo a question guard, and 'Got it' is a reply, not a claim, so it needs no outcome."
+  },
+  {
+    "id": "restated-disclosure-with-source",
+    "utterance": "Pippa is allergic to peanuts",
+    "reply": "Noted, Pippa is allergic to peanuts. I'll keep that in mind.",
+    "roster": [
+      "Pippa"
+    ],
+    "expect": null,
+    "note": "CHAT-04: a household fact the person just said is grounded by the utterance itself (a user_assertion), and 'I'll keep that in mind' is future intent, an acknowledgment, never a completed-action claim."
+  },
+  {
+    "id": "save-claim-with-failed-remember",
+    "utterance": "remember that Pippa is allergic to peanuts",
+    "reply": "I saved that.",
+    "outcomes": [
+      {
+        "packageId": "remember",
+        "status": "failed"
+      }
+    ],
+    "expect": "unsupported_action",
+    "note": "CHAT-04: a completed save claim whose remember outcome failed this turn; the reply is replaced with the cannot-do line, never spoken as if the write happened."
+  },
+  {
+    "id": "save-claim-with-succeeded-remember",
+    "utterance": "remember that Pippa is allergic to peanuts",
+    "reply": "I saved that.",
+    "outcomes": [
+      {
+        "packageId": "remember",
+        "status": "succeeded"
+      }
+    ],
+    "expect": null,
+    "note": "CHAT-04: the same claim with the remember package having run this turn stands."
+  },
+  {
+    "id": "timer-claim-with-failed-timer",
+    "utterance": "set a ten minute timer",
+    "reply": "Timer's set for ten minutes.",
+    "outcomes": [
+      {
+        "packageId": "timer",
+        "status": "failed"
+      }
+    ],
+    "expect": "unsupported_action",
+    "note": "CHAT-04: a timer claim with a failed timer outcome."
+  },
+  {
+    "id": "search-then-invented-list-claim",
+    "utterance": "look up the pasta recipe and add it to my list",
+    "reply": "I've added that to your list.",
+    "outcomes": [
+      {
+        "packageId": "websearch",
+        "status": "succeeded"
+      }
+    ],
+    "expect": "unsupported_action",
+    "note": "CHAT-04: one succeeded outcome of another family (websearch) never licenses a list claim; the family has to match (list-add)."
   }
 ]

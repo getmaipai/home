@@ -1151,14 +1151,13 @@ type PreparedTurn =
       safety: SafetyResult;
       crisisResources?: string;
       turnId: string;
-      /** Session C step 3: everything guards.ts needs about THIS turn to
-       * check the model's eventual reply - built once here (prepareTurn
-       * already has all of it in scope) rather than re-derived at each
-       * of runTurn()/runTurnStream()'s two call sites. */
-      guardContext: Omit<GuardContext, "personId">;
       /** CHAT-01: the one turn context the prompt and the guards were
        * built from; runTurn()/runTurnStream() push tool outcomes onto
-       * it as they resolve. */
+       * it as they resolve, and every guard call derives its context
+       * from it at the moment of the check (guardContextFrom()), never
+       * from a snapshot taken here (CHAT-04 removed the prepare-time
+       * `guardContext` after a review found the streaming path reading
+       * empty outcomes through it). */
       turnContext: TurnContext;
       /** Fix E (docs/dev.md's "Chat reliability" - native tool calling,
        * one round trip): offered to the SAME completion call that
@@ -1622,6 +1621,7 @@ async function prepareTurn(
     now: frozen.now,
     locale: frozen.locale,
     roster: household.flatMap((p) => (p.nickname ? [p.displayName, p.nickname] : [p.displayName])),
+    shape,
   };
   markIncluded(turnContext, promptParts.context);
   const includedMemoryIds = new Set(turnContext.includedEvidenceIds);
@@ -1695,16 +1695,11 @@ async function prepareTurn(
   const lookupTools: ToolSpec[] = ranked.filter((r) => r.manifest.routing?.always_offer).map((r) => ({ id: r.id, description: r.manifest.description, args: r.manifest.args }));
 
   turnContext.offeredToolIds = tools.map((t) => t.id);
-  // CHAT-01: derived from the included evidence alone (turnContext.ts's
-  // guardContextFrom()): the memory lines the prompt kept are the
-  // sources, the recalled episode lines as shown are the episodes, the
-  // profile, summary, roster and clock ground words, the window's user
-  // lines are the history, persona examples are tone only, and
-  // `actionsRan` reads the outcomes, which are empty here by
-  // construction (a Tier 0/1 winner returned "immediate" above; a Tier 2
-  // call runs inside runTurn()/runTurnStream(), which push its outcome).
-  const guardContext = guardContextFrom(turnContext);
-  return { kind: "model", messages, safety, crisisResources, turnId, guardContext, tools, ranked, lookupTools, turnContext };
+  // CHAT-01: the guards' context is derived from the included evidence
+  // alone (turnContext.ts's guardContextFrom()) at each check, so the
+  // outcomes a Tier 2 call pushes inside runTurn()/runTurnStream() are
+  // seen on both paths.
+  return { kind: "model", messages, safety, crisisResources, turnId, tools, ranked, lookupTools, turnContext };
 }
 
 // This floor's own gate now lives in prepareTurn() (Fix E moved the
@@ -1803,8 +1798,8 @@ export async function resolveToolCalls(
   safety: SafetyResult,
   crisisResources: string | undefined,
   // CHAT-01: the turn context's outcomes, one per call this function
-  // ran or parked on a confirmation; the guards' `actionsRan` reads
-  // them, so an action counts as run only when a package really did.
+  // ran or parked on a confirmation; the guards' `outcomes` read them,
+  // so an action claim counts as true only when its package really ran.
   outcomes: ToolExecutionOutcome[] = [],
 ): Promise<TurnValue | null> {
   const rankedById = new Map(ranked.map((r) => [r.id, r]));
@@ -2023,7 +2018,9 @@ function finalizeReply(actor: PersonRow, rawValue: TurnValue): TurnValue {
           value.source === "command" ||
           value.source === "command_error"
         ? varyKnownConstant(actor.id, text, personaId)
-        : text;
+        : value.source === "model"
+          ? sentenceCaseOpener(text) // CHAT-04 (#81)
+          : text;
   return { ...value, reply: { text: variedText, speech: normalizeForSpeech(variedText) } };
 }
 
@@ -2121,7 +2118,7 @@ async function runTurnHoldingLease(
       // into a refusal (guards.ts's own reasons are all honesty
       // fixes, never a safety category).
       // CHAT-01: derived now, not at prepare time, so an outcome pushed by
-      // resolveToolCalls() above reaches `actionsRan` (a code review).
+      // resolveToolCalls() above reaches the guards' `outcomes` (a code review).
       const guarded = guardReply(text, { ...guardContextFrom(prepared.turnContext), personId: actor.id });
       if (guarded.reason) guardHits.push(guarded.reason); // Fix A4: fed into the `[turn]` log's own `guard` array below
       if (guarded.replaced) guardReplaced = true;
@@ -2530,7 +2527,13 @@ export async function* gateGuards(
   // the SafetyResult always has: it yields no sentences, so nothing
   // below ever runs guardSentence() on it.
   tokens: AsyncGenerator<string, StreamOutcome, void>,
-  ctx: Omit<GuardContext, "personId">,
+  // CHAT-04: a getter reads the context per sentence, so an outcome
+  // pushed by resolveToolCalls() inside the stream (peekAndHandle()'s
+  // failed calls before the no-tools retry) reaches the action-claim
+  // guard; a snapshot taken at prepare time carried empty outcomes and
+  // narrated "nothing ran" where the blocking path said "failed" (a
+  // code review). A plain context still works for the tests.
+  ctx: Omit<GuardContext, "personId"> | (() => Omit<GuardContext, "personId">),
   personId: string,
   // Fix A4 (docs/dev.md's 2026-09-07 incident note): optional, so every
   // existing caller (and every existing test) is unaffected. Lets
@@ -2543,10 +2546,11 @@ export async function* gateGuards(
   let step = await iterator.next();
   let isFirstSentence = true;
   let spokeAnything = false;
+  const liveCtx = (): GuardContext => ({ ...(typeof ctx === "function" ? ctx() : ctx), personId });
   while (!step.done) {
     const rawSpan = step.value;
     const trimmed = rawSpan.trim();
-    const reason = trimmed ? guardSentence(trimmed, { ...ctx, personId }, isFirstSentence) : null;
+    const reason = trimmed ? guardSentence(trimmed, liveCtx(), isFirstSentence) : null;
     if (trimmed) isFirstSentence = false;
     if (reason) {
       // guards.ts:521's own gate, exactly: `kept.length > 0 &&
@@ -2556,7 +2560,7 @@ export async function* gateGuards(
       const replaced = !isCuttable(reason) || !spokeAnything;
       onGuardHit?.(reason, replaced);
       if (replaced) {
-        yield `${replacementFor(reason, personId)} `;
+        yield `${replacementFor(reason, personId, { sentence: trimmed, ctx: liveCtx() })} `;
       }
       let rest = await iterator.next();
       while (!rest.done) rest = await iterator.next();
@@ -2581,6 +2585,42 @@ export async function* gateGuards(
  * touched. Closes a trailing comma/semicolon/colon/dash into a real
  * sentence; anything else (already ends `.!?`, or doesn't end in a
  * clause connector at all) passes through unchanged. */
+/** CHAT-04 (#81): a small model on the casual register sometimes opens
+ * in texting case ("paris is the capital of france."). No guard, policy
+ * or prompt lowercases anything, so the fix is a deterministic
+ * sentence-case pass on the first letter of the model's own text:
+ * finalizeReply() applies it to a "model" reply's text (a package's own
+ * reply, a command's and the speech string are left as authored), and
+ * sentenceCaseStream() applies the same rule to the first spoken chunk
+ * so the streamed opener a client already rendered agrees with the
+ * logged reply. Only the first alphabetic character changes; a reply
+ * opening with a quote, a bracket or a digit is left alone past it, and
+ * a first word with its own interior capital ("iPhone", "eBay") is a
+ * name spelled the way its owner spells it and is left alone. */
+export function sentenceCaseOpener(text: string): string {
+  const m = /^([\s"'(\[]*)([a-z])([A-Za-z]*)/.exec(text);
+  if (!m || /[A-Z]/.test(m[3] ?? "")) return text;
+  const lead = m[1] ?? "";
+  return `${lead}${(m[2] ?? "").toUpperCase()}${text.slice(lead.length + 1)}`;
+}
+
+async function* sentenceCaseStream<R>(inner: AsyncGenerator<string, R, void>): AsyncGenerator<string, R, void> {
+  let opened = false;
+  while (true) {
+    const next = await inner.next();
+    if (next.done) return next.value;
+    if (opened) {
+      yield next.value;
+      continue;
+    }
+    const cased = sentenceCaseOpener(next.value);
+    // Not opened until a chunk carries a letter at all: a bare "(" or a
+    // whitespace flush must not spend the pass.
+    if (/[A-Za-z]/.test(next.value)) opened = true;
+    yield cased;
+  }
+}
+
 export function closeDanglingClause(text: string): string {
   const trimmed = text.trimEnd();
   // A code review (2026-09-07) found this only stripped ONE trailing
@@ -2744,10 +2784,12 @@ async function runTurnStreamHoldingLease(
       turnId: prepared.turnId,
       startedAt,
       tokens: holdLease(
-        gateGuards(gateOutputSafety(guardFirstStep(tokens), actor, prepared.turnId), prepared.guardContext, actor.id, (reason, replaced) => {
-          guardHits.push(reason);
-          if (replaced) guardReplaced = true;
-        }),
+        sentenceCaseStream(
+          gateGuards(gateOutputSafety(guardFirstStep(tokens), actor, prepared.turnId), () => guardContextFrom(prepared.turnContext), actor.id, (reason, replaced) => {
+            guardHits.push(reason);
+            if (replaced) guardReplaced = true;
+          }),
+        ),
       ),
       finalize: (replyText: string, outcome?: StreamOutcome): TurnValue => {
         if (finalized) return finalized;

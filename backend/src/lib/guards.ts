@@ -23,6 +23,8 @@
 // second-guessed.
 import { tokenize } from "@/lib/text";
 import { pickVariant } from "@/lib/replyVariation";
+import { utteranceShape, type UtteranceShape } from "@/lib/utteranceShape";
+import type { ToolExecutionOutcome } from "@/lib/turnContext";
 
 export type GuardReason =
   | "invention"
@@ -30,6 +32,13 @@ export type GuardReason =
   | "near_echo"
   | "medication_dose"
   | "capability_claim"
+  /** CHAT-04: an explicit claim that an action completed ("I saved
+   * that", "I've added it to the list", "timer's set") with no succeeded
+   * outcome from the package family the verb names this turn. Distinct
+   * from capability_claim (accepting a request the hub cannot do) so the
+   * streaming state machine (CHAT-17) can hold unsupported action text
+   * back and retry, where an accepted impossible request is a refusal. */
+  | "unsupported_action"
   | "like_i_said"
   | "example_parrot";
 
@@ -59,10 +68,18 @@ export interface GuardContext {
    * `episodes`, never an `unrelated_recall` candidate: only a memory
    * line said to the wrong question is that. */
   grounding?: readonly string[];
-  /** True only when a real package actually ran this turn - the one
-   * thing that can make "I've added that" true rather than a claim
-   * ahead of the fact. */
-  actionsRan?: boolean;
+  /** CHAT-04: the turn's tool outcomes (CHAT-01's ToolExecutionOutcome,
+   * package id and status), the only thing that can make "I've added
+   * that" true rather than a claim ahead of the fact. An explicit action
+   * claim is matched to the package family its verb names; one
+   * unrelated success is never sufficient, and a pending or failed
+   * outcome counts as nothing ran. */
+  outcomes?: readonly Pick<ToolExecutionOutcome, "packageId" | "status">[];
+  /** CHAT-04: the utterance's shape as the router read it (with the
+   * installed packages' command openers). Absent, the guards read the
+   * shape themselves with no openers, which can differ from the router
+   * on a package-declared opener; the turn engine always passes it. */
+  shape?: UtteranceShape;
   /** The active persona's own few-shot voice lines (persona.ts's
    * `Persona.examples`) - borrowed for TONE, never handed back verbatim. */
   personaExamples?: readonly string[];
@@ -468,6 +485,12 @@ function wordMatches(word: string, pool: readonly string[]): boolean {
 }
 
 function guardNearEcho(sentence: string, ctx: GuardContext): GuardReason | null {
+  // CHAT-04 (#74, #62): only a restated QUESTION is a non-answer. A
+  // statement, a first-person disclosure or a command said back behind
+  // an acknowledgment ("Got it, Pippa is allergic to peanuts.") is the
+  // acknowledgment, not a stall; the router's own shape reading, so the
+  // guard and the router agree on what a question is.
+  if (shapeOf(ctx) !== "question") return null;
   const stripped = sentence.replace(ACK_LEAD_RE, "");
   if (GREETING_ONLY_RE.test(stripped.trim()) && GREETING_ANYWHERE_RE.test(ctx.utterance)) return null;
   const words = [...tokenize(stripped)];
@@ -499,14 +522,273 @@ function guardMedicationDose(sentence: string): GuardReason | null {
 // as false as "done."
 
 const REQUEST_RE =
-  /^\s*(?:please\s+)?(?:can|could|would|will) you\b|^\s*(?:please\s+)?(?:text|send|order|book|email|add|set|call|print|buy|schedule|message|put|turn|play|lock|unlock|open|close|start|stop)\b/i;
+  /^\s*(?:please\s+)?(?:can|could|would|will) you\b|^\s*(?:please\s+)?(?:text|send|order|book|email|add|set|call|print|buy|schedule|message|put|turn|play|lock|unlock|open|close|start|stop|remind)\b/i;
 const CLAIMED_RE =
   /\bi(?:'ve| have)? (?:just )?(?:sent|added|ordered|booked|set|texted|emailed|called|printed|scheduled|messaged|bought|turned|locked|unlocked|opened|closed|started|stopped|put)\b|\b(?:done|all set|sent it|it's on the|consider it done|on it)\b|\bi(?:'ll| will) (?:send|add|order|book|text|email|call|print|schedule|message|buy)\b/i;
 const ACCEPTS_RE =
   /^\s*(?:sure|okay|ok|on it|will do|of course|absolutely|no problem|got it|alright|right away|consider it done|sure thing|you got it)\b|\bi(?:'ll| will) (?:get|set|do|take|handle|make|have|let|pass|send|text|call|email|order|book|print|add|buy|schedule|message|turn|play|put|open|close|lock|unlock|start|stop)\b/i;
 
+// CHAT-04: the package family an explicit, completed action claim names.
+// A completed claim ("I saved that", "I've added it to your list",
+// "timer's set") needs a succeeded outcome from that family this turn.
+// Future intent ("I'll remember that", "I'll keep that in mind") is an
+// acknowledgment, not a claim: the judge extracts the fact later, so it
+// is true in the household's terms. A verb with no package behind it on
+// the hub (sent, texted, emailed, called, ordered, booked, bought,
+// scheduled, printed, messaged) never matches an outcome.
+//
+// Two shapes per family. `claim` is first-person and completion-shaped
+// ("I've added ...", "I set a ...") and applies on any utterance; a
+// review found looser forms replacing honest answers ("Bruno added eggs
+// to the list earlier", "Here's what I've written for you", "I've
+// ordered them by priority"). `status` is the state statement a model
+// gives after doing something ("Timer's set.", "Lights are off.",
+// "That's saved.") and applies only when the utterance is a command,
+// since on a question ("is my timer still going") the same words are
+// the answer, not a claim. Neither shape runs on a question-shaped
+// utterance at all ("did you set my timer" answered "Yes, I set a timer
+// for eight." is a true answer about an earlier turn, and only this
+// turn's outcomes are known here; a second review), and every matching
+// family is checked, so a sentence carrying two claims ("I've added
+// milk and set a timer") needs both outcomes.
+//
+// The replacement is narrated from the typed outcome, not drawn from a
+// pool: what the family's package reported this turn (nothing ran, it
+// failed, it is parked on a confirmation) is a fact the engine holds,
+// and "That didn't get saved." is the true sentence where a pooled "I
+// can't do that" would be a second wrong claim.
+interface ActionFamily {
+  name: string;
+  /** First-person, completion-shaped; any utterance but a question. */
+  claim: RegExp;
+  /** The same claim chained behind an earlier first-person one ("I've
+   * added milk and set a timer"); read only after a command and only
+   * past a `claim` match earlier in the sentence, so an instruction to
+   * the person ("Boil the water, then set a timer") is never one. Built
+   * from `claim` by claimFamily(). */
+  chained?: RegExp;
+  /** A state statement; only on a command-shaped utterance. */
+  status?: RegExp;
+  /** A sentence matching this is not a claim of this family whatever
+   * else matched (a memory search described honestly is not a lookup). */
+  exclude?: RegExp;
+  /** A lookup claim ("I looked that up") is about the answer being
+   * given, so it is checked on a question too. */
+  onQuestion?: boolean;
+  packages: readonly string[];
+  /** The honest line per outcome state: nothing of the family ran, its
+   * call failed, or its call is parked on a confirmation. */
+  none: string;
+  failed: string;
+  pending?: string;
+}
+const WAITING = "That's waiting on your confirmation.";
+const I_DID = "\\bi(?:'ve| have)?\\s+(?:just\\s+)?";
+const AND_DID = "\\b(?:and|then)\\s+(?:just\\s+)?";
+// A bare status at the sentence's own start, behind an acknowledgment
+// at most ("Timer set for ten minutes.", "Done, saved.").
+const START = "^\\s*(?:okay|ok|sure|done|alright|got it|right|all set)?[,.! ]*";
+/** A family whose claim is written with I_DID gets the chained form for
+ * free: the same body behind "and"/"then" instead of "I've". */
+function claimFamily(family: Omit<ActionFamily, "claim" | "chained"> & { body: string }): ActionFamily {
+  const { body, ...rest } = family;
+  return { ...rest, claim: new RegExp(body.replaceAll("{DID}", I_DID), "i"), chained: new RegExp(body.replaceAll("{DID}", AND_DID), "i") };
+}
+const ACTION_FAMILIES: readonly ActionFamily[] = [
+  claimFamily({
+    name: "save",
+    // "saved", "stored", "logged", "written down" claim a write. "Noted"
+    // and every form of "remember" ("Remembered.", "I'll remember that")
+    // are what the hub does on its own through the memory judge, so they
+    // are acknowledgments in the household's terms, never claims.
+    // "saved" needs an object ("I have saved recipes" is a possessive);
+    // "logged in/into/on/out" is a sign-in, not a save.
+    body: `{DID}saved (?:that|it|this|those|these|your|the|a|an|everything|both|[a-z]+'s)\\b|{DID}(?:stored|logged(?! ?(?:in|on|out|into|onto)\\b))\\b|{DID}written (?:that |it |this )?down\\b|\\bsaved (?:that|it|this) (?:to|in) (?:your|my) memory\\b`,
+    status: new RegExp(`\\b(?:that's|it's|got it,?) (?:saved|stored)\\b|${START}saved\\b`, "i"),
+    packages: ["remember"],
+    none: "I haven't saved that as a memory.",
+    failed: "That didn't get saved.",
+    pending: "That save is waiting on your confirmation.",
+  }),
+  claimFamily({
+    name: "list",
+    body: `{DID}(?:added|put)\\b[^.!?]{0,40}\\b(?:to|on)\\b[^.!?]{0,20}\\blist\\b`,
+    // The bare form only at the sentence's own start ("Added milk to your
+    // list."), never inside a third-person report ("Bruno already added
+    // eggs to the list, so ...").
+    status: new RegExp(`${START}(?:added|put)\\b[^.!?]{0,40}\\b(?:to|on)\\b[^.!?]{0,20}\\blist\\b|${START}[a-z' ]{1,30}? (?:is )?added to (?:your|the) list\\b|\\b(?:that's|it's|is|are|[a-z]+'s) (?:now )?on (?:your|the) list\\b`, "i"),
+    packages: ["list-add"],
+    none: "I haven't added anything to your list.",
+    failed: "Adding that to your list didn't work.",
+  }),
+  claimFamily({
+    name: "timer",
+    body: `{DID}(?:set|started)\\b[^.!?]{0,30}\\btimer\\b`,
+    status: new RegExp(`\\btimer(?:'s| is| has been)\\s+(?:set|started)\\b|${START}(?:[a-z-]+ ){0,3}timer (?:set|started)\\b`, "i"),
+    packages: ["timer"],
+    none: "I haven't set a timer.",
+    failed: "The timer didn't get set.",
+  }),
+  claimFamily({
+    name: "reminder",
+    // "I'll remind you" is kept as a claim, unlike "I'll remember that":
+    // nothing on the hub reminds anyone unless the remind package ran.
+    body: `{DID}(?:set|added|created|scheduled)\\b[^.!?]{0,30}\\breminder\\b|\\bi(?:'ll| will) remind you\\b`,
+    status: new RegExp(`\\breminder(?:'s| is| has been)\\s+(?:set|scheduled)\\b|${START}(?:[a-z-]+ ){0,3}reminder (?:set|scheduled)\\b`, "i"),
+    packages: ["remind"],
+    none: "I haven't set a reminder.",
+    failed: "The reminder didn't get set.",
+  }),
+  claimFamily({
+    name: "lights",
+    body: `{DID}turned (?:on|off)\\b[^.!?]{0,30}\\blights?\\b|{DID}turned\\b[^.!?]{0,20}\\blights? (?:on|off)\\b`,
+    // "on/off" followed by a room ("off in the kitchen") is still a
+    // state claim; "on the panel by the door" (a location answer) is not.
+    status: new RegExp(
+      `\\blights?(?: (?:in|of) the [a-z]+)? (?:are|is) (?:now )?(?:on|off)(?: now| again)?(?=[.!,;]|$| (?:in|for) )|${START}(?:[a-z]+ ){0,2}lights? (?:on|off)(?=[.!,;]|$| (?:in|for|now) )`,
+      "i",
+    ),
+    packages: ["lights-on", "lights-off"],
+    none: "I haven't changed the lights.",
+    failed: "The lights didn't change.",
+  }),
+  claimFamily({
+    name: "lock",
+    // "locked in Friday", "locked myself out", "locked eyes" are idioms.
+    body: `{DID}(?:locked|unlocked)\\b(?!\\s+(?:in|myself|eyes|horns|down)\\b)`,
+    status: new RegExp(`\\bdoors?(?:'s| is| are) (?:now )?(?:locked|unlocked)\\b|${START}(?:[a-z]+ ){0,2}doors? (?:locked|unlocked)\\b|${START}(?:locked|unlocked)(?: up)?(?=[.!,;]|$)`, "i"),
+    packages: ["lock-doors"],
+    none: "I haven't locked or unlocked anything.",
+    failed: "The lock didn't respond.",
+  }),
+  claimFamily({
+    name: "lookup",
+    body: `{DID}(?:looked (?:that|it|this|these) up|looked up\\b|googled\\b|searched (?:for|the web|online)|checked online)\\b`,
+    // A search of the household's own memory, described honestly, is
+    // not a web lookup.
+    exclude: /\b(?:in|through) (?:your|my|the) (?:notes|memory|memories|history)\b/i,
+    onQuestion: true,
+    packages: ["websearch"],
+    none: "I didn't look that up.",
+    failed: "That lookup didn't work.",
+  }),
+  claimFamily({
+    name: "impossible",
+    // "ordered them by priority", "ordered the list", "called it a day",
+    // "called him Rover because" are not actions: the sorting sense (a
+    // "by" or a list within the clause) and the naming sense (a pronoun
+    // and a name, followed by a reason) are excluded; "called them" and
+    // "ordered them for you" are the claim. "Scheduled a reminder" is
+    // the reminder family's.
+    body: `{DID}(?:sent|texted|emailed|messaged|booked|bought|printed|scheduled(?![^.!?]{0,20}\\breminder\\b))\\b|{DID}(?:ordered|called)\\b(?!\\s+(?:it|them|him|her|you|us|me)\\s+(?:a day|a night|quits|[a-z]+\\s+(?:because|since|after|as)\\b))(?![^.!?]{0,24}\\b(?:by|list|items|tasks|results|alphabetically)\\b)`,
+    packages: [],
+    none: "I can't send messages, make calls, or order anything from here.",
+    failed: "I can't send messages, make calls, or order anything from here.",
+  }),
+];
+
+function shapeOf(ctx: GuardContext): UtteranceShape {
+  return ctx.shape ?? utteranceShape(ctx.utterance);
+}
+
+/** A command by the router's reading (package-declared openers), or by
+ * REQUEST_RE's fixed list of everyday action verbs and "can you" forms
+ * (the discipline guardCapabilityClaim() has always used). */
+function isCommand(ctx: GuardContext): boolean {
+  return shapeOf(ctx) === "command" || REQUEST_RE.test(ctx.utterance);
+}
+
+// A bare completion word after a command ("Done.", "All set.") names no
+// family; it is a claim about whatever the person asked for. With an
+// outcome this turn it is narrated from that outcome's family; with
+// none it is replaced with a line that says nothing ran.
+const BARE_DONE_RE = /^\s*(?:okay|ok|sure|alright|got it|right)?[,.! ]*(?:done|all set|all done|consider it done|that's done|taken care of)[.!]?\s*$/i;
+// A request to remember needs no outcome ("Done." after "remember that
+// X" is the acknowledgment; the judge remembers), unless a remember
+// call was made this turn and did not succeed.
+const REMEMBER_REQUEST_RE = /^\s*(?:please\s+)?(?:remember|don't forget|keep in mind|note)\b/i;
+const NOTHING_RAN = "I haven't actually done that.";
+function bareCompletion(sentence: string, ctx: GuardContext): { family: ActionFamily | null; state: "failed" | "pending" | "none" } | null {
+  if (!isCommand(ctx) || !BARE_DONE_RE.test(sentence)) return null;
+  const outcomes = ctx.outcomes ?? [];
+  if (outcomes.some((o) => o.status === "succeeded")) return null;
+  const unfinished = outcomes.find((o) => o.status === "pending") ?? outcomes.find((o) => o.status === "failed");
+  if (!unfinished) return REMEMBER_REQUEST_RE.test(ctx.utterance) ? null : { family: null, state: "none" };
+  return { family: ACTION_FAMILIES.find((f) => f.packages.includes(unfinished.packageId)) ?? null, state: unfinished.status === "pending" ? "pending" : "failed" };
+}
+
+// A first-person opener ("I went ahead and added ...", "Okay, I checked
+// and set a timer"), which lets the chained form stand on its own after
+// a command; "Boil the water, then set a timer" has none.
+const FIRST_PERSON_OPENER_RE = /^\s*(?:okay|ok|sure|done|alright|got it|right|all set)?[,.! ]*i(?:'ve| have|'ll| just)?\b/i;
+
+function actionFamiliesOf(sentence: string, ctx: GuardContext): ActionFamily[] {
+  const question = shapeOf(ctx) === "question";
+  const command = isCommand(ctx);
+  // The chained form is read only past an earlier first-person claim
+  // ("I've added milk to your list and set a timer") or behind a
+  // first-person opener after a command ("I went ahead and added
+  // milk"), so an instruction to the person ("Boil the water, then set
+  // a timer") is never one.
+  const firstClaimAt = Math.min(...ACTION_FAMILIES.map((f) => f.claim.exec(sentence)?.index ?? Infinity));
+  const firstPerson = command && FIRST_PERSON_OPENER_RE.test(sentence);
+  return ACTION_FAMILIES.filter((f) => {
+    if (question && !f.onQuestion) return false;
+    if (f.exclude?.test(sentence)) return false;
+    if (f.claim.test(sentence)) return true;
+    // A state statement ("Saved.", "Timer set.") is a claim on anything
+    // but a question, where the same words answer it.
+    if (f.status?.test(sentence)) return true;
+    const chainedAt = f.chained?.exec(sentence)?.index;
+    return chainedAt !== undefined && (chainedAt > firstClaimAt || firstPerson);
+  });
+}
+
+function familyOutcome(family: ActionFamily, ctx: GuardContext): "succeeded" | "failed" | "pending" | "none" {
+  const own = (ctx.outcomes ?? []).filter((o) => family.packages.includes(o.packageId));
+  if (own.some((o) => o.status === "succeeded")) return "succeeded";
+  if (own.some((o) => o.status === "pending")) return "pending";
+  if (own.length > 0) return "failed";
+  return "none";
+}
+
+/** CHAT-04: one decision, shared by both paths: the sentence claims a
+ * completed action whose family has no succeeded outcome this turn. */
+function guardUnsupportedAction(sentence: string, ctx: GuardContext): GuardReason | null {
+  if (sentence.includes("?")) return null;
+  if (bareCompletion(sentence, ctx)) return "unsupported_action";
+  return actionFamiliesOf(sentence, ctx).some((f) => familyOutcome(f, ctx) !== "succeeded") ? "unsupported_action" : null;
+}
+
+/** The narrated line for an `unsupported_action` hit on `sentence`: the
+ * family's own wording for what its package actually reported. Falls
+ * back to the CANNOT_DO pool only when the sentence no longer matches a
+ * family (a caller passing a sentence the guard never flagged). */
+export function unsupportedActionLine(sentence: string, ctx: GuardContext): string {
+  const bare = bareCompletion(sentence, ctx);
+  if (bare) {
+    if (bare.state === "none") return NOTHING_RAN;
+    if (!bare.family) return bare.state === "pending" ? WAITING : "That didn't go through.";
+    return bare.state === "pending" ? (bare.family.pending ?? WAITING) : bare.family.failed;
+  }
+  const family = actionFamiliesOf(sentence, ctx).find((f) => familyOutcome(f, ctx) !== "succeeded");
+  if (!family) return honest(ctx.personId, "unsupported_action", CANNOT_DO);
+  const state = familyOutcome(family, ctx);
+  if (state === "failed") return family.failed;
+  if (state === "pending") return family.pending ?? WAITING;
+  return family.none;
+}
+
 function guardCapabilityClaim(sentence: string, ctx: GuardContext): GuardReason | null {
-  if (ctx.actionsRan || !REQUEST_RE.test(ctx.utterance) || sentence.includes("?") || ctx.replyHasQuestion) return null;
+  // A request that something actually answered this turn (any succeeded
+  // outcome) may be accepted in words; a completed-action claim is
+  // guardUnsupportedAction()'s, per family, above.
+  // REQUEST_RE on purpose, not the router's shape: a router-shaped
+  // command such as "remember what I said" is answered "Okay, ..." in
+  // good faith (the judge remembers with no tool call), and ACCEPTS_RE
+  // would read that opener as accepting an impossible request.
+  const anySucceeded = (ctx.outcomes ?? []).some((o) => o.status === "succeeded");
+  if (anySucceeded || !REQUEST_RE.test(ctx.utterance) || sentence.includes("?") || ctx.replyHasQuestion) return null;
   if (CLAIMED_RE.test(sentence) || ACCEPTS_RE.test(sentence)) return "capability_claim";
   return null;
 }
@@ -576,6 +858,7 @@ const REPLACEMENT_FOR: Record<GuardReason, readonly string[]> = {
   near_echo: DONT_KNOW,
   medication_dose: MED_CAUTION,
   capability_claim: CANNOT_DO,
+  unsupported_action: CANNOT_DO,
   like_i_said: CHAT_LOOP,
   example_parrot: DONT_KNOW,
 };
@@ -583,8 +866,11 @@ const REPLACEMENT_FOR: Record<GuardReason, readonly string[]> = {
 /** The honest line a guard hit replaces text with, for a given reason -
  * exported so the streaming path (turnEngine.ts's `gateGuards`) can
  * build the SAME replacement `guardReply()` uses below, one sentence at
- * a time instead of the whole-reply cut/replace decision. */
-export function replacementFor(reason: GuardReason, personId: string): string {
+ * a time instead of the whole-reply cut/replace decision. For
+ * `unsupported_action` the line is narrated from the flagged sentence's
+ * family and the turn's outcomes (CHAT-04) when both are given. */
+export function replacementFor(reason: GuardReason, personId: string, flagged?: { sentence: string; ctx: GuardContext }): string {
+  if (reason === "unsupported_action" && flagged) return unsupportedActionLine(flagged.sentence, { ...flagged.ctx, personId });
   return honest(personId, reason, REPLACEMENT_FOR[reason]);
 }
 
@@ -613,6 +899,7 @@ export function guardSentence(sentence: string, ctx: GuardContext, isFirstSenten
   const s = sentence.trim();
   if (!s) return null;
   return (
+    guardUnsupportedAction(s, ctx) ??
     guardCapabilityClaim(s, ctx) ??
     guardMedicationDose(s) ??
     guardLikeISaid(s, ctx) ??
@@ -654,7 +941,7 @@ export function guardReply(reply: string, ctx: GuardContext): Guarded {
     if (kept.length > 0 && CUTTABLE.has(reason)) {
       return { reply: kept.join(" "), reason, replaced: false };
     }
-    return { reply: replacementFor(reason, ctx.personId), reason, replaced: true };
+    return { reply: replacementFor(reason, ctx.personId, { sentence, ctx: fullReplyCtx }), reason, replaced: true };
   }
   return { reply, reason: null, replaced: false };
 }
