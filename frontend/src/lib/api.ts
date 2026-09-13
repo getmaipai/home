@@ -546,6 +546,23 @@ export const api = {
   // stopped run, so a user-initiated "stop" actually cancels the fetch
   // instead of leaving the browser's request racing pointlessly against
   // work nothing will read the result of.
-  streamTurn: (text: string, thinking?: boolean, signal?: AbortSignal, conversationId?: string, supersedes?: string) =>
-    rawStreamPost("/api/turn/stream", { surface: "chat", text, thinking, conversation_id: conversationId, supersedes }, 0, undefined, signal),
+  //
+  // An options object, not five more positional params (a code review,
+  // 2026-09-13, found the growing positional list already forced
+  // `runFixedTurn.ts` into four throwaway `undefined`s just to reach
+  // `ephemeral`, with two same-typed optional booleans a silent reorder
+  // away from swapping): every param but `text` and `signal` (the two
+  // every real caller passes) lives here instead.
+  streamTurn: (
+    text: string,
+    signal?: AbortSignal,
+    opts: { thinking?: boolean; conversationId?: string; supersedes?: string; ephemeral?: boolean } = {},
+  ) =>
+    rawStreamPost(
+      "/api/turn/stream",
+      { surface: "chat", text, thinking: opts.thinking, conversation_id: opts.conversationId, supersedes: opts.supersedes, ephemeral: opts.ephemeral },
+      0,
+      undefined,
+      signal,
+    ),
 };

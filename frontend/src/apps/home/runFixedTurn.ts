@@ -7,9 +7,16 @@ import { stripThinking } from "@/apps/chat/chatModelAdapter";
  * by the query layer" - no separate widget backend, the same route Chat
  * itself uses). Ignores `turn_meta`/`delta`/`spoken_cue` entirely: a home
  * card shows the finished answer, not a live-typing effect, speech, or the
- * contract's own turn/conversation id line. */
+ * contract's own turn/conversation id line.
+ *
+ * `ephemeral: true` (a real bug this session found, docs/BACKLOG.md):
+ * this fixed utterance is a widget query, not something the household
+ * member actually said - without it, every Home page load silently wrote
+ * "What's the weather like today?" into the person's real chat history
+ * and the episode store, forever, with no way to tell it apart from a
+ * real message. */
 export async function runFixedTurn(text: string): Promise<string> {
-  const response = await api.streamTurn(text);
+  const response = await api.streamTurn(text, undefined, { ephemeral: true });
   for await (const event of readTurnStream(response)) {
     if (event.type === "done") return stripThinking(event.value.reply.text);
     if (event.type === "turn_meta" || event.type === "delta" || event.type === "spoken_cue") continue;

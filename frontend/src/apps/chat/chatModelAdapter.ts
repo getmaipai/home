@@ -209,7 +209,7 @@ export function createChatModelAdapter(deps: ChatModelAdapterDeps): ChatModelAda
       try {
         const conversationId = await deps.getConversationId?.();
         abortSignal.throwIfAborted();
-        const response = await api.streamTurn(text, deps.consumeThinking(), abortSignal, conversationId, supersedes);
+        const response = await api.streamTurn(text, abortSignal, { thinking: deps.consumeThinking(), conversationId, supersedes });
         for await (const event of readTurnStream(response)) {
           if (event.type === "turn_meta") {
             // The contract's first line on every turn (routes/turn.ts).

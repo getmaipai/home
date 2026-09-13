@@ -200,6 +200,7 @@ turnRoutes.post("/stream", requireAuth, bodyLimit({ maxSize: TURN_BODY_LIMIT }),
     thinking?: boolean;
     conversation_id?: string;
     supersedes?: string;
+    ephemeral?: boolean;
   };
   const surface = (body.surface ?? "chat") as Surface;
   // COR-7 (code review, 2026-09-06): a disconnected client used to leave
@@ -212,6 +213,12 @@ turnRoutes.post("/stream", requireAuth, bodyLimit({ maxSize: TURN_BODY_LIMIT }),
     thinking: body.thinking,
     conversationId: body.conversation_id,
     supersedes: body.supersedes,
+    // A widget's own fixed-utterance query (Home's weather card), never a
+    // household member's own words: skips logTurnSafely() only, so it
+    // never lands in a person's real chat history or the episode store,
+    // while still going through the exact same model/safety/reply path a
+    // typed message does (getmaipai/home BACKLOG, found 2026-09-11).
+    ephemeral: body.ephemeral,
     signal: abortController.signal,
   });
   if (!result.ok) {

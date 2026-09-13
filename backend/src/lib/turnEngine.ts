@@ -157,18 +157,33 @@ function logTurnSafely(
   surface: Surface,
   userText: string,
   value: TurnValue,
-  meta: { startedAt: number; guardHits: readonly GuardReason[]; guardReplaced?: boolean; supersedes?: string | null },
+  meta: { startedAt: number; guardHits: readonly GuardReason[]; guardReplaced?: boolean; supersedes?: string | null; ephemeral?: boolean },
 ): void {
-  try {
-    // getmaipai/home#78: the row records the reason only when the guard
-    // REPLACED the reply; a cut that kept the model's own prefix leaves
-    // a real (shortened) answer on the row, and the episode store may
-    // recall it.
-    logTurn(actor, surface, userText, value, { guardReasons: meta.guardReplaced ? meta.guardHits : [], supersedes: meta.supersedes });
-  } catch (err) {
-    console.error(`[turn] logTurn failed for an otherwise-successful turn: ${(err as Error).message}`);
+  // `ephemeral` (a widget's own fixed-utterance query, e.g. Home's
+  // weather card, never a household member's own words): the ONE choke
+  // point every runTurnStream() finalize site routes through, so a
+  // future finalize path can't ship without it (a code review, 2026-09-13,
+  // found the guard duplicated at each of the three call sites instead).
+  // Skips only the persisted row and its episode (conversationHistory.ts's
+  // logTurn(), which recordEpisodes() runs inside of) and the rolling-
+  // summary refresh below (nothing new to summarize for a conversation
+  // this turn was never added to) - the operational `[turn]` log line
+  // stays unconditional, so an ephemeral turn that fails or runs long is
+  // still traceable the same way Fix A4/A5 (docs/dev.md, 2026-09-07
+  // incident) made every other turn's failure traceable.
+  if (!meta.ephemeral) {
+    try {
+      // getmaipai/home#78: the row records the reason only when the guard
+      // REPLACED the reply; a cut that kept the model's own prefix leaves
+      // a real (shortened) answer on the row, and the episode store may
+      // recall it.
+      logTurn(actor, surface, userText, value, { guardReasons: meta.guardReplaced ? meta.guardHits : [], supersedes: meta.supersedes });
+    } catch (err) {
+      console.error(`[turn] logTurn failed for an otherwise-successful turn: ${(err as Error).message}`);
+    }
   }
   logTurnLine(surface, value, meta.startedAt, meta.guardHits);
+  if (meta.ephemeral) return;
   // Post-turn, fire-and-forget (step 3: "it never runs in the request
   // path"): whether this conversation's rolling summary needs a refresh.
   // Never awaited and never allowed to affect the turn's own outcome,
@@ -2584,7 +2599,14 @@ export async function runTurnStream(
   // instead of running to completion for a connection nobody is reading
   // from anymore, tying up the engine's one generation slot the whole
   // time.
-  opts: { thinking?: boolean; conversationId?: string; signal?: AbortSignal; supersedes?: string } = {},
+  // `ephemeral` (a widget's own fixed-utterance query, e.g. Home's weather
+  // card): goes through the exact same model/safety/reply path as a real
+  // typed message, but logTurnSafely() below is skipped for it - the turn
+  // never becomes a conversation_turns row or an episode, so it never
+  // shows up in the person's real chat history. finalizeReply() (the
+  // output safety boundary) and the lease still run for it exactly as
+  // for a real turn: only the log write is conditional.
+  opts: { thinking?: boolean; conversationId?: string; signal?: AbortSignal; supersedes?: string; ephemeral?: boolean } = {},
 ): Promise<TurnStreamResult> {
   // Fix A4 (docs/dev.md's 2026-09-07 incident note): matches runTurn()'s
   // own placement - measured from the top so the streamed path's
@@ -2628,14 +2650,14 @@ async function runTurnStreamHoldingLease(
   conversation: Conversation,
   lease: TurnLease,
   startedAt: number,
-  opts: { thinking?: boolean; conversationId?: string; signal?: AbortSignal; supersedes?: string },
+  opts: { thinking?: boolean; conversationId?: string; signal?: AbortSignal; supersedes?: string; ephemeral?: boolean },
 ): Promise<TurnStreamResult> {
   const prepared = await prepareTurn(actor, surface, text, loadAllManifests(), conversation, lease);
 
   if (prepared.kind === "immediate") {
     const value = finalizeReply(actor, prepared.value);
     lease.release(); // the caller's finally would too; released here so the log line below carries the finished state
-    logTurnSafely(actor, surface, text, value, { startedAt, guardHits: [], supersedes: opts.supersedes });
+    logTurnSafely(actor, surface, text, value, { startedAt, guardHits: [], supersedes: opts.supersedes, ephemeral: opts.ephemeral });
     return { ok: true, kind: "immediate", value };
   }
 
@@ -2726,7 +2748,7 @@ async function runTurnStreamHoldingLease(
         // place logTurnSafely() runs for it.
         if (outcome && "resolved" in outcome) {
           finalized = outcome.resolved;
-          logTurnSafely(actor, surface, text, outcome.resolved, { startedAt, guardHits: [], supersedes: opts.supersedes });
+          logTurnSafely(actor, surface, text, outcome.resolved, { startedAt, guardHits: [], supersedes: opts.supersedes, ephemeral: opts.ephemeral });
           return outcome.resolved;
         }
         const outputSafety = outcome;
@@ -2791,7 +2813,7 @@ async function runTurnStreamHoldingLease(
         // finalize() no longer leaks anything, since holdLease()'s
         // `finally` releases on the aborted fetch's throw.
         finalized = value;
-        logTurnSafely(actor, surface, text, value, { startedAt, guardHits, guardReplaced, supersedes: opts.supersedes });
+        logTurnSafely(actor, surface, text, value, { startedAt, guardHits, guardReplaced, supersedes: opts.supersedes, ephemeral: opts.ephemeral });
         return value;
       },
     };

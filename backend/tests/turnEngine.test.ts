@@ -313,6 +313,44 @@ describe("lib/turnEngine.ts runTurnStream()", () => {
     if (result.ok) return;
     expect(result.code).toBe("invalid_input");
   });
+
+  // getmaipai/home BACKLOG, found 2026-09-11: Home's weather card sends a
+  // fixed utterance ("What's the weather like today?") through this exact
+  // route on every page load, with nothing to tell that apart from a
+  // household member's own typed message - it silently wrote a real turn
+  // (and, via logTurn()'s own recordEpisodes() call, a real episode) into
+  // the person's chat history forever. `ephemeral: true` skips only the
+  // log write; the reply itself, the output safety boundary, and the
+  // lease all still run exactly as for a real turn.
+  test("ephemeral: true answers normally but never becomes a conversation_turns row or an episode (immediate/plugin-floor path)", async () => {
+    const { actor } = await owner();
+
+    const before = db.select().from(conversationTurns).all().length;
+    const episodesBefore = db.select().from(episodes).all().length;
+    const result = await runTurnStream(actor, "chat", "remember that the wifi password is on the fridge", { ephemeral: true });
+    expect(result.ok).toBe(true);
+    if (!result.ok || result.kind !== "immediate") return;
+    expect(result.value.source).toBe("plugin");
+    expect(db.select().from(conversationTurns).all().length).toBe(before);
+    expect(db.select().from(episodes).all().length).toBe(episodesBefore);
+  });
+
+  test("ephemeral: true answers normally but never becomes a conversation_turns row or an episode (streamed path)", async () => {
+    const { actor } = await owner();
+
+    const before = db.select().from(conversationTurns).all().length;
+    const episodesBefore = db.select().from(episodes).all().length;
+    const result = await runTurnStream(actor, "chat", "What's the weather like today?", { ephemeral: true });
+    expect(result.ok).toBe(true);
+    if (!result.ok || result.kind !== "stream") return;
+
+    let fullText = "";
+    for await (const delta of result.tokens) fullText += delta;
+    const value = result.finalize(fullText);
+    expect(value.source).toBe("model");
+    expect(db.select().from(conversationTurns).all().length).toBe(before);
+    expect(db.select().from(episodes).all().length).toBe(episodesBefore);
+  });
 });
 
 // getmaipai/home#63: a code review of the judge-contention fix found

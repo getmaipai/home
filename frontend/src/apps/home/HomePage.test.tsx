@@ -115,7 +115,7 @@ describe("HomePage - WeatherCard", () => {
     try {
       const { findByText } = renderHome();
       await findByText("It's 62 degrees in Portland, OR.");
-      expect(turnBodies).toEqual([{ surface: "chat", text: "What's the weather like today?" }]);
+      expect(turnBodies).toEqual([{ surface: "chat", text: "What's the weather like today?", ephemeral: true }]);
     } finally {
       restoreFetch();
     }
@@ -127,7 +127,7 @@ describe("HomePage - WeatherCard", () => {
     try {
       const { findByText } = renderHome();
       await findByText("It's 62 degrees in Portland, OR.");
-      expect(turnBodies).toEqual([{ surface: "chat", text: "What's the weather like in Portland, OR today?" }]);
+      expect(turnBodies).toEqual([{ surface: "chat", text: "What's the weather like in Portland, OR today?", ephemeral: true }]);
     } finally {
       restoreFetch();
     }

@@ -3956,26 +3956,33 @@ future session now that F's hub half exists.
       server-side VAD itself, since this session's own barge-in just
       forwards whatever the server decides rather than running local
       detection.
-- [ ] **A real bug this session found, not caused by it, and not fixed
-      here** (session E step 5, 2026-09-06): Home's `WeatherCard`
-      (`runFixedTurn.ts`) calls the exact same `POST /api/turn/stream`
-      route Chat itself uses for a fixed "What's the weather like
-      today?" utterance, and the turn engine persists every turn it
-      handles regardless of caller (`chatHistoryAdapter.ts`'s own
-      comment: "the backend already persists every turn server-side...
-      independent of anything this adapter does"). That means every time
-      a household member's Home page runs its own weather check, a
-      visible "What's the weather like today?" turn silently appears in
+- [x] **A real bug this session found, not caused by it, and not fixed
+      here** (session E step 5, 2026-09-06) - fixed 2026-09-13. Home's
+      `WeatherCard` (`runFixedTurn.ts`) calls the exact same `POST
+      /api/turn/stream` route Chat itself uses for a fixed "What's the
+      weather like today?" utterance, and the turn engine persisted
+      every turn it handled regardless of caller (`chatHistoryAdapter.ts`'s
+      own comment: "the backend already persists every turn server-side...
+      independent of anything this adapter does"). That meant every time
+      a household member's Home page ran its own weather check, a
+      visible "What's the weather like today?" turn silently appeared in
       their REAL Chat history - previously invisible only because the
       bug above broke history loading entirely. Confirmed live: the
       screenshot matrix's own repeated Home visits (across viewports/
       themes, one shared session) left several duplicate weather turns
       sitting in Chat's thread once the load bug was fixed, visible in
-      `chat-desktop-light.png`. Not this session's file to fix
-      (`turnEngine.ts`, session A's/D's territory) - needs either a
-      background/non-conversational turn kind the engine excludes from
-      history, or a `surface` this route can pass that widgets use
-      instead of `"chat"`.
+      `chat-desktop-light.png`. Fixed with the smaller of the two options
+      named below: an additive `ephemeral?: boolean` on `POST
+      /api/turn/stream`'s body and on `runTurnStream()`'s opts
+      (`routes/turn.ts`, `turnEngine.ts`), threaded only to the three
+      `logTurnSafely()` call sites inside `runTurnStreamHoldingLease()` -
+      the reply, the output safety boundary, and the lease all still run
+      exactly as for a real turn, only the log write (and, since
+      `recordEpisodes()` runs inside `logTurn()`, the episode write) is
+      skipped. `runFixedTurn.ts` sets it; `api.streamTurn()`'s new
+      trailing param carries it. See `docs/dev/session-b.md`,
+      `backend/tests/turnEngine.test.ts`'s ephemeral suite, and
+      `frontend/src/apps/home/runFixedTurn.test.ts`.
 - [x] **Kit gaps found by the audit, partial** (S each) - done 2026-09-05:
       `AsyncState` (loading, error with retry, empty - built, not yet
       wired into the five pages that hand-roll the triad; that's step 3's

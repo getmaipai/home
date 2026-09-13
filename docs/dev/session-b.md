@@ -130,3 +130,105 @@ request body; a live reply's `turn_id` reaches its own metadata). A full
 same happy-dom/Radix hover-and-click limitation the file's own header
 comment already documents for `ActionBarMorePrimitive` - not pursued
 further for the same reason, verified live instead.
+
+## Lane 5 item 3: Home's weather card writes a fake turn into real chat history
+
+BACKLOG.md's own "A real bug this session found, not caused by it, and
+not fixed here" (session E step 5, 2026-09-06): `runFixedTurn.ts` (the
+Home page's `WeatherCard`) calls the exact same `POST /api/turn/stream`
+route Chat itself uses, for a fixed "What's the weather like today?"
+utterance, and the turn engine persisted every turn it handled
+regardless of caller - so every Home page load silently wrote a real,
+visible turn into the household member's own Chat history, forever,
+with nothing to tell it apart from something they actually typed.
+
+Two shapes were on the table: a dedicated read-only route for fixed
+card queries, or a request flag the existing route accepts. Went with
+the flag - `ephemeral?: boolean`, additive on `POST /api/turn/stream`'s
+body and `runTurnStream()`'s opts (`routes/turn.ts`, `turnEngine.ts`) -
+because a dedicated route would have meant a second, parallel
+model/safety/reply path to keep in sync with the real one (CLAUDE.md's
+"one definition, one implementation" cuts against that directly), while
+the flag changes nothing about how the turn is answered: routing,
+safety (both input and `gateOutputSafety()`'s output-side boundary),
+tool calls, and the turn lease all run exactly as they do for a real
+message. The only thing conditional on the flag is the log write -
+`logTurnSafely()`, called from the three places inside
+`runTurnStreamHoldingLease()` that finalize a `TurnValue` (the immediate/
+plugin-floor path, a tool-resolved reply, and the streamed-text path).
+Skipping `logTurnSafely()` also skips `conversationHistory.ts`'s
+`logTurn()`, and since that function is what calls `recordEpisodes()`,
+one flag closes off both halves of the bug (the chat-history row and
+the episode) rather than needing two separate skips.
+
+`runFixedTurn.ts` sets `ephemeral: true` on its one call; the frontend
+carries it as a new trailing parameter on `api.streamTurn()` rather than
+an options object, matching that function's existing positional-params
+shape (`thinking`, `signal`, `conversationId`, `supersedes` are already
+positional). `runTurn()` (the non-streaming `POST /api/turn`, unused by
+any widget today) was deliberately left untouched - the bug and the
+acceptance criteria are both about the streamed route Home actually
+calls, and adding the flag there too with no caller would be scope
+nothing asked for.
+
+Verified on a spare-port backend (`PORT=18796 MAIPAI_DATA_DIR=<throwaway
+dir> bun run src/index.ts`, a fresh household, `sqlite3` reading
+`hub.db` directly): before any turn, `conversation_turns` and
+`episodes` both at 0. `POST /api/turn/stream` with `ephemeral: true` and
+the weather card's own utterance answered normally (a real "done" event
+with the reply text) and left both tables at 0 afterward. The same
+route with `ephemeral` omitted, sent right after, answered the same way
+and left one new `conversation_turns` row - proving the flag, not
+something else about the request, is what makes the difference.
+Backend test: `tests/turnEngine.test.ts`'s two new `runTurnStream()`
+cases (the immediate/plugin-floor path via "remember that..." and the
+streamed path via the weather utterance itself), each asserting the
+table counts are unchanged across the call. Frontend test:
+`runFixedTurn.test.ts` asserts the request body carries `ephemeral:
+true`; `HomePage.test.tsx`'s existing weather-card tests were updated
+for the new field in their own body assertions.
+
+**Code review (medium effort) found seven issues; two fixed here,
+two escalated.** Fixed: the `if (!opts.ephemeral)` guard was duplicated
+identically at all three `logTurnSafely()` call sites inside
+`runTurnStreamHoldingLease()` - moved into `logTurnSafely()` itself as
+the one choke point a future fourth finalize path can't ship without,
+and the move surfaced that the guard had also been silently skipping
+the operational `[turn]` log line (`logTurnLine()`), the one thing Fix
+A4/A5 (docs/dev.md, 2026-09-07 incident) added specifically so a
+failing turn is never untraceable - that line now runs unconditionally,
+only the persisted row/episode and the now-pointless summary-refresh
+schedule stay conditional. Also converted `api.streamTurn()`'s six
+positional params (two same-typed optional booleans, `thinking` and
+`ephemeral`, three apart) to an options object for everything after
+`text`/`signal`, closing the `(text, undefined, undefined, undefined,
+undefined, true)` five-blank-call `runFixedTurn.ts` had been reduced to.
+
+Escalated to the coordinator rather than fixed unilaterally: `ephemeral`
+is a plain client-supplied boolean on an otherwise ordinary,
+`requireAuth`-gated, no-role-check route, honored for any text a
+signed-in household member sends. Two consequences follow directly:
+(1) `conversationHistory.ts`'s own documented guarantee - a parent
+reviewing history can see a request was made and refused - has a real
+gap for content a person tags `ephemeral` themselves via a raw request,
+never through the app's own UI, which never sends the flag on a typed
+message; and (2) an ephemeral turn that happens to route to the
+`remember` package (its deterministic-floor pattern match, not
+anything Home's card would ever say) still permanently writes a
+`MemoryRecord` whose `source` is that turn's id, orphaned the moment
+the turn itself is never persisted. Two things bound the real risk
+below what they'd otherwise be: `notifyOncePerTurn()` fires from
+safety evaluation directly (input-side in `prepareTurn()`, output-side
+via `gateOutputSafety()`), entirely independent of `logTurnSafely()`,
+so a parent's flagged-content notification still fires for an ephemeral
+turn exactly as for a real one - only ordinary, unflagged content can
+disappear this way; and the "orphaned" memory record has no FK
+constraint to violate (`memoryRecords.source` is a free-text provenance
+string, not a reference), so today nothing reads it back and finds a
+dangling pointer, it just cannot be resolved by a future feature that
+tries. Closing this fully means either a role/trust boundary distinct
+from "any signed-in person" or persisting the turn (for audit) while
+excluding it from what a person sees, both bigger than this item's
+approved "additive flag, skip logTurn and episodes" design - a decision
+for the coordinator, not something to expand unilaterally. Filed as
+getmaipai/home#91.
