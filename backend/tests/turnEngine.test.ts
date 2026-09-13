@@ -5,6 +5,7 @@ import { __resetThrottleForTests } from "@/lib/secretThrottle";
 import { __resetLlmSupervisorForTests } from "@/lib/llmSupervisor";
 import {
   runTurn,
+  StreamUnavailable,
   runTurnStream,
   gateOutputSafety,
   gateGuards,
@@ -26,7 +27,7 @@ import { streamTurnEvents } from "@/routes/turn";
 import { guardReply } from "@/lib/guards";
 import { PERSON_TURN_BUDGET } from "@/lib/llm";
 import { __resetRateLimiterForTests } from "@/lib/rateLimiter";
-import { turnActiveWithin } from "@/lib/turnActivity";
+import { turnActiveWithin, activeTurnCount, acquireTurnLease, __setTurnActivityClockForTests, DEFAULT_IDLE_WINDOW_MS } from "@/lib/turnActivity";
 import { remember, recall, PROFILE_SOURCE } from "@/lib/memory";
 import { listPending } from "@/lib/notifications";
 import { REFUSAL_FIRST, REFUSAL_REPEAT, REMEMBER_CONFIRM_VARIANTS } from "@/lib/replyVariation";
@@ -316,41 +317,208 @@ describe("lib/turnEngine.ts runTurnStream()", () => {
 // the bug it was meant to fix. These prove the real wiring end to end,
 // through the actual runTurn()/runTurnStream() call sites, not just the
 // turnActivity.ts primitive in isolation (tests/turnActivity.test.ts's
-// own job).
+// own job). CHAT-18: the pair is a lease now; every exit path of both
+// functions releases it exactly once (the "exit paths" describe below).
 describe("runTurn()/runTurnStream() actually clear turnActiveWithin() when they finish (getmaipai/home#63)", () => {
-  test("runTurn()'s successful model path calls markTurnFinished()", async () => {
+  test("runTurn()'s successful model path releases the lease", async () => {
     const { actor } = await owner();
     const result = await runTurn(actor, "chat", "good morning");
     expect(result.ok).toBe(true);
+    expect(activeTurnCount()).toBe(0);
     expect(turnActiveWithin(0)).toBe(false);
   });
 
-  test("runTurn()'s immediate (plugin) path also calls markTurnFinished() - prepareTurn() starts a turn regardless of kind", async () => {
+  test("runTurn()'s immediate (plugin) path also releases - a lease is held from the validated start regardless of kind", async () => {
     const { actor } = await owner();
     const result = await runTurn(actor, "chat", "remember that the wifi password is on the fridge");
     expect(result.ok).toBe(true);
+    expect(activeTurnCount()).toBe(0);
     expect(turnActiveWithin(0)).toBe(false);
   });
 
-  test("runTurnStream()'s immediate (plugin) path calls markTurnFinished()", async () => {
+  test("runTurnStream()'s immediate (plugin) path releases", async () => {
     const { actor } = await owner();
     const result = await runTurnStream(actor, "chat", "remember that the wifi password is on the fridge");
     expect(result.ok).toBe(true);
+    expect(activeTurnCount()).toBe(0);
     expect(turnActiveWithin(0)).toBe(false);
   });
 
-  test("runTurnStream()'s own finalize() calls markTurnFinished() - the turn is still 'in flight' until finalize runs, not the instant tokens starts yielding", async () => {
+  test("runTurnStream(): the token generator owns the lease; exhausting it releases, and finalize() afterwards logs without releasing anything else", async () => {
     const { actor } = await owner();
     const result = await runTurnStream(actor, "chat", "good morning");
     expect(result.ok).toBe(true);
     if (!result.ok || result.kind !== "stream") return;
+    expect(activeTurnCount()).toBe(1); // handed back, still held
 
     let fullText = "";
     for await (const delta of result.tokens) fullText += delta;
-    expect(turnActiveWithin(0)).toBe(true); // draining tokens is not finishing the turn
+    expect(activeTurnCount()).toBe(0); // normal exhaustion is the release, and the finish timestamp is now
+    expect(turnActiveWithin(0)).toBe(false);
 
     result.finalize(fullText);
-    expect(turnActiveWithin(0)).toBe(false);
+    expect(activeTurnCount()).toBe(0);
+  });
+});
+
+// CHAT-18: every exit path releases exactly once, through the real
+// functions, with the count read back from the lease registry. No real
+// sleeps: the stub answers instantly or on a promise the test controls.
+describe("CHAT-18: the turn lease on every exit path", () => {
+  async function withStub<T>(
+    opts: Parameters<typeof import("@maipai/spec/llm/ts/stubServer.js").startStubLlmServer>[1],
+    fn: (stub: { url: string; stop: () => void }) => Promise<T>,
+  ): Promise<T> {
+    __resetLlmSupervisorForTests();
+    const { startStubLlmServer } = await import("@maipai/spec/llm/ts/stubServer.js");
+    const stub = startStubLlmServer(0, opts);
+    process.env.MAIPAI_LLAMA_SERVER_URL = stub.url;
+    try {
+      return await fn(stub);
+    } finally {
+      stub.stop();
+      delete process.env.MAIPAI_LLAMA_SERVER_URL;
+      __resetLlmSupervisorForTests();
+    }
+  }
+
+  test("an invalid request acquires no lease", async () => {
+    const { actor } = await owner();
+    const result = await runTurn(actor, "chat", "");
+    expect(result.ok).toBe(false);
+    expect(activeTurnCount()).toBe(0);
+    const stream = await runTurnStream(actor, "chat", "   ");
+    expect(stream.ok).toBe(false);
+    expect(activeTurnCount()).toBe(0);
+  });
+
+  test("a long model turn overlapped by an immediate command and a refusal still blocks background work until it ends", async () => {
+    const { actor } = await owner();
+    let releaseModel: () => void = () => {};
+    const modelGate = new Promise<void>((r) => (releaseModel = r));
+    await withStub(
+      {
+        scriptedChatReply: async () => {
+          await modelGate;
+          return "A long answer that waited on the household.";
+        },
+      },
+      async () => {
+        const long = runTurn(actor, "chat", "tell me something nice about mornings");
+        await new Promise((r) => setTimeout(r, 20)); // let the long turn reach the model
+        expect(activeTurnCount()).toBe(1);
+        const command = await runTurn(actor, "chat", "remember that the wifi password is on the fridge"); // Tier 0, never touches the model
+        expect(command.ok).toBe(true);
+        const refusal = await runTurn(actor, "chat", "how do I make a pipe bomb at home");
+        expect(refusal.ok).toBe(true);
+        if (refusal.ok) expect(refusal.value.source).toBe("safety_refuse");
+        expect(activeTurnCount()).toBe(1); // neither released the long turn's lease
+        expect(turnActiveWithin(0)).toBe(true);
+        releaseModel();
+        const done = await long;
+        expect(done.ok).toBe(true);
+        expect(activeTurnCount()).toBe(0);
+      },
+    );
+  });
+
+  test("runTurn(): an engine that fails during generation releases (the finally, not a matched call)", async () => {
+    const { actor } = await owner();
+    await withStub({}, async (stub) => {
+      stub.stop(); // the engine goes away between validation and the completion call
+      const result = await runTurn(actor, "chat", "good morning");
+      expect(result.ok).toBe(false); // an engine failure is a typed 503, never a leak
+      if (!result.ok) expect(result.code).toBe("unavailable");
+      expect(activeTurnCount()).toBe(0);
+    });
+  });
+
+  test("runTurnStream(): a failure before the first byte releases as the StreamUnavailable throw passes through", async () => {
+    const { actor } = await owner();
+    await withStub({}, async (stub) => {
+      const result = await runTurnStream(actor, "chat", "good morning");
+      expect(result.ok).toBe(true);
+      if (!result.ok || result.kind !== "stream") return;
+      stub.stop(); // the engine goes away before the first token is read
+      let threw: unknown;
+      try {
+        for await (const _ of result.tokens) void _;
+      } catch (err) {
+        threw = err;
+      }
+      expect(threw).toBeInstanceOf(StreamUnavailable);
+      expect(activeTurnCount()).toBe(0);
+    });
+  });
+
+  test("runTurnStream(): a consumer that stops after the first delta (a disconnect) releases through the generator's return()", async () => {
+    const { actor } = await owner();
+    await withStub({ scriptedChatReply: () => "First sentence here. Second sentence here. Third sentence here." }, async () => {
+      const result = await runTurnStream(actor, "chat", "good morning");
+      expect(result.ok).toBe(true);
+      if (!result.ok || result.kind !== "stream") return;
+      const iterator = result.tokens[Symbol.asyncIterator]();
+      const first = await iterator.next();
+      expect(first.done).toBe(false);
+      expect(activeTurnCount()).toBe(1);
+      await iterator.return(undefined);
+      expect(activeTurnCount()).toBe(0);
+      expect(turnActiveWithin(0)).toBe(false);
+    });
+  });
+
+  test("runTurnStream(): an aborted signal after a delta (the route's cancel()) releases and leaves the count exact", async () => {
+    const { actor } = await owner();
+    const abort = new AbortController();
+    await withStub({ scriptedChatReply: () => "First sentence here. Second sentence here. Third sentence here." }, async () => {
+      const result = await runTurnStream(actor, "chat", "good morning", { signal: abort.signal });
+      expect(result.ok).toBe(true);
+      if (!result.ok || result.kind !== "stream") return;
+      const iterator = result.tokens[Symbol.asyncIterator]();
+      await iterator.next();
+      abort.abort();
+      try {
+        while (!(await iterator.next()).done) {
+          /* drain until the abort surfaces or the stream ends */
+        }
+      } catch {
+        /* the aborted fetch's own throw */
+      }
+      expect(activeTurnCount()).toBe(0);
+    });
+  });
+
+  test("runTurnStream(): finalize() twice logs once and never touches another turn's lease", async () => {
+    const { actor } = await owner();
+    const result = await runTurnStream(actor, "chat", "good morning");
+    expect(result.ok).toBe(true);
+    if (!result.ok || result.kind !== "stream") return;
+    const other = acquireTurnLease(); // another user's turn, mid-flight
+    let fullText = "";
+    for await (const delta of result.tokens) fullText += delta;
+    const before = db.select().from(conversationTurns).all().length;
+    const a = result.finalize(fullText);
+    const b = result.finalize(fullText);
+    expect(b).toBe(a);
+    expect(db.select().from(conversationTurns).all().length).toBe(before + 1);
+    expect(activeTurnCount()).toBe(1); // the other user's lease is untouched
+    other.release();
+    expect(activeTurnCount()).toBe(0);
+  });
+
+  test("maintenance is permitted 20 seconds after the actual release, on the clock seam", async () => {
+    const { actor } = await owner();
+    let clock = Date.now();
+    __setTurnActivityClockForTests(() => clock);
+    try {
+      const result = await runTurn(actor, "chat", "good morning");
+      expect(result.ok).toBe(true);
+      expect(turnActiveWithin(DEFAULT_IDLE_WINDOW_MS)).toBe(true); // just finished
+      clock += DEFAULT_IDLE_WINDOW_MS + 1;
+      expect(turnActiveWithin(DEFAULT_IDLE_WINDOW_MS)).toBe(false);
+    } finally {
+      __setTurnActivityClockForTests(() => Date.now());
+    }
   });
 });
 
@@ -1990,7 +2158,7 @@ describe("FAST-04: literal patterns before the embed, a stream that starts befor
         expect(value.plugin_id).toBe("remember");
         expect(value.routing?.tier).toBe("tool");
         expect(REMEMBER_CONFIRM_VARIANTS).toContain(value.reply.text);
-        expect(turnActiveWithin(0)).toBe(false); // markTurnFinished() ran, exactly once, in finalize()
+        expect(turnActiveWithin(0)).toBe(false); // the lease released exactly once, on the stream's own exhaustion
       },
     );
   });

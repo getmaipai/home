@@ -573,7 +573,14 @@ not permission to expand scope.
 
 <a id="chat-18"></a>
 
-- [ ] **CHAT-18: Release turn activity exactly once on every exit path** (S)
+- [x] **CHAT-18: Release turn activity exactly once on every exit path** (S)
+
+    Status (2026-09-13, closed): `acquireTurnLease()` with an idempotent,
+    per-lease `release()`; blocking turns release in `finally`, streaming
+    turns through `holdLease()` on the outermost generator (exhaustion,
+    throw, `return()`, abort) and an idempotent `finalize()` with one
+    terminal flag; the two-minute timer is a once-per-lease warning, never
+    a decrement; a clock seam replaces sleeps. Details in docs/dev/session-a.md.
 
     Depends on: none. Files: `backend/src/lib/turnActivity.ts`,
     `turnEngine.ts`, `routes/turn.ts`, `routes/openai.ts`,

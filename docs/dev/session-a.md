@@ -548,3 +548,81 @@ top three by rank; the remedy is the package declaring its verbs in
 `routing.patterns` (one definition, the package's own), which
 `commandOpenersFrom()` then reads, not a verb list here. And the
 BACKLOG item, ticked with N=2 and the command-after-question number.
+
+## CHAT-18: release turn activity exactly once on every exit path (2026-09-13)
+
+`turnActivity.ts` held two global counters, `markTurnStarted()` and
+`markTurnFinished()`, that every exit path of `runTurn()` and
+`runTurnStream()` had to pair by hand; FAST-04's generator paths (the
+tool-call peek, the resolved variant, `StreamUnavailable`) kept adding
+exits, one missed match leaked an in-flight count that only a
+two-minute timer cleared, and a stray finish could decrement a
+different turn's count (the 2026-09-11 live find: a shared "already
+released" flag that made every later finish a no-op). The counters
+are a lease now. `acquireTurnLease()` registers the turn and returns
+`engage()` (the moment it is about to reach an engine, where the old
+start mark sat; a refusal, a pending-ask answer or a household command
+never engages, holds the lease for microseconds and leaves no cooldown
+behind, which keeps the 2026-09-06 review's point that commands do not
+gate the judge) and `release()`, idempotent and scoped to its own
+lease, stamping the finished time at the first call and never again.
+`turnActiveWithin()` reads the held set: any lease in flight blocks
+background work; a lease held past two minutes is reported once by
+`console.warn` and never cleared, since a leaked lease is a bug to
+find, not a count to fix quietly. `activeTurnCount()` is the exact
+count. A clock seam (`__setTurnActivityClockForTests`) replaces sleeps.
+
+Where the lease lives. `runTurn()` acquires after input and
+conversation validation (an invalid request acquires nothing), runs
+the body in `runTurnHoldingLease()`, and releases in `finally`, so a
+return, an engine failure (a typed 503) and a throw all release once.
+`runTurnStream()` acquires at the same point and owns the lease until
+a stream result is handed back: the owner phase runs in
+`runTurnStreamHoldingLease()` under one `finally` that releases unless
+a stream result took ownership (a `handedOff` flag), so an immediate
+result, an engine that fails to start and a throw anywhere in
+preparation all release structurally rather than by matched calls (a
+review found the first cut safe only because `startCompleteStream()`
+never throws today); once handed back, `holdLease()` wraps the outermost token
+generator and releases in `finally`, which runs on normal exhaustion,
+on a throw from any step (the first-step engine failure that becomes
+`StreamUnavailable`, a safety refusal, the aborted fetch after the
+route's `cancel()`) and on `.return()` (a consumer that stops early).
+`finalize()` releases too (idempotent; normally already released by
+exhaustion) and carries the one terminal flag: a second call returns
+the first value and logs nothing again (the route calls it on the
+normal path and again from its catch when a write fails after "done").
+`prepareTurn()` takes the lease and only engages it. The OpenAI route's
+stream path never called finalize, so it never marked a turn finished
+before; it releases on exhaustion now (its missing turn log is a
+separate, pre-existing gap, not this item's).
+
+Tests: `turnActivity.test.ts` rewritten on the lease (eleven: the
+overlap, the refusal that cannot release another turn, idempotent
+release with the finish timestamp held at the first call, no cooldown
+for an unengaged turn, the stale report once per lease, the window
+measured from the actual release on the clock seam). `turnEngine.test.ts`
+gains "the turn lease on every exit path": no lease for an invalid
+request; a long model turn overlapped by a Tier 0 command and a safety
+refusal still blocks background work until it ends (the stub's reply
+waits on a promise the test releases, no sleep); an engine failing
+during generation; a failure before the first byte (`StreamUnavailable`
+through `holdLease()`); a consumer stopping after the first delta via
+`return()`; an aborted signal after a delta; `finalize()` twice logging
+one turn row and leaving another user's lease untouched; maintenance
+permitted twenty seconds after the actual release on the clock seam.
+`memoryJudge.test.ts`'s mid-batch interrupt acquires a lease instead
+of calling the old mark. The #60 `supersedes` passthrough and
+`logTurn()`'s validation are untouched by the rewrite.
+
+The review traced every exit path of both functions and both route
+consumers and found no leak, double release or cross-lease release;
+three lows, two taken (the owner-phase `finally` above, and a comment
+that claimed a route double-finalize path `for await`'s `return()`
+never produces) and one confirmed as the intended trade: a lease that
+is never iterated and never finalized now gates background work until
+restart, with a once-per-lease warning when the judge polls, instead
+of the old timer quietly clearing it. That is the item's own
+instruction (the timer is not the correctness mechanism), no consumer
+today obtains a stream result without draining or finalizing it, and
+the warning names the condition so a leak is found rather than hidden.

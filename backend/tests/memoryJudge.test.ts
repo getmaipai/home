@@ -8,7 +8,7 @@ import { resolveOrCreateConversation, logTurn } from "@/lib/conversationHistory"
 import { judgeTurn, runJudgeBatch, runConsolidation } from "@/lib/memoryJudge";
 import { remember, similarByVector, PROFILE_SOURCE } from "@/lib/memory";
 import { listPending } from "@/lib/notifications";
-import { markTurnStarted, __resetTurnActivityForTests } from "@/lib/turnActivity";
+import { acquireTurnLease, __resetTurnActivityForTests } from "@/lib/turnActivity";
 import { embed } from "@/lib/llm";
 import { db } from "@/db";
 import { people, conversationTurns, memoryRecords } from "@/db/schema";
@@ -581,7 +581,7 @@ describe("runJudgeBatch()", () => {
     expect(t2Row.judgeStatus).toBe("done");
   });
 
-  test("markTurnStarted() mid-batch stops the loop with the rest left pending, not failed", async () => {
+  test("a turn lease acquired mid-batch stops the loop with the rest left pending, not failed", async () => {
     const { actor } = await owner();
     const t1 = makeTurn(actor, "I hate cilantro", "Noted.");
     const t2 = makeTurn(actor, "I love hiking", "Nice.");
@@ -597,7 +597,7 @@ describe("runJudgeBatch()", () => {
         const userText = request.messages[request.messages.length - 1]!.content;
         if (userText.includes("cilantro")) {
           extractions++;
-          if (extractions === 1) markTurnStarted();
+          if (extractions === 1) acquireTurnLease().engage(); // a person speaks: the lease stays held for the rest of this test
           return { facts: [{ text: "Marlow dislikes cilantro", category: "preference", scope: "person", importance: 0.7 }] };
         }
         if (userText.includes("hiking")) return { facts: [{ text: "Marlow loves hiking", category: "preference", scope: "person", importance: 0.7 }] };

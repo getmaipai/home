@@ -12640,5 +12640,8 @@ other's section once (147cd28, f4779a6).
 - ROUTE-01, the bot's shape guard and routing trace: design note and
   the shipped numbers in [docs/dev/session-a.md](dev/session-a.md)
   (2026-09-13); closes getmaipai/home#80, files #83.
-- ROUTE-02, a stable ordinary tool set: design note in
-  [docs/dev/session-a.md](dev/session-a.md) (2026-09-13).
+- ROUTE-02, a stable ordinary tool set: design note and the shipped
+  numbers in [docs/dev/session-a.md](dev/session-a.md) (2026-09-13).
+- CHAT-18, the turn-activity lease: [docs/dev/session-a.md](dev/session-a.md)
+  (2026-09-13); the CHAT program's order is in
+  docs/plans/session-a-chat-program-2026-09-13.md.

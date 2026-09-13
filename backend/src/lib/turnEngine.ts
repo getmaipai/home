@@ -37,7 +37,7 @@ import {
   type PendingAsk,
 } from "@/lib/conversationHistory";
 import { pickRefusalVariant, varyKnownConstant } from "@/lib/replyVariation";
-import { markTurnStarted, markTurnFinished, DEFAULT_IDLE_WINDOW_MS } from "@/lib/turnActivity";
+import { acquireTurnLease, DEFAULT_IDLE_WINDOW_MS, type TurnLease } from "@/lib/turnActivity";
 import { normalizeForSpeech } from "@maipai/spec/voice/ts/normalizeForSpeech.js";
 import { nextSentenceBoundary } from "@maipai/spec/safety/ts/sentenceChunker.js";
 import { getPersonSettingValue, getHouseholdSettingValue } from "@/lib/settings";
@@ -1313,6 +1313,9 @@ async function prepareTurn(
   text: string,
   loaded: LoadedManifest[],
   conversation: Conversation,
+  // CHAT-18: the caller's lease, engaged here at the point the turn is
+  // about to reach an engine; never released here (the caller owns it).
+  lease: TurnLease,
   skills: LoadedSkill[] = loadAllSkills(),
 ): Promise<PreparedTurn> {
   const turnId = newConversationTurnId();
@@ -1383,22 +1386,25 @@ async function prepareTurn(
     });
   }
 
-  // Marked here, not at the top of this function (lib/turnActivity.ts):
+  // Engaged here, not at the top of this function (lib/turnActivity.ts):
   // a code review (2026-09-06) found the original placement marked
   // EVERY turn as "chat engine active," including the safety-refuse,
   // pendingAsk and matchCommand returns just above, none of which ever
   // reach the chat engine - a household using mostly quick commands or
   // hitting repeated safety refusals could keep the memory judge
   // permanently gated even though nothing was ever actually contending
-  // for the slot. From here on, this turn is at minimum about to call
-  // the embed backend and possibly the chat model (route()'s Tier 1
-  // scoring, Tier 2's tool-calling complete() call, or the model
+  // for the slot. CHAT-18: the lease itself is held from the caller's
+  // validated start (those early returns hold it for microseconds and
+  // leave no cooldown behind); engaging is what makes the release count
+  // as household activity. From here on, this turn is at minimum about
+  // to call the embed backend and possibly the chat model (route()'s
+  // Tier 1 scoring, Tier 2's tool-calling complete() call, or the model
   // fallback below) - a Tier 0/1 plugin firing without ever reaching the
-  // model is still marked (a small, deliberate over-approximation: a
+  // model is still engaged (a small, deliberate over-approximation: a
   // plugin match doesn't own its own gate here, and being a little
   // conservative about the judge's timing costs far less than the
   // per-call precision would).
-  markTurnStarted();
+  lease.engage();
   // FAST-04: literal patterns before the embed round trip. A pattern
   // winner returns from the plugin branch below without ever calling
   // the embed engine (tests/turnEngine.test.ts asserts zero embed calls
@@ -1866,8 +1872,28 @@ export async function runTurn(
   }
   const conversation = conversationResult.value;
 
+  // CHAT-18: one lease per validated turn, released exactly once in the
+  // `finally` below whatever path this function leaves by (a return, an
+  // engine failure, a throw from preparation or generation).
+  const lease = acquireTurnLease();
+  try {
+    return await runTurnHoldingLease(actor, surface, text, conversation, lease, startedAt, opts);
+  } finally {
+    lease.release();
+  }
+}
+
+async function runTurnHoldingLease(
+  actor: PersonRow,
+  surface: Surface,
+  text: string,
+  conversation: Conversation,
+  lease: TurnLease,
+  startedAt: number,
+  opts: { thinking?: boolean; conversationId?: string; supersedes?: string },
+): Promise<TurnOpResult> {
   const loaded = loadAllManifests(); // one catalog scan, shared below
-  const prepared = await prepareTurn(actor, surface, text, loaded, conversation);
+  const prepared = await prepareTurn(actor, surface, text, loaded, conversation, lease);
 
   let value: TurnValue;
   const guardHits: GuardReason[] = [];
@@ -1937,8 +1963,7 @@ export async function runTurn(
       ...(offeringTools ? { tools: prepared.tools, tool_choice: "auto" as const } : {}),
     });
     if (!completion.ok) {
-      markTurnFinished(); // getmaipai/home#63: prepareTurn() above already called markTurnStarted() - an engine-down failure is still a real, finished turn, not a leaked in-flight count
-      return { ok: false, status: 503, code: "unavailable", error: completion.error };
+      return { ok: false, status: 503, code: "unavailable", error: completion.error }; // the lease releases in runTurn()'s finally
     }
 
     // getmaipai/home#67 code review: this function now resolves a
@@ -1961,7 +1986,6 @@ export async function runTurn(
         // without tools, answered as an ordinary reply.
         const retry = await complete("chat", prepared.messages, { thinking: opts.thinking });
         if (!retry.ok) {
-          markTurnFinished();
           return { ok: false, status: 503, code: "unavailable", error: retry.error };
         }
         value = answerWithSafetyAndGuards(retry.value.text);
@@ -2052,7 +2076,6 @@ export async function runTurn(
   }
 
   value = finalizeReply(actor, value);
-  markTurnFinished(); // getmaipai/home#63: the one match for prepareTurn()'s own markTurnStarted() on this function's normal, successful path
   logTurnSafely(actor, surface, text, value, { startedAt, guardHits, guardReplaced, supersedes: opts.supersedes });
   return { ok: true, value };
 }
@@ -2132,7 +2155,8 @@ export class StreamSafetyRefusal extends Error {
 // generator can no longer become an HTTP status - turn_meta is already
 // on the wire - so it travels as a typed throw, the same shape as
 // StreamSafetyRefusal, and routes/turn.ts emits `code: "unavailable"`
-// on the error event. Thrown only after markTurnFinished() has run.
+// on the error event. The turn's lease releases as the throw passes
+// through holdLease() (CHAT-18).
 export class StreamUnavailable extends Error {
   readonly code = "unavailable" as const;
   constructor(message: string) {
@@ -2394,12 +2418,41 @@ export async function runTurnStream(
   }
   const conversation = conversationResult.value;
 
-  const loaded = loadAllManifests();
-  const prepared = await prepareTurn(actor, surface, text, loaded, conversation);
+  // CHAT-18: one lease per validated turn. Until a stream result is
+  // handed back, this function owns it and releases on every exit
+  // (an immediate result, an engine that fails to start, a throw from
+  // preparation); once handed back, the token generator owns it
+  // (holdLease() below) and releases when it is exhausted, throws, or
+  // is returned from, a client disconnect included.
+  const lease = acquireTurnLease();
+  // Structural, not by inspection (a code review): everything up to the
+  // handoff runs under one `finally` that releases unless a stream result
+  // took ownership, so a future throw anywhere in the owner phase (a new
+  // pre-flight check, a supervisor call that rejects) cannot leak.
+  let handedOff = false;
+  try {
+    const result = await runTurnStreamHoldingLease(actor, surface, text, conversation, lease, startedAt, opts);
+    handedOff = result.ok && result.kind === "stream";
+    return result;
+  } finally {
+    if (!handedOff) lease.release();
+  }
+}
+
+async function runTurnStreamHoldingLease(
+  actor: PersonRow,
+  surface: Surface,
+  text: string,
+  conversation: Conversation,
+  lease: TurnLease,
+  startedAt: number,
+  opts: { thinking?: boolean; conversationId?: string; signal?: AbortSignal; supersedes?: string },
+): Promise<TurnStreamResult> {
+  const prepared = await prepareTurn(actor, surface, text, loadAllManifests(), conversation, lease);
 
   if (prepared.kind === "immediate") {
     const value = finalizeReply(actor, prepared.value);
-    markTurnFinished(); // getmaipai/home#63: prepareTurn() above already called markTurnStarted(), even for a kind that never touches the chat engine
+    lease.release(); // the caller's finally would too; released here so the log line below carries the finished state
     logTurnSafely(actor, surface, text, value, { startedAt, guardHits: [], supersedes: opts.supersedes });
     return { ok: true, kind: "immediate", value };
   }
@@ -2421,14 +2474,33 @@ export async function runTurnStream(
     // two starts a retry can produce.
     const guardHits: GuardReason[] = [];
     let guardReplaced = false;
+    // CHAT-18: the one terminal state. finalize() is idempotent: a
+    // second call (a consumer that finalizes from both its normal path
+    // and an error handler, or a test proving the contract) returns the
+    // first value and logs nothing again. routes/turn.ts today reaches
+    // it once per turn; the flag is what makes that a property of this
+    // function rather than of its callers.
+    let finalized: TurnValue | null = null;
+    // CHAT-18: the generator owns the lease from here. `finally` runs on
+    // exhaustion, on a throw from any step (an engine failure before the
+    // first token, the safety refusal, an aborted fetch after a client
+    // disconnect) and on `.return()` (a consumer that stops early), so
+    // every exit path of the stream releases exactly once.
+    async function* holdLease<T, R>(inner: AsyncGenerator<T, R, void>): AsyncGenerator<T, R, void> {
+      try {
+        return yield* inner;
+      } finally {
+        lease.release();
+      }
+    }
     // FAST-04: now that runTurnStream() returns before anything is sent,
     // an engine failure before the first token (the request itself
     // failing, the idle timeout ahead of any header, the all-failed
     // retry finding the engine gone) surfaces from the stream's FIRST
     // step, after turn_meta is already on the wire. With nothing
-    // delivered, routes/turn.ts's catch never calls finalize(), so this
-    // is the one place that can still mark the turn finished; it also
-    // gives the error the "unavailable" code the pre-FAST-04 HTTP 503
+    // delivered, routes/turn.ts's catch never calls finalize(); the
+    // lease releases as the throw passes holdLease(), and this gives
+    // the error the "unavailable" code the pre-FAST-04 HTTP 503
     // carried. Everything the inner generator does before its first
     // yield (the tool-call peek, resolveToolCalls(), the retry's own
     // first step) runs inside that first `.next()`, so one guard covers
@@ -2441,7 +2513,6 @@ export async function runTurnStream(
       try {
         first = await iterator.next();
       } catch (err) {
-        markTurnFinished();
         throw err instanceof StreamUnavailable ? err : new StreamUnavailable((err as Error).message);
       }
       if (first.done) return first.value;
@@ -2454,18 +2525,25 @@ export async function runTurnStream(
       conversationId: conversation.id,
       turnId: prepared.turnId,
       startedAt,
-      tokens: gateGuards(gateOutputSafety(guardFirstStep(tokens), actor), prepared.guardContext, actor.id, (reason, replaced) => {
-        guardHits.push(reason);
-        if (replaced) guardReplaced = true;
-      }),
+      tokens: holdLease(
+        gateGuards(gateOutputSafety(guardFirstStep(tokens), actor), prepared.guardContext, actor.id, (reason, replaced) => {
+          guardHits.push(reason);
+          if (replaced) guardReplaced = true;
+        }),
+      ),
       finalize: (replyText: string, outcome?: StreamOutcome): TurnValue => {
+        if (finalized) return finalized;
+        // CHAT-18: idempotent; normally already released by the
+        // generator's own exhaustion, this covers a consumer that
+        // finalizes without draining.
+        lease.release();
         // FAST-04: a tool-resolved reply is already a complete TurnValue
         // (peekAndHandle() ran resolveToolCalls() and finalizeReply());
         // it is logged and returned as-is, never rebuilt from
         // `replyText`, which is empty on this path. This is the ONE
-        // place markTurnFinished()/logTurnSafely() run for it.
+        // place logTurnSafely() runs for it.
         if (outcome && "resolved" in outcome) {
-          markTurnFinished();
+          finalized = outcome.resolved;
           logTurnSafely(actor, surface, text, outcome.resolved, { startedAt, guardHits: [], supersedes: opts.supersedes });
           return outcome.resolved;
         }
@@ -2526,15 +2604,11 @@ export async function runTurnStream(
           conversation_id: conversation.id,
           turn_id: prepared.turnId,
         });
-        // getmaipai/home#63: the real completion point for the streaming
-        // path - the one call site matching prepareTurn()'s own
-        // markTurnStarted() when the stream runs to a normal finish. A
-        // stream a client disconnects from before finalize() ever runs
-        // (routes/turn.ts's own ReadableStream.cancel()) leaks the
-        // in-flight count on THIS path specifically - turnActivity.ts's
-        // own MAX_TURN_DURATION_MS safety valve is what bounds that case,
-        // not a call here that would never run.
-        markTurnFinished();
+        // CHAT-18: the lease was released above (or by the generator's
+        // own exhaustion or abort before this ran); a disconnect before
+        // finalize() no longer leaks anything, since holdLease()'s
+        // `finally` releases on the aborted fetch's throw.
+        finalized = value;
         logTurnSafely(actor, surface, text, value, { startedAt, guardHits, guardReplaced, supersedes: opts.supersedes });
         return value;
       },
@@ -2546,7 +2620,8 @@ export async function runTurnStream(
   if (!offeringTools) {
     const started = await startCompleteStream("chat", prepared.messages, { thinking: opts.thinking }, opts.signal);
     if (!started.ok) {
-      markTurnFinished(); // getmaipai/home#63: an engine-down failure here is still a real, finished turn, not a leaked in-flight count
+      // An engine-down failure here is still a real, finished turn; the
+      // caller's finally releases (no stream result was handed off).
       // Collapsed to "unavailable", the same as runTurn()'s own handling of
       // complete()'s failure: llm.ts's own "unsupported_role"/"invalid_input"
       // codes describe a role/messages problem this function's own prior
@@ -2592,8 +2667,7 @@ export async function runTurnStream(
     opts.signal,
   );
   if (!startResult.ok) {
-    markTurnFinished();
-    return { ok: false, status: 503, code: "unavailable", error: startResult.error };
+    return { ok: false, status: 503, code: "unavailable", error: startResult.error }; // released by the caller's finally
   }
   const started = startResult as Extract<typeof startResult, { ok: true }>;
 
