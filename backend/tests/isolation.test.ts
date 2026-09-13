@@ -11,7 +11,7 @@ function fakeEnv(): Record<string, string | undefined> {
     MAIPAI_BACKUP_DIR: "/tmp/maipai-home-test-backups-abc",
     MAIPAI_KEYSTORE_BACKEND: "file",
     MAIPAI_TTS_DISABLE_SPAWN: "1",
-    MAIPAI_LLAMA_SERVER_PORT: "48788",
+    MAIPAI_LLAMA_SERVER_PORT: "39302",
   };
 }
 
@@ -37,9 +37,9 @@ describe("test isolation guard", () => {
     delete env.MAIPAI_LLAMA_SERVER_PORT;
     const violations = checkTestIsolation(env, expected);
     expect(violations).toHaveLength(1);
-    expect(violations[0]).toMatchObject({ name: "MAIPAI_LLAMA_SERVER_PORT", restoredTo: "48788" });
+    expect(violations[0]).toMatchObject({ name: "MAIPAI_LLAMA_SERVER_PORT", restoredTo: "39302" });
     expect(violations[0]!.found).toBeUndefined();
-    expect(read(env, "MAIPAI_LLAMA_SERVER_PORT")).toBe("48788");
+    expect(read(env, "MAIPAI_LLAMA_SERVER_PORT")).toBe("39302");
   });
 
   test("the chat port pointed at the production default is as bad as unset", () => {
@@ -48,7 +48,7 @@ describe("test isolation guard", () => {
     env.MAIPAI_LLAMA_SERVER_PORT = PRODUCTION_CHAT_PORT;
     const names: string[] = checkTestIsolation(env, expected).map((v) => v.name);
     expect(names).toEqual(["MAIPAI_LLAMA_SERVER_PORT"]);
-    expect(env.MAIPAI_LLAMA_SERVER_PORT).toBe("48788");
+    expect(env.MAIPAI_LLAMA_SERVER_PORT).toBe("39302");
   });
 
   test("a test's own throwaway chat port is allowed", () => {

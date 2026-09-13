@@ -6,6 +6,7 @@ import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { installTestIsolationGuard } from "./isolation";
+import { reserveFreePort } from "./fixtures/reserveFreePort";
 
 process.env.MAIPAI_DATA_DIR = mkdtempSync(join(tmpdir(), "maipai-home-test-"));
 // Its own, independent throwaway directory, not a sibling derived from
@@ -23,7 +24,7 @@ process.env.MAIPAI_KEYSTORE_BACKEND = "file";
 // live chat engine as a side effect of `bun test`. This isolates test
 // spawns from the real app's port entirely, the same "tests never touch
 // real state" guarantee MAIPAI_DATA_DIR/MAIPAI_BACKUP_DIR already give.
-process.env.MAIPAI_LLAMA_SERVER_PORT = "48788";
+process.env.MAIPAI_LLAMA_SERVER_PORT = String(reserveFreePort());
 // Same guarantee for the `tts` role: without this, ttsSupervisor.ts's
 // real-spawn tier would shell out to `uvx pocket-tts serve` on any
 // machine that has `uv` installed (Jesse's dev Mac included) the moment a

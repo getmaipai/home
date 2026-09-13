@@ -9,6 +9,7 @@ import {
 } from "@/lib/resourceGovernor";
 import { listIssues, __resetFixHandlersForTests } from "@/lib/issues";
 import { resetDb } from "./reset-db";
+import { reserveFreePort } from "./fixtures/reserveFreePort";
 
 // The tier-2 (developer override) spawn path is the only real, non-mocked
 // way to get llmSupervisor.ts's private chatBackend state (and so
@@ -30,6 +31,7 @@ const FAKE_BIN = join(import.meta.dir, "fixtures", "fakeLlamaServer.ts");
 // same machine. tests/isolation.ts now fails any test that leaves it
 // unset; this is the fix at the source.
 const ISOLATED_CHAT_PORT = process.env.MAIPAI_LLAMA_SERVER_PORT;
+const TEST_CHAT_PORT = String(reserveFreePort());
 
 beforeEach(() => {
   resetDb();
@@ -71,7 +73,7 @@ describe("resourceGovernor: trigger B (process usage vs. its own baseline)", () 
   test("sustained real RSS growth past baseline x1.3 raises a Repairs issue and restarts the backend", async () => {
     process.env.MAIPAI_LLAMA_SERVER_BIN = FAKE_BIN;
     process.env.MAIPAI_CHAT_MODEL_PATH = "/dev/null";
-    process.env.MAIPAI_LLAMA_SERVER_PORT = "39302";
+    process.env.MAIPAI_LLAMA_SERVER_PORT = TEST_CHAT_PORT;
     process.env.FAKE_LLAMA_INFLATE_MB = "50"; // a real, resident ~50MB+ allocation
 
     const client = await getChatClient(); // real tier-2 spawn of the fixture
@@ -101,7 +103,7 @@ describe("resourceGovernor: staleness guard against a racing manual restart", ()
   test("a manual restart mid-breach-accumulation stops the stale governor from ever acting", async () => {
     process.env.MAIPAI_LLAMA_SERVER_BIN = FAKE_BIN;
     process.env.MAIPAI_CHAT_MODEL_PATH = "/dev/null";
-    process.env.MAIPAI_LLAMA_SERVER_PORT = "39303";
+    process.env.MAIPAI_LLAMA_SERVER_PORT = TEST_CHAT_PORT;
     process.env.FAKE_LLAMA_INFLATE_MB = "50";
 
     await getChatClient();
@@ -128,7 +130,7 @@ describe("resourceGovernor: tier-2 override wiring", () => {
   test("a developer-override spawn starts a governor at all (trigger A only, no crash from a null baseline)", async () => {
     process.env.MAIPAI_LLAMA_SERVER_BIN = FAKE_BIN;
     process.env.MAIPAI_CHAT_MODEL_PATH = "/dev/null";
-    process.env.MAIPAI_LLAMA_SERVER_PORT = "39304";
+    process.env.MAIPAI_LLAMA_SERVER_PORT = TEST_CHAT_PORT;
 
     const client = await getChatClient();
     expect(await client.health()).toBe(true);

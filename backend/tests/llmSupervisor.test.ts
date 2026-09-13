@@ -7,6 +7,9 @@ import { listIssues } from "@/lib/issues";
 import { __resetSidecarsForTests, __setSidecarTimingForTestsOnly } from "@/lib/sidecars";
 import { join } from "node:path";
 import { resetDb } from "./reset-db";
+import { reserveFreePort } from "./fixtures/reserveFreePort";
+
+const TEST_CHAT_PORT = reserveFreePort();
 
 afterEach(() => {
   __resetLlmSupervisorForTests();
@@ -170,6 +173,7 @@ describe("llmSupervisor: an engine that dies out from under it", () => {
     resetDb();
     process.env.MAIPAI_LLAMA_SERVER_BIN = FAKE_BIN;
     process.env.MAIPAI_CHAT_MODEL_PATH = "/dev/null";
+    process.env.MAIPAI_LLAMA_SERVER_PORT = String(TEST_CHAT_PORT);
     const client = await getChatClient();
     expect(await client.health()).toBe(true);
     const pid = getEngineStatus().pid!;
@@ -204,7 +208,7 @@ describe("llmSupervisor: an engine that dies out from under it", () => {
     __setSidecarTimingForTestsOnly({ backoffMs: [50] });
     const pid = await spawnFakeEngine();
     process.kill(pid, "SIGKILL");
-    reportChatBackendUnreachable("could not reach http://127.0.0.1:48788");
+    reportChatBackendUnreachable(`could not reach http://127.0.0.1:${TEST_CHAT_PORT}`);
     await waitUntil(() => getEngineStatus().pid !== null && getEngineStatus().pid !== pid);
     // Whichever signal won the race (the request's own failure, or the
     // exit itself), it was reported as a death and healed.
