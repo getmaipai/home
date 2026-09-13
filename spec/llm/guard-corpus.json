@@ -229,8 +229,8 @@
     "id": "claimed-experience-is-invention",
     "utterance": "have you been to Paris",
     "reply": "I have been to Paris myself.",
-    "expect": "invention",
-    "note": "FAST-05 household negative: a first-person experience this hub cannot have."
+    "expect": "claimed_experience",
+    "note": "Item 1b (#67): a first-person claim of having seen, eaten or been somewhere is its own reason now, replaced with the cannot-experience line (never the household's 'nobody's told me'), and only that sentence is dropped when the reply says more."
   },
   {
     "id": "own-honest-line-is-not-an-attribution",
@@ -348,5 +348,12 @@
     "reply": "[Knowledge could not answer.]",
     "expect": "placeholder_echo",
     "note": "getmaipai/home#92: the window's bracketed system note for an earlier package failure, said back as the reply (the baseline bench's reader's rows, 2026-09-13). A note is nobody's words; replaced with the honest line."
+  },
+  {
+    "id": "claimed-experience-keeps-the-rest",
+    "utterance": "have you seen Finding Nemo",
+    "reply": "I think I've seen it! It's about a clownfish looking for his son.",
+    "expect": "claimed_experience",
+    "note": "Item 1b (#67): the claim is dropped and what the model knows stands (the baseline's film transcript lost the whole reply to the household honesty line)."
   }
 ]

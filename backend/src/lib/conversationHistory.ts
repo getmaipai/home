@@ -33,6 +33,7 @@
 // when no real model is running yet.
 import { eq, and, or, not, lt, gt, isNull, isNotNull, inArray, desc } from "drizzle-orm";
 import { redactCredentials, CREDENTIAL_REDACTION } from "@/lib/memoryContentPolicy";
+import { withoutHonestyLines } from "@/lib/guards";
 import { archiveByProvenance } from "@/lib/memory";
 import { db, sqlite } from "@/db";
 import { conversationTurns, conversations, people, memoryRecords, commands } from "@/db/schema";
@@ -698,6 +699,14 @@ function pluginDisplayName(pluginId: string): string {
  * told the household. A `system` note describes what happened instead,
  * in nobody's voice. The manifest's own `display` name is used, never
  * the bare package id (B3's own wording). */
+/** Item 1b (#67): what a guard-replaced model turn reads as: the
+ * honesty lines stripped, whatever else was said quoted in nobody's
+ * voice, and a turn that was only the honesty line noted as no reply. */
+function guardedTurnNote(t: ConversationTurnRow): string {
+  const kept = withoutHonestyLines(t.replyText);
+  return kept ? `[The reply given was: "${redactCredentials(kept)}"]` : "[No reply was given to this.]";
+}
+
 function nonModelWindowNote(t: ConversationTurnRow): string {
   switch (t.source) {
     case "plugin": {
@@ -783,7 +792,21 @@ export function buildConversationWindow(conversation: Conversation, opts: { supe
     // never BOTH, since pushing the raw canned/failure text as `assistant`
     // too would reintroduce the exact bug B3 fixes (the model reading a
     // Tier 1 handler's own words as something it had said itself).
-    messages.push(t.source === "model" ? { role: "assistant", content: redactCredentials(t.replyText) } : { role: "system", content: nonModelWindowNote(t) });
+    // Item 1b (#67): a model turn a guard replaced (its `guard_reason`
+    // set, #78) holds the guard's own line, not the model's words; fed
+    // back as an assistant message the model imitated it on the turns
+    // after ("nobody's told me" four times about one film). It enters
+    // as a system note instead: the honesty vocabulary never reaches
+    // the model, and a line that carries a fact the next turn needs
+    // ("I haven't added anything to your list") is quoted as a note, in
+    // nobody's voice (a review).
+    messages.push(
+      t.source === "model" && t.guardReason
+        ? { role: "system", content: guardedTurnNote(t) }
+        : t.source === "model"
+          ? { role: "assistant", content: redactCredentials(t.replyText) }
+          : { role: "system", content: nonModelWindowNote(t) },
+    );
   }
 
   const hasUncoveredOlder = older.length - includedOlder.length > 0;
@@ -854,7 +877,10 @@ export async function maybeRefreshConversationSummary(conversationId: string): P
   // catches the "resolved to the stub just now" case.
   if (getBackgroundBackendKind() === "stub") return;
 
-  let transcript = newSinceLastSummary.map((r) => `User: ${redactCredentials(r.userText)}\nReply: ${redactCredentials(r.replyText)}`).join("\n\n"); // CHAT-03: read-side redaction
+  // CHAT-03: read-side redaction. Item 1b: a guard-replaced turn reads
+  // as its note here too, so the honesty vocabulary reaches neither the
+  // summary nor, through it, the model.
+  let transcript = newSinceLastSummary.map((r) => `User: ${redactCredentials(r.userText)}\nReply: ${r.source === "model" && r.guardReason ? guardedTurnNote(r) : redactCredentials(r.replyText)}`).join("\n\n");
   if (transcript.length > MAX_SUMMARY_INPUT_CHARS) {
     transcript = transcript.slice(transcript.length - MAX_SUMMARY_INPUT_CHARS);
   }

@@ -2293,3 +2293,214 @@ the console only and the mirror persists it. `bun stop`
 sends SIGTERM and waits up to thirty seconds, which the shutdown's
 fifteen seconds of engine stops plus the deadline fit. Committed by
 name with Codex as the author of the change.
+
+## Item 1b (#67): the honesty lines never answer a world question (2026-09-13)
+
+Jesse met the defect live on the restarted hub: six turns about a film,
+four answered with the household honesty line, every one a model reply
+with `websearch` offered and never called. Two series of three bench
+runs, and a third for the commit as it stands, all against the hub's
+own engines (8B chat, 1.7B judge with #97's line, embed by URL).
+
+**Series one: the policy split alone** (a household sentence, a world
+sentence). Film rows, six turns about Finding Nemo: the premise, rating
+and runtime turns passed in runs one and three; "have you seen it" was
+answered "I think I've seen it!" and the claimed-experience rule <!-- prose-lint: allow -->
+replaced the whole reply with "That's not something I've been told"
+or "nobody's told me" (runs one and two), and run two's premise turn
+was "I don't actually have that - nobody's told me" outright: the
+model had read that line back as its own previous words, since a
+guard-replaced turn entered the window as the assistant's message.
+Totals 59, 60, 63 of 66.
+
+**Series two: Jesse's rules.** (a) The honesty vocabulary is out of
+everything the model reads: the stable suffix no longer says "only say
+the household hasn't told you" or any variant, the memory block's line
+is "Nothing stored here bears on this message.", and a guard-replaced
+model turn enters the window as the system note "[No reply was given
+to this.]" instead of the guard's line in the assistant's voice (this
+is how one "nobody's told me" bred four; `conversationHistory.test.ts`
+holds it). The lines live only in `guards.ts`'s replacement table.
+(b) The suffix describes the companion in this order: it knows a lot
+about the world and answers from that, using the offered lookup when
+unsure instead of guessing or declining; it cannot watch, taste or
+visit and says so while still saying what it knows; an opening
+statement ("I'm watching the movie Cobra") is met the way a friend
+would meet it, with something known or a question, never a sign-off;
+household facts are the one thing answered only from what it was
+told, never guessed. (c) The household corpus is untouched and holds.
+A claimed experience is its own guard reason, `claimed_experience`:
+the sentence is dropped wherever it sits and the rest of the reply
+stands (both paths), and only when it was the whole reply does the
+CANNOT_EXPERIENCE line ("I can't actually watch or go anywhere
+myself.") stand in, never the household's. The film row set restarts
+from "I'm watching the movie Cobra" with the rubric Jesse set: the
+reply mentions something about the film (a name, a year, a genre, a
+question) and carries no closer, and it is a reader's row.
+
+Film rows across the three runs of series two (raw replies; the
+opening turn passed in all three, no honesty line in any turn):
+
+1. "I'm watching the movie Cobra": "Hey, Cobra's a cool action film! I <!-- prose-lint: allow -->
+   remember it's about a team of mercenaries taking down a drug lord.
+   You like the movie?" / "Cobra's a pretty intense action movie,
+   right? I remember it's got some really cool fight scenes. What did
+   you think of it?" / "Cobra's a classic, right? Action packed and
+   full of cool stunts. You've seen it before?"
+2. "have you seen it": "I think I've seen it, but I'm not entirely
+   sure. It's a classic action movie with some intense scenes!" (the <!-- prose-lint: allow -->
+   claim dropped, the rest spoken) / "I haven't seen it myself, but
+   I've heard good things about Cobra! It's a classic action film with <!-- prose-lint: allow -->
+   some awesome stunts." / "I haven't seen it, but I've heard great
+   things about Cobra!" <!-- prose-lint: allow -->
+3. "do you know what it's about": mercenaries and a drug lord, a
+   kidnapped executive, a dangerous mission: wrong all three times
+   (Cobra is Stallone's 1986 police film), and never a lookup.
+4. "what's its rating": "I'm not sure about the exact rating... Let me
+   check that for you." / "Would you like me to look it up for you?" /
+   "I don't have the exact rating memorized... check a movie
+   database": the model offers to look it up and does not call the
+   lookup it was offered, all three runs.
+5. "how long is it": "around 1 hour and 50 minutes" / "about two
+   hours" (it is 87 minutes) / "The timer's got about nine minutes
+   left" (a timer memory from an earlier conversation, cut by
+   `unrelated_recall`).
+6. "is it okay for a six year old": "pretty intense with a lot of
+   action... I wouldn't say it's suitable for a six-year-old" in all
+   three, the one thing it knows right.
+
+So the item's defect is fixed (no honesty line answers a world question
+in any of the runs) and its acceptance is not met: the premise and
+rating turns fail three of three, because the 8B's own knowledge of
+this film is wrong and it does not use the lookup unprompted even when
+told to, twice choosing to offer a lookup instead. That is the
+evidence the coordinator asked for: the fix for "unsure about the
+world" is the composed lookup path (CHAT-15's retained outcomes, then
+CHAT-16), not more prompt. Totals 59, 60, 60 of 66; the drop against
+series one is two guard interactions the new prompt surfaced, fixed
+for the third series: "Sage mentioned that Pippa is allergic to
+peanuts" (every content word grounded) was cut by the attribution rule
+for its "that", and "Sure, I'll remember that Marlow's birthday is in
+June" to "can you remember ..." was read as accepting an impossible
+request (a remember request is an acknowledgment; the judge remembers).
+Also seen, item 3's: "Got it, added to the list" to three disclosures
+(the persona's example line said back, replaced by CHAT-04), and the
+spoken correction lost in every run.
+
+A review of the patch before the commit found six things; five taken:
+a guard-replaced turn whose line carries a fact the next turn needs
+("I haven't added anything to your list", the pharmacist caution) is
+quoted in the window as `[The reply given was: "..."]`, in nobody's
+voice, and a turn that was only the honesty line reads "[No reply was
+given to this.]"; the rolling summary's transcript reads the same
+notes, so the vocabulary reaches neither the summary nor the model
+through it; the remember exemption covers a request to remember a
+fact only ("can you remember to text Nadia" stays an action request,
+still checked); the hearsay "read" is not a claimed experience ("I've
+read that it's rated R"); the film's runtime rubric requires the
+number. Recorded, not handled: on the streaming path a
+claimed-experience sentence long enough for the chunker to flush at a
+clause boundary loses its head and speaks its tail as a fragment,
+where `guardReply()` drops the whole sentence; the same divergence
+the cuttable reasons already carry, noted beside it.
+
+A second review on the final patch found six more, all taken. The
+window note is keyed on the text, not the stored reason:
+`withoutHonestyLines()` in `guards.ts` strips the NOT_TOLD, DONT_KNOW
+and CHAT_LOOP lines from a guard-replaced turn and the note quotes
+whatever remains (the streaming path stores a spoken sentence beside
+the line when a later sentence trips a non-cuttable guard, "It's a
+Pixar film. I don't know, sorry.", and the first cut hid the spoken
+sentence). On the streaming path the replacing hit is now recorded
+first, so `guard_reason` names the reason that replaced, as
+`guardReply()` reports it ("I've seen it! I'll text her now." stored <!-- prose-lint: allow -->
+`claimed_experience` while the person heard the CANNOT_DO line).
+The forced-lookup precheck reads the first sentence the guards would
+not skip, since a skipped first sentence no longer means the reply
+stood. The "remember to" carve-out uses the same verb list as the
+exemption ("keep in mind to call the vet" was exempt). "I read it
+last summer" is a claimed experience again; only the hearsay forms
+("read that", "read about", "read somewhere") pass. And the bench's
+`HONESTY_LINES` covers the DONT_KNOW pool too, which the
+`unrelated_recall`, `near_echo`, `example_parrot` and
+`placeholder_echo` replacements use (no recorded film row carried
+one; the series stand).
+
+**Series three, the commit as it stands** (the two guard interactions
+fixed): 60, 59, 60 of 66. No honesty line in any film turn; the
+opening turn engaged in all three ("You've got the right vibe with
+Cobra, classic action with a solid cast. Any particular scene catching
+your eye?"; "Cool, I've heard of Cobra, it's a 1986 action film... it
+stars Sylvester Stallone", the one run that knew the film); "have you
+seen it" answered "I haven't seen it myself, but I've heard..." in all
+three with no guard needed. The premise turn passed once (the run that
+knew it) and the rating turn never; the model offers to look it up and
+does not. The item closes its own defect (#67: the honesty line as the
+model's own words about the world) and hands the rest to the
+media-conversation program (`docs/plans/media-conversation-program-
+2026-09-13.md`): CHAT-15, then CHAT-13 with an active subject, then
+CHAT-16's composer over Session B's media package, with this film
+conversation as the permanent regression set. The most frequent
+failure left on the board after this item is the persona's own example
+line "Got it, added to the list." said back to a disclosure (three or
+four rows a run, replaced by CHAT-04 with "I haven't added anything to
+your list."): the example teaches a completed-action claim, and the
+persona work should replace it with an acknowledgment that claims
+nothing.
+
+**Series four, the fixture at twenty-eight conversations** (bench pids
+16361, 17002, 17665; engines as above): 91, 91, 85 of 98 scored turns.
+The seven conversations added for the program's scope (Jesse: every
+subject kind through the same tracker), four other-kind subjects and
+three household subjects, each opened with a statement and followed
+by "have you heard of it" or a question that leans on the subject:
+Fleetwood Mac (band), Lisbon (city), the moon landing (historical
+event), Stardew Valley (video game); Atlas the dog, Marlow's fair,
+the Bosch dishwasher. Their rows beside the film's, three runs:
+
+- Film (Cobra): opening and "have you seen it" pass three of three;
+  premise, rating and runtime fail three of three (a mercenary
+  premise every run, and in run three "a secret U.S. military unit
+  led by Colonel Steven Drexler"; a rating never given; 114 minutes
+  or two hours). The six-year-old turn passes three of three.
+- Band: 14 of 15. Formed 1967, "Rumours", Stevie Nicks, every run;
+  run two's opening turn was "That's a great soundtrack for a
+  morning, classic rock with that soulful vibe. Enjoy the tunes!", <!-- prose-lint: allow -->
+  a closer with nothing about the band, the one miss.
+- City: 15 of 15. "have you heard of it" got "could you clarify what
+  'it' refers to?" in run one (passes the rubric, and it is the exact
+  gap CHAT-13's subject tracker closes: the subject was a sentence
+  ago); "how far is it from Porto" got "about a 2-hour train ride...
+  Let me check that for you", and no lookup followed.
+- Historical event: 13 of 15. Both misses are one row, "have you heard
+  of it", where the model's reply "It was the first time humans
+  stepped on the moon" was refused mid-stream by the safety
+  classifier as CSAM: "stepped on" with the separators removed
+  contains "pedo". Filed as #100 (the tight check on four-letter
+  terms also refuses "we hopped on the bus" and "hello little one,
+  time for bed"). The date, the crew and "do you think we'll go back"
+  pass every run.
+- Video game: 15 of 15 (ConcernedApe, 2016, fine for kids), with a
+  "the Netherlands" invented for the developer's home in run one, a
+  wrong world fact the rubric does not ask about.
+- Dog, person, thing: 12 of 12, 12 of 12, 11 of 12 (run three's
+  "it's a Bosch, about eight years old" ended "Let me know if you
+  need anything else", the closer). Every "how old is Atlas", "when
+  is Marlow's fair", "how old is the dishwasher" answered from the
+  turn that said it. What the rubric does not score and the program
+  must: "Marlow has been up since five baking bread for the fair"
+  got "Bread's in the oven, should be done in about thirty minutes.
+  Want me to set a timer?" and "when is Marlow's fair" got the
+  Saturday plus "Did you know Marlow's birthday is in June?" (an
+  earlier conversation's fact, offered unasked); "the dishwasher is
+  making a grinding noise again" got "I'll check the dishwasher...
+  Let me see what's going on", an action it cannot take, spoken as
+  narration rather than a claim the guard reads.
+
+Run three's six extra misses are the board's known rows, not the new
+ones: "Got it, added to the list." to four disclosures (replaced by
+CHAT-04's line), the spoken correction lost, and "when is the
+dentist" answered with a date-time from a reminder row. The three
+totals are not identical, and the reason is those rows' sampling
+variance, which this item does not touch; the film rows' verdicts are
+identical across the three runs.

@@ -24,7 +24,7 @@ import { recallEpisodes, formatEpisodesForPrompt, formatEpisodeLine, episodeQuot
 import { intentFor, markIncluded, guardContextFrom, type TurnContext, type TurnEvidence, type ToolExecutionOutcome } from "@/lib/turnContext";
 import { newConversationTurnId } from "@/lib/id";
 import { complete, startCompleteStream, type LlmMessage, type ToolSpec, type ToolCall } from "@/lib/llm";
-import { guardReply, guardSentence, replacementFor, isCuttable, splitIntoSentences, type GuardContext, type GuardReason } from "@/lib/guards";
+import { guardReply, guardSentence, replacementFor, isCuttable, isSkippable, splitIntoSentences, type GuardContext, type GuardReason } from "@/lib/guards";
 import { tokenize } from "@/lib/text";
 import { sanitizeForPrompt } from "@/lib/promptSanitize";
 import {
@@ -301,7 +301,22 @@ const STABLE_SYSTEM_SUFFIX = [
   // itself; this one names the tool path first so declining is the LAST
   // resort, not the default, matching what "look it up" already proved
   // the model is perfectly capable of doing unprompted.
-  "If a listed tool can look something up, use it before saying you don't know - only say the household hasn't told you something when no tool applies.",
+  // Item 1b (docs/plans/baseline-fixes-2026-09-13.md, #67 again,
+  // live-found 2026-09-13): the earlier sentence here ("only say the
+  // household hasn't told you something when no tool applies") taught
+  // the 8B the honesty line itself, and it recited it about a film
+  // ("have you seen it" got "nobody's told me"; runtime and premise got
+  // "I don't know that one, sorry", with websearch offered on every
+  // turn and never called). The honesty lines now live only in the
+  // guards' replacement table (guards.ts), used after a guard catches an
+  // invented household fact; the model never reads them. What it reads
+  // is the companion it is: knowledgeable about the world, looking
+  // things up when unsure, and careful about the household, in that
+  // order.
+  "You know a lot about the world: films, places, dates, how things work. Answer those from what you know, and when you're unsure, use the lookup tool you were offered instead of guessing or declining.",
+  "You can't watch, taste or visit things yourself; if someone asks whether you have, say so, and still tell them what you know about it.",
+  "When someone tells you what they're doing or watching, respond to it the way a friend would, with something you know about it or a question about it, not a sign-off.",
+  "Facts about this household, its people, their plans and this home, are the one thing you answer only from what you were told here; never guess one.",
 ].join(" ");
 
 // The speech register is now the selected Persona (lib/persona.ts,
@@ -371,7 +386,7 @@ export const MAX_TURN_TEXT_LENGTH = 8_000;
 const MAX_MEMORY_SNIPPETS = 5;
 /** #93: the memory block's own line when recall found nothing relevant
  * (exported for the tests and the bench). */
-export const NOTHING_STORED_LINE = "Nothing stored matches this message: answer from what you know, or say the household has not told you.";
+export const NOTHING_STORED_LINE = "Nothing stored here bears on this message.";
 const MAX_MEMORY_SECTION_CHARS = 800;
 const MAX_SKILLS_SECTION_CHARS = 1200;
 // Step 3: one line, so a generous cap is plenty; guards the same way
@@ -2344,10 +2359,18 @@ async function runTurnHoldingLease(
       // between this pre-check and the real pass, so a genuinely
       // fabricated first sentence could be misclassified here and the
       // retry silently skipped for the exact turn it exists to fix.
-      const firstSentence = splitIntoSentences(rawText)[0] ?? "";
-      const firstReason = firstSentence
-        ? guardSentence(firstSentence, { ...guardContextFrom(prepared.turnContext), personId: actor.id, replyHasQuestion: rawText.includes("?") }, true)
-        : null;
+      // Item 1b: a skippable first sentence ("I've seen it!") is dropped
+      // by guardReply(), so the sentence that decides "whole reply
+      // replaced" is the first one the guards would not skip (a review).
+      const precheckCtx: GuardContext = { ...guardContextFrom(prepared.turnContext), personId: actor.id, replyHasQuestion: rawText.includes("?") };
+      let firstReason: GuardReason | null = null;
+      const sentences = splitIntoSentences(rawText);
+      for (let i = 0; i < sentences.length; i++) {
+        const reason = guardSentence(sentences[i]!, precheckCtx, i === 0);
+        if (reason && isSkippable(reason)) continue;
+        firstReason = reason;
+        break;
+      }
       const looksInvented = firstReason === "invention" || firstReason === "unrelated_recall";
 
       if (offeringTools && looksInvented && prepared.lookupTools.length > 0) {
@@ -2657,12 +2680,22 @@ export async function* gateGuards(
   let step = await iterator.next();
   let isFirstSentence = true;
   let spokeAnything = false;
+  let skipped: { reason: GuardReason; sentence: string } | null = null;
   const liveCtx = (): GuardContext => ({ ...(typeof ctx === "function" ? ctx() : ctx), personId });
   while (!step.done) {
     const rawSpan = step.value;
     const trimmed = rawSpan.trim();
     const reason = trimmed ? guardSentence(trimmed, liveCtx(), isFirstSentence) : null;
     if (trimmed) isFirstSentence = false;
+    if (reason && isSkippable(reason)) {
+      // Item 1b: the sentence is dropped wherever it sits and the rest
+      // streams on; if nothing else is ever spoken, the honest line
+      // stands in at the end (guardReply()'s own rule).
+      skipped ??= { reason, sentence: trimmed };
+      onGuardHit?.(reason, false);
+      step = await iterator.next();
+      continue;
+    }
     if (reason) {
       // guards.ts:521's own gate, exactly: `kept.length > 0 &&
       // CUTTABLE.has(reason)` keeps the prefix and drops the rest with
@@ -2680,6 +2713,10 @@ export async function* gateGuards(
     spokeAnything = true;
     yield rawSpan;
     step = await iterator.next();
+  }
+  if (skipped && !spokeAnything) {
+    onGuardHit?.(skipped.reason, true);
+    yield `${replacementFor(skipped.reason, personId, { sentence: skipped.sentence, ctx: liveCtx() })} `;
   }
   return step.value;
 }
@@ -2897,8 +2934,16 @@ async function runTurnStreamHoldingLease(
       tokens: holdLease(
         sentenceCaseStream(
           gateGuards(gateOutputSafety(guardFirstStep(tokens), actor, prepared.turnId), () => guardContextFrom(prepared.turnContext), actor.id, (reason, replaced) => {
-            guardHits.push(reason);
-            if (replaced) guardReplaced = true;
+            // The reason that replaced is the one the row records
+            // (guard_reason reads the first hit, #78): a skipped
+            // sentence's hit (item 1b) can come before it, and the
+            // blocking path's guardReply() reports the replacing one.
+            if (replaced) {
+              guardReplaced = true;
+              guardHits.unshift(reason);
+            } else {
+              guardHits.push(reason);
+            }
           }),
         ),
       ),

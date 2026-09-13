@@ -496,6 +496,23 @@ describe("CHAT-18: the turn lease on every exit path", () => {
     });
   });
 
+  test("runTurnStream(): a skipped claimed experience before a replacing guard records the replacing reason, as guardReply() does (item 1b, a review)", async () => {
+    const { actor } = await owner();
+    await withStub({ scriptedChatReply: () => "I've seen it! I'll text her now." }, async () => {
+      const result = await runTurnStream(actor, "chat", "can you text Nadia");
+      expect(result.ok).toBe(true);
+      if (!result.ok || result.kind !== "stream") return;
+      const deltas: string[] = [];
+      for await (const delta of result.tokens) deltas.push(delta);
+      const value = result.finalize(deltas.join(""));
+      expect(value.reply.text).toMatch(/can't actually do that|not able to do that|not something I can do/);
+      const row = db.select().from(conversationTurns).where(eq(conversationTurns.id, value.turn_id)).get()!;
+      expect(row.guardReason).toBe("capability_claim");
+      const blocking = guardReply("I've seen it! I'll text her now.", { utterance: "can you text Nadia", personId: actor.id });
+      expect(blocking.reason).toBe("capability_claim");
+    });
+  });
+
   test("runTurnStream(): a consumer that stops after the first delta (a disconnect) releases through the generator's return()", async () => {
     const { actor } = await owner();
     await withStub({ scriptedChatReply: () => "First sentence here. Second sentence here. Third sentence here." }, async () => {
@@ -1269,6 +1286,23 @@ describe("lib/turnEngine.ts gateGuards() matches guardReply()'s real branches (F
     for (const s of sentences) yield `${s} `;
     return undefined;
   }
+
+  // Item 1b (#67): a claimed experience is dropped wherever it sits and
+  // the rest streams on; alone, the cannot-experience line stands in.
+  test("skippable (claimed_experience): the first sentence is dropped and the rest streams; alone it is replaced with the world's own line", async () => {
+    const ctx = { utterance: "have you seen Finding Nemo" };
+    const gated = gateGuards(fromSentences("I think I've seen it!", "It's about a clownfish looking for his son."), ctx, "person-1");
+    const delivered: string[] = [];
+    for await (const chunk of gated) delivered.push(chunk);
+    expect(delivered.join("").trim()).toBe("It's about a clownfish looking for his son.");
+    const hits: [string, boolean][] = [];
+    const alone = gateGuards(fromSentences("I've seen it a few times."), ctx, "person-1", (reason, replaced) => hits.push([reason, replaced]));
+    const spoken: string[] = [];
+    for await (const chunk of alone) spoken.push(chunk);
+    expect(spoken.join("")).toMatch(/can't actually watch|don't get to watch/);
+    expect(spoken.join("")).not.toMatch(/told me/);
+    expect(hits).toEqual([["claimed_experience", false], ["claimed_experience", true]]);
+  });
 
   test("non-cuttable (unsupported_action; capability_claim before CHAT-04 split the completed claim out): replaces the FIRST sentence and stops - the model's own next sentence is never spoken", async () => {
     // guardReply()'s own branch: reason is non-cuttable, kept.length is

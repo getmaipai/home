@@ -31,6 +31,51 @@ capital of France" answers "Paris"; the placeholder string appears in
 no reply in the bench or the guard corpus; tool-calling bench
 unchanged. Closes #92.
 
+## 1b. #67: world-knowledge questions get the household honesty line (M, ahead of #93 by severity)
+
+Live on the restarted dev hub, 2026-09-13 11:03, six turns about a
+film: "have you seen it" got "I don't actually have that - nobody's
+told me."; "do you know what it's about", "its runtime", "a
+description" each got "I don't (actually) know that one, sorry.";
+only "its rating" was answered. The hub log shows every reply with
+source `model`, guard `[]`, safety allow, 790 to 924 ms: the model's
+own words, not a guard replacement, and `websearch` offered on every
+turn (`offered: ["remember","weather","websearch"]`) and never called.
+So the cause is the prompt: the information policy is written around
+household facts ("say you were not told"), and the 8B applies it to
+the world; and nothing in the prompt tells it that not knowing a
+world fact means calling the offered lookup. This is #67's exact
+symptom, a week old, and the most visible defect a parent meets.
+
+Do: (1) add the film conversation to the bench fixture as a
+world-knowledge row set (six turns as above, persona-safe; rubric: a
+rating, runtime or premise question is answered from knowledge or
+through a websearch outcome, and the reply never contains the
+honesty phrases "nobody's told me" / "I don't know that one"; an
+"have you seen it" turn may say it cannot watch films but must not
+claim it was never told). (2) Split the policy prose into two
+sentences the model cannot conflate: household facts (people, plans,
+the home) are answered only from what it was told, and a question
+about the world is answered from what it knows or, when unsure, by
+using the lookup tool it was offered; never the household line for a
+world question. Keep it short (FAST-02's budget); do not re-add the
+plugins list. (3) If the model still declines the lookup with the
+policy fixed, the fallback is CHAT-17's forced-lookup retry brought
+forward narrowly: a model reply that matches the honesty phrases on
+a question-shaped world turn with websearch offered triggers one
+retry with tool_choice required on websearch (the mechanism exists
+in runTurn for the invention case); measure the cost. Acceptance:
+the film rows pass three identical runs; the guard corpus's
+household negatives still hold (a household question with no memory
+still gets the honesty line); naturalness rows unchanged; no
+regression on the other bench rows. Closes #67.
+
+Also, same commit or the #73 one (lib/log.ts is in both): every
+`[turn]` line is written twice to hub.log since 677d4c4, because the
+turn logger appends to the file itself and the console mirror now
+appends it again. One writer: the logger prints to the console and
+the mirror persists.
+
 ## 2. #93: recall has a relevance floor that was never measured (S-M)
 
 `memory.ts` passes durable records at cosine 0.37 and episodic at

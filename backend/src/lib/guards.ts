@@ -41,6 +41,14 @@ export type GuardReason =
   | "unsupported_action"
   | "like_i_said"
   | "example_parrot"
+  /** Item 1b (#67): a first-person claim of having watched, seen, eaten
+   * or been somewhere ("I think I've seen it!"). Split out of
+   * `invention`: it is about the world, so the household honesty line
+   * is the wrong replacement, and the sentence is padding around a
+   * world answer the rest of the reply may still hold, so only that
+   * sentence is dropped, wherever it sits, and the CANNOT_EXPERIENCE
+   * line stands in only when nothing else does. */
+  | "claimed_experience"
   /** #92: a sentence that is nothing but a bracketed system note ("[Knowledge
    * could not answer.]"), the window's own description of an earlier
    * non-model turn, echoed back as if it were a reply. */
@@ -153,6 +161,13 @@ const CHAT_LOOP = [
 // disclosure deserved, never "I don't know" about something the person
 // just said; on a question the DONT_KNOW line is the honest one.
 const ACKNOWLEDGE = ["Okay.", "Got it.", "Noted."];
+// Item 1b (#67): the hub cannot watch, visit or taste; said plainly,
+// never as "nobody's told me" (a world fact is not the household's to
+// tell it). The rest of the reply, what it knows about the film, stands.
+const CANNOT_EXPERIENCE = [
+  "I can't actually watch or go anywhere myself.",
+  "I don't get to watch things or go places, so I can't say from experience.",
+];
 const MED_CAUTION = [
   "I'm not able to give medication amounts - check with a pharmacist or the label.",
   "I can't advise on doses - a pharmacist or doctor is the safe call there.",
@@ -271,7 +286,10 @@ const PERSON_TRAIT_RE = /\b(?:he|she|they)(?:'s| is| are)?\s+(?:drives?|owns?|ha
 // voice assistant genuinely does); only a flat first-person claim of
 // having done/seen/eaten/watched something is the invention.
 const CLAIMED_EXPERIENCE_RE =
-  /\bi(?:'m| am| was|'ve| have|'d| had)?(?: just| also| even| already| actually)? (?:watch(?:ing|ed)|see(?:ing|n)|saw|play(?:ing|ed)|read(?:ing)?|binge\w*|eat(?:ing)?|ate|drink(?:ing)?|drank|cook(?:ing|ed)|went|visit(?:ing|ed)|been to|waiting for|sleep(?:ing)?|slept|dream(?:ing|ed|t)|tried|tasted|bought|drove|driving)\b/i;
+  // "read" is not here (item 1b): "I've read that it's rated R" is the
+  // hearsay framing the prompt invites, and reading is something the
+  // hub genuinely does, the same argument the comment makes for hearing.
+  /\bi(?:'m| am| was|'ve| have|'d| had)?(?: just| also| even| already| actually)? (?:watch(?:ing|ed)|see(?:ing|n)|saw|read(?!\s+(?:that|somewhere|about|online|it's|it is)\b)|play(?:ing|ed)|binge\w*|eat(?:ing)?|ate|drink(?:ing)?|drank|cook(?:ing|ed)|went|visit(?:ing|ed)|been to|waiting for|sleep(?:ing)?|slept|dream(?:ing|ed|t)|tried|tasted|bought|drove|driving)\b/i;
 
 // "Pippa is at soccer practice right now.", "You're at the office." - a
 // location for a person in THIS household, the one shape guards.py's own
@@ -392,7 +410,7 @@ function guardInvention(sentence: string, ctx: GuardContext): GuardReason | null
 
   if (declines) return null; // an honest "I don't know" is never itself an invention, for everything else below
 
-  if (CLAIMED_EXPERIENCE_RE.test(sentence)) return "invention";
+  if (CLAIMED_EXPERIENCE_RE.test(sentence)) return "claimed_experience";
   if (guessesAboutHousehold(sentence, ctx, grounded)) return "invention";
 
   if (claimsUngroundedHouseholdLocation(sentence, ctx, grounded)) return "invention";
@@ -403,7 +421,9 @@ function guardInvention(sentence: string, ctx: GuardContext): GuardReason | null
     // content, so a plain re-check of every content word (minus a small
     // set of the sentence's own scaffolding, on top of the shared safe
     // words) is what actually tells a real quote from a fabricated one.
-    const scaffold = new Set(["said", "says", "told", "mentioned", "your", "brother", "sister", "mother", "mom", "father", "dad"]);
+    // "that" (item 1b, #67: "Sage mentioned that Pippa is allergic to
+    // peanuts", every content word grounded, was cut for the "that").
+    const scaffold = new Set(["said", "says", "told", "mentioned", "that", "your", "brother", "sister", "mother", "mom", "father", "dad"]);
     if (unclaimedWords(sentence, grounded).some((w) => !scaffold.has(w))) return "invention";
   }
 
@@ -718,6 +738,10 @@ const BARE_DONE_RE = /^\s*(?:okay|ok|sure|alright|got it|right)?[,.! ]*(?:done|a
 // X" is the acknowledgment; the judge remembers), unless a remember
 // call was made this turn and did not succeed.
 const REMEMBER_REQUEST_RE = /^\s*(?:please\s+)?(?:remember|don't forget|keep in mind|note)\b/i;
+// The action form of the same verbs ("remember to text Nadia", "keep in
+// mind to call the vet"): a request to do something later, never a fact
+// to keep (a review, item 1b).
+const REMEMBER_TO_RE = /^\s*(?:please\s+)?(?:remember|don't forget|keep in mind|note)\s+to\b/i;
 const NOTHING_RAN = "I haven't actually done that.";
 function bareCompletion(sentence: string, ctx: GuardContext): { family: ActionFamily | null; state: "failed" | "pending" | "none" } | null {
   if (!isCommand(ctx) || !BARE_DONE_RE.test(sentence)) return null;
@@ -791,6 +815,14 @@ export function unsupportedActionLine(sentence: string, ctx: GuardContext): stri
 }
 
 function guardCapabilityClaim(sentence: string, ctx: GuardContext): GuardReason | null {
+  // Item 1b (#67): "Sure, I'll remember that" to "can you remember that
+  // ..." is not accepting an impossible request; the judge remembers
+  // with no tool call, the same rule the save family and the bare
+  // completion word already follow. Only a request to remember a FACT
+  // ("remember that", "remember my", "remember the"): "can you remember
+  // to text Nadia" is an action request and stays checked (a review).
+  const request = ctx.utterance.replace(/^\s*(?:please\s+)?(?:can|could|would|will) you\s+/i, "");
+  if (REMEMBER_REQUEST_RE.test(request) && !REMEMBER_TO_RE.test(request)) return null;
   // A request that something actually answered this turn (any succeeded
   // outcome) may be accepted in words; a completed-action claim is
   // guardUnsupportedAction()'s, per family, above.
@@ -866,6 +898,28 @@ function guardPlaceholderEcho(sentence: string): GuardReason | null {
 // `_CUTTABLE`: the sentence was padding, not the answer). Everything
 // else replaces the whole reply - the sentence WAS the reply's thesis.
 const CUTTABLE: ReadonlySet<GuardReason> = new Set(["invention", "unrelated_recall", "placeholder_echo"]);
+// Item 1b (#67): the honesty vocabulary ("nobody's told me", "I don't
+// know that one"), which the model must never read back as its own
+// words. conversationHistory.ts strips these lines from a guard-replaced
+// turn before the window sees it: what remains (a sentence the model
+// spoke before a later guard fired on the streaming path, or a line
+// that carries a fact the next turn needs, "I haven't added anything to
+// your list", the pharmacist caution) is quoted as a system note, and a
+// turn that was only the honesty line reads "[No reply was given to
+// this.]". Keyed on the text, not the stored reason: the streaming path
+// can store a spoken prefix beside the line, and the first recorded
+// reason is not always the one that replaced (a review).
+const HONESTY_VOCABULARY: ReadonlySet<string> = new Set([...NOT_TOLD, ...DONT_KNOW, ...CHAT_LOOP]);
+export function withoutHonestyLines(text: string): string {
+  return splitIntoSentences(text)
+    .filter((s) => !HONESTY_VOCABULARY.has(s.trim()))
+    .join(" ")
+    .trim();
+}
+// Item 1b: a reason whose sentence is dropped wherever it sits, first
+// sentence included, and the rest of the reply goes on; the honest
+// line stands in only when nothing else was said.
+const SKIPPABLE: ReadonlySet<GuardReason> = new Set(["claimed_experience"]);
 
 /** Exported so turnEngine.ts's streaming path (`gateGuards()`) makes the
  * SAME cut-vs-replace-the-rest distinction guardReply() does below - one
@@ -873,6 +927,11 @@ const CUTTABLE: ReadonlySet<GuardReason> = new Set(["invention", "unrelated_reca
  * never a second copy re-guessed at the call site. */
 export function isCuttable(reason: GuardReason): boolean {
   return CUTTABLE.has(reason);
+}
+
+/** Exported for the streaming path for the same reason as isCuttable(). */
+export function isSkippable(reason: GuardReason): boolean {
+  return SKIPPABLE.has(reason);
 }
 
 // Per-reason lines, not one generic fallback - bot-legacy's own
@@ -889,6 +948,7 @@ const REPLACEMENT_FOR: Record<GuardReason, readonly string[]> = {
   like_i_said: CHAT_LOOP,
   example_parrot: DONT_KNOW,
   placeholder_echo: DONT_KNOW,
+  claimed_experience: CANNOT_EXPERIENCE,
 };
 
 /** The honest line a guard hit replaces text with, for a given reason -
@@ -961,6 +1021,7 @@ export function guardReply(reply: string, ctx: GuardContext): Guarded {
   const sentences = splitIntoSentences(reply);
   const fullReplyCtx: GuardContext = { ...ctx, replyHasQuestion: (reply || "").includes("?") };
   const kept: string[] = [];
+  let skipped: { reason: GuardReason; sentence: string } | null = null;
   for (let i = 0; i < sentences.length; i++) {
     const sentence = sentences[i]!;
     const reason = guardSentence(sentence, fullReplyCtx, i === 0);
@@ -968,10 +1029,19 @@ export function guardReply(reply: string, ctx: GuardContext): Guarded {
       kept.push(sentence);
       continue;
     }
+    if (SKIPPABLE.has(reason)) {
+      // Item 1b: dropped wherever it sits, the rest of the reply goes on.
+      skipped ??= { reason, sentence };
+      continue;
+    }
     if (kept.length > 0 && CUTTABLE.has(reason)) {
       return { reply: kept.join(" "), reason, replaced: false };
     }
     return { reply: replacementFor(reason, ctx.personId, { sentence, ctx: fullReplyCtx }), reason, replaced: true };
+  }
+  if (skipped) {
+    if (kept.length > 0) return { reply: kept.join(" "), reason: skipped.reason, replaced: false };
+    return { reply: replacementFor(skipped.reason, ctx.personId, { sentence: skipped.sentence, ctx: fullReplyCtx }), reason: skipped.reason, replaced: true };
   }
   return { reply, reason: null, replaced: false };
 }

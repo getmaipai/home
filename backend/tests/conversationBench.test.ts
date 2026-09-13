@@ -62,27 +62,27 @@ async function withStubBench<T>(
 }
 
 describe("the fixture", () => {
-  test("twenty conversations with stable, unique ids, three to six turns each, four hard rows, roster names only", () => {
-    expect(CONVERSATIONS.length).toBe(20);
-    expect(new Set(CONVERSATIONS.map((c) => c.id)).size).toBe(20);
+  test("twenty-eight conversations with stable, unique ids, three to six turns each, four hard rows, roster names only", () => {
+    expect(CONVERSATIONS.length).toBe(28); // the baseline's twenty, item 1b's film conversation (#67), its four other-kind siblings, and three household subjects
+    expect(new Set(CONVERSATIONS.map((c) => c.id)).size).toBe(28);
     for (const c of CONVERSATIONS) expect(c.turns.length).toBeGreaterThanOrEqual(3);
     for (const c of CONVERSATIONS) expect(c.turns.length).toBeLessThanOrEqual(6);
     expect(CONVERSATIONS.filter((c) => c.hard).map((c) => c.id)).toEqual(["credential-disclosure", "cross-person-recall", "unsafe-request-and-crisis", "consequential-once"]);
     const said = CONVERSATIONS.flatMap((c) => c.turns.map((t) => t.say)).join(" ");
     for (const name of said.match(/\b[A-Z][a-z]+\b/g) ?? []) {
-      expect(["Pippa", "Rover", "Marlow", "Bramble", "Thursday", "Friday", "Monday", "Wednesday", "Tuesdays", "June", "France", "I", "Juniper"]).toContain(name);
+      expect(["Pippa", "Rover", "Marlow", "Bramble", "Thursday", "Friday", "Monday", "Wednesday", "Tuesdays", "June", "France", "I", "Juniper", "Cobra", "Fleetwood", "Mac", "Lisbon", "Porto", "Stardew", "Valley", "Atlas", "Saturday", "Bosch"]).toContain(name);
     }
   });
 
-  test("a free-text row never carries a reply regex: the reader judges it, word matching does not", () => {
+  test("a free-text row carries no fixed line: the reader judges it; a presence or absence check on it is a fact (something about the film was said, no sign-off), not a grade", () => {
     for (const c of CONVERSATIONS) {
       for (const t of c.turns) {
-        if (t.expect.humanVerdict) {
-          expect(t.expect.mustContain).toBeUndefined();
-          expect(t.expect.fixedLine).toBeUndefined();
-        }
+        if (t.expect.humanVerdict) expect(t.expect.fixedLine).toBeUndefined();
       }
     }
+    const film = CONVERSATIONS.find((c) => c.id === "world-knowledge-film")!;
+    expect(film.turns[0]?.expect.humanVerdict).toBe(true);
+    expect(film.turns[0]?.expect.mustNotContain).toBeDefined();
   });
 });
 

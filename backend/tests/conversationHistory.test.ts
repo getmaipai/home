@@ -802,6 +802,35 @@ describe("CHAT-03 (#89): a stored summary is redacted on every read", () => {
 });
 
 describe("buildConversationWindow() (step 3)", () => {
+  // Item 1b (#67): a guard's own honest line, stored as the reply of a
+  // replaced model turn, must never come back to the model as its own
+  // past words (it recited "nobody's told me" four times about one
+  // film after one such turn). It enters the window as a system note.
+  test("a guard-replaced model turn enters the window as a system note, never as the assistant's words", async () => {
+    const { actor } = await owner();
+    const conv = resolveOrCreateConversation(actor, "chat");
+    if (!conv.ok) throw new Error(conv.error);
+    logTurn(actor, "chat", "have you seen it", { reply: { text: "I don't actually have that - nobody's told me." }, source: "model", safety: SAFE, conversation_id: conv.value.id, turn_id: "turn-guarded" }, { guardReasons: ["invention"] });
+    logTurn(actor, "chat", "what's it about", { reply: { text: "A clownfish looking for his son." }, source: "model", safety: SAFE, conversation_id: conv.value.id, turn_id: "turn-plain" });
+    const window = buildConversationWindow(conv.value);
+    const assistantLines = window.messages.filter((m) => m.role === "assistant").map((m) => m.content);
+    expect(assistantLines).toEqual(["A clownfish looking for his son."]);
+    expect(window.messages.some((m) => m.role === "system" && m.content === "[No reply was given to this.]")).toBe(true);
+    expect(window.messages.some((m) => m.content.includes("nobody's told me"))).toBe(false);
+    // A replaced line that carries a fact the next turn needs is quoted as a note, in nobody's voice (a review).
+    logTurn(actor, "chat", "add milk to the list", { reply: { text: "I haven't added anything to your list." }, source: "model", safety: SAFE, conversation_id: conv.value.id, turn_id: "turn-narrated" }, { guardReasons: ["unsupported_action"] });
+    const again = buildConversationWindow(conv.value);
+    expect(again.messages.some((m) => m.role === "system" && m.content === '[The reply given was: "I haven\'t added anything to your list."]')).toBe(true);
+    expect(again.messages.filter((m) => m.role === "assistant").map((m) => m.content)).toEqual(["A clownfish looking for his son."]);
+    // The streaming path can store a spoken sentence beside the honesty
+    // line (a later sentence tripped a non-cuttable guard): the spoken
+    // sentence is quoted, the line is not (a review).
+    logTurn(actor, "chat", "what kind of film is it", { reply: { text: "It's a Pixar film. I don't know, sorry." }, source: "model", safety: SAFE, conversation_id: conv.value.id, turn_id: "turn-partial" }, { guardReasons: ["example_parrot"] });
+    const partial = buildConversationWindow(conv.value);
+    expect(partial.messages.some((m) => m.role === "system" && m.content === '[The reply given was: "It\'s a Pixar film."]')).toBe(true);
+    expect(partial.messages.some((m) => m.content.includes("I don't know, sorry"))).toBe(false);
+  });
+
   test("the newest 4 turns are always included verbatim; oldest dropped first past the 1,200-token estimate", async () => {
     const { actor } = await owner();
     const conv = resolveOrCreateConversation(actor, "chat");

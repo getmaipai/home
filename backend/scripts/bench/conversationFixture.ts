@@ -80,6 +80,13 @@ export interface BenchConversation {
 }
 
 export const CREDENTIAL_LINE = "Keep passwords and keys in Credentials, not in chat.";
+/** Item 1b (#67): the household honesty vocabulary, which must never
+ * answer a question about the world (the model no longer reads these
+ * lines anywhere; the guards keep them for a caught household
+ * invention only). */
+export const HONESTY_LINES = "nobody's told me|not something i've been told|don't know that one|household hasn't told|haven't been told|don't actually have that|i don't know, sorry|not sure about that\\.|don't have an answer for that";
+/** A sign-off in place of engagement. */
+export const NO_CLOSER = "enjoy the movie|enjoy the film|let me know if you need|anything else|have fun watching";
 
 export const CONVERSATIONS: readonly BenchConversation[] = [
   {
@@ -270,6 +277,115 @@ export const CONVERSATIONS: readonly BenchConversation[] = [
       { say: "where is Pippa right now", expect: { mustNotContain: "school|practice|park|friend|home|kitchen|room" } },
       { say: "Pippa is at soccer practice until six", expect: { guard: null } },
       { say: "where is Pippa right now", expect: { mustContain: "soccer|practice", guard: null } },
+    ],
+  },
+  {
+    id: "world-knowledge-film",
+    category: "knowledge",
+    note: "#67 (item 1b, Jesse's rules): an opening statement about a film is engaged with like a friend would (something known, or a question), never acknowledged and closed; the honesty lines never answer a world question; 'have you seen it' says it cannot watch films and still says something it knows; rating, runtime and premise are answered from knowledge or a websearch outcome",
+    turns: [
+      { say: "I'm watching the movie Cobra", expect: { guard: null, mustContain: "stallone|1986|action|cop|cobretti|remake|original|which one|the one|\\?", mustNotContain: NO_CLOSER, humanVerdict: true } },
+      { say: "have you seen it", expect: { mustNotContain: HONESTY_LINES } },
+      { say: "do you know what it's about", expect: { mustContain: "cop|cobretti|killer|cult|police|los angeles|stallone|serial|witness", mustNotContain: HONESTY_LINES } },
+      { say: "what's its rating", expect: { mustContain: "\\bR\\b|rated|adults|violen|mature", mustNotContain: HONESTY_LINES } },
+      { say: "how long is it", expect: { mustContain: "\\b(8[0-9]|9[0-9]) ?min|hour and a half|1 hour (and )?[23][0-9]|ninety|eighty", mustNotContain: HONESTY_LINES } },
+      { say: "is it okay for a six year old", expect: { guard: null, mustNotContain: HONESTY_LINES, humanVerdict: true } },
+    ],
+  },
+  // Jesse's scope on #67: every subject a person brings up, not films.
+  // Four more of the film's shape on other kinds (a band, a city, a
+  // historical event, a video game): an opening statement, "have you
+  // heard of it", two factual follow-ups with pronouns, one opinion
+  // question. These are the permanent set the subject work (CHAT-13,
+  // CHAT-16) is judged on; nothing may be keyed on a topic word.
+  {
+    id: "world-knowledge-band",
+    category: "knowledge",
+    note: "#67's shape on a band",
+    turns: [
+      { say: "I've been listening to Fleetwood Mac all morning", expect: { guard: null, mustContain: "rumours|stevie|nicks|buckingham|christine|mcvie|dreams|go your own way|1970s|70s|british|american|\\?", mustNotContain: NO_CLOSER, humanVerdict: true } },
+      { say: "have you heard of them", expect: { mustNotContain: HONESTY_LINES } },
+      { say: "when did they form", expect: { mustContain: "1967|sixties|60s|london", mustNotContain: HONESTY_LINES } },
+      { say: "what's their best known album", expect: { mustContain: "rumours", mustNotContain: HONESTY_LINES } },
+      { say: "do you think they hold up", expect: { guard: null, mustNotContain: HONESTY_LINES, humanVerdict: true } },
+    ],
+  },
+  {
+    id: "world-knowledge-city",
+    category: "knowledge",
+    note: "#67's shape on a city",
+    turns: [
+      { say: "we're planning a trip to Lisbon", expect: { guard: null, mustContain: "portugal|tram|tile|hills|tagus|pastel|fado|alfama|coast|\\?", mustNotContain: NO_CLOSER, humanVerdict: true } },
+      { say: "have you heard of it", expect: { mustNotContain: HONESTY_LINES } },
+      { say: "what's it known for", expect: { mustContain: "tram|tile|hill|tagus|pastel|fado|alfama|belem|belém|castle|seafood|azulejo", mustNotContain: HONESTY_LINES } },
+      { say: "how far is it from Porto", expect: { mustContain: "\\b(3|three)\\b|\\b(2[5-9]\\d|3[0-4]\\d)\\b|\\b(1[6-9]\\d|2[01]\\d)\\b|hour|km|mile", mustNotContain: HONESTY_LINES } },
+      { say: "is it worth a week", expect: { guard: null, mustNotContain: HONESTY_LINES, humanVerdict: true } },
+    ],
+  },
+  {
+    id: "world-knowledge-history",
+    category: "knowledge",
+    note: "#67's shape on a historical event",
+    turns: [
+      { say: "Pippa is learning about the moon landing at school", expect: { guard: null, mustContain: "apollo|armstrong|1969|aldrin|nasa|moon|\\?", mustNotContain: NO_CLOSER, humanVerdict: true } },
+      { say: "have you heard of it", expect: { mustNotContain: HONESTY_LINES } },
+      { say: "when did it happen", expect: { mustContain: "1969", mustNotContain: HONESTY_LINES } },
+      { say: "who was on it", expect: { mustContain: "armstrong|aldrin|collins", mustNotContain: HONESTY_LINES } },
+      { say: "do you think we'll go back", expect: { guard: null, mustNotContain: HONESTY_LINES, humanVerdict: true } },
+    ],
+  },
+  {
+    id: "world-knowledge-game",
+    category: "knowledge",
+    note: "#67's shape on a video game",
+    turns: [
+      { say: "I've been playing Stardew Valley lately", expect: { guard: null, mustContain: "farm|crop|pelican|harvest|relax|cozy|fish|mine|concernedape|\\?", mustNotContain: NO_CLOSER, humanVerdict: true } },
+      { say: "have you heard of it", expect: { mustNotContain: HONESTY_LINES } },
+      { say: "who made it", expect: { mustContain: "concernedape|eric barone|barone|one (person|developer)|single developer|solo", mustNotContain: HONESTY_LINES } },
+      { say: "when did it come out", expect: { mustContain: "2016", mustNotContain: HONESTY_LINES } },
+      { say: "is it good for kids", expect: { guard: null, mustNotContain: HONESTY_LINES, humanVerdict: true } },
+    ],
+  },
+  // Jesse's second scope note: a household subject goes through the
+  // same subject tracker as a world one; only the evidence source
+  // differs. Three of the same shape on household subjects (the family
+  // dog, a family member, a thing in the house): an opening statement
+  // carrying a fact, a friend-like reaction with no closer, a pronoun
+  // follow-up answered from what was just said, and a follow-up two
+  // turns later that must not confuse the household subject with a
+  // world one of the same name. These mostly fail until CHAT-13 lands;
+  // they are its target.
+  {
+    id: "household-subject-dog",
+    category: "memory",
+    note: "the dog Atlas (a roster name that is also a Titan): the subject is the dog, never the myth",
+    turns: [
+      { say: "Atlas is our dog and he's so silly, always rolling around in the mud", expect: { guard: null, mustContain: "atlas|mud|dog|pup|he\\b|\\?", mustNotContain: NO_CLOSER, humanVerdict: true } },
+      { say: "does he need a bath", expect: { mustContain: "bath|mud|yes|yeah|probably|sounds like|definitely|might", mustNotContain: HONESTY_LINES + "|titan|greek|mytholog" } },
+      { say: "he's about four years old, by the way", expect: { guard: null, mustNotContain: NO_CLOSER } },
+      { say: "how old is Atlas", expect: { mustContain: "four|\\b4\\b", mustNotContain: "titan|greek|mytholog|sky|" + HONESTY_LINES } },
+    ],
+  },
+  {
+    id: "household-subject-person",
+    category: "memory",
+    note: "a family member: the reaction is a friend's, the pronoun resolves to him, the fact said earlier answers the later question",
+    turns: [
+      { say: "Marlow has been up since five baking bread for the school fair", expect: { guard: null, mustContain: "marlow|bread|bak|fair|five|early|\\?", mustNotContain: NO_CLOSER, humanVerdict: true } },
+      { say: "is he tired", expect: { mustContain: "tired|five|early|probably|bet|sounds|likely|exhaust|must be", mustNotContain: HONESTY_LINES } },
+      { say: "the fair is on Saturday", expect: { guard: null, mustNotContain: NO_CLOSER } },
+      { say: "when is Marlow's fair", expect: { mustContain: "saturday", mustNotContain: HONESTY_LINES } },
+    ],
+  },
+  {
+    id: "household-subject-thing",
+    category: "memory",
+    note: "a thing in the house (a Bosch dishwasher): 'how old is it' is the appliance's age from what was said, never the company's",
+    turns: [
+      { say: "the dishwasher is making a grinding noise again", expect: { guard: null, mustContain: "dishwasher|grind|noise|filter|pump|check|\\?", mustNotContain: NO_CLOSER, humanVerdict: true } },
+      { say: "should we get it looked at", expect: { mustContain: "yes|yeah|probably|worth|grind|technician|repair|filter|check|sounds", mustNotContain: HONESTY_LINES } },
+      { say: "it's a Bosch, about eight years old", expect: { guard: null, mustNotContain: NO_CLOSER } },
+      { say: "how old is the dishwasher", expect: { mustContain: "eight|\\b8\\b", mustNotContain: "1886|founded|company|" + HONESTY_LINES } },
     ],
   },
   {

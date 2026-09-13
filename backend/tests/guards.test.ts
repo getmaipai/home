@@ -4,7 +4,7 @@
 // 2026-09-03), adapted to this hub's context shape (sources/history as
 // plain strings, no robot-specific Iterable-of-tuples).
 import { describe, expect, test } from "bun:test";
-import { guardReply, guardSentence, replacementFor, type GuardContext } from "@/lib/guards";
+import { guardReply, guardSentence, replacementFor, withoutHonestyLines, type GuardContext } from "@/lib/guards";
 
 function ctx(overrides: Partial<GuardContext> = {}): GuardContext {
   return { utterance: "", personId: "person-test", ...overrides };
@@ -92,7 +92,7 @@ describe("invention: a claim about the household still needs a source (FAST-05)"
   });
 
   test("a first-person experience is an invention - 'I've been to Paris myself.'", () => {
-    expect(guardReply("I've been to Paris myself.", ctx({ utterance: "have you been to Paris" })).reason).toBe("invention");
+    expect(guardReply("I've been to Paris myself.", ctx({ utterance: "have you been to Paris" })).reason).toBe("claimed_experience"); // item 1b: its own reason, the world's line, not the household's
   });
 });
 
@@ -696,5 +696,60 @@ describe("placeholder_echo (#92)", () => {
     const g = guardReply("I looked that up: it's in Peru.", ctx({ utterance: "where is Machu Picchu", outcomes: [{ packageId: "knowledge", status: "failed" }] }));
     expect(g.reason).toBe("unsupported_action");
     expect(g.reply).toBe("That lookup didn't work.");
+  });
+});
+
+// Item 1b (#67): the world's own line for a claimed experience, and only
+// that sentence dropped; the household honesty lines never answer a
+// world question.
+describe("claimed_experience (item 1b, #67)", () => {
+  test("'I think I've seen it! It's about a clownfish...' keeps the film fact and drops the claim", () => {
+    const g = guardReply("I think I've seen it! It's about a clownfish looking for his son.", ctx({ utterance: "have you seen Finding Nemo" }));
+    expect(g.reason).toBe("claimed_experience");
+    expect(g.replaced).toBe(false);
+    expect(g.reply).toBe("It's about a clownfish looking for his son.");
+  });
+
+  test("alone, the claim is replaced with the cannot-experience line, never 'nobody's told me'", () => {
+    const g = guardReply("I've seen it a few times.", ctx({ utterance: "have you seen it" }));
+    expect(g.reason).toBe("claimed_experience");
+    expect(g.replaced).toBe(true);
+    expect(g.reply).toMatch(/can't actually watch|don't get to watch/);
+    expect(g.reply).not.toMatch(/told me|don't know that one/);
+  });
+
+  test("a claim in the middle is dropped and both sides stand", () => {
+    const g = guardReply("It's a Pixar film. I watched it last week. It runs about a hundred minutes.", ctx({ utterance: "tell me about Finding Nemo" }));
+    expect(g.reply).toBe("It's a Pixar film. It runs about a hundred minutes.");
+  });
+});
+
+// Item 1b (#67): two honest replies the second series cut.
+describe("item 1b's own regressions", () => {
+  test("a fact attributed to a household member, every content word grounded, is not an invention for its 'that'", () => {
+    const g = guardReply("Sage mentioned that Pippa is allergic to peanuts.", ctx({ utterance: "what is Pippa allergic to", sources: ["Pippa is allergic to peanuts"], grounding: ["Who lives here: Sage (owner), Pippa (child)"], roster: ["Sage", "Pippa"] }));
+    expect(g.reason).toBeNull();
+  });
+
+  test("'Sure, I'll remember that' to a remember request is an acknowledgment, not an accepted impossible request", () => {
+    expect(guardReply("Sure, I'll remember that Marlow's birthday is in June.", ctx({ utterance: "can you remember that Marlow's birthday is in June" })).reason).toBeNull();
+    expect(guardReply("Sure, I'll text her now.", ctx({ utterance: "can you text Nadia" })).reason).toBe("capability_claim");
+    // "remember to <do something>" is an action request, still checked (a review).
+    expect(guardReply("Sure, I'll text her tomorrow.", ctx({ utterance: "can you remember to text Nadia tomorrow" })).reason).toBe("capability_claim");
+    expect(guardReply("Sure, I'll call the vet now.", ctx({ utterance: "can you keep in mind to call the vet tomorrow" })).reason).toBe("capability_claim");
+    expect(guardReply("Sure, I'll call the vet now.", ctx({ utterance: "could you note to call the vet tomorrow" })).reason).toBe("capability_claim");
+  });
+
+  test("'I've read that it's rated R' is hearsay, not a claimed experience; 'I read it last summer' still is one", () => {
+    expect(guardReply("I've read that it's rated R.", ctx({ utterance: "what's its rating" })).reason).toBeNull();
+    expect(guardReply("I read about it somewhere.", ctx({ utterance: "have you heard of it" })).reason).toBeNull();
+    expect(guardReply("Yes, I read it last summer.", ctx({ utterance: "have you read Dune" })).reason).toBe("claimed_experience");
+  });
+
+  test("withoutHonestyLines() strips every honesty line and keeps what the model itself said", () => {
+    expect(withoutHonestyLines("I don't actually have that - nobody's told me.")).toBe("");
+    expect(withoutHonestyLines("I don't know, sorry.")).toBe("");
+    expect(withoutHonestyLines("It's a Pixar film. I don't know, sorry.")).toBe("It's a Pixar film.");
+    expect(withoutHonestyLines("I haven't added anything to your list.")).toBe("I haven't added anything to your list.");
   });
 });
