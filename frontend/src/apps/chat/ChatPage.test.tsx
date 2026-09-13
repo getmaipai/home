@@ -167,6 +167,42 @@ test("thread history can be opened and closed without removing the composer", as
   } finally { restore(); }
 });
 
+// #71 (a phone-keyboard fix regressed six things, 2026-09-12): the loading
+// skeleton (shown while a selected conversation's history is still being
+// fetched) must actually render, replacing the greeting/message area, while
+// the composer stays interactive. happy-dom has no layout engine (every
+// element's getBoundingClientRect() is zeroed regardless of its real CSS),
+// so a real pixel-width or "is this bigger than that" assertion is not
+// obtainable here - that verification lives in scripts/screenshot.ts
+// against a real browser instead. What this test can and does prove: the
+// skeleton mounts (the loading branch actually renders, not the empty-chat
+// welcome or an error), and the composer is still present and enabled
+// alongside it (a household member can start typing while history loads,
+// they are not blocked on it).
+test("the loading skeleton replaces the greeting while a selected conversation's history is still fetching", async () => {
+  const restore = stubFetch();
+  let resolveTurns!: (value: unknown[]) => void;
+  const turnsPromise = new Promise<unknown[]>((resolve) => { resolveTurns = resolve; });
+  const fallback = globalThis.fetch;
+  globalThis.fetch = mock(async (input: RequestInfo | URL, init?: RequestInit) => {
+    const url = String(input);
+    if (url === "/api/conversations/conv-loading123/turns") return Response.json(await turnsPromise);
+    if (url === "/api/conversations/conv-loading123") return Response.json({ id: "conv-loading123", surface: "chat", title: "Loading chat" });
+    if (url === "/api/conversations/conv-loading123/resume") return Response.json({ id: "conv-loading123", status: "open" });
+    if (url === "/api/conversations") return Response.json([{ id: "conv-loading123", title: "Loading chat", surface: "chat", created_at: "2026-09-07T00:00:00Z" }]);
+    return fallback(input, init);
+  }) as unknown as typeof fetch;
+  try {
+    const view = renderWithQueryClient(<MemoryRouter initialEntries={["/chat?conversation=conv-loading123"]}><ChatPage person={makePerson()} /></MemoryRouter>);
+    await waitFor(() => expect(view.container.querySelector('[data-slot="aui_thread-history-skeleton"]')).toBeTruthy());
+    // The greeting (a new-chat-only view) must not also be showing.
+    expect(view.container.querySelector(".aui-thread-welcome-root")).toBeNull();
+    const input = view.getByRole("textbox", { name: "Message input" }) as HTMLTextAreaElement;
+    expect(input.disabled).toBe(false);
+    resolveTurns([]);
+  } finally { restore(); }
+});
+
 test("reopening a saved chat loads only its history and sends the next message to the same conversation", async () => {
   (globalThis as unknown as { AudioContext: unknown }).AudioContext = FakeAudioContext;
   const restore = stubFetch();

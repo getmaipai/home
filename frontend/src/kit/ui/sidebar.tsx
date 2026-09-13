@@ -141,12 +141,18 @@ function SidebarProvider({
             // height, and assistant-ui's own top-anchor scroll math (which
             // reads this chain's `clientHeight`) placed the reply where
             // the *unobscured* viewport would end - behind the keyboard,
-            // invisible until a manual scroll (Jesse, 2026-09-07). An
-            // inline pixel height from `visualViewport`, when the API
-            // exists, overrides the class below and actually tracks the
-            // keyboard; `h-svh` remains the fallback everywhere else
-            // (desktop, `far`/TV, and before the first effect runs).
-            ...(visualViewportHeight !== undefined ? { height: visualViewportHeight } : {}),
+            // invisible until a manual scroll (Jesse, 2026-09-07). When the
+            // keyboard is open, an inline pixel height from `visualViewport`
+            // overrides `h-svh` and tracks the keyboard; offsetTop positions
+            // the shell below any address bar that may have appeared. The
+            // fallback (`h-svh` + `top-0`) applies on desktop, `far`/TV, when
+            // the keyboard is closed, or when the API doesn't exist.
+            ...(visualViewportHeight
+              ? {
+                  height: visualViewportHeight.height,
+                  top: visualViewportHeight.offsetTop,
+                }
+              : {}),
             ...style,
           } as React.CSSProperties
         }

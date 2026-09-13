@@ -201,19 +201,22 @@ const ThreadRoot: FC<{
         className="relative flex flex-1 flex-col overflow-x-auto overflow-y-scroll scroll-smooth"
       >
         <div
-          className="mx-auto flex w-full max-w-(--thread-max-width) flex-1 flex-col px-4 pt-4"
+          className={cn("mx-auto flex w-full max-w-(--thread-max-width) flex-1 flex-col px-4 pt-4", isEmpty && "sm:justify-center")}
         >
-          {/* Desktop centers the greeting with the composer right underneath
-              it, Claude.ai/ChatGPT-style (`sm:` and up only) - but on phone
-              that same centering left the composer floating mid-screen with
-              a dead gap below it instead of sitting at the thumb-reachable
-              bottom edge every other mobile chat surface uses (Jesse,
-              2026-09-07). Below `sm`, this wrapper takes no extra space, so
-              whichever of it/`aui_message-group` is actually showing content
-              (below) does the bottom-pinning instead. Guard the visual-viewport
-              height on the mobile surface (when viewport.height !== window.innerHeight
-              due to keyboard), not the layout-viewport. */}
-          <div className={cn("flex flex-col items-center", isEmpty && "sm:flex-1 sm:justify-center")}>
+          {/* Desktop centers the greeting WITH the composer right underneath
+              it as one group, Claude.ai/ChatGPT-style (`sm:` and up only) -
+              centering belongs on this shared outer wrapper (so the footer
+              below, a flow sibling, centers along with the greeting) rather
+              than on the greeting's own inner wrapper alone: a `flex-1
+              justify-center` on the inner wrapper only centers the greeting
+              WITHIN its own box (which spans the full remaining height),
+              leaving the footer pinned far below at the true bottom edge
+              instead of sitting just under the greeting. On phone, that same
+              centering left the composer floating mid-screen with a dead gap
+              below it instead of sitting at the thumb-reachable bottom edge
+              every other mobile chat surface uses (Jesse, 2026-09-07) - so
+              this only applies at `sm:` and up. */}
+          <div className="w-full flex flex-col items-center">
             <AuiIf condition={isNewChatView}>
               <Welcome />
             </AuiIf>
@@ -249,8 +252,18 @@ const ThreadRoot: FC<{
 
           <ThreadPrimitive.ViewportFooter
             className={cn(
-              "aui-thread-viewport-footer bg-background flex flex-col gap-4 overflow-visible pb-0 sticky bottom-0 translate-y-9 rounded-t-(--composer-radius) sm:translate-y-0 sm:pb-6",
-              (isEmpty || isHistoryLoading) && "mt-auto",
+              "aui-thread-viewport-footer bg-background flex flex-col gap-4 overflow-visible pb-0 sticky bottom-0 rounded-t-(--composer-radius)",
+              !isEmpty && "translate-y-9",
+              "sm:translate-y-0 sm:pb-6",
+              // Below `sm`, an empty thread still pins the composer to the
+              // bottom edge (`mt-auto`) - the mobile "thumb-reachable
+              // bottom" design stands regardless of desktop centering. At
+              // `sm:` and up, the outer wrapper's own `sm:justify-center`
+              // (above) does the work of keeping the greeting and composer
+              // together as one centered group instead - `mt-auto` here
+              // would fight that by pinning the footer to the true bottom.
+              isEmpty && "mt-auto sm:mt-0",
+              isHistoryLoading && "mt-auto",
             )}
           >
             <ThreadScrollToBottom />

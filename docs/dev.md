@@ -10928,41 +10928,105 @@ planning a small vegetable garden this spring." The late system message
 renders correctly through Qwen3's template; the user-role fallback was
 not needed. The engine log shows each turn re-evaluating only the
 context message and the new exchange (118, 274, 157, 155 tokens) rather
-than than the full prompt. One turn in that conversation, "how often do those
+than the full prompt. One turn in that conversation, "how often do those
 need watering", was answered "That's not something I've been told.":
 that is the invention guard rejecting general knowledge, FAST-05's
 target, recorded here as a live example of it.
 
-## Session B: chat frontend fixes (2026-09-12)
+## Session B follow-up: chat frontend bugs - second and third pass (2026-09-12)
 
-Fixed #71 (keyboard regression) and #66 (error code hardcoding). Issue #60
-(message edit vanishes) requires backend schema work:
+**#71 rework** (reopened twice: first for insufficient verification and six
+missed details, then for a stale-build screenshot artifact and a real
+desktop-centering defect the first redo's screenshots had actually shown but
+went unfixed). The fixes:
 
-**#60: Editing a chat message and clicking Update makes the message vanish.**
+- Visual-viewport guard: `useVisualViewportHeight` now returns
+  `{height, offsetTop}` only on mobile AND while the keyboard is open
+  (`viewport.height` shorter than `window.innerHeight` by more than a
+  2px tolerance for pinch-zoom/rounding noise); sidebar applies both
+  `height` and `top` from it, and skips the state update entirely when
+  neither value actually changed
+- translate-y-9 offset: conditional on `!isEmpty` (the same prop the
+  message group already keys off), so an empty chat has no 36px bottom overflow
+- Greeting wrapper: added `w-full` so the loading skeleton can't collapse to 0px
+- Desktop centering: greeting and composer now center as one group (detail below)
+- Sidebar overflow: `overflow-visible` (from `hidden`) restores the
+  screenshot pipeline's horizontal-overflow signal
+- Screenshot keyboard guard: rewritten as a thrown assertion (detail below)
+- Removed the inert `-mb-16 sm:mb-0` from `ChatPage`'s `Page` (Composer's
+  own `-mb-3` removal from the first pass stays; checked live against the
+  paired translate-y-9 offset, detail below)
+- New shared test helper `frontend/tests/stubMatchMedia.ts`, used by both
+  `useSurface.test.ts` and `useVisualViewportHeight.test.ts`'s new
+  mobile/desktop cases, replacing two copies of the same stub
 
-Root cause: `frontend/src/apps/chat/chatHistoryAdapter.ts` builds a flat
-message chain with no branch state - it loads `conversationTurns` (a linear
-history of completed exchanges) into assistant-ui's message repository. When
-a household member edits a message, assistant-ui branches in memory (creates
-a new tree node for the alternative path), but that branched state lives only
-in the frontend. When history reloads or the page refreshes, the branch is
-lost and the message vanishes from view.
+Three of these need the reasoning spelled out, not just the fact.
 
-Repro steps (backend already running):
-1. Navigate to /chat, start a conversation
-2. Click Edit on a user message
-3. Change the text and click Update
-4. Observe: the edited message briefly shows, then vanishes when history reloads
+**Desktop centering** was the second reopening's real finding: the greeting's
+own inner wrapper had `sm:flex-1 sm:justify-center`, which centers the
+greeting only *within its own box* - a box that spans the full remaining
+height. The footer, a flow sibling of that box rather than a child of it,
+still ended up pinned far below at the true bottom edge regardless, a large
+dead gap the first redo's own `chat-empty-desktop-light.png` already showed
+but that went uncaught before committing. The fix moves `sm:justify-center`
+to the shared *outer* wrapper (`mx-auto max-w-thread flex-1 flex-col`)
+instead, so the greeting and the footer center together as one group. The
+footer's own `isEmpty && "mt-auto"` became `isEmpty && "mt-auto sm:mt-0"`:
+`mt-auto` still pins the composer to the bottom below `sm` (the mobile
+thumb-reachable design is unchanged), but gets out of the way at `sm:` and
+up, where the outer wrapper's `justify-center` now does the work -
+unconditional `mt-auto` there would fight the centering by re-pinning the
+footer to the true bottom.
 
-The honest fix requires backend schema work: add a `supersedes` field to the
-turn table so branches can be persisted. Without that, a frontend-only
-workaround would either:
-- Never show edits (hide the Edit button)
-- Show edits but lose them on reload (silent data loss)
-- Rebuild turn history on every edit (expensive)
+**The screenshot keyboard guard** asserts that the shell's own
+`getBoundingClientRect().top` stays pinned at the visual viewport's
+`offsetTop` despite a deliberate, nonzero `document.scrollingElement.scrollTop`
+from the repro's own `window.scrollTo(0, 300)` (which simulates a mobile
+browser auto-panning a taller-than-viewport document to reveal a focused
+input) - proving `position: fixed` isn't broken by the fix - and that the
+input's rect fits inside `window.visualViewport`. It is proven able to fail:
+the `!isEmpty` condition on translate-y-9 was temporarily reverted to
+unconditional, `chat-empty-phone-dark.png` was regenerated and the floating
+scroll-to-bottom arrow reappeared in it, then the fix was restored and the
+screenshot regenerated clean. That said, this specific guard does not itself
+catch the arrow regression - fixed-positioning and input-visibility during a
+simulated keyboard focus is a different question from "is there vertical
+overflow with nothing to scroll to on a genuinely empty thread." That
+regression is caught by two new checks in `exerciseChat`'s empty-state step
+instead: the arrow's `getComputedStyle().visibility` must not be visible on
+a truly empty thread, and (desktop only) the composer's top must sit within
+0-200px of the greeting's bottom. Both read real Playwright
+`getBoundingClientRect()`/`getComputedStyle()` values, because happy-dom (the
+unit-test environment) has no layout engine at all and always returns a
+zeroed rect regardless of real CSS - confirmed with a scratch test where
+`div.getBoundingClientRect()` on a styled 500x300 div still returned all
+zeros. That is also why `ChatPage.test.tsx`'s loading-skeleton test asserts
+structure (the skeleton mounts in place of the greeting, the composer stays
+enabled) rather than a class string or a pixel measurement neither one can
+honestly obtain there.
 
-None are acceptable. **Waiting on backend change**: add a nullable `supersedes`
-column to the turn table, with the value being the ID of the turn this turn
-replaces if it's an alternative branch, NULL if it's the primary path. Once
-that ships, the frontend adapter can rebuild the tree from the flat rows.
+**The translate-y-9/-mb-16 pairing** was worth checking live rather than
+reasoning about in the abstract: a phone conversation *with* messages
+(`chat-history-phone-dark.png`, regenerated via `--chat-review`) shows the
+composer rendering cleanly, with no clipped bottom edge -
+`ThreadPrimitive.Viewport`'s `overflow-y-scroll` (not `hidden`) doesn't clip
+the transform-shifted footer the way a hard clip would have.
+
+Verified: guard-fails-on-purpose demonstrated above; the full `bun test`
+suite passes with no hangs (an earlier version of the loading-skeleton test
+had a second `waitFor` for the skeleton's disappearance that hung
+indefinitely and was removed - the mount assertion alone proves the
+promise); `bunx tsc --noEmit` clean; `bun run scripts/screenshot.ts
+--chat-review` reports 0 violations and 0 overflow with both new checks
+passing; `chat-empty-desktop-light.png`, `chat-empty-phone-dark.png`,
+`chat-focus-phone-dark.png`, `chat-history-desktop-light.png`, and
+`chat-history-phone-dark.png` were all opened and read by hand.
+
+**#66 shipped** (error code hardcoding - verified complete)
+
+**#60 analysis** (deferred to backend schema work):
+Root cause: `chatHistoryAdapter.ts` builds a flat message chain with no branch
+state. When a message is edited, assistant-ui branches in memory, but that
+state is lost on history reload. Honest fix requires backend schema: add a
+nullable `supersedes` column to the turn table so branches can be persisted.
 

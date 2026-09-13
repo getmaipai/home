@@ -1,24 +1,7 @@
 import { describe, expect, test, beforeEach, afterEach } from "bun:test";
 import { renderHook, act } from "@testing-library/react";
 import { useSurface } from "@/kit/useSurface";
-
-// happy-dom's `matchMedia` does not evaluate `pointer`/`hover` media
-// features, so this stubs `window.matchMedia` directly rather than
-// relying on real CSS evaluation - the same reason `usehooks-ts`'s own
-// implementation only ever calls `.matches`/`.addEventListener` on
-// whatever `matchMedia` returns, never the query string itself.
-function stubMatchMedia(matches: Record<string, boolean>) {
-  window.matchMedia = ((query: string) => ({
-    matches: matches[query] ?? false,
-    media: query,
-    addEventListener: () => {},
-    removeEventListener: () => {},
-    addListener: () => {},
-    removeListener: () => {},
-    dispatchEvent: () => false,
-    onchange: null,
-  })) as typeof window.matchMedia;
-}
+import { stubMatchMedia } from "../../tests/stubMatchMedia";
 
 const originalUserAgent = navigator.userAgent;
 

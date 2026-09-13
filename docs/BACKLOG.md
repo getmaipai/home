@@ -3281,13 +3281,36 @@ future session now that F's hub half exists.
       echo "== a11y: axe-core scan"
       bun run a11y
       ```
-- [x] **Session B: Chat household-visible frontend bugs** (S, 2026-09-12)
-      - [x] #71: Phone keyboard regression in empty/loading/desktop layouts
-        (restore footer mt-auto, remove negative margins, fix overflow signals)
-      - [x] #66: Hardcoded "unavailable" error code masked safety refusals
-        (pass event.code through, show backend's message for specific codes)
-      - [ ] #60: Message edit vanishes on history reload (blocked on backend
-        `supersedes` column for turn branching; see docs/dev.md)
+- [x] **#71: Phone keyboard regression in empty/loading/desktop layouts** (M, Session B, 2026-09-12)
+
+    The phone-keyboard fix in 27858d0 regressed six things across empty,
+    loading, and desktop chat layouts. Full defect list, root causes, and
+    verification detail: docs/dev.md's "Session B follow-up" entry.
+    Files: `frontend/src/kit/assistant-ui/thread.aui.tsx`,
+    `frontend/src/kit/useVisualViewportHeight.ts` (+ its test),
+    `frontend/src/kit/ui/sidebar.tsx`, `frontend/src/apps/chat/ChatPage.tsx`,
+    `frontend/src/apps/chat/ChatPage.test.tsx`, `scripts/screenshot.ts`,
+    `frontend/tests/stubMatchMedia.ts` (new, shared with `useSurface.test.ts`).
+    Out of scope: #60 (message edit branching), #66 (shipped separately).
+    Checks: `bunx tsc --noEmit`, the full `bun test` suite,
+    `bash scripts/check.sh`, `bun run scripts/screenshot.ts --chat-review`,
+    every regenerated screenshot read by hand.
+
+- [x] **#66: Hardcoded "unavailable" error code masked safety refusals** (S, 2026-09-12)
+
+    Fixed: pass event.code through; show generic banner only for "unavailable";
+    show backend's message for coded errors like "safety_refused". Files:
+    `frontend/src/apps/chat/chatModelAdapter.ts`,
+    `frontend/src/apps/chat/chatModelAdapter.test.ts`. Checks:
+    `bun test src/apps/chat/chatModelAdapter.test.ts`, `bash scripts/check.sh`.
+
+- [ ] **#60: Message edit vanishes on history reload** (M, blocked on backend)
+
+    Root cause: `frontend/src/apps/chat/chatHistoryAdapter.ts` builds a flat
+    turn history with no branch state; assistant-ui's edit flow branches in
+    memory, and the branch is lost on reload. Needs a nullable `supersedes`
+    column on the backend's turn table before any frontend fix is honest.
+    See docs/dev.md's "Session B follow-up" entry for the repro and analysis.
 - [ ] **Parallelize `scripts/screenshot.ts`'s full matrix** (S) - a code
       review (2026-09-06) noted the 4 viewport x 2 theme x 11 route
       matrix runs fully sequentially against one browser (up to 88

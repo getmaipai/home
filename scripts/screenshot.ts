@@ -247,6 +247,32 @@ async function exerciseChat(page: import("playwright").Page, viewport: ViewportS
   await page.getByRole("textbox", { name: "Message input" }).waitFor();
   mkdirSync(SCREENS_DIR, { recursive: true });
   await settleChat(page);
+  // #71: an empty thread must never show the floating scroll-to-bottom
+  // arrow (it means the viewport thinks it isn't scrolled to the bottom,
+  // which on a genuinely empty thread means something - historically
+  // `translate-y-9` applying unconditionally - is creating vertical
+  // overflow with nothing to scroll to). Real layout, only obtainable
+  // against a real browser (happy-dom's unit tests always return a zeroed
+  // getBoundingClientRect() regardless of CSS).
+  const emptyState = await page.evaluate(() => {
+    const arrow = document.querySelector(".aui-thread-scroll-to-bottom");
+    const greeting = document.querySelector(".aui-thread-welcome-root");
+    const composer = document.querySelector(".aui-composer-root");
+    return {
+      arrowVisible: arrow ? getComputedStyle(arrow).visibility !== "hidden" : false,
+      greetingBottom: greeting?.getBoundingClientRect().bottom,
+      composerTop: composer?.getBoundingClientRect().top,
+    };
+  });
+  if (emptyState.arrowVisible) throw new Error("The scroll-to-bottom arrow shows on a genuinely empty chat");
+  // Desktop only: the composer must sit reasonably close under the
+  // greeting (grouped together, Claude.ai/ChatGPT-style), not pinned to
+  // the literal bottom of a tall viewport while the greeting centers
+  // separately somewhere in the middle, far above it.
+  if (viewport.slug === "desktop" && emptyState.greetingBottom !== undefined && emptyState.composerTop !== undefined) {
+    const gap = emptyState.composerTop - emptyState.greetingBottom;
+    if (gap < 0 || gap > 200) throw new Error(`Composer is ${gap}px from the greeting on desktop, expected it grouped just underneath (0-200px)`);
+  }
   await page.screenshot({ path: join(SCREENS_DIR, `chat-empty-${viewport.slug}-${theme}.png`) });
   if (viewport.slug === "phone") {
     // Reproduce keyboard focus panning the document while fixed navigation
@@ -255,18 +281,39 @@ async function exerciseChat(page: import("playwright").Page, viewport: ViewportS
     await page.setViewportSize({ width: viewport.width, height: 480 });
     await page.getByRole("textbox", { name: "Message input" }).click();
     await page.evaluate(() => window.scrollTo(0, 300));
+    // Wait for the scroll this guard depends on to actually land before
+    // reading it - `scrollTo` can be a frame or two behind `evaluate()`
+    // under load, and reading too early would misreport the setup itself
+    // as broken rather than checking what this guard exists to check.
+    await page.waitForFunction(() => (document.scrollingElement?.scrollTop ?? 0) !== 0, { timeout: 2000 });
     await settleChat(page);
-    try {
-      const shell = await page.locator('[data-slot="sidebar-wrapper"]').boundingBox();
-      if (!shell || shell.y < -1) throw new Error("Focusing the input scrolls the app shell offscreen while navigation stays fixed");
-    } catch (e) {
-      console.warn("Keyboard focus scroll check failed:", (e as Error).message);
-    }
-    const inputVisible = await page.getByRole("textbox", { name: "Message input" }).evaluate((element) => {
-      const rect = element.getBoundingClientRect();
-      return rect.top >= 0 && rect.bottom <= (window.visualViewport?.height ?? window.innerHeight)
-        && element.contains(document.elementFromPoint(rect.x + rect.width / 2, rect.y + rect.height / 2));
+    // Assert the shell stays fixed and the input stays visible when focused.
+    // The scrollTo(0, 300) above is a deliberate part of this repro (it
+    // simulates a mobile browser auto-panning the document to reveal a
+    // focused input on a page taller than the viewport) - scrollTop being
+    // nonzero afterward is expected, not a failure. What must NOT happen is
+    // the shell (`position: fixed`) moving WITH that scroll: its rect must
+    // stay pinned at the visual viewport's own offsetTop (0 here - this
+    // simulated resize never moves it - but read live rather than
+    // hardcoded, since a real device's offsetTop shifts when its address
+    // bar collapses, and the shell is designed to track that, not stay at
+    // a literal 0). The input's rect must also fit inside the visual
+    // viewport (not hidden behind the keyboard or clipped).
+    const { shellTop, expectedTop, inputVisible } = await page.evaluate(() => {
+      const shellElement = document.querySelector('[data-slot="sidebar-wrapper"]');
+      const inputElement = document.querySelector('[aria-label="Message input"]') as HTMLTextAreaElement | null;
+      if (!shellElement || !inputElement) return { shellTop: NaN, expectedTop: NaN, inputVisible: false };
+      const rect = inputElement.getBoundingClientRect();
+      const vpHeight = window.visualViewport?.height ?? window.innerHeight;
+      return {
+        shellTop: shellElement.getBoundingClientRect().top,
+        expectedTop: window.visualViewport?.offsetTop ?? 0,
+        inputVisible:
+          rect.top >= 0 && rect.bottom <= vpHeight &&
+          inputElement.contains(document.elementFromPoint(rect.x + rect.width / 2, rect.y + rect.height / 2)),
+      };
     });
+    if (Math.abs(shellTop - expectedTop) > 1) throw new Error(`Focusing the input moved the app shell to top=${shellTop}, expected it pinned at the visual viewport's own offsetTop=${expectedTop}`);
     if (!inputVisible) throw new Error("Focusing the input hides or covers the composer");
     await page.screenshot({ path: join(SCREENS_DIR, `chat-focus-${viewport.slug}-${theme}.png`) });
     await page.evaluate(() => { document.body.style.removeProperty("min-height"); window.scrollTo(0, 0); });
