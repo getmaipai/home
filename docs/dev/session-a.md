@@ -3185,3 +3185,22 @@ Seen once in a whole-file run of `turnEngine.test.ts` during 4c, not
 chased: "a top-ranked memory whose bullet line gets cut by the
 per-section budget is never bumped" failed, then passed on rerun and
 alone; an issue only if it shows again.
+
+**The judge's example date, fixed as its own commit (the coordinator's
+call from the BENCH-01 reading).** `buildExtractionPrompt` took the
+turn's timestamp plus six days at millisecond precision for its
+DATE FORMAT example, so no two judge prompts were ever the same bytes:
+the judge engine's prompt cache missed on every turn (the whole
+system prompt re-evaluated on the 1.7B, every conversation, all day),
+and under the seeded bench the written memory text differed run to
+run. The example is now the turn's day plus six at noon with the
+local offset ("2026-09-19T12:00:00-04:00"), so two turns on one day
+build the identical prompt (`exampleDateFor`, tested). The same-seed
+pair rerun on it: 125 and 127 of 159; 31 of 47 conversations
+identical turn for turn (from 15), 28 of 159 replies differing
+anywhere (from 75), two rows flipping (never-mind-on-an-ask#3,
+running-thing-follow-up#2; from nine), and the judge's total drain
+time per run 162 s (from 333 s), the cache hits made visible. What
+still differs is the timer, interrupt and promise rows (real time),
+compound-request, and the rows whose later turns read a judge-written
+memory that landed in a different dedupe decision.

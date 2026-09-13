@@ -666,6 +666,30 @@ describe("item 4b: a turn skipped while the judge is on it stays skipped and wri
   });
 });
 
+// BENCH-01's finding: the extraction prompt's example date was the
+// turn's timestamp plus six days at millisecond precision, so no two
+// judge prompts were the same bytes (the judge's prompt cache missed
+// on every turn, and the seeded bench wrote different memory text run
+// to run). The example is now the turn's day plus six at noon with the
+// local offset, so two turns on one day build the identical prompt.
+describe("the extraction prompt is the same bytes for two turns on the same day", () => {
+  test("two timestamps on one day give one prompt; the example date is day-precise with an offset, and a valid datetime", async () => {
+    const { buildExtractionPrompt, exampleDateFor } = await import("@/lib/memoryJudge");
+    const morning = new Date(2026, 8, 13, 9, 14, 3, 217);
+    const evening = new Date(2026, 8, 13, 21, 45, 59, 999);
+    expect(buildExtractionPrompt("Sage", morning.toISOString())).toBe(buildExtractionPrompt("Sage", evening.toISOString()));
+    const example = exampleDateFor(morning);
+    expect(example).toMatch(/^2026-09-19T12:00:00[+-]\d{2}:\d{2}$/);
+    // The gate remember() applies to valid_from/valid_to, not Date.parse
+    // (which takes a bare date the gate rejects; the review of this diff).
+    const { z } = await import("zod");
+    expect(z.string().datetime({ offset: true }).safeParse(example).success).toBe(true);
+    expect(buildExtractionPrompt("Sage", morning.toISOString())).toContain(example);
+    const nextDay = new Date(2026, 8, 14, 9, 0, 0, 0);
+    expect(buildExtractionPrompt("Sage", nextDay.toISOString())).not.toBe(buildExtractionPrompt("Sage", morning.toISOString()));
+  });
+});
+
 describe("runJudgeBatch()", () => {
   // getmaipai/home#63: MAX_TURNS_PER_RUN dropped from 10 to 1 (a live
   // diagnosis, 2026-09-07, measured one extraction call alone adding 2

@@ -179,7 +179,19 @@ const EXTRACTION_SCHEMA = {
   },
 } as const;
 
-function buildExtractionPrompt(speakerName: string, turnTimestamp: string): string {
+/** "2026-09-19T12:00:00-04:00" for a turn on 2026-09-13 local: the day
+ * plus six, at noon, with the local offset. Exported for the test. */
+export function exampleDateFor(turnDate: Date): string {
+  const day = new Date(turnDate);
+  day.setHours(12, 0, 0, 0);
+  day.setDate(day.getDate() + 6);
+  const two = (n: number) => String(Math.abs(n)).padStart(2, "0");
+  const offsetMinutes = -day.getTimezoneOffset();
+  const offset = `${offsetMinutes >= 0 ? "+" : "-"}${two(Math.trunc(offsetMinutes / 60))}:${two(offsetMinutes % 60)}`;
+  return `${day.getFullYear()}-${two(day.getMonth() + 1)}-${two(day.getDate())}T12:00:00${offset}`;
+}
+
+export function buildExtractionPrompt(speakerName: string, turnTimestamp: string): string {
   const turnDateObj = new Date(turnTimestamp);
   const turnDate = turnDateObj.toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" });
   // A real, computed ISO-8601-with-offset example date (not a bare
@@ -189,7 +201,16 @@ function buildExtractionPrompt(speakerName: string, turnTimestamp: string): stri
   // z.string().datetime({offset:true}); a plausible model output like
   // "2026-09-20" (no time, no offset) would fail validation and silently
   // drop the whole fact with no trace.
-  const exampleFutureDate = new Date(turnDateObj.getTime() + 6 * 86_400_000).toISOString();
+  //
+  // Six days after the turn's own day at noon, second precision, the
+  // local offset kept (BENCH-01's finding): the first cut took the
+  // turn's timestamp plus six days at millisecond precision, so no two
+  // judge prompts were ever the same bytes. That defeated the judge
+  // engine's prompt cache on every turn (the whole system prompt
+  // re-evaluated on the 1.7B, all day) and, under the seeded bench,
+  // made the written memory text differ between runs. Two turns on the
+  // same day now build the identical prompt.
+  const exampleFutureDate = exampleDateFor(turnDateObj);
   return `You are a long-term memory manager for a family's private AI. Review the exchange below and extract durable facts worth remembering.
 
 SOURCE RULE - extract ONLY facts ${speakerName} asserted or explicitly confirmed. The Assistant's own statements are context, never a source: if the Assistant guessed something and ${speakerName} didn't confirm it, do NOT store it.
