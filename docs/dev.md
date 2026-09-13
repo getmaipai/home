@@ -12892,3 +12892,14 @@ other's section once (147cd28, f4779a6).
   straight at a lazy route's URL suspends, which is what the new
   screenshot capture drives instead of a click:
   [docs/dev/session-b.md](dev/session-b.md) (2026-09-13).
+- Lane 10 item 3, the compute step's spoken arithmetic in Python too
+  (closes #72): `normalize_spoken_math()` mirrors the TypeScript
+  twin's seven-step rule chain exactly, `**` for powers since
+  simpleeval reads `^` as xor; the shared fixture proves both
+  interpreters agree. Found by review, filed rather than fixed since
+  fixing either is past what this S item asked for: #107 (a hex
+  literal like "0x10" misreads as multiplication, already present in
+  the shipped TypeScript interpreter, faithfully mirrored here) and
+  #108 (percent-of a unit conversion works in TypeScript's single-
+  evaluator design, fails in Python's separate regex-then-pint split):
+  [docs/dev/session-b.md](dev/session-b.md) (2026-09-13).

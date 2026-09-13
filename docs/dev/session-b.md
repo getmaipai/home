@@ -1988,3 +1988,59 @@ shows three skeleton bars, never blank; entry chunk re-measured after
 every pass, 1,891.92 kB (none of these fixes add real code to the
 bundle - a reverted duplicate, a one-line event fix, and type-only
 syntax that erases at build).
+
+## Lane 10 item 3: the compute step's spoken arithmetic, in Python too
+
+An S item, full spec handed over directly (the coordinator's own
+message, mirroring `home/data-scratch/qwen-task-7.md` written for the
+local coder's earlier attempt at this - reverted from the shared
+checkout before this session started; confirmed nothing of it was
+left in `spec/`). Closes getmaipai/home#72.
+
+`normalize_spoken_math()` (`spec/interpreters/py/compute.py`) mirrors
+`spec/interpreters/ts/compute.ts`'s own `normalizeSpokenMath()` rule
+for rule (same seven-step regex chain, `re.IGNORECASE` where the
+TypeScript twin uses `/i`), with the one deliberate difference the
+task named up front: powers become `**`, not `^`, because `simpleeval`
+(this evaluator) reads `^` as bitwise xor. `evaluate_expression()` now
+calls it first, before the existing `_CONVERT_RE` unit-conversion
+check, and uses the normalized text everywhere after, error messages
+included. `compute-spoken-arithmetic.json` (input "12 times 12", reply
+"144") is the shared fixture both `test_recipe_conformance.py` and
+`recipe-conformance.test.ts` pick up automatically (directory
+globbing, confirmed - no list to add the filename to).
+
+**Found by code review, before commit, two real gaps, both filed
+rather than fixed**: fixing either is architecture work past what this
+S item asked for (mirror the normalization rules exactly), and #107
+specifically is a bug this port is asked to reproduce faithfully, not
+correct unilaterally. getmaipai/home#107: the digit-x-digit
+multiplication rule (`(?<=\d)\s*x\s*(?=\d)` -> `*`) also fires inside a
+hex literal - `evaluate_expression("0x10")` silently returns `"0"`
+instead of 16, since normalization turns it into `"0*10"` first.
+Confirmed identical in the already-shipped TypeScript interpreter
+(`evaluateExpression("0x10")` has the same bug) - a faithful mirror of
+a pre-existing defect, not something this port introduces.
+getmaipai/home#108: `"50 percent of 2 miles to km"` evaluates
+correctly in TypeScript (mathjs takes the whole normalized string,
+`"(50/100)*2 miles to km"`, and handles the arithmetic and the unit
+conversion together) but raises `ComputeError` in Python, because
+`_QUANTITY_RE` only accepts a bare number in front of a unit, not an
+arithmetic expression - a real architectural gap between mathjs's
+single-evaluator design and this side's separate regex-then-`pint`
+split, newly reachable now that percent-of normalization exists on
+both sides (confirmed independently against both interpreters). Also
+caught before commit: the test file's own first draft missed two cases
+the TypeScript suite already had (a non-numeric "seven times three"
+case, and a trailing-punctuation case other than "?"/"." for "5
+squared") - added to match.
+
+**Verified**: `uv run ruff check . && uv run ruff format --check .`
+clean; `uv run pytest tests/py -q`, 139 passed (19 new, in
+`test_compute.py`: `normalize_spoken_math`'s own 15 cases parametrized,
+trailing-punctuation trimming, end-to-end spoken arithmetic, unit
+conversion still working after normalization, `ComputeError` on a
+malformed expression); `bun test` in `spec/`, 556 pass - the shared
+fixture is what proves the TypeScript side agrees, not a separate
+Python-only claim. Gate (`bash scripts/check.sh` in a throwaway
+worktree): clean on the first try. Commit: f8a229d.
