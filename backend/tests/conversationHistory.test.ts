@@ -985,6 +985,26 @@ describe("buildConversationWindow() (step 3)", () => {
     expect(window.messages.some((m) => m.role === "system" && m.content.includes("safety rules declined"))).toBe(true);
   });
 
+  // Item 4b: the forget command is the engine's own, not a household
+  // command row; the note says what happened instead of "unknown".
+  test("a forget turn enters the window as a note quoting the hub's answer, never as an unknown command", async () => {
+    const { actor } = await owner();
+    const conv = resolveOrCreateConversation(actor, "chat");
+    if (!conv.ok) throw new Error(conv.error);
+    logTurn(actor, "chat", "forget what I told you about Marlow's birthday", {
+      reply: { text: "Forgotten: Marlow's birthday is in June." },
+      source: "command",
+      command_id: "forget",
+      safety: SAFE,
+      conversation_id: conv.value.id,
+      turn_id: "turn-4b-forget",
+    });
+    const window = buildConversationWindow(conv.value);
+    const note = window.messages.find((m) => m.role === "system" && m.content.includes("asked to forget"));
+    expect(note?.content).toContain("Forgotten: Marlow's birthday is in June.");
+    expect(window.messages.some((m) => m.content.includes("unknown"))).toBe(false);
+  });
+
   test("a command turn enters the window as a system note naming the command's own trigger phrase", async () => {
     const { actor } = await owner();
     const conv = resolveOrCreateConversation(actor, "chat");

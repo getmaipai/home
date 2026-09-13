@@ -2897,3 +2897,150 @@ names the withheld argument each time ("the item \"it\" was not said
 (pronoun)"). A4 and A6 pass live; the compound, timer and list rows
 are unchanged.
 
+## Item 4b: forget in conversation is honored or refused, never "Got it." (2026-09-13)
+
+The 47-conversation run saw "actually, forget what I told you about
+Marlow's birthday" get "Got it." while the record stayed active, and
+the next conversation said June: a privacy lie. "Forget that", "forget
+what I (just) told you (about X)", "don't remember that", "forget it"
+and "erase that" are now the engine's own command (`lib/forgetCommand.ts`),
+answered in `prepareTurn()` before routing and before the model, the
+way a credential in chat is (CHAT-03), and after the pending-ask
+check on purpose ("forget it" to "Add what to the list?" is the ask's
+own cancel). It retires the records whose provenance is the last
+remembered turn of this conversation (the remember package's rows and
+the judge's, by their `source` turn id; `forgetByIds()` applies the
+same tombstone the Memory page does: status archived, text wiped,
+embeddings gone) and deletes that turn's episodes, so neither recall
+path can bring the words back, and replies with what it forgot
+("Forgotten: Marlow's birthday is in June."). With a topic, only the
+records sharing a content word with it go, and a topic nothing
+matches says so. When nothing has been remembered yet (the judge has
+not run), it says "I hadn't kept anything from that yet, and I
+won't.", marks the conversation's unjudged model turns `skipped` so
+the judge never reads them (its queue reads `judge_status IS NULL`),
+and deletes their episodes; with no earlier turn at all, "There's
+nothing to forget yet." A record that is not the person's to clear
+(an entity or pinned memory, for a non-admin) is refused in words.
+
+A model reply claiming to have forgotten, on a phrasing the command
+did not catch, meets a new "forget" family in the guards ("I haven't
+forgotten anything. Say \"forget that\" and I will."), and "Got it."
+to such a request is the accepted-request claim it always was; three
+corpus rows, one of them "I forgot my keys", which claims nothing.
+Tests: the remembered record retired and its episodes gone, the reply
+naming it, and the next question not answering June; the
+nothing-kept case with the turn skipped and the judge run afterward
+writing nothing; the nothing-said case. The bench's
+`memory-control-in-chat` row is the live check (G2's first verb).
+
+**The review's nine findings, taken before the commit.** The two high
+ones changed what "that" means: the judge drains on a five-second
+idle window, so the turn a person points at is nearly always still
+unjudged, and the first cut reached past it for the latest remembered
+record (it would have erased Marlow's birthday and kept the peanuts).
+"Forget that" now means the previous turn of this conversation,
+whatever its state: records tombstoned if it wrote any, skipped if it
+is unjudged, "Nothing was kept from that." if it was judged and kept
+nothing; never an older record, never every unjudged turn. With a
+topic that no record matches, only the unjudged turns whose own words
+mention the topic are skipped (Rover's turn stays the judge's to
+read). The judge re-reads `judge_status = 'skipped'` beside each of
+its three `#88` supersession re-checks (before extraction, after it,
+and per fact), and a skipped turn keeps its status and writes nothing.
+Topic words fold possessives ("Marlow's" and "Marlow" match) and a
+stopword-only topic ("about it") is "forget that". Episodes are
+deleted only after a record really went, so the "isn't yours to
+clear" refusal leaves the transcript alone. A possessive object
+("forget Marlow's birthday", "forget my dentist appointment", "forget
+what you know about the recital") is a command; a bare object ("forget
+the dishes, let's go") is not, since that is how people say "never
+mind" and treating it as a command would erase a record on an
+ordinary sentence; "forget about it" is not one either. The guard
+family no longer fires on "that's cleared up" or "it's gone" (agreement
+and weather, not memory) and does fire on "I've forgotten your
+birthday". Tests: seven in the 4b describe (the unjudged-previous-turn
+case leaving the older record, the topic-skips-only-the-mentioning-
+turn case, the judged-nothing case, the object forms both ways) and
+two guard tests; two corpus rows for the family's edges.
+
+**The second review's eleven findings, also taken before the commit.**
+Two were high and both were the judge writing the topic back after
+"Forgotten": a topic forget that tombstoned a record left the later
+unjudged turn about the same topic for the judge to extract, and a
+"forget that" on a turn the judge had left unjudged after a partial
+write (its idle early-return does that) tombstoned the record and then
+let the next tick write it again. A topic forget now skips every
+unjudged turn that mentions the topic in the same command, and a
+tombstoned record's own source turn is skipped when still unjudged.
+On the judge's side, `markAttempt` and the "done" stamp write only
+where `judge_status IS NULL` (a skip landing during a failing
+extraction was being reset to null and re-queued; a finished judge
+was overwriting `skipped` with `done`), and the skip is re-read once
+more after `decideDedupe()`, right before the write; a record that
+slips through the last window is swept by the command itself, which
+tombstones any active record whose source is a turn it just skipped.
+Scope changed for the topic form: "what I told you" is what this
+person told the hub in any conversation (an inner join from the
+record's `source` to the person's own turns), because the bench's
+scenario ends with "the next conversation said June", and a
+this-conversation-only miss reply there was the same privacy lie in
+other words; the miss reply now says "from what you've told me" and
+points at the Memory page. Smaller: a trailing "please" or "thanks"
+is still the command (it fell through to the model, whose "Got it."
+no guard catches); a curly apostrophe (the iOS default) is folded
+before matching; a partial refusal is said ("The rest isn't yours to
+clear, so it stays.") instead of hidden behind "Forgotten: <the other
+one>"; the forget turn carries `command_id: "forget"` and the episode
+store keeps no episode of it, so the request's own wording ("about
+Marlow's birthday") is not recallable after the remembered turn's
+episodes are gone. The guard family narrowed again: "deleted",
+"removed" and "cleared" are memory claims only with a memory object
+("I've removed it from your list" was getting the forget line, which
+coaches a memory command for a list item), the demonstratives carry a
+trailing word boundary ("items", "thistle"), and "I forgot it was
+Tuesday" or "sorry, I forgot what you said" is an admission, excluded.
+The first live bench run then showed two more gaps the unit tests had
+not: the fixture keeps Marlow's birthday twice (a polite "can you
+remember" in one conversation, judge-extracted as "Sage remembers that
+Marlow's birthday is in June", then a plain "remember" in another),
+and forgetting only the newest turn's record left June for the next
+question; and after both records were gone, the next question still
+answered "2 days ago, you asked me to remember that Marlow's birthday
+is in June" from the episodes of an earlier exchange that had answered
+June without writing a record. So a topic forget now tombstones every
+record carrying all of the topic's content words, in any conversation
+(a partial match, "Marlow loves the park" for "Marlow's birthday",
+still goes only from the newest turn that wrote one), and deletes the
+episodes of every turn of the person's whose own words or reply carry
+all the topic's words. Tests: fourteen in the 4b describe (the new one
+keeps the birthday in two conversations plus an answered question,
+forgets, and checks no record, no June episode, and no June in the
+next answer), two in the judge suite (a skip landing during a failing
+extraction, a skip landing during dedupe), four guard tests, four
+corpus rows.
+
+**A third review, on the diff as it stood after the bench fixes,
+found eleven more; all taken.** Two high: `contentWords` dropped
+words under three letters, so "forget Bo's birthday" was the topic
+"birthday" and every birthday went (a two-letter name is a word now;
+`tokenize` already drops stopwords and single letters); and the
+partial-match rule chose the newest turn sharing any topic word, so
+"Marlow loves the park" from today went beside yesterday's birthday
+record (partial matches count only when no record carries all the
+words, and the same rule now scopes which unjudged turns are skipped).
+The parser gave back "delete", "erase" and "scratch" as bare verbs
+("delete that" after "add milk" is the list package's, "scratch that"
+is "never mind"; they count only with "what you know about"), bare
+"forget it" is "never mind" again ("don't remember it" stays a
+command), and a contraction is not a possessive ("forget what's for
+dinner"). The episode wipe reads the person's own words only, never
+the reply's. A refusal no longer returns early: the person's own
+unjudged turn about the topic is still skipped and the transcript
+still cleared, and a record the sweep could not clear is named like
+any other. The forget turn enters the model's window as "[The hub was
+asked to forget something and answered: ...]" instead of "[Command
+"unknown" ran.]". The guard's exclusion covers "I forgot that you
+mentioned that" and an apology after the verb. Tests: seventeen in
+the 4b describe, one in the conversation-history suite, four guard
+tests.

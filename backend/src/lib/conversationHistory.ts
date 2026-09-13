@@ -46,6 +46,7 @@ import { completeBackground, getBackgroundBackendKind } from "@/lib/backgroundSu
 import { loadManifestOnly } from "@/lib/plugins";
 import { remember } from "@/lib/memory";
 import { recordEpisodes, deleteEpisodesForTurns } from "@/lib/episodes";
+import { FORGET_COMMAND_ID } from "@/lib/forgetCommand";
 import { nextHlc } from "@/lib/hlc";
 import { Conversation } from "@maipai/spec/gen/ts/conversation.js";
 import type { TurnValue, Surface } from "@/lib/turnEngine";
@@ -725,6 +726,10 @@ function nonModelWindowNote(t: ConversationTurnRow): string {
     case "safety_refuse":
       return "[The household's safety rules declined this request.]";
     case "command": {
+      // Item 4b: the forget command is the engine's own, not a
+      // household command row; the note says what happened without
+      // repeating the topic.
+      if (t.commandId === FORGET_COMMAND_ID) return `[The hub was asked to forget something and answered: "${redactCredentials(t.replyText)}"]`;
       const trigger = t.commandId ? commandTriggerFor(t.commandId) : null;
       return `[Command "${trigger ?? "unknown"}" ran.]`;
     }

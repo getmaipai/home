@@ -12766,6 +12766,13 @@ other's section once (147cd28, f4779a6).
   clearance Shell.tsx already reserves for it), proven to fail then
   fixed with a real-layout check in scripts/screenshot.ts:
   [docs/dev/session-b.md](dev/session-b.md) (2026-09-13).
+- Item 4b, "forget that" in conversation is the engine's own command
+  (the previous turn's records tombstoned and its episodes gone, or the
+  turn skipped before the judge reads it; a topic clears every record
+  and transcript turn about it in any conversation), never "Got it."
+  with the record kept; a "forget" guard family for the model's own
+  claim; three review rounds and the bench's cross-conversation gaps
+  taken: [docs/dev/session-a.md](dev/session-a.md) (2026-09-13).
 - Item 4a, a tool never runs on an argument the person did not say (an
   invented number, duration or a bare pronoun asks through the ask
   path instead; "never mind" clears an ask; a new command in place of

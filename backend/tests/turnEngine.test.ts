@@ -2114,6 +2114,354 @@ describe("getmaipai/home#77: a fact followed by 'please remember' is remembered,
   }
 });
 
+// Item 4b (docs/plans/baseline-fixes-2026-09-13.md): telling the hub to
+// forget is honored or refused, never "Got it." with the record kept.
+// The 47-conversation bench saw "forget what I told you about Marlow's
+// birthday" get "Got it." while the record stayed active and the next
+// conversation said June: a privacy lie.
+describe("item 4b: forget in conversation is honored or refused, never 'Got it.' with the record kept", () => {
+  // The remember package writes a household-scope record (person null); the judge's are the person's. Both count.
+  const records = (personId: string) => db.select({ text: memoryRecords.text, status: memoryRecords.status, deletedAt: memoryRecords.deletedAt, person: memoryRecords.person }).from(memoryRecords).all().filter((r) => r.person === null || r.person === personId);
+
+  test("'forget what I told you about X' retires the records the remembered turn wrote, deletes its episodes, and says what it forgot", async () => {
+    const { actor } = await owner();
+    const conv = resolveOrCreateConversation(actor, "chat");
+    if (!conv.ok) throw new Error(conv.error);
+    const kept = await runTurn(actor, "chat", "remember that Marlow's birthday is in June", { conversationId: conv.value.id });
+    expect(kept.ok && kept.value.plugin_id).toBe("remember");
+    expect(records(actor.id).filter((r) => r.status === "active" && /june/i.test(r.text)).length).toBe(1);
+    const forgot = await runTurn(actor, "chat", "actually, forget what I told you about Marlow's birthday", { conversationId: conv.value.id });
+    expect(forgot.ok).toBe(true);
+    if (!forgot.ok) return;
+    expect(forgot.value.source).toBe("command");
+    expect(forgot.value.reply.text).toMatch(/forgot|forgotten/i);
+    expect(forgot.value.reply.text).toMatch(/june/i); // it says what it forgot
+    expect(records(actor.id).filter((r) => r.status === "active" && /june/i.test(r.text))).toEqual([]);
+    expect(records(actor.id).some((r) => r.status === "archived" && r.deletedAt !== null)).toBe(true);
+    const { sqlite } = await import("@/db");
+    expect((sqlite.query("SELECT COUNT(*) AS n FROM episodes WHERE turn_id = ?").get(kept.ok ? kept.value.turn_id : "") as { n: number }).n).toBe(0);
+    const later = await runTurn(actor, "chat", "when is Marlow's birthday");
+    expect(later.ok && later.value.reply.text).not.toMatch(/june/i);
+  });
+
+  test("'forget that' with nothing remembered yet says so, and the unjudged turn is never extracted", async () => {
+    const { actor } = await owner();
+    await withStub({ scriptedChatReply: () => "Noted, peanuts are off the menu." }, async () => {
+      const conv = resolveOrCreateConversation(actor, "chat");
+      if (!conv.ok) throw new Error(conv.error);
+      const said = await runTurn(actor, "chat", "Pippa is allergic to peanuts", { conversationId: conv.value.id });
+      expect(said.ok && said.value.source).toBe("model");
+      const forgot = await runTurn(actor, "chat", "forget that", { conversationId: conv.value.id });
+      expect(forgot.ok).toBe(true);
+      if (!forgot.ok) return;
+      expect(forgot.value.source).toBe("command");
+      expect(forgot.value.reply.text).toMatch(/hadn't kept|nothing .*kept|won't/i);
+      const row = db.select().from(conversationTurns).where(eq(conversationTurns.id, said.ok ? said.value.turn_id : "")).get()!;
+      expect(row.judgeStatus).toBe("skipped");
+      const { runJudgeBatch } = await import("@/lib/memoryJudge");
+      const { __setTurnActivityClockForTests } = await import("@/lib/turnActivity");
+      __setTurnActivityClockForTests(() => Date.now() + 60_000);
+      try {
+        await runJudgeBatch();
+      } finally {
+        __setTurnActivityClockForTests(() => Date.now());
+      }
+      expect(records(actor.id).filter((r) => /peanut/i.test(r.text))).toEqual([]);
+    });
+  });
+
+  // The 4b review's high finding 1: with the judge's five-second idle
+  // window the last turn is usually unjudged, so "forget that" must mean
+  // the previous turn, never the latest remembered record; the first cut
+  // erased Marlow's birthday here and kept the peanuts.
+  test("'forget that' after an unjudged turn skips that turn and leaves an older remembered record alone", async () => {
+    const { actor } = await owner();
+    await withStub({ scriptedChatReply: () => "Noted, peanuts are off the menu." }, async () => {
+      const conv = resolveOrCreateConversation(actor, "chat");
+      if (!conv.ok) throw new Error(conv.error);
+      const kept = await runTurn(actor, "chat", "remember that Marlow's birthday is in June", { conversationId: conv.value.id });
+      expect(kept.ok && kept.value.plugin_id).toBe("remember");
+      const said = await runTurn(actor, "chat", "Pippa is allergic to peanuts", { conversationId: conv.value.id });
+      const forgot = await runTurn(actor, "chat", "forget that", { conversationId: conv.value.id });
+      expect(forgot.ok && forgot.value.reply.text).toMatch(/hadn't kept|won't/i);
+      const row = db.select().from(conversationTurns).where(eq(conversationTurns.id, said.ok ? said.value.turn_id : "")).get()!;
+      expect(row.judgeStatus).toBe("skipped");
+      expect(records(actor.id).filter((r) => r.status === "active" && /june/i.test(r.text)).length).toBe(1); // the older record stays
+    });
+  });
+
+  // High finding 2: a topic matching no record while the turn that said
+  // it is unjudged must skip that turn, and only that turn.
+  test("'forget what I told you about X' with nothing kept yet skips only the unjudged turn that mentions X", async () => {
+    const { actor } = await owner();
+    await withStub({ scriptedChatReply: () => "Got it." }, async () => {
+      const conv = resolveOrCreateConversation(actor, "chat");
+      if (!conv.ok) throw new Error(conv.error);
+      const other = await runTurn(actor, "chat", "Rover loves the park", { conversationId: conv.value.id });
+      const said = await runTurn(actor, "chat", "Pippa is allergic to peanuts", { conversationId: conv.value.id });
+      const forgot = await runTurn(actor, "chat", "forget what I told you about Pippa's allergy", { conversationId: conv.value.id });
+      expect(forgot.ok && forgot.value.reply.text).toMatch(/hadn't kept anything about/i);
+      const status = (id: string) => db.select().from(conversationTurns).where(eq(conversationTurns.id, id)).get()!.judgeStatus;
+      expect(status(said.ok ? said.value.turn_id : "")).toBe("skipped");
+      expect(status(other.ok ? other.value.turn_id : "")).toBeNull(); // Rover's turn is still the judge's to read
+    });
+  });
+
+  test("'forget that' after a judged turn that kept nothing says nothing was kept, and skips nothing", async () => {
+    const { actor } = await owner();
+    await withStub({ scriptedChatReply: () => "It is about 4 pm." }, async () => {
+      const conv = resolveOrCreateConversation(actor, "chat");
+      if (!conv.ok) throw new Error(conv.error);
+      const asked = await runTurn(actor, "chat", "what time is it in Lisbon", { conversationId: conv.value.id });
+      const { sqlite } = await import("@/db");
+      sqlite.query("UPDATE conversation_turns SET judge_status = 'done' WHERE id = ?").run(asked.ok ? asked.value.turn_id : "");
+      const forgot = await runTurn(actor, "chat", "forget that", { conversationId: conv.value.id });
+      expect(forgot.ok && forgot.value.source).toBe("command");
+      expect(forgot.ok && forgot.value.reply.text).toMatch(/nothing was kept/i);
+      expect(db.select().from(conversationTurns).where(eq(conversationTurns.id, asked.ok ? asked.value.turn_id : "")).get()!.judgeStatus).toBe("done");
+    });
+  });
+
+  // Finding 8: a possessive object is a memory by its own shape; a bare
+  // object is not a memory command at all ("forget the dishes" is
+  // "never mind the dishes", and must never erase a record).
+  test("'forget Marlow's birthday' retires the record; 'forget the dishes' is not a forget command", async () => {
+    const { parseForgetCommand } = await import("@/lib/forgetCommand");
+    expect(parseForgetCommand("forget Marlow's birthday")?.topic).toBe("Marlow's birthday");
+    expect(parseForgetCommand("forget what you know about the recital")?.topic).toBe("the recital");
+    expect(parseForgetCommand("forget my dentist appointment")?.topic).toBe("my dentist appointment");
+    expect(parseForgetCommand("forget the dishes, let's go")).toBeNull();
+    expect(parseForgetCommand("forget about it")).toBeNull(); // "never mind", not a memory command
+    expect(parseForgetCommand("forget what I told you about it")?.topic).toBe("it"); // a stopword topic: handled as "forget that"
+    const { actor } = await owner();
+    const conv = resolveOrCreateConversation(actor, "chat");
+    if (!conv.ok) throw new Error(conv.error);
+    await runTurn(actor, "chat", "remember that Marlow's birthday is in June", { conversationId: conv.value.id });
+    const forgot = await runTurn(actor, "chat", "forget Marlow's birthday", { conversationId: conv.value.id });
+    expect(forgot.ok && forgot.value.reply.text).toMatch(/forgotten/i);
+    expect(records(actor.id).filter((r) => r.status === "active" && /june/i.test(r.text))).toEqual([]);
+  });
+
+  // The second 4b review. Finding 1: a topic forget that tombstones a
+  // record must also skip the unjudged turns that mention the topic, or
+  // the judge writes it back seconds after "Forgotten".
+  test("'forget what I told you about X' tombstones the record and skips the later unjudged turn about X in the same command", async () => {
+    const { actor } = await owner();
+    await withStub({ scriptedChatReply: () => "Sounds fun." }, async () => {
+      const conv = resolveOrCreateConversation(actor, "chat");
+      if (!conv.ok) throw new Error(conv.error);
+      await runTurn(actor, "chat", "remember that Marlow's birthday is in June", { conversationId: conv.value.id });
+      const party = await runTurn(actor, "chat", "Marlow's birthday party is at the park", { conversationId: conv.value.id });
+      const forgot = await runTurn(actor, "chat", "forget what I told you about Marlow's birthday", { conversationId: conv.value.id });
+      expect(forgot.ok && forgot.value.reply.text).toMatch(/forgotten/i);
+      expect(records(actor.id).filter((r) => r.status === "active" && /june/i.test(r.text))).toEqual([]);
+      expect(db.select().from(conversationTurns).where(eq(conversationTurns.id, party.ok ? party.value.turn_id : "")).get()!.judgeStatus).toBe("skipped");
+    });
+  });
+
+  // Finding 2: the judge's idle early-return leaves a turn unjudged after
+  // a partial write; "forget that" on it tombstones what was written and
+  // skips the turn, so the next tick cannot write the fact again.
+  test("'forget that' on an unjudged turn that already has a record tombstones it and skips the turn", async () => {
+    const { actor } = await owner();
+    await withStub({ scriptedChatReply: () => "Noted." }, async () => {
+      const conv = resolveOrCreateConversation(actor, "chat");
+      if (!conv.ok) throw new Error(conv.error);
+      const said = await runTurn(actor, "chat", "Pippa is allergic to peanuts", { conversationId: conv.value.id });
+      const turnId = said.ok ? said.value.turn_id : "";
+      const partial = remember(actor, { text: "Pippa is allergic to peanuts", category: "fact", tier: "durable", scope: "person", person: actor.id, source: turnId, importance: 0.7 });
+      expect(partial.ok).toBe(true);
+      const forgot = await runTurn(actor, "chat", "forget that", { conversationId: conv.value.id });
+      expect(forgot.ok && forgot.value.reply.text).toMatch(/forgotten.*peanuts/i);
+      expect(records(actor.id).filter((r) => r.status === "active" && /peanut/i.test(r.text))).toEqual([]);
+      expect(db.select().from(conversationTurns).where(eq(conversationTurns.id, turnId)).get()!.judgeStatus).toBe("skipped");
+    });
+  });
+
+  // Findings 5 and 6: a courtesy after the object and an iOS curly
+  // apostrophe are still the command.
+  test("'forget that, thanks' and a curly apostrophe are still the command", async () => {
+    const { parseForgetCommand } = await import("@/lib/forgetCommand");
+    expect(parseForgetCommand("forget that please")).toEqual({ topic: null });
+    expect(parseForgetCommand("forget that, thanks.")).toEqual({ topic: null });
+    expect(parseForgetCommand("forget what I told you about Marlow's birthday, thanks")?.topic).toBe("Marlow's birthday");
+    expect(parseForgetCommand("forget Marlow\u2019s birthday")?.topic).toBe("Marlow's birthday");
+    expect(parseForgetCommand("don\u2019t remember that")).toEqual({ topic: null });
+    expect(parseForgetCommand("forget my dentist appointment please")?.topic).toBe("my dentist appointment");
+  });
+
+  // Finding 7: "what I told you" is what this person told the hub in any
+  // conversation. The bench's own scenario ends with "the next
+  // conversation said June".
+  test("'forget what I told you about X' in a later conversation still retires the record", async () => {
+    const { actor } = await owner();
+    const first = resolveOrCreateConversation(actor, "chat");
+    if (!first.ok) throw new Error(first.error);
+    await runTurn(actor, "chat", "remember that Marlow's birthday is in June", { conversationId: first.value.id });
+    const { createConversation } = await import("@/lib/conversationHistory");
+    const second = createConversation(actor, { surface: "chat" });
+    if (!second.ok) throw new Error(second.error);
+    expect(second.value.id).not.toBe(first.value.id);
+    const forgot = await runTurn(actor, "chat", "forget what I told you about Marlow's birthday", { conversationId: second.value.id });
+    expect(forgot.ok && forgot.value.reply.text).toMatch(/forgotten.*june/i);
+    expect(records(actor.id).filter((r) => r.status === "active" && /june/i.test(r.text))).toEqual([]);
+    const miss = await runTurn(actor, "chat", "forget what I told you about the recital", { conversationId: second.value.id });
+    expect(miss.ok && miss.value.reply.text).toMatch(/don't have anything kept about the recital/i);
+  });
+
+  // The live bench: the same birthday kept twice, from a polite "can you
+  // remember" in one conversation and a plain "remember" in another.
+  // Both carry every topic word, so both go, and the next question in a
+  // fresh conversation cannot answer June.
+  test("'forget what I told you about X' retires every record about X, across conversations", async () => {
+    const { actor } = await owner();
+    const { createConversation } = await import("@/lib/conversationHistory");
+    const first = createConversation(actor, { surface: "chat" });
+    if (!first.ok) throw new Error(first.error);
+    await runTurn(actor, "chat", "remember that Marlow's birthday is in June", { conversationId: first.value.id });
+    const older = db.select().from(conversationTurns).where(eq(conversationTurns.conversationId, first.value.id)).get()!;
+    const judged = remember(actor, { text: "Sage remembers that Marlow's birthday is in June", category: "fact", tier: "durable", scope: "person", person: actor.id, source: older.id, importance: 0.6 });
+    expect(judged.ok).toBe(true);
+    const second = createConversation(actor, { surface: "chat" });
+    if (!second.ok) throw new Error(second.error);
+    await runTurn(actor, "chat", "remember that Marlow's birthday is in June", { conversationId: second.value.id });
+    expect(records(actor.id).filter((r) => r.status === "active" && /june/i.test(r.text)).length).toBe(3);
+    // An earlier exchange that answered June wrote no record, but its
+    // episodes would recall the answer for the next question.
+    await withStub({ scriptedChatReply: () => "It's in June." }, async () => {
+      await runTurn(actor, "chat", "when is Marlow's birthday", { conversationId: first.value.id });
+    });
+    const { sqlite } = await import("@/db");
+    const juneEpisodes = () => (sqlite.query("SELECT COUNT(*) AS n FROM episodes WHERE text LIKE '%June%'").get() as { n: number }).n;
+    expect(juneEpisodes()).toBeGreaterThan(0);
+    const forgot = await runTurn(actor, "chat", "forget what I told you about Marlow's birthday", { conversationId: second.value.id });
+    expect(forgot.ok && forgot.value.reply.text).toMatch(/^Forgotten: /);
+    expect(records(actor.id).filter((r) => r.status === "active" && /june/i.test(r.text))).toEqual([]);
+    expect(juneEpisodes()).toBe(0);
+    const later = await runTurn(actor, "chat", "when is Marlow's birthday", { conversationId: (createConversation(actor, { surface: "chat" }) as { ok: true; value: { id: string } }).value.id });
+    expect(later.ok && later.value.reply.text).not.toMatch(/june/i);
+  });
+
+  // The third review: "delete that" belongs to the list package, "forget
+  // it" is "never mind", "what's" is not a possessive, and a two-letter
+  // name is a topic word.
+  test("package verbs, bare 'forget it', and contractions are not the command; a two-letter name still scopes the topic", async () => {
+    const { parseForgetCommand } = await import("@/lib/forgetCommand");
+    expect(parseForgetCommand("delete that")).toBeNull();
+    expect(parseForgetCommand("erase that")).toBeNull();
+    expect(parseForgetCommand("scratch that")).toBeNull();
+    expect(parseForgetCommand("delete my alarm")).toBeNull();
+    expect(parseForgetCommand("delete my shopping list")).toBeNull();
+    expect(parseForgetCommand("actually, forget it")).toBeNull();
+    expect(parseForgetCommand("don't remember it")).toEqual({ topic: null });
+    expect(parseForgetCommand("delete what you know about the recital")?.topic).toBe("the recital");
+    expect(parseForgetCommand("forget what's for dinner, let's order pizza")).toBeNull();
+    expect(parseForgetCommand("forget it's tuesday")).toBeNull();
+    expect(parseForgetCommand("forget Bo's birthday")?.topic).toBe("Bo's birthday");
+    const { actor } = await owner();
+    const conv = resolveOrCreateConversation(actor, "chat");
+    if (!conv.ok) throw new Error(conv.error);
+    await runTurn(actor, "chat", "remember that Marlow's birthday is in June", { conversationId: conv.value.id });
+    await runTurn(actor, "chat", "remember that Bo's birthday is in May", { conversationId: conv.value.id });
+    const forgot = await runTurn(actor, "chat", "forget Bo's birthday", { conversationId: conv.value.id });
+    expect(forgot.ok && forgot.value.reply.text).toMatch(/forgotten: bo's birthday is in may\.$/i);
+    expect(records(actor.id).filter((r) => r.status === "active" && /june/i.test(r.text)).length).toBe(1); // Marlow's stays
+  });
+
+  // Finding 2: a record sharing one word with the topic, from a newer
+  // turn, stays when a real match exists elsewhere.
+  test("'forget what I told you about Marlow's birthday' leaves 'Marlow loves the park' alone when the birthday record is older", async () => {
+    const { actor } = await owner();
+    const conv = resolveOrCreateConversation(actor, "chat");
+    if (!conv.ok) throw new Error(conv.error);
+    await runTurn(actor, "chat", "remember that Marlow's birthday is in June", { conversationId: conv.value.id });
+    await runTurn(actor, "chat", "remember that Marlow loves the park", { conversationId: conv.value.id });
+    const forgot = await runTurn(actor, "chat", "forget what I told you about Marlow's birthday", { conversationId: conv.value.id });
+    expect(forgot.ok && forgot.value.reply.text).toMatch(/forgotten: marlow's birthday is in june\.$/i);
+    const active = records(actor.id).filter((r) => r.status === "active").map((r) => r.text);
+    expect(active).toContain("Marlow loves the park");
+    expect(active.some((t) => /june/i.test(t))).toBe(false);
+  });
+
+  // Finding 8: a refusal still skips the person's own unjudged turn
+  // about the topic and says so.
+  test("a refused forget still skips the unjudged turn about the topic", async () => {
+    const { actor } = await owner();
+    const child = { ...actor, role: "child" as const };
+    await withStub({ scriptedChatReply: () => "Noted." }, async () => {
+      const conv = resolveOrCreateConversation(child, "chat");
+      if (!conv.ok) throw new Error(conv.error);
+      const earlier = await runTurn(child, "chat", "Rover the dog got a new collar", { conversationId: conv.value.id });
+      const entity = remember(actor, { text: "Rover is the family dog", record_kind: "entity", category: "thing", tier: "durable", scope: "person", person: child.id, source: earlier.ok ? earlier.value.turn_id : "", importance: 0.8 });
+      expect(entity.ok).toBe(true);
+      const { sqlite } = await import("@/db");
+      sqlite.query("UPDATE conversation_turns SET judge_status = 'done' WHERE id = ?").run(earlier.ok ? earlier.value.turn_id : "");
+      const said = await runTurn(child, "chat", "Rover the dog loves the park", { conversationId: conv.value.id });
+      const forgot = await runTurn(child, "chat", "forget what I told you about Rover the dog", { conversationId: conv.value.id });
+      expect(forgot.ok && forgot.value.reply.text).toMatch(/isn't yours to clear/i);
+      expect(db.select().from(conversationTurns).where(eq(conversationTurns.id, said.ok ? said.value.turn_id : "")).get()!.judgeStatus).toBe("skipped");
+      expect(records(child.id).filter((r) => r.status === "active").map((r) => r.text)).toEqual(["Rover is the family dog"]);
+    });
+  });
+
+  // Finding 10: a record the person may not clear is named in the reply,
+  // never silently kept behind "Forgotten: <the other one>."
+  test("a partial refusal is said, not hidden", async () => {
+    const { actor } = await owner();
+    const child = { ...actor, role: "child" as const };
+    await withStub({ scriptedChatReply: () => "Noted." }, async () => {
+      const conv = resolveOrCreateConversation(child, "chat");
+      if (!conv.ok) throw new Error(conv.error);
+      const said = await runTurn(child, "chat", "Rover is our dog and he loves the park", { conversationId: conv.value.id });
+      const turnId = said.ok ? said.value.turn_id : "";
+      const plain = remember(child, { text: "Rover loves the park", category: "preference", tier: "durable", scope: "person", person: child.id, source: turnId, importance: 0.5 });
+      const entity = remember(actor, { text: "Rover is the family dog", record_kind: "entity", category: "thing", tier: "durable", scope: "person", person: child.id, source: turnId, importance: 0.8 });
+      expect(plain.ok && entity.ok).toBe(true);
+      const forgot = await runTurn(child, "chat", "forget that", { conversationId: conv.value.id });
+      expect(forgot.ok && forgot.value.reply.text).toMatch(/forgotten: rover loves the park/i);
+      expect(forgot.ok && forgot.value.reply.text).toMatch(/isn't yours to clear/i);
+      expect(records(child.id).filter((r) => r.status === "active").map((r) => r.text)).toEqual(["Rover is the family dog"]);
+    });
+  });
+
+  // Finding 11: the forget request names the topic; it leaves no episode
+  // of its own, or the wording stays recallable after the remembered
+  // turn's episodes are gone.
+  test("the forget request's own turn keeps no episode", async () => {
+    const { actor } = await owner();
+    const conv = resolveOrCreateConversation(actor, "chat");
+    if (!conv.ok) throw new Error(conv.error);
+    await runTurn(actor, "chat", "remember that Marlow's birthday is in June", { conversationId: conv.value.id });
+    const forgot = await runTurn(actor, "chat", "forget what I told you about Marlow's birthday", { conversationId: conv.value.id });
+    expect(forgot.ok && forgot.value.command_id).toBe("forget");
+    const { sqlite } = await import("@/db");
+    expect((sqlite.query("SELECT COUNT(*) AS n FROM episodes WHERE turn_id = ?").get(forgot.ok ? forgot.value.turn_id : "") as { n: number }).n).toBe(0);
+    expect((sqlite.query("SELECT COUNT(*) AS n FROM episodes WHERE text LIKE '%birthday%'").get() as { n: number }).n).toBe(0);
+  });
+
+  test("with nothing said at all, 'forget that' says there is nothing to forget", async () => {
+    const { actor } = await owner();
+    const conv = resolveOrCreateConversation(actor, "chat");
+    if (!conv.ok) throw new Error(conv.error);
+    const forgot = await runTurn(actor, "chat", "forget that", { conversationId: conv.value.id });
+    expect(forgot.ok && forgot.value.source).toBe("command");
+    expect(forgot.ok && forgot.value.reply.text).toMatch(/nothing to forget/i);
+  });
+
+  async function withStub<T>(opts: Parameters<typeof import("@maipai/spec/llm/ts/stubServer.js").startStubLlmServer>[1], fn: () => Promise<T>): Promise<T> {
+    __resetLlmSupervisorForTests();
+    const { startStubLlmServer } = await import("@maipai/spec/llm/ts/stubServer.js");
+    const stub = startStubLlmServer(0, opts);
+    process.env.MAIPAI_LLAMA_SERVER_URL = stub.url;
+    try {
+      return await fn();
+    } finally {
+      stub.stop();
+      delete process.env.MAIPAI_LLAMA_SERVER_URL;
+    }
+  }
+});
+
 // Item 4a (docs/plans/baseline-fixes-2026-09-13.md): a tool never runs
 // on an argument the person did not say. The 47-conversation bench saw
 // "set a timer" run a ten-minute timer the model invented and "add it

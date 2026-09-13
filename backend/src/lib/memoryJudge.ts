@@ -369,9 +369,22 @@ async function decideDedupe(newText: string, candidates: SimilarMatch[]): Promis
   }
 }
 
+// Item 4b: both writers below touch only a still-unjudged turn. "Forget
+// that" can mark the turn skipped while extraction runs (seconds); a
+// failed attempt then must not put it back in the queue, and a finished
+// one must not stamp it done (the second review's findings 3 and 4).
 function markAttempt(turnId: string, attempts: number): void {
   const status = attempts >= MAX_JUDGE_ATTEMPTS ? "failed" : null;
-  db.update(conversationTurns).set({ judgeAttempts: attempts, judgeStatus: status, hlc: nextHlc() }).where(eq(conversationTurns.id, turnId)).run();
+  db.update(conversationTurns)
+    .set({ judgeAttempts: attempts, judgeStatus: status, hlc: nextHlc() })
+    .where(and(eq(conversationTurns.id, turnId), isNull(conversationTurns.judgeStatus)))
+    .run();
+}
+function markDone(turnId: string): void {
+  db.update(conversationTurns)
+    .set({ judgeStatus: "done", hlc: nextHlc() })
+    .where(and(eq(conversationTurns.id, turnId), isNull(conversationTurns.judgeStatus)))
+    .run();
 }
 
 export interface JudgeTurnResult {
@@ -406,14 +419,15 @@ export async function judgeTurn(turn: ConversationTurnRow): Promise<JudgeTurnRes
   // #88: superseded between selection and judging (an edit landed while
   // the batch ran): off the current branch, marked done, nothing written.
   if (isSupersededTurn(turn.id)) {
-    db.update(conversationTurns).set({ judgeStatus: "done", hlc: nextHlc() }).where(eq(conversationTurns.id, turn.id)).run();
+    markDone(turn.id);
     return { ok: true, factsWritten: 0 };
   }
+  if (isSkippedTurn(turn.id)) return { ok: true, factsWritten: 0 };
   // CHAT-03: a turn row that carries a credential (written before the
   // policy existed; a new one is logged redacted) is never sent to the
   // model. Marked done with nothing written, so it is not retried.
   if (detectCredential(turn.userText).detected || detectCredential(turn.replyText ?? "").detected) {
-    db.update(conversationTurns).set({ judgeStatus: "done", hlc: nextHlc() }).where(eq(conversationTurns.id, turn.id)).run();
+    markDone(turn.id);
     return { ok: true, factsWritten: 0 };
   }
   const facts = await extractFacts(sanitizeForPrompt(speaker.displayName), turn);
@@ -426,9 +440,10 @@ export async function judgeTurn(turn: ConversationTurnRow): Promise<JudgeTurnRes
   // second look before any write, so the replaced statement's facts are
   // never written under a turn that is already off the branch.
   if (isSupersededTurn(turn.id)) {
-    db.update(conversationTurns).set({ judgeStatus: "done", hlc: nextHlc() }).where(eq(conversationTurns.id, turn.id)).run();
+    markDone(turn.id);
     return { ok: true, factsWritten: 0 };
   }
+  if (isSkippedTurn(turn.id)) return { ok: true, factsWritten: 0 };
 
   let written = 0;
   const writtenTexts: string[] = [];
@@ -452,9 +467,10 @@ export async function judgeTurn(turn: ConversationTurnRow): Promise<JudgeTurnRes
     // #88: per fact, not once: an edit can land between one fact's
     // write and the next (each embed plus dedupe takes seconds).
     if (isSupersededTurn(turn.id)) {
-      db.update(conversationTurns).set({ judgeStatus: "done", hlc: nextHlc() }).where(eq(conversationTurns.id, turn.id)).run();
+      markDone(turn.id);
       return { ok: true, factsWritten: written };
     }
+    if (isSkippedTurn(turn.id)) return { ok: true, factsWritten: written };
     // CHAT-03: an extracted candidate carrying a credential is dropped
     // before it is embedded, compared or written (remember() would
     // refuse it too; this keeps the value out of the embed request).
@@ -470,6 +486,10 @@ export async function judgeTurn(turn: ConversationTurnRow): Promise<JudgeTurnRes
         )
       : [];
     const decision = await decideDedupe(fact.text, candidates);
+    // Item 4b, once more just before the write: embed() plus
+    // decideDedupe() took seconds, and a "forget that" in that window
+    // must win (forgetCommand.ts also sweeps a record that slips past).
+    if (isSkippedTurn(turn.id)) return { ok: true, factsWritten: written };
 
     if (decision.action === "SUPERSEDE" && decision.id) {
       // closeValidTo is "when did the OLD fact stop being true," which is
@@ -560,7 +580,7 @@ export async function judgeTurn(turn: ConversationTurnRow): Promise<JudgeTurnRes
     }
   }
 
-  db.update(conversationTurns).set({ judgeStatus: "done", hlc: nextHlc() }).where(eq(conversationTurns.id, turn.id)).run();
+  markDone(turn.id);
 
   if (written > 0) {
     const summary = writtenTexts.length === 1 ? writtenTexts[0]! : `${writtenTexts.length} things from our conversation`;
@@ -604,6 +624,14 @@ function supersededTurnIdsQuery() {
 }
 function isSupersededTurn(turnId: string): boolean {
   return db.select({ id: conversationTurns.id }).from(conversationTurns).where(eq(conversationTurns.supersedes, turnId)).get() !== undefined;
+}
+// Item 4b: "forget that" marks an unjudged turn skipped; like an edit
+// (#88) it can land between selection and any write, so it is re-read
+// at the same three points. A skipped turn keeps its status (never
+// overwritten with "done") and writes nothing.
+function isSkippedTurn(turnId: string): boolean {
+  const row = db.select({ status: conversationTurns.judgeStatus }).from(conversationTurns).where(eq(conversationTurns.id, turnId)).get();
+  return row?.status === "skipped";
 }
 function pendingTurnWhere() {
   return and(eq(conversationTurns.source, "model"), isNull(conversationTurns.judgeStatus), notInArray(conversationTurns.id, supersededTurnIdsQuery()));

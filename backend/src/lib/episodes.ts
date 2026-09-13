@@ -10,6 +10,7 @@ import { getEmbedClient } from "@/lib/embedSupervisor";
 import { nextHlc } from "@/lib/hlc";
 import { newEpisodeId } from "@/lib/id";
 import { vectorToBuffer, bufferToVector, cosineSimilarity } from "@/lib/memory";
+import { FORGET_COMMAND_ID } from "@/lib/forgetCommand";
 import * as chrono from "chrono-node";
 import type { ConversationTurnRow } from "@/wire";
 import type { PersonRow } from "@/types";
@@ -33,6 +34,10 @@ export function replyIsAnAnswer(turn: Pick<ConversationTurnRow, "source" | "guar
  * assistant side unless replyIsAnAnswer(). */
 export function recordEpisodes(turn: ConversationTurnRow): void {
   if (turn.source === "safety_refuse") return;
+  // Item 4b: the forget request names the topic it asked to forget
+  // ("...about Marlow's birthday"); an episode of it would keep that
+  // wording recallable after the remembered turn's episodes are gone.
+  if (turn.commandId === FORGET_COMMAND_ID) return;
 
   const now = new Date().toISOString();
   const hlc = nextHlc();

@@ -28,6 +28,7 @@ import { guardReply, guardSentence, replacementFor, isCuttable, isSkippable, spl
 import { tokenize } from "@/lib/text";
 import { unspokenArgument, askPromptFor, isActionPackage } from "@/lib/unspokenArgs";
 import { COURTESY_PREFIX } from "@/lib/utteranceShape";
+import { FORGET_COMMAND_ID, forgetFromConversation, parseForgetCommand } from "@/lib/forgetCommand";
 import { sanitizeForPrompt } from "@/lib/promptSanitize";
 import {
   logTurn,
@@ -1527,6 +1528,21 @@ async function prepareTurn(
   if (supersedes) setPendingAsk(conversation.id, null);
   const pendingAskValue = await resolvePendingAsk(text, actor, conversation, loaded, turnId, safety, crisisResources);
   if (pendingAskValue) return { kind: "immediate", value: pendingAskValue, turnId };
+
+  // Item 4b: "forget that" / "forget what I told you about X" is the
+  // engine's own command (lib/forgetCommand.ts), answered here before
+  // routing and before the model: the last remembered turn's records are
+  // tombstoned and its episodes deleted, or, with nothing kept yet, the
+  // unjudged turns are marked skipped so the judge never reads them.
+  // The model never gets to say "Got it." to a forget. After the pending
+  // ask above on purpose: "forget it" to "Add what to the list?" is the
+  // ask's own cancel, not a memory command.
+  const forget = parseForgetCommand(text);
+  if (forget) {
+    const outcome = forgetFromConversation(actor, conversation.id, forget.topic, turnId);
+    console.log(`[turn] forget: ${outcome.forgotten.length} record(s) tombstoned, ${outcome.skippedTurnIds.length} turn(s) skipped`);
+    return immediate({ reply: { text: outcome.reply }, source: "command", command_id: FORGET_COMMAND_ID, safety, crisis_resources: crisisResources });
+  }
 
   // Checked before the plugin floor: a command is household-authored,
   // deliberate, and exact-match-only (never fuzzy) - the identical "a

@@ -698,6 +698,29 @@ const ACTION_FAMILIES: readonly ActionFamily[] = [
     failed: "The lock didn't respond.",
   }),
   claimFamily({
+    // Item 4b: "forget that" is the engine's own command
+    // (lib/forgetCommand.ts) and never reaches the model; a model
+    // claiming to have forgotten, on a phrasing the command did not
+    // catch, has done nothing, and the honest line says how to make it
+    // happen. The command itself pushes no outcome (it answers the turn
+    // before the model), so `packages` names it for the family's shape.
+    name: "forget",
+    // "cleared that up" and "it's gone" are not memory claims (the 4b
+    // review's finding 9); "your birthday" and "about X" are (finding 8).
+    // "Forgot", "erased" and "wiped" are memory verbs on any object;
+    // "deleted", "removed" and "cleared" are memory claims only with a
+    // memory object ("I've removed it from your list" is a list claim,
+    // and the forget line would coach a memory command for a list item:
+    // the second review's finding 8). "I forgot it was Tuesday" and
+    // "sorry, I forgot what you said" admit a gap, and are excluded.
+    body: `{DID}(?:forgotten|forgot|erased|wiped)\\b[^.!?]{0,30}\\b(?:(?:that|it|this|those)\\b|the memory|the memories|what you (?:said|told)|from (?:my )?memory|your\\b|about\\b)|{DID}(?:deleted|removed|cleared)\\b[^.!?]{0,30}\\b(?:the memory|the memories|what you (?:said|told)|from (?:my |your )?memory)|\\bi(?:'ll| will) forget (?:(?:that|it|this)\\b|about it|your\\b)`,
+    exclude: /\bforgot (?:that |it |this )?(?:was|is|were|had|about)\b|\bforgot what\b|\bforgot(?:ten)? that you\b|\b(?:sorry|oops|ah|oh)\b[^.!?]{0,20}\bforgot(?:ten)?\b|\bforgot(?:ten)?\b[^.!?]{0,30}\b(?:sorry|my mistake|apologies)\b/i,
+    status: new RegExp(`\\b(?:that's|it's) (?:been )?(?:forgotten|erased|wiped|deleted)\\b|${START}forgotten\\b|${START}(?:done, )?(?:forgotten|erased)(?=[.!,;]|$)`, "i"),
+    packages: ["forget"],
+    none: "I haven't forgotten anything. Say \"forget that\" and I will.",
+    failed: "That didn't get forgotten.",
+  }),
+  claimFamily({
     name: "lookup",
     body: `{DID}(?:looked (?:that|it|this|these) up|looked up\\b|googled\\b|searched (?:for|the web|online)|checked online)\\b`,
     // A search of the household's own memory, described honestly, is

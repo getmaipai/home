@@ -611,6 +611,61 @@ describe("judgeTurn() - the poison guard", () => {
   });
 });
 
+// Item 4b: "forget that" marks an unjudged turn skipped while the judge
+// may be mid-way through it (extraction and dedupe take seconds). The
+// second 4b review's findings 3 and 4: a failed attempt used to reset
+// the status to null (back in the queue), and the final "done" stamp
+// and the per-fact write ran with no re-check after dedupe.
+describe("item 4b: a turn skipped while the judge is on it stays skipped and writes nothing", () => {
+  const skip = async (turnId: string) => {
+    const { sqlite } = await import("@/db");
+    sqlite.query("UPDATE conversation_turns SET judge_status = 'skipped' WHERE id = ?").run(turnId);
+  };
+
+  test("a skip that lands during a failing extraction is not undone by the attempt counter", async () => {
+    const { actor } = await owner();
+    const turn = makeTurn(actor, "Pippa is allergic to peanuts", "Noted.");
+    await withScriptedJudge(
+      async (schemaName) => {
+        if (schemaName !== "memory_extraction") return undefined;
+        await skip(turn.id);
+        return { facts: "not a list" }; // the extraction fails to parse
+      },
+      () => judgeTurn(turn),
+    );
+    const row = db.select().from(conversationTurns).where(eq(conversationTurns.id, turn.id)).get()!;
+    expect(row.judgeStatus).toBe("skipped");
+    expect(db.select().from(memoryRecords).all().length).toBe(0);
+  });
+
+  test("a skip that lands during dedupe stops the write, and the turn is never stamped done", async () => {
+    const { actor } = await owner();
+    const existing = remember(actor, { text: "Marlow lives in New York", category: "fact", tier: "durable", scope: "person", person: actor.id, source: "test", importance: 0.6 });
+    if (!existing.ok) throw new Error("setup failed");
+    const { sqlite } = await import("@/db");
+    sqlite
+      .query("INSERT INTO memory_embeddings (memory_id, space, dims, vector, hlc) VALUES (?, 'test', 4, ?, 'test-hlc')")
+      .run(existing.value.id, Buffer.from(new Float32Array([1, 0, 0, 0]).buffer));
+    const turn = makeTurn(actor, "actually I moved to Boston", "Updated.");
+    let dedupeCalled = false;
+    await withScriptedJudge(
+      async (schemaName) => {
+        if (schemaName === "memory_extraction") return { facts: [{ text: "Marlow lives in Boston", category: "fact", scope: "person", importance: 0.6 }] };
+        if (schemaName === "memory_dedupe") {
+          dedupeCalled = true;
+          await skip(turn.id);
+          return { action: "ADD" };
+        }
+        return undefined;
+      },
+      () => judgeTurn(turn),
+    );
+    expect(dedupeCalled).toBe(true);
+    expect(db.select().from(memoryRecords).all().filter((r) => /boston/i.test(r.text))).toEqual([]);
+    expect(db.select().from(conversationTurns).where(eq(conversationTurns.id, turn.id)).get()!.judgeStatus).toBe("skipped");
+  });
+});
+
 describe("runJudgeBatch()", () => {
   // getmaipai/home#63: MAX_TURNS_PER_RUN dropped from 10 to 1 (a live
   // diagnosis, 2026-09-07, measured one extraction call alone adding 2

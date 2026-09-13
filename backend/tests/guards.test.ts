@@ -10,6 +10,34 @@ function ctx(overrides: Partial<GuardContext> = {}): GuardContext {
   return { utterance: "", personId: "person-test", ...overrides };
 }
 
+describe("item 4b: the forget family (the review's findings 8 and 9)", () => {
+  test("'I've forgotten your birthday' is a forget claim with no outcome", () => {
+    expect(guardReply("I've forgotten your birthday.", ctx({ utterance: "forget my birthday please" })).reason).toBe("unsupported_action");
+  });
+  test("'that's cleared up' and 'it's gone' are not memory claims", () => {
+    expect(guardReply("Glad that's cleared up.", ctx({ utterance: "so the recital is Friday, not Thursday" })).reason).toBeNull();
+    expect(guardReply("The rain's gone for today.", ctx({ utterance: "is it still raining" })).reason).toBeNull();
+    expect(guardReply("I cleared that up with the school.", ctx({ utterance: "did you sort out the form" })).reason).not.toBe("unsupported_action");
+  });
+  // The second review's findings 8 and 9: a list or reminder claim is
+  // not answered with the forget family's line, and an admission of a
+  // gap is not a completed-forget claim.
+  test("'removed it from your list' and 'deleted your reminder' never get the forget line", () => {
+    const forgetLine = /say "forget that"/i;
+    expect(guardReply("I've removed it from your list.", ctx({ utterance: "remove milk from my list" })).reply ?? "").not.toMatch(forgetLine);
+    expect(guardReply("I've deleted your reminder.", ctx({ utterance: "delete my dentist reminder" })).reply ?? "").not.toMatch(forgetLine);
+    expect(guardReply("I've removed items you checked off.", ctx({ utterance: "clean up my list" })).reply ?? "").not.toMatch(forgetLine);
+    expect(guardReply("I've removed that from memory.", ctx({ utterance: "remove that from your memory" })).reason).toBe("unsupported_action");
+  });
+  test("'I forgot it was Tuesday' admits a gap and is not a forget claim", () => {
+    expect(guardReply("I forgot it.", ctx({ utterance: "forget my plans for Tuesday" })).reason).toBe("unsupported_action"); // the claim, same shape
+    expect(guardReply("I forgot it was Tuesday.", ctx({ utterance: "forget my plans for Tuesday" })).reason).toBeNull();
+    expect(guardReply("Sorry, I forgot what you said about Friday.", ctx({ utterance: "forget my plans for Friday" })).reason).toBeNull();
+    expect(guardReply("Right, I forgot that you mentioned that.", ctx({ utterance: "forget my plans for Friday" })).reason).toBeNull();
+    expect(guardReply("I've forgotten your name, sorry.", ctx({ utterance: "forget my plans for Friday" })).reason).toBeNull();
+  });
+});
+
 describe("capability claims (bot-legacy: claimed_action/accepted_request)", () => {
   test("a claimed action on a request is replaced - 'I've added milk to your list' (CHAT-04: a completed claim with no list-add outcome is unsupported_action)", () => {
     const g = guardReply("I've added milk to your list.", ctx({ utterance: "add milk to my list on my phone" }));
