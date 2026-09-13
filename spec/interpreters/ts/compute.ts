@@ -38,6 +38,41 @@ limitedMath.import(
 
 export class ComputeError extends Error {}
 
+/** Turns spoken arithmetic into calculator symbols for mathjs.
+ * The math package's `calculate *` pattern hands the evaluator
+ * spoken text; #72 */
+export function normalizeSpokenMath(text: string): string {
+  // 1. Trim; drop a trailing "?" or "."; collapse repeated spaces
+  let result = text.trim().replace(/[?.]+$/, "").replace(/\s+/g, " ");
+
+  // 2. Multi-word expressions
+  result = result.replace(/\bmultiplied by\b/gi, "*");
+  result = result.replace(/\bdivided by\b/gi, "/");
+  result = result.replace(/\bto the power of\b/gi, "^");
+
+  // 3. Single words
+  result = result.replace(/\bplus\b/gi, "+");
+  result = result.replace(/\bminus\b/gi, "-");
+  result = result.replace(/\btimes\b/gi, "*");
+  // Only replace "over" when it's between digits or parentheses
+  result = result.replace(/(?<=[\d)])\s+over\s+(?=[\d(])/gi, "/");
+
+  // 4. The letter "x" as multiplication sign
+  result = result.replace(/(?<=\d)\s*x\s*(?=\d)/g, "*");
+
+  // 5. Squared and cubed
+  result = result.replace(/(\d+(?:\.\d+)?|\([^)]+\))\s+squared/gi, "$1^2");
+  result = result.replace(/(\d+(?:\.\d+)?|\([^)]+\))\s+cubed/gi, "$1^3");
+
+  // 6. Percent of
+  result = result.replace(/(\d+(?:\.\d+)?)\s+percent\s+of\s+(\d+(?:\.\d+)?)/gi, "($1/100)*$2");
+
+  // 7. Percent alone
+  result = result.replace(/\b(\d+(?:\.\d+)?)\s+percent\b/gi, "($1/100)");
+
+  return result;
+}
+
 /** Evaluates one `compute` step's expression (already `{variable}`-
  * interpolated by the caller) and returns a display string - mathjs's
  * own `.toString()` on a `Unit` result already renders "7.5 km"-style
@@ -52,7 +87,8 @@ export class ComputeError extends Error {}
 // floating-point exactness.
 const DISPLAY_PRECISION = 6;
 
-export function evaluateExpression(expression: string): string {
+export function evaluateExpression(rawExpression: string): string {
+  const expression = normalizeSpokenMath(rawExpression);
   try {
     const result: unknown = limitedMath.evaluate(expression);
     if (typeof result === "number" || typeof result === "bigint") return limitedMath.format(result, { precision: DISPLAY_PRECISION });
