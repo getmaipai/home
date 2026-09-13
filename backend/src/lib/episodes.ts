@@ -432,16 +432,42 @@ function cutAtWord(text: string, max: number): string {
  * boundary, the whole block capped. Empty string for no matches. */
 export function formatEpisodesForPrompt(matches: EpisodeMatch[], displayName: string, locale: string, now: Date = new Date()): string {
   if (matches.length === 0) return "";
-  const dateFmt = new Intl.DateTimeFormat(locale || "en-US", { month: "short", day: "numeric" });
   const lines = [EPISODES_HEADER];
   for (const m of matches) {
-    const when = new Date(m.episode.createdAt);
-    const days = Math.max(0, Math.floor((now.getTime() - when.getTime()) / DAY_MS));
-    const ago = days === 0 ? "today" : days === 1 ? "yesterday" : `${days} days ago`;
-    const who = m.episode.speaker === "user" ? `${displayName} said` : "you replied";
-    const line = `- ${dateFmt.format(when)} (${ago}), ${who}: "${cutAtWord(m.episode.text, QUOTE_MAX_CHARS)}"`;
+    const line = formatEpisodeLine(m, displayName, locale, now);
     if ([...lines, line].join("\n").length > PROMPT_BLOCK_MAX_CHARS) break;
     lines.push(line);
   }
   return lines.length === 1 ? "" : lines.join("\n");
+}
+
+/** One episode's own line, as the block above renders it (CHAT-01: the
+ * turn context records this exact text per episode so inclusion in the
+ * prompt can be checked, and the guard grounds on the quoted text as
+ * shown, cut where the prompt cut it). */
+export function formatEpisodeLine(m: EpisodeMatch, displayName: string, locale: string, now: Date = new Date()): string {
+  const dateFmt = shortDateFormat(locale || "en-US");
+  const when = new Date(m.episode.createdAt);
+  const days = Math.max(0, Math.floor((now.getTime() - when.getTime()) / DAY_MS));
+  const ago = days === 0 ? "today" : days === 1 ? "yesterday" : `${days} days ago`;
+  const who = m.episode.speaker === "user" ? `${displayName} said` : "you replied";
+  return `- ${dateFmt.format(when)} (${ago}), ${who}: "${episodeQuote(m)}"`;
+}
+
+// One formatter per locale (a code review: this ran per episode and now
+// runs twice per episode, once for the block and once for the turn
+// context's evidence; turnEngine.ts caches its own for the same reason).
+const shortDateFormats = new Map<string, Intl.DateTimeFormat>();
+function shortDateFormat(locale: string): Intl.DateTimeFormat {
+  let fmt = shortDateFormats.get(locale);
+  if (!fmt) {
+    fmt = new Intl.DateTimeFormat(locale, { month: "short", day: "numeric" });
+    shortDateFormats.set(locale, fmt);
+  }
+  return fmt;
+}
+
+/** The quoted text the prompt shows for an episode. */
+export function episodeQuote(m: EpisodeMatch): string {
+  return cutAtWord(m.episode.text, QUOTE_MAX_CHARS);
 }

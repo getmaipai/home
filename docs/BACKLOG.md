@@ -49,7 +49,14 @@ not permission to expand scope.
 
 <a id="chat-01"></a>
 
-- [ ] **CHAT-01: Share the exact selected context with generation and guards** (M)
+- [x] **CHAT-01: Share the exact selected context with generation and guards** (M)
+
+    Status (2026-09-13, closed): `backend/src/lib/turnContext.ts` (the
+    ephemeral `TurnEvidence`/`TurnIntent`/`ToolExecutionOutcome`/
+    `TurnContext`), selection defined as what the render kept, the guard
+    input derived from the included evidence alone (`GuardContext.grounding`
+    for profile, summary, roster and clock), one frozen clock per turn,
+    outcomes pushed per resolved call. Details in docs/dev/session-a.md.
 
     Depends on: none. Files: `backend/src/lib/turnEngine.ts`, new
     `backend/src/lib/turnContext.ts`, `conversationHistory.ts`, `guards.ts`.

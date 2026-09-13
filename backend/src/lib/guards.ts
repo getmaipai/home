@@ -53,6 +53,12 @@ export interface GuardContext {
    * line said to the wrong question, and its words rarely share a stem
    * with the question that asked for it (a code review on JOIN-01). */
   episodes?: readonly string[];
+  /** CHAT-01: the other facts the prompt showed this turn (the profile
+   * paragraph, the conversation summary, the roster line, the local
+   * time), so a reply that repeats one passes grounding. Like
+   * `episodes`, never an `unrelated_recall` candidate: only a memory
+   * line said to the wrong question is that. */
+  grounding?: readonly string[];
   /** True only when a real package actually ran this turn - the one
    * thing that can make "I've added that" true rather than a claim
    * ahead of the fact. */
@@ -172,7 +178,7 @@ const DECLINE_RE =
 // uses) checked with `.has()` is real word-boundary matching, not a
 // substring scan.
 function groundedWords(ctx: GuardContext): Set<string> {
-  return tokenize([ctx.utterance, ...(ctx.sources ?? []), ...(ctx.episodes ?? []), ...(ctx.history ?? [])].join(" "));
+  return tokenize([ctx.utterance, ...(ctx.sources ?? []), ...(ctx.episodes ?? []), ...(ctx.grounding ?? []), ...(ctx.history ?? [])].join(" "));
 }
 
 // Narrow, specific invention SHAPES - each ported directly from a

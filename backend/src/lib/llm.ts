@@ -106,6 +106,10 @@ export interface ToolSpec {
 export interface ToolCall {
   tool: string;
   args: unknown;
+  /** The model's own call id from the wire (CHAT-01: kept so a
+   * ToolExecutionOutcome can name the call it answers); absent for a
+   * call built by a test or a stub without one. */
+  id?: string;
 }
 
 export function toToolDefinition(spec: ToolSpec): ToolDefinition {
@@ -127,7 +131,7 @@ function toolCallFromWire(wire: ToolCallWire): ToolCall {
   } catch {
     args = undefined;
   }
-  return { tool: wire.function.name, args };
+  return { tool: wire.function.name, args, ...(wire.id ? { id: wire.id } : {}) };
 }
 
 export interface LlmCompleteValue {

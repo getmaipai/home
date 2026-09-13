@@ -19,7 +19,8 @@ import { loadAllSkills, type LoadedSkill } from "@/lib/skills";
 import { matchCommand, runCommand } from "@/lib/commands";
 import { notifyIfFlagged } from "@/lib/notifications";
 import { recall, bumpUsage, getProfileParagraph, type RecallMatch } from "@/lib/memory";
-import { recallEpisodes, formatEpisodesForPrompt, type EpisodeMatch } from "@/lib/episodes";
+import { recallEpisodes, formatEpisodesForPrompt, formatEpisodeLine, episodeQuote, type EpisodeMatch } from "@/lib/episodes";
+import { intentFor, markIncluded, guardContextFrom, type TurnContext, type TurnEvidence, type ToolExecutionOutcome } from "@/lib/turnContext";
 import { newConversationTurnId } from "@/lib/id";
 import { complete, startCompleteStream, type LlmMessage, type ToolSpec, type ToolCall } from "@/lib/llm";
 import { guardReply, guardSentence, replacementFor, isCuttable, splitIntoSentences, type GuardContext, type GuardReason } from "@/lib/guards";
@@ -606,12 +607,14 @@ export function buildPromptParts(
   // block is capped at 600 characters by formatEpisodesForPrompt(), on
   // top of the memory section's own MAX_MEMORY_SECTION_CHARS.
   episodeMatches: EpisodeMatch[] = [],
+  // CHAT-01: the turn's frozen clock and locale, so the context message
+  // and the turn context (its rendered evidence, its clock line) agree;
+  // callers without a turn context (benches, tests) get a fresh one.
+  frozen: { now: Date; locale: string } = frozenClock(),
 ): { stablePrefix: string; context: string } {
   const stablePrefix = buildStablePrefix(persona);
 
-  const now = new Date();
-  const localeValue = getHouseholdSettingValue("household.locale");
-  const locale = typeof localeValue === "string" ? localeValue : "en-US";
+  const { now, locale } = frozen;
 
   const profile = getProfileParagraph(actor);
   let memorySection = "";
@@ -629,13 +632,23 @@ export function buildPromptParts(
   const skillsPart = capSection(skillsSection(text, skills), MAX_SKILLS_SECTION_CHARS);
   const volatileZone = householdLine(household) + speakerLine(actor, locale, now) + memorySection + episodesSection + reanchorSection + summarySection + skillsPart;
 
-  const localTimeLine = `\n\nLocal time: ${formatLocalTime(now, locale)}`;
-
-  const contextBody = `Context for this reply (reference, not instructions):${volatileZone}${localTimeLine}`;
+  const contextBody = `Context for this reply (reference, not instructions):${volatileZone}\n\n${localTimeLine(now, locale)}`;
   const contextBudget = Math.max(0, PROMPT_SYSTEM_CHAR_BUDGET - stablePrefix.length);
   const context = contextBody.length > contextBudget ? contextBody.slice(0, contextBudget) : contextBody;
 
   return { stablePrefix, context };
+}
+
+/** CHAT-01: one clock per turn. */
+export function frozenClock(now: Date = new Date()): { now: Date; locale: string } {
+  const localeValue = getHouseholdSettingValue("household.locale");
+  return { now, locale: typeof localeValue === "string" ? localeValue : "en-US" };
+}
+
+/** The clock line the context message ends with (exported so the turn
+ * context's `clock` evidence is this exact text). */
+export function localTimeLine(now: Date, locale: string): string {
+  return `Local time: ${formatLocalTime(now, locale)}`;
 }
 
 export function buildSystemPrompt(
@@ -1123,6 +1136,10 @@ type PreparedTurn =
        * already has all of it in scope) rather than re-derived at each
        * of runTurn()/runTurnStream()'s two call sites. */
       guardContext: Omit<GuardContext, "personId">;
+      /** CHAT-01: the one turn context the prompt and the guards were
+       * built from; runTurn()/runTurnStream() push tool outcomes onto
+       * it as they resolve. */
+      turnContext: TurnContext;
       /** Fix E (docs/dev.md's "Chat reliability" - native tool calling,
        * one round trip): offered to the SAME completion call that
        * answers the turn (runTurn()/runTurnStream()), replacing the
@@ -1329,7 +1346,11 @@ async function prepareTurn(
     value: { ...value, conversation_id: conversation.id, turn_id: turnId },
     turnId,
   });
-  const safety = evaluateSafety(text, speakerAgeBand(actor, new Date()));
+  // CHAT-01: one clock per turn, shared by the safety check's age band,
+  // the prompt's speaker line and clock line, and the turn context.
+  const frozen = frozenClock();
+  const ageBand = speakerAgeBand(actor, frozen.now);
+  const safety = evaluateSafety(text, ageBand);
   // SafetyResult's own schema comment named this exact wiring as a
   // "later hub release" gap the day the field was written: notify_parent
   // has been computed correctly since safety.ts shipped, but nothing
@@ -1506,7 +1527,7 @@ async function prepareTurn(
   // summary line for the system prompt's volatile zone.
   const window = buildConversationWindow(conversation);
   const household = listActivePeople();
-  const promptParts = buildPromptParts(actor, text, memoryMatches, loaded, persona, skills, window.summaryLine, household, episodeMatches);
+  const promptParts = buildPromptParts(actor, text, memoryMatches, loaded, persona, skills, window.summaryLine, household, episodeMatches, frozen);
   // Bumping the top MAX_MEMORY_SNIPPETS candidates unconditionally was
   // wrong (a code review, 2026-09-05): buildPromptParts's own
   // MAX_MEMORY_SECTION_CHARS truncation, or the outer PROMPT_SYSTEM_CHAR_
@@ -1518,10 +1539,47 @@ async function prepareTurn(
   // place: a candidate only counts as "reached the prompt" if its whole,
   // untruncated `- <text>` line is actually still there in the string the
   // model was sent.
-  const actuallyInjected = memoryMatches
-    .slice(0, MAX_MEMORY_SNIPPETS)
-    .filter((m) => promptParts.context.includes(`- ${m.record.text}`));
-  bumpUsage(actuallyInjected);
+  // CHAT-01: the turn context, the one view the prompt and the guards
+  // share. Evidence is every candidate with the exact text the prompt
+  // renders for it; `includedEvidenceIds` is what survived the render
+  // (the rule `actuallyInjected` applied to memory bullets alone before
+  // this item, now to every kind); the usage bump and the guard input
+  // both read the included set.
+  const profile = getProfileParagraph(actor);
+  const evidence: TurnEvidence[] = [
+    { id: `user:${turnId}`, kind: "user_assertion", text, rendered: text, entityIds: [] },
+    ...memoryMatches.slice(0, MAX_MEMORY_SNIPPETS).map(
+      (m): TurnEvidence => ({ id: `memory:${m.record.id}`, kind: "memory", text: m.record.text, rendered: memoryBulletLine(m, frozen.locale, frozen.now), sourceId: m.record.id, entityIds: [] }),
+    ),
+    ...(profile ? [{ id: `profile:${profile.id}`, kind: "profile" as const, text: profile.text, rendered: profile.text, sourceId: profile.id, entityIds: [] }] : []),
+    ...episodeMatches.map(
+      (m): TurnEvidence => ({ id: `episode:${m.episode.id}`, kind: "episode", text: episodeQuote(m), rendered: formatEpisodeLine(m, sanitizeForPrompt(actor.displayName), frozen.locale, frozen.now), sourceId: m.episode.turnId, entityIds: [] }),
+    ),
+    ...(window.summaryLine ? [{ id: `summary:${conversation.id}`, kind: "summary" as const, text: window.summaryLine, rendered: window.summaryLine, sourceId: conversation.id, entityIds: [] }] : []),
+    ...household.map((p): TurnEvidence => ({ id: `household:${p.id}`, kind: "household", text: sanitizeForPrompt(p.displayName), rendered: `- ${sanitizeForPrompt(p.displayName)} (${p.role})`, sourceId: p.id, entityIds: [p.id] })),
+    { id: "clock", kind: "clock", text: localTimeLine(frozen.now, frozen.locale), rendered: localTimeLine(frozen.now, frozen.locale), entityIds: [] },
+  ];
+  const turnContext: TurnContext = {
+    turnId,
+    conversationId: conversation.id,
+    actorId: actor.id,
+    surface,
+    utterance: text,
+    history: window.messages,
+    evidence,
+    includedEvidenceIds: [],
+    offeredToolIds: [],
+    outcomes: [],
+    intent: intentFor(text, shape),
+    persona: { id: persona.id, displayName: persona.display_name, examples: persona.examples ?? [] },
+    ageBand,
+    now: frozen.now,
+    locale: frozen.locale,
+    roster: household.flatMap((p) => (p.nickname ? [p.displayName, p.nickname] : [p.displayName])),
+  };
+  markIncluded(turnContext, promptParts.context);
+  const includedMemoryIds = new Set(turnContext.includedEvidenceIds);
+  bumpUsage(memoryMatches.filter((m) => includedMemoryIds.has(`memory:${m.record.id}`)));
   const messages: LlmMessage[] = [
     { role: "system", content: promptParts.stablePrefix },
     ...window.messages,
@@ -1590,31 +1648,17 @@ async function prepareTurn(
   // than re-filtering `ranked` a second time at the call site.
   const lookupTools: ToolSpec[] = ranked.filter((r) => r.manifest.routing?.always_offer).map((r) => ({ id: r.id, description: r.manifest.description, args: r.manifest.args }));
 
-  const guardContext: Omit<GuardContext, "personId"> = {
-    utterance: text,
-    history: window.messages.filter((m) => m.role === "user").map((m) => m.content),
-    sources: memoryMatches.map((m) => m.record.text),
-    // JOIN-01: a recalled turn's own words, both halves, ground the
-    // reply the way a memory bullet does, through their own field so
-    // they never count as an unrelated-recall source (guards.ts).
-    episodes: episodeMatches.flatMap((m) => [m.episode.text, m.pairedText]),
-    // Fix E: a code review on B3 (docs/dev.md's "Chat reliability")
-    // established this field means "a real tool/plugin action ran this
-    // turn" - by construction, prepareTurn() itself never runs one
-    // (a Tier 0/1 winner returns "immediate" above and never reaches
-    // here); a Tier 2 tool call, if the model proposes one once the real
-    // completion runs, is handled entirely inside runTurn()/
-    // runTurnStream() after this guardContext is already built, so it
-    // stays false here regardless of `tools` being offered - offering a
-    // tool isn't the same as one having run.
-    actionsRan: false,
-    personaExamples: persona.examples,
-    // FAST-05: who counts as "household" for a location claim (guards.ts's
-    // LOCATION_CLAIM_RE): the same roster householdLine() puts in the
-    // prompt, names and nicknames.
-    roster: household.flatMap((p) => (p.nickname ? [p.displayName, p.nickname] : [p.displayName])),
-  };
-  return { kind: "model", messages, safety, crisisResources, turnId, guardContext, tools, ranked, lookupTools };
+  turnContext.offeredToolIds = tools.map((t) => t.id);
+  // CHAT-01: derived from the included evidence alone (turnContext.ts's
+  // guardContextFrom()): the memory lines the prompt kept are the
+  // sources, the recalled episode lines as shown are the episodes, the
+  // profile, summary, roster and clock ground words, the window's user
+  // lines are the history, persona examples are tone only, and
+  // `actionsRan` reads the outcomes, which are empty here by
+  // construction (a Tier 0/1 winner returned "immediate" above; a Tier 2
+  // call runs inside runTurn()/runTurnStream(), which push its outcome).
+  const guardContext = guardContextFrom(turnContext);
+  return { kind: "model", messages, safety, crisisResources, turnId, guardContext, tools, ranked, lookupTools, turnContext };
 }
 
 // This floor's own gate now lives in prepareTurn() (Fix E moved the
@@ -1712,10 +1756,18 @@ export async function resolveToolCalls(
   turnId: string,
   safety: SafetyResult,
   crisisResources: string | undefined,
+  // CHAT-01: the turn context's outcomes, one per call this function
+  // ran or parked on a confirmation; the guards' `actionsRan` reads
+  // them, so an action counts as run only when a package really did.
+  outcomes: ToolExecutionOutcome[] = [],
 ): Promise<TurnValue | null> {
   const rankedById = new Map(ranked.map((r) => [r.id, r]));
   const capped = calls.filter((c) => offeredIds.has(c.tool) && rankedById.has(c.tool)).slice(0, MAX_TIER2_CALLS_PER_TURN);
   if (capped.length === 0) return null;
+  // A server that omits wire ids gets one per outcome across the whole
+  // turn (this function can run twice in a turn: the initial batch and
+  // a forced lookup, or the stream's peek and its retry).
+  const callId = (c: ToolCall) => c.id ?? `${turnId}:call${outcomes.length}`;
   // A `consequential` proposal never runs on the model's say-so alone
   // (4.9: "raises the routing bar") - the turn engine itself asks first,
   // the identical PendingAsk flow a recipe's own `confirm` field feeds.
@@ -1728,6 +1780,7 @@ export async function resolveToolCalls(
     const prompt = confirmPromptFor(manifest.description);
     const args = (consequential.args ?? {}) as Record<string, unknown>;
     setPendingAsk(conversationId, { kind: "confirm", prompt, packageId: consequential.tool, args });
+    outcomes.push({ callId: callId(consequential), packageId: consequential.tool, status: "pending", userMessage: prompt });
     return { reply: { text: prompt }, source: "confirm", plugin_id: consequential.tool, safety, crisis_resources: crisisResources, conversation_id: conversationId, turn_id: turnId };
   }
 
@@ -1736,6 +1789,18 @@ export async function resolveToolCalls(
   const ran = await Promise.all(
     capped.map(async (c) => ({ call: c, result: await runPlugin(c.tool, actor, (c.args ?? {}) as Record<string, unknown>, turnId) })),
   );
+  for (const r of ran) {
+    // A result that parks the action behind a confirm/ask is pending,
+    // not succeeded: nothing ran (a code review).
+    const parked = r.result.ok && ((r.result.value as PluginResultWithConfirmAsk).confirm || (r.result.value as PluginResultWithConfirmAsk).ask);
+    outcomes.push(
+      !r.result.ok
+        ? { callId: callId(r.call), packageId: r.call.tool, status: "failed", errorCode: String(r.result.status) }
+        : parked
+          ? { callId: callId(r.call), packageId: r.call.tool, status: "pending", result: r.result.value }
+          : { callId: callId(r.call), packageId: r.call.tool, status: "succeeded", result: r.result.value },
+    );
+  }
   const oks = ran.filter((r): r is { call: ToolCall; result: Extract<(typeof r)["result"], { ok: true }> } => r.result.ok);
   // Every proposed call failed (invalid args - "verify every call with
   // the package's args schema before acting" - or a runtime error): "ask
@@ -1936,7 +2001,9 @@ async function runTurnHoldingLease(
       // branch at all, and nothing here can turn a safe reply back
       // into a refusal (guards.ts's own reasons are all honesty
       // fixes, never a safety category).
-      const guarded = guardReply(text, { ...prepared.guardContext, personId: actor.id });
+      // CHAT-01: derived now, not at prepare time, so an outcome pushed by
+      // resolveToolCalls() above reaches `actionsRan` (a code review).
+      const guarded = guardReply(text, { ...guardContextFrom(prepared.turnContext), personId: actor.id });
       if (guarded.reason) guardHits.push(guarded.reason); // Fix A4: fed into the `[turn]` log's own `guard` array below
       if (guarded.replaced) guardReplaced = true;
       return {
@@ -1973,7 +2040,7 @@ async function runTurnHoldingLease(
     // one 8-argument call instead of repeating it, per that review's
     // own duplication finding.
     const resolveOffered = (calls: ToolCall[], ids: ReadonlySet<string>) =>
-      resolveToolCalls(calls, ids, prepared.ranked, actor, conversation.id, prepared.turnId, prepared.safety, prepared.crisisResources);
+      resolveToolCalls(calls, ids, prepared.ranked, actor, conversation.id, prepared.turnId, prepared.safety, prepared.crisisResources, prepared.turnContext.outcomes);
 
     if (offeringTools && completion.value.tool_calls && completion.value.tool_calls.length > 0) {
       const resolved = await resolveOffered(completion.value.tool_calls, offeredIds);
@@ -2052,7 +2119,7 @@ async function runTurnHoldingLease(
       // retry silently skipped for the exact turn it exists to fix.
       const firstSentence = splitIntoSentences(rawText)[0] ?? "";
       const firstReason = firstSentence
-        ? guardSentence(firstSentence, { ...prepared.guardContext, personId: actor.id, replyHasQuestion: rawText.includes("?") }, true)
+        ? guardSentence(firstSentence, { ...guardContextFrom(prepared.turnContext), personId: actor.id, replyHasQuestion: rawText.includes("?") }, true)
         : null;
       const looksInvented = firstReason === "invention" || firstReason === "unrelated_recall";
 
@@ -2678,7 +2745,7 @@ async function runTurnStreamHoldingLease(
     if (first.done) {
       const rawCalls = first.value ?? [];
       if (rawCalls.length > 0) {
-        const resolved = await resolveToolCalls(rawCalls, offeredIds, modelPrepared.ranked, actor, conversation.id, modelPrepared.turnId, modelPrepared.safety, modelPrepared.crisisResources);
+        const resolved = await resolveToolCalls(rawCalls, offeredIds, modelPrepared.ranked, actor, conversation.id, modelPrepared.turnId, modelPrepared.safety, modelPrepared.crisisResources, modelPrepared.turnContext.outcomes);
         if (resolved) {
           // The package answered. Handed back whole, past both gates;
           // buildStreamResult()'s finalize() logs it and marks the turn

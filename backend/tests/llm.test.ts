@@ -94,7 +94,7 @@ describe("lib/llm.ts complete() with tools (Fix E: native tool calling)", () => 
     );
     expect(result.ok).toBe(true);
     if (!result.ok) return;
-    expect(result.value.tool_calls).toEqual([{ tool: "weather", args: { place: "Seattle" } }]);
+    expect(result.value.tool_calls).toEqual([{ tool: "weather", args: { place: "Seattle" }, id: "call-1" }]); // CHAT-01: the wire's own call id rides along
   });
 
   test("two independent calls in one reply both parse", async () => {
@@ -127,7 +127,7 @@ describe("lib/llm.ts complete() with tools (Fix E: native tool calling)", () => 
     );
     expect(result.ok).toBe(true);
     if (!result.ok) return;
-    expect(result.value.tool_calls).toEqual([{ tool: "weather", args: undefined }]);
+    expect(result.value.tool_calls).toEqual([{ tool: "weather", args: undefined, id: "call-1" }]);
   });
 
   test("tool_choice is sent through to the request verbatim", async () => {
@@ -260,7 +260,7 @@ describe("lib/llm.ts startCompleteStream() with tools (Fix E: native tool callin
         if (!started.ok) return;
         const step = await started.tokens.next();
         expect(step.done).toBe(true); // no text deltas at all for a tool-calling reply
-        expect(step.value).toEqual([{ tool: "weather", args: { place: "Seattle" } }]);
+        expect(step.value).toEqual([{ tool: "weather", args: { place: "Seattle" }, id: "call-1" }]);
       },
     );
   });
