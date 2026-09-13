@@ -12766,6 +12766,11 @@ other's section once (147cd28, f4779a6).
   clearance Shell.tsx already reserves for it), proven to fail then
   fixed with a real-layout check in scripts/screenshot.ts:
   [docs/dev/session-b.md](dev/session-b.md) (2026-09-13).
+- BENCH-01, the live conversation bench pins llama-server's sampler
+  seed and the prompt's clock (a bench-only pin, production unseeded),
+  records both in its header, and measures the residual run-to-run
+  variance by row: [docs/dev/session-a.md](dev/session-a.md)
+  (2026-09-13).
 - Item 4c, the household invention guard reads a present activity for
   a roster name, the second person or a pronoun ("Sage is watching it
   too!"), grounded only by a line that says so about that subject: <!-- prose-lint: allow -->

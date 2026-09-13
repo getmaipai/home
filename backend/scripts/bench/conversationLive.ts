@@ -6,7 +6,9 @@
 // hard-row verdicts and the ranked failures. Not part of check.sh: a
 // bench run on demand, `bun run scripts/bench/conversation.ts --live`,
 // with MAIPAI_DATA_DIR (fresh, under the temp root), MAIPAI_LLAMA_SERVER_URL,
-// MAIPAI_EMBED_URL and MAIPAI_BACKGROUND_URL (the judge) set.
+// MAIPAI_EMBED_URL and MAIPAI_BACKGROUND_URL (the judge) set. The
+// sampler seed is pinned (BENCH-01, below): `--seed N` for another,
+// `--seed none` for the household's own dice.
 //
 // Import order matters: the recording proxy has to sit in front of the
 // chat engine before setup.ts reads MAIPAI_LLAMA_SERVER_URL, and
@@ -35,6 +37,39 @@ const { __setTurnActivityClockForTests } = await import("@/lib/turnActivity");
 const { getBackgroundClient, probeBackgroundEngine } = await import("@/lib/backgroundSupervisor");
 const { loadAllManifests, ordinaryToolIds } = await import("@/lib/turnEngine");
 const { CHAT_SAMPLING } = await import("@/lib/llm");
+const { __setSamplingSeedForBench, __setPromptClockForBench } = await import("@/lib/benchSampling");
+
+// BENCH-01 (docs/plans/baseline-fixes-2026-09-13.md item 5): the
+// sampler seed is pinned for every chat and judge request, so two runs
+// on the same commit answer the same way and a row that flips between
+// them is a change in the code, not the dice. `--seed N` picks another
+// one (a run with a different seed is allowed to differ, and the header
+// says which seed it ran); `--seed none` runs unpinned, the way the
+// household's own hub samples.
+const DEFAULT_BENCH_SEED = 20260913;
+function benchSeedFromArgv(argv: readonly string[]): number | null {
+  const at = argv.indexOf("--seed");
+  if (at === -1) return DEFAULT_BENCH_SEED;
+  const raw = argv[at + 1];
+  if (raw === "none") return null;
+  // A whole non-negative integer only (the review of this diff: parseInt
+  // took "12abc" as 12, and a negative seed is llama-server's own
+  // "random" sentinel once it lands in a uint32, an unpinned run under a
+  // header claiming a pin). A bare `--seed` is a mistake, not "none".
+  if (raw === undefined || !/^\d+$/.test(raw) || Number(raw) > 0xfffffffe) {
+    console.error(`bench setup refused: --seed wants a whole number below 4294967295, or "none"; got "${raw ?? ""}"`);
+    process.exit(2);
+  }
+  return Number(raw);
+}
+const benchSeed = benchSeedFromArgv(process.argv);
+__setSamplingSeedForBench(benchSeed);
+// The prompt's "Local time" line is pinned with the seed (a run's
+// prompts must be the same tokens as the last run's, or the seed buys
+// nothing); the instant is the fixture's own day at noon, whatever day
+// the run happens on. Unpinned when the seed is.
+const BENCH_PROMPT_INSTANT = new Date(2026, 8, 13, 12, 0, 0);
+if (benchSeed !== null) __setPromptClockForBench(() => BENCH_PROMPT_INSTANT);
 const { __resetEmbedSupervisorForTests } = await import("@/lib/embedSupervisor");
 
 interface EngineProps {
@@ -109,7 +144,24 @@ async function main(): Promise<{ executed: number; engine: string }> {
     chat: { url: upstream, build: chat.build_info ?? "n/a", model: chat.model_path ?? "n/a", sha256: await sha256Of(chat.model_path) },
     judge: { url: process.env.MAIPAI_BACKGROUND_URL, build: background.build_info ?? "n/a", model: background.model_path ?? "n/a", sha256: await sha256Of(background.model_path) },
     embed: { url: process.env.MAIPAI_EMBED_URL, build: embed.build_info ?? "n/a", model: embed.model_path ?? "n/a", sha256: await sha256Of(embed.model_path) },
-    sampling: { hub: CHAT_SAMPLING, engineDefaults: chat.default_generation_settings?.params ?? {} },
+    sampling: {
+      hub: CHAT_SAMPLING,
+      engineDefaults: chat.default_generation_settings?.params ?? {},
+      // The pinned seed, on every chat and judge request of this run;
+      // two runs with the same seed on the same commit are expected to
+      // produce the same pass set, a different seed may differ.
+      seed: benchSeed,
+      promptClock: benchSeed === null ? "unpinned" : BENCH_PROMPT_INSTANT.toISOString(),
+      // Memory and episode lines render their own created_at against
+      // the real calendar ("as of Sep 13"), which the pin does not reach,
+      // so the expectation holds for runs on the same day.
+      seedNote:
+        benchSeed === null
+          ? "unpinned: the sampler's own dice, runs are not comparable row by row"
+          : benchSeed === DEFAULT_BENCH_SEED
+            ? "the default seed; the same pass set is expected from another run of this commit on the same day"
+            : "a chosen seed; may differ from a default-seed run of this commit",
+    },
     ordinaryTools: ordinaryToolIds(loadAllManifests(), { byPlugin: [] }),
     fixtures: CONVERSATIONS.map((c) => c.id),
   };
@@ -163,7 +215,7 @@ async function main(): Promise<{ executed: number; engine: string }> {
   runner.cleanupBenchPeople(people); // after the output: the table is the run's product, the cleanup a courtesy
   __resetEmbedSupervisorForTests();
   console.log(`\nturns ${scores.length}; median first delta ${Math.round(median(timed.map((s) => s.observed.firstDeltaMs!)))} ms; median total ${Math.round(median(scores.map((s) => s.observed.totalMs)))} ms; wall ${Math.round((Date.now() - started) / 1000)} s`);
-  return { executed: scores.length, engine: `chat ${header.chat.build} ${header.chat.model}; judge ${header.judge.model}` };
+  return { executed: scores.length, engine: `chat ${header.chat.build} ${header.chat.model}; judge ${header.judge.model}; seed ${benchSeed ?? "none"}` };
 }
 
 let summary = { executed: 0, engine: "" };

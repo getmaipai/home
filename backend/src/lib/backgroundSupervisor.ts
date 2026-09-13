@@ -22,6 +22,7 @@ import { assertNotInCrashBootHold } from "@/lib/dirtyBoot";
 import { backgroundModelPath, ensureBackgroundModel } from "@/lib/backgroundAssets";
 import { LlamaServerClient } from "@maipai/spec/llm/ts/client.js";
 import { startStubLlmServer } from "@maipai/spec/llm/ts/stubServer.js";
+import { seedFields } from "@/lib/benchSampling";
 
 export type BackgroundBackendKind = "url" | "spawned" | "stub";
 
@@ -189,6 +190,7 @@ export async function completeBackground(
       model: "background",
       messages,
       temperature: opts?.temperature,
+      ...seedFields(),
       max_tokens: opts?.max_tokens ?? 1024,
       response_format: opts?.response_format as any,
       chat_template_kwargs: { enable_thinking: false },

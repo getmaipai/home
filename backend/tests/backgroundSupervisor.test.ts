@@ -46,6 +46,31 @@ describe("backgroundSupervisor getBackgroundClient()", () => {
 });
 
 describe("backgroundSupervisor completeBackground()", () => {
+  // BENCH-01: the bench's pinned seed reaches the judge's requests too,
+  // and an unpinned request carries none.
+  test("carries the bench's pinned sampler seed, and none otherwise", async () => {
+    const { startStubLlmServer } = await import("@maipai/spec/llm/ts/stubServer.js");
+    const { __setSamplingSeedForBench } = await import("@/lib/benchSampling");
+    const seen: Array<number | undefined> = [];
+    const stub = startStubLlmServer(0, {
+      scriptedChatReply: (request) => {
+        seen.push(request.seed);
+        return undefined;
+      },
+    });
+    process.env.MAIPAI_BACKGROUND_URL = stub.url;
+    try {
+      const { completeBackground } = await import("@/lib/backgroundSupervisor");
+      expect((await completeBackground([{ role: "user", content: "hello" }])).ok).toBe(true);
+      __setSamplingSeedForBench(7);
+      expect((await completeBackground([{ role: "user", content: "hello" }])).ok).toBe(true);
+      expect(seen).toEqual([undefined, 7]);
+    } finally {
+      __setSamplingSeedForBench(null);
+      stub.stop();
+    }
+  });
+
   test("returns unavailable when the background URL is dead", async () => {
     process.env.MAIPAI_BACKGROUND_URL = "http://127.0.0.1:9999";
     const result = await import("@/lib/backgroundSupervisor").then((m) => m.completeBackground([{ role: "user", content: "hello" }]));

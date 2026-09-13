@@ -243,6 +243,32 @@ describe("lib/llm.ts chat sampling (FAST-06)", () => {
     expect(request.min_p).toBeUndefined();
     expect(request.xtc_probability).toBeUndefined();
   });
+
+  // BENCH-01 (docs/plans/baseline-fixes-2026-09-13.md item 5): the
+  // sampler seed is a bench affordance. Nothing in the app pins it, so
+  // a plain request carries none; the bench's pin puts it on every
+  // chat request, streamed or not, beside the samplers.
+  test("no seed unless the bench pins one; the pin rides on plain and streamed requests and comes off with null", async () => {
+    const { __setSamplingSeedForBench } = await import("@/lib/benchSampling");
+    try {
+      const plain = await capture(() => complete("chat", [{ role: "user", content: "hi" }]));
+      expect(plain.seed).toBeUndefined();
+      __setSamplingSeedForBench(20260913);
+      const pinned = await capture(() => complete("chat", [{ role: "user", content: "hi" }]));
+      expect(pinned.seed).toBe(20260913);
+      expect(pinned.temperature).toBe(CHAT_SAMPLING.temperature); // the samplers stay; only the dice are fixed
+      const streamed = await capture(async () => {
+        const started = await startCompleteStream("chat", [{ role: "user", content: "hi" }]);
+        if (started.ok) for await (const _delta of started.tokens) void _delta;
+      });
+      expect(streamed.seed).toBe(20260913);
+      __setSamplingSeedForBench(null);
+      const unpinned = await capture(() => complete("chat", [{ role: "user", content: "hi" }]));
+      expect(unpinned.seed).toBeUndefined();
+    } finally {
+      __setSamplingSeedForBench(null);
+    }
+  });
 });
 
 describe("lib/llm.ts startCompleteStream() with tools (Fix E: native tool calling)", () => {

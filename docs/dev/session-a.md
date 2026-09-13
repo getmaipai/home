@@ -3105,3 +3105,83 @@ findings), all taken. The live check is the film row's
 opening turn (world-knowledge-film#1, `guard: null`), which the
 seeded bench (item 5, BENCH-01) makes measurable; the three-run
 acceptance for 4c is taken there.
+
+## BENCH-01: the live bench pins its sampling (2026-09-13)
+
+Twenty rows flipped between three runs of 4b's bench on the same code,
+so "three identical runs" was measurable only for the row an item
+targeted. The chat request carried temperature 0.7 and no seed;
+llama-server takes a per-request `seed`, and on an idle engine it is
+exact: three seeded requests with the same prompt answered "Silvery,
+sly, and shadowy." three times, two unseeded ones "Cunning, sly, and
+elusive." and "Cunning, sly, elusive.".
+
+The mechanism is a process-level pin (`lib/benchSampling.ts`), because
+the bench drives real turns through `runTurnStream()` and nothing
+threads a per-call option from there to `llm.ts`: `seedFields()` is
+spread onto every chat request (plain and streamed, beside the
+samplers, which stay on) and every judge request in
+`backgroundSupervisor.ts`; the app never sets it, so production chat
+stays at 0.7 unseeded. `seed?: number` joined `ChatCompletionRequest`
+in `spec/llm/ts/types.ts` (additive). The live bench pins 20260913 by
+default, `--seed N` picks another (a whole number below 4294967295:
+a negative one is llama-server's own "random" sentinel once it lands
+in a uint32, and a bare `--seed` is refused rather than read as
+"none"), `--seed none` runs unpinned, and
+the run header records `sampling.seed`, `sampling.promptClock` and a
+`seedNote` saying what to expect; the finish line names the seed.
+
+The first two same-seed runs still differed from the first turn on:
+the context message ends with "Local time: ..." to the minute, so the
+two runs sent different tokens and the seed bought nothing. The bench
+now pins the prompt's clock beside the seed (`promptNow()` in
+`benchSampling.ts`, read by `frozenClock()`; the fixture's own day at
+noon, whatever day the run happens). With both pinned, two runs on
+3938a3c plus this change (chat qwen3-8b-instruct q4_k_m on llama-server
+b10797, judge qwen3-1.7b q8_0, embed nomic; seed 20260913): 128 and
+127 of 159; 15 of 47 conversations identical turn for turn
+(correction-then-recall, edit-then-recall, ordinary-question,
+general-knowledge, list-then-follow-up, polite-command,
+greeting-and-thanks, fact-asked-next-day, credential-disclosure,
+cross-person-recall, consequential-once, never-mind-cancels,
+abstention, memory-driven-prompt, say-that-again); 75 of 159 replies
+differ somewhere; the rows that flip pass/fail are
+clarify-only-when-ambiguous#1 and #2, feeling-before-task#1,
+prior-reply-grounding#5, pronoun-follow-up#1, asks-back#1,
+coworker-likes-seltzer#3, household-location#1 and
+never-mind-on-an-ask#3. So the seed is honored and the residual
+variance is the finding, not a failure, with these sources named:
+the five world-knowledge conversations call SearXNG live, and the
+web's results are not the same twice; timer-then-follow-up and
+interruption read real time ("four minutes left", the interrupt
+landing mid-stream); the judge's extraction prompt carries an example
+future date at millisecond precision (`exampleFutureDate` in
+`buildExtractionPrompt`, six days after the turn's own timestamp), so
+no two judge prompts are the same tokens and the memory text the
+judge writes can differ ("Pippa is allergic to peanuts" against "Sage
+mentioned that Pippa is allergic to peanuts"), which then changes the
+context of every later recall turn (that line also defeats the judge's
+own prompt cache on every turn; worth a date-only example, filed for
+the judge's owner rather than changed here); episode and recall lines
+render times relative to the real clock, and a memory bullet's "as of
+<date>" is the record's real `created_at`, which the pin does not
+reach, so the same-pass-set expectation is stated for runs on the same
+day; and llama-server's prompt
+cache reuses a prefix computed in an earlier batch, whose logits are
+not bit-identical to a fresh computation, so even the same tokens can
+sample differently at 0.7 once the cache states diverge. A fully
+identical pair needs a virtual clock through the whole system
+(timestamps, backdating, timers, the scheduler) and recorded web
+results; that is a program item, not this one.
+
+The third run, `--seed 4242`, is allowed to differ and its header says
+so ("a chosen seed; may differ from a default-seed run of this
+commit"): 124 of 159. Tests: the seed on plain and streamed chat requests and off with
+null (`llm.test.ts`), the seed on the judge's request
+(`backgroundSupervisor.test.ts`); the prompt clock's pin rides through
+`frozenClock()`, covered by the existing CHAT-01 clock tests.
+
+Seen once in a whole-file run of `turnEngine.test.ts` during 4c, not
+chased: "a top-ranked memory whose bullet line gets cut by the
+per-section budget is never bumped" failed, then passed on rerun and
+alone; an issue only if it shows again.

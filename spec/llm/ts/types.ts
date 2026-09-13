@@ -68,6 +68,11 @@ export interface ChatCompletionRequest {
   model: string;
   messages: ChatMessage[];
   temperature?: number;
+  /** llama-server's per-request sampler seed. The hub never sets it in
+   * production (variety comes from the sampler); the conversation bench
+   * pins one so two runs on the same commit answer the same way
+   * (BENCH-01, docs/plans/baseline-fixes-2026-09-13.md item 5). */
+  seed?: number;
   max_tokens?: number;
   /** Forwarded verbatim into the model's Jinja chat template. This
    * pass's one real use (llm.ts's `thinking` option): Qwen3's template

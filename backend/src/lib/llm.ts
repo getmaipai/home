@@ -18,6 +18,7 @@ import { getEmbedClient } from "@/lib/embedSupervisor";
 import { tryConsume } from "@/lib/rateLimiter";
 import { LlmClientError } from "@maipai/spec/llm/ts/client.js";
 import type { ChatRole, ChatCompletionRequest, ToolDefinition, ToolCallWire } from "@maipai/spec/llm/ts/types.js";
+import { seedFields } from "@/lib/benchSampling";
 
 // Session C step 0 (wave-2.md): a person every couple of seconds, burst
 // of a few - Session A's own per-person limit (its step 11) hadn't
@@ -279,6 +280,7 @@ export async function complete(
       // temperature (a code review caught the other order doing that).
       ...rest,
       ...chatSamplingFor(rest),
+      ...seedFields(),
       // A code review (2026-09-07) found `...rest` above still carries a
       // caller-supplied `response_format` through with nothing stopping
       // it from being sent alongside `tools` in the same request - no
@@ -365,6 +367,7 @@ export async function startCompleteStream(
           messages,
           ...rest,
           ...chatSamplingFor(rest),
+          ...seedFields(),
           // Same explicit precedence as complete()'s own fix: offering
           // tools always wins over a caller-supplied response_format.
           response_format: offering ? undefined : rest.response_format,

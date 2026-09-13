@@ -157,6 +157,31 @@ up" (CHAT-15 retains outcomes across turns), the next-day thread
 (F1), the judge writing nothing from "my coworker Quill likes seltzer"
 (step 3a; check the third-party-fact filter first).
 
+## 5. BENCH-01: the live bench pins its sampling (S)
+
+Twenty rows flipped between three runs of 4b's bench on the same
+code, so "three identical runs" was measurable only for the row an
+item targeted; the film and household rows (program step 5) are
+judged by that rule and cannot be while the sampler's dice decide
+them. `lib/llm.ts` sends chat at temperature 0.7 with no seed;
+llama-server takes a per-request `seed`. The bench (conversationLive)
+pins one seed for every chat and judge request of its run through a
+bench-only switch (`lib/benchSampling.ts`, read by `llm.ts` and
+`backgroundSupervisor.ts`; the app never sets it, production stays at
+0.7 unseeded), `--seed N` picks another, `--seed none` runs unpinned,
+and the run header records the seed and what to expect of it.
+Acceptance: two runs on the same commit with the same seed produce
+the same pass set (rows, not only totals); a third run with a
+different seed may differ and says so in its header. If pinning does
+not make two runs identical (llama-server's batching can still vary),
+the residual variance is reported by row name; that is a finding, not
+a failure.
+
+- [x] BENCH-01, verified at the commit that carries this line: see
+  [docs/dev/session-a.md](../dev/session-a.md) "BENCH-01" for the two
+  same-seed pass sets, the different-seed run, and the residual
+  variance by row.
+
 ## Filed, not fixed here
 
 - The timer follow-up ("how long is left on it") invented a remaining

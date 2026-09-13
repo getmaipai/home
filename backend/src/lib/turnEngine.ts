@@ -29,6 +29,7 @@ import { tokenize } from "@/lib/text";
 import { unspokenArgument, askPromptFor, isActionPackage } from "@/lib/unspokenArgs";
 import { COURTESY_PREFIX } from "@/lib/utteranceShape";
 import { FORGET_COMMAND_ID, forgetFromConversation, parseForgetCommand } from "@/lib/forgetCommand";
+import { promptNow } from "@/lib/benchSampling";
 import { sanitizeForPrompt } from "@/lib/promptSanitize";
 import {
   logTurn,
@@ -689,8 +690,8 @@ export function buildPromptParts(
   return { stablePrefix, context };
 }
 
-/** CHAT-01: one clock per turn. */
-export function frozenClock(now: Date = new Date()): { now: Date; locale: string } {
+/** CHAT-01: one clock per turn (the bench pins it: benchSampling.ts). */
+export function frozenClock(now: Date = promptNow()): { now: Date; locale: string } {
   const localeValue = getHouseholdSettingValue("household.locale");
   return { now, locale: typeof localeValue === "string" ? localeValue : "en-US" };
 }
