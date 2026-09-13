@@ -4,7 +4,7 @@
   "kind": "plugin",
   "category": "Fun",
   "display": "Joke",
-  "description": "A real dad joke on demand (2026-09-05, the third real plugin built on host.fetch), via icanhazdadjoke.com's free, no-key, family-friendly API.",
+  "description": "Tell a family-friendly dad joke.",
   "author": "MaiPai",
   "license": "AGPL-3.0",
   "homepage": "https://github.com/getmaipai/home",

@@ -4,7 +4,7 @@
   "kind": "plugin",
   "category": "Info",
   "display": "On This Day",
-  "description": "What happened on this day in history (2026-09-06, step 7) - one of the almanac's five small lookups (legacy had five separate tools for this), via Wikipedia's own free public 'on this day' feed.",
+  "description": "Tell you something that happened on this day in history.",
   "author": "MaiPai",
   "license": "AGPL-3.0",
   "homepage": "https://github.com/getmaipai/home",

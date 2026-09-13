@@ -4,7 +4,7 @@
   "kind": "plugin",
   "category": "Info",
   "display": "Sports Scores",
-  "description": "Today's MLB scores (2026-09-06, step 7), via statsapi.mlb.com - no API key. MLB only for now, no team preference setting exists yet.",
+  "description": "Read today's MLB baseball scores.",
   "author": "MaiPai",
   "license": "AGPL-3.0",
   "homepage": "https://github.com/getmaipai/home",

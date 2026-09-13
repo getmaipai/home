@@ -4,7 +4,7 @@
   "kind": "plugin",
   "category": "Info",
   "display": "News",
-  "description": "Top news headlines (2026-09-06, step 7), via NPR's own public RSS feed - no API key, no per-topic personalization.",
+  "description": "Read the top news headlines.",
   "author": "MaiPai",
   "license": "AGPL-3.0",
   "homepage": "https://github.com/getmaipai/home",

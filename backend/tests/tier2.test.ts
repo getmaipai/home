@@ -154,7 +154,10 @@ const RECALL_CANDIDATE: RankedCandidate = {
 const CONSEQUENTIAL_CANDIDATE: RankedCandidate = {
   id: "lock-front-door",
   score: 0.9,
-  manifest: { id: "lock-front-door", version: "0.1.0", kind: "plugin", category: "home", display: "Lock the front door", description: "lock the front door", consequential: true, args: {} } as never,
+  // FAST-03: the description is the real manifest shape (one imperative
+  // sentence with a period), so the confirm prompt built from it can be
+  // asserted as a grammatical question.
+  manifest: { id: "lock-front-door", version: "0.1.0", kind: "plugin", category: "home", display: "Lock the front door", description: "Lock the front door.", consequential: true, args: {} } as never,
 };
 
 /** Every test below offers exactly the candidates it ranks, matching
@@ -237,7 +240,9 @@ describe("resolveToolCalls() (Fix E: the model's own native tool_calls decision,
     const value = await resolveToolCalls(calls, offeredFrom(ranked), ranked, actor, conversationId, "turn-1", SAFE, undefined);
     expect(value?.source).toBe("confirm");
     expect(value?.plugin_id).toBe("lock-front-door");
-    expect(value?.reply.text).toContain("lock the front door");
+    // FAST-03: the description folded into one grammatical question,
+    // trailing period gone, first letter lowercased, nothing else changed.
+    expect(value?.reply.text).toBe("Do you want me to lock the front door?");
     // A real, pending confirmation actually got stored - the whole point
     // of not just answering "sure" and forgetting about it.
     const pending = getPendingAsk(conversationId);

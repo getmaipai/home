@@ -4,7 +4,7 @@
   "kind": "plugin",
   "category": "Utilities",
   "display": "Currency",
-  "description": "Converts between currencies (2026-09-06, step 7), via api.frankfurter.dev's free ECB-based exchange rates - no API key. Say \"exchange\", not \"convert\" (convert is physical units).",
+  "description": "Convert an amount between currencies at today's exchange rate.",
   "author": "MaiPai",
   "license": "AGPL-3.0",
   "homepage": "https://github.com/getmaipai/home",

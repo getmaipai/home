@@ -4,7 +4,7 @@
   "kind": "plugin",
   "category": "Info",
   "display": "Next Holiday",
-  "description": "The next upcoming public holiday (2026-09-06, step 7), via date.nager.at's free public holiday API. One of the almanac's five small lookups. US only for now.",
+  "description": "Look up the next public holiday.",
   "author": "MaiPai",
   "license": "AGPL-3.0",
   "homepage": "https://github.com/getmaipai/home",

@@ -4,7 +4,7 @@
   "kind": "plugin",
   "category": "Utilities",
   "display": "Math",
-  "description": "Evaluates a math expression (2026-09-06, step 7) - standard notation only (+ - * / ^, sqrt(), %), no network, via the compute step's restricted evaluator (step 4).",
+  "description": "Calculate a math expression.",
   "author": "MaiPai",
   "license": "AGPL-3.0",
   "homepage": "https://github.com/getmaipai/home",

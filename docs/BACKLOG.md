@@ -1198,7 +1198,14 @@ Track B: MEM-01, MEM-02, MEM-03, MEM-04, MEM-05. Then JOIN-01, JOIN-02.
 
 <a id="fast-03"></a>
 
-- [ ] **FAST-03: Package descriptions that a person would say, in the prompt and in confirm prompts** (S-M)
+- [x] **FAST-03: Package descriptions that a person would say, in the prompt and in confirm prompts** (S-M)
+
+    Status (2026-09-12, measured and closed): all 32 bundled manifests
+    carry one imperative sentence (catalog commits 9caebca and 2391831
+    for the six mirrored ones), the confirm prompt lowercases only the
+    first letter, and the tool-calling bench at 10 repeats matches the
+    before run (every positive 10/10, 0/50 false calls) after two copy
+    rewrites the bench forced. Details in the Track A section of dev.md.
 
     Depends on: FAST-02. Files: every `backend/packages/*/manifest.json`
     `description`, their catalog sources for mirrored packages (the

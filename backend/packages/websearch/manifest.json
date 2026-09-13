@@ -4,7 +4,7 @@
   "kind": "plugin",
   "category": "Utilities",
   "display": "Web Search",
-  "description": "Searches the web via a household-run SearXNG instance, then answers using the household's own local chat model. No SearXNG configured means no web search - never a scrape.",
+  "description": "Search the web through your own search server and sum up what it finds.",
   "author": "MaiPai",
   "license": "AGPL-3.0",
   "homepage": "https://github.com/getmaipai/home",

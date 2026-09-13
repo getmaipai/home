@@ -11230,6 +11230,69 @@ line null under both.
 
 **Exit gate**: `bash scripts/check.sh` green in the worktree.
 
+### FAST-03: package descriptions a person would say (2026-09-12)
+
+Every bundled package's `description` is now one imperative sentence
+that says what it does for the household, at most 120 characters,
+ending with a period, with no dates, parentheses, internal notes, or
+platform branding: "Get the current weather for a named place." The
+same sentence is the store-card line, the native tool description the
+chat model reads on every tools-offered turn, and the body of the
+confirm prompt, which is why the old text (developer notes, step
+numbers, API provenance, "the read-side counterpart to Remember") had
+to go: it was read aloud. The six mirrored packages (define, joke,
+knowledge, trivia, weather, storytime-style) were edited in the
+`catalog` checkout (commits 9caebca and 2391831 there, each with an
+Unreleased changelog line per package) and pulled in with `bun run
+refresh-bundled-packages`, so `bundled-provenance.json` records the new
+commit and hashes; the other 26 were edited here. `confirmPromptFor()`
+in `turnEngine.ts` folds the sentence into "Do you want me to ...?",
+dropping the period and lowercasing only the first letter (the old
+code lowercased the whole sentence, so a name inside it lost its
+capital). `plugins.test.ts` checks every manifest against
+`/^[A-Z][^()]{10,118}\.$/` with no four-digit year; `turnEngine.test.ts`
+checks every consequential package's prompt reads as one question.
+
+**Tool-calling bench** (`scripts/bench/tool-calling.ts`, the eight
+`tool-call-corpus.json` rows, live on the Track A engine: same machine,
+build, model and flags as the FAST-04 section, 10 repeats per row at
+the chat temperature; "before" is the same engine with the pre-FAST-03
+manifests for remember, recall, define and trivia swapped in):
+
+| copy | positives selected | false calls on negatives |
+|---|---|---|
+| before (old descriptions) | 10/10, 10/10, 10/10 | 0/50 |
+| first cut ("Tell you what has been remembered about a topic." / "Ask a random trivia question and give the answer."), 5 repeats | 0/5, 5/5, 4/5 | 0/25 |
+| recall reworded to "Tell you what it remembers about something you ask about.", 5 repeats | 4/5, 5/5, 5/5 | 0/25 |
+| recall "Tell you what it knows or remembers about something you ask.", 10 repeats | 10/10, 10/10, 7/10 | 0/50 |
+| plus trivia "Give a random trivia question and its answer." (shipped), 10 repeats | 10/10, 10/10, 10/10 | 0/50 |
+
+Two copy lessons the bench taught, recorded because they will come up
+again for every package: the 8B keys on the description's words, so a
+sentence that drops "remember" loses the recall call on "what do you
+know about the wifi password" every time, and "give the answer" on the
+trivia line pulled the model away from calling recall for the second
+clause of "give me a trivia question and what do you remember about
+pizza night" 3 times in 10; "and its answer" (the old tail) does not.
+The shipped set holds every positive and every negative at the before
+level. Live through the API: "please lock the front door for me"
+answered `Do you want me to lock the front door?` (source `confirm`,
+plugin `lock-doors`), and "no, leave it" answered "Okay, I won't do
+that."
+
+The medium code review on this diff (targeted at the worktree) found
+no correctness defect and three lows, two fixed here (the manifest
+test's body class now also rejects a period, question mark or
+exclamation inside the sentence, so a two-sentence description cannot
+pass; `confirmPromptFor()` keeps a leading acronym's capitals) and one
+recorded as a gap: `currency` and `convert` both open with "Convert"
+now and the tool-call corpus has no row for either, so the bench's
+"all positives selected" does not cover that pair. A corpus row each
+belongs to CHAT-23's corpus work, not this item.
+
+**Exit gate**: `bash scripts/check.sh` green in the worktree, plus the
+catalog checkout's own `scripts/check.sh` for both commits there.
+
 ## Session B follow-up: chat frontend bugs - second and third pass (2026-09-12)
 
 **#71 rework** (reopened twice: first for insufficient verification and six

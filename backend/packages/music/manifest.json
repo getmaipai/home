@@ -4,7 +4,7 @@
   "kind": "plugin",
   "category": "Info",
   "display": "Music Lookup",
-  "description": "Looks up a music artist (2026-09-06, step 7), via MusicBrainz's own public search API - no API key. Artists only for now, not songs or albums; movie/TV lookup is a separate, not-yet-built package.",
+  "description": "Look up a music artist.",
   "author": "MaiPai",
   "license": "AGPL-3.0",
   "homepage": "https://github.com/getmaipai/home",

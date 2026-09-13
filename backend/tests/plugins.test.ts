@@ -667,3 +667,26 @@ describe("warmPackage (session-d-packages-and-store.md step 3)", () => {
     await expect(warmPackage("weather", { ...weather.value.manifest, warm: undefined })).resolves.toBeUndefined();
   });
 });
+
+// FAST-03 (docs/BACKLOG.md's 2026-09-12 chat block): one sentence per
+// package that a person would say, because it is read in three places:
+// the store card, the native tool description the chat model sees, and
+// the confirm prompt ("Do you want me to ...?"), where a date, a
+// parenthesis or a developer note gets spoken aloud.
+describe("every bundled package's description is one sentence a person would say (FAST-03)", () => {
+  // Tighter than the work order's `[^()]` body: no period, question
+  // mark or exclamation inside, so a two-sentence description cannot
+  // pass as one (a code review on this item).
+  const RULE = /^[A-Z][^().?!]{10,118}\.$/;
+  for (const id of listPackageIds()) {
+    test(`${id}: one imperative sentence, at most 120 characters, no parentheses, no year`, () => {
+      const loaded = loadManifestOnly(id);
+      expect(loaded.ok).toBe(true);
+      if (!loaded.ok) return;
+      const description = loaded.value.description;
+      expect(description).toMatch(RULE);
+      expect(description).not.toMatch(/\b\d{4}\b/);
+      expect(description.length).toBeLessThanOrEqual(120);
+    });
+  }
+});

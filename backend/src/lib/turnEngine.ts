@@ -1037,6 +1037,21 @@ export function pendingAskFromPluginResult(packageId: string, args: Record<strin
   return null;
 }
 
+/** FAST-03: the confirm question for a consequential package is its own
+ * one-sentence, imperative description ("Lock the front door.") folded
+ * into "Do you want me to lock the front door?": the trailing period
+ * goes and only the first letter is lowercased, so a name inside the
+ * sentence keeps its capital. One sentence, three places: the store
+ * card, the native tool description, and this prompt. */
+export function confirmPromptFor(description: string): string {
+  const body = description.trim().replace(/[.!]$/, "");
+  // A leading acronym ("SMS the babysitter") keeps its capitals; only a
+  // capitalised ordinary word is lowercased.
+  const firstWord = body.split(/\s+/)[0] ?? "";
+  const lowered = /^[A-Z]{2,}$/.test(firstWord) ? body : `${body.charAt(0).toLowerCase()}${body.slice(1)}`;
+  return `Do you want me to ${lowered}?`;
+}
+
 export async function resolvePendingAsk(
   text: string,
   actor: PersonRow,
@@ -1497,7 +1512,7 @@ export async function resolveToolCalls(
   const consequential = capped.find((c) => rankedById.get(c.tool)?.manifest.consequential);
   if (consequential) {
     const manifest = rankedById.get(consequential.tool)!.manifest;
-    const prompt = `Do you want me to ${manifest.description.replace(/\.$/, "").toLowerCase()}?`;
+    const prompt = confirmPromptFor(manifest.description);
     const args = (consequential.args ?? {}) as Record<string, unknown>;
     setPendingAsk(conversationId, { kind: "confirm", prompt, packageId: consequential.tool, args });
     return { reply: { text: prompt }, source: "confirm", plugin_id: consequential.tool, safety, crisis_resources: crisisResources, conversation_id: conversationId, turn_id: turnId };

@@ -4,7 +4,7 @@
   "kind": "plugin",
   "category": "Utilities",
   "display": "View Shopping List",
-  "description": "Reads back what's on the household's own shopping list (2026-09-06, step 8).",
+  "description": "Read back what is on the household shopping list.",
   "author": "MaiPai",
   "license": "AGPL-3.0",
   "homepage": "https://github.com/getmaipai/home",

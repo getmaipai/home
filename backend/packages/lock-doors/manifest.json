@@ -4,7 +4,7 @@
   "kind": "plugin",
   "category": "Home",
   "display": "Lock the Front Door",
-  "description": "Locks the front door through the household's own Home Assistant instance (2026-09-06, step 9) - a security domain, so this always asks for confirmation first.",
+  "description": "Lock the front door.",
   "author": "MaiPai",
   "license": "AGPL-3.0",
   "homepage": "https://github.com/getmaipai/home",

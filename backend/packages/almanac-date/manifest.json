@@ -4,7 +4,7 @@
   "kind": "plugin",
   "category": "Info",
   "display": "Today's Date",
-  "description": "Today's date, spoken naturally (2026-09-06, step 7) - one of the almanac's five small lookups (legacy had five separate tools for this).",
+  "description": "Say today's date.",
   "author": "MaiPai",
   "license": "AGPL-3.0",
   "homepage": "https://github.com/getmaipai/home",

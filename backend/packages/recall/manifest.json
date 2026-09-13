@@ -4,7 +4,7 @@
   "kind": "plugin",
   "category": "Utilities",
   "display": "Recall",
-  "description": "Tells you what it remembers about something you ask (4.4/4.9) - the read-side counterpart to Remember.",
+  "description": "Tell you what it knows or remembers about something you ask.",
   "author": "MaiPai",
   "license": "AGPL-3.0",
   "homepage": "https://github.com/getmaipai/home",

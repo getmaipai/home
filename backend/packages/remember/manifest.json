@@ -4,7 +4,7 @@
   "kind": "plugin",
   "category": "Utilities",
   "display": "Remember",
-  "description": "Remembers a fact you tell it, the way asking to remember something works (4.4/4.9).",
+  "description": "Remember a fact you tell it, for later.",
   "author": "MaiPai",
   "license": "AGPL-3.0",
   "homepage": "https://github.com/getmaipai/home",

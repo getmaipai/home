@@ -18,6 +18,7 @@ import {
   loadAllManifests,
   PROMPT_SYSTEM_CHAR_BUDGET,
   MAX_TURN_TEXT_LENGTH,
+  confirmPromptFor,
   type TurnStreamResult,
 } from "@/lib/turnEngine";
 import { __embedCallCountForTests, __resetEmbedCallCountForTests } from "@/lib/routing";
@@ -1361,6 +1362,33 @@ describe("prepareTurn() persona resolution (via runTurn - prepareTurn itself isn
     const { actor } = await owner();
     const result = await runTurn(actor, "chat", "good morning, how's it going");
     expect(result.ok).toBe(true);
+  });
+});
+
+// FAST-03: the confirm question is the package's own one-sentence
+// description folded into "Do you want me to ...?", so a description
+// written for the store card reads as one grammatical question when
+// spoken. The old code lowercased the whole sentence, so a name inside
+// it lost its capital.
+describe("confirmPromptFor() (FAST-03)", () => {
+  test("drops the trailing period and lowercases only the first letter", () => {
+    expect(confirmPromptFor("Lock the front door.")).toBe("Do you want me to lock the front door?");
+  });
+
+  test("a name inside the sentence keeps its capital", () => {
+    expect(confirmPromptFor("Send a message to Nadia.")).toBe("Do you want me to send a message to Nadia?");
+  });
+
+  test("a leading acronym keeps its capitals", () => {
+    expect(confirmPromptFor("SMS the babysitter.")).toBe("Do you want me to SMS the babysitter?");
+  });
+
+  test("every bundled consequential package reads as one grammatical question", () => {
+    for (const { manifest } of loadAllManifests()) {
+      if (!manifest.consequential) continue;
+      const prompt = confirmPromptFor(manifest.description);
+      expect(prompt).toMatch(/^Do you want me to [a-z][^.?]*\?$/);
+    }
   });
 });
 

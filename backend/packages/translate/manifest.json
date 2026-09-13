@@ -4,7 +4,7 @@
   "kind": "plugin",
   "category": "Utilities",
   "display": "Translate",
-  "description": "Translates text via the household's own local chat model - nothing leaves the house. A network translation service is a separate, opt-in package, not built yet.",
+  "description": "Translate text into another language, entirely on your own hub.",
   "author": "MaiPai",
   "license": "AGPL-3.0",
   "homepage": "https://github.com/getmaipai/home",

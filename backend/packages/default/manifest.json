@@ -4,7 +4,7 @@
   "kind": "companion",
   "category": "Fun",
   "display": "MaiPai",
-  "description": "The default MaiPai voice: plain, direct, easygoing conversation with no particular character on top of it.",
+  "description": "Talk in MaiPai's plain, direct, easygoing voice with no character on top.",
   "author": "MaiPai",
   "license": "AGPL-3.0",
   "homepage": "https://github.com/getmaipai/home",

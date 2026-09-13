@@ -4,7 +4,7 @@
   "kind": "plugin",
   "category": "Info",
   "display": "Knowledge",
-  "description": "A quick answer to a general-knowledge question, the first Tier 1 package - it runs in its own sandboxed process, not a shared recipe interpreter.",
+  "description": "Answer a general-knowledge question with a short summary.",
   "author": "MaiPai",
   "license": "AGPL-3.0",
   "homepage": "https://github.com/getmaipai/home",

@@ -4,7 +4,7 @@
   "kind": "plugin",
   "category": "Utilities",
   "display": "Weather",
-  "description": "Real current temperature for a named place (2026-09-05: the first real plugin built on host.fetch), via Open-Meteo's free, no-key geocoding and forecast APIs.",
+  "description": "Get the current weather for a named place.",
   "author": "MaiPai",
   "license": "AGPL-3.0",
   "homepage": "https://github.com/getmaipai/home",

@@ -4,7 +4,7 @@
   "kind": "plugin",
   "category": "Utilities",
   "display": "Reminders",
-  "description": "Sets a reminder for a later time (2026-09-06, step 8) - real natural-language time parsing (chrono-node), no network, no model.",
+  "description": "Set a reminder for a later time.",
   "author": "MaiPai",
   "license": "AGPL-3.0",
   "homepage": "https://github.com/getmaipai/home",

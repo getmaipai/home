@@ -4,7 +4,7 @@
   "kind": "plugin",
   "category": "Home",
   "display": "Lights On",
-  "description": "Turns on a light through the household's own Home Assistant instance (2026-09-06, step 9) - a real home.call_service action.",
+  "description": "Turn on a named light in the house.",
   "author": "MaiPai",
   "license": "AGPL-3.0",
   "homepage": "https://github.com/getmaipai/home",

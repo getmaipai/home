@@ -4,7 +4,7 @@
   "kind": "plugin",
   "category": "Utilities",
   "display": "Convert",
-  "description": "Converts between physical units - length, weight, temperature, volume. No network. Currency needs live exchange rates, so it's a separate package.",
+  "description": "Convert between units of length, weight, temperature, and volume.",
   "author": "MaiPai",
   "license": "AGPL-3.0",
   "homepage": "https://github.com/getmaipai/home",

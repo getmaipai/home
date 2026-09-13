@@ -4,7 +4,7 @@
   "kind": "skill",
   "category": "Family",
   "display": "Storytime style",
-  "description": "How MaiPai tells a bedtime story (2026-09-05, the first real skill kind) - gentle, age-appropriate, never scary.",
+  "description": "Tell bedtime stories gently, in an age-appropriate way that is never scary.",
   "author": "MaiPai",
   "license": "AGPL-3.0",
   "homepage": "https://github.com/getmaipai/home",
