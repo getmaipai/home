@@ -274,13 +274,42 @@ const SEXUAL_TERMS = [
 // confusables handling of its own - a second, incomplete copy of the
 // same idea): strip combining marks, then produce two forms. `compact`
 // collapses separator runs to a single space (for multi-word phrases like
-// "school girl"). `tight` removes separators entirely, concatenating
-// letters (for standalone terms like "loli" split with punctuation).
+// "school girl"). `tight` strips the punctuation separators inside each
+// whitespace-delimited token and keeps the tokens apart (so "l.o.l.i"
+// and "l-o-l-i" both reduce to the token "loli", and "under.age.sex" to
+// "underagesex"). getmaipai/home#100: `tight` used to strip whitespace
+// too, into one long string checked with a bare includes(), and the
+// four-letter terms then matched across word joins in ordinary talk:
+// "stepped on" became "steppedon", which contains "pedo", and "hello
+// little" became "hellolittle", which contains "loli". A model reply
+// about the moon landing was refused as CSAM mid-stream, and a child's
+// own "hello little one, time for bed" refused the same way. A term
+// now matches only at token boundaries after the per-token stripping,
+// never across a word join; a term split by punctuation inside one
+// token is still caught (corpus: csam.obfuscation.*), and so is a term
+// spelled out letter by letter ("l o l i"): a run of two or more
+// single-character words is joined into one word, which no ordinary
+// sentence contains and the old whitespace stripping used to catch (a
+// review of the #100 fix).
 function csamNormalize(text: string): { compact: string; tight: string } {
   const stripped = norm(text).normalize("NFKD").replace(/[̀-ͯ]/g, "");
+  const words = stripped
+    .split(/\s+/)
+    .map((token) => token.replace(/[._\-*]+/g, ""))
+    .filter((token) => token.length > 0);
+  const joined: string[] = [];
+  for (let i = 0; i < words.length; i++) {
+    if (words[i]!.length === 1 && i + 1 < words.length && words[i + 1]!.length === 1) {
+      let run = words[i]!;
+      while (i + 1 < words.length && words[i + 1]!.length === 1) run += words[++i]!;
+      joined.push(run);
+    } else {
+      joined.push(words[i]!);
+    }
+  }
   return {
     compact: stripped.replace(/[\s._\-*]+/g, " "),
-    tight: stripped.replace(/[\s._\-*]+/g, ""),
+    tight: joined.join(" "),
   };
 }
 
@@ -336,7 +365,7 @@ export function detectCsam(rawText: string): CategorySignals {
   const matched: string[] = [];
 
   for (const t of STANDALONE_SINGLE_TERMS) {
-    if (wordMatch(compact, t) || tight.includes(t)) {
+    if (wordMatch(compact, t) || wordMatch(tight, t)) {
       matched.push("csam.standalone_term");
       return { category: "csam", matched };
     }
@@ -347,7 +376,7 @@ export function detectCsam(rawText: string): CategorySignals {
     // dropped it for phrases specifically, silently losing detection of
     // "underagesex"-style concatenated evasion that the pre-fix code
     // caught (confirmed empirically).
-    if (wordMatch(compact, phrase) || tight.includes(phrase.replace(/\s+/g, ""))) {
+    if (wordMatch(compact, phrase) || wordMatch(tight, phrase.replace(/\s+/g, ""))) {
       matched.push("csam.standalone_term");
       return { category: "csam", matched };
     }

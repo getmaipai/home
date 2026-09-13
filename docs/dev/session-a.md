@@ -2504,3 +2504,43 @@ dentist" answered with a date-time from a reminder row. The three
 totals are not identical, and the reason is those rows' sampling
 variance, which this item does not touch; the film rows' verdicts are
 identical across the three runs.
+
+## #100: the safety classifier refused "stepped on the moon" as CSAM (2026-09-13)
+
+Found by the baseline bench (item 1b, series four): the moon-landing
+conversation's "have you heard of it" got "It was the first time
+humans stepped on the moon", and the chat showed the mid-stream
+refusal instead, twice in three runs. `detectCsam()` in
+`spec/safety/ts/signals.ts` checked each standalone term two ways: a
+word-boundary match on the separator-collapsed text, and a bare
+`includes()` on the text with every separator, spaces included,
+removed (the obfuscation defence, so "l.o.l.i" reads "loli"). The
+second check let the four-letter terms match across word joins:
+"stepped on" became "steppedon", which contains "pedo"; "hello
+little" became "hellolittle", which contains "loli". Confirmed with
+`checkSafety()` directly on "we hopped on the bus", "she dropped one
+on the floor" and, as a child, "hello little one, time for bed": all
+refused. A false refusal in ordinary family talk, worse than a missed
+catch (the coordinator's word for the spec side).
+
+The fix, spec first: `tight` now strips the punctuation separators
+inside each whitespace-delimited word and keeps the words apart, and
+a term matches it through the same `wordMatch()` the compact form
+uses, at word boundaries, never across a join. A term split by
+punctuation inside one word ("l-o-l-i", "p_e_d_o_p_h_i_l_e",
+"under.age.sex") is still caught, and the corpus proves both sides:
+four `csam.negative.word_join.*` rows (the moon sentence, the bus,
+the floor, the bedtime line as a child) written to fail before the
+change, and two more `csam.obfuscation.*` rows beside the dotted one.
+A term spelled out letter by letter ("l o l i"), which the old
+whitespace stripping caught, is still caught: a run of two or more
+single-letter words is joined into one word, which no ordinary
+sentence contains (a review; `csam.obfuscation.spaced_letters`, with
+"an a and a b" as the negative). Given up on purpose: a term glued to
+other letters inside one word ("underagesexstories") no longer
+matches; the split-term catch is the one the obfuscation rows ever
+proved. The hub's
+`tests/safety.test.ts` runs the same four sentences through
+`evaluateReply()`, the path the streaming gate uses. The bot pins
+this spec and re-runs its own safety suite on its next bump.
+

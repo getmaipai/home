@@ -73,12 +73,21 @@ exactly principle 8's carve-out (hard-won logic, not feature scope or UI).
 Two things worth knowing if you touch it:
 
 - **Obfuscation resistance.** Text is NFKD-normalized and separator
-  characters (spaces, dots, underscores, hyphens, asterisks) are both
+  characters (spaces, dots, underscores, hyphens, asterisks) are
   collapsed to a single space (`compact`, for multi-word phrases like
-  "school girl") and stripped entirely (`tight`, so "l.o.l.i" and
-  "l-o-l-i" both reduce to "loli"). `corpus.json`'s `csam.obfuscation.*`
-  entries prove both forms actually catch something a naive `\b...\b`
-  regex would miss.
+  "school girl"); the punctuation separators are also stripped inside
+  each whitespace-delimited word, and a run of two or more
+  single-letter words is joined into one (`tight`, so "l.o.l.i",
+  "l-o-l-i" and "l o l i" all reduce to the word "loli", and
+  "under.age.sex" to "underagesex"). A term matches `tight` only at
+  word boundaries, never across a join of two real words: `tight` used
+  to strip the spaces too and be checked with a bare substring test, and the
+  four-letter terms then fired on ordinary talk ("stepped on" joined to
+  a string containing "pedo", "hello little" to one containing "loli";
+  getmaipai/home#100, a reply about the moon landing refused
+  mid-stream). `corpus.json`'s `csam.obfuscation.*` entries prove the
+  split-term catches, and `csam.negative.word_join.*` the ordinary
+  sentences that must pass.
 - **A standalone-term list blocks regardless of context** (CSAM-coded
   terms that need no co-occurring sexual/age signal), separate from the
   minor-indicator-plus-sexual-term intersection the other detectors use.

@@ -275,6 +275,19 @@ describe("evaluateReply() (CHAT-02)", () => {
     expect(r.effective).toBe(r.text);
   });
 
+  // getmaipai/home#100: the baseline bench's moon-landing conversation
+  // had this exact reply refused mid-stream as CSAM (the classifier's
+  // separator-stripped form joined "stepped on" into a string that
+  // contained a four-letter blocklist term). Ordinary family talk in a
+  // reply, to an adult or a child, is allowed.
+  test("a reply about the moon landing, or a child's bedtime line, is never refused for a word join (#100)", () => {
+    expect(evaluateReply({ text: "It was the first time humans stepped on the moon." }, "adult").effective.action).toBe("allow");
+    expect(evaluateReply({ text: "Hello little one, time for bed." }, "child").effective.action).toBe("allow");
+    expect(evaluateReply({ text: "We hopped on the bus and she dropped one on the floor." }, "child").effective.action).toBe("allow");
+    // The obfuscation catch the fix keeps: a term split by punctuation inside one word.
+    expect(evaluateReply({ text: "any l-o-l-i stuff" }, "adult").effective.action).toBe("refuse");
+  });
+
   test("speech identical to the text is not evaluated twice", () => {
     const r = evaluateReply({ text: SAFE_TEXT, speech: SAFE_TEXT }, "child");
     expect(r.speech).toBeUndefined();

@@ -784,6 +784,12 @@ not permission to expand scope.
     the same inputs at 54, 54 and 56. The gate below (the
     forty sequences, five repeats, both transports, the thresholds)
     stays open; the next items come from the bench's ranking.
+    Status (2026-09-13, later): the fixture is 28 conversations (the
+    Cobra film set, four other-kind subjects, three household
+    subjects, item 1b of `docs/plans/baseline-fixes-2026-09-13.md`)
+    and its table is the chat regression suite: every item that
+    touches a turn reports its three runs against it, the latest
+    series at 91, 91 and 85 of 98 scored turns.
 
     Depends on: CHAT-02 through CHAT-21 and CHAT-22. Files:
     `spec/llm/{routing,tool-call,guard,naturalness}-corpus.json`,

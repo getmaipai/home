@@ -12743,3 +12743,8 @@ other's section once (147cd28, f4779a6).
   pattern capture includes a trailing "today") and #99 (a blank line in
   any reply silently disappears through the output safety gate):
   [docs/dev/session-b.md](dev/session-b.md) (2026-09-13).
+- #100, the safety classifier refusing "stepped on the moon" as CSAM:
+  the separator-stripped check matched four-letter terms across word
+  joins; a term now matches only at word boundaries after per-word
+  stripping, the split-term obfuscation catches kept, six corpus rows:
+  [docs/dev/session-a.md](dev/session-a.md) (2026-09-13).
