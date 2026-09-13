@@ -895,3 +895,45 @@ instead of forced:**
 
 BACKLOG's "A screenshot matrix in the pipeline" item ticked, rewritten
 to name exactly what's covered and the three findings above.
+
+## getmaipai/home#75: the real fix
+
+Root-caused via a headless WebKit run before pausing lane 7 for the
+media package (see the earlier entry in this file for the diagnostic
+trail: checkpoint logs, then per-element visibility/enabled/
+boundingBox reads, then `elementFromPoint` at the Send button's own
+center). The fix, once the coordinator reordered it ahead of the
+package:
+
+`thread.aui.tsx`'s composer footer gets `!isEmpty && "translate-y-9"`
+below `sm:` - a real transcript pushes the sticky footer 36px further
+down than the empty/greeting state, with nothing offsetting that
+against `PhoneNav.tsx`'s own fixed bottom bar. Measured live: composer
+bottom edge 816px, nav top edge 789px, a 27px overlap. Added
+`max-sm:bottom-16` to that same conditional class, reusing the exact
+`16` (4rem) clearance `Shell.tsx`'s own `pb-16 sm:pb-0` already
+reserves for PhoneNav on ordinary page content - the one existing
+definition of "PhoneNav's height" in this codebase, not a second
+literal invented for this one spot.
+
+**Proven to fail, then proven fixed**, since happy-dom's unit tests
+always return a zeroed `getBoundingClientRect()` regardless of CSS
+(this file's own history says so, `docs/dev.md`'s 2026-09-12 entry) -
+the only honest check is real layout, so it lives in
+`scripts/screenshot.ts`'s `exerciseChat()`, phone-only, right after the
+send that used to hang: reads the nav's top and the composer's bottom
+edge, throws if the composer's bottom is below the nav's top, naming
+both pixel values and the overlap amount. Temporarily reverted
+`max-sm:bottom-16` alone, reran `--chat-review` (plain Chromium, no
+`--webkit` needed - this is a real geometry check, not a click
+hit-test, so it doesn't depend on which browser's click() is
+stricter): failed with `composer's bottom edge (816) sits 27px inside
+PhoneNav's own top edge (789)`, the exact numbers from the original
+diagnosis. Restored the fix, reran: clean. Then
+`--chat-review --webkit` clean too (the original repro, now the live
+proof it stays fixed) - `bun test` in frontend, 505 pass, 0 fail,
+unaffected by the class change. Regenerated the full matrix and
+`--chat-review`; opened `chat-phone-dark.png` (composer sits clear of
+the nav bar with visible gap) and `chat-history-phone-dark.png` (the
+thread-list overlay, no composer in this view, unaffected either way).
+Closed #75 from this commit.

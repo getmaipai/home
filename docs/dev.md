@@ -12753,3 +12753,10 @@ other's section once (147cd28, f4779a6).
   common abbreviations never numerals, the Python twin and the shared
   fixture rows added): [docs/dev/session-a.md](dev/session-a.md)
   (2026-09-13).
+- Lane 7, the screenshot-matrix BACKLOG item reconciled against
+  docs/UI.md and docs/STYLE.md, a per-shot manifest.json added, and
+  #75 fixed (a phone chat with real history sat the composer 27px
+  inside PhoneNav's own fixed bar, `max-sm:bottom-16` reusing the same
+  clearance Shell.tsx already reserves for it), proven to fail then
+  fixed with a real-layout check in scripts/screenshot.ts:
+  [docs/dev/session-b.md](dev/session-b.md) (2026-09-13).

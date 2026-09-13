@@ -254,7 +254,25 @@ const ThreadRoot: FC<{
           <ThreadPrimitive.ViewportFooter
             className={cn(
               "aui-thread-viewport-footer bg-background flex flex-col gap-4 overflow-visible pb-0 sticky bottom-0 rounded-t-(--composer-radius)",
-              !isEmpty && "translate-y-9",
+              // getmaipai/home#75 (found live, 2026-09-13, via the WebKit
+              // chat exercise - WebKit's click refuses to click through
+              // something else, Chromium apparently doesn't, so only
+              // WebKit ever surfaced this): `translate-y-9` below pushes
+              // the footer 36px further down once a real transcript is
+              // loaded, with nothing offsetting that against `PhoneNav`'s
+              // own fixed bar at the true viewport bottom - measured live,
+              // the composer's bottom edge (816px) sat 27px inside the
+              // nav's top edge (789px), so a real phone tap on Send lands
+              // on the nav instead. `max-sm:bottom-16` reuses the exact
+              // clearance `Shell.tsx`'s own `pb-16 sm:pb-0` already
+              // reserves for PhoneNav on ordinary page content (the one
+              // existing definition of "PhoneNav's height" in this
+              // codebase - a CSS custom property purely for this pairing
+              // would be a second definition, not one), so the footer's
+              // sticking point moves up by the same amount every other
+              // phone surface already clears by. `sm:bottom-0` below
+              // still wins at `sm:` and up, where PhoneNav is hidden.
+              !isEmpty && "translate-y-9 max-sm:bottom-16",
               "sm:translate-y-0 sm:pb-6",
               // Below `sm`, an empty thread still pins the composer to the
               // bottom edge (`mt-auto`) - the mobile "thumb-reachable

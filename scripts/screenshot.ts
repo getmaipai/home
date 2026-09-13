@@ -535,6 +535,27 @@ async function exerciseChat(page: import("playwright").Page, viewport: ViewportS
   await page.locator('[data-role="user"]').getByText("Help me plan a small garden", { exact: true }).waitFor();
   if (await page.locator('[data-role="user"]').getByText("Help me choose a book", { exact: true }).count()) throw new Error("Reopened chat contains another conversation's messages");
   await send("And some herbs for cooking");
+  // getmaipai/home#75: on phone, a loaded conversation (real message
+  // history, not the empty/greeting state) sat the composer's own
+  // sticky footer 27px inside PhoneNav's fixed bar at the true viewport
+  // bottom - a real tap on Send landed on the nav instead. Caught only
+  // by WebKit's click(), which correctly refuses to click through
+  // something else sitting on top (Chromium's apparently doesn't, so
+  // this exact send() succeeding above is not itself proof of anything
+  // on Chromium) - this is the real geometry check, the only way to
+  // honestly catch a regression here (happy-dom's unit tests always
+  // return a zeroed getBoundingClientRect() regardless of CSS, the same
+  // reason the desktop composer-gap check above lives here and not in
+  // a unit test).
+  if (viewport.slug === "phone") {
+    const { navTop, composerBottom } = await page.evaluate(() => {
+      const nav = document.querySelector("nav.fixed.inset-x-0.bottom-0");
+      const composer = document.querySelector(".aui-composer-root");
+      return { navTop: nav?.getBoundingClientRect().top, composerBottom: composer?.getBoundingClientRect().bottom };
+    });
+    if (navTop === undefined || composerBottom === undefined) throw new Error("Could not measure the phone bottom nav or the composer to check they don't overlap");
+    if (composerBottom > navTop) throw new Error(`On phone, with a loaded conversation, the composer's bottom edge (${composerBottom}) sits ${composerBottom - navTop}px inside PhoneNav's own top edge (${navTop}) - a real tap on Send would land on the nav instead (#75)`);
+  }
   await page.reload();
   await page.getByText("And some herbs for cooking", { exact: true }).waitFor();
   await page.getByRole("button", { name: "Show threads" }).click();
