@@ -2167,8 +2167,8 @@ question nothing stored answers (#93).
 
 **Measured** (`scripts/bench/recall-floor.ts`, the ROUTE-01 method:
 nomic-embed-text-v1.5 Q4_K_M on llama-server b10797 by URL, a seeded
-household of 24 records, twelve durable and twelve episodic, roster
-names only; 2026-09-13). Thirty unrelated queries, the top hit's
+household of 26 records, fourteen durable and twelve episodic, roster
+names only, the committed bench's own seeds; 2026-09-13). Thirty unrelated queries, the top hit's
 cosine per tier: durable p50 0.472, p90 0.501, p95 0.545, max 0.558;
 episodic p50 0.465, p90 0.516, p95 0.523, max 0.549. Ten related
 queries, the right record's cosine: weakest 0.807, median 0.830, the
@@ -2218,6 +2218,21 @@ Rover, any concerns" row passes on Rover's entity record), and
 `memory-eval.ts`'s three durable-preference rows, which passed only
 because the old floor passed everything, now read NOT-RECALLED (8 of
 11, from 11 of 11 with unrelated questions passing too).
+
+A review after the commit (the review ran alongside the gate and
+came back after the push; the order should have been review, then
+commit) found nothing wrong and four small things, three taken here:
+the seed count above corrected to what the committed bench seeds (the
+null-floor numbers were re-read from a run with those seeds and are
+unchanged); the "nothing recalled" sentinel is checked on the `recall`
+call only, so a stored record whose text happens to be the line can
+never be read as a miss; and a note that the tool-calling bench's
+prompt (built with no recall at all) now carries the "nothing stored"
+line, so its next run is a new baseline, not a comparison. Recorded,
+not handled: the stub-tier floor check reads the embed backend kind at
+ranking time, so a supervisor reset landing between the query's embed
+and the ranking would apply the measured floor to a stub vector for
+that one turn.
 
 **Results** (2026-09-13, engines by URL as above). Three identical
 bench runs: 59, 57, 59 of 60; "what year did the second world war end"

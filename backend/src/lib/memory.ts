@@ -443,7 +443,8 @@ export interface RecallOptions extends ListOptions {
 // 0.37 durable and 0.55 episodic sat BELOW this embed model's null
 // floor, so a general question nothing stored answers ("what year did
 // the second world war end") recalled its nearest neighbors anyway. On
-// a seeded household of 24 records, thirty unrelated queries put the
+// a seeded household of 26 records (14 durable, 12 episodic, the
+// committed bench's own seeds), thirty unrelated queries put the
 // top hit at p50 0.472, p95 0.545, max 0.558 for durable and p50 0.465,
 // p95 0.523, max 0.549 for episodic; ten related queries put their
 // right record at 0.807 at the weakest and 0.830 at the median, top hit

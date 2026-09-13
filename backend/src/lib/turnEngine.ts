@@ -1938,7 +1938,7 @@ export async function resolveToolCalls(
   // the model answer from what it knows. A pattern-routed "what do you
   // remember about X" (Tier 0, prepareTurn) still says the line: there
   // the person asked the memory, and "nothing" is the honest answer.
-  const recalledNothing = (r: (typeof ran)[number]) => r.result.ok && r.result.value.reply?.text === NOTHING_RECALLED;
+  const recalledNothing = (r: (typeof ran)[number]) => r.call.tool === "recall" && r.result.ok && r.result.value.reply?.text === NOTHING_RECALLED;
   for (const r of ran) {
     // A result that parks the action behind a confirm/ask is pending,
     // not succeeded: nothing ran (a code review).
