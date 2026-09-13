@@ -84,6 +84,14 @@ if [ -d frontend/src ]; then
   echo "== frontend: build (includes typecheck)"
   (cd frontend && bun run build >/dev/null)
 
+  # Left out while #43 (the chat contrast failure) was open; #43 closed
+  # 2026-09-06 and the timestamp finding it left behind was resolved
+  # 2026-09-12 (11e8afd) - back in the gate now that it passes clean
+  # (getmaipai/home#55). `a11y` is a repo-root script (package.json),
+  # not frontend/'s own - it drives scripts/screenshot.ts directly.
+  echo "== frontend: a11y"
+  bun run a11y >/dev/null
+
   echo "== docs: reading-level lint"
   bun run scripts/reading-level.ts
 fi

@@ -12182,6 +12182,33 @@ lane 3 item 3 baseline exactly, confirming the chatReview guard works.
 
 Files: `scripts/screenshot.ts`, `docs/BACKLOG.md`.
 
+## Session B, lane 4 item 1: getmaipai/home#55, wire `bun run a11y` back into `check.sh` (2026-09-13)
+
+The gate was left out while #43 (the chat contrast failure) was open;
+#43 closed 2026-09-06, and the timestamp finding it left behind
+(BACKLOG.md's "second, narrower contrast finding") was a scan-timing
+artifact, resolved lane 3 item 3 (11e8afd). Confirmed clean first: a
+fresh `bun run a11y` on current main passed at 0 violations, 0
+overflow, reduced motion and keyboard-trap checks passed (34 pages, 2
+combos x 17 routes).
+
+Added `bun run a11y` to `scripts/check.sh`'s frontend block, after the
+build step and before the reading-level lint - the exact gap the org
+standard's own commit history left it in before pulling it out for #43.
+`a11y` is a repo-root `package.json` script (`bun run scripts/
+screenshot.ts --a11y-only`), not a `frontend/`-owned one, so it runs
+unwrapped, not inside the block's other `(cd frontend && ...)`
+subshells.
+
+**Added cost, timed directly**: 45.116s wall clock (33.31s user, 6.60s
+system, 88% CPU) for the standalone run. Well under the two-minute
+threshold the acceptance criterion names, so no "keep the gate anyway
+despite the cost" call was needed - it comfortably clears the bar.
+
+Closes getmaipai/home#55.
+
+Files: `scripts/check.sh`, `docs/plans/session-b-frontend-lane-4-2026-09-13.md`.
+
 ### getmaipai/home#79: the episode vector scan is bounded
 
 `recallEpisodes()`'s vector half read every embedded episode the person
