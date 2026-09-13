@@ -183,6 +183,7 @@ const ThreadRoot: FC<{
   composerDisabledReason?: string;
 }> = ({ isEmpty, autoFocus, composerToolbar, composerDisabled, composerDisabledReason }) => {
   const { Welcome = ThreadWelcome } = useContext(ThreadComponentsContext);
+  const isHistoryLoading = useAuiState(isHistoryLoadingView);
 
   return (
     <ThreadPrimitive.Root
@@ -209,7 +210,9 @@ const ThreadRoot: FC<{
               bottom edge every other mobile chat surface uses (Jesse,
               2026-09-07). Below `sm`, this wrapper takes no extra space, so
               whichever of it/`aui_message-group` is actually showing content
-              (below) does the bottom-pinning instead. */}
+              (below) does the bottom-pinning instead. Guard the visual-viewport
+              height on the mobile surface (when viewport.height !== window.innerHeight
+              due to keyboard), not the layout-viewport. */}
           <div className={cn("flex flex-col items-center", isEmpty && "sm:flex-1 sm:justify-center")}>
             <AuiIf condition={isNewChatView}>
               <Welcome />
@@ -247,7 +250,7 @@ const ThreadRoot: FC<{
           <ThreadPrimitive.ViewportFooter
             className={cn(
               "aui-thread-viewport-footer bg-background flex flex-col gap-4 overflow-visible pb-0 sticky bottom-0 translate-y-9 rounded-t-(--composer-radius) sm:translate-y-0 sm:pb-6",
-              isEmpty && "mt-auto",
+              (isEmpty || isHistoryLoading) && "mt-auto",
             )}
           >
             <ThreadScrollToBottom />
@@ -330,7 +333,7 @@ const ThreadSuggestionItem: FC = () => {
 
 const Composer: FC<{ autoFocus: boolean; toolbar?: ReactNode; disabled?: boolean; disabledReason?: string }> = ({ autoFocus, toolbar, disabled, disabledReason }) => {
   return (
-    <ComposerPrimitive.Root className="aui-composer-root relative -mb-3 flex w-full flex-col sm:mb-0">
+    <ComposerPrimitive.Root className="aui-composer-root relative flex w-full flex-col">
       <ComposerPrimitive.AttachmentDropzone asChild>
         <div
           data-slot="aui_composer-shell"

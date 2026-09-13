@@ -164,7 +164,7 @@ function SidebarProvider({
           // `Page.tsx`) was already built assuming existed.
           // Keep the shell anchored like PhoneNav when keyboard focus pans
           // the document. Pages and transcripts own their internal scrolling.
-          "group/sidebar-wrapper fixed inset-x-0 top-0 flex h-svh w-full overflow-hidden has-data-[variant=inset]:bg-sidebar",
+          "group/sidebar-wrapper fixed inset-x-0 top-0 flex h-svh w-full overflow-visible has-data-[variant=inset]:bg-sidebar",
           className
         )}
         {...props}
