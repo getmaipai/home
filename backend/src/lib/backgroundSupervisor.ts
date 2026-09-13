@@ -27,7 +27,10 @@ export type BackgroundBackendKind = "url" | "spawned" | "stub";
 
 interface BackgroundBackend {
   client: LlamaServerClient;
-  stop: () => void;
+  /** #73: a spawned backend's stop is watchEngine()'s, which resolves
+   * once the process has exited (SIGKILL after a timeout); the URL and
+   * stub tiers stop nothing and return at once. */
+  stop: () => void | Promise<void>;
   pid?: number;
   kind: BackgroundBackendKind;
   startedAt: string;
@@ -103,9 +106,13 @@ async function spawnBackgroundServer(binPath: string): Promise<BackgroundBackend
 export async function restartBackgroundBackend(): Promise<void> {
   cancelEngineRespawn("background");
   state.generation++;
-  state.backgroundBackend?.stop();
+  // The state is cleared before the (now awaited, #73) stop, so a
+  // caller that does not await, the test reset among them, sees the
+  // backend gone at once; the process is stopped in the background.
+  const previous = state.backgroundBackend;
   state.backgroundBackend = null;
   state.startingPromise = null;
+  await previous?.stop();
 }
 
 export async function probeBackgroundEngine(): Promise<EngineHealth> {

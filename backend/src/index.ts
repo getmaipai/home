@@ -24,10 +24,11 @@ import { seedHlcFromDatabase } from "@/lib/hlc";
 import { recoverInterruptedJobsAtBoot } from "@/lib/modelDownloadJobs";
 import { startupUrls } from "@/lib/startupUrls";
 import { installConsoleFileMirror, installFatalErrorHandlers } from "@/lib/log";
+import { shutdownEngines } from "@/lib/hubShutdown";
 
 const port = Number(process.env.PORT ?? 8787);
 installConsoleFileMirror();
-installFatalErrorHandlers();
+installFatalErrorHandlers(shutdownEngines);
 
 // FAST-01: set up the warmup prompt provider for cache priming after engine
 // spawn. ROUTE-02: with the ordinary tool block, the same one every
@@ -363,11 +364,10 @@ try {
   });
 }
 process.on("exit", () => wyomingServer?.stop());
-process.on("SIGINT", () => {
+const exitGracefully = async (): Promise<void> => {
   wyomingServer?.stop();
+  await shutdownEngines();
   process.exit(0);
-});
-process.on("SIGTERM", () => {
-  wyomingServer?.stop();
-  process.exit(0);
-});
+};
+process.on("SIGINT", () => void exitGracefully());
+process.on("SIGTERM", () => void exitGracefully());

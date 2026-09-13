@@ -35,7 +35,10 @@ export type EmbedBackendKind = "url" | "spawned" | "stub";
 
 interface EmbedBackend {
   client: LlamaServerClient;
-  stop: () => void;
+  /** #73: a spawned backend's stop is watchEngine()'s, which resolves
+   * once the process has exited (SIGKILL after a timeout); the URL and
+   * stub tiers stop nothing and return at once. */
+  stop: () => void | Promise<void>;
   /** Only set for a backend this module actually spawned ("spawned") -
    * llmSupervisor.ts's `ChatBackend.pid` precedent, needed here too for
    * Fix A2's own orphan-sweep exclusion (see `getEmbedLivePid()` below). */
@@ -105,9 +108,13 @@ async function spawnEmbedServer(binPath: string): Promise<EmbedBackend> {
 export async function restartEmbedBackend(): Promise<void> {
   cancelEngineRespawn("embed");
   state.generation++;
-  state.embedBackend?.stop();
+  // The state is cleared before the (now awaited, #73) stop, so a
+  // caller that does not await, the test reset among them, sees the
+  // backend gone at once; the process is stopped in the background.
+  const previous = state.embedBackend;
   state.embedBackend = null;
   state.startingPromise = null;
+  await previous?.stop();
 }
 
 /** For GET /api/health: the kind plus a real probe of the process. */

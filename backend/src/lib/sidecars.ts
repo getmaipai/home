@@ -398,7 +398,7 @@ export interface EngineWatch {
    * misread a death during an in-flight request as deliberate, because
    * the request's own failure handler dropped the backend before the
    * exit was observed. */
-  stop(): void;
+  stop(timeoutMs?: number): Promise<void>;
   /** A caller saw the engine unreachable (llm.ts's "could not reach"):
    * treat it as down right now, without waiting for the exit or the next
    * health poll. Idempotent with both. */
@@ -636,10 +636,20 @@ export function watchEngine(opts: EngineWatchOptions): EngineWatch {
 
   return {
     pid: proc.pid,
-    stop() {
+    // #73: SIGTERM, then SIGKILL once the timeout passes, and the
+    // promise resolves only when the process has actually exited (a
+    // bounded wait after the SIGKILL too, so a caller reading the exit
+    // reads a real one; a review found the first cut returning right
+    // after sending SIGKILL, with `signalCode` still null).
+    async stop(timeoutMs = 5_000): Promise<void> {
       deliberate = true;
       dispose();
       proc.kill();
+      const exited = proc.exited.then(() => true, () => true);
+      const within = (ms: number) => Promise.race([exited, new Promise<boolean>((resolve) => setTimeout(() => resolve(false), ms))]);
+      if (await within(timeoutMs)) return;
+      proc.kill("SIGKILL");
+      await within(1_000);
     },
     markDown(reason) {
       // One real probe first (a code review, 2026-09-07): the caller's

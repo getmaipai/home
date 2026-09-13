@@ -2244,3 +2244,37 @@ nothing" is therefore not met by this fix and, by the measurement,
 not meetable by a floor; the end-to-end abstention (the reply) is what
 the baseline bench measures, and it passes. Raised to the coordinator
 with the numbers rather than rewritten.
+
+## #73, the hub stops its engines: Codex's change, reviewed and gated here (2026-09-13)
+
+Codex implemented the one shutdown path (`backend/src/lib/hubShutdown.ts`
+and its test; SIGINT/SIGTERM in `index.ts` and the fatal handlers in
+`log.ts` call `shutdownEngines()`, which runs each supervisor's stop in
+turn; `watchEngine().stop()` in `sidecars.ts` sends SIGTERM and
+escalates to SIGKILL after five seconds) and left it uncommitted when
+its own gate could not run. Reviewed here as the supervisors' owner,
+four changes made before the commit: the three backends' `stop` is
+typed `() => void | Promise<void>` (a spawned backend's stop was
+already `watchEngine()`'s promise at runtime while the type said void,
+so the awaits looked like no-ops); `shutdownEngines()` catches a stop
+that throws and goes on to the next, and never rejects, since the
+fatal handler that awaits it would otherwise raise a second unhandled
+rejection into the same handler; the whole shutdown has a twenty-second
+deadline so a stop that never resolves cannot keep a dying process
+alive; and `watchEngine().stop()` waits for the exit after its SIGKILL
+too (a bounded second wait), so a caller reading the exit reads a real
+one. Codex's SIGKILL test raced the child's own signal handler
+(SIGTERM landed before the handler was installed and ended the child
+politely); it now waits for the child's "ready" line. The gate found
+one more: the awaited stop moved each supervisor's state clearing
+after the await, so a caller that does not await (the test reset seam,
+`drop` inside the watch) saw the old backend for a tick and two embed
+supervisor tests read "stub" where "none" was expected; each restart
+and stop now clears its state first and awaits the previous backend's
+stop after. Also in this commit, one writer for the turn log: the
+`[turn]` line went to `hub.log` twice since 677d4c4 (the turn logger's
+own append and the console mirror), so the turn logger now writes to
+the console only and the mirror persists it. `bun stop`
+sends SIGTERM and waits up to thirty seconds, which the shutdown's
+fifteen seconds of engine stops plus the deadline fit. Committed by
+name with Codex as the author of the change.

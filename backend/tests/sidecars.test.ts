@@ -372,6 +372,23 @@ describe("probeAlive (what the Health page asks)", () => {
 });
 
 describe("watchEngine (the engines' auto-heal)", () => {
+  // #73: a supervisor's stop is SIGTERM, then SIGKILL after its timeout.
+  // The child ignores SIGTERM and says so on stdout before the stop is
+  // sent (a SIGTERM that lands before the handler is installed would
+  // end the child politely and prove nothing).
+  test("escalates a supervisor stop to SIGKILL after its timeout", async () => {
+    const proc = Bun.spawn(["bun", "-e", "process.on('SIGTERM', () => {}); console.log('ready'); setInterval(() => {}, 1000)"], { stdout: "pipe" });
+    const reader = proc.stdout.getReader();
+    let seen = "";
+    while (!seen.includes("ready")) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      seen += new TextDecoder().decode(value);
+    }
+    const watch = watchEngine({ proc, role: "stop-timeout", label: "the test engine", healthCheck: async () => true, drop: () => {}, respawn: async () => {}, title: "Test engine stopped" });
+    await watch.stop(200);
+    expect(proc.signalCode).toBe("SIGKILL");
+  });
   // Real child processes, real SIGKILLs, real health fetches - the same
   // "no mocked child_process" rule the rest of this file follows. A
   // watched process is one of this suite's own throwaway servers, and

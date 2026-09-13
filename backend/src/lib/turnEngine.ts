@@ -25,7 +25,6 @@ import { intentFor, markIncluded, guardContextFrom, type TurnContext, type TurnE
 import { newConversationTurnId } from "@/lib/id";
 import { complete, startCompleteStream, type LlmMessage, type ToolSpec, type ToolCall } from "@/lib/llm";
 import { guardReply, guardSentence, replacementFor, isCuttable, splitIntoSentences, type GuardContext, type GuardReason } from "@/lib/guards";
-import { appendLogLine } from "@/lib/log";
 import { tokenize } from "@/lib/text";
 import { sanitizeForPrompt } from "@/lib/promptSanitize";
 import {
@@ -150,8 +149,12 @@ function logTurnLine(surface: Surface, value: TurnValue, startedAt: number, guar
     duration_ms: Date.now() - startedAt,
   };
   const line = `[turn] ${JSON.stringify(record)}`;
+  // One writer (#73): the hub's console mirror (lib/log.ts, installed
+  // at boot) persists every console line to hub.log, so this line goes
+  // to the console only; the direct append it also had wrote each turn
+  // twice since the mirror arrived. A process without the mirror (a
+  // test, a bench) reads the console.
   console.log(line);
-  appendLogLine(line);
 }
 
 function logTurnSafely(

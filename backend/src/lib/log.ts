@@ -110,13 +110,14 @@ export function installConsoleFileMirror(): void {
 }
 
 /** Keep terminal-fatal errors in the log before the process exits. */
-export function installFatalErrorHandlers(): void {
+export function installFatalErrorHandlers(shutdown: () => Promise<void> = async () => {}): void {
   const state = globalThis as typeof globalThis & { __maipaiFatalHandlers?: boolean };
   if (state.__maipaiFatalHandlers) return;
   state.__maipaiFatalHandlers = true;
-  const exitAfterLogging = (kind: string, error: unknown): void => {
+  const exitAfterLogging = async (kind: string, error: unknown): Promise<void> => {
     appendLogLine(`[fatal] ${kind}: ${error instanceof Error ? error.stack ?? error.message : format(error)}`);
     appendLogLine("hub exiting");
+    await shutdown();
     process.exit(1);
   };
   process.on("uncaughtException", (error) => exitAfterLogging("uncaughtException", error));

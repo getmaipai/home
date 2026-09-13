@@ -48,7 +48,10 @@ export type BackendKind = "url" | "override" | "selection" | "stub";
 
 interface ChatBackend {
   client: LlamaServerClient;
-  stop: () => void;
+  /** #73: a spawned backend's stop is watchEngine()'s, which resolves
+   * once the process has exited (SIGKILL after a timeout); the URL and
+   * stub tiers stop nothing and return at once. */
+  stop: () => void | Promise<void>;
   /** Only set for a backend this module actually spawned (tiers 2-3): the
    * child's pid, for enginePostLoadCheck.ts's real memory measurement. */
   pid?: number;
@@ -542,9 +545,13 @@ export async function restartChatBackend(): Promise<void> {
   cancelEngineRespawn("chat");
   state.manuallyStopped = false;
   state.generation++;
-  state.chatBackend?.stop();
+  // The state is cleared before the (now awaited, #73) stop, so a
+  // caller that does not await, the test reset among them, sees the
+  // backend gone at once; the process is stopped in the background.
+  const previous = state.chatBackend;
   state.chatBackend = null;
   state.startingPromise = null;
+  await previous?.stop();
 }
 
 /** Engine control's "stop/pause": kills the running backend (if any) and,
@@ -552,13 +559,14 @@ export async function restartChatBackend(): Promise<void> {
  * getChatClient() refuses to auto-respawn until restartChatBackend() (or
  * a fresh model select, which calls that) runs. Safe to call with nothing
  * running (a stopped stub, or nothing started yet). */
-export function stopChatBackend(): void {
+export async function stopChatBackend(): Promise<void> {
   cancelEngineRespawn("chat");
   state.manuallyStopped = true;
   state.generation++;
-  state.chatBackend?.stop();
+  const previous = state.chatBackend;
   state.chatBackend = null;
   state.startingPromise = null;
+  await previous?.stop();
 }
 
 /** Real-time engine status for the Household → AI models page: is
