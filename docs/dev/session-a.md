@@ -982,3 +982,93 @@ safe first sentence; three self-harm sentences in one streamed reply
 notifying once with `allow_with_resources` and the crisis text kept.
 The safety corpus suites and the floor and ceiling fixtures unchanged
 and green.
+
+## CHAT-03: credentials never enter chat memory or context, design (2026-09-13)
+
+Where a credential can enter today: the `remember` package's Tier 0
+pattern ("remember that the wifi password is X") writes the fact
+through `host.memory.remember`; the memory judge extracts facts from
+turn rows and its own prompt shows "The wifi password is Juniper2026"
+as a worked example, teaching the model to store exactly this;
+`POST /api/memory` stores any text; the turn row itself keeps the
+utterance verbatim and `recordEpisodes()` embeds it; the conversation
+window, the profile paragraph, recalled memories and the judge's
+"memory updated" summary read all of it back. `lib/secrets.ts` holds
+declared credentials encrypted; nothing keeps them out of the
+conversational store.
+
+### What changes
+
+`backend/src/lib/memoryContentPolicy.ts`, new and pure: one policy for
+every capture path. `detectCredential(text)` recognizes, bounded on
+purpose, an explicit assignment to a credential label (password,
+passcode, passphrase, PIN, token, API key, secret, cookie, private key,
+access key, client secret; "is", "=", ":", "was set to") whose value
+is a single token that looks like a value (six or more characters with
+a digit, mixed case or a symbol, or any quoted value), and the known
+secret formats (an AWS access key id, a GitHub token, an `sk-` style
+API key, a JWT, a PEM private-key header, a long hex or base64 run next
+to a credential label). A statement that a credential is kept
+somewhere ("the wifi password is on the fridge", "my password is
+managed in Credentials", "the API key is the same as last time")
+passes: the value position holds a preposition, an article or a
+verb, not a value. `hasDeclaredCredentialField(body)` rejects a
+structured input carrying a key named like a credential field with a
+non-empty string value, the declared-field half at the API boundary.
+`redactCredentials(text)` replaces each detected span with
+`[credential redacted]`. The limits, stated in the module and the user
+page: an unlabeled arbitrary string cannot be proven a secret or not
+by any heuristic, so a bare token pasted with no label and no known
+shape passes; the policy never enumerates or decrypts the keystore to
+compare values (a matcher built from the secrets would itself be the
+leak). `CREDENTIAL_SAFE_MESSAGE` is the fixed line: "Keep passwords
+and keys in Credentials, not in chat."
+
+The chat capture request. `prepareTurn()` checks the utterance right
+after the input safety check and before anything else touches it
+(before the lease engages, before routing's embed, before the model,
+before `logTurn()`): a detected credential returns an immediate turn
+carrying the fixed line, and that turn is logged with the utterance
+redacted (`[credential redacted]` in place of the value), so the row,
+the episode and its embedding hold a marker and never the value.
+Everything downstream of `remember()` is defense in depth: `remember()`
+and `supersede()` in `memory.ts` reject a detected credential with a
+400 whose error is the fixed line (the existing
+`{ error }` shape, so the API and `host.memory.remember` need no new
+plumbing; the route also rejects a body with a declared credential
+field); the judge drops an extracted fact the policy rejects, skips a
+turn row whose stored text detects one (a historical row from before
+this item) rather than sending it to the model, and its "memory
+updated" summary is built from written facts only, which the policy
+already filtered; the prompt's worked example becomes "The wifi
+password is written on the fridge", a location, not a value.
+
+The read side, without deleting anything: `recall()` and
+`getProfileParagraph()` drop a record whose text detects a credential;
+`buildConversationWindow()` redacts a user line that detects one (so
+the summary refresh, which reads the window, never sees it either);
+`recallEpisodes()` drops such an episode. Existing records stay where
+they are (destructive cleanup is out of scope and the household can
+forget them from the Memory page as before).
+
+Out of scope, per the item: migrating a credential said in chat into
+`lib/secrets.ts`, deleting old rows, a new store, and CHAT-06's
+ingestion service (this policy is the module it will call).
+
+### Acceptance, as tests
+
+`memoryContentPolicy.test.ts` (pure, synthetic values built in the
+test): each label with "is", "=", ":" and a value; each known format;
+the benign statements; the declared-field check; redaction. `memory.test.ts`:
+`remember()` and `supersede()` reject with the fixed line, `recall()`
+and the profile hide a historical record. `memoryJudge.test.ts`: an
+extracted candidate is dropped and a historical credential turn never
+reaches the model (the scripted judge sees no request with the value).
+`packageHost.test.ts`: `host.memory.remember` rejects. `turnEngine.test.ts`:
+"remember that the wifi password is <value>" through `runTurn()` answers
+the fixed line, the turn row and its episode hold the marker and not
+the value, the embed stub saw no request containing it, and "the wifi
+password is on the fridge, please remember that" still stores. The
+memory API: a 400 with `{ error }`. User page: a short "Passwords and
+keys" section on the memory page (and the site guide's copy), in the
+dad-test voice.

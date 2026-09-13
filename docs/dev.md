@@ -12650,3 +12650,5 @@ other's section once (147cd28, f4779a6).
   (2026-09-13).
 - CHAT-02, one output safety boundary: design note and the shipped
   record in [docs/dev/session-a.md](dev/session-a.md) (2026-09-13).
+- CHAT-03, credentials never enter chat memory or context: design note
+  in [docs/dev/session-a.md](dev/session-a.md) (2026-09-13).
