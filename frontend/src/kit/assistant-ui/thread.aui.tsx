@@ -33,6 +33,9 @@ import { ForgetThisMenuItem, ListenButton, RememberThisButton, RememberThisMenuI
 import { setPendingSupersedes } from "@/apps/chat/chatEditSupersedes";
 import { MemoryUpdatedChip } from "@/apps/chat/chatMemoryChip";
 import { ChatSourceCaption } from "@/apps/chat/chatSourceCaption";
+import { markCitations, type TurnWithSources } from "@/apps/chat/chatCitations";
+import { createCitationComponents } from "@/apps/chat/chatCitationLink";
+import { SourcesCard } from "@/apps/chat/chatSourcesCard";
 import { DayBoundaryProvider, DayDivider, MessageTimestamp } from "@/apps/chat/chatDayDivider";
 import { Button } from "@/kit/ui/button";
 import { Skeleton } from "@/kit/ui/skeleton";
@@ -71,6 +74,7 @@ import {
 import {
   createContext,
   useContext,
+  useMemo,
   type ComponentType,
   type FC,
   type PropsWithChildren,
@@ -510,6 +514,12 @@ const AssistantMessage: FC = () => {
   // doesn't announce every settled message's content on every DOM change
   // elsewhere in the thread.
   const running = useAuiState((s) => s.message.status?.type === "running");
+  // Lane 10 item 1: read the same "custom" metadata bag ChatSourceCaption/
+  // MemoryUpdatedChip already do, tolerant of `sources` being absent (both
+  // adapters carry it forward when present; nothing here requires it).
+  const sources = useAuiState((s) => (s.message.metadata?.custom as TurnWithSources | undefined)?.sources);
+  const citationComponents = useMemo(() => createCitationComponents(sources), [sources]);
+  const markCitationsIn = useMemo(() => (text: string) => markCitations(text, sources), [sources]);
 
   return (
     <MessagePrimitive.Root
@@ -564,7 +574,7 @@ const AssistantMessage: FC = () => {
                 );
               }
               case "text":
-                return <MarkdownText />;
+                return <MarkdownText components={citationComponents} preprocess={markCitationsIn} />;
               case "reasoning":
                 return <Reasoning {...part} />;
               case "tool-call":
@@ -600,6 +610,7 @@ const AssistantMessage: FC = () => {
         </MessagePrimitive.GroupedParts>
         <MessageError />
         <ChatSourceCaption />
+        {!running && <SourcesCard sources={sources} />}
         <MemoryUpdatedChip />
       </div>
 

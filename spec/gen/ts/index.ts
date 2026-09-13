@@ -2,6 +2,7 @@
 // Regenerate with: cd spec && bun run gen:ts
 
 export * from "./device.js";
+export * from "./source.js";
 export * from "./recipe.js";
 export * from "./relationship.js";
 export * from "./setting-value.js";

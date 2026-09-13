@@ -12852,3 +12852,15 @@ other's section once (147cd28, f4779a6).
   full item still needs, named for Session A with the response shape
   to consume:
   [docs/dev/session-b.md](dev/session-b.md) (2026-09-13).
+- Lane 10 item 1, sources on a reply: the work order's own
+  `conversation.schema.json` instruction didn't match that record's
+  real shape (a thread, not a turn - turns aren't spec-tracked today),
+  so the spec half became a standalone `spec/schemas/source.schema.json`
+  instead, regenerated into both language bindings with a round-trip
+  fixture; the frontend half (`SourcesCard`, `[N]` marker chips, both
+  adapters carrying `sources` forward) reads it through a
+  forward-compatible cast until CHAT-16 lands. Found live: a made-up
+  `citation:` URI scheme silently died to react-markdown's own
+  `urlTransform` (the same guard that blocks `javascript:` links);
+  fixed with a `#citation-N` fragment instead:
+  [docs/dev/session-b.md](dev/session-b.md) (2026-09-13).

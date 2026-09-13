@@ -2307,6 +2307,24 @@ alongside the first sourced skill, not before it.
       first pattern (which is what legacy already validated), with the
       same streaming-safe accumulate-then-parse discipline Perplexity's
       own docs warn matters.
+
+      **Status, 2026-09-13 (lane 10 item 1)**: the shape and the frontend
+      half are built (full writeup: docs/dev/session-b.md, "Lane 10 item
+      1"); the engine side still isn't. `spec/schemas/source.schema.json`
+      (a `Source` record: id, kind, title, url, site, an optional
+      snippet, the shared provenance/clock-stamp envelope) is generated
+      into both `spec/gen/ts` and `spec/gen/py`. The chat renders it end
+      to end already: `SourcesCard` (a numbered list under a settled
+      reply, `rel="noopener noreferrer"` and `referrerpolicy="no-referrer"`
+      on every link) and a `[N]` marker rewritten into a small linking
+      chip, parsed once from the FULL accumulated reply text
+      (`MarkdownTextPrimitive`'s own `preprocess` hook, never one
+      streamed delta alone) - both adapters (`chatHistoryAdapter.ts`,
+      `chatModelAdapter.ts`) carry a `sources` field forward the moment
+      a turn has one. Left unchecked: nothing renders yet in the real
+      app, because CHAT-16 hasn't started emitting `sources` on a turn -
+      that's the one piece left, Session A's own work, wired to the
+      exact shape above.
 - [ ] **Favicon fetch-once, cache, and reuse for citation/source chips**
       (S) - doesn't exist yet, but legacy had a complete, two-layer
       version worth reusing as-is (hard-won resolver/cache logic, not

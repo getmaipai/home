@@ -272,3 +272,96 @@ test("Copy on a household member's own message writes exactly what they typed to
     restore();
   }
 });
+
+// Lane 10 item 1: sources aren't on TurnValue yet (CHAT-16/Session A adds
+// them) - `done`'s `value.sources` here is exactly the shape this lane's
+// frontend already reads forward-compatibly (chatCitations.ts's
+// TurnWithSources), so this proves the real end-to-end render once that
+// field starts arriving, not just the adapter/component units in
+// isolation.
+function stubFetchWithSources(replyText: string, sources: unknown[]): () => void {
+  const original = globalThis.fetch;
+  globalThis.fetch = mock((input: RequestInfo | URL, init?: RequestInit) => {
+    const url = typeof input === "string" ? input : input.toString();
+    if (url.includes("/api/health")) return Promise.resolve(new Response(JSON.stringify({ brain: "llama-server", voice: "none" }), { status: 200 }));
+    if (url.includes("/api/conversations") && init?.method === "POST") return Promise.resolve(Response.json({ id: "conv-example123", status: "open", surface: "chat" }));
+    if (url.includes("/api/conversations")) return Promise.resolve(new Response(JSON.stringify([]), { status: 200 }));
+    if (url.includes("/api/plugins")) return Promise.resolve(new Response(JSON.stringify([]), { status: 200 }));
+    if (url.includes("/api/notifications")) return Promise.resolve(new Response(JSON.stringify([]), { status: 200 }));
+    if (url.includes("/api/turn/stream")) {
+      return Promise.resolve(
+        new Response(
+          ndjsonStream([
+            { type: "delta", text: replyText },
+            { type: "done", value: { reply: { text: replyText }, source: "model", safety: SAFETY, sources } },
+          ]),
+          { status: 200, headers: { "content-type": "application/x-ndjson" } },
+        ),
+      );
+    }
+    throw new Error(`unstubbed fetch: ${url}`);
+  }) as unknown as typeof fetch;
+  return () => (globalThis.fetch = original);
+}
+
+async function sendMessage(view: ReturnType<typeof renderWithQueryClient>, text: string): Promise<void> {
+  fireEvent.change(await view.findByLabelText("Message input"), { target: { value: text } });
+  const send = (await view.findByLabelText("Send message")) as HTMLButtonElement;
+  await waitFor(() => expect(send.disabled).toBe(false));
+  fireEvent.click(send);
+}
+
+const WEATHER_SOURCE = {
+  id: "src-1",
+  kind: "web",
+  title: "Boston weather",
+  url: "https://example.com/weather",
+  site: "example.com",
+  snippet: null,
+  source: "turn-example123",
+  created_at: "2026-09-13T00:00:00Z",
+  hlc: "1757000000000:0:abc123",
+};
+
+test("a reply with sources renders a numbered [N] chip and a SourcesCard", async () => {
+  (globalThis as unknown as { AudioContext: unknown }).AudioContext = FakeAudioContext;
+  const restore = stubFetchWithSources("It'll be sunny [1].", [WEATHER_SOURCE]);
+  try {
+    const view = renderWithQueryClient(<MemoryRouter><ChatPage person={makePerson()} /></MemoryRouter>);
+    await sendMessage(view, "what's the weather");
+    await view.findByText(/It'll be sunny/);
+    const chip = await view.findByRole("link", { name: "Source 1: Boston weather" });
+    expect(chip.getAttribute("href")).toBe(WEATHER_SOURCE.url);
+    expect(chip.getAttribute("target")).toBe("_blank");
+    expect(chip.getAttribute("rel")).toBe("noopener noreferrer");
+    await view.findByRole("link", { name: "Boston weather · example.com" }); // the SourcesCard
+  } finally {
+    restore();
+  }
+});
+
+test("a [7] marker with only one source stays plain text, not a chip", async () => {
+  (globalThis as unknown as { AudioContext: unknown }).AudioContext = FakeAudioContext;
+  const restore = stubFetchWithSources("See [7] for more.", [WEATHER_SOURCE]);
+  try {
+    const view = renderWithQueryClient(<MemoryRouter><ChatPage person={makePerson()} /></MemoryRouter>);
+    await sendMessage(view, "what's the weather");
+    await view.findByText((content) => content.includes("[7]"));
+    expect(view.queryByRole("link", { name: /^Source / })).toBeNull();
+  } finally {
+    restore();
+  }
+});
+
+test("a reply with no sources renders no chip and no SourcesCard", async () => {
+  (globalThis as unknown as { AudioContext: unknown }).AudioContext = FakeAudioContext;
+  const restore = stubFetch();
+  try {
+    const view = renderWithQueryClient(<MemoryRouter><ChatPage person={makePerson()} /></MemoryRouter>);
+    await sendMessage(view, "hi");
+    await view.findByText("A canned reply.");
+    expect(view.queryByRole("link", { name: /^Source / })).toBeNull();
+  } finally {
+    restore();
+  }
+});

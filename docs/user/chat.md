@@ -25,6 +25,8 @@ Weather, word meanings, trivia, and film lookups work right away. Web search tak
 
 See the [Privacy](privacy.md) page for what each one sends, and to whom.
 
+When an answer comes from something MaiPai looked up, you'll see small numbered links under the reply, one per source. Tap a number in the text, or a link in the list, to open that page in a new tab. This way you can always check where an answer came from.
+
 ## Talk instead of type
 
 Tap the microphone icon next to the message box and start speaking. MaiPai listens, turns your words into text, and sends it once you stop talking.

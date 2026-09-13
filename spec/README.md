@@ -15,6 +15,12 @@ and Relationship are new shapes chapter 3 does not describe; Grant is one
 it does. Still unbuilt from chapter 3: Content ceiling, Integration,
 Device, the link API, the LLM and voice contracts.
 
+Added 2026-09-13, same reason (`home/docs/dev/session-b.md`, "Lane 10
+item 1"): **Source**, one citation on an assistant reply (CHAT-16's
+evidence-ladder replies, `[N]` markers in the reply text) - lives on the
+assistant turn (`backend/src/wire.ts`'s `TurnValue`, additive), not a
+shape chapter 3 names.
+
 The error catalogue's *shape* (`ErrorEntry`) and the privacy row shape
 (`PrivacyRow`, used by the manifest's `data_sources[]`) are owned by
 `@maipai/standards` (std-v0.2.0) and imported by `$ref`, not defined here;

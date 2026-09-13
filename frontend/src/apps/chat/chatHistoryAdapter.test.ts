@@ -44,6 +44,24 @@ describe("rowsToBranchableMessages", () => {
     expect(items[1]!.message.metadata!.custom!.turnId).toBe("row-1");
   });
 
+  // Lane 10 item 1: ConversationTurnRow doesn't have `sources` yet
+  // (CHAT-16/Session A adds the column) - proves the reload path already
+  // carries it forward the moment a row has one, same key
+  // chatModelAdapter.ts's live path uses, so SourcesCard/the [N] chip
+  // render identically whether the message just streamed in or came back
+  // from a reload.
+  test("a row carrying sources passes them into the reply's metadata.custom.sources", () => {
+    const sources = [{ id: "src-1", kind: "web", title: "A page", url: "https://example.com/a", site: "example.com", snippet: null, source: "row-1", created_at: "2026-09-13T00:00:00Z", hlc: "1757000000000:0:abc123" }];
+    const row = { ...makeRow("row-1", "a reply"), sources };
+    const items = flatten(rowsToBranchableMessages([row], "Nova", "conv-example123"));
+    expect(items[1]!.message.metadata!.custom!.sources).toEqual(sources);
+  });
+
+  test("a row without sources leaves metadata.custom.sources undefined, not a crash", () => {
+    const items = flatten(rowsToBranchableMessages([makeRow("row-1", "a reply")], "Nova", "conv-example123"));
+    expect(items[1]!.message.metadata!.custom!.sources).toBeUndefined();
+  });
+
   test("empty history maps to an empty thread", () => {
     expect(rowsToBranchableMessages([], "Nova", "conv-example123")).toEqual([]);
   });

@@ -1698,3 +1698,119 @@ dedicated capture, `capturePaletteOpen()` in `scripts/screenshot.ts` -
 `SearchPage.tsx`'s own route is `far`'s real destination for this, not
 phone's or desktop's, both of which reach the dialog instead, which
 the route matrix never opens) opened and read correctly.
+
+## Lane 10 item 1: sources on a reply, the spec shape and the chat rendering
+
+The work order's own line ("Add an optional `sources: Source[]` to the
+assistant turn in `conversation.schema.json`") doesn't match what that
+file actually is: `conversation.schema.json` is the Conversation
+THREAD record (title, summary, lifecycle) - it has no notion of a
+single turn at all, because turns are hub-internal
+(`backend/src/db/schema.ts`'s `conversationTurns`, exposed to the
+frontend as `TurnValue`/`ConversationTurnRow` in `backend/src/wire.ts`,
+neither of which is spec-generated). Legacy's own precedent confirms
+sources belong on the reply, not the thread: `docs/BACKLOG.md`'s own
+citation item describes a `messages.sources` column, per message. So
+this lane built the one part of that instruction that IS a spec
+concern - `spec/schemas/source.schema.json`, a standalone `Source`
+record with the shared envelope (`source`, `hlc`, `created_at`, no
+`updated_at` since a citation is a snapshot, never edited) - and left
+`TurnValue`/the `conversationTurns` row exactly where the work order's
+own out-of-scope line puts them: Session A's, added when CHAT-16 emits
+real sources. Flagged here rather than silently reinterpreted, since a
+wrong guess here is exactly the kind of thing worth a paper trail.
+
+**The spec half**: `spec/schemas/source.schema.json` (`id`, `kind`:
+web/wikidata/wikipedia/weather/package, `title`, `url`, `site`, an
+optional `snippet`, plus `source`/`created_at`/`hlc`), regenerated into
+`spec/gen/ts/source.ts` and `spec/gen/py/source_schema.py`, a fixture
+(`spec/fixtures/records/source.example.json`) wired into both
+`tests/ts/fixtures.test.ts` and `tests/py/test_fixtures.py`, one
+sentence in `spec/README.md` matching the Entity/Relationship/Grant
+precedent.
+
+**The frontend half, forward-compatible until CHAT-16 lands**:
+`chatCitations.ts`'s `TurnWithSources = { sources?: Source[] }` is the
+one place both adapters read a field neither `TurnValue` nor
+`ConversationTurnRow` declares yet - `(row as TurnWithSources).sources`
+in `chatHistoryAdapter.ts`, `(event.value as TurnWithSources).sources`
+in `chatModelAdapter.ts` - narrower than a cast to `any`, and both
+casts disappear the moment Session A adds the real field (nothing else
+about the adapters changes). Both attach `sources` to `message.metadata
+.custom`, the identical bag `chatSourceCaption.tsx`/`chatMemoryChip.tsx`
+already read from, so the reload and live paths render identically -
+proven directly (`chatHistoryAdapter.test.ts`'s new "a row carrying
+sources passes them into the reply's metadata" test uses the same
+row-to-message path the reload adapter's other tests already exercise).
+
+**Rendering, kit primitives first**: `markCitations()`
+(`chatCitations.ts`) rewrites a `[N]` marker into a real markdown link,
+`[N](#citation-N)`, only when N indexes a real source - passed to
+`MarkdownTextPrimitive`'s own `preprocess` prop (newly forwarded
+through `kit/assistant-ui/markdown-text.tsx`), which always runs on the
+full accumulated reply text, never one streamed delta alone, which is
+exactly the "a marker can split across chunks" safety the design note
+asks for: a buffer ending mid-marker (`"...[""`) has nothing to match
+yet, so nothing is converted early. `chatCitationLink.tsx`'s `a`
+override then intercepts that `#citation-N` link and renders a chip
+naming the source (`aria-label="Source N: <title>"`, opens in a new tab
+with `rel="noopener noreferrer"`/`referrerpolicy="no-referrer"`) or
+falls through to the same plain-link styling for a real URL.
+`SourcesCard` renders the full numbered list under the settled reply
+(`!running`), same link attributes. No favicon fetch anywhere - the
+proxy is its own backlog item.
+
+**Found live, would have shipped broken**: the first version used a
+made-up `citation:N` URI scheme instead of a `#`-fragment. It rendered
+in the DOM as `href=""` with the chip logic never firing - traced to
+react-markdown's own default `urlTransform`, which allows only a fixed
+protocol allowlist (http/https/mailto/tel) plus relative/fragment
+links and silently blanks anything else, the same mechanism that keeps
+a `javascript:` link from a hostile reply from ever becoming clickable.
+A custom scheme falls into that same bucket. Switched to `#citation-N`
+(inherently relative, never touched by the transform) and the chip
+rendered correctly end to end. Caught by the "renders a numbered [N]
+chip and a SourcesCard" ChatPage.test.tsx case below, not by manual
+inspection - the test failed with the chip's own fallback (plain link,
+empty href) rendering instead of the chip, which is what pointed at
+`urlTransform` rather than my own component logic.
+
+**Found by code review, before this lane's commit**: three real
+findings, all fixed. (1) `markCitations()`'s original regex ran over
+the raw text with no code-span awareness, so a reply explaining
+`` `items[2]` `` in prose would have rewritten the marker INSIDE the
+backticks into a broken link fragment - fixed the same way
+`chatCitationLink.tsx`'s design already cited (`@assistant-ui/react-
+markdown`'s own math-delimiter helpers, "code spans and fences are
+never rewritten"): split on fenced/inline code spans first, only
+rewrite the segments outside them; two new regression tests. (2)
+`chatSourcesCard.tsx`'s "Title — site" separator used a literal em
+dash, banned outright by the org's own writing standard
+(`getmaipai/.github` CLAUDE.md, "No em dashes, ever") - switched to a
+middle dot, both tests updated. (3) `chatCitationLink.tsx`'s fallback
+`a` (a real URL a reply also contains, not a citation) hand-duplicated
+`markdown-text.tsx`'s own default link styling instead of reusing it,
+dropping the `aui-md-a` hook class in the process and creating a
+second definition that could silently drift - fixed by exporting
+`MARKDOWN_LINK_CLASS` from `markdown-text.tsx` and importing it in
+both places.
+
+**Verified**: `spec/tests/ts/fixtures.test.ts` and
+`spec/tests/py/test_fixtures.py` (`bun test`/`pytest`, both green) for
+the round-trip; `frontend/src/apps/chat/chatCitations.test.ts` (a
+matched `[N]` becomes a link, an unmatched `[N]` stays text, no sources
+leaves every marker untouched, a still-incomplete marker at the end of
+a buffer is never half-converted, a marker inside an inline span or a
+fenced block is left alone, `parseCitationHref`'s own inverse);
+`chatSourcesCard.test.tsx` (three sources render three numbered links
+with the right `target`/`rel`/`referrerpolicy`; no sources or an empty
+array render nothing); `chatHistoryAdapter.test.ts`'s two new cases
+(sources pass through; their absence doesn't crash); three new
+`ChatPage.test.tsx` cases driving the real end-to-end pipeline through
+a stubbed `/api/turn/stream` (a reply with sources renders the chip and
+the card with the right attributes; a `[7]` marker against a single
+source stays plain text; a plain reply with no sources renders neither).
+No live screenshot: nothing in the running app emits `sources` yet
+(CHAT-16 hasn't landed), so there is nothing true to capture - stated
+here rather than staging a screenshot that could only ever show an
+empty state.

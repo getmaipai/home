@@ -4,6 +4,7 @@ import { SentenceSpeechScheduler } from "@/lib/sentenceSpeechScheduler";
 import { splitReadyChunks } from "@/lib/sentenceChunker";
 import { normalizeForSpeech } from "@maipai/spec/voice/ts/normalizeForSpeech.js";
 import { messageText } from "@/apps/chat/chatMessageText";
+import type { TurnWithSources } from "@/apps/chat/chatCitations";
 
 // Qwen3's hybrid thinking mode wraps its reasoning in a `<think>...</think>`
 // block ahead of the real answer when enabled (llm.ts's `thinking` option);
@@ -310,7 +311,18 @@ export function createChatModelAdapter(deps: ChatModelAdapterDeps): ChatModelAda
             yield {
               content: [{ type: "text", text: finalText }],
               metadata: {
-                custom: { source: event.value.source, pluginId: event.value.plugin_id, commandId: event.value.command_id, turnId: event.value.turn_id, conversationId },
+                custom: {
+                  source: event.value.source,
+                  pluginId: event.value.plugin_id,
+                  commandId: event.value.command_id,
+                  turnId: event.value.turn_id,
+                  conversationId,
+                  // Lane 10 item 1: not on TurnValue yet, same
+                  // forward-compatible read chatHistoryAdapter.ts uses,
+                  // so a live reply carries sources the moment CHAT-16
+                  // emits them with no adapter change needed then.
+                  sources: (event.value as TurnWithSources).sources,
+                },
               },
             };
           } else {

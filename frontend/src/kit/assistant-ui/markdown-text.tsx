@@ -19,6 +19,11 @@ import { cn } from "@/kit/utils";
 
 type MarkdownTextProps = Partial<TextMessagePartProps> & {
   components?: Parameters<typeof memoizeMarkdownComponents>[0];
+  /** Forwarded straight to MarkdownTextPrimitive: a transform run on the
+   * full accumulated reply text before markdown parsing (chatCitationLink.tsx's
+   * `[N]` marker rewrite is the first caller), never on one streamed
+   * delta alone - see that prop's own doc for why that matters. */
+  preprocess?: (text: string) => string;
 };
 
 const useShallowStable = <T extends Record<string, unknown> | undefined>(
@@ -37,7 +42,7 @@ const useShallowStable = <T extends Record<string, unknown> | undefined>(
   return ref.current;
 };
 
-const MarkdownTextImpl: FC<MarkdownTextProps> = ({ components }) => {
+const MarkdownTextImpl: FC<MarkdownTextProps> = ({ components, preprocess }) => {
   const stableComponents = useShallowStable(components);
   const markdownComponents = useMemo(() => {
     if (!stableComponents) return defaultComponents;
@@ -52,6 +57,7 @@ const MarkdownTextImpl: FC<MarkdownTextProps> = ({ components }) => {
       remarkPlugins={[remarkGfm]}
       className="aui-md"
       components={markdownComponents}
+      preprocess={preprocess}
       defer
     />
   );
@@ -85,6 +91,13 @@ const CodeHeader: FC<CodeHeaderProps> = ({ language, code }) => {
     </div>
   );
 };
+
+/** The default markdown link's own styling - exported so chatCitationLink.tsx's
+ * `a` override (which fully replaces this entry, not merges into it) can
+ * reuse the identical look for the non-citation case, one definition
+ * instead of a copy that can silently drift. */
+export const MARKDOWN_LINK_CLASS =
+  "aui-md-a text-primary hover:text-primary/80 focus-visible:text-primary/80 underline underline-offset-2";
 
 const defaultComponents = memoizeMarkdownComponents({
   h1: ({ className, ...props }) => (
@@ -151,13 +164,7 @@ const defaultComponents = memoizeMarkdownComponents({
     />
   ),
   a: ({ className, ...props }) => (
-    <a
-      className={cn(
-        "aui-md-a text-primary hover:text-primary/80 underline underline-offset-2",
-        className,
-      )}
-      {...props}
-    />
+    <a className={cn(MARKDOWN_LINK_CLASS, className)} {...props} />
   ),
   blockquote: ({ className, ...props }) => (
     <blockquote

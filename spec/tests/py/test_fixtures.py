@@ -26,6 +26,7 @@ from gen.py.relationship_schema import Relationship
 from gen.py.safety_result_schema import SafetyResult
 from gen.py.setting_value_schema import SettingValue
 from gen.py.settings_key_schema import SettingsKey
+from gen.py.source_schema import Source
 
 # ErrorEntry is standards-owned (std-v0.2.0), not generated here; loaded
 # from the sibling .github checkout the same way spec/schemas/manifest
@@ -85,6 +86,10 @@ def test_device_fixture():
 
 def test_conversation_fixture():
     Conversation.model_validate(load_fixture("conversation.example.json"))
+
+
+def test_source_fixture():
+    Source.model_validate(load_fixture("source.example.json"))
 
 
 @pytest.mark.parametrize("kind", ["memory", "entity", "episode"])
