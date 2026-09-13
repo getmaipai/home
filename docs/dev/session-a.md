@@ -2544,3 +2544,28 @@ proved. The hub's
 `evaluateReply()`, the path the streaming gate uses. The bot pins
 this spec and re-runs its own safety suite on its next bump.
 
+## #61, Roman numerals in titles: Codex's change, reviewed and gated here (2026-09-13)
+
+Codex added `normalizeRomanNumerals()` to `spec/voice/ts/
+normalizeForSpeech.ts`: a numeral after a capitalized word is spoken as
+a cardinal ("Rocky IV", "Grand Theft Auto VI"), and after a name from
+an explicit, short regnal list as an ordinal ("Henry VIII" is "Henry
+the eighth"), the numeral parsed and checked against its canonical
+spelling so "MIL" and "DVD" are not numbers. Reviewed here before the
+commit; the list is explicit and short (24 names, kings and popes),
+which was the risk named. Two things changed. The first cut read every
+run of I V X L C D M after a capitalized word, so the hub's own "Okay I
+set the timer" spoke as "Okay one set the timer", "Tell John I said hi"
+as "Tell John the first said hi", and "Washington DC", "Vitamin C",
+"Audio CD", "Size XL", "Party MIX" all became numbers (each confirmed
+by running the function). Now a single letter is never a cardinal,
+"I" is never a numeral, the value stays at sixty or under (a film, a
+game, a Super Bowl, a reign; "DC" is 600 and "MIX" 1009), and "XL"
+is a size; "Rocky V" is given up with the single letters. The second:
+the change was TS-only, with its cases hardcoded in the TS test, while
+the file has a Python twin (`spec/voice/py/normalize_for_speech.py`,
+what the bot runs) and one shared fixture set both must pass. The
+eighteen cases, Codex's and the review's, are rows in
+`spec/voice/fixtures/normalize-for-speech.json`, and the Python twin
+has the same pass in the same place in its pipeline. Committed by name
+with Codex as the author of the change.

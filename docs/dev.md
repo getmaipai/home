@@ -12748,3 +12748,8 @@ other's section once (147cd28, f4779a6).
   joins; a term now matches only at word boundaries after per-word
   stripping, the split-term obfuscation catches kept, six corpus rows:
   [docs/dev/session-a.md](dev/session-a.md) (2026-09-13).
+- #61, Roman numerals in titles spoken as cardinals and regnal names as
+  ordinals (Codex's change, reviewed and gated here: single letters and
+  common abbreviations never numerals, the Python twin and the shared
+  fixture rows added): [docs/dev/session-a.md](dev/session-a.md)
+  (2026-09-13).

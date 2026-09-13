@@ -61,7 +61,10 @@ decoder waiting indefinitely for audio that will never arrive.
 v0.3's own sequencing at Jesse's direct request** ("build the entire
 thing properly, not partial"): `ts/normalizeForSpeech.ts` is the
 mechanical half - numbers, times, dates, currency, percentages, units,
-common abbreviations, and stray markdown/emoji, each read the way a
+common abbreviations, Roman numerals in titles and reigns (#61: "Rocky
+IV" is "Rocky four", "Henry VIII" is "Henry the eighth" from an explicit
+regnal list, and a single capital or a common abbreviation such as "DC"
+is never a numeral), and stray markdown/emoji, each read the way a
 person actually says them, never touching the text a household sees on
 screen (Jesse: "if you have the voice say ten O four, you still display
 10:04"). `backend/src/lib/turnEngine.ts`'s `finalizeReply()` is the one

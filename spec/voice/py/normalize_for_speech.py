@@ -337,6 +337,104 @@ def _normalize_units_and_abbreviations(text: str) -> str:
 # Generic numbers (the catch-all, run last)
 # ---------------------------------------------------------------------------
 
+# ---------------------------------------------------------------------------
+# Roman numerals (#61), mirroring normalizeRomanNumerals() in the TS file:
+# a numeral in a title or edition is a cardinal ("Rocky IV" -> "Rocky
+# four"), a regnal name from the explicit list takes the ordinal ("Henry
+# VIII" -> "Henry the eighth"). Narrow on purpose, since I V X L C D M are
+# also ordinary capitals: a single letter is never a cardinal ("Vitamin
+# C", "Okay I set the timer"), "I" is never a numeral, the value stays at
+# sixty or under ("Washington DC" is 600), and "XL" is a size.
+# ---------------------------------------------------------------------------
+
+_REGNAL_NAMES = {
+    "Alexander",
+    "Benedict",
+    "Boniface",
+    "Clement",
+    "Edward",
+    "George",
+    "Gregory",
+    "Henry",
+    "Innocent",
+    "James",
+    "John",
+    "Leo",
+    "Louis",
+    "Martin",
+    "Nicholas",
+    "Paul",
+    "Peter",
+    "Philip",
+    "Pius",
+    "Richard",
+    "Stephen",
+    "Urban",
+    "Victor",
+    "William",
+}
+_ROMAN_TOKEN_RE = re.compile(r"(?<![A-Za-z])([IVXLCDM]+)(?![A-Za-z])")
+_ROMAN_VALUES = {"I": 1, "V": 5, "X": 10, "L": 50, "C": 100, "D": 500, "M": 1000}
+_ROMAN_PARTS = [
+    (1000, "M"),
+    (900, "CM"),
+    (500, "D"),
+    (400, "CD"),
+    (100, "C"),
+    (90, "XC"),
+    (50, "L"),
+    (40, "XL"),
+    (10, "X"),
+    (9, "IX"),
+    (5, "V"),
+    (4, "IV"),
+    (1, "I"),
+]
+_ROMAN_MAX = 60
+_NEVER_NUMERALS = {"I", "XL"}
+_PRECEDING_WORD_RE = re.compile(r"([A-Za-z]+)\s*$")
+_TITLE_WORD_RE = re.compile(r"^[A-Z][a-z]+$")
+
+
+def _canonical_roman(n: int) -> str:
+    result = ""
+    for value, symbol in _ROMAN_PARTS:
+        while n >= value:
+            result += symbol
+            n -= value
+    return result
+
+
+def _roman_to_number(token: str) -> int | None:
+    value = 0
+    for i, ch in enumerate(token):
+        current = _ROMAN_VALUES[ch]
+        nxt = _ROMAN_VALUES.get(token[i + 1]) if i + 1 < len(token) else None
+        value += -current if nxt and current < nxt else current
+    return value if _canonical_roman(value) == token else None
+
+
+def _normalize_roman_numerals(text: str) -> str:
+    def replace(m: re.Match[str]) -> str:
+        token = m.group(1)
+        if token in _NEVER_NUMERALS:
+            return token
+        value = _roman_to_number(token)
+        if value is None or value > _ROMAN_MAX:
+            return token
+        preceding_match = _PRECEDING_WORD_RE.search(text[: m.start()])
+        preceding = preceding_match.group(1) if preceding_match else None
+        if preceding and preceding in _REGNAL_NAMES:
+            return f"the {_ordinal_words(value)}"
+        if len(token) < 2:
+            return token
+        if not preceding or not _TITLE_WORD_RE.match(preceding):
+            return token
+        return number_to_words(value)
+
+    return _ROMAN_TOKEN_RE.sub(replace, text)
+
+
 _ORDINAL_DIGIT_RE = re.compile(r"\b(\d+)(st|nd|rd|th)\b", re.IGNORECASE)
 _NUMBER_RE = re.compile(r"\b\d[\d,]*(?:\.\d+)?\b")
 _SINGULAR_AGREEMENT_RE = re.compile(r"\bone ([a-z]+)s\b")
@@ -377,6 +475,7 @@ def normalize_for_speech(text: str) -> str:
     s = _normalize_currency(s)
     s = _normalize_percent(s)
     s = _normalize_units_and_abbreviations(s)
+    s = _normalize_roman_numerals(s)
     s = _normalize_generic_numbers(s)
     s = _TRAILING_SPACE_RE.sub(" ", s)
     s = _SPACE_BEFORE_PUNCT_RE.sub(r"\1", s)

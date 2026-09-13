@@ -287,6 +287,72 @@ function normalizeUnitsAndAbbreviations(text: string): string {
   return s;
 }
 
+// Roman numerals in a title or edition name are cardinals ("Rocky IV" ->
+// "Rocky four"). Regnal names are the one deliberate ordinal exception:
+// "Henry VIII" -> "Henry the eighth". Keep the regnal list explicit so a
+// capitalized word in an ordinary title cannot be guessed to be a monarch.
+const REGNAL_NAMES = new Set([
+  "Alexander", "Benedict", "Boniface", "Clement", "Edward", "George",
+  "Gregory", "Henry", "Innocent", "James", "John", "Leo", "Louis",
+  "Martin", "Nicholas", "Paul", "Peter", "Philip", "Pius", "Richard",
+  "Stephen", "Urban", "Victor", "William",
+]);
+const ROMAN_TOKEN_RE = /(?<![A-Za-z])([IVXLCDM]+)(?![A-Za-z])/g;
+const ROMAN_VALUES: Record<string, number> = {
+  I: 1, V: 5, X: 10, L: 50, C: 100, D: 500, M: 1000,
+};
+
+function canonicalRoman(n: number): string {
+  const parts: [number, string][] = [
+    [1000, "M"], [900, "CM"], [500, "D"], [400, "CD"],
+    [100, "C"], [90, "XC"], [50, "L"], [40, "XL"],
+    [10, "X"], [9, "IX"], [5, "V"], [4, "IV"], [1, "I"],
+  ];
+  let result = "";
+  for (const [value, symbol] of parts) {
+    while (n >= value) {
+      result += symbol;
+      n -= value;
+    }
+  }
+  return result;
+}
+
+function romanToNumber(token: string): number | undefined {
+  let value = 0;
+  for (let i = 0; i < token.length; i++) {
+    const current = ROMAN_VALUES[token[i]!];
+    const next = ROMAN_VALUES[token[i + 1]!];
+    if (!current) return undefined;
+    value += next && current < next ? -current : current;
+  }
+  return canonicalRoman(value) === token ? value : undefined;
+}
+
+// A review before the commit: the letters I V X L C D M are also
+// ordinary capitals, so the rule is narrow on purpose. A single letter
+// is never a cardinal ("Vitamin C", "Model X", and the hub's own "Okay
+// I set the timer"), "I" is never a numeral at all ("Tell John I said
+// hi" after a regnal name), the value stays at sixty or under (a film,
+// a game, a Super Bowl, a reign; "Washington DC" is 600, "Audio CD"
+// 400, "Party MIX" 1009), and "XL" is a size.
+const ROMAN_MAX = 60;
+const NEVER_NUMERALS = new Set(["I", "XL"]);
+
+function normalizeRomanNumerals(text: string): string {
+  return text.replace(ROMAN_TOKEN_RE, (_whole, token: string, offset: number, whole: string) => {
+    if (NEVER_NUMERALS.has(token)) return token;
+    const value = romanToNumber(token);
+    if (value === undefined || value > ROMAN_MAX) return token;
+    const before = whole.slice(0, offset);
+    const preceding = before.match(/([A-Za-z]+)\s*$/)?.[1];
+    if (preceding && REGNAL_NAMES.has(preceding)) return `the ${ordinalWords(value)}`;
+    if (token.length < 2) return token;
+    if (!preceding || !/^[A-Z][a-z]+$/.test(preceding)) return token;
+    return numberToWords(value);
+  });
+}
+
 // ── Generic numbers (the catch-all, run last) ─────────────────────────────
 // Ordinal digits ("1st", "22nd") first, since a plain-number pass would
 // otherwise spell out the leading digits and strand the suffix letters as
@@ -354,6 +420,7 @@ export function normalizeForSpeech(text: string): string {
   s = normalizeCurrency(s);
   s = normalizePercent(s);
   s = normalizeUnitsAndAbbreviations(s);
+  s = normalizeRomanNumerals(s);
   s = normalizeGenericNumbers(s);
   return tidyWhitespace(s);
 }
