@@ -43,6 +43,35 @@ const ROOT = join(import.meta.dir, "..");
 const DATA_DIR = join(ROOT, ".demo-data");
 const BASE_URL = `http://localhost:${PORT}`;
 const useWebkit = process.argv.includes("--webkit");
+
+// Lane 3 item 5 (2026-09-13): the full matrix (4 viewports x 2 themes,
+// up to 11 routes each) ran fully sequentially against one Chromium
+// process, taking several minutes for no reason Playwright imposes -
+// one browser process happily supports many concurrent contexts.
+// Started at 4 per BACKLOG.md's own note; each context still visits its
+// own routes sequentially (unchanged), only the four-viewport/theme
+// combos run concurrently against each other.
+const CONTEXT_POOL_SIZE = 4;
+
+/** Runs `worker` over every item in `items`, at most `poolSize` at once,
+ * a new item starting the instant a slot frees rather than waiting for
+ * a whole batch to finish - a fixed chunk-of-4-then-wait shape would
+ * leave a slot idle for the rest of a chunk once its own item finishes
+ * early. Results land at their original index, not completion order, so
+ * the printed failure list and the final tally stay independent of
+ * scheduling. */
+async function runPool<T, R>(items: readonly T[], poolSize: number, worker: (item: T) => Promise<R>): Promise<R[]> {
+  const results: R[] = new Array(items.length);
+  let next = 0;
+  async function runSlot() {
+    while (next < items.length) {
+      const i = next++;
+      results[i] = await worker(items[i]!);
+    }
+  }
+  await Promise.all(Array.from({ length: Math.min(poolSize, items.length) }, runSlot));
+  return results;
+}
 // Issue #76: every browser wrote to the same `docs/assets/screens/<name>.png`
 // path, so a `--webkit` run (a11y/keyboard-trap verification, not the
 // published screenshots) silently overwrote the real Chromium-rendered
@@ -618,7 +647,8 @@ async function main() {
     await waitForHealth();
     const sessionValue = await seedHousehold();
 
-    browser = await (useWebkit ? webkit : chromium).launch();
+    const launchedBrowser = await (useWebkit ? webkit : chromium).launch();
+    browser = launchedBrowser;
 
     if (!a11yOnly && !settingsReview && !chatReview) await captureHero(browser, sessionValue);
 
@@ -626,11 +656,18 @@ async function main() {
       ? A11Y_ONLY_COMBOS
       : VIEWPORTS.flatMap((v) => THEMES.map((t) => ({ viewport: v.slug, theme: t })));
 
-    const results: RunResult[] = [];
-    for (const combo of combos) {
+    // `chatReview` clears and rebuilds the one shared conversation
+    // (`visitRoute`'s own `POST /api/conversations/clear` call, gated on
+    // `chatReview && route.slug === "chat"`) against this run's single
+    // seeded backend - its two combos (`A11Y_ONLY_COMBOS`) would race
+    // each other's chat history if run concurrently, so this mode stays
+    // sequential (pool size 1). Every other mode only ever reads.
+    const poolSize = chatReview ? 1 : CONTEXT_POOL_SIZE;
+    const comboResults = await runPool(combos, poolSize, async (combo): Promise<RunResult[]> => {
       const viewport = VIEWPORTS.find((v) => v.slug === combo.viewport);
       if (!viewport) throw new Error(`unknown viewport ${combo.viewport}`);
-      const context = await newContext(browser, viewport, combo.theme, sessionValue);
+      const context = await newContext(launchedBrowser, viewport, combo.theme, sessionValue);
+      const comboResult: RunResult[] = [];
       try {
         for (const route of (chatReview ? ROUTES.filter((entry) => entry.slug === "chat") : settingsReview ? ROUTES.filter((entry) => entry.slug === "settings" || entry.slug === "settings-models") : ROUTES)) {
           console.log(`${route.slug} @ ${viewport.slug}/${combo.theme}...`);
@@ -641,7 +678,7 @@ async function main() {
           // page under real contention) would otherwise stall this loop,
           // and everything after it, forever. A timeout here is reported
           // as a failure for this one combo, never silently skipped.
-          results.push(
+          comboResult.push(
             await Promise.race([
               visitRoute(context, route, viewport, combo.theme, !a11yOnly),
               new Promise<RunResult>((_, reject) =>
@@ -659,7 +696,9 @@ async function main() {
       } finally {
         await context.close();
       }
-    }
+      return comboResult;
+    });
+    const results: RunResult[] = comboResults.flat();
 
     console.log("checking prefers-reduced-motion...");
     const reducedMotionFailures = await checkReducedMotion(browser, sessionValue);

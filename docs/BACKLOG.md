@@ -3447,17 +3447,23 @@ future session now that F's hub half exists.
     memory, and the branch is lost on reload. Needs a nullable `supersedes`
     column on the backend's turn table before any frontend fix is honest.
     See docs/dev.md's "Session B follow-up" entry for the repro and analysis.
-- [ ] **Parallelize `scripts/screenshot.ts`'s full matrix** (S) - a code
-      review (2026-09-06) noted the 4 viewport x 2 theme x 11 route
-      matrix runs fully sequentially against one browser (up to 88
-      visits), taking several minutes; nothing about Playwright requires
-      that (one Chromium process supports many concurrent contexts), a
-      small concurrency pool would cut it roughly in proportion to pool
-      size. Not done in the same commit that added the matrix: `bun run
-      a11y`'s two-combo subset (the one that matters for check.sh) is
-      already fast, and getting the full matrix's correctness right
-      (the service-worker race it already found once) took priority
-      over its wall-clock time.
+- [x] **Parallelize `scripts/screenshot.ts`'s full matrix** (S) - done
+      2026-09-13 (lane 3 item 5). A code review (2026-09-06) noted the 4
+      viewport x 2 theme x up to 17 route matrix ran fully sequentially
+      against one browser, taking several minutes; nothing about
+      Playwright requires that (one Chromium process supports many
+      concurrent contexts). Added a small pool (`runPool()`, start at 4,
+      per this note): combos run concurrently against each other, each
+      combo's own routes stay sequential inside their one context.
+      `--chat-review` stays pool size 1 (its two combos share and mutate
+      one conversation, `POST /api/conversations/clear` - concurrent
+      would race). Full matrix: 1:38 to 55s (~1.8x, not the naive 4x -
+      Chromium and the one shared backend cap how much four contexts
+      actually overlap). Output not byte-identical, but proven to be
+      run-to-run variance the script already had (a same-code control
+      run differs by a near-identical count, same routes each time,
+      visually identical when opened) - see `docs/dev.md`. `bun run
+      a11y` unchanged: 0 violations.
 - [x] **`--primary` contrast, done** (session E step 7, 2026-09-06) -
       white text on `--primary` (`#ffffff` on the original `#06a9c6`,
       `hsl(189 94% 40%)`) measured at 2.8:1, under WCAG AA's 4.5:1 floor
