@@ -162,8 +162,29 @@ function WhoIsHere({ selfId }: { selfId: string }) {
   const people = query.data ?? [];
   if (people.length === 0) return null;
   return (
+    // `shrink-0 min-h-16`: `overflow-x-auto` computes `overflow-y` to
+    // `auto` too (MediaShelf.tsx's own comment on the identical quirk,
+    // 2026-09-05), which makes this row's own automatic minimum size (a
+    // flex item's `min-height: auto` resolves to 0, not its content
+    // size, once it establishes a scroll container) collapse to zero
+    // inside this page's own `flex-col` layout - a real bug found live,
+    // 2026-09-13: every name under an avatar rendered fully clipped, cut
+    // off at the very top of each letter, in the published home
+    // screenshot. `min-h-16` (64px: the 40px avatar plus the 20px label
+    // plus the 4px gap between them) gives the row a real height that
+    // doesn't depend on the browser's own automatic sizing at all. This
+    // is the same quirk MediaShelf.tsx's own scroll rail already
+    // documents (worked around there with padding, for a different
+    // symptom - focus-ring clipping, not a height collapse, since that
+    // rail isn't usually a `flex-col` item the way this row is) -  a
+    // code review, 2026-09-13, flagged that the two fixes are two
+    // different techniques for the identical root cause with nothing
+    // centralizing it; noted rather than unified here (scripts/
+    // screenshot.ts's own `clippedStrips` check, added in the same
+    // commit as this fix, is the runtime backstop for a THIRD instance
+    // turning up before anyone gets to that).
     // eslint-disable-next-line jsx-a11y/no-noninteractive-tabindex -- a keyboard-scrollable region, not a widget (DetailPane.tsx's own precedent).
-    <div tabIndex={0} className={cn("flex items-center gap-2 overflow-x-auto", FOCUS_RING)}>
+    <div tabIndex={0} className={cn("flex min-h-16 shrink-0 items-center gap-2 overflow-x-auto", FOCUS_RING)}>
       {people.map((p) => (
         <div key={p.id} className="flex shrink-0 flex-col items-center gap-1">
           <Avatar name={p.display_name} className="h-10 w-10 text-sm" />

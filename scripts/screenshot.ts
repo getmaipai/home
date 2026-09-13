@@ -199,6 +199,25 @@ async function seedHousehold(): Promise<string> {
     });
     if (!res.ok) throw new Error(`seed person ${person.displayName} failed: ${res.status}`);
   }
+
+  // household.home_place, found live 2026-09-13: without it, Home's own
+  // WeatherCard sends a place-free fixed question, and the weather
+  // package's deterministic floor (weather/recipe.json, matched before
+  // this ever reaches the chat model) geocodes an EMPTY place - no
+  // network flakiness, no stub-model gap, it simply cannot answer, so
+  // the published screenshot showed "Couldn't check the weather right
+  // now." A real household would set this in Settings on day one
+  // (getmaipai/home BACKLOG's own household-location item); "Seattle,
+  // WA" also matches the widget grid's own already-seeded default
+  // (`Your packages > Weather`), so both weather cards on this same
+  // page now agree instead of naming two different cities.
+  const place = await fetch(`${BASE_URL}/api/settings`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json", Cookie: `session=${sessionValue}` },
+    body: JSON.stringify({ scope: "household", key: "household.home_place", value: "Seattle, WA" }),
+  });
+  if (!place.ok) throw new Error(`seed household.home_place failed: ${place.status}`);
+
   return sessionValue;
 }
 
@@ -267,6 +286,36 @@ async function visitRoute(context: BrowserContext, route: RouteSpec, viewport: V
       await page.reload();
       await exerciseChat(page, viewport, theme);
     }
+
+    // getmaipai/home, found live 2026-09-13: Home's "who's here" avatar
+    // row (`WhoIsHere`, HomePage.tsx) collapsed to zero measured height
+    // in real Chromium (`overflow-x-auto` computes `overflow-y` to
+    // `auto` too, which zeroes a flex item's own automatic minimum size
+    // - MediaShelf.tsx's own comment on the identical quirk), clipping
+    // every name label right at the top of each letter in the published
+    // screenshot with nothing in the a11y/overflow checks below ever
+    // catching it (the row was still there, just too short to show what
+    // it held). Real layout, only obtainable against a real browser
+    // (happy-dom's own getBoundingClientRect() always reads zeroed
+    // regardless of CSS, the same reason `#71`'s empty-thread check
+    // above lives here and not in a unit test). Checked on every route
+    // that has this row, not just "home", since any page could mount it
+    // later - by the `overflow-x-auto` class alone, not also requiring
+    // `tabindex="0"` (a code review, 2026-09-13, caught the first draft
+    // missing MediaShelf's own identical strip whenever it mounts with
+    // an `onSelect` handler, which drops its own tabIndex to `undefined`
+    // per MediaShelf.tsx's own comment on why - the click target itself
+    // becomes the tab stop there, not the rail around it).
+    const clippedStrips = await page.evaluate(() => {
+      const strips = document.querySelectorAll(".overflow-x-auto");
+      let clipped = 0;
+      for (const strip of strips) {
+        const stripBottom = strip.getBoundingClientRect().bottom;
+        if (Array.from(strip.children).some((column) => column.getBoundingClientRect().bottom > stripBottom + 1)) clipped++;
+      }
+      return clipped;
+    });
+    if (clippedStrips > 0) throw new Error(`${clippedStrips} horizontally-scrollable row(s) are shorter than their own content, clipping what they hold (the WhoIsHere/MediaShelf 'overflow-x-auto computes overflow-y too' quirk)`);
 
     const overflow = await page.evaluate(
       () => document.documentElement.scrollWidth > document.documentElement.clientWidth + 1,
@@ -623,12 +672,28 @@ async function main() {
   mkdirSync(DATA_DIR, { recursive: true });
 
   console.log("Starting a throwaway backend on a temp data dir...");
-  const chatModel = chatReview ? startStubLlmServer(0, { scriptedChatReply: (request) => {
+  // Not gated on `chatReview` (it used to be) - Home's own WeatherCard
+  // asks a fixed question through this exact stub on EVERY run, chat-
+  // review or not, and without a scripted reply for it the published
+  // home screenshot showed the stub server's own raw debug prefix
+  // ("[stub model: no real model loaded, this is a canned reply] What's
+  // the weather like today?") right in the weather card - found live,
+  // 2026-09-13, reviewing a regenerated screenshot. The `weather like`
+  // branch below is a defensive fallback, not the actual fix for that:
+  // the weather card's fixed question pattern-matches the `weather`
+  // package's own deterministic floor (weather/recipe.json) before it
+  // ever reaches this stub, so `seedHousehold()`'s own
+  // `household.home_place` (below) is what makes that real package
+  // answer for real - this branch only ever fires if routing changes to
+  // send the question to the model instead. The herbs/book branches
+  // stay chat-review's.
+  const chatModel = startStubLlmServer(0, { scriptedChatReply: (request) => {
     const text = [...request.messages].reverse().find((message) => message.role === "user")?.content ?? "";
     if (text.includes("herbs")) return "Basil, parsley, and chives are useful kitchen herbs. Keep mint in its own pot so it does not spread.";
     if (text.includes("book")) return "What kind of story would you enjoy: a mystery, an adventure, or something funny?";
+    if (text.includes("weather like")) return "It's a clear, mild day - around 62°F with a light breeze.";
     return "Start with a sunny spot and a few easy plants.\n\n- Grow lettuce in a shallow container.\n- Give tomatoes a larger pot and a support.\n- Water when the top layer of soil feels dry.\n\nHow much space do you have?";
-  } }) : undefined;
+  } });
   // Occupies REPAIR_SEED_PORT ourselves before the backend starts, so its
   // own Wyoming satellite server (backend/src/index.ts) fails to bind and
   // raises a real Repairs issue ("The Wyoming satellite server failed to
@@ -665,7 +730,7 @@ async function main() {
     // depends on the box being empty." This matrix never needs real
     // speech, so the engine should never spawn at all, not just not
     // collide.
-    env: { ...process.env, PORT: String(PORT), MAIPAI_DATA_DIR: DATA_DIR, MAIPAI_WYOMING_PORT: String(REPAIR_SEED_PORT), MAIPAI_TTS_DISABLE_SPAWN: "1", ...(chatModel ? { MAIPAI_LLAMA_SERVER_URL: chatModel.url, MAIPAI_EMBED_SERVER_URL: chatModel.url } : {}) },
+    env: { ...process.env, PORT: String(PORT), MAIPAI_DATA_DIR: DATA_DIR, MAIPAI_WYOMING_PORT: String(REPAIR_SEED_PORT), MAIPAI_TTS_DISABLE_SPAWN: "1", MAIPAI_LLAMA_SERVER_URL: chatModel.url, MAIPAI_EMBED_SERVER_URL: chatModel.url },
     stdout: "ignore",
     stderr: "inherit",
   });
@@ -762,7 +827,7 @@ async function main() {
   } finally {
     await browser?.close();
     backend.kill();
-    chatModel?.stop();
+    chatModel.stop();
     repairSeedListener.stop(true);
     await backend.exited;
     rmSync(DATA_DIR, { recursive: true, force: true });

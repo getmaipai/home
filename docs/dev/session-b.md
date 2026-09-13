@@ -620,3 +620,120 @@ to `docs/user/privacy.md`'s "What never leaves your house" section
 instead, saying plainly that the browser also saves a copy of MaiPai's
 own screens on the device so the app can still open without internet,
 and that this is a copy of the app, never anything typed or remembered.
+
+## Lane 6 follow-up: the screenshot half, three real bugs
+
+The coordinator rejected the first pass on the screenshots specifically
+(the prose was fine): the weather card's own regenerated image still
+showed the stub server's raw debug text, the avatar row's name labels
+were clipped, and `chat-desktop-light.png` had gone from a real
+conversation to an empty thread. All three turned out to be real,
+findable bugs, not flukes - fixed with code changes this time, so this
+half went through the full `check.sh` gate and a code review, not the
+docs-only shortcut.
+
+**1. The avatar row's own labels, clipped at the top of every letter
+(`home-desktop-light.png`, `HomePage.tsx`'s `WhoIsHere`).** A real CSS
+bug, reproduced with a headless Chromium diagnostic (Playwright,
+matching the pipeline's own proven-working pattern - happy-dom's unit
+tests can't see it, `getBoundingClientRect()` always reads zeroed
+there): `overflow-x-auto` computes `overflow-y` to `auto` too (the
+exact quirk `MediaShelf.tsx`'s own 2026-09-05 comment already names for
+a different symptom, focus-ring clipping), and a flex item that
+establishes a scroll container on either axis gets an *automatic
+minimum size of zero* instead of its content size - so this row's own
+measured height collapsed to 0px inside the page's `flex-col` layout
+while its children (avatars, then labels) still painted at their real
+60px, spilling out past a box too short to show them. Fixed with
+`min-h-16 shrink-0` on the row (`HomePage.tsx`), which sidesteps the
+automatic-sizing path entirely with a real, explicit minimum. Verified
+by the same diagnostic script, before (`stripRect.height: 0`) and after
+(the strip now correctly bounds its children); also added a live check
+to `scripts/screenshot.ts` itself (right after the existing `#71`
+empty-thread check, the same "only a real browser can see this" reason)
+that fails the run if any `overflow-x-auto` row on any page is shorter
+than its own content - this bug had zero effect on axe's own contrast/
+ARIA checks or the overflow-width check already there, so nothing
+existing would ever have caught a regression.
+
+**2. The stub debug text in the weather card
+(`home-desktop-light.png`).** `scripts/screenshot.ts`'s scripted stub
+reply (`startStubLlmServer`'s `scriptedChatReply`) was gated behind
+`chatReview`, so the plain `bun run scripts/screenshot.ts` command used
+to regenerate every OTHER page's screenshot never had it at all - every
+chat completion, including the weather card's own fixed question, fell
+through to the stub server's bare default reply, always prefixed
+`[stub model: no real model loaded, this is a canned reply]`
+by design. Un-gated it (always starts now) and added a `weather like`
+branch alongside the existing herbs/book ones.
+
+**3. `chat-desktop-light.png` went from a real conversation to an empty
+thread.** Direct cause of the SAME gating as #2: `exerciseChat()` (the
+function that sends real messages and captures `chat-desktop-light.png`
+among others) only runs `if (chatReview && route.slug === "chat")` -
+the plain command visits the chat route but never exercises it, so the
+"chat" screenshot has only ever really been current after a SEPARATE
+`--chat-review` run (a mode this codebase has used this way since
+2026-09-04, per several `docs/dev.md` entries) - the full run I did
+first genuinely never populates it. Both were run this time: `bun run
+scripts/screenshot.ts` for the full matrix, then `bun run
+scripts/screenshot.ts --chat-review` for chat's own set, matching how
+this pipeline has always needed to be run for a complete regeneration.
+
+**A fourth thing found investigating #2, not really a bug in either of
+the two commits above**: even with a scripted stub reply, the weather
+card's fixed question never reaches the model at all - "What's the
+weather like today" pattern-matches the `weather` package's own
+deterministic floor (Tier 0/1 routing) before the turn engine ever
+calls the chat model, so the stub server's `weather like` branch is
+dead code today, kept only as a defensive fallback if routing ever
+changes. The REAL fix for the weather card needed
+`household.home_place` actually configured - the seeded household
+never set it, so the deterministic package's own geocoding step got an
+empty place. Added it to `seedHousehold()` (`"Seattle, WA"`, matching
+the widget grid's own already-seeded default so both weather cards on
+the same page agree). Even with a real place configured, the weather
+package still failed this run (`plugin_error`, the second fetch went
+out with its `{lat}`/`{lon}` placeholders literally unsubstituted,
+which is why open-meteo answered 403) - traced to the geocoding step
+itself returning no usable result. Live-tested directly (`bun -e`
+hitting `geocoding-api.open-meteo.com` from this same machine): it
+answers fine on its own. The most likely explanation is this session's
+own repeated weather-endpoint testing tonight (MEM-05's judge-eval
+runs, live verification passes, this investigation's own repeated
+calls) exhausting `host.fetch`'s per-host rate limit or poisoning its
+cache (`packageHost.ts`) for `api.open-meteo.com`/`geocoding-api.open-
+meteo.com` - not something reproduced from a clean state, and not
+something this lane's own scope covers fixing (`packageHost.ts`'s
+fetch/cache/rate-limit internals are backend territory). The published
+screenshot shows the weather card's real, honest current error text
+rather than a fabricated success - accurate to what actually happened
+this run, not a broken capture. `household.home_place` being seeded is
+correct and needed regardless of this separate finding; not filed as
+its own issue, since the evidence points to this session's own testing
+load rather than a reproducible defect.
+
+Every image a user page embeds (`home`, `privacy`, `settings-repairs`)
+and the two more the coordinator named (`settings`, `settings-users`)
+were opened again after this pass. `settings-desktop-light.png` and
+`settings-users-desktop-light.png` are new checks - both correct.
+
+**A code review of this fixup found two more real things**, both
+confirmed and addressed: the `clippedStrips` check only matched
+`[tabindex="0"].overflow-x-auto`, missing `MediaShelf.tsx`'s identical
+scroll rail whenever it mounts with an `onSelect` handler (that drops
+its own `tabIndex` to `undefined`, per that file's own comment on why -
+the click target becomes the tab stop, not the rail) - broadened to
+match `.overflow-x-auto` alone, re-ran the full matrix afterward to
+confirm the wider selector adds no false positives (0 violations, 0
+overflow, same as before). And: the same CSS quirk now has two
+different fixes in two files (`MediaShelf.tsx`'s own padding, from
+2026-09-05, for a different symptom - focus-ring clipping, not a height
+collapse; `WhoIsHere`'s `min-h-16 shrink-0` here) with nothing
+centralizing it - not unified into one shared primitive in this pass
+(a bigger change than a screenshot fixup's own scope, and `MediaShelf`'s
+own rail isn't confirmed to actually hit the height-collapse symptom
+anywhere it's mounted today, only theoretically capable of it), but
+cross-referenced in both files so a third instance is easier to find,
+and the `clippedStrips` check itself is the real backstop regardless of
+which files ever get a from-scratch fix.

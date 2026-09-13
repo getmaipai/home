@@ -93,7 +93,17 @@ export function MediaShelf<T>({
         // `overflow-y` to `auto` too, so the rail clips on both axes, and
         // a tile's focus ring (2px ring, 2px offset) would be shaved off
         // at the top edge and on the leading tile without room to draw
-        // in. Found in a code review, 2026-09-05.
+        // in. Found in a code review, 2026-09-05. The same underlying
+        // quirk collapsed this `<ul>`'s OWN height to zero for a
+        // different flex item elsewhere (HomePage.tsx's `WhoIsHere`,
+        // fixed 2026-09-13 with `min-h-16 shrink-0`) - unverified here
+        // whether this rail needs the same treatment where it's mounted
+        // inside a `flex-col` ancestor (a schema page's `media_shelf`
+        // node, via NodeRenderer.tsx); `scripts/screenshot.ts`'s
+        // `clippedStrips` check (added the same commit as that fix)
+        // covers every `.overflow-x-auto` element on every captured
+        // route, this one included, so a real instance would be caught
+        // there rather than fixed blind here.
         className={cn("flex min-w-0 list-none snap-x snap-mandatory gap-3 overflow-x-auto p-1.5", FOCUS_RING)}
       >
         {items.map((item) => (
