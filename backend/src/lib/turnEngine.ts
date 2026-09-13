@@ -808,8 +808,13 @@ export interface RouteResult {
 // round trip each, for the identical text). Optional and still embedded
 // here when omitted, so routingCorpus.test.ts's direct call keeps working
 // unchanged.
-export async function route(text: string, actor: PersonRow, loaded: LoadedManifest[], utteranceVector?: Float32Array): Promise<RouteResult> {
-  const eligible: LoadedManifest[] = [];
+/** FAST-04: the literal half of routing, run BEFORE the utterance is
+ * embedded so a `routing.patterns` winner ("remember that I like tea")
+ * never pays the embed round trip. Household commands stay where they
+ * are (prepareTurn()'s matchCommand(), ahead of this). Returns null when
+ * no pattern binds; the caller then embeds once and calls
+ * routeSemantic(). */
+export function routeLiteral(text: string, actor: PersonRow, loaded: LoadedManifest[]): RouteResult | null {
   for (const { id, manifest } of loaded) {
     if (!meetsMinRole(actor.role, manifest.min_role)) continue;
     // The spec's own kind doc comment (spec/schemas/manifest.schema.json):
@@ -856,14 +861,35 @@ export async function route(text: string, actor: PersonRow, loaded: LoadedManife
         return { winner: { id, args, score: 1, viaPattern: true, viaEmbedding: true }, ranked: [] };
       }
     }
+  }
+  return null;
+}
+
+/** FAST-04: the fuzzy half of routing (embedding scores with the
+ * keyword-overlap fallback, the Tier 1 threshold and margin, and the
+ * full `ranked` list Tier 2 offers from). Only called once routeLiteral()
+ * has returned null. Never embeds on its own: `utteranceVector` is the
+ * one embed the caller already made, and `undefined` means that embed
+ * failed and every candidate falls back to keyword overlap (a code
+ * review, 2026-09-13, caught a `?? embedUtterance()` here that would
+ * have paid a second 30 s timeout on a down sidecar). */
+export async function routeSemantic(
+  text: string,
+  actor: PersonRow,
+  loaded: LoadedManifest[],
+  utteranceVector: Float32Array | undefined,
+): Promise<RouteResult> {
+  const eligible: LoadedManifest[] = [];
+  for (const { id, manifest } of loaded) {
+    if (!meetsMinRole(actor.role, manifest.min_role)) continue;
+    if (manifest.kind !== "plugin") continue;
 
     eligible.push({ id, manifest });
   }
   if (eligible.length === 0) return { winner: null, ranked: [] };
 
   await ensureRoutingEmbeddings(eligible.map(({ id, manifest }) => ({ id, examples: manifest.routing?.examples })));
-  const vector = utteranceVector ?? (await embedUtterance(text));
-  const embeddingScores = vector ? scoreByEmbedding(vector, eligible.map(({ id }) => id)) : new Map<string, number>();
+  const embeddingScores = utteranceVector ? scoreByEmbedding(utteranceVector, eligible.map(({ id }) => id)) : new Map<string, number>();
 
   const scored = eligible.map(({ id, manifest }) => ({
     id,
@@ -890,6 +916,16 @@ export async function route(text: string, actor: PersonRow, loaded: LoadedManife
   const args = deterministicArgs(manifest.args, null)!; // canFire already proved this binds
   const viaEmbedding = scored.find((s) => s.id === tier1Winner.id)!.viaEmbedding;
   return { winner: { id: tier1Winner.id, args, score: tier1Winner.score, viaPattern: false, viaEmbedding }, ranked };
+}
+
+/** The two halves in order, for callers that do not care about the embed
+ * timing (routingCorpus.test.ts's direct call); prepareTurn() calls them
+ * separately so the embed only happens when the literal half missed.
+ * Embeds here when the caller did not, exactly once. */
+export async function route(text: string, actor: PersonRow, loaded: LoadedManifest[], utteranceVector?: Float32Array): Promise<RouteResult> {
+  const literal = routeLiteral(text, actor, loaded);
+  if (literal) return literal;
+  return routeSemantic(text, actor, loaded, utteranceVector ?? (await embedUtterance(text)));
 }
 
 type PreparedTurn =
@@ -1165,13 +1201,21 @@ async function prepareTurn(
   // conservative about the judge's timing costs far less than the
   // per-call precision would).
   markTurnStarted();
-  // Embedded once here (a review, 2026-09-06, found route() and recall()
-  // each embedding the identical utterance separately, two HTTP round
-  // trips to the embed sidecar for the same text) and reused below as
-  // recall()'s own queryVector - embedQueryForRecall() stays in memory.ts
-  // for its other real caller (packageHost.ts's Host.memory.recall).
-  const utteranceVector = await embedUtterance(text);
-  const { winner: routed, ranked } = await route(text, actor, loaded, utteranceVector);
+  // FAST-04: literal patterns before the embed round trip. A pattern
+  // winner returns from the plugin branch below without ever calling
+  // the embed engine (tests/turnEngine.test.ts asserts zero embed calls
+  // for "remember that I like tea"); only a miss pays for the embed,
+  // which is then made exactly once here (a review, 2026-09-06, found
+  // route() and recall() each embedding the identical utterance
+  // separately) and reused below as recall()'s own queryVector -
+  // embedQueryForRecall() stays in memory.ts for its other real caller
+  // (packageHost.ts's Host.memory.recall).
+  let utteranceVector: Float32Array | undefined;
+  let { winner: routed, ranked }: RouteResult = routeLiteral(text, actor, loaded) ?? { winner: null, ranked: [] };
+  if (!routed) {
+    utteranceVector = await embedUtterance(text);
+    ({ winner: routed, ranked } = await routeSemantic(text, actor, loaded, utteranceVector));
+  }
   // A real trigger phrase always wins outright (see RoutedPlugin's own
   // comment on why `viaPattern`, not `score === 1`, is the real signal).
   // Only a FUZZY plugin match is subject to being outscored - found live
@@ -1779,6 +1823,17 @@ export async function runTurn(
   return { ok: true, value };
 }
 
+/** FAST-04: what a turn's token stream resolves to once its deltas are
+ * spent. Either the most recently flagged, non-refuse SafetyResult
+ * gateOutputSafety() saw (or undefined when nothing was flagged), or
+ * `{ resolved }`: the model answered with a tool call instead of text,
+ * the package ran, and this is its complete TurnValue, which never went
+ * through gateOutputSafety()/gateGuards() (a grounded package reply
+ * like "It is 72 degrees in Boston." must not be cut by the invention
+ * guard, and its speech, plugin_id and routing fields must survive
+ * intact). The stream yields no deltas at all in that case. */
+export type StreamOutcome = SafetyResult | { resolved: TurnValue } | undefined;
+
 export type TurnStreamResult =
   | TurnFailure
   | { ok: true; kind: "immediate"; value: TurnValue }
@@ -1791,29 +1846,34 @@ export type TurnStreamResult =
        * ("turn_meta"), before any delta. */
       conversationId: string;
       turnId: string;
+      /** FAST-04: `Date.now()` at the top of runTurnStream(), before
+       * prepareTurn() ran. streamTurnEvents() counts its 900 ms
+       * spoken-cue timer from here, not from its own first `.next()`,
+       * so the cue means "900 ms since the utterance arrived with
+       * nothing said yet", whatever routing and prefill cost. */
+      startedAt: number;
       /** The generator's own return value (step 9), read from the final
        * `iterator.next()` result once `done` is true on a NORMAL
        * completion (never reached on a thrown StreamSafetyRefusal, which
-       * rejects instead): the most recently flagged, non-refuse
-       * SafetyResult gateOutputSafety() saw, if any - a self_harm mention
-       * in the model's own output, say. `undefined` when nothing was
-       * ever flagged. The caller passes this into `finalize()` the same
-       * way it passes a caught refusal's own SafetyResult, so a flag
-       * that never refuses still reaches the logged turn and its
-       * `crisis_resources` instead of being silently dropped once the
-       * notification fires. */
-      tokens: AsyncGenerator<string, SafetyResult | undefined, void>;
+       * rejects instead): see StreamOutcome. The caller passes this into
+       * `finalize()` the same way it passes a caught refusal's own
+       * SafetyResult, so a flag that never refuses still reaches the
+       * logged turn and its `crisis_resources` instead of being silently
+       * dropped once the notification fires. */
+      tokens: AsyncGenerator<string, StreamOutcome, void>;
       /** Builds the final TurnValue once the caller has drained `tokens`
        * to completion and knows the full reply text - also logs the turn
        * (conversationHistory.ts), the same "log once the real reply is
        * known" timing runTurn() already has, just triggered by the
        * caller finishing the stream instead of by this function awaiting
-       * it directly. `outputSafety` (step 9): passed by the caller's own
-       * catch block when `tokens` threw a `StreamSafetyRefusal`, so the
-       * logged/returned TurnValue's `safety` field reflects what
+       * it directly. `outcome`: the stream's own return value, or the
+       * SafetyResult from a caught `StreamSafetyRefusal` (step 9), so
+       * the logged/returned TurnValue's `safety` field reflects what
        * actually cut the stream rather than only ever the input-side
-       * result computed before generation started. */
-      finalize: (replyText: string, outputSafety?: SafetyResult) => TurnValue;
+       * result computed before generation started. A `{ resolved }`
+       * outcome is returned as-is: the package's reply, not rebuilt from
+       * `replyText` (which is empty on that path). */
+      finalize: (replyText: string, outcome?: StreamOutcome) => TurnValue;
     };
 
 // Step 9 (session-a-intelligence.md): "spec/safety/ts/classifier.ts
@@ -1829,6 +1889,20 @@ export type TurnStreamResult =
 export class StreamSafetyRefusal extends Error {
   constructor(public readonly safety: SafetyResult) {
     super("the model's own reply was flagged by the safety classifier mid-stream");
+  }
+}
+
+// FAST-04: the streaming twin of runTurnStream()'s own `{ ok: false,
+// code: "unavailable" }` return. Once the stream result has been handed
+// back (before the first token is read), an engine failure inside the
+// generator can no longer become an HTTP status - turn_meta is already
+// on the wire - so it travels as a typed throw, the same shape as
+// StreamSafetyRefusal, and routes/turn.ts emits `code: "unavailable"`
+// on the error event. Thrown only after markTurnFinished() has run.
+export class StreamUnavailable extends Error {
+  readonly code = "unavailable" as const;
+  constructor(message: string) {
+    super(message);
   }
 }
 
@@ -1871,17 +1945,17 @@ export class StreamSafetyRefusal extends Error {
  * be judged safe before it's complete, so it can't be delivered before
  * that either. */
 export async function* gateOutputSafety(
-  // Fix E: `tokens`' own return value is `ToolCall[] | undefined` now
-  // (llm.ts's startCompleteStream(), the model's own tool-calling
-  // decision) - this function's `for await` loop already discards
-  // whatever a wrapped generator returns (it only ever reads yielded
-  // deltas), so widening the type costs no behavior change; a
-  // tool-calling turn is intercepted before it ever reaches this
-  // function at all (runTurnStream()'s own peek), so in practice this
-  // only ever actually returns `undefined` here.
-  tokens: AsyncGenerator<string, ToolCall[] | undefined, void>,
+  // Fix E: `tokens`' own return value is `ToolCall[] | undefined` from
+  // llm.ts's startCompleteStream() (the model's own tool-calling
+  // decision, which a `for await` loop would discard). FAST-04 adds the
+  // third shape, `{ resolved }`: runTurnStream()'s peekAndHandle() ran
+  // the tool call and finished the turn as a package reply. That value
+  // is forwarded, never inspected here - the reply never went through
+  // this gate, by design (see StreamOutcome) - which is why this loop
+  // drives the iterator by hand instead of `for await`.
+  tokens: AsyncGenerator<string, ToolCall[] | undefined | { resolved: TurnValue }, void>,
   actor: PersonRow,
-): AsyncGenerator<string, SafetyResult | undefined, void> {
+): AsyncGenerator<string, StreamOutcome, void> {
   let pending = "";
   let isFirstChunk = true;
   let lastFlagged: SafetyResult | undefined;
@@ -1898,7 +1972,10 @@ export async function* gateOutputSafety(
     return safety;
   };
 
-  for await (const delta of tokens) {
+  const iterator = tokens[Symbol.asyncIterator]();
+  let step = await iterator.next();
+  while (!step.done) {
+    const delta = step.value;
     pending += delta;
     for (;;) {
       const end = nextSentenceBoundary(pending, isFirstChunk);
@@ -1912,7 +1989,10 @@ export async function* gateOutputSafety(
       if (safety.action === "refuse") throw new StreamSafetyRefusal(safety);
       yield rawSpan;
     }
+    step = await iterator.next();
   }
+  const inner = step.value;
+  if (inner && !Array.isArray(inner) && "resolved" in inner) return inner;
 
   // Whatever's left after the model's own generation ends is the final
   // chunk, complete or not (there's no more text coming to complete it
@@ -1976,7 +2056,11 @@ export async function* gateOutputSafety(
  * has already decided the reply, while still returning whatever
  * SafetyResult the drained stream resolves to unchanged. */
 export async function* gateGuards(
-  tokens: AsyncGenerator<string, SafetyResult | undefined, void>,
+  // FAST-04: a `{ resolved }` return value (a tool-resolved package
+  // reply, see StreamOutcome) passes through untouched, exactly like
+  // the SafetyResult always has: it yields no sentences, so nothing
+  // below ever runs guardSentence() on it.
+  tokens: AsyncGenerator<string, StreamOutcome, void>,
   ctx: Omit<GuardContext, "personId">,
   personId: string,
   // Fix A4 (docs/dev.md's 2026-09-07 incident note): optional, so every
@@ -1985,7 +2069,7 @@ export async function* gateGuards(
   // `[turn]` log line's own `guard` array - this generator's per-sentence
   // internals have no other channel back to whoever is draining it.
   onGuardHit?: (reason: GuardReason) => void,
-): AsyncGenerator<string, SafetyResult | undefined, void> {
+): AsyncGenerator<string, StreamOutcome, void> {
   const iterator = tokens[Symbol.asyncIterator]();
   let step = await iterator.next();
   let isFirstSentence = true;
@@ -2093,7 +2177,7 @@ export async function runTurnStream(
   // then-all-failed retry case all build their own `TurnStreamResult`
   // through this one closure rather than three copies of the same
   // gateGuards()/finalize() wiring.
-  const buildStreamResult = (tokens: AsyncGenerator<string, ToolCall[] | undefined, void>): TurnStreamResult => {
+  const buildStreamResult = (tokens: AsyncGenerator<string, ToolCall[] | undefined | { resolved: TurnValue }, void>): TurnStreamResult => {
     // Fix A4: collected by gateGuards()'s own onGuardHit callback as the
     // stream runs, read back once finalize() builds the log line below -
     // the stream itself has no other channel back to this closure's own
@@ -2101,13 +2185,52 @@ export async function runTurnStream(
     // whoever is draining it). Fresh per call, never shared across the
     // two starts a retry can produce.
     const guardHits: GuardReason[] = [];
+    // FAST-04: now that runTurnStream() returns before anything is sent,
+    // an engine failure before the first token (the request itself
+    // failing, the idle timeout ahead of any header, the all-failed
+    // retry finding the engine gone) surfaces from the stream's FIRST
+    // step, after turn_meta is already on the wire. With nothing
+    // delivered, routes/turn.ts's catch never calls finalize(), so this
+    // is the one place that can still mark the turn finished; it also
+    // gives the error the "unavailable" code the pre-FAST-04 HTTP 503
+    // carried. Everything the inner generator does before its first
+    // yield (the tool-call peek, resolveToolCalls(), the retry's own
+    // first step) runs inside that first `.next()`, so one guard covers
+    // all three sites (a code review, 2026-09-13, found the retry site
+    // alone was covered). A failure after real text has streamed is
+    // the route's catch and finalize() as before.
+    async function* guardFirstStep(inner: AsyncGenerator<string, ToolCall[] | undefined | { resolved: TurnValue }, void>) {
+      const iterator = inner[Symbol.asyncIterator]();
+      let first: IteratorResult<string, ToolCall[] | undefined | { resolved: TurnValue }>;
+      try {
+        first = await iterator.next();
+      } catch (err) {
+        markTurnFinished();
+        throw err instanceof StreamUnavailable ? err : new StreamUnavailable((err as Error).message);
+      }
+      if (first.done) return first.value;
+      yield first.value;
+      return yield* iterator;
+    }
     return {
       ok: true,
       kind: "stream",
       conversationId: conversation.id,
       turnId: prepared.turnId,
-      tokens: gateGuards(gateOutputSafety(tokens, actor), prepared.guardContext, actor.id, (reason) => guardHits.push(reason)),
-      finalize: (replyText: string, outputSafety?: SafetyResult): TurnValue => {
+      startedAt,
+      tokens: gateGuards(gateOutputSafety(guardFirstStep(tokens), actor), prepared.guardContext, actor.id, (reason) => guardHits.push(reason)),
+      finalize: (replyText: string, outcome?: StreamOutcome): TurnValue => {
+        // FAST-04: a tool-resolved reply is already a complete TurnValue
+        // (peekAndHandle() ran resolveToolCalls() and finalizeReply());
+        // it is logged and returned as-is, never rebuilt from
+        // `replyText`, which is empty on this path. This is the ONE
+        // place markTurnFinished()/logTurnSafely() run for it.
+        if (outcome && "resolved" in outcome) {
+          markTurnFinished();
+          logTurnSafely(actor, surface, text, outcome.resolved, { startedAt, guardHits: [] });
+          return outcome.resolved;
+        }
+        const outputSafety = outcome;
         // A safety cut with nothing safe delivered before it (the very
         // first sentence was itself the unsafe one, replyText === "") gets
         // treated as a real safety_refuse, the same clean "nothing shown
@@ -2196,70 +2319,98 @@ export async function runTurnStream(
   }
 
   // Fix E: `tools` rides on the SAME completion call that would
-  // otherwise stream the answer in plain text - peeked here (one
-  // `.next()` call, before this function commits to a response shape)
-  // rather than blindly wrapped in gateGuards()/gateOutputSafety(),
-  // because a tool-calling reply is not text at all: confirmed live
-  // against a real engine, 2026-09-07, its `content` stays empty/null
-  // throughout, so it yields ZERO deltas and the peek's own `.next()`
-  // call resolves as `{ done: true, value: ToolCall[] }` immediately -
-  // the household never sees a "thinking" indicator for a turn that's
-  // about to answer as a plugin instead.
-  const started = await startCompleteStream(
+  // otherwise stream the answer in plain text - peeked (one `.next()`
+  // call, before anything commits to a response shape) rather than
+  // blindly wrapped in gateGuards()/gateOutputSafety(), because a
+  // tool-calling reply is not text at all: confirmed live against a real
+  // engine, 2026-09-07, its `content` stays empty/null throughout, so it
+  // yields ZERO deltas and the peek's own `.next()` call resolves as
+  // `{ done: true, value: ToolCall[] }` immediately.
+  //
+  // FAST-04: the peek used to happen HERE, before this function
+  // returned, so on every tools-offered turn (websearch is always
+  // offered, so nearly every turn) the HTTP response and its turn_meta
+  // line waited for prefill plus the first token, and routes/turn.ts's
+  // 900 ms spoken-cue timer started too late to ever fire. Now the peek
+  // lives inside peekAndHandle() below, which is handed back unstarted:
+  // this function returns before anything is sent (llm.ts's token
+  // generator is lazy, so the HTTP request itself goes out on the
+  // route's first `.next()`), the route writes turn_meta at once and
+  // starts its cue timer from `startedAt`, and that first `.next()` is
+  // what sends the request and drives the peek. A tool call resolves
+  // INSIDE the stream as one finished
+  // TurnValue (StreamOutcome's `{ resolved }`), not as an "immediate"
+  // result, because the decision is only known after the peek.
+  //
+  // TS does not carry `prepared`'s narrowing (kind: "model") or
+  // `startResult`'s (ok: true) into a nested generator's body, hence
+  // the two casts.
+  const modelPrepared = prepared as Extract<typeof prepared, { kind: "model" }>;
+  const startResult = await startCompleteStream(
     "chat",
-    prepared.messages,
-    { thinking: opts.thinking, tools: prepared.tools, tool_choice: "auto" },
+    modelPrepared.messages,
+    { thinking: opts.thinking, tools: modelPrepared.tools, tool_choice: "auto" },
     opts.signal,
   );
-  if (!started.ok) {
+  if (!startResult.ok) {
     markTurnFinished();
-    return { ok: false, status: 503, code: "unavailable", error: started.error };
+    return { ok: false, status: 503, code: "unavailable", error: startResult.error };
   }
-  const first = await started.tokens.next();
+  const started = startResult as Extract<typeof startResult, { ok: true }>;
 
-  if (first.done) {
-    const rawCalls = first.value ?? [];
-    if (rawCalls.length > 0) {
-      const resolved = await resolveToolCalls(rawCalls, offeredIds, prepared.ranked, actor, conversation.id, prepared.turnId, prepared.safety, prepared.crisisResources);
-      if (resolved) {
-        const value = finalizeReply(actor, resolved);
-        markTurnFinished();
-        logTurnSafely(actor, surface, text, value, { startedAt, guardHits: [] });
-        return { ok: true, kind: "immediate", value };
+  async function* peekAndHandle(): AsyncGenerator<string, ToolCall[] | undefined | { resolved: TurnValue }, void> {
+    const iterator = started.tokens[Symbol.asyncIterator]();
+    const first = await iterator.next();
+
+    if (first.done) {
+      const rawCalls = first.value ?? [];
+      if (rawCalls.length > 0) {
+        const resolved = await resolveToolCalls(rawCalls, offeredIds, modelPrepared.ranked, actor, conversation.id, modelPrepared.turnId, modelPrepared.safety, modelPrepared.crisisResources);
+        if (resolved) {
+          // The package answered. Handed back whole, past both gates;
+          // buildStreamResult()'s finalize() logs it and marks the turn
+          // finished, so neither happens here.
+          return { resolved: finalizeReply(actor, resolved) };
+        }
+        // Every proposed call failed - the exact "ask again, never a
+        // silent drop" contract: a genuinely second completion, this time
+        // without tools, streamed normally through the SAME gate every
+        // ordinary reply goes through.
+        const retry = await startCompleteStream("chat", modelPrepared.messages, { thinking: opts.thinking }, opts.signal);
+        // buildStreamResult()'s guardFirstStep() catches this (nothing
+        // has been yielded yet) and marks the turn finished.
+        if (!retry.ok) throw new StreamUnavailable(retry.error);
+        yield* retry.tokens;
+        return undefined;
       }
-      // Every proposed call failed - the exact "ask again, never a
-      // silent drop" contract: a genuinely second completion, this time
-      // without tools, streamed normally through the SAME gate every
-      // ordinary reply goes through.
-      const retry = await startCompleteStream("chat", prepared.messages, { thinking: opts.thinking }, opts.signal);
-      if (!retry.ok) {
-        markTurnFinished();
-        return { ok: false, status: 503, code: "unavailable", error: retry.error };
-      }
-      return buildStreamResult(retry.tokens);
+      // No tool call was ever proposed AND no text streamed either (a
+      // genuinely empty reply) - the gates see an empty stream and the
+      // route finalizes an empty reply, as before. Not a retry case: the
+      // model was never asked to try again for THIS shape, only for a
+      // real failed proposal.
+      return undefined;
     }
-    // No tool call was ever proposed AND no text streamed either (a
-    // genuinely empty reply) - stream what's left of an already-finished
-    // generator through the normal gate; the loop inside it simply never
-    // iterates. Not a retry case: the model was never asked to try
-    // again for THIS shape, only for a real failed proposal.
-    return buildStreamResult(started.tokens);
-  }
 
-  // The first real step was text, not a tool call - replay it, then
-  // continue draining the SAME generator normally. `yield*` propagates
-  // whatever `rest` itself eventually returns (always `undefined` here
-  // in practice: a reply that starts with real prose never pivots into a
-  // tool call partway through, confirmed live, 2026-09-07), so this
-  // generator's own declared return type stays accurate without needing
-  // to special-case it. Captured into plain locals before the closure -
-  // TS doesn't carry `first`/`started`'s own narrowing (done: false,
-  // ok: true) into a nested generator function's body.
-  const firstText: string = first.value;
-  const rest: AsyncGenerator<string, ToolCall[] | undefined, void> = started.tokens;
-  async function* replay(): AsyncGenerator<string, ToolCall[] | undefined, void> {
+    // The first real step was text, not a tool call - replay it, then
+    // continue draining the SAME generator normally. `yield*` propagates
+    // whatever the rest eventually returns (always `undefined` in
+    // practice: a reply that starts with real prose never pivots into a
+    // tool call partway through, confirmed live, 2026-09-07).
+    //
+    // getmaipai/home#67, live-found 2026-09-07 (the same incident
+    // runTurn()'s own retry-on-invention fix addresses): a first cut of
+    // that fix tried to buffer the first SENTENCE here, judge it with
+    // guardSentence(), and retry with a forced tool call before ever
+    // streaming a caught guess. Reverted: for a model that free-
+    // associates a long run-on with no early punctuation that is an
+    // unbounded wait in front of the very first byte (caught by
+    // tests/openai.test.ts's cancellation test timing out). The
+    // streaming path stays on the plain gateGuards() catch (a canned
+    // honest line, no retry) until a design for "decide whether to retry
+    // without blocking the stream" exists; CHAT-17 owns that.
+    const firstText: string = first.value;
     yield firstText;
-    const trailingCalls = yield* rest;
+    const trailingCalls = yield* iterator;
     // A code review (2026-09-07) correctly flagged that "never happens"
     // above is an empirical observation, not a wire-contract guarantee -
     // gateOutputSafety() (this generator's real caller, via
@@ -2273,29 +2424,13 @@ export async function runTurnStream(
     // ever actually happens, rather than a silent drop.
     if (trailingCalls && trailingCalls.length > 0) {
       console.error(
-        `[turn] a streamed reply yielded real text before proposing tool_calls (${trailingCalls.map((c) => c.tool).join(", ")}) - dropped, never run; this contradicts what this engine build has always done and needs a real fix, not just a log line`,
+        `[turn] a streamed reply yielded real text before proposing tool_calls (${trailingCalls.map((c: ToolCall) => c.tool).join(", ")}) - dropped, never run; this contradicts what this engine build has always done and needs a real fix, not just a log line`,
       );
     }
     return undefined;
   }
-  // getmaipai/home#67, live-found 2026-09-07 (the same incident
-  // runTurn()'s own retry-on-invention fix addresses): a first cut of
-  // this fix tried to do the identical thing here - buffer the first
-  // sentence, judge it with guardSentence(), retry with a forced tool
-  // call before ever streaming a caught guess. Reverted: buffering a
-  // full sentence before this function can even RETURN means
-  // runTurnStream() itself doesn't resolve until a sentence boundary
-  // shows up - for a real model that free-associates a long run-on with
-  // no early punctuation, that's an unbounded wait standing in front of
-  // the very first byte, on every turn tools are offered (nearly every
-  // turn now that websearch is always_offer). Caught immediately by
-  // tests/openai.test.ts's own cancellation test timing out. The
-  // streaming path stays on the plain guardReply()/gateGuards() catch it
-  // already had (a canned honest line, no retry) until a real design for
-  // "decide whether to retry without blocking the stream" exists -
-  // STABLE_SYSTEM_SUFFIX's own fix (this same change, turnEngine.ts's
-  // system prompt) is what actually has to carry this path for now.
-  return buildStreamResult(replay());
+
+  return buildStreamResult(peekAndHandle());
 }
 
 // Not built this pass, deliberately (see docs/dev.md):

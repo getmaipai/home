@@ -1,7 +1,7 @@
 import { Hono } from "hono";
 import { bodyLimit } from "hono/body-limit";
 import { requireAuth } from "@/middleware/auth";
-import { runTurn, runTurnStream, StreamSafetyRefusal, type Surface, type TurnStreamResult } from "@/lib/turnEngine";
+import { runTurn, runTurnStream, StreamSafetyRefusal, StreamUnavailable, type Surface, type TurnStreamResult } from "@/lib/turnEngine";
 import { pickThinkingCue } from "@/lib/replyVariation";
 import { personWithinTurnBudget } from "@/lib/llm";
 import type { TurnStreamEvent } from "@/wire";
@@ -91,11 +91,16 @@ export async function* streamTurnEvents(
   let fullText = "";
   try {
     const iterator = result.tokens[Symbol.asyncIterator]();
+    // FAST-04: start the timer from startedAt (when prepareTurn() began),
+    // not from when we enter this function, so the cue fires 900 ms after
+    // the utterance arrived when nothing has streamed yet.
+    const elapsedMs = Date.now() - result.startedAt;
+    const remainingDelayMs = Math.max(0, cueDelayMs - elapsedMs);
     // Only one `.next()` call is ever made for the first step - racing a
     // timer against it means racing which one gets AWAITED first, never
     // calling `.next()` a second time (which would skip a real token).
     const firstStep = iterator.next();
-    const timer = delay(cueDelayMs);
+    const timer = delay(remainingDelayMs);
     const race = await Promise.race([firstStep, timer.promise]);
     timer.cancel();
     if (race === "timeout") yield { type: "spoken_cue", text: pickThinkingCue(actorId) };
@@ -107,13 +112,16 @@ export async function* streamTurnEvents(
       current = await iterator.next();
     }
     // `current.value` here is the generator's own RETURN value (step 9),
-    // not a yielded delta: gateOutputSafety() returns the most recently
-    // flagged, non-refuse SafetyResult it saw (self_harm in the model's
-    // own words, say), or undefined if nothing was ever flagged. A
-    // review (2026-09-05) found this was previously discarded entirely -
-    // only a THROWN refusal ever reached finalize() with its own
-    // SafetyResult, so a flag that never refuses silently never made it
-    // onto the logged turn or its crisis_resources at all.
+    // not a yielded delta: a StreamOutcome (turnEngine.ts). Either the
+    // most recently flagged, non-refuse SafetyResult gateOutputSafety()
+    // saw (a self_harm mention in the model's own words, say; a review,
+    // 2026-09-05, found this was previously discarded, so a flag that
+    // never refuses never reached the logged turn or its
+    // crisis_resources), or, FAST-04, `{ resolved }`: the model called a
+    // tool, the package answered, and the stream yielded no deltas at
+    // all. finalize() returns that TurnValue as-is, so this is still
+    // exactly one "done" line either way, and the resolved case simply
+    // has no "delta" lines before it.
     const value = result.finalize(fullText, current.value);
     yield { type: "done", value };
   } catch (err) {
@@ -142,10 +150,16 @@ export async function* streamTurnEvents(
     // SafetyResult is passed into finalize() so the logged/returned turn
     // reflects the real reason it was cut, not the input-side result
     // computed before generation ever started.
+    //
+    // A StreamUnavailable (FAST-04) is the engine-down case that used
+    // to be an HTTP 503 with `code: "unavailable"` when runTurnStream()
+    // still waited for the first token before returning; it now happens
+    // after turn_meta is out, so it carries the same code on the error
+    // event instead.
     const safetyRefusal = err instanceof StreamSafetyRefusal ? err : undefined;
-    yield safetyRefusal
-      ? { type: "error", error: safetyRefusal.message, code: "safety_refused" }
-      : { type: "error", error: (err as Error).message };
+    if (safetyRefusal) yield { type: "error", error: safetyRefusal.message, code: "safety_refused" };
+    else if (err instanceof StreamUnavailable) yield { type: "error", error: err.message, code: err.code };
+    else yield { type: "error", error: (err as Error).message };
     // Still finalize (and so still log) whatever text actually streamed
     // before the failure: a code review (2026-09-04) found this skipped
     // on the error path, so a reply that had already streamed several

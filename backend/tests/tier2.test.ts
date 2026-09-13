@@ -112,6 +112,26 @@ async function withScriptedGuessThenForcedTool<T>(guessText: string, forcedCalls
   }
 }
 
+/** FAST-04: runTurnStream() now resolves BEFORE the first token is read
+ * (the tool-call peek moved inside the stream), so a test that returns
+ * the stream result out of withScriptedToolCalls()'s callback would find
+ * the stub already stopped by the time it iterates. Every streaming test
+ * here drains inside the callback instead, the way routes/turn.ts does:
+ * the iterator is driven by hand so the generator's own RETURN value
+ * (a StreamOutcome - the `{ resolved }` shape a tool-resolved turn ends
+ * with) can be read from the final step, not just the yielded deltas. */
+async function drainStream(result: Awaited<ReturnType<typeof runTurnStream>>) {
+  if (!result.ok || result.kind !== "stream") return { result, deltas: [] as string[], outcome: undefined };
+  const iterator = result.tokens[Symbol.asyncIterator]();
+  const deltas: string[] = [];
+  let step = await iterator.next();
+  while (!step.done) {
+    deltas.push(step.value);
+    step = await iterator.next();
+  }
+  return { result, deltas, outcome: step.value };
+}
+
 // Real bundled packages (backend/packages/remember, recall), used so the
 // "a proposed call actually runs" tests exercise a real recipe through
 // runPlugin() - deliberately network-free ones (org standard: "a unit
@@ -274,23 +294,43 @@ describe("runTurn()/runTurnStream() with native tool calling end to end (Fix E)"
     expect(result.value.source).toBe("model"); // the retry's own plain reply, not a plugin result
   });
 
-  test("runTurnStream(): a real tool call resolves as an immediate reply - the stream never starts typing before falling back to a plugin answer", async () => {
+  // FAST-04: this used to assert `kind: "immediate"`, back when
+  // runTurnStream() awaited the first token before returning and could
+  // therefore know up front that the model had called a tool. The peek
+  // now happens inside the stream, so a tool call resolves INSIDE it: a
+  // "stream" result that yields no deltas at all and whose generator
+  // returns `{ resolved }`, the package's complete TurnValue, which never
+  // went through gateOutputSafety()/gateGuards() (a grounded package
+  // reply must not be cut by the invention guard) and keeps every field
+  // finalizeReply() gave it.
+  test("runTurnStream(): a real tool call resolves inside the stream as one finished reply, never typed as deltas", async () => {
     const { actor } = await owner();
-    const result = await withScriptedToolCalls(
+    const { result, deltas, outcome } = await withScriptedToolCalls(
       () => [{ id: "call-1", name: "remember", args: '{"fact":"Friday is pizza night"}' }],
       // Not starting with "remember" - see the runTurn() version of this
       // exact test for why (remember's own "remember *" pattern would
       // win Tier 0 outright otherwise, and this test would pass for the
       // wrong reason).
-      () => runTurnStream(actor, "chat", "Friday is pizza night, please remember"),
+      async () => drainStream(await runTurnStream(actor, "chat", "Friday is pizza night, please remember")),
     );
     expect(result.ok).toBe(true);
     if (!result.ok) return;
-    expect(result.kind).toBe("immediate");
-    if (result.kind !== "immediate") return;
-    expect(result.value.source).toBe("plugin");
-    expect(result.value.plugin_id).toBe("remember");
-    expect(result.value.routing?.tier).toBe("tool"); // the real proof, not just a same-shaped Tier 0 win
+    expect(result.kind).toBe("stream");
+    if (result.kind !== "stream") return;
+    expect(deltas).toEqual([]);
+    expect(outcome && "resolved" in outcome).toBe(true);
+    if (!outcome || !("resolved" in outcome)) return;
+    expect(outcome.resolved.source).toBe("plugin");
+    expect(outcome.resolved.plugin_id).toBe("remember");
+    expect(outcome.resolved.routing?.tier).toBe("tool"); // the real proof, not just a same-shaped Tier 0 win
+    expect(outcome.resolved.reply.text.length).toBeGreaterThan(0);
+    // finalize() hands the resolved value back as-is (same object, every
+    // field intact), never a "model" TurnValue rebuilt from the empty
+    // delta text.
+    const finalized = result.finalize("", outcome);
+    expect(finalized).toBe(outcome.resolved);
+    expect(finalized.reply.speech).toBe(outcome.resolved.reply.speech);
+    expect(finalized.plugin_id).toBe("remember");
   });
 
   test("runTurnStream(): an ordinary reply (tools offered, model answers in plain text) streams normally, first delta included", async () => {
@@ -487,18 +527,17 @@ describe("runTurn()/runTurnStream() with native tool calling end to end (Fix E)"
   // fabricated answer.
   test("runTurnStream(): a guessed (ungrounded) answer still streams normally - gateGuards() catches it downstream, no retry", async () => {
     const { actor } = await owner();
-    const result = await withScriptedGuessThenForcedTool(
+    const { result, deltas } = await withScriptedGuessThenForcedTool(
       "It's playing at Xanadu Cinemas downtown.",
       [{ id: "call-1", name: "remember", args: '{"fact":"Friday is pizza night"}' }],
-      () => runTurnStream(actor, "chat", "our wifi password is on the fridge, please remember"),
+      async () => drainStream(await runTurnStream(actor, "chat", "our wifi password is on the fridge, please remember")),
     );
     expect(result.ok).toBe(true);
     if (!result.ok) return;
     expect(result.kind).toBe("stream");
     if (result.kind !== "stream") return;
-    let fullText = "";
-    for await (const delta of result.tokens) fullText += delta;
-    expect(fullText).not.toContain("Xanadu"); // gateGuards() catches it before it reaches the household
+    expect(deltas.length).toBeGreaterThan(0); // the honest replacement line, at least
+    expect(deltas.join("")).not.toContain("Xanadu"); // gateGuards() catches it before it reaches the household
   });
 });
 

@@ -1067,7 +1067,15 @@ Track B: MEM-01, MEM-02, MEM-03, MEM-04, MEM-05. Then JOIN-01, JOIN-02.
 
 <a id="fast-04"></a>
 
-- [ ] **FAST-04: Literal patterns before the embed round trip, and a stream that starts before the first token** (M)
+- [x] **FAST-04: Literal patterns before the embed round trip, and a stream that starts before the first token** (M)
+
+    Status (2026-09-13, measured and closed): pattern turns answer in 9
+    to 17 ms with zero embed calls; the spoken cue lands at 906 to 910 ms
+    on every turn whose first sentence takes longer, and stays silent on
+    ordinary turns whose first sentence arrives at 736 to 769 ms; a
+    tool-resolved websearch turn is `turn_meta`, the cue, then one `done`
+    with the package reply intact. Table and readings in the Track A
+    section of dev.md.
 
     Depends on: FAST-02. Files: `backend/src/lib/turnEngine.ts`,
     `routing.ts`, `backend/src/routes/turn.ts`, `spec/llm/ts/stubServer.ts`

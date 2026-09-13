@@ -192,8 +192,11 @@ export interface StubLlmServerOptions {
    * same way the default echo reply always was, needed for testing
    * turnEngine.ts's output-safety gate, which requires a MODEL reply
    * that genuinely differs from the input - the default echo can never
-   * produce that by construction. */
-  scriptedChatReply?: (request: ChatCompletionRequest) => unknown;
+   * produce that by construction. May return a Promise (FAST-04): the
+   * stub awaits it before answering, so a test can hold the FIRST token
+   * back for a chosen delay and exercise the spoken-cue timer the way a
+   * real engine's prefill would. A plain value keeps working as is. */
+  scriptedChatReply?: (request: ChatCompletionRequest) => unknown | Promise<unknown>;
   /** Fix E: a scripted tool_calls reply, checked BEFORE scriptedChatReply
    * on any request - returning a non-empty array makes this request
    * answer as a real tool-calling reply (empty content, `finish_reason:
@@ -239,7 +242,7 @@ export function startStubLlmServer(port = 0, opts: StubLlmServerOptions = {}): S
             usage: { prompt_tokens: 0, completion_tokens: 0, total_tokens: 0 },
           });
         }
-        const scripted = opts.scriptedChatReply?.(body);
+        const scripted = await opts.scriptedChatReply?.(body);
         const scriptedContent = scripted !== undefined ? (typeof scripted === "string" ? scripted : JSON.stringify(scripted)) : undefined;
         if (body.stream) {
           return new Response(streamChatCompletion(body, scriptedContent), {

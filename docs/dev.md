@@ -10933,6 +10933,153 @@ need watering", was answered "That's not something I've been told.":
 that is the invention guard rejecting general knowledge, FAST-05's
 target, recorded here as a live example of it.
 
+### FAST-04: literal patterns before the embed, a stream that starts before the first token (2026-09-13)
+
+What changed, and why each piece is shaped the way it is:
+
+1. **`route()` is two halves.** `routeLiteral(text, actor, loaded)` is
+   the `routing.patterns` match (with the same `meetsMinRole()` and
+   consequential-package exclusions the old loop had); `routeSemantic()`
+   is everything else (embedding scores, keyword fallback, the Tier 1
+   threshold and margin, the full `ranked` list). `prepareTurn()` calls
+   the literal half first and only embeds when it returns null, so a
+   pattern turn never touches the embed engine. `route()` still exists
+   as the two in order for `routingCorpus.test.ts`. `routing.ts` exports
+   `__embedCallCountForTests()` and `__resetEmbedCallCountForTests()`.
+2. **`runTurnStream()` returns before the first token.** The tool-call
+   peek moved from the function body into `peekAndHandle()`, the
+   generator it hands back unstarted, so the route writes `turn_meta`
+   as soon as the request is on the wire. Two consequences, both
+   deliberate. A tool call now resolves *inside* the stream: the
+   generator returns `{ resolved: TurnValue }` (the new `StreamOutcome`
+   type) instead of the function returning `kind: "immediate"`, because
+   the decision is only known after the peek. That value passes through
+   `gateOutputSafety()` and `gateGuards()` untouched (both forward their
+   inner generator's return; `gateOutputSafety()` had used `for await`,
+   which discards it, and now drives the iterator by hand) and
+   `finalize()` returns it as-is, so a grounded package reply is never
+   rebuilt from empty delta text or cut by the invention guard, and it
+   keeps its `speech`, `plugin_id` and `routing` fields. `finalize()` is
+   the one place `markTurnFinished()` and `logTurnSafely()` run for it.
+   An engine failure before the first token (the request itself, or
+   the all-failed retry finding the engine gone) can no longer become
+   an HTTP 503 (headers are out), so `buildStreamResult()` wraps the
+   raw stream in `guardFirstStep()`: a throw on the first step marks
+   the turn finished and rethrows as the typed `StreamUnavailable`, and
+   the route emits `{ type: "error", code: "unavailable" }`. One wrapper
+   covers the no-tools path, the peek, and the retry, because all of
+   them run inside the outer generator's first `.next()`; the medium
+   code review on this diff found a first cut that covered the retry
+   site only, and a `?? embedUtterance()` fallback inside
+   `routeSemantic()` that would have paid a second embed timeout on a
+   down sidecar (it now never embeds; `route()` does, once).
+3. **The cue timer counts from `startedAt`.** `TurnStreamResult` carries
+   the `Date.now()` taken at the top of `runTurnStream()`;
+   `streamTurnEvents()` races the first `.next()` against `900 - elapsed`
+   ms, so the cue means "900 ms since the utterance arrived with nothing
+   said yet", however long routing and prefill took.
+4. **Tests.** `stubServer.ts`'s `scriptedChatReply` may now return a
+   Promise (awaited before the stub answers), which is how the 1,200 ms
+   first-token test holds the first token back. `tier2.test.ts`'s
+   helpers stop their stub as soon as the callback resolves, which
+   until now was after the first token; every streaming test there now
+   drains the stream inside the callback (`drainStream()`), and the
+   tool-call test asserts the new promise (kind `stream`, zero deltas,
+   `{ resolved }` with source `plugin`, `plugin_id` `remember`, tier
+   `tool`, `finalize()` returning the same object). `turnEngine.test.ts`
+   gains the FAST-04 block: zero embed calls for "remember that I like
+   tea" and exactly one for an ordinary turn; the role gate on literal
+   patterns; `turn_meta`, `spoken_cue`, deltas in that order for a
+   1,200 ms first token; no cue for a fast one; `turn_meta` then one
+   `done` for a scripted tool call with speech and plugin fields
+   intact; "It is 72 degrees in Boston" arriving intact from the
+   `recall` package while `guardReply()` on the same sentence and
+   context returns `invention`; the all-failed retry emitting
+   `code: "unavailable"` with `turnActiveWithin(0)` false afterwards.
+
+**Live acceptance, measured 2026-09-13** on the M4 Pro 24 GB dev
+machine, backend on port 8797 in the `home-track-a` worktree with its
+own data directory, chat engine llama-server b10797 macOS arm64 on
+8798 spawned by the backend from the catalog flags
+(`qwen3-8b-instruct-q4-k-m.gguf`, `-c 32768 -fa on -ngl all
+--reasoning off -ub 1024 --jinja --cache-reuse 256 -ctk q8_0 -ctv
+q8_0`), embed on the main checkout's engine (8794), owner `alfred`
+created through the setup route, one conversation throughout. Times
+are milliseconds from the client sending the request to each NDJSON
+line arriving; the main checkout's engines were idle. The websearch
+turns used the household's own SearXNG setting.
+
+| turn | kind | turn_meta | spoken_cue | first delta | done | `[turn]` duration_ms |
+|---|---|---|---|---|---|---|
+| "remember that I like tea" x3 | pattern (remember) | 17, 9, 9 | none | none (immediate) | 17, 9, 9 | 7, 4, 4 |
+| "calculate 12 times 12" x3 | pattern (math) | 11, 12, 11 | none | none (immediate) | 11, 12, 11 | see note |
+| "good morning, how is it going today" x3 | ordinary, tools offered, model answered | 33, 34, 20 | none | 769, 763, 736 | 1,324, 1,322, 1,293 | 1,290 to 1,330 |
+| "good morning, how is it going today", two earlier runs | ordinary | 37, 29 | 906, 906 | 1,163, 983 | 1,727, 1,538 | |
+| "who won the 1998 world cup" x3 | tools offered, model answered from its own knowledge | 28, 56, 28 | 906, 908, 908 | 3,495, 1,068, 985 | 3,525, 1,098, 1,012 | |
+| "any news about the artemis moon mission this week, look it up" x2, "look up who won the most recent formula one race" | tool-resolved (websearch, `routing.tier` "tool") | 21, 23, 31 | 906, 907, 910 | none (one `done`, no deltas) | 5,237, 4,635, 5,578 | 5,232, 4,629, 5,573 |
+
+Embed calls, counted from the main checkout's engine log (its embed
+and chat engines share one stdout; every embed request is one
+`launch_slot_` line, and the file gained none over an idle four
+seconds before each check): the three math pattern turns added 0
+lines each; each ordinary turn added exactly 1 (`n_tokens = 10`, the
+utterance); a `remember` pattern turn adds 1 line too, but it is the
+new memory record being embedded (`n_tokens = 5`, "I like tea"), not
+the utterance. The `[turn]` line for a pattern turn is the plain
+plugin line, `{"source":"plugin","plugin_id":"remember","routing":
+{"tier":"pattern","score":1},...,"duration_ms":4}`: 4 to 7 ms end to
+end, below a single embed round trip, and it carries no stage timings
+at all (CHAT-21 adds those).
+
+The websearch NDJSON, as received (one of the three, text cut here):
+
+```
+    21 ms  {"type":"turn_meta","conversation_id":"conv-...","turn_id":"turn-..."}
+   906 ms  {"type":"spoken_cue","text":"Let me see."}
+ 5,237 ms  {"type":"done","value":{"reply":{"text":"The Artemis II crew, including NASA astronauts Christina Koch, Victor Glover, Reid Wiseman, and CSA astronaut Jeremy Hansen, recently returned ..."},"source":"plugin","plugin_id":"websearch","routing":{"tier":"tool","score":0.55},...}}
+```
+
+Three readings, recorded rather than smoothed over:
+
+- **The cue now fires at all.** On `main` before this item the route's
+  timer started after `runTurnStream()` had already waited for the
+  first token, so on a tools-offered turn it could never win the race;
+  here it lands at 906 to 910 ms on every turn whose first sentence
+  took longer than that, and stays silent on the three ordinary turns
+  whose first sentence arrived at 736 to 769 ms. Two earlier ordinary
+  runs of the same text arrived at 983 and 1,163 ms and did get a cue;
+  the difference is the engine log's `prompt eval time` for the ~240
+  re-evaluated tokens (652 to 815 ms across runs), not the timer.
+- **First-sentence time is prefill plus a whole sentence.** The 736 to
+  769 ms ordinary figure is ~30 ms of routing (one embed round trip,
+  recall, prompt assembly), ~660 ms re-evaluating the ~240 tokens after
+  the cached prefix (the engine log shows `n_tokens` of ~1,300 for the
+  whole prompt, so the cache holds), and a first sentence of ~13 tokens
+  at 26 to 29 ms per token. A delta is a sentence, not a token
+  (`gateOutputSafety()`), so "first delta" here is not comparable to
+  the latency bench's first-token number in the FAST-02 table.
+  Decision 2's 800 ms p50 target for first approved text is met on the
+  three clean runs and missed on the two slower ones; CHAT-23's bench
+  is where that gate is measured properly.
+- **A tool-resolved turn is one `done`, no deltas, reply intact.** The
+  three websearch turns came back as `source: "plugin"` with proper
+  nouns and numbers the utterance never mentioned, uncut, at 4.6 to
+  5.6 s (two completions plus the search itself), with the cue at
+  ~906 ms in front of them. The "who won the 1998 world cup" turns
+  never called a tool (the model answered from its own knowledge with
+  websearch offered), so they are tools-offered turns, not tool turns;
+  the one that took 3,495 ms to its first sentence was the first
+  request after the conversation's shape changed and the engine log
+  shows a full re-evaluation for it.
+
+Side finding, not fixed here: the bundled `math` package fails on
+"calculate 12 times 12" (`plugin_error`, `Undefined symbol times`: the
+spoken pattern feeds a calculator-syntax evaluator); filed as
+getmaipai/home#72.
+
+**Exit gate**: `bash scripts/check.sh` green in the worktree (spec 514,
+backend 1,847, frontend 476 tests; standards core passed).
+
 ## Session B follow-up: chat frontend bugs - second and third pass (2026-09-12)
 
 **#71 rework** (reopened twice: first for insufficient verification and six
@@ -11335,4 +11482,3 @@ eslint` all clean.
 
 Files: `frontend/src/apps/chat/chatDayDivider.tsx`, `scripts/
 screenshot.ts`, `docs/BACKLOG.md`.
-

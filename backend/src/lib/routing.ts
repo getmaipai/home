@@ -141,12 +141,18 @@ export async function ensureRoutingEmbeddings(candidates: readonly RoutingCandid
   }
 }
 
+// FAST-04: how many times embedUtterance() has run, so a test can prove
+// a literal-pattern turn never embeds and an ordinary one embeds exactly
+// once. The same test-only shape as `__resetLlmSupervisorForTests`.
+let __embedCallCount = 0;
+
 /** Embeds the utterance once per turn (never once per candidate). Never
  * throws: undefined means "fall back to keyword overlap for every
  * candidate this turn," the same contract memory.ts's
  * `embedQueryForRecall()` already established for the identical
  * down-backend case. */
 export async function embedUtterance(text: string): Promise<Float32Array | undefined> {
+  __embedCallCount++;
   try {
     const result = await embed([text]);
     if (!result.ok) return undefined;
@@ -154,6 +160,14 @@ export async function embedUtterance(text: string): Promise<Float32Array | undef
   } catch {
     return undefined;
   }
+}
+
+export function __embedCallCountForTests(): number {
+  return __embedCallCount;
+}
+
+export function __resetEmbedCallCountForTests(): void {
+  __embedCallCount = 0;
 }
 
 /** Max cosine similarity between `utteranceVector` and each candidate's

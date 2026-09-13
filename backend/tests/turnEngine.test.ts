@@ -20,6 +20,7 @@ import {
   MAX_TURN_TEXT_LENGTH,
   type TurnStreamResult,
 } from "@/lib/turnEngine";
+import { __embedCallCountForTests, __resetEmbedCallCountForTests } from "@/lib/routing";
 import { streamTurnEvents } from "@/routes/turn";
 import { guardReply } from "@/lib/guards";
 import { PERSON_TURN_BUDGET } from "@/lib/llm";
@@ -731,7 +732,7 @@ describe("lib/turnEngine.ts gateGuards() matches guardReply()'s real branches (F
     }
     expect(flaggedReasons).toEqual(["capability_claim"]);
     expect(delivered.join("")).not.toContain("nobody should ever see");
-    expect(step.value?.action).toBe("allow_with_resources");
+    expect(step.value && "action" in step.value ? step.value.action : undefined).toBe("allow_with_resources");
   });
 });
 
@@ -1581,6 +1582,7 @@ describe("routes/turn.ts streamTurnEvents()", () => {
       kind: "stream",
       conversationId: "conv-testfixture",
       turnId: "turn-testfixture",
+      startedAt: Date.now(),
       tokens: failingTokens(),
       finalize: (replyText: string) => {
         finalizeCalls.push(replyText);
@@ -1615,6 +1617,7 @@ describe("routes/turn.ts streamTurnEvents()", () => {
       kind: "stream",
       conversationId: "conv-testfixture",
       turnId: "turn-testfixture",
+      startedAt: Date.now(),
       tokens: failingTokens(),
       finalize: (replyText: string) => {
         finalizeCalls.push(replyText);
@@ -1641,6 +1644,7 @@ describe("routes/turn.ts streamTurnEvents()", () => {
       kind: "stream",
       conversationId: "conv-testfixture",
       turnId: "turn-testfixture",
+      startedAt: Date.now(),
       tokens,
       finalize: (replyText: string) => ({
         reply: { text: replyText },
@@ -1703,6 +1707,222 @@ describe("routes/turn.ts streamTurnEvents()", () => {
     };
     for await (const _event of streamTurnEvents(result, "test-person", 5)) void _event;
     expect(loggedText).toBe("Real reply only.");
+  });
+});
+
+// FAST-04 (docs/BACKLOG.md's "Chat direction 2026-09-12" block): literal
+// patterns before the embed round trip, and a stream that starts before
+// the first token. Every test here goes through the real handlers
+// (runTurnStream(), streamTurnEvents(), POST /api/turn/stream) against
+// a scripted stub, never a parallel harness.
+describe("FAST-04: literal patterns before the embed, a stream that starts before the first token", () => {
+  /** Points the chat backend at a scripted stub for one callback, and
+   * stops it after - the same shape tier2.test.ts's helpers use. */
+  async function withStub<T>(
+    opts: Parameters<typeof import("@maipai/spec/llm/ts/stubServer.js").startStubLlmServer>[1],
+    fn: (stub: { url: string; stop: () => void }) => Promise<T>,
+  ): Promise<T> {
+    __resetLlmSupervisorForTests();
+    const { startStubLlmServer } = await import("@maipai/spec/llm/ts/stubServer.js");
+    const stub = startStubLlmServer(0, opts);
+    process.env.MAIPAI_LLAMA_SERVER_URL = stub.url;
+    try {
+      return await fn(stub);
+    } finally {
+      stub.stop();
+      delete process.env.MAIPAI_LLAMA_SERVER_URL;
+    }
+  }
+
+  test("a literal-pattern turn makes zero embed calls and still fires the package", async () => {
+    const { actor } = await owner();
+    __resetEmbedCallCountForTests();
+    const result = await runTurnStream(actor, "chat", "remember that I like tea");
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.kind).toBe("immediate");
+    if (result.kind !== "immediate") return;
+    expect(result.value.source).toBe("plugin");
+    expect(result.value.plugin_id).toBe("remember");
+    expect(result.value.routing?.tier).toBe("pattern");
+    expect(__embedCallCountForTests()).toBe(0);
+  });
+
+  test("a turn with no literal match still embeds, exactly once", async () => {
+    const { actor } = await owner();
+    __resetEmbedCallCountForTests();
+    const result = await runTurnStream(actor, "chat", "good morning, how is it going");
+    expect(result.ok).toBe(true);
+    if (!result.ok || result.kind !== "stream") return;
+    for await (const _delta of result.tokens) void _delta;
+    result.finalize("");
+    expect(__embedCallCountForTests()).toBe(1);
+  });
+
+  test("a literal pattern never fires a package the person's role cannot use", async () => {
+    // routeLiteral() keeps the meetsMinRole() check the old route() ran
+    // before pattern matching - a child must not trigger an adult-only
+    // package just because the words match.
+    const { actor } = await owner();
+    const gated = loadAllManifests().map(({ id, manifest }) => ({
+      id,
+      manifest: id === "remember" ? ({ ...manifest, min_role: "owner" } as typeof manifest) : manifest,
+    }));
+    const child = { ...actor, role: "child" as const };
+    const { routeLiteral } = await import("@/lib/turnEngine");
+    expect(routeLiteral("remember that I like tea", child, gated)).toBeNull();
+    expect(routeLiteral("remember that I like tea", actor, gated)?.winner?.id).toBe("remember");
+  });
+
+  test("a tools-offered turn whose first token takes 1,200 ms yields turn_meta, then spoken_cue, then deltas, in that order", async () => {
+    const { client } = await owner();
+    await withStub(
+      {
+        scriptedChatReply: async () => {
+          await new Promise((r) => setTimeout(r, 1200));
+          return "The 1998 World Cup was won by France. They beat Brazil in the final.";
+        },
+      },
+      async () => {
+        const res = await client.post("/api/turn/stream", { text: "who won the 1998 world cup" });
+        expect(res.status).toBe(200);
+        const events = await readNdjson(res);
+        const types = events.map((e) => e.type);
+        expect(types[0]).toBe("turn_meta");
+        expect(types[1]).toBe("spoken_cue");
+        expect(types.filter((t) => t === "spoken_cue")).toHaveLength(1);
+        expect(types.indexOf("delta")).toBeGreaterThan(types.indexOf("spoken_cue"));
+        expect(types.filter((t) => t === "delta").length).toBeGreaterThan(0);
+        expect(types[types.length - 1]).toBe("done");
+      },
+    );
+  }, 15_000);
+
+  test("the cue timer counts from when the utterance arrived: a first token within 900 ms gets no cue", async () => {
+    const { client } = await owner();
+    await withStub({ scriptedChatReply: () => "Instant answer. Nothing to wait for." }, async () => {
+      const res = await client.post("/api/turn/stream", { text: "good morning, how is it going" });
+      const events = await readNdjson(res);
+      expect(events.some((e) => e.type === "spoken_cue")).toBe(false);
+      expect(events[0]?.type).toBe("turn_meta");
+      expect(events[1]?.type).toBe("delta");
+    });
+  });
+
+  test("a scripted tool-call turn yields turn_meta then exactly one done whose text is the package reply, with speech and plugin fields intact", async () => {
+    const { client } = await owner();
+    await withStub(
+      {
+        scriptedToolCalls: (request) =>
+          request.tools?.length ? [{ id: "call-1", type: "function", function: { name: "remember", arguments: '{"fact":"Friday is pizza night"}' } }] : undefined,
+      },
+      async () => {
+        // Not starting with "remember", so the literal pattern misses
+        // and the turn reaches Tier 2 with `remember` offered.
+        const res = await client.post("/api/turn/stream", { text: "Friday is pizza night, please remember" });
+        expect(res.status).toBe(200);
+        const events = await readNdjson(res);
+        expect(events.map((e) => e.type)).toEqual(["turn_meta", "done"]);
+        const value = events[1]!.value as { source: string; plugin_id?: string; routing?: { tier: string }; reply: { text: string; speech?: string } };
+        expect(value.source).toBe("plugin");
+        expect(value.plugin_id).toBe("remember");
+        expect(value.routing?.tier).toBe("tool");
+        expect(REMEMBER_CONFIRM_VARIANTS).toContain(value.reply.text);
+        expect(turnActiveWithin(0)).toBe(false); // markTurnFinished() ran, exactly once, in finalize()
+      },
+    );
+  });
+
+  test("a resolved package reply is never cut by the guards: '72 degrees in Boston' with no grounding in the utterance arrives intact", async () => {
+    const { actor, client } = await owner();
+    // Stored where the turn's own recall() will NOT find it (no shared
+    // words with the utterance below), so the guard context has neither
+    // the number nor the proper noun: streamed as model text this would
+    // be an invention-guard cut. The `recall` package's own recipe finds
+    // it by topic and returns it as the reply.
+    const stored = remember(actor, { text: "It is 72 degrees in Boston", category: "fact", tier: "durable", scope: "person", person: actor.id, source: "test", importance: 0.8 });
+    expect(stored.ok).toBe(true);
+    // Close to recall's own routing.examples (so the stub's scorer offers
+    // it as a Tier 2 tool) without matching its literal patterns, and
+    // sharing no word with the stored fact.
+    const utterance = "what have I told you to remember about the weather";
+    await withStub(
+      {
+        scriptedToolCalls: (request) =>
+          request.tools?.some((t) => t.function.name === "recall")
+            ? [{ id: "call-1", type: "function", function: { name: "recall", arguments: '{"topic":"Boston"}' } }]
+            : undefined,
+      },
+      async () => {
+        const res = await client.post("/api/turn/stream", { text: utterance });
+        const events = await readNdjson(res);
+        const done = events.find((e) => e.type === "done");
+        expect(done).toBeTruthy();
+        const value = done!.value as { source: string; plugin_id?: string; reply: { text: string; speech?: string } };
+        expect(value.source).toBe("plugin");
+        expect(value.plugin_id).toBe("recall");
+        expect(value.reply.text).toContain("72 degrees in Boston");
+        // The speech string spells the number (finalizeReply()'s
+        // normalizeForSpeech), which is that feature working, not a cut.
+        expect(value.reply.speech).toContain("seventy-two degrees in Boston");
+        expect(events.some((e) => e.type === "delta")).toBe(false);
+        // The same sentence, streamed as model text against the same
+        // context, IS cut - the proof the resolved path skipped a gate
+        // that would otherwise have fired, not that the gate is lax.
+        const guarded = guardReply("It is 72 degrees in Boston.", { utterance, personId: actor.id });
+        expect(guarded.reason).toBe("invention");
+      },
+    );
+  });
+
+  test("the engine failing on the first request itself (after turn_meta is out) emits an error event with code 'unavailable', and the turn is marked finished", async () => {
+    const { client } = await owner();
+    await withStub({ scriptedChatReply: () => "Warm-up reply." }, async (stub) => {
+      // One turn caches the chat client, so the next startCompleteStream()
+      // succeeds; then the engine goes away, so that turn's first token
+      // fetch fails before any header - the failure lands on the
+      // stream's first step, never as an HTTP status.
+      const warm = await client.post("/api/turn/stream", { text: "good morning, how is it going" });
+      expect(warm.status).toBe(200);
+      await readNdjson(warm);
+      stub.stop();
+      const res = await client.post("/api/turn/stream", { text: "good morning, how is it going" });
+      expect(res.status).toBe(200);
+      const events = await readNdjson(res);
+      expect(events[0]?.type).toBe("turn_meta");
+      const error = events.find((e) => e.type === "error") as { type: string; error: string; code?: string } | undefined;
+      expect(error?.code).toBe("unavailable");
+      expect(error?.error).toContain("chat model unavailable");
+      expect(events.some((e) => e.type === "done")).toBe(false);
+      expect(turnActiveWithin(0)).toBe(false);
+    });
+  });
+
+  test("every proposed call failing and the retry finding the engine gone emits an error event with code 'unavailable', and the turn is marked finished", async () => {
+    const { client } = await owner();
+    const { stopChatBackend } = await import("@/lib/llmSupervisor");
+    await withStub(
+      {
+        scriptedToolCalls: (request) => {
+          if (!request.tools?.length) return undefined;
+          // The engine goes away between the tool decision and the
+          // tool-free retry (a crash mid-turn): the retry's own
+          // startCompleteStream() then fails before any header.
+          stopChatBackend();
+          return [{ id: "call-1", type: "function", function: { name: "remember", arguments: "{}" } }]; // fails remember's own args schema, so the batch is all-failed
+        },
+      },
+      async () => {
+        const res = await client.post("/api/turn/stream", { text: "Friday is pizza night, please remember" });
+        expect(res.status).toBe(200); // turn_meta was already committed
+        const events = await readNdjson(res);
+        expect(events[0]?.type).toBe("turn_meta");
+        const error = events.find((e) => e.type === "error") as { type: string; error: string; code?: string } | undefined;
+        expect(error?.code).toBe("unavailable");
+        expect(events.some((e) => e.type === "done")).toBe(false);
+        expect(turnActiveWithin(0)).toBe(false);
+      },
+    );
   });
 });
 
