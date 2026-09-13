@@ -21,6 +21,8 @@
 // exact same reason.
 //
 // Usage: bun run scripts/bench/naturalness.ts
+import "./setup"; // CHAT-22: must come before anything that reaches "@/db"
+import { finishBench, startBench } from "./setup";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { eq } from "drizzle-orm";
@@ -29,7 +31,7 @@ import { people } from "@/db/schema";
 import { newPersonId, randomSuffix } from "@/lib/id";
 import { nextHlc } from "@/lib/hlc";
 import { runTurn } from "@/lib/turnEngine";
-import { getEngineStatus, stopChatBackend } from "@/lib/llmSupervisor";
+import { getEngineStatus } from "@/lib/llmSupervisor";
 import { __resetEmbedSupervisorForTests } from "@/lib/embedSupervisor";
 import type { PersonRow } from "@/types";
 import { deleteEpisodesForPerson } from "@/lib/episodes";
@@ -67,7 +69,8 @@ function toRegExp(pattern: string): RegExp {
   return new RegExp(body, caseInsensitive ? "i" : undefined);
 }
 
-async function main(): Promise<void> {
+async function main(): Promise<number> {
+  await startBench();
   const nowIso = new Date().toISOString();
   sqlite
     .query(
@@ -104,18 +107,18 @@ async function main(): Promise<void> {
   }
 
   console.log(`\nnatural=${natural} robotic=${robotic} ambiguous=${ambiguous} / ${corpus.length} rows`);
+  return corpus.length;
 }
 
+let executed = 0;
 try {
-  await main();
+  executed = await main();
 } finally {
-  cleanup();
+  cleanup(); // this bench's own rows only, in its own disposable database
+  // A shared engine is never stopped: the URL tier's stop is a no-op, and
+  // CHAT-22's setup admits nothing but the URL tier.
   __resetEmbedSupervisorForTests();
-  stopChatBackend();
 }
-// FAST-06 (2026-09-12): without this the process printed its summary and
-// then sat for twenty minutes, kept alive by timers the turn engine's
-// imports start (the scheduler, the engine watchers); the FAST-02
-// section's "stalled after 14 minutes" run was most likely the same.
-// Everything above has already been logged and stopped.
-process.exit(0);
+// CHAT-22: the explicit exit is also what stops the process hanging on
+// the timers the turn engine's imports start (FAST-06's finding).
+finishBench({ executed, engine: `chat ${getEngineStatus().kind} at ${process.env.MAIPAI_LLAMA_SERVER_URL}` });

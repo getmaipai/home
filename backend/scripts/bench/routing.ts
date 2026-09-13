@@ -12,6 +12,8 @@
 // fire) is actually driving a bad number.
 //
 // Usage: bun run scripts/bench/routing.ts
+import "./setup"; // CHAT-22: must come before anything that reaches "@/db"
+import { finishBench, startBench } from "./setup";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { loadAllManifests, route, matchingSkills } from "@/lib/turnEngine";
@@ -69,7 +71,8 @@ interface PackageStats {
   falsePositives: number; // corpus rows expecting something else, wrongly routed here
 }
 
-async function main() {
+async function main(): Promise<{ executed: number; engine: string }> {
+  await startBench();
   const actor = benchActor();
   const loaded = loadAllManifests();
   const skills = loadAllSkills();
@@ -80,6 +83,9 @@ async function main() {
   // might still read "starting."
   await embedUtterance("warm the embed backend");
   console.log(`Embed backend: ${getEmbedBackendKind()}`);
+  // Read here, before the finally block below resets the supervisor and
+  // the kind reads "none" (a code review on CHAT-22).
+  const engine = `embed ${getEmbedBackendKind()} at ${process.env.MAIPAI_EMBED_URL}`;
   console.log(`Running ${corpus.length} routing-corpus rows...\n`);
 
   const stats = new Map<string, PackageStats>();
@@ -126,6 +132,7 @@ async function main() {
   }
 
   console.log(`\n${pass}/${corpus.length} passed\n`);
+  const executed = corpus.length;
   console.log("Per-package precision/recall:");
   for (const [id, s] of [...stats.entries()].sort(([a], [b]) => a.localeCompare(b))) {
     const precision = s.truePositives + s.falsePositives === 0 ? null : s.truePositives / (s.truePositives + s.falsePositives);
@@ -143,13 +150,17 @@ async function main() {
     console.log(`  p50=${quantile(0.5)} p90=${quantile(0.9)} p95=${quantile(0.95)} max=${sorted[sorted.length - 1]!.toFixed(3)}`);
     console.log(`  TIER1_THRESHOLD/TIER2_AMBIGUOUS_FLOOR should sit at or above p95 of this distribution.`);
   }
+  return { executed, engine };
 }
 
+let summary = { executed: 0, engine: "not run" };
 try {
-  await main();
+  summary = await main();
 } finally {
   // memory-eval.ts's own found-live lesson: nothing else stops a real
   // spawned/stub embed backend on its own, so this script never exits
-  // without calling this itself.
+  // without calling this itself (the URL tier's stop is a no-op, so a
+  // shared engine is never touched).
   __resetEmbedSupervisorForTests();
 }
+finishBench(summary);

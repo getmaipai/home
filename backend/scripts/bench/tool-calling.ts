@@ -18,6 +18,8 @@
 // mechanism did.
 //
 // Usage: bun run scripts/bench/tool-calling.ts
+import "./setup"; // CHAT-22: must come before anything that reaches "@/db"
+import { finishBench, startBench } from "./setup";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { complete, type ToolSpec } from "@/lib/llm";
@@ -60,12 +62,14 @@ const TOOLS: ToolSpec[] = ["remember", "recall", "define", "trivia"].map((id) =>
 const requestedRepeats = Number(process.env.MAIPAI_BENCH_REPEATS ?? 5);
 const REPEATS = Number.isFinite(requestedRepeats) && requestedRepeats > 0 ? requestedRepeats : 5;
 
-async function main() {
+async function main(): Promise<{ executed: number; engine: string }> {
+  await startBench();
   // Warm the engine before reporting which one is active - the same
   // reason memory-eval.ts's/routing.ts's own benches do this first.
   await complete("chat", [{ role: "user", content: "hello" }]);
   const status = getEngineStatus();
   console.log(`Chat engine: ${status.kind}, model ${status.modelId ?? "n/a"}`);
+  const engine = `chat ${status.kind} at ${process.env.MAIPAI_LLAMA_SERVER_URL}`; // before the reset below
   console.log(`Running ${corpus.length} tool-call-corpus rows, ${REPEATS} repeats each...\n`);
 
   let falseCallAttempts = 0; // every repeat of a negative row (expect_calls: [])
@@ -96,10 +100,13 @@ async function main() {
   if (falseCallAttempts > 0 && falseCallRate > 2) {
     console.log("Above Fix E's own 2% bar - needs a better floor or better negatives in the corpus, never a return to the grammar.");
   }
+  return { executed: corpus.length * REPEATS, engine };
 }
 
+let summary = { executed: 0, engine: "not run" };
 try {
-  await main();
+  summary = await main();
 } finally {
   __resetLlmSupervisorForTests();
 }
+finishBench(summary);

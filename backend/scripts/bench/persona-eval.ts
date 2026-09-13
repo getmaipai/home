@@ -36,6 +36,8 @@
 // reading the stub's own echoed-back user text is judging the user's
 // phrasing, not any persona - this flag is only informative once a real
 // chat model is configured (MAIPAI_LLAMA_SERVER_URL or a spawned engine).
+import "./setup"; // CHAT-22: must come before anything that reaches "@/db"
+import { finishBench, startBench } from "./setup";
 import { eq } from "drizzle-orm";
 import { db, sqlite } from "@/db";
 import { people } from "@/db/schema";
@@ -44,7 +46,7 @@ import { nextHlc } from "@/lib/hlc";
 import { runTurn } from "@/lib/turnEngine";
 import { setValue } from "@/lib/settings";
 import { PERSONAS } from "@/lib/persona";
-import { getEngineStatus, stopChatBackend } from "@/lib/llmSupervisor";
+import { getEngineStatus } from "@/lib/llmSupervisor";
 import { __resetEmbedSupervisorForTests } from "@/lib/embedSupervisor";
 import { judgePersonaConsistency, type JudgedExchange } from "@/lib/personaJudge";
 import type { PersonRow } from "@/types";
@@ -100,7 +102,8 @@ function cleanup(): void {
   sqlite.query("DELETE FROM people WHERE id = ?").run(testPersonId);
 }
 
-async function main(): Promise<void> {
+async function main(): Promise<number> {
+  await startBench();
   const nowIso = new Date().toISOString();
   sqlite
     .query(
@@ -188,22 +191,17 @@ async function main(): Promise<void> {
   console.log(
     `\nTotals: address-form ${totals.addressForm}/${maxPerCheck}, length-cap ${totals.lengthCap}/${maxPerCheck}, forbidden-phrases ${totals.forbidden}/${maxPerCheck}, repeated-framing ${totals.repeatedFraming}/${maxPerCheck} (lower is better)`,
   );
+  return maxPerCheck;
 }
 
+let executed = 0;
 try {
-  await main();
+  executed = await main();
 } finally {
-  cleanup();
-  // Found live (session-a-intelligence.md step 10's own verification
-  // run): runTurn() lazily starts real embed AND chat backends (its own
-  // prepareTurn() always calls embedQueryForRecall(), and the chat role
-  // for the reply itself; the stub is a real Bun.serve() HTTP listener
-  // either way) that nothing ever stopped, so this script's own process
-  // never exited on its own - earlier runs sat as zombies for hours,
-  // silently contending for the same SQLite file a later run needed.
+  cleanup(); // this bench's own rows only, in its own disposable database
+  // A shared engine is never stopped: the URL tier's stop is a no-op, and
+  // CHAT-22's setup admits nothing but the URL tier.
   __resetEmbedSupervisorForTests();
-  stopChatBackend();
 }
-// FAST-06 (2026-09-12): see naturalness.ts's own note on why the bench
-// has to exit explicitly once its summary is printed.
-process.exit(0);
+// CHAT-22: see naturalness.ts on why the bench exits explicitly.
+finishBench({ executed, engine: `chat ${getEngineStatus().kind} at ${process.env.MAIPAI_LLAMA_SERVER_URL}` });

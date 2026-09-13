@@ -694,7 +694,15 @@ not permission to expand scope.
 
 <a id="chat-22"></a>
 
-- [ ] **CHAT-22: Make every conversational live bench safe to run** (S)
+- [x] **CHAT-22: Make every conversational live bench safe to run** (S)
+
+    Status (2026-09-13, closed): one setup helper
+    (`backend/scripts/bench/setup.ts`) refuses a nonempty, non-temp or
+    missing data directory and any run without supplied chat and embed
+    URLs; every bench ends through `finishBench()` (zero cases exit 1);
+    `memory/run.ts` deletes only its own rows; seven entry points proven
+    isolated against a stub in `tests/benchSetup.test.ts`. Details in the
+    "Session A, after the block" section of dev.md.
 
     Depends on: none; run before any new live experiment. Files:
     `backend/scripts/bench/{routing,tool-calling,conversation,naturalness,persona-eval,judge-eval,memory-eval}.ts`,

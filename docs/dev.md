@@ -12290,9 +12290,22 @@ outside the OS temp root, or one that exists and is not empty (a
 household's, or a previous run's: every run gets a fresh directory);
 and a missing `MAIPAI_LLAMA_SERVER_URL` or `MAIPAI_EMBED_URL`, since
 the supervisors' other tiers spawn and, for a missing model, download,
-which a bench must never do. `MAIPAI_BACKGROUND_URL` defaults to a
+which a bench must never do. `startBench()`, the first line of every
+bench's `main()`, then probes both URLs with the supervisors' own
+`/health` check and refuses when either does not answer ready: every
+downstream call swallows an unreachable engine (`complete()` returns
+`ok: false`, the embed helpers return `undefined`), so a bench pointed
+at a dead port would otherwise score every case FAIL and still end
+with "executed N cases", exit 0. The probe is not a top-level await in
+`setup.ts` because an async module's sibling imports do not wait for
+it: `@/db` opened the database while the probe was in flight (seen in
+the test); by `main()` the directory is the bench's own fresh one, so
+refusing there mutates nothing that matters. `MAIPAI_BACKGROUND_URL` defaults to a
 closed port so the memory judge can never spawn its engine from a
-bench either (`judge-eval` needs a real one and says so). `resetDb()`
+bench either (`judge-eval` needs a real one: it probes the judge
+first and refuses with exit 2 when nothing answers). The keystore is
+pinned to its file backend and the speech engine's spawn tier closed
+for the same reason. `resetDb()`
 stays in `tests/reset-db.ts` for bun:test alone; no bench calls it.
 Each bench ends with `finishBench()` (`scripts/bench/finish.ts`, split
 out so a test can import it without the guard): it prints the engine
@@ -12304,7 +12317,8 @@ the bench's own rows in its own disposable database and never stops an
 engine it did not start (the URL tier's stop was a no-op anyway).
 `memory/run.ts`'s cleanup used to delete every household-scope record
 and every person-less embedding; it now deletes exactly the records it
-wrote (`source = "bench:memory-longeval"`) and its own person's turns.
+wrote (`source LIKE 'bench:memory-longeval%'`, the fixture stamps a
+session suffix on the source) and its own person's turns.
 `conversation.ts` is offline (guards only, no database, no engine) and
 needs none of this.
 
@@ -12318,7 +12332,51 @@ its own process against one in-process stub engine (chat, embeddings
 and health on one port) with a fresh temp directory, exits 0 with
 `bench finished: engine ...; executed N cases` for N above zero,
 leaves the stub answering `/health` afterwards, and is refused when
-run again against the same directory.
+run again against the same directory; `judge-eval` with no judge URL
+refuses before scoring; a chat URL nothing answers is refused before
+any case; a sibling of the temp root is refused.
+
+The medium review (explicit target, the diff alone) found five things,
+all fixed before the commit: four benches read the engine kind after
+their `finally` block had reset the supervisor, so the summary line
+would have said `engine embed none`; each now captures the identity
+inside `main()` and returns it with the count, and the test regex
+requires `engine (chat|embed|background) <kind> at http...` with the
+kind not `none`. `judge-eval` discarded the probe result and reported
+two executed cases even when the judge processed nothing; it now
+refuses when the probe is dead and counts the turns the judge batch
+actually processed. `memory/run.ts`'s cleanup matched the source by
+equality while the fixture writes `bench:memory-longeval-session-1`,
+so those rows survived; prefix match now. And `setup.ts` did not pin
+`MAIPAI_KEYSTORE_BACKEND=file` or `MAIPAI_TTS_DISABLE_SPAWN=1`, which
+`tests/preload.ts` sets for the test suite but nothing set for a bench
+run by hand; it does now. The re-review found two more: the engine
+URLs were required but never probed (the `startBench()` probe above,
+with a test pointing the chat URL at a closed port), and the temp-root
+check was a bare string prefix, so `/tmpdata` next to `/tmp` passed
+it; it now requires the separator (a test with a sibling of the temp
+root). 14 tests in `benchSetup.test.ts`. A delta review of those two
+changes added two one-liners (`MAIPAI_BACKUP_DIR` pinned inside the
+bench directory, since `paths.ts` puts backups in a sibling of the
+data directory, which for a bench is the shared temp root; and the
+temp root itself no longer admitted as a bench directory) and one
+thing left as is: `executed` in five benches is the planned case
+count, so an engine that dies after the probe still ends with
+"executed N cases"; the probe closes the item's stated hole (a run
+that never had an engine) and counting answered rows per bench is a
+change to each scoring loop, not this item.
+
+The gate also failed on a test outside this diff that the item's own
+promise covers ("safe to run beside a live hub"):
+`tests/denoHost.test.ts` proved "two concurrent calls share one
+process" with a machine-wide `pgrep -f knowledge/handler.ts`, which
+counts every knowledge handler on the box, so it failed whenever any
+hub backend (the household's own, or another session's spare-port one)
+had answered a knowledge query. The count is now scoped to this test
+run's own processes by filtering the `pgrep -fl` output on
+`--allow-write=<this run's MAIPAI_DATA_DIR>/`, which the host puts on
+every deno command line; proven against a live foreign handler (the
+unfiltered count read 2, the test passed).
 
 ## Session B, lane 4 item 2: a real PWA (2026-09-13)
 

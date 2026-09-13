@@ -27,6 +27,8 @@
 //   legacy's 0-9; every seed's importance below is the legacy value / 9.
 //
 // Usage: bun run scripts/bench/memory-eval.ts
+import "./setup"; // CHAT-22: must come before anything that reaches "@/db"
+import { finishBench, startBench } from "./setup";
 import { eq } from "drizzle-orm";
 import { db, sqlite } from "@/db";
 import { people } from "@/db/schema";
@@ -149,7 +151,8 @@ function cleanup(): void {
   sqlite.query("DELETE FROM people WHERE id = ?").run(testPersonId);
 }
 
-async function main(): Promise<void> {
+async function main(): Promise<{ executed: number; engine: string }> {
+  await startBench();
   const nowIso = now.toISOString();
   sqlite
     .query(
@@ -168,6 +171,7 @@ async function main(): Promise<void> {
   // getEmbedBackendKind() would still read back "starting".
   await embedQueryForRecall("warm the embed backend");
   console.log(`Embed backend: ${getEmbedBackendKind()}`);
+  const engine = `embed ${getEmbedBackendKind()} at ${process.env.MAIPAI_EMBED_URL}`; // before the reset below
   console.log(`Running ${CASES.length} recall probes...\n`);
   let pass = 0;
   for (const c of CASES) {
@@ -192,10 +196,12 @@ async function main(): Promise<void> {
     );
   }
   console.log(`\n${pass}/${CASES.length} passed`);
+  return { executed: CASES.length, engine };
 }
 
+let summary = { executed: 0, engine: "not run" };
 try {
-  await main();
+  summary = await main();
 } finally {
   cleanup();
   // Found live (session-a-intelligence.md step 10's own verification
@@ -209,3 +215,4 @@ try {
   // calls its own supervisor's real stop function here.
   __resetEmbedSupervisorForTests();
 }
+finishBench(summary);

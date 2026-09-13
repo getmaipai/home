@@ -108,8 +108,16 @@ describe("callTier1Handle (session-d-packages-and-store.md step 5)", () => {
     expect(unwrap(first).reply?.text).toBe("Seattle: Seattle is a seaport city on the West Coast of the United States.");
     expect(unwrap(second).reply?.text).toBe(unwrap(first).reply?.text);
 
-    const psOutput = await new Response(Bun.spawn(["pgrep", "-f", "knowledge/handler.ts"], { stdout: "pipe" }).stdout).text();
-    const pids = psOutput.split("\n").filter((line) => line.trim().length > 0);
+    // Scoped to THIS test run's own processes (CHAT-22): the host passes
+    // `--allow-write=<this run's MAIPAI_DATA_DIR>/...` on every deno
+    // command line, so filtering on that path counts only children of
+    // this suite. A bare `pgrep -f knowledge/handler.ts` counted every
+    // knowledge handler on the machine, and failed whenever a hub
+    // backend (the household's own, or another session's) had answered
+    // a knowledge query.
+    const psOutput = await new Response(Bun.spawn(["pgrep", "-fl", "knowledge/handler.ts"], { stdout: "pipe" }).stdout).text();
+    const ownDataDir = process.env.MAIPAI_DATA_DIR!;
+    const pids = psOutput.split("\n").filter((line) => line.includes(`--allow-write=${ownDataDir}/`));
     expect(pids.length).toBe(1);
   }, 15_000);
 

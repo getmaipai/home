@@ -19,7 +19,8 @@
 // refine).
 //
 // Usage: bun run scripts/bench/memory/run.ts
-import "./guard";
+import "../setup"; // CHAT-22: must come before anything that reaches "@/db"
+import { finishBench, startBench } from "../setup";
 import { eq } from "drizzle-orm";
 import { db, sqlite } from "@/db";
 import { people } from "@/db/schema";
@@ -27,7 +28,7 @@ import { newPersonId, randomSuffix } from "@/lib/id";
 import { nextHlc } from "@/lib/hlc";
 import { remember, supersede } from "@/lib/memory";
 import { runTurn } from "@/lib/turnEngine";
-import { getEngineStatus, stopChatBackend } from "@/lib/llmSupervisor";
+import { getEngineStatus } from "@/lib/llmSupervisor";
 import { __resetEmbedSupervisorForTests } from "@/lib/embedSupervisor";
 import { KNOWLEDGE_UPDATE_CASES, ABSTENTION_CASES, TEMPORAL_CASES, MULTI_SESSION_CASES, EPISODE_CASES, type KnowledgeUpdateSeed } from "./fixture";
 import { logTurn, resolveOrCreateConversation } from "@/lib/conversationHistory";
@@ -56,13 +57,25 @@ function seedDated(actor: PersonRow, s: KnowledgeUpdateSeed, source: string): st
   return created.value.id;
 }
 
+/** Every record this bench writes carries BENCH_SOURCE, and every turn
+ * and conversation belongs to its own person row, so cleanup deletes
+ * exactly those and nothing else (CHAT-22: a first cut deleted every
+ * household-scope record and every person-less embedding, which inside
+ * a household database would have been someone's memories; the setup
+ * guard now makes that database impossible to reach, and the cleanup no
+ * longer has to be trusted either way). */
+const BENCH_SOURCE = "bench:memory-longeval";
+
 function cleanup(): void {
   deleteEpisodesForPerson(testPersonId);
   sqlite.query("DELETE FROM conversation_turns WHERE person_id = ?").run(testPersonId);
   sqlite.query("DELETE FROM conversations WHERE person_id = ?").run(testPersonId);
-  sqlite.query("DELETE FROM memory_embeddings WHERE memory_id IN (SELECT id FROM memory_records WHERE person IS NULL)").run();
-  sqlite.query("DELETE FROM pending_embeddings WHERE memory_id IN (SELECT id FROM memory_records WHERE person IS NULL)").run();
-  sqlite.query("DELETE FROM memory_records WHERE scope = 'household'").run();
+  // The fixture stamps a session suffix on the source (bench:memory-
+  // longeval-session-1, ...), so the match is a prefix, not equality.
+  const sourcePattern = `${BENCH_SOURCE}%`;
+  sqlite.query("DELETE FROM memory_embeddings WHERE memory_id IN (SELECT id FROM memory_records WHERE source LIKE ?)").run(sourcePattern);
+  sqlite.query("DELETE FROM pending_embeddings WHERE memory_id IN (SELECT id FROM memory_records WHERE source LIKE ?)").run(sourcePattern);
+  sqlite.query("DELETE FROM memory_records WHERE source LIKE ?").run(sourcePattern);
   sqlite.query("DELETE FROM people WHERE id = ?").run(testPersonId);
 }
 
@@ -74,7 +87,8 @@ interface Result {
   reply: string;
 }
 
-async function main(): Promise<void> {
+async function main(): Promise<{ executed: number; engine: string }> {
+  await startBench();
   const nowIso = now.toISOString();
   sqlite
     .query(
@@ -94,11 +108,11 @@ async function main(): Promise<void> {
   // coexist. The old record's own valid_to closes, matching a real
   // household correction.
   for (const c of KNOWLEDGE_UPDATE_CASES) {
-    const oldId = seedDated(actor as PersonRow, c.before, "bench:memory-longeval");
+    const oldId = seedDated(actor as PersonRow, c.before, BENCH_SOURCE);
     const superseded = supersede(
       actor as PersonRow,
       oldId,
-      { text: c.after.text, category: "fact", tier: "durable", importance: 0.7, source: "bench:memory-longeval" },
+      { text: c.after.text, category: "fact", tier: "durable", importance: 0.7, source: BENCH_SOURCE },
       { closeValidTo: backdatedIso(c.after.ageDays) },
     );
     if (!superseded.ok) throw new Error(`supersede failed for "${c.id}": ${superseded.error}`);
@@ -130,7 +144,7 @@ async function main(): Promise<void> {
 
   // Temporal: two dated facts, a question asking their relative order.
   for (const c of TEMPORAL_CASES) {
-    for (const s of c.seeds) seedDated(actor as PersonRow, s, "bench:memory-longeval");
+    for (const s of c.seeds) seedDated(actor as PersonRow, s, BENCH_SOURCE);
     const turnResult = await runTurn(actor as PersonRow, "chat", c.question);
     const reply = turnResult.ok ? turnResult.value.reply.text : "";
     const lowerReply = reply.toLowerCase();
@@ -202,12 +216,19 @@ async function main(): Promise<void> {
   }
   const totalPass = results.filter((r) => r.pass).length;
   console.log(`\n${totalPass}/${results.length} passed overall`);
+  // Read after the turns above selected the engine (it reads "none"
+  // before the first turn) and before the finally block resets it.
+  const engine = `chat ${getEngineStatus().kind} at ${process.env.MAIPAI_LLAMA_SERVER_URL}`;
+  return { executed: results.length, engine };
 }
 
+let summary = { executed: 0, engine: "not run" };
 try {
-  await main();
+  summary = await main();
 } finally {
-  cleanup();
+  cleanup(); // this bench's own rows only, in its own disposable database
+  // A shared engine is never stopped: the URL tier's stop is a no-op, and
+  // CHAT-22's setup admits nothing but the URL tier.
   __resetEmbedSupervisorForTests();
-  stopChatBackend();
 }
+finishBench(summary);

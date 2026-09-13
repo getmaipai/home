@@ -20,7 +20,8 @@
 // MAIPAI_LLAMA_SERVER_BIN + MAIPAI_CHAT_MODEL_PATH to point at the judge
 // model). Record the precision/recall/seconds output; keep 1.7B if recall
 // is at least 85% of the 8B baseline and precision within 5 points.
-import "./memory/guard";
+import "./setup"; // CHAT-22: must come before anything that reaches "@/db"
+import { finishBench, startBench } from "./setup";
 import { eq } from "drizzle-orm";
 import { db, sqlite } from "@/db";
 import { people, conversationTurns } from "@/db/schema";
@@ -30,7 +31,7 @@ import { resolveOrCreateConversation, logTurn } from "@/lib/conversationHistory"
 import { runJudgeBatch } from "@/lib/memoryJudge";
 import { recall, embedQueryForRecall } from "@/lib/memory";
 import { getEmbedBackendKind, __resetEmbedSupervisorForTests } from "@/lib/embedSupervisor";
-import { getBackgroundBackendKind, probeBackgroundEngine, __resetBackgroundSupervisorForTests } from "@/lib/backgroundSupervisor";
+import { getBackgroundBackendKind, getBackgroundClient, probeBackgroundEngine, __resetBackgroundSupervisorForTests } from "@/lib/backgroundSupervisor";
 import type { PersonRow } from "@/types";
 import type { TurnValue } from "@/wire";
 import { deleteEpisodesForTurns } from "@/lib/episodes";
@@ -70,7 +71,8 @@ function cleanup(): void {
   sqlite.query("DELETE FROM people WHERE id = ?").run(testPersonId);
 }
 
-async function main(): Promise<void> {
+async function main(): Promise<{ executed: number; engine: string }> {
+  await startBench();
   const nowIso = new Date().toISOString();
   sqlite
     .query(
@@ -90,7 +92,16 @@ async function main(): Promise<void> {
   seedTurn(actor, conv.value.id, "what's the weather like today", "I don't have live weather access yet.", 0);
 
   console.log(`Background engine (judge): ${getBackgroundBackendKind()}`);
-  await probeBackgroundEngine();
+  // The setup's default MAIPAI_BACKGROUND_URL is a closed port; this
+  // bench is the one that needs the judge, so it refuses rather than
+  // scoring a batch the judge never processed (a code review on CHAT-22).
+  await getBackgroundClient(); // selects the URL tier; the probe reads what is selected
+  const probe = await probeBackgroundEngine();
+  if (!probe.alive) {
+    console.error(`bench setup refused: no memory judge answers at MAIPAI_BACKGROUND_URL (${process.env.MAIPAI_BACKGROUND_URL}); judge-eval needs a running background engine.`);
+    process.exit(2);
+  }
+  const engine = `background ${probe.kind} at ${process.env.MAIPAI_BACKGROUND_URL}`; // before the reset below
 
   const startTime = Date.now();
   const batchResult = await runJudgeBatch();
@@ -125,17 +136,21 @@ async function main(): Promise<void> {
   console.log(`Recall: ${recall_pct.toFixed(1)}%`);
   console.log(`Seconds per turn: ${secondsPerTurn.toFixed(3)}s`);
   console.log(`\n${passCount}/2 passed`);
+  // Executed means turns the judge actually processed, not the two
+  // probes: a judge that skipped every turn is a run of nothing.
+  return { executed: batchResult.processed, engine };
 }
 
+let summary = { executed: 0, engine: "not run" };
 try {
-  await main();
+  summary = await main();
 } finally {
-  cleanup();
-  // runJudgeBatch() lazily starts real embed AND background backends
-  // (the stub is a real Bun.serve() HTTP listener either way) that
-  // nothing ever stopped, so this script's own process never exited on
-  // its own - earlier runs sat as zombies for hours. Both supervisors'
-  // reset functions are called here to shut down any spawned processes.
+  cleanup(); // this bench's own rows only, in its own disposable database
+  // A shared engine is never stopped: the URL tier's stop is a no-op, and
+  // CHAT-22's setup admits nothing but the URL tier (MAIPAI_BACKGROUND_URL
+  // must name the running memory engine; the setup's default is a closed
+  // port, which the probe above reports as unreachable).
   __resetEmbedSupervisorForTests();
   __resetBackgroundSupervisorForTests();
 }
+finishBench(summary);
