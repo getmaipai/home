@@ -12829,3 +12829,26 @@ other's section once (147cd28, f4779a6).
   the last opt-in) rather than assumed from privacy.md, phrased as
   "ask it to look something up" since CHAT-16 hasn't landed:
   [docs/dev/session-b.md](dev/session-b.md) (2026-09-13).
+- Lane 9 item 1, the home screen reconciled against Jesse's own
+  2026-09-05 ruling by reading the page, not the backlog prose: mostly
+  already built (greeting, who's-here, pinned strip on the sidebar's
+  own pinnedIds, the Today/packages cards); the prompt box built for
+  real search-and-chat (apps, people, memories, conversations,
+  settings, commands, the same shared query as the palette); two real
+  live-only layout/a11y bugs found and fixed in the process (a
+  `size-full`/flex-shrink fight in an inline, non-dialog `Command`
+  usage; a dangling `aria-controls` on an unmounted `CommandList`);
+  "confirmed person" gating found not applicable to today's auth model
+  rather than built or faked:
+  [docs/dev/session-b.md](dev/session-b.md) (2026-09-13).
+- Lane 9 item 2, unified search corrected against the code (the
+  BACKLOG item's own "nothing like it exists" was stale, not true):
+  `CommandPalette.tsx` and `SearchPage.tsx` already shared six of seven
+  core providers; centralized them into `useSearchCommand.ts`/
+  `SearchResultGroups.tsx` so three surfaces (the palette, the phone/
+  far search page, Home's own prompt box) call one real
+  implementation; the mocked single-conversation provider replaced
+  with CHAT-20's real per-thread routes; the backend fan-out route the
+  full item still needs, named for Session A with the response shape
+  to consume:
+  [docs/dev/session-b.md](dev/session-b.md) (2026-09-13).

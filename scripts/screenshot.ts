@@ -664,6 +664,36 @@ async function exerciseChat(page: import("playwright").Page, viewport: ViewportS
   await page.getByText("And some herbs for cooking", { exact: true }).waitFor();
 }
 
+/** Lane 9 item 2's own acceptance: "screenshot of the open palette on
+ * desktop and phone opened." `/search` (the matrix's own route,
+ * `SearchPage.tsx`) is `far`'s real destination for this, not phone's
+ * or desktop's - both of those reach the identical shared search
+ * (`useSearchCommand`, `SearchResultGroups`) through `CommandPalette.tsx`'s
+ * own Cmd/Ctrl+K dialog instead (`CommandPalette.tsx`'s own comment:
+ * "everywhere, and the Search nav row on every surface but far"), which
+ * the regular route matrix never opens since it only ever navigates by
+ * URL. A small dedicated capture, the same shape `captureHero()` uses,
+ * rather than folding a modal-opening step into the matrix's own
+ * per-route loop. */
+async function capturePaletteOpen(browser: Browser, sessionValue: string, viewport: ViewportSpec, theme: "light" | "dark"): Promise<void> {
+  const context = await newContext(browser, viewport, theme, sessionValue);
+  try {
+    const page = await context.newPage();
+    await page.goto(`${BASE_URL}/`);
+    await page.getByRole("heading", { level: 1 }).first().waitFor({ timeout: 15000 });
+    await page.locator('[role="status"]').first().waitFor({ state: "detached", timeout: 5000 }).catch(() => {});
+    const isMac = process.platform === "darwin";
+    await page.keyboard.press(isMac ? "Meta+K" : "Control+K");
+    await page.getByPlaceholder("Search, or ask MaiPai...").waitFor();
+    await page.keyboard.type("weather");
+    await page.getByText("Ask MaiPai: weather", { exact: true }).waitFor();
+    await settleAnimations(page);
+    await page.screenshot({ path: join(SCREENS_DIR, `search-palette-${viewport.slug}-${theme}.png`) });
+  } finally {
+    await context.close();
+  }
+}
+
 async function captureHero(browser: Browser, sessionValue: string): Promise<void> {
   const context = await newContext(browser, { slug: "desktop", width: 1280, height: 800 }, "dark", sessionValue);
   try {
@@ -999,7 +1029,13 @@ async function main() {
     const launchedBrowser = await (useWebkit ? webkit : chromium).launch();
     browser = launchedBrowser;
 
-    if (!a11yOnly && !settingsReview && !chatReview) await captureHero(browser, sessionValue);
+    if (!a11yOnly && !settingsReview && !chatReview) {
+      await captureHero(browser, sessionValue);
+      const phone = VIEWPORTS.find((v) => v.slug === "phone")!;
+      const desktop = VIEWPORTS.find((v) => v.slug === "desktop")!;
+      await capturePaletteOpen(browser, sessionValue, phone, "dark");
+      await capturePaletteOpen(browser, sessionValue, desktop, "light");
+    }
 
     const combos = a11yOnly || settingsReview || chatReview
       ? A11Y_ONLY_COMBOS

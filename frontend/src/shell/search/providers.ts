@@ -84,18 +84,24 @@ async function memoriesProvider(query: string): Promise<SearchGroup> {
   }
 }
 
-// Mocked, same reason chatThreadListAdapter.ts is (step 4, pending
-// Session A's per-thread conversation routes): there is exactly one real
-// conversation per person today, and its title lives only inside
-// ChatPage's own runtime, not anywhere this module can read it from. This
-// answers the one thing that's actually true - "Chat" is a real
-// destination - without fabricating a list of conversations that don't
-// exist as separate records yet.
-function conversationsProvider(query: string): SearchGroup {
-  const items = matchesQuery(query, "Chat", "Conversation")
-    ? [{ id: "conversation:main", label: "Chat", icon: "message-circle", to: "/chat" }]
-    : [];
-  return { heading: "Conversations", items };
+// Lane 9, 2026-09-13: real per-thread conversation routes exist now
+// (GET /api/conversations, ConversationSummary's own title/id -
+// CHAT-20's own frontend half already reads this exact shape). The
+// mocked single "Chat" destination this replaced was written when only
+// one conversation per person existed as a concept, not a record -
+// stale the moment session-a-intelligence.md's step 3 shipped it, found
+// reading the page rather than trusting the old comment.
+async function conversationsProvider(query: string): Promise<SearchGroup> {
+  try {
+    const conversations = await api.conversationList();
+    const items = conversations
+      .filter((c) => matchesQuery(query, c.title))
+      .slice(0, RESULTS_PER_PROVIDER)
+      .map((c) => ({ id: `conversation:${c.id}`, label: c.title ?? "Untitled conversation", icon: "message-circle", to: `/chat?conversation=${encodeURIComponent(c.id)}` }));
+    return { heading: "Conversations", items };
+  } catch {
+    return { heading: "Conversations", items: [] };
+  }
 }
 
 async function settingsProvider(query: string): Promise<SearchGroup> {
@@ -139,7 +145,7 @@ export async function runSearchProviders(query: string): Promise<SearchGroup[]> 
     Promise.resolve(pagesProvider(query)),
     peopleProvider(query),
     memoriesProvider(query),
-    Promise.resolve(conversationsProvider(query)),
+    conversationsProvider(query),
     settingsProvider(query),
     commandsProvider(query),
   ]);

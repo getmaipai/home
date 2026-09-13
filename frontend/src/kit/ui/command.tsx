@@ -80,11 +80,24 @@ function CommandInput({
 }: React.ComponentProps<typeof CommandPrimitive.Input>) {
   return (
     <div data-slot="command-input-wrapper" className="p-1 pb-0">
-      <InputGroup className="h-8! rounded-lg! border-input/30 bg-input/30 shadow-none! *:data-[slot=input-group-addon]:pl-2!">
+      {/* h-[50px]!/text-base, not h-8!/text-sm: kit/ui/input.tsx's own
+          default (docs/UI.md's 48px target and 16px type floor,
+          "at every width") - this override had drifted below both,
+          found live building lane 9's search palette. 50px, not an
+          even 48px: `InputGroup`'s own `border` (1px each edge, this
+          box's `border-box` sizing) ate 2px of the CHILD input's own
+          `h-full` height, measuring 46px - a live check caught it. */}
+      <InputGroup className="h-[50px]! rounded-lg! border-input/30 bg-input/30 shadow-none! *:data-[slot=input-group-addon]:pl-2!">
         <CommandPrimitive.Input
           data-slot="command-input"
+          // `h-full`: the touch-target floor (docs/UI.md) - without it
+          // the input kept its own intrinsic text-line height (24px)
+          // centered inside the 48px `InputGroup` row above, a real,
+          // not just measured, gap: clicking the row's own top/bottom
+          // padding landed on nothing (no click-through wiring), found
+          // live building lane 9's search palette.
           className={cn(
-            "w-full text-sm outline-hidden disabled:cursor-not-allowed disabled:opacity-50",
+            "h-full w-full text-base outline-hidden disabled:cursor-not-allowed disabled:opacity-50",
             className
           )}
           {...props}
@@ -120,7 +133,10 @@ function CommandEmpty({
   return (
     <CommandPrimitive.Empty
       data-slot="command-empty"
-      className={cn("py-6 text-center text-sm", className)}
+      // text-base, not text-sm: the type floor (docs/UI.md), found live
+      // building lane 9's search palette - real instructional text a
+      // person reads ("Type to search, or press Enter to ask MaiPai.").
+      className={cn("py-6 text-center text-base", className)}
       {...props}
     />
   )
@@ -166,8 +182,12 @@ function CommandItem({
   return (
     <CommandPrimitive.Item
       data-slot="command-item"
+      // min-h-12/text-base, not the unset height/text-sm: the touch-
+      // target and type floors (docs/UI.md) - a result row, the palette's
+      // own primary content, found under both live building lane 9's
+      // search palette.
       className={cn(
-        "group/command-item relative flex cursor-default items-center gap-2 rounded-sm px-2 py-1.5 text-sm outline-hidden select-none in-data-[slot=dialog-content]:rounded-lg! data-[disabled=true]:pointer-events-none data-[disabled=true]:opacity-50 data-selected:bg-muted data-selected:text-foreground [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4 data-selected:*:[svg]:text-foreground",
+        "group/command-item relative flex min-h-12 cursor-default items-center gap-2 rounded-sm px-2 py-1.5 text-base outline-hidden select-none in-data-[slot=dialog-content]:rounded-lg! data-[disabled=true]:pointer-events-none data-[disabled=true]:opacity-50 data-selected:bg-muted data-selected:text-foreground [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4 data-selected:*:[svg]:text-foreground",
         className
       )}
       {...props}

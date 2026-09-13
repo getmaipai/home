@@ -7,7 +7,13 @@ import { useMemoryState, refreshTurnMemoryStatus } from "@/apps/chat/chatMemoryS
 const Brain = getIcon("brain");
 const Loader = getIcon("loader");
 
-const CHIP_CLASS = "mt-1 inline-flex w-fit items-center gap-1 self-start rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground";
+// `bg-secondary`/`text-secondary-foreground`, not `bg-muted`/
+// `text-muted-foreground`: found live regenerating lane 9's screenshots
+// (a real exercised chat reply, not a fixture) - axe's color-contrast
+// rule flagged the muted pairing in light theme (`badge.tsx`'s own
+// `secondary` variant is the kit's proven-contrast pairing for a
+// compact pill like this, not the deliberately low-emphasis muted one).
+const CHIP_CLASS = "mt-1 inline-flex w-fit items-center gap-1 self-start rounded-full bg-secondary px-2 py-0.5 text-xs text-secondary-foreground";
 
 /** Rendered per assistant message (thread.aui.tsx). Reads
  * chatMemoryState.ts's own store, the one place a turn's memory ids and

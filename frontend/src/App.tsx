@@ -107,7 +107,7 @@ export function App() {
                             <Route path="/chat" element={<ChatPage person={person} />} />
                             <Route path="/conversations" element={<ConversationsPage person={person} />} />
                             <Route path="/notifications" element={<NotificationsPage />} />
-                            <Route path="/search" element={<SearchPage />} />
+                            <Route path="/search" element={<SearchPage person={person} />} />
                             <Route path="/people" element={<PeoplePage />} />
                             <Route path="/memory" element={<MemoryPage person={person} />} />
                             <Route path="/privacy" element={<PrivacyPage />} />

@@ -1,6 +1,6 @@
 import { describe, test, expect, mock, afterEach } from "bun:test";
 import { cleanup, fireEvent } from "@testing-library/react";
-import { MemoryRouter, Routes, Route } from "react-router-dom";
+import { MemoryRouter, Routes, Route, useLocation } from "react-router-dom";
 import { setupI18n } from "@lingui/core";
 import { I18nProvider } from "@lingui/react";
 import { HomePage } from "@/apps/home/HomePage";
@@ -39,17 +39,27 @@ function makePerson(): Roster {
 // Stubs every endpoint HomePage's own cards touch on mount. `homePlace`
 // (household.home_place) drives the weather-turn assertion below,
 // `familyName` (household.family_name) drives the tagline assertion;
-// every other route returns an empty, well-formed shape since these
-// tests are about the weather/memories/tagline cards, not the roster
-// strip or the widget grid. Both are declared in
-// backend/src/settings/coreKeys.ts.
-function stubFetch(options: { homePlace?: string; familyName?: string; turnBodies: unknown[] }): () => void {
+// `people`/`memories`/`conversations`/`pinnedApps` feed the search
+// prompt box (lane 9 item 1) and the pinned strip - every other route
+// returns an empty, well-formed shape by default.
+function stubFetch(options: {
+  homePlace?: string;
+  familyName?: string;
+  turnBodies: unknown[];
+  people?: unknown[];
+  memories?: unknown[];
+  conversations?: unknown[];
+  pinnedApps?: string[];
+}): () => void {
   const original = globalThis.fetch;
   globalThis.fetch = mock((input: RequestInfo | URL, init?: RequestInit) => {
     const url = typeof input === "string" ? input : input.toString();
-    if (url.includes("/api/people")) return Promise.resolve(Response.json([]));
-    if (url.includes("/api/memory")) return Promise.resolve(Response.json([]));
+    if (url.includes("/api/people")) return Promise.resolve(Response.json(options.people ?? []));
+    if (url.includes("/api/memory")) return Promise.resolve(Response.json(options.memories ?? []));
     if (url.includes("/api/widgets")) return Promise.resolve(Response.json([]));
+    if (url.includes("/api/conversations")) return Promise.resolve(Response.json(options.conversations ?? []));
+    if (url.includes("/api/settings/registry")) return Promise.resolve(Response.json([]));
+    if (url.includes("/api/commands")) return Promise.resolve(Response.json([]));
     if (url.includes("/api/settings?scope=household")) {
       return Promise.resolve(
         Response.json([
@@ -72,7 +82,15 @@ function stubFetch(options: { homePlace?: string; familyName?: string; turnBodie
         ]),
       );
     }
-    if (url.includes("/api/settings?scope=person%3A")) return Promise.resolve(Response.json([]));
+    if (url.includes("/api/settings?scope=person%3A")) {
+      return Promise.resolve(
+        Response.json(
+          options.pinnedApps
+            ? [{ key: "ui.pinned_apps", value: JSON.stringify(options.pinnedApps), source: "user", label: "Pinned apps", level: "basic", secret: false }]
+            : [],
+        ),
+      );
+    }
     if (url.includes("/api/turn/stream")) {
       options.turnBodies.push(JSON.parse(String(init?.body ?? "{}")));
       return Promise.resolve(
@@ -89,6 +107,15 @@ function stubFetch(options: { homePlace?: string; familyName?: string; turnBodie
   };
 }
 
+// Reads the navigated `initialText` state a query-with-no-match falls
+// through to `/chat` with (ChatPage.tsx's own real contract), so the
+// Enter-sends-to-chat assertions below can check what was actually sent
+// without mounting the real Chat page.
+function ChatStub() {
+  const state = useLocation().state as { initialText?: string } | null;
+  return <div>Asked MaiPai: {state?.initialText ?? ""}</div>;
+}
+
 function renderHome() {
   return renderWithQueryClient(
     <I18nProvider i18n={testI18n}>
@@ -96,6 +123,7 @@ function renderHome() {
         <Routes>
           <Route path="/" element={<HomePage person={makePerson()} />} />
           <Route path="/memory" element={<div>The real memories page</div>} />
+          <Route path="/chat" element={<ChatStub />} />
         </Routes>
       </MemoryRouter>
     </I18nProvider>,
@@ -173,6 +201,86 @@ describe("HomePage - RecentMemoriesCard", () => {
       const link = await findByRole("button", { name: "View all →" });
       fireEvent.click(link);
       await findByText("The real memories page");
+    } finally {
+      restoreFetch();
+    }
+  });
+});
+
+// Lane 9 item 1: "one prompt box that is both search and chat" - the
+// same shared query (`useSearchCommand`) `CommandPalette.tsx` uses.
+describe("HomePage - search prompt box", () => {
+  test("typing lists a matching app, memory, and conversation", async () => {
+    const restoreFetch = stubFetch({
+      turnBodies: [],
+      memories: [{ id: "mem-chat1", text: "Prefers chat over phone calls", category: "fact" }],
+      conversations: [
+        { id: "conv-chat1", surface: "chat", companion_id: null, title: "Chat about weekend plans", turn_count: 2, last_turn_at: null, created_at: "2026-09-13T00:00:00.000Z" },
+      ],
+    });
+    try {
+      const { findByPlaceholderText, findByText, findAllByText } = renderHome();
+      const input = await findByPlaceholderText("Ask MaiPai anything...");
+      fireEvent.change(input, { target: { value: "chat" } });
+      await findByText("Chat"); // the app
+      // The memory's own text legitimately also shows in the "Recent
+      // memories" Today card, unrelated to search - at least one of the
+      // two is the search result the query row itself produced.
+      await findAllByText("Prefers chat over phone calls");
+      await findByText("Chat about weekend plans"); // the conversation
+    } finally {
+      restoreFetch();
+    }
+  });
+
+  test("selecting a matched app navigates straight to it", async () => {
+    const restoreFetch = stubFetch({ turnBodies: [] });
+    try {
+      const { findByPlaceholderText, findByText } = renderHome();
+      const input = await findByPlaceholderText("Ask MaiPai anything...");
+      fireEvent.change(input, { target: { value: "memory" } });
+      const match = await findByText("Memory");
+      fireEvent.click(match);
+      await findByText("The real memories page"); // renderHome()'s own /memory stub route
+    } finally {
+      restoreFetch();
+    }
+  });
+
+  // The exact promise the plain box already kept: pressing Enter with
+  // nothing deliberately arrowed to sends the raw text to chat, even
+  // when real matches exist for it (SearchResultGroups' own "Ask" row
+  // renders first, so cmdk's default-highlight-first-item lands there).
+  test("Enter with nothing arrowed to sends the typed text to chat, even with real matches showing", async () => {
+    const restoreFetch = stubFetch({
+      turnBodies: [],
+      memories: [{ id: "mem-chat1", text: "Prefers chat over phone calls", category: "fact" }],
+    });
+    try {
+      const { findByPlaceholderText, findByText } = renderHome();
+      const input = await findByPlaceholderText("Ask MaiPai anything...");
+      fireEvent.change(input, { target: { value: "chat" } });
+      await findByText("Ask MaiPai: chat"); // confirms real matches (the memory) are showing too, not just Ask
+      fireEvent.keyDown(input, { key: "Enter" });
+      await findByText("Asked MaiPai: chat");
+    } finally {
+      restoreFetch();
+    }
+  });
+});
+
+// Lane 9 item 1: the strip reads the sidebar's own `pinnedIds`
+// (`usePinnedApps`) - one definition, not a second favorites list.
+describe("HomePage - pinned apps strip", () => {
+  test("shows pinned apps in pin order, not catalog order", async () => {
+    // Settings and Chat, in that order, is the REVERSE of APP_CATALOG's
+    // own declared order (Chat first) - proves the strip follows
+    // pinnedIds, not just "whichever pinned apps happen to exist".
+    const restoreFetch = stubFetch({ turnBodies: [], pinnedApps: ["/settings", "/chat"] });
+    try {
+      const { findAllByText } = renderHome();
+      const labels = await findAllByText(/^(Settings|Chat)$/);
+      expect(labels.map((el) => el.textContent)).toEqual(["Settings", "Chat"]);
     } finally {
       restoreFetch();
     }

@@ -3878,7 +3878,7 @@ future session now that F's hub half exists.
       noted below (a widget is the most natural place a proactively-
       fetched fact would actually surface).
 
-- [ ] **The home screen: keep the dashboard, make it a real home**
+- [x] **The home screen: keep the dashboard, make it a real home**
       (decision for Jesse, then a design pass, M) - Jesse asked
       (2026-09-05) whether legacy's home (a grid of app shortcuts with
       favorites, search, a greeting and the weather, every app standalone
@@ -3914,6 +3914,31 @@ future session now that F's hub half exists.
       - **Personal data on the shared screen only after the person is
         confirmed** (Nest Hub's voice-matched-only toggle is the model);
         until then home shows household-level cards only.
+
+      **Status, done 2026-09-13 (lane 9 item 1)**, reconciled by
+      reading `frontend/src/apps/home/HomePage.tsx` directly, not this
+      prose (full per-clause audit: docs/dev/session-b.md, "Lane 9 item
+      1"). Built: the greeting and who's-here strip; the Today cards
+      plus a separate, already-shipped "Your packages" widget grid
+      (the manifest hook, data route, and a real card-size slider -
+      "skills as home-screen widgets" below stays its own item on
+      purpose, for the density/opt-in design questions it still has
+      open); the pinned-apps strip, reading the sidebar's own
+      `pinnedIds` (one definition, `usePinnedApps`); the prompt box,
+      now real search-and-chat for typing (apps, people, memories,
+      conversations, settings, commands - the same shared query lane 9
+      item 2 built). Each app's consistent header with Back is real.
+      Not built, left open rather than claimed: voice into the search
+      box ("talk" - only Chat's own composer has dictation today); the
+      sidebar's auto-collapse "in consumption modes" (the collapse
+      control itself is real, but manual-only by design,
+      `Shell.tsx`'s own comment: "the person's own choice - never the
+      default"). Not applicable: "confirmed person" gating - the
+      current auth model has no signed-in-but-unconfirmed state to
+      gate against (`App.tsx` renders sign-in INSTEAD of Home, never
+      both); what this describes is the same future ambient/shared-
+      screen case "voice or face ID later" above already names, not a
+      gap in today's build.
 - [ ] **Unified search: one palette over everything** (M; Jesse,
       2026-09-05: "we need a unified search, I think we had that in the
       old app") - legacy did: a Spotlight palette (app entries and
@@ -3924,8 +3949,10 @@ future session now that F's hub half exists.
       (a throwing provider contributes nothing rather than failing the
       search), six hits per provider, the last token prefix-matched so
       partial words match as you type, results grouped by type and
-      navigating to a route on select. Nothing like it exists in the
-      rebuild; `SearchBox` per page and "the shell palette for
+      navigating to a route on select. Most of this now exists in the
+      rebuild (see the status block below, 2026-09-13) - stale the
+      moment it was read against the actual code instead of assumed;
+      `SearchBox` per page and "the shell palette for
       everything" are already the rule in plan 6.4 and UI.md. Build it
       as the shell's command palette (Cmd/Ctrl+K, and the Search row
       on every surface, since this audience will not learn a shortcut):
@@ -3941,6 +3968,27 @@ future session now that F's hub half exists.
       with one caveat for that item: the local metasearch sidecar fits
       the "we are the user" rule, scraping Google from the hub's address
       does not.
+
+      **Status, 2026-09-13 (lane 9 item 2), read against the real code,
+      not assumed** (full writeup: docs/dev/session-b.md, "Lane 9 item
+      2"). Searchable right now, through the shell's real command
+      palette (Cmd/Ctrl+K everywhere, the Search row on phone and
+      desktop; `far`'s own dedicated `/search` page): apps, the Apps
+      library page, people, memories, real per-thread conversations by
+      title, settings keys, and commands - six of the seven core
+      providers this item names, one shared query
+      (`shell/search/useSearchCommand.ts`) three surfaces call, "ask
+      MaiPai" the first row always. Still waiting on the route: a
+      package's own content (recipes, saved videos, whatever a future
+      package's own tables hold) has no provider yet, because nothing
+      fans out to installed packages - that needs a real backend route,
+      `GET /api/search`, named for Session A with the exact response
+      shape the frontend would consume in docs/dev/session-b.md so it
+      can be built without a frontend redesign. The web-search skill as
+      a fall-through row is not wired into the palette either (it
+      answers today only by asking in chat, per docs/user/chat.md's own
+      lane 8 item 3 section) - a second, smaller gap alongside the
+      package route. Left unchecked until both land.
 - [x] **Input-mode detection in the kit** (M, everything TV depends on
       it) - done 2026-09-05. `kit/useSurface.ts`: `{ pointer, hover,
       input, far }` from `usehooks-ts`'s `useMediaQuery` (`pointer`,

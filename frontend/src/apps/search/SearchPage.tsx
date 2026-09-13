@@ -1,20 +1,26 @@
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { useQuery } from "@tanstack/react-query";
 import { Page } from "@/kit/primitives/Page";
 import { Input } from "@/kit/ui/input";
 import { Button } from "@/kit/ui/button";
 import { getIcon } from "@/kit/icons";
-import { runSearchProviders, type SearchResultItem } from "@/shell/search/providers";
+import { useSearchCommand } from "@/shell/search/useSearchCommand";
+import type { SearchResultItem } from "@/shell/search/providers";
 import { cn, FOCUS_RING } from "@/kit/utils";
+import type { Roster } from "@/lib/api";
+
+interface SearchPageProps {
+  person: Roster;
+}
 
 // `far`'s own destination for the "Search" nav row and Cmd/Ctrl+K (step
 // 6: "on far the palette is a page with no free text entry beyond the
-// remote's keyboard") - the same providers as `CommandPalette.tsx`, laid
-// out as a real page instead of a modal, since a Dialog over a remote-
-// navigated ten-foot surface is the wrong shape (nothing to click
-// outside of, no pointer to dismiss it with).
-export function SearchPage() {
+// remote's keyboard") - the same shared search (`useSearchCommand`,
+// lane 9) `CommandPalette.tsx` uses, laid out as a real page instead of
+// a modal, since a Dialog over a remote-navigated ten-foot surface is
+// the wrong shape (nothing to click outside of, no pointer to dismiss
+// it with).
+export function SearchPage({ person }: SearchPageProps) {
   const navigate = useNavigate();
   const [query, setQuery] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
@@ -30,11 +36,7 @@ export function SearchPage() {
     inputRef.current?.focus();
   }, []);
 
-  const { data: groups } = useQuery({
-    queryKey: ["search", query],
-    queryFn: () => runSearchProviders(query),
-    placeholderData: (previous) => previous,
-  });
+  const { visibleGroups, trimmed } = useSearchCommand(person.id, query);
 
   function select(item: SearchResultItem) {
     navigate(item.to, item.state ? { state: item.state } : undefined);
@@ -44,7 +46,6 @@ export function SearchPage() {
     navigate("/chat", { state: { initialText: query } });
   }
 
-  const trimmed = query.trim();
   const AskIcon = getIcon("sparkles");
 
   return (
@@ -59,7 +60,13 @@ export function SearchPage() {
         />
         {/* eslint-disable-next-line jsx-a11y/no-noninteractive-tabindex -- a keyboard-scrollable region, not a widget (DetailPane.tsx's own precedent). */}
         <div tabIndex={0} className={cn("flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto", FOCUS_RING)}>
-          {(groups ?? []).map((group) => (
+          {trimmed !== "" ? (
+            <Button variant="secondary" className="justify-start gap-2" onClick={askMaiPai}>
+              <AskIcon aria-hidden />
+              Ask MaiPai: {trimmed}
+            </Button>
+          ) : null}
+          {visibleGroups.map((group) => (
             <section key={group.heading} aria-label={group.heading}>
               {/* text-base, not text-xs: the type floor (docs/UI.md), lane 7 item 3. */}
               <h2 className="mb-1 text-base font-medium text-muted-foreground">{group.heading}</h2>
@@ -82,12 +89,6 @@ export function SearchPage() {
               </ul>
             </section>
           ))}
-          {trimmed !== "" ? (
-            <Button variant="secondary" className="justify-start gap-2" onClick={askMaiPai}>
-              <AskIcon aria-hidden />
-              Ask MaiPai: {trimmed}
-            </Button>
-          ) : null}
         </div>
       </div>
     </Page>

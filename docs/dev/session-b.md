@@ -1458,3 +1458,243 @@ prose, no new or changed app screen for the pipeline to capture.
 lookup-vs-search sentence and swapped a shorter example word before it
 passed). Read the rendered section back for the dad test and for
 honesty against what's actually shipped, per-package, above.
+
+## Lane 9 item 1: the home screen, reconciled
+
+BACKLOG.md's "The home screen: keep the dashboard, make it a real
+home" carries Jesse's 2026-09-05 ruling and a recommendation in five
+clauses. Read `frontend/src/apps/home/HomePage.tsx` and its
+components directly, not the backlog prose, before touching anything:
+
+1. **"A greeting with who is here (from sign-in now, voice or face ID
+   later)"** - built. `Tagline`/`greetingFor()` for the greeting,
+   `WhoIsHere` for the roster strip, both already shipped (a lane 7
+   fix for `WhoIsHere`'s own clipping bug is the most recent touch).
+   "Voice or face ID later" is exactly that - later, and explicitly
+   out of scope for this lane.
+2. **"A row of 'today' cards ... the 'skills as home-screen widgets'
+   item above is exactly this, so the two items merge"** - built, but
+   NOT merged with that item, on purpose (this lane's own instruction):
+   `WeatherCard`/`RecentMemoriesCard` under "Today," plus a separate
+   "Your packages" widget grid (`NodeRenderer` over
+   `widget_card`/`/api/widgets`) that IS the shipped half of "skills as
+   home-screen widgets" - the manifest hook, the data route, and a real
+   card-size slider (`CardSizeSlider`, matching that item's own
+   legacy-reference section almost exactly) all already exist. Left
+   that BACKLOG item open and untouched: what it still asks for (which
+   packages opt in by default, card density conventions) is a real,
+   undecided design question this lane doesn't answer.
+3. **"A pinned-apps strip driven by the same `pinnedIds` the sidebar
+   uses"** - built, and correctly: `PinnedAppsStrip` calls
+   `usePinnedApps(person.id)`, the identical hook
+   `shell/Shell.tsx`'s own sidebar Favorites section calls (`grep`
+   confirms both call sites) - one definition, not a second list that
+   could drift.
+4. **"One prompt box that is both search and chat (type or talk;
+   finds apps, memories and answers)"** - was chat-only (a bare form,
+   `navigate("/chat", {state: {initialText}})` on every submit, no
+   search at all); now built for "type": `HomeSearchPrompt`, the exact
+   same shared query (`shell/search/useSearchCommand.ts`,
+   `SearchResultGroups.tsx`) `CommandPalette.tsx`'s Cmd/Ctrl+K dialog
+   uses (see lane 9 item 2's own writeup below for that query's real
+   sources). "Talk" is still missing: nothing wires the composer's own
+   dictation adapter into this box, so voice only reaches MaiPai once
+   a person is already inside Chat - a real gap, not a false claim,
+   left open rather than silently expanded into scope this lane didn't
+   ask for.
+5. **"Personal data on the shared screen only after the person is
+   confirmed"** - not applicable yet, confirmed with the coordinator
+   before writing this down as fact rather than a guess: `App.tsx`'s
+   own routing renders `<SignIn>` INSTEAD of `<Shell>`/`HomePage` when
+   `person === null`, never both - every render of Home already has a
+   real, specific, signed-in person, so "household-only until
+   confirmed" has no unconfirmed state to gate against without
+   inventing a new auth concept this lane has no mandate for. What
+   this recommendation actually describes is a FUTURE ambient/shared-
+   screen case (a kiosk display nobody has voice- or face-confirmed
+   yet) - the same future case clause 1's "voice or face ID later"
+   names, and already its own deferred BACKLOG item. No test written
+   for it, no toggle invented.
+
+One more recommendation clause, found while reading `Shell.tsx` for
+clause 3, not itself part of this lane's own DO list but worth
+recording since the audit is meant to be honest either way: "the
+sidebar stays the one permanent navigation and auto-collapses in
+consumption modes" is only half true. The collapsible-to-icons
+mechanism is real and shipped, but `Shell.tsx`'s own comment says it
+plainly - "the person's own choice - never the default" - there is no
+automatic collapse tied to a "consumption mode" concept anywhere in
+the shell. Not fixed here (out of scope, not named in this lane's own
+work order); noted so the next session doesn't have to re-discover it.
+
+**Built this lane**: `HomeSearchPrompt` (search-and-chat, item 4
+above), and the shared `useSearchCommand`/`SearchResultGroups`
+extraction that makes it and `CommandPalette.tsx` the literal same
+code (lane 9 item 2's own section covers that extraction and its own
+bugs in full). Two real, live-only bugs found building it, neither
+visible from source alone:
+
+1. `Command`'s own base class (`kit/ui/command.tsx`) carries `size-full
+   overflow-hidden` - correct for `CommandDialog`'s always-sized
+   `DialogContent`, wrong for this inline box's real parent (a plain
+   flow div inside Home's own `overflow-y-auto flex-col` scroll
+   container). First symptom: the whole box collapsed to a few px (the
+   identical "`overflow-hidden` zeroes a flex item's own automatic
+   minimum size" quirk `WhoIsHere`/`MediaShelf` already document) -
+   `shrink-0` fixed that, but then exposed `size-full`'s OWN `height:
+   100%` computing against the scroll container's real height instead,
+   stretching the box to ~650px and pushing every card below it off
+   screen. Both `shrink-0` AND a forced `h-auto!` are the real fix
+   together - a plain `h-auto` alone survived in the class list next to
+   `size-full` rather than replacing it (`cn()`'s own `twMerge` didn't
+   treat them as conflicting) and lost the cascade to `.size-full`
+   either way, `!important` needed regardless of source order.
+2. `CommandInput`'s own `aria-controls` always points at
+   `CommandList`'s id, whether or not that list is actually mounted -
+   this box originally unmounted `CommandList` entirely on an empty
+   query (to avoid showing the full app catalog before anyone types
+   anything, unlike the deliberately-invoked palette), leaving a
+   dangling reference axe's `aria-valid-attr-value` correctly flagged
+   as critical. Fixed by always mounting `CommandList` and keeping only
+   its CONTENTS conditional on a real query - the same UX, a real DOM
+   node underneath it.
+
+**Also found regenerating this lane's own screenshots, fixed alongside
+(none of it new to this lane, all pre-existing)**: the touch-target
+check (lane 8 item 1) caught `CommandInput`'s own real `<input>`
+element measuring 24px tall inside its visually-48px `InputGroup` row -
+a real gap, not just a measured one (the row's own padding wasn't a
+real click target, nothing wired it through to the input); fixed with
+`h-full` on the input itself, then `InputGroup`'s own height bumped
+50px to compensate for its own 2px border eating into that `h-full`.
+Axe's `color-contrast` rule caught `chatMemoryChip.tsx`'s own chip
+(lane 8 item 2, `bg-muted`/`text-muted-foreground`) failing in light
+theme once a real exercised chat reply rendered one for the first time
+in a full-matrix run - switched to `badge.tsx`'s own proven-contrast
+`secondary` pairing.
+
+**Verified**: `bunx tsc --noEmit` and `bunx eslint .` clean (the same
+two pre-existing warnings every lane this session has seen); `bun test`
+in frontend, 536 pass, 0 fail, including the new
+`HomePage.test.tsx` suites (a typed query lists an app, a memory, and
+a conversation; selecting a match navigates to it; Enter with nothing
+arrowed to sends the raw text to chat even with real matches showing;
+the pinned strip's own order follows `pinnedIds`, not catalog order).
+Live-checked against a spare-port backend with a real seeded household:
+typing "hik" listed the real memory; typing "garden" listed a real,
+titled conversation and Enter (no selection) correctly opened Chat with
+that text; the pinned strip showed Settings/Chat/Memory in that exact
+pinned order. `bun run screenshots` (full 136-combo matrix, run three
+times across the two live bugs above) 0 violations on the last two
+runs; Home screenshots (desktop and phone, both themes) opened and
+read correctly.
+
+## Lane 9 item 2: unified search, over what exists
+
+BACKLOG.md's "Unified search: one palette over everything" opens with
+"Nothing like it exists in the rebuild" - false the moment
+`frontend/src/shell/search/` is actually read: `CommandPalette.tsx`
+(Cmd/Ctrl+K, wired in `Shell.tsx`) and `apps/search/SearchPage.tsx`
+(`far`'s own destination) already share one query module,
+`providers.ts`, with independent, best-effort providers for apps,
+pages, people, memories, conversations, settings, and commands - six
+of the seven core providers the BACKLOG item's own text asks for
+(only a package-contributed `search` blueprint is genuinely absent).
+The backlog text is stale, not the build; this lane corrects the
+record rather than re-building something that already exists.
+
+**What was real vs. what the code claimed**: `conversationsProvider`
+was mocked to a single hardcoded "Chat" destination, its own comment
+citing "pending Session A's per-thread conversation routes" - stale
+the moment CHAT-20's own frontend half (lane 8 item 2, this same
+session) started reading `GET /api/conversations`'s real
+`ConversationSummary[]` shape. Rewired to `api.conversationList()`,
+matching by real title, linking to `/chat?conversation=<id>` (an
+untitled conversation has nothing to match on and never appears,
+correctly).
+
+**Centralized, not duplicated**: extracted `useSearchCommand.ts`
+(the query: local Apps/Favorites merge plus `runSearchProviders`) and
+`SearchResultGroups.tsx` (the render: grouped results plus the "Ask
+MaiPai" fallthrough row, now rendered FIRST rather than last - see
+item 1's own writeup above for why) out of `CommandPalette.tsx`,
+which now just supplies the `CommandDialog` wrapper. `SearchPage.tsx`
+and the new `HomeSearchPrompt` (item 1) both call the identical hook
+and renderer - three surfaces, one real implementation, matching
+docs/BACKLOG.md's own "build it once."
+
+**Touch targets and type floor**: `command.tsx`'s `CommandItem`,
+`CommandInput`, and `CommandEmpty` had never been swept in lane 7 item
+3 or lane 8 item 1 (both landed before this file saw real use in a
+launcher context) - `CommandItem` was under both floors at once (no
+`min-h-12`, `text-sm` not `text-base`); `CommandInput`'s own wrapper
+was `h-8`/`text-sm`; `CommandEmpty` was `text-sm`. All three now match
+`kit/ui/input.tsx`'s own established `h-12`/`text-base` standard.
+
+**The backend route this still waits on, named for Session A**: the
+BACKLOG item's own "core providers... a `search` blueprint so any
+package contributes a provider over its own tables" is a real,
+separate piece of work - a fan-out `GET /api/search?q=<query>` route
+that queries every installed PACKAGE's own content (not the six
+sources above, which are all core-platform tables the frontend
+already reaches directly and cheaply). Proposed response shape, to
+match `SearchGroup`/`SearchResultItem`
+(`frontend/src/shell/search/providers.ts`) so the frontend needs no
+redesign to consume it, only one more provider function:
+```ts
+// GET /api/search?q=<query>
+{
+  groups: Array<{
+    heading: string;        // the package's own display name, e.g. "Recipes"
+    package_id: string;     // which installed package this came from
+    items: Array<{
+      id: string;            // unique within the response
+      label: string;
+      sublabel?: string;
+      icon: string;          // one of the kit's own icon names
+      to: string;             // a real in-app route to navigate to
+    }>;
+  }>;
+}
+```
+Matches `providers.ts`'s own "each provider independent and
+best-effort" rule: one package's own query failing should drop that
+one group, never the whole response. `RESULTS_PER_PROVIDER` (6, this
+file's own constant) is the per-provider cap the frontend already
+enforces for its six core providers; the route should hold to the
+same number per package rather than the frontend re-slicing a larger
+payload.
+
+**Found by code review, before this lane's commit**: `useSearchCommand`'s
+query used `placeholderData: (previous) => previous` (a "keep the last
+match visible while the next one loads" pattern) alongside `enabled:
+trimmed !== ""` - but TanStack Query v5 computes `placeholderData` off
+`status` (pending vs. success), not `fetchStatus`, so a *disabled* query
+still hands back the last successful data for whatever key it had
+before. Clearing the search box back to `""` never re-fetches (the
+query is disabled at that key), so the previous, real match stayed on
+screen instead of the empty-query state clearing it. Fixed by gating
+the provider-group spread directly on `trimmed === ""` in
+`useSearchCommand.ts`, rather than trusting the query's own data;
+regression test in `CommandPalette.test.tsx` ("clearing the query drops
+a provider match instead of leaving it stale") reproduces it against
+the pre-fix code and passes against the fix.
+
+**Verified**: `bun test` in frontend covers every source directly -
+`shell/search/providers.test.ts` (one test per provider: apps, pages,
+people including a failed-fetch-contributes-nothing case, memories,
+conversations including the untitled-never-matches case, settings,
+commands), `shell/search/CommandPalette.test.tsx` (closed renders
+nothing; open with no query shows the app catalog; selecting a match
+navigates and closes; Enter with nothing arrowed to asks MaiPai with a
+real match showing; clearing the query drops a stale provider match),
+`apps/search/SearchPage.test.tsx` (typing lists a
+match; selecting navigates; the Ask row sends to chat). Live-checked
+Cmd+Ctrl+K on a spare-port backend: opened to the real pinned-order
+Favorites row, typed "marlow" and got the real seeded household
+member back. `bun run screenshots`, 0 violations, `search-palette-
+desktop-light.png`/`search-palette-phone-dark.png` (a new, small,
+dedicated capture, `capturePaletteOpen()` in `scripts/screenshot.ts` -
+`SearchPage.tsx`'s own route is `far`'s real destination for this, not
+phone's or desktop's, both of which reach the dialog instead, which
+the route matrix never opens) opened and read correctly.

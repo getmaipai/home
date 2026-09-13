@@ -1,5 +1,5 @@
 import { favoriteApps } from "@/shell/appCatalog";
-import { useState, type FormEvent, type ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
 import { Trans } from "@lingui/react";
 import { useQuery } from "@tanstack/react-query";
@@ -8,8 +8,8 @@ import { cn, FOCUS_RING } from "@/kit/utils";
 import { Card } from "@/kit/primitives/Card";
 import { CardGrid } from "@/kit/primitives/CardGrid";
 import { Avatar } from "@/kit/primitives/Avatar";
-import { Input } from "@/kit/ui/input";
 import { Button } from "@/kit/ui/button";
+import { Command, CommandInput, CommandList } from "@/kit/ui/command";
 import { getIcon } from "@/kit/icons";
 import { CardSizeSlider, useCardSize, cardSizeStyle } from "@/kit/primitives/CardSizeSlider";
 import { NodeRenderer } from "@/kit/schema/NodeRenderer";
@@ -18,6 +18,9 @@ import { api, type Roster, type PersonRosterEntry, type ResolvedSetting } from "
 import { greetingFor } from "@/apps/home/greeting";
 import { runFixedTurn } from "@/apps/home/runFixedTurn";
 import { usePinnedApps } from "@/shell/usePinnedApps";
+import { useSearchCommand } from "@/shell/search/useSearchCommand";
+import { SearchResultGroups } from "@/shell/search/SearchResultGroups";
+import type { SearchResultItem } from "@/shell/search/providers";
 import { weatherCardQuestion } from "@maipai/home-backend/src/homeCardQuestions";
 
 // The one widget_card instance Home mounts (docs/plans/session-e-ui-and-
@@ -237,17 +240,74 @@ function PinnedAppsStrip({ person }: { person: Roster }) {
   );
 }
 
+// Lane 9 item 1: "one prompt box that is both search and chat" - the
+// exact same shared query (`useSearchCommand`, `SearchResultGroups`)
+// `CommandPalette.tsx`'s Cmd/Ctrl+K dialog uses, laid out inline on the
+// page instead of a modal (docs/BACKLOG.md: "the same prompt box the
+// home-screen item above describes; build it once"). Typing shows
+// matches (apps, memories, conversations, and more); Enter with nothing
+// deliberately arrowed to sends the raw text to chat, exactly as the
+// plain box already did - `SearchResultGroups`'s own "Ask" row renders
+// first, so cmdk's own default-highlight-first-item behavior lands
+// there unless a person arrows down to a real match first.
+function HomeSearchPrompt({ person }: { person: Roster }) {
+  const navigate = useNavigate();
+  const [query, setQuery] = useState("");
+  const { visibleGroups, trimmed } = useSearchCommand(person.id, query);
+
+  function select(item: SearchResultItem) {
+    navigate(item.to, item.state ? { state: item.state } : undefined);
+    setQuery("");
+  }
+
+  function askMaiPai() {
+    if (!query.trim()) return;
+    navigate("/chat", { state: { initialText: query } });
+    setQuery("");
+  }
+
+  return (
+    <Command
+      shouldFilter={false}
+      // `shrink-0 h-auto!`, not `Command`'s own `size-full`: two
+      // separate bugs found live, 2026-09-13, from the SAME root cause
+      // (`Command`'s base class carries `size-full overflow-hidden`,
+      // meant for `CommandDialog`'s always-sized `DialogContent`, wrong
+      // for this inline box's real parent - a plain flow div inside an
+      // `overflow-y-auto flex-col` scroll container). Bug 1: with only
+      // the default `flex-shrink: 1`, the flex algorithm shrank the
+      // whole box to a few px regardless of content (the identical
+      // "overflow-hidden zeroes a flex item's own automatic minimum
+      // size" quirk WhoIsHere/MediaShelf already document) - a height
+      // override alone did nothing, since shrinking overrides an
+      // explicit height. Bug 2: `shrink-0` alone fixed that, but then
+      // exposed `size-full`'s OWN `height: 100%` computing against the
+      // scroll container's real height (~650px), stretching the box
+      // and pushing every card below it out of view. Both together are
+      // the real fix - `h-auto!` (forced: a plain `h-auto` alone
+      // survived in the class list next to `size-full` rather than
+      // replacing it, `cn()`'s twMerge not treating them as
+      // conflicting, and lost the cascade to `.size-full` either way).
+      className="h-auto! shrink-0 rounded-2xl! border border-border/70 bg-card shadow-sm focus-within:ring-2 focus-within:ring-ring/30"
+    >
+      <CommandInput value={query} onValueChange={setQuery} placeholder="Ask MaiPai anything..." aria-label="Ask MaiPai" />
+      {/* `CommandList` always mounted, not conditional on `trimmed`: found
+          live, 2026-09-13 - cmdk's own `CommandInput` always carries
+          `aria-controls` pointing at the list's id regardless, so
+          unmounting the list on an empty query left that id dangling
+          (axe's aria-valid-attr-value, critical). Results stay
+          conditional on `trimmed`, matching Home's own "no dropdown
+          clutter until you type" intent (the strip below already shows
+          pinned apps) - only the list ELEMENT itself needs to always
+          exist, not its contents. */}
+      <CommandList>{trimmed !== "" ? <SearchResultGroups groups={visibleGroups} trimmedQuery={trimmed} onSelect={select} onAsk={askMaiPai} /> : null}</CommandList>
+    </Command>
+  );
+}
+
 export function HomePage({ person }: HomePageProps) {
   const navigate = useNavigate();
-  const [prompt, setPrompt] = useState("");
   const [cardSize, setCardSize] = useCardSize("home");
-
-  function submitPrompt(e: FormEvent) {
-    e.preventDefault();
-    const text = prompt.trim();
-    if (!text) return;
-    navigate("/chat", { state: { initialText: text } });
-  }
 
   // hideTitle: the greeting right below already gives this page its
   // identity (name + time of day) - a second, generic "Home" label above
@@ -264,16 +324,7 @@ export function HomePage({ person }: HomePageProps) {
 
         <WhoIsHere selfId={person.id} />
 
-        <form onSubmit={submitPrompt} className="flex gap-2 rounded-2xl border border-border/70 bg-card p-2 shadow-sm focus-within:ring-2 focus-within:ring-ring/30">
-          <Input
-            value={prompt}
-            onChange={(e) => setPrompt(e.target.value)}
-            placeholder="Ask MaiPai anything..."
-            aria-label="Ask MaiPai"
-            className="flex-1 border-0 bg-transparent shadow-none focus-visible:ring-0"
-          />
-          <Button type="submit">Ask</Button>
-        </form>
+        <HomeSearchPrompt person={person} />
 
         <div>
           <h3 className="mb-2 text-sm font-medium text-muted-foreground">
