@@ -40,7 +40,19 @@
 // copy of a routing test CLAUDE.md's "one definition" principle warns
 // against, not a guards one).
 //
-// Usage: bun run scripts/bench/conversation.ts
+// Usage: bun run scripts/bench/conversation.ts            (this offline half)
+//        bun run scripts/bench/conversation.ts --live     (the baseline bench)
+//
+// `--live` (docs/plans/measure-first-2026-09-13.md section 2) is the
+// other half: the twenty fixture conversations of conversationFixture.ts
+// through the real runTurnStream() against the household engines by
+// URL, every outcome read from the system's own state, in
+// conversationLive.ts (setup.ts's refusals first). It never runs from
+// check.sh; the offline half below stays exactly as it was.
+if (process.argv.includes("--live")) {
+  await import("./conversationLive");
+  // conversationLive.ts exits the process itself (finishBench()).
+}
 import { guardReply, type GuardContext } from "@/lib/guards";
 
 const BENCH_ROSTER = ["Marlow", "Riff", "Rover", "Nadia"];
@@ -324,4 +336,4 @@ function main(): void {
   console.log(`${results.length - failed}/${results.length} turns pass (${skipped} setup/model-less turns not graded)`);
 }
 
-main();
+if (!process.argv.includes("--live")) main();

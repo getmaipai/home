@@ -12686,6 +12686,11 @@ other's section once (147cd28, f4779a6).
   package family to outcomes with narrated replacements, the #81
   sentence-case pass; closes #74 and #62:
   [docs/dev/session-a.md](dev/session-a.md) (2026-09-13).
+- Block-end check on bare main at ce7717b, the baseline conversation
+  bench (measure-first section 2: twenty conversations through the real
+  turn engine, state-read outcomes, frozen header, hard rows) and its
+  first run's table and ranking: [docs/dev/session-a.md](dev/session-a.md)
+  (2026-09-13).
 - Lane 5 item 3, Home's weather card writing a fake turn into real chat
   history (an additive `ephemeral` flag on `POST /api/turn/stream`):
   [docs/dev/session-b.md](dev/session-b.md) (2026-09-13).

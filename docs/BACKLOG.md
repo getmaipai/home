@@ -773,6 +773,18 @@ not permission to expand scope.
 
 - [ ] **CHAT-23: Gate chat quality on complete conversations and measured latency** (M)
 
+    Status (2026-09-13, a first slice, left open): the baseline
+    conversation bench of `docs/plans/measure-first-2026-09-13.md`
+    section 2 is built (`scripts/bench/conversation.ts --live`, twenty
+    fixture conversations, outcomes read from system state, a frozen
+    run header, the four hard rows, the ranked failures) and its first
+    run is recorded in [docs/dev/session-a.md](dev/session-a.md): 56 of
+    60 scored turns, all four hard rows pass, two conversations broken
+    (both by #92), model-turn first delta p50 836 ms, and three runs of
+    the same inputs at 54, 54 and 56. The gate below (the
+    forty sequences, five repeats, both transports, the thresholds)
+    stays open; the next items come from the bench's ranking.
+
     Depends on: CHAT-02 through CHAT-21 and CHAT-22. Files:
     `spec/llm/{routing,tool-call,guard,naturalness}-corpus.json`,
     `backend/scripts/bench/memory/{fixture,run}.ts`, existing bench runners,

@@ -22,8 +22,9 @@ the skill requires, and the baseline's starting commit.
 
 A first slice of CHAT-23 plus the timing half of CHAT-21, pulled
 forward. Extend `backend/scripts/bench/conversation.ts` (do not add a
-framework; it already runs scripted conversations through the real
-`runTurnStream()` against engine URLs through `setup.ts`):
+framework; a `--live` mode of that file, through `setup.ts` and the
+real `runTurnStream()` against engine URLs, beside its offline
+guard-only half):
 
 - Twenty complete conversations, each three to six turns, with stable
   ids, covering: disclosure then recall in a later conversation;
