@@ -78,6 +78,7 @@ const FETCH_RATE_LIMIT = { capacity: 5, refillPerSecond: 0.2 };
 const FETCH_TIMEOUT_MS = 10_000;
 const FETCH_MAX_RESPONSE_BYTES = 2_000_000;
 const FETCH_USER_AGENT = "MaiPai-Home/1.0 (+https://github.com/getmaipai/home)";
+const packageFetch = globalThis.fetch.bind(globalThis);
 
 // host.home.call_service's real settings (2026-09-05, closing the first of
 // the two gaps docs/dev.md named for it). A shorter timeout than
@@ -236,7 +237,7 @@ async function attemptHttpFetch(
     let currentMethod = method;
     let currentBody = body;
     for (let hop = 0; ; hop++) {
-      const response = await fetch(currentUrl, { method: currentMethod, headers, body: currentBody, signal: controller.signal, redirect: "manual" });
+      const response = await packageFetch(currentUrl, { method: currentMethod, headers, body: currentBody, signal: controller.signal, redirect: "manual" });
       const location = response.status >= 300 && response.status < 400 ? response.headers.get("location") : null;
       if (location) {
         if (hop >= MAX_FETCH_REDIRECTS) {
