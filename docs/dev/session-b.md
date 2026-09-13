@@ -1784,8 +1784,8 @@ backticks into a broken link fragment - fixed the same way
 markdown`'s own math-delimiter helpers, "code spans and fences are
 never rewritten"): split on fenced/inline code spans first, only
 rewrite the segments outside them; two new regression tests. (2)
-`chatSourcesCard.tsx`'s "Title — site" separator used a literal em
-dash, banned outright by the org's own writing standard
+`chatSourcesCard.tsx`'s "Title" and "site" separator used a literal em
+dash character, banned outright by the org's own writing standard
 (`getmaipai/.github` CLAUDE.md, "No em dashes, ever") - switched to a
 middle dot, both tests updated. (3) `chatCitationLink.tsx`'s fallback
 `a` (a real URL a reply also contains, not a citation) hand-duplicated
