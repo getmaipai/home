@@ -284,6 +284,67 @@ describe("judgeTurn() - extraction and provenance", () => {
     expect(pending[0]!.typeId).toBe("memory.updated");
     expect(pending[0]!.text).toContain("cilantro");
   });
+
+  // getmaipai/home#64: chatMemoryChip.tsx correlates a delivery back to
+  // the exact message it's rendering by turn id, and links to the real
+  // records the judge wrote - both need to actually be on the delivery,
+  // not just the rendered summary text.
+  test("the notification carries the real turn id and the memory record's own id", async () => {
+    const { actor } = await owner();
+    const turn = makeTurn(actor, "I hate cilantro", "Noted.");
+
+    await withScriptedJudge(
+      () => ({ facts: [{ text: "Marlow dislikes cilantro", category: "preference", scope: "person", importance: 0.7 }] }),
+      () => judgeTurn(turn),
+    );
+
+    const pending = listPending(actor);
+    const written = db.select().from(memoryRecords).get()!;
+    expect(pending[0]!.subjectTurnId).toBe(turn.id);
+    expect(pending[0]!.memoryIds).toEqual([written.id]);
+  });
+
+  test("a SUPERSEDE decision's notification carries the NEW record's id, not the retired one", async () => {
+    const { actor } = await owner();
+    const existing = remember(actor, {
+      text: "Marlow lives in New York",
+      category: "fact",
+      tier: "durable",
+      scope: "person",
+      person: actor.id,
+      source: "test",
+      importance: 0.6,
+    });
+    if (!existing.ok) throw new Error("setup failed");
+    // A real vector, not the fire-and-forget one remember() itself kicks
+    // off (hasn't resolved by the time similarByVector() below runs) -
+    // the same direct-injection setup the SUPERSEDE test above uses.
+    const { sqlite } = await import("@/db");
+    sqlite
+      .query("INSERT INTO memory_embeddings (memory_id, space, dims, vector, hlc) VALUES (?, 'test', 4, ?, 'test-hlc')")
+      .run(existing.value.id, Buffer.from(new Float32Array([1, 0, 0, 0]).buffer));
+
+    const turn = makeTurn(actor, "actually I moved to Boston", "Updated.");
+
+    await withScriptedJudge(
+      (schemaName) => {
+        if (schemaName === "memory_extraction") {
+          return { facts: [{ text: "Marlow lives in Boston", category: "fact", scope: "person", importance: 0.6 }] };
+        }
+        if (schemaName === "memory_dedupe") {
+          return { action: "SUPERSEDE", id: existing.value.id, merged_text: "Marlow lives in Boston", contradiction: true };
+        }
+        return undefined;
+      },
+      () => judgeTurn(turn),
+    );
+
+    const newRow = db.select().from(memoryRecords).where(eq(memoryRecords.status, "active")).get()!;
+    const pending = listPending(actor);
+    expect(pending[0]!.subjectTurnId).toBe(turn.id);
+    expect(pending[0]!.memoryIds).toEqual([newRow.id]);
+    expect(pending[0]!.memoryIds).not.toEqual([existing.value.id]); // the retired row's own id, never the notification's
+  });
 });
 
 describe("judgeTurn() - dedupe by supersede", () => {

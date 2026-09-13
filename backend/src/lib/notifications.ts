@@ -105,6 +105,14 @@ export interface TriggerOptions {
    * about DIFFERENT people (personLifecycle.ts's applyAgeBandChanges(),
    * say) can de-duplicate on this instead of matching rendered text. */
   subjectPersonId?: string;
+  /** getmaipai/home#64: which turn this notification is about (`memory.
+   * updated`'s own case) - lets a client correlate a delivery back to a
+   * specific rendered message, the same reason subjectPersonId exists. */
+  subjectTurnId?: string;
+  /** The memory record ids a `memory.updated` delivery is actually
+   * about (what `remember()`/`supersede()` returned), so chatMemoryChip.tsx
+   * has real ids to link to (`/memory?ids=...`) without a second query. */
+  memoryIds?: readonly string[];
 }
 
 /** Renders and delivers one declared notification to its whole audience.
@@ -143,6 +151,8 @@ export async function trigger(typeId: string, vars: Record<string, string> = {},
         channels: JSON.stringify(channels),
         createdAt: new Date().toISOString(),
         subjectPersonId: opts.subjectPersonId ?? null,
+        subjectTurnId: opts.subjectTurnId ?? null,
+        memoryIds: opts.memoryIds ? JSON.stringify(opts.memoryIds) : null,
       })
       .run();
   }
@@ -177,6 +187,8 @@ export interface NotificationDeliveryView {
   createdAt: string;
   readAt: string | null;
   dismissedAt: string | null;
+  subjectTurnId: string | null;
+  memoryIds: string[] | null;
 }
 
 function toView(row: typeof notificationDeliveries.$inferSelect): NotificationDeliveryView {
@@ -188,6 +200,8 @@ function toView(row: typeof notificationDeliveries.$inferSelect): NotificationDe
     createdAt: row.createdAt,
     readAt: row.readAt,
     dismissedAt: row.dismissedAt,
+    subjectTurnId: row.subjectTurnId,
+    memoryIds: row.memoryIds ? (JSON.parse(row.memoryIds) as string[]) : null,
   };
 }
 

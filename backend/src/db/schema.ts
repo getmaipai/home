@@ -531,6 +531,25 @@ export const notificationDeliveries = sqliteTable("notification_deliveries", {
   // is vulnerable to unescaped LIKE metacharacters in a name. A real
   // column is the fix, not a smarter string match.
   subjectPersonId: text("subject_person_id").references(() => people.id),
+  // getmaipai/home#64: which turn a notification is about, when it's
+  // about one (memory.updated: the turn the judge just extracted facts
+  // from) - the same "a real column, not a text match" call
+  // subjectPersonId's own comment already made, for the identical
+  // reason: chatMemoryChip.tsx needs to correlate a delivery back to a
+  // specific message it's rendering, and matching on rendered `text` is
+  // exactly the fragile approach that comment already rejected once. No
+  // FK: conversation_turns rows are genuinely deleted (retention,
+  // deleteConversationById()), and a notification naming an aged-out
+  // turn should stay readable history, not get blocked by a constraint
+  // or need its own cascade.
+  subjectTurnId: text("subject_turn_id"),
+  // The memory record ids remember()/supersede() actually wrote for
+  // that turn (JSON string[], same encoding `channels` above already
+  // uses) - chatMemoryChip.tsx's own "Memory updated" link needs real
+  // ids to point at (/memory?ids=...), not just the rendered summary
+  // text. Nullable: every notification type other than memory.updated
+  // leaves this unset.
+  memoryIds: text("memory_ids"),
 });
 
 // Session F (platform and trust), step 1. Mirrors

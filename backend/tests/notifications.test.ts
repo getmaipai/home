@@ -68,6 +68,27 @@ describe("trigger()", () => {
     expect(delivery!.text).toBe("Qwen3 8B finished downloading and is ready to use.");
   });
 
+  // getmaipai/home#64: chatMemoryChip.tsx correlates a memory.updated
+  // delivery back to the specific message it's rendering by turn id, and
+  // links to the real memory records the judge wrote - both need a real
+  // column, the same "not a text match" call subjectPersonId's own
+  // schema comment already made.
+  test("subjectTurnId and memoryIds round-trip through a real delivery", async () => {
+    const { row } = await owner();
+    await trigger("memory.updated", { summary: "trash day is Tuesday" }, { personId: row.id, subjectTurnId: "turn-abc123", memoryIds: ["mem1-abc", "mem2-def"] });
+    const [delivery] = listPending(row);
+    expect(delivery!.subjectTurnId).toBe("turn-abc123");
+    expect(delivery!.memoryIds).toEqual(["mem1-abc", "mem2-def"]);
+  });
+
+  test("subjectTurnId and memoryIds default to null when the caller doesn't set them", async () => {
+    const { row } = await owner();
+    await trigger("model.download_ready", { modelName: "Test Model" });
+    const [delivery] = listPending(row);
+    expect(delivery!.subjectTurnId).toBeNull();
+    expect(delivery!.memoryIds).toBeNull();
+  });
+
   // No real person-audience core type exists yet (both declared types are
   // "adults" - lib/notificationTypes.ts), so `resolveRecipients`'s
   // `person`-audience branch has no bundled-type test of its own; this

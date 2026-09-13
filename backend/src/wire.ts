@@ -361,4 +361,6 @@ export interface NotificationDeliveryView {
   createdAt: string;
   readAt: string | null;
   dismissedAt: string | null;
+  subjectTurnId: string | null;
+  memoryIds: string[] | null;
 }

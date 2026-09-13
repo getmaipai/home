@@ -8,10 +8,11 @@ import { useToast } from "@/kit/primitives/Toast";
 import { pauseTvNavForOverlay } from "@/shell/tvNav";
 import { api, type NotificationDeliveryView } from "@/lib/api";
 
-const POLL_MS = 15_000;
 // Exported: chatMemoryChip.tsx reads this same cached list (the "memory
-// updated" chip, docs/plans/session-b-ui.md step 4) rather than
-// duplicating the query key and risking the two drifting apart.
+// updated" chip, getmaipai/home#64) and polls it on the same schedule,
+// rather than duplicating the query key/interval and risking the two
+// drifting apart.
+export const POLL_MS = 15_000;
 export const NOTIFICATIONS_QUERY_KEY = ["notifications"];
 // NotificationsPage.tsx's own history query key, exported from here (not
 // the other way around) so this shell-level file never has to import

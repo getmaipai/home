@@ -15,6 +15,8 @@ function notification(overrides: Partial<NotificationDeliveryView> = {}): Notifi
     createdAt: new Date().toISOString(),
     readAt: null,
     dismissedAt: null,
+    subjectTurnId: null,
+    memoryIds: null,
     ...overrides,
   };
 }

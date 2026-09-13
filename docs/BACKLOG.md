@@ -2865,7 +2865,7 @@ Memory clock stamps and validity writes already exist. The remaining temporal-re
 
 Maintenance is already scheduled in `backend/src/index.ts`; profile freshness and unified inference scheduling are tracked by [CHAT-11](#chat-11) and [CHAT-19](#chat-19).
 
-Loaded-history chips and the memory page exist. Live status refresh and per-message actions are tracked by [CHAT-20](#chat-20).
+Loaded-history chips and the memory page exist. getmaipai/home#64 (2026-09-13) added a narrower live-status path - the chip now shows on a LIVE reply too, via a `memory.updated` notification (`subjectTurnId`/`memoryIds` on `notificationDeliveries`) the chip polls for, not the conversation-turns re-poll CHAT-20 describes. No `memoryStatus` states (pending/failed/not_saved), no 5s/10min poll lifecycle, no per-message save/forget wiring - CHAT-20 is still the real remaining scope, but should build on or replace this path rather than duplicate it.
 
 - [ ] **A memory change feed for clients** (M) - the older UI work order's
       `GET /api/memory?since=` request remains separate from CHAT-20's
@@ -3348,20 +3348,11 @@ future session now that F's hub half exists.
       `docs/assets/screens/` for a human to look at before a commit),
       `bun run a11y` is a fast two-combo subset meant for `scripts/
       check.sh`.
-- [ ] **Wire `bun run a11y` into `scripts/check.sh`** (S, Session F -
-      that file's owner per `wave-2.md`'s shared-file protocol) - tried
-      in step 11 (2026-09-06) and backed out: it immediately fails on
-      the still-open "second, narrower contrast finding" above
-      (`chat @ desktop/light`, 6 nodes) every time, a real pre-existing
-      bug outside `frontend/`'s scope for this session to fix. Wiring it
-      in now would block every commit repo-wide over that one page,
-      the same "don't gate on content/code this session doesn't own"
-      call already made for the reading-level lint. Add the two lines
-      back to check.sh's frontend section once that finding is fixed:
-      ```
-      echo "== a11y: axe-core scan"
-      bun run a11y
-      ```
+- [x] **Wire `bun run a11y` into `scripts/check.sh`** (S) - done
+      2026-09-13 (cdd80f0): the contrast finding blocking this was fixed
+      first (aaaf724, `--destructive` retuned per-theme), then the a11y
+      scan added back to `check.sh`'s frontend section right where the
+      comment above said it used to sit.
 - [x] **#71: Phone keyboard regression in empty/loading/desktop layouts** (M, Session B, 2026-09-12)
 
     The phone-keyboard fix in 27858d0 regressed six things across empty,

@@ -409,6 +409,10 @@ export async function judgeTurn(turn: ConversationTurnRow): Promise<JudgeTurnRes
 
   let written = 0;
   const writtenTexts: string[] = [];
+  // getmaipai/home#64: real ids for the memory.updated delivery below, so
+  // chatMemoryChip.tsx has something to link to (/memory?ids=...) rather
+  // than just a rendered summary.
+  const writtenIds: string[] = [];
   for (const fact of facts) {
     // getmaipai/home#63: a fact-heavy turn can still hold the chat engine
     // for several embed+dedupe calls even with MAX_TURNS_PER_RUN at 1 -
@@ -467,6 +471,7 @@ export async function judgeTurn(turn: ConversationTurnRow): Promise<JudgeTurnRes
       if (result.ok) {
         written++;
         writtenTexts.push(decision.mergedText ?? fact.text);
+        writtenIds.push(result.value.created.id);
       } else {
         // Never counts against the poison guard (extraction already
         // succeeded - this is a single fact's own write failing its
@@ -515,6 +520,7 @@ export async function judgeTurn(turn: ConversationTurnRow): Promise<JudgeTurnRes
       if (result.ok) {
         written++;
         writtenTexts.push(fact.text);
+        writtenIds.push(result.value.id);
       } else {
         console.error(`[memoryJudge] remember failed for turn ${turn.id}: ${result.error}`);
       }
@@ -525,7 +531,7 @@ export async function judgeTurn(turn: ConversationTurnRow): Promise<JudgeTurnRes
 
   if (written > 0) {
     const summary = writtenTexts.length === 1 ? writtenTexts[0]! : `${writtenTexts.length} things from our conversation`;
-    await trigger("memory.updated", { summary }, { personId: speaker.id });
+    await trigger("memory.updated", { summary }, { personId: speaker.id, subjectTurnId: turn.id, memoryIds: writtenIds });
   }
 
   return { ok: true, factsWritten: written };

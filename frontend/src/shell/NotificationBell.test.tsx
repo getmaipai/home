@@ -27,6 +27,8 @@ function notification(id: string, text: string): NotificationDeliveryView {
     createdAt: "2026-09-05T00:00:00.000Z",
     readAt: null,
     dismissedAt: null,
+    subjectTurnId: null,
+    memoryIds: null,
   };
 }
 

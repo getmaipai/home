@@ -13,6 +13,8 @@ const NotificationSchema = z.object({
   createdAt: z.string(),
   readAt: z.string().nullable(),
   dismissedAt: z.string().nullable(),
+  subjectTurnId: z.string().nullable(),
+  memoryIds: z.array(z.string()).nullable(),
 });
 
 const IdParamSchema = idParamSchema("id", "notif-a1b2c3");

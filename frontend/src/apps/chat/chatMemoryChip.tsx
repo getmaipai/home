@@ -1,20 +1,46 @@
 import { useAuiState } from "@assistant-ui/react";
+import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import { getIcon } from "@/kit/icons";
+import { api, type NotificationDeliveryView } from "@/lib/api";
+import { NOTIFICATIONS_QUERY_KEY, POLL_MS } from "@/shell/NotificationBell";
 
 const Brain = getIcon("brain");
 
-/** Rendered per assistant message (thread.aui.tsx); shows only once this
- * message's own history row carried real `memory_ids`
- * (chatHistoryAdapter.ts's `metadata.custom.memoryIds`, getmaipai/home#64).
- * Reads straight off the rendered message's own metadata, not a
- * `memory.updated` notification: `NotificationDeliveryView` has no
- * `payload` field on `main`, so that path never actually fired - this
- * chip had never shown once before this fix. `memory_ids` is real data
- * (`list()`'s own join in `conversationHistory.ts`), already loaded with
- * the thread, so there is nothing separate to poll. */
+// The judge runs after the turn, not during it - even the newest
+// (getmaipai/home#60: a live reply's own `metadata.custom.turnId`) message
+// has no `memory_ids` at the moment it's yielded. `NotificationBell.tsx`'s
+// own 15s poll already fetches memory.updated deliveries (subjectTurnId,
+// memoryIds - getmaipai/home#64), so this reads that SAME cached query
+// (its own comment: "rather than duplicating the query key") instead of a
+// second one, and only while a message's own turn hasn't already reported
+// its ids straight off the row (chatHistoryAdapter.ts's reload-path
+// metadata) - once a reload happens, the join is real data and this
+// never needs to poll for that message again.
+function useMemoryUpdatesByTurnId(turnId: string | undefined): string[] | undefined {
+  const query = useQuery<NotificationDeliveryView[]>({
+    queryKey: NOTIFICATIONS_QUERY_KEY,
+    queryFn: () => api.notifications(),
+    refetchInterval: POLL_MS,
+    enabled: turnId !== undefined,
+  });
+  if (!turnId) return undefined;
+  const delivery = query.data?.find((n) => n.typeId === "memory.updated" && n.subjectTurnId === turnId);
+  return delivery?.memoryIds ?? undefined;
+}
+
+/** Rendered per assistant message (thread.aui.tsx). Two sources, in
+ * order: a reloaded message's own row already carries real `memory_ids`
+ * (chatHistoryAdapter.ts's `metadata.custom.memoryIds`) - nothing to wait
+ * on, shows immediately. A message from the CURRENT live session has
+ * none yet (the judge hasn't run), so it falls back to polling for a
+ * matching memory.updated delivery by turn id instead - this is the only
+ * way a live reply's chip can ever show without a reload. */
 export function MemoryUpdatedChip() {
-  const memoryIds = useAuiState((s) => (s.message.metadata?.custom?.memoryIds as string[] | undefined) ?? undefined);
+  const turnId = useAuiState((s) => s.message.metadata?.custom?.turnId as string | undefined);
+  const rowMemoryIds = useAuiState((s) => (s.message.metadata?.custom?.memoryIds as string[] | undefined) ?? undefined);
+  const liveMemoryIds = useMemoryUpdatesByTurnId(rowMemoryIds?.length ? undefined : turnId);
+  const memoryIds = rowMemoryIds?.length ? rowMemoryIds : liveMemoryIds;
 
   if (!memoryIds?.length) return null;
 
