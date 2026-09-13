@@ -3044,3 +3044,64 @@ asked to forget something and answered: ...]" instead of "[Command
 mentioned that" and an apology after the verb. Tests: seventeen in
 the 4b describe, one in the conversation-history suite, four guard
 tests.
+
+## Item 4c: the household invention guard reads activities (2026-09-13)
+
+The film opening turn of the 47-conversation run told Sage "Sage is
+watching it too!": a roster name plus a present activity, invented, <!-- prose-lint: allow -->
+and none of the invention shapes (a third party's traits, a place for
+a person, an attributed quote, a claimed experience) read it. Word
+grounding could not have caught it either: the utterance was "I'm
+watching the movie Cobra", so "watching" was grounded, only not for
+Sage.
+
+The shape (guards.ts, `ACTIVITY_CLAIM_RE`): a household subject plus
+one of a fixed list of activity verbs in the progressive (watching,
+playing, eating, sleeping, cooking, reading, working, driving,
+practicing, shopping, ...; "having dinner", "doing homework").
+Conversational progressives (asking, saying, wondering, looking for,
+planning, talking about) and "doing great" are not on the list. Who
+counts as a subject is narrower than for a place, because the code
+review of the first cut showed the wide reading cutting ordinary
+replies ("If you're driving, take the 101", "You're running out of
+time", "She's singing in the finale" about a pop star, "Your dog is
+sleeping a lot" after the person said so): a roster name's first
+word, always; he/she/they only beside a roster name, in the sentence
+("Sage, she's watching it too" is Sage) or in the question and the
+person's last two turns ("my kids" in the question does not make
+"they're streaming it" a household claim); the second person (or
+"your dog") only with a right-now marker before or after the verb
+(right now, too, tonight, still, also), and never behind "if" or
+"when". Grounding is about the subject, not the word: a name needs a
+source, episode, grounding or history line that carries the name and
+either an inflection of the verb or every content word of the
+activity clause ("Pippa plays soccer on Tuesdays" grounds "Pippa is
+playing soccer"; "Pippa: 5k on Saturday" grounds "Pippa is running a
+5k on Saturday"; a line about Marlow grounds nothing about Pippa;
+filler such as "as well" is not content); bare "you" needs a
+first-person line of the person's own ("I'm watching" grounds "you're
+watching it too"); "your dog" and a bare pronoun need any line with
+the verb, since the person describes a third party in the third
+person ("the dog has been sleeping all day"). The verb's inflections
+are its base with a doubled consonant folded plus -e, -s, -es, -ed,
+-d, -ing and the -ies forms, never an open prefix ("came" must not
+ground "camping", "restaurant" must not ground "resting"). An
+ungrounded activity is the `invention` reason and the
+household honesty line, the same as an ungrounded place. Known and
+accepted: a roster first name that is also a world word ("Nova" with
+Nova Scotia in the answer) is read as the person.
+
+Tests: ten in the guards suite (the Cobra sentence and its
+appositive form; "you're watching" grounded by the utterance, by
+history, and not at all; Pippa's soccer with a line about Pippa, with
+none, and with a line about Marlow; a 5k grounded by its own words; a
+pronoun grounded by an episode; Stallone, Taylor Swift and the Lakers
+are not the household; advice, idioms, conditionals and "your dog"
+after the person said so all stand; "they're streaming it" after "my
+kids" stands; "came", "pain", "restaurant" and "skill" ground nothing;
+"as well" is not an object; "studies" grounds "studying") and four
+corpus rows both ways. Two review rounds on the shape (nine and six
+findings), all taken. The live check is the film row's
+opening turn (world-knowledge-film#1, `guard: null`), which the
+seeded bench (item 5, BENCH-01) makes measurable; the three-run
+acceptance for 4c is taken there.

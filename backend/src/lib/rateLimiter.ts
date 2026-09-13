@@ -54,7 +54,7 @@ function refill(bucket: Bucket, opts: TokenBucketOptions, nowMs: number): void {
  * actually elapsed, flaking roughly 1 in 4 full-suite runs). Same
  * "explicit `now` parameter, default real time" shape scheduler.ts's own
  * runDueJobs() already uses. */
-export function tryConsume(key: string, opts: TokenBucketOptions, nowMs: number = Date.now()): boolean {
+export function tryConsume(key: string, opts: TokenBucketOptions, nowMs: number = clock()): boolean {
   let bucket = buckets.get(key);
   if (!bucket) {
     if (buckets.size >= MAX_BUCKETS) {
@@ -69,10 +69,25 @@ export function tryConsume(key: string, opts: TokenBucketOptions, nowMs: number 
   return true;
 }
 
+// home#106: the clock every real caller's default `nowMs` reads. A test
+// that spends a budget through the real routes (five turns through the
+// engine stub, then a sixth expecting 429) takes long enough under
+// full-suite load for a token to refill at 0.5/s, so it freezes this
+// instead of racing the wall clock; production never touches it.
+let clock: () => number = Date.now;
+
 /** Test-only: forgets every bucket's state so tests don't leak rate-limit
  * exhaustion into each other, the same reset shape __resetLlmSupervisorForTests()
  * and __resetThrottleForTests() already establish for other module-level
- * in-memory state. */
+ * in-memory state. Also puts the clock back on Date.now. */
 export function __resetRateLimiterForTests(): void {
   buckets.clear();
+  clock = Date.now;
+}
+
+/** Test-only: the limiter reads `now` from `fn` instead of Date.now,
+ * so a budget spent through real routes stays spent for as long as the
+ * test needs (home#106). Reset by __resetRateLimiterForTests(). */
+export function __setRateLimiterClockForTests(fn: () => number): void {
+  clock = fn;
 }

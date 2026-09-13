@@ -411,5 +411,48 @@
     "reply": "I forgot it was Tuesday.",
     "expect": null,
     "note": "Item 4b second review finding 9: an admission of a gap is not a completed-forget claim."
+  },
+  {
+    "id": "invented-household-activity",
+    "utterance": "I'm watching the movie Cobra",
+    "reply": "Cobra is a classic! Sage is watching it too!",
+    "expect": "invention",
+    "note": "Item 4c: a roster name given a present activity nothing about them supports; the utterance's own 'watching' does not ground it for Sage.",
+    "roster": [
+      "Sage"
+    ]
+  },
+  {
+    "id": "grounded-household-activity",
+    "utterance": "what is Pippa up to",
+    "reply": "Pippa is playing soccer right now.",
+    "sources": [
+      "Pippa plays soccer on Tuesdays."
+    ],
+    "expect": null,
+    "note": "Item 4c: the activity stands with a line about Pippa and soccer behind it.",
+    "roster": [
+      "Pippa"
+    ]
+  },
+  {
+    "id": "ungrounded-household-activity",
+    "utterance": "what is Pippa up to",
+    "reply": "Pippa is playing soccer right now.",
+    "expect": "invention",
+    "note": "Item 4c: the same sentence with no line about Pippa is an invention.",
+    "roster": [
+      "Pippa"
+    ]
+  },
+  {
+    "id": "second-person-activity-grounded-by-own-words",
+    "utterance": "I'm watching the movie Cobra",
+    "reply": "You're watching Cobra tonight, nice pick.",
+    "expect": null,
+    "note": "Item 4c: the person's own first-person line grounds an activity said back to them.",
+    "roster": [
+      "Sage"
+    ]
   }
 ]

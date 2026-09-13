@@ -98,6 +98,72 @@ describe("invention: general knowledge is not an invention (FAST-05)", () => {
   });
 });
 
+// Item 4c (docs/plans/baseline-fixes-2026-09-13.md): the live bench heard
+// "Sage is watching it too!" after "I'm watching the movie Cobra": a
+// roster name given a present activity nothing about Sage supports, and
+// the utterance's own "watching" grounded the word.
+describe("item 4c: an activity for a household subject needs a line that says so about them", () => {
+  test("'Sage is watching it too!' after the person said they are watching is an invention", () => {
+    expect(guardReply("Cobra is a classic! Sage is watching it too!", ctx({ utterance: "I'm watching the movie Cobra", roster: ["Sage"] })).reason).toBe("invention");
+  });
+  test("'you're watching Cobra tonight' is grounded by the person's own first-person line", () => {
+    expect(guardReply("You're watching Cobra tonight, nice pick.", ctx({ utterance: "I'm watching the movie Cobra", roster: ["Sage"] })).reason).toBeNull();
+    expect(guardReply("You're watching Cobra tonight, nice pick.", ctx({ utterance: "any thoughts", history: ["I'm watching the movie Cobra"], roster: ["Sage"] })).reason).toBeNull();
+    expect(guardReply("You're watching Cobra tonight, nice pick.", ctx({ utterance: "any thoughts", roster: ["Sage"] })).reason).toBe("invention");
+  });
+  test("'Pippa is playing soccer right now' with a memory about Pippa and soccer passes; without it, cut", () => {
+    expect(guardReply("Pippa is playing soccer right now.", ctx({ utterance: "what is Pippa up to", roster: ["Pippa"] })).reason).toBe("invention");
+    expect(guardReply("Pippa is playing soccer right now.", ctx({ utterance: "what is Pippa up to", roster: ["Pippa"], sources: ["Pippa plays soccer on Tuesdays."] })).reason).toBeNull();
+    // A line about someone else does not ground Pippa's activity.
+    expect(guardReply("Pippa is playing soccer right now.", ctx({ utterance: "what is Pippa up to", roster: ["Pippa", "Marlow"], sources: ["Marlow plays soccer on Tuesdays."] })).reason).toBe("invention");
+  });
+  test("a pronoun subject is grounded by any line with the verb; a stranger's name is not the household's", () => {
+    expect(guardReply("She's sleeping in the car.", ctx({ utterance: "where is Pippa", roster: ["Pippa"] })).reason).toBe("invention");
+    expect(guardReply("She's sleeping in the car.", ctx({ utterance: "where is Pippa", roster: ["Pippa"], episodes: ["Pippa sleeps in the car on long drives."] })).reason).toBeNull();
+    expect(guardReply("Stallone is playing a cop named Cobretti.", ctx({ utterance: "what is Cobra about", roster: ["Sage"] })).reason).toBeNull();
+  });
+  test("conversational and idiomatic progressives are not activity claims", () => {
+    expect(guardReply("You're doing great, keep going.", ctx({ utterance: "how am I doing", roster: ["Sage"] })).reason).toBeNull();
+    expect(guardReply("If you're looking for a comedy, try Airplane.", ctx({ utterance: "any film ideas", roster: ["Sage"] })).reason).toBeNull();
+    expect(guardReply("You're asking about the runtime, right?", ctx({ utterance: "how long", roster: ["Sage"] })).reason).toBeNull();
+  });
+  // The review of the first cut: the second person is a claim only
+  // with a right-now marker, never advice, an idiom or a conditional.
+  test("advice and idioms in the second person stand: 'if you're driving', 'you're running out of time'", () => {
+    const c = ctx({ utterance: "fastest way to the city", roster: ["Sage"] });
+    expect(guardReply("Great choice. If you're driving, take the 101.", c).reason).toBeNull();
+    expect(guardReply("When you're cooking rice, rinse it first.", c).reason).toBeNull();
+    expect(guardReply("You're running out of time on that return.", c).reason).toBeNull();
+    expect(guardReply("You're playing with fire there.", c).reason).toBeNull();
+    expect(guardReply("You're reading that right, it is 200 calories.", c).reason).toBeNull();
+    expect(guardReply("Your dog is sleeping a lot.", ctx({ utterance: "Rover sleeps all day, is that normal", roster: ["Sage"] })).reason).toBeNull();
+    expect(guardReply("You're watching it right now, so no spoilers.", ctx({ utterance: "what happens at the end", roster: ["Sage"] })).reason).toBe("invention");
+  });
+  test("a pronoun answering a world question is the world's; beside a roster name it is that person", () => {
+    expect(guardReply("She's singing in the finale.", ctx({ utterance: "is Taylor Swift in the show", roster: ["Sage"] })).reason).toBeNull();
+    expect(guardReply("They're building a new stadium downtown.", ctx({ utterance: "what are the Lakers up to", roster: ["Sage"] })).reason).toBeNull();
+    expect(guardReply("Sage, she's watching it too!", ctx({ utterance: "I'm watching the movie Cobra", roster: ["Sage"] })).reason).toBe("invention");
+  });
+  // The second review of this shape.
+  test("'your dog' is grounded by the person's third-person words; impersonal 'they' after 'my kids' is not a claim", () => {
+    expect(guardReply("Your dog is sleeping a lot today, which is normal in summer.", ctx({ utterance: "the dog has been sleeping all day today, is that ok", roster: ["Sage"] })).reason).toBeNull();
+    expect(guardReply("Try Paddington, they're streaming it on most services.", ctx({ utterance: "what should I watch with my kids tonight", roster: ["Sage"] })).reason).toBeNull();
+    expect(guardReply("You're still watching it, so no spoilers.", ctx({ utterance: "what happens at the end", roster: ["Sage"] })).reason).toBe("invention");
+  });
+  test("filler never grounds the object, and a stem matches its own inflections only", () => {
+    expect(guardReply("Sage is watching it as well!", ctx({ utterance: "I'm watching the movie Cobra", roster: ["Sage"], sources: ["Sage works as a nurse."] })).reason).toBe("invention");
+    expect(guardReply("Pippa is resting today.", ctx({ utterance: "what is Pippa up to", roster: ["Pippa"], sources: ["Pippa went to a restaurant."] })).reason).toBe("invention");
+    expect(guardReply("Pippa is skiing this weekend.", ctx({ utterance: "what is Pippa up to", roster: ["Pippa"], sources: ["Pippa has a skill test."] })).reason).toBe("invention");
+    expect(guardReply("Pippa is studying tonight.", ctx({ utterance: "what is Pippa up to", roster: ["Pippa"], sources: ["Pippa studies most nights."] })).reason).toBeNull();
+  });
+  test("a line that grounds the activity's own words counts, and a short stem never grounds by accident", () => {
+    expect(guardReply("Pippa is running a 5k on Saturday.", ctx({ utterance: "what is Pippa up to", roster: ["Pippa"], grounding: ["Pippa: 5k on Saturday."] })).reason).toBeNull();
+    expect(guardReply("Sage is watching a movie at Marlow's.", ctx({ utterance: "where is Sage", roster: ["Sage", "Marlow"], sources: ["Sage went to Marlow's for a movie."] })).reason).toBeNull();
+    expect(guardReply("Pippa is camping this weekend.", ctx({ utterance: "what is Pippa up to", roster: ["Pippa"], sources: ["Pippa came home late."] })).reason).toBe("invention");
+    expect(guardReply("Pippa is painting today.", ctx({ utterance: "what is Pippa up to", roster: ["Pippa"], sources: ["Pippa has a pain in her knee."] })).reason).toBe("invention");
+  });
+});
+
 describe("invention: a claim about the household still needs a source (FAST-05)", () => {
   test("a place for a person on the roster with no memory is an invention - 'Pippa is at soccer practice right now.'", () => {
     expect(guardReply("Pippa is at soccer practice right now.", ctx({ utterance: "where is Pippa", roster: ["Pippa"] })).reason).toBe("invention");

@@ -1982,13 +1982,26 @@ describe("plugin-vs-skill priority (2026-09-05, a real live-found bug)", () => {
   // dad joke" example (pure filler-word overlap on "tell me a," nothing
   // semantic) to fire it outright, before the turn ever reached the
   // model or the far more relevant bundled `storytime-style` skill.
+  // home#106: the turn needs a chat engine, and under full-suite load
+  // the implicit one was not always there (result.ok false, one gate in
+  // four); a stub of the test's own, like the neighbors that survive.
   test("a weak, fuzzy-matched plugin no longer preempts a more confident skill match for the same turn", async () => {
     const { actor } = await owner();
-    const result = await runTurn(actor, "chat", "tell me a bedtime story about a fox");
-    expect(result.ok).toBe(true);
-    if (!result.ok) return;
-    expect(result.value.source).toBe("model");
-    expect(result.value.source).not.toBe("plugin");
+    __resetLlmSupervisorForTests();
+    const { startStubLlmServer } = await import("@maipai/spec/llm/ts/stubServer.js");
+    const stub = startStubLlmServer(0, { scriptedChatReply: () => "Once upon a time, a fox..." });
+    process.env.MAIPAI_LLAMA_SERVER_URL = stub.url;
+    try {
+      const result = await runTurn(actor, "chat", "tell me a bedtime story about a fox");
+      expect(result.ok).toBe(true);
+      if (!result.ok) return;
+      expect(result.value.source).toBe("model");
+      expect(result.value.source).not.toBe("plugin");
+    } finally {
+      stub.stop();
+      delete process.env.MAIPAI_LLAMA_SERVER_URL;
+      __resetLlmSupervisorForTests();
+    }
   });
 
   // The other half of the same fix: a real trigger phrase (a genuine
@@ -2954,23 +2967,48 @@ describe("POST /api/turn/stream", () => {
     // weather card, and a person's own chat paid from the same bucket.
     // An ephemeral turn draws from its own small per-person bucket,
     // never from the chat budget, so neither can starve the other.
+    // home#106: the buckets refill at 0.5 tokens a second on the wall
+    // clock, and five turns through the engine stub under full-suite
+    // load can take longer than two seconds, so the sixth was sometimes
+    // a 200 (three failing full runs, never alone). The limiter's clock
+    // is frozen for the test; each reset below also restarts it, so it
+    // is frozen again after each. The chat turns also get a chat engine
+    // of this test's own: in the full suite the supervisor was still
+    // pointed at a neighbor's stopped stub and one "hi" was a 503
+    // before the budget question was ever asked.
     test("an ephemeral turn draws from its own per-person bucket, never the chat budget (#102)", async () => {
       const { client } = await owner();
       const { PERSON_TURN_BUDGET, EPHEMERAL_TURN_BUDGET } = await import("@/lib/llm");
-      const card = { text: "What's the weather like today?", ephemeral: true };
-      // The chat budget spent: the card's question still answers.
-      for (let i = 0; i < PERSON_TURN_BUDGET.capacity; i++) expect((await client.post("/api/turn", { text: "hi" })).status).toBe(200);
-      expect((await client.post("/api/turn", { text: "hi" })).status).toBe(429);
-      expect((await client.post("/api/turn/stream", card)).status).toBe(200);
-      // The card's bucket spent: the chat budget is untouched by it.
-      __resetRateLimiterForTests();
-      for (let i = 0; i < EPHEMERAL_TURN_BUDGET.capacity; i++) expect((await client.post("/api/turn/stream", card)).status).toBe(200);
-      expect((await client.post("/api/turn/stream", card)).status).toBe(429);
-      expect((await client.post("/api/turn", { text: "hi" })).status).toBe(200);
-      // A claimed flag on ordinary text is a chat turn and pays as one.
-      __resetRateLimiterForTests();
-      for (let i = 0; i < PERSON_TURN_BUDGET.capacity; i++) expect((await client.post("/api/turn", { text: "hi" })).status).toBe(200);
-      expect((await client.post("/api/turn/stream", { text: "remember that the wifi password is on the fridge", ephemeral: true })).status).toBe(429);
+      const { __setRateLimiterClockForTests } = await import("@/lib/rateLimiter");
+      const frozen = Date.now();
+      __setRateLimiterClockForTests(() => frozen);
+      __resetLlmSupervisorForTests();
+      const { startStubLlmServer } = await import("@maipai/spec/llm/ts/stubServer.js");
+      const stub = startStubLlmServer(0, { scriptedChatReply: () => "Hello there." });
+      process.env.MAIPAI_LLAMA_SERVER_URL = stub.url;
+      try {
+        const card = { text: "What's the weather like today?", ephemeral: true };
+        // The chat budget spent: the card's question still answers.
+        for (let i = 0; i < PERSON_TURN_BUDGET.capacity; i++) expect((await client.post("/api/turn", { text: "hi" })).status).toBe(200);
+        expect((await client.post("/api/turn", { text: "hi" })).status).toBe(429);
+        expect((await client.post("/api/turn/stream", card)).status).toBe(200);
+        // The card's bucket spent: the chat budget is untouched by it.
+        __resetRateLimiterForTests();
+        __setRateLimiterClockForTests(() => frozen);
+        for (let i = 0; i < EPHEMERAL_TURN_BUDGET.capacity; i++) expect((await client.post("/api/turn/stream", card)).status).toBe(200);
+        expect((await client.post("/api/turn/stream", card)).status).toBe(429);
+        expect((await client.post("/api/turn", { text: "hi" })).status).toBe(200);
+        // A claimed flag on ordinary text is a chat turn and pays as one.
+        __resetRateLimiterForTests();
+        __setRateLimiterClockForTests(() => frozen);
+        for (let i = 0; i < PERSON_TURN_BUDGET.capacity; i++) expect((await client.post("/api/turn", { text: "hi" })).status).toBe(200);
+        expect((await client.post("/api/turn/stream", { text: "remember that the wifi password is on the fridge", ephemeral: true })).status).toBe(429);
+      } finally {
+        stub.stop();
+        delete process.env.MAIPAI_LLAMA_SERVER_URL;
+        __resetLlmSupervisorForTests();
+        __resetRateLimiterForTests(); // the clock too, whatever threw above
+      }
     });
 
     test("an arbitrary sentence with the flag set is logged normally, not skipped", async () => {

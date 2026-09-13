@@ -353,6 +353,124 @@ function claimsUngroundedHouseholdLocation(sentence: string, ctx: GuardContext, 
   return false;
 }
 
+// Item 4c (docs/plans/baseline-fixes-2026-09-13.md): "Sage is watching
+// it too!", "Pippa is playing soccer right now": a household subject
+// given a present activity. The trait and location shapes above do not
+// read it, and the live bench heard a roster name invented into the
+// film the person had just started. A shape, not a word check: the
+// subject plus one of these activity verbs in the progressive.
+// Conversational verbs (asking, saying, wondering, looking for,
+// planning) are not on the list; neither is "doing great".
+//
+// Who counts as a household subject here is narrower than for a place
+// (the review of this diff found the wide reading cut "If you're
+// driving, take the 101", "She's singing in the finale" about a pop
+// star, and "Your dog is sleeping a lot" after the person said so):
+// a roster name's first word, always; he/she/they only when the
+// question or the person's last two turns name a roster member (a
+// pronoun answering a world question is the world's); the second
+// person only with a right-now marker in the clause ("you're watching
+// it too", never advice or an idiom), and never behind "if" or "when".
+// Grounding is about the subject, not the word: a name needs a source,
+// episode, grounding or history line that carries the name and either
+// the verb's stem or every content word of the activity clause ("Pippa:
+// 5k on Saturday" grounds "Pippa is running a 5k on Saturday"; a line
+// about Marlow grounds nothing about Pippa); "you" needs a first-person
+// line of the person's own ("I'm watching" grounds "you're watching it
+// too"); a pronoun beside a roster name in the same sentence ("Sage,
+// she's watching it too") is that name; a bare pronoun needs any line
+// with the stem. Word-level grounding alone cannot tell whose activity
+// it is, which is exactly how "Sage is watching it too" passed: the
+// utterance grounded "watching".
+const ACTIVITY_VERBS =
+  "watching|playing|eating|drinking|sleeping|napping|resting|cooking|baking|reading|writing|studying|working|driving|running|jogging|swimming|practicing|practising|training|exercising|visiting|shopping|cleaning|painting|drawing|listening|walking|hiking|biking|cycling|skating|skiing|dancing|singing|gaming|streaming|gardening|fishing|camping|building|coding|travelling|traveling|flying|sitting|waiting|staying|hanging out|having (?:dinner|lunch|breakfast|a snack|a nap)|doing (?:homework|chores|the dishes|laundry)";
+const ACTIVITY_CLAIM_RE = new RegExp(
+  String.raw`(?:^|[^\p{L}])(?:(if|when|whenever|while|unless|once|whether|as long as)\s+)?(he|she|they|you|your\s+(?:brother|sister|mom|mother|dad|father|son|daughter|kids?|wife|husband|partner|friend|grandma|grandpa|family|dog|cat)|\p{L}[\p{L}'-]+)(?:'s|'re|\s+(?:is|are))\s+((?:also|even|still|currently|probably|busy)\s+)?(${ACTIVITY_VERBS})\b([^.!?;,]*)`,
+  "giu",
+);
+const RIGHT_NOW_RE = /\b(?:right now|at the moment|currently|as we speak|too|as well|tonight|today|still|also)\b/i;
+const FIRST_PERSON_RE = /\b(?:i|i'm|i've|i'd|we|we're|we've|we'd|my|our)\b/i;
+
+/** The words a progressive verb is grounded by: its own inflections
+ * ("watching" by "watch", "watches", "watched"; "running" by "run";
+ * "baking" by "bake"; "studying" by "studies"), never an open prefix
+ * (the reviews: "came" grounded "camping", "restaurant" grounded
+ * "resting", "skill" grounded "skiing"). */
+function inflectionsOf(verb: string): Set<string> {
+  const base = verb.toLowerCase().split(/\s+/).pop()!.replace(/ing$/, "");
+  const single = /([b-df-hj-np-tv-z])\1$/.test(base) ? base.slice(0, -1) : base;
+  const forms = new Set<string>();
+  for (const stem of new Set([base, single])) {
+    for (const end of ["", "e", "s", "es", "ed", "d", "ing"]) forms.add(stem + end);
+    if (stem.endsWith("y")) forms.add(`${stem.slice(0, -1)}ies`).add(`${stem.slice(0, -1)}ied`);
+  }
+  forms.add(verb.toLowerCase().split(/\s+/).pop()!);
+  return forms;
+}
+
+// Filler the object-word path must not count as content ("Sage is
+// watching it as well" against "Sage works as a nurse"): a word is
+// content when it carries a digit ("5k") or is four letters or more
+// and not scaffolding.
+const OBJECT_FILLER = new Set(["well", "right", "here", "there", "then", "than", "with", "from", "into", "onto", "over", "this", "that", "these", "those", "some", "much", "many", "more", "most", "very", "just", "also", "still", "again", "later", "soon", "today", "tonight", "now"]);
+function objectWordsOf(clause: string): string[] {
+  return [...tokenize(clause)].filter((w) => !CLAIM_SAFE_WORDS.has(w) && !OBJECT_FILLER.has(w) && (/\d/.test(w) || w.length >= 4));
+}
+
+function lineGrounds(line: string, forms: Set<string>, objectWords: string[]): boolean {
+  const words = tokenize(line);
+  if ([...words].some((w) => forms.has(w))) return true;
+  return objectWords.length > 0 && objectWords.every((w) => words.has(w));
+}
+
+function namesIn(text: string, ctx: GuardContext): string[] {
+  return (ctx.roster ?? [])
+    .map((name) => name.trim().split(/\s+/)[0]!)
+    .filter((first) => first && new RegExp(`(?<!\\p{L})${first.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}(?!\\p{L})`, "iu").test(text));
+}
+
+/** True when some clause of `sentence` gives a household subject an
+ * activity no line about that subject supports. */
+function claimsUngroundedHouseholdActivity(sentence: string, ctx: GuardContext): boolean {
+  const recent = [ctx.utterance, ...(ctx.history ?? []).slice(-RECENT_TURNS_FOR_RECALL)].join(" ");
+  const lines = [ctx.utterance, ...(ctx.history ?? []), ...(ctx.sources ?? []), ...(ctx.episodes ?? []), ...(ctx.grounding ?? [])];
+  for (const m of sentence.matchAll(ACTIVITY_CLAIM_RE)) {
+    if (m[1]) continue; // "if you're driving": advice, not a claim
+    const subject = m[2]!.toLowerCase();
+    const clause = m[5] ?? "";
+    const forms = inflectionsOf(m[4]!);
+    const objectWords = objectWordsOf(clause);
+    let name: string | null = null;
+    if (subject === "you" || subject.startsWith("your ")) {
+      // The marker may sit before the verb ("you're still watching it")
+      // or after ("you're watching it too").
+      if (!RIGHT_NOW_RE.test(`${m[3] ?? ""} ${m[4]} ${clause}`)) continue;
+    } else if (subject === "he" || subject === "she" || subject === "they") {
+      // A pronoun is the household's only beside a roster name: in this
+      // sentence, or in the question and the person's last two turns.
+      // "my kids" in the question does not make "they're streaming it"
+      // a claim about the household (the second review).
+      const named = namesIn(sentence, ctx)[0] ?? null;
+      if (!named && namesIn(recent, ctx).length === 0) continue;
+      name = named;
+    } else {
+      if (!isHouseholdSubject(subject, ctx)) continue;
+      name = subject.split(/\s+/)[0]!;
+    }
+    const grounded = lines.some((line) => {
+      if (!lineGrounds(line, forms, objectWords)) return false;
+      if (name) return namesIn(line, ctx).some((n) => n.toLowerCase() === name!.toLowerCase());
+      // Bare "you" needs the person's own words; "your dog" is a third
+      // party the person describes in the third person ("the dog has
+      // been sleeping all day"), so any line with the verb grounds it.
+      if (subject === "you") return FIRST_PERSON_RE.test(line);
+      return true;
+    });
+    if (!grounded) return true;
+  }
+  return false;
+}
+
 // "Nadia said she'd like pasta tonight." - speech attributed to a named
 // person, where the CONTENT of the quote isn't anything the sources
 // actually hold. A real quote the robot holds ("Bramble said he wants
@@ -421,6 +539,7 @@ function guardInvention(sentence: string, ctx: GuardContext): GuardReason | null
   if (guessesAboutHousehold(sentence, ctx, grounded)) return "invention";
 
   if (claimsUngroundedHouseholdLocation(sentence, ctx, grounded)) return "invention";
+  if (claimsUngroundedHouseholdActivity(sentence, ctx)) return "invention";
 
   if (attributesToAPerson(sentence)) {
     // The name/relation word and the speech verb itself are never the
