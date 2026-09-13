@@ -1,14 +1,17 @@
 #!/usr/bin/env bash
 # MaiPai Home pre-commit gate. Runs the spec package's checks, then the
 # backend's, then the pinned @maipai/standards core. See docs/dev.md.
+# With --docs it runs only the reading-level lint and the standards core, the gate for a commit that touches only Markdown.
 set -euo pipefail
 cd "$(dirname "$0")/.."
+
+DOCS_ONLY=0; if [ "${1:-}" = "--docs" ]; then DOCS_ONLY=1; fi
 
 STANDARDS_DIR="${MAIPAI_STANDARDS_DIR:-../.github}"
 STANDARDS_DIR="$(cd "$STANDARDS_DIR" && pwd)"
 export MAIPAI_STANDARDS_DIR="$STANDARDS_DIR"
 
-if [ -d spec/schemas ]; then
+if [ "$DOCS_ONLY" = 0 ] && [ -d spec/schemas ]; then
   # spec/README.md: "standards/gen/ts/ and standards/gen/py/ (in the
   # sibling .github checkout) need to already be generated before home's
   # codegen runs" - a schema here $ref's a standards schema by bare
@@ -46,7 +49,7 @@ if [ -d spec/schemas ]; then
   (cd spec && uv run pytest tests/py -q)
 fi
 
-if [ -d backend/src ]; then
+if [ "$DOCS_ONLY" = 0 ] && [ -d backend/src ]; then
   echo "== backend: install"
   bun install --silent
 
@@ -73,7 +76,7 @@ if [ -d backend/src ]; then
   (cd backend && bun test)
 fi
 
-if [ -d frontend/src ]; then
+if [ "$DOCS_ONLY" = 0 ] && [ -d frontend/src ]; then
   echo "== frontend: bun test"
   (cd frontend && bun test)
 
@@ -93,10 +96,11 @@ if [ -d frontend/src ]; then
   # not frontend/'s own - it drives scripts/screenshot.ts directly.
   echo "== frontend: a11y"
   bun run a11y >/dev/null
-
-  echo "== docs: reading-level lint"
-  bun run scripts/reading-level.ts
 fi
+
+echo "== docs: reading-level lint"
+bun install --silent
+bun run scripts/reading-level.ts
 
 if [ ! -d "$STANDARDS_DIR/standards" ]; then
   echo "missing @maipai/standards checkout at $STANDARDS_DIR (pin std-v0.2.0)"

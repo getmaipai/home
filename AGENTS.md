@@ -36,3 +36,4 @@ full pre-commit gate: it needs a sibling `getmaipai/.github` checkout
 relative to the repo root) with its
 own `gen/ts` and `gen/py` already generated, or the spec step fails with
 a "missing or empty" error that looks unrelated to what you changed.
+A commit that touches only docs runs `bash scripts/check.sh --docs` instead (the reading-level lint plus the standards core, seconds not minutes).
