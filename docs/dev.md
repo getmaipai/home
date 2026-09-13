@@ -12276,3 +12276,211 @@ change keep whatever text they have (the field is null for them, and
 text is never matched).
 
 **Exit gate**: `bash scripts/check.sh` green on this diff.
+
+### CHAT-22: every conversational live bench safe to run
+
+One setup helper, `backend/scripts/bench/setup.ts`, grown from Track
+B's `scripts/bench/memory/guard.ts` (removed) and imported first by
+every engine-backed bench (`routing`, `tool-calling`, `naturalness`,
+`persona-eval`, `memory-eval`, `judge-eval`, `memory/run`), before
+anything that reaches `@/db`, because that module opens and migrates
+whatever `MAIPAI_DATA_DIR` names at import time. It refuses, with exit
+code 2 and before any mutation: a missing `MAIPAI_DATA_DIR`, one
+outside the OS temp root, or one that exists and is not empty (a
+household's, or a previous run's: every run gets a fresh directory);
+and a missing `MAIPAI_LLAMA_SERVER_URL` or `MAIPAI_EMBED_URL`, since
+the supervisors' other tiers spawn and, for a missing model, download,
+which a bench must never do. `MAIPAI_BACKGROUND_URL` defaults to a
+closed port so the memory judge can never spawn its engine from a
+bench either (`judge-eval` needs a real one and says so). `resetDb()`
+stays in `tests/reset-db.ts` for bun:test alone; no bench calls it.
+Each bench ends with `finishBench()` (`scripts/bench/finish.ts`, split
+out so a test can import it without the guard): it prints the engine
+identity and the executed case count, exits 1 when that count is zero
+(a run that ran nothing proves nothing, whatever its summary said) and
+0 otherwise, and is also the explicit exit FAST-06 found the benches
+needed. No bench calls `stopChatBackend()` any more: cleanup deletes
+the bench's own rows in its own disposable database and never stops an
+engine it did not start (the URL tier's stop was a no-op anyway).
+`memory/run.ts`'s cleanup used to delete every household-scope record
+and every person-less embedding; it now deletes exactly the records it
+wrote (`source = "bench:memory-longeval"`) and its own person's turns.
+`conversation.ts` is offline (guards only, no database, no engine) and
+needs none of this.
+
+Tests, `backend/tests/benchSetup.test.ts` (bun:test, no shell harness):
+a directory holding a sentinel file is refused, the sentinel's content
+and mtime unchanged and no database created; a directory outside the
+temp root is refused and never created; a missing chat URL is refused
+with the directory left empty; `finishBench` exits 1 for zero or NaN
+cases and 0 otherwise; and each of the seven entry points, spawned as
+its own process against one in-process stub engine (chat, embeddings
+and health on one port) with a fresh temp directory, exits 0 with
+`bench finished: engine ...; executed N cases` for N above zero,
+leaves the stub answering `/health` afterwards, and is refused when
+run again against the same directory.
+
+## Session B, lane 4 item 2: a real PWA (2026-09-13)
+
+BACKLOG.md's "A real PWA": manifest-only before this, no service
+worker, no offline page, one oversized icon. Three real gaps to close:
+icons, the service worker's own rules (copied from the legacy hub's
+`sw.js` v5, read directly from `legacy-backups/home-legacy.git` rather
+than reconstructed from memory), and a stale-build/render-crash safety
+net. Two of the three latter turned out to already exist.
+
+### Icons
+
+`public/manifest.webmanifest` had a correctly-sized 192 and 512 (`
+purpose: "any"`) plus a THIRD entry pointing straight at the raw
+1254x1254 brand asset with no resizing at all - the "one oversized
+icon" BACKLOG named. Removed that entry (the source file itself stays;
+`Shell.tsx`/`SignIn.tsx` still use it as the visible in-app logo,
+unrelated to the manifest). Generated two maskable variants (192, 512)
+from the same source via ImageMagick (`brand/`'s own icon, resized to
+60% and centered on a white canvas matching the icon's own background -
+processing an existing asset into a platform-specific variant, not
+redrawing it): Android's adaptive-icon mask can crop up to ~20% from
+each edge, and the plain "any" icons had no safe-zone padding for that.
+Confirmed via Chrome's own `Page.getAppManifest` CDP call that all four
+resolve correctly.
+
+### The service worker: `injectManifest`, not `generateSW`
+
+`vite.config.ts` already used `vite-plugin-pwa` with `generateSW` and a
+`navigateFallback: "index.html"` - its own comment explains why:
+`generateSW`'s `navigateFallback` option installs an implicit route
+that serves its target for EVERY navigation ahead of anything else, so
+an earlier attempt at a real network-first `runtimeCaching` rule for
+navigations never actually ran (found by inspecting the generated
+sw.js, not by belief - dead code, since removed). That is cache-first
+for the shell, the opposite of what a network-first rule needs, and the
+same design pattern the legacy hub's own sw.js abandoned at its
+CACHE_VERSION v2 (its own comment: `navigateFallback`-style caching
+served the PREVIOUS build's hashed chunks after a deploy, so new
+deploys never took effect until several reloads).
+
+Switched `strategies` to `injectManifest`: `src/sw.ts` now owns the
+fetch handler directly, with `precacheAndRoute(self.__WB_MANIFEST)`
+(via `workbox-precaching`, added as an explicit devDependency rather
+than relying on it resolving as vite-plugin-pwa's own transitive
+dependency) still handling every OTHER precached asset exactly as
+`generateSW` did. Three rules, all read from the legacy hub's real
+`sw.js` v5 (`git --git-dir=legacy-backups/home-legacy.git show
+198aa3a:frontend/public/sw.js`), not reconstructed from a paraphrase:
+
+1. **Navigations are network-first.** `fetch(req).catch(() =>
+   matchPrecache(OFFLINE_URL)...)` - try the network, only fall back to
+   the precached offline page on failure. Registered as its OWN
+   `self.addEventListener("fetch", ...)` call, placed BEFORE
+   `precacheAndRoute()`'s internal call (which registers workbox's
+   router as a SECOND `fetch` listener): a service worker's multiple
+   `fetch` listeners all run, but only the first `respondWith()` call
+   wins, so this listener claims every navigation and simply returns
+   (no `respondWith`) for anything else, letting workbox's own routing
+   handle the rest exactly as if this were its only listener. Confirmed
+   by reading the actual compiled `dist/sw.js` output, not just the
+   source: my listener's registration genuinely precedes workbox's own.
+2. **Firefox is passed through entirely.** `/\bFirefox\//.test(self.
+   navigator?.userAgent)`, returning before any interception - Firefox's
+   Local Network Access gate auto-allows a page's own request to a LAN
+   host but blocks the identical request when a service worker makes
+   it, the legacy hub's own root cause for a healthy hub looking
+   unreachable. Verified the regex's logic is sound and matches
+   legacy's own already-shipped, real-world-proven pattern exactly;
+   could NOT verify it live in an actual Firefox (none available here)
+   or by spoofing Firefox's UA in Chromium - confirmed directly (`context.
+   serviceWorkers()[0].evaluate(() => self.navigator.userAgent)`) that
+   Playwright/Chromium's `newContext({ userAgent })` override reaches
+   the PAGE's own `navigator.userAgent` but not the service worker's
+   separate execution context, which still reports the real browser's
+   UA. A real, documented tooling limitation, not a gap in the app.
+3. **Reload exactly once on `controllerchange`.** Already existed:
+   `pwaBoot.ts`'s `installReloadOnceOnNewServiceWorker`, wired up in
+   `main.tsx`, already implements this rule (with an extra correctness
+   fix over legacy's own version: only reloads when a service worker
+   was ALREADY controlling the page, not on a page's first-ever load).
+   Nothing to add here.
+
+A real bug found live, not in review: my first version called
+`caches.match(OFFLINE_URL)` directly. Killing the spare-port backend
+mid-session and reloading returned a raw network error instead of the
+offline page - `caches.match()` does an exact URL match, and a
+precached entry's real cache key carries a `?__WB_REVISION__=...` query
+param workbox adds itself, so the plain `/offline.html` string never
+matched anything. Fixed by using `workbox-precaching`'s own
+`matchPrecache()` instead, which resolves the real key the same way the
+precache route does internally. Re-verified after the fix: killed the
+backend mid-session, reloaded, the offline page rendered
+("Can't reach MaiPai right now..."); restarted the backend and
+reloaded again, the real page returned (network-first's trivial case -
+`fetch()` just succeeds, no fallback code runs at all).
+
+### The stale-build and render-crash safety net
+
+`lazyRetry` (a per-lazy-import wrapper, legacy's own pattern) has
+nothing to wrap yet: no route in this app is `React.lazy()`-loaded
+today (a separate, already-tracked gap - BACKLOG.md's "Real code-
+splitting for the frontend shell chunk"). `pwaBoot.ts` already has the
+strictly better, Vite-native equivalent: `installStaleChunkRetry`
+listens for Vite's own `vite:preloadError` event, which fires for ANY
+stale dynamically-imported module (not just a route wrapped by hand),
+already covering the one real dynamic `import()` this app has today
+(`wake-word-runtime.ts`'s `onnxruntime-web` load). Already tested
+(`pwaBoot.test.ts`): reloads once on a stale chunk, reloads once on
+`controllerchange`, never twice for either, and a shared retry budget
+across both plus the boot watchdog. Nothing to add there either.
+
+What was genuinely missing: a React error boundary. `pwaBoot.ts`'s own
+`runBootWatchdog` only covers the FIRST render, before `BootConfirm`'s
+effect confirms boot succeeded - a throw during any LATER render
+(navigating into a page with a bug) was still uncaught, unmounting the
+whole tree to a blank page. Added `kit/primitives/ErrorBoundary.tsx`
+(a class component, React's own requirement for `componentDidCatch`/
+`getDerivedStateFromError`), wrapping the whole app in `App.tsx`
+(outermost, so a bug in the shell itself gets the same recovery screen
+a bug in one page does): "Something went wrong" / "MaiPai ran into a
+problem showing this page. Reloading usually fixes it." plus a Reload
+button. Tests (`ErrorBoundary.test.tsx`): renders children normally
+when nothing throws; shows the recovery screen when a child throws
+during render; the Reload button calls `window.location.reload()`.
+
+### Installability
+
+Lighthouse 13.4.1 (the version this repo's own `bunx lighthouse`
+resolves) has no PWA category at all - Google removed it; `--list-all-
+audits` confirms no installable-manifest/service-worker audits exist
+in this version, so "Lighthouse's PWA installability checks" as
+literally named in the acceptance criterion can't be run against
+today's tool. Used the same signal Lighthouse's own now-removed audit
+was built on instead: Chrome DevTools Protocol's `Page.
+getInstallabilityErrors`, called directly via a small Playwright script
+against the built frontend served by a spare-port backend (8795, temp
+data dir, never Jesse's real running household). Result:
+`{"installabilityErrors": []}` - zero errors, Chrome's own authoritative
+check. `Page.getAppManifest` in the same run confirms all four icons
+resolve to real URLs and the manifest parses cleanly. Service worker
+registration confirmed separately: `navigator.serviceWorker.
+getRegistrations()` shows one registration, scope `/`, state
+`"activated"`.
+
+### Privacy
+
+No change needed - stated per the acceptance criterion. The service
+worker caches only build output (shell JS/CSS/HTML/icons) already
+served by this same origin; no new outbound connection, no new data
+leaving the house, no new third-party origin. `docs/user/privacy.md`
+is unchanged.
+
+Full `bun test` (491, three new: `ErrorBoundary.test.tsx`'s three
+cases), `bunx tsc --noEmit`, and `bunx eslint .` all clean (two
+pre-existing warnings elsewhere, unrelated to this change).
+
+Closes the BACKLOG item.
+
+Files: `frontend/vite.config.ts`, `frontend/src/sw.ts`, `frontend/
+package.json`, `bun.lock`, `deno.lock`, `frontend/public/
+manifest.webmanifest`, `frontend/public/brand/pwa-icon-maskable-192.png`,
+`frontend/public/brand/pwa-icon-maskable-512.png`, `frontend/src/
+kit/primitives/ErrorBoundary.tsx`, `frontend/src/kit/primitives/
+ErrorBoundary.test.tsx`, `frontend/src/App.tsx`, `docs/BACKLOG.md`.

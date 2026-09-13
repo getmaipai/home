@@ -27,6 +27,7 @@ import { PeoplePage } from "@/apps/people/PeoplePage";
 import { MemoryPage } from "@/apps/memory/MemoryPage";
 import { PrivacyPage } from "@/apps/privacy/PrivacyPage";
 import { Progress } from "@/kit/primitives/Progress";
+import { ErrorBoundary } from "@/kit/primitives/ErrorBoundary";
 import { ToastProvider } from "@/kit/primitives/Toast";
 import { TooltipProvider } from "@/kit/ui/tooltip";
 import { api, type Roster } from "@/lib/api";
@@ -77,72 +78,74 @@ export function App() {
   // component with no path of its own the way the old inline first-run
   // form had).
   return (
-    <I18nProvider i18n={i18n}>
-      <QueryClientProvider client={queryClient}>
-        <ToastProvider>
-          <TooltipProvider>
-            <BrowserRouter>
-              <Routes>
-                <Route path="/setup" element={<SetupWizard onDone={loadPerson} />} />
-                <Route
-                  path="/*"
-                  element={
-                    person === undefined ? (
-                      <div className="flex h-screen items-center justify-center">
-                        <Progress mode="spinner" label="Loading MaiPai Home" />
-                      </div>
-                    ) : person === null ? (
-                      <SignIn onSignedIn={loadPerson} />
-                    ) : (
-                      <Shell
-                        person={person}
-                        onSignOut={() => api.logout().finally(() => setPerson(null))}
-                        onPersonChange={revalidatePerson}
-                      >
-                        <Routes>
-                          <Route path="/" element={<HomePage person={person} />} />
-                          <Route path="/apps" element={<AppsPage person={person} />} />
-                          <Route path="/chat" element={<ChatPage person={person} />} />
-                          <Route path="/conversations" element={<ConversationsPage person={person} />} />
-                          <Route path="/notifications" element={<NotificationsPage />} />
-                          <Route path="/search" element={<SearchPage />} />
-                          <Route path="/people" element={<PeoplePage />} />
-                          <Route path="/memory" element={<MemoryPage person={person} />} />
-                          <Route path="/privacy" element={<PrivacyPage />} />
-                          <Route
-                            path="/settings"
-                            element={<SettingsPage person={person} onPersonChange={revalidatePerson} />}
-                          >
-                            {/* Nested (2026-09-06), not sibling routes: navigating to
-                                one of these used to unmount SettingsPage entirely,
-                                taking the tree rail/Household-Me switcher/search box
-                                down with it. SettingsPage renders these through its
-                                own <Outlet/>, so its chrome stays put. */}
-                            <Route path="users" element={<UsersPage person={person} />} />
-                            <Route path="models" element={<ModelsPage person={person} />} />
-                            <Route path="backups" element={<BackupsPage person={person} />} />
-                            <Route path="voices" element={<VoicesPage person={person} />} />
-                            <Route path="commands" element={<CommandsPage person={person} />} />
-                            <Route path="devices" element={<DevicesPage />} />
-                            <Route path="repairs" element={<RepairsPage person={person} />} />
-                            {/* No AdminGatedContent wrapper, unlike Repairs
-                                and Backups above it: Health is
-                                informational for every signed-in household
-                                member (app.ts's healthRoute is requireAuth,
-                                not requireRole), so HealthSection gates
-                                only its own restart control, not the page. */}
-                            <Route path="health" element={<HealthSection person={person} />} />
-                          </Route>
-                        </Routes>
-                      </Shell>
-                    )
-                  }
-                />
-              </Routes>
-            </BrowserRouter>
-          </TooltipProvider>
-        </ToastProvider>
-      </QueryClientProvider>
-    </I18nProvider>
+    <ErrorBoundary>
+      <I18nProvider i18n={i18n}>
+        <QueryClientProvider client={queryClient}>
+          <ToastProvider>
+            <TooltipProvider>
+              <BrowserRouter>
+                <Routes>
+                  <Route path="/setup" element={<SetupWizard onDone={loadPerson} />} />
+                  <Route
+                    path="/*"
+                    element={
+                      person === undefined ? (
+                        <div className="flex h-screen items-center justify-center">
+                          <Progress mode="spinner" label="Loading MaiPai Home" />
+                        </div>
+                      ) : person === null ? (
+                        <SignIn onSignedIn={loadPerson} />
+                      ) : (
+                        <Shell
+                          person={person}
+                          onSignOut={() => api.logout().finally(() => setPerson(null))}
+                          onPersonChange={revalidatePerson}
+                        >
+                          <Routes>
+                            <Route path="/" element={<HomePage person={person} />} />
+                            <Route path="/apps" element={<AppsPage person={person} />} />
+                            <Route path="/chat" element={<ChatPage person={person} />} />
+                            <Route path="/conversations" element={<ConversationsPage person={person} />} />
+                            <Route path="/notifications" element={<NotificationsPage />} />
+                            <Route path="/search" element={<SearchPage />} />
+                            <Route path="/people" element={<PeoplePage />} />
+                            <Route path="/memory" element={<MemoryPage person={person} />} />
+                            <Route path="/privacy" element={<PrivacyPage />} />
+                            <Route
+                              path="/settings"
+                              element={<SettingsPage person={person} onPersonChange={revalidatePerson} />}
+                            >
+                              {/* Nested (2026-09-06), not sibling routes: navigating to
+                                  one of these used to unmount SettingsPage entirely,
+                                  taking the tree rail/Household-Me switcher/search box
+                                  down with it. SettingsPage renders these through its
+                                  own <Outlet/>, so its chrome stays put. */}
+                              <Route path="users" element={<UsersPage person={person} />} />
+                              <Route path="models" element={<ModelsPage person={person} />} />
+                              <Route path="backups" element={<BackupsPage person={person} />} />
+                              <Route path="voices" element={<VoicesPage person={person} />} />
+                              <Route path="commands" element={<CommandsPage person={person} />} />
+                              <Route path="devices" element={<DevicesPage />} />
+                              <Route path="repairs" element={<RepairsPage person={person} />} />
+                              {/* No AdminGatedContent wrapper, unlike Repairs
+                                  and Backups above it: Health is
+                                  informational for every signed-in household
+                                  member (app.ts's healthRoute is requireAuth,
+                                  not requireRole), so HealthSection gates
+                                  only its own restart control, not the page. */}
+                              <Route path="health" element={<HealthSection person={person} />} />
+                            </Route>
+                          </Routes>
+                        </Shell>
+                      )
+                    }
+                  />
+                </Routes>
+              </BrowserRouter>
+            </TooltipProvider>
+          </ToastProvider>
+        </QueryClientProvider>
+      </I18nProvider>
+    </ErrorBoundary>
   );
 }

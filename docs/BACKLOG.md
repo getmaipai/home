@@ -3965,14 +3965,26 @@ future session now that F's hub half exists.
       hand-written rule, no plugin covers it) a `hover:` variant with no
       paired `focus` on a native element. `bun run lint` runs it;
       `scripts/check.sh` calls it. See `docs/dev.md`.
-- [ ] **A real PWA** (S-M) - manifest only today: no service worker, no
-      offline page, one oversized icon. Copy the rules legacy's `sw.js`
-      v5 learned: navigations network-first with an offline page (a
-      cached index once pinned old hashes for several reloads), full
-      passthrough on Firefox (local network access), reload exactly once
-      on `controllerchange`; plus `lazyRetry` (stale-chunk reload once
-      per session, hit right after an update) and an error boundary,
-      neither of which exists.
+- [x] **A real PWA** (S-M) - done 2026-09-13 (lane 4 item 2). Removed
+      the one oversized icon from the manifest, added maskable variants.
+      Switched `vite-plugin-pwa` from `generateSW` to `injectManifest`
+      (`generateSW`'s own `navigateFallback` blocked a real network-first
+      rule from ever running) and wrote `src/sw.ts` with the legacy
+      `sw.js` v5 rules: navigations network-first with a precached
+      offline page, full Firefox passthrough (its Local Network Access
+      gate blocks SW-routed fetches to a LAN host). Reload-once-on-
+      `controllerchange` and a stale-chunk reload already existed
+      (`pwaBoot.ts`, Vite's own `vite:preloadError` event - stronger
+      than a hand-wrapped `lazyRetry`, since nothing here is
+      `React.lazy()`-loaded yet). Added the one real gap, a React error
+      boundary (`kit/primitives/ErrorBoundary.tsx`), for a render crash
+      after boot that the existing boot watchdog doesn't cover. Verified
+      live: killing a spare-port backend mid-session and reloading shows
+      the offline page; Chrome's own `Page.getInstallabilityErrors`
+      reports zero errors. See `docs/dev.md` for the full detail,
+      including a real bug (`caches.match` vs `matchPrecache`) found and
+      fixed during that live verification. Privacy page needs no
+      change - no new outbound connection.
 - [x] **Reduced motion, type floor, theme colour** (S) - done 2026-09-05.
       `kit/tokens.css` now has one global `prefers-reduced-motion: reduce`
       rule (zeroes animation/transition duration everywhere); the

@@ -42,42 +42,27 @@ export default defineConfig({
     // data; an offline page." `manifest: false` because index.html already
     // links the hand-authored public/manifest.webmanifest (real icon
     // sizes, MaiPai's own theme colors) - this plugin owns only the
-    // service worker and its own registration script. The default
-    // `globPatterns` precache build output only (JS/CSS/fonts/icons), so
-    // no `/api` response is ever added without a runtimeCaching rule this
-    // config deliberately never adds - household data never enters the
-    // cache.
+    // service worker and its own registration script.
+    //
+    // `injectManifest`, not the default `generateSW`: `generateSW`'s own
+    // `navigateFallback` option installs an implicit "serve this for
+    // every navigation" route ahead of anything a config adds, which a
+    // prior attempt at true network-first navigation (below) found by
+    // inspecting the generated sw.js - a custom `runtimeCaching` navigate
+    // rule never ran, because that implicit route always won first.
+    // `injectManifest` hands the fetch handler to `src/sw.ts` directly
+    // (this plugin's own job shrinks to injecting the precache manifest
+    // and generating the client registration script), which is the only
+    // way to express real network-first navigation with workbox's own
+    // precaching still doing the rest (lane 4 item 2, 2026-09-13; see
+    // `src/sw.ts`'s own header for the three rules it implements).
     VitePWA({
       registerType: "autoUpdate",
       manifest: false,
-      workbox: {
-        // `navigateFallback` set to the real SPA shell, not offline.html:
-        // that option serves its target for EVERY navigation not already
-        // precached, unconditionally, regardless of whether the network
-        // is reachable - it's workbox's generic "SPA shell" mechanism
-        // (the standard fix for a client-side route the server never
-        // heard of), not an offline-only one. Found live (2026-09-06,
-        // Session E step 1's own wizard verification, pointed at
-        // offline.html at the time): reloading on `/setup` served the
-        // offline page even with the backend fully healthy, because
-        // `/setup` simply isn't a precached URL - every deep route would
-        // have hit this on reload, not just this one. `index.html` is
-        // itself precached and served from Cache Storage, so this always
-        // succeeds even genuinely offline: there is no SW-level "network
-        // down" moment left to catch. A tried-and-abandoned custom
-        // `runtimeCaching` NetworkOnly-with-offline-fallback rule sat
-        // here briefly, matching on `request.mode === "navigate"` - dead
-        // code found by inspecting the generated sw.js, not by belief:
-        // `precacheAndRoute` registers its own implicit NavigationRoute
-        // for `index.html` ahead of any explicit `registerRoute` call, so
-        // that rule never actually ran. Detecting a genuinely unreachable
-        // hub is therefore the app's own job once the shell has loaded
-        // (a failed API call), not a service-worker one; offline.html
-        // stays as a real, reachable, precached page for the one case
-        // that IS a SW-level concern - opening the PWA before it has ever
-        // successfully installed a service worker at all.
-        navigateFallback: "index.html",
-        navigateFallbackDenylist: [/^\/api\//],
+      strategies: "injectManifest",
+      srcDir: "src",
+      filename: "sw.ts",
+      injectManifest: {
         // The onnxruntime-web runtime (copy-ort.mjs's public/ort/ files,
         // ~40 MB, plus its own bundled JS loader emitted as a hashed
         // `assets/ort.bundle.min-*.js` chunk - a code review found the
