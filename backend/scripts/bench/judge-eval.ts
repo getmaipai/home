@@ -1,7 +1,12 @@
 // Memory judge bench (MEM-05: "Prove the small judge, or fall back to the 4B pin").
-// Not part of scripts/check.sh - a bench, run on demand against the spawned
-// background engine. Records precision, recall, and seconds per turn beside
-// the 8B baseline to decide whether the 1.7B pin meets the cutoff.
+// Not part of scripts/check.sh - a bench, run on demand against a running
+// background engine (MAIPAI_BACKGROUND_URL). Reports extraction precision
+// and recall per seeded turn (#87, scripts/bench/judgeScore.ts: expected
+// facts against the memory records the judge WROTE for that turn, so a
+// fact extracted and then dropped by the dedupe decision reads as a miss
+// here and as a supersede fault in the retrieval scenarios), the two
+// retrieval scenarios separately, and seconds per turn, beside the 8B
+// baseline to decide whether the 1.7B pin meets the cutoff.
 //
 // LongMemEval (Wu et al. 2026) names five failure categories for a
 // memory-augmented assistant; this bench exercises the two the plan
@@ -22,9 +27,10 @@
 // is at least 85% of the 8B baseline and precision within 5 points.
 import "./setup"; // CHAT-22: must come before anything that reaches "@/db"
 import { finishBench, startBench } from "./setup";
+import { scoreExtraction, formatPercent } from "./judgeScore";
 import { eq } from "drizzle-orm";
 import { db, sqlite } from "@/db";
-import { people, conversationTurns } from "@/db/schema";
+import { people, conversationTurns, memoryRecords } from "@/db/schema";
 import { newPersonId, randomSuffix } from "@/lib/id";
 import { nextHlc } from "@/lib/hlc";
 import { resolveOrCreateConversation, logTurn } from "@/lib/conversationHistory";
@@ -48,8 +54,15 @@ const SAFE: TurnValue["safety"] = {
   checked_at: new Date().toISOString(),
 };
 
-function seedTurn(actor: PersonRow, conversationId: string, userText: string, replyText: string, ageDays: number): void {
+// #87: each seeded turn carries its expected facts as keyword sets, so
+// the judge's extractions are scored per case as true positives, false
+// positives and misses (scripts/bench/judgeScore.ts), separately from
+// whether recall then surfaces the right fact.
+const seeded: { turnId: string; label: string; expected: string[][] }[] = [];
+
+function seedTurn(actor: PersonRow, conversationId: string, userText: string, replyText: string, ageDays: number, label: string, expected: string[][]): void {
   const turnId = `turn-${randomSuffix(10)}`;
+  seeded.push({ turnId, label, expected });
   logTurn(actor, "chat", userText, { reply: { text: replyText }, source: "model", safety: SAFE, conversation_id: conversationId, turn_id: turnId });
   createdTurnIds.push(turnId);
   if (ageDays > 0) {
@@ -86,10 +99,10 @@ async function main(): Promise<{ executed: number; engine: string }> {
   if (!conv.ok) throw new Error("failed to create the bench conversation");
 
   console.log("Seeding a two-session conversation (a knowledge update, days apart)...");
-  seedTurn(actor, conv.value.id, "I work as a nurse at Riverside Hospital", "That sounds rewarding!", 14);
-  seedTurn(actor, conv.value.id, "I actually just started a new job, I'm a teacher now", "Congratulations on the new job!", 0);
-  // Never asserted - the abstention probe below must find nothing.
-  seedTurn(actor, conv.value.id, "what's the weather like today", "I don't have live weather access yet.", 0);
+  seedTurn(actor, conv.value.id, "I work as a nurse at Riverside Hospital", "That sounds rewarding!", 14, "job", [["nurse"]]);
+  seedTurn(actor, conv.value.id, "I actually just started a new job, I'm a teacher now", "Congratulations on the new job!", 0, "new job", [["teacher"]]);
+  // An abstention turn: nothing to extract, so any extraction is a false positive.
+  seedTurn(actor, conv.value.id, "what's the weather like today", "I don't have live weather access yet.", 0, "abstention", []);
 
   console.log(`Background engine (judge): ${getBackgroundBackendKind()}`);
   // The setup's default MAIPAI_BACKGROUND_URL is a closed port; this
@@ -126,16 +139,36 @@ async function main(): Promise<{ executed: number; engine: string }> {
   const abstentionOk = colorMatches.length === 0;
   console.log(`${abstentionOk ? "PASS" : "FAIL"}  abstention        -> recalled ${colorMatches.length} matches for a fact never stated`);
 
-  const passCount = Number(knowledgeUpdateOk) + Number(abstentionOk);
-  const precision = passCount / 2;
-  const recall_pct = (passCount / 2) * 100;
+  // #87: extraction scored per case from the records the judge wrote for
+  // each seeded turn (whatever their status: a superseded record was
+  // still extracted), apart from the two retrieval probes above.
+  const extractionScore = scoreExtraction(
+    seeded.map((c) => ({
+      turnId: c.turnId,
+      label: c.label,
+      expected: c.expected,
+      extracted: db
+        .select({ text: memoryRecords.text })
+        .from(memoryRecords)
+        .where(eq(memoryRecords.source, c.turnId))
+        .all()
+        .map((r) => r.text),
+    })),
+  );
+  console.log(`\nExtraction, per case:`);
+  for (const c of extractionScore.cases) {
+    const detail = [c.missed.length ? `missed ${c.missed.map((k) => k.join("+")).join(", ")}` : "", c.extra.length ? `extra ${c.extra.map((t) => JSON.stringify(t)).join(", ")}` : ""].filter(Boolean).join("; ");
+    console.log(`  ${c.label.padEnd(12)} tp=${c.truePositives} fp=${c.falsePositives} missed=${c.misses}${detail ? `  (${detail})` : ""}`);
+  }
+
+  const retrievalPass = Number(knowledgeUpdateOk) + Number(abstentionOk);
 
   console.log(`\nEmbed backend: ${getEmbedBackendKind()}`);
   console.log(`\n=== BENCHMARK RESULTS ===`);
-  console.log(`Precision: ${(precision * 100).toFixed(1)}%`);
-  console.log(`Recall: ${recall_pct.toFixed(1)}%`);
+  console.log(`Extraction precision: ${formatPercent(extractionScore.precision)} (tp ${extractionScore.truePositives}, fp ${extractionScore.falsePositives})`);
+  console.log(`Extraction recall: ${formatPercent(extractionScore.recall)} (tp ${extractionScore.truePositives}, missed ${extractionScore.misses})`);
+  console.log(`Retrieval scenarios: ${retrievalPass}/2 passed (knowledge update ${knowledgeUpdateOk ? "pass" : "fail"}, abstention ${abstentionOk ? "pass" : "fail"})`);
   console.log(`Seconds per turn: ${secondsPerTurn.toFixed(3)}s`);
-  console.log(`\n${passCount}/2 passed`);
   // Executed means turns the judge actually processed, not the two
   // probes: a judge that skipped every turn is a run of nothing.
   return { executed: batchResult.processed, engine };

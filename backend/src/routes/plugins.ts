@@ -76,7 +76,14 @@ pluginsRoutes.post("/:id/run", requireAuth, async (c) => {
     // widgets.ts both already speak the manifest's own honest fallback
     // text for the identical failure; a direct test-run of a package
     // should see the same thing, not just the raw internal error string.
-    return c.json(result.status === 502 ? { error: result.error, fallback_reply: result.fallback_reply } : { error: result.error }, result.status);
+    // #86: the fallback reply is package text too (the manifest's own
+    // honest line, or a handler's typed report) and meets the same
+    // boundary as a successful answer before it leaves.
+    if (result.status === 502) {
+      const fallback = refusePackageReplyIfUnsafe(actor, result.fallback_reply) ?? result.fallback_reply;
+      return c.json({ error: result.error, fallback_reply: fallback }, result.status);
+    }
+    return c.json({ error: result.error }, result.status);
   }
   return c.json(result.value);
 });

@@ -100,7 +100,9 @@ export async function getWidgetData(actor: PersonRow, packageId: string, widgetI
     // itself speaks for this exact failure) rather than dropping the
     // widget from the dashboard entirely.
     if (result.status === 502) {
-      const text = result.fallback_reply.reply?.text ?? "Couldn't load this right now.";
+      // #86: the fallback line meets the same boundary as a successful answer.
+      const fallback = refusePackageReplyIfUnsafe(actor, result.fallback_reply) ?? result.fallback_reply;
+      const text = fallback.reply?.text ?? "Couldn't load this right now.";
       return { ok: true, status: 200, value: { as_of: new Date().toISOString(), items: [{ title: text }], degraded: true } };
     }
     return { ok: false, status: result.status, error: result.error };

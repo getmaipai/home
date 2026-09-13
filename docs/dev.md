@@ -10780,6 +10780,26 @@ is in the band: a candidate pair in the 0.60 to 0.92 cosine range whose
 subjects match should lean to SUPERSEDE, which the next judge slice can
 measure.
 
+Correction (2026-09-13, #87): the bench of that run printed
+"Precision" and "Recall" lines that were both the same two-case pass
+rate, which is why the table above reports pass/fail per scenario and
+no precision or recall figure; those two words in that bench's output
+were never extraction metrics and are not cited here. The bench now
+scores extraction per seeded turn against expected facts (true
+positives, false positives, misses; `scripts/bench/judgeScore.ts`, with
+a deterministic test telling a missed fact from an extra one) and
+reports the two retrieval scenarios separately. First run with the
+new scorer, the 1.7B Q8_0 pin on port 8789 (llama-server b10797):
+extraction precision 66.7% (2 true positives, 1 false positive: a
+second, overlapping "teacher" fact for the new-job turn), extraction
+recall 100% (nothing missed, the abstention turn extracted nothing),
+retrieval 0 of 2 (the stale "nurse" fact survives beside "teacher": the
+supersede decision, as the table already said; the abstention probe
+recalls two matches), 2.59 s per turn. MEM-05's rule (85 percent recall,
+precision within five points of the 4B) can be applied to these
+numbers once the 4B and the 8B are run through the same scorer;
+CHAT-23's corpus is what gives the rule enough cases to mean anything.
+
 ### Sources consulted
 
 llama.cpp server prefix cache and `--cache-reuse`
@@ -12652,6 +12672,9 @@ other's section once (147cd28, f4779a6).
   record in [docs/dev/session-a.md](dev/session-a.md) (2026-09-13).
 - CHAT-03, credentials never enter chat memory or context: design note
   and the shipped record in [docs/dev/session-a.md](dev/session-a.md)
+  (2026-09-13).
+- #86 and #87, the package fallback outlets through the output boundary
+  and the judge scorer: [docs/dev/session-a.md](dev/session-a.md)
   (2026-09-13).
 - Lane 5 item 3, Home's weather card writing a fake turn into real chat
   history (an additive `ephemeral` flag on `POST /api/turn/stream`):

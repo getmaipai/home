@@ -1195,3 +1195,93 @@ only with two or more case changes ("MySecretPass", not "McDonald's",
 side is (a package answer echoing a credential would otherwise land
 in `reply_text` and its episode embedding). Every phrasing the review
 named is a test, both directions.
+
+## #86 and #87: the fallback outlets and the judge scorer (2026-09-13)
+
+Two findings from an outside review (Codex, by source inspection),
+one commit.
+
+#86, a CHAT-02 follow-up. The claim CHAT-02 makes is universal: every
+reply a package produces meets the one output boundary before a person
+sees it. The error branches did not: `POST /api/plugins/:id/run`
+returned a 502's `fallback_reply` raw, and `getWidgetData()` rendered
+it as the degraded tile before `refusePackageReplyIfUnsafe()` ran.
+Both route the fallback through the same evaluator now. The outlets a
+package reply can reach, each with its test: the chat turn (a
+successful reply and a `plugin_error` fallback both pass through
+`finalizeReply()`'s boundary; `turnEngine.test.ts` and the new
+`packageFallbackBoundary.test.ts` chat case), the direct package run
+(success in `turnEngine.test.ts`, the 502 fallback in the new file),
+the dashboard widget (the 502 fallback in the new file; the success
+path is the same helper), and the streaming route's immediate result
+(the same `finalizeReply()`, `turnEngine.test.ts`). The OpenAI route
+consumes the same `runTurnStream()` and so the same values. The new
+tests run the real Tier 1 sandbox: a store-installed copy of the
+knowledge package written into the test's own data directory with no
+net permission, so `host.fetch` refuses, the handler reports a typed
+upstream error, `runPlugin()` returns a 502, and the manifest's
+fallback carries safe text with unsafe speech; all three outlets
+answer the refusal line and never the fallback.
+
+#87. `judge-eval.ts` printed "precision" and "recall" that were both
+`passCount / 2`, a two-case pass rate. `scripts/bench/judgeScore.ts`
+is pure: each seeded turn carries its expected facts as keyword sets
+(the abstention turn's list is empty, so any extraction from it is a
+false positive), each extraction matches one expected fact at most,
+and precision, recall, misses and extras are reported per case and
+in total, with the two retrieval scenarios reported separately.
+`judgeScore.test.ts` tells a missed fact from an extra one, proves the
+two numbers move apart, and returns null rather than a score when
+nothing was extracted or expected. The MEM-05 note in dev.md carries
+the correction and the first numbers from the new scorer against the
+1.7B pin: extraction precision 66.7%, recall 100%, retrieval 0 of 2,
+2.59 s per turn. The review confirmed every outlet (the five callers of
+`runPlugin()` and the routes that consume the turn functions) and
+sharpened the scorer: keywords match whole words (nurse is not
+nursery), an empty keyword set throws rather than matching everything,
+and the more specific expected fact claims an extraction first so a
+perfect two-fact extraction is never a miss plus an extra; the bench
+header says the metric is the records the judge wrote per turn, so a
+fact extracted and then dropped by the dedupe decision reads as a miss
+here and a supersede fault in the retrieval scenarios.
+
+## #88: one rule for the current branch, design (2026-09-13)
+
+#60 gave `conversation_turns` a `supersedes` column and taught
+`buildConversationWindow()` to drop a superseded row, so the model
+continues from the edited message. Two other readers of turns did not
+learn it: `recallEpisodes()` still returns the superseded turn's
+episode to a later conversation, and the judge's drain still picks a
+superseded, unjudged turn and extracts a memory from the statement
+the person replaced. A memory already extracted from a turn that is
+edited afterwards stays active. The corrected statement comes back.
+
+The rule: a turn is on the current branch unless some turn in its
+conversation names it in `supersedes`. The superseded row and its
+episodes stay stored (the branch switcher and the explicit history
+view need both); nothing that feeds the model or the memory store
+reads them as current.
+
+Three readers, one predicate. `episodes.ts`: both candidate queries
+(the FTS half and the vector half) exclude any episode whose `turn_id`
+is named by a `supersedes` value, at query time, so an edit made after
+the episode was recorded takes effect on the next recall with no
+rewrite. `memoryJudge.ts`: the drain's pending query excludes turns
+named by a `supersedes` value, and `judgeTurn()` itself checks again
+before extracting (a turn superseded between selection and judging is
+marked done with nothing written); the queue count agrees. `memory.ts`
+and `conversationHistory.ts`: when `logTurn()` records a turn that
+supersedes another, every active memory record whose provenance
+(`source`) is the superseded turn is archived (`archiveByProvenance()`,
+the system retiring what it wrote, the same `archived` status
+`runMaintenance()` and `supersede()` already use, never a delete), so a
+fact extracted before the edit stops surfacing and the edited turn's
+own facts are extracted fresh when the judge reaches it. The episode
+rows stay; the memory rows stay archived.
+
+Tests: an unjudged turn edited and resent, the judge drained, the
+replaced statement never sent to the judge and no memory from it; a
+recall from another conversation after an edit returning the edited
+episode and not the replaced one; a memory extracted from a turn and
+that turn then superseded, the memory archived and absent from recall
+while the row still exists.
