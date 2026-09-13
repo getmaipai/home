@@ -332,3 +332,85 @@ placed candidate changes it) is the coordinator's to schedule, not a
 reason to restore the floor. Both spare-port backends were started by
 pid and stopped by pid with 8809 and 8810 confirmed free; the shared
 engines were never restarted.
+
+## ROUTE-02: a stable ordinary tool set, design (2026-09-13)
+
+The problem ROUTE-01 measured: the offered set now changes between a
+question-shaped and a command-shaped turn, and every change is a
+prefix-cache miss of half a second to a second of time to first token
+on that turn. Two facts fix where the answer can live. First, the
+Qwen3 chat template (read from the running engine's `/props`) renders
+the `tools` list inside the first system message, right after
+`messages[0].content` and before every history message and the late
+context message; nothing we pass can move it, so "put the block after
+history" is not available without hand-rolling the template, which is
+the hand-built answer the org rule forbids. Second, the chat engine
+already runs with `--cache-reuse 256`, so llama-server can shift and
+reuse cached chunks after a changed segment, but only chunks of 256
+tokens or more, and a household turn's history messages are shorter
+than that; what a switch re-evaluates is the tool block itself (four
+tools with FAST-03's descriptions and their arg schemas are several
+hundred tokens) plus everything after it. The only stable position is
+therefore a stable block: the same tools, in the same order, on every
+ordinary turn, with a command turn's extras appended after them so
+the common prefix survives.
+
+### What changes
+
+**1. The ordinary set.** `ordinaryToolSet(loaded)`: every
+`routing.always_offer` package, plus the N most used packages by
+`routingStats().byPlugin` (the `plugin` turns each package has
+answered; a Tier 2 multi-call id "a+b" counts for both), N = 5, tied
+and empty households falling back to a fixed default order (the
+bundled memory pair `remember` and `recall` first, then `timer`,
+`remind`, `weather`), always sorted by id so the rendered block is
+byte-identical across turns. Computed once at boot and again only
+when the installed set changes (`packages` install or remove, the
+same hook that invalidates the routing embeddings), never per turn,
+so a household's usage moves the set between boots, not between
+sentences. Every conversation-shaped turn sends exactly this set (plus
+the one Tier 1 placed-but-unbindable candidate, appended, when there
+is one).
+
+**2. Command extras, appended.** A command-shaped turn keeps ROUTE-01's
+top three, but as an addition after the ordinary set, and only the
+ones the set does not already hold; `selectOfferedTools(ranked,
+shape, ordinary)` returns `[...ordinary, ...extras]` in that order.
+With N = 5 covering what the household actually uses, most command
+turns add nothing and stay on the cached block; a rare package costs
+its own tokens once.
+
+**3. No signal is conversation.** ROUTE-01 left "a turn with no
+signal at all is a command" as today's default; it made "good
+morning" carry its own three. Now a turn with no imperative signal
+(no courtesy word, no opener the installed patterns declare, no
+question or first-person opener) is conversation-shaped, named
+`statement` in the trace, and offers the ordinary set. "good
+morning", "thanks", "okay" are the tests. The cost is the one ROUTE-01
+named: "keep that on file" with no opener rides the ordinary set,
+which holds `remember` on every household that uses it (and by
+default), so the model still sees it.
+
+### Measurement (acceptance)
+
+The same eight-turn sequence as ROUTE-01's table, spare-port backends
+at HEAD (the ROUTE-01 commit) and at this diff, two runs each: time
+to first delta on the question-after-command and command-after-
+question turns within 100 ms of aaaf724's, and the greeting on the
+ordinary set. The routed tool-calling pass unchanged: 0/50 false
+calls outside always-offer, the #77 rows 10/10. If a command turn
+whose top three fall outside the ordinary set still pays for its
+extras, that number is recorded with the extras' token count and the
+item stops there; N is not raised to pass, because the block's size
+is prompt tokens on every turn for every household.
+
+Unit tests: `ordinaryToolSet()` from a stats fixture (usage order,
+the "a+b" split, the default order on an empty household, sorted by
+id, always-offer always present); `selectOfferedTools()` order
+(ordinary first, extras after, no duplicates); `utteranceShape()` on
+"good morning", "thanks", "okay" as `statement`; a `runTurn()` case
+proving two consecutive conversational turns send byte-identical
+`tools`.
+
+Out of scope: tool description length (FAST-03's sentences stay),
+the template, `--cache-reuse`'s chunk size, #83.
