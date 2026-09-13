@@ -872,6 +872,137 @@ describe("forget and export", () => {
   });
 });
 
+describe("batch forget", () => {
+  test("forgets exactly the selected memories, tombstoned like a single forget", async () => {
+    const { childClient, childId } = await ownerAndChild();
+    const a = await childClient.post("/api/memory", {
+      text: "Bramble's first secret",
+      category: "fact",
+      tier: "durable",
+      scope: "person",
+      person: childId,
+      source: "test",
+      importance: 0.5,
+    });
+    const b = await childClient.post("/api/memory", {
+      text: "Bramble's second secret",
+      category: "fact",
+      tier: "durable",
+      scope: "person",
+      person: childId,
+      source: "test",
+      importance: 0.5,
+    });
+    const c = await childClient.post("/api/memory", {
+      text: "Bramble's third secret",
+      category: "fact",
+      tier: "durable",
+      scope: "person",
+      person: childId,
+      source: "test",
+      importance: 0.5,
+    });
+    const idA = ((await a.json()) as MemoryRecord).id;
+    const idB = ((await b.json()) as MemoryRecord).id;
+    const idC = ((await c.json()) as MemoryRecord).id;
+
+    const res = await childClient.post("/api/memory/batch-forget", { ids: [idA, idB] });
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { outcomes: Array<{ id: string; deleted: boolean }> };
+    expect(body.outcomes).toEqual([
+      { id: idA, deleted: true },
+      { id: idB, deleted: true },
+    ]);
+
+    const rows = db.select().from(memoryRecords).where(eq(memoryRecords.person, childId)).all();
+    const byId = new Map(rows.map((r) => [r.id, r]));
+    expect(byId.get(idA)!.status).toBe("archived");
+    expect(byId.get(idA)!.text).toBe("[forgotten]");
+    expect(byId.get(idA)!.deletedAt).not.toBeNull();
+    expect(byId.get(idB)!.status).toBe("archived");
+    expect(byId.get(idC)!.status).toBe("active");
+    expect(byId.get(idC)!.text).toBe("Bramble's third secret");
+  });
+
+  test("a partial failure (a pinned record) still forgets the rest and reports which was refused", async () => {
+    const { owner, childClient, childId } = await ownerAndChild();
+    const pinned = await owner.post("/api/memory", {
+      text: "an already-pinned household fact",
+      category: "fact",
+      tier: "durable",
+      scope: "household",
+      source: "test",
+      importance: 0.5,
+      pinned: true,
+    });
+    const ordinary = await childClient.post("/api/memory", {
+      text: "Bramble's own secret",
+      category: "fact",
+      tier: "durable",
+      scope: "person",
+      person: childId,
+      source: "test",
+      importance: 0.5,
+    });
+    const pinnedId = ((await pinned.json()) as MemoryRecord).id;
+    const ordinaryId = ((await ordinary.json()) as MemoryRecord).id;
+
+    const res = await childClient.post("/api/memory/batch-forget", { ids: [pinnedId, ordinaryId] });
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { outcomes: Array<{ id: string; deleted: boolean; reason?: string }> };
+    expect(body.outcomes[0]).toEqual({
+      id: pinnedId,
+      deleted: false,
+      reason: "only owner or admin may forget an entity or pinned memory",
+    });
+    expect(body.outcomes[1]).toEqual({ id: ordinaryId, deleted: true });
+
+    const rows = db.select().from(memoryRecords).all();
+    const byId = new Map(rows.map((r) => [r.id, r]));
+    expect(byId.get(pinnedId)!.status).toBe("active");
+    expect(byId.get(ordinaryId)!.status).toBe("archived");
+  });
+
+  test("forgetting another person's memories is refused per id, same as a single forget", async () => {
+    const owner = new TestClient();
+    await owner.post("/api/auth/setup", { displayName: "Sage", secret: "correcthorse" });
+    const createdA = await owner.post("/api/people", { displayName: "Marlow", role: "adult", secret: "pass1234" });
+    const createdB = await owner.post("/api/people", { displayName: "Marsh", role: "adult", secret: "pass5678" });
+    const a = (await createdA.json()) as { id: string };
+    const b = (await createdB.json()) as { id: string };
+
+    const clientB = new TestClient();
+    await clientB.post("/api/auth/verify-secret", { personId: b.id, secret: "pass5678" });
+    const created = await clientB.post("/api/memory", {
+      text: "Marsh's own secret",
+      category: "fact",
+      tier: "durable",
+      scope: "person",
+      person: b.id,
+      source: "test",
+      importance: 0.5,
+    });
+    const id = ((await created.json()) as MemoryRecord).id;
+
+    const clientA = new TestClient();
+    await clientA.post("/api/auth/verify-secret", { personId: a.id, secret: "pass1234" });
+    const res = await clientA.post("/api/memory/batch-forget", { ids: [id] });
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { outcomes: Array<{ id: string; deleted: boolean; reason?: string }> };
+    expect(body.outcomes[0]!.deleted).toBe(false);
+
+    const row = db.select().from(memoryRecords).where(eq(memoryRecords.id, id)).get()!;
+    expect(row.status).toBe("active");
+  });
+
+  test("refuses an empty selection", async () => {
+    const owner = new TestClient();
+    await owner.post("/api/auth/setup", { displayName: "Sage", secret: "correcthorse" });
+    const res = await owner.post("/api/memory/batch-forget", { ids: [] });
+    expect(res.status).toBe(400);
+  });
+});
+
 describe("POST /api/memory/maintenance/run", () => {
   test("requires owner or admin", async () => {
     const { childClient } = await ownerAndChild();

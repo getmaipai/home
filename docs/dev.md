@@ -11839,6 +11839,132 @@ eslint` all clean.
 Files: `frontend/src/apps/chat/chatDayDivider.tsx`, `scripts/
 screenshot.ts`, `docs/BACKLOG.md`.
 
+**Lane 3 item 4: Memory batch select and clear-all.** BACKLOG.md named
+Memory specifically: People and Conversations already had multi-select
+and a real clear-all; Memory's default (own-memories) list had neither,
+and `lib/memory.ts`'s `forget()` (the real, irreversible erasure right)
+had no UI anywhere except the admin-only "forget everything about a
+child" button on the per-person view.
+
+The default list was a `SchemaPage` (`spec/ui/pages/memory.json`,
+interpreted by `kit/schema/`) at the start of this item, and that
+schema's own `batch` block already declared "Archive selected"/"Clear
+all" actions - but `kit/schema/actions.ts`'s `runAction` only knows how
+to loop one call per selected item, never send a single request with
+every id. That is fine for a small archive-per-row loop; it defeats the
+entire point of a real batch endpoint, and it wires to `archive`
+(reversible hide) rather than `forget` (real erasure) regardless. Moved
+`MemoryPage.tsx`'s default view off `SchemaPage` and back to
+hand-written - the same "generic interpreter has no concept of this"
+call People, Conversations, and the per-person Memory view already made
+(each for its own real capability gap: per-row conditional UI, a
+person-scoped query param, a real batch endpoint). `spec/ui/pages/
+memory.json` stays in place, unedited, as the platform's own schema
+description of this page for a client that renders schema pages
+natively (MaiPai Go, not built yet) - the same divergence `chat.json`
+already has from assistant-ui's hand-rolled chat page, not a leftover to
+clean up or a contradiction to resolve.
+
+Backend: `backend/src/lib/memory.ts` gained `forgetByIds(actor, ids)`,
+the batch counterpart of the existing person-wide `forget()`. Per id:
+`getWritable()`'s ownership check (the same one `archive()` uses), then
+the same owner/admin-only gate `archive()` already enforces on a pinned
+or entity record (forgetting is strictly more destructive than
+archiving - wiping content, not just hiding it - so it can never be
+looser), then the same tombstone `forgetTransaction()` applies to a
+whole person's records (`status: archived`, `text: "[forgotten]"`,
+`embedding_space: NULL`, `deleted_at` set). No status check, unlike
+`archive()`: this matches `forget()`'s own person-wide behavior, which
+tombstones a person's records regardless of current status. Partial
+success on purpose, the same reasoning as `personLifecycle.ts`'s
+`deletePeople()`: ten memories selected and one pinned should forget the
+other nine, not refuse the whole batch. New route `POST /api/memory/
+batch-forget` (`.openapi()`-declared, Zod body `{ids: string[]}`,
+`requireAuth`, 400 on an empty selection) returns `{outcomes: [{id,
+deleted, reason?}]}`, mirroring `people.ts`'s own `/batch-delete` shape
+exactly. Did not extend the existing `POST /api/memory/forget` (a
+personId body, whole-person erasure, already shipped and tested) despite
+the plan file's own text assuming that path was free - a real,
+different-shaped request at the same path would collide, so `/batch-
+forget` is the new, separate, purely additive route instead.
+
+Frontend: `api.batchForgetMemories(ids)`. `MemoryPage.tsx`'s own-list
+view: `SelectModeToggle` ("Select memories") and `BatchBar` from the
+kit, a `DestructiveConfirm` naming the real count for both "Forget
+selected" and "Clear all" ("Forget every one of your N memories? This
+cannot be undone."), a partial-failure message when `outcomes` reports
+one refused (docs/UI.md > Batch actions: reported, never swallowed). The
+existing per-row "Archive" quick action (an icon button, `kit/icons.ts`'s
+`archive`, not the kit-banned raw `lucide-react` import) is unchanged.
+Extracted the row-rendering (checkbox, text, subtitle, per-row action)
+into a small shared `MemoryRows` component so the default view and the
+per-person admin view (`OtherPersonMemories`, itself unchanged - its own
+whole-person "Forget everything about X" already covers its batch/
+clear-all case) don't hand-duplicate the same row markup.
+
+Tests: `backend/tests/memory.test.ts` - `forgetByIds` tombstones exactly
+the selected ids and leaves the rest active; a pinned record's refusal
+doesn't block the rest of the batch and reports why; another person's
+memory is refused per id, same as the single-forget route; an empty
+selection is refused with 400. `frontend/src/apps/memory/
+MemoryPage.test.tsx` - select mode's count updates as rows are checked;
+forgetting selected removes exactly those rows and keeps the rest;
+clear-all asks with the real count, then empties the list; a partial
+batch-forget failure surfaces which memory could not be forgotten.
+Updated (not just added): the "archiving a memory" test's now-stale
+schema-invalidation comment, the query-key assertion in "once viewing a
+child, the viewer's own unscoped memory query is disabled" (`["memory-
+list", "me"]`, not the old `["schema-binding", "/api/memory"]`), and
+the "raw category and scope" test's comment (no schema page to
+contrast against anymore).
+
+Verified live against a real (not the schema-page) throwaway backend
+(`PORT=8796 MAIPAI_DATA_DIR=<temp dir>`, never Jesse's own running
+household - `bun start`'s already-running instance on 8787 is real
+family data and was left untouched): seeded four household memories,
+opened Memory in a browser, entered select mode, selected two, forgot
+them (both disappeared, the other two stayed), then Clear all on the
+remaining two (confirm named "2", list emptied to "Nothing remembered
+yet."). Confirmed directly against the sqlite file, not just the UI,
+that all four rows are genuinely `status: archived`, `text:
+"[forgotten]"`, `deleted_at` set - real erasure, not a client-side hide.
+Screenshot of select mode (two checked, "2 selected", "Forget selected"
+armed) opened and judged. `docs/user/memory.md` updated in dad-test
+prose: forgetting one, forgetting several, and clearing everything, each
+stated as irreversible. Full `bun test` (488 frontend, 61 backend
+`memory.test.ts` alone), `bunx tsc --noEmit`, and `bunx eslint` all
+clean; `bun run gen:api-docs` regenerated `docs/api/openapi.json` for
+the new route.
+
+A code review (medium, 2026-09-13) caught three real gaps, all fixed:
+the query key rename (`["schema-binding", "/api/memory"]` to
+`["memory-list", "me"]`) silently broke `HomePage.tsx`'s
+`RecentMemoriesCard`, which deliberately shares that exact key so
+forgetting a memory anywhere also updates the dashboard's "Recent
+memories" card - moved its key to match, with the same one-cache-entry
+comment updated to explain why it moved. "Clear all" was shown and
+enabled on an already-empty list, confirming to "forget 0 memories" and
+then hitting the batch-forget route's own 400 - `disabled={all.length
+=== 0}` now hides that dead end. `MemoryRows`, once shared between the
+own-list and `OtherPersonMemories`, silently changed the per-person
+admin view's subtitle from `{category}` to `{category} · {scope}`
+(always "person" there, since a child's own memories are all
+scope=person - a repeated word, not new information) with no test
+covering the change; added a `subtitle` override prop, defaulting to the
+own-list's richer line, with `OtherPersonMemories` passing its original
+`{category}`-only one, plus a test asserting it. A fourth finding
+(`MemoryPage` and `OwnMemories` both querying `["memory-list", "me"]`,
+one only to compute the `?ids=` chip's count) was judged a style
+observation, not a defect - react-query shares the one cache entry and
+issues one request regardless of how many hook instances subscribe to
+it - and left as is.
+
+Files: `backend/src/lib/memory.ts`, `backend/src/routes/memory.ts`,
+`backend/tests/memory.test.ts`, `frontend/src/lib/api.ts`, `frontend/
+src/apps/memory/MemoryPage.tsx`, `frontend/src/apps/memory/
+MemoryPage.test.tsx`, `frontend/src/apps/home/HomePage.tsx`, `docs/user/
+memory.md`, `docs/api/openapi.json`, `docs/BACKLOG.md`.
+
 ## Chat direction 2026-09-12: the join items, on main after both tracks merged (2026-09-13)
 
 ### JOIN-01: recalled episodes reach the prompt and the guards

@@ -464,6 +464,14 @@ export const api = {
     request<MemoryRecord[]>(`/api/memory${personId ? `?person=${encodeURIComponent(personId)}` : ""}`),
   forgetPersonMemories: (personId: string) =>
     request<{ deleted: number }>("/api/memory/forget", { method: "POST", body: JSON.stringify({ personId }) }),
+  // Distinct from forgetPersonMemories above (that erases every record
+  // for ONE person): MemoryPage.tsx's own "forget selected"/"clear all"
+  // over a caller-chosen set of ids, one round trip regardless of count.
+  batchForgetMemories: (ids: string[]) =>
+    request<{ outcomes: Array<{ id: string; deleted: boolean; reason?: string }> }>("/api/memory/batch-forget", {
+      method: "POST",
+      body: JSON.stringify({ ids }),
+    }),
   exportPersonMemories: (personId: string) =>
     request<MemoryRecord[]>(`/api/memory/export?personId=${encodeURIComponent(personId)}`),
   archiveMemory: (id: string) =>

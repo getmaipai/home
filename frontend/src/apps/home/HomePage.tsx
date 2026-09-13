@@ -110,16 +110,20 @@ function WeatherCard() {
 
 function RecentMemoriesCard() {
   const navigate = useNavigate();
-  // The same `["schema-binding", "/api/memory"]` key MemoryPage.tsx and
-  // its own actions already use (kit/schema/binding.ts's convention) -
-  // one cache entry, not a second fetch, and archiving a memory anywhere
-  // invalidates this card too. Sliced to "recent" client-side
+  // The same `["memory-list", "me"]` key MemoryPage.tsx's own
+  // `OwnMemories` uses for the actor's own list - one cache entry, not a
+  // second fetch, and forgetting or archiving a memory anywhere
+  // invalidates this card too (lane 3 item 4, 2026-09-13: this key was
+  // `["schema-binding", "/api/memory"]` while MemoryPage's default view
+  // was schema-page-driven; it moved to hand-written for real batch
+  // forget, and this card's key moved with it, or the two would silently
+  // stop sharing a cache entry). Sliced to "recent" client-side
   // (`created_at` descending): the contract's own `GET /api/memory?since=`
   // (session-a-intelligence.md) isn't on `main` yet, so this is the same
   // "local mock until the real route lands" the conversations adapter
   // already uses, not a second design.
   const query = useQuery({
-    queryKey: ["schema-binding", "/api/memory"],
+    queryKey: ["memory-list", "me"],
     queryFn: () => api.memories(),
   });
   const recent = [...(query.data ?? [])].sort((a, b) => b.created_at.localeCompare(a.created_at)).slice(0, 3);

@@ -2038,6 +2038,92 @@
         }
       }
     },
+    "/api/memory/batch-forget": {
+      "post": {
+        "tags": [
+          "Memory"
+        ],
+        "summary": "Forget (tombstone) several memories at once",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "ids": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  }
+                },
+                "required": [
+                  "ids"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "One outcome per requested id, in the same words the single-forget/archive routes would have used for a failure.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "outcomes": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "deleted": {
+                            "type": "boolean"
+                          },
+                          "reason": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "deleted"
+                        ]
+                      }
+                    }
+                  },
+                  "required": [
+                    "outcomes"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "ids is missing, empty, or not a list of strings",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/memory/import/legacy": {
       "post": {
         "tags": [

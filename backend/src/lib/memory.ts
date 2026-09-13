@@ -913,6 +913,63 @@ const forgetTransaction = sqlite.transaction((personId: string): number => {
   return ids.length;
 });
 
+export interface BatchForgetOutcome {
+  id: string;
+  deleted: boolean;
+  /** Why this one was left alone, in the same words a single forget
+   * would have used. */
+  reason?: string;
+}
+
+// A `sqlite.query(...).run(id)` per record, not the `IN (...)` bulk
+// shape forgetTransaction above uses: forget() erases every record for
+// ONE person under ONE auth check, so a bulk statement is safe there,
+// but a batch of ids can span records with DIFFERENT owners, scopes,
+// and privilege levels - each needs its OWN getWritable()/
+// isPrivilegedRecord() check, so it has to be a per-row loop regardless.
+function tombstone(id: string): void {
+  const now = new Date().toISOString();
+  sqlite
+    .query("UPDATE memory_records SET status = 'archived', text = ?, embedding_space = NULL, deleted_at = ?, hlc = ? WHERE id = ?")
+    .run(TOMBSTONE_TEXT, now, nextHlc(), id);
+  sqlite.query("DELETE FROM memory_embeddings WHERE memory_id = ?").run(id);
+  sqlite.query("DELETE FROM pending_embeddings WHERE memory_id = ?").run(id);
+}
+
+/** Batch counterpart of forget(), for a list's own "forget selected"/
+ * "clear all" (docs/UI.md > Batch actions, lane 3 item 4, 2026-09-13):
+ * each id gets the exact same tombstone forget() applies to a whole
+ * person's memories, under the same per-record rules archive() already
+ * enforces (getWritable's ownership check, plus the owner/admin-only
+ * gate on a pinned or entity record) - forgetting is strictly more
+ * destructive than archiving (content is actually wiped), so it can
+ * never be looser than it. No status check, matching forget()'s own
+ * behavior: an already-archived or superseded record still gets its
+ * content wiped, the same as every one of a person's records does today
+ * regardless of status.
+ *
+ * Partial success on purpose, same reasoning as personLifecycle.ts's
+ * deletePeople(): selecting ten memories and having the whole request
+ * refused because one is pinned helps nobody - each is attempted under
+ * its own rules and the caller is told, per id, what happened. */
+export function forgetByIds(actor: PersonRow, ids: string[]): BatchForgetOutcome[] {
+  const outcomes: BatchForgetOutcome[] = [];
+  for (const id of ids) {
+    const found = getWritable(actor, id);
+    if (!found.ok) {
+      outcomes.push({ id, deleted: false, reason: found.error });
+      continue;
+    }
+    if (!isOwnerOrAdmin(actor) && isPrivilegedRecord(found.value)) {
+      outcomes.push({ id, deleted: false, reason: "only owner or admin may forget an entity or pinned memory" });
+      continue;
+    }
+    tombstone(id);
+    outcomes.push({ id, deleted: true });
+  }
+  return outcomes;
+}
+
 /** Per-person export (4.14): every scope=person record about them,
  * whatever its status, so the archive is complete - EXCEPT a tombstone
  * (step 10: `deleted_at` set): its content is already wiped, so

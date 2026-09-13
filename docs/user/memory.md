@@ -11,9 +11,17 @@ Everything it remembers stays on your hub. It never goes anywhere else.
 
 Open **Memory** in the sidebar. Each entry shows one thing MaiPai learned from a conversation.
 
-## Forget something
+## Forget one memory
 
-Find the memory you want gone. Tap **Forget**. It's gone right away, and MaiPai won't use it again.
+Find the memory you want gone. Tap the small icon next to it. It's gone right away, and MaiPai won't use it again.
+
+## Forget several at once
+
+Tap **Select memories** at the top of the page. Check the ones you want gone, then tap **Forget selected**. Confirm, and they're erased for good. This cannot be undone.
+
+## Clear everything
+
+Tap **Clear all**. Confirm how many memories you're about to erase, and every one of them is gone for good. This cannot be undone.
 
 ## Export your memories
 

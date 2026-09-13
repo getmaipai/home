@@ -8,6 +8,7 @@ import {
   archive,
   supersede,
   forget,
+  forgetByIds,
   exportPerson,
   runMaintenance,
   isPrivilegedRecordKind,
@@ -178,6 +179,42 @@ memoryRoutes.post("/forget", requireAuth, async (c) => {
   const result = forget(actor, body.personId);
   if (!result.ok) return fail(c, result);
   return c.json(result.value);
+});
+
+// Batch forget (docs/UI.md > Batch actions, lane 3 item 4, 2026-09-13):
+// distinct from the personId-based /forget above, which erases every
+// record for ONE person - this takes a caller-chosen set of ids
+// (MemoryPage.tsx's own "forget selected"/"clear all"), one round trip
+// regardless of how many are selected, rather than the client looping
+// N single-forget calls.
+const batchForgetRoute = createRoute({
+  method: "post",
+  path: "/batch-forget",
+  tags: ["Memory"],
+  summary: "Forget (tombstone) several memories at once",
+  middleware: [requireAuth] as const,
+  request: {
+    body: { content: { "application/json": { schema: z.object({ ids: z.array(z.string()) }) } } },
+  },
+  responses: {
+    200: {
+      content: {
+        "application/json": {
+          schema: z.object({
+            outcomes: z.array(z.object({ id: z.string(), deleted: z.boolean(), reason: z.string().optional() })),
+          }),
+        },
+      },
+      description: "One outcome per requested id, in the same words the single-forget/archive routes would have used for a failure.",
+    },
+    ...errorResponses({ 400: "ids is missing, empty, or not a list of strings", 401: "Not signed in" }),
+  },
+});
+memoryRoutes.openapi(batchForgetRoute, (c) => {
+  const actor = c.get("person");
+  const { ids } = c.req.valid("json");
+  if (ids.length === 0) return c.json({ error: "no memories were selected" }, 400);
+  return c.json({ outcomes: forgetByIds(actor, ids) }, 200);
 });
 
 memoryRoutes.post("/maintenance/run", requireRole("owner", "admin"), async (c) => {

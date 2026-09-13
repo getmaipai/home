@@ -102,12 +102,11 @@ describe("MemoryPage", () => {
     }
   });
 
-  // The schema page (spec/ui/pages/memory.json) shows the raw scope/
-  // category value, not a name resolved against the people roster - the
-  // hand-rolled version this replaced joined against a second `/api/people`
-  // fetch, which the generic interpreter has no join mechanism for
-  // (MemoryPage.tsx's own comment has the full reasoning); this is the
-  // one documented behavior change from that version.
+  // Shows the raw scope/category value, not a name resolved against the
+  // people roster - joining against a second `/api/people` fetch for
+  // one subtitle line is exactly the kind of ahead-of-need primitive
+  // docs/plans/session-b-ui.md step 5 says not to build for a single
+  // page (MemoryPage.tsx's own comment has the full reasoning).
   test("renders a memory with its raw category and scope", async () => {
     const restore = stubFetch({ "/api/memory": [record()] });
     try {
@@ -130,10 +129,10 @@ describe("MemoryPage", () => {
   });
 
   test("archiving a memory removes it from the list", async () => {
-    // Stateful, not a fixed fixture: the row_action's call invalidates
-    // every schema-bound query (kit/schema/actions.ts), so a stub that
-    // always returns the same array regardless of the archive call would
-    // never actually prove removal.
+    // Stateful, not a fixed fixture: handleArchive() invalidates
+    // ["memory-list", "me"], so a stub that always returns the same
+    // array regardless of the archive call would never actually prove
+    // removal.
     let archived = false;
     const original = globalThis.fetch;
     globalThis.fetch = mock((input: RequestInfo | URL) => {
@@ -151,16 +150,6 @@ describe("MemoryPage", () => {
       const { findByRole, queryByText } = renderMemoryPage();
       const archiveButton = await findByRole("button", { name: 'Archive "Likes dinosaurs"' });
       fireEvent.click(archiveButton);
-      // Issue #21: observed flaky only under the full suite's real CPU
-      // contention (never in isolation, never reproduced across several
-      // dozen local full-suite runs while investigating) - the archive
-      // POST, the schema-binding invalidation, and the refetch are three
-      // real async hops for waitFor's default 1000ms window to land
-      // inside every time. No leaked timer, retry, or poll was found
-      // anywhere in this path (queryClient.ts disables retries
-      // everywhere; MemoryPage.tsx has no interval/poll of its own) - a
-      // wider window is the correct response to genuine scheduling
-      // contention, not a guess at an unconfirmed root cause.
       await waitFor(() => expect(queryByText("Likes dinosaurs")).toBeNull(), { timeout: 5_000 });
     } finally {
       globalThis.fetch = original;
@@ -213,6 +202,12 @@ describe("MemoryPage", () => {
       expect(queryByText("My own memory")).toBeNull();
       await findByRole("button", { name: "Export Bramble's memories" });
       await findByRole("button", { name: "Forget everything about Bramble" });
+      // Unlike the own-list's "{category} · {scope}" line: every one of
+      // a child's own memories is scope=person already, so repeating
+      // "person" on every row would be a redundant word, not new
+      // information (MemoryRows' own `subtitle` override for this view).
+      expect(await findByText("preference")).toBeInTheDocument();
+      expect(queryByText("preference · person")).toBeNull();
     } finally {
       restore();
     }
@@ -226,6 +221,11 @@ describe("MemoryPage", () => {
     // nothing on screen uses (a code review, 2026-09-06). Checked
     // directly against the query's own state, not by trying to provoke
     // a real refetch (window refocus, a remount) inside a test.
+    //
+    // `OwnMemories` (lane 3 item 4, 2026-09-13) fully unmounts once
+    // viewing someone else - the query key `["memory-list", "me"]` is
+    // MemoryPage.tsx's OWN `enabled: viewingSelf` guard (kept for the
+    // `?ids=` chip's `visibleCount`), the one still alive here.
     const ownListCalls: string[] = [];
     const original = globalThis.fetch;
     globalThis.fetch = mock((input: RequestInfo | URL) => {
@@ -256,8 +256,8 @@ describe("MemoryPage", () => {
       fireEvent.click(await findByRole("combobox", { name: "Viewing whose memories" }));
       fireEvent.click(await findByRole("option", { name: "Bramble" }));
       await findByRole("button", { name: "Forget everything about Bramble" });
-      const state = queryClient.getQueryState(["schema-binding", "/api/memory"]);
-      const observers = queryClient.getQueryCache().find({ queryKey: ["schema-binding", "/api/memory"] })?.observers ?? [];
+      const state = queryClient.getQueryState(["memory-list", "me"]);
+      const observers = queryClient.getQueryCache().find({ queryKey: ["memory-list", "me"] })?.observers ?? [];
       expect(observers.every((o) => !o.options.enabled)).toBe(true);
       expect(state).toBeDefined(); // still cached from the earlier self-view mount, just no longer active
     } finally {
@@ -306,5 +306,124 @@ describe("MemoryPage", () => {
     } finally {
       globalThis.fetch = original;
     }
+  });
+
+  // Lane 3 item 4 (2026-09-13): the org's standing batch-actions rule
+  // (docs/UI.md > Batch actions), applied to Memory's own list -
+  // People/Conversations/Users already had it, Memory was the case
+  // Jesse named specifically.
+  describe("batch select and clear-all", () => {
+    function twoRecords() {
+      return [
+        record({ id: "mem1-abc123", text: "Likes dinosaurs" }),
+        record({ id: "mem2-def456", text: "Allergic to peanuts" }),
+      ];
+    }
+
+    test("select mode shows the count as rows are checked", async () => {
+      const restore = stubFetch({ "/api/memory": twoRecords() });
+      try {
+        const { findByRole, findByText } = renderMemoryPage();
+        fireEvent.click(await findByRole("button", { name: "Select memories" }));
+        expect(await findByText("0 selected")).toBeInTheDocument();
+        fireEvent.click(await findByRole("checkbox", { name: "Select Likes dinosaurs" }));
+        expect(await findByText("1 selected")).toBeInTheDocument();
+        fireEvent.click(await findByRole("checkbox", { name: "Select Allergic to peanuts" }));
+        expect(await findByText("2 selected")).toBeInTheDocument();
+      } finally {
+        restore();
+      }
+    });
+
+    test("forgetting selected memories asks first, then removes exactly those rows", async () => {
+      let forgottenIds: string[] | null = null;
+      const original = globalThis.fetch;
+      globalThis.fetch = mock((input: RequestInfo | URL, init?: RequestInit) => {
+        const url = typeof input === "string" ? input : input.toString();
+        if (url.endsWith("/api/memory/batch-forget") && init?.method === "POST") {
+          forgottenIds = (JSON.parse(init.body as string) as { ids: string[] }).ids;
+          return Promise.resolve(
+            new Response(JSON.stringify({ outcomes: forgottenIds.map((id) => ({ id, deleted: true })) }), { status: 200 }),
+          );
+        }
+        if (url.endsWith("/api/memory")) {
+          return Promise.resolve(
+            new Response(JSON.stringify(forgottenIds ? twoRecords().filter((r) => !forgottenIds!.includes(r.id)) : twoRecords()), {
+              status: 200,
+            }),
+          );
+        }
+        throw new Error(`unstubbed fetch: ${url}`);
+      }) as unknown as typeof fetch;
+      try {
+        const { findByRole, findByText, queryByText } = renderMemoryPage();
+        await findByText("Likes dinosaurs");
+        fireEvent.click(await findByRole("button", { name: "Select memories" }));
+        fireEvent.click(await findByRole("checkbox", { name: "Select Likes dinosaurs" }));
+        fireEvent.click(await findByRole("button", { name: "Forget selected" }));
+        await findByText("Forget 1 memory? This cannot be undone.");
+        fireEvent.click(await findByRole("button", { name: "Yes, forget 1" }));
+        await waitFor(() => expect(forgottenIds).toEqual(["mem1-abc123"]));
+        await waitFor(() => expect(queryByText("Likes dinosaurs")).toBeNull());
+        expect(await findByText("Allergic to peanuts")).toBeInTheDocument();
+      } finally {
+        globalThis.fetch = original;
+      }
+    });
+
+    test("clear all asks, names the real count, then empties the list", async () => {
+      let forgottenIds: string[] | null = null;
+      const original = globalThis.fetch;
+      globalThis.fetch = mock((input: RequestInfo | URL, init?: RequestInit) => {
+        const url = typeof input === "string" ? input : input.toString();
+        if (url.endsWith("/api/memory/batch-forget") && init?.method === "POST") {
+          forgottenIds = (JSON.parse(init.body as string) as { ids: string[] }).ids;
+          return Promise.resolve(
+            new Response(JSON.stringify({ outcomes: forgottenIds.map((id) => ({ id, deleted: true })) }), { status: 200 }),
+          );
+        }
+        if (url.endsWith("/api/memory")) {
+          return Promise.resolve(new Response(JSON.stringify(forgottenIds ? [] : twoRecords()), { status: 200 }));
+        }
+        throw new Error(`unstubbed fetch: ${url}`);
+      }) as unknown as typeof fetch;
+      try {
+        const { findByRole, findByText, queryByText } = renderMemoryPage();
+        await findByText("Likes dinosaurs");
+        fireEvent.click(await findByRole("button", { name: "Clear all" }));
+        await findByText("Forget every one of your 2 memories? This cannot be undone.");
+        fireEvent.click(await findByRole("button", { name: "Yes, forget all" }));
+        await waitFor(() => expect(forgottenIds).toEqual(["mem1-abc123", "mem2-def456"]));
+        await waitFor(() => expect(queryByText("Likes dinosaurs")).toBeNull());
+        expect(queryByText("Allergic to peanuts")).toBeNull();
+      } finally {
+        globalThis.fetch = original;
+      }
+    });
+
+    // docs/UI.md > Batch actions: a partial failure is reported, never
+    // swallowed - one refused (a pinned or entity record) has to say so.
+    test("a partial batch-forget failure surfaces which memory could not be forgotten", async () => {
+      const restore = stubFetch({
+        "/api/memory": twoRecords(),
+        "/api/memory/batch-forget": {
+          outcomes: [
+            { id: "mem1-abc123", deleted: false, reason: "only owner or admin may forget an entity or pinned memory" },
+            { id: "mem2-def456", deleted: true },
+          ],
+        },
+      });
+      try {
+        const { findByRole, findByText } = renderMemoryPage();
+        await findByText("Likes dinosaurs");
+        fireEvent.click(await findByRole("button", { name: "Clear all" }));
+        fireEvent.click(await findByRole("button", { name: "Yes, forget all" }));
+        expect(
+          await findByText(/1 of 2 could not be forgotten: only owner or admin may forget an entity or pinned memory/),
+        ).toBeInTheDocument();
+      } finally {
+        restore();
+      }
+    });
   });
 });

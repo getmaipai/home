@@ -3265,24 +3265,35 @@ future session now that F's hub half exists.
       household member only, or an exported file/link off the hub
       entirely; the org's privacy architecture rules govern the second
       case directly) - not just wiring up a button.
-- [ ] **Batch select and clear-all everywhere else** (M) - the org rule
-      landed 2026-09-05 (`getmaipai/.github/docs/UI.md` > Batch actions,
-      Jesse: "every section should provide easy batch and or delete all
-      mechanism"). People has it. Memory does not, and is the case Jesse
-      named specifically: it needs multi-select archive/forget plus a
-      real clear-all, which also finally gives `lib/memory.ts`'s
-      `forget()` a UI (`MemoryPage.tsx`'s own comment deferred it for
-      want of a confirmation pattern; `PeoplePage.tsx` now has one worth
-      lifting into the kit). Conversation history and notifications
-      inherit the same rule when they get surfaces.
+- [x] **Batch select and clear-all everywhere else** (M) - done 2026-09-13
+      (lane 3 item 4). The org rule landed 2026-09-05
+      (`getmaipai/.github/docs/UI.md` > Batch actions, Jesse: "every
+      section should provide easy batch and or delete all mechanism").
+      People and Conversations already had it; Memory was the case Jesse
+      named specifically. `MemoryPage.tsx`'s default (own-memories) view
+      moved from the generic schema-page interpreter back to
+      hand-written (the same "stays hand-written" call People and
+      Conversations already made): the interpreter's own batch mechanism
+      only loops one call per selected item, never a single request
+      carrying every id, and a real clear-all needs exactly that. New
+      "Select memories" -> "Forget selected" and "Clear all" both call
+      the new `POST /api/memory/batch-forget` (`backend/src/lib/
+      memory.ts`'s `forgetByIds`, one round trip regardless of count),
+      finally giving `forget()`'s real erasure a UI on the default list,
+      not just the per-person admin view. Partial failure (a pinned or
+      entity record) is reported, never swallowed. The per-row "Archive"
+      quick action is unchanged. Notifications still inherits the same
+      rule when it gets a surface.
 - [x] **The kit owns the batch-selection pattern** (S) - done 2026-09-05.
       `kit/primitives/BatchBar.tsx` (the count, the caller's own batch
       actions, Done) and `SelectModeToggle`; `PeoplePage.tsx` now consumes
-      it instead of hand-rolling the row. Still page-specific: entering
-      select mode's exact wording and the destructive confirmation panel
-      (their copy differs per list). Memory is still the pattern's second
-      real consumer, once its own batch actions land (below). See
-      `docs/dev.md`, "Session B: step 1".
+      it instead of hand-rolling the row. Entering select mode's exact
+      wording stays page-specific (copy differs per list); the
+      destructive confirmation panel itself was ALSO lifted once a
+      fourth hand-copy turned up (`kit/primitives/DestructiveConfirm.tsx`,
+      2026-09-06: Users, Conversations, Memory's admin view). Memory's
+      own default list became the pattern's real consumer 2026-09-13
+      (item above). See `docs/dev.md`, "Session B: step 1".
 - [x] Notifications UI (done 2026-09-05, `docs/dev.md`'s "The
       notification system, a real working slice" entry) - `NotificationBell`
       (shell header: pending list + toast on new arrival). Still real gaps:
