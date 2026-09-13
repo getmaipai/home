@@ -42,3 +42,10 @@ spec/schemas.resolved/
 # scripts/screenshot.ts's throwaway demo backend data - regenerated every
 # run, never the real household, never committed
 .demo-data/
+
+# scripts/screenshot.ts's non-Chromium output (issue #76): only Chromium's
+# renders are the published docs screenshots; every other browser (--webkit,
+# used for a11y/keyboard-trap verification, not screenshot review) writes
+# here instead so it can never overwrite them.
+docs/assets/screens/webkit/
+docs/assets/webkit/

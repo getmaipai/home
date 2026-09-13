@@ -25,18 +25,34 @@
 //
 // "far" (TV) is a user-agent, not a viewport (frontend/src/kit/
 // useSurface.ts's own TV_USER_AGENT) - the far entry below sets one.
+//
+// `--webkit` (a11y/keyboard-trap verification against WebKit's real Tab
+// order, not screenshot review - see checkKeyboardTrap's own comment)
+// writes its PNGs, if any, under a gitignored `.../webkit/` subdirectory
+// instead of the paths above (issue #76: every browser used to share the
+// same output paths, so a `--webkit` run silently overwrote the published
+// Chromium screenshots). Only Chromium's output is ever committed.
 import { chromium, webkit, type Browser, type BrowserContext } from "playwright";
 import { startStubLlmServer } from "../spec/llm/ts/stubServer";
 import AxeBuilder from "@axe-core/playwright";
 import { rmSync, mkdirSync, existsSync } from "node:fs";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 
 const PORT = 8799;
 const ROOT = join(import.meta.dir, "..");
 const DATA_DIR = join(ROOT, ".demo-data");
 const BASE_URL = `http://localhost:${PORT}`;
-const SCREENS_DIR = join(ROOT, "docs", "assets", "screens");
-const HERO_PATH = join(ROOT, "docs", "assets", "hero.png");
+const useWebkit = process.argv.includes("--webkit");
+// Issue #76: every browser wrote to the same `docs/assets/screens/<name>.png`
+// path, so a `--webkit` run (a11y/keyboard-trap verification, not the
+// published screenshots) silently overwrote the real Chromium-rendered
+// images the docs actually publish - hit live while fixing #69, reverted
+// by hand. Chromium is the only browser whose output ships in docs, so its
+// path is the one that must never move; every other browser writes under
+// its own gitignored subdirectory instead; `bun run screenshots` (default,
+// no `--webkit`) is unaffected by any of this.
+const SCREENS_DIR = useWebkit ? join(ROOT, "docs", "assets", "screens", "webkit") : join(ROOT, "docs", "assets", "screens");
+const HERO_PATH = useWebkit ? join(ROOT, "docs", "assets", "webkit", "hero.png") : join(ROOT, "docs", "assets", "hero.png");
 
 const a11yOnly = process.argv.includes("--a11y-only");
 // Focused review retains the same seeded data, readiness, and a11y checks.
@@ -371,7 +387,15 @@ async function captureHero(browser: Browser, sessionValue: string): Promise<void
     // rule - a shot of a loading state is not a shot of the feature).
     await page.getByRole("heading", { name: "Household" }).waitFor();
     await page.getByText("Nova", { exact: true }).waitFor();
-    mkdirSync(join(ROOT, "docs", "assets"), { recursive: true });
+    // Derived from HERO_PATH itself, not a hardcoded "docs/assets" -
+    // under --webkit that path is "docs/assets/webkit/" (issue #76), and
+    // a code review (2026-09-12) caught that a hardcoded parent here
+    // would still create only the Chromium one, so a bare `--webkit` run
+    // (nothing else skips captureHero) would throw ENOENT on the write
+    // below - never actually exercised by this fix's own verification,
+    // since that ran with `--chat-focus-review`, which skips captureHero
+    // entirely.
+    mkdirSync(dirname(HERO_PATH), { recursive: true });
     await page.screenshot({ path: HERO_PATH });
     console.log(`Wrote ${HERO_PATH}`);
   } finally {
@@ -576,7 +600,7 @@ async function main() {
     await waitForHealth();
     const sessionValue = await seedHousehold();
 
-    browser = await (process.argv.includes("--webkit") ? webkit : chromium).launch();
+    browser = await (useWebkit ? webkit : chromium).launch();
 
     if (!a11yOnly && !settingsReview && !chatReview) await captureHero(browser, sessionValue);
 

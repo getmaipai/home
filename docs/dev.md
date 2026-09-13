@@ -11184,3 +11184,51 @@ opened and read by hand.
 
 Closes #56.
 
+## Session B, lane 3 (2026-09-12)
+
+**#76: a WebKit screenshot run overwrote the Chromium images.** Fixed by
+making `SCREENS_DIR`/`HERO_PATH` browser-conditional: Chromium keeps the
+published `docs/assets/screens/`/`docs/assets/hero.png` paths unchanged
+(the only browser whose output ships in docs), every other browser
+(`--webkit`, used for a11y/keyboard-trap verification, never screenshot
+review) writes under a gitignored `.../webkit/` subdirectory instead.
+Picked the subdirectory option over "write no PNGs unless `--write`" from
+the two the issue proposed, since the subdirectory still lets a real
+WebKit rendering bug be inspected visually when one comes up, at the same
+zero-collision-risk cost.
+
+Verified: `bun run scripts/screenshot.ts --chat-focus-review --webkit`
+writes to `docs/assets/screens/webkit/` (its own log line confirms the
+path), and `git status` on `docs/assets/` comes back completely clean
+afterward - the fix's whole point. The plain Chromium run
+(`--chat-focus-review`, no flag) still writes to the original
+`docs/assets/screens/` and reports it in its own log line, confirming the
+published path is untouched. One process-hygiene note from testing this:
+an earlier `--a11y-only --webkit` run I'd started got orphaned (its
+background job outlived the monitor call that was supposed to report
+completion) and kept holding port 8799, which made the next run's own
+`seedHousehold()` 500 trying to set up a household that already existed -
+not a bug in this fix, just a reminder to confirm a prior screenshot run
+has actually exited (`lsof -i :8799`) before starting another.
+
+A code review (2026-09-12) caught a real gap in the first pass:
+`captureHero()`'s own `mkdirSync` call hardcoded `docs/assets` as the
+directory to create, rather than deriving it from `HERO_PATH` - under
+`--webkit`, `HERO_PATH` points at `docs/assets/webkit/hero.png`, a
+directory that call never created, so a bare `bun run scripts/
+screenshot.ts --webkit` (nothing else skips `captureHero`; only
+`a11yOnly`/`settingsReview`/`chatReview` do) would throw `ENOENT` on the
+write. My own verification above only ran `--chat-focus-review --webkit`,
+which sets `chatReview` and skips `captureHero` entirely - never
+exercising the exact path that broke. Fixed by deriving the directory
+from `dirname(HERO_PATH)` instead of a hardcoded string. Verified live: a
+bare `--webkit` run now writes `docs/assets/webkit/hero.png` (confirmed
+by the script's own "Wrote ..." log line and the file's existence)
+without crashing, and `git status` on `docs/assets/` still comes back
+clean afterward.
+
+Files: `scripts/screenshot.ts`, `.gitignore`. Checks: the live runs above;
+no `bunx tsc`/`eslint` config covers this root-level script.
+
+Closes #76.
+

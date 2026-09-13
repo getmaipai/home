@@ -3344,6 +3344,20 @@ future session now that F's hub half exists.
     Checked `docs/user/privacy.md` against it - no drift, no prose change
     needed. Files: `docs/assets/screens/privacy-desktop-light.png`.
 
+- [x] **#76: A WebKit screenshot run overwrote the Chromium images** (S, Session B, 2026-09-12)
+
+    Every browser wrote to the same `docs/assets/screens/<name>.png` path;
+    a `--webkit` run (a11y/keyboard-trap verification, never screenshot
+    review) silently overwrote the published Chromium images. Fixed:
+    Chromium keeps the published path, every other browser writes under a
+    gitignored `docs/assets/screens/webkit/` subdirectory instead - chosen
+    over "write no PNGs unless `--write`" since it still allows visual
+    inspection of a real WebKit rendering bug. Full story: docs/dev.md's
+    "Session B, lane 3" entry. Files: `scripts/screenshot.ts`,
+    `.gitignore`. Checks: a `--webkit` run's own log line confirms the
+    webkit-subdirectory path and leaves `git status` on `docs/assets/`
+    clean; a plain Chromium run confirms the published path is unchanged.
+
 - [x] **#66: Hardcoded "unavailable" error code masked safety refusals** (S, 2026-09-12)
 
     Fixed: pass event.code through; show generic banner only for "unavailable";
