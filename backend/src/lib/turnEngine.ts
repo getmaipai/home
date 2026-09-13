@@ -694,17 +694,31 @@ const EXAMPLE_MATCH_THRESHOLD = 0.6;
 // single capture to bind to an arg and is treated as non-matching (falls
 // through to the fuzzy example score, or ultimately to the model): real
 // multi-slot extraction needs tier 2 native tool calling (4.5), not built.
+// getmaipai/home#77 (2026-09-13), two rules a code review added with the
+// trailing "please remember" patterns: sentence-final punctuation is
+// stripped before matching, so "..., please remember it." (typed chat
+// and the speech path both end sentences with a period) still matches a
+// suffix-anchored pattern, and "what's the weather in Boston?" captures
+// "Boston" rather than "Boston?"; and a LEADING wildcard's capture must
+// be at least three words, so "yes, please remember it" answering "I'll
+// make sure to remember it" and "can you please remember that" fall
+// through to the model instead of storing "yes" or "can you" as the
+// fact (a two-word fact falls through too, offered to the model with
+// `remember` as before).
 export function matchPattern(text: string, pattern: string): string | null {
   const parts = pattern.split("*");
   if (parts.length > 2) return null;
-  const trimmedText = text.trim();
+  const trimmedText = text.trim().replace(/[.!?]+$/, "").trimEnd();
   if (parts.length === 1) {
     return trimmedText.toLowerCase() === pattern.trim().toLowerCase() ? "" : null;
   }
   const escaped = parts.map((p) => p.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"));
   const regex = new RegExp(`^${escaped[0]}(.+)${escaped[1]}$`, "is");
   const match = trimmedText.match(regex);
-  return match ? match[1]!.trim() : null;
+  if (!match) return null;
+  const captured = match[1]!.trim();
+  if (parts[0] === "" && captured.split(/\s+/).length < 3) return null;
+  return captured;
 }
 
 // A package's `args` schema declares its call arguments (manifest.schema.json:

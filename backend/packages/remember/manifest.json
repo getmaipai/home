@@ -16,7 +16,16 @@
       "remember that Friday is pizza night",
       "can you remember I have a dentist appointment next week"
     ],
-    "patterns": ["remember that *", "remember *"]
+    "patterns": [
+      "remember that *",
+      "remember *",
+      "*, please remember it",
+      "* please remember it",
+      "*, please remember that",
+      "* please remember that",
+      "*, please remember",
+      "* please remember"
+    ]
   },
   "args": {
     "type": "object",

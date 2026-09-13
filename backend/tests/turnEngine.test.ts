@@ -1366,6 +1366,58 @@ describe("prepareTurn() persona resolution (via runTurn - prepareTurn itself isn
   });
 });
 
+// getmaipai/home#77: "the plumber's number is 555 9876 extension 12,
+// please remember it" and "Friday is pizza night, please remember" were
+// answered in text and nothing was stored. Bisected live (2026-09-13,
+// docs/dev.md): the first never clears the Tier 2 floor for `remember`,
+// so the model was never offered it, and a text acknowledgment in the
+// window then primes the next turn to answer in text too. The fix is a
+// literal pattern for trailing "please remember" forms in the remember
+// package, so both phrasings fire at Tier 0 and never depend on the
+// model's offer or mood. The stub here WOULD call remember if the turn
+// ever reached it, and is asserted never to have been asked.
+describe("getmaipai/home#77: a fact followed by 'please remember' is remembered, every time", () => {
+  for (const text of [
+    "the plumber's number is 555 9876 extension 12, please remember it",
+    "Friday is pizza night, please remember",
+    "the plumber's number is 555 9876 extension 12, please remember it.",
+    "Friday is pizza night, please remember.",
+  ]) {
+    test(`"${text}" stores the fact at Tier 0 without a model call`, async () => {
+      const { actor, client } = await owner();
+      let modelRequests = 0;
+      __resetLlmSupervisorForTests();
+      const { startStubLlmServer } = await import("@maipai/spec/llm/ts/stubServer.js");
+      const stub = startStubLlmServer(0, {
+        scriptedToolCalls: (request) => {
+          modelRequests++;
+          return request.tools?.some((t) => t.function.name === "remember") ? [{ id: "call-1", type: "function", function: { name: "remember", arguments: JSON.stringify({ fact: text }) } }] : undefined;
+        },
+      });
+      process.env.MAIPAI_LLAMA_SERVER_URL = stub.url;
+      try {
+        const result = await runTurnStream(actor, "chat", text);
+        expect(result.ok).toBe(true);
+        if (!result.ok) return;
+        expect(result.kind).toBe("immediate");
+        if (result.kind !== "immediate") return;
+        expect(result.value.source).toBe("plugin");
+        expect(result.value.plugin_id).toBe("remember");
+        expect(result.value.routing?.tier).toBe("pattern");
+        expect(modelRequests).toBe(0);
+        const recall = await client.post("/api/memory/recall", { q: text.includes("plumber") ? "plumber number" : "pizza night" });
+        const matches = (await recall.json()) as Array<{ record: { text: string } }>;
+        const expected = text.includes("plumber") ? "the plumber's number is 555 9876 extension 12" : "Friday is pizza night";
+        expect(matches.some((m) => m.record.text.includes(expected))).toBe(true);
+        expect(matches.some((m) => m.record.text.includes("please remember"))).toBe(false); // the trailing request is not part of the fact
+      } finally {
+        stub.stop();
+        delete process.env.MAIPAI_LLAMA_SERVER_URL;
+      }
+    });
+  }
+});
+
 // JOIN-01 (docs/BACKLOG.md's 2026-09-12 chat block, after both tracks
 // merged): what was said in an earlier conversation reaches the prompt
 // as a verbatim episode (MEM-03/MEM-04) and grounds the guards, so a
@@ -1453,6 +1505,23 @@ describe("confirmPromptFor() (FAST-03)", () => {
 });
 
 describe("matchPattern()", () => {
+  // getmaipai/home#77's two review rules: sentence-final punctuation
+  // never defeats a suffix-anchored pattern, and a leading wildcard needs
+  // a real fact behind it.
+  test("sentence-final punctuation is stripped before matching, on both ends of a pattern", () => {
+    expect(matchPattern("Friday is pizza night, please remember.", "*, please remember")).toBe("Friday is pizza night");
+    expect(matchPattern("the plumber's number is 555 9876 extension 12, please remember it.", "*, please remember it")).toBe("the plumber's number is 555 9876 extension 12");
+    expect(matchPattern("what's the weather in Boston?", "what's the weather in *")).toBe("Boston");
+    expect(matchPattern("lock the front door!", "lock the front door")).toBe("");
+  });
+
+  test("a leading wildcard needs at least three words: 'yes, please remember it' stores nothing", () => {
+    expect(matchPattern("yes, please remember it", "*, please remember it")).toBeNull();
+    expect(matchPattern("yes please remember it", "* please remember it")).toBeNull();
+    expect(matchPattern("can you please remember that", "* please remember that")).toBeNull();
+    expect(matchPattern("Friday is pizza night, please remember", "*, please remember")).toBe("Friday is pizza night");
+  });
+
   test("a wildcard captures the rest of the utterance", () => {
     expect(matchPattern("remember that pizza night is Friday", "remember that *")).toBe("pizza night is Friday");
   });
@@ -1912,7 +1981,7 @@ describe("FAST-04: literal patterns before the embed, a stream that starts befor
       async () => {
         // Not starting with "remember", so the literal pattern misses
         // and the turn reaches Tier 2 with `remember` offered.
-        const res = await client.post("/api/turn/stream", { text: "Friday is pizza night, please remember" });
+        const res = await client.post("/api/turn/stream", { text: "Friday is pizza night, can you remember that for me" });
         expect(res.status).toBe(200);
         const events = await readNdjson(res);
         expect(events.map((e) => e.type)).toEqual(["turn_meta", "done"]);
@@ -2008,7 +2077,7 @@ describe("FAST-04: literal patterns before the embed, a stream that starts befor
         },
       },
       async () => {
-        const res = await client.post("/api/turn/stream", { text: "Friday is pizza night, please remember" });
+        const res = await client.post("/api/turn/stream", { text: "Friday is pizza night, can you remember that for me" });
         expect(res.status).toBe(200); // turn_meta was already committed
         const events = await readNdjson(res);
         expect(events[0]?.type).toBe("turn_meta");

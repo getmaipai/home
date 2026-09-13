@@ -12040,3 +12040,144 @@ diff alone (`bash scripts/check.sh`: spec 515, backend 1,939, frontend
 484, standards core passed), because the shared checkout carried
 Session B's in-progress Memory route with its API-docs drift pending
 at the time; the worktree was removed after the commits.
+
+## Session A, after the block: #77, #79, #78, CHAT-22 (2026-09-13)
+
+Work order: `docs/plans/session-a-post-block-2026-09-13.md`. Live checks
+on a backend from this checkout on port 8809 with a fresh temp data
+directory, the main checkout's running chat engine (8788, llama-server
+b10797, `qwen3-8b-instruct-q4-k-m.gguf`) and embed engine (8794) by
+URL, the background URL pointed at a closed port, owner `alfred`, M4
+Pro 24 GB.
+
+### getmaipai/home#77: a fact followed by "please remember" is remembered
+
+The bisection, run with the real assembly functions (`buildPromptParts`,
+`routeSemantic` plus `prepareTurn()`'s own offer rule, `complete()` with
+the samplers on) against the live engine, five samples per variant,
+counting `remember` calls:
+
+| variant | "the plumber's number is 555 9876 extension 12, please remember it" | "Friday is pizza night, please remember" |
+|---|---|---|
+| V0 real everything (real offered set) | 0/5, offered set was `[websearch]` only | 5/5, offered `[remember, recall, remind, websearch]` |
+| V1 the bench's four tools, real messages | 5/5 | 5/5 |
+| V2 real tools, pre-FAST-03 remember and recall descriptions | 0/5 | 5/5 |
+| V3 real tools, no information policy in the prefix | 0/5 | 5/5 |
+| V4 real tools, no late context message | 0/5 | 5/5 |
+| V5 real tools, samplers off | 0/5 | 5/5 |
+| V6 real tools, bare prompt (user message only) | 0/5 | 5/5 |
+| V7 the bench's four tools, bare prompt (the bench itself) | 5/5 | 5/5 |
+
+One cause, not five: for the plumber sentence `remember` never clears
+`TIER2_AMBIGUOUS_FLOOR` (0.68), so the real turn offers `websearch`
+alone and the model, never shown `remember`, answers in text; every
+variant that offers `remember` calls it 5 of 5, and the descriptions,
+the policy, the context message, the samplers and the prompt shape
+move nothing. The pizza sentence is offered `remember` and calls it 5
+of 5 in the real assembly, and live in three fresh conversations it
+stored a record 3 of 3 before any fix, so its failure on 2026-09-12 was
+its conversation: reproduced live, a plumber turn answered in text
+followed by two pizza turns in the same conversation gave text answers
+both times (then `near_echo` cuts, #74), the model imitating its own
+prior acknowledgment in the window.
+
+The fix is the plan's routing-side one: the remember package's
+`routing.patterns` gain the trailing forms `*, please remember it`,
+`* please remember it`, `*, please remember that`, `* please remember
+that`, `*, please remember`, `* please remember` (the comma forms
+first, so the captured fact carries no trailing comma; `matchPattern()`
+anchors both ends, so "please remember to call mum" matches none of
+them). Both phrasings now fire at Tier 0 and never depend on the offer
+or on what the window holds. Regression test in `turnEngine.test.ts`:
+both exact phrasings through `runTurnStream()` against a stub scripted
+to call `remember` whenever offered, asserting an immediate plugin
+reply with `routing.tier` "pattern", zero requests to the stub, and the
+stored record with the fact and without "please remember".
+
+The medium code review on the diff added two rules to `matchPattern()`,
+each with tests: sentence-final punctuation (`.`, `!`, `?`) is stripped
+before matching, because typed chat and the speech path both end
+sentences with a period and a suffix-anchored pattern would otherwise
+miss "..., please remember it." every time (a side effect for every
+prefix pattern too: "what's the weather in Boston?" now captures
+"Boston", not "Boston?"); and a leading wildcard's capture must be at
+least three words, so "yes, please remember it" (the natural answer to
+the model's own "I'll make sure to remember it") and "can you please
+remember that" fall through to the model instead of storing "yes" or
+"can you" as the fact. The Tier 2 tests that used "..., please
+remember" to reach the model now say "Friday is pizza night, can you
+remember that for me" and "our wifi password is on the fridge, please
+remember this", which match no pattern and still clear the stub
+scorer's floor (0.689 and 0.856 against 0.68; "..., please remember
+this" alone scored 0.670 for the pizza sentence, one hundredth short).
+
+**Live on 8809**: plumber phrasing 3 of 3 stored (pattern, 8 to 18 ms),
+pizza phrasing 3 of 3 stored (pattern, 10 to 11 ms; a first burst hit
+the per-person turn budget's 429, `PERSON_TURN_BUDGET` capacity 5, and
+was re-run paced). Tool-calling bench at 10 repeats against 8788 after
+the change: every positive 10 of 10, false calls 0 of 50, unchanged
+(the patterns never reach that bench, which offers tools to a bare
+prompt).
+
+**Exit gate**: `bash scripts/check.sh` green on this diff.
+
+## Session B, lane 3 item 5: parallelize the screenshot matrix (2026-09-13)
+
+BACKLOG.md's own note (session E code review, 2026-09-06): the 4
+viewport x 2 theme x up to 17 route matrix ran fully sequentially
+against one Chromium process, and nothing about Playwright requires
+that - one browser process supports many concurrent contexts. Added a
+small `runPool()` helper (`scripts/screenshot.ts`): at most `poolSize`
+combos in flight at once, a new one starting the instant a slot frees
+rather than waiting for a whole batch, so an uneven combo (chat's own
+scripted interaction vs. a plain page visit) never leaves a slot idle.
+Each combo's own routes stay sequential inside their one context
+(unchanged); only the combos run concurrently against each other.
+Started at 4, per the note.
+
+One real correctness question the note didn't raise: `--chat-review`'s
+`visitRoute` clears and rebuilds the ONE shared conversation
+(`POST /api/conversations/clear`, gated on `chatReview && route.slug
+=== "chat"`) against this run's single seeded backend. Its own combo
+set is `A11Y_ONLY_COMBOS` (2 entries), which would both land in the
+pool and race each other's chat history if run concurrently - a false
+"pass" or a wrong screenshot, not a crash, so nothing would have caught
+it by accident. Every other mode (the full matrix, `--a11y-only`,
+`--settings-review`) only ever reads. Fixed by pinning pool size to 1
+whenever `chatReview` is set, keeping it 4 everywhere else - a one-line
+guard, not a redesign.
+
+**Wall-clock, full matrix (`bun run screenshots`, no flags), same
+machine, back to back**: sequential (pre-change) 1:38.28 (88.73s user,
+16.24s system, 106% CPU); pooled (pool size 4) 55.248s (89.50s user,
+17.23s system, 193% CPU). Roughly 1.8x, not the naive 4x a 4-wide pool
+might suggest - Playwright/Chromium's own per-process limits and the
+one shared backend's own request handling cap how much four contexts
+actually overlap; the CPU-time totals barely moved (88.73s to 89.50s
+user), confirming this is real concurrency, not less work.
+
+**Output**: NOT byte-identical, and here is why, checked directly
+rather than assumed. Running the OLD sequential script twice in a row
+(no code change at all) already produces 34 of 141 PNGs with different
+bytes - checked with a real back-to-back control run, same seeded
+household, same machine. The pooled run against that same baseline
+differs by a nearly identical 36 of 141. Every differing file is one of
+a small set of routes (chat, conversations, home, memory, people,
+search, settings-devices, settings-users, setup) whose content is
+genuinely time- or randomness-sensitive between two separate runs
+(relative timestamps, "last seen" text, avatar seed placement) or whose
+PNG encoding is not bit-for-bit deterministic run to run even with
+identical pixels (browser screenshot compression). Opened several of
+the differing before/after pairs side by side (`setup-desktop-light.png`
+among them) - visually identical. This is run-to-run variance inherent
+to the script already, not something the pool introduced; the control
+run proves it rather than asserting it.
+
+**`bun run a11y`**: unchanged, 34 pages checked (2 combos, both now
+running concurrently since a11y-only never writes), 0 violations, 0
+overflow, reduced motion and keyboard-trap checks passed - same result
+as every prior run this session. `--chat-review` re-verified separately
+(pool size 1 there): 2 pages checked, 0 violations, matching the
+lane 3 item 3 baseline exactly, confirming the chatReview guard works.
+
+Files: `scripts/screenshot.ts`, `docs/BACKLOG.md`.

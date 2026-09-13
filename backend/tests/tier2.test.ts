@@ -272,7 +272,7 @@ describe("runTurn()/runTurnStream() with native tool calling end to end (Fix E)"
       // as a tool) rather than winning Tier 0's own literal pattern
       // outright, or the scripted tool_calls reply above would never
       // actually be exercised.
-      () => runTurn(actor, "chat", "Friday is pizza night, please remember"),
+      () => runTurn(actor, "chat", "Friday is pizza night, can you remember that for me"),
     );
     expect(result.ok).toBe(true);
     if (!result.ok) return;
@@ -288,13 +288,14 @@ describe("runTurn()/runTurnStream() with native tool calling end to end (Fix E)"
     const { actor } = await owner();
     const result = await withScriptedToolCalls(
       () => [{ id: "call-1", name: "remember", args: "{}" }], // missing required `fact`
-      // Deliberately NOT starting with "remember" - remember's own
-      // `routing.patterns` ("remember *") would win Tier 0 outright on
-      // any utterance that does, bypassing Tier 2 (and this test)
-      // entirely. Shares enough vocabulary with the package's own
-      // routing.examples ("please remember our wifi password is on the
-      // fridge") for the stub's bag-of-words scorer to still offer it.
-      () => runTurn(actor, "chat", "our wifi password is on the fridge, please remember"),
+      // Deliberately NOT starting with "remember", and (since #77) not
+      // ENDING in "please remember" either - remember's own
+      // `routing.patterns` would win Tier 0 outright on either shape,
+      // bypassing Tier 2 (and this test) entirely. Shares enough
+      // vocabulary with the package's own routing.examples ("please
+      // remember our wifi password is on the fridge") for the stub's
+      // bag-of-words scorer to still offer it.
+      () => runTurn(actor, "chat", "our wifi password is on the fridge, please remember this"),
     );
     expect(result.ok).toBe(true);
     if (!result.ok) return;
@@ -318,7 +319,7 @@ describe("runTurn()/runTurnStream() with native tool calling end to end (Fix E)"
       // exact test for why (remember's own "remember *" pattern would
       // win Tier 0 outright otherwise, and this test would pass for the
       // wrong reason).
-      async () => drainStream(await runTurnStream(actor, "chat", "Friday is pizza night, please remember")),
+      async () => drainStream(await runTurnStream(actor, "chat", "Friday is pizza night, can you remember that for me")),
     );
     expect(result.ok).toBe(true);
     if (!result.ok) return;
@@ -421,7 +422,7 @@ describe("runTurn()/runTurnStream() with native tool calling end to end (Fix E)"
       // Same non-"remember"-prefixed shape as the tests above it - must
       // reach Tier 2 (offered as a tool, `remember` included) rather
       // than winning Tier 0's own literal pattern outright.
-      await runTurn(actor, "chat", "our wifi password is on the fridge, please remember");
+      await runTurn(actor, "chat", "our wifi password is on the fridge, please remember this");
     } finally {
       stub.stop();
     }
@@ -479,7 +480,7 @@ describe("runTurn()/runTurnStream() with native tool calling end to end (Fix E)"
       // resolveToolCalls() itself is the real backstop, not just the
       // fact that websearch is what gets offered.
       [{ id: "call-1", name: "remember", args: '{"fact":"the odyssey is rated PG-13"}' }],
-      () => runTurn(actor, "chat", "our wifi password is on the fridge, please remember"),
+      () => runTurn(actor, "chat", "our wifi password is on the fridge, please remember this"),
     );
     expect(result.ok).toBe(true);
     if (!result.ok) return;
@@ -497,7 +498,7 @@ describe("runTurn()/runTurnStream() with native tool calling end to end (Fix E)"
     const result = await withScriptedGuessThenForcedTool(
       "Your brother said it's playing at Xanadu Cinemas downtown.",
       [{ id: "call-1", name: "websearch", args: "{}" }], // missing required `expression` - resolveToolCalls() rejects it
-      () => runTurn(actor, "chat", "our wifi password is on the fridge, please remember"),
+      () => runTurn(actor, "chat", "our wifi password is on the fridge, please remember this"),
     );
     expect(result.ok).toBe(true);
     if (!result.ok) return;
@@ -516,7 +517,7 @@ describe("runTurn()/runTurnStream() with native tool calling end to end (Fix E)"
     const result = await withScriptedGuessThenForcedTool(
       "Noted. Your brother said it's playing at Xanadu Cinemas downtown.",
       [{ id: "call-1", name: "websearch", args: '{"expression":"the odyssey showtimes"}' }],
-      () => runTurn(actor, "chat", "our wifi password is on the fridge, please remember"),
+      () => runTurn(actor, "chat", "our wifi password is on the fridge, please remember this"),
     );
     expect(result.ok).toBe(true);
     if (!result.ok) return;
@@ -538,7 +539,7 @@ describe("runTurn()/runTurnStream() with native tool calling end to end (Fix E)"
     const { result, deltas } = await withScriptedGuessThenForcedTool(
       "Your brother said it's playing at Xanadu Cinemas downtown.",
       [{ id: "call-1", name: "remember", args: '{"fact":"Friday is pizza night"}' }],
-      async () => drainStream(await runTurnStream(actor, "chat", "our wifi password is on the fridge, please remember")),
+      async () => drainStream(await runTurnStream(actor, "chat", "our wifi password is on the fridge, please remember this")),
     );
     expect(result.ok).toBe(true);
     if (!result.ok) return;
