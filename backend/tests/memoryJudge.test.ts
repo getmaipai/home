@@ -586,14 +586,18 @@ describe("runJudgeBatch()", () => {
     const t1 = makeTurn(actor, "I hate cilantro", "Noted.");
     const t2 = makeTurn(actor, "I love hiking", "Nice.");
 
-    let processCount = 0;
-    const results = await withScriptedJudge(
+    // A person speaks while t1's extraction is in flight. judgeTurn()'s
+    // own per-fact idle re-check (kept on purpose, see its comment) then
+    // stops before writing t1's fact and leaves t1 unjudged, and the
+    // drain loop stops before ever reaching t2. Nothing is marked
+    // failed, nothing is written twice on the next tick.
+    let extractions = 0;
+    const interrupted = await withScriptedJudge(
       (_schemaName, request) => {
         const userText = request.messages[request.messages.length - 1]!.content;
         if (userText.includes("cilantro")) {
-          processCount++;
-          // Fires during first turn's judgment, interrupting the batch drain
-          if (processCount === 1) markTurnStarted();
+          extractions++;
+          if (extractions === 1) markTurnStarted();
           return { facts: [{ text: "Marlow dislikes cilantro", category: "preference", scope: "person", importance: 0.7 }] };
         }
         if (userText.includes("hiking")) return { facts: [{ text: "Marlow loves hiking", category: "preference", scope: "person", importance: 0.7 }] };
@@ -602,28 +606,31 @@ describe("runJudgeBatch()", () => {
       () => runJudgeBatch(),
     );
 
-    expect(results.processed).toBe(1); // only t1 judged before interrupt
-    expect(results.factsWritten).toBe(1); // cilantro fact was written
+    expect(interrupted.processed).toBe(1); // t1 was picked up, then interrupted
+    expect(interrupted.factsWritten).toBe(0); // and its fact was NOT written past the interrupt
     const t1Row = db.select().from(conversationTurns).where(eq(conversationTurns.id, t1.id)).get()!;
     const t2Row = db.select().from(conversationTurns).where(eq(conversationTurns.id, t2.id)).get()!;
-    expect(t1Row.judgeStatus).toBe("done"); // t1 was completed before interrupt
-    expect(t2Row.judgeStatus).toBeNull(); // t2 left pending, not failed
+    expect(t1Row.judgeStatus).toBeNull(); // pending again, never "failed"
+    expect(t1Row.judgeAttempts).toBe(0); // an interrupt is not an extraction failure
+    expect(t2Row.judgeStatus).toBeNull(); // never reached
 
     __resetTurnActivityForTests();
     const resumed = await withScriptedJudge(
-      (_schemaName, _request) => {
-        // Second batch processes the interrupted t2
-        return { facts: [{ text: "Marlow loves hiking", category: "preference", scope: "person", importance: 0.7 }] };
+      (_schemaName, request) => {
+        const userText = request.messages[request.messages.length - 1]!.content;
+        if (userText.includes("cilantro")) return { facts: [{ text: "Marlow dislikes cilantro", category: "preference", scope: "person", importance: 0.7 }] };
+        if (userText.includes("hiking")) return { facts: [{ text: "Marlow loves hiking", category: "preference", scope: "person", importance: 0.7 }] };
+        return { facts: [] };
       },
       () => runJudgeBatch(),
     );
 
-    expect(resumed.processed).toBe(1); // t2 now judged in second batch
-    expect(resumed.factsWritten).toBe(1); // hiking added
-    const t2FinalRow = db.select().from(conversationTurns).where(eq(conversationTurns.id, t2.id)).get()!;
-    expect(t2FinalRow.judgeStatus).toBe("done"); // now marked done
-    const allFacts = db.select().from(memoryRecords).where(and(inArray(memoryRecords.source, [t1.id, t2.id]), eq(memoryRecords.status, "active"))).all();
-    expect(allFacts.map((r) => r.text).sort()).toEqual(["Marlow dislikes cilantro", "Marlow loves hiking"]);
+    expect(resumed.processed).toBe(2); // the drain picks both up once the house is quiet
+    expect(resumed.factsWritten).toBe(2);
+    const texts = db.select().from(memoryRecords).all().map((r) => r.text).sort();
+    expect(texts).toEqual(["Marlow dislikes cilantro", "Marlow loves hiking"]); // once each, no duplicate from the retry
+    expect(db.select().from(conversationTurns).where(eq(conversationTurns.id, t1.id)).get()!.judgeStatus).toBe("done");
+    expect(db.select().from(conversationTurns).where(eq(conversationTurns.id, t2.id)).get()!.judgeStatus).toBe("done");
   });
 });
 

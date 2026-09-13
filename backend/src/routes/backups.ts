@@ -307,6 +307,7 @@ const PartialRestoreResultSchema = z.object({
   conversations: z.number(),
   conversationThreads: z.number(),
   settings: z.number(),
+  episodes: z.number(),
 });
 const partialRestoreRoute = createRoute({
   method: "post",

@@ -17,7 +17,8 @@ import {
   clearConversations,
   type ConversationOpResult,
 } from "@/lib/conversationHistory";
-import { recallEpisodes, formatEpisodesForPrompt } from "@/lib/recall";
+import { recallEpisodes } from "@/lib/episodes";
+import { embedQueryForRecall } from "@/lib/memory";
 import type { AppEnv } from "@/types";
 import type { Surface } from "@/lib/turnEngine";
 
@@ -91,6 +92,58 @@ conversationsRoutes.post("/clear", requireAuth, async (c) => {
   return c.json(clearConversations(actor));
 });
 
+// Registered before the "/:id" routes on purpose: Hono matches in
+// registration order, and "/search" would otherwise be read as an id.
+const SearchQuerySchema = z.object({
+  q: z.string().min(1).describe("Search query"),
+  limit: z.coerce.number().int().min(1).max(20).default(5).describe("Results to return"),
+});
+
+const EpisodeSchema = z.object({
+  turn_id: z.string().describe("The turn this was said in"),
+  conversation_id: z.string().nullable().describe("The conversation that turn belongs to"),
+  created_at: z.string().describe("When it was said (ISO 8601)"),
+  speaker: z.enum(["user", "assistant"]).describe("Who said it: you, or the assistant"),
+  text: z.string().describe("What was said, verbatim"),
+  paired_text: z.string().describe("The other side of the same turn"),
+  score: z.number().describe("Fused relevance rank score; higher is more relevant"),
+});
+
+const searchRoute = createRoute({
+  method: "get",
+  path: "/search",
+  tags: ["Conversations"],
+  summary: "Search episode history across conversations",
+  middleware: [requireAuth] as const,
+  request: { query: SearchQuerySchema },
+  responses: {
+    200: { content: { "application/json": { schema: z.array(EpisodeSchema) } }, description: "Recalled episodes ranked by relevance." },
+    ...errorResponses({ 401: "Sign in first" }),
+  },
+});
+
+conversationsRoutes.openapi(searchRoute, async (c) => {
+  const actor = c.get("person");
+  const { q, limit } = c.req.valid("query");
+  // The turn engine passes its own utterance vector; a search request
+  // has none yet, so it embeds once here (undefined when the embed
+  // engine is down, in which case lexical recall alone answers).
+  const vector = await embedQueryForRecall(q);
+  const results = recallEpisodes(actor, q, vector, { limit });
+  return c.json(
+    results.map((m) => ({
+      turn_id: m.episode.turnId,
+      conversation_id: m.episode.conversationId ?? null,
+      created_at: m.episode.createdAt,
+      speaker: m.episode.speaker,
+      text: m.episode.text,
+      paired_text: m.pairedText,
+      score: m.score,
+    })),
+    200,
+  );
+});
+
 conversationsRoutes.get("/:id", requireAuth, async (c) => {
   const actor = c.get("person");
   const result = getConversation(actor, c.req.param("id"));
@@ -121,37 +174,6 @@ conversationsRoutes.delete("/:id", requireAuth, async (c) => {
   return c.json({ ok: true });
 });
 
-const SearchQuerySchema = z.object({
-  q: z.string().min(1).describe("Search query"),
-  limit: z.coerce.number().int().min(1).max(20).default(5).describe("Results to return"),
-});
-
-const EpisodeSchema = z.object({
-  text: z.string().describe("Episode text (truncated to 200 chars)"),
-  speaker: z.enum(["user", "assistant"]).describe("Who said it"),
-  timeLabel: z.string().describe("Time label (e.g., 'today', '3 days ago')"),
-});
-
-const searchRoute = createRoute({
-  method: "get",
-  path: "/search",
-  tags: ["Conversations"],
-  summary: "Search episode history across conversations",
-  middleware: [requireAuth] as const,
-  request: { query: SearchQuerySchema },
-  responses: {
-    200: { content: { "application/json": { schema: z.array(EpisodeSchema) } }, description: "Recalled episodes ranked by relevance." },
-    ...errorResponses({ 401: "Sign in first" }),
-  },
-});
-
-conversationsRoutes.openapi(searchRoute, async (c) => {
-  const actor = c.get("person");
-  const { q, limit } = c.req.valid("query");
-  const results = await recallEpisodes(actor, q, limit);
-  const formatted = formatEpisodesForPrompt(results);
-  return c.json(formatted, 200);
-});
 
 const resumeRoute = createRoute({
   method: "post",

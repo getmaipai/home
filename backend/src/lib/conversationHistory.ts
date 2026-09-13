@@ -39,7 +39,6 @@ import { canAccessPerson } from "@/lib/access";
 import { speakerAgeBand } from "@/lib/ageBand";
 import { getHouseholdSettingValue, getPersonSettingValue } from "@/lib/settings";
 import { complete, type LlmMessage } from "@/lib/llm";
-import { getEngineStatus } from "@/lib/llmSupervisor";
 import { completeBackground, getBackgroundBackendKind } from "@/lib/backgroundSupervisor";
 import { loadManifestOnly } from "@/lib/plugins";
 import { remember } from "@/lib/memory";
@@ -766,7 +765,11 @@ export async function maybeRefreshConversationSummary(conversationId: string): P
     : -1;
   const newSinceLastSummary = olderThanWindow.slice(throughIndex + 1);
   if (newSinceLastSummary.length < SUMMARY_REFRESH_THRESHOLD_TURNS) return;
-  if (getEngineStatus().kind === "stub") return;
+  // The summary runs on the background engine (MEM-02), so the CHAT
+  // engine's kind is irrelevant here; an unresolved background backend
+  // is resolved by the call itself, and the post-call check below
+  // catches the "resolved to the stub just now" case.
+  if (getBackgroundBackendKind() === "stub") return;
 
   let transcript = newSinceLastSummary.map((r) => `User: ${r.userText}\nReply: ${r.replyText}`).join("\n\n");
   if (transcript.length > MAX_SUMMARY_INPUT_CHARS) {
@@ -869,7 +872,7 @@ const MAX_SUMMARY_INPUT_CHARS = 8_000;
  * already knows it's on the stub, the common case on every retention
  * tick after the first) and AFTER each call (the only way to know for a
  * process's very first completion ever, since getChatClient() resolves
- * lazily - `getEngineStatus()` only reports "none" beforehand, and
+ * lazily - `getBackgroundBackendKind()` only reports "none" beforehand, and
  * complete() itself is what decides real-vs-stub). A real model that's
  * merely slow, or a completion that fails for any other reason, is
  * treated the same way: logged, not thrown, since runRetention()'s own
@@ -890,7 +893,11 @@ export async function summarizeBeforeDelete(rows: ConversationTurnRow[]): Promis
     byPerson.get(row.personId)!.push(row);
   }
   if (byPerson.size === 0) return;
-  if (getEngineStatus().kind === "stub") return;
+  // The summary runs on the background engine (MEM-02), so the CHAT
+  // engine's kind is irrelevant here; an unresolved background backend
+  // is resolved by the call itself, and the post-call check below
+  // catches the "resolved to the stub just now" case.
+  if (getBackgroundBackendKind() === "stub") return;
 
   for (const [personId, personRows] of byPerson) {
     // isNull(deletedAt), not a bare id match: a code review (2026-09-04)

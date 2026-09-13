@@ -20,6 +20,7 @@
 // MAIPAI_LLAMA_SERVER_BIN + MAIPAI_CHAT_MODEL_PATH to point at the judge
 // model). Record the precision/recall/seconds output; keep 1.7B if recall
 // is at least 85% of the 8B baseline and precision within 5 points.
+import "./memory/guard";
 import { eq } from "drizzle-orm";
 import { db, sqlite } from "@/db";
 import { people, conversationTurns } from "@/db/schema";
@@ -32,6 +33,7 @@ import { getEmbedBackendKind, __resetEmbedSupervisorForTests } from "@/lib/embed
 import { getBackgroundBackendKind, probeBackgroundEngine, __resetBackgroundSupervisorForTests } from "@/lib/backgroundSupervisor";
 import type { PersonRow } from "@/types";
 import type { TurnValue } from "@/wire";
+import { deleteEpisodesForTurns } from "@/lib/episodes";
 
 const testPersonId = newPersonId();
 const createdTurnIds: string[] = [];
@@ -60,6 +62,7 @@ function cleanup(): void {
     sqlite.query("DELETE FROM memory_embeddings WHERE memory_id IN (SELECT id FROM memory_records WHERE source = ?)").run(id);
     sqlite.query("DELETE FROM pending_embeddings WHERE memory_id IN (SELECT id FROM memory_records WHERE source = ?)").run(id);
     sqlite.query("DELETE FROM memory_records WHERE source = ?").run(id);
+    deleteEpisodesForTurns([id]); // MEM-03: the turn's verbatim episodes carry a FK to it
     sqlite.query("DELETE FROM conversation_turns WHERE id = ?").run(id);
   }
   sqlite.query("DELETE FROM notification_deliveries WHERE recipient_id = ?").run(testPersonId);

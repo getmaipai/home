@@ -1708,6 +1708,9 @@
                         "conversations": {
                           "type": "number"
                         },
+                        "episodes": {
+                          "type": "number"
+                        },
                         "conversationThreads": {
                           "type": "number"
                         },
@@ -1739,6 +1742,7 @@
                       "required": [
                         "memories",
                         "conversations",
+                        "episodes",
                         "conversationThreads",
                         "settings",
                         "clonedVoices",
@@ -3134,9 +3138,18 @@
                   "items": {
                     "type": "object",
                     "properties": {
-                      "text": {
+                      "turn_id": {
                         "type": "string",
-                        "description": "Episode text (truncated to 200 chars)"
+                        "description": "The turn this was said in"
+                      },
+                      "conversation_id": {
+                        "type": "string",
+                        "nullable": true,
+                        "description": "The conversation that turn belongs to"
+                      },
+                      "created_at": {
+                        "type": "string",
+                        "description": "When it was said (ISO 8601)"
                       },
                       "speaker": {
                         "type": "string",
@@ -3144,17 +3157,29 @@
                           "user",
                           "assistant"
                         ],
-                        "description": "Who said it"
+                        "description": "Who said it: you, or the assistant"
                       },
-                      "timeLabel": {
+                      "text": {
                         "type": "string",
-                        "description": "Time label (e.g., 'today', '3 days ago')"
+                        "description": "What was said, verbatim"
+                      },
+                      "paired_text": {
+                        "type": "string",
+                        "description": "The other side of the same turn"
+                      },
+                      "score": {
+                        "type": "number",
+                        "description": "Fused relevance rank score; higher is more relevant"
                       }
                     },
                     "required": [
-                      "text",
+                      "turn_id",
+                      "conversation_id",
+                      "created_at",
                       "speaker",
-                      "timeLabel"
+                      "text",
+                      "paired_text",
+                      "score"
                     ]
                   }
                 }
@@ -3942,13 +3967,17 @@
                     },
                     "settings": {
                       "type": "number"
+                    },
+                    "episodes": {
+                      "type": "number"
                     }
                   },
                   "required": [
                     "memories",
                     "conversations",
                     "conversationThreads",
-                    "settings"
+                    "settings",
+                    "episodes"
                   ]
                 }
               }

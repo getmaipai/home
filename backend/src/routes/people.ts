@@ -389,6 +389,7 @@ const deleteRoute = createRoute({
             erased: z.object({
               memories: z.number(),
               conversations: z.number(),
+              episodes: z.number(),
               conversationThreads: z.number(),
               settings: z.number(),
               clonedVoices: z.number(),

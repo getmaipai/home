@@ -19,6 +19,7 @@
 // refine).
 //
 // Usage: bun run scripts/bench/memory/run.ts
+import "./guard";
 import { eq } from "drizzle-orm";
 import { db, sqlite } from "@/db";
 import { people } from "@/db/schema";
@@ -28,7 +29,10 @@ import { remember, supersede } from "@/lib/memory";
 import { runTurn } from "@/lib/turnEngine";
 import { getEngineStatus, stopChatBackend } from "@/lib/llmSupervisor";
 import { __resetEmbedSupervisorForTests } from "@/lib/embedSupervisor";
-import { KNOWLEDGE_UPDATE_CASES, ABSTENTION_CASES, TEMPORAL_CASES, MULTI_SESSION_CASES, type KnowledgeUpdateSeed } from "./fixture";
+import { KNOWLEDGE_UPDATE_CASES, ABSTENTION_CASES, TEMPORAL_CASES, MULTI_SESSION_CASES, EPISODE_CASES, type KnowledgeUpdateSeed } from "./fixture";
+import { logTurn, resolveOrCreateConversation } from "@/lib/conversationHistory";
+import { recallEpisodes, embedPendingEpisodes, deleteEpisodesForPerson } from "@/lib/episodes";
+import { embedQueryForRecall } from "@/lib/memory";
 import type { PersonRow } from "@/types";
 
 const testPersonId = newPersonId();
@@ -53,6 +57,7 @@ function seedDated(actor: PersonRow, s: KnowledgeUpdateSeed, source: string): st
 }
 
 function cleanup(): void {
+  deleteEpisodesForPerson(testPersonId);
   sqlite.query("DELETE FROM conversation_turns WHERE person_id = ?").run(testPersonId);
   sqlite.query("DELETE FROM conversations WHERE person_id = ?").run(testPersonId);
   sqlite.query("DELETE FROM memory_embeddings WHERE memory_id IN (SELECT id FROM memory_records WHERE person IS NULL)").run();
@@ -153,6 +158,33 @@ async function main(): Promise<void> {
     const reply = turnResult.ok ? turnResult.value.reply.text : "";
     const pass = reply.toLowerCase().includes(c.mustContain.toLowerCase());
     results.push({ category: "multi-session", id: c.id, pass, question: c.question, reply });
+  }
+
+  // MEM-04: episodes. Each case's turns go into their own closed
+  // conversation, backdated; the question is asked from outside it
+  // through the same recall the turn engine will use (JOIN-01), with
+  // the query embedded once the way the turn engine embeds its
+  // utterance. Graded by turn id, never by reply wording.
+  const SAFE = { flagged: false, categories: [], action: "allow" as const, notify_parent: false, matched_signals: [] };
+  for (const c of EPISODE_CASES) {
+    for (const seed of c.seeds) {
+      const conv = resolveOrCreateConversation(actor as PersonRow, "chat");
+      if (!conv.ok) throw new Error(conv.error);
+      logTurn(actor as PersonRow, "chat", seed.user, {
+        reply: { text: seed.reply },
+        source: "model",
+        safety: { ...SAFE, checked_at: backdatedIso(seed.ageDays) },
+        conversation_id: conv.value.id,
+        turn_id: seed.turnId,
+      });
+      sqlite.query("UPDATE conversations SET status = 'closed' WHERE id = ?").run(conv.value.id);
+    }
+    await embedPendingEpisodes();
+    const vector = await embedQueryForRecall(c.question);
+    const matches = recallEpisodes(actor as PersonRow, c.question, vector, { now });
+    const top = matches[0]?.episode.turnId ?? null;
+    const pass = c.expectTurnId === null ? matches.length === 0 : top === c.expectTurnId;
+    results.push({ category: "episodes", id: c.id, pass, question: c.question, reply: top ? `top=${top}` : "(nothing)" });
   }
 
   console.log(`\nRunning ${results.length} LongMemEval-shaped probes...\n`);

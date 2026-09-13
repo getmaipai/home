@@ -1258,7 +1258,7 @@ Track B: MEM-01, MEM-02, MEM-03, MEM-04, MEM-05. Then JOIN-01, JOIN-02.
 
 <a id="mem-01"></a>
 
-- [ ] **MEM-01: A background engine on its own process, shaped like the embed role** (M)
+- [x] **MEM-01: A background engine on its own process, shaped like the embed role** (M)
 
     Depends on: Step 0. Files: new `backend/src/lib/backgroundAssets.ts`,
     new `backend/src/lib/backgroundSupervisor.ts`, `backend/src/routes/host.ts`
@@ -1320,7 +1320,7 @@ Track B: MEM-01, MEM-02, MEM-03, MEM-04, MEM-05. Then JOIN-01, JOIN-02.
 
 <a id="mem-02"></a>
 
-- [ ] **MEM-02: Judge and summaries on the background engine, a judge that drains, and dedupe that asks the model only when unsure** (M)
+- [x] **MEM-02: Judge and summaries on the background engine, a judge that drains, and dedupe that asks the model only when unsure** (M)
 
     Depends on: MEM-01. Files: `backend/src/lib/memoryJudge.ts`,
     `conversationHistory.ts`, `scheduler.ts`, and `backend/tests/memoryJudge.test.ts`,
@@ -1375,7 +1375,7 @@ Track B: MEM-01, MEM-02, MEM-03, MEM-04, MEM-05. Then JOIN-01, JOIN-02.
 
 <a id="mem-03"></a>
 
-- [ ] **MEM-03: Store every turn verbatim as searchable episodes** (M)
+- [x] **MEM-03: Store every turn verbatim as searchable episodes** (M)
 
     Depends on: MEM-01. Files: `backend/src/db/schema.ts`,
     `schema-version.ts`, a generated file under `migrations/`, new
@@ -1431,7 +1431,7 @@ Track B: MEM-01, MEM-02, MEM-03, MEM-04, MEM-05. Then JOIN-01, JOIN-02.
 
 <a id="mem-04"></a>
 
-- [ ] **MEM-04: Hybrid, time-aware recall over episodes, and a search route** (M)
+- [x] **MEM-04: Hybrid, time-aware recall over episodes, and a search route** (M)
 
     Depends on: MEM-03. Files: `backend/src/lib/episodes.ts`,
     `backend/src/routes/conversations.ts`, `backend/tests/episodes.test.ts`,
@@ -1490,6 +1490,12 @@ Track B: MEM-01, MEM-02, MEM-03, MEM-04, MEM-05. Then JOIN-01, JOIN-02.
 <a id="mem-05"></a>
 
 - [ ] **MEM-05: Prove the small judge, or fall back to the 4B pin** (S)
+
+    Status (2026-09-12, measured, left open): on the two-case judge eval
+    the 8B passes 1 of 2, the 1.7B pin 0 of 2, the 4B fallback 0 of 2 at
+    four times the time and memory; the corpus is too small to apply the
+    85-percent rule, so the 1.7B stays the default and the verdict waits
+    for CHAT-23's corpus. Table in the Track B section of dev.md.
 
     Depends on: MEM-02. Files: `backend/scripts/bench/judge-eval.ts`
     (read the background URL instead of the chat URL, since the judge

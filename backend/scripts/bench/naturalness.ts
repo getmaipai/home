@@ -32,6 +32,7 @@ import { runTurn } from "@/lib/turnEngine";
 import { getEngineStatus, stopChatBackend } from "@/lib/llmSupervisor";
 import { __resetEmbedSupervisorForTests } from "@/lib/embedSupervisor";
 import type { PersonRow } from "@/types";
+import { deleteEpisodesForPerson } from "@/lib/episodes";
 
 interface CorpusRow {
   id: string;
@@ -49,6 +50,7 @@ const corpus: CorpusRow[] = JSON.parse(readFileSync(join(import.meta.dir, "..", 
 const testPersonId = newPersonId();
 
 function cleanup(): void {
+  deleteEpisodesForPerson(testPersonId); // MEM-03: episodes carry a FK to the turns
   sqlite.query("DELETE FROM conversation_turns WHERE person_id = ?").run(testPersonId);
   sqlite.query("DELETE FROM conversations WHERE person_id = ?").run(testPersonId);
   sqlite.query("DELETE FROM people WHERE id = ?").run(testPersonId);

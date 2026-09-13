@@ -36,6 +36,8 @@ function health(overrides: Partial<HealthStatus> = {}): HealthStatus {
     engines: {
       chat: { kind: "selection", pid: 4242, alive: true },
       embed: { kind: "spawned", pid: 4243, alive: true },
+
+      background: { kind: "none", pid: null, alive: null },
       voice: { kind: "spawned", pid: 4244, alive: true },
     },
     uptimeSeconds: 3_700,
@@ -104,6 +106,8 @@ describe("HealthSection", () => {
         engines: {
           chat: { kind: "restarting", pid: null, alive: null },
           embed: { kind: "failed", pid: null, alive: null },
+
+          background: { kind: "none", pid: null, alive: null },
           voice: { kind: "stub", pid: null, alive: true },
         },
       }),

@@ -1,3 +1,4 @@
+import { deleteEpisodesForPerson } from "@/lib/episodes";
 import { describe, expect, test, beforeEach } from "bun:test";
 import { existsSync, readdirSync, rmSync } from "node:fs";
 import { join } from "node:path";
@@ -66,7 +67,7 @@ describe("restorePersonFromBackup()", () => {
     // Lose it all live: this is the scenario the feature exists for -
     // an accidental forget()/settings reset, not necessarily a delete.
     sqlite.query("DELETE FROM memory_records WHERE person = ?").run(person.id);
-    sqlite.query("DELETE FROM episodes WHERE person_id = ?").run(person.id); // episodes deleted with turns
+    deleteEpisodesForPerson(person.id);
     sqlite.query("DELETE FROM conversation_turns WHERE person_id = ?").run(person.id);
     sqlite.query("DELETE FROM conversations WHERE person_id = ?").run(person.id);
     sqlite.query("DELETE FROM settings_values WHERE scope = ?").run(`person:${person.id}`);
@@ -76,6 +77,9 @@ describe("restorePersonFromBackup()", () => {
     expect(result.conversations).toBe(1);
     expect(result.conversationThreads).toBe(1);
     expect(result.settings).toBe(1);
+    // MEM-03: the turn's two verbatim episodes come back with it.
+    expect(result.episodes).toBe(2);
+    expect((sqlite.query("SELECT count(*) AS n FROM episodes WHERE person_id = ?").get(person.id) as { n: number }).n).toBe(2);
 
     const memory = sqlite.query("SELECT text, embedding_space FROM memory_records WHERE person = ?").get(person.id) as
       | { text: string; embedding_space: string | null }
@@ -105,9 +109,9 @@ describe("restorePersonFromBackup()", () => {
 
     const backup = runBackup();
     sqlite.query("DELETE FROM memory_records WHERE person = ?").run(a.id);
-    sqlite.query("DELETE FROM episodes WHERE person_id = ?").run(a.id);
+    deleteEpisodesForPerson(a.id);
     sqlite.query("DELETE FROM memory_records WHERE person = ?").run(b.id);
-    sqlite.query("DELETE FROM episodes WHERE person_id = ?").run(b.id);
+    deleteEpisodesForPerson(b.id);
 
     restorePersonFromBackup(backup.filename, a.id);
     expect((sqlite.query("SELECT COUNT(*) AS n FROM memory_records WHERE person = ?").get(a.id) as { n: number }).n).toBe(1);

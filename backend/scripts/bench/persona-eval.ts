@@ -48,6 +48,7 @@ import { getEngineStatus, stopChatBackend } from "@/lib/llmSupervisor";
 import { __resetEmbedSupervisorForTests } from "@/lib/embedSupervisor";
 import { judgePersonaConsistency, type JudgedExchange } from "@/lib/personaJudge";
 import type { PersonRow } from "@/types";
+import { deleteEpisodesForPerson } from "@/lib/episodes";
 
 // Step 4 (session-c-brain-and-voice.md): "plus a model-judged version on
 // demand" - opt-in, not the default, since it doubles the model calls
@@ -89,6 +90,7 @@ function cleanup(): void {
   // delete itself fails under foreign_keys=ON (the same ordering
   // forgetTransaction() in lib/memory.ts already has to respect for its
   // own FK-carrying child tables).
+  deleteEpisodesForPerson(testPersonId); // MEM-03: episodes carry a FK to the turns
   sqlite.query("DELETE FROM conversation_turns WHERE person_id = ?").run(testPersonId);
   sqlite.query("DELETE FROM conversations WHERE person_id = ?").run(testPersonId);
   sqlite.query("DELETE FROM settings_values WHERE scope = ?").run(`person:${testPersonId}`);

@@ -45,6 +45,7 @@ import {
 import { clonedVoicesDir } from "@/lib/paths";
 import { nextHlc } from "@/lib/hlc";
 import { TOMBSTONE_TEXT } from "@/lib/memory";
+import { deleteEpisodesForPerson } from "@/lib/episodes";
 import { invalidateScopeCache } from "@/lib/settings";
 import { deleteReceivedBackupsForDevice } from "@/lib/receivedBackups";
 import { ROLE_LADDER, invalidateSessionCacheForPerson, type Role } from "@/middleware/auth";
@@ -220,6 +221,8 @@ export function hasSecret(personId: string): boolean {
 export interface ErasureCounts {
   memories: number;
   conversations: number;
+  /** MEM-03: the verbatim episode rows (two per turn) deleted with the turns. */
+  episodes: number;
   /** Session A step 3: conversation THREADS (the `conversations` table),
    * distinct from `conversations` above (conversation_turns, the
    * existing field name here since before threads existed - kept as-is
@@ -300,6 +303,12 @@ export function erasePersonData(personId: string): ErasureCounts {
       .run(TOMBSTONE_TEXT, tombstonedAt, nextHlc(), row.id);
   }
   const memories = memoryIds.length;
+  // MEM-03: a person's verbatim episodes carry a real FK to their turns
+  // (and their embeddings to the episodes), so they go first, through the
+  // same helper forget() uses. Really gone, not tombstoned: the turns
+  // they quote are deleted outright right below.
+  const episodeCount = (sqlite.query("SELECT count(*) AS n FROM episodes WHERE person_id = ?").get(personId) as { n: number }).n;
+  deleteEpisodesForPerson(personId);
   const conversations = sqlite.query("DELETE FROM conversation_turns WHERE person_id = ?").run(personId).changes;
   // The thread record itself (step 3's `conversations` table), not just
   // its turns: left alone, this table's own person_id column would keep
@@ -369,6 +378,7 @@ export function erasePersonData(personId: string): ErasureCounts {
 
   return {
     memories,
+    episodes: episodeCount,
     conversations,
     conversationThreads,
     settings,

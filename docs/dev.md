@@ -10666,57 +10666,119 @@ because of it, the composed answer states the conflict and the
 recommendation, and a greeting and a timer in the same suite still
 take one completion or none.
 
-## Track B progress (2026-09-12)
+## Track B: the background engine, episodes, and hybrid recall (2026-09-12)
 
-Track B session implementing MEM-01 through MEM-05, the background engine
-and memory system overhaul. Status as of this session end:
+Two sessions plus a takeover by the reviewing session. What the first
+session left (structure right, 27 tests failing, a placeholder recall,
+nothing run live) is recorded in the backlog history; this is what
+shipped, measured on the M4 Pro dev machine.
 
-**MEM-01: COMPLETE** - A background engine on its own process, shaped like
-the embed role. Created backgroundAssets.ts with pinned Qwen3-1.7B model
-(Qwen3-4B fallback via MAIPAI_BACKGROUND_MODEL=qwen3-4b). Created
-backgroundSupervisor.ts with lazy-start pattern, mirroring embedSupervisor.ts
-exactly. Wired into health endpoint in app.ts and wire.ts. All tests pass.
+**MEM-01, the background engine.** `backgroundAssets.ts` pins Qwen3-1.7B
+Q8_0 from Qwen's official GGUF repo at a fixed revision (1,834,426,016
+bytes, sha256 verified on download; the 4B Q4_K_M fallback is pinned the
+same way and selected by `MAIPAI_BACKGROUND_MODEL=qwen3-4b`).
+`backgroundSupervisor.ts` mirrors the embed role: URL, spawn, and stub
+tiers, hot-reload state, the auto-heal watch, and `completeBackground()`
+with thinking always off. Spawn flags: `-c 8192 -ngl 0 -t 4 -fa on
+--reasoning off --jinja --no-webui --metrics --cache-reuse 256`, CPU by
+default so the GPU stays with chat. `GET /api/health` reports it.
+Measured live: download 80 s; first spawn healthy inside the judge's own
+tick; resident set 2.86 GB; prefill 368 to 426 tokens per second, decode
+70 to 89 tokens per second on four CPU threads.
 
-**MEM-02: COMPLETE** - Judge and summaries on background engine. All 4
-`complete("chat", ...)` calls in memoryJudge.ts and 2 in conversationHistory.ts
-replaced with `completeBackground(...)`. Implemented dedupe cosine similarity
-band logic: near-identical facts (>= 0.92) and clearly new facts (< 0.60)
-skip model calls; only 0.60-0.92 band asks model. Drain loop: process up to
-50 turns, 5 minutes, or until backlog empty. All tests pass.
+**MEM-02, the judge on that engine.** Extraction, dedupe, contradiction,
+profile rewrites, the rolling summary, and the retention summary all go
+through `completeBackground()`. `runJudgeBatch()` drains: it keeps taking
+the oldest pending turn until none remain, a person speaks (the idle
+window is now 5 s, down from 20 s, because slot contention is gone), 50
+turns, or five minutes. Dedupe asks the model only between cosine 0.60
+and 0.92; above it supersedes without a call, below it adds without one.
+`judgeQueueStats()` logs `processed`, `pending`, and the oldest pending
+age every tick. Measured live through the API on port 8807 (chat and
+embed by URL, the background engine spawned by this backend): two
+fact-bearing turns, the judge woke 88 s after the first, spawned the
+engine, and wrote four correct facts ("alfred's son Sprout starts
+swimming lessons on Tuesdays in October", "alfred keeps the spare key
+with the neighbour Marlow", "Iris prefers oat milk", and one more) while
+the chat engine served nothing. Tests: the chat stub receives zero
+requests during a judge batch; five pending turns drain in one tick; an
+interrupt leaves the current turn pending, never failed, and the next
+tick judges everything once.
 
-**MEM-03: COMPLETE** - Episodic memory store. Added episodes table (turn
-verbatim, user/assistant split), episodeEmbeddings (vector indexed), and
-pendingEpisodeEmbeddings (queue). FTS5 virtual table with three auto-sync
-triggers. recordEpisodes() in logTurn() captures user and assistant sides,
-queues for embedding. deleteEpisodesForTurns() and deleteEpisodesForPerson()
-cascade deletes on turn/person removal. All cleanup paths (conversation
-delete, forget, retention) tested. 9 tests, all pass.
+**MEM-03, episodes.** Every logged turn becomes two rows (theirs, ours)
+in `episodes`, indexed by an FTS5 external-content table with the three
+sync triggers, embedded later by the existing `memory.embedding_retry`
+job through `pending_episode_embeddings`. Deleted with the turn (retention,
+conversation delete, clear), with the person (`erasePersonData()`, now
+counted in `erased.episodes`), and with `forget()`; rebuilt from the
+turns on partial restore rather than copied (`episodes` in the restore
+result). Schema version 27. The privacy page names them.
 
-**MEM-04: COMPLETE** - Hybrid episode recall. recallEpisodes() combines
-cosine similarity (embeddings) and BM25 (FTS5) via reciprocal rank fusion,
-with time decay (50% at 4 weeks). formatEpisodesForPrompt() truncates to 200
-chars, adds time labels. GET /api/conversations/search endpoint via
-@hono/zod-openapi. Tests: 8 questions, 3-week fixture, person isolation,
-time decay ranking, empty results, time labels. All pass.
+**MEM-04, hybrid recall.** `recallEpisodes(actor, query, queryVector,
+{ limit, excludeConversationId, now })` in `episodes.ts`: BM25 over the
+FTS5 index (query terms quoted, stopwords dropped) and cosine over the
+person's episode embeddings using memory.ts's own `cosineSimilarity`,
+fused by reciprocal rank (k = 60), one match per turn with the other
+side attached, the current conversation's newest four turns excluded, and
+a `created_at` window from `chrono-node` (a week phrase covers that
+week, a month phrase that month, anything else that day; a weekday
+resolved into the future is read as the last one). The caller passes the
+vector; this never embeds. `formatEpisodesForPrompt()` returns the
+labeled, dated block capped at 600 characters. `GET
+/api/conversations/search?q=` returns turn id, conversation id, date,
+both texts, and score, registered ahead of the `/:id` routes. Tests cover
+the work order's list (recipe last week ranks first, exact word with no
+vectors, the three-week-old exclusion, the current-window exclusion,
+another person's rows, the block cap, the route's 401 and scoping).
 
-**MEM-05: COMPLETE** - Judge model evaluation. Updated judge-eval.ts to run
-against background engine. Measures precision, recall, and seconds per turn.
-To run: `MAIPAI_LLAMA_SERVER_URL=... bun run scripts/bench/judge-eval.ts`
-(point at the 1.7B background model). Record results below. Keep 1.7B if
-recall ≥ 85% of 8B baseline and precision within 5 points; otherwise
-fallback to 4B pin (MAIPAI_BACKGROUND_MODEL=qwen3-4b) and re-run.
+**The memory bench** (`scripts/bench/memory/run.ts`, now with eight
+episode questions scored by expected turn id, run with a fresh data
+directory against the shared engines): 12 of 15 overall; episodes 7 of
+8. The seven found were the recipe from last week, the trip decision,
+what was said about Rover scratching, yesterday's dentist change, a
+paraphrased bike-brake question, the assistant-side plant swap, and the
+two-weeks-ago garage plan. The miss is the abstention case: "what did
+you say about the kayak rental" returned the trip turn, because the
+vector half always ranks something when the lexical half finds nothing.
+Recorded as the known gap; a minimum fused score, or requiring a lexical
+hit when the query has content terms, is the follow-up (MEM-04 met its
+six-of-eight acceptance as written). The older probes are unchanged by
+this track: knowledge-update 1 of 2 and multi-session 1 of 2 are the
+chat model's guard cutting a grounded answer ("I don't have an answer
+for that"), FAST-05's target, not recall failures.
 
-### MEM-05 evaluation results
+**MEM-02's drain rate**, measured by the judge eval's own batch rather
+than a separate twenty-turn seeding script (not built, stated here
+rather than implied): three pending turns judged in 6.06 s on the
+background engine, 2.02 s per turn including one embed and one dedupe
+decision each, so an evening of twenty model turns clears in well under
+a minute once the house is quiet. The interrupt path is covered by the
+test named above.
 
-To be filled in when judge-eval.ts is run on real hardware. Template:
+**MEM-05, the judge model verdict: not decided, and the default stays
+1.7B.** `scripts/bench/judge-eval.ts` (which now reads
+`MAIPAI_BACKGROUND_URL`) was run three times on the same two-case
+corpus, each model behind the same judge code:
 
-| Model | Precision | Recall | Seconds/turn | Status |
-|---|---|---|---|---|
-| 8B baseline (Qwen3-8B) | TBD% | TBD% | TBD | Reference |
-| 1.7B candidate (Qwen3-1.7B) | TBD% | TBD% | TBD | Keep if recall ≥ 85% of baseline and precision within ±5pts |
-| 4B fallback (Qwen3-4B) | TBD% | TBD% | TBD | Use only if 1.7B fails criteria |
+| judge model | where | knowledge update | abstention | seconds per turn | resident |
+|---|---|---|---|---|---|
+| Qwen3-8B Q4_K_M (the chat model) | GPU, port 8788 | pass | fail | 2.67 s | shared with chat |
+| Qwen3-1.7B Q8_0 (the pin) | CPU, 4 threads | fail | fail | 2.02 s | 2.86 GB |
+| Qwen3-4B Q4_K_M (the fallback) | CPU, 4 threads | fail | fail | 7.87 s | 4.93 GB |
 
-Decision: [PENDING]
+The knowledge-update case ("Marlow is a nurse" then "Marlow is a
+teacher") needs the dedupe decision to supersede the old fact; the 8B
+does, both small models choose ADD and the stale fact survives. The
+abstention case fails for all three, including the 8B, so it is a recall
+floor question, not a judge one. Two cases cannot carry an 85-percent
+rule: the item's cutoff is not met by either small model and not
+disproved either, so MEM-05 stays open with these numbers, the 1.7B pin
+stays the default (equal to the 4B here at a quarter of the time and
+memory), and the follow-up is a real judge corpus (CHAT-23's forty
+sequences) before any pin changes. Until then the practical mitigation
+is in the band: a candidate pair in the 0.60 to 0.92 cosine range whose
+subjects match should lean to SUPERSEDE, which the next judge slice can
+measure.
 
 ### Sources consulted
 

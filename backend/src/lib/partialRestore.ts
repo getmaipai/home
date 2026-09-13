@@ -22,7 +22,9 @@ import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { Database } from "bun:sqlite";
 import { db, sqlite } from "@/db";
-import { pendingEmbeddings } from "@/db/schema";
+import { pendingEmbeddings, conversationTurns } from "@/db/schema";
+import { eq } from "drizzle-orm";
+import { recordEpisodes } from "@/lib/episodes";
 import { backupDir } from "@/lib/paths";
 import { decryptFile } from "@/lib/backupCrypto";
 import { CURRENT_SCHEMA_VERSION } from "@/db/schema-version";
@@ -41,6 +43,8 @@ export interface PartialRestoreResult {
   conversations: number;
   conversationThreads: number;
   settings: number;
+  /** MEM-03: verbatim episode rows rebuilt from the restored turns. */
+  episodes: number;
 }
 
 /** Same posture as restoreStaging.ts's verifyRestorable(), narrowed to
@@ -152,9 +156,25 @@ export function restorePersonFromBackup(filename: string, personId: string): Par
 
         const conversationThreads = copyPersonScopedRows("conversations", "person_id = ?", personId);
         const conversations = copyPersonScopedRows("conversation_turns", "person_id = ?", personId);
+        // MEM-03: episodes are derived from turns (two verbatim rows per
+        // turn, embedded later by the retry job), so they are rebuilt from
+        // the restored turns rather than copied, the same "re-queue, never
+        // restore a vector" stance the memory rows above take.
+        // Only the turns this backup carried: a turn that survived a
+        // forget() (which deletes episodes but keeps turns) must not get
+        // its quotes rebuilt by an unrelated restore.
+        const restoredTurnIds = (sqlite.query("SELECT id FROM restore_src.conversation_turns WHERE person_id = ?").all(personId) as Array<{ id: string }>).map((r) => r.id);
+        let episodes = 0;
+        for (const turn of db.select().from(conversationTurns).where(eq(conversationTurns.personId, personId)).all()) {
+          if (!restoredTurnIds.includes(turn.id)) continue;
+          const before = (sqlite.query("SELECT count(*) AS n FROM episodes WHERE turn_id = ?").get(turn.id) as { n: number }).n;
+          if (before > 0) continue;
+          recordEpisodes(turn);
+          episodes += (sqlite.query("SELECT count(*) AS n FROM episodes WHERE turn_id = ?").get(turn.id) as { n: number }).n;
+        }
         const settings = copyPersonScopedRows("settings_values", "scope = ?", `person:${personId}`);
 
-        return { memories: restoredMemoryIds.length, conversations, conversationThreads, settings };
+        return { memories: restoredMemoryIds.length, conversations, conversationThreads, settings, episodes };
       });
       return restore();
     } finally {

@@ -137,3 +137,79 @@ export const MULTI_SESSION_CASES: MultiSessionCase[] = [
     mustContain: "Riff",
   },
 ];
+
+// MEM-04: cross-conversation recall over verbatim episodes. Each case
+// seeds whole turns (both sides, backdated) into their own conversations,
+// then asks a question in a fresh one; the grade is the expected turn id
+// ranking first, or nothing at all for the one that must abstain.
+export interface EpisodeSeedTurn {
+  turnId: string;
+  ageDays: number;
+  user: string;
+  reply: string;
+}
+
+export interface EpisodeCase {
+  id: string;
+  seeds: EpisodeSeedTurn[];
+  question: string;
+  /** The turn whose episode must rank first; null means no match at all is the right answer. */
+  expectTurnId: string | null;
+}
+
+export const EPISODE_CASES: EpisodeCase[] = [
+  {
+    id: "recipe-last-week",
+    seeds: [
+      { turnId: "ep-recipe-old", ageDays: 24, user: "any ideas for a picnic recipe", reply: "A tomato tart travels well." },
+      { turnId: "ep-recipe-new", ageDays: 7, user: "what should we cook for the visitors", reply: "Try a mushroom risotto recipe, it feeds six." },
+    ],
+    question: "what recipe did you suggest last week",
+    expectTurnId: "ep-recipe-new",
+  },
+  {
+    id: "trip-decision",
+    seeds: [{ turnId: "ep-trip", ageDays: 3, user: "did we decide on the trip", reply: "Yes, the coast on the first weekend of October." }],
+    question: "what did we decide about the trip",
+    expectTurnId: "ep-trip",
+  },
+  {
+    id: "pet-said",
+    seeds: [{ turnId: "ep-rover", ageDays: 10, user: "Rover keeps scratching the door", reply: "That is often boredom; a longer walk before you leave usually helps." }],
+    question: "what did you say about Rover scratching",
+    expectTurnId: "ep-rover",
+  },
+  {
+    id: "which-day",
+    seeds: [{ turnId: "ep-dentist", ageDays: 1, user: "the dentist moved to Thursday", reply: "Got it, Thursday it is." }],
+    question: "what did I tell you yesterday about the dentist",
+    expectTurnId: "ep-dentist",
+  },
+  {
+    id: "paraphrase",
+    seeds: [{ turnId: "ep-bike", ageDays: 5, user: "the bicycle's rear brake squeals", reply: "Wipe the rim and the pads with rubbing alcohol; if it still squeals the pads are glazed." }],
+    question: "how did you say I should fix the squeaky bike brake",
+    expectTurnId: "ep-bike",
+  },
+  {
+    id: "assistant-side",
+    seeds: [{ turnId: "ep-library", ageDays: 12, user: "anything on this weekend", reply: "The library has its plant swap on Saturday morning." }],
+    question: "where was that plant swap you mentioned",
+    expectTurnId: "ep-library",
+  },
+  {
+    id: "two-weeks-window",
+    seeds: [
+      { turnId: "ep-plan-old", ageDays: 40, user: "planning the garage clear-out", reply: "Start with the shelves by the door." },
+      { turnId: "ep-plan-new", ageDays: 14, user: "planning the garage clear-out again", reply: "This time start with the bikes, then the shelves." },
+    ],
+    question: "two weeks ago what did we plan for the garage",
+    expectTurnId: "ep-plan-new",
+  },
+  {
+    id: "nothing-there",
+    seeds: [],
+    question: "what did you say about the kayak rental",
+    expectTurnId: null,
+  },
+];
