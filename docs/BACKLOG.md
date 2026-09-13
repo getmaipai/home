@@ -1668,6 +1668,16 @@ Track B: MEM-01, MEM-02, MEM-03, MEM-04, MEM-05. Then JOIN-01, JOIN-02.
 
 - [ ] **EVAL-01: Qwen3.5-4B against the current Qwen3-8B, measured, with a keep-or-drop verdict** (S-M)
 
+    Status (2026-09-13): not tested, no official artifact. Qwen
+    publishes `Qwen/Qwen3.5-4B` (transformers format) but no
+    `Qwen/Qwen3.5-4B-GGUF` or equivalent official GGUF conversion -
+    every GGUF found (unsloth, bartowski, lmstudio-community,
+    prithivMLmods, mlx-community's MLX format) is a third-party quant,
+    which the item's own instructions rule out substituting. No engine
+    was spawned, no catalog entry added, no bench run. Re-check when
+    Qwen ships an official GGUF for this model; nothing else in this
+    item changes until then.
+
     Depends on: FAST-01 through FAST-06 merged to `main` (the fixed
     prompt, cache, guards, and samplers are the baseline; a comparison
     before them measures the broken prompt, not the models). Runs as its

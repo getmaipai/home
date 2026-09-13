@@ -460,3 +460,33 @@ that thin an edge - the org's own rule for model changes applies here
 too: a recommendation is not a switch. MEM-05 stays open; re-run once
 the baseline conversation bench's disclosure rows exist (measure-first
 step 2) for a real sample size, then it is Jesse's call.
+
+## EVAL-01: stopped at step 1, no official GGUF for the candidate
+
+Session A's baseline conversation bench landed (`da97e37`,
+`docs/dev/session-a.md`'s "The baseline conversation bench: first run")
+with the 20 fixed fixture ids and the frozen-input header shape EVAL-01
+needs, so this item's own step 1 (add the catalog entry) was next.
+
+Checked before touching anything else, per the item's own instruction
+("If Qwen publishes no official GGUF for the candidate at the time,
+record 'not tested: no official artifact' in dev.md and stop; do not
+substitute a third-party quant"): Qwen's own Hugging Face org publishes
+`Qwen/Qwen3.5-4B` and `Qwen/Qwen3.5-4B-Base` in Transformers format
+only. No `Qwen/Qwen3.5-4B-GGUF` or equivalent exists on Qwen's own org
+today. Every GGUF conversion that does exist is third-party:
+`unsloth/Qwen3.5-4B-GGUF`, `bartowski/Qwen_Qwen3.5-4B-GGUF`,
+`lmstudio-community/Qwen3.5-4B-GGUF`, `prithivMLmods/Qwen3.5-4B-f32-GGUF`,
+and an MLX (not GGUF) build from `mlx-community`. None of these are the
+Qwen-published artifact the item requires, and the item is explicit
+that a third-party quant is not an acceptable substitute (the same
+"never trusted from a listing, only from what we actually downloaded
+and hashed ourselves" discipline `backgroundAssets.ts` documents for
+its own pins would not even apply here, since there is no first-party
+file to hash in the first place).
+
+Stopped here: no `modelCatalog.ts` entry added, no engine spawned
+beyond the hub's own three (8788/8789/8794, all untouched throughout),
+no bench run. `docs/BACKLOG.md`'s EVAL-01 item carries the same finding
+as its status line. Nothing else to re-check until Qwen ships an
+official GGUF for this specific model.

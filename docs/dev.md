@@ -12704,3 +12704,6 @@ other's section once (147cd28, f4779a6).
   (ruling: pin stays the 1.7B, n=2 too small to switch):
   [docs/dev/session-b.md](dev/session-b.md) (2026-09-13). #93 (a
   recall-side abstention defect) filed from the same run.
+- EVAL-01, stopped at step 1 (no official GGUF for the Qwen3.5-4B
+  candidate, only third-party quants): [docs/dev/session-b.md](dev/session-b.md)
+  (2026-09-13).
