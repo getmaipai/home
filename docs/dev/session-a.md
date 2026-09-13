@@ -145,3 +145,190 @@ Out of scope: the guard on Tier 1 wins, any change to
 `TIER1_THRESHOLD`/`TIER1_MARGIN`, the routing corpus's thresholds,
 `conversationHistory.ts` and `routes/turn.ts` (Session B needs them
 for #60).
+
+## ROUTE-01: shipped, and the numbers (2026-09-13)
+
+What landed, against the design above: `utteranceShape()` and
+`conversationShaped()` in `routing.ts` (the bot's three expressions,
+plus "please" as a courtesy prefix; after a courtesy prefix only the
+opener counts, so "could you remember that pippa's recital is friday?"
+is a command, the coordinator's condition on this item);
+`selectOfferedTools(ranked, shape)` in `turnEngine.ts`, exported, the
+inline floor block gone; `logRoute()` printing one `[route]` line per
+decision (Tier 0 and Tier 1 wins included); the tool-calling bench's
+routed pass with the two #77 rows; `TIER2_AMBIGUOUS_FLOOR` kept only
+as the routing bench's noise ceiling.
+
+One refinement found by FAST-04's own regression test ("what have I
+told you to remember about the weather", `recall` at 0.771 on the real
+scorer): a question or first-person turn offers the always-offer set
+plus the one candidate Tier 1 placed (cleared `TIER1_THRESHOLD` with
+`TIER1_MARGIN`, `pickTier1Winner` over `ranked`) but could not fire
+because its required arg binds only from a literal pattern. `recall`
+can never win Tier 1 for that reason, so without this the guard
+removed it from every question; a placement that only lacks its
+argument is still a deterministic placement, and the argument is what
+the model's tool call supplies. The top three by mere rank are never
+offered on a question.
+
+Tests: `routing.test.ts` (six `conversationShaped()` cases from the
+bot, the coordinator's two conversation-shaped and three polite
+command-shaped phrasings, compound sentences, plain commands,
+`utteranceShape()` names),
+`tier2.test.ts` (`selectOfferedTools()` on a command, on a question
+with and without a Tier 1 placement, the margin rule, an always-offer
+package already in the top three; `runTurn()` on "Friday is pizza
+night, keep that in mind", 0.63 under the stub's scorer and no pattern,
+now reaching `remember`; a question offered websearch alone; the
+`[route]` line's fields, and never the utterance).
+
+First measurement, `bun run scripts/bench/tool-calling.ts` at ten repeats,
+qwen3-8b-instruct-q4-k-m.gguf on llama-server b10797 at 8788, nomic
+embed at 8794, a MacBook Pro (M-series), fresh temp data directory:
+
+Fixed pass (four tools, bare prompt, the corpus's own contract): the
+three positive rows 10/10 each, negatives 0/50 false calls.
+
+Routed pass (offered set from `routeSemantic` + `selectOfferedTools`,
+real prompt shape):
+
+| row | shape | offered | result |
+|---|---|---|---|
+| remember that pizza night is Friday and what do you know about the wifi password | command | remember, recall, remind, websearch | 10/10 |
+| what does ephemeral mean and remember that my dentist appointment is next week | question | websearch | 0/10 |
+| give me a trivia question and what do you remember about pizza night | command | recall, remember, trivia, websearch | 7/10 (three called trivia alone) |
+| should I dye my hair black | question | websearch | 10/10, no call |
+| I might go see the new Spiderman movie | first_person | websearch | 10/10, no call |
+| what's the latest Stephen king novel | question | websearch | 10/10 websearch (lookup call, designed) |
+| good morning | command | remember, remind, joke, websearch | 10/10, no call |
+| I'm feeling kind of down | first_person | websearch | 10/10, no call |
+| the plumber's number is 555 9876 extension 12, please remember it (#77) | command | remind, remember, joke, websearch | 10/10 remember |
+| Friday is pizza night, please remember (#77) | command | remember, recall, remind, websearch | 10/10 remember |
+
+False calls on negative rows outside always-offer: 0/50. Lookup calls
+(websearch on the Stephen King row): 10/50, the designed behavior.
+The #77 phrasings select `remember` 10/10 each through the model path
+with both their scores under the old floor (remind 0.546, remember
+0.490 on the first), which is #80's case closed.
+
+Two positive rows short of 10/10. The trivia row's offered set is
+identical to the floor rule's (recall 0.781 cleared it) and the
+messages are the production prompt; the fixed pass on a bare prompt
+gets 10/10, so the three single-call replies are the real prompt shape
+costing the second call on a compound turn, present before this item
+and visible now because the routed pass measures the production path.
+The ephemeral row is the guard's cost: it leads with "what", no Tier 1
+placement (remember 0.692, define 0.667, margin under 0.08), so the
+offer was websearch alone and the model could not call either; under
+the old floor remember cleared 0.68 and the row passed. Recorded and
+handed to the coordinator before anything was tuned.
+
+The ruling: a compound sentence is its clauses. `utteranceShape()`
+now splits on " and " and on a comma (a clause under two words, "Sage,
+what time is it", is a vocative, not a clause), reads each clause with
+the courtesy-prefix rule, and the turn is a command when any clause
+is; otherwise a question when any clause is; otherwise first person.
+"who won the 1998 world cup and what do you remember about pizza
+night" stays a question, "I'm home now, turn the porch light off" is a
+command, and the ephemeral row is a command. Second run, same engine
+and repeats, only the rows that changed or fell short:
+
+| row | shape | offered | result |
+|---|---|---|---|
+| what does ephemeral mean and remember that my dentist appointment is next week | command | remember, define, recall, websearch | 7/10 (two called remember alone, one called nothing) |
+| give me a trivia question and what do you remember about pizza night | command | recall, remember, trivia, websearch | 8/10 (two called trivia alone) |
+
+Everything else unchanged: the other positives 10/10, negatives 0/50
+false calls outside always-offer, 10/50 lookup calls, the #77 rows
+10/10 on `remember`. The guard no longer blocks the ephemeral row;
+what remains on both compound rows has one cause, and it is not
+routing's. With the identical offered set (`selectOfferedTools()`'s
+own) the bare prompt calls both tools 10/10 on each row; adding the
+stable prefix alone drops it to 5/10 and 2/10; the full production
+prompt (prefix plus context) 6/10 and 2/10. The system prompt is what
+costs the second call on a compound request. Filed as
+getmaipai/home#83 ("A compound request only gets its first action"),
+pointing at CHAT-16's shared composer and CHAT-15's typed outcomes,
+with that table; the routed pass stays in the bench as the number to
+watch, and the fixed pass (bare prompt) stays 10/10 as the corpus's
+contract.
+
+The review on the diff found the first clause rule wrong in the other
+direction: it defaulted every opener-less fragment to command, so
+"what's the difference between a crocodile and an alligator" was a
+command by its noun phrase, "hey maipai, who won the world cup" by its
+vocative, and "the plumber is coming tuesday, right?" lost its question
+mark to a one-word tag. Rewritten: a vocative in front ("hey maipai,",
+"Sage,") is dropped; a clause counts as a command only on an imperative
+signal, a courtesy prefix or an opening word that opens one of the
+installed packages' own literal patterns (`commandOpenersFrom()`, the
+first word of each `routing.patterns` entry that is not a question
+opener, a determiner or a wildcard: remember, turn, set, add, put,
+tell, give, convert, define, remind, translate, search and the rest,
+the packages' own declaration rather than a hand-kept verb list); a
+trailing question mark makes the turn a question unless a clause was a
+polite request; a clause with no signal decides nothing, and a turn
+made only of those ("good morning", "keep that on file") stays a
+command, today's default, which ROUTE-02 takes up for greetings. The
+review's seven cases are in `routing.test.ts`. Third routed run after
+that rewrite: every shape and every offered set identical to the
+second run, negatives 0/50 outside always-offer, the #77 rows 10/10,
+the two compound rows 4/10 and 6/10 (7/10 and 8/10 the run before,
+same offered set, same prompt: the spread is #83's at temperature
+0.7). The trace line also gained `outscored_by_skill` for a fuzzy Tier
+1 winner a stronger skill match displaced, so that placement is not
+counted as "nothing placed".
+
+A delta review of that rewrite found two more, both fixed: a vocative
+without its comma ("hey maipai what time is it", the shape a
+transcript has) was never stripped and fell to the command default,
+so both forms are stripped now, except when the word after "hey" (or
+before the comma) is a courtesy word or a command opener, which is the
+signal and not a name ("Remember, I have a dentist appointment next
+week" and "hey remember that the gate code is 4412" are commands); and
+a leading "please," is a courtesy on the whole turn, a command unless
+the rest opens as a question. Two it named are recorded, not fixed:
+the pattern-derived openers include "got" (from "got any jokes") and
+"weather" (from "weather in *"), so "I'm home and got the groceries"
+reads as a command, and the courtesy rule reads "can you hear me?" and
+"would you rather have a dog or a cat?" as commands because nothing
+looks at the verb after the prefix. Both misreads cost a top-three
+offer (a prefix-cache miss and the model's own judgment, which the
+routed pass puts at 0/50 false calls), never a wrong action; the fix
+for both is a verb reading the guard does not have today, and a
+hand-kept stative or noun list is the kind of list this item avoided
+on purpose. Left for ROUTE-02, which changes what a command-shaped
+misread costs in the first place.
+
+The prompt-cache cost, measured: a spare-port backend at HEAD
+(aaaf724, the floor rule) and one at this diff, each on a fresh temp
+directory against the same 8B on 8788, the same eight-turn sequence
+in one conversation (a greeting, a question twice, a command twice,
+the question again, the command again, the greeting again), time to
+first delta in ms, two runs each:
+
+| turn | HEAD run 1 | HEAD run 2 | ROUTE-01 run 1 | ROUTE-01 run 2 |
+|---|---|---|---|---|
+| Q1 "should I dye my hair black" | 766 | 452 | 1421 | 1043 |
+| Q2 same again | 834 | 523 | 176 | 381 |
+| C1 "tell me something nice about mornings" | 810 | 834 | 1360 | 1420 |
+| C2 same again | 809 | 774 | 510 | 488 |
+| Q3 question after the command | 834 | 527 | 999 | 998 |
+| C3 command after the question | 815 | 994 | 1334 | 1429 |
+
+At HEAD the tool set never changes (websearch alone on every one of
+these turns), and the numbers sit between 450 and 1000 ms with no
+pattern. With this diff the pattern is the tool set: a turn whose set
+matches the previous turn's starts in 180 to 510 ms, and a turn whose
+set differs (the question after the command, the command after the
+question, the first of each) starts in 1000 to 1430 ms, about half a
+second to a second more than the same turn at HEAD. The greeting is
+command-shaped under the clause rule ("good morning" has no opener),
+so it carries its own three (remember, remind, joke) and switches the
+set too. The cost is real and bounded, and it lands on command-shaped
+turns that follow a different set; the follow-up named in the design
+(a stable offered set across ordinary turns, so only a genuinely
+placed candidate changes it) is the coordinator's to schedule, not a
+reason to restore the floor. Both spare-port backends were started by
+pid and stopped by pid with 8809 and 8810 confirmed free; the shared
+engines were never restarted.

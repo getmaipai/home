@@ -15,6 +15,9 @@ import {
   pickTier1WinnerAmong,
   TIER1_THRESHOLD,
   TIER1_MARGIN,
+  conversationShaped,
+  utteranceShape,
+  commandOpenersFrom,
 } from "@/lib/routing";
 
 beforeEach(() => {
@@ -212,5 +215,96 @@ describe("routing_embeddings: candidate ids never clash across different package
     ]);
     expect(rowsFor("pkg-a")).toHaveLength(1);
     expect(rowsFor("pkg-b")).toHaveLength(1);
+  });
+});
+
+// ROUTE-01 (docs/dev/session-a.md): the bot's shape guard, ported from
+// router.py. A question or a first-person statement no deterministic
+// tier placed is conversation; a polite request is a command, judged on
+// the verb after the courtesy prefix, never on its question mark; a
+// compound sentence is its clauses, and a clause is a command only on an
+// imperative signal (a courtesy prefix, or a verb the installed packages'
+// own patterns open with).
+describe("conversationShaped() (ROUTE-01)", () => {
+  // The bundled packages' own pattern openers, as prepareTurn() derives them.
+  const openers = commandOpenersFrom(["remember that *", "remember *", "turn off the * light", "set a timer for *", "give me a trivia question", "what does * mean", "this day in history", "* please remember it"]);
+
+  test("commandOpenersFrom(): the first word of each literal pattern, never a question opener, a determiner or a wildcard", () => {
+    expect([...openers].sort()).toEqual(["give", "remember", "set", "turn"]);
+  });
+
+  test("the bot's own cases: a question by opener, a question by punctuation, a first-person statement", () => {
+    expect(conversationShaped("who wrote the book IT")).toBe(true);
+    expect(conversationShaped("what do you mean")).toBe(true);
+    expect(conversationShaped("the plumber is coming tuesday?")).toBe(true);
+    expect(conversationShaped("I might go see the new Spiderman movie")).toBe(true);
+    expect(conversationShaped("I'm feeling kind of down")).toBe(true);
+    expect(conversationShaped("we've been thinking about a dog")).toBe(true);
+  });
+
+  test("the coordinator's two conversation-shaped cases", () => {
+    expect(conversationShaped("what do you remember about pizza night")).toBe(true);
+    expect(conversationShaped("who won the 1998 world cup")).toBe(true);
+  });
+
+  test("a polite request is a command, even with a question mark: the shape is the verb after the courtesy prefix", () => {
+    expect(conversationShaped("can you set a timer for ten minutes?")).toBe(false);
+    expect(conversationShaped("could you remember that pippa's recital is friday?")).toBe(false);
+    expect(conversationShaped("would you add milk to the list?")).toBe(false);
+    expect(conversationShaped("can you please clear the timer")).toBe(false);
+    expect(conversationShaped("hey maipai, will you dim the lights")).toBe(false);
+    expect(conversationShaped("please remember that the gate code is 4412")).toBe(false);
+  });
+
+  test("a courtesy prefix in front of a question opener is still a question; in front of an imperative it is a command", () => {
+    expect(conversationShaped("please, what time is it")).toBe(true);
+    expect(conversationShaped("could you tell me what time it is")).toBe(false);
+  });
+
+  test("a compound sentence is command-shaped when a clause carries an imperative signal", () => {
+    expect(conversationShaped("what does ephemeral mean and remember that my dentist appointment is next week", openers)).toBe(false);
+    expect(conversationShaped("I'm home now, turn the porch light off", openers)).toBe(false);
+    expect(conversationShaped("who won the 1998 world cup, and set a timer for ten minutes", openers)).toBe(false);
+    expect(conversationShaped("Friday is pizza night, please remember", openers)).toBe(false);
+    expect(conversationShaped("give me a trivia question and what do you remember about pizza night", openers)).toBe(false);
+  });
+
+  test("a clause with no imperative signal never flips a question or a first-person statement to a command (code review)", () => {
+    expect(conversationShaped("who won the 1998 world cup and what do you remember about pizza night", openers)).toBe(true);
+    expect(conversationShaped("I'm tired and I think I'll go to bed", openers)).toBe(true);
+    expect(conversationShaped("what's the difference between a crocodile and an alligator", openers)).toBe(true);
+    expect(conversationShaped("I'm going to the store and the pharmacy", openers)).toBe(true);
+    expect(conversationShaped("who wrote the book IT, the horror one", openers)).toBe(true);
+    expect(conversationShaped("the plumber is coming tuesday, is that right?", openers)).toBe(true);
+    expect(conversationShaped("the plumber is coming tuesday, right?", openers)).toBe(true);
+  });
+
+  test("a vocative in front is not a clause, with or without its comma", () => {
+    expect(conversationShaped("Sage, what time is it", openers)).toBe(true);
+    expect(conversationShaped("hey maipai, who won the world cup", openers)).toBe(true);
+    expect(conversationShaped("hey sage, I'm feeling kind of down", openers)).toBe(true);
+    expect(conversationShaped("hey maipai what time is it", openers)).toBe(true);
+    expect(conversationShaped("hey maipai I'm home", openers)).toBe(true);
+    expect(conversationShaped("hey maipai set a timer for ten minutes", openers)).toBe(false);
+  });
+
+  test("a command verb or a courtesy word before a comma is the signal, never a name (code review)", () => {
+    expect(conversationShaped("Remember, I have a dentist appointment next week", openers)).toBe(false);
+    expect(conversationShaped("Please, I need you to set a timer", openers)).toBe(false);
+    expect(conversationShaped("hey remember that the gate code is 4412", openers)).toBe(false);
+  });
+
+  test("a plain command is a command", () => {
+    expect(conversationShaped("the plumber's number is 555 9876 extension 12, keep that on file", openers)).toBe(false);
+    expect(conversationShaped("set a timer for ten minutes", openers)).toBe(false);
+    expect(conversationShaped("dim the lights")).toBe(false);
+    expect(conversationShaped("good morning")).toBe(false);
+  });
+
+  test("utteranceShape() names the shape for the trace line", () => {
+    expect(utteranceShape("who won the 1998 world cup")).toBe("question");
+    expect(utteranceShape("I'm feeling kind of down")).toBe("first_person");
+    expect(utteranceShape("could you remember that pippa's recital is friday?")).toBe("command");
+    expect(utteranceShape("good morning")).toBe("command");
   });
 });

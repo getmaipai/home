@@ -21,6 +21,7 @@ import { eq } from "drizzle-orm";
 import { resetDb } from "./reset-db";
 import { __resetThrottleForTests } from "@/lib/secretThrottle";
 import { __resetLlmSupervisorForTests } from "@/lib/llmSupervisor";
+import { embedUtterance } from "@/lib/routing";
 import { TestClient } from "./client";
 import {
   resolveToolCalls,
@@ -28,6 +29,10 @@ import {
   pendingAskFromPluginResult,
   runTurn,
   runTurnStream,
+  selectOfferedTools,
+  routeSemantic,
+  loadAllManifests,
+  TIER2_AMBIGUOUS_FLOOR,
   type RankedCandidate,
   type PluginResultWithConfirmAsk,
 } from "@/lib/turnEngine";
@@ -638,5 +643,114 @@ describe("pendingAskFromPluginResult()", () => {
     const pending = pendingAskFromPluginResult("some-package", {}, result, conversationId);
     expect(pending).toBeNull();
     expect(getPendingAsk(conversationId)).toBeNull();
+  });
+});
+
+// ROUTE-01 (docs/dev/session-a.md, getmaipai/home#80): the Tier 2 offer
+// has no similarity floor any more; the bot's shape guard decides
+// between the top three plus always-offer (a command) and always-offer
+// alone (a question or first-person statement no deterministic tier
+// placed).
+describe("ROUTE-01: the offer without a floor, and the shape guard in front of it", () => {
+  const manifest = (id: string, always_offer = false) => ({ id, description: id, args: {}, routing: always_offer ? { always_offer: true } : {} }) as unknown as RankedCandidate["manifest"];
+  const ranked: RankedCandidate[] = [
+    { id: "remember", score: 0.41, manifest: manifest("remember") },
+    { id: "recall", score: 0.33, manifest: manifest("recall") },
+    { id: "define", score: 0.2, manifest: manifest("define") },
+    { id: "trivia", score: 0.1, manifest: manifest("trivia") },
+    { id: "websearch", score: 0.05, manifest: manifest("websearch", true) },
+  ];
+
+  test("selectOfferedTools(): a command-shaped turn offers the top three plus always-offer, with every score under the old floor", () => {
+    expect(ranked[0]!.score).toBeLessThan(TIER2_AMBIGUOUS_FLOOR);
+    expect(selectOfferedTools(ranked, "command").map((t) => t.id)).toEqual(["remember", "recall", "define", "websearch"]);
+  });
+
+  test("selectOfferedTools(): a question or first-person turn no tier placed offers the always-offer set alone, never the top three by rank", () => {
+    expect(selectOfferedTools(ranked, "question").map((t) => t.id)).toEqual(["websearch"]);
+    expect(selectOfferedTools(ranked, "first_person").map((t) => t.id)).toEqual(["websearch"]);
+  });
+
+  test("selectOfferedTools(): a question Tier 1 placed (threshold and margin) but could not fire still offers that one candidate", () => {
+    const placed: RankedCandidate[] = [{ id: "recall", score: 0.8, manifest: manifest("recall") }, ...ranked.filter((r) => r.id !== "recall")];
+    expect(selectOfferedTools(placed, "question").map((t) => t.id)).toEqual(["recall", "websearch"]);
+    // Two close scores are ambiguity, not a placement: the margin rule holds here too.
+    const close: RankedCandidate[] = [{ id: "recall", score: 0.8, manifest: manifest("recall") }, { id: "remember", score: 0.76, manifest: manifest("remember") }, ...ranked.filter((r) => r.id !== "recall" && r.id !== "remember")];
+    expect(selectOfferedTools(close, "question").map((t) => t.id)).toEqual(["websearch"]);
+  });
+
+  test("selectOfferedTools(): an always-offer package already in the top three is offered once", () => {
+    const top: RankedCandidate[] = [{ id: "websearch", score: 0.9, manifest: manifest("websearch", true) }, ...ranked.filter((r) => r.id !== "websearch")];
+    expect(selectOfferedTools(top, "command").map((t) => t.id)).toEqual(["websearch", "remember", "recall"]);
+  });
+
+  // #80's own shape, with a wording no Tier 0 pattern catches (147cd28
+  // covers the "please remember" endings) and, under the stub's
+  // bag-of-words scorer, a top score under the old floor: before this
+  // item the offered set was websearch alone and the model could not
+  // have chosen remember however clear the sentence was.
+  test("runTurn(): a command-shaped utterance under the old floor now reaches the remember package when the model chooses it", async () => {
+    const { actor } = await owner();
+    const text = "Friday is pizza night, keep that in mind";
+    const { winner, ranked: real } = await routeSemantic(text, actor, loadAllManifests(), await embedUtterance(text));
+    expect(winner).toBeNull();
+    expect(real[0]!.score).toBeLessThan(TIER2_AMBIGUOUS_FLOOR);
+    expect(real.slice(0, 3).map((r) => r.id)).toContain("remember");
+    let offered: string[] = [];
+    const result = await withScriptedToolCalls(
+      (request) => {
+        offered = (request.tools ?? []).map((t) => t.function.name);
+        return offered.includes("remember") ? [{ id: "call-1", name: "remember", args: JSON.stringify({ fact: "Friday is pizza night" }) }] : undefined;
+      },
+      () => runTurn(actor, "chat", text),
+    );
+    expect(offered).toContain("remember");
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.value.source).toBe("plugin");
+    expect(result.value.plugin_id).toBe("remember");
+  });
+
+  test("runTurn(): a question no tier placed is offered the always-offer set alone, never a guessed package", async () => {
+    const { actor } = await owner();
+    let offered: string[] | undefined;
+    await withScriptedToolCalls(
+      (request) => {
+        offered = (request.tools ?? []).map((t) => t.function.name);
+        return undefined;
+      },
+      () => runTurn(actor, "chat", "who won the 1998 world cup"),
+    );
+    expect(offered).toEqual(["websearch"]);
+  });
+
+  test("a [route] trace line is printed once per decision with tier, shape, top, runner-up, margin and the offered ids", async () => {
+    const { actor } = await owner();
+    const lines: string[] = [];
+    const original = console.log;
+    console.log = (...args: unknown[]) => {
+      const line = args.map(String).join(" ");
+      if (line.startsWith("[route] ")) lines.push(line);
+      original(...args);
+    };
+    try {
+      await withScriptedToolCalls(
+        () => undefined,
+        () => runTurn(actor, "chat", "the plumber's number is 555 9876 extension 12, keep that on file"),
+      );
+    } finally {
+      console.log = original;
+    }
+    expect(lines.length).toBe(1);
+    const record = JSON.parse(lines[0]!.slice("[route] ".length)) as Record<string, unknown>;
+    expect(record.tier).toBe("tier2");
+    expect(record.shape).toBe("command");
+    expect(record.winner).toBeNull();
+    expect((record.top as { id: string; score: number }).id).toBeString();
+    expect(typeof (record.top as { score: number }).score).toBe("number");
+    expect(record.runner_up).toBeDefined();
+    expect(typeof record.margin).toBe("number");
+    expect(record.offered).toContain("websearch");
+    expect(JSON.stringify(record)).not.toContain("plumber"); // ids and numbers, never the utterance
   });
 });

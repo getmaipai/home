@@ -14,7 +14,7 @@
 import { evaluateSafety } from "@/lib/safety";
 import { speakerAgeBand } from "@/lib/ageBand";
 import { listPackageIds, loadManifestOnly, meetsMinRole, runPlugin } from "@/lib/plugins";
-import { ensureRoutingEmbeddings, embedUtterance, scoreByEmbedding, pickTier1WinnerAmong } from "@/lib/routing";
+import { ensureRoutingEmbeddings, embedUtterance, scoreByEmbedding, pickTier1Winner, pickTier1WinnerAmong, utteranceShape, commandOpenersFrom, type UtteranceShape } from "@/lib/routing";
 import { loadAllSkills, type LoadedSkill } from "@/lib/skills";
 import { matchCommand, runCommand } from "@/lib/commands";
 import { notifyIfFlagged } from "@/lib/notifications";
@@ -810,6 +810,63 @@ interface RoutedPlugin {
 const MAX_TIER2_TOOLS_OFFERED = 3;
 const MAX_TIER2_CALLS_PER_TURN = 2;
 
+/** ROUTE-01: the Tier 2 offer. A command-shaped turn offers the top
+ * MAX_TIER2_TOOLS_OFFERED of `ranked` (best first, no similarity floor:
+ * the floor hid every paraphrase that drifted from a package's examples,
+ * getmaipai/home#80) plus every `routing.always_offer` package not
+ * already among them. A question or first-person turn is the bot's
+ * shape guard's case (routing.ts's utteranceShape()): "a question no
+ * deterministic tier could place goes to conversation", so it offers
+ * the always-offer set, plus the one candidate Tier 1 DID place when
+ * there is one: a package that cleared TIER1_THRESHOLD with the margin
+ * (pickTier1Winner over `ranked`) but could not fire because its
+ * required arg binds only from a literal pattern (`recall` on "what
+ * have I told you to remember about the weather", 0.77 on the real
+ * scorer) is a deterministic placement that only lacks its argument,
+ * which is exactly what the model's tool call supplies. Never the top
+ * three by mere rank on a question: that is the guess the guard
+ * exists to stop. Exported for the tool-calling bench's routed pass, so
+ * its numbers come from this exact rule. */
+export function selectOfferedTools(ranked: readonly RankedCandidate[], shape: UtteranceShape): ToolSpec[] {
+  const placed = shape === "command" ? null : pickTier1Winner(ranked);
+  const topRanked = shape === "command" ? ranked.slice(0, MAX_TIER2_TOOLS_OFFERED) : placed ? ranked.filter((r) => r.id === placed.id) : [];
+  const topRankedIds = new Set(topRanked.map((r) => r.id));
+  const alwaysOffered = ranked.filter((r) => r.manifest.routing?.always_offer && !topRankedIds.has(r.id));
+  return [...topRanked, ...alwaysOffered].map((r) => ({ id: r.id, description: r.manifest.description, args: r.manifest.args }));
+}
+
+/** ROUTE-01: one `[route]` line per routing decision, the bot's router
+ * trace: after a few hundred real turns the arithmetic is what share of
+ * turns each tier answers and what the conversational fallthrough is
+ * made of (real conversation, a missing package, or a missing example
+ * line), which want three different fixes. Ids and rounded numbers,
+ * never the utterance (the `[turn]` line's own rule). */
+function logRoute(
+  turnId: string,
+  tier: "pattern" | "embedding" | "keyword" | "tier2",
+  shape: UtteranceShape,
+  winner: string | null,
+  ranked: readonly RankedCandidate[],
+  offered: string[],
+  /** A fuzzy Tier 1 winner a stronger skill match displaced (the
+   * bedtime-story rule above): still a placement, traced so the
+   * fallthrough arithmetic does not count it as "nothing placed". */
+  outscoredBySkill: string | null = null,
+): void {
+  const round = (n: number) => Math.round(n * 1000) / 1000;
+  const top = ranked[0] ? { id: ranked[0].id, score: round(ranked[0].score) } : null;
+  const runnerUp = ranked[1] ? { id: ranked[1].id, score: round(ranked[1].score) } : null;
+  const margin = ranked[0] && ranked[1] ? round(ranked[0].score - ranked[1].score) : null;
+  console.log(`[route] ${JSON.stringify({ turn_id: turnId, tier, shape, winner, top, runner_up: runnerUp, margin, offered, ...(outscoredBySkill ? { outscored_by_skill: outscoredBySkill } : {}) })}`);
+}
+
+/** The installed packages' own command verbs for the shape guard
+ * (routing.ts's commandOpenersFrom()); a few dozen first words per
+ * turn, cheaper than any cache would be worth. */
+export function commandOpeners(loaded: LoadedManifest[]): ReadonlySet<string> {
+  return commandOpenersFrom(loaded.flatMap((l) => l.manifest.routing?.patterns ?? []));
+}
+
 export interface RankedCandidate {
   id: string;
   score: number;
@@ -974,14 +1031,15 @@ type PreparedTurn =
        * one round trip): offered to the SAME completion call that
        * answers the turn (runTurn()/runTurnStream()), replacing the
        * deleted attemptTier2Tools()'s own separate, up-front `complete()`
-       * call. Empty (never sent as `[]` - llm.ts's own `offering` check)
-       * only when `ranked` never cleared TIER2_AMBIGUOUS_FLOOR AND no
-       * installed package declares `routing.always_offer` (manifest.
-       * schema.json) - a package that DOES (websearch is the first) is
-       * offered on every turn regardless of the floor, so `tools` is no
-       * longer guaranteed empty on an ordinary turn once one exists; the
-       * offered SET stays identical across ordinary turns either way, so
-       * the prompt prefix is still cacheable, just no longer empty. */
+       * call. ROUTE-01: selectOfferedTools() builds it with no floor: a
+       * command-shaped turn carries the top three ranked packages plus
+       * every `routing.always_offer` package (websearch is the first); a
+       * question or first-person turn carries the always-offer set
+       * alone, so the common conversational case keeps one identical,
+       * prompt-cacheable set while a command's own three vary per turn
+       * (the named prompt-cache cost in docs/dev/session-a.md). Empty
+       * (never sent as `[]` - llm.ts's own `offering` check) only when
+       * nothing is ranked and no always-offer package is installed. */
       tools: ToolSpec[];
       /** The exact candidates `tools` was built from - resolveToolCalls()
        * needs each call's own manifest (a `consequential` check) and
@@ -1274,7 +1332,10 @@ async function prepareTurn(
   // trigger phrase always still can.
   const routedViaFuzzyMatch = routed && !routed.viaPattern;
   const bestSkillScore = routedViaFuzzyMatch ? (matchingSkills(text, skills)[0]?.score ?? 0) : 0;
-  if (routed && !(routedViaFuzzyMatch && bestSkillScore > routed.score)) {
+  const shape = utteranceShape(text, commandOpeners(loaded));
+  const outscoredBySkill = routed && routedViaFuzzyMatch && bestSkillScore > routed.score ? routed.id : null;
+  if (routed && !outscoredBySkill) {
+    logRoute(turnId, routed.viaPattern ? "pattern" : routed.viaEmbedding ? "embedding" : "keyword", shape, routed.id, ranked, []);
     const result = await runPlugin(routed.id, actor, routed.args, turnId);
     if (result.ok) {
       const pending = pendingAskFromPluginResult(routed.id, routed.args, result.value as PluginResultWithConfirmAsk, conversation.id);
@@ -1374,8 +1435,15 @@ async function prepareTurn(
   // round trip on every turn that reached here); the model's own
   // tool_calls decision (or lack of one) is read back from that one call
   // by runTurn()/runTurnStream() and handed to resolveToolCalls() below.
-  const floorCleared = ranked.length > 0 && ranked[0]!.score >= TIER2_AMBIGUOUS_FLOOR;
-  const topRanked = floorCleared ? ranked.slice(0, MAX_TIER2_TOOLS_OFFERED) : [];
+  // ROUTE-01 (docs/dev/session-a.md, getmaipai/home#80): no floor on the
+  // offer any more; the shape guard picks between the top three plus
+  // always-offer (a command) and always-offer alone (a question or a
+  // first-person statement no deterministic tier placed). The long
+  // comment below is the history of the always-offer set, kept because
+  // its reasoning (the offer costs prompt tokens, not a round trip; the
+  // model's own judgment is the gate) is what ROUTE-01 generalized.
+  const tools = selectOfferedTools(ranked, shape);
+  logRoute(turnId, "tier2", shape, null, ranked, tools.map((t) => t.id), outscoredBySkill);
   // manifest.routing.always_offer (spec/schemas/manifest.schema.json,
   // Fix E's own addition - a code review, 2026-09-07, found the first
   // cut of this hardcoded a `Set(["websearch"])` in this file instead of
@@ -1411,9 +1479,6 @@ async function prepareTurn(
   // - always-offered packages are added ON TOP of that cap (a package
   // author's own explicit choice to always show up costs one more slot
   // deliberately, not an unbounded one).
-  const topRankedIds = new Set(topRanked.map((r) => r.id));
-  const alwaysOffered = ranked.filter((r) => r.manifest.routing?.always_offer && !topRankedIds.has(r.id));
-  const tools: ToolSpec[] = [...topRanked, ...alwaysOffered].map((r) => ({ id: r.id, description: r.manifest.description, args: r.manifest.args }));
   // getmaipai/home#67: the FULL always-offer set (unlike `alwaysOffered`
   // just above, which deliberately excludes a candidate already counted
   // via `topRanked` to avoid offering it twice in `tools`) - runTurn()'s
@@ -1492,6 +1557,15 @@ async function prepareTurn(
 // to remember about pizza night", 1.00 against `recall` - a genuine
 // runner-up Tier 1 can't bind, not ordinary chat) both score far above
 // this floor either way, so raising it costs neither case anything.
+//
+// ROUTE-01 (docs/dev/session-a.md, getmaipai/home#80): no longer gates
+// the offer. The floor's reason to exist was the separate round trip,
+// which Fix E removed; what it did afterwards was hide every package
+// whose examples a paraphrase drifted from, and the model never got to
+// see the candidate the household meant. selectOfferedTools() offers
+// the top three without it (the shape guard in front decides who gets
+// them). Kept exported as the measured ordinary-negative noise ceiling
+// the routing bench reports against, nothing else.
 export const TIER2_AMBIGUOUS_FLOOR = 0.68;
 
 /** Fix E (docs/dev.md's "Chat reliability" - native tool calling, one
