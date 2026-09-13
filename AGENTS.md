@@ -32,6 +32,7 @@ server; `bun test` in `backend/`, `frontend/`, or `spec/` for that
 package's own tests; `tsc --noEmit` (backend) or `tsc --noEmit && eslint
 .` (frontend) to lint. `bash scripts/check.sh` from the repo root is the
 full pre-commit gate: it needs a sibling `getmaipai/.github` checkout
-(`../.github` by default, override with `MAIPAI_STANDARDS_DIR`) with its
+(`../.github` by default, override with `MAIPAI_STANDARDS_DIR`, which may be
+relative to the repo root) with its
 own `gen/ts` and `gen/py` already generated, or the spec step fails with
 a "missing or empty" error that looks unrelated to what you changed.

@@ -5,6 +5,8 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 
 STANDARDS_DIR="${MAIPAI_STANDARDS_DIR:-../.github}"
+STANDARDS_DIR="$(cd "$STANDARDS_DIR" && pwd)"
+export MAIPAI_STANDARDS_DIR="$STANDARDS_DIR"
 
 if [ -d spec/schemas ]; then
   # spec/README.md: "standards/gen/ts/ and standards/gen/py/ (in the
