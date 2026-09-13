@@ -3449,13 +3449,16 @@ future session now that F's hub half exists.
     `frontend/src/apps/chat/chatModelAdapter.test.ts`. Checks:
     `bun test src/apps/chat/chatModelAdapter.test.ts`, `bash scripts/check.sh`.
 
-- [ ] **#60: Message edit vanishes on history reload** (M, blocked on backend)
-
-    Root cause: `frontend/src/apps/chat/chatHistoryAdapter.ts` builds a flat
-    turn history with no branch state; assistant-ui's edit flow branches in
-    memory, and the branch is lost on reload. Needs a nullable `supersedes`
-    column on the backend's turn table before any frontend fix is honest.
-    See docs/dev.md's "Session B follow-up" entry for the repro and analysis.
+- [x] **#60: Message edit vanishes on history reload** (M) - done 2026-09-13.
+    A nullable `supersedes` column on `conversation_turns` (migration 0030,
+    no spec change - it's part of the hub-internal utterance log, not the
+    synced conversation thread), threaded through `runTurn()`/
+    `runTurnStream()` and `POST /api/turn(/stream)`; `chatHistoryAdapter.ts`
+    rebuilds the real branch tree from it (`fromBranchableArray()`) so an
+    edit's sibling survives a reload. See docs/dev/session-b.md for the
+    full writeup, including why getting the edited message's own id out of
+    assistant-ui took two dead ends before landing on reading state
+    directly inside `EditComposer`.
 - [x] **Parallelize `scripts/screenshot.ts`'s full matrix** (S) - done
       2026-09-13 (lane 3 item 5). A code review (2026-09-06) noted the 4
       viewport x 2 theme x up to 17 route matrix ran fully sequentially

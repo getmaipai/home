@@ -1,8 +1,8 @@
 import { describe, expect, test, mock } from "bun:test";
-import { createChatHistoryAdapter, rowsToThreadMessages } from "@/apps/chat/chatHistoryAdapter";
+import { createChatHistoryAdapter, rowsToBranchableMessages } from "@/apps/chat/chatHistoryAdapter";
 import type { ConversationTurnWithMemoryIds } from "@/lib/api";
 
-function makeRow(id: string, replyText: string, memoryIds: string[] = []): ConversationTurnWithMemoryIds {
+function makeRow(id: string, replyText: string, memoryIds: string[] = [], supersedes: string | null = null): ConversationTurnWithMemoryIds {
   return {
     id,
     personId: "person-abc123",
@@ -16,33 +16,84 @@ function makeRow(id: string, replyText: string, memoryIds: string[] = []): Conve
     safetyAction: "allow",
     minorSpeaker: false,
     createdAt: "2026-09-04T00:00:00.000Z",
+    supersedes,
     memory_ids: memoryIds,
   } as ConversationTurnWithMemoryIds;
 }
 
-describe("rowsToThreadMessages", () => {
+// Flattens a rowsToBranchableMessages() result into the same
+// {message, parentId}[] shape ExportedMessageRepository.fromBranchableArray()
+// consumes, so a test can assert on parent links directly.
+function flatten(turns: ReturnType<typeof rowsToBranchableMessages>) {
+  return turns.flatMap((t) => [t.user, t.reply]);
+}
+
+describe("rowsToBranchableMessages", () => {
   test("one row becomes a user message and a reply message, oldest first", () => {
     const rows = [makeRow("row-1", "first reply"), makeRow("row-2", "second reply")]; // per-thread route is oldest first
-    const messages = rowsToThreadMessages(rows, "Nova");
-    expect(messages.map((m) => m.id)).toEqual(["row-1-user", "row-1-reply", "row-2-user", "row-2-reply"]);
-    expect(messages[0]).toMatchObject({ role: "user", content: "question row-1" });
-    expect(messages[1]).toMatchObject({ role: "assistant", content: "first reply", status: { type: "complete", reason: "stop" } });
+    const items = flatten(rowsToBranchableMessages(rows, "Nova"));
+    expect(items.map(({ message }) => message.id)).toEqual(["row-1-user", "row-1-reply", "row-2-user", "row-2-reply"]);
+    expect(items[0]!.message).toMatchObject({ role: "user", content: "question row-1" });
+    expect(items[1]!.message).toMatchObject({ role: "assistant", content: "first reply", status: { type: "complete", reason: "stop" } });
   });
 
   test("each pair carries the row's real id as metadata.custom.turnId - what remember/forget attribute to", () => {
-    const messages = rowsToThreadMessages([makeRow("row-1", "a reply")], "Nova");
-    expect(messages[0]!.metadata!.custom!.turnId).toBe("row-1");
-    expect(messages[1]!.metadata!.custom!.turnId).toBe("row-1");
+    const items = flatten(rowsToBranchableMessages([makeRow("row-1", "a reply")], "Nova"));
+    expect(items[0]!.message.metadata!.custom!.turnId).toBe("row-1");
+    expect(items[1]!.message.metadata!.custom!.turnId).toBe("row-1");
   });
 
   test("empty history maps to an empty thread", () => {
-    expect(rowsToThreadMessages([], "Nova")).toEqual([]);
+    expect(rowsToBranchableMessages([], "Nova")).toEqual([]);
   });
 
   test("a safety-refused turn still renders both sides, not swallowed", () => {
     const row = { ...makeRow("row-1", "I can't help with that."), source: "safety_refuse" };
-    const messages = rowsToThreadMessages([row], "Nova");
-    expect(messages[1]).toMatchObject({ role: "assistant", content: "I can't help with that." });
+    const items = flatten(rowsToBranchableMessages([row], "Nova"));
+    expect(items[1]!.message).toMatchObject({ role: "assistant", content: "I can't help with that." });
+  });
+
+  test("a linear chain: each row's user message parents off the previous row's reply", () => {
+    const rows = [makeRow("row-1", "first reply"), makeRow("row-2", "second reply")];
+    const items = flatten(rowsToBranchableMessages(rows, "Nova"));
+    expect(items[0]).toMatchObject({ parentId: null }); // the very first message in the conversation
+    expect(items[1]).toMatchObject({ parentId: "row-1-user" });
+    expect(items[2]).toMatchObject({ parentId: "row-1-reply" }); // row-2's user message follows row-1's reply
+  });
+
+  // getmaipai/home#60: an edited-and-resent message is a real new
+  // conversation_turns row with its own id and `supersedes` pointing at
+  // the row it replaces - not a rewrite of the old one. The old row's own
+  // user message and the new row's user message must land as SIBLINGS
+  // (the same parentId) for BranchPickerPrimitive to show "1/2, 2/2"
+  // instead of two separate exchanges after a reload.
+  test("a row with supersedes becomes a sibling branch of the row it replaces, not a child of it", () => {
+    const rows = [makeRow("row-1", "original reply"), makeRow("row-2", "edited reply", [], "row-1")];
+    const turns = rowsToBranchableMessages(rows, "Nova");
+    const items = flatten(turns);
+    const originalUser = items.find(({ message }) => message.id === "row-1-user")!;
+    const editedUser = items.find(({ message }) => message.id === "row-2-user")!;
+    expect(editedUser.parentId).toBe(originalUser.parentId); // same parent = siblings = a branch, not a new exchange
+    expect(editedUser.parentId).toBeNull(); // both are the conversation's very first message
+  });
+
+  test("a normal turn sent after an edit chains off the edited (newest) reply, not the original", () => {
+    const rows = [makeRow("row-1", "original reply"), makeRow("row-2", "edited reply", [], "row-1"), makeRow("row-3", "third reply")];
+    const items = flatten(rowsToBranchableMessages(rows, "Nova"));
+    const row3User = items.find(({ message }) => message.id === "row-3-user")!;
+    expect(row3User.parentId).toBe("row-2-reply"); // the edit is the conversation's current path going forward
+  });
+
+  test("a second edit of the same slot chains off the same anchor as the first edit", () => {
+    const rows = [
+      makeRow("row-1", "original reply"),
+      makeRow("row-2", "first edit", [], "row-1"),
+      makeRow("row-3", "second edit", [], "row-1"),
+    ];
+    const items = flatten(rowsToBranchableMessages(rows, "Nova"));
+    const row1User = items.find(({ message }) => message.id === "row-1-user")!;
+    const row3User = items.find(({ message }) => message.id === "row-3-user")!;
+    expect(row3User.parentId).toBe(row1User.parentId); // a third sibling under the same original parent
   });
 });
 

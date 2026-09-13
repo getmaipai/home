@@ -49,20 +49,26 @@ renders on a thrown render error in a test. The privacy page needs no
 change (nothing new leaves the house), state that in dev.md. Tick the
 item.
 
-## 3. getmaipai/home#60: an edited message survives a history reload (M, spec first)
+## 3. getmaipai/home#60: an edited message survives a history reload (M)
 
 Now unblocked: Track A merged and Session A is not in these files.
-Read `spec/schemas/conversation.schema.json` and the turn row in
-`backend/src/db/schema.ts`. Add to the spec, additive: an optional
-`supersedes` on a turn (the id of the turn this one replaces when a
-person edits and resends). Regenerate the bindings (`bun run gen:ts`
-and `bash scripts/gen-py.sh` in `spec/`), add a round-trip fixture,
-then the hub: a nullable column with a migration, `POST /api/turn`
-and `/api/turn/stream` accept `supersedes`, the history route returns
-it, and `chatHistoryAdapter.ts` rebuilds the branch so an edited
-message shows the edit as the active branch with the original as its
-sibling. Files: `spec/schemas/conversation.schema.json` and fixtures,
+Correction (coordinator ruling, 2026-09-13): this item's own text
+originally said "spec first" - a real conversation THREAD is spec-
+shaped (spec/schemas/conversation.schema.json, since it syncs), but an
+individual TURN (conversation_turns) is deliberately NOT
+(conversationHistory.ts's own header comment: a raw utterance log
+never syncs and stays hub-internal). `supersedes` describes an edit
+branch within that same hub-internal log, so it is a backend-only
+nullable column with a migration, no spec schema, no fixture, no
+regenerated bindings. Read the turn row in `backend/src/db/schema.ts`
+directly, not the conversation spec. `POST /api/turn` and `/api/turn/
+stream` accept `supersedes`, the history route returns it, and
+`chatHistoryAdapter.ts` rebuilds the branch so an edited message shows
+the edit as the active branch with the original as its sibling. Files:
 `backend/src/db/schema.ts` and a generated migration,
+`backend/src/lib/turnEngine.ts` (an additive passthrough option on
+`runTurn()`/`runTurnStream()`'s own opts, threaded to `logTurn()` -
+Session A's file, mid-ROUTE-01 there: tell it before you edit),
 `backend/src/lib/conversationHistory.ts` (Session A's file: tell it
 before you edit and keep the change additive), `backend/src/routes/
 turn.ts` (also Session A's: same), `frontend/src/apps/chat/

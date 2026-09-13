@@ -18,6 +18,7 @@ import { brainBlockReason, useEngineHealth } from "@/apps/chat/useEngineHealth";
 import { createSttDictationAdapter } from "@/lib/voice/sttDictationAdapter";
 import { createSttSocket } from "@/lib/voice/sttSocket";
 import { ChatActorContext } from "@/apps/chat/chatMemoryActions";
+import { consumeSupersedes } from "@/apps/chat/chatEditSupersedes";
 import { cn, FOCUS_RING } from "@/kit/utils";
 import type { Roster } from "@/lib/api";
 import type { SentenceSpeechScheduler } from "@/lib/sentenceSpeechScheduler";
@@ -161,6 +162,7 @@ export function ChatPage({ person }: ChatPageProps) {
           setThinking(false);
           return value;
         },
+        consumeSupersedes,
         onCrisisResources: setBanner,
         turnSchedulerRef,
         onSpeakingChange: (value) => { setIsSpeaking(value); if (value) setSpeechError(false); },

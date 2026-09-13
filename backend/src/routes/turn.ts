@@ -34,9 +34,14 @@ turnRoutes.post("/", requireAuth, bodyLimit({ maxSize: TURN_BODY_LIMIT }), async
     text?: string;
     thinking?: boolean;
     conversation_id?: string;
+    supersedes?: string;
   };
   const surface = (body.surface ?? "chat") as Surface;
-  const result = await runTurn(actor, surface, body.text ?? "", { thinking: body.thinking, conversationId: body.conversation_id });
+  const result = await runTurn(actor, surface, body.text ?? "", {
+    thinking: body.thinking,
+    conversationId: body.conversation_id,
+    supersedes: body.supersedes,
+  });
   if (!result.ok) {
     return c.json({ error: result.error, code: result.code }, result.status);
   }
@@ -194,6 +199,7 @@ turnRoutes.post("/stream", requireAuth, bodyLimit({ maxSize: TURN_BODY_LIMIT }),
     text?: string;
     thinking?: boolean;
     conversation_id?: string;
+    supersedes?: string;
   };
   const surface = (body.surface ?? "chat") as Surface;
   // COR-7 (code review, 2026-09-06): a disconnected client used to leave
@@ -205,6 +211,7 @@ turnRoutes.post("/stream", requireAuth, bodyLimit({ maxSize: TURN_BODY_LIMIT }),
   const result = await runTurnStream(actor, surface, body.text ?? "", {
     thinking: body.thinking,
     conversationId: body.conversation_id,
+    supersedes: body.supersedes,
     signal: abortController.signal,
   });
   if (!result.ok) {

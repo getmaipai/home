@@ -546,6 +546,6 @@ export const api = {
   // stopped run, so a user-initiated "stop" actually cancels the fetch
   // instead of leaving the browser's request racing pointlessly against
   // work nothing will read the result of.
-  streamTurn: (text: string, thinking?: boolean, signal?: AbortSignal, conversationId?: string) =>
-    rawStreamPost("/api/turn/stream", { surface: "chat", text, thinking, conversation_id: conversationId }, 0, undefined, signal),
+  streamTurn: (text: string, thinking?: boolean, signal?: AbortSignal, conversationId?: string, supersedes?: string) =>
+    rawStreamPost("/api/turn/stream", { surface: "chat", text, thinking, conversation_id: conversationId, supersedes }, 0, undefined, signal),
 };

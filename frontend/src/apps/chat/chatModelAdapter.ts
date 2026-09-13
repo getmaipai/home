@@ -45,6 +45,13 @@ export interface ChatModelAdapterDeps {
   onReplyState?(state: "waiting" | "responding" | "ready" | "error" | "idle"): void;
   onSpeechError?(): void;
   consumeThinking(): boolean;
+  // getmaipai/home#60: reads AND resets the "which turn is this Update
+  // replacing" ref that thread.aui.tsx's EditComposer sets right before
+  // its own Send click reaches assistant-ui's real send callback
+  // (chatEditSupersedes.ts), the same single-shot pattern consumeThinking()
+  // already uses - undefined for an ordinary send, never anything else's
+  // edit once this one's been read.
+  consumeSupersedes(): string | undefined;
   getConversationId?(): Promise<string>;
   // 4.3: "offer, never block" - a crisis-resources banner rides alongside
   // the reply, not as part of the message content assistant-ui renders.
@@ -191,11 +198,18 @@ export function createChatModelAdapter(deps: ChatModelAdapterDeps): ChatModelAda
         }
       }
 
+      // Consumed here, synchronously, before anything that can throw or
+      // abort below: consumeSupersedes() is a single-shot read-and-reset
+      // (chatEditSupersedes.ts), so calling it any later - after an
+      // `await` a Stop click can race - risks throwing past it and
+      // leaving a stale edit's turn id sitting in the module-scope ref
+      // for a later, unrelated send to inherit.
+      const supersedes = deps.consumeSupersedes();
       deps.onReplyState?.("waiting");
       try {
         const conversationId = await deps.getConversationId?.();
         abortSignal.throwIfAborted();
-        const response = await api.streamTurn(text, deps.consumeThinking(), abortSignal, conversationId);
+        const response = await api.streamTurn(text, deps.consumeThinking(), abortSignal, conversationId, supersedes);
         for await (const event of readTurnStream(response)) {
           if (event.type === "turn_meta") {
             // The contract's first line on every turn (routes/turn.ts).
@@ -279,9 +293,18 @@ export function createChatModelAdapter(deps: ChatModelAdapterDeps): ChatModelAda
             // just streamed in live or came back from GET /api/conversations/
             // :id/turns - camelCase keys to match that adapter's row fields,
             // even though TurnValue itself is snake_case on the wire.
+            // getmaipai/home#60: `turnId` matches chatHistoryAdapter.ts's
+            // own reload-path metadata shape exactly (camelCase, same
+            // key) - a live reply carries its real turn id from the
+            // moment it's created, not only once a reload rebuilds it
+            // from the database, so editing a message sent THIS session
+            // can find the turn its own reply belongs to (thread.aui.tsx's
+            // EditComposer) without waiting for a reload.
             yield {
               content: [{ type: "text", text: finalText }],
-              metadata: { custom: { source: event.value.source, pluginId: event.value.plugin_id, commandId: event.value.command_id } },
+              metadata: {
+                custom: { source: event.value.source, pluginId: event.value.plugin_id, commandId: event.value.command_id, turnId: event.value.turn_id },
+              },
             };
           } else {
             sawTerminalEvent = true;

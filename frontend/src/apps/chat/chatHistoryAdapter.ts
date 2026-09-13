@@ -1,21 +1,53 @@
 import { ExportedMessageRepository, type ThreadHistoryAdapter, type ThreadMessageLike } from "@assistant-ui/react";
 import { api, type ConversationTurnWithMemoryIds } from "@/lib/api";
 
-// The per-conversation endpoint returns turns oldest first. Each saved
-// exchange becomes two messages with its real provenance and memory ids.
-export function rowsToThreadMessages(rows: ConversationTurnWithMemoryIds[], selfName: string): ThreadMessageLike[] {
-  const out: ThreadMessageLike[] = [];
+/** One {message, parentId} pair per turn's user half, in the exact branch
+ * shape ExportedMessageRepository.fromBranchableArray() wants. */
+export interface BranchableTurnMessages {
+  user: { message: ThreadMessageLike; parentId: string | null };
+  reply: { message: ThreadMessageLike; parentId: string | null };
+}
+
+/** getmaipai/home#60: rows come oldest-first (real creation order), and a
+ * `supersedes` row is a genuine new database row, never a rewrite of the
+ * one it replaces - the old row is untouched, still sitting earlier in
+ * this same list. So a plain "each turn's user message follows the
+ * previous turn's reply" chain would show every edit as one more linear
+ * exchange, exactly the bug this issue is about (the branch relationship
+ * survives in the data but not in what gets rendered). Rebuilt as a real
+ * tree instead: a row with no `supersedes` extends the running chain
+ * (`chainTail`, the previous reply); a row that supersedes turn X
+ * attaches under whatever X's OWN user message's parent was - a
+ * SIBLING of X, not a child of it - which is what makes
+ * BranchPickerPrimitive show "1/2, 2/2" instead of two separate
+ * exchanges. `parentByRowId` remembers each row's resolved parent (not
+ * just its own row id) so a third edit of the same slot chains off the
+ * same anchor as the first two, and the running chain always advances to
+ * the newest row either way: whichever version was sent most recently is
+ * the conversation's real current path, edit or not. */
+export function rowsToBranchableMessages(rows: ConversationTurnWithMemoryIds[], selfName: string): BranchableTurnMessages[] {
+  const parentByRowId = new Map<string, string | null>();
+  let chainTail: string | null = null;
+  const out: BranchableTurnMessages[] = [];
   for (const row of rows) {
     const createdAt = new Date(row.createdAt);
-    out.push({
-      id: `${row.id}-user`,
+    // `?? chainTail` would be wrong here: a row whose OWN parent is
+    // genuinely `null` (the conversation's first message) makes
+    // parentByRowId.get() return null too, and `null ?? chainTail`
+    // can't tell that apart from "not found" - .has() is the real check.
+    const parentId = row.supersedes && parentByRowId.has(row.supersedes) ? parentByRowId.get(row.supersedes)! : chainTail;
+    parentByRowId.set(row.id, parentId);
+    const userId = `${row.id}-user`;
+    const replyId = `${row.id}-reply`;
+    const userMessage: ThreadMessageLike = {
+      id: userId,
       role: "user",
       content: row.userText,
       createdAt,
       metadata: { custom: { turnId: row.id, senderName: selfName } },
-    });
-    out.push({
-      id: `${row.id}-reply`,
+    };
+    const replyMessage: ThreadMessageLike = {
+      id: replyId,
       role: "assistant",
       content: row.replyText,
       createdAt,
@@ -25,19 +57,25 @@ export function rowsToThreadMessages(rows: ConversationTurnWithMemoryIds[], self
       // for a non-model reply - the same row fields Fix B3
       // (conversationHistory.ts's buildConversationWindow()) already uses.
       metadata: { custom: { turnId: row.id, memoryIds: row.memory_ids, source: row.source, pluginId: row.pluginId, commandId: row.commandId } },
-    });
+    };
+    out.push({ user: { message: userMessage, parentId }, reply: { message: replyMessage, parentId: userId } });
+    chainTail = replyId;
   }
   return out;
 }
 
-// Turns are persisted by the turn engine. Branch persistence is separate
-// work; this adapter only reloads the selected conversation's linear history.
+// Turns are persisted by the turn engine. `supersedes` (getmaipai/home#60)
+// is what makes an edit-and-resend a real branch here rather than just
+// another exchange in the linear history.
 export function createChatHistoryAdapter(selfName: string, getConversationId: () => string | undefined): ThreadHistoryAdapter {
   return {
     async load() {
       const id = getConversationId();
       const rows = id ? await api.conversationTurns(id) : [];
-      return ExportedMessageRepository.fromArray(rowsToThreadMessages(rows, selfName));
+      const turns = rowsToBranchableMessages(rows, selfName);
+      const items = turns.flatMap((t) => [t.user, t.reply]);
+      const headId = turns.length > 0 ? turns[turns.length - 1]!.reply.message.id : undefined;
+      return ExportedMessageRepository.fromBranchableArray(items, { headId });
     },
     async append() {},
   };

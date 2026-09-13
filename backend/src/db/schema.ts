@@ -381,6 +381,18 @@ export const conversationTurns = sqliteTable(
     // (lib/episodes.ts) tells a canned line from an answer by this field
     // alone, never by the text.
     guardReason: text("guard_reason"),
+    // getmaipai/home#60: the id of the turn this one replaces when a
+    // person edits an earlier message and resends - an edit branch
+    // within this hub-internal utterance log, not a property of the
+    // synced conversation thread record, so this stays a plain column
+    // here (no spec/schemas/ change - coordinator ruling, 2026-09-13,
+    // docs/dev/session-b.md has the full reasoning), the same "no FK
+    // constraint, just an id" shape `memoryRecords.supersededBy` already
+    // uses for the identical self-referencing relationship. Null for
+    // every ordinary turn; set only on the NEW row an edit-and-resend
+    // creates, never on the old one it replaces (the old row is left
+    // exactly as it was, still readable as the other branch).
+    supersedes: text("supersedes"),
     // Step 10: not a spec-shaped record itself (conversation_turns stays
     // hub-internal, see the table's own header above), but the plan's
     // own text still asks for it here so a synced conversation's

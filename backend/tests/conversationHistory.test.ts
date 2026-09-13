@@ -109,6 +109,91 @@ describe("logTurn (via runTurn)", () => {
   });
 });
 
+describe("logTurn's supersedes option (getmaipai/home#60)", () => {
+  test("defaults to null for an ordinary turn", async () => {
+    const { actor } = await owner();
+    const conv = resolveOrCreateConversation(actor, "chat");
+    if (!conv.ok) throw new Error(conv.error);
+
+    logTurn(actor, "chat", "hi", { reply: { text: "hello" }, source: "model", safety: SAFE, conversation_id: conv.value.id, turn_id: "turn-original" });
+
+    const row = db.select().from(conversationTurns).where(eq(conversationTurns.id, "turn-original")).get()!;
+    expect(row.supersedes).toBeNull();
+  });
+
+  test("an edit-and-resend writes a new row carrying the old turn's id, leaving the old row untouched", async () => {
+    const { actor } = await owner();
+    const conv = resolveOrCreateConversation(actor, "chat");
+    if (!conv.ok) throw new Error(conv.error);
+
+    logTurn(actor, "chat", "whats the weather", {
+      reply: { text: "sunny" },
+      source: "model",
+      safety: SAFE,
+      conversation_id: conv.value.id,
+      turn_id: "turn-original",
+    });
+    logTurn(
+      actor,
+      "chat",
+      "what's the weather tomorrow",
+      { reply: { text: "rainy" }, source: "model", safety: SAFE, conversation_id: conv.value.id, turn_id: "turn-edited" },
+      { supersedes: "turn-original" },
+    );
+
+    const original = db.select().from(conversationTurns).where(eq(conversationTurns.id, "turn-original")).get()!;
+    const edited = db.select().from(conversationTurns).where(eq(conversationTurns.id, "turn-edited")).get()!;
+    expect(original.supersedes).toBeNull(); // the replaced row is a real, untouched sibling - never rewritten
+    expect(original.userText).toBe("whats the weather");
+    expect(edited.supersedes).toBe("turn-original");
+    expect(edited.userText).toBe("what's the weather tomorrow");
+
+    const rows = db.select().from(conversationTurns).where(eq(conversationTurns.conversationId, conv.value.id)).all();
+    expect(rows.length).toBe(2); // both branches persist - editing never deletes the original
+  });
+
+  // A code review (2026-09-13) found `supersedes` reached the DB straight
+  // from POST /api/turn(/stream)'s own request body with nothing actually
+  // checking it names a real, same-conversation turn - the exact gap a
+  // buggy or malicious client could exploit to plant a row that points at
+  // an unrelated or nonexistent turn.
+  test("a supersedes value naming a turn from a DIFFERENT conversation is dropped, not stored", async () => {
+    const { actor } = await owner();
+    const convA = resolveOrCreateConversation(actor, "chat");
+    const convB = resolveOrCreateConversation(actor, "tv");
+    if (!convA.ok || !convB.ok) throw new Error("setup failed");
+
+    logTurn(actor, "chat", "hi", { reply: { text: "hello" }, source: "model", safety: SAFE, conversation_id: convA.value.id, turn_id: "turn-conv-a" });
+    logTurn(
+      actor,
+      "tv",
+      "play something",
+      { reply: { text: "ok" }, source: "model", safety: SAFE, conversation_id: convB.value.id, turn_id: "turn-conv-b" },
+      { supersedes: "turn-conv-a" }, // cross-conversation - not this turn's own history
+    );
+
+    const row = db.select().from(conversationTurns).where(eq(conversationTurns.id, "turn-conv-b")).get()!;
+    expect(row.supersedes).toBeNull();
+  });
+
+  test("a supersedes value naming a turn that doesn't exist is dropped, not stored", async () => {
+    const { actor } = await owner();
+    const conv = resolveOrCreateConversation(actor, "chat");
+    if (!conv.ok) throw new Error(conv.error);
+
+    logTurn(
+      actor,
+      "chat",
+      "hi",
+      { reply: { text: "hello" }, source: "model", safety: SAFE, conversation_id: conv.value.id, turn_id: "turn-real" },
+      { supersedes: "turn-does-not-exist" },
+    );
+
+    const row = db.select().from(conversationTurns).where(eq(conversationTurns.id, "turn-real")).get()!;
+    expect(row.supersedes).toBeNull();
+  });
+});
+
 describe("routingStats()", () => {
   test("counts real turns by source, and computes the fall-through rate", async () => {
     const { actor } = await owner();
@@ -797,6 +882,31 @@ describe("buildConversationWindow() (step 3)", () => {
     expect(window.messages.some((m) => m.role === "assistant" && m.content === "hello there")).toBe(true);
     expect(window.messages.some((m) => m.role === "system")).toBe(false);
   });
+
+  // A code review (2026-09-13) found a superseded row still fed the
+  // model's own context window: an edited-and-resent message put the
+  // stale, user-discarded exchange right back in front of the model
+  // alongside the real one, defeating the entire point of an edit.
+  test("a superseded turn never enters the model's own context window - only the edit does", async () => {
+    const { actor } = await owner();
+    const conv = resolveOrCreateConversation(actor, "chat");
+    if (!conv.ok) throw new Error(conv.error);
+
+    logTurn(actor, "chat", "whats the weather", { reply: { text: "sunny" }, source: "model", safety: SAFE, conversation_id: conv.value.id, turn_id: "turn-original" });
+    logTurn(
+      actor,
+      "chat",
+      "what's the weather tomorrow",
+      { reply: { text: "rainy" }, source: "model", safety: SAFE, conversation_id: conv.value.id, turn_id: "turn-edited" },
+      { supersedes: "turn-original" },
+    );
+
+    const window = buildConversationWindow(conv.value);
+    expect(window.messages.some((m) => m.content.includes("whats the weather") && !m.content.includes("tomorrow"))).toBe(false);
+    expect(window.messages.some((m) => m.role === "assistant" && m.content === "sunny")).toBe(false);
+    expect(window.messages.some((m) => m.content === "what's the weather tomorrow")).toBe(true);
+    expect(window.messages.some((m) => m.role === "assistant" && m.content === "rainy")).toBe(true);
+  });
 });
 
 describe("maybeRefreshConversationSummary() (step 3: runs when due, not before)", () => {
@@ -851,6 +961,65 @@ describe("maybeRefreshConversationSummary() (step 3: runs when due, not before)"
     if (!row.ok) throw new Error(row.error);
     expect(row.value.summary).not.toBeNull();
     expect(row.value.summary_through_turn).not.toBeNull();
+  });
+
+  // A code review (2026-09-13) found that editing the exact turn named by
+  // `summary_through_turn` made this function lose its place:
+  // excludeSupersededRows() drops that row, an id lookup against the
+  // filtered list then misses it, and the WHOLE older-than-window range -
+  // already-summarized turns included - gets treated as new again.
+  test("editing the turn that marks summary_through_turn doesn't reset progress - only the real new increment gets summarized again", async () => {
+    const { actor } = await owner();
+    const conv = resolveOrCreateConversation(actor, "chat");
+    if (!conv.ok) throw new Error(conv.error);
+
+    const { startStubLlmServer } = await import("@maipai/spec/llm/ts/stubServer.js");
+    const stub = startStubLlmServer();
+    process.env.MAIPAI_BACKGROUND_URL = stub.url;
+    try {
+      // First batch: 8 turns triggers a first summary covering the 4
+      // oldest (turn-anchor0..3); summary_through_turn lands on turn-anchor3.
+      for (let i = 0; i < 8; i++) {
+        logTurn(actor, "chat", `first batch msg ${i}`, { reply: { text: `first batch reply ${i}` }, source: "model", safety: SAFE, conversation_id: conv.value.id, turn_id: `turn-anchor${i}` });
+      }
+      await maybeRefreshConversationSummary(conv.value.id);
+      const afterFirst = getConversation(actor, conv.value.id);
+      if (!afterFirst.ok) throw new Error(afterFirst.error);
+      expect(afterFirst.value.summary_through_turn).toBe("turn-anchor3");
+
+      // Edit the EXACT turn the summary's own progress marker names - a
+      // real edit-and-resend, not a hypothetical.
+      logTurn(
+        actor,
+        "chat",
+        "edited anchor message",
+        { reply: { text: "edited anchor reply" }, source: "model", safety: SAFE, conversation_id: conv.value.id, turn_id: "turn-anchor3-edited" },
+        { supersedes: "turn-anchor3" },
+      );
+      // Four more turns fall out of the window past the (still-valid) anchor point.
+      for (let i = 0; i < 4; i++) {
+        logTurn(actor, "chat", `second batch msg ${i}`, { reply: { text: `second batch reply ${i}` }, source: "model", safety: SAFE, conversation_id: conv.value.id, turn_id: `turn-second${i}` });
+      }
+
+      await maybeRefreshConversationSummary(conv.value.id);
+      const afterSecond = getConversation(actor, conv.value.id);
+      if (!afterSecond.ok) throw new Error(afterSecond.error);
+      // The stub echoes the whole prompt back as the summary text, and
+      // the prompt itself carries the FIRST summary forward verbatim as
+      // "Prior summary: ..." - so "first batch msg 0" legitimately
+      // appears once, carried from that prior summary. What must NOT
+      // happen is a SECOND occurrence: that would mean the second call's
+      // own transcript re-included an already-summarized turn, exactly
+      // the bug (summary_through_turn's own turn getting superseded and
+      // losing its place) this test exists to catch.
+      const summary = afterSecond.value.summary ?? "";
+      expect(summary.split("first batch msg 0").length - 1).toBe(1);
+      expect(summary.split("first batch msg 1").length - 1).toBe(1);
+      expect(summary.split("first batch msg 2").length - 1).toBe(1);
+      expect(summary).toContain("edited anchor message");
+    } finally {
+      stub.stop();
+    }
   });
 
   // Issue #45: runTurn()'s own post-turn hook used to call this

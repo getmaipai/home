@@ -89,13 +89,35 @@ const insertTurnAndBumpConversation = sqlite.transaction((row: ConversationTurnR
   db.update(conversations).set({ updatedAt: row.createdAt, hlc: nextHlc() }).where(eq(conversations.id, conversationId)).run();
 });
 
-export function logTurn(actor: PersonRow, surface: Surface, userText: string, value: TurnValue, opts: { guardReasons?: readonly string[] } = {}): ConversationTurnRow {
+/** getmaipai/home#60: `supersedes` reaches here from `POST /api/turn(/
+ * stream)`'s own request body (`routes/turn.ts`) by way of `runTurn()`/
+ * `runTurnStream()`'s opts, with nothing in between actually checking it
+ * refers to a real turn in THIS conversation - a code review (2026-09-13)
+ * caught that the claim used to sit here unenforced. A bogus or
+ * cross-conversation id is dropped to null, not thrown: a malformed edit
+ * hint on an otherwise-real, otherwise-successful turn should never cost
+ * the household their reply, the same posture logTurnSafely()'s own
+ * try/catch already takes for this whole function. */
+function resolveSupersedes(supersedes: string | null | undefined, conversationId: string): string | null {
+  if (!supersedes) return null;
+  const superseded = db.select({ conversationId: conversationTurns.conversationId }).from(conversationTurns).where(eq(conversationTurns.id, supersedes)).get();
+  return superseded && superseded.conversationId === conversationId ? supersedes : null;
+}
+
+export function logTurn(
+  actor: PersonRow,
+  surface: Surface,
+  userText: string,
+  value: TurnValue,
+  opts: { guardReasons?: readonly string[]; supersedes?: string | null } = {},
+): ConversationTurnRow {
   // Built and returned directly from the caller's own values, not
   // re-selected after the insert: a review (2026-09-04) pointed out every
   // field is already known here, the same "don't round-trip the database
   // to read back what you just validated and wrote" precedent
   // lib/memory.ts's remember() already set. This runs once per completed
   // turn, the app's hottest path.
+  const supersedes = resolveSupersedes(opts.supersedes, value.conversation_id);
   const row: ConversationTurnRow = {
     id: value.turn_id,
     personId: actor.id,
@@ -121,6 +143,10 @@ export function logTurn(actor: PersonRow, surface: Surface, userText: string, va
     // getmaipai/home#78: the first guard that fired is the one whose
     // honest line (or cut) the household actually heard.
     guardReason: opts.guardReasons?.[0] ?? null,
+    // getmaipai/home#60: the turn this one replaces, when the caller is
+    // an edit-and-resend rather than a fresh message - resolveSupersedes()
+    // above already checked it's a real, same-conversation turn.
+    supersedes,
     // Every new turn starts unjudged (step 6's own poison-guard state,
     // lib/memoryJudge.ts) - never anything but null/0 at insert time.
     judgeStatus: null,
@@ -587,6 +613,20 @@ function estimateTokens(text: string): number {
   return Math.ceil(text.length / CHARS_PER_TOKEN_ESTIMATE);
 }
 
+/** getmaipai/home#60: a superseded row is a real, permanent sibling (the
+ * branch switcher needs both), but it is never the household's CURRENT
+ * answer to anything - the model's own context window and the rolling
+ * summary must see only the live branch, or an edited-and-resent message
+ * (`buildConversationWindow()`'s whole reason to exist: what the model
+ * gets asked to continue from) puts the stale, user-discarded exchange
+ * back in front of it right alongside the real one. `rows` is already
+ * bounded (WINDOW_ROW_FETCH_LIMIT), so this is a plain in-memory filter,
+ * not a second query. */
+function excludeSupersededRows(rows: readonly ConversationTurnRow[]): ConversationTurnRow[] {
+  const supersededIds = new Set(rows.map((r) => r.supersedes).filter((id): id is string => id !== null));
+  return rows.filter((r) => !supersededIds.has(r.id));
+}
+
 export interface ConversationWindow {
   messages: LlmMessage[];
   /** One system-side line covering everything older than the window,
@@ -691,10 +731,11 @@ export function buildConversationWindow(conversation: Conversation): Conversatio
     .limit(WINDOW_ROW_FETCH_LIMIT)
     .all();
   rows.sort((a, b) => a.createdAt.localeCompare(b.createdAt));
-  if (rows.length === 0) return { messages: [] };
+  const liveRows = excludeSupersededRows(rows);
+  if (liveRows.length === 0) return { messages: [] };
 
-  const newest = rows.slice(-WINDOW_NEWEST_TURNS_KEPT);
-  const older = rows.slice(0, Math.max(0, rows.length - WINDOW_NEWEST_TURNS_KEPT));
+  const newest = liveRows.slice(-WINDOW_NEWEST_TURNS_KEPT);
+  const older = liveRows.slice(0, Math.max(0, liveRows.length - WINDOW_NEWEST_TURNS_KEPT));
 
   let tokenTotal = newest.reduce((sum, t) => sum + estimateTokens(t.userText) + estimateTokens(t.replyText), 0);
   const includedOlder: ConversationTurnRow[] = [];
@@ -760,13 +801,24 @@ export async function maybeRefreshConversationSummary(conversationId: string): P
     .limit(WINDOW_ROW_FETCH_LIMIT)
     .all();
   rows.sort((a, b) => a.createdAt.localeCompare(b.createdAt));
-  if (rows.length <= WINDOW_NEWEST_TURNS_KEPT) return; // nothing has fallen out of the window yet
+  const liveRows = excludeSupersededRows(rows);
+  if (liveRows.length <= WINDOW_NEWEST_TURNS_KEPT) return; // nothing has fallen out of the window yet
 
-  const olderThanWindow = rows.slice(0, rows.length - WINDOW_NEWEST_TURNS_KEPT);
-  const throughIndex = conversation.summaryThroughTurn
-    ? olderThanWindow.findIndex((t) => t.id === conversation.summaryThroughTurn)
-    : -1;
-  const newSinceLastSummary = olderThanWindow.slice(throughIndex + 1);
+  const olderThanWindow = liveRows.slice(0, liveRows.length - WINDOW_NEWEST_TURNS_KEPT);
+  // getmaipai/home#60: `summary_through_turn` names a turn id, but that
+  // exact row may since have been superseded (edited) and so dropped from
+  // `liveRows` above - looking it up there by id would then miss it
+  // entirely (findIndex -1) and treat NOTHING as summarized yet, redoing
+  // the whole older-than-window range instead of just the new increment.
+  // Resolved by POSITION in the original `rows` instead of by timestamp:
+  // a code review (2026-09-05) on listConversationTurns()'s own `since`
+  // cursor already found same-millisecond turns make timestamp
+  // comparison inexact ("same millisecond, different id"), and slicing
+  // by index is what that fix landed on - `rows.indexOf` works here
+  // because `liveRows`/`olderThanWindow` are filtered VIEWS of the same
+  // row objects, not copies.
+  const throughIndex = conversation.summaryThroughTurn ? rows.findIndex((t) => t.id === conversation.summaryThroughTurn) : -1;
+  const newSinceLastSummary = throughIndex === -1 ? olderThanWindow : olderThanWindow.filter((t) => rows.indexOf(t) > throughIndex);
   if (newSinceLastSummary.length < SUMMARY_REFRESH_THRESHOLD_TURNS) return;
   // The summary runs on the background engine (MEM-02), so the CHAT
   // engine's kind is irrelevant here; an unresolved background backend

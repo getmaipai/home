@@ -211,6 +211,13 @@
       "when": 1789276118540,
       "tag": "0029_rainy_spot",
       "breakpoints": true
+    },
+    {
+      "idx": 30,
+      "version": "6",
+      "when": 1789281163824,
+      "tag": "0030_strange_doctor_strange",
+      "breakpoints": true
     }
   ]
 }

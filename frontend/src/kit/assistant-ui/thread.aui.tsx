@@ -30,6 +30,7 @@ import {
 } from "@/kit/assistant-ui/tool-group.aui";
 import { TooltipIconButton } from "@/kit/assistant-ui/tooltip-icon-button";
 import { ForgetThisMenuItem, ListenButton, RememberThisButton, RememberThisMenuItem } from "@/apps/chat/chatActionBar";
+import { setPendingSupersedes } from "@/apps/chat/chatEditSupersedes";
 import { MemoryUpdatedChip } from "@/apps/chat/chatMemoryChip";
 import { ChatSourceCaption } from "@/apps/chat/chatSourceCaption";
 import { DayBoundaryProvider, DayDivider, MessageTimestamp } from "@/apps/chat/chatDayDivider";
@@ -701,7 +702,31 @@ const UserActionBar: FC = () => {
   );
 };
 
+// getmaipai/home#60: assistant-ui never threads an edit's original
+// message id into chatModelAdapter.ts's ChatModelRunOptions (the only
+// place that carries it, `composer.send`'s own event, fires from a
+// MESSAGE-scoped composer client - a listener outside this component's
+// own subtree never receives it, confirmed live even with `{ scope: "*"
+// }`), so this is computed and stashed here instead, from inside the one
+// component that already sits in that message's own scope. `s.thread.
+// messages` is the CURRENTLY DISPLAYED branch, so the entry right after
+// this message is the turn's own reply, and chatModelAdapter.ts's "done"
+// yield now stamps every live reply's real turnId onto that entry too -
+// resolves for a message edited moments after sending, not only one
+// already reloaded from history. Read at SEND time (inside the Update
+// button's own onClick, composed to run before assistant-ui's real send
+// callback - createActionButton's composeEventHandlers(primitiveProps.
+// onClick, callback) - never at render time: the messages list is
+// otherwise stale by the moment a person actually clicks).
 const EditComposer: FC = () => {
+  const editedMessageId = useAuiState((s) => s.message.id);
+  const messages = useAuiState((s) => s.thread.messages);
+  const handleSendClick = () => {
+    const editedIndex = messages.findIndex((m) => m.id === editedMessageId);
+    const reply = editedIndex >= 0 ? messages[editedIndex + 1] : undefined;
+    const turnId = reply?.role === "assistant" ? (reply.metadata?.custom?.turnId as string | undefined) : undefined;
+    setPendingSupersedes(turnId ?? null);
+  };
   return (
     <MessagePrimitive.Root
       data-slot="aui_edit-composer-wrapper"
@@ -722,7 +747,7 @@ const EditComposer: FC = () => {
               Cancel
             </Button>
           </ComposerPrimitive.Cancel>
-          <ComposerPrimitive.Send asChild>
+          <ComposerPrimitive.Send asChild onClick={handleSendClick}>
             <Button size="sm" className="h-8 rounded-full px-3.5">
               Update
             </Button>

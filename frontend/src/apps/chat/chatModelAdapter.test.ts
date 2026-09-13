@@ -55,6 +55,7 @@ function stubEnvironment(streamBody: ReadableStream<Uint8Array> | (() => Promise
 async function collect(messages: ThreadMessage[], abortSignal = new AbortController().signal): Promise<{ yields: ChatModelRunResult[]; error?: unknown }> {
   const adapter = createChatModelAdapter({
     consumeThinking: () => false,
+    consumeSupersedes: () => undefined,
     onCrisisResources: () => {},
     turnSchedulerRef: { current: null },
   });
@@ -145,6 +146,7 @@ describe("createChatModelAdapter streaming", () => {
     try {
       const adapter = createChatModelAdapter({
         consumeThinking: () => false,
+        consumeSupersedes: () => undefined,
         onCrisisResources: () => {},
         turnSchedulerRef: { current: null },
       });
@@ -198,6 +200,7 @@ describe("createChatModelAdapter streaming", () => {
     try {
       const adapter = createChatModelAdapter({
         consumeThinking: () => false,
+        consumeSupersedes: () => undefined,
         onCrisisResources: () => {},
         turnSchedulerRef: { current: null },
       });
@@ -355,6 +358,7 @@ describe("createChatModelAdapter streaming", () => {
       const speakingEvents: boolean[] = [];
       const adapter = createChatModelAdapter({
         consumeThinking: () => false,
+        consumeSupersedes: () => undefined,
         onCrisisResources: () => {},
         turnSchedulerRef: { current: null },
         onSpeakingChange: (speaking) => speakingEvents.push(speaking),
@@ -504,5 +508,111 @@ describe("createChatModelAdapter errors", () => {
     } finally {
       env.restore();
     }
+  });
+});
+
+// getmaipai/home#60: an edited message survives a history reload.
+// chatHistoryAdapter.test.ts covers the branch reconstruction itself; this
+// covers the two pieces run() is responsible for that make it possible -
+// sending the edit's own supersedes and stamping a live reply's real turn
+// id, both proven directly rather than through a full ChatPage render
+// (that render path hit a genuine happy-dom/Radix hover-and-click
+// limitation, the same class of gap ChatPage.test.tsx's own header
+// comment already documents for a different component; verified live in
+// the running app instead).
+describe("getmaipai/home#60: supersedes and live turnId", () => {
+  test("consumeSupersedes()'s value is sent as the request body's supersedes field", async () => {
+    (globalThis as unknown as { AudioContext: unknown }).AudioContext = FakeAudioContext;
+    let capturedBody: { supersedes?: string } | undefined;
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = mock((input: RequestInfo | URL, init?: RequestInit) => {
+      const url = typeof input === "string" ? input : input.toString();
+      if (url.includes("/api/turn/stream")) {
+        capturedBody = JSON.parse(String(init?.body ?? "{}"));
+        return Promise.resolve(
+          new Response(ndjsonStream([{ type: "done", value: { reply: { text: "ok" }, source: "model", safety: SAFETY } }]), {
+            status: 200,
+            headers: { "content-type": "application/x-ndjson" },
+          }),
+        );
+      }
+      return Promise.reject(new Error(`unstubbed fetch: ${url}`));
+    }) as unknown as typeof fetch;
+    try {
+      const adapter = createChatModelAdapter({
+        consumeThinking: () => false,
+        consumeSupersedes: () => "turn-original123",
+        onCrisisResources: () => {},
+        turnSchedulerRef: { current: null },
+      });
+      const options = {
+        messages: [fakeUserMessage("edited text")],
+        runConfig: {},
+        abortSignal: new AbortController().signal,
+        context: {},
+        unstable_getMessage: () => fakeUserMessage("edited text"),
+      } as unknown as ChatModelRunOptions;
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      for await (const _ of runAdapter(adapter, options)) {
+        /* drain */
+      }
+      expect(capturedBody).toMatchObject({ supersedes: "turn-original123" });
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+  });
+
+  // Fixes the gap chatActionBar.tsx's own comment named: "a message from
+  // the CURRENT live session has none yet" - turnId used to be populated
+  // only once a reload rebuilt it from the database (chatHistoryAdapter.ts).
+  test("the done event stamps the real turn_id onto the reply's own metadata for a live (not-yet-reloaded) turn", async () => {
+    const env = stubEnvironment(
+      ndjsonStream([{ type: "done", value: { reply: { text: "ok" }, source: "model", safety: SAFETY, turn_id: "turn-live456", conversation_id: "conv-live456" } }]),
+    );
+    try {
+      const { yields } = await collect([fakeUserMessage("hi")]);
+      const last = yields[yields.length - 1];
+      expect(last?.metadata?.custom?.turnId).toBe("turn-live456");
+    } finally {
+      env.restore();
+    }
+  });
+
+  // A code review (2026-09-13) found consumeSupersedes() was called after
+  // `await deps.getConversationId?.()` and `abortSignal.throwIfAborted()` -
+  // an abort or a getConversationId() failure before that point threw past
+  // the read-and-reset, leaving chatEditSupersedes.ts's module-scope ref
+  // stuck with a stale edit's turn id for the NEXT, unrelated send to
+  // wrongly inherit. Moved ahead of both; this proves it stays drained
+  // even when everything after it fails.
+  test("consumeSupersedes() is drained even when getConversationId() fails before the request is ever sent", async () => {
+    (globalThis as unknown as { AudioContext: unknown }).AudioContext = FakeAudioContext;
+    let consumed = false;
+    const adapter = createChatModelAdapter({
+      consumeThinking: () => false,
+      consumeSupersedes: () => {
+        consumed = true;
+        return "turn-original123";
+      },
+      getConversationId: () => Promise.reject(new Error("conversation resolution failed")),
+      onCrisisResources: () => {},
+      turnSchedulerRef: { current: null },
+    });
+    const options = {
+      messages: [fakeUserMessage("hi")],
+      runConfig: {},
+      abortSignal: new AbortController().signal,
+      context: {},
+      unstable_getMessage: () => fakeUserMessage("hi"),
+    } as unknown as ChatModelRunOptions;
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      for await (const _ of runAdapter(adapter, options)) {
+        /* drain */
+      }
+    } catch {
+      /* the failure itself is expected and irrelevant here */
+    }
+    expect(consumed).toBe(true);
   });
 });

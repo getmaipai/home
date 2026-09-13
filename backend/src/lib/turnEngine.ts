@@ -155,14 +155,14 @@ function logTurnSafely(
   surface: Surface,
   userText: string,
   value: TurnValue,
-  meta: { startedAt: number; guardHits: readonly GuardReason[]; guardReplaced?: boolean },
+  meta: { startedAt: number; guardHits: readonly GuardReason[]; guardReplaced?: boolean; supersedes?: string | null },
 ): void {
   try {
     // getmaipai/home#78: the row records the reason only when the guard
     // REPLACED the reply; a cut that kept the model's own prefix leaves
     // a real (shortened) answer on the row, and the episode store may
     // recall it.
-    logTurn(actor, surface, userText, value, { guardReasons: meta.guardReplaced ? meta.guardHits : [] });
+    logTurn(actor, surface, userText, value, { guardReasons: meta.guardReplaced ? meta.guardHits : [], supersedes: meta.supersedes });
   } catch (err) {
     console.error(`[turn] logTurn failed for an otherwise-successful turn: ${(err as Error).message}`);
   }
@@ -1845,7 +1845,7 @@ export async function runTurn(
   actor: PersonRow,
   surface: Surface,
   text: string,
-  opts: { thinking?: boolean; conversationId?: string } = {},
+  opts: { thinking?: boolean; conversationId?: string; supersedes?: string } = {},
 ): Promise<TurnOpResult> {
   // Fix A4 (docs/dev.md's 2026-09-07 incident note): measured from the
   // very top, so `duration_ms` in the `[turn]` log line reflects the
@@ -2053,7 +2053,7 @@ export async function runTurn(
 
   value = finalizeReply(actor, value);
   markTurnFinished(); // getmaipai/home#63: the one match for prepareTurn()'s own markTurnStarted() on this function's normal, successful path
-  logTurnSafely(actor, surface, text, value, { startedAt, guardHits, guardReplaced });
+  logTurnSafely(actor, surface, text, value, { startedAt, guardHits, guardReplaced, supersedes: opts.supersedes });
   return { ok: true, value };
 }
 
@@ -2378,7 +2378,7 @@ export async function runTurnStream(
   // instead of running to completion for a connection nobody is reading
   // from anymore, tying up the engine's one generation slot the whole
   // time.
-  opts: { thinking?: boolean; conversationId?: string; signal?: AbortSignal } = {},
+  opts: { thinking?: boolean; conversationId?: string; signal?: AbortSignal; supersedes?: string } = {},
 ): Promise<TurnStreamResult> {
   // Fix A4 (docs/dev.md's 2026-09-07 incident note): matches runTurn()'s
   // own placement - measured from the top so the streamed path's
@@ -2400,7 +2400,7 @@ export async function runTurnStream(
   if (prepared.kind === "immediate") {
     const value = finalizeReply(actor, prepared.value);
     markTurnFinished(); // getmaipai/home#63: prepareTurn() above already called markTurnStarted(), even for a kind that never touches the chat engine
-    logTurnSafely(actor, surface, text, value, { startedAt, guardHits: [] });
+    logTurnSafely(actor, surface, text, value, { startedAt, guardHits: [], supersedes: opts.supersedes });
     return { ok: true, kind: "immediate", value };
   }
 
@@ -2466,7 +2466,7 @@ export async function runTurnStream(
         // place markTurnFinished()/logTurnSafely() run for it.
         if (outcome && "resolved" in outcome) {
           markTurnFinished();
-          logTurnSafely(actor, surface, text, outcome.resolved, { startedAt, guardHits: [] });
+          logTurnSafely(actor, surface, text, outcome.resolved, { startedAt, guardHits: [], supersedes: opts.supersedes });
           return outcome.resolved;
         }
         const outputSafety = outcome;
@@ -2535,7 +2535,7 @@ export async function runTurnStream(
         // own MAX_TURN_DURATION_MS safety valve is what bounds that case,
         // not a call here that would never run.
         markTurnFinished();
-        logTurnSafely(actor, surface, text, value, { startedAt, guardHits, guardReplaced });
+        logTurnSafely(actor, surface, text, value, { startedAt, guardHits, guardReplaced, supersedes: opts.supersedes });
         return value;
       },
     };
