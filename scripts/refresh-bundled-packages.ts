@@ -27,6 +27,7 @@ const BUNDLED: { id: string; catalogPath: string }[] = [
   { id: "define", catalogPath: "plugins/utilities/define" },
   { id: "joke", catalogPath: "plugins/fun/joke" },
   { id: "knowledge", catalogPath: "plugins/info/knowledge" },
+  { id: "media-lookup", catalogPath: "plugins/info/media-lookup" },
   { id: "trivia", catalogPath: "plugins/fun/trivia" },
   { id: "weather", catalogPath: "plugins/utilities/weather" },
   { id: "storytime-style", catalogPath: "skills/family/storytime-style" },

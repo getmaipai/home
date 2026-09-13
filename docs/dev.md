@@ -12760,3 +12760,9 @@ other's section once (147cd28, f4779a6).
   clearance Shell.tsx already reserves for it), proven to fail then
   fixed with a real-layout check in scripts/screenshot.ts:
   [docs/dev/session-b.md](dev/session-b.md) (2026-09-13).
+- The `media-lookup` package (step 1 of docs/plans/media-conversation-
+  program-2026-09-13.md): film/TV director, cast, runtime, rating,
+  year, and synopsis by title, keyless (Wikidata plus Wikipedia),
+  built in the catalog checkout first and bundled, tests against
+  recorded fixtures for two films and one TV show, live-checked end to
+  end: [docs/dev/session-b.md](dev/session-b.md) (2026-09-13).

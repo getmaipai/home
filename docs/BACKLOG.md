@@ -2174,11 +2174,22 @@ frequently a hard prerequisite, not just a preference.
       case it was ported to protect stays caught, including inside a
       greeting-carrying utterance ("good morning, I play it on the ps5" ->
       "Okay, playing it on the ps5."). Full writeup in `docs/dev.md`.
-- [ ] Music / media search (S-M) - "what's this song," "who sings X,"
-      show/movie info and availability. A pure lookup against a
-      catalog/metadata API - explicitly NOT the same skill as playing
-      anything (see Priority 3 below); this is the half of "media" that's
-      cheap, safe, and useful standalone.
+- [x] Music / media search (S-M) - the film/TV half done 2026-09-13:
+      `media-lookup` (catalog `plugins/info/media-lookup`, bundled),
+      keyless (Wikidata for director/cast/runtime/rating/year, Wikipedia
+      for the synopsis), 8 routing examples, tests against recorded
+      fixtures for two films and one TV show, a typed `not_found`
+      (#92's shape), live-checked ("what's the runtime of Cobra" ->
+      "Cobra (1986), directed by George P. Cosmatos, 83 minutes.").
+      Step 1 of `docs/plans/media-conversation-program-2026-09-13.md`;
+      CHAT-13/CHAT-15/CHAT-16 there still own routing a resolved
+      subject to it and composing its reply in the companion's voice.
+      "What's this song" (music identification) is a different, harder
+      problem (audio fingerprinting, not a text lookup) - not
+      attempted here, split back out as its own item below if wanted.
+      A pure lookup against a metadata API - explicitly NOT the same
+      skill as playing anything (see Priority 3 below); this is the
+      half of "media" that's cheap, safe, and useful standalone.
 - [ ] Unit and currency conversion (S) - pure `host.fetch` shape, same
       pattern as `weather`/`define` (e.g. frankfurter.app for currency).
 - [ ] Math / quick calculation (S)

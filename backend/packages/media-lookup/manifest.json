@@ -1,0 +1,82 @@
+{
+  "id": "media-lookup",
+  "version": "0.1.0",
+  "kind": "plugin",
+  "category": "Info",
+  "display": "Media Lookup",
+  "description": "Look up a film or TV show's director, cast, runtime, rating, and story.",
+  "author": "MaiPai",
+  "license": "AGPL-3.0",
+  "homepage": "https://github.com/getmaipai/home",
+  "routing": {
+    "examples": [
+      "what's the runtime of Cobra",
+      "who directed Cobra",
+      "what is Cobra about",
+      "is Cobra any good",
+      "when did Cobra come out",
+      "who's in Cobra",
+      "what is Cobra rated",
+      "tell me about the movie Cobra"
+    ],
+    "patterns": [
+      "what's the runtime of *",
+      "who directed *",
+      "what is * about",
+      "is * any good",
+      "when did * come out",
+      "who's in *",
+      "what is * rated",
+      "tell me about the movie *"
+    ]
+  },
+  "args": {
+    "type": "object",
+    "required": ["title"],
+    "properties": {
+      "title": { "type": "string", "minLength": 1 }
+    }
+  },
+  "requires": [],
+  "optional": [],
+  "platforms": ["home"],
+  "min_role": "child",
+  "consequential": false,
+  "offline": "unavailable",
+  "config": [],
+  "data_sources": [
+    {
+      "id": "wikidata",
+      "destination": "Wikidata's own public API (www.wikidata.org)",
+      "when": "each time the family asks about a film or TV show's director, cast, runtime, rating, or release date",
+      "what": "the title spoken in the request (e.g. 'Cobra'), and a release year when one was given",
+      "who": "the Wikimedia Foundation",
+      "opt_in": true,
+      "retention": "unknown, see Wikimedia's own policy"
+    },
+    {
+      "id": "wikipedia",
+      "destination": "Wikipedia's own public REST summary API (en.wikipedia.org)",
+      "when": "each time a Wikidata match is found, to read its plain-language summary",
+      "what": "the film or TV show's own Wikipedia page title, resolved from Wikidata, never anything typed by the family",
+      "who": "the Wikimedia Foundation",
+      "opt_in": true,
+      "retention": "unknown, see Wikimedia's own policy"
+    }
+  ],
+  "permissions": ["net:www.wikidata.org", "net:en.wikipedia.org"],
+  "notifications": [],
+  "cache": { "key_template": "media-lookup:{title}", "ttl_s": 86400, "stale_ok_s": 604800, "max_bytes": 200000 },
+  "fallback_reply": {
+    "text": "Sorry, I'm having trouble looking that up right now.",
+    "speech": "Sorry, I'm having trouble looking that up right now."
+  },
+  "backup": "exclude",
+  "background": false,
+  "contributes": {},
+  "min_app": "0.1.0",
+  "timeout_ms": 12000,
+  "tier": 1,
+  "quality_scale": "bronze",
+  "smoke": { "kind": "deno_test" }
+}

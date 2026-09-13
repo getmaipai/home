@@ -937,3 +937,84 @@ unaffected by the class change. Regenerated the full matrix and
 the nav bar with visible gap) and `chat-history-phone-dark.png` (the
 thread-list overlay, no composer in this view, unaffected either way).
 Closed #75 from this commit.
+
+## The `media-lookup` package (conversation program step 1)
+
+Coordinator reorder: paused lane 7 (item 2 done above; item 3, the
+type-floor sweep, still open) to build this first, per Jesse's live
+film exchange and `docs/plans/media-conversation-program-2026-09-13.md`.
+
+**Design, decided before writing anything.** Wikidata's own API
+(`www.wikidata.org`) for the typed fields, Wikipedia's REST summary API
+(`en.wikipedia.org`) for the synopsis - both keyless, both the model
+`knowledge` already uses for Wikipedia. Verified the actual shapes live
+(curl, not assumed) before committing to the design: `wbsearchentities`
+is a label match, not full text, so a title with a year appended
+("Cobra 1986 film") returns nothing - the handler splits a trailing
+year off the title text instead (`parseTitleAndYear()`) and uses it
+only to disambiguate among the search results, never in the search
+string itself. A bare title collides with every other kind of thing on
+Wikidata - "Cobra" returned a 1986 video game, a roller coaster, a
+Bolkow anti-tank missile, and fifteen other unrelated entries before
+the film, unqualified - so `pickCandidate()` filters to results whose
+own Wikidata *description* reads as a film or a television series
+(also deciding `kind` from that same field, one Wikidata call saved
+rather than a second one to resolve `P31`'s own value). No Wikidata
+property exists for a TV content rating (checked directly, searched
+Wikidata's own property list) - `rating` stays `null` for a TV show,
+an honest gap, not a guess.
+
+**Two real bugs this package's own tests caught before anything ran
+live**, both in the "made the tests deliberately exercise the real
+shape, not a simplified stand-in" sense the org's testing standard
+asks for: `pickCandidate()`'s declared return type was `{ id, kind }`
+but the implementation returned its own internal `description` field
+too - the test asserting the literal returned object caught the
+mismatch immediately. And the composed reply's title came from the
+Wikidata entity's Wikipedia *sitelink* title ("Cobra (1986 film)",
+Wikipedia's own disambiguation form) rather than Wikidata's clean
+display label ("Cobra") - produced "Cobra (1986 film) (1986), directed
+by..." in the end-to-end fixture test, caught before it ever reached a
+live check. Fixed by folding the candidate's own Wikidata id into the
+existing batched label lookup (the same call that already resolves
+director/cast/rating names) instead of adding a second Wikidata round
+trip just for the display title.
+
+**Built in the catalog checkout first** (`getmaipai/catalog`,
+commit 7effc0e, pushed), matching `knowledge` as the model to copy:
+same Tier 1 Deno/MCP shape, same `host.fetch` seam (no direct network
+access from the Deno sandbox), same typed `not_found` on a miss
+(#92's shape) instead of a spoken apology. `tools/check` there (lint +
+scorecard) passed 7/7 packages including this one; the full
+`scripts/check.sh` there passed clean. Bundled into `home` with `bun
+run refresh-bundled-packages` after adding the one line
+`refresh-bundled-packages.ts` needed (the `BUNDLED` list is hand-kept,
+not auto-discovered) - `backend/packages/media-lookup/` and
+`bundled-provenance.json` are generated output of that script, never
+hand-edited.
+
+**Verification, in order**: `deno test` on the package's own
+`handler_test.ts` (14 tests: the four pure shaping functions exercised
+directly, `handleMedia()` end to end against real recorded fixtures
+for two films - Cobra, The Godfather, one with a rating recorded on
+Wikidata and one without - and one TV show - Breaking Bad, confirming
+the optional fields genuinely go `null` rather than the handler
+crashing or guessing - plus the typed `not_found` and
+`network_unreachable` error paths). `bun test bundledPackages` and
+`bun test plugins` in backend (the latter includes FAST-03's own
+description-lint regex across every manifest) both green. Full backend
+`bun test`, 2217 pass. **Live check**, a spare-port backend, a real
+turn through the real turn engine, real network calls to Wikidata and
+Wikipedia: "what's the runtime of Cobra" routed to `media-lookup` at
+Tier 0 pattern matching and answered "Cobra (1986), directed by George
+P. Cosmatos, 83 minutes." (no rating spoken - this build of the film's
+own Wikidata entry carries no MPA rating claim, confirmed directly
+against the live API before writing the fixture, not assumed).
+Regenerated the full screenshot matrix; the Privacy page's own "what
+leaves your house" count moved from 14 to 15 rows (this package's two
+new `data_sources[]` entries, auto-aggregated by the existing `GET
+/api/privacy` route - no privacy page text or screenshot hand-edited,
+the generated table did its own job). Ticked BACKLOG's "Music / media
+search" item for the film/TV half done; split "what's this song" (a
+genuinely different, audio-fingerprinting problem) back out as its own
+line for later, un-implied by this item's own close.
