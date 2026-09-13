@@ -10,6 +10,7 @@ import {
 } from "@assistant-ui/react";
 import { renderWithQueryClient } from "../../../tests/renderWithQueryClient";
 import { MemoryUpdatedChip } from "@/apps/chat/chatMemoryChip";
+import { NOTIFICATIONS_QUERY_KEY } from "@/shell/NotificationBell";
 import type { NotificationDeliveryView } from "@/lib/api";
 
 afterEach(cleanup);
@@ -137,6 +138,32 @@ describe("MemoryUpdatedChip", () => {
       const { queryByText } = renderChip(replyMessage(undefined));
       await new Promise((resolve) => setTimeout(resolve, 20));
       expect(queryByText("Memory updated")).toBeNull();
+    } finally {
+      restore();
+    }
+  });
+
+  // A code review (2026-09-13) caught the chip un-rendering itself: once
+  // it found its ids via the live poll, NotificationBell.tsx's own
+  // dismiss optimistically filters that same delivery out of the shared
+  // NOTIFICATIONS_QUERY_KEY cache this chip also reads, so the very next
+  // render's find() would miss and the chip already on screen would
+  // vanish - dismissing the toast should never take back what the
+  // transcript already showed.
+  test("stays shown once found via the live poll, even if that delivery later disappears from the shared cache (a dismiss)", async () => {
+    const restore = stubNotifications([memoryUpdatedDelivery("turn-1", ["mem-live-1"])]);
+    try {
+      const { findByText, queryClient } = renderChip(replyMessage(undefined));
+      await findByText("Memory updated");
+
+      // Simulates NotificationBell.tsx's dismissMutation onMutate: an
+      // optimistic removal from the exact same query key, before any
+      // network round trip completes.
+      queryClient.setQueryData<NotificationDeliveryView[]>(NOTIFICATIONS_QUERY_KEY, []);
+
+      await new Promise((resolve) => setTimeout(resolve, 20));
+      expect(queryClient.getQueryData<NotificationDeliveryView[]>(NOTIFICATIONS_QUERY_KEY)).toEqual([]); // the dismiss really landed in the cache
+      await findByText("Memory updated"); // the chip itself never noticed
     } finally {
       restore();
     }

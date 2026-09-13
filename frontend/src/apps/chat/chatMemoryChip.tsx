@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { useAuiState } from "@assistant-ui/react";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
@@ -40,7 +41,18 @@ export function MemoryUpdatedChip() {
   const turnId = useAuiState((s) => s.message.metadata?.custom?.turnId as string | undefined);
   const rowMemoryIds = useAuiState((s) => (s.message.metadata?.custom?.memoryIds as string[] | undefined) ?? undefined);
   const liveMemoryIds = useMemoryUpdatesByTurnId(rowMemoryIds?.length ? undefined : turnId);
-  const memoryIds = rowMemoryIds?.length ? rowMemoryIds : liveMemoryIds;
+  // A code review (2026-09-13) caught the chip un-rendering itself: once
+  // this message got its ids from the live poll, dismissing that SAME
+  // delivery from NotificationBell.tsx optimistically filters it out of
+  // the shared NOTIFICATIONS_QUERY_KEY cache this hook reads, so the next
+  // render's `find()` misses and the chip that was already showing
+  // vanishes - dismissing a toast should never take back something
+  // already shown in the transcript. Latched once found; a poll result
+  // disappearing later never un-shows it (a reload still gets the real,
+  // durable answer straight from the row instead of this latch).
+  const [latchedMemoryIds, setLatchedMemoryIds] = useState<string[] | undefined>(undefined);
+  if (liveMemoryIds?.length && !latchedMemoryIds) setLatchedMemoryIds(liveMemoryIds);
+  const memoryIds = rowMemoryIds?.length ? rowMemoryIds : latchedMemoryIds;
 
   if (!memoryIds?.length) return null;
 
