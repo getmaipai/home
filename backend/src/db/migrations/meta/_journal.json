@@ -204,6 +204,13 @@
       "when": 1789249451270,
       "tag": "0028_parallel_living_lightning",
       "breakpoints": true
+    },
+    {
+      "idx": 29,
+      "version": "6",
+      "when": 1789276118540,
+      "tag": "0029_rainy_spot",
+      "breakpoints": true
     }
   ]
 }

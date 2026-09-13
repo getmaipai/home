@@ -87,6 +87,13 @@ export interface GuardContext {
 export interface Guarded {
   reply: string;
   reason: GuardReason | null;
+  /** getmaipai/home#78: true when `reply` is the guard's own honest line
+   * (nothing of the model's words survived); false when a cuttable
+   * reason only dropped the tail and `reply` is the model's own kept
+   * prefix, a genuine if shortened answer. The turn row stores the
+   * reason only for the replaced case, so the episode store can tell a
+   * canned line from an answer by the row alone. */
+  replaced: boolean;
 }
 
 // ==== Honest replacement lines, one small rotating bank per reason ====
@@ -639,9 +646,9 @@ export function guardReply(reply: string, ctx: GuardContext): Guarded {
       continue;
     }
     if (kept.length > 0 && CUTTABLE.has(reason)) {
-      return { reply: kept.join(" "), reason };
+      return { reply: kept.join(" "), reason, replaced: false };
     }
-    return { reply: replacementFor(reason, ctx.personId), reason };
+    return { reply: replacementFor(reason, ctx.personId), reason, replaced: true };
   }
-  return { reply, reason: null };
+  return { reply, reason: null, replaced: false };
 }

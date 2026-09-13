@@ -12239,3 +12239,40 @@ as MEM-04 recorded (`nothing-there`, the question about a kayak rental
 that was never said still finds the trip turn).
 
 **Exit gate**: `bash scripts/check.sh` green on this diff.
+
+### getmaipai/home#78: guard lines and plugin errors are never recalled as MaiPai's own answer
+
+`recordEpisodes()` stored every non-refused turn's reply verbatim, so a
+guard's honest replacement line ("I don't have an answer for that.")
+or a package's error text ("Sorry, I couldn't do that.") came back in
+a later conversation as `you replied: ...`, a position MaiPai never
+took. The assistant side is now recorded only when the reply is an
+answer, read from the turn row's own fields and never from the text:
+`replyIsAnAnswer()` accepts `source` "plugin" (a package's successful
+reply) or "model" with no `guard_reason`. That column is new on
+`conversation_turns` (migration 0029, schema version 28): a
+guard-replaced reply was indistinguishable from a real one on the row,
+since the hits only ever reached the `[turn]` log line, so `logTurn()`
+now takes the guard reasons `logTurnSafely()` already had and stores
+the first one, and only when the guard REPLACED the reply. The medium
+review on this diff caught the other shape: a cuttable reason firing
+on a later sentence keeps the model's own prefix and emits no honest
+line (guards.ts's `kept.join(" ")` branch, and `gateGuards()`'s kept
+prefix), so "Try a mushroom risotto, it feeds six. Your brother said he
+loves it." stores the first sentence, a real if shortened answer.
+`Guarded` and `gateGuards()`'s `onGuardHit` now carry `replaced`, the
+row's `guard_reason` stays null for a cut, and that prefix is recorded
+and recallable (a test covers it).
+A plugin or command error, a confirm question and a household command's
+canned text are never "you replied" either; the person's own side is
+still recorded for every non-refused turn, so what they said stays
+searchable. Tests in `episodes.test.ts` run both shapes through
+`runTurn()`: a model reply the invention guard replaces (the row's
+`guard_reason` is "invention") and the math package failing on spoken
+words leave no assistant episode, and a later recall's formatted block
+carries neither line; a package's successful reply and an uncut model
+reply are both still recorded. Episodes already stored before this
+change keep whatever text they have (the field is null for them, and
+text is never matched).
+
+**Exit gate**: `bash scripts/check.sh` green on this diff.

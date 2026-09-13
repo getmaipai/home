@@ -453,6 +453,93 @@ describe("getmaipai/home#79: the vector scan is bounded", () => {
   });
 });
 
+// getmaipai/home#78: episodes stored every reply verbatim, so a guard's
+// honest replacement line or a package's error text came back in a
+// later conversation as "you replied: ...", a position MaiPai never
+// took. The assistant side is now recorded only for the model's own
+// uncut reply or a package's successful one, read from the turn row's
+// source and guard_reason, never from the text.
+describe("getmaipai/home#78: guard lines and plugin errors are never recalled as MaiPai's own answer", () => {
+  test("a guard-cut model reply and a failed plugin in conversation one leave no assistant episode; the person's words still do", async () => {
+    const { actor } = await setupOwner();
+    const { runTurn } = await import("@/lib/turnEngine");
+    const { __resetLlmSupervisorForTests } = await import("@/lib/llmSupervisor");
+    __resetLlmSupervisorForTests();
+    const { startStubLlmServer } = await import("@maipai/spec/llm/ts/stubServer.js");
+    // An attributed quote grounded nowhere: the invention guard replaces it.
+    const stub = startStubLlmServer(0, { scriptedChatReply: () => "Your brother said he would be late." });
+    process.env.MAIPAI_LLAMA_SERVER_URL = stub.url;
+    try {
+      const cut = await runTurn(actor, "chat", "any news from my brother");
+      expect(cut.ok).toBe(true);
+      if (!cut.ok) return;
+      expect(cut.value.source).toBe("model");
+      expect(cut.value.reply.text).not.toContain("late"); // the guard replaced it
+      const cutRow = db.select().from(conversationTurns).where(eq(conversationTurns.id, cut.value.turn_id)).get()!;
+      expect(cutRow.guardReason).toBe("invention"); // the row itself says so
+      // A real package that fails: math cannot evaluate spoken words.
+      const failed = await runTurn(actor, "chat", "calculate twelve times twelve");
+      expect(failed.ok).toBe(true);
+      if (!failed.ok) return;
+      expect(failed.value.source).toBe("plugin_error");
+
+      const rows = db.select().from(episodes).where(eq(episodes.personId, actor.id)).all();
+      expect(rows.filter((r) => r.speaker === "user").map((r) => r.text).sort()).toEqual(["any news from my brother", "calculate twelve times twelve"]);
+      expect(rows.filter((r) => r.speaker === "assistant")).toEqual([]);
+
+      // A later conversation recalling either finds only the person's side.
+      const later = recallEpisodes(actor, "what did you say about my brother", undefined, { now: new Date() });
+      expect(later.every((m) => m.episode.speaker === "user")).toBe(true);
+      const block = formatEpisodesForPrompt(later, "Sage", "en-US", new Date());
+      expect(block).not.toContain("you replied");
+      expect(block).not.toContain(cut.value.reply.text);
+      expect(block).not.toContain(failed.value.reply.text);
+    } finally {
+      stub.stop();
+      delete process.env.MAIPAI_LLAMA_SERVER_URL;
+    }
+  });
+
+  test("a cut that keeps the model's own first sentence is still an answer: recorded, with no guard reason on the row", async () => {
+    const { actor } = await setupOwner();
+    const { runTurn } = await import("@/lib/turnEngine");
+    const { __resetLlmSupervisorForTests } = await import("@/lib/llmSupervisor");
+    __resetLlmSupervisorForTests();
+    const { startStubLlmServer } = await import("@maipai/spec/llm/ts/stubServer.js");
+    // Sentence one is a real answer; sentence two is an attributed quote
+    // grounded nowhere, a cuttable invention, so guardReply() keeps the
+    // prefix and drops the tail without an honest line.
+    const stub = startStubLlmServer(0, { scriptedChatReply: () => "Try a mushroom risotto, it feeds six. Your brother said he loves it." });
+    process.env.MAIPAI_LLAMA_SERVER_URL = stub.url;
+    try {
+      const result = await runTurn(actor, "chat", "any ideas for dinner");
+      expect(result.ok).toBe(true);
+      if (!result.ok) return;
+      expect(result.value.reply.text).toBe("Try a mushroom risotto, it feeds six.");
+      const row = db.select().from(conversationTurns).where(eq(conversationTurns.id, result.value.turn_id)).get()!;
+      expect(row.guardReason).toBeNull(); // cut, not replaced: the row holds the model's own words
+      const assistantSides = db.select().from(episodes).where(eq(episodes.personId, actor.id)).all().filter((r) => r.speaker === "assistant");
+      expect(assistantSides.map((r) => r.text)).toEqual(["Try a mushroom risotto, it feeds six."]);
+    } finally {
+      stub.stop();
+      delete process.env.MAIPAI_LLAMA_SERVER_URL;
+    }
+  });
+
+  test("a package's successful reply and the model's own uncut reply are still recorded", async () => {
+    const { actor } = await setupOwner();
+    const { runTurn } = await import("@/lib/turnEngine");
+    const { __resetLlmSupervisorForTests } = await import("@/lib/llmSupervisor");
+    __resetLlmSupervisorForTests(); // back to the in-process stub after the test above's own URL stub
+    const ok = await runTurn(actor, "chat", "remember that I like tea"); // the remember package answers
+    expect(ok.ok && ok.value.source).toBe("plugin");
+    const model = await runTurn(actor, "chat", "good morning, how is it going"); // the stub echoes, uncut
+    expect(model.ok && model.value.source).toBe("model");
+    const assistantSides = db.select().from(episodes).where(eq(episodes.personId, actor.id)).all().filter((r) => r.speaker === "assistant");
+    expect(assistantSides).toHaveLength(2);
+  });
+});
+
 describe("MEM-04 formatEpisodesForPrompt()", () => {
   test("labels each side, dates each line, and stays under the cap", async () => {
     const { actor } = await setupOwner();

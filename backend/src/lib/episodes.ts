@@ -13,8 +13,23 @@ import * as chrono from "chrono-node";
 import type { ConversationTurnRow } from "@/wire";
 import type { PersonRow } from "@/types";
 
+/** getmaipai/home#78: whether a turn's reply text is something MaiPai
+ * actually answered, read from the row's own fields, never from the
+ * text. Only the model's own uncut reply (source "model" with no guard
+ * reason) or a package's successful reply (source "plugin") qualify. A
+ * guard's honest replacement line, a plugin or command error, a
+ * confirm question and a household command's canned text are never
+ * stored as "you replied", so a later conversation cannot recall "Sorry,
+ * I couldn't do that." as a position MaiPai once took. The person's own
+ * side is still recorded for every non-refused turn. */
+export function replyIsAnAnswer(turn: Pick<ConversationTurnRow, "source" | "guardReason">): boolean {
+  if (turn.source === "plugin") return true;
+  return turn.source === "model" && !turn.guardReason;
+}
+
 /** Record both sides of a turn as episodes and queue for embedding.
- * Skips a safety_refuse turn entirely and skips empty sides. */
+ * Skips a safety_refuse turn entirely, skips empty sides, and skips the
+ * assistant side unless replyIsAnAnswer(). */
 export function recordEpisodes(turn: ConversationTurnRow): void {
   if (turn.source === "safety_refuse") return;
 
@@ -35,7 +50,7 @@ export function recordEpisodes(turn: ConversationTurnRow): void {
     });
   }
 
-  if (turn.replyText && turn.replyText.trim()) {
+  if (turn.replyText && turn.replyText.trim() && replyIsAnAnswer(turn)) {
     rows.push({
       id: newEpisodeId(),
       turnId: turn.id,

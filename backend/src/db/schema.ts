@@ -373,6 +373,14 @@ export const conversationTurns = sqliteTable(
     // file) doesn't render them yet, a noted frontend follow-up.
     routingTier: text("routing_tier"),
     routingScore: real("routing_score"),
+    // getmaipai/home#78: the guard reason when a guard REPLACED this reply
+    // with its own honest line (lib/guards.ts's GuardReason); null when
+    // the reply stood as the model wrote it, and null too when a cuttable
+    // guard only dropped the tail and kept the model's own prefix (the
+    // stored text is then a real, shortened answer). The episode store
+    // (lib/episodes.ts) tells a canned line from an answer by this field
+    // alone, never by the text.
+    guardReason: text("guard_reason"),
     // Step 10: not a spec-shaped record itself (conversation_turns stays
     // hub-internal, see the table's own header above), but the plan's
     // own text still asks for it here so a synced conversation's

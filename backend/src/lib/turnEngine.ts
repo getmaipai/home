@@ -154,10 +154,14 @@ function logTurnSafely(
   surface: Surface,
   userText: string,
   value: TurnValue,
-  meta: { startedAt: number; guardHits: readonly GuardReason[] },
+  meta: { startedAt: number; guardHits: readonly GuardReason[]; guardReplaced?: boolean },
 ): void {
   try {
-    logTurn(actor, surface, userText, value);
+    // getmaipai/home#78: the row records the reason only when the guard
+    // REPLACED the reply; a cut that kept the model's own prefix leaves
+    // a real (shortened) answer on the row, and the episode store may
+    // recall it.
+    logTurn(actor, surface, userText, value, { guardReasons: meta.guardReplaced ? meta.guardHits : [] });
   } catch (err) {
     console.error(`[turn] logTurn failed for an otherwise-successful turn: ${(err as Error).message}`);
   }
@@ -1697,6 +1701,9 @@ export async function runTurn(
 
   let value: TurnValue;
   const guardHits: GuardReason[] = [];
+  // getmaipai/home#78: whether the reply the household got is a guard's
+  // own line (stored on the turn row) rather than the model's words.
+  let guardReplaced = false;
   if (prepared.kind === "immediate") {
     value = prepared.value;
   } else {
@@ -1735,6 +1742,7 @@ export async function runTurn(
       // fixes, never a safety category).
       const guarded = guardReply(text, { ...prepared.guardContext, personId: actor.id });
       if (guarded.reason) guardHits.push(guarded.reason); // Fix A4: fed into the `[turn]` log's own `guard` array below
+      if (guarded.replaced) guardReplaced = true;
       return {
         reply: { text: guarded.reply },
         source: "model",
@@ -1875,7 +1883,7 @@ export async function runTurn(
 
   value = finalizeReply(actor, value);
   markTurnFinished(); // getmaipai/home#63: the one match for prepareTurn()'s own markTurnStarted() on this function's normal, successful path
-  logTurnSafely(actor, surface, text, value, { startedAt, guardHits });
+  logTurnSafely(actor, surface, text, value, { startedAt, guardHits, guardReplaced });
   return { ok: true, value };
 }
 
@@ -2124,7 +2132,7 @@ export async function* gateGuards(
   // runTurnStream() collect which reason stopped the reply, for the
   // `[turn]` log line's own `guard` array - this generator's per-sentence
   // internals have no other channel back to whoever is draining it.
-  onGuardHit?: (reason: GuardReason) => void,
+  onGuardHit?: (reason: GuardReason, replaced: boolean) => void,
 ): AsyncGenerator<string, StreamOutcome, void> {
   const iterator = tokens[Symbol.asyncIterator]();
   let step = await iterator.next();
@@ -2136,12 +2144,13 @@ export async function* gateGuards(
     const reason = trimmed ? guardSentence(trimmed, { ...ctx, personId }, isFirstSentence) : null;
     if (trimmed) isFirstSentence = false;
     if (reason) {
-      onGuardHit?.(reason);
       // guards.ts:521's own gate, exactly: `kept.length > 0 &&
       // CUTTABLE.has(reason)` keeps the prefix and drops the rest with
       // no honest line; anything else (non-cuttable, or cuttable with
       // nothing kept yet) replaces with the honest line.
-      if (!isCuttable(reason) || !spokeAnything) {
+      const replaced = !isCuttable(reason) || !spokeAnything;
+      onGuardHit?.(reason, replaced);
+      if (replaced) {
         yield `${replacementFor(reason, personId)} `;
       }
       let rest = await iterator.next();
@@ -2241,6 +2250,7 @@ export async function runTurnStream(
     // whoever is draining it). Fresh per call, never shared across the
     // two starts a retry can produce.
     const guardHits: GuardReason[] = [];
+    let guardReplaced = false;
     // FAST-04: now that runTurnStream() returns before anything is sent,
     // an engine failure before the first token (the request itself
     // failing, the idle timeout ahead of any header, the all-failed
@@ -2274,7 +2284,10 @@ export async function runTurnStream(
       conversationId: conversation.id,
       turnId: prepared.turnId,
       startedAt,
-      tokens: gateGuards(gateOutputSafety(guardFirstStep(tokens), actor), prepared.guardContext, actor.id, (reason) => guardHits.push(reason)),
+      tokens: gateGuards(gateOutputSafety(guardFirstStep(tokens), actor), prepared.guardContext, actor.id, (reason, replaced) => {
+        guardHits.push(reason);
+        if (replaced) guardReplaced = true;
+      }),
       finalize: (replyText: string, outcome?: StreamOutcome): TurnValue => {
         // FAST-04: a tool-resolved reply is already a complete TurnValue
         // (peekAndHandle() ran resolveToolCalls() and finalizeReply());
@@ -2352,7 +2365,7 @@ export async function runTurnStream(
         // own MAX_TURN_DURATION_MS safety valve is what bounds that case,
         // not a call here that would never run.
         markTurnFinished();
-        logTurnSafely(actor, surface, text, value, { startedAt, guardHits });
+        logTurnSafely(actor, surface, text, value, { startedAt, guardHits, guardReplaced });
         return value;
       },
     };

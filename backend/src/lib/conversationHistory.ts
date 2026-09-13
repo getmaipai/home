@@ -89,7 +89,7 @@ const insertTurnAndBumpConversation = sqlite.transaction((row: ConversationTurnR
   db.update(conversations).set({ updatedAt: row.createdAt, hlc: nextHlc() }).where(eq(conversations.id, conversationId)).run();
 });
 
-export function logTurn(actor: PersonRow, surface: Surface, userText: string, value: TurnValue): ConversationTurnRow {
+export function logTurn(actor: PersonRow, surface: Surface, userText: string, value: TurnValue, opts: { guardReasons?: readonly string[] } = {}): ConversationTurnRow {
   // Built and returned directly from the caller's own values, not
   // re-selected after the insert: a review (2026-09-04) pointed out every
   // field is already known here, the same "don't round-trip the database
@@ -118,6 +118,9 @@ export function logTurn(actor: PersonRow, surface: Surface, userText: string, va
     // only exists on a "plugin" source).
     routingTier: value.routing?.tier ?? null,
     routingScore: value.routing?.score ?? null,
+    // getmaipai/home#78: the first guard that fired is the one whose
+    // honest line (or cut) the household actually heard.
+    guardReason: opts.guardReasons?.[0] ?? null,
     // Every new turn starts unjudged (step 6's own poison-guard state,
     // lib/memoryJudge.ts) - never anything but null/0 at insert time.
     judgeStatus: null,
