@@ -12484,3 +12484,27 @@ manifest.webmanifest`, `frontend/public/brand/pwa-icon-maskable-192.png`,
 `frontend/public/brand/pwa-icon-maskable-512.png`, `frontend/src/
 kit/primitives/ErrorBoundary.tsx`, `frontend/src/kit/primitives/
 ErrorBoundary.test.tsx`, `frontend/src/App.tsx`, `docs/BACKLOG.md`.
+
+**Follow-up (2026-09-13): the maskable icons had a transparent
+background.** The coordinator opened `pwa-icon-maskable-512.png` and
+found this - a maskable icon is cropped by the launcher to a circle or
+squircle and must be opaque edge to edge, or Android paints the cropped
+padding black or the launcher's own color instead of the icon's own
+white, so the installed icon looks broken. My own `-background white
+-extent 1254x1254` step left an alpha channel in place (ImageMagick's
+`-extent` pads a canvas but doesn't itself guarantee the new region is
+composited fully opaque onto that background unless the image is also
+flattened), so the PNG carried transparency even though nothing looked
+transparent in a plain viewer. Fixed by regenerating both sizes with an
+explicit `-flatten` onto the same white background, then `-alpha remove
+-alpha off` to strip the alpha channel entirely - not just visually
+opaque, but with no alpha channel left to be ambiguous about. Confirmed
+directly (`magick identify -format "%[channels]"`): the fixed files
+report `srgb` (3 channels), not `srgba`. Opened both PNGs and judged
+them: the mark stays within the safe zone, plain white background,
+no visible change from before other than the fixed opacity. Re-ran the
+CDP installability check (`Page.getInstallabilityErrors`): still zero
+errors, `Page.getAppManifest` still resolves all four icons.
+
+Files: `frontend/public/brand/pwa-icon-maskable-192.png`, `frontend/
+public/brand/pwa-icon-maskable-512.png`.
