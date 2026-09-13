@@ -11163,3 +11163,24 @@ itself running clean is the verification.
 
 Closes #69.
 
+**#56: the Privacy page screenshot was stale.** Regenerated with
+`bun run screenshots` (the full matrix, since the script writes every
+route/viewport/theme combo in one run - only `privacy-desktop-light.png`
+and the org's own `hero.png` came out changed from that run touching
+every file; `hero.png` was reverted as out of scope for this issue, only
+the one target file is in this commit). Opened the result: it leads with
+"Can someone outside see what we say to MaiPai?", then "Can someone reach
+into your house?", then "What leaves your house (15)" - the #12
+reorganization, real content (a live Sage household, "huggingface.co" as
+the first real outbound entry), no spinner or empty state. Checked
+`docs/user/privacy.md` against it: the prose still accurately describes
+what the page shows (the four-column "When/What it sends/Who gets it/How
+long they keep it" shape, the API-token "something reaching into your
+house" callout, the "everything stays on this computer" framing) - no
+drift found, no prose change needed.
+
+Files: `docs/assets/screens/privacy-desktop-light.png`. Checks: the image
+opened and read by hand.
+
+Closes #56.
+

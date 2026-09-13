@@ -3330,7 +3330,19 @@ future session now that F's hub half exists.
     --a11y-only --webkit` (34 pages, 0 violations, keyboard-trap check
     passing). Note: the full `--chat-review --webkit` repro command still
     fails on an unrelated, pre-existing WebKit chat-exchange timeout - not
-    a keyboard issue, out of scope here, flagged for its own issue.
+    a keyboard issue, filed as #75. Also filed #76: a `--webkit` run
+    silently overwrites the Chromium screenshots the docs publish, since
+    output filenames carry no browser tag - hit this myself verifying
+    #69, reverted the overwritten images by hand.
+
+- [x] **#56: The Privacy page screenshot was stale** (S, Session B, 2026-09-12)
+
+    Regenerated with `bun run screenshots`, opened, confirmed the #12
+    reorganization (leads with "Can someone outside see what we say to
+    MaiPai?", then "Can someone reach into your house?", then "What
+    leaves your house (15)"), real content, no spinner or empty state.
+    Checked `docs/user/privacy.md` against it - no drift, no prose change
+    needed. Files: `docs/assets/screens/privacy-desktop-light.png`.
 
 - [x] **#66: Hardcoded "unavailable" error code masked safety refusals** (S, 2026-09-12)
 
