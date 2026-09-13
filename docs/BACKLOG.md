@@ -920,14 +920,12 @@ Track B: MEM-01, MEM-02, MEM-03, MEM-04, MEM-05. Then JOIN-01, JOIN-02.
 
 <a id="fast-01"></a>
 
-- [ ] **FAST-01: Make the prompt prefix cache actually hit, and measure it** (M)
+- [x] **FAST-01: Make the prompt prefix cache actually hit, and measure it** (M)
   
-  Status (2026-09-12, measured): engine flags, wire fields, warm-up, and
-  the bench are in; the live acceptance is NOT met on the production
-  prompt layout (first delta p50 1,282 ms, cache ratio 0.58 with the new
-  flags; `--cache-reuse 256` measured inert) and IS met on the reordered
-  layout (394 ms, 0.89). Tables and findings are in the Track A section
-  of dev.md. Stays open; FAST-02 closes both items with one re-run.
+  Status (2026-09-12, measured and closed with FAST-02): on the real
+  prompt assembly the reordered layout shows cache ratio 0.86 and first
+  delta p50 385 ms (p95 389 ms), against 1,262 ms and 0.50 for the
+  single-message shape; tables in the Track A section of dev.md.
 
     Depends on: Step 0. Files: `backend/src/lib/engineAutotune.ts`,
     `llmSupervisor.ts`, `llm.ts`, `backend/src/index.ts`,
@@ -978,9 +976,11 @@ Track B: MEM-01, MEM-02, MEM-03, MEM-04, MEM-05. Then JOIN-01, JOIN-02.
        (persona-roster names only), a production-shaped volatile zone
        (rotating memory bullets, a minute-level clock), and thirty
        distinct short user messages, in either of two layouts
-       (`--layout=current`, today's one system message with the
-       volatile zone before the history; `--layout=reordered`,
-       FAST-02's late context message). Three uncounted warm-ups, then
+       (`--layout=single-message`, the assembled prompt as one system
+       message ahead of the history, the old shape's cache behaviour;
+       `--layout=reordered`, FAST-02's late context message), both built
+       by the real assembly functions with a synthetic actor and salted
+       synthetic memory matches. Three uncounted warm-ups, then
        thirty streamed turns; per turn it records time to the first
        content delta, total time, and the engine's own
        `timings.prompt_n` and `timings.cache_n` from the final stream
@@ -1006,7 +1006,7 @@ Track B: MEM-01, MEM-02, MEM-03, MEM-04, MEM-05. Then JOIN-01, JOIN-02.
 
 <a id="fast-02"></a>
 
-- [ ] **FAST-02: Put the volatile context after the history and drop the plugins list** (M)
+- [x] **FAST-02: Put the volatile context after the history and drop the plugins list** (M)
 
     Depends on: FAST-01. Files: `backend/src/lib/turnEngine.ts`,
     `backend/tests/turnEngine.test.ts`, `persona.test.ts` if it asserts
@@ -1043,8 +1043,8 @@ Track B: MEM-01, MEM-02, MEM-03, MEM-04, MEM-05. Then JOIN-01, JOIN-02.
 
     Acceptance: tests green. Live, on Track A's engine: run
     `scripts/bench/latency.ts` again, after replacing its typed replica
-    of the volatile zone with the real assembly: `--layout=current` from
-    `buildSystemPrompt()` and `--layout=reordered` from
+    of the volatile zone with the real assembly: `--layout=single-message`
+    from `buildSystemPrompt()` and `--layout=reordered` from
     `buildPromptParts()`, each fed a synthetic actor and memory matches
     (so the bench can never drift from what production sends)
     and record the table. Then hold one four-turn conversation through
@@ -4948,9 +4948,9 @@ that owns it.
       Qwen3 8B: 1 natural, 0 robotic, 7 ambiguous of 8 - a real first
       data point, not a gate; see docs/dev/session-c.md's step 4 entry,
       including a genuine unrelated finding it helped surface (below).
-- [ ] **Short, ambiguous utterances free-associate onto the plugins
-      list** (S, C found it; amended 2026-09-12: FAST-02 removes the
-      list, tick this when FAST-02 lands) - `buildSystemPrompt()`'s standing "Things
+- [x] **Short, ambiguous utterances free-associate onto the plugins
+      list** (S, C found it; closed by FAST-02 on 2026-09-12, which
+      removed the list from the prompt) - `buildSystemPrompt()`'s standing "Things
       this household has set up" section names Weather unconditionally;
       Session C step 4's live naturalness/persona bench runs against a
       real Qwen3 8B (2026-09-06) found several completely unrelated

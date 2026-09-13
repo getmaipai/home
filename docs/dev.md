@@ -10752,3 +10752,70 @@ a script (importing it must not touch the environment), takes
 **Exit gate**: `bash scripts/check.sh` green in the worktree after these
 changes (typecheck included).
 
+### FAST-02: measured on the real assembly (2026-09-12)
+
+With `buildPromptParts()` in place, the bench builds both layouts from
+the real functions (`--layout=reordered` from `buildPromptParts()`, what
+production now sends; `--layout=single-message` from
+`buildSystemPrompt()`, the same prefix and context glued into one system
+message ahead of the history, a stand-in for the old shape's cache
+behaviour). Every turn's memory bullets carry the turn number, so no
+two turns send an identical prompt: a first cut of this run cycled eight
+bullets, and llama-server's server-side prompt cache (on by default)
+restored turn i minus 8's whole prompt, which read as a fast "old
+layout"; a code review caught it. The bench seeds no household, so the
+context here carries the speaker line, three bullets, the re-anchor and
+the clock but no roster or profile paragraph: thinner than a real
+household's, so production's context message will cost somewhat more
+than the 144 tokens below. Same machine, engine build, and model file as
+the FAST-01 table; 30 counted turns, figures over turns 2 to 30:
+
+| engine | layout | first delta p50 | first delta p95 | total p50 | processed tokens | cache ratio |
+|---|---|---|---|---|---|---|
+| main, no `--cache-reuse` | single-message (context before history) | 1,265 ms | 1,464 ms | 1,727 ms | 528 | 0.50 |
+| main, no `--cache-reuse` | reordered (`buildPromptParts`, context after history) | 385 ms | 389 ms | 812 ms | 144 | 0.86 |
+| FAST-01 flags, `--cache-reuse 256` | single-message | 1,262 ms | 1,274 ms | 1,718 ms | 528 | 0.50 |
+| FAST-01 flags, `--cache-reuse 256` | reordered | 385 ms | 389 ms | 820 ms | 144 | 0.86 |
+
+The layout is the whole effect and `--cache-reuse` stays inert for this
+shape (FAST-01's finding stands): with the context ahead of the history
+the engine re-evaluates 528 tokens every turn and the first word takes
+about 1.3 s; with the context after the history it evaluates 144 and the
+first word takes 385 ms, on both engines. The reordered layout meets
+both acceptance numbers (cache ratio 0.86, first delta p50 385 ms), so
+FAST-01 and FAST-02 are ticked together.
+
+Routing bench after the change (`scripts/bench/routing.ts` against the
+real embed engine): 107 of 107, precision and recall 1.00 on every
+package, null-row noise floor p50 0.524, p90 0.586, p95 0.602, max 0.657
+(the 2026-09-07 measurement had p95 0.705); the thresholds sit above it.
+Naturalness bench (`scripts/bench/naturalness.ts`, 8 rows, live
+replies from the 8B on the reordered layout, run twice; a third run
+stalled inside a turn after 14 minutes and was killed, cause not
+chased here): run one natural 0, robotic 2, ambiguous 6; run two natural
+1, robotic 2, ambiguous 5. The 2026-09-07 baseline was natural 1,
+ambiguous 7, robotic 0. The two robotic rows are the same in both runs:
+"what time is it" answered "It's 7:47 PM." (the corpus wants the time
+spoken as words, which `normalizeForSpeech` handles on the speech string,
+not the text the bench grades) and "okay thanks" answered `You're
+welcome! Let me know if you need anything else.` (a canned closer). With
+sampled replies and eight rows the two runs differ by one row between
+themselves, so this is recorded as the current picture rather than
+proof of a regression or of parity; FAST-05 and FAST-06 re-run it, and
+the second robotic row is exactly the framing FAST-06's samplers and the
+housemate test target.
+
+Coherence, live through the API on port 8797 against the 8798 engine
+(setup as `alfred`, one conversation, four turns): "hi, I am planning a
+small vegetable garden this spring" got a relevant reply; "what should I
+plant first if I only have a sunny balcony" got container suggestions;
+"and what did I say I was planning at the start" got "You said you were
+planning a small vegetable garden this spring." The late system message
+renders correctly through Qwen3's template; the user-role fallback was
+not needed. The engine log shows each turn re-evaluating only the
+context message and the new exchange (118, 274, 157, 155 tokens) rather
+than the full prompt. One turn in that conversation, "how often do those
+need watering", was answered "That's not something I've been told.":
+that is the invention guard rejecting general knowledge, FAST-05's
+target, recorded here as a live example of it.
+

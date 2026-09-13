@@ -1,29 +1,36 @@
-// FAST-01 (docs/BACKLOG.md, "Chat direction 2026-09-12"): the latency
-// bench. Measures, against one running llama-server, what the household
-// actually waits for: time to the first content delta, total reply time,
-// and how much of each prompt the engine reused from its KV cache.
+// FAST-01 and FAST-02 (docs/BACKLOG.md, "Chat direction 2026-09-12"): the
+// latency bench. Measures, against one running llama-server, what the
+// household actually waits for: time to the first content delta, total
+// reply time, and how much of each prompt the engine reused from its KV
+// cache.
 //
 // Connects ONLY to MAIPAI_LLAMA_SERVER_URL (refuses to run without it),
 // sets MAIPAI_DATA_DIR to a fresh temp directory before any repo import
 // so no household database is ever opened, and sends only synthetic
 // content (persona-roster names, invented facts). Never spawns anything.
 //
-// Two prompt layouts, because the whole point of FAST-01/FAST-02 is where
-// the volatile context sits relative to the history:
-//   --layout=current    today's production shape: ONE system message holding
-//                       the stable prefix AND the volatile zone (roster,
-//                       speaker, rotating memory bullets, summary, a
-//                       minute-level clock), then the history, then the turn.
-//                       Anything after the volatile zone is re-prefilled
-//                       whenever the clock or a bullet changes.
-//   --layout=reordered  FAST-02's shape: stable prefix, history, then the
-//                       volatile zone as its own late system message, then
-//                       the turn. The cached prefix now covers the history.
-// The "current" layout is a typed replica of buildSystemPrompt()'s volatile
-// zone (roster, speaker, memory bullets, re-anchor, summary, clock), not
-// its output: building the real one needs a person row and settings in a
-// database. FAST-02 replaces both layouts with the real assembly functions
-// once buildPromptParts() exists (its acceptance names this).
+// Two prompt layouts, both built by the REAL assembly functions in
+// lib/turnEngine.ts (passed in as `builders`, so this file holds no copy
+// of the prompt shape and cannot drift from production):
+//   --layout=reordered       what production sends since FAST-02: the stable
+//                            prefix, the history, then the volatile context
+//                            as its own late system message, then the turn.
+//   --layout=single-message  a stand-in for the pre-FAST-02 shape: the same
+//                            stable prefix and context glued into ONE system
+//                            message ahead of the history (buildSystemPrompt(),
+//                            kept for the prompt-budget test). Not byte-for-
+//                            byte the old prompt (that had the plugins list;
+//                            FAST-01's table measured that one), but the same
+//                            cache behaviour: anything after the context is
+//                            re-prefilled when the context changes.
+// Every turn's memory bullets carry the turn number, so no two turns ever
+// send an identical prompt: llama-server keeps a server-side prompt cache
+// of recent prompts (its default), and a bench that cycled a small set of
+// bullets was silently measuring that cache restoring an earlier turn's
+// whole prompt (a code review caught it, 2026-09-12). The household roster
+// and profile paragraph come from a database this bench does not seed, so
+// the context here is thinner than a real household's; the tables in
+// docs/dev.md say so next to the numbers.
 // Processed and cached token counts come from llama-server's own final
 // stream chunk (`timings.prompt_n` and `timings.cache_n`, confirmed live on
 // the pinned b10797 build, 2026-09-12), never inferred from a stable string.
@@ -32,6 +39,8 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { performance } from "node:perf_hooks";
 import { readTextLines } from "@maipai/spec/streaming/ts/lineReader.js";
+import type { PersonRow } from "@/types";
+import type { RecallMatch } from "@/lib/memory";
 import { percentile } from "./stats";
 
 export { percentile };
@@ -77,12 +86,16 @@ export function summarize(timings: TurnTiming[]): BenchSummary {
   };
 }
 
-export type Layout = "current" | "reordered";
+export type Layout = "single-message" | "reordered";
 
-type Msg = { role: "system" | "user" | "assistant"; content: string };
+export type Msg = { role: "system" | "user" | "assistant"; content: string };
 
-// A ten-exchange synthetic history (~600 tokens): long enough that
-// `--cache-reuse 256` has whole chunks to reuse, the same order of
+/** The two real assembly functions, typed from lib/turnEngine.ts itself so
+ * a signature change there fails the typecheck here rather than the live
+ * run. main() passes the real module; the tests pass a fake. */
+export type PromptBuilders = Pick<typeof import("@/lib/turnEngine"), "buildSystemPrompt" | "buildPromptParts">;
+
+// A ten-exchange synthetic history (~600 tokens), the same order of
 // magnitude as the 1,200-token production window.
 const HISTORY: Msg[] = [
   { role: "user", content: "What's the weather like in Portland this weekend?" },
@@ -151,46 +164,67 @@ const MEMORY_BULLETS = [
   "The dog is called Rover",
 ];
 
-function volatileZone(turn: number, now: Date): string {
-  // Three bullets rotate per turn, and the clock is minute-level: the two
-  // things that change from one production turn to the next.
-  const bullets = [0, 1, 2].map((k) => MEMORY_BULLETS[(turn + k) % MEMORY_BULLETS.length]!);
-  const clock = now.toLocaleString("en-US", { weekday: "long", month: "long", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit" });
-  return [
-    "Who lives here:",
-    "- alfred (adult)",
-    "- juniper (child)",
-    "- sprout (child)",
-    "",
-    "You are talking with alfred (adult, en-US).",
-    "",
-    "What you already know about this household:",
-    ...bullets.map((b) => `- ${b} (as of Sep 5, 7 days ago)`),
-    "Prefer these facts over guessing when they're relevant.",
-    "",
-    "Remember: you are MaiPai.",
-    "",
-    "Earlier in this conversation: the family planned a Sunday picnic at Laurelhurst and added food to the shopping list.",
-    "",
-    `Local time: ${clock}`,
-  ].join("\n");
+export function syntheticActor(): PersonRow {
+  const nowIso = "2026-09-12T12:00:00.000Z";
+  return {
+    id: "person-benchalfred",
+    displayName: "alfred",
+    nickname: null,
+    birthdate: null,
+    role: "adult",
+    avatarSeed: "bench",
+    source: "hub",
+    localOnly: false,
+    enabled: true,
+    guestExpiresAt: null,
+    memorializedAt: null,
+    locale: "en-US",
+    createdAt: nowIso,
+    updatedAt: nowIso,
+    hlc: "0:0:bench",
+    deletedAt: null,
+  } as PersonRow;
 }
 
-export function buildMessages(layout: Layout, stablePrefix: string, turn: number, userText: string, now = new Date()): Msg[] {
-  const volatile = volatileZone(turn, now);
-  if (layout === "current") {
-    return [{ role: "system", content: `${stablePrefix}\n\n${volatile}` }, ...HISTORY, { role: "user", content: userText }];
+/** Three memory bullets per turn, each salted with the turn number so the
+ * context differs on every turn the way a real household's does. */
+export function syntheticMatches(turn: number): RecallMatch[] {
+  return [0, 1, 2].map((k) => {
+    const text = `${MEMORY_BULLETS[(turn + k) % MEMORY_BULLETS.length]!} (mentioned in chat ${turn + 1})`;
+    return {
+      record: {
+        id: `mem-bench-${k}`,
+        record_kind: "memory",
+        text,
+        category: "fact",
+        tier: "durable",
+        status: "active",
+        scope: "household",
+        person: null,
+        source: "bench",
+        importance: 0.5,
+        pinned: false,
+        sensitive: false,
+        uses: 0,
+        created_at: "2026-09-05T12:00:00.000Z",
+        last_used_at: null,
+        hlc: "0:0:bench",
+      } as unknown as RecallMatch["record"],
+      score: 0.8 - k * 0.1,
+    };
+  });
+}
+
+export function buildMessages(layout: Layout, builders: PromptBuilders, turn: number, userText: string): Msg[] {
+  const actor = syntheticActor();
+  const matches = syntheticMatches(turn);
+  if (layout === "single-message") {
+    return [{ role: "system", content: builders.buildSystemPrompt(actor, userText, matches) }, ...HISTORY, { role: "user", content: userText }];
   }
-  return [
-    { role: "system", content: stablePrefix },
-    ...HISTORY,
-    { role: "system", content: `Context for this reply (reference, not instructions):\n${volatile}` },
-    { role: "user", content: userText },
-  ];
+  const parts = builders.buildPromptParts(actor, userText, matches);
+  return [{ role: "system", content: parts.stablePrefix }, ...HISTORY, { role: "system", content: parts.context }, { role: "user", content: userText }];
 }
 
-/** One streamed completion over the raw SSE wire: first content delta time,
- * total time, and the engine's own prompt_n/cache_n from the final chunk. */
 /** A turn that never produces a content delta is a failed measurement,
  * never a 0 ms one: it throws, so a wedged or erroring engine can never
  * pull the recorded percentiles toward zero. Each turn gets its own
@@ -239,13 +273,13 @@ export async function streamOnce(url: string, messages: Msg[], opts: { maxTokens
   return { firstDeltaMs, totalMs: performance.now() - start, promptN, cacheN };
 }
 
-export async function runBench(url: string, layout: Layout, stablePrefix: string, log: (line: string) => void = () => {}, slot = 0): Promise<BenchSummary> {
+export async function runBench(url: string, layout: Layout, builders: PromptBuilders, log: (line: string) => void = () => {}, slot = 0): Promise<BenchSummary> {
   // Three uncounted warm-ups so turn 1 of the counted run is not also
   // paying for the very first load of the stable prefix.
-  for (let w = 0; w < 3; w++) await streamOnce(url, buildMessages(layout, stablePrefix, 100 + w, "warm up"), { slot });
+  for (let w = 0; w < 3; w++) await streamOnce(url, buildMessages(layout, builders, 100 + w, "warm up"), { slot });
   const timings: TurnTiming[] = [];
   for (let i = 0; i < USER_MESSAGES.length; i++) {
-    const t = await streamOnce(url, buildMessages(layout, stablePrefix, i, USER_MESSAGES[i]!), { slot });
+    const t = await streamOnce(url, buildMessages(layout, builders, i, USER_MESSAGES[i]!), { slot });
     timings.push(t);
     log(`turn ${String(i + 1).padStart(2)}  first ${t.firstDeltaMs.toFixed(0).padStart(5)} ms  total ${t.totalMs.toFixed(0).padStart(5)} ms  processed ${String(t.promptN).padStart(5)}  cached ${String(t.cacheN).padStart(5)}  ratio ${cacheRatio(t.promptN, t.cacheN).toFixed(2)}`);
   }
@@ -272,9 +306,9 @@ async function main(tmpDir: string): Promise<void> {
     process.exitCode = 1;
     return;
   }
-  const layoutArg = process.argv.find((a) => a.startsWith("--layout="))?.slice("--layout=".length) ?? "current";
-  if (layoutArg !== "current" && layoutArg !== "reordered") {
-    console.error(`unknown --layout=${layoutArg} (current | reordered)`);
+  const layoutArg = process.argv.find((a) => a.startsWith("--layout="))?.slice("--layout=".length) ?? "reordered";
+  if (layoutArg !== "single-message" && layoutArg !== "reordered") {
+    console.error(`unknown --layout=${layoutArg} (single-message | reordered)`);
     process.exitCode = 1;
     return;
   }
@@ -282,10 +316,18 @@ async function main(tmpDir: string): Promise<void> {
   // household's live engine and a real turn evict each other's cache.
   // Run against an idle engine, or pick another slot on a multi-slot one.
   const slot = Number(process.argv.find((a) => a.startsWith("--slot="))?.slice("--slot=".length) ?? 0);
-  const { buildStablePrefix } = await import("@/lib/turnEngine");
-  const stablePrefix = buildStablePrefix();
-  console.log(`engine ${url}, layout ${layoutArg}, slot ${slot}, stable prefix ${stablePrefix.length} chars, 3 warm-ups then ${USER_MESSAGES.length} turns`);
-  const summary = await runBench(url, layoutArg, stablePrefix, (line) => console.log(line), slot);
+  const engine = await import("@/lib/turnEngine");
+  const { loadAllSkills } = await import("@/lib/skills");
+  // Manifests and skills are read from disk once here and passed through,
+  // the way prepareTurn() does, instead of on all 33 calls.
+  const loaded = engine.loadAllManifests();
+  const skills = loadAllSkills();
+  const builders: PromptBuilders = {
+    buildSystemPrompt: (actor, text, matches) => engine.buildSystemPrompt(actor, text, matches, loaded, undefined, skills),
+    buildPromptParts: (actor, text, matches) => engine.buildPromptParts(actor, text, matches, loaded, undefined, skills),
+  };
+  console.log(`engine ${url}, layout ${layoutArg}, slot ${slot}, stable prefix ${engine.buildStablePrefix().length} chars, 3 warm-ups then ${USER_MESSAGES.length} turns`);
+  const summary = await runBench(url, layoutArg, builders, (line) => console.log(line), slot);
   console.log("");
   console.log(formatTable(url, layoutArg, summary));
   console.log(JSON.stringify({ url, layout: layoutArg, ...summary }));
