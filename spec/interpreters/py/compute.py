@@ -45,6 +45,54 @@ class ComputeError(Exception):
     pass
 
 
+# Turns spoken arithmetic into calculator symbols for simpleeval. The
+# math package's `calculate *` pattern hands the evaluator spoken text
+# (#72); mirrors interpreters/ts/compute.ts's own normalizeSpokenMath()
+# rule for rule, one deliberate difference: powers become `**`, not
+# `^`, because simpleeval reads `^` as bitwise xor ("5^2" would give 7).
+def normalize_spoken_math(text: str) -> str:
+    # 1. Trim; drop a trailing "?" or "."; collapse repeated spaces
+    result = re.sub(r"\s+", " ", re.sub(r"[?.]+$", "", text.strip()))
+
+    # 2. Multi-word expressions
+    result = re.sub(r"\bmultiplied by\b", "*", result, flags=re.IGNORECASE)
+    result = re.sub(r"\bdivided by\b", "/", result, flags=re.IGNORECASE)
+    result = re.sub(r"\bto the power of\b", "**", result, flags=re.IGNORECASE)
+
+    # 3. Single words
+    result = re.sub(r"\bplus\b", "+", result, flags=re.IGNORECASE)
+    result = re.sub(r"\bminus\b", "-", result, flags=re.IGNORECASE)
+    result = re.sub(r"\btimes\b", "*", result, flags=re.IGNORECASE)
+    # Only replace "over" when it's between digits or parentheses
+    result = re.sub(r"(?<=[\d)])\s+over\s+(?=[\d(])", "/", result, flags=re.IGNORECASE)
+
+    # 4. The letter "x" as multiplication sign
+    result = re.sub(r"(?<=\d)\s*x\s*(?=\d)", "*", result)
+
+    # 5. Squared and cubed
+    result = re.sub(
+        r"(\d+(?:\.\d+)?|\([^)]+\))\s+squared", r"\1**2", result, flags=re.IGNORECASE
+    )
+    result = re.sub(
+        r"(\d+(?:\.\d+)?|\([^)]+\))\s+cubed", r"\1**3", result, flags=re.IGNORECASE
+    )
+
+    # 6. Percent of
+    result = re.sub(
+        r"(\d+(?:\.\d+)?)\s+percent\s+of\s+(\d+(?:\.\d+)?)",
+        r"(\1/100)*\2",
+        result,
+        flags=re.IGNORECASE,
+    )
+
+    # 7. Percent alone
+    result = re.sub(
+        r"\b(\d+(?:\.\d+)?)\s+percent\b", r"(\1/100)", result, flags=re.IGNORECASE
+    )
+
+    return result
+
+
 def _format(value: float) -> str:
     formatted = f"{value:.{_DISPLAY_PRECISION}g}"
     # Python's "g" format switches to exponential notation past a
@@ -61,7 +109,8 @@ def _format(value: float) -> str:
     return formatted
 
 
-def evaluate_expression(expression: str) -> str:
+def evaluate_expression(raw_expression: str) -> str:
+    expression = normalize_spoken_math(raw_expression)
     convert_match = _CONVERT_RE.match(expression.strip())
     if convert_match:
         quantity_expr, target_unit = (

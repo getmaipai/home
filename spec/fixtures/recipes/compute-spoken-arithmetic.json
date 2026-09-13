@@ -1,0 +1,20 @@
+{
+  "description": "compute + format: spoken arithmetic, the words a person says (#72), normalized before the evaluator sees them.",
+  "recipe": {
+    "id": "compute-spoken-arithmetic",
+    "inputs": [{ "name": "expression", "selector": "text" }],
+    "steps": [
+      { "op": "compute", "as": "result", "expression": "{expression}" },
+      { "op": "format", "as": "reply", "text": "{result}", "speech": "{result}" }
+    ]
+  },
+  "inputs": { "expression": "12 times 12" },
+  "host_setup": {},
+  "expected": {
+    "reply": { "text": "144", "speech": "144" },
+    "actions": [],
+    "scheduled_jobs": [],
+    "home_calls": [],
+    "memory_added": []
+  }
+}
