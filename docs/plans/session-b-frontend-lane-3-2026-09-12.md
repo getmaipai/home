@@ -8,9 +8,11 @@ and your own lines in `docs/BACKLOG.md` and `docs/dev.md`. One
 exception, stated here so it is not a guess: item 4 may add an
 additive batch route in `backend/src/routes/memory.ts` with its
 `lib/memory.ts` helper and tests, because Track A does not own those
-files and Track B has merged; nothing else under `backend/`. Never
-`scripts/check.sh`. Long commands in the background or with a raised
-timeout. Code review at medium before each commit; docs in the same
+files and Track B has merged; nothing else under `backend/`. Do not
+edit `scripts/check.sh` (issue #55 waits for Track A); do run it,
+`bash scripts/check.sh` from the repo root, before every commit, in
+the background or with a raised timeout, and state its result in the
+done report. Code review at medium before each commit; docs in the same
 commit; stage by name; push `main` after each item; report to
 `getmaipai-c0` on done (hash, commands and results, evidence paths),
 blocked (pasted error), question, or low context. Commit this file

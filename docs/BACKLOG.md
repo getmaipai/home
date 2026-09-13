@@ -3414,27 +3414,23 @@ future session now that F's hub half exists.
       requirement was never the violation and stays clear). Re-running
       the full `bun run a11y` matrix confirms every one of these
       instances is gone.
-- [ ] **A second, narrower contrast finding, found while verifying the
-      fix above** (session E step 7, 2026-09-06) - `chat @ desktop/
-      light` still shows 6 `color-contrast` nodes, all the same root
-      cause: a `<time>` element (a message's timestamp,
-      `class="text-base text-muted-foreground"`) measured at 3.66:1,
-      still under 4.5:1. Not the `--primary` fix's territory at all -
-      this text uses `--muted-foreground`, and the computed color axe
-      reported (`#85858d`) doesn't match this repo's own
-      `--muted-foreground` (`hsl(240 4% 46%)`, which computes to a
-      visibly darker `#70707a`) when checked by hand - something in
-      `@assistant-ui/react`'s own message-timestamp rendering (no
-      `<time>` element is authored anywhere in `kit/assistant-ui/
-      thread.aui.tsx`; it comes from the library's own internals) is
-      resolving `text-muted-foreground` to a different, lighter value
-      than the rest of this app gets from the same class - a real
-      styling-integration gap between assistant-ui's own theme
-      resolution and this kit's tokens in that specific scoped context,
-      not a token value to darken further. Needs a live browser's
-      computed-styles inspection to root-cause properly (which CSS rule
-      is actually winning), not more token math - left for whoever picks
-      this up next; the number is real and verified, not guessed at.
+- [x] **A second, narrower contrast finding, found while verifying the
+      fix above** (session E step 7, 2026-09-06; root-caused and closed
+      Session B lane 3 item 3, 2026-09-12) - the `#85858d`-vs-`#70707a`
+      mismatch was never an assistant-ui theming gap: it was axe-core
+      scanning before the chat pane's `fade-in` entrance animation
+      (`animate-in fade-in duration-150`) finished, catching the
+      timestamp mid-transition at a lighter, still-animating color.
+      Proved deterministically (`scripts/screenshot.ts`'s own
+      `settleAnimations()`, see `docs/dev.md`): with the settle step
+      removed and the fade lengthened to 5s, the scan reliably fails (11
+      nodes on chat/phone/dark, 7 on chat/desktop/light); with the
+      settle step restored before the same 5s fade, it passes at 0
+      violations. The element itself is `frontend/src/apps/chat/
+      chatDayDivider.tsx`'s own `MessageTimestamp`, not an assistant-ui
+      internal. Fixed by moving the settle wait to run before every
+      route's axe scan (previously only chat-review's post-scan cleanup)
+      and closed alongside the type-floor fix below.
 - [x] **`scrollable-region-focusable`, done** (session E step 6/7,
       2026-09-06) - re-running the full `bun run a11y` matrix after
       merging main (F's real `GET /api/health` landed with
@@ -3920,10 +3916,18 @@ future session now that F's hub half exists.
       scope, `backend/src/settings/uiKeys.ts`) exists and `shell/
       useAppearance.ts` applies it (a `.dark`/`.light` class, and drives
       `theme-color` off the resolved value instead of the hardcoded dark
-      meta tag). **Still open:** the bell badge and thread timestamp
-      `text-[10px]`/`text-xs` instances themselves weren't hunted down
-      and fixed in this pass (a real, separate audit-style sweep, not
-      folded into the shell rebuild).
+      meta tag). The bell badge and thread timestamp this note named are
+      done (Session B lane 3 item 3, 2026-09-12): the bell badge (`shell/
+      NotificationBell.tsx`) was already on `text-base` from an earlier,
+      unrelated change; `chatDayDivider.tsx`'s `DayDivider` and
+      `MessageTimestamp` were the two `text-xs` (12px) instances this
+      note pointed at, under the kit's 16px floor, and are now
+      `text-base`. No `text-[10px]` instances exist anywhere in the
+      current codebase. Other `text-xs` usage remains scattered across
+      the frontend (shell chrome, dropdown/select internals, tool
+      fallback rendering); this item closed the two named here, not a
+      repo-wide `text-xs` audit - that broader sweep is still open work,
+      not filed as its own item yet.
 - [ ] **A screenshot matrix in the pipeline** (M; sharpens the tracked
       "wire the measurable half" note) - every page at every surface,
       light and dark, with overflow and target checks, per UI.md; today

@@ -66,7 +66,13 @@ export function DayDivider() {
   if (!isFirstOfDay) return null;
 
   return (
-    <div role="separator" className="my-2 flex items-center gap-2 px-2 text-xs text-muted-foreground select-none">
+    // BACKLOG.md's "still open" note (2026-09-05): this divider used
+    // `text-xs` (12px), under the kit's own 16px hard floor
+    // (`kit/tokens.css`, docs/UI.md - "the kit refuses to go below").
+    // `text-base` is that floor exactly (`html { font-size: 16px }` makes
+    // Tailwind's 1rem default land there), the same class every other
+    // body-weight text in the kit already uses to stay compliant.
+    <div role="separator" className="my-2 flex items-center gap-2 px-2 text-base text-muted-foreground select-none">
       <div className="h-px flex-1 bg-border" />
       {dayLabel(createdAt)}
       <div className="h-px flex-1 bg-border" />
@@ -77,7 +83,9 @@ export function DayDivider() {
 export function MessageTimestamp() {
   const createdAt = useAuiState((s) => s.message.createdAt);
   return (
-    <time dateTime={createdAt.toISOString()} className="text-xs text-muted-foreground">
+    // Same type-floor fix as DayDivider above: was `text-xs` (12px, under
+    // the kit's 16px floor), now `text-base` (16px, the floor itself).
+    <time dateTime={createdAt.toISOString()} className="text-base text-muted-foreground">
       {createdAt.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" })}
     </time>
   );

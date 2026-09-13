@@ -195,6 +195,27 @@ interface RunResult {
   overflow: boolean;
 }
 
+// Waits for every finite (non-looping) CSS animation/transition on the
+// page to finish - message bubbles, action bars, and other UI fade/slide
+// in via Tailwind's `animate-in` utilities (thread.aui.tsx's own
+// `fade-in slide-in-from-bottom-1 ... duration-150`), and a scan or
+// screenshot taken mid-transition sees a genuinely different, blended
+// color, not the settled one. Found live (2026-09-12): axe reported a
+// message timestamp's `text-muted-foreground` at `#85858d` where the
+// token itself computes to `#70707a` - the exact blend a ~0.85 opacity
+// partway through a 150ms fade-in produces toward a white background,
+// confirmed by temporarily lengthening that duration to 5s and watching
+// the same scan fail before this call and pass after it (docs/dev.md's
+// "Lane 3 item 3" entry has the full before/after). Not chat-specific
+// (any route with a freshly-mounted animated element could race the
+// same way), so this is unconditional for every route, not gated on
+// `chatReview` the way it used to be.
+async function settleAnimations(page: import("playwright").Page) {
+  await page.evaluate(async () => {
+    await Promise.all(document.getAnimations().filter((animation) => animation.effect?.getTiming().iterations !== Infinity).map((animation) => animation.finished.catch(() => {})));
+  });
+}
+
 /** Navigates to one route, waits for its real content (never a spinner or
  * an empty shell), runs the axe scan and the overflow check, and - unless
  * `a11yOnly` - saves the PNG. Throws on a navigation/selector failure
@@ -222,6 +243,12 @@ async function visitRoute(context: BrowserContext, route: RouteSpec, viewport: V
       () => document.documentElement.scrollWidth > document.documentElement.clientWidth + 1,
     );
 
+    // Every animated element (message bubbles, action bars, ...) must be
+    // settled before axe reads computed color/contrast, not after - see
+    // settleAnimations' own comment for why this moved here and stopped
+    // being chat-only.
+    await settleAnimations(page);
+
     // Explicit tags, not axe's own bare default run (session E step 7):
     // axe-core's default excludes newer WCAG 2.1/2.2 success criteria
     // unless a version ships them pre-enabled, which drifts silently
@@ -233,7 +260,6 @@ async function visitRoute(context: BrowserContext, route: RouteSpec, viewport: V
       .analyze();
     const violations = axe.violations.map((v) => `${v.id} (${v.impact ?? "unknown"}): ${v.nodes.length} node(s) - ${v.help}: ${v.nodes.map((node) => node.target.join(" ")).join("; ")}`);
 
-    if (chatReview) await settleChat(page);
     if (saveScreenshot) {
       mkdirSync(SCREENS_DIR, { recursive: true });
       await page.screenshot({ path: join(SCREENS_DIR, `${route.slug}-${viewport.slug}-${theme}.png`), fullPage: true });
@@ -245,14 +271,6 @@ async function visitRoute(context: BrowserContext, route: RouteSpec, viewport: V
   }
 }
 
-// Same seeded browser pipeline, with a scripted offline model. These shots
-// illustrate demo conversations; the assertions exercise real HTTP persistence.
-async function settleChat(page: import("playwright").Page) {
-  await page.evaluate(async () => {
-    await Promise.all(document.getAnimations().filter((animation) => animation.effect?.getTiming().iterations !== Infinity).map((animation) => animation.finished.catch(() => {})));
-  });
-}
-
 async function exerciseChat(page: import("playwright").Page, viewport: ViewportSpec, theme: string) {
   const send = async (text: string) => {
     await page.getByRole("textbox", { name: "Message input" }).fill(text);
@@ -262,7 +280,7 @@ async function exerciseChat(page: import("playwright").Page, viewport: ViewportS
   };
   await page.getByRole("textbox", { name: "Message input" }).waitFor();
   mkdirSync(SCREENS_DIR, { recursive: true });
-  await settleChat(page);
+  await settleAnimations(page);
   // #71: an empty thread must never show the floating scroll-to-bottom
   // arrow (it means the viewport thinks it isn't scrolled to the bottom,
   // which on a genuinely empty thread means something - historically
@@ -302,7 +320,7 @@ async function exerciseChat(page: import("playwright").Page, viewport: ViewportS
     // under load, and reading too early would misreport the setup itself
     // as broken rather than checking what this guard exists to check.
     await page.waitForFunction(() => (document.scrollingElement?.scrollTop ?? 0) !== 0, { timeout: 2000 });
-    await settleChat(page);
+    await settleAnimations(page);
     // Assert the shell stays fixed and the input stays visible when focused.
     // The scrollTo(0, 300) above is a deliberate part of this repro (it
     // simulates a mobile browser auto-panning the document to reveal a
@@ -362,7 +380,7 @@ async function exerciseChat(page: import("playwright").Page, viewport: ViewportS
   await page.reload();
   await page.getByRole("button", { name: "Show threads" }).click();
   await page.getByRole("button", { name: "Garden plans", exact: true }).waitFor();
-  await settleChat(page);
+  await settleAnimations(page);
   await page.screenshot({ path: join(SCREENS_DIR, `chat-history-${viewport.slug}-${theme}.png`) });
   const other = page.locator('[data-slot="aui_thread-list-item"]').filter({ has: page.getByRole("button", { name: "Help me choose a book", exact: true }) }).last();
   await other.getByRole("button", { name: "More options" }).click();

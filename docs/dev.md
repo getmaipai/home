@@ -11273,3 +11273,66 @@ Files: `frontend/src/apps/privacy/PrivacyPage.tsx`,
 `frontend/src/apps/privacy/PrivacyPage.test.tsx`,
 `docs/assets/screens/privacy-desktop-light.png`.
 
+**Lane 3 item 3: the message-timestamp contrast finding was a scan-timing
+artifact, not a real defect, plus the type-floor sweep.** `docs/
+BACKLOG.md`'s open item (session E, 2026-09-06) blamed `@assistant-ui/
+react`'s own internals for resolving `text-muted-foreground` to a lighter
+color (`#85858d`) than this repo's token computes to by hand (`#70707a`).
+That diagnosis was wrong on two counts: the element in question is not an
+assistant-ui internal at all, it is this repo's own `frontend/src/apps/
+chat/chatDayDivider.tsx`'s `MessageTimestamp` (a `<time>` this repo
+authors), and the color mismatch was never a theming gap - it was
+`scripts/screenshot.ts`'s axe scan running before the chat pane's
+`animate-in fade-in duration-150` entrance transition had finished,
+catching the timestamp mid-fade at whatever partial opacity the animation
+was on that tick.
+
+Proved this deterministically rather than statistically, per instruction:
+temporarily lengthened the fade to 5 seconds (`sed`, `thread.aui.tsx`
+lines 495 and 663, `duration-150` to `duration-5000`) and ran the same
+`--chat-review` scan with the settle step disabled and then enabled.
+Disabled: the scan reliably fails with 11 `color-contrast` nodes on chat/
+phone/dark and 7 on chat/desktop/light, every run. Enabled: the same 5s
+fade passes at 0 violations, every run. Restored `duration-150` afterward
+and confirmed `git diff` on `thread.aui.tsx` comes back empty.
+
+Fixed in `scripts/screenshot.ts`: renamed the settle helper `settleChat`
+to `settleAnimations` (it was never chat-specific, only ever called for
+chat routes) and moved its call from after the axe scan, gated on
+`chatReview`, to before the scan, unconditionally, inside `visitRoute` -
+every route now waits out its own animations and transitions before axe
+measures anything, not just chat. This is also why the finding never
+reproduced consistently under the old `--chat-review` runs: a 150ms fade
+mostly finishes before axe gets to it on a fast machine, so the failure
+was a race, not a permanent bug on this hardware, real on a slower one or
+under load.
+
+Second half of the item, exactly what the same BACKLOG note named: the
+bell badge and thread timestamp. `shell/NotificationBell.tsx`'s bell
+badge was already `text-base` from an earlier, unrelated change, nothing
+to do there. `chatDayDivider.tsx`'s `DayDivider` and `MessageTimestamp`
+were still `text-xs` (12px, under the kit's 16px floor, `kit/tokens.css`'s
+`html { font-size: 16px }`); both moved to `text-base` (16px, the floor
+itself), with a comment on each citing the floor. No `text-[10px]`
+instances exist anywhere in the current codebase, so the note's specific
+mention of that size was already stale by the time this item picked it
+up. This closed the two instances the note named, not a repo-wide
+`text-xs` audit: `grep -rn "text-xs" frontend/src` still turns up ~49
+other hits (shell chrome, dropdown/select internals, tool-fallback
+rendering) not in this item's scope - a broader sweep is real remaining
+work, left for whoever picks it up, not filed as its own BACKLOG item
+yet.
+
+Verified: `bun run scripts/screenshot.ts --chat-review` with both fixes
+in place reports 2 pages checked, 0 violations, 0 overflow, reduced
+motion and keyboard-trap checks passed. Opened the regenerated
+`chat-desktop-light.png`: the "Today" divider and message timestamps
+render at a visibly larger, properly readable size next to the message
+body text. Corrected `docs/BACKLOG.md`'s two entries (the contrast
+finding and the type-floor "still open" note) to record the real root
+cause and closure. Full `bun test` suite, `bunx tsc --noEmit`, and `bunx
+eslint` all clean.
+
+Files: `frontend/src/apps/chat/chatDayDivider.tsx`, `scripts/
+screenshot.ts`, `docs/BACKLOG.md`.
+
