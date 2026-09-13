@@ -19,8 +19,9 @@ The first time you open MaiPai Home, it walks you through a short setup wizard. 
 5. **Set up security certificate.** This step isn't built yet - you can set it up later once it's ready.
 6. **Set up packages.** The package store isn't built yet - once it is, you'll be able to browse and choose what your household uses here.
 7. **Set up remote access.** You can optionally set up secure remote access to your hub away from home. This isn't built yet - skip it for now.
-8. **Run your first backup.** Tap **Run a backup now** so your household's data is saved from the start. You can set up a regular schedule later in Settings.
-9. **You're done.** MaiPai shows you a few things to try first, like asking a question in Chat.
+8. **Emergency kit.** Once backups are set up, MaiPai will give you an emergency kit: a printable page with the key to restore your household's data if this hub is ever lost. That page isn't generated yet - you'll see it for real once backups are configured in the next step.
+9. **Run your first backup.** Tap **Run a backup now** so your household's data is saved from the start. You can set up a regular schedule later in Settings.
+10. **You're done.** MaiPai shows you a few things to try first, like asking a question in Chat.
 
 You'll know it worked when MaiPai greets you by name on the Home screen.
 
