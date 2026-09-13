@@ -11030,3 +11030,87 @@ state. When a message is edited, assistant-ui branches in memory, but that
 state is lost on history reload. Honest fix requires backend schema: add a
 nullable `supersedes` column to the turn table so branches can be persisted.
 
+## Session B, second lane: frontend issues (2026-09-12)
+
+**#59: the wake word toggle crashes the dev server** - the issue's own
+diagnosis named the crashing file correctly but the wrong mechanism. The
+real cause, confirmed against Vite's own dev-server error text rather than
+guessed: `wake-word-runtime.ts` set `ort.env.wasm.wasmPaths = "/ort/"`
+unconditionally, and onnxruntime-web's WASM backend loads its own
+`ort-wasm-simd-threaded.jsep.mjs` with a runtime `import()` built from that
+path. Vite's dev server refuses to load ANY file under `public/` through a
+JS `import()` by design - its own error, reproduced live by clicking the
+toggle: "This file is in /public and will be copied as-is during build
+without going through the plugin transforms, and therefore should not be
+imported from source code. It can only be referenced via HTML tags." This
+has nothing to do with worker/proxy mode: `ort.env.wasm.proxy` was already
+`false` by default in the installed onnxruntime-web version (1.29.0, its
+own type definitions confirm this), so setting it explicitly is harmless
+documentation of intent, not the fix.
+
+Fix: in dev (`!import.meta.env.PROD`), leave `wasmPaths` unset entirely.
+onnxruntime-web then resolves the loader file relative to its own
+`import.meta.url`, landing inside `node_modules` - a location Vite serves
+and imports from normally. Confirmed live, several ways: a direct
+`ort.InferenceSession.create()` call against a fake model path 500'd with
+the exact Vite public-dir error when `wasmPaths` pointed at `/ort/`, and
+succeeded (reaching a real "protobuf parsing failed" error from the fake
+model, proving the WASM backend itself loaded) once `wasmPaths` was left
+unset - reproduced against both the pre-bundled dependency path
+(`/node_modules/.vite/deps/onnxruntime-web.js`) and, temporarily, a direct
+`/@fs/` path once `optimizeDeps.exclude: ["onnxruntime-web"]` was added to
+vite.config.ts. That second config change turned out to be unnecessary -
+the same fix works with the default pre-bundled dependency too - so it was
+reverted; the plan's own instruction ("add optimizeDeps.exclude only if the
+crash persists without it") is answered: it wasn't needed. Production
+keeps `wasmPaths = "/ort/"` (`import.meta.env.PROD`), preserving the
+existing architecture (`frontend/scripts/copy-ort.mjs` copies the WASM/JS
+assets there at build time) and the privacy promise it exists for - no CDN
+fetch for the wake-word engine.
+
+Verified: clicking "Wake word (experimental)" in a real `bun run dev`
+session reaches "Starting…" with zero console errors and no dev-server
+crash (confirmed against the dev server's own terminal log, which
+previously printed the Vite public-dir error the instant a session was
+created); a direct session-creation call against the dev server's real
+module graph succeeds past WASM backend init; the production build
+(`bun run build`) succeeds, and the same direct-session-creation check
+against the built `dist/` output, served by the real backend, also
+succeeds. Getting past microphone permission itself to observe the full
+"Listening for hey jarvis" state needs a real user gesture browser
+automation can't grant; the WASM crash this issue is about is the thing
+proven fixed, on both sides of the permission gate.
+
+The PROD-vs-dev decision was pulled out into its own exported function,
+`bundledWasmPaths(isProd = !!import.meta.env.PROD)`, rather than left as an
+inline `if` - a code review (2026-09-12) found the first pass's test only
+covered the dev branch, and `import.meta.env.PROD` can't be flipped from a
+test to reach the other one: it's genuinely `undefined` under `bun:test`
+(no Vite build ran), and each module owns its own `import.meta`, so
+mutating a test file's copy never touches the module under test. With the
+flag as an explicit parameter, `bundledWasmPaths(true)` and `(false)` are
+two direct, trivial unit tests, closing the gap a silent revert or
+inversion would otherwise leave open (onnxruntime-web falls back to a
+CDN-capable default resolution when `wasmPaths` is unset, so a regression
+here would reintroduce exactly the network fetch the privacy promise
+forbids). `setSessionFactory(null)` was also fixed to clear the cached
+`defaultLoading` promise, not just the injected `factory` - needed for a
+test to force a fresh `loadDefaultFactory()` run, and arguably a latent gap
+before this: "go back to the real default" should have meant a fresh
+computation next time, not a stale cached one from whenever it first ran.
+
+New unit tests (`wake-word-runtime.test.ts`): one, mocking the
+`onnxruntime-web` import, asserts the real loader wiring under the dev
+environment (`numThreads: 1`, `proxy: false`, `wasmPaths` unset); two more
+call `bundledWasmPaths` directly with each boolean. Verified in the built
+production bundle too: the minified default parameter compiles to the
+literal `true` (`function zle(e=!0){return e?"/ort/":void 0}`), confirming
+Vite's own `import.meta.env.PROD` replacement reaches this function
+correctly. Files: `frontend/src/lib/voice/wake-word-runtime.ts`,
+`frontend/src/lib/voice/wake-word-runtime.test.ts` (new). Checks:
+`bunx tsc --noEmit`, `bunx eslint`, the full `bun test` suite (483 pass),
+`bun run build`, and a second live click-through against the rebuilt
+production bundle (served by the real backend) after the refactor.
+
+Closes #59.
+

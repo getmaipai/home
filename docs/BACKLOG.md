@@ -3296,6 +3296,23 @@ future session now that F's hub half exists.
     `bash scripts/check.sh`, `bun run scripts/screenshot.ts --chat-review`,
     every regenerated screenshot read by hand.
 
+- [x] **#59: The wake word toggle crashes the dev server** (S, Session B, 2026-09-12)
+
+    Root cause was not what the issue guessed: `wasmPaths = "/ort/"` made
+    onnxruntime-web's WASM backend `import()` a file under `public/`, which
+    Vite's dev server refuses by design (confirmed against Vite's own error
+    text). Fixed by leaving `wasmPaths` unset in dev (resolves inside
+    `node_modules` instead, which Vite serves normally) and keeping it only
+    in production (`import.meta.env.PROD`), preserving the no-CDN privacy
+    guarantee. `ort.env.wasm.proxy = false` was already the library's
+    default and isn't the actual fix, kept only for explicitness. Full
+    story: docs/dev.md's "Session B, second lane" entry. Files:
+    `frontend/src/lib/voice/wake-word-runtime.ts`,
+    `frontend/src/lib/voice/wake-word-runtime.test.ts` (new). Checks:
+    `bunx tsc --noEmit`, the full `bun test` suite, `bun run build`,
+    clicking the toggle in a real `bun run dev` session (console and
+    dev-server log both read).
+
 - [x] **#66: Hardcoded "unavailable" error code masked safety refusals** (S, 2026-09-12)
 
     Fixed: pass event.code through; show generic banner only for "unavailable";
