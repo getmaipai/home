@@ -677,6 +677,25 @@ not permission to expand scope.
 
 - [ ] **CHAT-20: Update memory state in the open chat without reloading it** (M)
 
+    **Frontend half: done, lane 8 item 2 (2026-09-13).** `judgeStatus`
+    (backend/src/db/schema.ts's own `judge_status`, already carried by
+    `ConversationTurnWithMemoryIds`) plus `memory_ids` derive a real
+    `MemoryStatus` (`pending`/`saved`/`not_saved`/`failed`) client-side -
+    no backend change needed, the fields already existed. One store
+    (`chatMemoryState.ts`), turn-id keyed, the chip and remember/forget
+    both read and write it; a 5s poll of the existing per-conversation
+    turns endpoint runs only while something in the open conversation is
+    pending, paused while the tab is hidden, stopped once nothing is
+    pending or the conversation changes. Ten-minute stall: a client-side
+    flag, "Still waiting to process memory" plus a manual Refresh, never
+    a false "failed". Replaces #64's narrower notifications-poll path
+    (chatMemoryChip.tsx), which only ever produced "saved" with no
+    forget wiring. Backend half (routes/conversations.ts,
+    lib/conversationHistory.ts's own remaining CHAT-20 acceptance,
+    session-a-intelligence.md's contract) not audited here - out of
+    scope for lane 8, Session A's files. Full writeup: docs/dev/
+    session-b.md, "Lane 8 item 2: CHAT-20's frontend half".
+
     Depends on: CHAT-07. Files: `backend/src/wire.ts`,
     `routes/conversations.ts`, `lib/conversationHistory.ts`,
     `frontend/src/apps/chat/chatModelAdapter.ts`, `chatHistoryAdapter.ts`,

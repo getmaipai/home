@@ -18,6 +18,7 @@ import { brainBlockReason, useEngineHealth } from "@/apps/chat/useEngineHealth";
 import { createSttDictationAdapter } from "@/lib/voice/sttDictationAdapter";
 import { createSttSocket } from "@/lib/voice/sttSocket";
 import { ChatActorContext } from "@/apps/chat/chatMemoryActions";
+import { useMemoryStatusPoll } from "@/apps/chat/chatMemoryState";
 import { consumeSupersedes } from "@/apps/chat/chatEditSupersedes";
 import { cn, FOCUS_RING } from "@/kit/utils";
 import type { Roster } from "@/lib/api";
@@ -62,6 +63,11 @@ export function ChatPage({ person }: ChatPageProps) {
   // should land on a plain empty composer, not replay a stale prompt.
   const location = useLocation();
   const [searchParams, setSearchParams] = useSearchParams();
+  // CHAT-20: the same conversation id the runtime below uses as its own
+  // `threadId` - polling follows whichever conversation is actually open,
+  // stopping on its own (chatMemoryState.ts's own cleanup) the moment the
+  // person switches threads, navigates away, or nothing is pending.
+  useMemoryStatusPoll(searchParams.get("conversation") ?? undefined);
   const initialText =
     typeof (location.state as { initialText?: unknown } | null)?.initialText === "string"
       ? (location.state as { initialText: string }).initialText

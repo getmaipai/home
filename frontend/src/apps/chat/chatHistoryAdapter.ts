@@ -25,7 +25,7 @@ export interface BranchableTurnMessages {
  * same anchor as the first two, and the running chain always advances to
  * the newest row either way: whichever version was sent most recently is
  * the conversation's real current path, edit or not. */
-export function rowsToBranchableMessages(rows: ConversationTurnWithMemoryIds[], selfName: string): BranchableTurnMessages[] {
+export function rowsToBranchableMessages(rows: ConversationTurnWithMemoryIds[], selfName: string, conversationId: string): BranchableTurnMessages[] {
   const parentByRowId = new Map<string, string | null>();
   let chainTail: string | null = null;
   const out: BranchableTurnMessages[] = [];
@@ -44,7 +44,13 @@ export function rowsToBranchableMessages(rows: ConversationTurnWithMemoryIds[], 
       role: "user",
       content: row.userText,
       createdAt,
-      metadata: { custom: { turnId: row.id, senderName: selfName } },
+      // CHAT-20: the same memory fields the reply carries below - a
+      // turn's memory belongs to the whole exchange, not one side of it
+      // (`memoryRecords.source` is the turn id either way), and
+      // RememberThisButton renders on this row too (thread.aui.tsx's
+      // UserActionBar), reading the identical chatMemoryState.ts store
+      // entry the reply's own chip does.
+      metadata: { custom: { turnId: row.id, conversationId, memoryIds: row.memory_ids, judgeStatus: row.judgeStatus, source: row.source, senderName: selfName } },
     };
     const replyMessage: ThreadMessageLike = {
       id: replyId,
@@ -56,7 +62,11 @@ export function rowsToBranchableMessages(rows: ConversationTurnWithMemoryIds[], 
       // reads these straight off the reloaded message to show "via <package>"
       // for a non-model reply - the same row fields Fix B3
       // (conversationHistory.ts's buildConversationWindow()) already uses.
-      metadata: { custom: { turnId: row.id, memoryIds: row.memory_ids, source: row.source, pluginId: row.pluginId, commandId: row.commandId } },
+      // `judgeStatus` (CHAT-20): chatMemoryState.ts's own
+      // `deriveMemoryStatus()` needs it alongside `memoryIds` and
+      // `source` to tell "not yet judged" from "judged, nothing worth
+      // remembering" from "a plugin turn the judge never queues."
+      metadata: { custom: { turnId: row.id, conversationId, memoryIds: row.memory_ids, judgeStatus: row.judgeStatus, source: row.source, pluginId: row.pluginId, commandId: row.commandId } },
     };
     out.push({ user: { message: userMessage, parentId }, reply: { message: replyMessage, parentId: userId } });
     chainTail = replyId;
@@ -72,7 +82,7 @@ export function createChatHistoryAdapter(selfName: string, getConversationId: ()
     async load() {
       const id = getConversationId();
       const rows = id ? await api.conversationTurns(id) : [];
-      const turns = rowsToBranchableMessages(rows, selfName);
+      const turns = id ? rowsToBranchableMessages(rows, selfName, id) : [];
       const items = turns.flatMap((t) => [t.user, t.reply]);
       const headId = turns.length > 0 ? turns[turns.length - 1]!.reply.message.id : undefined;
       return ExportedMessageRepository.fromBranchableArray(items, { headId });

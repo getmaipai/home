@@ -4,7 +4,8 @@ import { getIcon } from "@/kit/icons";
 import { TooltipIconButton } from "@/kit/assistant-ui/tooltip-icon-button";
 import { messageText } from "@/apps/chat/chatMessageText";
 import { useChatListenStore } from "@/apps/chat/chatListenStore";
-import { forgetMessage, rememberMessage, useChatActorId, useRememberedMemoryId } from "@/apps/chat/chatMemoryActions";
+import { forgetMessage, rememberMessage, useChatActorId } from "@/apps/chat/chatMemoryActions";
+import { useMemoryState } from "@/apps/chat/chatMemoryState";
 
 const Volume2 = getIcon("volume-2");
 const Loader = getIcon("loader");
@@ -37,12 +38,12 @@ export function ListenButton() {
 // both the household member's own messages and MaiPai's replies (a
 // recommendation or a stated fact from MaiPai is just as worth saving).
 // Both need a real turn id to attribute to (chatHistoryAdapter.ts's
-// `metadata.custom.turnId`, populated only for a message already loaded
-// from GET /api/conversations - a message from the CURRENT live session
-// has none yet, since session-a-intelligence.md's turn_meta/done.turn_id
-// hasn't landed). Disabled rather than hidden on such a message: the
-// action exists, it just isn't attributable yet, the same honest gap the
-// plan's own "swap to the real routes when they merge" calls for.
+// `metadata.custom.turnId`, and getmaipai/home#60's live `done.turn_id`
+// for the assistant side of a message sent this session) - the user
+// message's own live object never gets one (assistant-ui's runtime never
+// retrofits a reply's turn id onto its sibling user message), so it stays
+// disabled there until a reload. Disabled rather than hidden on such a
+// message: the action exists, it just isn't attributable yet.
 function useRememberThis(): {
   turnId: string | undefined;
   alreadySaved: boolean;
@@ -52,8 +53,16 @@ function useRememberThis(): {
 } {
   const text = useAuiState((s) => messageText(s.message));
   const turnId = useAuiState((s) => (s.message.metadata?.custom?.turnId as string | undefined) ?? undefined);
+  const conversationId = useAuiState((s) => s.message.metadata?.custom?.conversationId as string | undefined);
+  const source = useAuiState((s) => s.message.metadata?.custom?.source as string | undefined);
+  const judgeStatus = useAuiState((s) => s.message.metadata?.custom?.judgeStatus as string | null | undefined);
+  const rowMemoryIds = useAuiState((s) => (s.message.metadata?.custom?.memoryIds as string[] | undefined) ?? undefined);
   const actorId = useChatActorId();
-  const alreadySaved = useRememberedMemoryId(turnId) !== undefined;
+  const memoryState = useMemoryState(
+    turnId,
+    turnId && conversationId && source !== undefined ? { conversationId, source, judgeStatus, memoryIds: rowMemoryIds ?? [] } : undefined,
+  );
+  const alreadySaved = (memoryState?.memoryIds.length ?? 0) > 0;
   const [state, setState] = useState<"idle" | "saving" | "error">("idle");
 
   return {
@@ -62,9 +71,9 @@ function useRememberThis(): {
     isSaving: state === "saving",
     isError: state === "error",
     trigger() {
-      if (!turnId || alreadySaved) return;
+      if (!turnId || !conversationId || alreadySaved) return;
       setState("saving");
-      rememberMessage({ text, turnId, actorId })
+      rememberMessage({ text, turnId, conversationId, actorId })
         .then(() => setState("idle"))
         .catch(() => setState("error"));
     },
@@ -126,10 +135,18 @@ export function RememberThisMenuItem() {
 
 export function ForgetThisMenuItem() {
   const turnId = useAuiState((s) => (s.message.metadata?.custom?.turnId as string | undefined) ?? undefined);
+  const conversationId = useAuiState((s) => s.message.metadata?.custom?.conversationId as string | undefined);
+  const source = useAuiState((s) => s.message.metadata?.custom?.source as string | undefined);
+  const judgeStatus = useAuiState((s) => s.message.metadata?.custom?.judgeStatus as string | null | undefined);
+  const rowMemoryIds = useAuiState((s) => (s.message.metadata?.custom?.memoryIds as string[] | undefined) ?? undefined);
   const [state, setState] = useState<"idle" | "forgetting" | "error">("idle");
-  const memoryId = useRememberedMemoryId(turnId);
+  const memoryState = useMemoryState(
+    turnId,
+    turnId && conversationId && source !== undefined ? { conversationId, source, judgeStatus, memoryIds: rowMemoryIds ?? [] } : undefined,
+  );
+  const memoryIds = memoryState?.memoryIds ?? [];
 
-  if (!turnId || !memoryId) return null;
+  if (!turnId || memoryIds.length === 0) return null;
 
   return (
     <ActionBarMorePrimitive.Item
@@ -138,7 +155,7 @@ export function ForgetThisMenuItem() {
       onSelect={(e) => {
         e.preventDefault();
         setState("forgetting");
-        forgetMessage(turnId)
+        forgetMessage(turnId, memoryIds)
           .then(() => setState("idle"))
           .catch(() => setState("error"));
       }}

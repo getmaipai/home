@@ -1,71 +1,84 @@
-import { useState } from "react";
 import { useAuiState } from "@assistant-ui/react";
-import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import { getIcon } from "@/kit/icons";
-import { api, type NotificationDeliveryView } from "@/lib/api";
-import { NOTIFICATIONS_QUERY_KEY, POLL_MS } from "@/shell/NotificationBell";
+import { Button } from "@/kit/ui/button";
+import { useMemoryState, refreshTurnMemoryStatus } from "@/apps/chat/chatMemoryState";
 
 const Brain = getIcon("brain");
+const Loader = getIcon("loader");
 
-// The judge runs after the turn, not during it - even the newest
-// (getmaipai/home#60: a live reply's own `metadata.custom.turnId`) message
-// has no `memory_ids` at the moment it's yielded. `NotificationBell.tsx`'s
-// own 15s poll already fetches memory.updated deliveries (subjectTurnId,
-// memoryIds - getmaipai/home#64), so this reads that SAME cached query
-// (its own comment: "rather than duplicating the query key") instead of a
-// second one, and only while a message's own turn hasn't already reported
-// its ids straight off the row (chatHistoryAdapter.ts's reload-path
-// metadata) - once a reload happens, the join is real data and this
-// never needs to poll for that message again.
-function useMemoryUpdatesByTurnId(turnId: string | undefined): string[] | undefined {
-  const query = useQuery<NotificationDeliveryView[]>({
-    queryKey: NOTIFICATIONS_QUERY_KEY,
-    queryFn: () => api.notifications(),
-    refetchInterval: POLL_MS,
-    enabled: turnId !== undefined,
-  });
-  if (!turnId) return undefined;
-  const delivery = query.data?.find((n) => n.typeId === "memory.updated" && n.subjectTurnId === turnId);
-  return delivery?.memoryIds ?? undefined;
-}
+const CHIP_CLASS = "mt-1 inline-flex w-fit items-center gap-1 self-start rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground";
 
-/** Rendered per assistant message (thread.aui.tsx). Two sources, in
- * order: a reloaded message's own row already carries real `memory_ids`
- * (chatHistoryAdapter.ts's `metadata.custom.memoryIds`) - nothing to wait
- * on, shows immediately. A message from the CURRENT live session has
- * none yet (the judge hasn't run), so it falls back to polling for a
- * matching memory.updated delivery by turn id instead - this is the only
- * way a live reply's chip can ever show without a reload. */
+/** Rendered per assistant message (thread.aui.tsx). Reads
+ * chatMemoryState.ts's own store, the one place a turn's memory ids and
+ * status live now (CHAT-20) - seeded once per message, from a loaded
+ * row's real `memory_ids`/`judge_status` or a live reply's `source`
+ * alone (the judge hasn't run yet), then kept current by
+ * `useMemoryStatusPoll` (mounted once at the chat page's own top level)
+ * while anything in the open conversation is still pending. */
 export function MemoryUpdatedChip() {
   const turnId = useAuiState((s) => s.message.metadata?.custom?.turnId as string | undefined);
+  const conversationId = useAuiState((s) => s.message.metadata?.custom?.conversationId as string | undefined);
+  const source = useAuiState((s) => s.message.metadata?.custom?.source as string | undefined);
+  const judgeStatus = useAuiState((s) => s.message.metadata?.custom?.judgeStatus as string | null | undefined);
   const rowMemoryIds = useAuiState((s) => (s.message.metadata?.custom?.memoryIds as string[] | undefined) ?? undefined);
-  const liveMemoryIds = useMemoryUpdatesByTurnId(rowMemoryIds?.length ? undefined : turnId);
-  // A code review (2026-09-13) caught the chip un-rendering itself: once
-  // this message got its ids from the live poll, dismissing that SAME
-  // delivery from NotificationBell.tsx optimistically filters it out of
-  // the shared NOTIFICATIONS_QUERY_KEY cache this hook reads, so the next
-  // render's `find()` misses and the chip that was already showing
-  // vanishes - dismissing a toast should never take back something
-  // already shown in the transcript. Latched once found; a poll result
-  // disappearing later never un-shows it (a reload still gets the real,
-  // durable answer straight from the row instead of this latch).
-  const [latchedMemoryIds, setLatchedMemoryIds] = useState<string[] | undefined>(undefined);
-  if (liveMemoryIds?.length && !latchedMemoryIds) setLatchedMemoryIds(liveMemoryIds);
-  const memoryIds = rowMemoryIds?.length ? rowMemoryIds : latchedMemoryIds;
 
-  if (!memoryIds?.length) return null;
-
-  return (
-    // Deliberate type-floor exception (docs/UI.md, lane 7 item 3,
-    // 2026-09-13): a compact rounded-full chip, the same category as a
-    // badge count, not a line of body text.
-    <Link
-      to={`/memory?ids=${memoryIds.map(encodeURIComponent).join(",")}`}
-      className="mt-1 inline-flex w-fit items-center gap-1 self-start rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground hover:bg-accent"
-    >
-      <Brain className="size-3" />
-      Memory updated
-    </Link>
+  const state = useMemoryState(
+    turnId,
+    turnId && conversationId && source !== undefined ? { conversationId, source, judgeStatus, memoryIds: rowMemoryIds ?? [] } : undefined,
   );
+
+  if (!state) return null;
+
+  if (state.status === "saved") {
+    return (
+      // Deliberate type-floor exception (docs/UI.md, lane 7 item 3,
+      // 2026-09-13): a compact rounded-full chip, the same category as a
+      // badge count, not a line of body text.
+      <Link to={`/memory?ids=${state.memoryIds.map(encodeURIComponent).join(",")}`} className={`${CHIP_CLASS} hover:bg-accent`}>
+        <Brain className="size-3" />
+        Memory updated
+      </Link>
+    );
+  }
+
+  if (state.status === "failed") {
+    return (
+      <Link to="/memory" className={`${CHIP_CLASS} hover:bg-accent`}>
+        <Brain className="size-3" />
+        Memory wasn't saved
+      </Link>
+    );
+  }
+
+  if (state.status === "pending" && state.stalled) {
+    return (
+      <span className={CHIP_CLASS}>
+        <Brain className="size-3" />
+        Still waiting to process memory
+        <Button
+          type="button"
+          variant="link"
+          size="xs"
+          className="h-auto p-0 text-inherit underline hover:no-underline focus-visible:no-underline"
+          onClick={() => {
+            if (turnId && conversationId) void refreshTurnMemoryStatus(conversationId, turnId);
+          }}
+        >
+          Refresh
+        </Button>
+      </span>
+    );
+  }
+
+  if (state.status === "pending") {
+    return (
+      <span className={CHIP_CLASS}>
+        <Loader className="size-3 animate-spin" />
+        Checking for memories
+      </span>
+    );
+  }
+
+  return null; // not_saved: no chip
 }

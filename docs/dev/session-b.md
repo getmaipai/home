@@ -1261,3 +1261,166 @@ Settings, a settings sub-page (the back link), and the phone bottom
 nav, at both phone and desktop, both themes - all correctly sized, no
 visual regression from the hit-area extensions (invisible by design)
 or the composer's taller minimum height.
+
+## A regression found regenerating item 1's own screenshots: the plain
+matrix's chat route silently reverted to the empty state
+
+Folded into item 2's commit, per the coordinator (a review of ebecad7's
+own published `chat-desktop-light.png`, back to the empty "How can I
+help you today?" state it showed before 88ffaee's own fixup). Root
+cause: `--chat-review` is the only mode that ever clears and exercises
+a real conversation (`exerciseChatFirst`, `scripts/screenshot.ts`), and
+its own two combos (`A11Y_ONLY_COMBOS`: phone/dark, desktop/light)
+happen to share output filenames with two of the plain matrix's own
+eight - whichever of the two commands ran LAST is what the published
+files actually show. 88ffaee's own fixup depended on a person running
+both commands in the right order by hand ("ran both commands, matching
+how this pipeline has needed to be run since 2026-09-04"); this
+session's own later re-verification run (`bun run screenshots`, no
+flags, checking the `TooltipIconButton` fix across the full matrix)
+was the plain command running last, silently reverting the two files
+chat-review had just fixed - the exact regression 88ffaee describes
+finding once already, recurring for the identical structural reason.
+
+Fixed for real rather than re-ordered by hand: `visitRoute()` takes an
+`exerciseChatFirst` parameter (defaults to the module-level
+`chatReview` flag, so `--chat-review`'s own behavior is unchanged), and
+the plain run now does one small sequential re-visit of chat for
+`A11Y_ONLY_COMBOS` after its own main pooled pass, with a cleared and
+exercised conversation, replacing those two combos' results and
+screenshots - the same single-shared-conversation race
+`chatReview`'s own pool size of 1 already exists to avoid. One
+canonical `bun run screenshots` command is now correct regardless of
+what ran before it, in a single process. Verified: `docs/assets/
+screens/manifest.json`'s own `chat-phone-dark.png`/`chat-
+desktop-light.png` entries show `captureScript: "scripts/
+screenshot.ts"` (no flags) with a timestamp after the main matrix's
+own pass; both images opened, show the real garden conversation
+(the herbs/book scripted exchange). `bun run a11y` and the full
+`bun run screenshots` both 0 violations after the fix, run twice.
+
+## Lane 8 item 2: CHAT-20's frontend half
+
+BACKLOG.md's CHAT-20 (real `turnId`/`memoryIds`/`memoryStatus` in both
+live and loaded assistant metadata, a bounded poll of the existing
+per-conversation turns endpoint, one shared source of truth for the
+chip and the memory actions). Read `routes/conversations.ts` and
+`lib/conversationHistory.ts` first, as the plan asked, rather than
+assuming: `GET /:id/turns` already carries real `memory_ids` per turn
+(`memoryIdsByTurn()`, getmaipai/home#64's own contract), and its row
+type (`ConversationTurnWithMemoryIds`, `@/wire`) is Drizzle-inferred
+from the real table, so it already carries `judgeStatus` too
+(`backend/src/db/schema.ts`'s own `judge_status` column) - nothing was
+missing from the backend for the frontend half to build on; no message
+to Session A was needed.
+
+**The status derivation** (`chatMemoryState.ts`'s `deriveMemoryStatus`),
+the one piece of real judgment this item needed: `judge_status` is
+`null` until judged, `"done"`/`"failed"` after - but `memoryJudge.ts`'s
+own queue query (`eq(conversationTurns.source, "model")`) only ever
+selects `source: "model"` turns, so a plugin/command/safety-refusal
+turn's `judge_status` stays `null` forever, not "still pending." Read
+that wrong on a first pass (every non-model turn would have shown
+"Checking for memories" permanently); the fix is source-aware: no
+memory ids, judge not `"failed"`/`"done"`, and `source !== "model"` is
+`not_saved`, not `pending`. A non-empty `memory_ids` always wins
+regardless of source or judge status, since "Remember this" writes
+into the exact same `memory_records.source = turn_id` provenance field
+the automated judge does (chatMemoryActions.ts, unchanged reasoning).
+
+**One store, one source of truth.** `chatMemoryState.ts`'s zustand
+store, keyed by turn id: `{conversationId, memoryIds, status,
+pendingSince, stalled}`. Seeded once per message mount from whatever
+metadata it already carries (a loaded row's real fields, or a live
+reply's `source` alone - the judge runs after the turn, never during
+it, so a live message has no `judgeStatus` field at all;
+`deriveMemoryStatus` reads that the same as an explicit `null`),
+never re-seeded, never overwritten by a stale mount-time snapshot.
+Replaces `chatMemoryActions.ts`'s own former localStorage-backed
+"remembered id per turn" map: that map existed only because the real
+per-turn `memory_ids` hadn't reached the frontend yet ("session-a-
+intelligence.md's contract adds GET /:id/turns' per-turn memory_ids,
+not merged" - its own comment, now stale, since it has been merged for
+a while); once real ids flow through both live and loaded paths, nothing
+needs to be approximated client-side between reloads, and `rememberMessage`/
+`forgetMessage` now write directly into the same store the chip reads,
+targeting exact returned/given ids rather than a single remembered slot.
+
+**The poll** (`useMemoryStatusPoll`, mounted once in `ChatPage.tsx` off
+the same conversation id its own runtime uses as `threadId`): a 5s
+`setInterval` re-fetching `GET /:id/turns` in full (no `since` - the
+poll is rechecking EXISTING rows' status, not fetching new ones, so
+`since`'s own "everything after this turn" semantics don't apply here)
+whenever anything in the open conversation is `pending`, paused on
+`visibilitychange` to hidden, stopped entirely (effect cleanup) the
+moment nothing is pending or the conversation id changes/unmounts. A
+first pass tried per-turn dependency arrays and array-identity
+selectors, which risked re-running the effect on every store write
+even when nothing observable changed; settled on a boolean
+`hasPending` selector (stable via zustand's default `Object.is`) as
+the only effect dependency, with the interval's own tick reading fresh
+state via `useMemoryStore.getState()` rather than closing over a stale
+list. Ten-minute stall is a real wall-clock timestamp (`pendingSince`,
+set once, kept across ticks so backgrounding the tab doesn't reset it)
+checked at the start of each tick, not a separate timer.
+
+**Two real bugs a live check caught, not the unit tests** (see below):
+
+1. `rowMemoryIds ?? []` inside a `useAuiState` selector - a fresh empty
+   array literal on every single call when the field is absent, which
+   `useAuiState`'s underlying subscription (`useSyncExternalStore`)
+   read as "changed" every render, an infinite render loop
+   (`getSnapshot should be cached`, React's own diagnostic). Reproduced
+   in isolation with plain `useAuiState` calls, no store code involved,
+   before finding it. Fixed by keeping the selector's own return value
+   `?? undefined` (stable) and coalescing to `[]` only afterward, in a
+   plain synchronous statement outside the hook.
+2. `size="icon-lg"` on the composer's action buttons (thought this
+   would ALSO close the touch-target work item 1 left slightly loose -
+   see its own lane 8 item 1 writeup above) lost the fix silently: two
+   different wrapping components (`ThreadListNew`'s own baked-in `h-8`,
+   `TooltipIconButton`'s own baked-in `size-6 p-1`) append their
+   default classes AFTER the variant slot in the same `cn()`/`twMerge`
+   call, so they won the merge back. Reverted those two call sites to
+   the caller-className approach lane 8 item 1 already used elsewhere
+   (guaranteed to be the last word regardless of wrapper depth) -
+   noted there, not re-explained here.
+
+**Proven both ways, live, not just unit-tested**: a spare-port backend
+(`PORT=8850`, its own throwaway `MAIPAI_DATA_DIR`) pointed at the real
+household chat and embed engines already running on the box
+(`MAIPAI_LLAMA_SERVER_URL`/`MAIPAI_EMBED_URL`, the household's real
+Qwen3-8B chat model and nomic-embed), a real household seeded, a real
+message sent from a real Vite dev server against it. The chip showed
+"Checking for memories" the instant the live reply landed, before any
+reload. The automated judge itself failed on both messages sent
+(`judgeAttempts: 3`, `judgeStatus: "failed"`) - traced to the
+`background` role (the judge's own extraction call,
+`backgroundSupervisor.ts`) having no `MAIPAI_BACKGROUND_URL` pointed
+at this spare instance, so it fell to its own in-process stub, whose
+canned reply doesn't parse as the extraction schema's JSON - a real
+gap in this session's own spare-instance setup, not a product bug (the
+household's own real chat/embed models both worked correctly; only
+the third, background role was left unconfigured), so no issue filed.
+That failure still proved the "failed" chip state for real
+(`judgeStatus: "failed"` did reach the chip and render "Memory wasn't
+saved") and, since it left nothing for the automated path to
+demonstrate "saved" with, "Remember this" from the message's own "..."
+menu stood in for stating a fact: clicked, the chip flipped to "Memory
+updated" with no reload; "Forget this" (now available in the same
+menu), clicked, the chip disappeared and `GET /api/memory` confirmed
+the record was really archived server-side. Also directly observed the
+"pause while hidden" behavior working (the Chrome extension's own
+automated tab reports `document.visibilityState: "hidden"`, not a page
+bug - the poll correctly stopped issuing requests while it did, and
+resumed once forced back to `"visible"` for the check).
+
+**Verified**: `bunx tsc --noEmit` clean; `bunx eslint .` clean (2
+pre-existing, unrelated warnings only, the same two lane 8 item 1 also
+saw); `bun test` in frontend, 515 pass, 0 fail, including new suites
+for `chatMemoryState.ts` (deriveMemoryStatus's every branch, the poll:
+never fetches when nothing pending, resolves pending-to-saved without
+a reload, stops polling once everything resolves) and the rewritten
+`chatMemoryChip.test.tsx` (all four states, a manual save always
+outranking a pending/not_saved judge status, forgetting a saved
+message turning its chip off). `bun run build` clean.

@@ -1,5 +1,7 @@
 import { describe, expect, test, mock } from "bun:test";
 import { forgetMessage, rememberMessage } from "@/apps/chat/chatMemoryActions";
+import { useMemoryState } from "@/apps/chat/chatMemoryState";
+import { renderHook } from "@testing-library/react";
 
 function stubFetch(): { restore: () => void; calls: { url: string; body: unknown }[] } {
   const original = globalThis.fetch;
@@ -16,6 +18,14 @@ function stubFetch(): { restore: () => void; calls: { url: string; body: unknown
   return { restore: () => (globalThis.fetch = original), calls };
 }
 
+// Reads chatMemoryState.ts's own store for a turn, without seeding it -
+// the way the chip and the action-bar buttons do (a seed only fills a
+// GAP, never overwrites what rememberMessage/forgetMessage already wrote).
+function storedState(turnId: string) {
+  const { result } = renderHook(() => useMemoryState(turnId));
+  return result.current;
+}
+
 describe("rememberMessage", () => {
   // Defaults decided 2026-09-05 against memory-record.schema.json and the
   // maintenance job's decay rules (chatMemoryActions.ts's own comment has
@@ -24,7 +34,7 @@ describe("rememberMessage", () => {
   test("posts to /api/memory with the decided one-click defaults, attributed to the turn and actor", async () => {
     const env = stubFetch();
     try {
-      await rememberMessage({ text: "We're going to Boston in July", turnId: "turn-1", actorId: "person-abc123" });
+      await rememberMessage({ text: "We're going to Boston in July", turnId: "turn-1", conversationId: "conv-1", actorId: "person-abc123" });
       expect(env.calls).toHaveLength(1);
       expect(env.calls[0]!.url).toContain("/api/memory");
       expect(env.calls[0]!.body).toEqual({
@@ -42,34 +52,33 @@ describe("rememberMessage", () => {
   });
 });
 
-describe("remembered-id persistence", () => {
-  // A code review (2026-09-05) found the earlier in-memory-only version
-  // lost this the moment the page reloaded (chatHistoryAdapter.ts's
-  // load() runs on every mount), even though the memory record itself
-  // was still real - a second "remember this" click on the same message
-  // in a later session would have silently created a duplicate record.
-  test("survives what a reload would do: the id is readable from localStorage after rememberMessage()", async () => {
+describe("chatMemoryState store, updated by remember/forget", () => {
+  // CHAT-20: replaces the earlier localStorage-backed map - the real
+  // memory id now lives in the same store the chip and the turns-endpoint
+  // poll read, so a reload isn't needed to see it, and there is nothing
+  // left to persist across a reload (GET /:id/turns' own real memory_ids
+  // is that source once one happens).
+  test("rememberMessage() writes the real memory id into the shared store as 'saved'", async () => {
     const env = stubFetch();
     try {
-      await rememberMessage({ text: "a fact", turnId: "turn-persist", actorId: "person-abc123" });
-      const stored = JSON.parse(localStorage.getItem("maipai.chat.rememberedByTurnId") ?? "{}");
-      expect(stored["turn-persist"]).toBe("mem-1");
+      await rememberMessage({ text: "a fact", turnId: "turn-persist", conversationId: "conv-1", actorId: "person-abc123" });
+      const state = storedState("turn-persist");
+      expect(state).toMatchObject({ status: "saved", memoryIds: ["mem-1"] });
     } finally {
       env.restore();
-      localStorage.removeItem("maipai.chat.rememberedByTurnId");
     }
   });
 
-  test("forgetMessage() removes the turn from localStorage too", async () => {
+  test("forgetMessage() archives every id it's given and clears the turn back to not_saved", async () => {
     const env = stubFetch();
     try {
-      await rememberMessage({ text: "a fact", turnId: "turn-persist-2", actorId: "person-abc123" });
-      await forgetMessage("turn-persist-2");
-      const stored = JSON.parse(localStorage.getItem("maipai.chat.rememberedByTurnId") ?? "{}");
-      expect(stored["turn-persist-2"]).toBeUndefined();
+      await rememberMessage({ text: "a fact", turnId: "turn-persist-2", conversationId: "conv-1", actorId: "person-abc123" });
+      await forgetMessage("turn-persist-2", ["mem-1"]);
+      expect(env.calls[1]!.url).toContain("/api/memory/mem-1/archive");
+      const state = storedState("turn-persist-2");
+      expect(state).toMatchObject({ status: "not_saved", memoryIds: [] });
     } finally {
       env.restore();
-      localStorage.removeItem("maipai.chat.rememberedByTurnId");
     }
   });
 });
@@ -78,18 +87,18 @@ describe("forgetMessage", () => {
   test("archives the memory a prior rememberMessage() call for the same turn created", async () => {
     const env = stubFetch();
     try {
-      await rememberMessage({ text: "a fact", turnId: "turn-2", actorId: "person-abc123" });
-      await forgetMessage("turn-2");
+      await rememberMessage({ text: "a fact", turnId: "turn-2", conversationId: "conv-1", actorId: "person-abc123" });
+      await forgetMessage("turn-2", ["mem-1"]);
       expect(env.calls[1]!.url).toContain("/api/memory/mem-1/archive");
     } finally {
       env.restore();
     }
   });
 
-  test("does nothing for a turn nothing was ever remembered from", async () => {
+  test("does nothing (no request) when given no memory ids", async () => {
     const env = stubFetch();
     try {
-      await forgetMessage("turn-never-remembered");
+      await forgetMessage("turn-never-remembered", []);
       expect(env.calls).toHaveLength(0);
     } finally {
       env.restore();

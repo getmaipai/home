@@ -10,38 +10,22 @@ import {
 } from "@assistant-ui/react";
 import { renderWithQueryClient } from "../../../tests/renderWithQueryClient";
 import { MemoryUpdatedChip } from "@/apps/chat/chatMemoryChip";
-import { NOTIFICATIONS_QUERY_KEY } from "@/shell/NotificationBell";
-import type { NotificationDeliveryView } from "@/lib/api";
+import { forgetMessage } from "@/apps/chat/chatMemoryActions";
 
 afterEach(cleanup);
 
-// getmaipai/home#64: a message with no row-level memory_ids yet (a live
-// reply, the judge hasn't run) falls back to polling GET /api/notifications
-// for a matching memory.updated delivery - every test needs this stubbed,
-// even the ones proving the row-level path alone (no live match should
-// ever override real row data).
-function stubNotifications(deliveries: NotificationDeliveryView[] = []): () => void {
+// CHAT-20: the chip reads chatMemoryState.ts's own store, seeded from a
+// message's `source`/`judgeStatus`/`memoryIds` metadata (a loaded row's
+// real fields, or a live reply's `source` alone - the judge hasn't run
+// yet at that point) - never network calls on its own; a poll (mounted
+// separately, at the chat page's own top level) is what keeps a pending
+// entry current. Every test here uses its own turnId: the store is a
+// module-level singleton, and a shared id across tests would leak state
+// (chatMemoryActions.test.ts's own established pattern).
+function stubFetchNeverCalled(): () => void {
   const original = globalThis.fetch;
-  globalThis.fetch = mock((input: RequestInfo | URL) => {
-    const url = typeof input === "string" ? input : input.toString();
-    if (url.includes("/api/notifications")) return Promise.resolve(new Response(JSON.stringify(deliveries), { status: 200 }));
-    return Promise.reject(new Error(`unstubbed fetch: ${url}`));
-  }) as unknown as typeof fetch;
+  globalThis.fetch = mock(() => Promise.reject(new Error("chip should never fetch on its own"))) as unknown as typeof fetch;
   return () => (globalThis.fetch = original);
-}
-
-function memoryUpdatedDelivery(subjectTurnId: string, memoryIds: string[]): NotificationDeliveryView {
-  return {
-    id: "notif-abc123",
-    typeId: "memory.updated",
-    text: "I remembered: something",
-    channels: ["in_app"],
-    createdAt: "2026-09-13T00:00:00.000Z",
-    readAt: null,
-    dismissedAt: null,
-    subjectTurnId,
-    memoryIds,
-  };
 }
 
 const NEVER_RUNS: ChatModelAdapter = {
@@ -50,12 +34,12 @@ const NEVER_RUNS: ChatModelAdapter = {
   },
 };
 
-function replyMessage(memoryIds?: string[]): ThreadMessageLike {
+function replyMessage(turnId: string, custom: Record<string, unknown>): ThreadMessageLike {
   return {
-    id: "reply-1",
+    id: `${turnId}-reply`,
     role: "assistant",
     content: "MaiPai's reply",
-    metadata: { custom: { turnId: "turn-1", ...(memoryIds ? { memoryIds } : {}) } },
+    metadata: { custom: { turnId, ...custom } },
   };
 }
 
@@ -81,10 +65,12 @@ function renderChip(message: ThreadMessageLike) {
 }
 
 describe("MemoryUpdatedChip", () => {
-  test("shows when this message's own history row carried real memory_ids", async () => {
-    const restore = stubNotifications();
+  test("saved: shows the linked chip when the row already carries real memory_ids", async () => {
+    const restore = stubFetchNeverCalled();
     try {
-      const { findByText, findByRole } = renderChip(replyMessage(["mem-1", "mem-2"]));
+      const { findByText, findByRole } = renderChip(
+        replyMessage("turn-saved", { conversationId: "conv-1", source: "model", judgeStatus: "done", memoryIds: ["mem-1", "mem-2"] }),
+      );
       await findByText("Memory updated");
       const link = await findByRole("link", { name: /Memory updated/ });
       expect(link.getAttribute("href")).toBe("/memory?ids=mem-1,mem-2");
@@ -93,95 +79,114 @@ describe("MemoryUpdatedChip", () => {
     }
   });
 
-  test("stays hidden when the message carries an empty memory_ids list and no live delivery matches either", async () => {
-    const restore = stubNotifications();
+  test("pending: a model turn not yet judged shows 'Checking for memories'", async () => {
+    const restore = stubFetchNeverCalled();
     try {
-      const { queryByText } = renderChip(replyMessage([]));
-      await new Promise((resolve) => setTimeout(resolve, 20));
-      expect(queryByText("Memory updated")).toBeNull();
+      const { findByText } = renderChip(replyMessage("turn-pending", { conversationId: "conv-1", source: "model", judgeStatus: null, memoryIds: [] }));
+      await findByText("Checking for memories");
     } finally {
       restore();
     }
   });
 
-  test("stays hidden when the message has no memoryIds metadata and no live delivery matches", async () => {
-    const restore = stubNotifications();
+  test("pending: a live reply with no judgeStatus field at all reads the same as a fresh unjudged row", async () => {
+    const restore = stubFetchNeverCalled();
     try {
-      const { queryByText } = renderChip(replyMessage(undefined));
-      await new Promise((resolve) => setTimeout(resolve, 20));
-      expect(queryByText("Memory updated")).toBeNull();
+      const { findByText } = renderChip(replyMessage("turn-live", { conversationId: "conv-1", source: "model" }));
+      await findByText("Checking for memories");
     } finally {
       restore();
     }
   });
 
-  // getmaipai/home#64: the judge runs AFTER the turn - a live reply's own
-  // metadata has no memory_ids at the moment it's rendered, so the chip
-  // has to find out some other way once the judge finishes. This is that
-  // path: a memory.updated delivery arrives (GET /api/notifications) whose
-  // subjectTurnId matches this message's own turnId.
-  test("shows via the live notifications poll when the judge finishes after the message already rendered", async () => {
-    const restore = stubNotifications([memoryUpdatedDelivery("turn-1", ["mem-live-1"])]);
+  test("not_saved: a judged model turn with nothing worth remembering shows no chip", async () => {
+    const restore = stubFetchNeverCalled();
     try {
-      const { findByText, findByRole } = renderChip(replyMessage(undefined));
+      const { queryByText } = renderChip(
+        replyMessage("turn-not-saved", { conversationId: "conv-1", source: "model", judgeStatus: "done", memoryIds: [] }),
+      );
+      await new Promise((resolve) => setTimeout(resolve, 20));
+      expect(queryByText("Memory updated")).toBeNull();
+      expect(queryByText("Checking for memories")).toBeNull();
+    } finally {
+      restore();
+    }
+  });
+
+  test("not_saved: a plugin-sourced turn (never queued for judging) shows no chip", async () => {
+    const restore = stubFetchNeverCalled();
+    try {
+      const { queryByText } = renderChip(
+        replyMessage("turn-plugin", { conversationId: "conv-1", source: "plugin", judgeStatus: null, memoryIds: [] }),
+      );
+      await new Promise((resolve) => setTimeout(resolve, 20));
+      expect(queryByText("Checking for memories")).toBeNull();
+    } finally {
+      restore();
+    }
+  });
+
+  test("failed: a judge that couldn't parse the turn shows the failed chip, linked to the memory page", async () => {
+    const restore = stubFetchNeverCalled();
+    try {
+      const { findByText, findByRole } = renderChip(
+        replyMessage("turn-failed", { conversationId: "conv-1", source: "model", judgeStatus: "failed", memoryIds: [] }),
+      );
+      await findByText("Memory wasn't saved");
+      const link = await findByRole("link", { name: /Memory wasn't saved/ });
+      expect(link.getAttribute("href")).toBe("/memory");
+    } finally {
+      restore();
+    }
+  });
+
+  test("a manual save always wins over a pending/not_saved judge status, regardless of source", async () => {
+    const restore = stubFetchNeverCalled();
+    try {
+      const { findByText } = renderChip(
+        replyMessage("turn-manual-save", { conversationId: "conv-1", source: "plugin", judgeStatus: null, memoryIds: ["mem-manual"] }),
+      );
       await findByText("Memory updated");
-      const link = await findByRole("link", { name: /Memory updated/ });
-      expect(link.getAttribute("href")).toBe("/memory?ids=mem-live-1");
     } finally {
       restore();
     }
   });
 
-  test("ignores a memory.updated delivery for a DIFFERENT turn", async () => {
-    const restore = stubNotifications([memoryUpdatedDelivery("turn-other", ["mem-other"])]);
-    try {
-      const { queryByText } = renderChip(replyMessage(undefined));
-      await new Promise((resolve) => setTimeout(resolve, 20));
-      expect(queryByText("Memory updated")).toBeNull();
-    } finally {
-      restore();
-    }
-  });
-
-  // A code review (2026-09-13) caught the chip un-rendering itself: once
-  // it found its ids via the live poll, NotificationBell.tsx's own
-  // dismiss optimistically filters that same delivery out of the shared
-  // NOTIFICATIONS_QUERY_KEY cache this chip also reads, so the very next
-  // render's find() would miss and the chip already on screen would
-  // vanish - dismissing the toast should never take back what the
-  // transcript already showed.
-  test("stays shown once found via the live poll, even if that delivery later disappears from the shared cache (a dismiss)", async () => {
-    const restore = stubNotifications([memoryUpdatedDelivery("turn-1", ["mem-live-1"])]);
-    try {
-      const { findByText, queryClient } = renderChip(replyMessage(undefined));
-      await findByText("Memory updated");
-
-      // Simulates NotificationBell.tsx's dismissMutation onMutate: an
-      // optimistic removal from the exact same query key, before any
-      // network round trip completes.
-      queryClient.setQueryData<NotificationDeliveryView[]>(NOTIFICATIONS_QUERY_KEY, []);
-
-      await new Promise((resolve) => setTimeout(resolve, 20));
-      expect(queryClient.getQueryData<NotificationDeliveryView[]>(NOTIFICATIONS_QUERY_KEY)).toEqual([]); // the dismiss really landed in the cache
-      await findByText("Memory updated"); // the chip itself never noticed
-    } finally {
-      restore();
-    }
-  });
-
-  test("prefers the message's own row data over a live delivery, never polling once it's already known", async () => {
-    let fetchCalled = false;
-    const originalFetch = globalThis.fetch;
-    globalThis.fetch = mock(() => {
-      fetchCalled = true;
-      return Promise.reject(new Error("should never be called"));
+  // CHAT-20's own acceptance: "forget from the chip updates the message."
+  // ForgetThisMenuItem (chatActionBar.tsx) calls exactly this same
+  // forgetMessage() on a click; this proves the chip really does update
+  // once it resolves, without needing to drive the menu item's own click
+  // handler through a portal.
+  test("forgetting a saved message's memory turns the chip off", async () => {
+    const original = globalThis.fetch;
+    globalThis.fetch = mock((input: RequestInfo | URL) => {
+      const url = typeof input === "string" ? input : input.toString();
+      if (url.includes("/archive")) return Promise.resolve(new Response(JSON.stringify({ id: "mem-1", status: "archived" }), { status: 200 }));
+      return Promise.reject(new Error(`unstubbed fetch: ${url}`));
     }) as unknown as typeof fetch;
     try {
-      const { findByText } = renderChip(replyMessage(["mem-row-1"]));
+      const { findByText, queryByText } = renderChip(
+        replyMessage("turn-forget", { conversationId: "conv-1", source: "model", judgeStatus: "done", memoryIds: ["mem-1"] }),
+      );
       await findByText("Memory updated");
-      expect(fetchCalled).toBe(false);
+
+      await forgetMessage("turn-forget", ["mem-1"]);
+
+      await new Promise((resolve) => setTimeout(resolve, 20));
+      expect(queryByText("Memory updated")).toBeNull();
     } finally {
-      globalThis.fetch = originalFetch;
+      globalThis.fetch = original;
+    }
+  });
+
+  test("renders nothing at all (not even a seed) without a turnId", async () => {
+    const restore = stubFetchNeverCalled();
+    try {
+      const { container } = renderChip({ id: "no-turn", role: "assistant", content: "no metadata" });
+      await new Promise((resolve) => setTimeout(resolve, 20));
+      expect(container.textContent).toBe("");
+    } finally {
+      restore();
     }
   });
 });

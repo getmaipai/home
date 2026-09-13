@@ -12803,3 +12803,22 @@ other's section once (147cd28, f4779a6).
   once (`TooltipIconButton`'s own default size) instead of five call
   sites, proven to fail a planted violation then pass clean:
   [docs/dev/session-b.md](dev/session-b.md) (2026-09-13).
+- A screenshot-matrix regression found regenerating the above: the
+  plain run's own chat route had silently reverted to the empty state
+  (88ffaee's own fixup depended on running two separate commands in
+  the right order by hand; a later plain-only regeneration undid it,
+  the same failure mode recurring) - fixed so one command is correct
+  regardless of run order, not just re-ordered:
+  [docs/dev/session-b.md](dev/session-b.md) (2026-09-13).
+- Lane 8 item 2, CHAT-20's frontend half: real `turnId`/`memoryIds`/
+  `memoryStatus` in both live and loaded assistant metadata (the
+  backend already carried everything needed, `judgeStatus` included -
+  no backend change), one turn-id-keyed store the chip and remember/
+  forget both read and write, a 5s poll of the existing per-
+  conversation turns endpoint only while something is pending, paused
+  while hidden, a ten-minute client-side stall with a manual Refresh;
+  replaces #64's narrower notifications-poll chip path. Live-checked
+  against a spare-port backend pointed at the household's real chat
+  and embed engines: a chip appearing on a live reply, "Remember this"
+  and "Forget this" both updating the open message with no reload:
+  [docs/dev/session-b.md](dev/session-b.md) (2026-09-13).

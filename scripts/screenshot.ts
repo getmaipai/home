@@ -355,7 +355,7 @@ async function settleAnimations(page: import("playwright").Page) {
  * an empty shell), runs the axe scan and the overflow check, and - unless
  * `a11yOnly` - saves the PNG. Throws on a navigation/selector failure
  * rather than silently screenshotting a broken page. */
-async function visitRoute(context: BrowserContext, route: RouteSpec, viewport: ViewportSpec, theme: string, saveScreenshot: boolean): Promise<RunResult> {
+async function visitRoute(context: BrowserContext, route: RouteSpec, viewport: ViewportSpec, theme: string, saveScreenshot: boolean, exerciseChatFirst = chatReview): Promise<RunResult> {
   const page = await context.newPage();
   page.setDefaultTimeout(PAGE_VISIT_TIMEOUT_MS);
   try {
@@ -397,7 +397,7 @@ async function visitRoute(context: BrowserContext, route: RouteSpec, viewport: V
       }
     }
 
-    if (chatReview && route.slug === "chat") {
+    if (exerciseChatFirst && route.slug === "chat") {
       const cleared = await page.request.post(`${BASE_URL}/api/conversations/clear`, { data: {} });
       if (!cleared.ok()) throw new Error("Could not reset demo chats");
       await page.reload();
@@ -1048,6 +1048,43 @@ async function main() {
       return comboResult;
     });
     const results: RunResult[] = comboResults.flat();
+
+    // getmaipai/home, found live 2026-09-13 (a coordinator review of a
+    // regenerated main): the plain run's own "chat" route only ever
+    // shows the empty "How can I help you today?" state - `--chat-review`
+    // is the only mode that clears and exercises a real conversation
+    // (`exerciseChatFirst` above), and its own two combos
+    // (`A11Y_ONLY_COMBOS`) happen to share their output filenames with
+    // two of the plain matrix's own eight. Whichever command ran LAST
+    // is what `docs/assets/screens/chat-{phone-dark,desktop-light}.png`
+    // actually show - 88ffaee's own fixup depended on running both
+    // commands in the right order by hand, and a later plain-matrix-
+    // only regeneration (this file's own touch-target work, 2026-09-13)
+    // silently reverted the published chat screenshot back to empty,
+    // exactly the regression 88ffaee had already found once. One
+    // command should not depend on what ran before it: the plain run
+    // now re-visits those same two combos itself, sequentially (the
+    // same single-shared-conversation race `chatReview`'s own pool
+    // size of 1 avoids), replacing their results and screenshots with
+    // the exercised conversation - the manifest records the real
+    // capture script for each, so a stale one is visible, not silent.
+    if (!a11yOnly && !settingsReview && !chatReview) {
+      console.log("re-visiting chat with a real conversation (phone/dark, desktop/light)...");
+      for (const combo of A11Y_ONLY_COMBOS) {
+        const viewport = VIEWPORTS.find((v) => v.slug === combo.viewport);
+        if (!viewport) throw new Error(`unknown viewport ${combo.viewport}`);
+        const context = await newContext(launchedBrowser, viewport, combo.theme, sessionValue);
+        try {
+          const chatRoute = ROUTES.find((r) => r.slug === "chat")!;
+          const exercised = await visitRoute(context, chatRoute, viewport, combo.theme, true, true);
+          const idx = results.findIndex((r) => r.route === "chat" && r.viewport === combo.viewport && r.theme === combo.theme);
+          if (idx >= 0) results[idx] = exercised;
+          else results.push(exercised);
+        } finally {
+          await context.close();
+        }
+      }
+    }
 
     console.log("checking prefers-reduced-motion...");
     const reducedMotionFailures = await checkReducedMotion(browser, sessionValue);

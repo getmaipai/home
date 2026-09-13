@@ -300,10 +300,17 @@ export function createChatModelAdapter(deps: ChatModelAdapterDeps): ChatModelAda
             // from the database, so editing a message sent THIS session
             // can find the turn its own reply belongs to (thread.aui.tsx's
             // EditComposer) without waiting for a reload.
+            // CHAT-20: `conversationId` (already resolved above, before
+            // the stream even opened) lets chatMemoryState.ts's poller
+            // know which conversation this live turn belongs to the
+            // moment it finishes - no `judgeStatus` field here on
+            // purpose (the judge runs after the turn, never during it;
+            // `deriveMemoryStatus` reads an absent/undefined field the
+            // same as a freshly-created row's real `null`).
             yield {
               content: [{ type: "text", text: finalText }],
               metadata: {
-                custom: { source: event.value.source, pluginId: event.value.plugin_id, commandId: event.value.command_id, turnId: event.value.turn_id },
+                custom: { source: event.value.source, pluginId: event.value.plugin_id, commandId: event.value.command_id, turnId: event.value.turn_id, conversationId },
               },
             };
           } else {
