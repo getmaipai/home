@@ -335,7 +335,10 @@ export function SettingsPage({ person, onPersonChange }: SettingsPageProps) {
           </aside>
 
           <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-4">
-            {isDefaultRoute ? <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search settings" aria-label="Search settings" className="h-11 rounded-xl bg-card" /> : <Link to={`/settings?tab=${tab}`} className={cn("w-fit rounded-lg py-2 text-sm text-muted-foreground hover:text-foreground focus-visible:text-foreground", FOCUS_RING)}>← All {tab === "me" ? "personal" : "household"} settings</Link>}
+            {/* h-12 / py-3.5, not h-11 / py-2: the touch-target floor
+                (docs/UI.md, BACKLOG.md lane 8 item 1, 2026-09-13) - both
+                measured under 48px tall by the live check. */}
+            {isDefaultRoute ? <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search settings" aria-label="Search settings" className="h-12 rounded-xl bg-card" /> : <Link to={`/settings?tab=${tab}`} className={cn("flex w-fit items-center rounded-lg py-3.5 text-sm text-muted-foreground hover:text-foreground focus-visible:text-foreground", FOCUS_RING)}>← All {tab === "me" ? "personal" : "household"} settings</Link>}
             {/* eslint-disable-next-line jsx-a11y/no-noninteractive-tabindex -- a keyboard-scrollable region, not a widget (DetailPane.tsx's own precedent). */}
             <div ref={scrollRef} tabIndex={0} className={cn("flex min-h-0 flex-1 flex-col gap-6 overflow-y-auto", FOCUS_RING)}>
               {isDefaultRoute && shortcuts.length > 0 ? <div className="grid gap-3 sm:grid-cols-2">

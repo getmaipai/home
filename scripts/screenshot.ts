@@ -455,6 +455,57 @@ async function visitRoute(context: BrowserContext, route: RouteSpec, viewport: V
       .analyze();
     const violations = axe.violations.map((v) => `${v.id} (${v.impact ?? "unknown"}): ${v.nodes.length} node(s) - ${v.help}: ${v.nodes.map((node) => node.target.join(" ")).join("; ")}`);
 
+    // getmaipai/home BACKLOG.md "Enforce the kit's 48px touch-target
+    // floor": docs/UI.md's own "48 px targets... the kit refuses to go
+    // below" has never been a real check - axe-core ships no target-size
+    // rule (checked its own rule list directly). A real measurement of
+    // rendered geometry, exempting anything carrying
+    // `data-touch-target-exempt` (the sweep's own documented-exception
+    // marker, same shape as the type-floor sweep's comment marker) and
+    // crediting the kit's own pseudo-element hit-area extension - either
+    // `::before` (button.tsx's `xs`/`sm`/`icon-xs`/`icon-sm` sizes) or
+    // `::after` (slider.tsx's thumb, switch.tsx, checkbox.tsx): a
+    // visually compact control with a transparent absolutely-positioned
+    // layer that makes the real tappable area 48px even though the
+    // painted box is smaller, credited rather than flagged as a false
+    // violation.
+    const touchTargetViolations = await page.evaluate(() => {
+      const FLOOR = 48;
+      const SELECTOR = 'button, a[href], input, select, textarea, [role="button"], [role="link"], [role="checkbox"], [role="radio"], [role="switch"], [role="tab"], [role="menuitem"], [tabindex]:not([tabindex="-1"])';
+      const found: string[] = [];
+      for (const el of Array.from(document.querySelectorAll(SELECTOR))) {
+        if (el.closest("[data-touch-target-exempt]")) continue;
+        // Radix's Select renders a real, visually-hidden native <select>
+        // purely to fire native `change` events for form libraries (its
+        // own "bubble input", @radix-ui/react-select's own source:
+        // `"aria-hidden": true, tabIndex: -1`) - never perceivable or
+        // reachable by anyone, so not a real touch target. `aria-hidden`
+        // alone is the filter, not a blanket tabIndex===-1 skip: an
+        // inactive tab in a roving-tabindex tablist also carries
+        // tabIndex -1 but is still a real, visible, clickable target.
+        if (el.getAttribute("aria-hidden") === "true") continue;
+        const rect = el.getBoundingClientRect();
+        if (rect.width === 0 || rect.height === 0) continue;
+        const style = getComputedStyle(el);
+        if (style.visibility === "hidden" || style.display === "none") continue;
+        let width = rect.width;
+        let height = rect.height;
+        for (const pseudo of ["::before", "::after"] as const) {
+          const layer = getComputedStyle(el, pseudo);
+          if (layer.content !== "none" && layer.position === "absolute") {
+            width = Math.max(width, rect.width + Math.max(0, -(parseFloat(layer.left) || 0)) + Math.max(0, -(parseFloat(layer.right) || 0)));
+            height = Math.max(height, rect.height + Math.max(0, -(parseFloat(layer.top) || 0)) + Math.max(0, -(parseFloat(layer.bottom) || 0)));
+          }
+        }
+        if (width < FLOOR || height < FLOOR) {
+          const label = el.getAttribute("aria-label") || (el.textContent || "").trim().slice(0, 40) || el.tagName.toLowerCase();
+          found.push(`${el.tagName.toLowerCase()} "${label}": ${Math.round(width)}x${Math.round(height)}`);
+        }
+      }
+      return found;
+    });
+    for (const v of touchTargetViolations) violations.push(`touch-target-floor (under 48px): ${v}`);
+
     let screenshotFile: string | undefined;
     if (saveScreenshot) {
       mkdirSync(SCREENS_DIR, { recursive: true });

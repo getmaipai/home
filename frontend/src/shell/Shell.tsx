@@ -258,7 +258,11 @@ export function Shell({ person, onSignOut, onPersonChange, children }: ShellProp
           live, 2026-09-06, by the new screenshot/a11y matrix. */}
       <Sidebar collapsible="icon" className="hidden sm:flex" role="navigation" aria-label="Main navigation">
         <SidebarHeader className="h-16 justify-center border-b border-sidebar-border/60 px-4 group-data-[collapsible=icon]:px-2">
-          <Link to="/" aria-label="MaiPai Home" className="flex min-h-10 items-center gap-2.5 rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+          {/* min-h-12 (48px), not min-h-10: the kit's own touch-target
+              floor (docs/UI.md, BACKLOG.md lane 8 item 1, 2026-09-13) -
+              this brand mark is a real link home, measured under 48px
+              tall by the live check in `visitRoute()`. */}
+          <Link to="/" aria-label="MaiPai Home" className="flex min-h-12 items-center gap-2.5 rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
             <span className="flex size-8 shrink-0 items-center justify-center">
               <img src="/brand/maipai-home-icon-light.png" alt="" className="size-8 object-contain brand-logo-light" />
               <img src="/brand/maipai-home-icon-dark.png" alt="" className="size-8 object-contain brand-logo-dark" />
@@ -312,7 +316,12 @@ export function Shell({ person, onSignOut, onPersonChange, children }: ShellProp
                 default (docs/plans/session-b-ui.md step 2) - this is that
                 choice's one control. Phone has no sidebar to collapse. */}
             <SidebarTrigger className="hidden sm:inline-flex" />
-            <Link to="/" aria-label="MaiPai Home" className="rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:hidden">
+            {/* flex + min-h-12 (48px): the touch-target floor (docs/UI.md,
+                BACKLOG.md lane 8 item 1, 2026-09-13) - this link's box was
+                only as tall as the logo image (28px) with no
+                container height of its own; centering the same 28px
+                mark inside a 48px hit area keeps the visual unchanged. */}
+            <Link to="/" aria-label="MaiPai Home" className="flex min-h-12 items-center rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:hidden">
               <img src="/brand/maipai-home-logo-light.png" alt="" className="h-7 w-auto brand-logo-light" />
               <img src="/brand/maipai-home-logo-dark.png" alt="" className="h-7 w-auto brand-logo-dark" />
             </Link>

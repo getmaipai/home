@@ -20,13 +20,13 @@ const buttonVariants = cva(
         link: "text-primary underline-offset-4 hover:underline",
       },
       // 48px is the kit's hard minimum touch target (docs/UI.md); "default",
-      // "lg" and "icon" clear it directly. "xs"/"sm"/"icon-xs"/"icon-sm" stay
-      // visually compact (desktop/mouse-only, never the only way to reach an
-      // action a touch or TV surface must also use) but keep the same 48px
-      // hit area with a transparent pseudo-element, the technique the
-      // accessibility audit established for Switch's track and the
-      // select-mode checkbox: the target and the artwork are different
-      // things.
+      // "lg" and "icon" clear it directly. "xs"/"sm"/"icon-xs"/"icon-sm"/
+      // "icon-lg" stay visually compact (desktop/mouse-only, never the
+      // only way to reach an action a touch or TV surface must also use)
+      // but keep the same 48px hit area with a transparent pseudo-
+      // element, the technique the accessibility audit established for
+      // Switch's track and the select-mode checkbox: the target and the
+      // artwork are different things.
       size: {
         default:
           "h-12 gap-1.5 px-4 text-base has-data-[icon=inline-end]:pr-3 has-data-[icon=inline-start]:pl-3",
@@ -43,7 +43,15 @@ const buttonVariants = cva(
           "relative size-6 rounded-[min(var(--radius-md),10px)] before:absolute before:-inset-3 before:content-[''] in-data-[slot=button-group]:rounded-lg [&_svg:not([class*='size-'])]:size-3",
         "icon-sm":
           "relative size-7 rounded-[min(var(--radius-md),12px)] before:absolute before:-inset-2.5 before:content-[''] in-data-[slot=button-group]:rounded-lg",
-        "icon-lg": "size-9",
+        // Touch-target-floor fix (docs/UI.md, BACKLOG.md lane 8 item 1,
+        // 2026-09-13): every call site using this size reached it via a
+        // raw `size-9` className override, never this variant, so it had
+        // never received the same hit-area treatment as its `xs`/`sm`
+        // siblings - a live measurement caught the composer's send,
+        // dictate, cancel and stop-speaking buttons, plus "New chat" and
+        // "Chat options", all real 36x36 targets. `-inset-1.5` (6px) on
+        // a 36px box reaches the 48px floor.
+        "icon-lg": "relative size-9 before:absolute before:-inset-1.5 before:content-['']",
       },
     },
     defaultVariants: {

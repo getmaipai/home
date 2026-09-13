@@ -196,7 +196,14 @@ export function ChatPage({ person }: ChatPageProps) {
                 <HistoryIcon className="size-4" />
               </Button>
               <h2 className="text-base font-semibold">Chat</h2>
-              <ThreadListNew aria-label="New chat" className="size-9 justify-center p-0" labelClassName="sr-only" />
+              {/* `relative before:-inset-1.5`: the touch-target floor
+                  (docs/UI.md, BACKLOG.md lane 8 item 1, 2026-09-13) - a
+                  `size="icon-lg"` prop alone loses this component's own
+                  baked-in `h-8` in the className merge order, so the
+                  hit-area extension has to ride along with the `size-9`
+                  override in this component's own className, the one
+                  place guaranteed to win. */}
+              <ThreadListNew aria-label="New chat" className="relative size-9 justify-center p-0 before:absolute before:-inset-1.5 before:content-['']" labelClassName="sr-only" />
             </div>
             <SensesDock health={health} reply={reply} speaking={isSpeaking} speechError={speechError} ears={ears} earError={earError}>
               <WakeWordToggle onStatusChange={onEarStatus} onWakeDetected={() => setBanner("MaiPai heard its wake word. It can't act on it yet - that's coming soon.")} />
@@ -215,7 +222,7 @@ export function ChatPage({ person }: ChatPageProps) {
                 composerToolbar={<>
                   <Popover.Root>
                     <Popover.Trigger asChild>
-                      <TooltipIconButton tooltip={thinking ? "Chat options: thinking on" : "Chat options"} className={cn("size-9 rounded-full", thinking && "bg-primary text-primary-foreground")}><OptionsIcon className="size-4" /></TooltipIconButton>
+                      <TooltipIconButton tooltip={thinking ? "Chat options: thinking on" : "Chat options"} className={cn("relative size-9 rounded-full before:absolute before:-inset-1.5 before:content-['']", thinking && "bg-primary text-primary-foreground")}><OptionsIcon className="size-4" /></TooltipIconButton>
                     </Popover.Trigger>
                     <Popover.Portal>
                       <Popover.Content side="top" align="start" sideOffset={8} className="z-50 rounded-xl border bg-popover p-2 text-popover-foreground shadow-lg">
@@ -228,7 +235,7 @@ export function ChatPage({ person }: ChatPageProps) {
                     </Popover.Portal>
                   </Popover.Root>
 
-                  {isSpeaking ? <TooltipIconButton tooltip="Stop speaking" className="size-9 rounded-full" onClick={() => { turnSchedulerRef.current?.stop(); setIsSpeaking(false); }}><VolumeXIcon className="size-4" /></TooltipIconButton> : null}
+                  {isSpeaking ? <TooltipIconButton tooltip="Stop speaking" className="relative size-9 rounded-full before:absolute before:-inset-1.5 before:content-['']" onClick={() => { turnSchedulerRef.current?.stop(); setIsSpeaking(false); }}><VolumeXIcon className="size-4" /></TooltipIconButton> : null}
                 </>}
               />
             </div>

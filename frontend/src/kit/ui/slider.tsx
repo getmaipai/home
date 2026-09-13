@@ -58,7 +58,13 @@ function Slider({
           // future multi-thumb range slider would need one label per
           // index instead.
           aria-label={ariaLabel}
-          className="relative block size-3 shrink-0 rounded-full border border-ring bg-white ring-ring/50 transition-[color,box-shadow] select-none after:absolute after:-inset-2 hover:ring-3 focus-visible:ring-3 focus-visible:outline-hidden active:ring-3 disabled:pointer-events-none disabled:opacity-50"
+          // `after:-inset-[18px]`, not the kit's own `-inset-2`/`-inset-3`
+          // tokens: this thumb is `size-3` (12px), so a 48px touch-target
+          // floor (BACKLOG.md, lane 8 item 1, 2026-09-13) needs 18px of
+          // hit area on every side, not the 8px `-inset-2` gave (only
+          // 28px effective - a real violation the live measurement in
+          // `visitRoute()` caught).
+          className="relative block size-3 shrink-0 rounded-full border border-ring bg-white ring-ring/50 transition-[color,box-shadow] select-none after:absolute after:-inset-[18px] hover:ring-3 focus-visible:ring-3 focus-visible:outline-hidden active:ring-3 disabled:pointer-events-none disabled:opacity-50"
         />
       ))}
     </SliderPrimitive.Root>

@@ -249,7 +249,16 @@ export function ConversationsPage({ person }: ConversationsPageProps) {
                       />
                     ) : null}
                     <div className="flex min-w-0 flex-col">
-                      {viewingSelf && !selectMode && c.surface === "chat" ? <a href={`/chat?conversation=${encodeURIComponent(c.id)}`} className={cn("truncate rounded text-base hover:underline", FOCUS_RING)}>{c.title ?? "Untitled conversation"}</a> : <span className="truncate text-base">{c.title ?? "Untitled conversation"}</span>}
+                      {/* `relative before:-inset-y-3 before:content-['']`:
+                          the touch-target floor (docs/UI.md, BACKLOG.md
+                          lane 8 item 1, 2026-09-13) - the row around this
+                          link is already `min-h-12` (List.tsx), but the
+                          link itself is only as tall as its one line of
+                          text (24px), a real 24px-tall tap target the
+                          live check caught. The pseudo-element extends
+                          the hit area to the row's own height without
+                          growing the visible text. */}
+                      {viewingSelf && !selectMode && c.surface === "chat" ? <a href={`/chat?conversation=${encodeURIComponent(c.id)}`} className={cn("relative truncate rounded text-base before:absolute before:-inset-y-3 before:content-[''] hover:underline", FOCUS_RING)}>{c.title ?? "Untitled conversation"}</a> : <span className="truncate text-base">{c.title ?? "Untitled conversation"}</span>}
                       <span className="text-sm text-muted-foreground">
                         {c.turn_count} {c.turn_count === 1 ? "message" : "messages"} · {whenText(c.last_turn_at)}
                       </span>

@@ -318,6 +318,14 @@ function SidebarRail({ className, ...props }: React.ComponentProps<"button">) {
       data-slot="sidebar-rail"
       aria-label="Toggle Sidebar"
       tabIndex={-1}
+      // Deliberate touch-target-floor exception (docs/UI.md, BACKLOG.md
+      // lane 8 item 1, 2026-09-13): a desktop-only, mouse-only resize/
+      // collapse rail (`tabIndex={-1}`, never a keyboard stop, hidden
+      // below `sm`) redundant with the header's own `SidebarTrigger`
+      // button, which already clears the 48px floor through its own
+      // `icon-sm` hit-area extension. Widening this rail itself would
+      // eat into the page content next to it for no accessibility gain.
+      data-touch-target-exempt
       onClick={toggleSidebar}
       title="Toggle Sidebar"
       className={cn(

@@ -12766,6 +12766,11 @@ other's section once (147cd28, f4779a6).
   clearance Shell.tsx already reserves for it), proven to fail then
   fixed with a real-layout check in scripts/screenshot.ts:
   [docs/dev/session-b.md](dev/session-b.md) (2026-09-13).
+- Item 4a, a tool never runs on an argument the person did not say (an
+  invented number, duration or a bare pronoun asks through the ask
+  path instead; "never mind" clears an ask; a new command in place of
+  an answer routes as itself):
+  [docs/dev/session-a.md](dev/session-a.md) (2026-09-13).
 - #102, a Home card's ephemeral turn draws from its own per-person
   bucket (capacity 2, the chat budget's refill), never from the chat
   budget, so neither starves the other:
@@ -12787,4 +12792,14 @@ other's section once (147cd28, f4779a6).
   both to pass the swept tree and fail a planted violation; #102 filed
   (Home's weather card racing its own household turn budget under the
   screenshot matrix's own concurrency), worked around in the pipeline:
+  [docs/dev/session-b.md](dev/session-b.md) (2026-09-13).
+- Lane 8 item 1, the kit's 48px touch-target floor enforced: a real
+  `page.evaluate()` geometry check in `visitRoute()`, crediting the
+  kit's own `::before`/`::after` hit-area extensions rather than
+  flagging them, every real violation fixed at the source (brand-mark
+  links, the chat composer and its action bar, New chat, Chat options,
+  the conversations list's title links, the settings back link and
+  search field, the card-size slider's thumb), one whole class fixed
+  once (`TooltipIconButton`'s own default size) instead of five call
+  sites, proven to fail a planted violation then pass clean:
   [docs/dev/session-b.md](dev/session-b.md) (2026-09-13).

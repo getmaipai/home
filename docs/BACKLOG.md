@@ -4165,20 +4165,35 @@ future session now that F's hub half exists.
       Contrast, the third fixed theme STYLE.md names, isn't captured
       either, but that is blocked on the theme system itself (no High
       Contrast preset ships yet) - a theming gap, not this item's.
-- [ ] **Enforce the kit's 48px touch-target floor** (M) - docs/UI.md
-      names it ("48 px targets... the kit refuses to go below"), but
-      nothing checks it: axe-core has no target-size rule, and a live
-      measurement (`scripts/screenshot.ts`, 2026-09-13) found dozens of
-      real violations across nearly every page - the sidebar's nav rows
-      (200x40), most icon buttons (28x28, 36x36), settings tabs
-      (154x32), all under 48px on at least one axis. Sweep to the
-      floor (or a documented, deliberate exception per instance, the
-      same shape lane 7 item 3's type-floor sweep uses) is a kit-wide
-      pass across every button/nav/tab size in `@maipai/ui`, not a
-      screenshot-pipeline change - out of scope there. Acceptance: a
-      `page.evaluate()` touch-target check added back into
-      `visitRoute()` (a real measurement, not an axe rule that doesn't
-      exist) passes clean across the full matrix once the sweep lands.
+- [x] **Enforce the kit's 48px touch-target floor** (M) - done
+      2026-09-13, lane 8 item 1. A `page.evaluate()` measurement in
+      `visitRoute()` (real rendered geometry, not an axe rule - axe-core
+      still ships none), crediting the kit's own pseudo-element hit-area
+      extension (`::before` or `::after`, button.tsx's `xs`/`sm`/
+      `icon-xs`/`icon-sm`/`icon-lg`, slider.tsx's thumb) and exempting
+      `aria-hidden` mirrors (Radix Select's hidden native `<select>`)
+      and anything carrying `data-touch-target-exempt` (the sidebar's
+      own resize rail: mouse-only, `tabIndex={-1}`, redundant with the
+      header's real `SidebarTrigger`). Every real violation the sweep
+      found got fixed at the floor, not exempted: the brand-mark links
+      (Shell.tsx), the composer's own input and its five action buttons
+      (thread.aui.tsx, `size="icon-lg"` fixed in button.tsx plus a
+      per-site hit area since a couple of wrapping components' own
+      baked-in classes beat a bare `size` prop in the merge order), New
+      chat and Chat options (ChatPage.tsx), the conversations list's
+      title links, the settings back link and search field
+      (SettingsPage.tsx), the card-size slider's thumb (slider.tsx,
+      `::after` credited, not just `::before`), and - found only once a
+      real transcript loaded, not by the empty-state matrix - the whole
+      per-message action bar (Copy, Refresh, More, Listen, Remember
+      this), fixed once in `TooltipIconButton`'s own default size rather
+      than five call sites. Proven both ways: a planted 24px button
+      failed the check with its exact measured size, then passed clean
+      again reverted. `bun run a11y` (34 combos) and `bun run
+      screenshots` (136 combos, twice) both 0 violations; `bun run
+      scripts/screenshot.ts --chat-review` (the one path that renders
+      real assistant messages) also 0. Full writeup: docs/dev/
+      session-b.md, "Lane 8 item 1: the touch-target floor".
 - [ ] **A vision-model verdict per screenshot** (L) - getmaipai/.github's
       docs/STYLE.md describes it: "every screenshot carries a declared
       expectation beside its capture script, and a vision-model check

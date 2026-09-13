@@ -376,7 +376,11 @@ const Composer: FC<{ autoFocus: boolean; toolbar?: ReactNode; disabled?: boolean
           <ComposerPrimitive.Input
             placeholder={disabled ? (disabledReason ?? "MaiPai's AI isn't ready yet.") : "Send a message..."}
             disabled={disabled}
-            className="aui-composer-input caret-primary placeholder:text-muted-foreground/60 max-h-48 min-h-9 min-w-0 flex-1 resize-none bg-transparent px-1 py-1.5 text-base leading-6 outline-none disabled:cursor-not-allowed"
+            // min-h-12 (48px), not min-h-9: the touch-target floor
+            // (docs/UI.md, BACKLOG.md lane 8 item 1, 2026-09-13) - the
+            // composer's own text field, a real tap target every message
+            // starts with, measured under 48px tall by the live check.
+            className="aui-composer-input caret-primary placeholder:text-muted-foreground/60 max-h-48 min-h-12 min-w-0 flex-1 resize-none bg-transparent px-1 py-3 text-base leading-6 outline-none disabled:cursor-not-allowed"
             rows={1}
             autoFocus={autoFocus}
             enterKeyHint="send"
@@ -402,7 +406,7 @@ const ComposerAction: FC<{ disabled?: boolean; disabledReason?: string }> = ({ d
                 type="button"
                 variant="ghost"
                 size="icon"
-                className="aui-composer-dictate text-muted-foreground hover:text-foreground size-9 rounded-full"
+                className="aui-composer-dictate text-muted-foreground hover:text-foreground size-9 rounded-full relative before:absolute before:-inset-1.5 before:content-['']"
                 aria-label="Start voice input"
               >
                 <MicIcon className="aui-composer-dictate-icon size-4" />
@@ -417,7 +421,7 @@ const ComposerAction: FC<{ disabled?: boolean; disabledReason?: string }> = ({ d
                 type="button"
                 variant="ghost"
                 size="icon"
-                className="aui-composer-stop-dictation text-destructive size-9 rounded-full"
+                className="aui-composer-stop-dictation text-destructive size-9 rounded-full relative before:absolute before:-inset-1.5 before:content-['']"
                 aria-label="Stop voice input"
               >
                 <SquareIcon className="aui-composer-stop-dictation-icon size-3.5 animate-pulse fill-current" />
@@ -439,7 +443,7 @@ const ComposerAction: FC<{ disabled?: boolean; disabledReason?: string }> = ({ d
             variant="default"
             size="icon"
             disabled
-            className="aui-composer-send size-9 rounded-full"
+            className="aui-composer-send size-9 rounded-full relative before:absolute before:-inset-1.5 before:content-['']"
             aria-label="Send message"
           >
             <ArrowUpIcon className="aui-composer-send-icon size-4" />
@@ -454,7 +458,7 @@ const ComposerAction: FC<{ disabled?: boolean; disabledReason?: string }> = ({ d
                   type="button"
                   variant="default"
                   size="icon"
-                  className="aui-composer-send size-9 rounded-full"
+                  className="aui-composer-send size-9 rounded-full relative before:absolute before:-inset-1.5 before:content-['']"
                   aria-label="Send message"
                 >
                   <ArrowUpIcon className="aui-composer-send-icon size-4" />
@@ -467,7 +471,7 @@ const ComposerAction: FC<{ disabled?: boolean; disabledReason?: string }> = ({ d
                   type="button"
                   variant="default"
                   size="icon"
-                  className="aui-composer-cancel size-9 rounded-full"
+                  className="aui-composer-cancel size-9 rounded-full relative before:absolute before:-inset-1.5 before:content-['']"
                   aria-label="Stop generating"
                 >
                   <SquareIcon className="aui-composer-cancel-icon size-3.5 fill-current" />

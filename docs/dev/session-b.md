@@ -1133,3 +1133,131 @@ skip the budget entirely - not mine to decide); worked around in
 reload once if the fallback text is showing after visiting Home,
 scoped to that one route), the same thing a real person hitting this
 would do, and it answers for real every time in testing since.
+
+## Lane 8 item 1: the touch-target floor
+
+BACKLOG.md's own "Enforce the kit's 48px touch-target floor" item
+(written by this session in lane 7 item 1) named the shape: a live
+`page.evaluate()` measurement in `visitRoute()` (axe-core still ships
+no target-size rule, checked its own rule list directly), every real
+sub-48px interactive element either moved to the floor or given a
+documented exception, the same discipline lane 7 item 3's type-floor
+sweep used.
+
+**The check.** Selects every `button`, `a[href]`, `input`, `select`,
+`textarea`, and ARIA `button`/`link`/`checkbox`/`radio`/`switch`/`tab`/
+`menuitem`/tabbable-widget role, measures `getBoundingClientRect()`,
+and - unlike a naive version - also reads `getComputedStyle(el,
+"::before")` and `"::after"`: the kit's own established hit-area
+technique (`button.tsx`'s `xs`/`sm`/`icon-xs`/`icon-sm` sizes, a
+transparent absolutely-positioned pseudo-element wider than the
+painted box) makes a visually-compact control a real 48px target, and
+a naive rect-only check would have flagged every one of those as a
+false violation. Two exclusions, both found live, not assumed up
+front: `aria-hidden="true"` (Radix Select renders a real, genuinely
+hidden native `<select>` purely to fire native `change` events for
+form libraries - its own source, `@radix-ui/react-select`'s
+`useSelect.ts`: `"aria-hidden": true, tabIndex: -1` - and it showed up
+in the first run as two nonsense "1x1" violations with concatenated
+option text as the label); and `data-touch-target-exempt`, the
+sweep's own documented-exception marker, the same shape as the
+type-floor sweep's comment marker but for a geometry check rather than
+a source-text one. Deliberately NOT a blanket `tabIndex === -1` skip:
+an inactive tab in a roving-tabindex tablist also carries `tabIndex
+-1` and is still a real, visible, clickable target - the exclusion has
+to name the actual reason (imperceptible, not just non-tabbable), not
+a proxy for it.
+
+**Every real violation, and what fixed it** (none forced through a
+kit-wide redesign - each judged on its own, the same discipline the
+type-floor sweep used):
+
+- The sidebar brand link (`Shell.tsx`, both the desktop sidebar-header
+  mark and the phone-only header mark) - `min-h-10`/no min-height at
+  all, moved to `min-h-12` (48px), centered via `flex items-center`.
+- The sidebar's resize rail (`kit/ui/sidebar.tsx`'s `SidebarRail`, 16px
+  wide, the full sidebar's height) - a genuine exception:
+  `tabIndex={-1}` (never a keyboard stop), mouse-only, redundant with
+  the header's own `SidebarTrigger` button which already clears the
+  floor through its `icon-sm` hit-area extension. Marked
+  `data-touch-target-exempt` with a comment naming why, rather than
+  widened into the page content next to it for no accessibility gain.
+- The card-size slider's thumb (`kit/ui/slider.tsx`, Radix Slider) -
+  already used the hit-area technique, but via `::after`, not
+  `::before`, which the first draft of the check didn't read; and even
+  once read, the actual extension (`after:-inset-2`, 8px) only reached
+  28px, not 48 - `-inset-2` was reused from elsewhere without doing
+  the arithmetic for this thumb's own `size-3` (12px). Fixed the check
+  to read both pseudo-elements, and the thumb to `after:-inset-[18px]`
+  (12 + 18 + 18 = 48).
+- The chat composer's text field (`thread.aui.tsx`) - `min-h-9` (36px),
+  moved to `min-h-12` with `py-3` instead of `py-1.5` so a single line
+  centers in the taller box rather than sitting top-left.
+- The composer's five action buttons (dictate, stop-dictation, send,
+  disabled-send, cancel - `thread.aui.tsx`) and New chat and Chat
+  options (`ChatPage.tsx`) - all a raw `size-9` class override with no
+  hit-area extension. Fixed `button.tsx`'s own `icon-lg` variant first
+  (it existed as a name but had never actually gained the same
+  `before:-inset-*` treatment as its `xs`/`sm`/`icon-xs`/`icon-sm`
+  siblings - nothing used it as a `size` prop, every call site
+  overrode with a raw `size-9` class instead), then tried switching
+  the composer buttons to `size="icon-lg"` to use it. That produced
+  partial results (48x44 on one, unchanged 36x36 on three others): a
+  live check caught two different wrapping components -
+  `ThreadListNew`'s own baked-in `h-8`, `TooltipIconButton`'s own
+  baked-in `size-6 p-1` - whose own hardcoded classes sit later in the
+  final `cn()`/`twMerge` string than a `size` prop's CVA-computed
+  classes, so they won the merge and silently ate the fix. The
+  reliable fix was the caller's own `className`, which is always the
+  last word regardless of wrapper depth: `size-9 relative
+  before:absolute before:-inset-1.5 before:content-['']` at each of
+  the six call sites. `icon-lg`'s own fix in `button.tsx` stays - it's
+  correct for a bare `Button` no wrapper overrides, just not what any
+  current call site actually uses.
+- The conversations list's title link (`ConversationsPage.tsx`) - the
+  row it sits in is already `min-h-12` (`List.tsx`'s own generic
+  floor), but the link itself is only as tall as its one line of text
+  (24px) - clicking the row's own padding does nothing, since this
+  page doesn't pass `onSelect` (the row here isn't a `List`-owned
+  selectable row; the title's own inline link is the real target).
+  Extended via `relative before:-inset-y-3 before:content-['']` rather
+  than restructuring the row.
+- The settings back link and the settings search field
+  (`SettingsPage.tsx`) - `py-2` (≈36px) and `h-11` (44px), moved to
+  `py-3.5` and `h-12`.
+- The whole per-message action bar (Copy, Refresh, the "More" menu
+  trigger, Listen, Remember this) - found only once a real assistant
+  message actually rendered: the regular matrix's Chat route always
+  shows the empty "How can I help you today?" state, so this entire
+  class of violations was invisible to `bun run a11y` and `bun run
+  screenshots` and only surfaced running `--chat-review`, the one mode
+  that seeds a real reply. All five are `TooltipIconButton` with no
+  size override, i.e. its own default (`size-6 p-1`, 24px, no hit-area
+  extension at all). Fixed once, in `TooltipIconButton`'s own base
+  className (`relative size-6 ... before:-inset-3`), rather than at
+  five call sites across two files (`chatActionBar.tsx`,
+  `thread.aui.tsx`) - a caller that already overrides size (the
+  composer buttons above) supplies its own pseudo classes after this
+  one in the same `cn()` call, which wins the merge, so the base fix
+  and the per-site fixes don't fight each other.
+
+**Proven both ways.** Planted a violation (`Button` for "Show/Hide
+threads", `className="size-6"`, no hit area): `bun run a11y` failed
+with `touch-target-floor (under 48px): button "Show threads": 24x24`,
+the exact measured size, on both combos. Reverted; clean again.
+
+**Verified**: `bun run build` (tsc + vite) clean; `bunx eslint .` clean
+(2 pre-existing, unrelated `react-hooks/exhaustive-deps` warnings
+only); `bun test` in frontend for the touched pages (ChatPage,
+conversations, SettingsPage), 30 pass, 0 fail. `bun run a11y` (34
+combos, the fast pass) 0 violations. `bun run screenshots` (136
+combos, the full matrix) run twice - once before the
+`TooltipIconButton` base fix, once after - both 0 violations, 0
+overflow. `bun run scripts/screenshot.ts --chat-review` (the one path
+that renders a real assistant message with its action bar) 0
+violations, run after the `TooltipIconButton` fix. Regenerated
+screenshots opened: Home, Chat (empty and with a loaded transcript),
+Settings, a settings sub-page (the back link), and the phone bottom
+nav, at both phone and desktop, both themes - all correctly sized, no
+visual regression from the hit-area extensions (invisible by design)
+or the composer's taller minimum height.
