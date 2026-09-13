@@ -18,6 +18,7 @@ import { api, type Roster, type PersonRosterEntry, type ResolvedSetting } from "
 import { greetingFor } from "@/apps/home/greeting";
 import { runFixedTurn } from "@/apps/home/runFixedTurn";
 import { usePinnedApps } from "@/shell/usePinnedApps";
+import { weatherCardQuestion } from "@maipai/home-backend/src/homeCardQuestions";
 
 // The one widget_card instance Home mounts (docs/plans/session-e-ui-and-
 // docs.md step 2). Home is still hand-written React, not a JSON page, so
@@ -83,7 +84,7 @@ function WeatherCard() {
   // ask about once the household has set one.
   const settingsQuery = useHouseholdSettings();
   const place = textSetting(settingsQuery.data, "household.home_place");
-  const question = place ? `What's the weather like in ${place} today?` : "What's the weather like today?";
+  const question = weatherCardQuestion(place);
   // Cached by the query layer (step 6: "calling the weather plugin
   // through the existing turn route with a fixed utterance, cached by
   // the query layer") - a real turn through the shared engine, not a

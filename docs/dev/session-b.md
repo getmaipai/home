@@ -232,3 +232,61 @@ excluding it from what a person sees, both bigger than this item's
 approved "additive flag, skip logTurn and episodes" design - a decision
 for the coordinator, not something to expand unilaterally. Filed as
 getmaipai/home#91.
+
+## getmaipai/home#91: ephemeral needs a trust boundary, not just a flag
+
+The coordinator's call on #91 above: rather than a new trust tier or a
+persist-then-hide redesign, declare the exact question `ephemeral` is
+allowed to skip logging for, once, on the backend, and refuse the flag
+for anything else. `backend/src/lib/homeCardQueries.ts`'s
+`isFixedHomeCardQuery()` is that one declaration - it rebuilds the same
+two shapes `HomePage.tsx`'s `WeatherCard` can ask (with or without a
+configured `household.home_place`) from that same setting, read
+straight off `lib/settings.ts` rather than duplicated as a second list
+anywhere in the frontend, and compares the submitted text against it
+exactly. `routes/turn.ts`'s POST /stream now only honors `ephemeral:
+true` when that check passes; a request that sets the flag on anything
+else is logged exactly as if the flag had never been sent, plus a
+`console.warn` naming the actor, so a stray or misbehaving caller is
+visible in the operational log rather than silently ignored.
+
+This keeps the parent-visibility guarantee (a household member cannot
+make an arbitrary message disappear from their own history just by
+setting a client-side flag) without adding a new actor/role concept and
+without ever persisting a turn only to hide it again later - the
+ordinary case (a real message) is untouched, and the one exempted case
+is named, not inferred. A future second ephemeral-eligible card gets
+its own line in `isFixedHomeCardQuery()`, not a looser pattern.
+
+Verified on a spare-port backend, reading `hub.db` directly: the
+weather card's own question with `ephemeral: true` still leaves
+`conversation_turns` unchanged; an unrelated sentence with the same
+flag writes a row exactly as an ordinary turn would, and the server log
+carries the warning. Backend test:
+`tests/turnEngine.test.ts`'s new `getmaipai/home#91` suite, going
+through the real `POST /api/turn/stream` route (not `runTurnStream()`
+directly) since the enforcement lives in the route, not the engine.
+
+**A second review pass on this fix (medium effort) found two more real
+issues, both fixed here.** First: the fixed question template was
+hand-duplicated in `homeCardQueries.ts` instead of imported from the one
+place `HomePage.tsx`'s `WeatherCard` builds it - exactly the drift risk
+this fix exists to prevent (a future wording edit in one place silently
+stops the other from matching, quietly regressing lane 5 item 3's own
+bug with no test failure to catch it). Fixed by extracting the shared
+builder into `backend/src/homeCardQuestions.ts`, alias-free like
+`wire.ts` for the same reason - so `HomePage.tsx` imports the identical
+function through the `@maipai/home-backend` workspace dependency
+(`@maipai/home-backend/src/homeCardQuestions`) instead of retyping the
+template. Second: the with-place shape (`household.home_place` set) had
+no automated coverage through the real route, only the manual spare-
+backend check named above - added
+`tests/turnEngine.test.ts`'s with-place case, plus one proving the
+place-free shape is correctly refused once a place is configured (using
+a deterministic-floor phrase, not a live-model one, after the first
+draft's "good morning" case hit an unrelated cross-test race: a
+neighboring engine-down simulation can leave the chat engine pointed at
+a dead port for whichever test runs right after it). Also hoisted the
+route's twice-evaluated `body.ephemeral === true` into one
+`requestedEphemeral` (a smaller finding from the same pass). Closes
+getmaipai/home#91.

@@ -12685,3 +12685,6 @@ other's section once (147cd28, f4779a6).
 - Lane 5 item 3, Home's weather card writing a fake turn into real chat
   history (an additive `ephemeral` flag on `POST /api/turn/stream`):
   [docs/dev/session-b.md](dev/session-b.md) (2026-09-13).
+- #91, `ephemeral` needs a trust boundary, not just a flag (a code
+  review's own follow-up to lane 5 item 3 above):
+  [docs/dev/session-b.md](dev/session-b.md) (2026-09-13).

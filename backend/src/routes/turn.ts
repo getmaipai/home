@@ -4,6 +4,7 @@ import { requireAuth } from "@/middleware/auth";
 import { runTurn, runTurnStream, StreamSafetyRefusal, StreamUnavailable, type Surface, type TurnStreamResult } from "@/lib/turnEngine";
 import { pickThinkingCue } from "@/lib/replyVariation";
 import { personWithinTurnBudget } from "@/lib/llm";
+import { isFixedHomeCardQuery } from "@/lib/homeCardQueries";
 import type { TurnStreamEvent } from "@/wire";
 import type { AppEnv } from "@/types";
 
@@ -203,6 +204,21 @@ turnRoutes.post("/stream", requireAuth, bodyLimit({ maxSize: TURN_BODY_LIMIT }),
     ephemeral?: boolean;
   };
   const surface = (body.surface ?? "chat") as Surface;
+  // getmaipai/home#91 (a code review of the original ephemeral fix,
+  // 2026-09-13): honoring the flag for whatever text a caller sends
+  // would let a household member skip their own chat-history/episode
+  // write on ordinary content just by setting it, undercutting
+  // conversationHistory.ts's own "a parent can see a request was made"
+  // guarantee. `isFixedHomeCardQuery()` is the one place the actual
+  // allowed question is declared, so a request claiming `ephemeral` is
+  // only honored when the text matches it exactly; anything else is
+  // logged normally, same as if the flag had never been sent, and
+  // warned about here so a stray/misbehaving caller is visible.
+  const requestedEphemeral = body.ephemeral === true;
+  const ephemeral = requestedEphemeral && isFixedHomeCardQuery(body.text ?? "");
+  if (requestedEphemeral && !ephemeral) {
+    console.warn(`[turn/stream] ephemeral requested for a non-widget utterance from ${actor.id}; logging it normally`);
+  }
   // COR-7 (code review, 2026-09-06): a disconnected client used to leave
   // generation running with nothing reading it - this controller's
   // signal reaches all the way to the real fetch (lib/llm.ts's
@@ -218,7 +234,7 @@ turnRoutes.post("/stream", requireAuth, bodyLimit({ maxSize: TURN_BODY_LIMIT }),
     // never lands in a person's real chat history or the episode store,
     // while still going through the exact same model/safety/reply path a
     // typed message does (getmaipai/home BACKLOG, found 2026-09-11).
-    ephemeral: body.ephemeral,
+    ephemeral,
     signal: abortController.signal,
   });
   if (!result.ok) {

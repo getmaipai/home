@@ -1,4 +1,4 @@
-import { describe, expect, test, beforeEach, afterEach } from "bun:test";
+import { describe, expect, test, beforeEach, afterEach, spyOn } from "bun:test";
 import { TestClient } from "./client";
 import { resetDb } from "./reset-db";
 import { __resetThrottleForTests } from "@/lib/secretThrottle";
@@ -2321,6 +2321,61 @@ describe("POST /api/turn/stream", () => {
     expect(body.code).toBe("unsupported_surface");
   });
 
+  // getmaipai/home#91: a code review of the ephemeral fix found the flag
+  // honored for any text at all, letting a person skip their own
+  // chat-history write on ordinary content just by setting it.
+  // `isFixedHomeCardQuery()` (homeCardQueries.ts) is the route's own
+  // gate - only the exact question Home's WeatherCard actually asks
+  // gets the skip; anything else is logged normally.
+  describe("getmaipai/home#91: ephemeral is honored only for a real fixed home-card question", () => {
+    test("the weather card's own question, with the flag, writes no conversation_turns row", async () => {
+      const { client } = await owner();
+      const before = db.select().from(conversationTurns).all().length;
+      const res = await client.post("/api/turn/stream", { text: "What's the weather like today?", ephemeral: true });
+      expect(res.status).toBe(200);
+      expect(db.select().from(conversationTurns).all().length).toBe(before);
+    });
+
+    test("an arbitrary sentence with the flag set is logged normally, not skipped", async () => {
+      const { client } = await owner();
+      const before = db.select().from(conversationTurns).all().length;
+      const warnSpy = spyOn(console, "warn");
+      try {
+        const res = await client.post("/api/turn/stream", { text: "remember that the wifi password is on the fridge", ephemeral: true });
+        expect(res.status).toBe(200);
+        expect(db.select().from(conversationTurns).all().length).toBe(before + 1);
+        expect(warnSpy.mock.calls.some((args) => String(args[0]).includes("ephemeral requested for a non-widget utterance"))).toBe(true);
+      } finally {
+        warnSpy.mockRestore();
+      }
+    });
+
+    test("the weather card's own with-place question, once household.home_place is set, also writes no row", async () => {
+      const { client } = await owner();
+      setHouseholdSettingValue("household.home_place", "Portland, OR");
+      const before = db.select().from(conversationTurns).all().length;
+      const res = await client.post("/api/turn/stream", { text: "What's the weather like in Portland, OR today?", ephemeral: true });
+      expect(res.status).toBe(200);
+      expect(db.select().from(conversationTurns).all().length).toBe(before);
+    });
+
+    // The deterministic `remember` pattern floor, not "good morning" or
+    // the place-free weather phrase itself: both of those need a real
+    // chat completion, which a neighboring test's simulated engine-down
+    // scenario can leave unavailable for whichever test runs right after
+    // it (this file's own afterEach resets the supervisor, but not fast
+    // enough to avoid an occasional cross-test race) - a network- and
+    // model-free phrase proves the same property (setting a place never
+    // widens the match) without depending on either.
+    test("an ordinary sentence is still refused once a place is set - a place never widens the match", async () => {
+      const { client } = await owner();
+      setHouseholdSettingValue("household.home_place", "Portland, OR");
+      const before = db.select().from(conversationTurns).all().length;
+      const res = await client.post("/api/turn/stream", { text: "remember that today is trash day", ephemeral: true });
+      expect(res.status).toBe(200);
+      expect(db.select().from(conversationTurns).all().length).toBe(before + 1);
+    });
+  });
 });
 
 describe("per-person turn rate limiting (Session C step 0, wave-2.md)", () => {
