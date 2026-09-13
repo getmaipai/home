@@ -1505,6 +1505,21 @@ describe("buildSystemPrompt() prompt budget", () => {
     expect(prompt).toContain("MaiPai");
   });
 
+  // #93: an empty recall is said, not left blank, so the model answers a
+  // general question from what it knows instead of reaching for the
+  // recall tool to check what the context already checked.
+  test("with no memories the context says nothing stored matches; with one it does not", async () => {
+    const { NOTHING_STORED_LINE } = await import("@/lib/turnEngine");
+    expect(buildSystemPrompt(fakeActor(), "what year did the second world war end", [])).toContain(NOTHING_STORED_LINE);
+    const { actor } = await owner();
+    const created = remember(actor, { text: "Pippa is allergic to peanuts", category: "fact", tier: "durable", scope: "household", source: "test", importance: 0.9 });
+    expect(created.ok).toBe(true);
+    if (!created.ok) return;
+    const withMemory = buildSystemPrompt(actor, "what is Pippa allergic to", [{ record: created.value, score: 0.9 }]);
+    expect(withMemory).toContain("Pippa is allergic to peanuts");
+    expect(withMemory).not.toContain(NOTHING_STORED_LINE);
+  });
+
   // A review (2026-09-04) found the first cut assembled the full prompt
   // (including the trailing "Current time" line) and then blind-sliced the
   // whole string to the budget, which could cut the timestamp itself off

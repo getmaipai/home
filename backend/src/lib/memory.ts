@@ -17,6 +17,7 @@ import { toMemoryRecord } from "@/lib/memoryShape";
 import { isOwnerOrAdmin, rolesById, canAccessPerson } from "@/lib/access";
 import { tokenize } from "@/lib/text";
 import { embed } from "@/lib/llm";
+import { getEmbedBackendKind } from "@/lib/embedSupervisor";
 import { nextHlc } from "@/lib/hlc";
 import { deleteEpisodesForPerson } from "@/lib/episodes";
 import { MemoryRecord } from "@maipai/spec/gen/ts/memory-record.js";
@@ -429,21 +430,57 @@ export interface RecallOptions extends ListOptions {
 // Legacy's tuned values (ported verbatim, session-a-intelligence.md step
 // 5's own instruction - "record that they must be re-measured on the
 // bench before v0.1"; see docs/dev.md's bench-script entry for the
-// pointer): 0.7/0.2/0.1 weights, floors of 0.55 for episodic and 0.37
-// for durable, a hyperbolic recency decay (0.05/day) that durable
-// records skip entirely (recency 1.0, unchanging - a durable fact's
-// value doesn't fade with age the way an episodic aside's does). The
-// spec's third tier, "observation", has no legacy counterpart; treated
-// as episodic here, the same judgment call runMaintenance()'s own decay
-// logic already made for the identical reason.
+// pointer): 0.7/0.2/0.1 weights, a hyperbolic recency decay (0.05/day)
+// that durable records skip entirely (recency 1.0, unchanging - a
+// durable fact's value doesn't fade with age the way an episodic
+// aside's does). The spec's third tier, "observation", has no legacy
+// counterpart; treated as episodic here, the same judgment call
+// runMaintenance()'s own decay logic already made for the identical
+// reason.
+//
+// The floors were re-measured on 2026-09-13 (#93, scripts/bench/
+// recall-floor.ts, nomic-embed-text-v1.5 Q4_K_M on b10797): legacy's
+// 0.37 durable and 0.55 episodic sat BELOW this embed model's null
+// floor, so a general question nothing stored answers ("what year did
+// the second world war end") recalled its nearest neighbors anyway. On
+// a seeded household of 24 records, thirty unrelated queries put the
+// top hit at p50 0.472, p95 0.545, max 0.558 for durable and p50 0.465,
+// p95 0.523, max 0.549 for episodic; ten related queries put their
+// right record at 0.807 at the weakest and 0.830 at the median, top hit
+// every time. 0.62 sits above the null maximum by 0.06 and below the
+// weakest signal by 0.19, per tier; the same value for both since the
+// tiers' null floors are within 0.01 of each other. Two bands no floor
+// can split, measured on the same bench and recorded as limits: a
+// question that NAMES a household member and asks what was never
+// stored ("what is Pippa's favorite color") scores 0.64 to 0.86 against
+// that person's other facts, inside the signal band, so those facts
+// come along and the model has to abstain on the attribute (the guards
+// hold it to that); and an indirect fact ("what should I cook for
+// dinner" against "Marlow is vegetarian") scores 0.40 to 0.54, inside
+// the null band, so it is not recalled by cosine (an entity record or a
+// pinned fact is how it surfaces).
 const COSINE_WEIGHT = 0.7;
 const IMPORTANCE_WEIGHT = 0.2;
 const RECENCY_WEIGHT = 0.1;
 const RECENCY_DECAY_PER_DAY = 0.05;
-const EPISODIC_MIN_COSINE = 0.55;
-const DURABLE_MIN_COSINE = 0.37;
+export const EPISODIC_MIN_COSINE = 0.62;
+export const DURABLE_MIN_COSINE = 0.62;
+/** The measured null floor (the top hit's cosine on an unrelated
+ * query, p95 and max over thirty queries) the floors above must clear;
+ * a test holds the relation so a future edit cannot drop a floor under
+ * the noise without re-measuring. */
+export const MEASURED_NULL_FLOOR = { durable: { p95: 0.545, max: 0.558 }, episodic: { p95: 0.523, max: 0.549 }, weakestSignal: 0.807 } as const;
+// The embed supervisor's stub tier (spec/llm/ts/stubServer.ts, the
+// in-process fallback when no engine and no binary exist, and every
+// test run) makes bag-of-words vectors with a cosine distribution of its
+// own, nothing like nomic's; its floors are legacy's unmeasured values,
+// kept so the deterministic suite keeps exercising the ranking, and
+// they are not a measurement of any model.
+const STUB_EPISODIC_MIN_COSINE = 0.55;
+const STUB_DURABLE_MIN_COSINE = 0.37;
 
 function minCosineForTier(tier: string): number {
+  if (getEmbedBackendKind() === "stub") return tier === "durable" ? STUB_DURABLE_MIN_COSINE : STUB_EPISODIC_MIN_COSINE;
   return tier === "durable" ? DURABLE_MIN_COSINE : EPISODIC_MIN_COSINE;
 }
 

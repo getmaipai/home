@@ -42,6 +42,7 @@ import {
 import { pickRefusalVariant, varyKnownConstant } from "@/lib/replyVariation";
 import { acquireTurnLease, DEFAULT_IDLE_WINDOW_MS, type TurnLease } from "@/lib/turnActivity";
 import { normalizeForSpeech } from "@maipai/spec/voice/ts/normalizeForSpeech.js";
+import { NOTHING_RECALLED } from "@maipai/spec/interpreters/ts/recipe-interpreter.js";
 import { nextSentenceBoundary } from "@maipai/spec/safety/ts/sentenceChunker.js";
 import { getPersonSettingValue, getHouseholdSettingValue } from "@/lib/settings";
 import { listActivePeople } from "@/lib/access";
@@ -365,6 +366,9 @@ export const PROMPT_SYSTEM_CHAR_BUDGET = 4000;
 // output side.
 export const MAX_TURN_TEXT_LENGTH = 8_000;
 const MAX_MEMORY_SNIPPETS = 5;
+/** #93: the memory block's own line when recall found nothing relevant
+ * (exported for the tests and the bench). */
+export const NOTHING_STORED_LINE = "Nothing stored matches this message: answer from what you know, or say the household has not told you.";
 const MAX_MEMORY_SECTION_CHARS = 800;
 const MAX_SKILLS_SECTION_CHARS = 1200;
 // Step 3: one line, so a generous cap is plenty; guards the same way
@@ -641,9 +645,14 @@ export function buildPromptParts(
   if (profile || memoryMatches.length > 0) {
     const profileLine = profile ? `${profile.text}\n` : "";
     const lines = memoryMatches.slice(0, MAX_MEMORY_SNIPPETS).map((m) => memoryBulletLine(m, locale, now));
-    const bulletsBlock = lines.length > 0 ? `${lines.join("\n")}\n` : "";
+    // #93: an empty recall is said, not left blank, so the model answers
+    // a general question from what it knows instead of reaching for the
+    // recall tool to check what the context already checked.
+    const bulletsBlock = lines.length > 0 ? `${lines.join("\n")}\n` : `${NOTHING_STORED_LINE}\n`;
     memorySection = `\n\nWhat you already know about this household:\n${profileLine}${bulletsBlock}${MEMORY_TRUST_REMINDER}`;
     memorySection = capSection(memorySection, MAX_MEMORY_SECTION_CHARS);
+  } else {
+    memorySection = `\n\n${NOTHING_STORED_LINE}`;
   }
   const episodesBlock = formatEpisodesForPrompt(episodeMatches, sanitizeForPrompt(actor.displayName), locale, now);
   const episodesSection = episodesBlock ? `\n\n${episodesBlock}` : "";
@@ -1916,6 +1925,17 @@ export async function resolveToolCalls(
   const ran = await Promise.all(
     capped.map(async (c) => ({ call: c, result: await runPlugin(c.tool, actor, (c.args ?? {}) as Record<string, unknown>, turnId) })),
   );
+  // #93: a recall the MODEL asked for that found nothing is a miss, not
+  // an answer. The recipe language has no conditional, so the recall
+  // package binds the spec's own "nothing recalled" line as its reply;
+  // spoken back it ended "what year did the second world war end" with
+  // "I don't remember anything about that." (the baseline bench). On
+  // this path the miss becomes a failed `not_found` outcome and, with
+  // every other call failed too, the turn's own retry without tools lets
+  // the model answer from what it knows. A pattern-routed "what do you
+  // remember about X" (Tier 0, prepareTurn) still says the line: there
+  // the person asked the memory, and "nothing" is the honest answer.
+  const recalledNothing = (r: (typeof ran)[number]) => r.result.ok && r.result.value.reply?.text === NOTHING_RECALLED;
   for (const r of ran) {
     // A result that parks the action behind a confirm/ask is pending,
     // not succeeded: nothing ran (a code review).
@@ -1923,12 +1943,14 @@ export async function resolveToolCalls(
     outcomes.push(
       !r.result.ok
         ? { callId: callId(r.call), packageId: r.call.tool, status: "failed", errorCode: String(r.result.status) }
-        : parked
-          ? { callId: callId(r.call), packageId: r.call.tool, status: "pending", result: r.result.value }
-          : { callId: callId(r.call), packageId: r.call.tool, status: "succeeded", result: r.result.value },
+        : recalledNothing(r)
+          ? { callId: callId(r.call), packageId: r.call.tool, status: "failed", errorCode: "not_found" }
+          : parked
+            ? { callId: callId(r.call), packageId: r.call.tool, status: "pending", result: r.result.value }
+            : { callId: callId(r.call), packageId: r.call.tool, status: "succeeded", result: r.result.value },
     );
   }
-  const oks = ran.filter((r): r is { call: ToolCall; result: Extract<(typeof r)["result"], { ok: true }> } => r.result.ok);
+  const oks = ran.filter((r): r is { call: ToolCall; result: Extract<(typeof r)["result"], { ok: true }> } => r.result.ok && !recalledNothing(r));
   // Every proposed call failed (invalid args - "verify every call with
   // the package's args schema before acting" - or a runtime error): "ask
   // again," never a silent drop, means null (a normal conversational

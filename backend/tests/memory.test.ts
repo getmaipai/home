@@ -1463,3 +1463,19 @@ describe("CHAT-03: credentials never enter memory", () => {
     expect(db.select().from(memoryRecords).where(eq(memoryRecords.id, "mem-cred-1")).get()).toBeDefined(); // still there for the Memory page
   });
 });
+
+// #93: recall's floors were legacy's unmeasured values, below this embed
+// model's own null floor, so a general question recalled its nearest
+// neighbors anyway. The floors now sit above the measured null floor
+// (scripts/bench/recall-floor.ts, recorded in memory.ts) and below the
+// weakest measured signal; this test holds that relation so an edit
+// cannot drop a floor under the noise without re-measuring.
+describe("recall's relevance floors (#93)", () => {
+  test("each tier's floor clears the measured null floor's maximum and stays under the weakest measured signal", async () => {
+    const { DURABLE_MIN_COSINE, EPISODIC_MIN_COSINE, MEASURED_NULL_FLOOR } = await import("@/lib/memory");
+    expect(DURABLE_MIN_COSINE).toBeGreaterThan(MEASURED_NULL_FLOOR.durable.max);
+    expect(EPISODIC_MIN_COSINE).toBeGreaterThan(MEASURED_NULL_FLOOR.episodic.max);
+    expect(DURABLE_MIN_COSINE).toBeLessThan(MEASURED_NULL_FLOOR.weakestSignal);
+    expect(EPISODIC_MIN_COSINE).toBeLessThan(MEASURED_NULL_FLOOR.weakestSignal);
+  });
+});

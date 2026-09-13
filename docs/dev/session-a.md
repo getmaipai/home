@@ -2154,3 +2154,93 @@ hold, which waits for memory headroom (swap 13.7 of 14.3 GB as this
 was written, most of it the old judge). The supervisor still has no
 resident ceiling or recycle of its own, and no clean stop on hub stop
 (#73).
+
+## #93: recall's floors, measured, and an empty recall said out loud (2026-09-13)
+
+Item 2 of `docs/plans/baseline-fixes-2026-09-13.md`. `memory.ts` passed
+durable records at cosine 0.37 and episodic at 0.55, legacy's values
+with its own comment that they had to be re-measured; the baseline
+bench's "what year did the second world war end" row went to the
+recall tool and came back with "Pippa loves painting, Sage's pet",
+and the judge-eval's abstention probe recalled two matches for a
+question nothing stored answers (#93).
+
+**Measured** (`scripts/bench/recall-floor.ts`, the ROUTE-01 method:
+nomic-embed-text-v1.5 Q4_K_M on llama-server b10797 by URL, a seeded
+household of 24 records, twelve durable and twelve episodic, roster
+names only; 2026-09-13). Thirty unrelated queries, the top hit's
+cosine per tier: durable p50 0.472, p90 0.501, p95 0.545, max 0.558;
+episodic p50 0.465, p90 0.516, p95 0.523, max 0.549. Ten related
+queries, the right record's cosine: weakest 0.807, median 0.830, the
+top hit every time. Legacy's floors sat below this model's null
+floor by 0.19 (durable) and at it (episodic), which is the whole
+defect: every general question passed its nearest neighbors. The
+floors are 0.62 for both tiers (above the null maximum by 0.06, below
+the weakest signal by 0.19; one value, since the tiers' null floors
+are within 0.01 of each other), and `MEASURED_NULL_FLOOR` in
+`memory.ts` records the numbers with a test holding floor > null max
+and floor < weakest signal, so an edit cannot drop a floor under the
+noise without re-measuring. The embed supervisor's stub tier (the
+in-process fallback with no engine and no binary, and every test run)
+keeps legacy's values as its own floors: its bag-of-words vectors have
+a distribution nothing like nomic's, and those values are not a
+measurement of any model.
+
+**An empty recall is said, not left blank.** Two places. On the tool
+path, a recall the model asked for that found nothing is a failed
+`not_found` outcome (the spec's own `NOTHING_RECALLED` line, exported
+from the recipe interpreter, is how the recipe language says "nothing"
+with no conditional step): it never joins a combined reply, and alone
+it is "ask again" (null), so the turn's existing retry without tools
+lets the model answer from what it knows. A pattern-routed "what do you
+remember about X" (Tier 0) still says the line: there the person asked
+the memory, and "nothing" is the honest answer. In the prompt, the
+memory block carries `NOTHING_STORED_LINE` ("Nothing stored matches
+this message: answer from what you know, or say the household has not
+told you.") when recall returned nothing, with or without a profile
+paragraph, so the model does not reach for the recall tool to check
+what the context already checked.
+
+**Two bands no floor can split**, measured on the same bench and
+recorded as limits. A question that names a household member and asks
+what was never stored ("what is Pippa's favorite color", "how old is
+Marlow") scores 0.64 to 0.86 (p50 0.730, max 0.864) against that
+person's other facts, inside the signal band: those facts come along,
+and the model has to abstain on the attribute, which the bench's
+abstention rows show it doing ("The household hasn't told me what
+Bramble's favorite color is.", three runs of three) with the guards
+holding it there. An indirect fact ("what should I cook for dinner
+tonight" against "Marlow is vegetarian" at 0.44, "should I go for a
+run this weekend" against the half-marathon at 0.54) sits inside the
+null band and is not recalled by cosine; an entity record or a pinned
+fact is how such a fact surfaces (the memory bench's "cooking for
+Rover, any concerns" row passes on Rover's entity record), and
+`memory-eval.ts`'s three durable-preference rows, which passed only
+because the old floor passed everything, now read NOT-RECALLED (8 of
+11, from 11 of 11 with unrelated questions passing too).
+
+**Results** (2026-09-13, engines by URL as above). Three identical
+bench runs: 59, 57, 59 of 60; "what year did the second world war end"
+answered "1945." in all three from the model with no tool; the
+abstention rows honest in all three; the one failure every run is the
+spoken correction (item 3), plus in run two the edit-then-recall
+conversation (the model said "I've added Rover's vet appointment for
+Wednesday to the list", replaced by CHAT-04, and then echoed an episode
+line "Sep 13 (today), Sage said: ..." which the invention guard
+replaced; item 3's territory). Median first delta 705, 697, 703 ms;
+total 811, 815, 848 ms. `scripts/bench/memory/run.ts`: 14 of 15 overall
+(the baseline's record was 12 of 15), episodes 7 of 8 with the same
+kayak-rental miss as before (the episode store's own abstention, not
+the memory floor). `scripts/bench/judge-eval.ts` (the 1.7B on 8789 with
+#97's line): extraction precision 66.7 percent and recall 100 percent
+as before; the knowledge-update probe still sees the stale "nurse"
+beside "teacher" (the judge's contradiction path, item 3); the
+abstention probe still recalls two matches for "what is Iris's
+favorite color", the named-null band above: recall returns Iris's two
+job facts because the question names Iris, and no cosine floor changes
+that without dropping "what day does Pippa have soccer" with it. The
+item's acceptance line "the judge-eval abstention probe recalls
+nothing" is therefore not met by this fix and, by the measurement,
+not meetable by a floor; the end-to-end abstention (the reply) is what
+the baseline bench measures, and it passes. Raised to the coordinator
+with the numbers rather than rewritten.

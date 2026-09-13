@@ -59,7 +59,10 @@ type RecipeStep =
 // the interpreter, not by asking the recipe author for a branch that
 // doesn't exist" call `remember`'s own fixed confirmation text already
 // makes.
-const NOTHING_RECALLED = "I don't remember anything about that.";
+/** What a `recall` step binds when nothing matched. Exported (#93) so
+ * the hub's turn engine can tell an empty recall from an answer on the
+ * tool path without a second copy of the phrase. */
+export const NOTHING_RECALLED = "I don't remember anything about that.";
 
 // Decodes HTML entities in the SUBSTITUTED VALUE, never the template
 // itself (the template is always our own authored manifest/recipe text,

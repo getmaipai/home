@@ -12693,6 +12693,10 @@ other's section once (147cd28, f4779a6).
   turn engine, state-read outcomes, frozen header, hard rows) and its
   first run's table and ranking: [docs/dev/session-a.md](dev/session-a.md)
   (2026-09-13).
+- #93, recall's floors measured (null p95 0.545, signal 0.807 and up,
+  floors 0.62), an empty recall said out loud on the tool path and in
+  the prompt, and the two bands no floor can split recorded:
+  [docs/dev/session-a.md](dev/session-a.md) (2026-09-13).
 - #97, the background engine's prompt cache (default 8192 MiB) grew the
   judge to 11 GB; `--cache-ram 0` on its launch line, measured side by
   side at 2.8 GB against 9.3 GB over the same runs:

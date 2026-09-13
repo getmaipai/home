@@ -38,6 +38,8 @@ import {
   type PluginResultWithConfirmAsk,
 } from "@/lib/turnEngine";
 import type { ToolCall } from "@/lib/llm";
+import type { ToolExecutionOutcome } from "@/lib/turnContext";
+import { remember } from "@/lib/memory";
 import { resolveOrCreateConversation, getPendingAsk, setPendingAsk } from "@/lib/conversationHistory";
 import type { ChatCompletionRequest } from "@maipai/spec/llm/ts/types.js";
 import type { PersonRow } from "@/types";
@@ -188,6 +190,8 @@ describe("resolveToolCalls() (Fix E: the model's own native tool_calls decision,
 
   test("two independent calls both run and their replies combine", async () => {
     const { actor } = await owner();
+    const seeded = remember(actor, { text: "Friday is pizza night", category: "fact", tier: "durable", scope: "household", source: "test", importance: 0.8 });
+    expect(seeded.ok).toBe(true);
     const calls: ToolCall[] = [
       { tool: "remember", args: { fact: "the wifi password is on the fridge" } },
       { tool: "recall", args: { topic: "pizza night" } },
@@ -196,6 +200,26 @@ describe("resolveToolCalls() (Fix E: the model's own native tool_calls decision,
     const value = await resolveToolCalls(calls, offeredFrom(ranked), ranked, actor, "conv-1", "turn-1", SAFE, undefined);
     expect(value?.source).toBe("plugin");
     expect(value?.plugin_id).toBe("remember+recall");
+  });
+
+  // #93: a recall the model asked for that found nothing is a miss, not
+  // an answer: its "I don't remember anything about that." never joins
+  // a combined reply, and alone it is "ask again" (null), so the turn's
+  // own retry without tools lets the model answer from what it knows.
+  test("a recall that finds nothing is a failed not_found outcome: dropped from a combined reply, and alone it is null, never spoken", async () => {
+    const { actor } = await owner();
+    const outcomes: ToolExecutionOutcome[] = [];
+    const both: ToolCall[] = [
+      { tool: "remember", args: { fact: "the wifi password is on the fridge" } },
+      { tool: "recall", args: { topic: "pizza night" } },
+    ];
+    const ranked = [REMEMBER_CANDIDATE, RECALL_CANDIDATE];
+    const value = await resolveToolCalls(both, offeredFrom(ranked), ranked, actor, "conv-1", "turn-1", SAFE, undefined, outcomes);
+    expect(value?.plugin_id).toBe("remember");
+    expect(value?.reply.text).not.toContain("I don't remember anything about that.");
+    expect(outcomes.find((o) => o.packageId === "recall")).toMatchObject({ status: "failed", errorCode: "not_found" });
+    const alone = await resolveToolCalls([{ tool: "recall", args: { topic: "the second world war" } }], offeredFrom([RECALL_CANDIDATE]), [RECALL_CANDIDATE], actor, "conv-1", "turn-2", SAFE, undefined);
+    expect(alone).toBeNull();
   });
 
   test("an invalid call (fails the package's own args schema) is 'ask again' - null, never a silent drop", async () => {
