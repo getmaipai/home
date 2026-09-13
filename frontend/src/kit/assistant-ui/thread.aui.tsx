@@ -593,6 +593,24 @@ const AssistantMessage: FC = () => {
   );
 };
 
+// getmaipai/home#82: shared by AssistantActionBar and UserActionBar - a
+// household member's own messages get the identical Copy affordance
+// (icon, tooltip, isCopied swap) replies already had, `className` only
+// place they differ (UserActionBar's own `aui-user-action-copy` hook for
+// its bar's layout).
+const MessageCopyButton: FC<{ className?: string }> = ({ className }) => (
+  <ActionBarPrimitive.Copy asChild>
+    <TooltipIconButton tooltip="Copy" className={className}>
+      <AuiIf condition={(s) => s.message.isCopied}>
+        <CheckIcon className="animate-in zoom-in-50 fade-in duration-200 ease-out" />
+      </AuiIf>
+      <AuiIf condition={(s) => !s.message.isCopied}>
+        <CopyIcon className="animate-in zoom-in-75 fade-in duration-150" />
+      </AuiIf>
+    </TooltipIconButton>
+  </ActionBarPrimitive.Copy>
+);
+
 const AssistantActionBar: FC = () => {
   return (
     <ActionBarPrimitive.Root
@@ -600,16 +618,7 @@ const AssistantActionBar: FC = () => {
       autohide="not-last"
       className="aui-assistant-action-bar-root text-muted-foreground animate-in fade-in col-start-3 row-start-2 -ms-1 flex gap-1 duration-200"
     >
-      <ActionBarPrimitive.Copy asChild>
-        <TooltipIconButton tooltip="Copy">
-          <AuiIf condition={(s) => s.message.isCopied}>
-            <CheckIcon className="animate-in zoom-in-50 fade-in duration-200 ease-out" />
-          </AuiIf>
-          <AuiIf condition={(s) => !s.message.isCopied}>
-            <CopyIcon className="animate-in zoom-in-75 fade-in duration-150" />
-          </AuiIf>
-        </TooltipIconButton>
-      </ActionBarPrimitive.Copy>
+      <MessageCopyButton />
       <ActionBarPrimitive.Reload asChild>
         <TooltipIconButton tooltip="Refresh">
           <RefreshCwIcon />
@@ -692,6 +701,7 @@ const UserActionBar: FC = () => {
       autohide="not-last"
       className="aui-user-action-bar-root flex flex-col items-end"
     >
+      <MessageCopyButton className="aui-user-action-copy" />
       <ActionBarPrimitive.Edit asChild>
         <TooltipIconButton tooltip="Edit" className="aui-user-action-edit">
           <PencilIcon />

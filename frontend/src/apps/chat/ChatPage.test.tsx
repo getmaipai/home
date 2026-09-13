@@ -1,5 +1,5 @@
 import { describe, test, expect, mock, afterEach } from "bun:test";
-import { cleanup, fireEvent, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, waitFor, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { ChatPage } from "@/apps/chat/ChatPage";
 import { renderWithQueryClient } from "../../../tests/renderWithQueryClient";
@@ -234,4 +234,41 @@ test("reopening a saved chat loads only its history and sends the next message t
     expect(calls).not.toContain("GET /api/conversations/turns");
     expect(calls).not.toContain("POST /api/conversations");
   } finally { restore(); }
+});
+
+// getmaipai/home#82: replies already had a Copy button (AssistantActionBar);
+// a household member's own messages did not, so a good question typed on a
+// phone could only be reused by hand-selecting the bubble's text. Adds the
+// identical ActionBarPrimitive.Copy + icon swap to UserActionBar
+// (thread.aui.tsx). Only the copy action itself is proven here (a real
+// clipboard write, not just the icon animation) - the hover-to-reveal gate
+// is the same one #60's edit test already exercises directly against
+// MessageRoot.tsx's real "mouseenter" listener.
+test("Copy on a household member's own message writes exactly what they typed to the clipboard", async () => {
+  (globalThis as unknown as { AudioContext: unknown }).AudioContext = FakeAudioContext;
+  const restore = stubFetch();
+  const writeText = mock(() => Promise.resolve());
+  const originalClipboard = Object.getOwnPropertyDescriptor(navigator, "clipboard");
+  Object.defineProperty(navigator, "clipboard", { value: { writeText }, configurable: true });
+  try {
+    const view = renderWithQueryClient(<MemoryRouter><ChatPage person={makePerson()} /></MemoryRouter>);
+    fireEvent.change(await view.findByLabelText("Message input"), { target: { value: "whats the best way to grow tomatoes" } });
+    const send = (await view.findByLabelText("Send message")) as HTMLButtonElement;
+    await waitFor(() => expect(send.disabled).toBe(false));
+    fireEvent.click(send);
+    await view.findByText("A canned reply.");
+
+    const userMessage = view.container.querySelector('[data-slot="aui_user-message-root"]')!;
+    fireEvent.mouseEnter(userMessage);
+    // The assistant's own reply carries an identically-named "Copy"
+    // button (AssistantActionBar) - scoped to the user message's own
+    // subtree so this exercises the new UserActionBar one, not that one.
+    fireEvent.click(await within(userMessage as HTMLElement).findByRole("button", { name: "Copy" }));
+
+    expect(writeText).toHaveBeenCalledWith("whats the best way to grow tomatoes");
+  } finally {
+    if (originalClipboard) Object.defineProperty(navigator, "clipboard", originalClipboard);
+    else delete (navigator as { clipboard?: unknown }).clipboard;
+    restore();
+  }
 });
