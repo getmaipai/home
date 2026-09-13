@@ -388,12 +388,19 @@ describe("POST /api/plugins/math/run", () => {
   // input round-trips into it) so a regression in evaluateExpression's
   // own message-generation logic - not just its ComputeError-ness -
   // would fail this test too.
+  // #72's normalizeSpokenMath() (b9ffc9c) now turns "plus"/"minus"/
+  // "times"/etc into real operators before evaluation, so "15 plus 12"
+  // itself no longer reaches the evaluator malformed - it evaluates to
+  // 27. "fifteen plus twelve" still does, since normalizeSpokenMath()
+  // only rewrites operator WORDS, not spelled-out number words, and the
+  // error message reports the normalized text (what the evaluator
+  // actually saw), not the original input.
   test("400s with a clear message for a malformed expression, not a 500", async () => {
     const client = await owner();
-    const res = await client.post("/api/plugins/math/run", { expression: "15 plus 12" });
+    const res = await client.post("/api/plugins/math/run", { expression: "fifteen plus twelve" });
     expect(res.status).toBe(400);
     const body = (await res.json()) as { error?: string };
-    expect(body.error).toBe('"15 plus 12" failed to evaluate: Undefined symbol plus');
+    expect(body.error).toBe('"fifteen + twelve" failed to evaluate: Undefined symbol fifteen');
   });
 });
 
