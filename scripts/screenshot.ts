@@ -35,7 +35,7 @@
 import { chromium, webkit, type Browser, type BrowserContext } from "playwright";
 import { startStubLlmServer } from "../spec/llm/ts/stubServer";
 import AxeBuilder from "@axe-core/playwright";
-import { rmSync, mkdirSync, existsSync, writeFileSync } from "node:fs";
+import { rmSync, mkdirSync, existsSync, writeFileSync, readFileSync } from "node:fs";
 import { createHash } from "node:crypto";
 import { dirname, join } from "node:path";
 
@@ -327,6 +327,7 @@ interface RunResult {
   theme: string;
   violations: string[];
   overflow: boolean;
+  screenshotFile?: string;
 }
 
 // Waits for every finite (non-looping) CSS animation/transition on the
@@ -424,12 +425,14 @@ async function visitRoute(context: BrowserContext, route: RouteSpec, viewport: V
       .analyze();
     const violations = axe.violations.map((v) => `${v.id} (${v.impact ?? "unknown"}): ${v.nodes.length} node(s) - ${v.help}: ${v.nodes.map((node) => node.target.join(" ")).join("; ")}`);
 
+    let screenshotFile: string | undefined;
     if (saveScreenshot) {
       mkdirSync(SCREENS_DIR, { recursive: true });
-      await page.screenshot({ path: join(SCREENS_DIR, `${route.slug}-${viewport.slug}-${theme}.png`), fullPage: true });
+      screenshotFile = `${route.slug}-${viewport.slug}-${theme}.png`;
+      await page.screenshot({ path: join(SCREENS_DIR, screenshotFile), fullPage: true });
     }
 
-    return { route: route.slug, viewport: viewport.slug, theme, violations, overflow };
+    return { route: route.slug, viewport: viewport.slug, theme, violations, overflow, screenshotFile };
   } finally {
     await page.close();
   }
@@ -744,6 +747,38 @@ async function checkKeyboardTrap(browser: Browser, sessionValue: string): Promis
   }
 }
 
+// docs/UI.md > "Responsive layout, PWA, tabs, icons": "Every page is
+// captured at every surface, light and dark"; getmaipai/.github's
+// docs/STYLE.md > "Platform screenshot pipeline": "a generated manifest
+// per shot records the capture script, viewport, theme, and date."
+// Lane 7 item 1 (2026-09-13) reconciled the matrix against both and
+// found this the one missing, S-sized piece - the matrix, overflow,
+// and target checks (WCAG 2.2's own 2.5.5/2.5.8 via the existing axe
+// scan) already existed. One manifest.json in SCREENS_DIR, keyed by
+// filename so a partial run (--chat-review's two routes, a
+// --settings-review) updates only the entries it actually captured
+// rather than wiping the rest - a full matrix run and a scoped review
+// run share this same file over time, never a second manifest system.
+interface ManifestEntry {
+  route: string;
+  viewport: string;
+  theme: string;
+  capturedAt: string;
+  captureScript: string;
+}
+function writeScreenshotManifest(results: RunResult[], captureScript: string): void {
+  const withFiles = results.filter((r): r is RunResult & { screenshotFile: string } => r.screenshotFile !== undefined);
+  if (withFiles.length === 0) return;
+  const manifestPath = join(SCREENS_DIR, "manifest.json");
+  const existing: Record<string, ManifestEntry> = existsSync(manifestPath) ? JSON.parse(readFileSync(manifestPath, "utf-8")) : {};
+  const capturedAt = new Date().toISOString();
+  for (const r of withFiles) {
+    existing[r.screenshotFile] = { route: r.route, viewport: r.viewport, theme: r.theme, capturedAt, captureScript };
+  }
+  mkdirSync(SCREENS_DIR, { recursive: true });
+  writeFileSync(manifestPath, JSON.stringify(existing, null, 2) + "\n");
+}
+
 async function main() {
   console.log("Building the frontend so the backend has something to serve...");
   const build = Bun.spawnSync({
@@ -937,7 +972,10 @@ async function main() {
     }
 
     console.log(`\n${results.length} page(s) checked, 0 violations, 0 overflow, reduced motion and keyboard-trap checks passed.`);
-    if (!a11yOnly) console.log(`Screenshots written to ${SCREENS_DIR}`);
+    if (!a11yOnly) {
+      writeScreenshotManifest(results, `scripts/screenshot.ts ${process.argv.slice(2).join(" ")}`.trim());
+      console.log(`Screenshots written to ${SCREENS_DIR}`);
+    }
   } finally {
     await browser?.close();
     backend.kill();

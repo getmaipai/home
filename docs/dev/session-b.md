@@ -830,3 +830,68 @@ a user page embeds (`home`, `privacy`, `settings`, `settings-repairs`,
 `settings-users`) opened again too - all correct. Added the "shared
 horizontal-rail primitive" BACKLOG item under UI / shell (S, not fixed,
 per the coordinator's own instruction).
+
+## Lane 7 item 1: reconcile the screenshot-matrix BACKLOG item
+
+Read getmaipai/.github's `docs/UI.md` ("Responsive layout, PWA, tabs,
+icons") and `docs/STYLE.md` ("Platform screenshot pipeline") against
+what `scripts/screenshot.ts` actually does tonight, to find what the
+standard names that the pipeline still lacks.
+
+**Already met, no change needed:** every page (18 routes) at every
+surface (phone/tablet/desktop, TV via `far`'s user agent) in light and
+dark (136 shots); horizontal overflow; `clippedStrips` (the
+WhoIsHere/MediaShelf `overflow-x-auto` quirk, lane 6); a real axe scan
+tagged `wcag2a`/`wcag2aa`/`wcag21a`/`wcag21aa`/`wcag22aa`/
+`best-practice`; reduced-motion and keyboard-trap checks. The BACKLOG
+item's own text ("today one hero shot at one size") was simply stale -
+that described the pipeline before session-e-ui-and-docs.md's step 0,
+not tonight's.
+
+**Added (S, done):** STYLE.md: "a generated manifest per shot records
+the capture script, viewport, theme, and date." Nothing wrote one.
+Added `writeScreenshotManifest()`, one `manifest.json` in
+`SCREENS_DIR`, keyed by filename so a partial run (`--chat-review`,
+`--settings-review`) updates only the entries it actually captured
+rather than clobbering the other 130-odd from the last full run.
+Verified: a full matrix run wrote 136 entries; a follow-up
+`--chat-review` run left all 136 in place and updated exactly the two
+chat entries' `capturedAt`/`captureScript` in place (checked both
+counts and the two entries' content directly).
+
+**Found, NOT met, NOT S-sized - left open, two new BACKLOG items filed
+instead of forced:**
+
+1. UI.md's own type-floor line: "48 px targets... the kit refuses to
+   go below." Nothing checks this. Confirmed axe-core 4.13.0 ships no
+   `target-size` rule at all (grepped its own rule table directly, no
+   match for `target-size` or any `2.5.5`/`2.5.8` WCAG tag). Wrote a
+   real `page.evaluate()` measurement (every `button`/`a[href]`/input/
+   role=button etc., `getBoundingClientRect()` under 48px on either
+   axis) and ran it across the full matrix as a **proven-to-fail
+   check**, not committed: dozens of real violations on nearly every
+   page - the sidebar's own nav rows (200x40), most icon buttons
+   (28x28, 36x36 - "Toggle Sidebar", "Voice input", "Send message",
+   "New chat"), settings tabs (154x32), the settings-repairs
+   "Dismiss" button (70x28). This is a kit-wide component-sizing pass,
+   not a screenshot-pipeline change - reverted the check rather than
+   land a hard-failing gate the rest of the app isn't built to pass,
+   and filed it as its own BACKLOG item ("Enforce the kit's 48px
+   touch-target floor").
+2. STYLE.md's own vision-model review ("a vision-model check ...
+   fails the build on a miss ... written into the screenshot's
+   manifest") - not built at all; a session still opens and judges
+   every image by hand (which happened again this lane, per CLAUDE.md's
+   own rule, same as every prior lane). Filed as its own BACKLOG item
+   ("A vision-model verdict per screenshot", L - a declared expectation
+   per route, a real model call, a manifest verdict field).
+3. STYLE.md's third fixed theme, High Contrast, isn't captured -
+   traced to the theme system itself: `frontend/src/kit/tokens.css` has
+   no High Contrast preset to capture yet. A theming gap, not a
+   pipeline one; noted in the reconciled BACKLOG item's own text, not
+   filed as a separate item (the theme-preset work already has its own
+   home in the platform plan's section 6.8, not this repo's screenshot
+   lane).
+
+BACKLOG's "A screenshot matrix in the pipeline" item ticked, rewritten
+to name exactly what's covered and the three findings above.

@@ -12693,6 +12693,12 @@ other's section once (147cd28, f4779a6).
   turn engine, state-read outcomes, frozen header, hard rows) and its
   first run's table and ranking: [docs/dev/session-a.md](dev/session-a.md)
   (2026-09-13).
+- Item 1b (#67), the honesty lines never answer a world question: the
+  vocabulary out of everything the model reads, a guard-replaced turn as
+  a system note in the window, `claimed_experience` as its own guard
+  reason, the Cobra film row set; three series of three runs recorded,
+  the rest handed to the media-conversation program:
+  [docs/dev/session-a.md](dev/session-a.md) (2026-09-13).
 - #73, the hub stops its engines on SIGTERM and on a fatal error (Codex's
   hubShutdown.ts, reviewed and gated here; typed stops, a deadline, a
   real exit wait after SIGKILL):

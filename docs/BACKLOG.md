@@ -4104,10 +4104,60 @@ future session now that F's hub half exists.
       fallback rendering); this item closed the two named here, not a
       repo-wide `text-xs` audit - that broader sweep is still open work,
       not filed as its own item yet.
-- [ ] **A screenshot matrix in the pipeline** (M; sharpens the tracked
-      "wire the measurable half" note) - every page at every surface,
-      light and dark, with overflow and target checks, per UI.md; today
-      one hero shot at one size.
+- [x] **A screenshot matrix in the pipeline** (M; sharpens the tracked
+      "wire the measurable half" note) - done 2026-09-13, reconciled
+      against getmaipai/.github's docs/UI.md and docs/STYLE.md. What the
+      standard asks for and the matrix now does: every page (18 routes)
+      at every surface (phone, tablet, desktop, TV via a user agent) in
+      light and dark (136 shots); horizontal overflow; the
+      `clippedStrips` check (a real layout bug class, the WhoIsHere/
+      MediaShelf `overflow-x-auto` quirk); WCAG 2.2 AA via a real axe
+      scan (`wcag2a`/`wcag2aa`/`wcag21a`/`wcag21aa`/`wcag22aa`/
+      `best-practice`); reduced-motion and keyboard-trap checks; a
+      generated `manifest.json` per shot (capture script, viewport,
+      theme, date), merged across partial runs (`--chat-review` etc.)
+      rather than a second manifest system or a wipe. Two things the
+      standard also names, found NOT met and NOT S-sized, so left open
+      rather than forced: (1) undersized touch targets - axe-core
+      4.13.0 ships no target-size rule at all (checked its own rule
+      list directly), and a live measurement across the full matrix
+      found dozens of real interactive elements under the kit's own
+      48px floor on nearly every page (sidebar nav rows, icon buttons,
+      role tabs) - enforcing this is a kit-wide redesign, not a
+      pipeline check; new item below. (2) the AI vision-model review
+      STYLE.md describes (a verdict per shot, written into the
+      manifest, failing the build on a miss) - not built; a new,
+      separate pipeline stage, not a screenshot-matrix gap. High
+      Contrast, the third fixed theme STYLE.md names, isn't captured
+      either, but that is blocked on the theme system itself (no High
+      Contrast preset ships yet) - a theming gap, not this item's.
+- [ ] **Enforce the kit's 48px touch-target floor** (M) - docs/UI.md
+      names it ("48 px targets... the kit refuses to go below"), but
+      nothing checks it: axe-core has no target-size rule, and a live
+      measurement (`scripts/screenshot.ts`, 2026-09-13) found dozens of
+      real violations across nearly every page - the sidebar's nav rows
+      (200x40), most icon buttons (28x28, 36x36), settings tabs
+      (154x32), all under 48px on at least one axis. Sweep to the
+      floor (or a documented, deliberate exception per instance, the
+      same shape lane 7 item 3's type-floor sweep uses) is a kit-wide
+      pass across every button/nav/tab size in `@maipai/ui`, not a
+      screenshot-pipeline change - out of scope there. Acceptance: a
+      `page.evaluate()` touch-target check added back into
+      `visitRoute()` (a real measurement, not an axe rule that doesn't
+      exist) passes clean across the full matrix once the sweep lands.
+- [ ] **A vision-model verdict per screenshot** (L) - getmaipai/.github's
+      docs/STYLE.md describes it: "every screenshot carries a declared
+      expectation beside its capture script, and a vision-model check
+      ... answers it and fails the build on a miss. The verdict is
+      written into the screenshot's manifest." `scripts/screenshot.ts`
+      now writes a manifest (capture script, viewport, theme, date,
+      2026-09-13) but declares no per-route expectation and runs no
+      vision check - a session still has to open and judge every image
+      by hand (done every time so far, per CLAUDE.md's own rule, but
+      the automated half described in STYLE.md doesn't exist). Needs a
+      declared expectation string per `RouteSpec`, a vision-capable
+      model call (the hub's own `vision` role per STYLE.md, or the dev
+      machine's), and a verdict field added to `ManifestEntry`.
 - [ ] **Health and Repairs pages, the updates projection, self-update
       with stage, swap, health check and rollback** (L) - plan v0.1
       scope, absent here entirely; "cut a first release" below cannot be
