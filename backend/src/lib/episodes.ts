@@ -1,7 +1,7 @@
 // Episodes: every turn verbatim as one or two searchable records (user and
 // assistant sides), indexed by full-text and vector for hybrid recall
 // ("what recipe did you suggest last week"). Mirrored after memory embeddings.
-import { eq, and, inArray, isNull, desc, gte, lt } from "drizzle-orm";
+import { eq, and, inArray, notInArray, isNull, isNotNull, desc, gte, lt } from "drizzle-orm";
 import { detectCredential } from "@/lib/memoryContentPolicy";
 import { db, sqlite } from "@/db";
 import { episodes, episodeEmbeddings, pendingEpisodeEmbeddings, conversationTurns } from "@/db/schema";
@@ -181,6 +181,9 @@ export interface RecallEpisodesOptions {
   /** The conversation currently in progress: its newest four turns are
    * already in the model's window, so they are never recalled here too. */
   excludeConversationId?: string;
+  /** #88: the explicit history view (the conversations search) keeps a
+   * replaced turn findable; a prompt never sees one. Default false. */
+  includeSuperseded?: boolean;
   /** JOIN-01: exclude every turn of `excludeConversationId`, not only the
    * newest four. The prompt block is headed "From earlier conversations",
    * and buildConversationWindow() keeps up to its token budget of older
@@ -305,6 +308,11 @@ function inWindow(row: { createdAt: string }, window: DateWindow | null): boolea
  * already has it; this never embeds), or undefined when the embed engine
  * is down, in which case lexical recall alone answers. Synchronous, like
  * memory.ts's recall(). */
+/** #88: the turns off the current branch, as a subquery for both halves. */
+function supersededTurnIdsQuery() {
+  return db.select({ id: conversationTurns.supersedes }).from(conversationTurns).where(isNotNull(conversationTurns.supersedes));
+}
+
 export function recallEpisodes(actor: PersonRow, query: string, queryVector: Float32Array | undefined, opts: RecallEpisodesOptions = {}): EpisodeMatch[] {
   const limit = opts.limit ?? 5;
   const now = opts.now ?? new Date();
@@ -327,6 +335,11 @@ export function recallEpisodes(actor: PersonRow, query: string, queryVector: Flo
   // The date window and the excluded turns are part of the SQL, so a
   // word the household has said hundreds of times still finds its dated
   // mention instead of losing it below a candidate cap.
+  // #88: a turn that another turn in its conversation names in
+  // `supersedes` (an edited-and-resent message) is off the current
+  // branch; its episodes stay stored and are never recalled. Read at
+  // query time, so an edit after the episode was recorded takes effect
+  // on the next recall with nothing rewritten.
   const lexical: CandidateRow[] = [];
   const fts = ftsQueryFor(query);
   if (fts) {
@@ -338,6 +351,7 @@ export function recallEpisodes(actor: PersonRow, query: string, queryVector: Flo
          FROM episodes_fts f JOIN episodes e ON e.rowid = f.rowid
          WHERE episodes_fts MATCH ? AND e.person_id = ?
            AND (? IS NULL OR e.created_at >= ?) AND (? IS NULL OR e.created_at < ?)
+           ${opts.includeSuperseded ? "" : "AND e.turn_id NOT IN (SELECT supersedes FROM conversation_turns WHERE supersedes IS NOT NULL)"}
            ${excluded.length ? `AND e.turn_id NOT IN (${placeholders})` : ""}
          ORDER BY bm25(episodes_fts) LIMIT ?`,
       )
@@ -372,7 +386,7 @@ export function recallEpisodes(actor: PersonRow, query: string, queryVector: Flo
       .select(columns)
       .from(episodeEmbeddings)
       .innerJoin(episodes, eq(episodeEmbeddings.episodeId, episodes.id))
-      .where(scope)
+      .where(opts.includeSuperseded ? scope : and(scope, notInArray(episodes.turnId, supersededTurnIdsQuery())))
       .orderBy(desc(episodes.createdAt))
       .limit(VECTOR_SCAN_RECENT_EPISODES)
       .all();

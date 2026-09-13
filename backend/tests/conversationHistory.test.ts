@@ -23,7 +23,7 @@ import { createCommand } from "@/lib/commands";
 import { REMEMBER_CONFIRM_VARIANTS } from "@/lib/replyVariation";
 import { db } from "@/db";
 import { people, conversationTurns, conversations, memoryRecords } from "@/db/schema";
-import { eq } from "drizzle-orm";
+import { eq, inArray } from "drizzle-orm";
 import type { TurnValue } from "@/wire";
 
 const SAFE: TurnValue["safety"] = {
@@ -713,6 +713,39 @@ describe("CHAT-03: the window and summary read historical credentials redacted",
     expect(JSON.stringify(window.messages)).not.toContain(value);
     expect(window.messages.some((m) => m.content.includes("[credential redacted]"))).toBe(true);
     expect(db.select().from(conversationTurns).where(eq(conversationTurns.id, "turn-plain")).get()?.userText).toContain(value); // not rewritten
+  });
+});
+
+describe("#88: retention never summarizes a replaced turn into a durable memory", () => {
+  test("the expiring batch handed to summarizeBeforeDelete() carries the edited turn and not the one it superseded", async () => {
+    const { actor } = await owner();
+    const conv = resolveOrCreateConversation(actor, "chat");
+    if (!conv.ok) throw new Error(conv.error);
+    logTurn(actor, "chat", "the dentist is on the fourteenth", { reply: { text: "Noted." }, source: "model", safety: SAFE, conversation_id: conv.value.id, turn_id: "turn-old-date" });
+    logTurn(actor, "chat", "the dentist is on the fifteenth", { reply: { text: "Noted." }, source: "model", safety: SAFE, conversation_id: conv.value.id, turn_id: "turn-new-date" }, { supersedes: "turn-old-date" });
+    // The replaced turn crosses the retention cutoff first; its replacement is still young (the normal case, a review).
+    const ancient = new Date(Date.now() - 200 * 86_400_000).toISOString();
+    db.update(conversationTurns).set({ createdAt: ancient }).where(eq(conversationTurns.id, "turn-old-date")).run();
+    logTurn(actor, "chat", "and the fifteenth is a Tuesday", { reply: { text: "It is." }, source: "model", safety: SAFE, conversation_id: conv.value.id, turn_id: "turn-old-other" });
+    db.update(conversationTurns).set({ createdAt: ancient }).where(eq(conversationTurns.id, "turn-old-other")).run();
+    const seen: string[] = [];
+    const { startStubLlmServer } = await import("@maipai/spec/llm/ts/stubServer.js");
+    const stub = startStubLlmServer(0, {
+      scriptedChatReply: (request) => {
+        seen.push(JSON.stringify(request.messages));
+        return "They discussed a dentist appointment.";
+      },
+    });
+    process.env.MAIPAI_BACKGROUND_URL = stub.url;
+    try {
+      runRetention();
+      await new Promise((r) => setTimeout(r, 300)); // the summary batch is fire-and-forget
+    } finally {
+      stub.stop();
+      delete process.env.MAIPAI_BACKGROUND_URL;
+    }
+    expect(seen.join("")).toContain("Tuesday"); // the batch was summarized
+    expect(seen.join("")).not.toContain("fourteenth"); // without the replaced turn
   });
 });
 

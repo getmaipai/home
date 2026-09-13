@@ -584,3 +584,31 @@ describe("GET /api/conversations/search", () => {
     expect(body[0]!.paired_text.length).toBeGreaterThan(0);
   });
 });
+
+// #88 (docs/dev/session-a.md): a turn another turn in its conversation
+// names in `supersedes` (edited and resent) is off the current branch;
+// its episodes stay stored and are never recalled.
+describe("#88: an edited turn's episodes are never recalled", () => {
+  test("a recall from another conversation returns the edited statement, not the replaced one, while both rows stay", async () => {
+    const { actor } = await setupOwner();
+    const earlier = newConversation(actor);
+    say(actor, earlier, 7, "the dentist appointment is on the fourteenth", "Noted, the fourteenth.", "t-dentist-old");
+    // The edit: the person resends the corrected statement, superseding the old turn.
+    logTurn(
+      actor,
+      "chat",
+      "the dentist appointment is on the fifteenth",
+      { reply: { text: "Noted, the fifteenth." }, source: "model", safety: { ...SAFE, checked_at: daysAgo(7) }, conversation_id: earlier, turn_id: "t-dentist-new" },
+      { supersedes: "t-dentist-old" },
+    );
+    sqlite.query("UPDATE episodes SET created_at = ? WHERE turn_id = ?").run(daysAgo(7), "t-dentist-new");
+    newConversation(actor);
+    const matches = recallEpisodes(actor, "when is the dentist appointment", undefined, { now: NOW });
+    expect(matches.some((m) => m.episode.turnId === "t-dentist-old")).toBe(false);
+    expect(matches.some((m) => m.episode.turnId === "t-dentist-new")).toBe(true);
+    expect(db.select().from(episodes).where(eq(episodes.turnId, "t-dentist-old")).all().length).toBeGreaterThan(0); // stored, for the history view
+    // The explicit history view keeps what was said: the search still finds the replaced turn.
+    const history = recallEpisodes(actor, "when is the dentist appointment", undefined, { now: NOW, includeSuperseded: true });
+    expect(history.some((m) => m.episode.turnId === "t-dentist-old")).toBe(true);
+  });
+});

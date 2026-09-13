@@ -8,10 +8,10 @@
 // What's built here and what's deferred is documented in
 // docs/dev.md and repeated at the point it matters below; read that
 // before extending this file.
-import { eq, and, lt, isNull, inArray } from "drizzle-orm";
+import { eq, and, ne, lt, isNull, isNotNull, inArray, notInArray } from "drizzle-orm";
 import { detectCredential, CREDENTIAL_SAFE_MESSAGE } from "@/lib/memoryContentPolicy";
 import { db, sqlite } from "@/db";
-import { memoryRecords, memoryEmbeddings, pendingEmbeddings, people } from "@/db/schema";
+import { memoryRecords, memoryEmbeddings, pendingEmbeddings, people, conversationTurns } from "@/db/schema";
 import { newMemoryRecordId } from "@/lib/memoryId";
 import { toMemoryRecord } from "@/lib/memoryShape";
 import { isOwnerOrAdmin, rolesById, canAccessPerson } from "@/lib/access";
@@ -409,6 +409,11 @@ export interface RecallOptions extends ListOptions {
    * recall()'s own top-20 cutoff (step 2: "uses/last_used_at bump only
    * on records that reached the prompt"). */
   bumpUsage?: boolean;
+  /** #88: records whose provenance is this turn are left out; the edited
+   * turn's own run reads recall before the replacing row exists, so the
+   * retracted statement's facts are hidden here and archived by
+   * logTurn() once the edit is a real row. */
+  excludeSource?: string;
   /** The query's own embedding (step 5), pre-computed by the caller:
    * recall() itself stays synchronous (pure scoring given a vector it's
    * handed is CPU work, not I/O), so any caller that can afford the
@@ -548,6 +553,7 @@ export function recall(actor: PersonRow, query: string, opts: RecallOptions = {}
   // that carries a credential is hidden from recall, not deleted (the
   // household forgets it from the Memory page as before).
   rows = rows.filter((r) => !detectCredential(r.text).detected);
+  if (opts.excludeSource) rows = rows.filter((r) => r.source !== opts.excludeSource);
   rows = rows.filter((r) => canRead(actor, r, roleOf, opts.selfOnly));
 
   const queryWords = tokenize(query);
@@ -751,6 +757,53 @@ export function archive(actor: PersonRow, id: string): MemoryOpResult<MemoryReco
   db.update(memoryRecords).set({ status: "archived", expiredAt: now, hlc: nextHlc() }).where(eq(memoryRecords.id, id)).run();
   const updated = db.select().from(memoryRecords).where(eq(memoryRecords.id, id)).get()!;
   return { ok: true, value: toMemoryRecord(updated) };
+}
+
+/** #88: the system retiring what it wrote. When a turn is edited and
+ * resent (conversation_turns.supersedes), every active record whose
+ * provenance is the replaced turn is archived, the same status
+ * archive() and runMaintenance() use and never a delete, so a fact
+ * extracted before the edit stops surfacing while its row stays for the
+ * Memory page. No actor check: the write is the judge's own, and the
+ * edit that retires it belongs to the same person's conversation. */
+export function archiveByProvenance(turnId: string): number {
+  // A pinned record is the household's own deliberate keep, not the
+  // judge's guess; an edit to the turn it came from does not retire it
+  // (a review: a typo fix would otherwise silently unpin a kept fact).
+  const rows = db
+    .select({ id: memoryRecords.id })
+    .from(memoryRecords)
+    .where(and(eq(memoryRecords.source, turnId), eq(memoryRecords.status, "active"), eq(memoryRecords.pinned, false)))
+    .all();
+  if (rows.length === 0) return 0;
+  const now = new Date().toISOString();
+  const ids = rows.map((r) => r.id);
+  db.update(memoryRecords).set({ status: "archived", expiredAt: now, hlc: nextHlc() }).where(inArray(memoryRecords.id, ids)).run();
+  // The judge's SUPERSEDE chain: when the record being retired had itself
+  // replaced an older fact ("likes tea" superseded by "likes tea and
+  // coffee" from the edited turn), the older fact comes back, since the
+  // statement that retired it is the one being withdrawn (a review found
+  // the household otherwise left with no active record for a fact the
+  // edit never retracted).
+  // Restored only when its own provenance is still on the branch: never
+  // a record from the retracted turn itself (an interrupted judge
+  // re-extracts the same turn and supersedes its own earlier fact) and
+  // never one from a turn edited earlier (a review found both coming
+  // back). The expiry and validity stamps supersede() put on it are
+  // cleared with the status, so an active record reads as one.
+  const offBranch = db.select({ id: conversationTurns.supersedes }).from(conversationTurns).where(isNotNull(conversationTurns.supersedes));
+  db.update(memoryRecords)
+    .set({ status: "active", supersededBy: null, expiredAt: null, validTo: null, hlc: nextHlc() })
+    .where(
+      and(
+        inArray(memoryRecords.supersededBy, ids),
+        eq(memoryRecords.status, "superseded"),
+        ne(memoryRecords.source, turnId),
+        notInArray(memoryRecords.source, offBranch),
+      ),
+    )
+    .run();
+  return rows.length;
 }
 
 export interface SupersedeInput {

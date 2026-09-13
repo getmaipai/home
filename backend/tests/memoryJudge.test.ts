@@ -5,8 +5,9 @@ import { __resetThrottleForTests } from "@/lib/secretThrottle";
 import { __resetLlmSupervisorForTests } from "@/lib/llmSupervisor";
 import { __resetBackgroundSupervisorForTests } from "@/lib/backgroundSupervisor";
 import { resolveOrCreateConversation, logTurn } from "@/lib/conversationHistory";
-import { judgeTurn, runJudgeBatch, runConsolidation } from "@/lib/memoryJudge";
-import { remember, similarByVector, PROFILE_SOURCE } from "@/lib/memory";
+import { judgeTurn, runJudgeBatch, runConsolidation, judgeQueueStats } from "@/lib/memoryJudge";
+import { runTurn } from "@/lib/turnEngine";
+import { remember, recall, supersede, archiveByProvenance, similarByVector, PROFILE_SOURCE } from "@/lib/memory";
 import { listPending } from "@/lib/notifications";
 import { acquireTurnLease, __resetTurnActivityForTests } from "@/lib/turnActivity";
 import { embed } from "@/lib/llm";
@@ -989,5 +990,161 @@ describe("CHAT-03: the judge and credentials", () => {
     expect(db.select().from(memoryRecords).all().some((r) => r.text.includes(value))).toBe(false);
     await new Promise((r) => setTimeout(r, 0));
     expect(listPending(actor).some((n) => JSON.stringify(n).includes(value))).toBe(false);
+  });
+});
+
+// #88 (docs/dev/session-a.md): the judge reads the current branch only.
+describe("#88: the judge and an edited turn", () => {
+  test("an unjudged turn that is edited and resent is never sent to the judge; the edited turn is, and the replaced statement becomes no memory", async () => {
+    const { actor } = await owner();
+    const original = makeTurn(actor, "I hate cilantro", "Noted.");
+    const conv = resolveOrCreateConversation(actor, "chat");
+    if (!conv.ok) throw new Error("setup failed");
+    // The edit: same conversation, supersedes the original.
+    logTurn(actor, "chat", "I love cilantro, actually", { reply: { text: "Good to know." }, source: "model", safety: SAFE, conversation_id: conv.value.id, turn_id: "turn-edited" }, { supersedes: original.id });
+    expect(judgeQueueStats().pending).toBe(1); // the replaced turn is not pending
+    const seen: string[] = [];
+    await withScriptedJudge(
+      (schemaName, request) => {
+        if (schemaName === "memory_extraction") seen.push(request.messages[request.messages.length - 1]!.content);
+        return schemaName === "memory_extraction" ? { facts: [{ text: "Marlow loves cilantro", category: "preference", scope: "person", importance: 0.7 }] } : undefined;
+      },
+      () => runJudgeBatch(),
+    );
+    expect(seen.join("\n")).not.toContain("I hate cilantro");
+    expect(seen.join("\n")).toContain("I love cilantro, actually");
+    const texts = db.select().from(memoryRecords).all().map((r) => r.text);
+    expect(texts.some((t) => t.includes("hate"))).toBe(false);
+    expect(texts).toContain("Marlow loves cilantro");
+    expect(db.select().from(conversationTurns).where(eq(conversationTurns.id, original.id)).get()?.judgeStatus).toBeNull(); // never drained, still a real row
+  });
+
+  test("a turn superseded between selection and judging is marked done with nothing written", async () => {
+    const { actor } = await owner();
+    const turn = makeTurn(actor, "I hate cilantro", "Noted.");
+    const conv = resolveOrCreateConversation(actor, "chat");
+    if (!conv.ok) throw new Error("setup failed");
+    logTurn(actor, "chat", "I love cilantro", { reply: { text: "Ok." }, source: "model", safety: SAFE, conversation_id: conv.value.id, turn_id: "turn-edited-2" }, { supersedes: turn.id });
+    let asked = 0;
+    const result = await withScriptedJudge(
+      () => {
+        asked++;
+        return { facts: [{ text: "Marlow dislikes cilantro", category: "preference", scope: "person", importance: 0.7 }] };
+      },
+      () => judgeTurn(turn), // handed the already-selected row directly, as the drain would after the edit landed
+    );
+    expect(result.factsWritten).toBe(0);
+    expect(asked).toBe(0);
+    expect(db.select().from(conversationTurns).where(eq(conversationTurns.id, turn.id)).get()?.judgeStatus).toBe("done");
+  });
+
+  test("the edited turn's own run: the replaced exchange leaves the window and its memory leaves recall before the model is asked", async () => {
+    const { actor } = await owner();
+    const turn = makeTurn(actor, "I hate cilantro", "Noted, no cilantro.");
+    await withScriptedJudge(
+      (schemaName) => (schemaName === "memory_extraction" ? { facts: [{ text: "Marlow dislikes cilantro", category: "preference", scope: "person", importance: 0.7 }] } : undefined),
+      () => judgeTurn(turn),
+    );
+    const { startStubLlmServer } = await import("@maipai/spec/llm/ts/stubServer.js");
+    let promptSeen = "";
+    const stub = startStubLlmServer(0, {
+      scriptedChatReply: (request) => {
+        promptSeen = JSON.stringify(request.messages);
+        return "Good to know.";
+      },
+    });
+    process.env.MAIPAI_LLAMA_SERVER_URL = stub.url;
+    try {
+      const result = await runTurn(actor, "chat", "I love cilantro, actually", { conversationId: turn.conversationId ?? undefined, supersedes: turn.id });
+      expect(result.ok).toBe(true);
+    } finally {
+      stub.stop();
+      delete process.env.MAIPAI_LLAMA_SERVER_URL;
+    }
+    expect(promptSeen).not.toContain("I hate cilantro"); // the replaced user line is not in the window
+    expect(promptSeen).not.toContain("dislikes cilantro"); // the memory it produced is archived before recall
+    expect(db.select().from(memoryRecords).where(eq(memoryRecords.source, turn.id)).get()?.status).toBe("archived");
+  });
+
+  test("a pinned memory survives an edit of the turn it came from; the judge's supersede chain is unwound when the replacing record is retired", async () => {
+    const { actor } = await owner();
+    const turn = makeTurn(actor, "I like tea", "Noted.");
+    await withScriptedJudge(
+      (schemaName) => (schemaName === "memory_extraction" ? { facts: [{ text: "Marlow likes tea", category: "preference", scope: "person", importance: 0.7 }] } : undefined),
+      () => judgeTurn(turn),
+    );
+    const tea = db.select().from(memoryRecords).where(eq(memoryRecords.source, turn.id)).get()!;
+    // A later turn's judge decision SUPERSEDEs it with a merged fact.
+    const later = makeTurn(actor, "I like coffee too", "Noted.");
+    const merged = supersede(actor, tea.id, { text: "Marlow likes tea and coffee", category: "preference", tier: "durable", source: later.id, importance: 0.7 });
+    expect(merged.ok).toBe(true);
+    if (!merged.ok) return;
+    expect(db.select().from(memoryRecords).where(eq(memoryRecords.id, tea.id)).get()?.status).toBe("superseded");
+    // The person pins the merged fact, then edits the later turn.
+    db.update(memoryRecords).set({ pinned: true }).where(eq(memoryRecords.id, merged.value.created.id)).run();
+    expect(archiveByProvenance(later.id)).toBe(0); // pinned: kept
+    expect(db.select().from(memoryRecords).where(eq(memoryRecords.id, merged.value.created.id)).get()?.status).toBe("active");
+    // Unpinned, the same edit retires the merged fact and brings the older one back.
+    db.update(memoryRecords).set({ pinned: false }).where(eq(memoryRecords.id, merged.value.created.id)).run();
+    expect(archiveByProvenance(later.id)).toBe(1);
+    expect(db.select().from(memoryRecords).where(eq(memoryRecords.id, merged.value.created.id)).get()?.status).toBe("archived");
+    const restored = db.select().from(memoryRecords).where(eq(memoryRecords.id, tea.id)).get()!;
+    expect(restored.status).toBe("active");
+    expect(restored.supersededBy).toBeNull();
+  });
+
+  test("the chain restore never resurrects a record from the retracted turn itself or from a turn edited earlier", async () => {
+    const { actor } = await owner();
+    const turn = makeTurn(actor, "I like tea", "Noted.");
+    const first = remember(actor, { text: "Marlow likes tea", category: "preference", tier: "durable", scope: "person", person: actor.id, source: turn.id, importance: 0.7 });
+    if (!first.ok) throw new Error(first.error);
+    // The interrupted-judge case: the same turn re-extracted supersedes its own earlier fact.
+    const second = supersede(actor, first.value.id, { text: "Marlow likes tea a lot", category: "preference", tier: "durable", source: turn.id, importance: 0.7 });
+    if (!second.ok) throw new Error(second.error);
+    expect(archiveByProvenance(turn.id)).toBe(1);
+    expect(db.select().from(memoryRecords).where(eq(memoryRecords.id, first.value.id)).get()?.status).toBe("superseded"); // not brought back: its source is the retracted turn
+    expect(db.select().from(memoryRecords).where(eq(memoryRecords.id, second.value.created.id)).get()?.status).toBe("archived");
+  });
+
+  test("the edited turn's own run hides the replaced turn's memory without writing anything until the edit is a real row", async () => {
+    const { actor } = await owner();
+    const turn = makeTurn(actor, "I hate cilantro", "Noted.");
+    await withScriptedJudge(
+      (schemaName) => (schemaName === "memory_extraction" ? { facts: [{ text: "Marlow dislikes cilantro", category: "preference", scope: "person", importance: 0.7 }] } : undefined),
+      () => judgeTurn(turn),
+    );
+    const before = db.select().from(memoryRecords).where(eq(memoryRecords.source, turn.id)).get()!;
+    expect(before.status).toBe("active");
+    // A model failure on the edited run: no row is written, and the memory must still be active afterwards.
+    const { startStubLlmServer } = await import("@maipai/spec/llm/ts/stubServer.js");
+    const stub = startStubLlmServer(0);
+    stub.stop();
+    process.env.MAIPAI_LLAMA_SERVER_URL = stub.url;
+    try {
+      const result = await runTurn(actor, "chat", "I love cilantro, actually", { conversationId: turn.conversationId ?? undefined, supersedes: turn.id });
+      expect(result.ok).toBe(false);
+    } finally {
+      delete process.env.MAIPAI_LLAMA_SERVER_URL;
+    }
+    expect(db.select().from(memoryRecords).where(eq(memoryRecords.source, turn.id)).get()?.status).toBe("active"); // the edit never landed, nothing retired
+    expect(db.select().from(conversationTurns).where(eq(conversationTurns.supersedes, turn.id)).get()).toBeUndefined();
+  });
+
+  test("a memory extracted from a turn that is edited afterwards is archived, absent from recall, and still in the table", async () => {
+    const { actor } = await owner();
+    const turn = makeTurn(actor, "I hate cilantro", "Noted.");
+    await withScriptedJudge(
+      (schemaName) => (schemaName === "memory_extraction" ? { facts: [{ text: "Marlow dislikes cilantro", category: "preference", scope: "person", importance: 0.7 }] } : undefined),
+      () => judgeTurn(turn),
+    );
+    const before = db.select().from(memoryRecords).where(eq(memoryRecords.source, turn.id)).all();
+    expect(before.length).toBe(1);
+    expect(before[0]!.status).toBe("active");
+    const conv = resolveOrCreateConversation(actor, "chat");
+    if (!conv.ok) throw new Error("setup failed");
+    logTurn(actor, "chat", "I love cilantro, actually", { reply: { text: "Ok." }, source: "model", safety: SAFE, conversation_id: conv.value.id, turn_id: "turn-edited-3" }, { supersedes: turn.id });
+    const after = db.select().from(memoryRecords).where(eq(memoryRecords.source, turn.id)).get()!;
+    expect(after.status).toBe("archived"); // retired, never deleted
+    expect(recall(actor, "cilantro", { selfOnly: true, bumpUsage: false }).some((m) => m.record.text.includes("dislikes"))).toBe(false);
   });
 });

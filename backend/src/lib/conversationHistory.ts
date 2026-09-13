@@ -31,8 +31,9 @@
 // best-effort upgrade on top of it, not a precondition. See
 // summarizeBeforeDelete()'s own comment for exactly what that means
 // when no real model is running yet.
-import { eq, and, or, not, lt, gt, isNull, inArray, desc } from "drizzle-orm";
+import { eq, and, or, not, lt, gt, isNull, isNotNull, inArray, desc } from "drizzle-orm";
 import { redactCredentials, CREDENTIAL_REDACTION } from "@/lib/memoryContentPolicy";
+import { archiveByProvenance } from "@/lib/memory";
 import { db, sqlite } from "@/db";
 import { conversationTurns, conversations, people, memoryRecords, commands } from "@/db/schema";
 import { newConversationTurnId, newConversationId } from "@/lib/id";
@@ -99,7 +100,7 @@ const insertTurnAndBumpConversation = sqlite.transaction((row: ConversationTurnR
  * hint on an otherwise-real, otherwise-successful turn should never cost
  * the household their reply, the same posture logTurnSafely()'s own
  * try/catch already takes for this whole function. */
-function resolveSupersedes(supersedes: string | null | undefined, conversationId: string): string | null {
+export function resolveSupersedes(supersedes: string | null | undefined, conversationId: string): string | null {
   if (!supersedes) return null;
   const superseded = db.select({ conversationId: conversationTurns.conversationId }).from(conversationTurns).where(eq(conversationTurns.id, supersedes)).get();
   return superseded && superseded.conversationId === conversationId ? supersedes : null;
@@ -167,6 +168,10 @@ export function logTurn(
   };
   insertTurnAndBumpConversation(row, value.conversation_id);
   recordEpisodes(row);
+  // #88: the replaced turn leaves the current branch; the memories the
+  // judge extracted from it are retired (archived, never deleted) so the
+  // corrected statement's own facts are what the judge extracts next.
+  if (supersedes) archiveByProvenance(supersedes);
   return row;
 }
 
@@ -634,8 +639,11 @@ function estimateTokens(text: string): number {
  * back in front of it right alongside the real one. `rows` is already
  * bounded (WINDOW_ROW_FETCH_LIMIT), so this is a plain in-memory filter,
  * not a second query. */
-function excludeSupersededRows(rows: readonly ConversationTurnRow[]): ConversationTurnRow[] {
+function excludeSupersededRows(rows: readonly ConversationTurnRow[], alsoSuperseded?: string | null): ConversationTurnRow[] {
   const supersededIds = new Set(rows.map((r) => r.supersedes).filter((id): id is string => id !== null));
+  // #88: on the edited turn's own run the replacing row does not exist
+  // yet, so the caller names the turn it is about to supersede.
+  if (alsoSuperseded) supersededIds.add(alsoSuperseded);
   return rows.filter((r) => !supersededIds.has(r.id));
 }
 
@@ -731,7 +739,7 @@ function nonModelWindowNote(t: ConversationTurnRow): string {
  * more would exceed it. Whatever's older than what fit is represented by
  * the conversation's own rolling `summary` as one line instead, when one
  * exists. */
-export function buildConversationWindow(conversation: Conversation): ConversationWindow {
+export function buildConversationWindow(conversation: Conversation, opts: { supersedes?: string | null } = {}): ConversationWindow {
   // Bounded, not the full history (a code review, 2026-09-05, found this
   // fetching and re-sorting every turn ever logged, on every model-
   // routed turn): WINDOW_ROW_FETCH_LIMIT is far more than the token
@@ -747,7 +755,7 @@ export function buildConversationWindow(conversation: Conversation): Conversatio
     .limit(WINDOW_ROW_FETCH_LIMIT)
     .all();
   rows.sort((a, b) => a.createdAt.localeCompare(b.createdAt));
-  const liveRows = excludeSupersededRows(rows);
+  const liveRows = excludeSupersededRows(rows, opts.supersedes);
   if (liveRows.length === 0) return { messages: [] };
 
   const newest = liveRows.slice(-WINDOW_NEWEST_TURNS_KEPT);
@@ -1074,7 +1082,20 @@ export function runRetention(): { deleted: number } {
       ),
     )
     .all();
-  void summarizeBeforeDelete(expiring).catch((err: Error) =>
+  // #88: a replaced turn is off the current branch; it is deleted with
+  // the rest but never summarized into a durable memory. The replacing
+  // row is newer and crosses the cutoff on a later day, so the pointers
+  // are read from the whole table, not the expiring batch (a review).
+  const supersededEverywhere = new Set(
+    db
+      .select({ id: conversationTurns.supersedes })
+      .from(conversationTurns)
+      .where(isNotNull(conversationTurns.supersedes))
+      .all()
+      .map((r) => r.id)
+      .filter((id): id is string => id !== null),
+  );
+  void summarizeBeforeDelete(expiring.filter((t) => !supersededEverywhere.has(t.id))).catch((err: Error) =>
     console.log(`[conversationHistory] retention summarization batch failed: ${err.message}`),
   );
 

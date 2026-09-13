@@ -36,6 +36,7 @@ import {
   getPendingAsk,
   setPendingAsk,
   routingStats,
+  resolveSupersedes,
   type PendingAsk,
 } from "@/lib/conversationHistory";
 import { pickRefusalVariant, varyKnownConstant } from "@/lib/replyVariation";
@@ -1352,6 +1353,15 @@ async function prepareTurn(
   // CHAT-18: the caller's lease, engaged here at the point the turn is
   // about to reach an engine; never released here (the caller owns it).
   lease: TurnLease,
+  // #88: the turn this one supersedes (an edited-and-resent message,
+  // #60), validated by the caller: on this run the replaced exchange
+  // leaves the window, its pending ask is dropped, and the memories
+  // extracted from it are hidden from recall, so the model never
+  // continues from what the person just retracted. Nothing is written
+  // here: logTurn() archives those memories once the edit is a real row
+  // (a review: archiving first left a failed edit with the old turn
+  // live and its memories gone).
+  supersedes: string | null = null,
   skills: LoadedSkill[] = loadAllSkills(),
 ): Promise<PreparedTurn> {
   const turnId = newConversationTurnId();
@@ -1407,6 +1417,10 @@ async function prepareTurn(
   // Session C step 2: matched against the utterance before the floor
   // (commands, Tier 0/1/2) - a pendingAsk from an earlier turn always
   // gets first refusal on what this utterance means.
+  // #88: an edit is a new statement, never the answer to a question the
+  // replaced reply asked; the replaced exchange's pending ask is dropped
+  // rather than bound to the edited text.
+  if (supersedes) setPendingAsk(conversation.id, null);
   const pendingAskValue = await resolvePendingAsk(text, actor, conversation, loaded, turnId, safety, crisisResources);
   if (pendingAskValue) return { kind: "immediate", value: pendingAskValue, turnId };
 
@@ -1543,7 +1557,7 @@ async function prepareTurn(
   // scoring runs whenever the embed backend is up; embedQueryForRecall()
   // degrades to undefined on any failure, which recall() already treats
   // as "fall back to keyword overlap" - no separate handling needed here.
-  const memoryMatches = recall(actor, text, { selfOnly: true, bumpUsage: false, queryVector: utteranceVector });
+  const memoryMatches = recall(actor, text, { selfOnly: true, bumpUsage: false, queryVector: utteranceVector, excludeSource: supersedes ?? undefined });
   // JOIN-01: what was actually said in earlier conversations (MEM-03's
   // verbatim episodes, MEM-04's hybrid recall), beside the extracted
   // facts. This conversation is excluded whole: its turns are the
@@ -1557,7 +1571,7 @@ async function prepareTurn(
   // text - buildConversationWindow() returns both the verbatim
   // user/assistant messages AND, when older turns exist beyond them, one
   // summary line for the system prompt's volatile zone.
-  const window = buildConversationWindow(conversation);
+  const window = buildConversationWindow(conversation, { supersedes });
   const household = listActivePeople();
   const promptParts = buildPromptParts(actor, text, memoryMatches, loaded, persona, skills, window.summaryLine, household, episodeMatches, frozen);
   // Bumping the top MAX_MEMORY_SNIPPETS candidates unconditionally was
@@ -2061,7 +2075,7 @@ async function runTurnHoldingLease(
   opts: { thinking?: boolean; conversationId?: string; supersedes?: string },
 ): Promise<TurnOpResult> {
   const loaded = loadAllManifests(); // one catalog scan, shared below
-  const prepared = await prepareTurn(actor, surface, text, loaded, conversation, lease);
+  const prepared = await prepareTurn(actor, surface, text, loaded, conversation, lease, resolveSupersedes(opts.supersedes, conversation.id));
 
   let value: TurnValue;
   const guardHits: GuardReason[] = [];
@@ -2652,7 +2666,7 @@ async function runTurnStreamHoldingLease(
   startedAt: number,
   opts: { thinking?: boolean; conversationId?: string; signal?: AbortSignal; supersedes?: string; ephemeral?: boolean },
 ): Promise<TurnStreamResult> {
-  const prepared = await prepareTurn(actor, surface, text, loadAllManifests(), conversation, lease);
+  const prepared = await prepareTurn(actor, surface, text, loadAllManifests(), conversation, lease, resolveSupersedes(opts.supersedes, conversation.id));
 
   if (prepared.kind === "immediate") {
     const value = finalizeReply(actor, prepared.value);

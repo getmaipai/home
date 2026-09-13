@@ -12676,6 +12676,10 @@ other's section once (147cd28, f4779a6).
 - #86 and #87, the package fallback outlets through the output boundary
   and the judge scorer: [docs/dev/session-a.md](dev/session-a.md)
   (2026-09-13).
+- #88, one rule for the current branch (episode recall, the judge and
+  extracted memories after an edit), and ROUTE-02's status corrected
+  with ROUTE-03 opened: [docs/dev/session-a.md](dev/session-a.md)
+  (2026-09-13).
 - Lane 5 item 3, Home's weather card writing a fake turn into real chat
   history (an additive `ephemeral` flag on `POST /api/turn/stream`):
   [docs/dev/session-b.md](dev/session-b.md) (2026-09-13).

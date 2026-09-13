@@ -1285,3 +1285,82 @@ recall from another conversation after an edit returning the edited
 episode and not the replaced one; a memory extracted from a turn and
 that turn then superseded, the memory archived and absent from recall
 while the row still exists.
+
+## #88: shipped (2026-09-13)
+
+As designed. `episodes.ts`: both candidate queries exclude any episode
+whose turn is named by a `supersedes` value (a subquery, at query
+time). `memoryJudge.ts`: one `pendingTurnWhere()` for the drain and the
+queue count excludes those turns, and `judgeTurn()` checks again
+before extracting, marking a turn superseded meanwhile as done with
+nothing written. `memory.ts`: `archiveByProvenance(turnId)` archives
+the active records whose source is the replaced turn (the existing
+`archived` status, `expired_at` stamped, never a delete), called by
+`logTurn()` when a turn supersedes another. Tests: `episodes.test.ts`
+(a recall from a later conversation returns the edited statement, not
+the replaced one, and the replaced episode row stays), `memoryJudge.test.ts`
+(an unjudged edited turn is never sent to the judge and is not counted
+pending while the edit is judged; a turn superseded between selection
+and judging is marked done with the judge never asked; a memory
+extracted before the edit is archived, absent from recall, and still
+in the table).
+
+The review traced every reader and found the rule open on four paths,
+all closed: on the edited turn's own run the replacing row does not
+exist yet, so `prepareTurn()` now takes the validated `supersedes`,
+drops that turn from the window (`buildConversationWindow()`'s new
+option) and archives its memories before recall, so the model never
+continues from what the person just retracted (a test reads the
+prompt back); the retention summary skipped nothing, so a replaced
+turn could become a durable episode memory at expiry, and now
+`runRetention()` hands `summarizeBeforeDelete()` the current branch
+only (a test reads the transcript sent); the judge's re-check ran
+before extraction, and an edit landing during the model's seconds of
+work would have written the replaced statement's facts under a turn
+already off the branch, so the check runs again after extraction and
+before any write; and `archiveByProvenance()` retired pinned records
+and left the judge's SUPERSEDE chain broken (the older fact stayed
+`superseded` after its replacement was archived), so a pinned record
+is kept and the older fact is restored to active when the record that
+superseded it is retired (a test walks the chain). One design call
+made explicit: the conversations search is the history view and keeps
+a replaced turn findable (`includeSuperseded`); a prompt never sees
+one. Recorded, not changed: a turn edited after it was already
+summarized keeps its substance in the rolling summary until the next
+refresh rewrites it (rare, and the summary is a lossy aid by the
+record's own rule); and `conversation_turns.supersedes` has no index,
+so the subqueries scan a table bounded by the 90-day retention, low
+milliseconds today, a partial index if it ever shows.
+
+The delta review then found the fixes themselves wrong in three
+places and thin in three, all closed. Archiving before the edit
+existed meant a 503 or a disconnect on the edited run left the old
+turn live and its memories gone with nothing to restore them; the
+write now stays in `logTurn()` alone and the edited run hides those
+records on the read side (`recall()`'s `excludeSource`), which a test
+proves with an engine that fails on the edited run. The chain restore
+could resurrect a record from the retracted turn itself (an
+interrupted judge re-extracts the same turn and supersedes its own
+earlier fact) or from a turn edited earlier; it restores only a record
+whose source is neither the retracted turn nor any turn off the
+branch, and clears the expiry and validity stamps `supersede()` set,
+so an active record reads as one (a test with the same-turn chain).
+The retention exclusion read the `supersedes` pointers of the expiring
+batch alone, and the replacing row is always newer and crosses the
+cutoff on a later day, so the replaced turn was summarized in the
+normal case; the pointers are read from the whole table (the test now
+ages the replaced turn alone). The judge's post-extraction re-check
+ran once, and each fact's embed plus dedupe takes seconds, so it runs
+per fact beside the activity check. And a replaced reply's pending ask
+would have bound the edited message as its answer and run a package;
+an edit clears it.
+
+## ROUTE-02's status, corrected; ROUTE-03 (2026-09-13)
+
+An outside review read ROUTE-02's tick as overstating: the routed
+bench acceptance was met, the switching-latency acceptance was not,
+and the tick said "closed". The status line now says "implementation
+complete; switching-latency acceptance outstanding (accepted
+exception, coordinator ruling 2026-09-13)" with both halves named, and
+ROUTE-03 is the open item for the quiet-box re-measure and the
+mechanism hunt, so the dashboard reads true.

@@ -55,7 +55,7 @@
 // round failure never does (it just defaults to ADD, matching legacy's
 // own catch block) - dedupe deciding "keep both" safely is never wrong
 // enough to burn a turn's whole budget over.
-import { eq, and, isNull, isNotNull, ne, asc } from "drizzle-orm";
+import { eq, and, isNull, isNotNull, notInArray, ne, asc } from "drizzle-orm";
 import { detectCredential } from "@/lib/memoryContentPolicy";
 import { db } from "@/db";
 import { conversationTurns, people, memoryRecords } from "@/db/schema";
@@ -403,6 +403,12 @@ export async function judgeTurn(turn: ConversationTurnRow): Promise<JudgeTurnRes
   // straight into buildExtractionPrompt()'s system prompt below - the
   // same class of injection turnEngine.ts's speakerLine()/householdLine()
   // were fixed for.
+  // #88: superseded between selection and judging (an edit landed while
+  // the batch ran): off the current branch, marked done, nothing written.
+  if (isSupersededTurn(turn.id)) {
+    db.update(conversationTurns).set({ judgeStatus: "done", hlc: nextHlc() }).where(eq(conversationTurns.id, turn.id)).run();
+    return { ok: true, factsWritten: 0 };
+  }
   // CHAT-03: a turn row that carries a credential (written before the
   // policy existed; a new one is logged redacted) is never sent to the
   // model. Marked done with nothing written, so it is not retried.
@@ -414,6 +420,14 @@ export async function judgeTurn(turn: ConversationTurnRow): Promise<JudgeTurnRes
   if (facts === null) {
     markAttempt(turn.id, turn.judgeAttempts + 1);
     return { ok: false, factsWritten: 0 };
+  }
+  // #88, the race: the edit may have landed while the model extracted
+  // (seconds), after archiveByProvenance() found nothing to retire; a
+  // second look before any write, so the replaced statement's facts are
+  // never written under a turn that is already off the branch.
+  if (isSupersededTurn(turn.id)) {
+    db.update(conversationTurns).set({ judgeStatus: "done", hlc: nextHlc() }).where(eq(conversationTurns.id, turn.id)).run();
+    return { ok: true, factsWritten: 0 };
   }
 
   let written = 0;
@@ -433,6 +447,12 @@ export async function judgeTurn(turn: ConversationTurnRow): Promise<JudgeTurnRes
     // candidate `decideDedupe()` will find and SUPERSEDE onto rather
     // than duplicate.
     if (turnActiveWithin(JUDGE_IDLE_WINDOW_MS)) {
+      return { ok: true, factsWritten: written };
+    }
+    // #88: per fact, not once: an edit can land between one fact's
+    // write and the next (each embed plus dedupe takes seconds).
+    if (isSupersededTurn(turn.id)) {
+      db.update(conversationTurns).set({ judgeStatus: "done", hlc: nextHlc() }).where(eq(conversationTurns.id, turn.id)).run();
       return { ok: true, factsWritten: written };
     }
     // CHAT-03: an extracted candidate carrying a credential is dropped
@@ -576,19 +596,22 @@ export interface JudgeQueueStats {
   oldestCreatedAt: string | null;
 }
 
+// #88: a turn another turn in its conversation names in `supersedes`
+// (edited and resent) is off the current branch: never drained, never
+// counted as pending.
+function supersededTurnIdsQuery() {
+  return db.select({ id: conversationTurns.supersedes }).from(conversationTurns).where(isNotNull(conversationTurns.supersedes));
+}
+function isSupersededTurn(turnId: string): boolean {
+  return db.select({ id: conversationTurns.id }).from(conversationTurns).where(eq(conversationTurns.supersedes, turnId)).get() !== undefined;
+}
+function pendingTurnWhere() {
+  return and(eq(conversationTurns.source, "model"), isNull(conversationTurns.judgeStatus), notInArray(conversationTurns.id, supersededTurnIdsQuery()));
+}
+
 export function judgeQueueStats(): JudgeQueueStats {
-  const [oldest] = db
-    .select({ createdAt: conversationTurns.createdAt })
-    .from(conversationTurns)
-    .where(and(eq(conversationTurns.source, "model"), isNull(conversationTurns.judgeStatus)))
-    .orderBy(asc(conversationTurns.createdAt))
-    .limit(1)
-    .all();
-  const all = db
-    .select({ id: conversationTurns.id })
-    .from(conversationTurns)
-    .where(and(eq(conversationTurns.source, "model"), isNull(conversationTurns.judgeStatus)))
-    .all();
+  const [oldest] = db.select({ createdAt: conversationTurns.createdAt }).from(conversationTurns).where(pendingTurnWhere()).orderBy(asc(conversationTurns.createdAt)).limit(1).all();
+  const all = db.select({ id: conversationTurns.id }).from(conversationTurns).where(pendingTurnWhere()).all();
   return { pending: all.length, oldestCreatedAt: oldest?.createdAt ?? null };
 }
 
@@ -608,13 +631,7 @@ export async function runJudgeBatch(): Promise<JudgeBatchResult> {
     if (Date.now() - startMs >= MAX_JUDGE_BATCH_MS) break;
     if (turnActiveWithin(JUDGE_IDLE_WINDOW_MS)) break;
 
-    const pending = db
-      .select()
-      .from(conversationTurns)
-      .where(and(eq(conversationTurns.source, "model"), isNull(conversationTurns.judgeStatus)))
-      .orderBy(asc(conversationTurns.createdAt))
-      .limit(1)
-      .all();
+    const pending = db.select().from(conversationTurns).where(pendingTurnWhere()).orderBy(asc(conversationTurns.createdAt)).limit(1).all();
 
     if (pending.length === 0) break;
 
