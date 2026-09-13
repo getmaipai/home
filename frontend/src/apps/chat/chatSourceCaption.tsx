@@ -62,5 +62,6 @@ export function ChatSourceCaption() {
         : undefined;
   if (!label) return null;
 
-  return <div className="mt-1 text-xs text-muted-foreground">via {label}</div>;
+  // text-base, not text-xs: the type floor (docs/UI.md), lane 7 item 3.
+  return <div className="mt-1 text-base text-muted-foreground">via {label}</div>;
 }

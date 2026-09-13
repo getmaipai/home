@@ -24,6 +24,9 @@ const fileVariants = cva(
         muted: "bg-muted/50 hover:bg-muted/70",
       },
       size: {
+        // Deliberate type-floor exception (docs/UI.md, lane 7 item 3,
+        // 2026-09-13): "sm" is the deliberately compact size option,
+        // same reasoning as the kit's own Button "xs"/"sm" variants.
         sm: "px-2.5 py-1.5 text-xs",
         default: "px-3 py-2 text-sm",
         lg: "px-4 py-3 text-base",
@@ -221,6 +224,9 @@ const FileImpl: FileMessagePartComponent = ({
       <FileIconDisplay mimeType={mimeType} />
       <div className="flex min-w-0 flex-1 flex-col gap-0.5">
         <FileName>{filename}</FileName>
+        {/* Deliberate type-floor exception (docs/UI.md, lane 7 item 3,
+            2026-09-13): a byte-size measurement (e.g. "2.3 MB"), the
+            same category as a monospace token. */}
         {showSize && (
           <FileSize bytes={getBase64Size(data)} className="text-xs" />
         )}

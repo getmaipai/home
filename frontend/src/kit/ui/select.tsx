@@ -96,7 +96,8 @@ function SelectLabel({
   return (
     <SelectPrimitive.Label
       data-slot="select-label"
-      className={cn("px-1.5 py-1 text-xs text-muted-foreground", className)}
+      // text-base, not text-xs: the type floor (docs/UI.md), lane 7 item 3.
+      className={cn("px-1.5 py-1 text-base text-muted-foreground", className)}
       {...props}
     />
   )

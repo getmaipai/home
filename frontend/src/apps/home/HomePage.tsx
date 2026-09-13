@@ -162,7 +162,7 @@ function WhoIsHere({ selfId }: { selfId: string }) {
   const people = query.data ?? [];
   if (people.length === 0) return null;
   return (
-    // `shrink-0 min-h-16`: `overflow-x-auto` computes `overflow-y` to
+    // `shrink-0 min-h-[72px]`: `overflow-x-auto` computes `overflow-y` to
     // `auto` too (MediaShelf.tsx's own comment on the identical quirk,
     // 2026-09-05), which makes this row's own automatic minimum size (a
     // flex item's `min-height: auto` resolves to 0, not its content
@@ -170,25 +170,30 @@ function WhoIsHere({ selfId }: { selfId: string }) {
     // inside this page's own `flex-col` layout - a real bug found live,
     // 2026-09-13: every name under an avatar rendered fully clipped, cut
     // off at the very top of each letter, in the published home
-    // screenshot. `min-h-16` (64px: the 40px avatar plus the 20px label
-    // plus the 4px gap between them) gives the row a real height that
-    // doesn't depend on the browser's own automatic sizing at all. This
-    // is the same quirk MediaShelf.tsx's own scroll rail already
-    // documents (worked around there with padding, for a different
-    // symptom - focus-ring clipping, not a height collapse, since that
-    // rail isn't usually a `flex-col` item the way this row is) -  a
-    // code review, 2026-09-13, flagged that the two fixes are two
-    // different techniques for the identical root cause with nothing
-    // centralizing it; noted rather than unified here (scripts/
-    // screenshot.ts's own `clippedStrips` check, added in the same
-    // commit as this fix, is the runtime backstop for a THIRD instance
-    // turning up before anyone gets to that).
+    // screenshot. `min-h-[72px]` (the 40px avatar, the label's own
+    // ~24px line height at `text-base`'s default leading, and the 4px
+    // gap between them, with a little rounding room) gives the row a
+    // real height that doesn't depend on the browser's own automatic
+    // sizing at all - recomputed lane 7 item 3 (2026-09-13) when the
+    // label below moved off `text-xs` to the type floor, from the
+    // original `min-h-16` (64px) tuned for that smaller label's own
+    // ~20px line height. This is the same quirk MediaShelf.tsx's own
+    // scroll rail already documents (worked around there with padding,
+    // for a different symptom - focus-ring clipping, not a height
+    // collapse, since that rail isn't usually a `flex-col` item the way
+    // this row is) -  a code review, 2026-09-13, flagged that the two
+    // fixes are two different techniques for the identical root cause
+    // with nothing centralizing it; noted rather than unified here
+    // (scripts/screenshot.ts's own `clippedStrips` check, added in the
+    // same commit as this fix, is the runtime backstop for a THIRD
+    // instance turning up before anyone gets to that).
     // eslint-disable-next-line jsx-a11y/no-noninteractive-tabindex -- a keyboard-scrollable region, not a widget (DetailPane.tsx's own precedent).
-    <div tabIndex={0} className={cn("flex min-h-16 shrink-0 items-center gap-2 overflow-x-auto", FOCUS_RING)}>
+    <div tabIndex={0} className={cn("flex min-h-[72px] shrink-0 items-center gap-2 overflow-x-auto", FOCUS_RING)}>
       {people.map((p) => (
         <div key={p.id} className="flex shrink-0 flex-col items-center gap-1">
           <Avatar name={p.display_name} className="h-10 w-10 text-sm" />
-          <span className="text-xs text-muted-foreground">{p.id === selfId ? "You" : p.display_name}</span>
+          {/* text-base, not text-xs: the type floor (docs/UI.md), lane 7 item 3. */}
+          <span className="text-base text-muted-foreground">{p.id === selfId ? "You" : p.display_name}</span>
         </div>
       ))}
     </div>
@@ -203,7 +208,8 @@ function Tagline() {
   const query = useHouseholdSettings();
   const familyName = textSetting(query.data, "household.family_name");
   const text = familyName ? `${familyName} Family` : DEFAULT_TAGLINE;
-  return <p className="mb-2 text-xs font-medium tracking-widest text-primary uppercase">{text}</p>;
+  // text-base, not text-xs: the type floor (docs/UI.md), lane 7 item 3.
+  return <p className="mb-2 text-base font-medium tracking-widest text-primary uppercase">{text}</p>;
 }
 
 function PinnedAppsStrip({ person }: { person: Roster }) {

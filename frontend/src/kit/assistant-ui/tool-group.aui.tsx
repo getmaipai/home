@@ -121,10 +121,13 @@ function ToolGroupTrigger({
           className="aui-tool-group-trigger-loader size-3 shrink-0 animate-spin [animation-duration:0.6s]"
         />
       )}
+      {/* text-base, not text-xs: the type floor (docs/UI.md), lane 7
+          item 3, 2026-09-13 - a real label a person reads to know what
+          the tool call did, not a badge or a token. */}
       <span
         data-slot="tool-group-trigger-label"
         className={cn(
-          "aui-tool-group-trigger-label-wrapper inline-block text-start text-xs leading-none font-medium",
+          "aui-tool-group-trigger-label-wrapper inline-block text-start text-base leading-none font-medium",
           "group-data-[variant=ghost]/tool-group-root:font-normal",
           "group-data-[variant=outline]/tool-group-root:grow",
           "group-data-[variant=muted]/tool-group-root:grow",

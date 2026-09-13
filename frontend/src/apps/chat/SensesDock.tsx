@@ -55,6 +55,11 @@ export function SensesDock({ health, reply, speaking, speechError, ears, earErro
   const StatusIcon = getIcon("info");
   return <Popover.Root>
     <Popover.Trigger asChild>
+      {/* Deliberate type-floor exception (docs/UI.md, lane 7 item 3,
+          2026-09-13): a compact rounded-full status pill, the same
+          category as a badge count - the expanded popover this opens
+          (`dd` below) carries the real, readable explanation at the
+          floor; this trigger is a glanceable chip, not body text. */}
       <Button variant="ghost" size="sm" aria-label={`Chat status: ${brain.state}`} className="gap-2 rounded-full text-xs text-muted-foreground">
         <StatusIcon className={cn("size-4", tones[brain.tone])} />{label}
       </Button>
@@ -65,7 +70,8 @@ export function SensesDock({ health, reply, speaking, speechError, ears, earErro
         <dl className="space-y-3">
           {[brain, voice, listening, { name: "Eyes", icon: "eye", state: "Coming soon", detail: "Vision is not available yet. MaiPai cannot see through a camera or interpret images here.", tone: "quiet" } as Sense].map((sense) => { const Icon = getIcon(sense.icon); return <div key={sense.name}>
             <dt className="flex justify-between gap-3 text-sm"><span className="flex items-center gap-2"><Icon className={cn("size-4", tones[sense.tone])} />{sense.name}</span><span className={tones[sense.tone]}>{sense.state}</span></dt>
-            <dd className="mt-1 text-xs text-muted-foreground">{sense.detail}</dd>
+            {/* text-base, not text-xs: the type floor (docs/UI.md), lane 7 item 3. */}
+            <dd className="mt-1 text-base text-muted-foreground">{sense.detail}</dd>
           </div>; })}
         </dl>
         <div className="mt-4 border-t pt-3">{children}</div>

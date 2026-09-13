@@ -47,6 +47,10 @@ function AvatarFallback({
   return (
     <AvatarPrimitive.Fallback
       data-slot="avatar-fallback"
+      // `group-data-[size=sm]/avatar:text-xs`: deliberate type-floor
+      // exception (docs/UI.md, lane 7 item 3, 2026-09-13) - fallback
+      // initials inside a small circular avatar, physically sized to
+      // the avatar itself, not free-standing body text.
       className={cn(
         "flex size-full items-center justify-center rounded-full bg-muted text-sm text-muted-foreground group-data-[size=sm]/avatar:text-xs",
         className

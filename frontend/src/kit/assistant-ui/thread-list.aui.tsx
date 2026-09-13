@@ -204,9 +204,12 @@ const ThreadListItemGroups: FC<{ searchQuery?: string }> = ({
 
   return groups.map((group) => (
     <Fragment key={group.label}>
+      {/* text-base, not text-xs: the type floor (docs/UI.md), lane 7
+          item 3, 2026-09-13 - a real date-group heading ("Today"), the
+          same reasoning that already moved DayDivider off text-xs. */}
       <div
         data-slot="aui_thread-list-group-label"
-        className="text-muted-foreground px-2.5 pt-3 pb-1 text-xs font-medium"
+        className="text-muted-foreground px-2.5 pt-3 pb-1 text-base font-medium"
       >
         {group.label}
       </div>

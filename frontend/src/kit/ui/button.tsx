@@ -30,6 +30,11 @@ const buttonVariants = cva(
       size: {
         default:
           "h-12 gap-1.5 px-4 text-base has-data-[icon=inline-end]:pr-3 has-data-[icon=inline-start]:pl-3",
+        // Deliberate type-floor exception (docs/UI.md, lane 7 item 3,
+        // 2026-09-13): the "xs" size, a fixed h-6 (24px) button too
+        // short for 16px text - a caller choosing "xs" over "default"
+        // (which is already text-base) is asking for the compact
+        // option on purpose.
         xs: "relative h-6 gap-1 rounded-[min(var(--radius-md),10px)] px-2 text-xs before:absolute before:-inset-3 before:content-[''] in-data-[slot=button-group]:rounded-lg has-data-[icon=inline-end]:pr-1.5 has-data-[icon=inline-start]:pl-1.5 [&_svg:not([class*='size-'])]:size-3",
         sm: "relative h-7 gap-1 rounded-[min(var(--radius-md),12px)] px-2.5 text-[0.8rem] before:absolute before:-inset-2.5 before:content-[''] in-data-[slot=button-group]:rounded-lg has-data-[icon=inline-end]:pr-1.5 has-data-[icon=inline-start]:pl-1.5 [&_svg:not([class*='size-'])]:size-3.5",
         lg: "h-14 gap-1.5 px-6 text-lg has-data-[icon=inline-end]:pr-4 has-data-[icon=inline-start]:pl-4",

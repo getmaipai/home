@@ -52,8 +52,67 @@ const hoverNeedsFocus = {
   },
 };
 
+// Lane 7 item 3 (2026-09-13): the 49 `text-xs`/`text-[10px]`-shaped
+// instances BACKLOG.md's type-floor note named, swept - each moved to
+// `text-base` (16px, docs/UI.md's own floor) or left with a comment
+// naming why it's a deliberate exception (a badge/chip/token, a
+// compact size variant, a typographic convention like `<sup>` that is
+// supposed to be smaller than body text). This rule is what keeps that
+// sweep from regressing: same best-effort shape as `hoverNeedsFocus`
+// above (string/template literals and `cn(...)` call arguments, not a
+// full data-flow analysis), scoped to `src/apps` and `src/shell` only,
+// matching the file scope the kit's OTHER accessibility-floor rules
+// already use below (`src/kit/ui`/`src/kit/assistant-ui` are vendored,
+// not hand-audited wholesale - see that block's own comment) - a
+// sub-floor class there still needs the SAME exception comment by
+// convention (every instance in this sweep has one), just not lint-
+// enforced, the same "hand-fixed where it mattered" posture the kit
+// already takes for the 48px/focus-ring floors.
+const SUB_FLOOR_TEXT_CLASS = /\btext-xs\b|\btext-\[(\d+)px\]/g;
+const EXCEPTION_MARKER = /type-floor/i;
+const typeFloor = {
+  create(context) {
+    const sourceCode = context.sourceCode ?? context.getSourceCode();
+    function hasNearbyException(node) {
+      const startLine = node.loc.start.line;
+      const windowStart = Math.max(0, startLine - 8);
+      const nearby = sourceCode.lines.slice(windowStart, startLine).join("\n");
+      return EXCEPTION_MARKER.test(nearby) && /exception/i.test(nearby);
+    }
+    function check(node, raw) {
+      if (typeof raw !== "string") return;
+      SUB_FLOOR_TEXT_CLASS.lastIndex = 0;
+      let match;
+      while ((match = SUB_FLOOR_TEXT_CLASS.exec(raw)) !== null) {
+        if (match[1] !== undefined && Number(match[1]) >= 16) continue;
+        if (hasNearbyException(node)) continue;
+        context.report({
+          node,
+          message: `"${match[0]}" is under the kit's 16px type floor (docs/UI.md) with no nearby "deliberate type-floor exception" comment explaining why (lane 7 item 3, 2026-09-13). Move it to text-base, or add the exception comment if this is a badge, a token, or a compact size variant.`,
+        });
+      }
+    }
+    function checkExpression(node, expr) {
+      if (!expr) return;
+      if (expr.type === "Literal") check(node, expr.value);
+      else if (expr.type === "TemplateLiteral") {
+        for (const quasi of expr.quasis) check(node, quasi.value.raw);
+      } else if (expr.type === "CallExpression") {
+        for (const arg of expr.arguments) checkExpression(node, arg);
+      }
+    }
+    return {
+      JSXAttribute(node) {
+        if (node.name.name !== "className" || !node.value) return;
+        if (node.value.type === "Literal") check(node, node.value.value);
+        if (node.value.type === "JSXExpressionContainer") checkExpression(node, node.value.expression);
+      },
+    };
+  },
+};
+
 const HEX_OR_RGB_ARBITRARY = "\\[(#[0-9a-fA-F]{3,8}|rgba?\\()";
-const localPlugin = { rules: { "hover-needs-focus": hoverNeedsFocus } };
+const localPlugin = { rules: { "hover-needs-focus": hoverNeedsFocus, "type-floor": typeFloor } };
 
 export default tseslint.config(
   {
@@ -189,6 +248,7 @@ export default tseslint.config(
         },
       ],
       "local/hover-needs-focus": "error",
+      "local/type-floor": "error",
     },
   },
 );

@@ -285,11 +285,16 @@ export function Shell({ person, onSignOut, onPersonChange, children }: ShellProp
               ? NAV_ENTRIES.filter((entry) => ["/", "/apps", "/chat"].includes(entry.to)).map((entry) => <TvNavItem key={entry.to} entry={entry} isFirst={false} />)
               : NAV_ENTRIES.filter((entry) => ["/", "/apps", "/chat"].includes(entry.to)).map((entry) => <NavItem key={entry.to} entry={entry} />)}
           </SidebarMenu>
-          <div className="mt-6 px-2 text-xs font-medium text-muted-foreground group-data-[collapsible=icon]:hidden">Favorites</div>
+          {/* text-base (16px), not text-xs: docs/UI.md's own type floor
+              ("16 px body on phone and desktop"), lane 7 item 3's sweep
+              (2026-09-13) - this is a real section label a person reads,
+              the same reasoning that moved DayDivider/MessageTimestamp
+              off text-xs (docs/dev.md, "Lane 3 item 3"). */}
+          <div className="mt-6 px-2 text-base font-medium text-muted-foreground group-data-[collapsible=icon]:hidden">Favorites</div>
           <SidebarMenu>
             {favorites.map((entry) => surface.far ? <TvNavItem key={entry.to} entry={entry} isFirst={false} /> : <NavItem key={entry.to} entry={entry} />)}
           </SidebarMenu>
-          {favorites.length === 0 ? <p className="px-2 text-xs leading-relaxed text-muted-foreground group-data-[collapsible=icon]:hidden">Pin your go-to apps from the app library.</p> : null}
+          {favorites.length === 0 ? <p className="px-2 text-base leading-relaxed text-muted-foreground group-data-[collapsible=icon]:hidden">Pin your go-to apps from the app library.</p> : null}
         </SidebarContent>
         <SidebarFooter className="border-t border-sidebar-border/60 p-2">
           <SidebarMenu>

@@ -134,7 +134,10 @@ function CommandGroup({
     <CommandPrimitive.Group
       data-slot="command-group"
       className={cn(
-        "overflow-hidden p-1 text-foreground **:[[cmdk-group-heading]]:px-2 **:[[cmdk-group-heading]]:py-1.5 **:[[cmdk-group-heading]]:text-xs **:[[cmdk-group-heading]]:font-medium **:[[cmdk-group-heading]]:text-muted-foreground",
+        // text-base, not text-xs: the type floor (docs/UI.md), lane 7
+        // item 3, 2026-09-13 - this heading names a real group of real
+        // results ("Apps", "Chat"), not a compact badge or a token.
+        "overflow-hidden p-1 text-foreground **:[[cmdk-group-heading]]:px-2 **:[[cmdk-group-heading]]:py-1.5 **:[[cmdk-group-heading]]:text-base **:[[cmdk-group-heading]]:font-medium **:[[cmdk-group-heading]]:text-muted-foreground",
         className
       )}
       {...props}
@@ -182,6 +185,9 @@ function CommandShortcut({
   return (
     <span
       data-slot="command-shortcut"
+      // Deliberate type-floor exception (docs/UI.md, lane 7 item 3,
+      // 2026-09-13): a keyboard-shortcut token (e.g. "⌘K"), the same
+      // category as a monospace token, not body text.
       className={cn(
         "ml-auto text-xs tracking-widest text-muted-foreground group-data-selected/command-item:text-foreground",
         className

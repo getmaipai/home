@@ -1018,3 +1018,118 @@ the generated table did its own job). Ticked BACKLOG's "Music / media
 search" item for the film/TV half done; split "what's this song" (a
 genuinely different, audio-fingerprinting problem) back out as its own
 line for later, un-implied by this item's own close.
+
+## Lane 7 item 3: the type-floor sweep, and a lint that proves it
+
+The last open piece of lane 7. Lane 3's own item 3 (2026-09-12) closed
+the two named instances (the bell badge, already fine; `DayDivider`/
+`MessageTimestamp`) and recorded ~49 other `text-xs` instances still
+scattered across the frontend as real, unscoped remaining work. `grep
+-rn "text-xs" frontend/src` confirmed exactly 49 (two more hits were
+stale historical comments in `chatDayDivider.tsx` itself, already
+correctly worded "was text-xs, now text-base").
+
+**Judged each of the 49 individually** rather than a blanket rule,
+per the item's own instruction ("each instance either moves to the
+floor or is a deliberate exception with a comment naming why"):
+
+- **26 moved to `text-base`** (16px): real headings, group labels,
+  captions, and body text a person actually reads - "Favorites" and
+  its empty-state line (`Shell.tsx`), search/command-palette result
+  sublabels, settings group headings and shortcut descriptions, the
+  avatar-row name label and page tagline on Home, three instances on
+  the Apps library page, search result group headings, a chat source
+  citation, a Senses popover's detail text, the composer's "For your
+  next message only" hint, and - inside the kit itself, where it was
+  genuinely real content, not vendored chrome - a cmdk/Select/
+  DropdownMenu group-heading primitive, a thread-list date-group
+  heading, an image's filename caption and its generation-error text,
+  and a tool-call group's own trigger label.
+- **23 left as deliberate exceptions**, each with an inline comment:
+  badges and chips (the kit's own `Badge` primitive, `SidebarMenuBadge`,
+  `chatMemoryChip`'s "Memory updated" pill, `SensesDock`'s status
+  trigger - a fixed-size dot/chip is the coordinator's own named
+  exception, and the popover it opens already carries the real,
+  readable text at the floor); keyboard-shortcut and byte-size/
+  duration tokens (`CommandShortcut`, `DropdownMenuShortcut`, a file's
+  own size, a tool call's own elapsed time, a grant's permission id);
+  raw JSON/args dumps in `<pre>` (monospace data, not prose, and the
+  label sitting directly on top of one stays paired with it rather
+  than becoming an odd large caption over small data); compact size
+  variants that exist on purpose (Button's `xs`, the kit Sidebar's
+  `sm`, a File attachment's `sm`, Avatar's small-avatar fallback,
+  physically sized to a tiny circle); a `<sup>` footnote reference
+  (smaller than body text is the entire point of superscript); a
+  tooltip bubble (transient, hover/focus-only, not persistent body
+  text); a code block's own compact language/copy header bar; and the
+  "1 / 2" edited-message branch-picker (a compact inline pagination
+  control). The one approval-flow error alert in that same file
+  (`tool-fallback.aui.tsx`, `role="alert"`) is NOT on this list - it
+  moved to `text-base`, since it genuinely needs to be readable before
+  an adult approves or denies something consequential.
+
+**Two instances needed more than a class swap, checked live rather
+than assumed:**
+
+- Home's `WhoIsHere` avatar-row name label moving to `text-base` grew
+  the row's own content height past the `min-h-16` (64px) the lane 6
+  fix tuned for `text-xs`'s shorter line height - recomputed to
+  `min-h-[72px]` (40px avatar + `text-base`'s own ~24px line height +
+  the 4px gap, with rounding room) and re-verified with the same
+  `clippedStrips` check that caught the original bug.
+- `PhoneNav`'s five tab labels ("Home", "Apps", "Chat", "Conversations",
+  "More") were the one real judgment call with a genuine risk: `text-
+  base` in a ~78px-wide flex column risked "Conversations" wrapping or
+  overflowing. Moved it anyway (a bottom-tab label is still something
+  a person reads to navigate, the same reasoning that moved every
+  other real label) and checked live rather than assumed safe: `bun
+  run scripts/screenshot.ts --a11y-only` (0 violations, 0 overflow)
+  and the regenerated `home-phone-light.png` both confirm it fits on
+  one line with room to spare.
+
+**The `local/type-floor` ESLint rule** (`frontend/eslint.config.js`),
+the same hand-written shape as the kit's own `hover-needs-focus`
+(string/template literals and `cn(...)` call arguments, not a full
+data-flow analysis): flags a `text-xs` or `text-[Npx]` (n < 16) class
+with no "type-floor"/"exception" marker in a comment within the eight
+lines above it. Scoped to `src/apps/**` and `src/shell/**` only,
+matching the exact file-scope convention `eslint.config.js` already
+uses for the kit's other accessibility-floor rules (`src/kit/ui` and
+`src/kit/assistant-ui` are shadcn/assistant-ui-generated, "not a
+mandate to hand-patch every accessibility nuance of vendored component
+internals... applied by hand where it mattered," that block's own
+words) - the sweep still gave every kit instance a real, individual
+comment either way, just not lint-enforced there, the same posture the
+48px/focus-ring floors already take in that file.
+
+**Proven both directions**, not just asserted: planted a violation (a
+scratch component, `text-xs` with no comment) - `bunx eslint` reported
+it with the rule's own message. Added a "Deliberate type-floor
+exception" comment to the identical class - clean, no report. Deleted
+the scratch file afterward.
+
+**Verified**: `bunx tsc --noEmit` clean; `bunx eslint .` clean (2
+pre-existing, unrelated `react-hooks/exhaustive-deps` warnings only);
+`bun test` in frontend, 505 pass, 0 fail; `bun run scripts/screenshot.ts
+--a11y-only`, 0 violations, 0 overflow across all 34 combos. Regenerated
+the full matrix and `--chat-review`; opened every page a user page
+embeds plus Chat, Search, Settings, and the phone bottom nav
+specifically - all correct, no clipping, no wrapping.
+
+**One unrelated thing found regenerating, not caused by this sweep**:
+Home's own Weather card intermittently showed "Couldn't check the
+weather right now." in the regenerated screenshots - not a fixture
+problem (the offline cache from lane 6 answers fine in isolation,
+checked directly), but the household's own per-person turn rate budget
+(`PERSON_TURN_BUDGET`, `backend/src/lib/llm.ts`: capacity 5, refills
+0.5/s) getting exceeded by several concurrent browser contexts each
+firing Home's own real ephemeral weather turn within the same couple
+of seconds - confirmed by firing eight of that identical turn at once
+by hand and watching several come back `429 turn_rate_limited`. Filed
+as [getmaipai/home#102](https://github.com/getmaipai/home/issues/102)
+(a real design question - should an ephemeral, no-history card question
+skip the budget entirely - not mine to decide); worked around in
+`scripts/screenshot.ts` itself for now (wait out the refill window and
+reload once if the fallback text is showing after visiting Home,
+scoped to that one route), the same thing a real person hitting this
+would do, and it answers for real every time in testing since.

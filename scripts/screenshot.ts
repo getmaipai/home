@@ -367,6 +367,36 @@ async function visitRoute(context: BrowserContext, route: RouteSpec, viewport: V
     // loading" - the whole point of waiting for the real shell first.
     await page.locator('[role="status"]').first().waitFor({ state: "detached", timeout: 5000 }).catch(() => {});
 
+    // getmaipai/home#102, found live 2026-09-13: Home's own WeatherCard
+    // fires a real ephemeral turn on every mount (`runFixedTurn()`,
+    // HomePage.tsx), and this matrix mounts Home from several
+    // concurrent browser contexts (`CONTEXT_POOL_SIZE` above) within a
+    // few seconds of each other - enough real turns landing close
+    // together to exceed the household's own per-person turn budget
+    // (`PERSON_TURN_BUDGET`, backend/src/lib/llm.ts: capacity 5, refills
+    // 0.5/s), which the frontend's own `retry: false` on that query
+    // then shows as a permanent "Couldn't check the weather right now."
+    // for the rest of that page load - a real rate-limit response, not
+    // a broken fixture (this pipeline's weather cache itself answers
+    // fine in isolation, confirmed live). A genuine person hitting this
+    // would just ask again a few seconds later and get a real answer,
+    // so that is what this does for the screenshot too, rather than
+    // holding up lane 7's own unrelated work on a rate-limiter design
+    // question that belongs to whoever owns it: reload once, after
+    // waiting out the budget's own refill window, if the fallback text
+    // is showing. Scoped to the one route that actually fires a turn on
+    // mount - every other route is unaffected and pays nothing for
+    // this.
+    if (route.slug === "home") {
+      const showingFallback = await page.getByText("Couldn't check the weather right now.").count();
+      if (showingFallback > 0) {
+        await page.waitForTimeout(4000);
+        await page.reload();
+        await page.getByRole("heading", { level: 1 }).first().waitFor({ timeout: 15000 });
+        await page.locator('[role="status"]').first().waitFor({ state: "detached", timeout: 5000 }).catch(() => {});
+      }
+    }
+
     if (chatReview && route.slug === "chat") {
       const cleared = await page.request.post(`${BASE_URL}/api/conversations/clear`, { data: {} });
       if (!cleared.ok()) throw new Error("Could not reset demo chats");

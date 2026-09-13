@@ -166,8 +166,9 @@ function DropdownMenuLabel({
     <DropdownMenuPrimitive.Label
       data-slot="dropdown-menu-label"
       data-inset={inset}
+      // text-base, not text-xs: the type floor (docs/UI.md), lane 7 item 3.
       className={cn(
-        "px-1.5 py-1 text-xs font-medium text-muted-foreground data-inset:pl-7",
+        "px-1.5 py-1 text-base font-medium text-muted-foreground data-inset:pl-7",
         className
       )}
       {...props}
@@ -195,6 +196,9 @@ function DropdownMenuShortcut({
   return (
     <span
       data-slot="dropdown-menu-shortcut"
+      // Deliberate type-floor exception (docs/UI.md, lane 7 item 3,
+      // 2026-09-13): a keyboard-shortcut token, the same category as a
+      // monospace token, not body text.
       className={cn(
         "ml-auto text-xs tracking-widest text-muted-foreground group-focus/dropdown-menu-item:text-accent-foreground",
         className

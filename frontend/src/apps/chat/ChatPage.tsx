@@ -222,7 +222,8 @@ export function ChatPage({ person }: ChatPageProps) {
                         <Button type="button" variant="ghost" onClick={() => setThinking((value) => !value)} aria-pressed={thinking}>
                           <BrainIcon />Think longer{thinking ? " (on)" : ""}
                         </Button>
-                        <p className="px-3 pb-2 text-xs text-muted-foreground">For your next message only.</p>
+                        {/* text-base, not text-xs: the type floor (docs/UI.md), lane 7 item 3. */}
+                        <p className="px-3 pb-2 text-base text-muted-foreground">For your next message only.</p>
                       </Popover.Content>
                     </Popover.Portal>
                   </Popover.Root>

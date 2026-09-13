@@ -4122,11 +4122,22 @@ future session now that F's hub half exists.
       `MessageTimestamp` were the two `text-xs` (12px) instances this
       note pointed at, under the kit's 16px floor, and are now
       `text-base`. No `text-[10px]` instances exist anywhere in the
-      current codebase. Other `text-xs` usage remains scattered across
-      the frontend (shell chrome, dropdown/select internals, tool
-      fallback rendering); this item closed the two named here, not a
-      repo-wide `text-xs` audit - that broader sweep is still open work,
-      not filed as its own item yet.
+      current codebase. **The repo-wide sweep is done too** (lane 7 item
+      3, 2026-09-13): all 49 remaining `text-xs` instances judged one by
+      one - 26 real body text/labels/headings moved to `text-base`, 23
+      left as deliberate exceptions with a comment naming why (a badge
+      or chip, a keyboard-shortcut/byte-size/duration token, a compact
+      size variant like Button's `xs` or Avatar's small fallback, a
+      typographic convention like `<sup>`), matching `eslint.config.js`'s
+      own established policy that `src/kit/ui`/`src/kit/assistant-ui`
+      (vendored shadcn/assistant-ui output) get the floor applied by
+      hand where it matters rather than swept wholesale. A new
+      `local/type-floor` ESLint rule (same shape as the kit's own
+      `hover-needs-focus`), scoped to `src/apps`/`src/shell` matching
+      that same file-scope convention, fails a sub-floor class with no
+      nearby exception comment - proven both ways (a planted violation
+      failed, the same class with an exception comment passed), so the
+      sweep can't quietly regress.
 - [x] **A screenshot matrix in the pipeline** (M; sharpens the tracked
       "wire the measurable half" note) - done 2026-09-13, reconciled
       against getmaipai/.github's docs/UI.md and docs/STYLE.md. What the

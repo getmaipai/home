@@ -57,6 +57,9 @@ export function MemoryUpdatedChip() {
   if (!memoryIds?.length) return null;
 
   return (
+    // Deliberate type-floor exception (docs/UI.md, lane 7 item 3,
+    // 2026-09-13): a compact rounded-full chip, the same category as a
+    // badge count, not a line of body text.
     <Link
       to={`/memory?ids=${memoryIds.map(encodeURIComponent).join(",")}`}
       className="mt-1 inline-flex w-fit items-center gap-1 self-start rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground hover:bg-accent"

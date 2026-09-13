@@ -302,7 +302,8 @@ export function SettingsPage({ person, onPersonChange }: SettingsPageProps) {
               const isActive = entry.to ? location.pathname === entry.to : isDefaultRoute && activeId === entry.id;
               return (
                 <Fragment key={entry.id}>
-                {index === 0 || tree[index - 1]?.group !== entry.group ? <p className="px-3 pt-4 pb-1 text-xs font-medium text-muted-foreground">{entry.group}</p> : null}
+                {/* text-base, not text-xs: the type floor (docs/UI.md), lane 7 item 3. */}
+                {index === 0 || tree[index - 1]?.group !== entry.group ? <p className="px-3 pt-4 pb-1 text-base font-medium text-muted-foreground">{entry.group}</p> : null}
                 <Button
                   type="button"
                   variant="ghost"
@@ -340,7 +341,8 @@ export function SettingsPage({ person, onPersonChange }: SettingsPageProps) {
               {isDefaultRoute && shortcuts.length > 0 ? <div className="grid gap-3 sm:grid-cols-2">
                 {shortcuts.map((entry) => { const Icon = getIcon(entry.icon); return <Link key={entry.id} to={entry.to!} className={cn("flex items-start gap-3 rounded-2xl border border-border/60 bg-card p-4 transition-colors hover:border-primary/40 focus-visible:border-primary/40", FOCUS_RING)}>
                   <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary"><Icon aria-hidden className="size-4" /></span>
-                  <span><span className="block text-sm font-semibold">{entry.label}</span><span className="mt-1 block text-xs leading-relaxed text-muted-foreground">{entry.description}</span></span>
+                  {/* text-base, not text-xs: the type floor (docs/UI.md), lane 7 item 3. */}
+                  <span><span className="block text-sm font-semibold">{entry.label}</span><span className="mt-1 block text-base leading-relaxed text-muted-foreground">{entry.description}</span></span>
                 </Link>; })}
               </div> : null}
               {!isDefaultRoute ? (

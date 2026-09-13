@@ -39,7 +39,7 @@ export function PhoneNav() {
               to={entry.to}
               aria-current={active ? "page" : undefined}
               className={cn(
-                "flex min-h-12 flex-1 flex-col items-center justify-center gap-0.5 py-2 text-xs",
+                "flex min-h-12 flex-1 flex-col items-center justify-center gap-0.5 py-2 text-base",
                 active ? "text-primary" : "text-muted-foreground",
               )}
             >
@@ -52,7 +52,7 @@ export function PhoneNav() {
           <button
             type="button"
             onClick={() => setMoreOpen(true)}
-            className="flex min-h-12 flex-1 flex-col items-center justify-center gap-0.5 py-2 text-xs text-muted-foreground"
+            className="flex min-h-12 flex-1 flex-col items-center justify-center gap-0.5 py-2 text-base text-muted-foreground"
           >
             <MoreIcon className="h-5 w-5" aria-hidden />
             <span>More</span>

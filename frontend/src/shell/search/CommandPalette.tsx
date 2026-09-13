@@ -77,7 +77,8 @@ export function CommandPalette({ open, onOpenChange, personId }: CommandPaletteP
                     <Icon aria-hidden />
                     <span className="flex flex-col">
                       <span>{item.label}</span>
-                      {item.sublabel ? <span className="text-xs text-muted-foreground">{item.sublabel}</span> : null}
+                      {/* text-base, not text-xs: the type floor (docs/UI.md), lane 7 item 3. */}
+                      {item.sublabel ? <span className="text-base text-muted-foreground">{item.sublabel}</span> : null}
                     </span>
                   </CommandItem>
                 );

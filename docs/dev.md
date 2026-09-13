@@ -12772,3 +12772,10 @@ other's section once (147cd28, f4779a6).
   built in the catalog checkout first and bundled, tests against
   recorded fixtures for two films and one TV show, live-checked end to
   end: [docs/dev/session-b.md](dev/session-b.md) (2026-09-13).
+- Lane 7 item 3, closing lane 7: the type-floor sweep (49 `text-xs`
+  instances, each moved to `text-base` or left with a deliberate
+  exception comment) and a new `local/type-floor` ESLint rule, proven
+  both to pass the swept tree and fail a planted violation; #102 filed
+  (Home's weather card racing its own household turn budget under the
+  screenshot matrix's own concurrency), worked around in the pipeline:
+  [docs/dev/session-b.md](dev/session-b.md) (2026-09-13).

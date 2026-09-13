@@ -793,6 +793,9 @@ const BranchPicker: FC<BranchPickerPrimitive.Root.Props> = ({
   return (
     <BranchPickerPrimitive.Root
       hideWhenSingleBranch
+      // Deliberate type-floor exception (docs/UI.md, lane 7 item 3,
+      // 2026-09-13): the "1 / 2" edited-message switcher, a compact
+      // inline pagination control, the same category as a badge count.
       className={cn(
         "aui-branch-picker-root text-muted-foreground -ms-2 me-2 inline-flex items-center text-xs",
         className,

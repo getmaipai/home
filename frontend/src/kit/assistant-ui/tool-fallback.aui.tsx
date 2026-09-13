@@ -115,6 +115,9 @@ function ToolFallbackDuration({
   return (
     <span
       data-slot="tool-fallback-duration"
+      // Deliberate type-floor exception (docs/UI.md, lane 7 item 3,
+      // 2026-09-13): `tabular-nums` timing (e.g. "1.2s"), the same
+      // category as a monospace token.
       className={cn(
         "aui-tool-fallback-duration text-muted-foreground text-xs tabular-nums",
         className,
@@ -234,6 +237,9 @@ function ToolFallbackArgs({
       className={cn("aui-tool-fallback-args", className)}
       {...props}
     >
+      {/* Deliberate type-floor exception (docs/UI.md, lane 7 item 3,
+          2026-09-13): a raw JSON args dump, the same category as a
+          monospace token, not prose. */}
       <pre className="aui-tool-fallback-args-value bg-muted/50 text-foreground/90 rounded-md p-2.5 text-xs whitespace-pre-wrap">
         {argsText}
       </pre>
@@ -256,6 +262,11 @@ function ToolFallbackResult({
       className={cn("aui-tool-fallback-result", className)}
       {...props}
     >
+      {/* Deliberate type-floor exception (docs/UI.md, lane 7 item 3,
+          2026-09-13): this label sits directly on top of a raw
+          JSON/string dump (the same monospace-token exception below) -
+          moving just the label to the floor would look like a large
+          caption over small data. */}
       <p className="aui-tool-fallback-result-header text-muted-foreground text-xs font-medium">
         Result:
       </p>
@@ -465,9 +476,12 @@ function ToolFallbackApproval({
   ) : null;
 
   const errorText = error ? (
+    // text-base, not text-xs: the type floor (docs/UI.md), lane 7 item
+    // 3, 2026-09-13 - a real error a person needs to read clearly
+    // before deciding whether to approve or deny.
     <p
       role="alert"
-      className="aui-tool-fallback-approval-error text-destructive text-xs"
+      className="aui-tool-fallback-approval-error text-destructive text-base"
     >
       {error}
     </p>
@@ -523,6 +537,10 @@ function ToolFallbackApproval({
           <ul className="aui-tool-fallback-approval-confirm-grants flex flex-col gap-1">
             {confirming.grants.map((grant) => (
               <li key={grant}>
+                {/* Deliberate type-floor exception (docs/UI.md, lane 7
+                    item 3, 2026-09-13): a permission identifier
+                    (e.g. "net:api.example.com"), the same category as
+                    a monospace token. */}
                 <code className="aui-tool-fallback-approval-confirm-grant bg-muted rounded px-1.5 py-0.5 text-xs">
                   {grant}
                 </code>

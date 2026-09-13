@@ -236,8 +236,11 @@ function ImageFilename({
   return (
     <span
       data-slot="image-filename"
+      // text-base, not text-xs: the type floor (docs/UI.md), lane 7
+      // item 3, 2026-09-13 - a real filename a person reads, not a
+      // badge or a token.
       className={cn(
-        "text-muted-foreground block truncate px-2 py-1.5 text-xs",
+        "text-muted-foreground block truncate px-2 py-1.5 text-base",
         className,
       )}
       {...props}
@@ -394,7 +397,10 @@ function ImageContentFilterError({
     >
       <ShieldAlertIcon className="text-muted-foreground size-8" />
       <p className="text-sm font-medium">Image could not be generated</p>
-      {reason && <p className="text-muted-foreground text-xs">{reason}</p>}
+      {/* text-base, not text-xs: the type floor (docs/UI.md), lane 7
+          item 3, 2026-09-13 - a real explanation a person needs to
+          read, not a badge or a token. */}
+      {reason && <p className="text-muted-foreground text-base">{reason}</p>}
     </div>
   );
 }

@@ -23,7 +23,8 @@ export function AppsPage({ person }: { person: Roster }) {
       <div className="min-h-0 flex-1 overflow-y-auto">
         <div className="mx-auto max-w-6xl px-4 py-6 sm:px-8">
           <div className="mb-8">
-            <p className="mb-2 text-xs font-medium tracking-widest text-primary uppercase">Your app library</p>
+            {/* text-base, not text-xs: the type floor (docs/UI.md), lane 7 item 3. */}
+            <p className="mb-2 text-base font-medium tracking-widest text-primary uppercase">Your app library</p>
             <h2 className="text-3xl font-semibold tracking-tight sm:text-4xl">A place for everything.</h2>
             <p className="mt-3 text-sm text-muted-foreground">Find an app, make it a favorite, and jump right in.</p>
           </div>
@@ -35,7 +36,8 @@ export function AppsPage({ person }: { person: Roster }) {
             {categories.map((name) => <Button key={name} variant={category === name ? "secondary" : "ghost"} size="sm" className="rounded-full" aria-pressed={category === name} onClick={() => setCategory(name)}>{name}</Button>)}
           </div>
           {error ? <p role="alert" className="mb-4 text-sm text-destructive">{error}</p> : null}
-          <p role="status" className="mb-4 text-xs text-muted-foreground">{isLoading && category === "Favorites" ? "Loading favorites…" : `${apps.length} ${apps.length === 1 ? "app" : "apps"}`}</p>
+          {/* text-base, not text-xs: the type floor (docs/UI.md), lane 7 item 3. */}
+          <p role="status" className="mb-4 text-base text-muted-foreground">{isLoading && category === "Favorites" ? "Loading favorites…" : `${apps.length} ${apps.length === 1 ? "app" : "apps"}`}</p>
           <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
             {apps.map((app) => {
               const Icon = getIcon(app.icon);
@@ -45,7 +47,8 @@ export function AppsPage({ person }: { person: Roster }) {
                   <span className="mb-5 flex size-12 items-center justify-center rounded-2xl bg-primary/10 text-primary"><Icon aria-hidden className="size-6" strokeWidth={1.6} /></span>
                   <span className="font-semibold">{app.label}</span>
                   <span className="mt-1 text-sm leading-relaxed text-muted-foreground">{app.description}</span>
-                  <span className="mt-5 text-xs text-muted-foreground">{app.category}<span className="float-end text-primary">Open ↗</span></span>
+                  {/* text-base, not text-xs: the type floor (docs/UI.md), lane 7 item 3. */}
+                  <span className="mt-5 text-base text-muted-foreground">{app.category}<span className="float-end text-primary">Open ↗</span></span>
                 </Link>
                 <Button variant="ghost" size="icon" className={cn("absolute end-3 top-3 rounded-full", favorite && "bg-primary/10 text-primary")} aria-label={`${favorite ? "Unpin" : "Pin"} ${app.label}`} aria-pressed={favorite} disabled={isLoading || isSaving} onClick={() => togglePin(app.to)}><PinIcon aria-hidden className="size-4" /></Button>
               </div>;

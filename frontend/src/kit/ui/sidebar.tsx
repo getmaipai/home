@@ -443,8 +443,12 @@ function SidebarGroupLabel({
     <Comp
       data-slot="sidebar-group-label"
       data-sidebar="group-label"
+      // text-base, not text-xs: the type floor (docs/UI.md), lane 7
+      // item 3, 2026-09-13 - a real section heading, not a badge or a
+      // token, the same reasoning Shell.tsx's own "Favorites" label
+      // (a plain div, not this primitive) already moved to.
       className={cn(
-        "flex h-8 shrink-0 items-center rounded-md px-2 text-xs font-medium text-sidebar-foreground/70 ring-sidebar-ring outline-hidden transition-[margin,opacity] duration-200 ease-linear group-data-[collapsible=icon]:-mt-8 group-data-[collapsible=icon]:opacity-0 focus-visible:ring-2 [&>svg]:size-4 [&>svg]:shrink-0",
+        "flex h-8 shrink-0 items-center rounded-md px-2 text-base font-medium text-sidebar-foreground/70 ring-sidebar-ring outline-hidden transition-[margin,opacity] duration-200 ease-linear group-data-[collapsible=icon]:-mt-8 group-data-[collapsible=icon]:opacity-0 focus-visible:ring-2 [&>svg]:size-4 [&>svg]:shrink-0",
         className
       )}
       {...props}
@@ -533,6 +537,11 @@ const sidebarMenuButtonVariants = cva(
       },
       size: {
         default: "h-12 text-base",
+        // Deliberate type-floor exception (docs/UI.md, lane 7 item 3,
+        // 2026-09-13): a "sm" size variant, a fixed h-7 (28px) row too
+        // short for 16px text with real padding - a caller choosing
+        // "sm" over the default "h-12 text-base" is asking for the
+        // compact option on purpose.
         sm: "h-7 text-xs",
         lg: "h-14 text-base group-data-[collapsible=icon]:p-0!",
       },
@@ -628,6 +637,9 @@ function SidebarMenuBadge({
     <div
       data-slot="sidebar-menu-badge"
       data-sidebar="menu-badge"
+      // Deliberate type-floor exception (docs/UI.md, lane 7 item 3,
+      // 2026-09-13): a fixed-size (h-5, min-w-5) count badge, the
+      // coordinator's own named exception category.
       className={cn(
         "pointer-events-none absolute right-1 flex h-5 min-w-5 items-center justify-center rounded-md px-1 text-xs font-medium text-sidebar-foreground tabular-nums select-none group-data-[collapsible=icon]:hidden peer-hover/menu-button:text-sidebar-accent-foreground peer-data-[size=default]/menu-button:top-1.5 peer-data-[size=lg]/menu-button:top-2.5 peer-data-[size=sm]/menu-button:top-1 peer-data-active/menu-button:text-sidebar-accent-foreground",
         className
@@ -722,6 +734,10 @@ function SidebarMenuSubButton({
       data-sidebar="menu-sub-button"
       data-size={size}
       data-active={isActive}
+      // `data-[size=sm]:text-xs`: deliberate type-floor exception
+      // (docs/UI.md, lane 7 item 3, 2026-09-13) - the `sm` size on a
+      // fixed h-7 (28px) sub-item row, the same reasoning as
+      // SidebarMenuButton's own "sm" variant above.
       className={cn(
         "flex h-7 min-w-0 -translate-x-px items-center gap-2 overflow-hidden rounded-md px-2 text-sidebar-foreground ring-sidebar-ring outline-hidden group-data-[collapsible=icon]:hidden hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:ring-2 active:bg-sidebar-accent active:text-sidebar-accent-foreground disabled:pointer-events-none disabled:opacity-50 aria-disabled:pointer-events-none aria-disabled:opacity-50 data-[size=md]:text-sm data-[size=sm]:text-xs data-active:bg-sidebar-accent data-active:text-sidebar-accent-foreground [&>span:last-child]:truncate [&>svg]:size-4 [&>svg]:shrink-0 [&>svg]:text-sidebar-accent-foreground",
         className

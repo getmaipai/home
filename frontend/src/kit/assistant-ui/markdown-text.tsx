@@ -67,6 +67,9 @@ const CodeHeader: FC<CodeHeaderProps> = ({ language, code }) => {
   };
 
   return (
+    // Deliberate type-floor exception (docs/UI.md, lane 7 item 3,
+    // 2026-09-13): a code block's own compact language/copy-button
+    // header bar, styled like a badge, not prose.
     <div className="aui-code-header-root border-border/50 bg-muted/50 mt-3 flex items-center justify-between rounded-t-xl border border-b-0 px-3.5 py-1.5 text-xs">
       <span className="aui-code-header-language text-muted-foreground font-medium lowercase">
         {language}
@@ -237,6 +240,9 @@ const defaultComponents = memoizeMarkdownComponents({
     />
   ),
   sup: ({ className, ...props }) => (
+    // Deliberate type-floor exception (docs/UI.md, lane 7 item 3,
+    // 2026-09-13): a footnote-reference superscript - smaller than
+    // body text is the entire point of `<sup>`, not a floor violation.
     <sup
       className={cn("aui-md-sup [&>a]:text-xs [&>a]:no-underline", className)}
       {...props}

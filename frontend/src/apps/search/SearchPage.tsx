@@ -61,7 +61,8 @@ export function SearchPage() {
         <div tabIndex={0} className={cn("flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto", FOCUS_RING)}>
           {(groups ?? []).map((group) => (
             <section key={group.heading} aria-label={group.heading}>
-              <h2 className="mb-1 text-xs font-medium text-muted-foreground">{group.heading}</h2>
+              {/* text-base, not text-xs: the type floor (docs/UI.md), lane 7 item 3. */}
+              <h2 className="mb-1 text-base font-medium text-muted-foreground">{group.heading}</h2>
               <ul className="flex flex-col gap-1">
                 {group.items.map((item) => {
                   const Icon = getIcon(item.icon);
@@ -71,7 +72,8 @@ export function SearchPage() {
                         <Icon aria-hidden />
                         <span className="flex flex-col items-start">
                           <span>{item.label}</span>
-                          {item.sublabel ? <span className="text-xs text-muted-foreground">{item.sublabel}</span> : null}
+                          {/* text-base, not text-xs: the type floor (docs/UI.md), lane 7 item 3. */}
+                          {item.sublabel ? <span className="text-base text-muted-foreground">{item.sublabel}</span> : null}
                         </span>
                       </Button>
                     </li>
