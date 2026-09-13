@@ -79,14 +79,14 @@ export default defineConfig({
         // merged in (Session E step 10's wrap-up merge, 2026-09-06): it
         // crossed 2 MiB from real app growth (entities/relationships/
         // grants, STT, the memory bench's own types, this step's own
-        // Lingui addition), not from anything wrong with the build. The
-        // shell chunk is exactly what this app-shell service worker
-        // exists to cache in full (this file's own header comment); a
-        // real code-splitting pass to shrink it is separate, tracked
-        // work (docs/BACKLOG.md, "Real code-splitting for the frontend
-        // shell chunk"), not something to paper over by silently
-        // excluding the shell from precache.
-        maximumFileSizeToCacheInBytes: 5 * 1024 * 1024,
+        // Lingui addition), not from anything wrong with the build.
+        // Worked around then by raising this ceiling to 5 MiB; the real
+        // fix (lane 10 item 2, docs/BACKLOG.md's "Real code-splitting
+        // for the frontend shell chunk") is route-level `import()` for
+        // every app but Home and Chat (App.tsx's `lazyNamed`), which
+        // dropped the entry chunk to ~1.85 MiB - back under the
+        // default, so the override is gone rather than left at a value
+        // nothing needs anymore.
       },
     }),
   ],

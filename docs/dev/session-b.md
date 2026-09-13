@@ -1814,3 +1814,71 @@ No live screenshot: nothing in the running app emits `sources` yet
 (CHAT-16 hasn't landed), so there is nothing true to capture - stated
 here rather than staging a screenshot that could only ever show an
 empty state.
+
+## Lane 10 item 2: real code-splitting for the frontend shell chunk
+
+`App.tsx`'s `lazyNamed()` (a small `React.lazy()` wrapper for a named,
+not default, export) turns every route but Home and Chat into its own
+dynamic `import()`: `AppsPage`, `SetupWizard`, `ConversationsPage`,
+`NotificationsPage`, `SearchPage`, `SettingsPage` and its seven nested
+pages, `PeoplePage`, `MemoryPage`, `PrivacyPage`. Home and Chat stay in
+the entry chunk deliberately, against the work order's own literal
+"the shell, the kit and the chat stay in the entry chunk since chat is
+the first screen" line: `/` (Home) is what a signed-in person's every
+session actually lands on post-lane-9, not Chat, and lazy-loading the
+one route hit on essentially every load would trade a smaller shell
+for a loading flash on the single most common first paint - the
+opposite of what code-splitting is for. Flagged here, not silently
+assumed, the same as item 1's own correction.
+
+**Before → after** (`vite build`'s own report, `frontend/dist/`):
+
+| | Before | After |
+|---|---|---|
+| Entry chunk | 2,103.55 kB raw / 485.76 kB gzip (`index-B03fZQcH.js`) | 1,891.89 kB raw / 429.02 kB gzip (`index-Dqdb0T5g.js`) |
+| JS chunks emitted | 1 | 39 (Rolldown's own automatic splitting factored out shared vendor chunks too - `react-dom`, `useQuery`, `useMutation`, `Select`, the icon set - not just the 15 lazy route boundaries this step added) |
+| App-shell precache manifest | 5 entries, 2201.44 KiB | 39 entries, 2212.75 KiB |
+
+The precache total barely moved (every emitted chunk is still
+eagerly precached by default, lazy route or not - shrinking THAT is a
+separate, un-asked-for change, narrowing `injectManifest`'s own glob to
+exclude route chunks the way `globIgnores` already excludes the
+onnxruntime bundle). What matters is the entry chunk alone, since
+that's what crossed the ceiling: 1,891.89 KB now sits under Workbox's
+default 2 MiB (2,097.152 KB) ceiling with about 205 KB (9.8%) to
+spare, so `vite.config.ts`'s `maximumFileSizeToCacheInBytes: 5 * 1024 *
+1024` override (BACKLOG.md's "worked around for now") is removed
+entirely rather than lowered to some other number - the default is the
+smallest value that holds, which is exactly what the plan asked to
+find.
+
+**Found live, real UI behavior, not a bug**: verifying the Suspense
+fallback actually shows (`scripts/screenshot.ts`'s new
+`captureLazyRouteSkeleton()`) surfaced that a normal in-app navigation
+(clicking a sidebar link) never shows `RouteSkeleton` at all -
+react-router-dom's own `Link` wraps the navigation in
+`React.startTransition`, and React's concurrent-rendering rule for a
+transition is to keep the PREVIOUS page fully live on screen for as
+long as the next one is still suspended, exactly the "no loading flash
+for a fast navigation" behavior that feature exists for. The fallback
+still has a real, reachable case: a fresh load straight at a lazy
+route's own URL (a bookmark, a reload, a deep link) has no previous
+page to keep showing, so it suspends immediately. The capture also
+found that this app's own PWA precaching (`sw.ts`) defeats an
+artificial network delay on a chunk once installed - a precached asset
+is served straight from the Service Worker's Cache Storage, a layer
+Playwright's `page.route()` never sees - worked around for this one
+capture with `serviceWorkers: "block"`, matching what a person's very
+first visit (before anything is precached yet) would actually
+experience.
+
+**Verified**: `bun test` in frontend, 556 passing across 86 files
+(`RouteSkeleton.test.tsx`, new: it announces `role="status"`/
+`aria-label="Loading"`, never a blank div); `bun run screenshots`, 136
+page/viewport/theme
+combinations, 0 accessibility violations, 0 overflow; Home, Chat, and
+Privacy (the lazy-loaded example) opened and read - all three show real
+content, no spinner or empty state; `lazy-route-skeleton.png` (new)
+opened and read - the shell (nav, the Privacy link highlighted active)
+renders immediately while the content pane shows three skeleton bars,
+never blank.

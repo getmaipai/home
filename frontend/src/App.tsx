@@ -1,5 +1,4 @@
-import { AppsPage } from "@/apps/library/AppsPage";
-import { useEffect, useState } from "react";
+import { lazy, Suspense, useEffect, useState, type ComponentType } from "react";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { I18nProvider } from "@lingui/react";
@@ -8,29 +7,55 @@ import { createQueryClient } from "@/lib/queryClient";
 import { SignIn } from "@/shell/SignIn";
 import { Shell } from "@/shell/Shell";
 import { useHouseholdLocale } from "@/shell/useHouseholdLocale";
-import { SetupWizard } from "@/apps/setup/SetupWizard";
 import { ChatPage } from "@/apps/chat/ChatPage";
-import { ConversationsPage } from "@/apps/conversations/ConversationsPage";
-import { NotificationsPage } from "@/apps/notifications/NotificationsPage";
 import { HomePage } from "@/apps/home/HomePage";
-import { SearchPage } from "@/apps/search/SearchPage";
-import { SettingsPage } from "@/apps/settings/SettingsPage";
-import { ModelsPage } from "@/apps/settings/ModelsPage";
-import { BackupsPage } from "@/apps/settings/BackupsPage";
-import { VoicesPage } from "@/apps/settings/VoicesPage";
-import { CommandsPage } from "@/apps/settings/CommandsPage";
-import { RepairsPage } from "@/apps/settings/RepairsPage";
-import { HealthSection } from "@/apps/settings/HealthSection";
-import { UsersPage } from "@/apps/settings/UsersPage";
-import { DevicesPage } from "@/apps/settings/DevicesPage";
-import { PeoplePage } from "@/apps/people/PeoplePage";
-import { MemoryPage } from "@/apps/memory/MemoryPage";
-import { PrivacyPage } from "@/apps/privacy/PrivacyPage";
 import { Progress } from "@/kit/primitives/Progress";
+import { RouteSkeleton } from "@/kit/primitives/RouteSkeleton";
 import { ErrorBoundary } from "@/kit/primitives/ErrorBoundary";
 import { ToastProvider } from "@/kit/primitives/Toast";
 import { TooltipProvider } from "@/kit/ui/tooltip";
 import { api, type Roster } from "@/lib/api";
+
+// A small helper for a named export, since `lazy()` itself only takes a
+// promise of `{ default }` - every page below is a named export, not a
+// default one, and repeating `.then((m) => ({ default: m.X }))` 15 times
+// inline would bury the one line that actually matters (which route).
+function lazyNamed<P extends object>(loader: () => Promise<Record<string, unknown>>, name: string) {
+  return lazy(() => loader().then((m) => ({ default: m[name] as ComponentType<P> })));
+}
+
+// Lane 10 item 2 (docs/BACKLOG.md's "Real code-splitting for the frontend
+// shell chunk"): every app EXCEPT Home and Chat becomes its own chunk,
+// dynamic-imported only once its route is actually visited - Home and
+// Chat are what a signed-in person's very first paint renders on
+// essentially every session, so keeping them eager avoids trading "a
+// smaller shell" for "a loading flash on the one screen everybody hits
+// every time." The shell and the kit stay in the entry chunk too (they
+// render on every route, lazy-loading them would just delay the first
+// paint instead of shrinking it).
+const AppsPage = lazyNamed<{ person: Roster }>(() => import("@/apps/library/AppsPage"), "AppsPage");
+const SetupWizard = lazyNamed<{ onDone: () => void }>(() => import("@/apps/setup/SetupWizard"), "SetupWizard");
+const ConversationsPage = lazyNamed<{ person: Roster }>(
+  () => import("@/apps/conversations/ConversationsPage"),
+  "ConversationsPage",
+);
+const NotificationsPage = lazyNamed(() => import("@/apps/notifications/NotificationsPage"), "NotificationsPage");
+const SearchPage = lazyNamed<{ person: Roster }>(() => import("@/apps/search/SearchPage"), "SearchPage");
+const SettingsPage = lazyNamed<{ person: Roster; onPersonChange: () => void }>(
+  () => import("@/apps/settings/SettingsPage"),
+  "SettingsPage",
+);
+const ModelsPage = lazyNamed<{ person: Roster }>(() => import("@/apps/settings/ModelsPage"), "ModelsPage");
+const BackupsPage = lazyNamed<{ person: Roster }>(() => import("@/apps/settings/BackupsPage"), "BackupsPage");
+const VoicesPage = lazyNamed<{ person: Roster }>(() => import("@/apps/settings/VoicesPage"), "VoicesPage");
+const CommandsPage = lazyNamed<{ person: Roster }>(() => import("@/apps/settings/CommandsPage"), "CommandsPage");
+const RepairsPage = lazyNamed<{ person: Roster }>(() => import("@/apps/settings/RepairsPage"), "RepairsPage");
+const HealthSection = lazyNamed<{ person: Roster }>(() => import("@/apps/settings/HealthSection"), "HealthSection");
+const UsersPage = lazyNamed<{ person: Roster }>(() => import("@/apps/settings/UsersPage"), "UsersPage");
+const DevicesPage = lazyNamed(() => import("@/apps/settings/DevicesPage"), "DevicesPage");
+const PeoplePage = lazyNamed(() => import("@/apps/people/PeoplePage"), "PeoplePage");
+const MemoryPage = lazyNamed<{ person: Roster }>(() => import("@/apps/memory/MemoryPage"), "MemoryPage");
+const PrivacyPage = lazyNamed(() => import("@/apps/privacy/PrivacyPage"), "PrivacyPage");
 
 // One QueryClient for the app's lifetime (docs/plans/session-b-ui.md
 // step 3): created once, outside the component, not per render.
@@ -85,7 +110,14 @@ export function App() {
             <TooltipProvider>
               <BrowserRouter>
                 <Routes>
-                  <Route path="/setup" element={<SetupWizard onDone={loadPerson} />} />
+                  <Route
+                    path="/setup"
+                    element={
+                      <Suspense fallback={<RouteSkeleton />}>
+                        <SetupWizard onDone={loadPerson} />
+                      </Suspense>
+                    }
+                  />
                   <Route
                     path="/*"
                     element={
@@ -101,41 +133,43 @@ export function App() {
                           onSignOut={() => api.logout().finally(() => setPerson(null))}
                           onPersonChange={revalidatePerson}
                         >
-                          <Routes>
-                            <Route path="/" element={<HomePage person={person} />} />
-                            <Route path="/apps" element={<AppsPage person={person} />} />
-                            <Route path="/chat" element={<ChatPage person={person} />} />
-                            <Route path="/conversations" element={<ConversationsPage person={person} />} />
-                            <Route path="/notifications" element={<NotificationsPage />} />
-                            <Route path="/search" element={<SearchPage person={person} />} />
-                            <Route path="/people" element={<PeoplePage />} />
-                            <Route path="/memory" element={<MemoryPage person={person} />} />
-                            <Route path="/privacy" element={<PrivacyPage />} />
-                            <Route
-                              path="/settings"
-                              element={<SettingsPage person={person} onPersonChange={revalidatePerson} />}
-                            >
-                              {/* Nested (2026-09-06), not sibling routes: navigating to
-                                  one of these used to unmount SettingsPage entirely,
-                                  taking the tree rail/Household-Me switcher/search box
-                                  down with it. SettingsPage renders these through its
-                                  own <Outlet/>, so its chrome stays put. */}
-                              <Route path="users" element={<UsersPage person={person} />} />
-                              <Route path="models" element={<ModelsPage person={person} />} />
-                              <Route path="backups" element={<BackupsPage person={person} />} />
-                              <Route path="voices" element={<VoicesPage person={person} />} />
-                              <Route path="commands" element={<CommandsPage person={person} />} />
-                              <Route path="devices" element={<DevicesPage />} />
-                              <Route path="repairs" element={<RepairsPage person={person} />} />
-                              {/* No AdminGatedContent wrapper, unlike Repairs
-                                  and Backups above it: Health is
-                                  informational for every signed-in household
-                                  member (app.ts's healthRoute is requireAuth,
-                                  not requireRole), so HealthSection gates
-                                  only its own restart control, not the page. */}
-                              <Route path="health" element={<HealthSection person={person} />} />
-                            </Route>
-                          </Routes>
+                          <Suspense fallback={<RouteSkeleton />}>
+                            <Routes>
+                              <Route path="/" element={<HomePage person={person} />} />
+                              <Route path="/apps" element={<AppsPage person={person} />} />
+                              <Route path="/chat" element={<ChatPage person={person} />} />
+                              <Route path="/conversations" element={<ConversationsPage person={person} />} />
+                              <Route path="/notifications" element={<NotificationsPage />} />
+                              <Route path="/search" element={<SearchPage person={person} />} />
+                              <Route path="/people" element={<PeoplePage />} />
+                              <Route path="/memory" element={<MemoryPage person={person} />} />
+                              <Route path="/privacy" element={<PrivacyPage />} />
+                              <Route
+                                path="/settings"
+                                element={<SettingsPage person={person} onPersonChange={revalidatePerson} />}
+                              >
+                                {/* Nested (2026-09-06), not sibling routes: navigating to
+                                    one of these used to unmount SettingsPage entirely,
+                                    taking the tree rail/Household-Me switcher/search box
+                                    down with it. SettingsPage renders these through its
+                                    own <Outlet/>, so its chrome stays put. */}
+                                <Route path="users" element={<UsersPage person={person} />} />
+                                <Route path="models" element={<ModelsPage person={person} />} />
+                                <Route path="backups" element={<BackupsPage person={person} />} />
+                                <Route path="voices" element={<VoicesPage person={person} />} />
+                                <Route path="commands" element={<CommandsPage person={person} />} />
+                                <Route path="devices" element={<DevicesPage />} />
+                                <Route path="repairs" element={<RepairsPage person={person} />} />
+                                {/* No AdminGatedContent wrapper, unlike Repairs
+                                    and Backups above it: Health is
+                                    informational for every signed-in household
+                                    member (app.ts's healthRoute is requireAuth,
+                                    not requireRole), so HealthSection gates
+                                    only its own restart control, not the page. */}
+                                <Route path="health" element={<HealthSection person={person} />} />
+                              </Route>
+                            </Routes>
+                          </Suspense>
                         </Shell>
                       )
                     }

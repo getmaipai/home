@@ -12766,6 +12766,10 @@ other's section once (147cd28, f4779a6).
   clearance Shell.tsx already reserves for it), proven to fail then
   fixed with a real-layout check in scripts/screenshot.ts:
   [docs/dev/session-b.md](dev/session-b.md) (2026-09-13).
+- Item 4c, the household invention guard reads a present activity for
+  a roster name, the second person or a pronoun ("Sage is watching it
+  too!"), grounded only by a line that says so about that subject: <!-- prose-lint: allow -->
+  [docs/dev/session-a.md](dev/session-a.md) (2026-09-13).
 - Item 4b, "forget that" in conversation is the engine's own command
   (the previous turn's records tombstoned and its episodes gone, or the
   turn skipped before the judge reads it; a topic clears every record
@@ -12870,4 +12874,16 @@ other's section once (147cd28, f4779a6).
   `citation:` URI scheme silently died to react-markdown's own
   `urlTransform` (the same guard that blocks `javascript:` links);
   fixed with a `#citation-N` fragment instead:
+  [docs/dev/session-b.md](dev/session-b.md) (2026-09-13).
+- Lane 10 item 2, real code-splitting for the frontend shell chunk:
+  route-level `React.lazy()` for every app but Home and Chat (kept
+  eager against the work order's own "chat is the first screen" line -
+  Home is what every session actually lands on post-lane-9), entry
+  chunk 2,103.55 kB to 1,891.89 kB raw, back under Workbox's default 2
+  MiB precache ceiling so the 5 MiB override is gone. Found live:
+  react-router-dom's own `startTransition` wrapping means a normal
+  in-app navigation never shows the new `RouteSkeleton` fallback at
+  all (React keeps the previous page live instead) - only a fresh load
+  straight at a lazy route's URL suspends, which is what the new
+  screenshot capture drives instead of a click:
   [docs/dev/session-b.md](dev/session-b.md) (2026-09-13).

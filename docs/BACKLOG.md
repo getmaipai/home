@@ -2090,7 +2090,7 @@ clear it in full:
 - [ ] **The far surface's type scale per script** (S, blocked on a
       non-Latin `household.locale` option existing) - see the deferral
       note above.
-- [ ] **Real code-splitting for the frontend shell chunk** (M) - found
+- [x] **Real code-splitting for the frontend shell chunk** (M) - found
       at Session E's own step 10 wrap-up merge (2026-09-06): the main
       chunk crossed the PWA plugin's default 2 MiB precache ceiling once
       everything Wave 2 merged in landed together (real growth, not a
@@ -2103,6 +2103,22 @@ clear it in full:
       populate - not a fix for the underlying size. `vite build`'s own
       suggestion (`dynamic import()`, `rolldownOptions.output.
       codeSplitting`) is the real fix, unexplored so far.
+
+      **Status, done 2026-09-13 (lane 10 item 2)**: route-level
+      `React.lazy()` (`App.tsx`'s `lazyNamed()`) for every app but Home
+      and Chat (docs/dev/session-b.md, "Lane 10 item 2," has the reasoning
+      for keeping those two eager). Entry chunk 2,103.55 kB → 1,891.89 kB
+      raw (485.76 kB → 429.02 kB gzip), 1 JS chunk → 39 (Rolldown's own
+      automatic vendor splitting, not just this step's 15 route
+      boundaries). That's back under Workbox's default 2 MiB ceiling with
+      about 205 KB (9.8%) to spare, so the `maximumFileSizeToCacheInBytes`
+      override is removed entirely rather than lowered to some other
+      number. `RouteSkeleton` (new, `kit/primitives/`) is the Suspense
+      fallback; a real in-app navigation never shows it at all
+      (react-router-dom's `Link` wraps navigation in `startTransition`,
+      which keeps the previous page live rather than flash a loader), but
+      a fresh load straight at a lazy route's own URL does, screenshotted
+      and opened (`docs/assets/screens/lazy-route-skeleton.png`).
 
 Default packages are held to the same bar as community ones per
 `PACKAGES.md` - the release skill is meant to refuse shipping a default

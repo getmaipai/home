@@ -694,6 +694,48 @@ async function capturePaletteOpen(browser: Browser, sessionValue: string, viewpo
   }
 }
 
+/** Lane 10 item 2's own acceptance: "the loading state between chunks
+ * must be the kit's own skeleton, never a blank screen: take one shot
+ * mid-load if the script can." Two things stack against catching it
+ * against a click-driven in-app navigation: a real localhost fetch for
+ * a lazy chunk (App.tsx's `lazyNamed`) resolves in a few milliseconds,
+ * and react-router-dom's own `Link` wraps a navigation in
+ * `startTransition` - React's own concurrent-rendering rule then keeps
+ * the PREVIOUS page fully on screen for as long as the next one is
+ * still suspended, never showing the Suspense fallback at all, exactly
+ * the "no flash for a fast navigation" behavior that feature exists
+ * for. A fresh load straight at a lazy route's own URL has no previous
+ * page to keep showing, so this is a `page.goto()` directly to
+ * `/privacy`, not a click from `/` - the real shape a bookmarked link
+ * or a reload lands in. `serviceWorkers: "block"` turns off this app's
+ * own PWA precaching (`sw.ts`) for this one context, since a precached
+ * chunk is served straight from the Service Worker's Cache Storage, a
+ * layer Playwright's page-level network interception never sees - the
+ * artificial `page.route()` delay below only affects the real network
+ * fetch a person's very first visit, before anything is precached yet,
+ * would also see. */
+async function captureLazyRouteSkeleton(browser: Browser, sessionValue: string): Promise<void> {
+  const viewport = VIEWPORTS.find((v) => v.slug === "desktop")!;
+  const context = await browser.newContext({
+    viewport: { width: viewport.width, height: viewport.height },
+    colorScheme: "light",
+    serviceWorkers: "block",
+  });
+  try {
+    await context.addCookies([{ name: "session", value: sessionValue, url: BASE_URL }]);
+    const page = await context.newPage();
+    await page.route("**/assets/PrivacyPage-*.js", async (route) => {
+      await new Promise((resolve) => setTimeout(resolve, 1500));
+      await route.continue();
+    });
+    await page.goto(`${BASE_URL}/privacy`);
+    await page.locator('[role="status"][aria-label="Loading"]').waitFor({ timeout: 5000 });
+    await page.screenshot({ path: join(SCREENS_DIR, "lazy-route-skeleton.png") });
+  } finally {
+    await context.close();
+  }
+}
+
 async function captureHero(browser: Browser, sessionValue: string): Promise<void> {
   const context = await newContext(browser, { slug: "desktop", width: 1280, height: 800 }, "dark", sessionValue);
   try {
@@ -1035,6 +1077,7 @@ async function main() {
       const desktop = VIEWPORTS.find((v) => v.slug === "desktop")!;
       await capturePaletteOpen(browser, sessionValue, phone, "dark");
       await capturePaletteOpen(browser, sessionValue, desktop, "light");
+      await captureLazyRouteSkeleton(browser, sessionValue);
     }
 
     const combos = a11yOnly || settingsReview || chatReview
