@@ -786,3 +786,91 @@ so an assistant guess that passed once can re-enter grounding through
 the summary after the window rolls; a summary is a lossy aid (it never
 grounds an action), and CHAT-02/CHAT-16 are where the summary's own
 provenance gets its treatment.
+
+## CHAT-02: one output safety boundary, design (2026-09-13)
+
+What reaches the household unchecked today. The model's own text is
+evaluated (`runTurn()` checks the whole reply, `runTurnStream()`'s
+`gateOutputSafety()` checks each sentence and the final fragment).
+Everything else is not: a Tier 0/1 package reply from `runPlugin()`
+(the knowledge package's fetched extract, a search result), a Tier 2
+result from `resolveToolCalls()` (the FAST-04 resolved reply, which
+skips the style guards on purpose and, as built, skips the safety
+check with them), a confirm or ask prompt from a recipe, a package's
+`fallback_reply` on error, a household command's result, and an
+explicit `reply.speech` that differs from `reply.text` (`finalizeReply()`
+returns such a value untouched: no evaluation, no normalization). A
+package that calls `host.llm.complete` gets model text that reaches
+the household only through its own reply, so the same hole covers it.
+Parent notifications fire once per evaluation, so a stream with three
+flagged sentences notifies three times. Two gates are different
+things and stay apart: the style guards (`guards.ts`, honesty) and the
+safety evaluator (`safety.ts`, the mandatory floor); the resolved reply
+keeps skipping the first and must reach the second before the done
+event.
+
+### What changes
+
+`safety.ts` gains `evaluateReply(reply, band)`: one implementation
+over the existing `evaluateSafety()` and vocabulary that evaluates
+`reply.text` and, when `reply.speech` is present and differs,
+`reply.speech` independently, returning the text result, the speech
+result and the effective action (the stricter of the two: a refusal
+on either side refuses the reply). Nothing new in policy; the same
+classifier, the same age band from `speakerAgeBand()`.
+
+`turnEngine.ts` gains `applyOutputBoundary(actor, value, turnId)` and
+calls it as the first step of `finalizeReply()`, the one point every
+`TurnValue` already passes through before a caller sees it (`runTurn()`'s
+return, `runTurnStream()`'s immediate result, the resolved outcome
+inside `peekAndHandle()`, and `finalize()`'s text path), so ordinary
+completions, direct package replies, package-generated text, pending
+prompts, error fallbacks and command results all reach it before
+visible text, audio (`reply.speech` is read from the finalized value)
+and the persisted assistant reply (`logTurn()` runs after
+`finalizeReply()`). An input-side refusal (`source: safety_refuse`) is
+already a refusal and passes through. On `refuse` the value becomes a
+refusal: empty text, `source: safety_refuse`, the output result as
+`safety`, crisis resources kept when the category carries them, and
+the canned refusal line from `finalizeReply()`'s existing branch; a
+refused confirm or ask prompt also clears the conversation's pending
+ask, so the parked action can never run on a later "yes". On
+`allow_with_resources` the resources are attached where the value had
+none. Normalization (`normalizeForSpeech`) and the canned-phrase
+variation run after, on approved text only. Notifications go through
+`notifyOncePerTurn()`, a wrapper over the existing `notifyIfFlagged()`
+keyed by turn id and category (a small bounded set), so a turn's
+sentences and its final whole-reply check notify once per category;
+`notifications.ts` itself is not edited (Session B holds it).
+
+`gateOutputSafety()` keeps its per-sentence delivery and adds the
+cumulative check the "split-chunk" case needs: each boundary
+evaluates the sentence and the reply so far together, so content that
+is safe in two halves and unsafe as one is stopped before the second
+half is yielded. The final fragment without punctuation is already
+evaluated; whitespace fidelity stays as it is (the raw span is
+yielded). A refusal still throws `StreamSafetyRefusal`, which cancels
+generation through `holdLease()` and reaches the route's error event;
+the streamed text's `finalize()` then passes through `finalizeReply()`
+like every other value.
+
+No opt-out, no persona exception, no manifest flag, no change to the
+floor or ceiling fixtures. `packageHost.ts` is not edited: package text
+reaches the household only through a `TurnValue`, and the boundary sits
+on that.
+
+### Acceptance, as tests
+
+`turnEngine.test.ts`: safe input, unsafe direct package output (the
+knowledge package answering "tell me about Seattle" from a cache
+seeded with an unsafe extract) is refused before exposure, through
+`runTurn()` and through `runTurnStream()`'s immediate result, with the
+same decision and one notification; a Tier 2 resolved result carrying
+unsafe text is refused inside the stream before the done event; a
+value whose `reply.speech` is unsafe while its `reply.text` is safe is
+refused; a stream whose two sentences are each safe and unsafe together
+stops before the second is delivered; an unsafe final fragment without
+punctuation is stopped; three flagged sentences notify once per
+category; a refused confirm prompt leaves no pending ask. `safety.test.ts`:
+`evaluateReply()` on text, on speech, on both. The shared safety
+corpus suites and the floor/ceiling fixtures unchanged and green.

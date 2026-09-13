@@ -12648,3 +12648,5 @@ other's section once (147cd28, f4779a6).
 - CHAT-01, one turn context for generation and the guards: design note
   and the shipped record in [docs/dev/session-a.md](dev/session-a.md)
   (2026-09-13).
+- CHAT-02, one output safety boundary: design note in
+  [docs/dev/session-a.md](dev/session-a.md) (2026-09-13).
