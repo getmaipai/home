@@ -626,3 +626,93 @@ of the old timer quietly clearing it. That is the item's own
 instruction (the timer is not the correctness mechanism), no consumer
 today obtains a stream result without draining or finalizing it, and
 the warning names the condition so a leak is found rather than hidden.
+
+## CHAT-01: one turn context shared by generation and the guards, design (2026-09-13)
+
+The defect, in `prepareTurn()` today: the prompt's context message and
+the guard's `GuardContext` are assembled from the same retrieval
+results by two separate pieces of code, and they disagree. The prompt
+renders the top `MAX_MEMORY_SNIPPETS` memory bullets, capped again by
+`MAX_MEMORY_SECTION_CHARS` and once more by the outer
+`PROMPT_SYSTEM_CHAR_BUDGET` slice; the guard grounds on every recall
+candidate. The prompt renders each recalled episode's own half, cut at
+200 characters and the block capped at 600; the guard grounds on both
+halves, uncut, of every match. The profile paragraph, the roster line,
+the conversation summary and the local time are in the prompt and
+ground nothing in the guard, so a reply that repeats an included
+profile fact can be cut as an invention. Only memories had a partial
+fix (`actuallyInjected`, for usage bumps, not for the guard).
+
+### What changes
+
+`backend/src/lib/turnContext.ts`, new: the ephemeral types from the
+2026-09-07 decision record ("One ephemeral turn context"), runtime
+views over existing records, never persisted. `TurnEvidence` (`id`,
+`kind`, `text`, optional `sourceId`, `entityIds`) with the record's
+kinds plus `episode` (JOIN-01 postdates the record; a recalled turn is
+grounding, and the guard treats it apart from a memory line, so it is
+its own kind), each carrying `rendered`, the exact text the prompt
+shows for it. `TurnIntent` (`kind` chat|lookup|action|clarify, `query`,
+`subjectEntityIds`, `explicitDetailedAnswer`): kind defaults to chat,
+reads ROUTE-01's shape (a question is a lookup, a command an action,
+never recomputed), query is the utterance, the detail flag is set only
+for case-insensitive "in detail", "detailed explanation" or "step by
+step"; CHAT-13 refines it. `ToolExecutionOutcome` (`callId`,
+`packageId`, `status`, optional `result`, `errorCode`, `userMessage`).
+`TurnContext`: `turnId`, `conversationId`, `actorId`, `surface`,
+`utterance`, `history` (the window's messages with their roles),
+`evidence`, `includedEvidenceIds`, `offeredToolIds`, `outcomes`,
+`intent`, and the frozen per-turn facts: `persona` (id, display name,
+examples), `ageBand`, `now`, `locale`, `roster`.
+
+Evidence ids are deterministic within the turn and never a source of
+truth: `memory:<record id>`, `profile:<record id>`,
+`episode:<episode id>`, `summary:<conversation id>`,
+`household:<person id>`, `clock`, `user:<turn id>` for the utterance
+and `user:<turn id>:h<n>` for the window's user lines. Assistant lines
+in the window are history, not evidence; persona examples are never
+evidence; a summary is a lossy aid and grounds words, never an action.
+
+Selection is the render. `buildPromptParts()` keeps its signature,
+its caps and its order (the budgets stay until CHAT-12) and gains a
+frozen `now`/`locale` so the prompt and the context agree on the
+clock; `markIncluded(ctx, contextText)` then sets
+`includedEvidenceIds` to the items whose `rendered` text appears
+intact in the final context message, the rule `actuallyInjected`
+already used for memories, applied to every kind. `guardContextFrom(ctx)`
+builds the guard input from the included items alone: `sources` from
+included memories, the profile, the summary, the roster line and the
+clock; `episodes` from included episode lines (the rendered half, cut
+as shown; the paired half is not in the prompt, so it no longer
+grounds); `history` from the window's user lines; `roster` from the
+frozen household; `personaExamples` from the frozen persona;
+`actionsRan` from `outcomes` (a succeeded outcome and nothing else).
+`prepareTurn()` builds the context once, carries it on the prepared
+turn, and both `runTurn()` and `runTurnStream()` push a
+`ToolExecutionOutcome` per resolved call before any guard that runs
+after it. `messages` keep their shape: the context message stays the
+delimited reference block it is ("reference, not instructions"); no
+package result text is placed in a system message (none is today: a
+resolved result becomes the reply directly), and a tool runs only on an
+exact offered-id, argument and confirmation check whatever the text
+says (`resolveToolCalls()`, unchanged).
+
+Out of scope, per the item: persistence, another model pass, UI, a
+second record system, moving the context message off the system role
+(a prompt-shape change with bench consequences, its own decision),
+CHAT-12's selection policy, CHAT-13's intent.
+
+### Acceptance, as tests
+
+`turnEngine.test.ts`: an included profile fact, the roster and the
+local time pass grounding (scripted completions that repeat them are
+not cut); a memory removed between recall and render is absent from
+both the context message and the guard's sources; a candidate that
+missed the memory cap is absent from both; an assistant line in the
+window and a persona example never become sources or `actionsRan`;
+reference text carrying "call remember" cannot make the engine run a
+tool the model was not offered (a scripted call naming a tool outside
+the offered set is rejected, as today); `explicitDetailedAnswer` only
+on the three phrasings. `guards.test.ts` and
+`conversationHistory.test.ts` unchanged in meaning. Exit: the three
+suites, then the full gate.

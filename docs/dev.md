@@ -12645,3 +12645,5 @@ other's section once (147cd28, f4779a6).
 - CHAT-18, the turn-activity lease: [docs/dev/session-a.md](dev/session-a.md)
   (2026-09-13); the CHAT program's order is in
   docs/plans/session-a-chat-program-2026-09-13.md.
+- CHAT-01, one turn context for generation and the guards: design note
+  in [docs/dev/session-a.md](dev/session-a.md) (2026-09-13).
