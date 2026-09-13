@@ -12,6 +12,7 @@
 // What's deferred, and why, is repeated at the point it matters below;
 // read docs/dev.md's turn engine section before extending this file.
 import { evaluateSafety, evaluateReply, forOutput, carriesCrisisSignal } from "@/lib/safety";
+import { detectCredential, CREDENTIAL_SAFE_MESSAGE } from "@/lib/memoryContentPolicy";
 import { speakerAgeBand } from "@/lib/ageBand";
 import { listPackageIds, loadManifestOnly, meetsMinRole, runPlugin } from "@/lib/plugins";
 import { ensureRoutingEmbeddings, embedUtterance, scoreByEmbedding, pickTier1Winner, pickTier1WinnerAmong, utteranceShape, commandOpenersFrom, type UtteranceShape } from "@/lib/routing";
@@ -1374,6 +1375,19 @@ async function prepareTurn(
     return immediate({ reply: { text: "I can't help with that." }, source: "safety_refuse", safety });
   }
   const crisisResources = deriveCrisisResources(safety);
+
+  // CHAT-03 (docs/dev/session-a.md): a credential said in chat stops
+  // here, before the lease engages, before routing's embed, before the
+  // model, before the remember package and before the turn is logged
+  // (logTurn() redacts the value from the row). The fixed line tells the
+  // household where a password or key belongs; nothing downstream sees
+  // the value. Anything the policy misses (its stated limit: an
+  // unlabeled string with no known shape) meets remember()'s own check
+  // and the judge's before it could become a memory.
+  if (detectCredential(text).detected) {
+    console.log("[turn] credential detected in the utterance; answered with the fixed line, value never logged");
+    return immediate({ reply: { text: CREDENTIAL_SAFE_MESSAGE }, source: "policy", safety, crisis_resources: crisisResources });
+  }
 
   // Session C step 2: matched against the utterance before the floor
   // (commands, Tier 0/1/2) - a pendingAsk from an earlier turn always

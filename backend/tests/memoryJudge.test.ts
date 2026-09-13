@@ -952,3 +952,42 @@ describe("runConsolidation() - the profile paragraph (step 7)", () => {
     expect(db.select().from(memoryRecords).where(eq(memoryRecords.source, PROFILE_SOURCE)).all().length).toBe(0);
   });
 });
+
+// CHAT-03 (docs/dev/session-a.md): the judge never sends a credential to
+// the model and never writes one.
+describe("CHAT-03: the judge and credentials", () => {
+  const value = `Jun${"i".repeat(2)}per${20}26`;
+
+  test("a historical turn row carrying a credential is never sent to the judge model and is marked done with nothing written", async () => {
+    const { actor } = await owner();
+    const turn = makeTurn(actor, "hello there", "hi");
+    // A row from before the policy: written past logTurn()'s redaction, straight into the table.
+    db.update(conversationTurns).set({ userText: `remember that the wifi password is ${value}` }).where(eq(conversationTurns.id, turn.id)).run();
+    const seen: string[] = [];
+    const result = await withScriptedJudge(
+      (_schema, request) => {
+        seen.push(JSON.stringify(request));
+        return { facts: [] };
+      },
+      () => judgeTurn({ ...turn, userText: `remember that the wifi password is ${value}` }),
+    );
+    expect(result.ok).toBe(true);
+    expect(result.factsWritten).toBe(0);
+    expect(seen.join("")).not.toContain(value); // the model spy received no request with the value
+    expect(db.select().from(conversationTurns).where(eq(conversationTurns.id, turn.id)).get()?.judgeStatus).toBe("done");
+  });
+
+  test("an extracted candidate carrying a credential is dropped before the store, the vector table and the notification see it", async () => {
+    const { actor } = await owner();
+    const turn = makeTurn(actor, "the router password is on the sticker", "Noted.");
+    const result = await withScriptedJudge(
+      (schemaName) => (schemaName === "memory_extraction" ? { facts: [{ text: `the router password is ${value}`, category: "fact", scope: "household", importance: 0.6 }] } : undefined),
+      () => judgeTurn(turn),
+    );
+    expect(result.ok).toBe(true);
+    expect(result.factsWritten).toBe(0);
+    expect(db.select().from(memoryRecords).all().some((r) => r.text.includes(value))).toBe(false);
+    await new Promise((r) => setTimeout(r, 0));
+    expect(listPending(actor).some((n) => JSON.stringify(n).includes(value))).toBe(false);
+  });
+});

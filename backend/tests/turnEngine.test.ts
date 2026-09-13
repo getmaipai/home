@@ -37,7 +37,8 @@ import { listPending } from "@/lib/notifications";
 import { REFUSAL_FIRST, REFUSAL_REPEAT, REMEMBER_CONFIRM_VARIANTS } from "@/lib/replyVariation";
 import { resolvePersona, composePersonaPrompt, INFORMATION_HANDLING_POLICY, NATURALNESS_POLICY, PERSONA_IDS } from "@/lib/persona";
 import { db } from "@/db";
-import { people, conversationTurns, memoryRecords } from "@/db/schema";
+import { people, conversationTurns, memoryRecords, episodes } from "@/db/schema";
+import { CREDENTIAL_SAFE_MESSAGE } from "@/lib/memoryContentPolicy";
 import { eq } from "drizzle-orm";
 import type { TurnStreamEvent, TurnValue } from "@/wire";
 import { resolveOrCreateConversation, getPendingAsk, setPendingAsk } from "@/lib/conversationHistory";
@@ -886,6 +887,78 @@ describe("CHAT-02: one output safety boundary", () => {
       expect(value.crisis_resources).toBeDefined();
     });
     expect((await settledNotifications(ownerRow)).length).toBe(1);
+  });
+});
+
+// CHAT-03 (docs/dev/session-a.md): a credential said in chat never
+// reaches the model, the embed, the remember package or the turn log's
+// text. Synthetic value built here.
+describe("CHAT-03: a chat capture request with a credential", () => {
+  const value = `Jun${"i".repeat(2)}per${20}26`;
+
+  test("answers the fixed line, engages no engine, and logs the turn with the value redacted", async () => {
+    const { actor } = await owner();
+    const seen: string[] = [];
+    __resetLlmSupervisorForTests();
+    const { startStubLlmServer } = await import("@maipai/spec/llm/ts/stubServer.js");
+    const stub = startStubLlmServer(0, {
+      scriptedChatReply: (request) => {
+        seen.push(JSON.stringify(request));
+        return "the model should never see this turn";
+      },
+    });
+    process.env.MAIPAI_LLAMA_SERVER_URL = stub.url;
+    try {
+      const result = await runTurn(actor, "chat", `remember that the wifi password is ${value}`);
+      expect(result.ok).toBe(true);
+      if (!result.ok) return;
+      expect(result.value.source).toBe("policy");
+      expect(result.value.reply.text).toBe(CREDENTIAL_SAFE_MESSAGE);
+    } finally {
+      stub.stop();
+      delete process.env.MAIPAI_LLAMA_SERVER_URL;
+      __resetLlmSupervisorForTests();
+    }
+    expect(seen.length).toBe(0); // the chat model got no request at all
+    expect(turnActiveWithin(0)).toBe(false); // the lease never engaged an engine (no cooldown left behind)
+    const rows = db.select().from(conversationTurns).all();
+    expect(rows.length).toBe(1);
+    expect(rows[0]!.userText).toBe("[credential redacted]"); // a policy turn keeps only the marker (a second, unlabeled value would survive a span redaction)
+    expect(JSON.stringify(rows)).not.toContain(value);
+    expect(db.select().from(memoryRecords).all().some((r) => r.text.includes(value))).toBe(false); // the remember package never ran
+    expect(db.select().from(episodes).all().some((e) => e.text.includes(value))).toBe(false);
+  });
+
+  test("the same request through the streaming path is an immediate result with the fixed line", async () => {
+    const { actor } = await owner();
+    const result = await runTurnStream(actor, "chat", `my api key is ${value}, please remember it`);
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.kind).toBe("immediate");
+    if (result.kind !== "immediate") return;
+    expect(result.value.source).toBe("policy");
+    expect(result.value.reply.text).toBe(CREDENTIAL_SAFE_MESSAGE);
+  });
+
+  test("a benign statement that the password is kept elsewhere still stores a memory", async () => {
+    const { actor } = await owner();
+    const result = await runTurn(actor, "chat", "remember that the wifi password is on the fridge");
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.value.source).toBe("plugin");
+    expect(result.value.plugin_id).toBe("remember");
+    expect(db.select().from(memoryRecords).all().some((r) => r.text.includes("on the fridge"))).toBe(true);
+  });
+
+  test("the memory API refuses a credential in the text and a credential-named field with the documented 400 shape", async () => {
+    const { client } = await owner();
+    const inText = await client.post("/api/memory", { text: `the wifi password is ${value}`, category: "fact", tier: "durable", scope: "household", importance: 0.6 });
+    expect(inText.status).toBe(400);
+    expect(((await inText.json()) as { error: string }).error).toBe(CREDENTIAL_SAFE_MESSAGE);
+    const asField = await client.post("/api/memory", { text: "the wifi network is called Juniper", password: value, category: "fact", tier: "durable", scope: "household", importance: 0.6 });
+    expect(asField.status).toBe(400);
+    expect(((await asField.json()) as { error: string }).error).toBe(CREDENTIAL_SAFE_MESSAGE);
+    expect(db.select().from(memoryRecords).all().some((r) => r.text.includes(value))).toBe(false);
   });
 });
 

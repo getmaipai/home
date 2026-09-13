@@ -1,6 +1,7 @@
 import { Hono, type Context } from "hono";
 import { createRoute, z } from "@hono/zod-openapi";
 import { requireAuth, requireRole } from "@/middleware/auth";
+import { hasDeclaredCredentialField, CREDENTIAL_SAFE_MESSAGE } from "@/lib/memoryContentPolicy";
 import {
   remember,
   list,
@@ -112,6 +113,11 @@ function parseListOptions(query: URLSearchParams): ListOptions {
 memoryRoutes.post("/", requireAuth, async (c) => {
   const actor = c.get("person");
   const rawBody = await c.req.json().catch(() => null);
+  // CHAT-03: the declared-field half of the content policy, at the
+  // boundary: a body carrying a credential-named field is refused by
+  // name, before the schema strips unknown keys. The text itself meets
+  // the same policy inside remember().
+  if (hasDeclaredCredentialField(rawBody)) return c.json({ error: CREDENTIAL_SAFE_MESSAGE }, 400);
   const parsed = RememberBodySchema.safeParse(rawBody);
   if (!parsed.success) return c.json({ error: parsed.error.issues.map((i) => i.message).join("; ") }, 400);
   const body = parsed.data;

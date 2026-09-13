@@ -42,7 +42,10 @@ export interface TurnValue {
   // "confirm" (Session C step 2): a pendingAsk resolved to "no" - the
   // person declined, nothing ran. A "yes" instead runs the pending
   // plugin and reports "plugin"/"plugin_error" as usual.
-  source: "safety_refuse" | "plugin" | "plugin_error" | "command" | "command_error" | "model" | "confirm";
+  /** CHAT-03 adds `policy`: a deterministic line from a content policy
+   * (today the one: "Keep passwords and keys in Credentials, not in
+   * chat."), neither a package's answer nor the model's words. */
+  source: "safety_refuse" | "plugin" | "plugin_error" | "command" | "command_error" | "model" | "confirm" | "policy";
   plugin_id?: string;
   command_id?: string;
   safety: SafetyResult;

@@ -96,6 +96,10 @@ function buildLegacyFixture(): string {
     ["msg-2", "assistant", "Hello, Bramble!", now - 990],
     ["msg-3", "user", "How are you?", now - 980],
     ["msg-4", "assistant", "I'm doing well, thanks.", now - 970],
+    // CHAT-03: a legacy chat line holding a credential (synthetic) lands
+    // redacted on import, never verbatim.
+    ["msg-5", "user", `by the way the wifi password is Jun${"i".repeat(2)}per${20}26`, now - 960],
+    ["msg-6", "assistant", "Noted.", now - 950],
   ];
   for (const [id, role, content, createdAt] of msgs) {
     legacy.query("INSERT INTO messages (id, conversation_id, role, content, active, created_at) VALUES (?,?,?,?,1,?)").run(id, "conv-normal", role, content, createdAt);
@@ -129,7 +133,13 @@ function buildLegacyFixture(): string {
     .run("mem-willow-pref", "user-willow", null, "Willow loves gardening", "preference", "durable", "active", 8, now - 2000);
   legacy
     .query("INSERT INTO memories (id, user_id, character_id, text, category, tier, status, importance, pinned, sensitive, created_at) VALUES (?,?,?,?,?,?,?,?,0,0,?)")
-    .run("mem-household-wifi", null, "char-1", "The wifi password is Juniper2026", "fact", "episodic", "active", 6, now - 3000);
+    .run("mem-household-wifi", null, "char-1", "The wifi password is written on the fridge", "fact", "episodic", "active", 6, now - 3000);
+  // CHAT-03: a legacy memory that holds a credential is refused by the
+  // one content policy on import and reported, never brought across
+  // (a synthetic value, built here).
+  legacy
+    .query("INSERT INTO memories (id, user_id, character_id, text, category, tier, status, importance, pinned, sensitive, created_at) VALUES (?,?,?,?,?,?,?,?,0,0,?)")
+    .run("mem-legacy-secret", null, "char-1", `The router password is Jun${"i".repeat(2)}per${20}26`, "fact", "episodic", "active", 6, now - 2900);
   legacy
     .query("INSERT INTO memories (id, user_id, character_id, text, category, tier, status, importance, pinned, sensitive, created_at) VALUES (?,?,?,?,?,?,?,?,0,0,?)")
     .run("mem-bramble-entity", "user-bramble", null, "Rivet: Bramble's brother", "person", "durable", "active", 9, now - 1500);
@@ -189,7 +199,7 @@ describe("runLegacyImport()", () => {
     expect(result.counts.peopleSkippedMinor).toBe(1);
     // 5 memories total: 1 archived is never counted, 1 belongs to the
     // skipped child - 3 real candidates.
-    expect(result.counts.memoriesImported).toBe(3);
+    expect(result.counts.memoriesImported).toBe(4); // the dry run counts the credential row too: nothing runs the policy until a write
     expect(result.counts.memoriesSkippedNoPerson).toBe(1);
     // 2 real conversations (incognito excluded entirely by the query
     // itself, never even counted as skipped).
@@ -197,7 +207,7 @@ describe("runLegacyImport()", () => {
     // conv-normal: 2 paired turns + 1 discarded-branch exclusion (active=0
     // is filtered by the SQL itself, not paired at all).
     // conv-orphaned: 1 orphaned turn.
-    expect(result.counts.turnsImported).toBe(3);
+    expect(result.counts.turnsImported).toBe(4);
 
     // Nothing was actually written.
     expect(db.select().from(people).all().length).toBe(2); // owner + Willow only
@@ -212,7 +222,10 @@ describe("runLegacyImport()", () => {
 
     const result = runLegacyImport(ownerRow, { dbPath, dryRun: false });
     expect(result.dryRun).toBe(false);
-    expect(result.errors).toEqual([]);
+    // CHAT-03: the one legacy memory holding a credential is refused and
+    // reported with the fixed line; nothing else errs.
+    expect(result.errors).toEqual(["legacy memory mem-legacy-secret: Keep passwords and keys in Credentials, not in chat."]);
+    expect(db.select().from(memoryRecords).all().some((r) => r.text.includes("per2026"))).toBe(false);
 
     const bramble = result.people.find((p) => p.legacyId === "user-bramble")!;
     expect(bramble.outcome).toBe("created");
@@ -256,7 +269,9 @@ describe("runLegacyImport()", () => {
 
     const normalTurns = db.select().from(conversationTurns).where(eq(conversationTurns.conversationId, normalConv.id)).all();
     normalTurns.sort((a, b) => a.createdAt.localeCompare(b.createdAt));
-    expect(normalTurns.length).toBe(2);
+    expect(normalTurns.length).toBe(3);
+    expect(normalTurns[2]!.userText).toBe("by the way the wifi password is [credential redacted]");
+    expect(JSON.stringify(normalTurns)).not.toContain("per2026");
     expect(normalTurns[0]!.userText).toBe("Hi there");
     expect(normalTurns[0]!.replyText).toBe("Hello, Bramble!");
     expect(normalTurns[1]!.userText).toBe("How are you?");
@@ -280,9 +295,9 @@ describe("runLegacyImport()", () => {
 
     const first = runLegacyImport(ownerRow, { dbPath, dryRun: false });
     expect(first.counts.peopleCreated).toBe(1);
-    expect(first.counts.memoriesImported).toBe(3);
+    expect(first.counts.memoriesImported).toBe(3); // the refused credential row is not counted as imported
     expect(first.counts.conversationsImported).toBe(2);
-    expect(first.counts.turnsImported).toBe(3);
+    expect(first.counts.turnsImported).toBe(4);
 
     const peopleCountAfterFirst = db.select().from(people).all().length;
     const memoryCountAfterFirst = db.select().from(memoryRecords).all().length;
@@ -297,7 +312,7 @@ describe("runLegacyImport()", () => {
     expect(second.counts.conversationsImported).toBe(0);
     expect(second.counts.conversationsAlreadyPresent).toBe(2);
     expect(second.counts.turnsImported).toBe(0);
-    expect(second.counts.turnsAlreadyPresent).toBe(3);
+    expect(second.counts.turnsAlreadyPresent).toBe(4);
 
     expect(db.select().from(people).all().length).toBe(peopleCountAfterFirst);
     expect(db.select().from(memoryRecords).all().length).toBe(memoryCountAfterFirst);

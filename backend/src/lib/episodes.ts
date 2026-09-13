@@ -2,6 +2,7 @@
 // assistant sides), indexed by full-text and vector for hybrid recall
 // ("what recipe did you suggest last week"). Mirrored after memory embeddings.
 import { eq, and, inArray, isNull, desc, gte, lt } from "drizzle-orm";
+import { detectCredential } from "@/lib/memoryContentPolicy";
 import { db, sqlite } from "@/db";
 import { episodes, episodeEmbeddings, pendingEpisodeEmbeddings, conversationTurns } from "@/db/schema";
 import { embed } from "@/lib/llm";
@@ -401,7 +402,13 @@ export function recallEpisodes(actor: PersonRow, query: string, queryVector: Flo
     const held = byTurn.get(entry.row.turnId);
     if (!held || held.score < entry.score) byTurn.set(entry.row.turnId, entry);
   }
-  const top = [...byTurn.values()].sort((a, b) => b.score - a.score).slice(0, limit);
+  // CHAT-03, the read side: an episode carrying a credential (recorded
+  // before the policy existed; a new one is recorded redacted) is never
+  // recalled into a prompt, and never deleted here.
+  const top = [...byTurn.values()]
+    .filter((e) => !detectCredential(e.row.text).detected)
+    .sort((a, b) => b.score - a.score)
+    .slice(0, limit);
   if (top.length === 0) return [];
 
   const pairs = db

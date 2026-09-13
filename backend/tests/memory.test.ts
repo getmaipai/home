@@ -6,7 +6,9 @@ import { __resetThrottleForTests } from "@/lib/secretThrottle";
 import { eq } from "drizzle-orm";
 import { db, sqlite } from "@/db";
 import { memoryRecords, memoryEmbeddings, pendingEmbeddings, people } from "@/db/schema";
-import { recall, remember, bumpUsage, drainPendingEmbeddings, PROFILE_SOURCE } from "@/lib/memory";
+import { recall, remember, supersede, bumpUsage, drainPendingEmbeddings, getProfileParagraph, PROFILE_SOURCE } from "@/lib/memory";
+import { CREDENTIAL_SAFE_MESSAGE } from "@/lib/memoryContentPolicy";
+import { nextHlc } from "@/lib/hlc";
 import { compareHlc } from "@/lib/hlc";
 import type { PersonRow } from "@/types";
 
@@ -1407,5 +1409,57 @@ describe("drainPendingEmbeddings (step 5: the retry job)", () => {
 
     const pendingRow = db.select().from(pendingEmbeddings).where(eq(pendingEmbeddings.memoryId, "mem1-doesnotexist")).get();
     expect(pendingRow).toBeUndefined();
+  });
+});
+
+// CHAT-03 (docs/dev/session-a.md): a credential never becomes a memory,
+// and one that already is (written before the policy) is hidden on the
+// read side without being deleted. Synthetic values, built here.
+describe("CHAT-03: credentials never enter memory", () => {
+  const value = `Jun${"i".repeat(2)}per${20}26`;
+
+  test("remember() rejects a detected credential with the fixed line and a 400", async () => {
+    const { ownerRow } = await ownerAndChildRows();
+    const result = remember(ownerRow, { text: `the wifi password is ${value}`, category: "fact", tier: "durable", scope: "household", source: "test", importance: 0.6 });
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.status).toBe(400);
+    expect(result.error).toBe(CREDENTIAL_SAFE_MESSAGE);
+    expect(db.select().from(memoryRecords).all().some((r) => r.text.includes(value))).toBe(false);
+  });
+
+  test("supersede() rejects a detected credential the same way, and the old record stays", async () => {
+    const { ownerRow } = await ownerAndChildRows();
+    const old = remember(ownerRow, { text: "the wifi password is on the fridge", category: "fact", tier: "durable", scope: "household", source: "test", importance: 0.6 });
+    expect(old.ok).toBe(true);
+    if (!old.ok) return;
+    const result = supersede(ownerRow, old.value.id, { text: `the wifi password is ${value}`, category: "fact", tier: "durable", source: "test", importance: 0.6 });
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.error).toBe(CREDENTIAL_SAFE_MESSAGE);
+    expect(db.select().from(memoryRecords).where(eq(memoryRecords.id, old.value.id)).get()?.status).toBe("active");
+  });
+
+  test("a benign statement that a password is managed elsewhere still stores", async () => {
+    const { ownerRow } = await ownerAndChildRows();
+    const result = remember(ownerRow, { text: "the wifi password is on the fridge", category: "fact", tier: "durable", scope: "household", source: "test", importance: 0.6 });
+    expect(result.ok).toBe(true);
+  });
+
+  test("a record written before the policy that carries a credential is hidden from recall and the profile, not deleted", async () => {
+    const { ownerRow } = await ownerAndChildRows();
+    const now = new Date().toISOString();
+    const insert = (id: string, text: string, source: string) =>
+      sqlite
+        .query(
+          "INSERT INTO memory_records (id, record_kind, text, category, tier, status, scope, person, source, importance, pinned, sensitive, uses, created_at, last_used_at, hlc) VALUES (?, 'entity', ?, 'fact', 'durable', 'active', 'person', ?, ?, 0.6, 0, 0, 0, ?, ?, ?)",
+        )
+        .run(id, text, ownerRow.id, source, now, now, nextHlc());
+    insert("mem-cred-1", `the router password is ${value}`, "test");
+    insert("mem-prof-1", `Sage is a nurse; the api key is ${value}`, PROFILE_SOURCE);
+    const matches = recall(ownerRow, "what is the router password", { selfOnly: true, bumpUsage: false });
+    expect(matches.some((m) => m.record.text.includes(value))).toBe(false);
+    expect(getProfileParagraph(ownerRow)).toBeUndefined();
+    expect(db.select().from(memoryRecords).where(eq(memoryRecords.id, "mem-cred-1")).get()).toBeDefined(); // still there for the Memory page
   });
 });

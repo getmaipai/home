@@ -56,6 +56,7 @@
 // own catch block) - dedupe deciding "keep both" safely is never wrong
 // enough to burn a turn's whole budget over.
 import { eq, and, isNull, isNotNull, ne, asc } from "drizzle-orm";
+import { detectCredential } from "@/lib/memoryContentPolicy";
 import { db } from "@/db";
 import { conversationTurns, people, memoryRecords } from "@/db/schema";
 import { complete, embed, type LlmMessage } from "@/lib/llm";
@@ -216,7 +217,8 @@ Examples (these exact names never recur in a real household - never copy them in
 - "How long until bacteria grows on meat left out?" -> nothing (a one-off question)
 - "My brother Rover loves horror movies" -> {"text": "Rover loves horror movies, ${speakerName}'s brother", "category": "relationship", "scope": "person", "importance": 0.7}
 - "I hate cilantro" -> {"text": "${speakerName} dislikes cilantro", "category": "preference", "scope": "person", "importance": 0.7}
-- "The wifi password is Juniper2026" -> {"text": "the wifi password is Juniper2026", "category": "fact", "scope": "household", "importance": 0.6}
+- "The wifi password is written on the fridge" -> {"text": "the wifi password is written on the fridge", "category": "fact", "scope": "household", "importance": 0.6}
+- "The wifi password is Juniper2026" -> nothing (a password, a key or a token is never a memory; the household keeps those in Credentials)
 - "We're in Brazil until next week visiting my wife's family" -> {"text": "${speakerName} was in Brazil visiting his wife's family, ${turnDate}", "category": "state", "scope": "person", "importance": 0.5, "valid_to": "${exampleFutureDate}"}
 
 Return ONLY a JSON object: {"facts": [...]} (an empty array if nothing qualifies). At most ${MAX_FACTS_PER_TURN} facts.`;
@@ -401,6 +403,13 @@ export async function judgeTurn(turn: ConversationTurnRow): Promise<JudgeTurnRes
   // straight into buildExtractionPrompt()'s system prompt below - the
   // same class of injection turnEngine.ts's speakerLine()/householdLine()
   // were fixed for.
+  // CHAT-03: a turn row that carries a credential (written before the
+  // policy existed; a new one is logged redacted) is never sent to the
+  // model. Marked done with nothing written, so it is not retried.
+  if (detectCredential(turn.userText).detected || detectCredential(turn.replyText ?? "").detected) {
+    db.update(conversationTurns).set({ judgeStatus: "done", hlc: nextHlc() }).where(eq(conversationTurns.id, turn.id)).run();
+    return { ok: true, factsWritten: 0 };
+  }
   const facts = await extractFacts(sanitizeForPrompt(speaker.displayName), turn);
   if (facts === null) {
     markAttempt(turn.id, turn.judgeAttempts + 1);
@@ -426,6 +435,10 @@ export async function judgeTurn(turn: ConversationTurnRow): Promise<JudgeTurnRes
     if (turnActiveWithin(JUDGE_IDLE_WINDOW_MS)) {
       return { ok: true, factsWritten: written };
     }
+    // CHAT-03: an extracted candidate carrying a credential is dropped
+    // before it is embedded, compared or written (remember() would
+    // refuse it too; this keeps the value out of the embed request).
+    if (detectCredential(fact.text).detected) continue;
     const embedded = await embed([fact.text]);
     const vector = embedded.ok ? new Float32Array(embedded.value.vectors[0]!) : undefined;
     const candidates = vector

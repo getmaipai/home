@@ -64,6 +64,20 @@ function seedMemory(actor: Awaited<ReturnType<typeof owner>>, text: string, pers
 }
 
 describe("packageHost memory.remember", () => {
+  // CHAT-03: the one content policy reaches a package's own write too.
+  test("a credential is refused with the fixed line, and nothing is stored", async () => {
+    const actor = await owner();
+    const host = createHost(actor, manifest({ permissions: ["memory:write"] }));
+    const value = `Jun${"i".repeat(2)}per${20}26`;
+    expect(() => host.memory.remember(`the wifi password is ${value}`, "fact", "household")).toThrow(HostError);
+    try {
+      host.memory.remember(`the wifi password is ${value}`, "fact", "household");
+    } catch (err) {
+      expect((err as Error).message).toContain("Keep passwords and keys in Credentials");
+    }
+    expect(db.select().from(memoryRecords).all().some((r) => r.text.includes(value))).toBe(false);
+  });
+
   test("writes through to the real memory store when permitted", async () => {
     const actor = await owner();
     const host = createHost(actor, manifest({ permissions: ["memory:write"] }));

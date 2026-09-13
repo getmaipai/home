@@ -31,6 +31,14 @@ Tap **Export**. This downloads everything MaiPai remembers about you. Keep the f
 
 Owners and admins can switch to another household member. Use the person picker at the top of the page. You'll see their memories the same way. You can view or forget entries there too. This helps you manage what MaiPai keeps about a child.
 
+## Passwords and keys
+
+MaiPai does not keep passwords, PINs, API keys or tokens in memory. If you say one in chat, it answers "Keep passwords and keys in Credentials, not in chat." and stores nothing. It also blanks the password out of the chat history, so it is never saved anywhere.
+
+Saying where a password lives is fine. "The wifi password is on the fridge" gets remembered like any other fact.
+
+One limit to know about: MaiPai spots passwords and keys by their shape, or by words like "password" or "token" right before them. A secret pasted on its own, with no label and no known shape, can look like any other word to it. Real credentials belong in **Settings**, in the fields marked as secret (an account password for an integration, an API key). Those are stored encrypted and never shown back.
+
 ## Still need help?
 
 Memory can look empty, or Forget can seem stuck. For either one, see [Fix a problem](fix-a-problem.md).

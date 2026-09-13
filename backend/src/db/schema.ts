@@ -342,7 +342,7 @@ export const conversationTurns = sqliteTable(
     conversationId: text("conversation_id").references(() => conversations.id),
     userText: text("user_text").notNull(),
     replyText: text("reply_text").notNull(),
-    source: text("source").notNull(), // "safety_refuse" | "plugin" | "plugin_error" | "command" | "command_error" | "model" | "confirm"
+    source: text("source").notNull(), // "safety_refuse" | "plugin" | "plugin_error" | "command" | "command_error" | "model" | "confirm" | "policy" (wire.ts's TurnValue.source)
     pluginId: text("plugin_id"),
     commandId: text("command_id"),
     safetyFlagged: integer("safety_flagged", { mode: "boolean" }).notNull().default(false),

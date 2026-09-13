@@ -1072,3 +1072,126 @@ password is on the fridge, please remember that" still stores. The
 memory API: a 400 with `{ error }`. User page: a short "Passwords and
 keys" section on the memory page (and the site guide's copy), in the
 dad-test voice.
+
+## CHAT-03: shipped (2026-09-13)
+
+As designed, with one addition found while wiring it: `logTurn()`
+itself redacts the utterance (`redactCredentials()`), so the persisted
+row, its episode and the episode's embedding hold the marker whatever
+path logged the turn, not only the early return. `memoryContentPolicy.ts`
+holds `CREDENTIAL_SAFE_MESSAGE`, `detectCredential()` (assignments to
+a credential label with a value-shaped or quoted value; the known
+formats; a long hex or base64 run only next to a label),
+`hasDeclaredCredentialField()` and `redactCredentials()`, with the
+limit stated in the module: an unlabeled string with no known shape
+passes, and the keystore is never read to build a matcher.
+`prepareTurn()` answers a detected credential with the fixed line as a
+new `policy` source (`wire.ts`, additive; the conversation window notes
+it as a reminder, `routingStats()` counts it nowhere, the chat caption
+ignores it) before the lease engages, before routing's embed, before
+the model and before the remember package. `remember()` (and so
+`supersede()`, `host.memory.remember` and the memory API) refuses with
+a 400 carrying the fixed line; the route also refuses a body with a
+credential-named field. The judge's prompt example now shows a
+location, not a value, followed by the value case as "nothing"; a
+historical turn row carrying a credential is marked done without
+reaching the model; an extracted candidate carrying one is dropped
+before the embed. The read side: `recall()`, `getProfileParagraph()`
+and `recallEpisodes()` hide such records, the window reads redacted
+rows, and the summary refresh reads the window. `docs/user/memory.md`
+and the site guide gain "Passwords and keys" in the dad-test voice,
+naming the limit and where a real credential belongs today (the
+secret-marked settings fields; the fixed line's "Credentials" is the
+credentials center the platform plan names, and the settings fields
+are where those live until it has its own page).
+
+Tests: `memoryContentPolicy.test.ts` (nine, synthetic values built in
+the test: each label and operator, the benign statements, short and
+plain words, each format, the labeled-only hex rule with the unlabeled
+limit, the declared field, redaction). `memory.test.ts` (four:
+`remember()` and `supersede()` refuse with the line and the old record
+stays, a benign statement stores, a historical record inserted past
+the policy is hidden from recall and the profile and still in the
+table). `memoryJudge.test.ts` (two: a historical credential row is
+marked done and the scripted judge sees no request carrying the value;
+an extracted credential candidate is dropped with nothing in the store
+or the notifications). `packageHost.test.ts` (one: `host.memory.remember`
+throws the line and stores nothing). `turnEngine.test.ts` (four: the
+capture request answers the fixed line, the chat stub sees no request,
+the lease leaves no cooldown, the turn row reads "remember that the
+wifi password is [credential redacted]", no memory and no episode carry
+the value; the streaming path returns the same as an immediate result;
+"remember that the wifi password is on the fridge" still stores; the
+memory API returns the documented 400 for the text and for a
+`password` field). Every existing "wifi password is on the fridge"
+fixture (routing examples, the tool-call corpus, the tier2 tests)
+passes unchanged, which is the benign case proven forty times over.
+The legacy import test's fixture held "The wifi password is
+Juniper2026" as its household memory; the policy refuses it on import
+(the import writes through `remember()`), which is the right outcome
+(credential migration into the keystore is out of scope, and a
+credential never enters the memory store by any path), so the fixture's
+household fact is now a location and a separate credential row proves
+the refusal is reported per record and not imported.
+
+The review, run as credential-handling code, found four highs in the
+first cut of the regexes and three gaps around them, all fixed. The
+word operators were not anchored, so a bare "is" matched inside
+"disney" and "this" and shadowed "is now", and "my password is now X",
+"the password for disney plus is X" and "the password for this account
+is X" all went undetected; the operators are anchored and the
+multi-word ones ordered first. A PIN never qualified under the
+six-character rule; an all-digit run of four or more is a value. A
+dot in a password split or defeated the match; the value runs to
+whitespace and only a trailing period or question mark is trimmed (an
+exclamation mark may be part of a password, so it stays). A plain capitalized word read as a
+value, so "my favorite cookie is Snickerdoodle", "the secret is
+Patience" and "my password is Bramble" were refused as credentials; a
+value now needs a digit, a symbol or a capital past the first letter.
+Overlapping hits were skipped instead of merged, so a labeled JWT lost
+only its header to the marker; spans merge to the widest. The legacy
+import inserted turns verbatim; they land redacted. The window, the
+summary refresh and the delete-time summary read rows without the
+read-side filter; they redact on read. A `policy` turn stores only the
+marker as its user text, since a second, unlabeled value in the same
+sentence would survive a span redaction. And the schema comment on
+`source` names the new value. Each is a test now (the review's own
+phrasings, a PIN, the dotted password, the cookie and the name, the
+labeled JWT, an imported credential line, a pre-policy row read into
+the window with its labeled repeat redacted and the row untouched).
+What stays as the stated limit, now proven in a test as well as
+written: an unlabeled value with no known shape, in a reply or an
+utterance, passes.
+
+An outside review (Codex, by source inspection; #89) added two before
+the commit: the stored conversation summary, model-written from rows
+that may predate the policy, was inserted unredacted into the
+window's summary line and into the refresh prompt's "prior summary",
+so a credential already in a summary kept reaching the model; both
+reads redact now, the stored summary is never rewritten, and a test
+seeds a summary with a value and reads it back through both. And the
+PEM rule matched the header line alone, leaving the key body behind on
+redaction; it now matches the whole block through the footer (a cut
+paste with no footer still marks the header). "set the wifi password
+to X" gained "to" as an operator while proving the summary case.
+
+The delta review then ran about a hundred phrasings against the
+rewritten rules and found the one-regex shape itself was the problem:
+the first token after the label consumed the match, so "the password to
+the wifi is X" (a regression from "to") and "the password is: X" both
+went undetected, and "to" as a plain operator read "text the wifi
+password to 555-0100" and "send the token to https://example.com/hook"
+as values. Detection is procedural now: for each label, every operator
+inside a 32-character window is tried in order and the first
+value-shaped token wins, a rejected candidate never consumes the
+label; "to" counts only after a set or change verb before the label;
+"was", "are" and "will be" are operators; one article after the
+operator is stepped over ("the password is the X"); a URL, an email
+address or a phone number is never a value; an apostrophe alone is a
+possessive or a contraction, not a symbol ("Grandma's", "Don'tPanic42"
+still counts by its digit); and a purely alphabetic token is a value
+only with two or more case changes ("MySecretPass", not "McDonald's",
+"iPhone" or "LeBron"). The reply side is redacted at write as the user
+side is (a package answer echoing a credential would otherwise land
+in `reply_text` and its episode embedding). Every phrasing the review
+named is a test, both directions.

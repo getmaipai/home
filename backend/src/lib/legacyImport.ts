@@ -40,6 +40,7 @@
 //   name only "memories" and "conversations" - left as a documented,
 //   real gap rather than a scope addition assumed without the plan
 //   actually asking for it.
+import { redactCredentials } from "@/lib/memoryContentPolicy";
 import { Database } from "bun:sqlite";
 import { createHash } from "node:crypto";
 import { existsSync } from "node:fs";
@@ -584,8 +585,10 @@ function importConversations(
             personId,
             surface: "chat",
             conversationId: newConvId,
-            userText: t.userText,
-            replyText: t.replyText,
+            // CHAT-03: a legacy line holding a credential lands redacted,
+            // the same door logTurn() keeps for a live turn.
+            userText: redactCredentials(t.userText),
+            replyText: redactCredentials(t.replyText),
             source: "import",
             pluginId: null,
             commandId: null,

@@ -9,6 +9,7 @@
 // docs/dev.md and repeated at the point it matters below; read that
 // before extending this file.
 import { eq, and, lt, isNull, inArray } from "drizzle-orm";
+import { detectCredential, CREDENTIAL_SAFE_MESSAGE } from "@/lib/memoryContentPolicy";
 import { db, sqlite } from "@/db";
 import { memoryRecords, memoryEmbeddings, pendingEmbeddings, people } from "@/db/schema";
 import { newMemoryRecordId } from "@/lib/memoryId";
@@ -119,6 +120,11 @@ export interface RememberInput {
 }
 
 export function remember(actor: PersonRow, input: RememberInput): MemoryOpResult<MemoryRecord> {
+  // CHAT-03: the one content policy, at the write. Every capture path
+  // (the memory API, the remember package through host.memory.remember,
+  // the judge's extracted facts) lands here; a credential never becomes
+  // a record, and the error is the fixed line the household sees.
+  if (detectCredential(input.text).detected) return { ok: false, status: 400, error: CREDENTIAL_SAFE_MESSAGE };
   const scope = input.scope;
   const person = input.scope === "person" ? (input.person ?? null) : null;
   const auth = assertCanWrite(actor, scope, person);
@@ -538,6 +544,10 @@ export function recall(actor: PersonRow, query: string, opts: RecallOptions = {}
   // the read-side twin of the dedupe-candidate bug similarByVector()
   // below has the identical fix for.
   rows = rows.filter((r) => r.source !== PROFILE_SOURCE);
+  // CHAT-03, the read side: a record written before the policy existed
+  // that carries a credential is hidden from recall, not deleted (the
+  // household forgets it from the Memory page as before).
+  rows = rows.filter((r) => !detectCredential(r.text).detected);
   rows = rows.filter((r) => canRead(actor, r, roleOf, opts.selfOnly));
 
   const queryWords = tokenize(query);
@@ -1207,7 +1217,10 @@ export function getProfileParagraph(actor: PersonRow): MemoryRecord | undefined 
     .from(memoryRecords)
     .where(and(eq(memoryRecords.person, actor.id), eq(memoryRecords.source, PROFILE_SOURCE), eq(memoryRecords.status, "active")))
     .get();
-  return row ? toMemoryRecord(row) : undefined;
+  if (!row) return undefined;
+  // CHAT-03, the read side: a profile paragraph carrying a credential
+  // (derived before the policy existed) is withheld, not deleted.
+  return detectCredential(row.text).detected ? undefined : toMemoryRecord(row);
 }
 
 // Not built this pass, deliberately (see docs/dev.md):

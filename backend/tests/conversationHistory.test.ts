@@ -697,6 +697,77 @@ describe("GET /api/conversations/export", () => {
   });
 });
 
+// CHAT-03: a row from before the policy is redacted on the way into the
+// model's window and the summary transcript, never rewritten in place.
+describe("CHAT-03: the window and summary read historical credentials redacted", () => {
+  test("a pre-policy row's user and reply text reach the window with the value replaced, and the row itself is untouched", async () => {
+    const { actor } = await owner();
+    const conv = resolveOrCreateConversation(actor, "chat");
+    if (!conv.ok) throw new Error(conv.error);
+    const value = `Jun${"i".repeat(2)}per${20}26`;
+    logTurn(actor, "chat", "hi", { reply: { text: "hello" }, source: "model", safety: SAFE, conversation_id: conv.value.id, turn_id: "turn-plain" });
+    // Written past logTurn()'s redaction, straight into the table, the way a row from before this item sits.
+    // The reply repeats it with its label (an unlabeled repeat is the policy's stated limit).
+    db.update(conversationTurns).set({ userText: `the wifi password is ${value}`, replyText: `Got it, your wifi password is ${value}.` }).where(eq(conversationTurns.id, "turn-plain")).run();
+    const window = buildConversationWindow(conv.value);
+    expect(JSON.stringify(window.messages)).not.toContain(value);
+    expect(window.messages.some((m) => m.content.includes("[credential redacted]"))).toBe(true);
+    expect(db.select().from(conversationTurns).where(eq(conversationTurns.id, "turn-plain")).get()?.userText).toContain(value); // not rewritten
+  });
+});
+
+describe("CHAT-03: the reply side is redacted at write too", () => {
+  test("a reply that repeats a labeled credential lands in reply_text with the marker", async () => {
+    const { actor } = await owner();
+    const conv = resolveOrCreateConversation(actor, "chat");
+    if (!conv.ok) throw new Error(conv.error);
+    const value = `Jun${"i".repeat(2)}per${20}26`;
+    logTurn(actor, "chat", "what did I say the wifi password was", { reply: { text: `You said the wifi password is ${value}.` }, source: "plugin", plugin_id: "recall", safety: SAFE, conversation_id: conv.value.id, turn_id: "turn-echo" });
+    const row = db.select().from(conversationTurns).where(eq(conversationTurns.id, "turn-echo")).get()!;
+    expect(row.replyText).toBe("You said the wifi password is [credential redacted].");
+    expect(row.userText).toBe("what did I say the wifi password was"); // a question, nothing to redact
+  });
+});
+
+describe("CHAT-03 (#89): a stored summary is redacted on every read", () => {
+  test("a summary holding a credential reaches the window's summary line and the refresh prompt's prior summary redacted, and the stored summary is untouched", async () => {
+    const { actor } = await owner();
+    const conv = resolveOrCreateConversation(actor, "chat");
+    if (!conv.ok) throw new Error(conv.error);
+    const value = `Jun${"i".repeat(2)}per${20}26`;
+    // Enough turns that older ones fall out of the verbatim window, so the summary line is used.
+    const longText = "x".repeat(1200);
+    for (let i = 0; i < 8; i++) {
+      logTurn(actor, "chat", `${longText} turn ${i}`, { reply: { text: `reply ${i}` }, source: "model", safety: SAFE, conversation_id: conv.value.id, turn_id: `turn-sum${i}` });
+    }
+    db.update(conversations).set({ summary: `Earlier they set the wifi password to ${value} and planned a trip.`, summaryThroughTurn: "turn-sum1" }).where(eq(conversations.id, conv.value.id)).run();
+    const fresh = db.select().from(conversations).where(eq(conversations.id, conv.value.id)).get()!;
+    const window = buildConversationWindow({ ...conv.value, summary: fresh.summary, summaryThroughTurn: fresh.summaryThroughTurn } as typeof conv.value);
+    expect(window.summaryLine).toBeDefined();
+    expect(window.summaryLine).not.toContain(value);
+    expect(window.summaryLine).toContain("[credential redacted]");
+    expect(fresh.summary).toContain(value); // never rewritten in place
+
+    // The refresh prompt: the prior summary line it sends carries the marker, not the value.
+    const seen: string[] = [];
+    const { startStubLlmServer } = await import("@maipai/spec/llm/ts/stubServer.js");
+    const stub = startStubLlmServer(0, {
+      scriptedChatReply: (request) => {
+        seen.push(JSON.stringify(request.messages));
+        return "A short summary.";
+      },
+    });
+    process.env.MAIPAI_BACKGROUND_URL = stub.url;
+    try {
+      await maybeRefreshConversationSummary(conv.value.id);
+    } finally {
+      stub.stop();
+      delete process.env.MAIPAI_BACKGROUND_URL;
+    }
+    expect(seen.join("")).not.toContain(value);
+  });
+});
+
 describe("buildConversationWindow() (step 3)", () => {
   test("the newest 4 turns are always included verbatim; oldest dropped first past the 1,200-token estimate", async () => {
     const { actor } = await owner();

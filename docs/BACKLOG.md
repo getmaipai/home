@@ -125,7 +125,14 @@ not permission to expand scope.
 
 <a id="chat-03"></a>
 
-- [ ] **CHAT-03: Exclude credentials from ordinary chat memory and context** (M)
+- [x] **CHAT-03: Exclude credentials from ordinary chat memory and context** (M)
+
+    Status (2026-09-13, closed): `backend/src/lib/memoryContentPolicy.ts`
+    (bounded assignments, known formats, declared fields, redaction, the
+    stated limit) behind `prepareTurn()`'s early answer, `remember()`, the
+    judge, `host.memory.remember`, the memory API and `logTurn()`'s
+    redaction; the read side hides historical records without deleting
+    them; the user memory page explains it. Details in docs/dev/session-a.md.
 
     Depends on: none; integrate with CHAT-06 when it lands. Files:
     `backend/src/lib/memoryJudge.ts`, `memory.ts`, `packageHost.ts`,

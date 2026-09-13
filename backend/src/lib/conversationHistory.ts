@@ -32,6 +32,7 @@
 // summarizeBeforeDelete()'s own comment for exactly what that means
 // when no real model is running yet.
 import { eq, and, or, not, lt, gt, isNull, inArray, desc } from "drizzle-orm";
+import { redactCredentials, CREDENTIAL_REDACTION } from "@/lib/memoryContentPolicy";
 import { db, sqlite } from "@/db";
 import { conversationTurns, conversations, people, memoryRecords, commands } from "@/db/schema";
 import { newConversationTurnId, newConversationId } from "@/lib/id";
@@ -107,10 +108,19 @@ function resolveSupersedes(supersedes: string | null | undefined, conversationId
 export function logTurn(
   actor: PersonRow,
   surface: Surface,
-  userText: string,
+  rawUserText: string,
   value: TurnValue,
   opts: { guardReasons?: readonly string[]; supersedes?: string | null } = {},
 ): ConversationTurnRow {
+  // CHAT-03: the persisted row, its episode and the episode's embedding
+  // (recordEpisodes() below reads this) hold a redacted marker in place
+  // of any detected credential, never the value, whatever path logged
+  // the turn. The engine already answered such a turn with the fixed
+  // line before anything else saw the text; this is the last door.
+  // A `policy` turn (the engine answered a pasted credential with the
+  // fixed line) keeps only the marker: the person was pasting secrets,
+  // and a second, unlabeled one would survive a span redaction.
+  const userText = value.source === "policy" ? CREDENTIAL_REDACTION : redactCredentials(rawUserText);
   // Built and returned directly from the caller's own values, not
   // re-selected after the insert: a review (2026-09-04) pointed out every
   // field is already known here, the same "don't round-trip the database
@@ -124,7 +134,9 @@ export function logTurn(
     surface,
     conversationId: value.conversation_id,
     userText,
-    replyText: value.reply.text,
+    // The reply side too (a package answer that echoes a credential would
+    // otherwise land in reply_text and its episode embedding).
+    replyText: redactCredentials(value.reply.text),
     source: value.source,
     pluginId: value.plugin_id ?? null,
     commandId: value.command_id ?? null,
@@ -682,7 +694,7 @@ function nonModelWindowNote(t: ConversationTurnRow): string {
   switch (t.source) {
     case "plugin": {
       const display = t.pluginId ? pluginDisplayName(t.pluginId) : "A package";
-      return `[${display} answered: "${t.replyText}"]`;
+      return `[${display} answered: "${redactCredentials(t.replyText)}"]`;
     }
     case "plugin_error": {
       const display = t.pluginId ? pluginDisplayName(t.pluginId) : "A package";
@@ -700,6 +712,10 @@ function nonModelWindowNote(t: ConversationTurnRow): string {
     }
     case "confirm":
       return "[The household was asked to confirm before this action ran.]";
+    case "policy":
+      // CHAT-03: the row's own user text is already redacted; the note
+      // tells the model what happened without repeating anything.
+      return "[The household was reminded to keep passwords and keys in Credentials, not in chat.]";
     default:
       return "[A household action ran.]";
   }
@@ -750,19 +766,23 @@ export function buildConversationWindow(conversation: Conversation): Conversatio
   const windowTurns = [...includedOlder, ...newest];
   const messages: LlmMessage[] = [];
   for (const t of windowTurns) {
-    messages.push({ role: "user", content: t.userText });
+    // CHAT-03, the read side: a row from before the policy (or an import)
+    // is redacted on the way into the model's window, never rewritten.
+    messages.push({ role: "user", content: redactCredentials(t.userText) });
     // A `model` turn's own reply enters the window in its own voice
     // (`assistant`); any other source instead gets a `system` note
     // (nonModelWindowNote(), Fix B3) describing what really happened -
     // never BOTH, since pushing the raw canned/failure text as `assistant`
     // too would reintroduce the exact bug B3 fixes (the model reading a
     // Tier 1 handler's own words as something it had said itself).
-    messages.push(t.source === "model" ? { role: "assistant", content: t.replyText } : { role: "system", content: nonModelWindowNote(t) });
+    messages.push(t.source === "model" ? { role: "assistant", content: redactCredentials(t.replyText) } : { role: "system", content: nonModelWindowNote(t) });
   }
 
   const hasUncoveredOlder = older.length - includedOlder.length > 0;
+  // CHAT-03 (#89): the stored summary is model-written from rows that
+  // may predate the policy; it is redacted on the way in like a row.
   const summaryLine =
-    hasUncoveredOlder && conversation.summary ? `Summary of earlier conversation: ${conversation.summary}` : undefined;
+    hasUncoveredOlder && conversation.summary ? `Summary of earlier conversation: ${redactCredentials(conversation.summary)}` : undefined;
 
   return { messages, summaryLine };
 }
@@ -826,11 +846,11 @@ export async function maybeRefreshConversationSummary(conversationId: string): P
   // catches the "resolved to the stub just now" case.
   if (getBackgroundBackendKind() === "stub") return;
 
-  let transcript = newSinceLastSummary.map((r) => `User: ${r.userText}\nReply: ${r.replyText}`).join("\n\n");
+  let transcript = newSinceLastSummary.map((r) => `User: ${redactCredentials(r.userText)}\nReply: ${redactCredentials(r.replyText)}`).join("\n\n"); // CHAT-03: read-side redaction
   if (transcript.length > MAX_SUMMARY_INPUT_CHARS) {
     transcript = transcript.slice(transcript.length - MAX_SUMMARY_INPUT_CHARS);
   }
-  const priorSummary = conversation.summary ? `Prior summary: ${conversation.summary}\n\n` : "";
+  const priorSummary = conversation.summary ? `Prior summary: ${redactCredentials(conversation.summary)}\n\n` : ""; // CHAT-03 (#89): the refresh never re-reads a credential from its own prior summary
 
   try {
     const result = await completeBackground([
@@ -965,7 +985,7 @@ export async function summarizeBeforeDelete(rows: ConversationTurnRow[]): Promis
     if (!person) continue; // deleted since these turns were written; nothing to attribute a summary to
 
     personRows.sort((a, b) => a.createdAt.localeCompare(b.createdAt));
-    let transcript = personRows.map((r) => `User: ${r.userText}\nReply: ${r.replyText}`).join("\n\n");
+    let transcript = personRows.map((r) => `User: ${redactCredentials(r.userText)}\nReply: ${redactCredentials(r.replyText)}`).join("\n\n"); // CHAT-03: read-side redaction
     if (transcript.length > MAX_SUMMARY_INPUT_CHARS) {
       transcript = transcript.slice(transcript.length - MAX_SUMMARY_INPUT_CHARS);
     }
@@ -1209,6 +1229,10 @@ export function routingStats(): RoutingStats {
         break;
       case "safety_refuse":
         safetyRefuse++;
+        break;
+      case "policy":
+        // CHAT-03: neither routable nor a refusal; counted nowhere, like
+        // a turn the engine answered on its own terms.
         break;
     }
   }
