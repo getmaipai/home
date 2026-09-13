@@ -480,12 +480,30 @@ async function checkKeyboardTrap(browser: Browser, sessionValue: string): Promis
     const page = await context.newPage();
     await page.goto(`${BASE_URL}/`);
     await page.getByRole("heading", { level: 1 }).first().waitFor({ timeout: 15000 });
+    // WebKit's default Tab order (macOS's own `AppleKeyboardUIMode`,
+    // "Text boxes and lists only") excludes `<button>` and `<a>` -
+    // confirmed live (2026-09-12, issue #69): plain `Tab` on Home cycled
+    // through only 4 real elements (a scroll container, an avatar strip,
+    // the search input, one custom radio span) before landing on
+    // `document.body` and wrapping, a false "keyboard trap" that was
+    // really just WebKit skipping every button on the page. A real
+    // keyboard-only Safari user almost always has "Full Keyboard Access"
+    // turned on system-wide for exactly this reason, but a test script
+    // must never flip a machine-wide OS preference (it would outlive a
+    // killed run, affect the developer's own Safari, and not exist on
+    // another contributor's machine at all). `Option+Tab` (Playwright's
+    // "Alt+Tab") is WebKit's own manual override for this - it moves
+    // focus through every control regardless of the system setting,
+    // exactly what that same keyboard-only user experiences - so this
+    // check presses it in WebKit and plain `Tab` everywhere else.
+    const isWebkit = browser.browserType().name() === "webkit";
+    const tabKey = isWebkit ? "Alt+Tab" : "Tab";
     const MAX_TAB_PRESSES = 60;
     const MAX_PERIOD = 10;
     const REPEATS_REQUIRED = 3;
     const visited: string[] = [];
     for (let i = 0; i < MAX_TAB_PRESSES; i++) {
-      await page.keyboard.press("Tab");
+      await page.keyboard.press(tabKey);
       const id = await page.evaluate(() => {
         const el = document.activeElement;
         if (!el || el === document.body) return "(body)";
@@ -509,7 +527,7 @@ async function checkKeyboardTrap(browser: Browser, sessionValue: string): Promis
         const repeats = Array.from({ length: REPEATS_REQUIRED }, (_, k) => tail.slice(k * period, (k + 1) * period));
         if (repeats.every((chunk) => chunk.every((v, j) => v === cycle[j]))) {
           return [
-            `keyboard trap suspected: focus repeated the same ${period}-element cycle ${REPEATS_REQUIRED} times in a row after ${visited.length} Tab presses (${cycle.join(" -> ")})`,
+            `keyboard trap suspected: focus repeated the same ${period}-element cycle ${REPEATS_REQUIRED} times in a row after ${visited.length} ${tabKey} presses (${cycle.join(" -> ")})`,
           ];
         }
       }

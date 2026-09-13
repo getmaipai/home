@@ -3309,9 +3309,28 @@ future session now that F's hub half exists.
     story: docs/dev.md's "Session B, second lane" entry. Files:
     `frontend/src/lib/voice/wake-word-runtime.ts`,
     `frontend/src/lib/voice/wake-word-runtime.test.ts` (new). Checks:
-    `bunx tsc --noEmit`, the full `bun test` suite, `bun run build`,
-    clicking the toggle in a real `bun run dev` session (console and
-    dev-server log both read).
+    `bunx tsc --noEmit`, `bunx eslint .`, the full `bun test` suite,
+    `bun run build`, `bash scripts/check.sh` (all checks passed), clicking
+    the toggle in a real `bun run dev` session (console and dev-server log
+    both read).
+
+- [x] **#69: WebKit reports a keyboard trap on Home** (S, Session B, 2026-09-12)
+
+    Not a real focus defect: macOS's `AppleKeyboardUIMode` default excludes
+    every `<button>`/`<a>` from WebKit's Tab order, leaving only a handful
+    of form fields and explicitly-tabindexed elements to cycle through -
+    exactly the 5-element loop the check flagged. Fixed by pressing
+    `Option+Tab` (Playwright's `"Alt+Tab"`, WebKit's own override that
+    reaches every control regardless of the system setting) instead of
+    plain `Tab` when the check runs against WebKit; Chromium unchanged. No
+    OS-level preference touched (a first attempt using `defaults write`
+    was rejected on review for exactly that reason). Full story:
+    docs/dev.md's "Session B, second lane" entry. Files:
+    `scripts/screenshot.ts`. Checks: `bun run scripts/screenshot.ts
+    --a11y-only --webkit` (34 pages, 0 violations, keyboard-trap check
+    passing). Note: the full `--chat-review --webkit` repro command still
+    fails on an unrelated, pre-existing WebKit chat-exchange timeout - not
+    a keyboard issue, out of scope here, flagged for its own issue.
 
 - [x] **#66: Hardcoded "unavailable" error code masked safety refusals** (S, 2026-09-12)
 

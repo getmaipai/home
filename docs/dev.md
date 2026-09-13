@@ -11114,3 +11114,52 @@ production bundle (served by the real backend) after the refactor.
 
 Closes #59.
 
+**#69: WebKit reports a keyboard trap on Home.** Reproduced with
+`bun run scripts/screenshot.ts --chat-review --webkit`: `checkKeyboardTrap`
+(screenshot.ts) found a real 5-element cycle after 15 Tab presses -
+a scroll container div, the avatar strip ("SYouMMarlowNNova"), the search
+input, one custom radio-styled span, then `document.body`, then wrapping
+back to the first div. Cause: not a real focus defect. macOS's own
+`AppleKeyboardUIMode` preference (confirmed unset on this machine, meaning
+its default, 0 - "Text boxes and lists only") makes WebKit exclude every
+`<button>` and `<a>` from the Tab order entirely, leaving only form
+fields and explicitly-tabindexed elements reachable - exactly the small
+set the cycle was built from. A real keyboard-only Safari user almost
+always has "Full Keyboard Access" turned on system-wide for exactly this
+reason, which is why the check needs to see the SAME page a Full Keyboard
+Access user would.
+
+First fix attempt (flipping `AppleKeyboardUIMode` to 2 via `defaults
+write` around the WebKit run, restored after) was rejected on review: a
+test script must never write a machine-wide OS preference, even bracketed
+in try/finally - a killed run leaves the machine changed, it alters the
+developer's own Safari behavior for everything else they do, and it
+wouldn't exist on another contributor's OS at all. The actual fix:
+`Option+Tab` (Playwright's `"Alt+Tab"`) is WebKit's own built-in override
+for this - it moves focus through every control regardless of the system
+setting, which is exactly what a Full-Keyboard-Access user's Tab key does.
+`checkKeyboardTrap` now presses `"Alt+Tab"` when `browser.browserType().
+name() === "webkit"` and plain `"Tab"` everywhere else - no OS state
+touched, nothing outside the repo changed, Chromium's own check unchanged.
+The cycle-detection logic itself (period 1-10, 3 repeats) is untouched, so
+a genuine trap under Alt+Tab would still be caught exactly the same way.
+
+Verified: `bun run scripts/screenshot.ts --a11y-only --webkit` (the
+fastest way to exercise `checkKeyboardTrap` against every route without
+also running the separate chat-exchange flow) reports "34 page(s) checked,
+0 violations, 0 overflow, reduced motion and keyboard-trap checks
+passed" - the trap is gone, the check stayed enabled. The full
+`--chat-review --webkit` command from the reproduction step still fails,
+but on something else entirely: the `chat` page's own message-exchange
+flow times out after 90s on WebKit specifically, present identically in
+the pre-fix reproduction run too (confirmed by grepping the original
+repro log), so it predates this fix and is a different WebKit
+compatibility gap, not a keyboard-navigation one. Out of scope here; worth
+its own issue.
+
+Files: `scripts/screenshot.ts`. Checks: the live WebKit run above; no
+`bunx tsc`/`eslint` config covers this root-level script, and the script
+itself running clean is the verification.
+
+Closes #69.
+
