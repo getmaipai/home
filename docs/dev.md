@@ -11334,6 +11334,108 @@ invention-guard rows.
 
 **Exit gate**: `bash scripts/check.sh` green in the worktree.
 
+### FAST-06: variation from samplers, not from a prompt sentence (2026-09-12)
+
+`spec/llm/ts/types.ts` gains six optional request fields (`min_p`,
+`xtc_probability`, `xtc_threshold`, `dry_multiplier`, `dry_base`,
+`dry_allowed_length`), additive, with the wire test extended.
+`llm.ts` defines `CHAT_SAMPLING` (`temperature 0.7, min_p 0.05,
+xtc_probability 0.5, xtc_threshold 0.1, dry_multiplier 0.8, dry_base
+1.75, dry_allowed_length 2`) and both `complete()` and
+`startCompleteStream()` spread it into a `chat` request when the
+caller passed neither a `response_format` (a JSON-schema answer must
+be the single most likely one) nor its own `temperature` (a caller
+that chose one is choosing its own sampling); the judge's and
+extraction's calls all pass one or both, so none of them get it. The
+sentence "Never say the same thing the same way twice: vary how you
+open a reply and how you phrase something you've already said earlier
+in the conversation" is gone from `INFORMATION_HANDLING_POLICY` in
+`persona.ts`; no test quoted it. Tests in `llm.test.ts`: a plain chat
+request carries all seven fields (streamed too); a `json_schema`
+request carries none; a caller-supplied temperature wins and switches
+the set off.
+
+Two bench changes made to measure this, both noted in the scripts:
+`persona-eval.ts` gains a "repeated framing" count (the item names the
+measure, the bench had none): replies whose first two words already
+opened an earlier reply in the same persona's run, lower is better.
+And both `naturalness.ts` and `persona-eval.ts` now `process.exit(0)`
+after their summary: the first before-run of naturalness printed its
+summary and then sat for twenty minutes, kept alive by timers the
+turn engine's imports start since Track B (the scheduler, the engine
+watchers); the FAST-02 section's "stalled after 14 minutes" run was
+most likely the same.
+
+**Live, measured 2026-09-12** on the Track A engine (same machine,
+build, model file and flags as the FAST-04 section, engine on 8798,
+each bench with a fresh temp `MAIPAI_DATA_DIR`), "before" being the
+same engine with the pre-FAST-06 `llm.ts` and `persona.ts` swapped in.
+Naturalness (`scripts/bench/naturalness.ts`, 8 rows, live replies, run
+twice each), row for row:
+
+| run | natural | robotic | ambiguous | rows |
+|---|---|---|---|---|
+| before, run 1 | 2 | 2 | 4 | robotic: "what time is it" ("It's 11:10 PM."), "okay thanks" (the canned "You're welcome, let me know if you need anything else" closer, written with an exclamation mark by the model); natural: precision, evidentials |
+| before, run 2 | 1 | 2 | 5 | the same two robotic rows; precision fell to ambiguous |
+| after, run 1 | 2 | 2 | 4 | the same two robotic rows ("It's 11:12 PM.", and the closer now worded "You're welcome, have a good night", again with the model's exclamation mark); natural: precision, evidentials |
+| after, run 2 | 1 | 2 | 5 | the same two robotic rows; precision ambiguous |
+
+No row regressed: the verdict per row is identical between the
+before pair and the after pair. The two robotic rows are the ones
+FAST-02 recorded (the clock read as digits, which `normalizeForSpeech`
+handles on the speech string, and a canned closer); the samplers vary
+the closer's wording ("have a good night" against "let me know if you
+need anything else") without making it less of a closer, which is the
+housemate test's job, not a sampler's.
+
+Persona-eval (`scripts/bench/persona-eval.ts --judge`, 10 exchanges
+per companion, 4 companions, the judge on the same engine):
+
+| measure | before | after |
+|---|---|---|
+| repeated-framing (lower is better) | 1/40 (tutor 1) | 0/40 |
+| forbidden-phrases | 24/40 | 25/40 |
+| length-cap | 40/40 | 39/40 (pal, one long reply) |
+| address-form | 40/40 | 40/40 |
+| judge-score buddy / default / pal / tutor | 70% / 90% / 20% / 0% | 90% / 90% / 10% / 0% |
+
+The item's gate is met: no naturalness row regressed and repeated
+framing did not get worse (it went to zero). The judge scores are one
+sampled reply apart on buddy (up two rows) and pal (down one); tutor's
+0% on both sides is the register-consistency finding the 2026-09-12
+review already recorded ("tutor 0%"), which control vectors (EVAL-03),
+not samplers, are meant to move.
+
+The medium code review on this diff (targeted at the worktree) raised
+one medium and three lows. The medium, that a tools-offered completion
+(which is the ordinary chat turn, since websearch is always offered)
+also gets XTC and DRY and that XTC could flip a tool choice or DRY
+paraphrase a copied argument, was measured rather than assumed: the
+tool-calling bench at 10 repeats with the samplers on holds every
+positive 10 of 10 and 0 of 50 false calls, the same as before FAST-03
+and FAST-06, so the set stays on those turns. The DRY read-back
+worry (a verbatim copy of a stored number penalised) was checked live:
+"remember that the dentist's number is 555 0123 extension 4", then
+"what number do I call for the dentist" five times, answered "The
+dentist's number is 555-0123, extension 4." five of five. Two lows
+fixed: `...rest` now spreads before the sampling so routes/llm.ts's
+`temperature: undefined` cannot switch the samplers on without a
+temperature (a test covers it), and the comment and this section now
+say plainly that 0.7 lowers the chat temperature from llama-server's
+own 0.8 default, which is what the item prescribes.
+
+Two live findings from the same session, neither FAST-06's and both
+filed: "the plumber's number is 555 9876 extension 12, please remember
+it" and "Friday is pizza night, please remember" through the real turn
+engine do not call `remember` (the model answers in text, samplers on
+or off, three runs each, while the tool-calling bench's bare prompt
+gets the call 10 of 10), getmaipai/home#77; and the model's restated
+acknowledgment of that disclosure is cut by `near_echo`, the same-turn
+shape getmaipai/home#74 already describes, seen live three times.
+
+**Exit gate**: `bash scripts/check.sh` green in the worktree, `cd spec
+&& bun test` green.
+
 ## Session B follow-up: chat frontend bugs - second and third pass (2026-09-12)
 
 **#71 rework** (reopened twice: first for insufficient verification and six

@@ -154,7 +154,12 @@ export function resolvePersona(id: unknown): Persona {
 export const INFORMATION_HANDLING_POLICY = [
   "Skip detail nobody asked for (exact decimals, timezones, a full date when only the day matters) and round the way people round in conversation (\"about thirty\", \"low seventies\") unless they asked for the exact number or it genuinely matters, like money or an appointment time.",
   "Talk about anything uncertain or secondhand as uncertain, never as flat fact: forecasts, predictions, and guesses get hedged (\"it's supposed to\", \"I think\", \"probably\"), not asserted outright.",
-  "Never say the same thing the same way twice: vary how you open a reply and how you phrase something you've already said earlier in the conversation.",
+  // FAST-06 (2026-09-12): the third sentence, "Never say the same thing
+  // the same way twice: vary how you open a reply and how you phrase
+  // something you've already said earlier in the conversation", is
+  // gone. Variety is the sampler's job now (llm.ts's CHAT_SAMPLING:
+  // min-p, XTC and DRY), which is cheaper, more predictable, and does
+  // not spend a prompt sentence asking a small model to police itself.
 ].join(" ");
 
 // Step 4 (session-c-brain-and-voice.md): "the before/after framing

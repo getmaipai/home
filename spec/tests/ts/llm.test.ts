@@ -275,6 +275,33 @@ describe("LlamaServerClient against the stub server", () => {
       expect(capturedRequest?.id_slot).toBe(0);
     });
 
+    test("chatComplete sends the sampler fields verbatim (FAST-06)", async () => {
+      let capturedRequest: ChatCompletionRequest | null = null;
+      handle = startStubLlmServer(0, {
+        scriptedChatReply: (request) => {
+          capturedRequest = request;
+          return undefined;
+        },
+      });
+      const client = new LlamaServerClient(handle.url);
+      await client.chatComplete({
+        model: "chat",
+        messages: [{ role: "user", content: "test" }],
+        min_p: 0.05,
+        xtc_probability: 0.5,
+        xtc_threshold: 0.1,
+        dry_multiplier: 0.8,
+        dry_base: 1.75,
+        dry_allowed_length: 2,
+      });
+      expect(capturedRequest?.min_p).toBe(0.05);
+      expect(capturedRequest?.xtc_probability).toBe(0.5);
+      expect(capturedRequest?.xtc_threshold).toBe(0.1);
+      expect(capturedRequest?.dry_multiplier).toBe(0.8);
+      expect(capturedRequest?.dry_base).toBe(1.75);
+      expect(capturedRequest?.dry_allowed_length).toBe(2);
+    });
+
     test("chatCompleteStream sends cache_prompt and id_slot in the request (FAST-01)", async () => {
       let capturedRequest: ChatCompletionRequest | null = null;
       handle = startStubLlmServer(0, {

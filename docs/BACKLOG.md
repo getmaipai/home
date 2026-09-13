@@ -1251,7 +1251,14 @@ Track B: MEM-01, MEM-02, MEM-03, MEM-04, MEM-05. Then JOIN-01, JOIN-02.
 
 <a id="fast-06"></a>
 
-- [ ] **FAST-06: Variation from samplers, not from a prompt sentence** (S)
+- [x] **FAST-06: Variation from samplers, not from a prompt sentence** (S)
+
+    Status (2026-09-12, measured and closed): min-p, XTC and DRY ride
+    every plain chat completion (never a JSON-schema or caller-tempered
+    one), the "never say the same thing the same way twice" sentence is
+    out of the policy, naturalness is identical row for row before and
+    after (two runs each), and persona-eval's new repeated-framing
+    count went from 1/40 to 0/40. Table in the Track A section of dev.md.
 
     Depends on: FAST-05. Files: `spec/llm/ts/types.ts`,
     `backend/src/lib/llm.ts`, `persona.ts`, and `backend/tests/llm.test.ts`,

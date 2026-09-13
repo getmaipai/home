@@ -81,6 +81,9 @@ interface PersonaScore {
   addressFormOk: number;
   lengthCapOk: number;
   forbiddenPhrasesOk: number;
+  /** FAST-06: replies whose first two words already opened an earlier
+   * reply in the same run; lower is better. */
+  repeatedFraming: number;
   total: number;
 }
 
@@ -138,10 +141,25 @@ async function main(): Promise<void> {
       if (hasContraction === wantsContraction) forbiddenPhrasesOk++;
     }
 
+    // FAST-06 (2026-09-12): "repeated framing", the measure the samplers
+    // are meant to move. A reply repeats a framing when its first two
+    // words (lowercased, punctuation stripped) already opened an earlier
+    // reply in the same persona's run: "Sure, I" three times is the
+    // canned-opener habit the deleted "never say the same thing the same
+    // way twice" sentence used to ask the model to avoid. Lower is better.
+    const openers = new Set<string>();
+    let repeatedFraming = 0;
+    for (const { reply } of transcript) {
+      const opener = reply.toLowerCase().replace(/[^a-z' ]+/g, " ").trim().split(/\s+/).slice(0, 2).join(" ");
+      if (!opener) continue;
+      if (openers.has(opener)) repeatedFraming++;
+      else openers.add(opener);
+    }
+
     const total = addressFormOk + lengthCapOk + forbiddenPhrasesOk;
-    scores.push({ id: persona.id, addressFormOk, lengthCapOk, forbiddenPhrasesOk, total });
+    scores.push({ id: persona.id, addressFormOk, lengthCapOk, forbiddenPhrasesOk, repeatedFraming, total });
     console.log(
-      `${persona.id.padEnd(8)} address-form ${addressFormOk}/${EXCHANGES.length}  length-cap ${lengthCapOk}/${EXCHANGES.length}  forbidden-phrases ${forbiddenPhrasesOk}/${EXCHANGES.length}`,
+      `${persona.id.padEnd(8)} address-form ${addressFormOk}/${EXCHANGES.length}  length-cap ${lengthCapOk}/${EXCHANGES.length}  forbidden-phrases ${forbiddenPhrasesOk}/${EXCHANGES.length}  repeated-framing ${repeatedFraming}/${EXCHANGES.length}`,
     );
 
     if (RUN_JUDGE) {
@@ -159,10 +177,17 @@ async function main(): Promise<void> {
 
   const maxPerCheck = EXCHANGES.length * PERSONAS.length;
   const totals = scores.reduce(
-    (acc, s) => ({ addressForm: acc.addressForm + s.addressFormOk, lengthCap: acc.lengthCap + s.lengthCapOk, forbidden: acc.forbidden + s.forbiddenPhrasesOk }),
-    { addressForm: 0, lengthCap: 0, forbidden: 0 },
+    (acc, s) => ({
+      addressForm: acc.addressForm + s.addressFormOk,
+      lengthCap: acc.lengthCap + s.lengthCapOk,
+      forbidden: acc.forbidden + s.forbiddenPhrasesOk,
+      repeatedFraming: acc.repeatedFraming + s.repeatedFraming,
+    }),
+    { addressForm: 0, lengthCap: 0, forbidden: 0, repeatedFraming: 0 },
   );
-  console.log(`\nTotals: address-form ${totals.addressForm}/${maxPerCheck}, length-cap ${totals.lengthCap}/${maxPerCheck}, forbidden-phrases ${totals.forbidden}/${maxPerCheck}`);
+  console.log(
+    `\nTotals: address-form ${totals.addressForm}/${maxPerCheck}, length-cap ${totals.lengthCap}/${maxPerCheck}, forbidden-phrases ${totals.forbidden}/${maxPerCheck}, repeated-framing ${totals.repeatedFraming}/${maxPerCheck} (lower is better)`,
+  );
 }
 
 try {
@@ -179,3 +204,6 @@ try {
   __resetEmbedSupervisorForTests();
   stopChatBackend();
 }
+// FAST-06 (2026-09-12): see naturalness.ts's own note on why the bench
+// has to exit explicitly once its summary is printed.
+process.exit(0);

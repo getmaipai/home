@@ -111,6 +111,25 @@ export interface ChatCompletionRequest {
   /** Prompt cache slot (FAST-01, 2026-09-12): the llama.cpp cache slot
    * to use (0 is reserved for the chat role). Paired with `cache_prompt`. */
   id_slot?: number;
+  /** Sampling (FAST-06, 2026-09-12), llama-server's own request fields,
+   * all optional and additive. The hub sends them on a plain chat
+   * completion so that variety in phrasing comes from the sampler
+   * instead of a prompt sentence asking the model to vary itself: min-p
+   * keeps only tokens at least `min_p` times as likely as the best one;
+   * XTC ("exclude top choices") drops the most likely tokens above
+   * `xtc_threshold` with probability `xtc_probability`, so the second-
+   * best phrasing gets a turn; DRY ("don't repeat yourself") penalises
+   * a token that would extend a sequence already seen in the context,
+   * scaled by `dry_multiplier` and `dry_base`, once a repeat is longer
+   * than `dry_allowed_length` tokens. Never sent with a JSON-schema
+   * `response_format`: a constrained answer must be the most likely
+   * one, not a varied one. */
+  min_p?: number;
+  xtc_probability?: number;
+  xtc_threshold?: number;
+  dry_multiplier?: number;
+  dry_base?: number;
+  dry_allowed_length?: number;
 }
 
 export interface JsonSchemaResponseFormat {

@@ -207,6 +207,34 @@ function recoverFromDeadBackend(err: unknown): void {
   }
 }
 
+/** FAST-06 (docs/dev.md, the 2026-09-12 review's decision 6): variety
+ * in phrasing comes from the sampler, not from a prompt sentence. Sent
+ * on every plain `chat` completion (complete() and startCompleteStream())
+ * when the caller passed neither a `response_format` (a JSON-schema
+ * answer must be the single most likely one) nor its own `temperature`
+ * (a caller that chose one is choosing its own sampling). The values
+ * are llama.cpp's own documented defaults for the three samplers; the
+ * temperature is the item's 0.7, which is a change: plain chat used
+ * to run at llama-server's own default of 0.8, since nothing passed
+ * `--temp` or a request temperature. A tools-offered completion (the
+ * ordinary chat turn, since websearch is always offered) gets the set
+ * too, measured rather than assumed: the tool-calling bench at 10
+ * repeats holds every positive and every negative with it on. */
+export const CHAT_SAMPLING = {
+  temperature: 0.7,
+  min_p: 0.05,
+  xtc_probability: 0.5,
+  xtc_threshold: 0.1,
+  dry_multiplier: 0.8,
+  dry_base: 1.75,
+  dry_allowed_length: 2,
+} as const;
+
+function chatSamplingFor(opts: { temperature?: number; response_format?: unknown }): Partial<typeof CHAT_SAMPLING> {
+  if (opts.response_format !== undefined || opts.temperature !== undefined) return {};
+  return CHAT_SAMPLING;
+}
+
 export async function complete(
   role: LlmRole,
   messages: LlmMessage[],
@@ -228,7 +256,12 @@ export async function complete(
     const response = await client.chatComplete({
       model: "chat",
       messages,
+      // `rest` first, then the sampling: a caller that passed
+      // `temperature: undefined` (routes/llm.ts forwards the body's
+      // field as-is) must not end up with the samplers on and no
+      // temperature (a code review caught the other order doing that).
       ...rest,
+      ...chatSamplingFor(rest),
       // A code review (2026-09-07) found `...rest` above still carries a
       // caller-supplied `response_format` through with nothing stopping
       // it from being sent alongside `tools` in the same request - no
@@ -314,6 +347,7 @@ export async function startCompleteStream(
           model: "chat",
           messages,
           ...rest,
+          ...chatSamplingFor(rest),
           // Same explicit precedence as complete()'s own fix: offering
           // tools always wins over a caller-supplied response_format.
           response_format: offering ? undefined : rest.response_format,

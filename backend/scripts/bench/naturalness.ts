@@ -113,3 +113,9 @@ try {
   __resetEmbedSupervisorForTests();
   stopChatBackend();
 }
+// FAST-06 (2026-09-12): without this the process printed its summary and
+// then sat for twenty minutes, kept alive by timers the turn engine's
+// imports start (the scheduler, the engine watchers); the FAST-02
+// section's "stalled after 14 minutes" run was most likely the same.
+// Everything above has already been logged and stopped.
+process.exit(0);

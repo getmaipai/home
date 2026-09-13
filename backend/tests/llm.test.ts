@@ -5,7 +5,7 @@ import { __resetThrottleForTests } from "@/lib/secretThrottle";
 import { __resetLlmSupervisorForTests } from "@/lib/llmSupervisor";
 import { __resetEmbedSupervisorForTests } from "@/lib/embedSupervisor";
 import { __resetRateLimiterForTests } from "@/lib/rateLimiter";
-import { complete, startCompleteStream, embed, PERSON_TURN_BUDGET, type ToolSpec, type ToolCall } from "@/lib/llm";
+import { complete, startCompleteStream, embed, PERSON_TURN_BUDGET, type ToolSpec, type ToolCall, CHAT_SAMPLING } from "@/lib/llm";
 import { clampMaxTokens } from "@/routes/llm";
 import type { ChatCompletionRequest } from "@maipai/spec/llm/ts/types.js";
 
@@ -169,6 +169,79 @@ describe("lib/llm.ts complete() with tools (Fix E: native tool calling)", () => 
     } finally {
       stub.stop();
     }
+  });
+});
+
+// FAST-06 (docs/BACKLOG.md's 2026-09-12 chat block): variety comes from
+// the samplers, not a prompt sentence. A plain chat request carries all
+// seven fields; a JSON-schema request carries none (a constrained answer
+// must be the most likely one); a caller-supplied temperature wins and
+// switches the whole set off (that caller chose its own sampling).
+describe("lib/llm.ts chat sampling (FAST-06)", () => {
+  async function capture(run: () => Promise<unknown>): Promise<ChatCompletionRequest> {
+    let capturedRequest: ChatCompletionRequest | null = null;
+    __resetLlmSupervisorForTests();
+    const { startStubLlmServer } = await import("@maipai/spec/llm/ts/stubServer.js");
+    const stub = startStubLlmServer(0, {
+      scriptedChatReply: (request: ChatCompletionRequest) => {
+        capturedRequest = request;
+        return undefined;
+      },
+    });
+    process.env.MAIPAI_LLAMA_SERVER_URL = stub.url;
+    try {
+      await run();
+    } finally {
+      stub.stop();
+    }
+    expect(capturedRequest).not.toBeNull();
+    return capturedRequest!;
+  }
+
+  test("a plain chat request carries all seven sampler fields", async () => {
+    const request = await capture(() => complete("chat", [{ role: "user", content: "good morning" }]));
+    expect(request.temperature).toBe(CHAT_SAMPLING.temperature);
+    expect(request.min_p).toBe(CHAT_SAMPLING.min_p);
+    expect(request.xtc_probability).toBe(CHAT_SAMPLING.xtc_probability);
+    expect(request.xtc_threshold).toBe(CHAT_SAMPLING.xtc_threshold);
+    expect(request.dry_multiplier).toBe(CHAT_SAMPLING.dry_multiplier);
+    expect(request.dry_base).toBe(CHAT_SAMPLING.dry_base);
+    expect(request.dry_allowed_length).toBe(CHAT_SAMPLING.dry_allowed_length);
+  });
+
+  test("a streamed plain chat request carries them too", async () => {
+    const request = await capture(async () => {
+      const started = await startCompleteStream("chat", [{ role: "user", content: "good morning" }]);
+      if (started.ok) for await (const _delta of started.tokens) void _delta;
+    });
+    expect(request.min_p).toBe(CHAT_SAMPLING.min_p);
+    expect(request.dry_multiplier).toBe(CHAT_SAMPLING.dry_multiplier);
+  });
+
+  test("a json_schema request carries none of them", async () => {
+    const request = await capture(() =>
+      complete("chat", [{ role: "user", content: "extract" }], {
+        response_format: { type: "json_schema", json_schema: { name: "t", schema: { type: "object", properties: { a: { type: "string" } } } } },
+      }),
+    );
+    expect(request.temperature).toBeUndefined();
+    expect(request.min_p).toBeUndefined();
+    expect(request.xtc_probability).toBeUndefined();
+    expect(request.dry_multiplier).toBeUndefined();
+  });
+
+  test("an explicit `temperature: undefined` (routes/llm.ts's shape) still gets the set, temperature included", async () => {
+    const request = await capture(() => complete("chat", [{ role: "user", content: "hi" }], { temperature: undefined, max_tokens: 64 }));
+    expect(request.temperature).toBe(CHAT_SAMPLING.temperature);
+    expect(request.min_p).toBe(CHAT_SAMPLING.min_p);
+    expect(request.max_tokens).toBe(64);
+  });
+
+  test("a caller-supplied temperature wins, and switches the set off", async () => {
+    const request = await capture(() => complete("chat", [{ role: "user", content: "hi" }], { temperature: 0.1 }));
+    expect(request.temperature).toBe(0.1);
+    expect(request.min_p).toBeUndefined();
+    expect(request.xtc_probability).toBeUndefined();
   });
 });
 
