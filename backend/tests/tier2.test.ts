@@ -30,6 +30,7 @@ import {
   runTurn,
   runTurnStream,
   selectOfferedTools,
+  ordinaryToolIds,
   routeSemantic,
   loadAllManifests,
   TIER2_AMBIGUOUS_FLOOR,
@@ -661,27 +662,32 @@ describe("ROUTE-01: the offer without a floor, and the shape guard in front of i
     { id: "websearch", score: 0.05, manifest: manifest("websearch", true) },
   ];
 
+  // ROUTE-02: the ordinary set is always-offer alone here (the bare
+  // minimum a household can have), so ROUTE-01's own rules show plainly.
+  const alwaysOnly = ["websearch"];
+
   test("selectOfferedTools(): a command-shaped turn offers the top three plus always-offer, with every score under the old floor", () => {
     expect(ranked[0]!.score).toBeLessThan(TIER2_AMBIGUOUS_FLOOR);
-    expect(selectOfferedTools(ranked, "command").map((t) => t.id)).toEqual(["remember", "recall", "define", "websearch"]);
+    expect(selectOfferedTools(ranked, "command", alwaysOnly).map((t) => t.id)).toEqual(["websearch", "remember", "recall", "define"]);
   });
 
   test("selectOfferedTools(): a question or first-person turn no tier placed offers the always-offer set alone, never the top three by rank", () => {
-    expect(selectOfferedTools(ranked, "question").map((t) => t.id)).toEqual(["websearch"]);
-    expect(selectOfferedTools(ranked, "first_person").map((t) => t.id)).toEqual(["websearch"]);
+    expect(selectOfferedTools(ranked, "question", alwaysOnly).map((t) => t.id)).toEqual(["websearch"]);
+    expect(selectOfferedTools(ranked, "first_person", alwaysOnly).map((t) => t.id)).toEqual(["websearch"]);
+    expect(selectOfferedTools(ranked, "statement", alwaysOnly).map((t) => t.id)).toEqual(["websearch"]);
   });
 
   test("selectOfferedTools(): a question Tier 1 placed (threshold and margin) but could not fire still offers that one candidate", () => {
     const placed: RankedCandidate[] = [{ id: "recall", score: 0.8, manifest: manifest("recall") }, ...ranked.filter((r) => r.id !== "recall")];
-    expect(selectOfferedTools(placed, "question").map((t) => t.id)).toEqual(["recall", "websearch"]);
+    expect(selectOfferedTools(placed, "question", alwaysOnly).map((t) => t.id)).toEqual(["websearch", "recall"]);
     // Two close scores are ambiguity, not a placement: the margin rule holds here too.
     const close: RankedCandidate[] = [{ id: "recall", score: 0.8, manifest: manifest("recall") }, { id: "remember", score: 0.76, manifest: manifest("remember") }, ...ranked.filter((r) => r.id !== "recall" && r.id !== "remember")];
-    expect(selectOfferedTools(close, "question").map((t) => t.id)).toEqual(["websearch"]);
+    expect(selectOfferedTools(close, "question", alwaysOnly).map((t) => t.id)).toEqual(["websearch"]);
   });
 
-  test("selectOfferedTools(): an always-offer package already in the top three is offered once", () => {
+  test("selectOfferedTools(): a package already in the ordinary set is offered once, in the set's place", () => {
     const top: RankedCandidate[] = [{ id: "websearch", score: 0.9, manifest: manifest("websearch", true) }, ...ranked.filter((r) => r.id !== "websearch")];
-    expect(selectOfferedTools(top, "command").map((t) => t.id)).toEqual(["websearch", "remember", "recall"]);
+    expect(selectOfferedTools(top, "command", alwaysOnly).map((t) => t.id)).toEqual(["websearch", "remember", "recall"]);
   });
 
   // #80's own shape, with a wording no Tier 0 pattern catches (147cd28
@@ -689,7 +695,7 @@ describe("ROUTE-01: the offer without a floor, and the shape guard in front of i
   // bag-of-words scorer, a top score under the old floor: before this
   // item the offered set was websearch alone and the model could not
   // have chosen remember however clear the sentence was.
-  test("runTurn(): a command-shaped utterance under the old floor now reaches the remember package when the model chooses it", async () => {
+  test("runTurn(): an utterance under the old floor now reaches the remember package when the model chooses it", async () => {
     const { actor } = await owner();
     const text = "Friday is pizza night, keep that in mind";
     const { winner, ranked: real } = await routeSemantic(text, actor, loadAllManifests(), await embedUtterance(text));
@@ -711,7 +717,7 @@ describe("ROUTE-01: the offer without a floor, and the shape guard in front of i
     expect(result.value.plugin_id).toBe("remember");
   });
 
-  test("runTurn(): a question no tier placed is offered the always-offer set alone, never a guessed package", async () => {
+  test("runTurn(): a question no tier placed is offered the ordinary set alone, never a guessed package", async () => {
     const { actor } = await owner();
     let offered: string[] | undefined;
     await withScriptedToolCalls(
@@ -721,7 +727,10 @@ describe("ROUTE-01: the offer without a floor, and the shape guard in front of i
       },
       () => runTurn(actor, "chat", "who won the 1998 world cup"),
     );
-    expect(offered).toEqual(["websearch"]);
+    // ROUTE-02: the ordinary set (a household with no usage yet: the
+    // default order plus always-offer), and nothing by rank.
+    expect(offered).toEqual(ordinaryToolIds(loadAllManifests(), { byPlugin: [] }));
+    expect(offered).toContain("websearch");
   });
 
   test("a [route] trace line is printed once per decision with tier, shape, top, runner-up, margin and the offered ids", async () => {
@@ -744,7 +753,7 @@ describe("ROUTE-01: the offer without a floor, and the shape guard in front of i
     expect(lines.length).toBe(1);
     const record = JSON.parse(lines[0]!.slice("[route] ".length)) as Record<string, unknown>;
     expect(record.tier).toBe("tier2");
-    expect(record.shape).toBe("command");
+    expect(record.shape).toBe("statement");
     expect(record.winner).toBeNull();
     expect((record.top as { id: string; score: number }).id).toBeString();
     expect(typeof (record.top as { score: number }).score).toBe("number");
@@ -752,5 +761,97 @@ describe("ROUTE-01: the offer without a floor, and the shape guard in front of i
     expect(typeof record.margin).toBe("number");
     expect(record.offered).toContain("websearch");
     expect(JSON.stringify(record)).not.toContain("plumber"); // ids and numbers, never the utterance
+  });
+});
+
+// ROUTE-02 (docs/dev/session-a.md): the ordinary tool set, byte-identical
+// across ordinary turns so the prompt prefix survives; a command turn
+// appends only the extras the set lacks.
+describe("ROUTE-02: a stable ordinary tool set", () => {
+  const manifest = (id: string, always_offer = false) => ({ id, description: id, args: {}, kind: "plugin", routing: always_offer ? { always_offer: true } : {} }) as unknown as RankedCandidate["manifest"];
+  const installed = ["weather", "remember", "trivia", "recall", "websearch", "timer", "joke", "define", "remind", "lights-on"].map((id) => ({ id, manifest: manifest(id, id === "websearch") }));
+
+  const tool = (n: number) => ({ tool: n });
+
+  test("ordinaryToolIds(): the most used by Tier 2 wins first, a multi-call id counting for both, the default order on ties, always-offer always present, sorted by id", () => {
+    const usage = { byPlugin: [{ pluginId: "joke", count: 9, tier: tool(9) }, { pluginId: "define+trivia", count: 4, tier: tool(4) }, { pluginId: "trivia", count: 1, tier: tool(1) }] };
+    // joke 9, trivia 5 (define 4 misses the cut at N=2); always-offer on top
+    expect(ordinaryToolIds(installed, usage)).toEqual(["joke", "trivia", "websearch"]);
+    // A tie is broken by the default order, then by id.
+    expect(ordinaryToolIds(installed, { byPlugin: [{ pluginId: "joke", count: 2, tier: tool(2) }, { pluginId: "recall", count: 2, tier: tool(2) }, { pluginId: "timer", count: 2, tier: tool(2) }] })).toEqual(["recall", "timer", "websearch"]);
+  });
+
+  test("ordinaryToolIds(): an empty household gets always-offer plus the default order", () => {
+    expect(ordinaryToolIds(installed, { byPlugin: [] })).toEqual(["recall", "remember", "websearch"]);
+  });
+
+  test("ordinaryToolIds(): pattern and embedding wins do not count, so a household's timer habit never evicts the memory pair (code review)", () => {
+    const usage = { byPlugin: [{ pluginId: "timer", count: 40, tier: { pattern: 40, embedding: 0, keyword: 0, tool: 0 } }, { pluginId: "weather", count: 30, tier: { pattern: 25, embedding: 5, keyword: 0, tool: 0 } }] };
+    expect(ordinaryToolIds(installed, usage)).toEqual(["recall", "remember", "websearch"]);
+  });
+
+  test("ordinaryToolIds(): the same inputs give the same set every time, whatever the input order", () => {
+    const usage = { byPlugin: [{ pluginId: "joke", count: 3, tier: tool(3) }, { pluginId: "timer", count: 3, tier: tool(3) }] };
+    const a = ordinaryToolIds(installed, usage);
+    const b = ordinaryToolIds([...installed].reverse(), { byPlugin: [...usage.byPlugin].reverse() });
+    expect(a).toEqual(b);
+    expect(a).toEqual(["joke", "timer", "websearch"]);
+  });
+
+  test("ordinaryToolIds(): a package in the stats that is no longer installed is ignored", () => {
+    expect(ordinaryToolIds(installed, { byPlugin: [{ pluginId: "gone", count: 99, tier: tool(99) }] })).toEqual(["recall", "remember", "websearch"]);
+  });
+
+  test("selectOfferedTools(): the ordinary set comes first in id order, a command's extras after it, nothing twice", () => {
+    const ranked: RankedCandidate[] = [
+      { id: "joke", score: 0.5, manifest: manifest("joke") },
+      { id: "remember", score: 0.4, manifest: manifest("remember") },
+      { id: "trivia", score: 0.3, manifest: manifest("trivia") },
+      { id: "recall", score: 0.2, manifest: manifest("recall") },
+      { id: "websearch", score: 0.1, manifest: manifest("websearch", true) },
+    ];
+    const ordinary = ["recall", "remember", "websearch"];
+    expect(selectOfferedTools(ranked, "command", ordinary).map((t) => t.id)).toEqual(["recall", "remember", "websearch", "joke", "trivia"]);
+    expect(selectOfferedTools(ranked, "statement", ordinary).map((t) => t.id)).toEqual(["recall", "remember", "websearch"]);
+    expect(selectOfferedTools(ranked, "question", ordinary).map((t) => t.id)).toEqual(["recall", "remember", "websearch"]);
+  });
+
+  test("runTurn(): a command turn's request renders the ordinary base first, in its fixed order, then the extras", async () => {
+    const { actor } = await owner();
+    let names: string[] = [];
+    await withScriptedToolCalls(
+      (request) => {
+        names = (request.tools ?? []).map((t) => t.function.name);
+        return undefined;
+      },
+      () => runTurn(actor, "chat", "tell me something nice about mornings"),
+    );
+    const base = ordinaryToolIds(loadAllManifests(), { byPlugin: [] });
+    expect(names.slice(0, base.length)).toEqual(base); // the cached prefix
+    expect(names.length).toBeGreaterThan(base.length); // "tell" is a command opener: extras follow
+    expect(new Set(names).size).toBe(names.length);
+  });
+
+  test("runTurn(): two consecutive conversational turns send byte-identical tool lists", async () => {
+    const { actor } = await owner();
+    const seen: string[] = [];
+    await withScriptedToolCalls(
+      (request) => {
+        seen.push(JSON.stringify(request.tools));
+        return undefined;
+      },
+      async () => {
+        await runTurn(actor, "chat", "good morning");
+        await runTurn(actor, "chat", "I'm feeling kind of down");
+        await runTurn(actor, "chat", "who won the 1998 world cup");
+      },
+    );
+    expect(seen.length).toBe(3);
+    expect(seen[1]).toBe(seen[0]);
+    expect(seen[2]).toBe(seen[0]);
+    const ids = (JSON.parse(seen[0]!) as { function: { name: string } }[]).map((t) => t.function.name);
+    expect(ids).toContain("websearch");
+    expect(ids).toContain("remember"); // the default order on a household with no usage yet
+    expect(ids).toEqual([...ids].sort());
   });
 });

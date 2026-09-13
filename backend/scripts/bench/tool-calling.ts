@@ -47,7 +47,7 @@ import { getEngineStatus, __resetLlmSupervisorForTests } from "@/lib/llmSupervis
 import { __resetEmbedSupervisorForTests } from "@/lib/embedSupervisor";
 import { loadManifestOnly } from "@/lib/plugins";
 import { embedUtterance, utteranceShape } from "@/lib/routing";
-import { buildPromptParts, commandOpeners, loadAllManifests, routeSemantic, selectOfferedTools } from "@/lib/turnEngine";
+import { buildPromptParts, commandOpeners, loadAllManifests, ordinaryToolIds, routeSemantic, selectOfferedTools } from "@/lib/turnEngine";
 import type { PersonRow } from "@/types";
 
 interface ToolCallCorpusRow {
@@ -159,6 +159,12 @@ async function routedPass(): Promise<number> {
   const loaded = loadAllManifests();
   const alwaysOffer = new Set(loaded.filter((l) => l.manifest.routing?.always_offer).map((l) => l.id));
   const openers = commandOpeners(loaded);
+  // ROUTE-02: the ordinary set from a FIXED usage fixture (an empty
+  // household: always-offer plus the default order), never this
+  // machine's routing stats, so the bench's offered sets do not drift
+  // with whatever the household has been asking.
+  const ordinary = ordinaryToolIds(loaded, { byPlugin: [] });
+  console.log(`Ordinary tool set (fixture: empty household): [${ordinary.join(", ")}]`);
   const rows = [...corpus, ...ROUTE01_ROWS];
   console.log(`\nRouted pass: ${rows.length} rows (${corpus.length} corpus + ${ROUTE01_ROWS.length} from #77), ${REPEATS} repeats each, offered set from routeSemantic + selectOfferedTools, real prompt shape...\n`);
   let falseCallAttempts = 0;
@@ -170,7 +176,7 @@ async function routedPass(): Promise<number> {
     const vector = await embedUtterance(row.utterance);
     const { winner, ranked } = await routeSemantic(row.utterance, actor, loaded, vector);
     const shape = utteranceShape(row.utterance, openers);
-    const tools = selectOfferedTools(ranked, shape);
+    const tools = selectOfferedTools(ranked, shape, ordinary);
     const parts = buildPromptParts(actor, row.utterance, [], loaded);
     const messages: LlmMessage[] = [
       { role: "system", content: parts.stablePrefix },

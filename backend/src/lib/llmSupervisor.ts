@@ -28,6 +28,7 @@
 import { existsSync } from "node:fs";
 import { join } from "node:path";
 import { LlamaServerClient } from "@maipai/spec/llm/ts/client.js";
+import type { ToolDefinition } from "@maipai/spec/llm/ts/types.js";
 import { startStubLlmServer } from "@maipai/spec/llm/ts/stubServer.js";
 import type { ModelCapabilities } from "@maipai/spec/gen/ts/model-capabilities.js";
 import { CATALOG } from "@/lib/modelCatalog";
@@ -120,21 +121,31 @@ const state = hotReloadState<LlmSupervisorState>("llmSupervisor", () => ({
   manuallyStopped: false,
 }));
 
-let warmupPromptProvider: (() => string) | null = null;
+/** ROUTE-02: the warm-up carries the ordinary tool block too, so the
+ * prefix it primes is the one the first real turn sends (the template
+ * renders tools inside the first system message; a warm-up without them
+ * primes a prefix no turn ever reuses). */
+export interface WarmupPrompt {
+  system: string;
+  tools?: ToolDefinition[];
+}
+let warmupPromptProvider: (() => WarmupPrompt) | null = null;
 
-export function setWarmupPrompt(provider: () => string): void {
+export function setWarmupPrompt(provider: () => WarmupPrompt): void {
   warmupPromptProvider = provider;
 }
 
 async function warmChatPrefix(client: LlamaServerClient): Promise<void> {
   if (!warmupPromptProvider) return;
   try {
+    const warmup = warmupPromptProvider();
     const result = await client.chatComplete({
       model: "chat",
       messages: [
-        { role: "system", content: warmupPromptProvider() },
+        { role: "system", content: warmup.system },
         { role: "user", content: "hi" },
       ],
+      ...(warmup.tools && warmup.tools.length > 0 ? { tools: warmup.tools } : {}),
       max_tokens: 1,
       cache_prompt: true,
       id_slot: 0,

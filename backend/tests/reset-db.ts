@@ -4,7 +4,7 @@ import { dataDir } from "@/lib/paths";
 import { __resetSettingsCacheForTests } from "@/lib/settings";
 import { __resetCommandsCacheForTests } from "@/lib/commands";
 import { __resetTurnActivityForTests } from "@/lib/turnActivity";
-import { __clearPendingSummaryRefreshesForTests } from "@/lib/turnEngine";
+import { __clearPendingSummaryRefreshesForTests, __resetOrdinaryToolSetForTests } from "@/lib/turnEngine";
 import { __resetPackageCachesForTests } from "@/lib/plugins";
 import { __resetSkillCacheForTests } from "@/lib/skills";
 import {
@@ -154,6 +154,9 @@ export function resetDb(): void {
   // five this pass added that reset-db.ts didn't already clear).
   __resetPackageCachesForTests();
   __resetSkillCacheForTests();
+  // ROUTE-02: the ordinary tool set is read from routing stats once per
+  // installed set (boot); a fresh database is a fresh boot.
+  __resetOrdinaryToolSetForTests();
   db.delete(idSequences).run();
   db.delete(sessions).run();
   db.delete(personApiTokens).run();

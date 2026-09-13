@@ -414,3 +414,137 @@ proving two consecutive conversational turns send byte-identical
 
 Out of scope: tool description length (FAST-03's sentences stay),
 the template, `--cache-reuse`'s chunk size, #83.
+
+## ROUTE-02: shipped, and the numbers (2026-09-13)
+
+What landed, against the design above: `ordinaryToolIds(loaded,
+usage)` in `turnEngine.ts`, pure (always-offer, then the
+`ORDINARY_SET_MOST_USED` most used by `routingStats().byPlugin` with
+"a+b" split, ties in `ORDINARY_DEFAULT_ORDER` then by id, the whole
+set sorted by id), memoized per installed id list in
+`ordinaryToolIdsForInstalled()` (read once when an installed set is
+first seen: boot, or an install or remove; `resetDb()` clears it,
+since a fresh database is a fresh boot); `selectOfferedTools(ranked,
+shape, ordinaryIds)` returning the ordinary set first in id order and
+the shape's extras after it, never a duplicate; `utteranceShape()`
+returning `statement` for a turn with no signal (a greeting, "thanks",
+"okay", a bare fact), conversation-shaped; the boot warm-up
+(`setWarmupPrompt` in `index.ts`, `warmChatPrefix` in the supervisor)
+carrying the ordinary tool block so the primed prefix is the one the
+first real turn reuses; the tool-calling bench's routed pass building
+its sets from a fixed usage fixture (an empty household) and printing
+that set, so its numbers never drift with the machine's own history.
+
+Tests: `tier2.test.ts` (`ordinaryToolIds()` on a usage fixture, the
+"a+b" split, the tie order, the empty household, the same set from
+reversed inputs, a package in the stats no longer installed;
+`selectOfferedTools()` order; `runTurn()` sending byte-identical tool
+lists on three consecutive conversational turns), `routing.test.ts`
+("good morning", "thanks", "okay", a bare fact and "dim the lights"
+as conversation; `statement` in the trace).
+
+N, measured rather than chosen. The routed pass on the fixture, ten
+repeats, qwen3-8b-instruct-q4-k-m on llama-server b10797 at 8788,
+the row the block's size decides ("remember that pizza night is
+Friday and what do you know about the wifi password", expecting
+`remember` and `recall`):
+
+| N | ordinary set (empty household) | row 1 | negatives | #77 rows |
+|---|---|---|---|---|
+| 5 | recall, remember, remind, timer, weather, websearch | 0/10 (recall alone, ten times) | 0/50 | 10/10, 10/10 |
+| 3 | recall, remember, timer, websearch | 7/10 | 0/50 | 10/10, 10/10 |
+| 2 | recall, remember, websearch | 10/10 | 0/50 | 10/10, 10/10 |
+
+Order is not the cause: ROUTE-01's four tools give 10/10 in rank
+order and 10/10 in id order; the six-tool set gives 0/10 in id order
+and 3/10 in rank order. Two unrelated tools in the block are enough to
+make the 8B drop the second action on a compound request. So N is
+bounded by the 8B's second-call behavior on a compound request, not
+by prompt tokens, and #83's prompt fix is what would let it grow; N =
+2, the largest that holds row 1 at 10/10 with negatives 0/50 and the
+#77 rows 10/10 (the coordinator's rule, the measurement its
+evidence). The other two compound rows sit in #83's band at every N
+(N=2: 0/10 and 9/10; N=3: 4/10 and 5/10; N=5: 8/10 and 6/10), which
+is the spread that issue records.
+
+The prompt-cache cost, before and after, interleaved. Spare-port
+backends at ceb354d (ROUTE-01, "before") and at this diff ("after"),
+alternating, one at a time, a fresh temp directory each, the same
+eight-turn sequence as ROUTE-01's table in one conversation, the same
+8B on 8788, the greeting as the warm-up turn in both arms. Box at the
+time: swap 4.2 GB of 5 GB used, about 900 MB free, load 2.3 to 3.8,
+the household hub and its three engines up, nothing else (Session B's
+verify backend had stopped). Time to first delta in ms, three pairs:
+
+| turn | before 1 | after 1 | before 2 | after 2 | before 3 | after 3 |
+|---|---|---|---|---|---|---|
+| warm "good morning" | 1131 | 827 | 631 | 582 | 601 | 605 |
+| Q1 "should I dye my hair black" | 1073 | 467 | 951 | 453 | 1014 | 461 |
+| Q2 same again | 857 | 521 | 796 | 525 | 816 | 523 |
+| C1 "tell me something nice about mornings" | 1699 | 1299 | 1678 | 1435 | 1632 | 1457 |
+| C2 same again | 837 | 805 | 700 | 945 | 820 | 957 |
+| Q3 question after the command | 1126 | 1062 | 1351 | 1103 | 1226 | 1032 |
+| C3 command after the question | 1028 | 1759 | 2132 | 1890 | 1029 | 1825 |
+| G2 "good morning" again | 1452 | 721 | 1539 | 739 | 1380 | 724 |
+
+Offered sets, from the `[route]` lines: after, every conversational
+turn (the greeting, the questions) [recall, remember, websearch] and
+the command [recall, remember, websearch, remind, almanac-onthisday];
+before, the questions [websearch], the greeting [remember, remind,
+joke, websearch], the command [remember, remind, almanac-onthisday,
+websearch].
+
+What the table says. The common case is what the item was for, and it
+moved: a question after the warm-up starts in 453 to 467 ms against
+951 to 1073 before, a repeated question 521 to 525 against 796 to
+857, the greeting again 721 to 739 against 1380 to 1539; the block
+holds across conversational turns, and the warm-up primes the block
+the first real turn reuses. The question after a command improved
+too (1032 to 1103 against 1126 to 1351): the ordinary block survives
+the command turn, so only the command's extras fall out. The command
+after a question did not: 1759 to 1890 after, against 1028, 2132 and
+1029 before, slower in two of three pairs by about 800 ms, with the
+same two extras appended each time (remind, almanac-onthisday) after
+a cached three-tool block, which by the prefix arithmetic should cost
+less than re-evaluating before's four. I do not have the mechanism;
+the numbers were taken under 4.2 GB of swap, and the before arm's own
+spread on that turn (1028 to 2132) is as wide as the difference. The
+acceptance said set-switch turns within 100 ms of aaaf724; the
+question-after-command turn is within 100 ms of the interleaved
+before arm and better than it, the command-after-question turn is
+not, and aaaf724's own numbers (527 to 994 on those turns, taken
+hours earlier on a quieter box) are not comparable to tonight's.
+Recorded and stopped here, per the rule. The coordinator's one check
+before shipping: that the rendered tools array keeps the base first
+in its fixed order with the extras after it (a list re-sorted by id,
+or extras put first by rank, would rewrite the block from its first
+differing tool on every command turn, which fits the three command
+turns being the slow ones). Verified two ways: the `[route]` lines
+above show [recall, remember, websearch, remind, almanac-onthisday],
+and a test now reads the request's own `tools` array on a command
+turn and asserts the base prefix in its fixed order with the extras
+after and nothing twice; `llm.ts` sorts nothing but embeddings. The
+order is right and the cost remains without a mechanism; shipped per
+the ruling, the conversational gain being the item's purpose, with
+the command-after-question number recorded as the follow-up for a
+quiet box.
+
+The review on the diff, five findings, three fixed: the usage count
+took every plugin win, so a household's timer and weather habits
+(pattern wins, which never needed the offer) could evict `remember`
+and `recall` from the block a bare statement now depends on; the
+count is Tier 2 wins only (`byPlugin[].tier.tool`, the turns where
+the model chose the package from the offer), with a test. The
+warm-up rendered the block in `loadAllManifests()`'s `.sort()` order
+while turns render it in `localeCompare` order, the same today and
+not for a future id with an uppercase letter; the warm-up now takes
+the set's own order. The memo key was the id list alone, so an
+in-place package update that flipped `always_offer` or `kind` kept a
+stale set until reboot; the key now carries both fields. Two recorded
+as verdicts rather than changed: a bare imperative whose verb no
+installed package declares ("dim the lights", "play some jazz") is a
+statement and rides the ordinary set, where before ROUTE-01 it got the
+top three by rank; the remedy is the package declaring its verbs in
+`routing.patterns` (one definition, the package's own), which
+`commandOpenersFrom()` then reads, not a verb list here. And the
+BACKLOG item, ticked with N=2 and the command-after-question number.

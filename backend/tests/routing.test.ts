@@ -294,17 +294,28 @@ describe("conversationShaped() (ROUTE-01)", () => {
     expect(conversationShaped("hey remember that the gate code is 4412", openers)).toBe(false);
   });
 
-  test("a plain command is a command", () => {
-    expect(conversationShaped("the plumber's number is 555 9876 extension 12, keep that on file", openers)).toBe(false);
+  test("a command with an imperative signal is a command", () => {
     expect(conversationShaped("set a timer for ten minutes", openers)).toBe(false);
-    expect(conversationShaped("dim the lights")).toBe(false);
-    expect(conversationShaped("good morning")).toBe(false);
+    expect(conversationShaped("remember that the gate code is 4412", openers)).toBe(false);
+    expect(conversationShaped("turn off the porch light", openers)).toBe(false);
+  });
+
+  // ROUTE-02: a turn with no signal at all is a statement, conversation;
+  // it rides the ordinary tool set (which holds remember by default), so
+  // "keep that on file" still reaches the model with remember in view.
+  test("a greeting, thanks, okay or a bare statement is conversation, not a command", () => {
+    expect(conversationShaped("good morning")).toBe(true);
+    expect(conversationShaped("thanks")).toBe(true);
+    expect(conversationShaped("okay")).toBe(true);
+    expect(conversationShaped("the plumber's number is 555 9876 extension 12, keep that on file", openers)).toBe(true);
+    expect(conversationShaped("dim the lights")).toBe(true); // no package declares "dim"; the ordinary set carries it
   });
 
   test("utteranceShape() names the shape for the trace line", () => {
     expect(utteranceShape("who won the 1998 world cup")).toBe("question");
     expect(utteranceShape("I'm feeling kind of down")).toBe("first_person");
     expect(utteranceShape("could you remember that pippa's recital is friday?")).toBe("command");
-    expect(utteranceShape("good morning")).toBe("command");
+    expect(utteranceShape("good morning")).toBe("statement");
+    expect(utteranceShape("thanks")).toBe("statement");
   });
 });

@@ -251,7 +251,10 @@ const QUESTION_OPENER =
 const TRAILING_QUESTION_MARK = /\?\s*$/;
 const FIRST_PERSON_OPENER = /^\s*(?:i|i'm|i've|i'd|i'll|we|we're|we've|we'd)\b/i;
 
-export type UtteranceShape = "question" | "first_person" | "command";
+/** ROUTE-02: `statement` is a turn with no signal at all (a greeting,
+ * "thanks", "okay", a bare fact), conversation-shaped: it rides the
+ * ordinary tool set like a question does. */
+export type UtteranceShape = "question" | "first_person" | "command" | "statement";
 
 // A compound sentence is its clauses: "what does ephemeral mean and
 // remember that my dentist appointment is next week" carries a command
@@ -269,8 +272,10 @@ export type UtteranceShape = "question" | "first_person" | "command";
 // opener-less fragment to command, so "what's the difference between a
 // crocodile and an alligator" was a command by its noun phrase). A
 // clause with no signal at all decides nothing; a turn made only of
-// those ("good morning", "keep that on file") is a command, today's
-// default, ROUTE-02's question.
+// those ("good morning", "thanks", "keep that on file") is a statement,
+// conversation (ROUTE-02: it rides the stable ordinary tool set, which
+// holds the packages the household actually uses, `remember` by
+// default).
 // Two vocative forms: "hey maipai" with or without a comma (speech
 // transcripts carry none), and a bare "Sage," with one. The word
 // itself is never stripped when it is a courtesy word or a command
@@ -316,11 +321,12 @@ function clauseSignal(clause: string, commandOpeners: ReadonlySet<string>): { si
  * question mark makes the turn a question unless a clause was a polite
  * request. Any command clause makes the turn a command; otherwise any
  * question clause a question; otherwise any first-person clause first
- * person; a turn with no signal at all is a command. */
+ * person; a turn with no signal at all is a statement. */
 export function utteranceShape(text: string, commandOpeners: ReadonlySet<string> = NO_OPENERS): UtteranceShape {
-  const unaddressed = text.replace(VOCATIVE_PREFIX, (whole, afterHey: string | undefined, bare: string | undefined) => {
+  const unaddressed = text.replace(VOCATIVE_PREFIX, (whole: string, afterHey: string | undefined, bare: string | undefined) => {
     const word = (afterHey ?? bare ?? "").toLowerCase();
-    return COURTESY_WORDS.test(word) || commandOpeners.has(word) ? whole : "";
+    if (!COURTESY_WORDS.test(word) && !commandOpeners.has(word)) return "";
+    return whole.slice(whole.toLowerCase().indexOf(word)); // "hey remember ..." keeps its verb, loses the "hey"
   });
   // A leading "please," is a courtesy on the whole turn: a command
   // unless what follows opens as a question ("please, what time is it").
@@ -339,7 +345,7 @@ export function utteranceShape(text: string, commandOpeners: ReadonlySet<string>
   if (signals.has("command")) return "command";
   if (signals.has("question")) return "question";
   if (signals.has("first_person")) return "first_person";
-  return "command";
+  return "statement";
 }
 
 /** True when the utterance is a question or a first-person statement:

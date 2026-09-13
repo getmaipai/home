@@ -33,6 +33,7 @@ import {
   maybeRefreshConversationSummary,
   getPendingAsk,
   setPendingAsk,
+  routingStats,
   type PendingAsk,
 } from "@/lib/conversationHistory";
 import { pickRefusalVariant, varyKnownConstant } from "@/lib/replyVariation";
@@ -810,29 +811,124 @@ interface RoutedPlugin {
 const MAX_TIER2_TOOLS_OFFERED = 3;
 const MAX_TIER2_CALLS_PER_TURN = 2;
 
-/** ROUTE-01: the Tier 2 offer. A command-shaped turn offers the top
- * MAX_TIER2_TOOLS_OFFERED of `ranked` (best first, no similarity floor:
- * the floor hid every paraphrase that drifted from a package's examples,
- * getmaipai/home#80) plus every `routing.always_offer` package not
- * already among them. A question or first-person turn is the bot's
- * shape guard's case (routing.ts's utteranceShape()): "a question no
- * deterministic tier could place goes to conversation", so it offers
- * the always-offer set, plus the one candidate Tier 1 DID place when
+// ROUTE-02 (docs/dev/session-a.md): the ordinary tool set, the block
+// every conversation-shaped turn sends byte-identically so the prompt
+// prefix survives from turn to turn (the Qwen3 template renders tools
+// inside the first system message, ahead of history; a set that differs
+// from the previous turn's re-evaluates the block and everything after
+// it, half a second to a second measured on ROUTE-01). Every
+// always-offer package, plus the ORDINARY_SET_MOST_USED most used
+// packages by routingStats() (a Tier 2 multi-call id "a+b" counts for
+// both), ties and empty households in ORDINARY_DEFAULT_ORDER then by
+// id, the whole set sorted by id. Pure in `ordinaryToolIds()` so a
+// fixed (installed, stats) pair always gives the same block; memoized
+// per installed set in `ordinaryToolIdsForInstalled()`, so the block
+// moves between boots and installs, never between sentences.
+//
+// N is bounded by the 8B's second-call behavior on a compound request,
+// not by prompt tokens (measured on the routed tool-calling pass, ten
+// repeats: "remember that pizza night is Friday and what do you know
+// about the wifi password" calls both tools 10/10 with N=2, 7/10 with
+// N=3, 0/10 with N=5; two unrelated tools in the block are enough to
+// lose the second call). #83's prompt fix is what would let it grow.
+export const ORDINARY_SET_MOST_USED = 2;
+export const ORDINARY_DEFAULT_ORDER = ["remember", "recall", "timer", "remind", "weather"];
+
+/** routingStats().byPlugin's shape: `tier.tool` is the Tier 2 wins, the
+ * turns where the model had to choose the package from the offer; a
+ * pattern or embedding win never needed the offer, so it does not
+ * count toward the block (a code review: counting every plugin win let
+ * a household's timer and weather habits evict remember and recall
+ * from the block a bare statement now depends on). */
+export interface PluginUsage {
+  byPlugin: readonly { pluginId: string; count: number; tier?: { tool: number } }[];
+}
+
+export function ordinaryToolIds(loaded: readonly LoadedManifest[], usage: PluginUsage): string[] {
+  const plugins = loaded.filter((l) => l.manifest.kind === "plugin");
+  const always = plugins.filter((l) => l.manifest.routing?.always_offer).map((l) => l.id);
+  const installed = new Set(plugins.map((l) => l.id));
+  const counts = new Map<string, number>();
+  for (const { pluginId, tier } of usage.byPlugin) {
+    const toolWins = tier?.tool ?? 0;
+    if (toolWins === 0) continue;
+    for (const id of pluginId.split("+")) {
+      if (installed.has(id)) counts.set(id, (counts.get(id) ?? 0) + toolWins);
+    }
+  }
+  const rank = (id: string) => {
+    const i = ORDINARY_DEFAULT_ORDER.indexOf(id);
+    return i === -1 ? ORDINARY_DEFAULT_ORDER.length : i;
+  };
+  const candidates = plugins
+    .map((l) => l.id)
+    .filter((id) => !always.includes(id))
+    .sort((a, b) => (counts.get(b) ?? 0) - (counts.get(a) ?? 0) || rank(a) - rank(b) || a.localeCompare(b));
+  return [...always, ...candidates.slice(0, ORDINARY_SET_MOST_USED)].sort((a, b) => a.localeCompare(b));
+}
+
+const ordinaryCache = new Map<string, string[]>();
+export function __resetOrdinaryToolSetForTests(): void {
+  ordinaryCache.clear();
+}
+
+/** The ordinary set for the installed packages, read from routing
+ * stats the first time this installed set is seen (boot, or after an
+ * install, remove or update changes the id list or a package's kind or
+ * always-offer flag, the two manifest fields the set reads) and held
+ * from then on. */
+export function ordinaryToolIdsForInstalled(loaded: readonly LoadedManifest[]): string[] {
+  const key = loaded
+    .map((l) => `${l.id}:${l.manifest.kind}:${l.manifest.routing?.always_offer ? 1 : 0}`)
+    .sort()
+    .join(",");
+  let ids = ordinaryCache.get(key);
+  if (!ids) {
+    ids = ordinaryToolIds(loaded, routingStats());
+    ordinaryCache.set(key, ids);
+  }
+  return ids;
+}
+
+/** The ordinary set as tool specs, for the boot warm-up (index.ts):
+ * the warmed prefix must carry the same block the first real turn
+ * sends, or that turn is a miss. */
+export function ordinaryToolSpecs(loaded: readonly LoadedManifest[] = loadAllManifests()): ToolSpec[] {
+  const byId = new Map(loaded.map((l) => [l.id, l] as const));
+  // In the set's own order, the one selectOfferedTools() renders, so
+  // the primed block and a turn's block are the same bytes.
+  return ordinaryToolIdsForInstalled(loaded)
+    .map((id) => byId.get(id))
+    .filter((l): l is LoadedManifest => l !== undefined)
+    .map((l) => ({ id: l.id, description: l.manifest.description, args: l.manifest.args }));
+}
+
+/** ROUTE-01 and ROUTE-02: the Tier 2 offer. The ordinary set first, in
+ * id order, on every turn (ROUTE-02); then, appended so the common
+ * prefix survives, what the turn's shape earns: a command-shaped turn
+ * the top MAX_TIER2_TOOLS_OFFERED of `ranked` (best first, no
+ * similarity floor: the floor hid every paraphrase that drifted from a
+ * package's examples, getmaipai/home#80); a question, first-person or
+ * statement turn is the bot's shape guard's case (routing.ts's
+ * utteranceShape()), "a question no deterministic tier could place goes
+ * to conversation", so only the one candidate Tier 1 DID place when
  * there is one: a package that cleared TIER1_THRESHOLD with the margin
  * (pickTier1Winner over `ranked`) but could not fire because its
  * required arg binds only from a literal pattern (`recall` on "what
  * have I told you to remember about the weather", 0.77 on the real
  * scorer) is a deterministic placement that only lacks its argument,
  * which is exactly what the model's tool call supplies. Never the top
- * three by mere rank on a question: that is the guess the guard
- * exists to stop. Exported for the tool-calling bench's routed pass, so
- * its numbers come from this exact rule. */
-export function selectOfferedTools(ranked: readonly RankedCandidate[], shape: UtteranceShape): ToolSpec[] {
+ * three by mere rank on a question: that is the guess the guard exists
+ * to stop. `ranked` is already role-filtered for the actor, so the
+ * ordinary set is too. Exported for the tool-calling bench's routed
+ * pass, so its numbers come from this exact rule. */
+export function selectOfferedTools(ranked: readonly RankedCandidate[], shape: UtteranceShape, ordinaryIds: readonly string[]): ToolSpec[] {
+  const ordinarySet = new Set(ordinaryIds);
+  const ordinary = ranked.filter((r) => ordinarySet.has(r.id)).sort((a, b) => a.id.localeCompare(b.id));
   const placed = shape === "command" ? null : pickTier1Winner(ranked);
-  const topRanked = shape === "command" ? ranked.slice(0, MAX_TIER2_TOOLS_OFFERED) : placed ? ranked.filter((r) => r.id === placed.id) : [];
-  const topRankedIds = new Set(topRanked.map((r) => r.id));
-  const alwaysOffered = ranked.filter((r) => r.manifest.routing?.always_offer && !topRankedIds.has(r.id));
-  return [...topRanked, ...alwaysOffered].map((r) => ({ id: r.id, description: r.manifest.description, args: r.manifest.args }));
+  const earned = shape === "command" ? ranked.slice(0, MAX_TIER2_TOOLS_OFFERED) : placed ? ranked.filter((r) => r.id === placed.id) : [];
+  const extras = earned.filter((r) => !ordinarySet.has(r.id));
+  return [...ordinary, ...extras].map((r) => ({ id: r.id, description: r.manifest.description, args: r.manifest.args }));
 }
 
 /** ROUTE-01: one `[route]` line per routing decision, the bot's router
@@ -1442,7 +1538,7 @@ async function prepareTurn(
   // comment below is the history of the always-offer set, kept because
   // its reasoning (the offer costs prompt tokens, not a round trip; the
   // model's own judgment is the gate) is what ROUTE-01 generalized.
-  const tools = selectOfferedTools(ranked, shape);
+  const tools = selectOfferedTools(ranked, shape, ordinaryToolIdsForInstalled(loaded));
   logRoute(turnId, "tier2", shape, null, ranked, tools.map((t) => t.id), outscoredBySkill);
   // manifest.routing.always_offer (spec/schemas/manifest.schema.json,
   // Fix E's own addition - a code review, 2026-09-07, found the first

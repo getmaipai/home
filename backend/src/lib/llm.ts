@@ -108,7 +108,7 @@ export interface ToolCall {
   args: unknown;
 }
 
-function toToolDefinition(spec: ToolSpec): ToolDefinition {
+export function toToolDefinition(spec: ToolSpec): ToolDefinition {
   return { type: "function", function: { name: spec.id, description: spec.description, parameters: spec.args } };
 }
 
