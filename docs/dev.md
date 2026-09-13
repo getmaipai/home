@@ -10928,8 +10928,41 @@ planning a small vegetable garden this spring." The late system message
 renders correctly through Qwen3's template; the user-role fallback was
 not needed. The engine log shows each turn re-evaluating only the
 context message and the new exchange (118, 274, 157, 155 tokens) rather
-than the full prompt. One turn in that conversation, "how often do those
+than than the full prompt. One turn in that conversation, "how often do those
 need watering", was answered "That's not something I've been told.":
 that is the invention guard rejecting general knowledge, FAST-05's
 target, recorded here as a live example of it.
+
+## Session B: chat frontend fixes (2026-09-12)
+
+Fixed #71 (keyboard regression) and #66 (error code hardcoding). Issue #60
+(message edit vanishes) requires backend schema work:
+
+**#60: Editing a chat message and clicking Update makes the message vanish.**
+
+Root cause: `frontend/src/apps/chat/chatHistoryAdapter.ts` builds a flat
+message chain with no branch state - it loads `conversationTurns` (a linear
+history of completed exchanges) into assistant-ui's message repository. When
+a household member edits a message, assistant-ui branches in memory (creates
+a new tree node for the alternative path), but that branched state lives only
+in the frontend. When history reloads or the page refreshes, the branch is
+lost and the message vanishes from view.
+
+Repro steps (backend already running):
+1. Navigate to /chat, start a conversation
+2. Click Edit on a user message
+3. Change the text and click Update
+4. Observe: the edited message briefly shows, then vanishes when history reloads
+
+The honest fix requires backend schema work: add a `supersedes` field to the
+turn table so branches can be persisted. Without that, a frontend-only
+workaround would either:
+- Never show edits (hide the Edit button)
+- Show edits but lose them on reload (silent data loss)
+- Rebuild turn history on every edit (expensive)
+
+None are acceptable. **Waiting on backend change**: add a nullable `supersedes`
+column to the turn table, with the value being the ID of the turn this turn
+replaces if it's an alternative branch, NULL if it's the primary path. Once
+that ships, the frontend adapter can rebuild the tree from the flat rows.
 

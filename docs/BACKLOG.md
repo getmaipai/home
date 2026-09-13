@@ -3281,6 +3281,13 @@ future session now that F's hub half exists.
       echo "== a11y: axe-core scan"
       bun run a11y
       ```
+- [x] **Session B: Chat household-visible frontend bugs** (S, 2026-09-12)
+      - [x] #71: Phone keyboard regression in empty/loading/desktop layouts
+        (restore footer mt-auto, remove negative margins, fix overflow signals)
+      - [x] #66: Hardcoded "unavailable" error code masked safety refusals
+        (pass event.code through, show backend's message for specific codes)
+      - [ ] #60: Message edit vanishes on history reload (blocked on backend
+        `supersedes` column for turn branching; see docs/dev.md)
 - [ ] **Parallelize `scripts/screenshot.ts`'s full matrix** (S) - a code
       review (2026-09-06) noted the 4 viewport x 2 theme x 11 route
       matrix runs fully sequentially against one browser (up to 88
