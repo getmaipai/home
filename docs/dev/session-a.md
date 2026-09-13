@@ -2107,3 +2107,50 @@ stream (a tee crashed the interruption row), and the hub's background
 engine had grown to 11 GB over the day (#97, with the growth rate
 measured on its respawn: 3.5 GB to 9.4 GB across these three runs).
 Closes #92.
+
+## #97: the background engine's prompt cache (2026-09-13)
+
+Ordered ahead of #93 by the coordinator: the judge engine the hub
+respawned at 09:42 was at 9.3 GB again by 10:20 and the household hub
+would swap by night. The hypothesis, from FAST-02's own note on
+llama-server's server-side prompt cache, held: b10797's `--cache-ram`
+("set the maximum cache size in MiB, default 8192") keeps the KV
+state of every distinct prompt the engine has answered until that
+ceiling, and every judge prompt is a different transcript, so each
+drain added a state until the cache filled near 8 GB over the model's
+own 2 to 3 GB, the 11 GB plateau of the morning.
+
+**Measured, side by side.** The same three baseline bench runs
+(twenty conversations, nine judge drains each) against two 1.7B
+engines on the same machine: the hub's own judge, spawned with the
+default, at 3.5 GB after its respawn and 9.3 GB after the runs (top's
+memory column, compressed included; the process was mostly in swap);
+a second 1.7B on port 8799 launched with the new line (`--cache-ram
+0`, no `--cache-reuse`, otherwise the same `-c 8192 -ngl 0 -t 4 -fa on
+--reasoning off --jinja --no-webui --metrics`) at 4.4 GB resident
+after load and 2.8 GB total after the same three runs. Resident size
+alone (ps) is not a usable figure under this much swap: it read 2.1,
+0.4 and 1.3 GB after the three runs for the same process. Tried and
+reverted: `-np 1` (one slot instead of llama-server's auto four)
+loaded at the same 4.4 GB, so the base is the model and its compute
+buffers, not the KV pool, and one slot would only serialize the
+conversation summaries behind the judge for nothing.
+
+**Shipped.** `backgroundLaunchArgs()` in `backgroundSupervisor.ts`,
+the launch line made pure so `backgroundSupervisor.test.ts` holds it:
+`--cache-ram 0` and no `--cache-reuse`, with the reason on the
+function. It takes effect on the hub's next restart; the running
+judge keeps its 9 GB until then (the earlier kill was a one-time
+authorization, not a habit). Bench totals for the three runs against
+the fixed engine, for the record: 58, 56, 56 of 60 (the moving rows
+are item 3's and #93's; #92's rows passed in all three).
+
+**Left open on #97.** The chat engine runs with the same default and
+has held at 3.3 GB across some five hundred turns today (its prompts
+share one stable prefix, so few distinct states accumulate); a small
+bound for it (the coordinator's 512 MB) needs a spawned 8B on a spare
+port and the latency bench to prove first-delta and the cache ratio
+hold, which waits for memory headroom (swap 13.7 of 14.3 GB as this
+was written, most of it the old judge). The supervisor still has no
+resident ceiling or recycle of its own, and no clean stop on hub stop
+(#73).

@@ -1,5 +1,5 @@
 import { describe, expect, test, beforeEach, afterEach } from "bun:test";
-import { getBackgroundClient, getBackgroundBackendKind, __resetBackgroundSupervisorForTests } from "@/lib/backgroundSupervisor";
+import { getBackgroundClient, getBackgroundBackendKind, backgroundLaunchArgs, __resetBackgroundSupervisorForTests } from "@/lib/backgroundSupervisor";
 import { LlamaServerClient } from "@maipai/spec/llm/ts/client.js";
 
 beforeEach(() => {
@@ -67,5 +67,18 @@ describe("backgroundAssets", () => {
     const { backgroundModelPath, BACKGROUND_MODEL_FALLBACK_FILE } = await import("@/lib/backgroundAssets");
     const path = backgroundModelPath();
     expect(path).toContain(BACKGROUND_MODEL_FALLBACK_FILE);
+  });
+});
+
+// #97: the background engine grew to 11 GB over a day of judge runs
+// because llama-server's server-side prompt cache (default 8192 MiB)
+// kept the KV state of every distinct judge prompt. The launch line
+// disables it and carries no --cache-reuse (nothing to reuse from).
+describe("backgroundLaunchArgs() (#97)", () => {
+  test("launches with --cache-ram 0 and no --cache-reuse, at 8192 context and the given GPU layers", () => {
+    const args = backgroundLaunchArgs("/bin/llama-server", "/models/judge.gguf", 8789, 0);
+    // The whole line: the rest is what spawnBackgroundServer() has always passed.
+    expect(args).toEqual(["/bin/llama-server", "--model", "/models/judge.gguf", "--port", "8789", "--host", "127.0.0.1", "-c", "8192", "-ngl", "0", "-t", "4", "-fa", "on", "--reasoning", "off", "--jinja", "--no-webui", "--metrics", "--cache-ram", "0"]);
+    expect(args).not.toContain("--cache-reuse");
   });
 });

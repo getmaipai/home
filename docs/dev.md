@@ -10680,7 +10680,9 @@ same way and selected by `MAIPAI_BACKGROUND_MODEL=qwen3-4b`).
 `backgroundSupervisor.ts` mirrors the embed role: URL, spawn, and stub
 tiers, hot-reload state, the auto-heal watch, and `completeBackground()`
 with thinking always off. Spawn flags: `-c 8192 -ngl 0 -t 4 -fa on
---reasoning off --jinja --no-webui --metrics --cache-reuse 256`, CPU by
+--reasoning off --jinja --no-webui --metrics --cache-reuse 256` (the
+`--cache-reuse` became `--cache-ram 0` on 2026-09-13, #97: the
+server-side prompt cache grew the engine to 11 GB), CPU by
 default so the GPU stays with chat. `GET /api/health` reports it.
 Measured live: download 80 s; first spawn healthy inside the judge's own
 tick; resident set 2.86 GB; prefill 368 to 426 tokens per second, decode
@@ -12691,6 +12693,10 @@ other's section once (147cd28, f4779a6).
   turn engine, state-read outcomes, frozen header, hard rows) and its
   first run's table and ranking: [docs/dev/session-a.md](dev/session-a.md)
   (2026-09-13).
+- #97, the background engine's prompt cache (default 8192 MiB) grew the
+  judge to 11 GB; `--cache-ram 0` on its launch line, measured side by
+  side at 2.8 GB against 9.3 GB over the same runs:
+  [docs/dev/session-a.md](dev/session-a.md) (2026-09-13).
 - #92, a lookup miss is not a reply: the typed not_found end to end, a
   Tier 0 miss falling through to the model with the outcome on the
   TurnContext, a literal pattern yielding on a household name or

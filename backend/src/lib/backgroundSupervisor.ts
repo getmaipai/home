@@ -45,27 +45,43 @@ const state = hotReloadState<BackgroundSupervisorState>("backgroundSupervisor", 
   generation: 0,
 }));
 
+/** The background engine's launch line, pure so a test can hold it.
+ * #97: `--cache-ram 0` turns off llama-server's server-side prompt cache
+ * (default 8192 MiB on b10797, `--cache-ram` in its help), which keeps
+ * the KV state of every distinct prompt it has answered until that
+ * ceiling. The judge's prompts never repeat (each is a different
+ * transcript), so the cache bought nothing and grew the process from
+ * 3.5 GB after load to 9.4 GB in three bench runs and 11 GB over a day,
+ * with the machine swapping. No `--cache-reuse` either: it only ever
+ * reused from that cache. The slot count is left to llama-server's
+ * auto (four): measured, one slot loads at the same 4.4 GB resident as
+ * four, so the base is the model and its compute buffers, not the KV
+ * pool, and a change there would serialize the summaries for nothing. */
+export function backgroundLaunchArgs(binPath: string, modelPath: string, port: number, gpuLayers: number): string[] {
+  return [
+    binPath,
+    "--model", modelPath,
+    "--port", String(port),
+    "--host", "127.0.0.1",
+    "-c", "8192",
+    "-ngl", String(gpuLayers),
+    "-t", "4",
+    "-fa", "on",
+    "--reasoning", "off",
+    "--jinja",
+    "--no-webui",
+    "--metrics",
+    "--cache-ram", "0",
+  ];
+}
+
 async function spawnBackgroundServer(binPath: string): Promise<BackgroundBackend> {
   const port = Number(process.env.MAIPAI_BACKGROUND_PORT ?? 8789);
   await ensureBackgroundModel();
   const client = new LlamaServerClient(`http://127.0.0.1:${port}`);
   const gpuLayers = Number(process.env.MAIPAI_BACKGROUND_GPU_LAYERS ?? 0);
   const proc = await spawnAndWaitHealthy({
-    command: [
-      binPath,
-      "--model", backgroundModelPath(),
-      "--port", String(port),
-      "--host", "127.0.0.1",
-      "-c", "8192",
-      "-ngl", String(gpuLayers),
-      "-t", "4",
-      "-fa", "on",
-      "--reasoning", "off",
-      "--jinja",
-      "--no-webui",
-      "--metrics",
-      "--cache-reuse", "256",
-    ],
+    command: backgroundLaunchArgs(binPath, backgroundModelPath(), port, gpuLayers),
     port,
     healthCheck: () => client.health(),
     timeoutMs: 60_000,
