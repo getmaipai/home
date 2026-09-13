@@ -2685,3 +2685,95 @@ experience-claim regex lets knowledge phrasing through ("I've read
 it's about a cop", "I saw that it came out in 1986", "I've seen it
 described as a cult film"); and the test that the seeded fact is never
 said in the transcript is a real assertion now.
+
+## The missing competencies, one failing conversation each, and #101 (2026-09-13)
+
+Seventeen conversations added to the bench for the rows the checklist
+(`docs/plans/conversation-competencies-2026-09-13.md`) marks missing,
+each written to fail today so the table shows the gap and the fix is
+judged the way every other item is: A2 (a digression and a return by
+pronoun, the subject the tracker records on the `[turn]` line), A4 (a
+request missing its argument gets a question, "never mind" clears
+it), A6 (clarify only when ambiguous), B3 (a stored plan brought up
+unprompted), B6 (a child's register, by length and plain words), B7
+(the feeling before the task), D2 (a question back), D3 (length
+matches the moment), E3 (time left on a running timer), F1 (yesterday's
+thread picked up), F2 (a promise in plain words kept by the
+scheduler), G1 (a preference shapes a recommendation), G2 (forget in
+conversation, checked on the record's status), G3 (prior-reply
+grounding, the item taken off the list), G4 (say that again), G5 (how
+do you know, after a lookup), and step 3a's own row (Jesse's example
+with a roster name: "my coworker Quill likes seltzer", the entity the
+judge is to create, the speaker's own taste not guessed). Five new
+expectations carry them: `subject`, `maxWords` and `minWords`,
+`listLacks`, `entityExists`; the runner reads the `[turn]` line's
+`subject` field once a tracker writes one, and the registry's entities.
+Every conversation now starts with empty lists, since the household's
+one shopping list is shared and the live run found "the second one"
+pointing at an item added twenty conversations earlier.
+
+**One live run** (47 conversations, 159 scored turns; engines and
+header as in item 1b): 119 of 159, 26 conversations with a miss.
+The seventeen rows' verdicts, with what each showed beyond its
+designed miss:
+
+- A2: the return turn answered Lisbon correctly and no subject is
+  recorded (nothing writes one); "and what's on the list now" was
+  answered from thin air without list-view, and happened to be right.
+- A4: "set a timer" with no length ran the timer package with an
+  invented ten minutes; nothing asked. The ask path does not exist
+  for a missing argument, and the model fills it in.
+- A6: "add it to the list" added the word "it" (the pattern captures
+  the pronoun); "add eggs" never asked which list.
+- B3: the recital never reached the Friday-dinner turn's context.
+- B6: "why is the sky blue" answered a child with "molecules ...
+  scatter the shorter wavelengths"; "what does allergic mean" reached
+  the define package, which has no network in the bench.
+- B7: "ugh, what a long day" got "You got this, it's not the end of
+  the day yet! Let me know if you need anything." (a closer, no <!-- prose-lint: allow -->
+  feeling); the puppy turn passed.
+- D2: the lasagna turn got a question back; "from scratch, first
+  time" got "Let me know if you need help", the persona's closer
+  against #67's friend rule.
+- D3: "what's the capital of Portugal" got the knowledge package's
+  whole 98-word Portugal summary (the literal "what's the capital of
+  *" claim, #92's shape); "in detail" passed.
+- E3: "how long is left on it" got "It's been five minutes, so
+  there's five left", invented.
+- F1: "morning" the next day got "Had a good night?", nothing about
+  the film; the opening turn said "Sage is watching it too!" to Sage, <!-- prose-lint: allow -->
+  an invention about the household the guards do not read (a roster
+  name with "watching" is not a trait verb).
+- F2: "in five seconds, tell me to stretch" set a five-second timer
+  (a `timers.fire` job and a `timer.done` delivery), not a reminder
+  with the words; the row asks for `remind.due`.
+- G1: "what should I make for dinner" got "I'm making lasagna
+  tonight! Want to join in?" with no vegetarian in the context. <!-- prose-lint: allow -->
+- G2: "forget what I told you about Marlow's birthday" got "Got it."
+  and the record stayed active; the next conversation said June.
+- G3: "take the second one off" got "Noted." and the list kept bread;
+  there is no list-remove path.
+- G4: passed in full (the window carries the last answer).
+- G5: "how do you know" after the media-lookup turn got "I didn't
+  look that up." from the unsupported-action guard, which reads this
+  turn's outcomes only: the lookup was the previous turn's, so the
+  narrated line is false. CHAT-15's retained outcomes own this.
+- Step 3a: the judge wrote no record from "my coworker Quill likes
+  seltzer" and created no entity; "what does Quill drink" in the next
+  conversation got the honesty line; "who is Quill" passed from the
+  window alone.
+
+#101 in the same commit: `PERSON_TRAIT_RE`'s "good boy" half needs a
+subject: a pronoun for any of its nouns ("he's a really good boy",
+"he's a good one" still inventions, adverbs allowed), a capitalized
+name for the person nouns ("Rover's such a good boy" caught, "Cobra's
+a good one" not), with the film's opening reply as a corpus row. A
+review of the patch took four more things: a checked-off list item
+counts as gone for the G3 row, so a "take it off" that completes the
+item passes too; the lists a conversation starts by clearing are the
+household's and the bench people's own, never another person's; the
+G3 row's "which" is `which one` or `which list`, not the relative
+pronoun; and the Cobra runtime rubric (the G5 setup) accepts the
+common phrasings of 87 minutes. The plain-words promise row costs the
+live run about twelve seconds of waiting for a delivery that never
+comes today; noted, and worth it for the row.

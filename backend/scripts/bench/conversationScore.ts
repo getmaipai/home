@@ -62,6 +62,10 @@ export interface TurnObserved {
   /** Notification type ids delivered to the person since the turn
    * started, after the wait. */
   deliveries: readonly string[];
+  /** The subject the `[turn]` line names, once a tracker writes one. */
+  subject: string | null;
+  /** The registry's entities after the turn (kind and name). */
+  entities: readonly { kind: string; name: string }[];
 }
 
 export interface Check {
@@ -121,6 +125,11 @@ export function describeExpectation(e: TurnExpectation): string {
   if (e.inferenceStopped) parts.push("inference stopped");
   if (e.reconciled) parts.push("reconciled");
   if (e.delivered) parts.push(`${e.delivered.notification} delivered within ${e.delivered.withinMs} ms`);
+  if (e.subject) parts.push(`subject ${e.subject}`);
+  if (e.maxWords) parts.push(`at most ${e.maxWords} words`);
+  if (e.minWords) parts.push(`at least ${e.minWords} words`);
+  if (e.listLacks) parts.push(`list lacks ${e.listLacks.join(", ")}`);
+  if (e.entityExists) parts.push(`entity ${e.entityExists.kind} ${e.entityExists.name}`);
   if (e.humanVerdict) parts.push("(reader's verdict)");
   return parts.join("; ");
 }
@@ -237,6 +246,20 @@ export function scoreTurn(conversation: BenchConversation, turnIndex: number, tu
   if (e.delivered) {
     const hit = observed.deliveries.includes(e.delivered.notification);
     checks.push({ name: "delivered", pass: hit, detail: hit ? `${e.delivered.notification} delivered` : `${e.delivered.notification} not delivered within ${e.delivered.withinMs} ms (pending: ${observed.deliveries.join(", ") || "none"})` });
+  }
+  if (e.subject) checks.push({ name: "subject", pass: observed.subject !== null && observed.subject.toLowerCase() === e.subject.toLowerCase(), detail: observed.subject ? `resolved to ${observed.subject}` : "no subject recorded on the turn" });
+  if (e.maxWords || e.minWords) {
+    const words = reply.trim() ? reply.trim().split(/\s+/).length : 0;
+    if (e.maxWords) checks.push({ name: "length", pass: words <= e.maxWords, detail: `${words} words (at most ${e.maxWords})` });
+    if (e.minWords) checks.push({ name: "length", pass: words >= e.minWords, detail: `${words} words (at least ${e.minWords})` });
+  }
+  if (e.listLacks) {
+    const present = e.listLacks.filter((k) => observed.listItems.some((item) => has(item, k)));
+    checks.push({ name: "list lacks", pass: present.length === 0, detail: present.length === 0 ? "absent" : `still on the list: ${present.join(", ")}` });
+  }
+  if (e.entityExists) {
+    const hit = observed.entities.find((x) => x.kind === e.entityExists!.kind && x.name.toLowerCase() === e.entityExists!.name.toLowerCase());
+    checks.push({ name: "entity", pass: hit !== undefined, detail: hit ? `${hit.kind} ${hit.name} exists` : `no ${e.entityExists.kind} named ${e.entityExists.name} (entities: ${observed.entities.map((x) => `${x.kind} ${x.name}`).join(", ") || "none"})` });
   }
   const pass = checks.length === 0 ? null : checks.every((c) => c.pass);
   return {

@@ -276,8 +276,15 @@ function guessesAboutHousehold(sentence: string, ctx: GuardContext, grounded: Se
 // "he drives a black BMW i3", "she lives in the kitchen": a third-party
 // pronoun given a concrete trait or place. Narrow on purpose (a pronoun
 // PLUS one of these specific verbs) - word grounding alone can't tell
-// whose blue car it is, so the shape itself is what's checked.
-const PERSON_TRAIT_RE = /\b(?:he|she|they)(?:'s| is| are)?\s+(?:drives?|owns?|has|had|lives?|works?|wears?|stays?|sits?|sleeps?)\b|\bgood (?:boy|girl|guy|kid|one)\b/i;
+// whose blue car it is, so the shape itself is what's checked. The
+// "good boy" half needs the pronoun subject too (#101): "Cobra's a good
+// one" about the film the person just named tripped it with no subject
+// at all, and the live bench heard the honesty line for a friend's
+// reaction.
+// "he's a really good boy" and "Rover's such a good boy" stay caught (a
+// review); only "good one" needs the pronoun, since a named thing can
+// be a good one and a named person is still a trait claim.
+const PERSON_TRAIT_RE = /\b(?:he|she|they)(?:'s| is| are)?\s+(?:drives?|owns?|has|had|lives?|works?|wears?|stays?|sits?|sleeps?)\b|\b(?:he|she|they)(?:'s| is| are|'re) (?:\w+ )?a (?:\w+ )?good (?:boy|girl|guy|kid|one)\b|\b\p{Lu}\p{L}+(?:'s| is) (?:\w+ )?a (?:\w+ )?good (?:boy|girl|guy|kid)\b/iu;
 
 // "I'm watching too", "I've even seen one of their videos" - a first-
 // person SENSORY EXPERIENCE this hub cannot have (no eyes, no ears

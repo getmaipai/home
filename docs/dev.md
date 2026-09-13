@@ -12766,6 +12766,11 @@ other's section once (147cd28, f4779a6).
   clearance Shell.tsx already reserves for it), proven to fail then
   fixed with a real-layout check in scripts/screenshot.ts:
   [docs/dev/session-b.md](dev/session-b.md) (2026-09-13).
+- Seventeen bench conversations for the competencies the checklist
+  marks missing (A2, A4, A6, B3, B6, B7, D2, D3, E3, F1, F2, G1 to G5,
+  step 3a's Quill row), written to fail, with what one live run showed
+  beyond each designed miss; #101's guard fix beside them:
+  [docs/dev/session-a.md](dev/session-a.md) (2026-09-13).
 - The `media-lookup` package (step 1 of docs/plans/media-conversation-
   program-2026-09-13.md): film/TV director, cast, runtime, rating,
   year, and synopsis by title, keyless (Wikidata plus Wikipedia),

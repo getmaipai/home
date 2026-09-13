@@ -95,6 +95,23 @@ export interface TurnExpectation {
    * scheduler and reads the person's pending notifications: one of
    * this type is delivered within the wait (F2). */
   delivered?: { notification: string; withinMs: number };
+  // The missing competencies' rows (the same file, sections A to G;
+  // every row below fails today by design and names the piece that
+  // makes it pass).
+  /** The subject the turn resolved to, as the subject tracker records
+   * it on the `[turn]` line (CHAT-13; A1, A2). */
+  subject?: string;
+  /** The reply's length in words, for the register and length rows
+   * (B6, D3): a reading of the reply, kept because length is the
+   * effect those rows are about. */
+  maxWords?: number;
+  minWords?: number;
+  /** No item on the household's lists matches this keyword after the
+   * turn (G3, an item taken off). */
+  listLacks?: readonly string[];
+  /** An entity of this kind and name exists in the registry after the
+   * turn (step 3a of the program: the judge creates it). */
+  entityExists?: { kind: string; name: string };
 }
 
 /** A household entity seeded in the registry before a conversation (B4):
@@ -482,6 +499,187 @@ export const CONVERSATIONS: readonly BenchConversation[] = [
       { say: "should we get it looked at", expect: { mustContain: "yes|yeah|probably|worth|grind|technician|repair|filter|check|sounds", mustNotContain: HONESTY_LINES } },
       { say: "how old is the dishwasher", expect: { recallInContext: ["eight years|8 years|eight-year-old"], mustContain: "eight|\\b8\\b", mustNotContain: "1886|founded|company|" + HONESTY_LINES } },
       { say: "what brand is it", expect: { recallInContext: ["bosch"], mustContain: "bosch", mustNotContain: HONESTY_LINES } },
+    ],
+  },
+  // The missing competencies (docs/plans/conversation-competencies-
+  // 2026-09-13.md, "What this changes now", 2): one conversation per
+  // row the checklist marks missing, written to fail today so the table
+  // shows the gap and the fix is judged the same way as every other
+  // item. Each conversation's note names the row and the piece that
+  // makes it pass. Rows that need a human read (B7, D2) are the
+  // reader's beside their one presence check.
+  {
+    id: "subject-switch-and-return",
+    category: "knowledge",
+    note: "A2: a digression (two list turns) and a return by pronoun; the subject tracker (CHAT-13, a stack of depth two) records Lisbon on the return turn",
+    turns: [
+      { say: "we're planning a trip to Lisbon", expect: { guard: null, mustNotContain: NO_CLOSER, humanVerdict: true } },
+      { say: "add sunscreen to the shopping list", expect: { toolRan: "list-add", listHas: ["sunscreen"] } },
+      { say: "and what's on the list now", expect: { toolRan: "list-view", mustContain: "sunscreen" } },
+      { say: "anyway, back to the trip, what's it known for", expect: { subject: "Lisbon", mustContain: "tram|tile|hill|tagus|pastel|fado|alfama|belem|belém|castle|seafood|azulejo", mustNotContain: "sunscreen|shopping|" + HONESTY_LINES } },
+    ],
+  },
+  {
+    id: "never-mind-on-an-ask",
+    category: "tools",
+    note: "A4: a request missing its one argument is answered with a question (a pending ask), 'never mind' clears it, and the argument said later starts nothing",
+    turns: [
+      { say: "set a timer", expect: { pendingAsk: "ask", toolRan: null, mustContain: "how long|for how|what length|minutes\\?|\\?" } },
+      { say: "never mind", expect: { pendingAsk: null, toolRan: null } },
+      { say: "ten minutes", expect: { pendingAsk: null, toolRan: null, mustNotContain: "timer set|timer's set|set a timer|started" } },
+    ],
+  },
+  {
+    id: "clarify-only-when-ambiguous",
+    category: "tools",
+    note: "A6 (TURN-01's rule): 'add it to the list' with nothing to point at asks what, and adds nothing; 'add eggs to the list' with one list never asks which",
+    turns: [
+      { say: "add it to the list", expect: { toolRan: null, mustContain: "\\?", mustNotContain: "added|on the list" } },
+      { say: "add eggs to the list", expect: { toolRan: "list-add", listHas: ["egg"], mustNotContain: "which list|\\?" } },
+      { say: "thanks", expect: { guard: null, humanVerdict: true } },
+    ],
+  },
+  {
+    id: "memory-driven-prompt",
+    category: "memory",
+    note: "B3: a stored plan comes up unprompted when the person mentions its day (the memory-driven prompts item after CHAT-16)",
+    turns: [
+      { say: "Pippa's recital is on Friday at six", expect: { guard: null } },
+      { say: "I'm planning a big dinner for Friday", newConversation: true, drainJudge: true, expect: { recallInContext: ["recital"], mustContain: "recital", guard: null } },
+      { say: "oh right, thanks", expect: { guard: null, humanVerdict: true } },
+    ],
+  },
+  {
+    id: "child-register",
+    category: "etiquette",
+    note: "B6: a child gets a child's answer, short and in plain words (the per-person speech profile)",
+    turns: [
+      { say: "why is the sky blue", as: "child", expect: { maxWords: 45, mustNotContain: "rayleigh|wavelength|nanomet|molecul|scattering of", guard: null, humanVerdict: true } },
+      { say: "what does allergic mean", as: "child", expect: { maxWords: 40, mustContain: "react|sick|itch|sneez|body|hurt|makes you|bad for|can't eat|can't have", mustNotContain: "immune system|histamine|antibod|immunoglobulin|didn't work", guard: null, humanVerdict: true } },
+      { say: "okay thanks", as: "child", expect: { guard: null, humanVerdict: true } },
+    ],
+  },
+  {
+    id: "feeling-before-task",
+    category: "etiquette",
+    note: "B7: a bad day and a good one get the feeling answered before anything else (the warmth measure, bench only); the reader judges the warmth, the check only that nothing was offered instead",
+    turns: [
+      { say: "ugh, what a long day", expect: { mustContain: "sorry|rough|tough|long day|hope|hang in|that sounds|sounds like|\\?", mustNotContain: "timer|the list|remind you|" + NO_CLOSER, toolRan: null, guard: null, humanVerdict: true } },
+      { say: "we picked up the new puppy today", expect: { mustContain: "congrat|exciting|aww|cute|adorable|name|\\?", mustNotContain: NO_CLOSER, toolRan: null, guard: null, humanVerdict: true } },
+      { say: "his name is Rover", expect: { guard: null, humanVerdict: true } },
+    ],
+  },
+  {
+    id: "asks-back",
+    category: "etiquette",
+    note: "D2: a statement a friend would ask about gets a question back; the persona's own 'no follow-up question tacked on' line and #67's friend rule pull opposite ways here",
+    turns: [
+      { say: "I'm making lasagna tonight", expect: { mustContain: "\\?", mustNotContain: NO_CLOSER, guard: null, humanVerdict: true } },
+      { say: "from scratch, first time", expect: { mustContain: "\\?|luck|tip|tell me", mustNotContain: NO_CLOSER, guard: null, humanVerdict: true } },
+      { say: "wish me luck", expect: { guard: null, humanVerdict: true } },
+    ],
+  },
+  {
+    id: "length-matches-the-moment",
+    category: "knowledge",
+    note: "D3 (CHAT-12, the detail flag): a short question gets a short answer, 'in detail' a long one",
+    turns: [
+      { say: "what's the capital of Portugal", expect: { maxWords: 12, mustContain: "lisbon", guard: null } },
+      { say: "tell me about Lisbon in detail", expect: { minWords: 60, mustContain: "lisbon|tagus|alfama|tram|portug", guard: null } },
+      { say: "and in one line, is it worth a visit", expect: { maxWords: 20, guard: null, humanVerdict: true } },
+    ],
+  },
+  {
+    id: "running-thing-follow-up",
+    category: "tools",
+    note: "E3 (#94): 'how long is left on it' is answered from the timer's own state, never guessed and never declined",
+    turns: [
+      { say: "set a timer for ten minutes", expect: { toolRan: "timer", jobScheduled: "timers.fire" } },
+      { say: "how long is left on it", expect: { mustContain: "\\b(9|nine|10|ten)\\b.{0,12}min|minutes? left|left on it|about (nine|ten)", mustNotContain: "can't|cannot|don't know|not sure|unable|" + HONESTY_LINES, guard: null } },
+      { say: "okay", expect: { guard: null, humanVerdict: true } },
+    ],
+  },
+  {
+    id: "thread-from-yesterday",
+    category: "memory",
+    note: "F1: the person returns the next day and the hub picks up yesterday's thread (episodes exist; nothing prompts from them)",
+    turns: [
+      { say: "we're watching the movie Cobra tonight", expect: { guard: null, mustNotContain: NO_CLOSER, humanVerdict: true } },
+      { say: "morning", newConversation: true, daysLater: 1, drainJudge: true, expect: { mustContain: "cobra|movie|film|how was", guard: null } },
+      { say: "it was fun, thanks for asking", expect: { guard: null, humanVerdict: true } },
+    ],
+  },
+  {
+    id: "promise-in-plain-words",
+    category: "tools",
+    note: "F2: a promise made in plain words, outside the reminder package's own phrasing, is kept by the scheduler",
+    turns: [
+      { say: "in five seconds, tell me to stretch", expect: { jobScheduled: "reminders.fire", delivered: { notification: "remind.due", withinMs: 12_000 }, mustNotContain: HONESTY_LINES } },
+      { say: "thanks", expect: { guard: null, humanVerdict: true } },
+      { say: "what time is it", expect: { toolRan: "almanac-time" } },
+    ],
+  },
+  {
+    id: "personalization",
+    category: "memory",
+    note: "G1: a stored preference changes a recommendation",
+    turns: [
+      { say: "I'm vegetarian, by the way", expect: { guard: null } },
+      { say: "what should I make for dinner tonight", newConversation: true, drainJudge: true, expect: { recallInContext: ["vegetarian"], mustNotContain: "chicken|beef|pork|steak|salmon|shrimp|bacon|turkey|lamb|sausage", guard: null } },
+      { say: "sounds good", expect: { guard: null, humanVerdict: true } },
+    ],
+  },
+  {
+    id: "memory-control-in-chat",
+    category: "memory",
+    note: "G2: forget in conversation, checked on the record's status, and a confirmation of what was forgotten",
+    turns: [
+      { say: "remember that Marlow's birthday is in June", expect: { memoryWritten: [["june"]], guard: null } },
+      { say: "actually, forget what I told you about Marlow's birthday", drainJudge: true, expect: { recordRetired: [["june"]], mustContain: "forgot|forgotten|removed|gone|won't remember|deleted|cleared", mustNotContain: HONESTY_LINES } },
+      { say: "when is Marlow's birthday", newConversation: true, expect: { mustNotContain: "june" } },
+    ],
+  },
+  {
+    id: "prior-reply-grounding",
+    category: "tools",
+    note: "G3: 'the second one' resolves against the list the hub just read out; the item comes off the list (a list-remove path)",
+    turns: [
+      { say: "add milk to the shopping list", expect: { toolRan: "list-add", listHas: ["milk"] } },
+      { say: "put bread on the shopping list", expect: { toolRan: "list-add", listHas: ["bread"] } },
+      { say: "what's on my shopping list", expect: { toolRan: "list-view", mustContain: "milk" } },
+      { say: "take the second one off", expect: { listLacks: ["bread"], listHas: ["milk"], mustNotContain: "\\?|\\bwhich (?:one|list)\\b" } },
+      { say: "what did you mean by the first one", expect: { mustContain: "milk", guard: null } },
+    ],
+  },
+  {
+    id: "say-that-again",
+    category: "etiquette",
+    note: "G4 (the chat half of voice repair): 'say that again' and 'sorry, what?' repeat the last answer's fact",
+    turns: [
+      { say: "what's the capital of Portugal", expect: { mustContain: "lisbon", guard: null } },
+      { say: "say that again", expect: { mustContain: "lisbon", mustNotContain: "\\?", guard: null } },
+      { say: "sorry, what?", expect: { mustContain: "lisbon", guard: null } },
+    ],
+  },
+  {
+    id: "how-do-you-know",
+    category: "knowledge",
+    note: "G5: after a lookup, 'how do you know' names the source (CHAT-15's typed outcomes carry source and as_of)",
+    turns: [
+      { say: "what's the runtime of Cobra", expect: { toolRan: "media-lookup", mustContain: "\\b(8[0-9]|9[0-9]) ?min|eighty|ninety|hour and (a half|2[0-9]|twenty)|\\b1 ?h(our)? ?(and )?2[0-9]|an hour and", mustNotContain: HONESTY_LINES } },
+      { say: "how do you know", expect: { mustContain: "wikipedia|wikidata|looked it up|look(ed)? up|search|source|found it", mustNotContain: HONESTY_LINES + "|i just know|common knowledge", guard: null } },
+      { say: "when was that from", expect: { mustContain: "today|just now|minute|moment|\\b20[0-9][0-9]\\b", guard: null } },
+    ],
+  },
+  {
+    id: "coworker-likes-seltzer",
+    category: "memory",
+    note: "step 3a of the program (Jesse's example): the subject is a person entity Quill, coworker of the speaker, and the preference is his; asked back, the hub knows what Quill drinks and who he is, and does not guess the speaker's own taste",
+    turns: [
+      { say: "my coworker Quill likes seltzer", expect: { memoryWritten: [["quill", "seltzer"]], entityExists: { kind: "person", name: "Quill" }, guard: null } },
+      { say: "do I like seltzer", newConversation: true, drainJudge: true, expect: { mustNotContain: "\\byes\\b|\\byep\\b|you (do|love|like|enjoy) seltzer|you're a fan", guard: null } },
+      { say: "what does Quill drink", expect: { recallInContext: ["seltzer"], mustContain: "seltzer", mustNotContain: HONESTY_LINES } },
+      { say: "who is Quill", expect: { mustContain: "coworker|co-worker|colleague|work", mustNotContain: HONESTY_LINES } },
     ],
   },
   {

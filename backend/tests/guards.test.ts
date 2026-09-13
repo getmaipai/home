@@ -746,6 +746,15 @@ describe("item 1b's own regressions", () => {
     expect(guardReply("Yes, I read it last summer.", ctx({ utterance: "have you read Dune" })).reason).toBe("claimed_experience");
   });
 
+  test("#101: 'a good one' about the thing the person named is not a person trait; a pronoun's or a name's good boy still is, adverbs included", () => {
+    const film = ctx({ utterance: "I'm watching the movie Cobra" });
+    expect(guardReply("Cobra's a good one, lots of action and some solid stunts. You enjoying it?", film).reason).toBeNull();
+    const dog = ctx({ utterance: "how is Rover doing", roster: ["Sage", "Rover"] });
+    for (const reply of ["He's a good boy.", "He's a really good boy.", "I bet he's a very good boy.", "She's probably a good girl.", "Rover's such a good boy.", "He's a good one."]) {
+      expect(guardReply(reply, dog).reason).toBe("invention");
+    }
+  });
+
   test("withoutHonestyLines() strips every honesty line and keeps what the model itself said", () => {
     expect(withoutHonestyLines("I don't actually have that - nobody's told me.")).toBe("");
     expect(withoutHonestyLines("I don't know, sorry.")).toBe("");

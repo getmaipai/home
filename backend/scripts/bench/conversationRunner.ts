@@ -38,6 +38,8 @@ interface TurnLine {
   plugin_id?: string;
   source?: string;
   safety_action?: string;
+  /** The subject tracker's resolved subject, once one writes it (CHAT-13). */
+  subject?: string;
 }
 interface RouteLine {
   turn_id: string;
@@ -280,7 +282,9 @@ function recordsFor(actor: PersonRow): { text: string; status: string }[] {
     .filter((r) => r.text.length > 0);
 }
 
-/** Every item on the household's lists by id (A5, the list-add effect). */
+/** Every open item on the household's lists by id (A5, the list-add
+ * effect; a checked-off item counts as gone, so G3's "take it off"
+ * passes whether the path removes or completes the item). */
 function listItemsNow(): Map<string, string> {
   return new Map(
     db
@@ -288,7 +292,7 @@ function listItemsNow(): Map<string, string> {
       .from(lists)
       .where(isNull(lists.deletedAt))
       .all()
-      .flatMap((r) => (JSON.parse(r.items) as { id: string; text: string }[]).map((i) => [i.id, i.text] as const)),
+      .flatMap((r) => (JSON.parse(r.items) as { id: string; text: string; done?: boolean }[]).filter((i) => !i.done).map((i) => [i.id, i.text] as const)),
   );
 }
 
@@ -360,6 +364,13 @@ export async function runConversation(conv: BenchConversation, deps: RunDeps): P
     if (!seeded.ok) throw new Error(`seeding ${conv.id}: ${seeded.error}`);
   }
   seedEntities(conv, deps.people.owner);
+  // Every conversation starts with empty lists: the household's one
+  // shopping list is shared, and the live run found "the second one"
+  // pointing at an item a conversation twenty rows earlier had added.
+  // The household's lists and the bench people's own, never another
+  // person's (the bench's database is disposable, setup.ts refuses any
+  // other, and this keeps that promise inside the function too).
+  sqlite.query("DELETE FROM lists WHERE scope = 'household' OR person IN (?, ?)").run(deps.people.owner.id, deps.people.child.id);
   const tick = deps.tickScheduler ?? defaultTick;
   // The fake Home Assistant counts for the whole run; a row reads the
   // calls this conversation made (the live run found the second lock
@@ -441,6 +452,12 @@ export async function runConversation(conv: BenchConversation, deps: RunDeps): P
       inferenceStopped: own ? own.aborted && !own.completed : null,
       reconciledRow: row !== undefined && row.replyText.trim().length > 0,
       deliveries,
+      subject: line?.subject ?? null,
+      entities: db
+        .select({ kind: entities.kind, name: entities.name })
+        .from(entities)
+        .where(isNull(entities.deletedAt))
+        .all(),
     };
     if (driven.error) observed.reply = `[error: ${driven.error}]`;
     scores.push(scoreTurn(conv, i, turn, observed));
