@@ -12209,6 +12209,70 @@ Closes getmaipai/home#55.
 
 Files: `scripts/check.sh`, `docs/plans/session-b-frontend-lane-4-2026-09-13.md`.
 
+**Follow-up (2026-09-13): two defects Session A's own gate run surfaced,
+both in this item's own change.**
+
+1. **The a11y step's throwaway backend fought a real hub for the TTS
+   port.** `ttsSupervisor.ts` binds its speech engine to a FIXED port
+   (8793), so a second backend on the same box (a real running hub, or
+   another spare-port instance) collides with it: the loser's engine
+   died (SIGKILL), and Repairs rendered a real "engine issue" badge the
+   matrix then correctly flagged for a REAL contrast defect (below) -
+   but the gate itself had no business depending on the box being
+   empty. Fixed in `scripts/screenshot.ts`: `MAIPAI_TTS_DISABLE_SPAWN=1`
+   on the throwaway backend's own env (the same flag `tests/preload.ts`
+   and CHAT-22's `scripts/bench/setup.ts` already set for the identical
+   reason) - this matrix never needs real speech, so the engine should
+   never spawn at all, not just avoid colliding. Verified live: `bun run
+   a11y` with the real hub (8787) and a second spare-port backend both
+   already running, 0 violations - the exact two-backend scenario the
+   original bug needed to reproduce.
+
+2. **`settings-repairs`'s severity Badge failed color-contrast in both
+   themes**, `.group\/badge`, `text-destructive` over its own
+   `bg-destructive/10-20%` tint (`kit/ui/badge.tsx`, `kit/ui/button.tsx`'s
+   "destructive" variant shares the exact same pattern) - measured by
+   hand: light theme ~4.1:1, dark theme ~3.5:1, both under WCAG AA's
+   4.5:1. Never caught before because Repairs only shows a Badge when a
+   real issue exists, and nothing before this seeded one on purpose (the
+   ONLY reason it surfaced now is the TTS-collision bug above happening
+   to raise a different real issue as a side effect). Fixed at the token
+   level (`kit/tokens.css`'s own `--destructive`), same hue and
+   saturation, but tuned PER THEME rather than one shared value: light
+   theme darkened (51% to 38% lightness, ~6.3:1 measured) the same
+   direction `--primary`'s own earlier fix went, but dark theme needed
+   the OPPOSITE direction - lightened (51% to 65%), because a darker red
+   text over an ALREADY-dark tinted background on this theme's near-
+   black surface loses contrast instead of gaining it (darkening
+   uniformly measured ~2.4:1 there, worse than the original's ~3.5:1).
+   Verified the numbers by hand before touching CSS, not by guessing and
+   re-scanning until axe stopped complaining.
+
+   Seeded a real Repairs issue on every a11y run so this badge (and any
+   future contrast regression on it) is always exercised, not only when
+   an unrelated failure happens to raise one: `scripts/screenshot.ts`
+   now binds `0.0.0.0:18799` itself before spawning the backend, with
+   `MAIPAI_WYOMING_PORT` pointed at that same port - `wyomingServer.ts`'s
+   own real startup code then genuinely fails to bind and raises "The
+   Wyoming satellite server failed to start" (`backend/src/index.ts`),
+   a real application failure, not a fake database row. Two attempts to
+   get the collision itself right: binding only `127.0.0.1` first did
+   NOT collide with the backend's own `0.0.0.0` bind on the same port
+   (confirmed live - the Wyoming server started successfully anyway, no
+   issue raised); switched to `0.0.0.0` to match exactly, then confirmed
+   via a direct `GET /api/repairs` call that the issue really appears.
+   No separate `settings-repairs-with-a-repair` combo needed: the
+   existing `settings-repairs` visits in `A11Y_ONLY_COMBOS` now always
+   have a real issue present, so they already exercise the badge on
+   every run.
+
+   Verified: `bun run a11y` in isolation and with two other backends
+   running, both 0 violations; a direct `GET /api/repairs` call during a
+   manual run confirms the seeded issue's real shape (`source:
+   "wyomingServer"`, `key: "bind_failed"`, `severity: "error"`).
+
+Files: `scripts/screenshot.ts`, `frontend/src/kit/tokens.css`.
+
 ### getmaipai/home#79: the episode vector scan is bounded
 
 `recallEpisodes()`'s vector half read every embedded episode the person

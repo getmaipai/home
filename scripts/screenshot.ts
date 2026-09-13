@@ -629,10 +629,43 @@ async function main() {
     if (text.includes("book")) return "What kind of story would you enjoy: a mystery, an adventure, or something funny?";
     return "Start with a sunny spot and a few easy plants.\n\n- Grow lettuce in a shallow container.\n- Give tomatoes a larger pot and a support.\n- Water when the top layer of soil feels dry.\n\nHow much space do you have?";
   } }) : undefined;
+  // Occupies REPAIR_SEED_PORT ourselves before the backend starts, so its
+  // own Wyoming satellite server (backend/src/index.ts) fails to bind and
+  // raises a real Repairs issue ("The Wyoming satellite server failed to
+  // start") every run - the settings-repairs route otherwise renders an
+  // empty list, and its severity Badge (a real color-contrast bug, found
+  // live 2026-09-13 only because a DIFFERENT failure - an engine dying
+  // under port contention - happened to raise one) went unexercised by
+  // this matrix indefinitely. A real application failure, not a fake
+  // database row: nothing about the fix below depends on this being the
+  // SPECIFIC issue it happens to be, only that Repairs has at least one
+  // open, real, severity-carrying issue on every run.
+  const REPAIR_SEED_PORT = 18799;
+  // `0.0.0.0`, matching wyomingServer.ts's own bind address exactly - a
+  // loopback-only listener here (127.0.0.1) does NOT collide with the
+  // backend's wildcard bind on the same port (confirmed live, macOS: the
+  // Wyoming server bound successfully anyway, "MaiPai Home Wyoming
+  // satellite server listening on tcp://0.0.0.0:18799", and no issue was
+  // raised - two listeners on the same port but different specific
+  // addresses coexist under BSD socket semantics unless both bind the
+  // same wildcard address).
+  const repairSeedListener = Bun.listen({ hostname: "0.0.0.0", port: REPAIR_SEED_PORT, socket: { data() {}, open() {} } });
   const backend = Bun.spawn({
     cmd: ["bun", "run", "src/index.ts"],
     cwd: join(ROOT, "backend"),
-    env: { ...process.env, PORT: String(PORT), MAIPAI_DATA_DIR: DATA_DIR, MAIPAI_WYOMING_PORT: "0", ...(chatModel ? { MAIPAI_LLAMA_SERVER_URL: chatModel.url, MAIPAI_EMBED_SERVER_URL: chatModel.url } : {}) },
+    // MAIPAI_TTS_DISABLE_SPAWN (the same flag tests/preload.ts and
+    // CHAT-22's bench setup already use): this backend's own speech
+    // engine binds a FIXED port (8793, ttsSupervisor.ts), so a second
+    // one - a real hub already running on the box, or another spare-
+    // port backend - collides with it. Found live (2026-09-13): check.sh's
+    // own a11y step spawned this backend while another was already up,
+    // the losing engine died (SIGKILL), and Repairs rendered an
+    // engine-issue badge the matrix then flagged for real contrast, a
+    // false "the a11y gate found a defect" that was actually "the gate
+    // depends on the box being empty." This matrix never needs real
+    // speech, so the engine should never spawn at all, not just not
+    // collide.
+    env: { ...process.env, PORT: String(PORT), MAIPAI_DATA_DIR: DATA_DIR, MAIPAI_WYOMING_PORT: String(REPAIR_SEED_PORT), MAIPAI_TTS_DISABLE_SPAWN: "1", ...(chatModel ? { MAIPAI_LLAMA_SERVER_URL: chatModel.url, MAIPAI_EMBED_SERVER_URL: chatModel.url } : {}) },
     stdout: "ignore",
     stderr: "inherit",
   });
@@ -730,6 +763,7 @@ async function main() {
     await browser?.close();
     backend.kill();
     chatModel?.stop();
+    repairSeedListener.stop(true);
     await backend.exited;
     rmSync(DATA_DIR, { recursive: true, force: true });
   }

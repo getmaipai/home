@@ -70,7 +70,16 @@
    * here and stays comfortably clear at this lightness too. */
   --primary: hsl(189 94% 29%); /* cyan, MaiPai Home's accent */
   --primary-foreground: hsl(0 0% 100%);
-  --destructive: hsl(0 72% 51%);
+  /* Darkened from the original hsl(0 72% 51%), same hue and saturation
+   * (getmaipai/home lane 4 item 1's own follow-up, 2026-09-13): every
+   * "destructive" surface in this kit (Button, Badge) pairs solid
+   * `text-destructive` over a `bg-destructive/10` tint, not white text
+   * on a solid fill - a real gap the a11y matrix had never actually
+   * exercised (Repairs' severity badge only renders when an issue
+   * exists, and nothing before this seeded one). Text over its own
+   * 10%-opacity tint measures ~6.3:1 at this lightness; the original
+   * 51% measured ~4.1:1, under WCAG AA's 4.5:1 floor. */
+  --destructive: hsl(0 72% 38%);
   --destructive-foreground: hsl(0 0% 100%);
   --ring: hsl(189 94% 29%);
   /* 1rem, not shadcn's own 0.75rem default: a visual pass (2026-09-06)
@@ -114,6 +123,17 @@
     --primary: hsl(189 84% 55%);
     --primary-foreground: hsl(240 10% 6%);
     --ring: hsl(189 84% 55%);
+    /* Lightened, not darkened (same lane 4 item 1 follow-up as :root's
+     * own comment above): a solid destructive/10-20% tint over this
+     * theme's near-black background is itself very dark, so a darker
+     * text color loses contrast against it instead of gaining it -
+     * darkening the way :root's own fix does measures ~2.4:1 here, worse
+     * than the original 51% lightness's ~3.5:1. Lightened to where text
+     * over its own 20%-opacity tint clears 4.5:1 (~4.8:1 measured); dark
+     * themes pairing a lighter accent with a darker surface for the same
+     * semantic role is the same pattern `--primary`'s own dark value
+     * above already uses (55% here vs. `:root`'s 29%). */
+    --destructive: hsl(0 72% 65%);
     --sidebar: hsl(240 8% 9%);
     --sidebar-foreground: hsl(0 0% 96%);
     --sidebar-primary: hsl(189 84% 55%);
@@ -143,6 +163,11 @@
   --primary: hsl(189 84% 55%);
   --primary-foreground: hsl(240 10% 6%);
   --ring: hsl(189 84% 55%);
+  /* Same value and reasoning as the `prefers-color-scheme: dark` block
+   * above (lane 4 item 1 follow-up, 2026-09-13): lightened, not
+   * darkened, since a darker text color loses contrast against this
+   * theme's own dark tinted background instead of gaining it. */
+  --destructive: hsl(0 72% 65%);
   --sidebar: hsl(240 8% 9%);
   --sidebar-foreground: hsl(0 0% 96%);
   --sidebar-primary: hsl(189 84% 55%);
