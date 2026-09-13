@@ -1553,7 +1553,13 @@ Track B: MEM-01, MEM-02, MEM-03, MEM-04, MEM-05. Then JOIN-01, JOIN-02.
 
 <a id="join-01"></a>
 
-- [ ] **JOIN-01: Recalled episodes reach the prompt and the guards** (S)
+- [x] **JOIN-01: Recalled episodes reach the prompt and the guards** (S)
+
+    Status (2026-09-13, measured and closed): episodes render after the
+    memory block and ground the guards; live on main, "my dentist is on
+    Thursday" in one conversation answered "when is my dentist
+    appointment" in the next with "Thursday." from the episode alone (no
+    memory record existed). Details in the join section of dev.md.
 
     Depends on: FAST-02 and MEM-04 merged. Files:
     `backend/src/lib/turnEngine.ts`, `backend/tests/turnEngine.test.ts`.

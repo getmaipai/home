@@ -165,6 +165,13 @@ export interface RecallEpisodesOptions {
   /** The conversation currently in progress: its newest four turns are
    * already in the model's window, so they are never recalled here too. */
   excludeConversationId?: string;
+  /** JOIN-01: exclude every turn of `excludeConversationId`, not only the
+   * newest four. The prompt block is headed "From earlier conversations",
+   * and buildConversationWindow() keeps up to its token budget of older
+   * turns of the current one verbatim, so a turn from this conversation
+   * recalled here would be both a duplicate and mislabelled (a code
+   * review on JOIN-01). */
+  excludeWholeConversation?: boolean;
   now?: Date;
 }
 
@@ -273,7 +280,7 @@ export function recallEpisodes(actor: PersonRow, query: string, queryVector: Flo
           .from(conversationTurns)
           .where(eq(conversationTurns.conversationId, opts.excludeConversationId))
           .orderBy(desc(conversationTurns.createdAt))
-          .limit(WINDOW_TURNS_EXCLUDED)
+          .limit(opts.excludeWholeConversation ? Number.MAX_SAFE_INTEGER : WINDOW_TURNS_EXCLUDED)
           .all()
           .map((r) => r.id)
       : [],

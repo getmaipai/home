@@ -19,6 +19,7 @@ import { loadAllSkills, type LoadedSkill } from "@/lib/skills";
 import { matchCommand, runCommand } from "@/lib/commands";
 import { notifyIfFlagged } from "@/lib/notifications";
 import { recall, bumpUsage, getProfileParagraph, type RecallMatch } from "@/lib/memory";
+import { recallEpisodes, formatEpisodesForPrompt, type EpisodeMatch } from "@/lib/episodes";
 import { newConversationTurnId } from "@/lib/id";
 import { complete, startCompleteStream, type LlmMessage, type ToolSpec, type ToolCall } from "@/lib/llm";
 import { guardReply, guardSentence, replacementFor, isCuttable, splitIntoSentences, type GuardContext, type GuardReason } from "@/lib/guards";
@@ -595,6 +596,11 @@ export function buildPromptParts(
   // the guard context's roster from it (a code review found the same
   // rows queried twice in one turn).
   household: PersonRow[] = listActivePeople(),
+  // JOIN-01: verbatim episodes from earlier conversations (MEM-04's
+  // recallEpisodes()), rendered right after the memory block. Their
+  // block is capped at 600 characters by formatEpisodesForPrompt(), on
+  // top of the memory section's own MAX_MEMORY_SECTION_CHARS.
+  episodeMatches: EpisodeMatch[] = [],
 ): { stablePrefix: string; context: string } {
   const stablePrefix = buildStablePrefix(persona);
 
@@ -611,10 +617,12 @@ export function buildPromptParts(
     memorySection = `\n\nWhat you already know about this household:\n${profileLine}${bulletsBlock}${MEMORY_TRUST_REMINDER}`;
     memorySection = capSection(memorySection, MAX_MEMORY_SECTION_CHARS);
   }
+  const episodesBlock = formatEpisodesForPrompt(episodeMatches, sanitizeForPrompt(actor.displayName), locale, now);
+  const episodesSection = episodesBlock ? `\n\n${episodesBlock}` : "";
   const reanchorSection = companionReanchorLine(persona);
   const summarySection = capSection(conversationSummaryLine ? `\n\n${conversationSummaryLine}` : "", MAX_SUMMARY_SECTION_CHARS);
   const skillsPart = capSection(skillsSection(text, skills), MAX_SKILLS_SECTION_CHARS);
-  const volatileZone = householdLine(household) + speakerLine(actor, locale, now) + memorySection + reanchorSection + summarySection + skillsPart;
+  const volatileZone = householdLine(household) + speakerLine(actor, locale, now) + memorySection + episodesSection + reanchorSection + summarySection + skillsPart;
 
   const localTimeLine = `\n\nLocal time: ${formatLocalTime(now, locale)}`;
 
@@ -1302,6 +1310,13 @@ async function prepareTurn(
   // degrades to undefined on any failure, which recall() already treats
   // as "fall back to keyword overlap" - no separate handling needed here.
   const memoryMatches = recall(actor, text, { selfOnly: true, bumpUsage: false, queryVector: utteranceVector });
+  // JOIN-01: what was actually said in earlier conversations (MEM-03's
+  // verbatim episodes, MEM-04's hybrid recall), beside the extracted
+  // facts. This conversation is excluded whole: its turns are the
+  // window's job, and the block's header says "earlier conversations".
+  // A recalled assistant sentence is evidence of what MaiPai said, not
+  // proof it was right; the header says that too.
+  const episodeMatches = recallEpisodes(actor, text, utteranceVector, { excludeConversationId: conversation.id, excludeWholeConversation: true });
   const persona = resolvePersona(getPersonSettingValue(actor, "persona.active_id"));
   // The follow-up-turn context (step 3): "and tomorrow?" needs the prior
   // exchange in the messages array, not just in the system prompt's own
@@ -1310,7 +1325,7 @@ async function prepareTurn(
   // summary line for the system prompt's volatile zone.
   const window = buildConversationWindow(conversation);
   const household = listActivePeople();
-  const promptParts = buildPromptParts(actor, text, memoryMatches, loaded, persona, skills, window.summaryLine, household);
+  const promptParts = buildPromptParts(actor, text, memoryMatches, loaded, persona, skills, window.summaryLine, household, episodeMatches);
   // Bumping the top MAX_MEMORY_SNIPPETS candidates unconditionally was
   // wrong (a code review, 2026-09-05): buildPromptParts's own
   // MAX_MEMORY_SECTION_CHARS truncation, or the outer PROMPT_SYSTEM_CHAR_
@@ -1394,6 +1409,10 @@ async function prepareTurn(
     utterance: text,
     history: window.messages.filter((m) => m.role === "user").map((m) => m.content),
     sources: memoryMatches.map((m) => m.record.text),
+    // JOIN-01: a recalled turn's own words, both halves, ground the
+    // reply the way a memory bullet does, through their own field so
+    // they never count as an unrelated-recall source (guards.ts).
+    episodes: episodeMatches.flatMap((m) => [m.episode.text, m.pairedText]),
     // Fix E: a code review on B3 (docs/dev.md's "Chat reliability")
     // established this field means "a real tool/plugin action ran this
     // turn" - by construction, prepareTurn() itself never runs one

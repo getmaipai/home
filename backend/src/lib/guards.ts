@@ -46,6 +46,13 @@ export interface GuardContext {
    * model's own persona/rules prompt text (that's what the attractor and
    * recitation guards exist to catch it borrowing from instead). */
   sources?: readonly string[];
+  /** JOIN-01: verbatim lines from earlier conversations (both halves of
+   * each recalled turn) that ground a reply the same way `sources` do,
+   * but are NOT candidates for `unrelated_recall`: a recalled reply said
+   * back to "what did you suggest last week" is the answer, not a memory
+   * line said to the wrong question, and its words rarely share a stem
+   * with the question that asked for it (a code review on JOIN-01). */
+  episodes?: readonly string[];
   /** True only when a real package actually ran this turn - the one
    * thing that can make "I've added that" true rather than a claim
    * ahead of the fact. */
@@ -158,7 +165,7 @@ const DECLINE_RE =
 // uses) checked with `.has()` is real word-boundary matching, not a
 // substring scan.
 function groundedWords(ctx: GuardContext): Set<string> {
-  return tokenize([ctx.utterance, ...(ctx.sources ?? []), ...(ctx.history ?? [])].join(" "));
+  return tokenize([ctx.utterance, ...(ctx.sources ?? []), ...(ctx.episodes ?? []), ...(ctx.history ?? [])].join(" "));
 }
 
 // Narrow, specific invention SHAPES - each ported directly from a

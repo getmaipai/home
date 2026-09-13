@@ -11838,3 +11838,58 @@ eslint` all clean.
 
 Files: `frontend/src/apps/chat/chatDayDivider.tsx`, `scripts/
 screenshot.ts`, `docs/BACKLOG.md`.
+
+## Chat direction 2026-09-12: the join items, on main after both tracks merged (2026-09-13)
+
+### JOIN-01: recalled episodes reach the prompt and the guards
+
+`prepareTurn()` calls MEM-04's `recallEpisodes(actor, text,
+utteranceVector, { excludeConversationId: conversation.id })` right after
+`recall()`, and `buildPromptParts()` renders the matches with
+`formatEpisodesForPrompt()` immediately after the memory block (its own
+600-character cap, on top of the memory section's 800), before the
+companion re-anchor, so the local time line stays last. Each recalled
+turn's words, both halves, ground the reply the way a memory bullet
+does, through a new `GuardContext.episodes` field rather than
+`sources`: the medium code review on this diff (targeted at these
+files) showed that an earlier reply used as an `unrelated_recall`
+source gets a correct "what did you suggest last week" answer replaced,
+because the suggestion's words share no stem with the question that
+asked for it, which is the shape that guard was built to catch for
+memory lines and the shape a correct episode answer always has.
+`episodes` feeds `groundedWords()` only; a test in `guards.test.ts`
+pins both readings. The same review found two more things fixed here:
+the current conversation is now excluded whole (`excludeWholeConversation`
+on `recallEpisodes()`), since the window keeps up to its token budget
+of older turns of this conversation and the block's header says
+"earlier conversations"; and the first test's scripted reply ("It's on
+Thursday.") would have passed with no grounding at all, so it now
+scripts a household guess ("My guess is your dentist is Thursday."),
+which the test also shows `guardReply()` flags without the episode and
+passes with it. The test runs the whole path through `runTurn()`: "my
+dentist is on Thursday" in conversation one (never judged; the stub's
+echo is a model turn, so nothing is extracted), then "when is my
+dentist appointment" in a fresh conversation, reading the assembled
+messages off the stub's request: the context message carries `From
+earlier conversations (what was said, not necessarily true):` and
+`said: "my dentist is on Thursday"`, and the guess comes back
+untouched. Two review lows outside this item are filed:
+getmaipai/home#78 (a recalled plugin error or guard line rendered as
+"you replied") and #79 (the vector half scans every stored episode
+embedding on every turn).
+
+**Live on main, 2026-09-13**, a backend on 8809 from this checkout with
+a fresh temp data directory, the main checkout's running chat engine
+(8788, llama-server b10797, `qwen3-8b-instruct-q4-k-m.gguf`) and embed
+engine (8794) by URL, the background URL pointed at a closed port so no
+memory engine spawned and nothing could be judged, owner `alfred`
+through the setup route, M4 Pro 24 GB: "my dentist is on Thursday" in
+conversation one (its acknowledgment was cut by `near_echo`,
+getmaipai/home#74's same-turn shape, which does not touch the logged
+turn or its episodes); then, in a new conversation, "when is my dentist
+appointment" answered `Thursday.`, `guard: []`, first sentence at 659
+ms, done at 680 ms. The temp database afterwards: `memory_records`
+with "dentist" 0 rows, `episodes` 4 rows (both sides of both turns),
+`episodes_fts MATCH 'dentist'` 2 rows. The episode carried the answer.
+
+**Exit gate**: `bash scripts/check.sh` green on main.

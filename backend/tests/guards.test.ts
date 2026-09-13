@@ -197,6 +197,21 @@ describe("unrelated recall (bot-legacy's own test: eye exam answered from the de
     expect(g.reason).toBe("unrelated_recall");
   });
 
+  // JOIN-01: a recalled turn from an earlier conversation grounds the
+  // reply (GuardContext.episodes) without being an unrelated-recall
+  // candidate: "what did you suggest last week" answered with the
+  // suggestion shares no stem with the question's own words, which is
+  // the shape this guard was built to catch for memory lines and the
+  // shape a correct episode answer always has.
+  test("a recalled earlier reply said back to 'what did you suggest' is the answer, not an unrelated memory line", () => {
+    const utterance = "what did you suggest for dinner last week";
+    const reply = "I suggested lemon chicken pasta.";
+    const asSource = guardReply(reply, ctx({ utterance, sources: ["How about lemon chicken pasta? It's quick."] }));
+    expect(asSource.reason).toBe("unrelated_recall"); // the memory-line reading, kept for memory lines
+    const asEpisode = guardReply(reply, ctx({ utterance, episodes: ["any recipe ideas for tonight?", "How about lemon chicken pasta? It's quick."] }));
+    expect(asEpisode.reason).toBeNull();
+  });
+
   test("the identical line answering the RIGHT question stands", () => {
     const g = guardReply("The dentist is on Thursday at four.", ctx({ utterance: "when is the dentist", sources: SOURCES }));
     expect(g.reason).toBeNull();
