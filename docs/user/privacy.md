@@ -3,7 +3,7 @@ title: Privacy
 description: See exactly what, if anything, leaves your house.
 ---
 
-Everything stays on this computer: everything you say to MaiPai, everything it remembers, and everyone in your household. It's never sent to us. MaiPai doesn't run a server that your family's information passes through. Nothing reports back to us about how you use it.
+Your conversations, memories, and household profiles stay on this computer. MaiPai does not run a server that your family's information passes through, and nothing reports back to us about how you use it. A feature can send the small piece of information it needs directly to its own service, such as the place in a weather request or the word you want defined. The list below names every connection.
 
 ## See what leaves your house
 
@@ -14,13 +14,13 @@ Open **Privacy** in the sidebar. It lists every outbound connection MaiPai can m
 - **Who receives it**
 - **How long they keep it**
 
-Anything not on this list doesn't happen. Most entries only happen when an adult chooses to download a model or a voice in Settings. The rest happen when your household turns on an optional feature, like weather or trivia. MaiPai downloads a small 1.7-gigabyte model on its own for memory and learning tasks: summarizing conversations, making decisions about what to remember, and finding old episodes when you ask for them, the same way it downloads a voice for speaking.
+Anything not on this list does not happen. Most entries happen only when an adult chooses a download or turns on an optional feature. Other entries happen when someone asks for a service, such as weather, trivia, a joke, a definition, news, sports, music, web search, or a film or TV lookup. One daily check asks GitHub whether a new MaiPai Home release is available. Downloads send the file name and your home's internet address. They do not send anything anyone in the house said, asked, or saved.
 
-An adult can also generate an API token for another app or device. This page shows that too, under its own heading. It's the one thing that goes the other way: something reaching into your house, not out of it.
+An adult can also generate an API token for another app or device. This page shows that too, under its own heading. It is the one thing that goes the other way: an app or device you gave the token to can send text or audio to your hub over your home network and receive a reply. Revoking the token ends that access.
 
 ## What never leaves your house
 
-Your conversations stay on this computer. So does everything MaiPai remembers, and every profile in your household. MaiPai doesn't collect usage stats or crash reports. Nothing your family says is ever used to train anything. Your browser also saves a copy of MaiPai's own screens on this device so the app can still open without internet - that's a copy of the app itself, never anything you typed or anything MaiPai remembers.
+Your conversations stay on this computer. So does everything MaiPai remembers, and every profile in your household. MaiPai does not collect usage stats or crash reports. Nothing your family says is used to train anything. Your browser saves a copy of MaiPai's own screens on this device so the app can still open without internet. That cache is same-origin only: it stores the app's own files, never anything you typed or anything MaiPai remembers.
 
 ![The Privacy page, listing every outbound connection MaiPai can make](../assets/screens/privacy-desktop-light.png)
 
