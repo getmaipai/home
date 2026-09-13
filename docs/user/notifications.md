@@ -3,14 +3,14 @@ title: Notifications
 description: See MaiPai's alerts, and set up Telegram notifications.
 ---
 
-MaiPai can let you know about things worth your attention. You'll see these right in the hub, or through Telegram.
+MaiPai can let you know about things worth your attention. You'll see these in the hub, or on Telegram.
 
 ## See your notifications
 
-Tap the bell icon in the header. This shows your recent notifications. You stay on the page you're on. Tap "View history" in the popover for the full history. It goes back 30 days.
+Tap the bell in the header. It shows your recent alerts, and you stay on the page you're on. Tap "View history" for the full list. It goes back 30 days.
 
-- Tap a notification to open what it's about.
-- Tap **Dismiss** to remove individual notifications from the list.
+- Tap an alert to open what it's about.
+- Tap **Dismiss** to remove one from the list.
 
 ## Get notified on Telegram
 
