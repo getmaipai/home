@@ -1578,7 +1578,12 @@ Track B: MEM-01, MEM-02, MEM-03, MEM-04, MEM-05. Then JOIN-01, JOIN-02.
 
 <a id="join-02"></a>
 
-- [ ] **JOIN-02: The orphan sweep leaves the background engine alone** (S)
+- [x] **JOIN-02: The orphan sweep leaves the background engine alone** (S)
+
+    Status (2026-09-13, closed): index.ts passes getBackgroundLivePid()
+    into the boot-time sweep; a real spawned process registered as the
+    background backend survives the sweep with its pid and dies without
+    it (llmSupervisor.test.ts).
 
     Depends on: MEM-01 merged. Files: `backend/src/lib/llmSupervisor.ts`.
     Add `getBackgroundLivePid()` to the same exclusion the sweep already

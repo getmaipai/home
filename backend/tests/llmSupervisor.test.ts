@@ -264,6 +264,41 @@ describe("sweepOrphanEngineProcesses", () => {
     // nothing against a real spawned process.
     await expect(sweepOrphanEngineProcesses([999_002, null])).resolves.toBe(0);
   });
+
+  // JOIN-02 (docs/BACKLOG.md's 2026-09-12 chat block): the memory engine
+  // (backgroundSupervisor.ts) runs the same llama-server binary as chat
+  // and embed, so index.ts passes its live pid into the sweep the same
+  // way it passes embed's and tts's. Proven the way tests/sidecars.test.ts
+  // proves the exclusion itself: a real spawned process, registered as
+  // the background backend, survives a sweep that would otherwise kill it.
+  test("excludes the background (memory) engine's own live pid, read through getBackgroundLivePid()", async () => {
+    const { getBackgroundLivePid } = await import("@/lib/backgroundSupervisor");
+    const { sweepOrphanProcesses } = await import("@/lib/sidecars");
+    const marker = `maipai-join02-${Date.now()}`;
+    const survivor = Bun.spawn(["bun", "-e", `/* ${marker} */ setTimeout(() => {}, 60000);`], { stdout: "ignore", stderr: "ignore" });
+    const registry = (globalThis as { __maipai_backgroundSupervisor?: { backgroundBackend: unknown } }).__maipai_backgroundSupervisor;
+    expect(registry).toBeDefined();
+    const previous = registry!.backgroundBackend;
+    registry!.backgroundBackend = { pid: survivor.pid, kind: "spawned", stop: () => {} } as unknown as never;
+    try {
+      await new Promise((r) => setTimeout(r, 200)); // give `ps` a moment to see the new process, as tests/sidecars.test.ts does
+      expect(getBackgroundLivePid()).toBe(survivor.pid);
+      // The exclusion index.ts builds from getBackgroundLivePid(), against
+      // the marker the survivor carries in its own command line. This
+      // proves the mechanism through the same functions; index.ts's own
+      // call list is not exercised by any test (boot is not unit-run).
+      const killed = await sweepOrphanProcesses(marker, { excludePids: [getBackgroundLivePid()].filter((pid): pid is number => typeof pid === "number") });
+      expect(killed).toBe(0);
+      expect(survivor.exitCode).toBeNull();
+      // And without the exclusion the same sweep does kill it: the test
+      // proves the pid is what protected it, not that nothing matched.
+      const killedNow = await sweepOrphanProcesses(marker, { excludePids: [] });
+      expect(killedNow).toBe(1);
+    } finally {
+      registry!.backgroundBackend = previous;
+      survivor.kill();
+    }
+  }, 10_000);
 });
 
 describe("tier 2 (override) with MAIPAI_CHAT_MODEL_ID (FAST-01)", () => {

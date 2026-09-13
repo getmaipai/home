@@ -11893,3 +11893,24 @@ with "dentist" 0 rows, `episodes` 4 rows (both sides of both turns),
 `episodes_fts MATCH 'dentist'` 2 rows. The episode carried the answer.
 
 **Exit gate**: `bash scripts/check.sh` green on main.
+
+### JOIN-02: the orphan sweep leaves the background engine alone
+
+`index.ts`'s boot-time `sweepOrphanEngineProcesses()` now receives
+`getBackgroundLivePid()` beside the embed and speech pids. The memory
+engine (MEM-01's background supervisor) runs the same llama-server
+binary from the same engines directory as chat, so a `bun --hot`
+reload's re-run of the sweep found it as an orphan and killed the
+judge's engine mid-extraction. The test in `llmSupervisor.test.ts`
+mirrors `sidecars.test.ts`'s real-process proof: a spawned process
+registered as the background backend survives a sweep that carries its
+pid and dies to the same sweep without it, so the pid is what protected
+it. The medium review on the two files raised only test-shape points
+(the 200 ms settle before `ps`, the 10 s timeout the sibling tests
+carry), folded in.
+
+Both join items were gated on a throwaway worktree at main plus this
+diff alone (`bash scripts/check.sh`: spec 515, backend 1,939, frontend
+484, standards core passed), because the shared checkout carried
+Session B's in-progress Memory route with its API-docs drift pending
+at the time; the worktree was removed after the commits.

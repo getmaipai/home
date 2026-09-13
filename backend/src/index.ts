@@ -9,6 +9,7 @@ import { sweepOrphanEngineProcesses, getChatClient, setWarmupPrompt } from "@/li
 import { buildStablePrefix } from "@/lib/turnEngine";
 import { getEmbedClient, getEmbedLivePid } from "@/lib/embedSupervisor";
 import { getTtsClient, getTtsLivePid } from "@/lib/ttsSupervisor";
+import { getBackgroundLivePid } from "@/lib/backgroundSupervisor";
 import { runAllSmokeTests } from "@/lib/smoke";
 import { startIdleSweep, registerDenoHostGracefulExit } from "@/lib/denoHost";
 import { hasHouseholdLeaf, getHouseholdLeafForServer, checkLeafExpiry, onLeafRenewed, registerRenewFixHandler } from "@/lib/householdCa";
@@ -141,8 +142,11 @@ registerDenoHostGracefulExit();
 // `state.chatBackend`, checked inside sweepOrphanEngineProcesses() itself)
 // keeps a reload from SIGKILLing its own still-healthy engines, the
 // concrete fix for the incident that respawned qwen3-8b eleven times in
-// one evening and killed a reply mid-turn.
-await sweepOrphanEngineProcesses([getEmbedLivePid(), getTtsLivePid()]);
+// one evening and killed a reply mid-turn. JOIN-02 (2026-09-13): the
+// memory engine (MEM-01's background supervisor) runs the same binary
+// from the same engines directory, so without its pid here a reload
+// swept the judge's engine mid-extraction.
+await sweepOrphanEngineProcesses([getEmbedLivePid(), getTtsLivePid(), getBackgroundLivePid()]);
 await initCrashBootHold();
 void startAllSidecars();
 // A latency review (2026-09-06) found none of the three engines were
