@@ -7,7 +7,11 @@ description: What to check first when something isn't working right.
 
 Open **Settings**, then **Repairs** (under Household). MaiPai checks its own health here. It lists anything that needs attention, each with a button to fix it. This is the fastest way to find out what's wrong.
 
-![The Repairs page, showing a healthy hub with nothing to fix](../assets/screens/settings-repairs-desktop-light.png)
+![The Repairs page, showing an example of something it caught, with a Dismiss button](../assets/screens/settings-repairs-desktop-light.png)
+
+## If MaiPai won't load at all
+
+If your device shows a plain dark screen saying "Can't reach MaiPai right now," it isn't connected to your home network - the hub itself may be off, or you're away from home. Nothing works without that connection, since everything MaiPai does lives on your own hub. Reconnect to your home Wi-Fi, or try again once you're back in range.
 
 ## If Chat won't send a message or answer
 

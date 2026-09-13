@@ -12707,3 +12707,7 @@ other's section once (147cd28, f4779a6).
 - EVAL-01, stopped at step 1 (no official GGUF for the Qwen3.5-4B
   candidate, only third-party quants): [docs/dev/session-b.md](dev/session-b.md)
   (2026-09-13).
+- Lane 6, docs and user-facing truth: CHAT-25's current-documentation
+  half, the doc-drift plain corrections and BACKLOG split, the
+  reader's-row issue check, and the privacy page's service-worker
+  sentence: [docs/dev/session-b.md](dev/session-b.md) (2026-09-13).

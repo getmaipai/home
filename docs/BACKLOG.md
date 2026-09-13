@@ -858,6 +858,22 @@ not permission to expand scope.
 
 - [ ] **CHAT-25: Reconcile current chat documentation and readiness claims** (S)
 
+    Status (2026-09-13): the "current documentation" half is done - the
+    six user pages (`chat.md`, `memory.md`, `privacy.md`, `home.md`,
+    `getting-started.md`, `fix-a-problem.md`) were checked against a
+    spare-port backend on the hub's own real engines with a seeded
+    household, and updated for what shipped since they were last
+    written: your own message's Copy/Edit/Remember buttons and the
+    edit-history switcher (both survive a reload, verified live), the
+    "Memory updated" chip, and the PWA offline page's exact wording. No
+    stale "not yet" claim about world knowledge, memory batch actions,
+    or credentials was found - those pages were already current.
+    Screenshots regenerated for every affected page and opened. The
+    "readiness claims" half (the final benchmark report link,
+    distinguishing measured live quality from deterministic checks) is
+    unchanged, still waiting on the baseline bench's own verdict
+    (measure-first-2026-09-13.md).
+
     Depends on: CHAT-23; each earlier item still updates its own docs in
     its implementation commit. Files: `docs/user/chat.md`, `memory.md`,
     user privacy page, `docs/dev.md`, `spec/README.md`, `spec/llm/README.md`,
@@ -4395,19 +4411,35 @@ on a spec tag that was never cut.
       packages' real `remind.due`/`timer.done` notifications
       (`backend/tests/scheduler.test.ts`).
 
-- [ ] **Doc drift the audit found** (S, but some of it is Jesse's call) -
-      `.github/CLAUDE.md` says the rebuild follows `home/spec/design/`,
-      which does not exist; the plan lives at
-      `~/.claude/plans/purring-chasing-noodle.md`, outside every repo and
-      unversioned. `.github/STACK.md` and the global `CLAUDE.md` point at
-      a `home/agents.md` that does not exist either. Committing the plan
-      into `home/spec/design/` needs a PII pass first (it names Jesse's
-      machines) and is his call. Also stale: `spec/llm/README.md`
-      ("non-streaming only") and `spec/ui/README.md` ("single-shot JSON")
-      since streaming landed 2026-09-04; plan 5.1/5.6 still say `skill`
-      for what is now `plugin`; "tier" means both routing tiers 0/1/2
-      (plan 4.5) and package tiers 0/1 (plan 5.2), often in adjacent
-      sentences, and one ladder should be renamed.
+- [x] **Doc drift the audit found: the plain corrections** (S) - done
+      2026-09-13. `spec/llm/README.md`'s "Non-streaming only" paragraph
+      was genuinely stale (streaming, tools, JSON-schema-constrained
+      output and `chat_template_kwargs` all shipped since it was
+      written, per `spec/llm/ts/types.ts`/`client.ts`) - rewritten to
+      say so, cross-referencing the file's own later "Tools: real,
+      native" section instead of duplicating it. `spec/ui/README.md`'s
+      named "single-shot JSON" claim was checked against the file and
+      isn't there anymore - no stale text to fix, the file already only
+      describes the schema/interpreter split accurately. The two
+      remaining parts of the original item, both genuinely Jesse's
+      call, are split out below rather than folded back into one line.
+
+- [ ] **Jesse's call: commit the platform plan into `home/spec/design/`**
+      (S decision) - `.github/CLAUDE.md` says the rebuild follows
+      `home/spec/design/`, which does not exist; the plan lives at
+      `~/.claude/plans/purring-chasing-noodle.md`, outside every repo
+      and unversioned. `.github/STACK.md` and the global `CLAUDE.md`
+      point at a `home/agents.md` that does not exist either (the real
+      file is `home/AGENTS.md`, capitalized). Committing the plan needs
+      a PII pass first (it names Jesse's machines), and once it's in a
+      real, editable file, its own stale terminology can finally be
+      fixed too: plan 5.1/5.6 still say `skill` for what shipped as
+      `plugin`.
+
+- [ ] **Jesse's call: rename the tier ladder** (S decision) - "tier"
+      means both routing tiers 0/1/2 (plan 4.5) and package tiers 0/1
+      (plan 5.2), often in adjacent sentences across the docs; one
+      ladder should be renamed so the word means one thing.
 - [ ] **Roles versus grants is a wider conflict than the one item under
       People** (S decision) - the Grant spec removes age and role from
       authorization while `Person.role` stays required, `min_role` is on

@@ -21,17 +21,18 @@ coding/tts/stt/wakeword) have no consumer anywhere in this repo yet. This
 is the same "narrow to what's genuinely buildable now" discipline
 `docs/dev.md`'s other Hub v0.1 slices already followed.
 
-**Non-streaming only.** 4.11's contract wants "chat completions with
-streaming, tools, JSON schema, grammar, `chat_template_kwargs`."
-`types.ts`/`client.ts` have none of tools, JSON schema, grammar, or
-streaming: every request sends `stream: false` and reads one JSON body.
-Real llama-server always speaks this subset regardless of what else it
-supports, so this is a true subset, not a divergent contract; the
-turn engine (4.5) will need tools and JSON-schema-constrained output for
-routing and structured replies, and streaming for barge-in-aware speech,
-before it can do its real job. Both are additive: the request/response
-shapes above only grow fields, so a future pass doesn't need to change
-what's here, just add to it.
+**Streaming, tools, JSON schema and `chat_template_kwargs` all shipped
+since this section was first written.** 4.11's contract wanted "chat
+completions with streaming, tools, JSON schema, grammar,
+`chat_template_kwargs`," and `types.ts`/`client.ts` now carry all of
+them: `chatCompleteStream()` for real token-by-token streaming (`stream:
+true`), `tools`/`tool_choice` for native function calling, and
+`response_format`'s `json_schema` variant for grammar-constrained
+structured output (the memory judge depends on this one). See "Tools:
+real, native, both request shapes" and "The real engine, live end to
+end" below for when and how each landed; `chatComplete()` (non-
+streaming, one JSON body) is still there too, for callers with nothing
+to stream.
 
 **`ModelCapabilities` landed 2026-09-04, narrower than 4.11's full list.**
 This section originally deferred it ("nothing to populate it and no code
@@ -215,9 +216,8 @@ still open:
 
 ## Tools: real, native, both request shapes (2026-09-07, Fix E)
 
-The "non-streaming only... none of tools" line near the top of this file
-is now historical, not current: Fix E (docs/dev.md's "Chat reliability:
-the 2026-09-07 incident and the five fixes") added `types.ts`'s
+Fix E (docs/dev.md's "Chat reliability: the 2026-09-07 incident and the
+five fixes") added `types.ts`'s
 `ToolDefinition`/`ToolCallWire`/`ToolCallDelta` and `ChatCompletionRequest`'s
 `tools`/`tool_choice`, matching llama-server's own OpenAI-compatible
 function-calling shape exactly - confirmed live against a real spawn

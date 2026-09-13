@@ -490,3 +490,133 @@ beyond the hub's own three (8788/8789/8794, all untouched throughout),
 no bench run. `docs/BACKLOG.md`'s EVAL-01 item carries the same finding
 as its status line. Nothing else to re-check until Qwen ships an
 official GGUF for this specific model.
+
+## Lane 6: docs and user-facing truth
+
+Frontend and docs only, per `docs/plans/session-b-lane-6-2026-09-13.md`.
+Session A owns the chat engine and memory files; nothing here touches
+`backend/` beyond reading it, or `spec/schemas`.
+
+### Item 1: CHAT-25's "current documentation" half
+
+Read all six user pages (`docs/user/chat.md`, `memory.md`, `privacy.md`,
+`home.md`, `getting-started.md`, `fix-a-problem.md`) against the actual
+running code, then verified the claims that changed against a real,
+live spare-port backend (`MAIPAI_DATA_DIR` under the OS temp root,
+`MAIPAI_LLAMA_SERVER_URL`/`MAIPAI_EMBED_URL`/`MAIPAI_BACKGROUND_URL` all
+pointed at the hub's own real, already-running engines - 8788/8794/8789
+- so nothing new was spawned) with a fresh household seeded through the
+real API, not a mock.
+
+**What was already accurate, checked and left alone**: `memory.md`'s
+batch select/forget/clear-all section, and its credential section -
+the fixed line it quotes verbatim (`"Keep passwords and keys in
+Credentials, not in chat."`) matches `CREDENTIAL_SAFE_MESSAGE`
+(`memoryContentPolicy.ts`) exactly. World knowledge, `home.md`'s "Ask
+MaiPai anything" (confirmed live: it really does navigate to Chat and
+send a real, saved turn - `HomePage.tsx`'s `submitPrompt`, unrelated to
+the Home weather card's own ephemeral one), and `getting-started.md`
+had no stale claims to find.
+
+**What changed, verified live then written**: `chat.md` was missing any
+mention of a household member's OWN message having its own action
+bar (`UserActionBar`, `thread.aui.tsx`: Copy, Edit, a brain-icon
+"Remember this") and the edit-history switcher. Live-verified via the
+spare backend's real API: sent a message, edited it (`supersedes`), and
+confirmed via `GET /api/conversations/:id/turns` that BOTH the original
+and the edited row persist as separate turns linked by `supersedes` -
+exactly what the branch switcher (`BranchPickerPrimitive`, hidden when
+there's only one branch) reads to show "1 / 2" and survive a reload.
+Also missing: the "Memory updated" chip - live-verified by sending
+"remember that the wifi password is on the fridge" through the real
+`remember` plugin and confirming the turn's own row carries
+`memory_ids` (`GET /api/conversations/:id/turns`), which is what the
+chip (`chatMemoryChip.tsx`) reads on a reload. `fix-a-problem.md` had
+no mention of the PWA's offline page at all - added a section quoting
+its actual wording (`frontend/public/offline.html`) rather than
+paraphrasing it.
+
+**Not documented, on purpose**: capitalized replies and broadened
+"please remember" phrasing recognition are real fixes from tonight
+(CHAT-04, and the guard work before it) but neither is a distinguishable
+feature a parent would look for or notice as new - the pages never
+claimed the opposite, so there was nothing false to correct and adding
+either as its own bullet would read as trivia rather than something the
+dad test wants. The baseline bench's own failing rows (#92 among them)
+were also deliberately left undocumented, per the item's own rule: a
+row the bench shows broken is not a feature yet.
+
+Screenshots: regenerated with `bun run scripts/screenshot.ts` (the full
+matrix, not a partial run - the only way to be sure nothing else drifted
+alongside the pages actually edited) against the same seeded household,
+then the affected images opened and checked against what the pages now
+claim. Two real findings from actually looking at them, per the org's
+own "every screenshot gets looked at" rule:
+
+- `fix-a-problem.md`'s Repairs caption said "showing a healthy hub with
+  nothing to fix," but the captured image shows a real error ("The
+  Wyoming satellite server failed to start"). Not a bad capture: the
+  pipeline deliberately occupies the Wyoming port before the backend
+  starts (`scripts/screenshot.ts`'s `REPAIR_SEED_PORT`) so the Repairs
+  page always has real, non-empty content to show - this pipeline can
+  never produce a genuinely "nothing to fix" state, on any run, by
+  design. The caption was simply wrong about what its own image always
+  shows; corrected to describe the real content (an example finding
+  with its Dismiss button), which is arguably more useful on a
+  troubleshooting page than a sterile all-clear screen would be anyway.
+- `home.md`'s screenshot shows the weather card's reply verbatim,
+  including the stub backend's own deliberate debug prefix ("[stub
+  model: no real model loaded, this is a canned reply]"). Pre-existing,
+  unrelated to anything this lane touched (the weather card's own text
+  never changed), and out of this lane's scope to fix (it needs a
+  scripted stub reply for the weather card's fixed question, touching
+  the stub server rather than docs or frontend). Filed as
+  getmaipai/home#96 rather than silently published or silently ignored.
+
+### Item 2: doc drift, the plain corrections
+
+`spec/llm/README.md`'s "Non-streaming only" paragraph was genuinely
+stale - `spec/llm/ts/types.ts`/`client.ts` now carry streaming
+(`chatCompleteStream()`), native tools (`tools`/`tool_choice`), and
+grammar-constrained structured output (`response_format`'s
+`json_schema` variant, which the memory judge depends on) alongside
+`chat_template_kwargs`. Rewritten to say so plainly, cross-referencing
+the file's own later "Tools: real, native" section instead of
+duplicating its detail, and trimmed that later section's own now-
+redundant "the line near the top is historical" sentence since the top
+itself no longer says the stale thing.
+
+`spec/ui/README.md`'s named "single-shot JSON" claim, checked against
+the file: it isn't there. The file already only describes the schema/
+interpreter split (which pages convert, which stay hand-written, why)
+with no streaming-related claim of any kind - nothing to fix. The
+BACKLOG item's own description of this drift was itself stale by the
+time this ran.
+
+`docs/BACKLOG.md`'s combined item split per the lane's instruction: the
+plain corrections above are done and ticked; two standalone "Jesse's
+call" items now carry the platform-plan-commit question (which also
+subsumes the `.github/CLAUDE.md`/`STACK.md` broken references and the
+plan's own internal `skill`/`plugin` terminology drift, all only fixable
+once the plan is a real, editable file in the repo) and the routing-tier-
+vs-package-tier renaming question, separately.
+
+### Item 3: reader's rows, checked for filed issues
+
+Session A's baseline bench (`docs/dev/session-a.md`, "The reader's
+rows") named two findings it was asked to file: the timer follow-up
+that invents a remaining time, and replies ending in an emoji or a
+canned closer. Both already exist (`gh issue list`): getmaipai/home#94
+and #95. Nothing missing to file.
+
+### Item 4: the privacy page and the service worker
+
+Read `backend/src/lib/privacy.ts`'s aggregation (`platformConnections()`,
+`pluginConnections()`, `inboundConnections()`) in full: nothing added
+tonight touches it, and the service worker's own same-origin caching
+isn't an outbound connection in the first place - there's no third
+party to name, so no new row belongs in the table. Added one sentence
+to `docs/user/privacy.md`'s "What never leaves your house" section
+instead, saying plainly that the browser also saves a copy of MaiPai's
+own screens on the device so the app can still open without internet,
+and that this is a copy of the app, never anything typed or remembered.

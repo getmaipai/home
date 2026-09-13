@@ -35,6 +35,10 @@ Each of MaiPai's replies has a few small buttons under it:
 - **Listen**, to have MaiPai read the answer out loud
 - **More**, for extra options like remembering or forgetting that exchange
 
+Your own messages have buttons too. Hover or tap one to see **Copy**, **Edit**, and a brain icon for **Remember this**. Editing sends a new version and gets a fresh reply. MaiPai keeps both the old and new versions. A small **1 / 2** switcher lets you flip between them, even after you reload the page.
+
+Did MaiPai save something you said? A **Memory updated** chip shows up under its reply. Tap the chip to see what was saved, on the [Memory](memory.md) page.
+
 ## Start a new conversation
 
 Tap the **+** button beside Chat to start fresh. A new chat is saved when you send its first message.

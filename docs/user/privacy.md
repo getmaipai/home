@@ -20,7 +20,7 @@ An adult can also generate an API token for another app or device. This page sho
 
 ## What never leaves your house
 
-Your conversations stay on this computer. So does everything MaiPai remembers, and every profile in your household. MaiPai doesn't collect usage stats or crash reports. Nothing your family says is ever used to train anything.
+Your conversations stay on this computer. So does everything MaiPai remembers, and every profile in your household. MaiPai doesn't collect usage stats or crash reports. Nothing your family says is ever used to train anything. Your browser also saves a copy of MaiPai's own screens on this device so the app can still open without internet - that's a copy of the app itself, never anything you typed or anything MaiPai remembers.
 
 ![The Privacy page, listing every outbound connection MaiPai can make](../assets/screens/privacy-desktop-light.png)
 
