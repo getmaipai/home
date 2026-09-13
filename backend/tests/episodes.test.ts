@@ -1,7 +1,20 @@
 import { describe, expect, test, beforeEach } from "bun:test";
 import { resetDb } from "./reset-db";
 import { resolveOrCreateConversation, logTurn, deleteConversationById } from "@/lib/conversationHistory";
-import { recordEpisodes, deleteEpisodesForTurns, deleteEpisodesForPerson, listEpisodes, recallEpisodes, formatEpisodesForPrompt, dateWindowForQuery, ftsQueryFor, embedPendingEpisodes } from "@/lib/episodes";
+import {
+  recordEpisodes,
+  deleteEpisodesForTurns,
+  deleteEpisodesForPerson,
+  listEpisodes,
+  recallEpisodes,
+  formatEpisodesForPrompt,
+  dateWindowForQuery,
+  ftsQueryFor,
+  embedPendingEpisodes,
+  VECTOR_SCAN_RECENT_EPISODES,
+  __vectorRowsScannedForTests,
+  __resetVectorRowsScannedForTests,
+} from "@/lib/episodes";
 import { forget, vectorToBuffer } from "@/lib/memory";
 import { TestClient } from "./client";
 import { newPersonId } from "@/lib/id";
@@ -375,6 +388,68 @@ describe("MEM-04 recallEpisodes()", () => {
     expect(db.select().from(pendingEpisodeEmbeddings).all()).toHaveLength(0);
     const matches = recallEpisodes(actor, "risotto", new Float32Array(768), { now: NOW });
     expect(matches.map((m) => m.episode.turnId)).toContain("t-risotto");
+  });
+});
+
+// getmaipai/home#79: the vector half used to read every embedded episode
+// the person has, on every turn, and episodes grow two rows per turn for
+// ever. Now it reads the newest VECTOR_SCAN_RECENT_EPISODES (plus a
+// dated query's own window, itself capped the same way).
+describe("getmaipai/home#79: the vector scan is bounded", () => {
+  /** N + 500 embedded episodes, one per turn (user side only, to keep the
+   * seeding quick), inserted directly the way the vector test above
+   * places its hand-made vectors, spread one minute apart. */
+  function seedEmbedded(actor: PersonRow, count: number, conversationId: string, opts: { oldestInWindow?: { count: number; daysAgo: number; vector: number[] } } = {}): void {
+    const hlc = `${Date.now()}:0:testfix`;
+    const base = NOW.getTime() - count * 60_000;
+    const turnRows: (typeof conversationTurns.$inferInsert)[] = [];
+    const episodeRows: (typeof episodes.$inferInsert)[] = [];
+    const vectorRows: (typeof episodeEmbeddings.$inferInsert)[] = [];
+    for (let i = 0; i < count; i++) {
+      const old = opts.oldestInWindow && i < opts.oldestInWindow.count ? opts.oldestInWindow : null;
+      const createdAt = old ? new Date(new Date(daysAgo(old.daysAgo)).getTime() + i * 60_000).toISOString() : new Date(base + i * 60_000).toISOString();
+      const turnId = `t-bulk-${i}`;
+      turnRows.push({ id: turnId, conversationId, personId: actor.id, surface: "chat", userText: `bulk fact number ${i}`, replyText: "Okay.", source: "model", safetyAction: "allow", createdAt, hlc } as never);
+      episodeRows.push({ id: `ep-bulk-${i}`, turnId, conversationId, personId: actor.id, speaker: "user", text: `bulk fact number ${i}`, createdAt, hlc } as never);
+      vectorRows.push({ episodeId: `ep-bulk-${i}`, space: "test", dims: 3, vector: vectorToBuffer(old ? old.vector : [1, 0, 0]), hlc });
+    }
+    sqlite.transaction(() => {
+      for (let i = 0; i < turnRows.length; i += 200) db.insert(conversationTurns).values(turnRows.slice(i, i + 200)).run();
+      for (let i = 0; i < episodeRows.length; i += 200) db.insert(episodes).values(episodeRows.slice(i, i + 200)).run();
+      for (let i = 0; i < vectorRows.length; i += 200) db.insert(episodeEmbeddings).values(vectorRows.slice(i, i + 200)).run();
+    })();
+  }
+
+  test(`with ${VECTOR_SCAN_RECENT_EPISODES} + 500 embedded episodes, a turn reads at most ${VECTOR_SCAN_RECENT_EPISODES} vectors, the newest ones`, async () => {
+    const { actor } = await setupOwner();
+    const conversationId = newConversation(actor);
+    seedEmbedded(actor, VECTOR_SCAN_RECENT_EPISODES + 500, conversationId);
+    expect(db.select({ id: episodeEmbeddings.episodeId }).from(episodeEmbeddings).all()).toHaveLength(VECTOR_SCAN_RECENT_EPISODES + 500);
+    __resetVectorRowsScannedForTests();
+    const matches = recallEpisodes(actor, "what did I say", new Float32Array([1, 0, 0]), { now: NOW });
+    expect(__vectorRowsScannedForTests()).toBe(VECTOR_SCAN_RECENT_EPISODES);
+    expect(matches.length).toBeGreaterThan(0);
+    // The newest rows are the ones read: the oldest 500 can never win.
+    const newestTurn = `t-bulk-${VECTOR_SCAN_RECENT_EPISODES + 499}`;
+    expect(matches.some((m) => m.episode.turnId === newestTurn)).toBe(true);
+    expect(matches.some((m) => Number(m.episode.turnId.replace("t-bulk-", "")) < 500)).toBe(false);
+  });
+
+  test("a dated question reads its own window instead: the oldest 500, outside the recent scan, become reachable", async () => {
+    const { actor } = await setupOwner();
+    const conversationId = newConversation(actor);
+    // The oldest 500 sit three weeks back with a distinguishable vector;
+    // the newest N sit within the last two days and point elsewhere.
+    seedEmbedded(actor, VECTOR_SCAN_RECENT_EPISODES + 500, conversationId, { oldestInWindow: { count: 500, daysAgo: 21, vector: [0, 1, 0] } });
+    __resetVectorRowsScannedForTests();
+    const undated = recallEpisodes(actor, "what did I say", new Float32Array([0, 1, 0]), { now: NOW });
+    expect(__vectorRowsScannedForTests()).toBe(VECTOR_SCAN_RECENT_EPISODES);
+    expect(undated).toEqual([]); // the recent scan never sees the old rows, and the recent vectors are orthogonal
+    __resetVectorRowsScannedForTests();
+    const dated = recallEpisodes(actor, "what did I say three weeks ago", new Float32Array([0, 1, 0]), { now: NOW });
+    expect(__vectorRowsScannedForTests()).toBe(500); // the window's own rows, not the recent set
+    expect(dated.length).toBeGreaterThan(0);
+    expect(dated.every((m) => Number(m.episode.turnId.replace("t-bulk-", "")) < 500)).toBe(true);
   });
 });
 

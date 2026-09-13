@@ -12181,3 +12181,34 @@ as every prior run this session. `--chat-review` re-verified separately
 lane 3 item 3 baseline exactly, confirming the chatReview guard works.
 
 Files: `scripts/screenshot.ts`, `docs/BACKLOG.md`.
+
+### getmaipai/home#79: the episode vector scan is bounded
+
+`recallEpisodes()`'s vector half read every embedded episode the person
+has, on every model-routed turn, and episodes grow two rows per turn
+for ever. It now reads the newest `VECTOR_SCAN_RECENT_EPISODES`
+(2,000) rows, or, when the question named a date, up to the same
+number inside that window instead (one bounded select either way; a
+first cut read both and the medium review pointed out every recent
+row outside the window was dropped anyway), and scores only those;
+the lexical half was already bounded by SQL. What the constant costs:
+at ten thousand stored episodes the scan reads 2,000 rows either way,
+about 6 MB of 768-dimensional float32 blobs (3,072 bytes each)
+decoded and dotted in JavaScript per turn, where the unbounded scan
+read all ten thousand (about 30 MB); 2,000 episodes is about a
+thousand turns, a few months of daily use, kept in the hot path.
+Older episodes stay reachable through the lexical half (BM25 over the
+whole index) and through a dated question, which reads its own window.
+Tests in `episodes.test.ts`: N + 500 embedded episodes seeded
+directly, one turn reads exactly N vectors (the
+`__vectorRowsScannedForTests()` seam), the newest row is among the
+matches and none of the oldest 500 can be; with the oldest 500 placed
+three weeks back with their own vector, an undated question finds
+none of them (N rows read) and "three weeks ago" finds only them (500
+rows read). Memory bench
+(`scripts/bench/memory/run.ts`, fresh temp data directory, embed by
+URL) after the change: episode questions 7 of 8, the same single miss
+as MEM-04 recorded (`nothing-there`, the question about a kayak rental
+that was never said still finds the trip turn).
+
+**Exit gate**: `bash scripts/check.sh` green on this diff.

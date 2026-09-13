@@ -1,7 +1,7 @@
 // Episodes: every turn verbatim as one or two searchable records (user and
 // assistant sides), indexed by full-text and vector for hybrid recall
 // ("what recipe did you suggest last week"). Mirrored after memory embeddings.
-import { eq, and, inArray, isNull, desc } from "drizzle-orm";
+import { eq, and, inArray, isNull, desc, gte, lt } from "drizzle-orm";
 import { db, sqlite } from "@/db";
 import { episodes, episodeEmbeddings, pendingEpisodeEmbeddings, conversationTurns } from "@/db/schema";
 import { embed } from "@/lib/llm";
@@ -176,6 +176,27 @@ export interface RecallEpisodesOptions {
 }
 
 const RRF_K = 60;
+/** getmaipai/home#79: how many of a person's newest embedded episodes the
+ * vector half reads and scores per turn (or, for a dated question, up to
+ * this many inside its window). 2,000 is about a thousand turns, or a
+ * few months of daily use, kept in the hot path; at ten thousand stored
+ * episodes the scan still reads 2,000 rows (about 6 MB of
+ * 768-dimensional float32 blobs at 3,072 bytes each, decoded and dotted
+ * in JavaScript), where an unbounded scan would read all ten thousand
+ * (about 30 MB). Older episodes stay reachable through the lexical half
+ * (BM25 over the whole index) and through a dated question ("three
+ * weeks ago"), which reads its own window instead. */
+export const VECTOR_SCAN_RECENT_EPISODES = 2000;
+
+let __vectorRowsScanned = 0;
+/** Test seam: how many episode vectors recallEpisodes() has read since
+ * the last reset, so a test can prove the bound. */
+export function __vectorRowsScannedForTests(): number {
+  return __vectorRowsScanned;
+}
+export function __resetVectorRowsScannedForTests(): void {
+  __vectorRowsScanned = 0;
+}
 /** The same floor memory.ts's recall() applies to episodic records: below
  * it a vector match is noise, and a query about something never said
  * must come back empty rather than with the nearest unrelated turn. */
@@ -309,23 +330,37 @@ export function recallEpisodes(actor: PersonRow, query: string, queryVector: Flo
   }
 
   // Vector: brute-force cosine over the person's embedded episodes, the
-  // same scan memory.ts's similarByVector() does for memory records.
+  // same scan memory.ts's similarByVector() does for memory records,
+  // but bounded (getmaipai/home#79): episodes grow two rows per turn for
+  // ever, so the scan reads the newest VECTOR_SCAN_RECENT_EPISODES rows,
+  // or, when the question named a date, up to the same number inside
+  // that window instead (every row outside the window is dropped anyway,
+  // so reading the recent set too would be waste, a code review's
+  // finding), and scores only those. The FTS half is bounded by SQL
+  // already.
   const vector: CandidateRow[] = [];
   if (queryVector) {
+    const columns = {
+      id: episodes.id,
+      turnId: episodes.turnId,
+      conversationId: episodes.conversationId,
+      speaker: episodes.speaker,
+      text: episodes.text,
+      createdAt: episodes.createdAt,
+      vector: episodeEmbeddings.vector,
+    };
+    const scope = window
+      ? and(eq(episodes.personId, actor.id), gte(episodes.createdAt, window.start.toISOString()), lt(episodes.createdAt, window.end.toISOString()))
+      : eq(episodes.personId, actor.id);
     const rows = db
-      .select({
-        id: episodes.id,
-        turnId: episodes.turnId,
-        conversationId: episodes.conversationId,
-        speaker: episodes.speaker,
-        text: episodes.text,
-        createdAt: episodes.createdAt,
-        vector: episodeEmbeddings.vector,
-      })
+      .select(columns)
       .from(episodeEmbeddings)
       .innerJoin(episodes, eq(episodeEmbeddings.episodeId, episodes.id))
-      .where(eq(episodes.personId, actor.id))
+      .where(scope)
+      .orderBy(desc(episodes.createdAt))
+      .limit(VECTOR_SCAN_RECENT_EPISODES)
       .all();
+    __vectorRowsScanned += rows.length;
     const scored = rows
       .filter((r) => inWindow(r, window) && !excludedTurnIds.has(r.turnId))
       .map((r) => ({ row: r as CandidateRow & { vector: Buffer }, cosine: cosineSimilarity(queryVector, bufferToVector(r.vector as Buffer)) }))
