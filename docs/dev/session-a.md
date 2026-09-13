@@ -2801,3 +2801,99 @@ screenshot matrix's eight contexts keep their wait-and-reload in
 budget and is Session B's to update with that file), and a flagged
 request now costs the settings read behind `isFixedHomeCardQuery()`
 before its refusal, bounded by the body limit.
+
+## Item 4a: a tool never runs on an argument the person did not say (2026-09-13)
+
+The 47-conversation run showed "set a timer" running a ten-minute
+timer the model invented and "add it to the list" adding the word
+"it" (`docs/plans/baseline-fixes-2026-09-13.md`, section 4). The rule,
+`unspokenArgument()` in `lib/unspokenArgs.ts`, applied on both paths
+before any package runs: an argument whose value carries a number or a
+duration unit that does not appear in the utterance, or that is a bare
+pronoun, is not run; the turn asks for the value through the existing
+ask path ("For how long?", "Add what to the list?") and the next
+utterance binds it, the way a package's own `ask` already worked. On
+the literal path the pattern's capture is checked in `prepareTurn()`;
+on the model path `resolveToolCalls()` withholds the call, runs the
+other calls whose arguments were said, and parks the first withheld one
+as the pending ask, with a pending outcome so the guards read it.
+
+Narrow on purpose: number words fold to digits, compound ones too
+("twenty five", "a hundred and twenty", "one and a half"), unit
+synonyms to one word, and a spoken duration counts in every unit the
+model might write it in ("an hour and a half" is also "90 minutes" and
+"1.5 hours"), so a model writing "5 minutes" for a spoken "five
+minutes", "1 hour" for "an hour", or "6pm" for "at 6" is not read as
+inventing (am/pm is a qualifier the rule does not read); a value with
+no number, unit or pronoun in it is never questioned here. The rule
+reads action packages only (`isActionPackage()`: consequential, a
+home device permission, or a write permission other than memory's): a
+lookup's argument is the model's own rephrasing of the question
+("World War 2" for "the second world war") and a memory's is the
+person's words as a sentence, neither a quantity the person had to
+say. The engine's own question names the package and argument where
+the wording matters ("For how long?", "Add what to the list?") and
+otherwise the reason ("Which one do you mean?", "How much, or for how
+long?"), never the argument's internal name.
+
+Two things on the ask path came with it. "Never mind" on a pending
+ask clears it and runs nothing (A4's cancel rule; before this the
+words were bound as the answer, "never mind" on the list), the same
+as on a confirmation; the cancel is the whole utterance, so an answer
+that merely opens with "no" ("no-salt crackers") binds. A mixed batch
+("add milk to the list and start a timer") runs the call whose
+argument was said and asks for the other's, the question following
+the reply the way a package's own ask does; the engine's ask names
+the argument it withheld and the answer binds to it by name, whatever
+the manifest's required list says. And a whole new command said in place of an
+answer ("add eggs to the list" after "Add what to the list?") routes
+as itself, never bound as the item: a literal pattern match says so,
+and so does an utterance opening with one of the installed packages'
+own command verbs (the first live run after the rule put the whole
+sentence "add eggs to the list" on the list, since that phrasing
+matches no pattern). The bench's `toolRan` reads a parked ask (source
+"confirm") as no run, so the A4 and A6 rows can pass. Tests: the two
+bench rows' shapes end to end on the stub (the invented ten minutes
+never scheduled, the spoken answer scheduling it; "it" never on the
+list, a spoken item still added, a command in place of the answer
+routed as itself; "never mind" clearing the ask), a timer with a
+spoken length in digits still running, and the pure rule's cases. A
+review of the first patch found six things, all taken: the mixed
+batch dropped the withheld call silently; compound number words never
+folded, so every "twenty five minutes" was withheld; the rule fired on
+lookup queries and the forced-lookup retry; the fallback prompt spoke
+the argument's name; "no" as a prefix cancelled an ask; and the
+answer bound through the one-required-string rule, which discards it
+for an optional argument. A second review found four more, all
+taken: the cancel of an ask takes a leading "no,", "actually," or
+"oh" and a trailing "that" or "about it" ("no, never mind" used to
+bind as the list item); a number is read only in a value that also
+carries a duration unit, so a clock time or a date the model
+normalized ("6:30" for "half past six", "18:00" for "6pm") is not an
+invented quantity, and "next week" is the model's "1 week"; a
+package's own ask beside a withheld call keeps the package's ask
+pending and says the withheld one's question after it, with its
+pending outcome (unreachable with today's recipes); and the model's
+own article ("half an hour" for a spoken "30 minutes") is no number
+the person had to say. A third review, five more: sentence
+punctuation no longer hides a unit ("10 minutes." was withheld as a
+missing unit); a duration the model writes in two units, or sums from
+two spoken ones ("1 hour 30 minutes" for "an hour and a half", "75
+minutes" for "an hour and fifteen minutes", "15 minutes" for "a
+quarter of an hour"), counts by its total; a courtesy prefix on a
+restated command ("can you add eggs to the list" as the answer) is
+stripped before the opener is read, so it routes as itself; a failed
+lookup beside a withheld action falls through to the model as before,
+so the question is not lost behind "For how long?"; and the withheld
+call beside a package's own ask is said and pushed as pending, with
+the package's ask the one the next utterance answers (a stated limit,
+unreachable today).
+
+**Live** (one run, the 47-conversation fixture): 123 of 159, from 119.
+"set a timer" got "For how long?" with nothing scheduled, "never mind"
+got "Okay, I'll leave it." with the ask cleared, "add it to the list"
+got "Add what to the list?" with the list untouched; the `[turn]` log
+names the withheld argument each time ("the item \"it\" was not said
+(pronoun)"). A4 and A6 pass live; the compound, timer and list rows
+are unchanged.
+

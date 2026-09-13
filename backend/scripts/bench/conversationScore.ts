@@ -168,8 +168,10 @@ export function scoreTurn(conversation: BenchConversation, turnIndex: number, tu
     checks.push({ name: "not in context", pass: leaked.length === 0, detail: leaked.length === 0 ? "absent" : `present: ${leaked.join(", ")}` });
   }
   if (e.toolRan !== undefined) {
-    // A Tier 2 turn that ran two calls stores "a+b" as its plugin id.
-    const ran = observed.pluginId ? observed.pluginId.split("+") : [];
+    // A Tier 2 turn that ran two calls stores "a+b" as its plugin id. A
+    // parked ask or confirmation (source "confirm") names the package
+    // it is waiting on and ran nothing (item 4a).
+    const ran = observed.pluginId && observed.source !== "confirm" ? observed.pluginId.split("+") : [];
     checks.push({ name: "tool", pass: e.toolRan === null ? ran.length === 0 : ran.includes(e.toolRan), detail: `ran ${ran.join("+") || "none"} (source ${observed.source ?? "none"})` });
   }
   if (e.guard !== undefined) {

@@ -19,7 +19,7 @@
 // never off the question mark (the coordinator's condition on this
 // item). The three expressions are the bot's, plus "please" as a
 // courtesy prefix of its own.
-const COURTESY_PREFIX = /^\s*(?:hey\s+\w+[,\s]+)?(?:(?:can|could|would|will)\s+you\s+(?:please\s+)?|please[,\s]+)/i;
+export const COURTESY_PREFIX = /^\s*(?:hey\s+\w+[,\s]+)?(?:(?:can|could|would|will)\s+you\s+(?:please\s+)?|please[,\s]+)/i;
 const QUESTION_OPENER =
   /^\s*(?:who|whose|what|whats|when|where|which|why|how|is|are|was|were|am|do|does|did|can|could|should|would|will|shall|have|has|had|any|anything|anyone)\b/i;
 const TRAILING_QUESTION_MARK = /\?\s*$/;

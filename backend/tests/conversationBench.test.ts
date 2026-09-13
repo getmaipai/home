@@ -414,6 +414,23 @@ describe("the runner against the stub (control-flow rows)", () => {
     expect(scoreTurn(privacy, 1, privacy.turns[1]!, observedFor({ reply: "Yes, he keeps a lamp on." })).pass).toBe(false);
   });
 
+  test("never-mind-on-an-ask (A4, item 4a): 'set a timer' with no length asks, 'never mind' clears the ask, and nothing ever runs", async () => {
+    await withStubBench(
+      {
+        reply: () => "Okay.",
+        calls: (request) => (request.tools?.some((t) => t.function.name === "timer") ? [{ id: "call-1", name: "timer", args: JSON.stringify({ expression: "ten minutes" }) }] : undefined),
+      },
+      async (deps) => {
+        const { scores } = await runConversation(byId("never-mind-on-an-ask"), deps);
+        expect(scores[0]?.observed.source).toBe("confirm");
+        expect(scores[0]?.observed.pendingAsk).toBe("ask");
+        expect(scores[0]?.observed.jobs).toEqual([]);
+        expect(scores[1]?.observed.pendingAsk).toBeNull();
+        expect(scores.map((s) => s.pass)).toEqual([true, true, true]);
+      },
+    );
+  }, 20_000);
+
   test("the missing-competency rows' checks: a subject from the turn line, a word count, an item taken off, an entity in the registry", () => {
     const sw = byId("subject-switch-and-return");
     const back = sw.turns[3]!;

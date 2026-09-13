@@ -109,6 +109,54 @@ correction row pass three runs; judge-eval precision and recall hold.
 If the 1.7B cannot resolve pronouns reliably with the context added,
 record the numbers and stop; that becomes MEM-05's evidence.
 
+## 4. From the 47-conversation run (d4a27c7): three small items ahead of CHAT-15, by severity
+
+The failing rows landed and the run (119 of 159) showed, beyond the
+designed misses, things the hub does rather than declines. In order:
+
+**4a. A tool never runs on an argument the person did not say (S).**
+"set a timer" with no length ran a ten-minute timer the model
+invented; "add it to the list" added the word "it". Rule, in the
+tool-call resolution before any package runs: an argument whose value
+is a number, duration or time that does not appear in the utterance,
+or a bare pronoun (it, that, this, them), is not run; the turn asks
+for the value through the existing ask path ("How long?", "Add what
+to the list?"). A pronoun argument resolves through the active subject
+once CHAT-13 lands; until then it asks. Tests: the two rows; a timer
+with a spoken length still runs; a list add with a spoken item still
+runs. Bench rows updated to expect the ask.
+
+**4b. Telling the hub to forget is honored or refused, never "Got it."
+with the record kept (S-M).** "Forget what I told you" got "Got it."
+and the record stayed active: a privacy lie. Build the chat-side
+forget: a Tier 0 command ("forget that", "forget what I (just) told
+you", "don't remember that") that retires the records whose provenance
+is the last remembered turns of this conversation (the judge's
+provenance ids; `forgetByIds()` exists) and replies with what it
+forgot; when nothing was remembered yet, it says so and marks the
+pending turns not to be judged. Until the command exists on a path,
+"forget" is an action claim with no outcome and CHAT-04's narration
+must say it cannot, never "Got it.". Tests on the record's status
+(the effect standard). Closes the G2 row's first verb.
+
+**4c. The household invention guard reads activities, not only traits
+and places (S).** The film opening turn told Sage "Sage is watching it
+too!": a roster name plus a present-tense activity, invented, and the <!-- prose-lint: allow -->
+guards (traits, locations, claimed experience) do not read it. Add an
+activity claim about a roster name or a second-person form to the
+household invention family (present progressive or "is at/doing"),
+grounded only by a memory or a turn that says so; corpus rows both
+ways ("Pippa is at soccer practice" with the memory passes; without
+it, cut).
+
+Then #102, #99, #98 (small, already ruled), then CHAT-15. Recorded
+for the items that own them, not fixed here: the knowledge package's
+whole summary spoken for "the capital of Portugal" (CHAT-16 composes
+it), "how do you know" after a lookup narrated as "I didn't look that
+up" (CHAT-15 retains outcomes across turns), the next-day thread
+(F1), the judge writing nothing from "my coworker Quill likes seltzer"
+(step 3a; check the third-party-fact filter first).
+
 ## Filed, not fixed here
 
 - The timer follow-up ("how long is left on it") invented a remaining

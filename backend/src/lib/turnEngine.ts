@@ -26,6 +26,8 @@ import { newConversationTurnId } from "@/lib/id";
 import { complete, startCompleteStream, type LlmMessage, type ToolSpec, type ToolCall } from "@/lib/llm";
 import { guardReply, guardSentence, replacementFor, isCuttable, isSkippable, splitIntoSentences, type GuardContext, type GuardReason } from "@/lib/guards";
 import { tokenize } from "@/lib/text";
+import { unspokenArgument, askPromptFor, isActionPackage } from "@/lib/unspokenArgs";
+import { COURTESY_PREFIX } from "@/lib/utteranceShape";
 import { sanitizeForPrompt } from "@/lib/promptSanitize";
 import {
   logTurn,
@@ -1283,6 +1285,8 @@ type PreparedTurn =
 // "no" and shouldn't need to match it exactly to be understood.
 const AFFIRMATIVE_RE = /^(yes|yeah|yep|yup|sure|ok|okay|go ahead|do it|please do|confirmed?)\b/i;
 const NEGATIVE_RE = /^(no|nope|nah|cancel|never ?mind|don'?t|stop)\b/i;
+// Item 4a: the cancel of an ask is the whole utterance, never a prefix.
+const ASK_CANCEL_RE = /^(?:(?:no|nah|nope|actually|ok(?:ay)?|oh)[,\s]+)*(?:no|nope|nah|cancel(?: (?:that|it))?|never ?mind(?: (?:that|it|about it))?|forget (?:it|that|about it)|stop|no thanks|no thank you|don'?t(?: bother| worry(?: about it)?)?|skip it|leave it)\s*[.!]?$/i;
 
 /** Session C step 2's pendingAsk continuation, either trigger
  * (Tier 2 proposing a `consequential` package, or a recipe result's own
@@ -1399,8 +1403,29 @@ export async function resolvePendingAsk(
   // no wildcard capture needed" logic this needs, reused rather than a
   // second copy of it.
   setPendingAsk(conversation.id, null);
+  // Item 4a (A4's cancel rule): "never mind" on an ask clears it and
+  // runs nothing, the same as on a confirmation; before this the
+  // utterance was bound as the answer ("never mind" on the list). The
+  // whole utterance has to be the cancel: an answer that merely opens
+  // with "no" ("no-salt crackers", "no more than ten minutes") binds (a
+  // review).
+  if (ASK_CANCEL_RE.test(text.trim())) {
+    return { reply: { text: "Okay, I'll leave it." }, source: "confirm", safety, crisis_resources: crisisResources, conversation_id: conversation.id, turn_id: turnId };
+  }
+  // A whole new command in place of an answer ("add eggs to the list"
+  // after "Add what to the list?") is routed as itself, never bound as
+  // the value: a literal pattern match says so, and so does an
+  // utterance that opens with one of the installed packages' own
+  // command verbs ("add", "set", "remind"), since the live bench put
+  // the whole sentence "add eggs to the list" on the list (item 4a).
+  // "ten minutes" opens with neither and binds.
   const manifest = loaded.find((l) => l.id === pending.packageId)?.manifest;
-  const boundArg = manifest ? deterministicArgs(manifest.args, text) : null;
+  const opener = text.trim().replace(COURTESY_PREFIX, "").split(/\s+/)[0]?.toLowerCase().replace(/[^a-z']/g, "") ?? "";
+  if (routeLiteral(text, actor, loaded)?.winner || commandOpeners(loaded).has(opener)) return null;
+  // The engine's own ask names the argument it withheld (item 4a) and
+  // the answer binds to it by name; a package's own ask binds through
+  // the one-required-string rule as before.
+  const boundArg = pending.argName ? { [pending.argName]: text.trim() } : manifest ? deterministicArgs(manifest.args, text) : null;
   if (!boundArg) return null; // can't bind - fall through to normal routing rather than guess
   const result = await runPlugin(pending.packageId, actor, { ...pending.args, ...boundArg }, turnId);
   if (!result.ok) return null; // the continuation attempt failed - fall through rather than report a confusing error for an utterance that wasn't really about this
@@ -1596,6 +1621,19 @@ async function prepareTurn(
   let tier0Miss: { packageId: string; error: string } | null = null;
   if (routed && !outscoredBySkill) {
     logRoute(turnId, routed.viaPattern ? "pattern" : routed.viaEmbedding ? "embedding" : "keyword", shape, routed.id, ranked, []);
+    // Item 4a: a literal pattern's capture can be a bare pronoun ("add
+    // it to the shopping list" captured "it", and the list gained the
+    // word). The package never runs on it; the turn asks for the value
+    // through the ask path, and the next utterance binds it.
+    const routedManifest = loaded.find((l) => l.id === routed.id)?.manifest;
+    const unspoken = routedManifest && isActionPackage(routedManifest) ? unspokenArgument(routed.args, text) : null;
+    if (unspoken) {
+      const { [unspoken.name]: _dropped, ...rest } = routed.args;
+      const prompt = askPromptFor(routed.id, unspoken.name, unspoken.reason);
+      setPendingAsk(conversation.id, { kind: "ask", prompt, packageId: routed.id, args: rest, argName: unspoken.name });
+      console.log(`[turn] plugin ${routed.id} not run: the ${unspoken.name} "${unspoken.value}" was not said (${unspoken.reason}); asking`);
+      return immediate({ reply: { text: prompt }, source: "confirm", plugin_id: routed.id, safety, crisis_resources: crisisResources });
+    }
     const result = await runPlugin(routed.id, actor, routed.args, turnId);
     // The miss is a lookup's: a pattern winner of an outside-looking
     // package whose run raised the typed not_found (a recipe fetch's, or
@@ -1914,6 +1952,10 @@ export async function resolveToolCalls(
   // ran or parked on a confirmation; the guards' `outcomes` read them,
   // so an action claim counts as true only when its package really ran.
   outcomes: ToolExecutionOutcome[] = [],
+  // Item 4a: the person's own words, which every call's arguments are
+  // checked against before a package runs; absent (a caller that has
+  // none) the check is skipped, never run against an empty string.
+  utterance?: string,
 ): Promise<TurnValue | null> {
   const rankedById = new Map(ranked.map((r) => [r.id, r]));
   const capped = calls.filter((c) => offeredIds.has(c.tool) && rankedById.has(c.tool)).slice(0, MAX_TIER2_CALLS_PER_TURN);
@@ -1938,10 +1980,44 @@ export async function resolveToolCalls(
     return { reply: { text: prompt }, source: "confirm", plugin_id: consequential.tool, safety, crisis_resources: crisisResources, conversation_id: conversationId, turn_id: turnId };
   }
 
+  // Item 4a: a call whose argument the person did not say (a number or
+  // duration the model filled in, "ten minutes" for "set a timer"; a
+  // bare pronoun) never runs. The first such call is parked as an ask
+  // for its value (the next utterance binds it through the ask path);
+  // the calls whose arguments were said run as usual, and the question
+  // follows their reply the way a package's own ask does below.
+  // Action packages only: a lookup's argument is the model's own
+  // rephrasing of the question ("World War 2"), never a quantity the
+  // person had to say (a review).
+  const withheld =
+    utterance === undefined
+      ? []
+      : capped
+          .filter((c) => isActionPackage(rankedById.get(c.tool)!.manifest))
+          .map((c) => ({ call: c, unspoken: unspokenArgument((c.args ?? {}) as Record<string, unknown>, utterance) }))
+          .filter((x) => x.unspoken !== null);
+  const runnable = capped.filter((c) => !withheld.some((w) => w.call === c));
+  for (const w of withheld) {
+    console.log(`[turn] plugin ${w.call.tool} not run: the ${w.unspoken!.name} "${w.unspoken!.value}" was not said (${w.unspoken!.reason})`);
+  }
+  const askForWithheld = (): { prompt: string } | null => {
+    const first = withheld[0];
+    if (!first) return null;
+    const { [first.unspoken!.name]: _dropped, ...rest } = (first.call.args ?? {}) as Record<string, unknown>;
+    const prompt = askPromptFor(first.call.tool, first.unspoken!.name, first.unspoken!.reason);
+    setPendingAsk(conversationId, { kind: "ask", prompt, packageId: first.call.tool, args: rest, argName: first.unspoken!.name });
+    outcomes.push({ callId: callId(first.call), packageId: first.call.tool, status: "pending", userMessage: prompt });
+    return { prompt };
+  };
+  if (runnable.length === 0) {
+    const ask = askForWithheld();
+    if (ask) return { reply: { text: ask.prompt }, source: "confirm", plugin_id: withheld[0]!.call.tool, safety, crisis_resources: crisisResources, conversation_id: conversationId, turn_id: turnId };
+  }
+
   // Two independent calls, run in parallel - never chained (a result
   // feeding another is a recipe, not this step's job).
   const ran = await Promise.all(
-    capped.map(async (c) => ({ call: c, result: await runPlugin(c.tool, actor, (c.args ?? {}) as Record<string, unknown>, turnId) })),
+    runnable.map(async (c) => ({ call: c, result: await runPlugin(c.tool, actor, (c.args ?? {}) as Record<string, unknown>, turnId) })),
   );
   // #93: a recall the MODEL asked for that found nothing is a miss, not
   // an answer. The recipe language has no conditional, so the recall
@@ -1973,14 +2049,33 @@ export async function resolveToolCalls(
   // the package's args schema before acting" - or a runtime error): "ask
   // again," never a silent drop, means null (a normal conversational
   // reply), not fabricating a plugin success or reporting a confusing
-  // tool-shaped error.
-  if (oks.length === 0) return null;
+  // tool-shaped error. A withheld call (item 4a) asks its question only
+  // when nothing else was attempted: a failed lookup beside it falls
+  // through to the model as before, so the question the person asked
+  // is not lost behind "For how long?" (a review).
+  if (oks.length === 0) {
+    if (runnable.length > 0) return null;
+    const ask = askForWithheld();
+    if (ask) return { reply: { text: ask.prompt }, source: "confirm", plugin_id: withheld[0]!.call.tool, safety, crisis_resources: crisisResources, conversation_id: conversationId, turn_id: turnId };
+    return null;
+  }
 
   const withPending = oks.find((r) => (r.result.value as PluginResultWithConfirmAsk).confirm || (r.result.value as PluginResultWithConfirmAsk).ask);
   if (withPending) {
     const args = (withPending.call.args ?? {}) as Record<string, unknown>;
     const pending = pendingAskFromPluginResult(withPending.call.tool, args, withPending.result.value as PluginResultWithConfirmAsk, conversationId);
     if (pending) {
+      // A withheld call (item 4a) beside a package's own ask: two asks
+      // cannot coexist, so the package's stands and is the one the next
+      // utterance answers; the withheld one is said here and is a
+      // pending outcome for the guards, and the person asks again for
+      // it (a review; unreachable with today's bundled recipes).
+      const first = withheld[0];
+      if (first) {
+        const prompt = askPromptFor(first.call.tool, first.unspoken!.name, first.unspoken!.reason);
+        outcomes.push({ callId: callId(first.call), packageId: first.call.tool, status: "pending", userMessage: prompt });
+        pending.prompt = `${pending.prompt} And then: ${prompt.charAt(0).toLowerCase()}${prompt.slice(1)}`;
+      }
       // A code review (2026-09-06) found this discarding any OTHER
       // call's own reply text outright - two independent calls, one
       // that already ran with a real side effect and a real answer, the
@@ -1999,6 +2094,14 @@ export async function resolveToolCalls(
   const replyText = oks.map((r) => r.result.value.reply?.text ?? "Done.").join(" ");
   const pluginIds = oks.map((r) => r.call.tool).join("+");
   const bestScore = Math.max(...oks.map((r) => rankedById.get(r.call.tool)?.score ?? 0));
+  // Item 4a, a mixed batch ("add milk to the list and set a timer" with
+  // no length): the calls that ran are reported and the withheld one's
+  // question follows, the shape a package's own ask takes above (a
+  // review found the withheld call dropped silently here).
+  const ask = askForWithheld();
+  if (ask) {
+    return { reply: { text: `${replyText} ${ask.prompt}` }, source: "confirm", plugin_id: withheld[0]!.call.tool, safety, crisis_resources: crisisResources, conversation_id: conversationId, turn_id: turnId };
+  }
   return {
     reply: { text: replyText },
     source: "plugin",
@@ -2282,7 +2385,7 @@ async function runTurnHoldingLease(
     // one 8-argument call instead of repeating it, per that review's
     // own duplication finding.
     const resolveOffered = (calls: ToolCall[], ids: ReadonlySet<string>) =>
-      resolveToolCalls(calls, ids, prepared.ranked, actor, conversation.id, prepared.turnId, prepared.safety, prepared.crisisResources, prepared.turnContext.outcomes);
+      resolveToolCalls(calls, ids, prepared.ranked, actor, conversation.id, prepared.turnId, prepared.safety, prepared.crisisResources, prepared.turnContext.outcomes, text);
 
     if (offeringTools && completion.value.tool_calls && completion.value.tool_calls.length > 0) {
       const resolved = await resolveOffered(completion.value.tool_calls, offeredIds);
@@ -3094,7 +3197,7 @@ async function runTurnStreamHoldingLease(
     if (first.done) {
       const rawCalls = first.value ?? [];
       if (rawCalls.length > 0) {
-        const resolved = await resolveToolCalls(rawCalls, offeredIds, modelPrepared.ranked, actor, conversation.id, modelPrepared.turnId, modelPrepared.safety, modelPrepared.crisisResources, modelPrepared.turnContext.outcomes);
+        const resolved = await resolveToolCalls(rawCalls, offeredIds, modelPrepared.ranked, actor, conversation.id, modelPrepared.turnId, modelPrepared.safety, modelPrepared.crisisResources, modelPrepared.turnContext.outcomes, text);
         if (resolved) {
           // The package answered. Handed back whole, past both gates;
           // buildStreamResult()'s finalize() logs it and marks the turn

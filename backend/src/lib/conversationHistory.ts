@@ -327,6 +327,11 @@ export interface PendingAsk {
    * matcher; turnEngine.ts's own consumption is documented at its call
    * site since the shape genuinely doesn't say more than this. */
   expects?: string;
+  /** Item 4a: the argument the engine withheld and is asking for; the
+   * answer binds to it by name, whatever the manifest's required list
+   * says (a review: binding through the one-required-string rule
+   * discarded the answer for an optional argument). */
+  argName?: string;
 }
 
 export function getPendingAsk(conversationId: string): PendingAsk | null {
