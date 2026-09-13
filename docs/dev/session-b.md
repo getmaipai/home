@@ -1872,13 +1872,119 @@ capture with `serviceWorkers: "block"`, matching what a person's very
 first visit (before anything is precached yet) would actually
 experience.
 
-**Verified**: `bun test` in frontend, 556 passing across 86 files
-(`RouteSkeleton.test.tsx`, new: it announces `role="status"`/
-`aria-label="Loading"`, never a blank div); `bun run screenshots`, 136
-page/viewport/theme
-combinations, 0 accessibility violations, 0 overflow; Home, Chat, and
-Privacy (the lazy-loaded example) opened and read - all three show real
-content, no spinner or empty state; `lazy-route-skeleton.png` (new)
-opened and read - the shell (nav, the Privacy link highlighted active)
-renders immediately while the content pane shows three skeleton bars,
-never blank.
+**Found by code review, before this lane's commit, round 1**: six
+findings on the merged commit, five fixed. (1) A failed dynamic
+`import()` (a stale tab's own `index.html` pointing at a chunk hash a
+newer deploy already dropped) had nowhere to go but the top-level
+`ErrorBoundary`. (2) The one `Suspense` boundary around the whole
+routed tree sat above `SettingsPage`'s own `<Outlet/>`, so a cold load
+straight at a nested settings route (never visited yet, its own chunk
+not cached) would suspend the WHOLE content pane - rail, tab switcher,
+search box included - exactly the bug the 2026-09-06 nested-routing
+fix exists to prevent; only survived by react-router-dom's own
+undocumented-here reliance on `startTransition` keeping the previous
+paint up. Fixed with a second, nested `Suspense` around `SettingsPage`'s
+own `<Outlet/>`, so only the nested child's content shows
+`RouteSkeleton`, never the chrome around it. (3) `RouteSkeleton` and
+`AsyncState.tsx`'s own internal loading block were byte-for-byte
+identical markup, a second copy of the exact thing the org standard
+calls out - `AsyncState` now renders `<RouteSkeleton label={...} />`
+instead of its own copy. (4) `captureLazyRouteSkeleton()` sat in the
+default screenshot run's critical path with no error isolation - a
+renamed chunk or a slow CI margin would abort the entire matrix, not
+just this one shot. (5) `lazyNamed<P>`'s manual type argument couldn't
+catch a real component's props signature drifting out of sync with the
+lazy call site - 11 of the 15 now derive `P` via `ComponentProps<typeof
+RealComponent>` from a type-only import (erased at build, never a real
+eager import), so a future signature change is caught automatically;
+the remaining four (`NotificationsPage`, `DevicesPage`, `PeoplePage`,
+`PrivacyPage`) take no props at all and use `Record<string, never>`
+instead, since TypeScript infers `unknown`, not `{}`, from a truly
+zero-parameter function component (a documented inference quirk,
+confirmed against the installed `@types/react`). Not fixed, a
+deliberate scope decision: (6) no build-time guard against the entry
+chunk regrowing past 2 MiB again - the plan asked to lower the ceiling
+to the smallest value that holds today, not add size-regression
+tooling; a real guard (a `check.sh` assertion on `dist/assets/index-*
+.js`) is a reasonable follow-up but a different, un-asked-for piece of
+work.
+
+**Found by a second review pass, before this fix's own commit**: the
+first-pass fix for finding (1) above - a per-chunk `.catch()` in
+`lazyNamed()` reloading once via its own `sessionStorage` flag - was
+itself a real defect: `src/lib/pwaBoot.ts` already has
+`installStaleChunkRetry()`, wired up in `main.tsx`, listening for
+Vite's own `vite:preloadError` (fired for exactly this failure, any
+dynamic `import()` in the app, not just a lazy route's) and reloading
+against ONE shared, capped retry budget every other boot-resilience
+guard in this file already uses. `pwaBoot.ts`'s own header comment
+documents fixing this precise class of bug once already (2026-09-06:
+two uncoordinated per-guard caps let a single broken deploy compound
+to six reload cycles before they were unified into one shared budget).
+The new per-chunk flag was a second, uncapped, uncoordinated reload
+path for the identical failure - reintroducing the bug the shared
+budget exists to prevent, on top of its own two smaller defects (the
+flag is set but never cleared, so a second failure for the same route
+name skips its one documented retry; the real error is discarded on
+reload, so a genuine transient failure leaves no trace). Reverted
+entirely - `lazyNamed()` needs no chunk-load handling of its own, since
+`installStaleChunkRetry()` already covers every dynamic import in the
+app, lazy routes included. Also fixed: (2) `captureLazyRouteSkeleton()`'s
+try/catch only logged a failure, never affecting `main()`'s own
+`process.exit(1)` gate - a regression there would leave the script,
+and `check.sh`/CI with it, reporting green over a broken capture.
+`lazyRouteSkeletonError` (a variable outside the try, set only by that
+one catch) is checked alongside the existing accessibility/overflow
+gate, so the isolation still holds (the rest of the run keeps going)
+but a real failure still fails the script in the end.
+
+**Found by a third review pass, on the revert itself**: pointing at
+`installStaleChunkRetry()` as "already correct" wasn't quite true -
+reading Vite's own source (`handlePreloadError`) found it dispatches
+`vite:preloadError` as a *cancelable* event and re-throws the original
+rejection whenever nothing calls `preventDefault()` on it;
+`installStaleChunkRetry()` never did, so the failed `import()` still
+propagated to whichever `Suspense`/`ErrorBoundary` sat above it - a
+real crash-UI flash on the way to the reload this listener already had
+in flight regardless, for every dynamic import in the app, not
+something this lane introduced. Fixed with one line
+(`event.preventDefault()`) in the shared listener itself, benefiting
+every consumer rather than reopening the per-route duplicate this
+lane's own second pass just removed; a new regression test
+(`pwaBoot.test.ts`, "suppresses the original rejection so it never
+reaches an ErrorBoundary") fires a real `cancelable: true` event and
+asserts `defaultPrevented`. Also found: (3) the existing "navigating
+into a nested route" test in `SettingsPage.test.tsx` uses a plain,
+synchronous `<div>` for its nested route, so it never actually
+exercises the new nested `Suspense` boundary - added "a still-loading
+nested route shows RouteSkeleton without unmounting the rail or tab
+switcher," a real `lazy()` component with a manually-resolved promise,
+proving the rail and tab switcher stay mounted while it's pending and
+`RouteSkeleton` shows in their place; confirmed it fails (an infinite
+suspend, no fallback) with the nested boundary removed and passes with
+it restored. (4) The 13 type-only imports for `ComponentProps<typeof
+X>` duplicated each page's module path (once for the import, once
+inside `lazyNamed`'s own dynamic `import()`) - replaced with the
+inline form, `ComponentProps<typeof import("path")["Name"]>`, need no
+top-level import at all. (5) `lazyNamed<P extends object>` had no
+default, forcing the four no-prop pages to spell out `Record<string,
+never>` as a second convention alongside `ComponentProps<...>` -
+defaulted to `Record<string, never>` so those four routes need no type
+argument at all, matching how an untyped lazy component reads most
+naturally.
+
+**Verified**: `bun test` in frontend, 558 passing across 86 files
+(`RouteSkeleton.test.tsx` and the two new regression tests above);
+`bunx tsc --noEmit` and `eslint .` clean, re-run after all three review
+passes; `bun run screenshots`, 136 page/viewport/theme combinations, 0
+accessibility violations, 0 overflow, re-run after all three passes
+with the same clean result; Home, Chat, a Settings sub-page
+(`settings-backups`, proving the nested-Suspense fix keeps the
+rail/switcher/search mounted), and Privacy (the lazy-loaded example)
+opened and read - all show real content, no spinner or empty state;
+`lazy-route-skeleton.png` opened and read - the shell (nav, the Privacy
+link highlighted active) renders immediately while the content pane
+shows three skeleton bars, never blank; entry chunk re-measured after
+every pass, 1,891.92 kB (none of these fixes add real code to the
+bundle - a reverted duplicate, a one-line event fix, and type-only
+syntax that erases at build).

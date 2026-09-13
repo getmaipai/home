@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
-import { Skeleton } from "@/kit/ui/skeleton";
 import { Button } from "@/kit/ui/button";
 import { EmptyState } from "@/kit/primitives/EmptyState";
+import { RouteSkeleton } from "@/kit/primitives/RouteSkeleton";
 
 interface AsyncStateProps<T> {
   /** `undefined` means still loading, `null` means the fetch itself
@@ -52,13 +52,7 @@ export function AsyncState<T>({
   loadingLabel = "Loading",
   children,
 }: AsyncStateProps<T>) {
-  const loading = (
-    <div className="flex flex-col gap-3 p-4" role="status" aria-label={loadingLabel}>
-      <Skeleton className="h-12 w-full" />
-      <Skeleton className="h-12 w-full" />
-      <Skeleton className="h-12 w-3/4" />
-    </div>
-  );
+  const loading = <RouteSkeleton label={loadingLabel} />;
 
   // Checked before `error`: a query's `isError` stays true until a
   // retry actually settles, so without this a retry in flight looked

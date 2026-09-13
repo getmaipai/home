@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useState, type ComponentType } from "react";
+import { lazy, Suspense, useEffect, useState, type ComponentProps, type ComponentType } from "react";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { I18nProvider } from "@lingui/react";
@@ -20,7 +20,27 @@ import { api, type Roster } from "@/lib/api";
 // promise of `{ default }` - every page below is a named export, not a
 // default one, and repeating `.then((m) => ({ default: m.X }))` 15 times
 // inline would bury the one line that actually matters (which route).
-function lazyNamed<P extends object>(loader: () => Promise<Record<string, unknown>>, name: string) {
+// `P` defaults to "no props at all" so the four routes that really take
+// none (`NotificationsPage`, `DevicesPage`, `PeoplePage`, `PrivacyPage`)
+// need no type argument, rather than a second, separate convention
+// alongside the `ComponentProps<...>` calls below - a review, 2026-09-13.
+//
+// A failed chunk fetch (a stale tab's own index.html pointing at a
+// hash a newer deploy already dropped) needs no handling here: it
+// rejects as a plain `import()` failure, which Vite's own runtime
+// turns into a `vite:preloadError` on `window` - `src/lib/pwaBoot.ts`'s
+// `installStaleChunkRetry` (wired in `main.tsx`) already listens for
+// exactly that, reloading once against the SAME shared, capped retry
+// budget every other boot-resilience guard in this app uses. A review
+// (2026-09-13) first added a second, per-chunk reload path here before
+// finding that shared mechanism - reverted, since two uncoordinated
+// reload guards for the identical failure is the precise bug
+// `pwaBoot.ts`'s own header comment documents fixing once already
+// (2026-09-06, up to six reload cycles from two independent caps).
+function lazyNamed<P extends object = Record<string, never>>(
+  loader: () => Promise<Record<string, unknown>>,
+  name: string,
+) {
   return lazy(() => loader().then((m) => ({ default: m[name] as ComponentType<P> })));
 }
 
@@ -33,28 +53,72 @@ function lazyNamed<P extends object>(loader: () => Promise<Record<string, unknow
 // every time." The shell and the kit stay in the entry chunk too (they
 // render on every route, lazy-loading them would just delay the first
 // paint instead of shrinking it).
-const AppsPage = lazyNamed<{ person: Roster }>(() => import("@/apps/library/AppsPage"), "AppsPage");
-const SetupWizard = lazyNamed<{ onDone: () => void }>(() => import("@/apps/setup/SetupWizard"), "SetupWizard");
-const ConversationsPage = lazyNamed<{ person: Roster }>(
-  () => import("@/apps/conversations/ConversationsPage"),
-  "ConversationsPage",
+// `ComponentProps<typeof import("path")["Name"]>` - a type-only query,
+// erased at build, never a real eager import - derives each page's
+// props from its own real signature instead of a hand-typed copy that
+// could drift the moment that signature changes without this call site
+// changing to match (a review, 2026-09-13, found the hand-typed version
+// wouldn't have caught exactly that drift for any of these 15). Left
+// off entirely for the four pages that take no props at all
+// (`NotificationsPage`, `DevicesPage`, `PeoplePage`, `PrivacyPage`):
+// TypeScript infers `unknown`, not `{}`, from a truly zero-parameter
+// function component's `ComponentProps` (a documented inference quirk),
+// so `lazyNamed`'s own default (`Record<string, never>`, "no props")
+// covers them instead.
+const AppsPage = lazyNamed<ComponentProps<typeof import("@/apps/library/AppsPage")["AppsPage"]>>(
+  () => import("@/apps/library/AppsPage"),
+  "AppsPage",
 );
+const SetupWizard = lazyNamed<ComponentProps<typeof import("@/apps/setup/SetupWizard")["SetupWizard"]>>(
+  () => import("@/apps/setup/SetupWizard"),
+  "SetupWizard",
+);
+const ConversationsPage = lazyNamed<
+  ComponentProps<typeof import("@/apps/conversations/ConversationsPage")["ConversationsPage"]>
+>(() => import("@/apps/conversations/ConversationsPage"), "ConversationsPage");
 const NotificationsPage = lazyNamed(() => import("@/apps/notifications/NotificationsPage"), "NotificationsPage");
-const SearchPage = lazyNamed<{ person: Roster }>(() => import("@/apps/search/SearchPage"), "SearchPage");
-const SettingsPage = lazyNamed<{ person: Roster; onPersonChange: () => void }>(
+const SearchPage = lazyNamed<ComponentProps<typeof import("@/apps/search/SearchPage")["SearchPage"]>>(
+  () => import("@/apps/search/SearchPage"),
+  "SearchPage",
+);
+const SettingsPage = lazyNamed<ComponentProps<typeof import("@/apps/settings/SettingsPage")["SettingsPage"]>>(
   () => import("@/apps/settings/SettingsPage"),
   "SettingsPage",
 );
-const ModelsPage = lazyNamed<{ person: Roster }>(() => import("@/apps/settings/ModelsPage"), "ModelsPage");
-const BackupsPage = lazyNamed<{ person: Roster }>(() => import("@/apps/settings/BackupsPage"), "BackupsPage");
-const VoicesPage = lazyNamed<{ person: Roster }>(() => import("@/apps/settings/VoicesPage"), "VoicesPage");
-const CommandsPage = lazyNamed<{ person: Roster }>(() => import("@/apps/settings/CommandsPage"), "CommandsPage");
-const RepairsPage = lazyNamed<{ person: Roster }>(() => import("@/apps/settings/RepairsPage"), "RepairsPage");
-const HealthSection = lazyNamed<{ person: Roster }>(() => import("@/apps/settings/HealthSection"), "HealthSection");
-const UsersPage = lazyNamed<{ person: Roster }>(() => import("@/apps/settings/UsersPage"), "UsersPage");
+const ModelsPage = lazyNamed<ComponentProps<typeof import("@/apps/settings/ModelsPage")["ModelsPage"]>>(
+  () => import("@/apps/settings/ModelsPage"),
+  "ModelsPage",
+);
+const BackupsPage = lazyNamed<ComponentProps<typeof import("@/apps/settings/BackupsPage")["BackupsPage"]>>(
+  () => import("@/apps/settings/BackupsPage"),
+  "BackupsPage",
+);
+const VoicesPage = lazyNamed<ComponentProps<typeof import("@/apps/settings/VoicesPage")["VoicesPage"]>>(
+  () => import("@/apps/settings/VoicesPage"),
+  "VoicesPage",
+);
+const CommandsPage = lazyNamed<ComponentProps<typeof import("@/apps/settings/CommandsPage")["CommandsPage"]>>(
+  () => import("@/apps/settings/CommandsPage"),
+  "CommandsPage",
+);
+const RepairsPage = lazyNamed<ComponentProps<typeof import("@/apps/settings/RepairsPage")["RepairsPage"]>>(
+  () => import("@/apps/settings/RepairsPage"),
+  "RepairsPage",
+);
+const HealthSection = lazyNamed<ComponentProps<typeof import("@/apps/settings/HealthSection")["HealthSection"]>>(
+  () => import("@/apps/settings/HealthSection"),
+  "HealthSection",
+);
+const UsersPage = lazyNamed<ComponentProps<typeof import("@/apps/settings/UsersPage")["UsersPage"]>>(
+  () => import("@/apps/settings/UsersPage"),
+  "UsersPage",
+);
 const DevicesPage = lazyNamed(() => import("@/apps/settings/DevicesPage"), "DevicesPage");
 const PeoplePage = lazyNamed(() => import("@/apps/people/PeoplePage"), "PeoplePage");
-const MemoryPage = lazyNamed<{ person: Roster }>(() => import("@/apps/memory/MemoryPage"), "MemoryPage");
+const MemoryPage = lazyNamed<ComponentProps<typeof import("@/apps/memory/MemoryPage")["MemoryPage"]>>(
+  () => import("@/apps/memory/MemoryPage"),
+  "MemoryPage",
+);
 const PrivacyPage = lazyNamed(() => import("@/apps/privacy/PrivacyPage"), "PrivacyPage");
 
 // One QueryClient for the app's lifetime (docs/plans/session-b-ui.md

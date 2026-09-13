@@ -58,8 +58,16 @@ function clearRetryCount(storage: Storage, key: string): void {
  * running again - it runs again on every reload, including the ones this
  * exact cap exists to eventually stop. */
 export function installStaleChunkRetry(win: Window, storage: Storage): void {
-  win.addEventListener("vite:preloadError", () => {
+  win.addEventListener("vite:preloadError", (event) => {
     if (getRetryCount(storage, RETRY_KEY) >= MAX_BOOT_RETRIES) return;
+    // Vite's own dispatcher (`handlePreloadError`) re-throws the
+    // original rejection whenever nothing calls `preventDefault()` on
+    // this cancelable event - found live (lane 10 item 2's own review,
+    // 2026-09-13) reading Vite's source: without this, the failed
+    // `import()` still propagates to whichever Suspense boundary/
+    // ErrorBoundary is above it, a real crash-UI flash on the way to a
+    // reload this listener already has in flight regardless.
+    event.preventDefault();
     bumpRetryCount(storage, RETRY_KEY);
     win.location.reload();
   });

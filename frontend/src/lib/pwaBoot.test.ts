@@ -40,6 +40,28 @@ describe("installStaleChunkRetry", () => {
     expect(getRetryCount(storage, "maipai:reload-retry-count")).toBe(1);
   });
 
+  // Found by review (lane 10 item 2, 2026-09-13, reading Vite's own
+  // source): `handlePreloadError` re-throws the original rejection
+  // whenever nothing calls `preventDefault()` on this cancelable event,
+  // so a stale-chunk import still crashed to the nearest ErrorBoundary
+  // on its way to the reload this listener already schedules.
+  test("suppresses the original rejection so it never reaches an ErrorBoundary", () => {
+    const storage = fakeStorage();
+    const listeners = new Map<string, EventListener[]>();
+    const win = {
+      addEventListener: (type: string, fn: EventListener) => {
+        listeners.set(type, [...(listeners.get(type) ?? []), fn]);
+      },
+      location: { reload: () => {} },
+    } as unknown as Window;
+
+    installStaleChunkRetry(win, storage);
+    const event = new Event("vite:preloadError", { cancelable: true });
+    for (const fn of listeners.get("vite:preloadError") ?? []) fn(event);
+
+    expect(event.defaultPrevented).toBe(true);
+  });
+
   test("stops retrying past the cap instead of reloading forever", () => {
     const storage = fakeStorage();
     storage.setItem("maipai:reload-retry-count", "3");

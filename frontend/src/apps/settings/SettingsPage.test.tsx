@@ -1,4 +1,5 @@
 import { describe, expect, test, mock, afterEach } from "bun:test";
+import { lazy, type ReactElement } from "react";
 import { cleanup, waitFor, fireEvent } from "@testing-library/react";
 import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
 import { SettingsPage } from "@/apps/settings/SettingsPage";
@@ -634,6 +635,67 @@ describe("SettingsPage nested routes keep the shell mounted", () => {
       expect(await findByRole("button", { name: "Household" })).toBeTruthy();
       // Subpages offer a working way back instead of a disabled search.
       expect(await findByRole("link", { name: "← All household settings" })).toHaveAttribute("href", "/settings?tab=household");
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+  });
+
+  // Lane 10 item 2's own review (2026-09-13): the test above uses a
+  // plain, synchronous <div> for the nested route, which never suspends
+  // - it would pass identically with or without SettingsPage's own
+  // nested <Suspense> boundary around <Outlet/>. A real lazy() component
+  // is what actually exercises it: without that boundary (or with the
+  // single outer one from App.tsx instead), a still-pending nested
+  // route blanks this whole pane, rail and tab switcher included -
+  // exactly the bug the 2026-09-06 fix above exists to prevent.
+  test("a still-loading nested route shows RouteSkeleton without unmounting the rail or tab switcher", async () => {
+    const person = makePerson("owner");
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = mock((input: RequestInfo | URL) => {
+      const url = typeof input === "string" ? input : input.toString();
+      if (url.includes("/api/settings/registry")) {
+        return Promise.resolve(new Response(JSON.stringify(REGISTRY), { status: 200 }));
+      }
+      if (url.includes("/api/settings?scope=")) {
+        return Promise.resolve(
+          new Response(JSON.stringify([resolved("household.locale", "en-US", "Language and region")]), {
+            status: 200,
+          }),
+        );
+      }
+      return Promise.reject(new Error(`unstubbed fetch: ${url}`));
+    }) as unknown as typeof fetch;
+
+    let resolveImport: (() => void) | undefined;
+    const LazyModels = lazy(
+      () =>
+        new Promise<{ default: () => ReactElement }>((resolve) => {
+          resolveImport = () => resolve({ default: () => <div>Real AI models content</div> });
+        }),
+    );
+
+    try {
+      const { findByRole, findByText, queryByRole } = renderWithQueryClient(
+        <MemoryRouter initialEntries={["/settings"]}>
+          <Routes>
+            <Route path="/settings" element={<SettingsPage person={person} onPersonChange={() => {}} />}>
+              <Route path="models" element={<LazyModels />} />
+            </Route>
+          </Routes>
+        </MemoryRouter>,
+      );
+
+      await findByText("Language and region");
+      fireEvent.click(await findByRole("button", { name: "AI models" }));
+
+      await findByRole("status", { name: "Loading" });
+      // The whole point: still mounted while the nested chunk is pending.
+      expect(await findByRole("button", { name: "AI models" })).toBeTruthy();
+      expect(await findByRole("button", { name: "Household" })).toBeTruthy();
+
+      resolveImport?.();
+      await findByText("Real AI models content");
+      expect(queryByRole("status", { name: "Loading" })).toBeNull();
     } finally {
       globalThis.fetch = originalFetch;
     }

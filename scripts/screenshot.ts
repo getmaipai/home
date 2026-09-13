@@ -1064,6 +1064,12 @@ async function main() {
   // behind on any error after launch (a slow render, a selector that
   // never appears).
   let browser: Browser | undefined;
+  // Set only by `captureLazyRouteSkeleton`'s own catch below - isolated
+  // from aborting the rest of this run, but still checked before this
+  // function returns, so a real regression there still fails the script
+  // (and check.sh/CI with it) instead of only printing a line no one is
+  // watching for.
+  let lazyRouteSkeletonError: unknown;
   try {
     await waitForHealth();
     const sessionValue = await seedHousehold();
@@ -1077,7 +1083,21 @@ async function main() {
       const desktop = VIEWPORTS.find((v) => v.slug === "desktop")!;
       await capturePaletteOpen(browser, sessionValue, phone, "dark");
       await capturePaletteOpen(browser, sessionValue, desktop, "light");
-      await captureLazyRouteSkeleton(browser, sessionValue);
+      // Isolated, unlike the captures above: it hardcodes one chunk's own
+      // hashed-filename prefix and races a fixed delay against a fixed
+      // timeout, both of which are more likely to need adjusting after an
+      // unrelated refactor (the chunk gets renamed or merged, or CI is
+      // just slower) than the palette/hero captures are. A failure here
+      // must not take the rest of this run's screenshots down with it,
+      // but still has to fail the script in the end (recorded in
+      // `lazyRouteSkeletonError`, checked below) - a silent console line
+      // no exit code backs up is not "flagging loudly."
+      try {
+        await captureLazyRouteSkeleton(browser, sessionValue);
+      } catch (error) {
+        console.error("captureLazyRouteSkeleton failed:", error);
+        lazyRouteSkeletonError = error;
+      }
     }
 
     const combos = a11yOnly || settingsReview || chatReview
@@ -1188,6 +1208,7 @@ async function main() {
       }
       throw new Error("accessibility or overflow check failed");
     }
+    if (lazyRouteSkeletonError !== undefined) throw lazyRouteSkeletonError;
 
     console.log(`\n${results.length} page(s) checked, 0 violations, 0 overflow, reduced motion and keyboard-trap checks passed.`);
     if (!a11yOnly) {

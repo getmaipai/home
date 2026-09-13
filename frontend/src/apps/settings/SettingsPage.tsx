@@ -1,8 +1,9 @@
 import { Select } from "@/kit/primitives/Select";
 import { getIcon } from "@/kit/icons";
-import { useEffect, useRef, useState, Fragment, type ReactNode } from "react";
+import { useEffect, useRef, useState, Fragment, Suspense, type ReactNode } from "react";
 import { Link, Outlet, useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { Page } from "@/kit/primitives/Page";
+import { RouteSkeleton } from "@/kit/primitives/RouteSkeleton";
 import { SettingsRenderer } from "@/kit/settings/SettingsRenderer";
 import { Input } from "@/kit/ui/input";
 import { Button } from "@/kit/ui/button";
@@ -351,8 +352,18 @@ export function SettingsPage({ person, onPersonChange }: SettingsPageProps) {
               {!isDefaultRoute ? (
                 // Models/Backups/Voices/Commands (App.tsx's nested routes) -
                 // rendered right here so the rail/tab switcher/search above
-                // stay mounted instead of the whole page unmounting.
-                <Outlet />
+                // stay mounted instead of the whole page unmounting. Its own
+                // Suspense boundary (lane 10 item 2): each nested page is
+                // ALSO lazy-loaded, and without this the shared boundary in
+                // App.tsx (above this whole component) would catch a
+                // still-loading nested chunk and blank this rail/switcher/
+                // search too, exactly what this comment's own 2026-09-06 fix
+                // exists to prevent - scoping the fallback here instead
+                // keeps them mounted, only the nested content shows
+                // RouteSkeleton while its own chunk loads.
+                <Suspense fallback={<RouteSkeleton />}>
+                  <Outlet />
+                </Suspense>
               ) : tab === "household" ? (
                 <>
                   <SettingsRenderer scope="household" scopeValue="household" filter={search} />
