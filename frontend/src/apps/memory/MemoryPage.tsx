@@ -7,6 +7,7 @@ import { AsyncState } from "@/kit/primitives/AsyncState";
 import { Select } from "@/kit/primitives/Select";
 import { DestructiveConfirm } from "@/kit/primitives/DestructiveConfirm";
 import { BatchBar, SelectModeToggle } from "@/kit/primitives/BatchBar";
+import { useSelectMode } from "@/kit/hooks/useSelectMode";
 import { Checkbox } from "@/kit/ui/checkbox";
 import { Button } from "@/kit/ui/button";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/kit/ui/tabs";
@@ -250,26 +251,15 @@ function OwnMemories({ filterIds }: { filterIds: Set<string> | null }) {
   const all = query.data ?? [];
   const records = filterIds ? all.filter((m) => filterIds.has(m.id)) : all;
 
-  const [selectMode, setSelectMode] = useState(false);
-  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const selectMode = useSelectMode(records.map((m) => m.id));
   const [confirmingForget, setConfirmingForget] = useState<"batch" | "clear" | null>(null);
   const [busy, setBusy] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
   const [archivingId, setArchivingId] = useState<string | null>(null);
 
   function leaveSelectMode() {
-    setSelectMode(false);
-    setSelected(new Set());
+    selectMode.exit();
     setConfirmingForget(null);
-  }
-
-  function toggle(id: string) {
-    setSelected((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
   }
 
   async function forgetIds(ids: string[]) {
@@ -312,16 +302,16 @@ function OwnMemories({ filterIds }: { filterIds: Set<string> | null }) {
 
       {!filterIds ? (
         <div className="flex flex-wrap items-center gap-2">
-          {selectMode ? (
-            <BatchBar count={selected.size} onExit={leaveSelectMode}>
-              <Button variant="destructive" disabled={selected.size === 0} onClick={() => setConfirmingForget("batch")}>
+          {selectMode.active ? (
+            <BatchBar count={selectMode.count} onExit={leaveSelectMode}>
+              <Button variant="destructive" disabled={selectMode.count === 0} onClick={() => setConfirmingForget("batch")}>
                 Forget selected
               </Button>
             </BatchBar>
           ) : (
-            <SelectModeToggle label="Select memories" onClick={() => setSelectMode(true)} />
+            <SelectModeToggle label="Select memories" onClick={selectMode.enter} />
           )}
-          {!selectMode ? (
+          {!selectMode.active ? (
             <Button variant="ghost" disabled={all.length === 0} onClick={() => setConfirmingForget("clear")}>
               Clear all
             </Button>
@@ -331,11 +321,11 @@ function OwnMemories({ filterIds }: { filterIds: Set<string> | null }) {
 
       {confirmingForget === "batch" ? (
         <DestructiveConfirm
-          message={`Forget ${selected.size} ${selected.size === 1 ? "memory" : "memories"}? This cannot be undone.`}
-          confirmLabel={`Yes, forget ${selected.size}`}
+          message={`Forget ${selectMode.count} ${selectMode.count === 1 ? "memory" : "memories"}? This cannot be undone.`}
+          confirmLabel={`Yes, forget ${selectMode.count}`}
           busyLabel="Forgetting…"
           busy={busy}
-          onConfirm={() => forgetIds([...selected])}
+          onConfirm={() => forgetIds([...selectMode.selected])}
           onCancel={() => setConfirmingForget(null)}
           cancelLabel="Keep them"
         />
@@ -367,9 +357,9 @@ function OwnMemories({ filterIds }: { filterIds: Set<string> | null }) {
         {() => (
           <MemoryRows
             records={records}
-            selectMode={selectMode}
-            selected={selected}
-            onToggle={toggle}
+            selectMode={selectMode.active}
+            selected={selectMode.selected}
+            onToggle={selectMode.toggle}
             onArchive={handleArchive}
             archivingId={archivingId}
           />

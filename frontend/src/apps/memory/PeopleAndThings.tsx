@@ -5,6 +5,7 @@ import { AsyncState } from "@/kit/primitives/AsyncState";
 import { Select } from "@/kit/primitives/Select";
 import { DestructiveConfirm } from "@/kit/primitives/DestructiveConfirm";
 import { BatchBar, SelectModeToggle } from "@/kit/primitives/BatchBar";
+import { useSelectMode } from "@/kit/hooks/useSelectMode";
 import { Checkbox } from "@/kit/ui/checkbox";
 import { Button } from "@/kit/ui/button";
 import { Input } from "@/kit/ui/input";
@@ -272,8 +273,7 @@ export function PeopleAndThings({ actorRole }: { actorRole: Role }) {
   const people = peopleQuery.data ?? [];
   const entityById = useMemo(() => new Map(entities.map((e) => [e.id, e])), [entities]);
 
-  const [selectMode, setSelectMode] = useState(false);
-  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const selectMode = useSelectMode(entities.map((e) => e.id));
   const [confirmingDelete, setConfirmingDelete] = useState<{ kind: "one"; id: string; name: string } | { kind: "batch" } | null>(null);
   const [busy, setBusy] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
@@ -311,18 +311,8 @@ export function PeopleAndThings({ actorRole }: { actorRole: Role }) {
   }
 
   function leaveSelectMode() {
-    setSelectMode(false);
-    setSelected(new Set());
+    selectMode.exit();
     setConfirmingDelete(null);
-  }
-
-  function toggleSelected(id: string) {
-    setSelected((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
   }
 
   async function deleteEntities(ids: string[]) {
@@ -492,15 +482,15 @@ export function PeopleAndThings({ actorRole }: { actorRole: Role }) {
       {actionError ? <p className="text-base text-destructive">{actionError}</p> : null}
 
       <div className="flex flex-wrap items-center gap-2">
-        {selectMode ? (
-          <BatchBar count={selected.size} onExit={leaveSelectMode}>
-            <Button variant="destructive" disabled={selected.size === 0} onClick={() => setConfirmingDelete({ kind: "batch" })}>
+        {selectMode.active ? (
+          <BatchBar count={selectMode.count} onExit={leaveSelectMode}>
+            <Button variant="destructive" disabled={selectMode.count === 0} onClick={() => setConfirmingDelete({ kind: "batch" })}>
               Remove selected
             </Button>
           </BatchBar>
         ) : (
           <>
-            <SelectModeToggle label="Select" onClick={() => setSelectMode(true)} />
+            <SelectModeToggle label="Select" onClick={selectMode.enter} />
             <Button variant="secondary" onClick={() => setCreating((v) => !v)}>
               {creating ? "Cancel" : "Add"}
             </Button>
@@ -567,11 +557,11 @@ export function PeopleAndThings({ actorRole }: { actorRole: Role }) {
 
       {confirmingDelete?.kind === "batch" ? (
         <DestructiveConfirm
-          message={`Remove ${selected.size} ${selected.size === 1 ? "entry" : "entries"}? This cannot be undone.`}
-          confirmLabel={`Yes, remove ${selected.size}`}
+          message={`Remove ${selectMode.count} ${selectMode.count === 1 ? "entry" : "entries"}? This cannot be undone.`}
+          confirmLabel={`Yes, remove ${selectMode.count}`}
           busyLabel="Removing…"
           busy={busy}
-          onConfirm={() => deleteEntities([...selected])}
+          onConfirm={() => deleteEntities([...selectMode.selected])}
           onCancel={() => setConfirmingDelete(null)}
           cancelLabel="Keep them"
         />
@@ -599,8 +589,8 @@ export function PeopleAndThings({ actorRole }: { actorRole: Role }) {
                   label={KIND_GROUP_LABEL[kind]}
                   renderItem={(e) => (
                     <div className="flex min-w-0 flex-1 items-center gap-3">
-                      {selectMode ? (
-                        <Checkbox checked={selected.has(e.id)} onCheckedChange={() => toggleSelected(e.id)} aria-label={`Select ${e.name}`} className="shrink-0" />
+                      {selectMode.active ? (
+                        <Checkbox checked={selectMode.isSelected(e.id)} onCheckedChange={() => selectMode.toggle(e.id)} aria-label={`Select ${e.name}`} className="shrink-0" />
                       ) : null}
                       <EntityRow
                         entity={e}
@@ -623,7 +613,7 @@ export function PeopleAndThings({ actorRole }: { actorRole: Role }) {
                     </div>
                   )}
                   renderAction={
-                    selectMode
+                    selectMode.active
                       ? undefined
                       : (e) => (
                           <Button

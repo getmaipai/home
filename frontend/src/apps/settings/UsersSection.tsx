@@ -9,6 +9,7 @@ import { Select } from "@/kit/primitives/Select";
 import { Button } from "@/kit/ui/button";
 import { Checkbox } from "@/kit/ui/checkbox";
 import { BatchBar, SelectModeToggle } from "@/kit/primitives/BatchBar";
+import { useSelectMode } from "@/kit/hooks/useSelectMode";
 import { api, ApiError, type PersonRosterEntry, type Role, type Roster } from "@/lib/api";
 import { ROLE_LABELS, canDeletePerson, canManagePerson, creatableRoles, requiresSecret } from "@/apps/people/roles";
 
@@ -50,8 +51,6 @@ export function UsersSection({ person }: UsersSectionProps) {
   const [editName, setEditName] = useState("");
   const [editRole, setEditRole] = useState<Role>("adult");
 
-  const [selectMode, setSelectMode] = useState(false);
-  const [selected, setSelected] = useState<Set<string>>(new Set());
   const [confirmingDelete, setConfirmingDelete] = useState<"batch" | string | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -69,18 +68,10 @@ export function UsersSection({ person }: UsersSectionProps) {
     canDeletePerson(actorRole, person.id, { id: p.id, role: p.role as Role }),
   );
 
-  function toggle(id: string) {
-    setSelected((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-  }
+  const selectMode = useSelectMode(deletable.map((p) => p.id));
 
   function leaveSelectMode() {
-    setSelectMode(false);
-    setSelected(new Set());
+    selectMode.exit();
     setConfirmingDelete(null);
   }
 
@@ -143,7 +134,7 @@ export function UsersSection({ person }: UsersSectionProps) {
     setBusy(true);
     setActionError(null);
     try {
-      const { outcomes } = await api.deletePeople([...selected]);
+      const { outcomes } = await api.deletePeople([...selectMode.selected]);
       // Partial success is reported, never swallowed (docs/UI.md > Batch
       // actions): four of five removed and one refused has to say which
       // and why, or a parent is left guessing what happened.
@@ -176,25 +167,25 @@ export function UsersSection({ person }: UsersSectionProps) {
         {(loadedRoster) => (
         <Section heading="Users">
           {deletable.length > 0 ? (
-            selectMode ? (
-              <BatchBar count={selected.size} onExit={leaveSelectMode}>
+            selectMode.active ? (
+              <BatchBar count={selectMode.count} onExit={leaveSelectMode}>
                 <Button
                   variant="destructive"
-                  disabled={selected.size === 0}
+                  disabled={selectMode.count === 0}
                   onClick={() => setConfirmingDelete("batch")}
                 >
                   Remove selected
                 </Button>
               </BatchBar>
             ) : (
-              <SelectModeToggle label="Select people" onClick={() => setSelectMode(true)} />
+              <SelectModeToggle label="Select people" onClick={selectMode.enter} />
             )
           ) : null}
 
           {confirmingDelete === "batch" ? (
             <div className="flex flex-col gap-2 rounded-[var(--radius)] border border-[var(--destructive)] p-3">
               <p className="text-base font-medium">
-                Remove {selected.size} {selected.size === 1 ? "person" : "people"} from your household?
+                Remove {selectMode.count} {selectMode.count === 1 ? "person" : "people"} from your household?
               </p>
               <p className="text-base text-[var(--muted-foreground)]">
                 Everything MaiPai remembers about them, every conversation they had, their settings and any voice
@@ -202,7 +193,7 @@ export function UsersSection({ person }: UsersSectionProps) {
               </p>
               <div className="flex flex-wrap gap-2">
                 <Button variant="destructive" onClick={handleDeleteSelected} disabled={busy}>
-                  {busy ? "Removing…" : `Yes, remove ${selected.size}`}
+                  {busy ? "Removing…" : `Yes, remove ${selectMode.count}`}
                 </Button>
                 <Button variant="secondary" onClick={() => setConfirmingDelete(null)}>
                   Keep them
@@ -250,7 +241,7 @@ export function UsersSection({ person }: UsersSectionProps) {
               }
               return (
                 <div className="flex min-w-0 flex-1 items-center gap-3">
-                  {selectMode && canDeletePerson(actorRole, person.id, { id: p.id, role: p.role as Role }) ? (
+                  {selectMode.active && canDeletePerson(actorRole, person.id, { id: p.id, role: p.role as Role }) ? (
                     // The box stays its designed 16px; `kit/ui/checkbox.tsx`
                     // already carries its own 48px hit area (docs/UI.md's
                     // floor - the fix a code review (2026-09-05) applied
@@ -258,8 +249,8 @@ export function UsersSection({ person }: UsersSectionProps) {
                     // no wrapping div is needed to reach it (a second code
                     // review, same night, caught one left behind here).
                     <Checkbox
-                      checked={selected.has(p.id)}
-                      onCheckedChange={() => toggle(p.id)}
+                      checked={selectMode.isSelected(p.id)}
+                      onCheckedChange={() => selectMode.toggle(p.id)}
                       aria-label={`Select ${p.display_name}`}
                       className="shrink-0"
                     />
@@ -297,7 +288,7 @@ export function UsersSection({ person }: UsersSectionProps) {
                   </div>
                 );
               }
-              if (selectMode) return null;
+              if (selectMode.active) return null;
               const mayEdit = canManagePerson(actorRole, person.id, { id: p.id, role: p.role as Role });
               const mayDelete = canDeletePerson(actorRole, person.id, { id: p.id, role: p.role as Role });
               if (!mayEdit && !mayDelete) return null;
