@@ -4525,3 +4525,72 @@ with the note and its good reply standing, the streaming regeneration
 with the tail cut on the wire, the request narration unchanged), and
 the two CHAT-04 tests that asserted the old behavior on a statement
 ("Got it, noted.", "I saved that.") now assert this one.
+
+**The seeded set** (2026-09-14, after 6b5a5e9; the 8B chat engine, the
+4B judge, seed 20260913, three runs; logs `bench-reg01-set1-seed-
+{a,b,c}.log`). Scored turns 184, 182 and 185 of 242 against ACT-01's
+167, 169 and 168 of 239: the register scrub landed on 33 to 36 turns
+per run (every "You're welcome" followed by "let me know if you need
+anything else" after a thank-you became the close alone, the
+act-register rows'
+closers went, the coworker-likes-seltzer and personalization rows
+passed), `repeat_question` on four or five, the statement-turn skip on
+seven to nine `unsupported_action` hits, and one malformed line per run
+where the retry drew the same claim ("Rover's vet appointment is on
+Monday" answered twice with "Got it, added to the list", the 8B's
+claim, no list narration spoken). Fixed against ACT-01's set in every
+run: correction-then-recall turn 1, household-location turn 2,
+personalization turn 1, polite-command turn 1, act-register-requests
+turn 1, act-memory-eligibility turn 4, the act-memory-stance rows'
+redaction check. Newly failing, each read: `pending-ask-who` turn 2 in
+every run, the 4B on "she's my sister" naming the subject "she" and the
+registry gaining a person called she (the judge's own defect, fixed
+below: a pronoun or a bare relation word is never a subject name, the
+fact dropped whole); `prior-reply-grounding` turn 5 in every run and
+`polite-command` turn 2 in two, the 8B parroting the window's bracketed
+rendering of an earlier reply, the `placeholder_echo` guard's class
+(CHAT-16's rendering); `copied-line-history` turn 3 once, a thank-you
+answered "You're welcome" plus "happy to help" (an em dash between,
+no spaces) that the register rule
+emptied and the retry emptied again (fixed below: a closing's or a
+greeting's first sentence is the reciprocal move and stands);
+`statement-not-request` turns 1 and 2 once, "You've got it, added to
+the list" (a status claim behind a longer acknowledgment the claim
+regex did not read, fixed below) and an ask-back caught by the row's
+own too-broad "anything else" (the row names the register lines now);
+`edit-then-recall` turn 1 once and `correction-then-recall` turn 3
+once, the 8B's claim and its correction miss, known classes;
+`act-memory-state` turn 3 once, MEM-06's. Also seen in the logs: a
+register lead cut to a one-word addressee ("I'm here if you need
+anything, kiddo." became "Kiddo."), fixed below.
+
+**The follow-up.** Guard refinements: the claim regexes' opening
+acknowledgment set gains "you've got it", "sure thing", "will do", "no
+problem"; a closing's or a greeting's first sentence in a reciprocal
+form ("You're welcome", "No problem, happy to help", "Good morning") is
+the reciprocal move and stands, what follows it still scrubbed, and a
+first sentence that is not one ("I'm still learning", "How can I help
+you today?") is register as anywhere; a register lead whose rest is
+only an addressee, capitalized or a term of address ("kiddo",
+"buddy"), leaves the sentence to the sentence rule, which strips the
+same addressees; an en or em dash, spaced or not, separates a tail;
+"I'm here if you need ..." consumes its object, "I'm here to help you
+plan the carpool" keeps its content. The judge drops a fact whose
+subject or relation name is a pronoun, or a bare relation word the
+household knows nobody by ("Mom" as a nickname stays a name;
+`subjectNotAName()`), with tests. The outside review of this
+follow-up caught the nickname case and the exemption's width. The partial
+rerun (ten conversations, three runs, logs `bench-reg01-rerun-seed-
+{a,b,c}.log`): `statement-not-request` turn 1 passes in every run
+("Quill's probably gonna miss the sourdough. You sure you don't wanna
+try one last loaf?", the design's effect), turn 3 in every run, turn 2
+in one, the other two on "I'm here if you need a hand or a chat" (the
+register with an object, which the phrase now consumes to the clause's
+end, so the tail is cut); the registry gained no pronoun (the judge's
+line "dropped a fact whose subject 'she' is a pronoun" in two runs);
+"You're welcome" joined by an unspaced em dash to "let me know if you
+need anything else" stood whole on
+a thank-you (an unspaced em dash was not a separator; it is now, so
+the close stands alone). The other misses are the known classes (the
+window's bracketed rendering parroted, `placeholder_echo`; the
+personalization recall; ASK-01's and ACT-03's rows).

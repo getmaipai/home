@@ -890,6 +890,19 @@ describe("ACT-01: the judge's queue is keyed on the stored signal", () => {
     expect(JSON.stringify(turnSignalOf(row))).not.toContain("Quill");
   });
 
+  test("a fact whose subject is a pronoun or a relation word is dropped whole: no record, no entity named she (REG-01's set)", async () => {
+    const { actor } = await owner();
+    const turn = makeTurn(actor, "she's my sister", "Got it, so she's your sister.");
+    const result = await withScriptedJudge(
+      () => ({ facts: [{ text: "Marlow's sister is named she", category: "relationship", scope: "person", importance: 0.6, subject: { name: "she", kind: "person" } }] }),
+      async () => judgeTurn(turn),
+    );
+    expect(result).toEqual({ ok: true, factsWritten: 0 });
+    const { entities } = await import("@/db/schema");
+    expect(db.select({ name: entities.name }).from(entities).all().map((e) => e.name.toLowerCase())).not.toContain("she");
+    expect(db.select().from(memoryRecords).where(eq(memoryRecords.source, turn.id)).all()).toEqual([]);
+  });
+
   test("on read, a signal with no eligible clause skips the turn even if its status was cleared", async () => {
     const { actor } = await owner();
     const closing = makeSignalledTurn(actor, "thanks, that's all for tonight", "Good night.", "model");

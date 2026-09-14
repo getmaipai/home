@@ -959,6 +959,30 @@ describe("REG-01: a statement is not a request, and the assistant register is st
     expect(stripRegisterTail("Hope that helps, Sage!", ctx({ utterance: "what's the capital of Portugal", act: "question" }))).toBe("Hope that helps, Sage!");
     expect(guardReply("Lisbon. Hope that helps, Sage!", ctx({ utterance: "what's the capital of Portugal", act: "question" })).reply).toBe("Lisbon.");
     expect(stripRegisterTail("Sounds fun - let me know if you need anything else.", stated())).toBe("Sounds fun.");
+    // The set's cases: a one-word rest is an addressee; a thank-you's
+    // reciprocal close stands whole and what follows it is scrubbed; a
+    // status claim behind a longer acknowledgment is a claim.
+    expect(stripRegisterTail("I'm here if you need anything, kiddo.", ctx({ utterance: "okay", act: "backchannel" }))).toBe("I'm here if you need anything, kiddo.");
+    const thanks = ctx({ utterance: "thanks", act: "closing" });
+    expect(guardReply("You're welcome—happy to help!", thanks)).toMatchObject({ reason: "assistant_register", replaced: false, reply: "You're welcome." }); // the tail cut; the close itself stands
+    expect(guardReply("Happy to help!", thanks)).toMatchObject({ reason: null, reply: "Happy to help!" });
+    // The review's cases: only a reciprocal form stands first on a close
+    // or a greeting; a lowercase addressee is not content; "I'm here to
+    // help you plan the carpool" is content; "As an AI, I can't." keeps
+    // its answer.
+    expect(guardReply("I'm still learning!", thanks).reason).toBe("assistant_register");
+    expect(guardReply("How can I help you today?", ctx({ utterance: "hi", act: "greeting" })).reason).toBe("assistant_register");
+    expect(guardReply("Good morning! How can I help you today?", ctx({ utterance: "hi", act: "greeting" })).reply).toBe("Good morning!");
+    expect(guardReply("I'm here if you need anything, kiddo.", ctx({ utterance: "okay", act: "backchannel" })).reason).toBe("assistant_register");
+    expect(guardReply("I'm here to help you plan the carpool for Friday.", stated()).reason).toBeNull();
+    expect(guardReply("As an AI, I can't.", stated()).reply).toBe("I can't.");
+    expect(guardReply("You're welcome! Let me know if you need anything else.", thanks)).toMatchObject({ reason: "assistant_register", replaced: false, reply: "You're welcome!" });
+    expect(guardReply("Anytime! Happy to help.", ctx({ utterance: "thanks a lot", act: "closing" })).reply).toBe("Anytime!");
+    // The rerun's cases: an unspaced em dash separates a tail; "I'm here if you need a hand or a chat" is the register with an object.
+    expect(guardReply("You're welcome—let me know if you need anything else!", thanks).reply).toBe("You're welcome.");
+    expect(guardReply("You're not asking me to do anything, but I'm here if you need a hand or a chat.", stated({ utterance: "I wasn't asking you to do anything, just talking" })).reply).toBe("You're not asking me to do anything.");
+    const claimed = guardReply("You've got it, added to the list. Want to mention anything else?", stated());
+    expect([claimed.reason, claimed.replaced, claimed.reply]).toEqual(["unsupported_action", false, "Want to mention anything else?"]);
     expect(stripRegisterTail("Sorry if I confused you, the recital is Friday.", stated())).toBe("The recital is Friday.");
     for (const line of ["Start with a no-knead loaf; you're learning the feel of the dough.", "The note on the fridge says Friday.", "I noted the time on the calendar entry you shared.", "Pippa needs help with fractions tonight."]) {
       expect([line, guardReply(line, stated()).reason]).toEqual([line, null]);

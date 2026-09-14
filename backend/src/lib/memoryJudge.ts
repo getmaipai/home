@@ -619,6 +619,25 @@ export interface JudgeTurnResult {
  * a subject is not evidence of a new person). A relation slot with no
  * subject names its entity the same way, with the kind the type's
  * other end admits. */
+// REG-01's set: the 4B on "she's my sister" (an answer whose antecedent
+// was in the previous turn) named the subject "she" and the registry
+// gained a person called she. A pronoun or a bare relation word is never
+// a name; the fact is dropped and the row says why.
+const PRONOUN_NAME = /^\s*(?:she|he|they|it|her|him|them|we|us|you|i|me|my|mine|his|hers|theirs|this|that|someone|somebody|anyone|everyone|nobody)\s*$/i;
+const RELATION_WORD_NAME = /^\s*(?:sister|brother|mom|dad|mother|father|parent|friend|coworker|colleague|neighbou?r|boss|partner|the (?:dog|cat|kids?|baby))\s*$/i;
+
+/** The subject or relation name the fact carries when it is not a name
+ * at all: a pronoun always; a bare relation word unless the household
+ * knows someone by it ("Mom" as a nickname is a name). The fact is
+ * dropped whole, never written with a pronoun as its subject. */
+function subjectNotAName(speaker: PersonRow, fact: ExtractedFact): string | null {
+  const name = fact.subject?.name ?? fact.relation?.name ?? null;
+  if (name === null) return null;
+  if (PRONOUN_NAME.test(name)) return name.trim();
+  if (RELATION_WORD_NAME.test(name) && !findSubjectByName(speaker, name)) return name.trim();
+  return null;
+}
+
 function resolveSubject(speaker: PersonRow, fact: ExtractedFact, turn: ConversationTurnRow): Entity | null {
   const named = fact.subject ?? (fact.relation ? { name: fact.relation.name, kind: kindForRelation(fact.relation.type, fact.category) } : null);
   if (named) {
@@ -749,6 +768,11 @@ export async function judgeTurn(turn: ConversationTurnRow): Promise<JudgeTurnRes
   // than just a rendered summary.
   const writtenIds: string[] = [];
   for (const fact of facts) {
+    const notAName = subjectNotAName(speaker, fact);
+    if (notAName) {
+      console.log(`[memoryJudge] turn ${turn.id}: dropped a fact whose subject "${notAName.toLowerCase()}" is a pronoun or a relation word, not a name`);
+      continue;
+    }
     // getmaipai/home#63: a fact-heavy turn can still hold the chat engine
     // for several embed+dedupe calls even with MAX_TURNS_PER_RUN at 1 -
     // re-checked before EACH fact, not just once at runJudgeBatch()'s own

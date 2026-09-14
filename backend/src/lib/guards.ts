@@ -645,7 +645,7 @@ export function isCloserSentence(sentence: string): boolean {
 // dash on a real sentence is cut. "Got it, noted" on a statement is
 // the same register; "noted" as an acknowledgment of a request stays.
 const REGISTER_PHRASE_RE =
-  /\b(?:i'?ve (?:noted|got|made a note of) (?:that|it|this)|noted|i'?m (?:still )?learning|i'?m here (?:to help|for you|if you need)|as an ai(?: (?:assistant|model))?|as a language model|sorry (?:if|that) i (?:confused|misunderstood|missed)(?: you| that)?|let me know (?:what you need|how (?:i can|else i can) help|if (?:you need|there'?s|you'?d like|you want)[^.!?,]*|when you'?re ready[^.!?,]*)|happy to help(?: (?:with|out|if|when|whenever|any ?time)[^.!?,]*)?|glad (?:to|i could) help|i'?m happy to assist|how (?:else )?can i (?:help|assist)(?: you)?(?: today)?|is there anything else(?: i can (?:help|do)[^.!?,]*)?|anything else (?:you need|i can (?:help|do)[^.!?,]*)|feel free to (?:ask|reach out|let me know)[^.!?,]*|don'?t hesitate to (?:ask|reach out)[^.!?,]*|hope (?:that|this) helps|you'?re welcome|no problem(?: at all)?|got it,? noted|will do)\b/i;
+  /\b(?:i'?ve (?:noted|got|made a note of) (?:that|it|this)|noted|i'?m (?:still )?learning|i'?m here (?:to help|for you|(?:if you (?:need|want|ever need)|whenever you need)[^.!?,]*)|as an ai(?: (?:assistant|model))?|as a language model|sorry (?:if|that) i (?:confused|misunderstood|missed)(?: you| that)?|let me know (?:what you need|how (?:i can|else i can) help|if (?:you need|there'?s|you'?d like|you want)[^.!?,]*|when you'?re ready[^.!?,]*)|happy to help(?: (?:with|out|if|when|whenever|any ?time)[^.!?,]*)?|glad (?:to|i could) help|i'?m happy to assist|how (?:else )?can i (?:help|assist)(?: you)?(?: today)?|is there anything else(?: i can (?:help|do)[^.!?,]*)?|anything else (?:you need|i can (?:help|do)[^.!?,]*)|feel free to (?:ask|reach out|let me know)[^.!?,]*|don'?t hesitate to (?:ask|reach out)[^.!?,]*|hope (?:that|this) helps|you'?re welcome|no problem(?: at all)?|got it,? noted|will do)\b/i;
 const REGISTER_FILLER_RE = /\b(?:okay|ok|sure|alright|great|of course|absolutely|certainly|just|so|and|or|but|then|now|also|too|again|anytime|always|please|thanks|thank you|though|at all|for now|for today|tonight|today)\b/gi;
 function isRegisterSentence(sentence: string): boolean {
   if (!REGISTER_PHRASE_RE.test(sentence) && !CLOSER_RE.test(sentence)) return false;
@@ -656,9 +656,16 @@ function isRegisterSentence(sentence: string): boolean {
     .replace(/'(?:s|d|m|re|ll|ve|t)\b/gi, " ") // the contractions' tails are not subjects, once the phrases are out
     .replace(CLOSER_FILLER_RE, " ")
     .replace(REGISTER_FILLER_RE, " ")
-    .replace(/[,\s]+(?:\p{Lu}\p{L}*)(?=[\s!.,?]*$)/u, " "); // an addressee at the end
+    .replace(ADDRESSEE_TAIL_RE, " "); // an addressee at the end
   return tokenize(residual).size === 0;
 }
+// An addressee at the end of a sentence: a capitalized name, a group
+// word, or a lowercase term of address ("kiddo", "buddy").
+const ADDRESSEE_TAIL_RE = /[,\s]+(?:\p{Lu}\p{L}*|everyone|everybody|all|guys|folks|there|kiddo|kid|buddy|bud|friend|mate|pal|dear|love|hon|honey|sweetie|champ|sir|ma'am)(?=[\s!.,?]*$)/u;
+/** The reciprocal move a closing or a greeting gets ("You're welcome",
+ * "No problem, happy to help!", "Good morning!"): register by nature,
+ * and the right reply there. */
+const RECIPROCAL_RE = /^\W*(?:okay|ok|sure|alright|got it|aw+|oh)?[,.! ]*(?:you'?re (?:very |so |most )?welcome|no problem(?: at all)?|no worries|anytime|any time|my pleasure|of course|sure thing|happy to help|glad (?:to|i could) help|glad it helped|you got it|you'?ve got it|will do|noted|(?:good\s+)?(?:morning|afternoon|evening|night)|hello|hi|hey|howdy|hiya|bye|goodbye|see you|take care|sleep well|talk (?:later|soon)|later|cheers)\b[^.!?]{0,20}[.!?]*\s*$/i;
 // The acknowledgment half of the register ("Noted.", "Will do.", "No
 // problem.") is the right answer to a request and a thank-you; it is
 // register only on a statement, where nothing was asked.
@@ -670,7 +677,14 @@ function isRegisterFor(sentence: string, ctx: Pick<GuardContext, "act" | "shape"
   if (ACK_REGISTER_RE.test(sentence) && (!isStatementTurn(ctx) || ctx.act === "closing" || ctx.act === "greeting")) return false;
   return true;
 }
-function guardAssistantRegister(sentence: string, ctx: GuardContext): GuardReason | null {
+function guardAssistantRegister(sentence: string, ctx: GuardContext, isFirstSentence: boolean): GuardReason | null {
+  // A closing or a greeting gets its reciprocal move, which is register
+  // by nature ("You're welcome, happy to help!"): a first sentence in a
+  // reciprocal form is the close and stands; what follows it is still
+  // scrubbed, and a first sentence that is only "I'm still learning" or
+  // "How can I help you today?" is not a close (a review). REG-01's set:
+  // an emptied "You're welcome—happy to help!" drew the malformed line.
+  if (isFirstSentence && (ctx.act === "closing" || ctx.act === "greeting") && RECIPROCAL_RE.test(sentence)) return null;
   return isRegisterFor(sentence, ctx) ? "assistant_register" : null;
 }
 /** A register tail behind a comma, a semicolon, a colon or a spaced
@@ -680,14 +694,19 @@ export function stripRegisterTail(sentence: string, ctx: Pick<GuardContext, "act
   // A register lead behind a comma ("As an AI, I can't taste it",
   // "Sorry if I confused you, the recital is Friday") goes the same way:
   // the rest stands on its own, capitalized.
-  const lead = /^\s*([^,;:]+?)\s*(?:[,;:]|\s[-–—])\s*(\S.*)$/s.exec(sentence);
+  // The separators: a comma, a semicolon, a colon, a spaced hyphen, or
+  // an en or em dash with or without spaces ("You're welcome—let me
+  // know if you need anything else").
+  const lead = /^\s*([^,;:–—]+?)\s*(?:[,;:]|\s-\s|\s?[–—]\s?)\s*(\S.*)$/s.exec(sentence);
   // A rest that is only an addressee ("Hope that helps, Sage!") makes
   // the whole sentence register, left to the sentence rule (a review).
-  if (lead && isRegisterFor(lead[1]!, ctx) && tokenize(lead[2]!.replace(/^\s*(?:\p{Lu}\p{L}*|everyone|everybody|all|guys|folks|there)[\s!.,?]*$/u, "")).size > 0) {
+  // A rest that is only an addressee ("kiddo.", "Sage!") is not content
+  // (the whole sentence is register); "I can't." is (a review).
+  if (lead && isRegisterFor(lead[1]!, ctx) && /\p{L}/u.test(lead[2]!.replace(ADDRESSEE_TAIL_RE, "").replace(/^\s*(?:\p{Lu}\p{L}*|kiddo|kid|buddy|bud|friend|mate|pal|dear|love|hon|honey|sweetie|champ|sir|ma'am|everyone|everybody|all|guys|folks|there)[\s!.,?]*$/u, ""))) {
     const rest = lead[2]!;
     return rest.charAt(0).toUpperCase() + rest.slice(1);
   }
-  const m = /^(.*?[^\s,;:-])\s*(?:[,;:]|\s[-–—])\s*(?:and\s+|but\s+|so\s+)?([^,;:]+?)([.!?]*)\s*$/i.exec(sentence);
+  const m = /^(.*?[^\s,;:–—-])\s*(?:[,;:]|\s-\s|\s?[–—]\s?)\s*(?:and\s+|but\s+|so\s+)?([^,;:–—]+?)([.!?]*)\s*$/i.exec(sentence);
   if (!m) return sentence;
   const head = m[1]!;
   const tail = m[2]!;
@@ -926,7 +945,9 @@ const I_DID = "\\bi(?:'ve| have)?\\s+(?:just\\s+)?";
 const AND_DID = "\\b(?:and|then)\\s+(?:just\\s+)?";
 // A bare status at the sentence's own start, behind an acknowledgment
 // at most ("Timer set for ten minutes.", "Done, saved.").
-const START = "^\\s*(?:okay|ok|sure|done|alright|got it|right|all set)?[,.! ]*";
+// REG-01's set: "You've got it, added to the list" is the same bare
+// status claim behind a longer acknowledgment.
+const START = "^\\s*(?:okay|ok|sure|sure thing|done|alright|got it|you'?ve got it|you got it|will do|no problem|right|all set)?[,.! ]*";
 /** A family whose claim is written with I_DID gets the chained form for
  * free: the same body behind "and"/"then" instead of "I've". */
 function claimFamily(family: Omit<ActionFamily, "claim" | "chained"> & { body: string }): ActionFamily {
@@ -1366,7 +1387,7 @@ export function guardSentence(sentence: string, ctx: GuardContext, isFirstSenten
   if (!s) return null;
   return (
     guardPlaceholderEcho(s) ??
-    guardAssistantRegister(s, ctx) ??
+    guardAssistantRegister(s, ctx, isFirstSentence) ??
     guardRepeatQuestion(s, ctx) ??
     guardUnsupportedAction(s, ctx) ??
     guardCapabilityClaim(s, ctx) ??

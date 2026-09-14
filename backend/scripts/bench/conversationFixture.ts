@@ -1100,9 +1100,12 @@ export const CONVERSATIONS: readonly BenchConversation[] = [
     category: "etiquette",
     note: "section 5 (findings 12, 14, 10's loop): a first-person statement never gets 'I've noted that' or an action claim; a guard replacement never names a family the person did not mention; no question said twice",
     turns: [
-      { say: "I told Quill I'm done with sourdough, too much fuss", expect: { signal: { primary_act: "inform" }, toolRan: null, guard: null, mustContain: "\\?|that|why|how|fuss|sourdough", mustNotContain: "noted|i've (?:added|saved)|added (?:it|that)|still learning|" + NO_CLOSER, humanVerdict: true } },
-      { say: "I wasn't asking you to do anything, just talking", expect: { signal: { primary_act: "inform" }, toolRan: null, guard: null, mustNotContain: "\\blist\\b|timer|reminder|noted|" + NO_CLOSER, humanVerdict: true } },
-      { say: "anyway, Quill was going to lend me her starter but now she's not", expect: { signal: { primary_act: "inform" }, toolRan: null, guard: null, noCopiedEpisode: true, mustNotContain: NO_CLOSER, humanVerdict: true } },
+      // A question back ("want to mention anything else?") is the ask-back
+      // the design wants after an inform, so the register check names the
+      // register lines, not every "anything else".
+      { say: "I told Quill I'm done with sourdough, too much fuss", expect: { signal: { primary_act: "inform" }, toolRan: null, guard: null, mustContain: "\\?|that|why|how|fuss|sourdough", mustNotContain: "noted|i've (?:added|saved)|added (?:it|that|to)|still learning|let me know if you need|here if you need|happy to help", humanVerdict: true } },
+      { say: "I wasn't asking you to do anything, just talking", expect: { signal: { primary_act: "inform" }, toolRan: null, guard: null, mustNotContain: "\\blist\\b|timer|reminder|noted|let me know if you need|here if you need|happy to help", humanVerdict: true } },
+      { say: "anyway, Quill was going to lend me her starter but now she's not", expect: { signal: { primary_act: "inform" }, toolRan: null, guard: null, noCopiedEpisode: true, mustNotContain: "let me know if you need|here if you need|happy to help", humanVerdict: true } },
     ],
   },
 ];
