@@ -241,6 +241,17 @@ rule, classes only):
     the guard replacement bank losing the honesty vocabulary
     (GUARD-LINES), both ahead of ASK-01.
 
+21. Four wrong titles for one game across three corrections, with no
+    lookup until the person demanded one. A person corrected once
+    rechecks; corrected twice, concedes. Rule for CHAT-13 and CHAT-16,
+    Jesse's, 2026-09-14: after the first correction of a claim, the
+    hub never re-asserts that claim from its own knowledge (the
+    subject stack's rejected list); it looks the claim up once; if the
+    lookup settles it, it says so once; if the lookup cannot settle
+    it, it concedes and asks ("I clearly don't have this one, what's
+    it called?"). Never a third guess. The chat is the bench row with
+    a fictional game and roster names.
+
 Read together: the hub never asks about what it does not know, acts as
 if it knows what it was never told, copies other conversations into
 this one, sends broken text, and reads search results aloud like an
