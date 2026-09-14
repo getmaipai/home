@@ -31,8 +31,10 @@ const CLASS_ORDER = [
 // mulberry32: a tiny, dependency-free deterministic PRNG (public
 // domain). Not cryptographic, not meant to be - only meant to be the
 // same sequence on every machine and every run for a given seed, which
-// is the one property a reproducible sample needs.
-function mulberry32(seed: number): () => number {
+// is the one property a reproducible sample needs. Exported (lane 13
+// item 1's mine.ts is the second caller) rather than duplicated: one
+// definition, the org's own rule.
+export function mulberry32(seed: number): () => number {
   let a = seed;
   return () => {
     a |= 0;
@@ -43,7 +45,7 @@ function mulberry32(seed: number): () => number {
   };
 }
 
-function seededShuffle<T>(items: readonly T[], seed: number): T[] {
+export function seededShuffle<T>(items: readonly T[], seed: number): T[] {
   const rng = mulberry32(seed);
   const result = [...items];
   for (let i = result.length - 1; i > 0; i--) {

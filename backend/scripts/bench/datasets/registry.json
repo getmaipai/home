@@ -90,8 +90,8 @@
       "collectionMethod": "Crowdsourced: self-dialogs written solo by one crowdworker playing both sides; woz-dialogs collected two-crowdworker Wizard-of-Oz sessions.",
       "holdsRealIdentities": false,
       "allowedUses": ["research", "internal-eval", "commercial-with-attribution"],
-      "heldOut": "not sampled by any item yet; downloaded for the phenomenon-mining item (mixed intent, corrections in spoken task talk), which lands after CHAT-16.",
-      "loader": null,
+      "heldOut": "lane 13 item 1's mine.ts reads this whole file (both self-dialogs and woz-dialogs) to select phenomenon fragments for a person's review; no item samples scenarios from it yet - that rewrite step lands after CHAT-16 (docs/plans/session-b-lane-13-2026-09-14.md).",
+      "loader": "taskmaster1.ts",
       "files": [
         { "path": "taskmaster1/self-dialogs.json", "sha256": "1e590ed0ccee279e40c2fb9e083d3b9417477c6bfe35ce5b2277167698dd858d" },
         { "path": "taskmaster1/woz-dialogs.json", "sha256": "cd3bc4e968487315d412c044d30af2bf0a4b33c3ef8b74c589f1e1fa832bf72f" },
@@ -112,8 +112,8 @@
       "collectionMethod": "Crowdsourced: two workers per session, one coached to elicit the other's movie preferences.",
       "holdsRealIdentities": false,
       "allowedUses": ["research", "internal-eval", "commercial-with-attribution"],
-      "heldOut": "not sampled by any item yet; downloaded for the phenomenon-mining item (the preference-extraction reference), which lands after CHAT-16.",
-      "loader": null,
+      "heldOut": "lane 13 item 1's mine.ts reads this whole file to select preference fragments for a person's review; no item samples scenarios from it yet - that rewrite step lands after CHAT-16 (docs/plans/session-b-lane-13-2026-09-14.md).",
+      "loader": "ccpeM.ts",
       "files": [
         { "path": "ccpe/data.json", "sha256": "4ff051ea7ea60cf0f480c911c7e2cfed56434e2e2c9ea8965ac5e26365773f0a" }
       ],
@@ -148,8 +148,8 @@
       "collectionMethod": "Crowdsourced: a student asks free-form questions about a Wikipedia section, a teacher (with access to the article) answers with a quoted span.",
       "holdsRealIdentities": false,
       "allowedUses": ["research", "internal-eval", "share-alike"],
-      "heldOut": "val_v0.2.json is treated as this project's held-out split; train_v0.2.json only is used if a later item needs examples.",
-      "loader": null,
+      "heldOut": "val_v0.2.json is treated as this project's held-out split; lane 13 item 1's mine.ts reads train_v0.2.json only, to select phenomenon fragments for a person's review.",
+      "loader": "quac.ts",
       "files": [
         { "path": "quac/train_v0.2.json", "sha256": "ff5cca5a2e4b4d1cb5b5ced68b9fce88394ef6d93117426d6d4baafbcc05c56a" },
         { "path": "quac/val_v0.2.json", "sha256": "09e622916280ba04c9352acb1bc5bbe80f11a2598f6f34e934c51d9e6570f378" }

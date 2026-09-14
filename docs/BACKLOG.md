@@ -1866,6 +1866,17 @@ invented for the roster's household, and added to
     `docs/dev/session-b.md`, "Lane 12 item 4". Left: the engine replay
     itself (Session A's).
 
+    Mining half's own tool shipped 2026-09-14, Session B (lane 13 item
+    1): `mine.ts` selects about 200 phenomenon fragments (23
+    phenomena, no model) from Taskmaster-1, CCPE-M and QuAC (three new
+    loaders, `taskmaster1.ts`/`ccpeM.ts`/`quac.ts`) plus DailyDialog,
+    LoCoMo and LongMemEval, each rule named in the committed
+    `phenomena.json`, into the git-ignored `data-scratch/eval/
+    review-sheet.md` for a person to mark keep/skip/rewrite. Design
+    note: `docs/dev/session-b.md`, "Lane 13 item 1". Left: Jesse's or a
+    design session's review of the sheet, and the rewrite into bench
+    scenarios (after CHAT-16).
+
 <a id="cur-01"></a>
 
 - [ ] **CUR-01: The memory curator** (S-M, after MEM-06)
@@ -1965,7 +1976,27 @@ invented for the roster's household, and added to
 
 <a id="act-01"></a>
 
-- [ ] **ACT-01: The turn signal, the spec, the producer's first layers, and the rows** (S-M, before REG-01)
+- [x] **ACT-01: The turn signal, the spec, the producer's first layers, and the rows** (S-M, before REG-01)
+
+    Done 2026-09-14 (docs/dev/session-a.md "ACT-01"; the spec half is
+    SPEC-01's, 29ac71f and 7705ed5): `lib/turnSignal.ts` with the
+    protocol and rule layers and the fallback; `readClauses()` in
+    `utteranceShape.ts` as the one clause split with ranges;
+    `TurnContext.signal` in place of `shape`, the router's and the
+    guards' shape a projection (`shapeOf()`); the signal frozen before
+    routing on every path, a literal-pattern win freezing a directive
+    (a question stays a question); the `signal` column (migration 0034,
+    schema version 33) written by `logTurn()` with `judge_status`
+    `skipped` at insert when no clause is eligible; the judge's queue
+    keyed on the signal; per-stage timings (`signal_us`, routing,
+    recall, prompt, first token, finalize, retries, CHAT-13's
+    `subjects` slot) on the `[turn]` line and the bench's stage
+    summary; an act expectation on every fixture turn and seven new
+    conversations (the act-register rows, the act-memory rows whose
+    clause-contract checks wait on MEM-06, the curator rows on
+    CUR-01); `scripts/bench/turn-signal.ts` with the DailyDialog
+    reference and the baseline recorded. The seeded set is recorded
+    in the notes.
 
     Objective: the engine records, before routing and frozen for the
     turn, what kind of turn the person made and what it expressed, on

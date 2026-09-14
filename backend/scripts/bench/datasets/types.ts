@@ -41,7 +41,11 @@ export interface DatasetSession {
   turns: DatasetTurn[];
 }
 
-export type DatasetSource = "longmemeval" | "locomo" | "dailydialog";
+// Lane 13 item 1 (docs/plans/session-b-lane-13-2026-09-14.md): widened
+// for the phenomenon-mining sources (mine.ts), which read Taskmaster-1,
+// CCPE-M and QuAC through the same internal form rather than a fourth
+// shape.
+export type DatasetSource = "longmemeval" | "locomo" | "dailydialog" | "taskmaster1" | "ccpe-m" | "quac";
 
 /** One conversation: LongMemEval's is one question's own haystack (id =
  * that question's id, since each question gets its own distinct set of

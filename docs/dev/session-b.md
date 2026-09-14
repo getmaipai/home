@@ -2808,3 +2808,95 @@ fewer than the target).
 engine (Session A's replay); the phenomenon-mining tags over
 Taskmaster-1/CCPE-M/QuAC/MultiWOZ (after CHAT-16); GoEmotions training
 (ACT-02). Nothing under `backend/src/` touched.
+
+## Lane 13 item 1: the phenomenon review sheet
+
+EVAL-07's mining half (the program file's "EVAL-07" section, "about
+200 reviewed fragments across 20 to 25 phenomena") is a person's job,
+never a model's: `mine.ts` selects the fragments, no model call
+anywhere in it. Three new loaders join lane 12's three
+(`taskmaster1.ts` for Taskmaster-1's self-dialogs and woz-dialogs,
+`ccpeM.ts` for CCPE-M, `quac.ts` for QuAC), each converting its own raw
+JSON into the same internal form (`types.ts`, `DatasetSource` widened
+to admit `taskmaster1 | ccpe-m | quac`); `registry.json`'s three
+matching entries now name their loader instead of `null`. QuAC's own
+`heldOut` note already reserved `val_v0.2.json`, so mining reads
+`train_v0.2.json` only, honoring it.
+
+**`phenomena.json`** is the one place a phenomenon's selection rule is
+written in words: 23 phenomena (within the item's 20-to-25 target),
+each a real dataset label (DailyDialog's act/emotion numbers, CCPE-M's
+`ENTITY_PREFERENCE`/`ENTITY_DESCRIPTION` segment annotations, QuAC's
+`followup`/`yesno` tags and its own `CANNOTANSWER` convention, LoCoMo's
+and LongMemEval's own question-type fields) or a narrow, named lexical
+pattern where no label exists (DailyDialog's `closing` and
+`backchannel`, which the four-act scheme folds into `inform`;
+Taskmaster-1's `correction`/`confirmation`/`woz-indirect-request`;
+CCPE-M's `preference-change`, an `ENTITY_PREFERENCE` turn past the
+conversation's first one whose own text also carries a contrast word).
+Every rule's basis is stated plainly in the file's own `labelRule`
+field, including which ones are heuristics rather than dataset labels
+- nothing here claims more precision than it has.
+
+**`mine.ts`** holds one selector function per phenomenon
+(`PHENOMENON_SELECTORS`), each producing candidate fragments (two to
+four turns around the phenomenon for a transcript-window rule;
+for LoCoMo and LongMemEval, whose questions grade against cited
+evidence turns rather than one spot in the transcript, up to two
+evidence turns plus the question and its gold answer as two synthetic
+lines). A consistency test
+(`backend/tests/datasetsMine.test.ts`) asserts `phenomena.json` and
+`PHENOMENON_SELECTORS` name exactly the same set, so the two cannot
+drift. Selection itself reuses `sample.ts`'s own `mulberry32`/
+`seededShuffle` (exported, not duplicated - lane 13's own second
+caller) seeded from the same `SAMPLE_SEED`: shuffle each phenomenon's
+candidate pool, keep the first `targetCount`, so which fragments land
+on the sheet depends only on the seed and the downloaded files, never
+on run order.
+
+**The sheet** (`data-scratch/eval/review-sheet.md`, git-ignored, never
+committed): one section per phenomenon, its description and label rule,
+then each fragment's turns as quoted lines with a keep/skip/note
+checkbox line and a blank "rewrite as" line. Live run, 2026-09-14: 201
+fragments total across the 23 phenomena; 21 reached their own target
+count, and 2 (`backchannel`, `correction`) fell short (3 and 4 against
+a target of 9 each) after a code review's own two confirmed findings
+narrowed their regexes - the first-word-only backchannel check let
+ordinary short sentences ("Right but that seems odd") through as
+acknowledgments, and the correction pattern's bare "actually"/"i mean"
+alternatives matched ordinary filler and preference openers rather
+than an actual retraction. Both are fixed (`isBackchannel()` now
+checks the whole cleaned turn; `CORRECTION_RE` now requires an
+explicit "meant"/"not what i said" phrase), with a regression test
+pinning both false-positive sentences to `false` and real examples to
+`true` (`datasetsMine.test.ts`); the lower counts on these two
+phenomena are the honest result - Taskmaster-1's self-dialogs.json
+genuinely has few explicit corrections, and DailyDialog few turns that
+are purely an acknowledgment and nothing else - not a bug to chase
+back up to 9.
+
+**The review procedure** (why this file exists rather than scenarios
+going straight into the bench fixture): the sheet is Jesse's or a
+design-pass session's to mark, never a coder session's - about 200
+short judgments (keep the fragment as a real example of its
+phenomenon, skip a weak match, or note what makes it borderline), each
+kept fragment gaining a one-line "rewrite as" sketch. A design-pass
+session then turns the kept rows into the household bench's own
+executable scenarios (`backend/scripts/bench/conversationFixture.ts`'s
+shape: roster names, a controlled clock, seeded state, observable
+effects, never the dataset's own text or names), which land after
+CHAT-16 per the program file's own ordering. This item builds the tool
+that makes that review cheap; it does not do the review and it does
+not write a single scenario.
+
+Verified: `bun run lint` (`tsc --noEmit`) clean; 45 new tests
+(`datasetsTaskmaster1.test.ts`, `datasetsCcpeM.test.ts`,
+`datasetsQuac.test.ts`, `datasetsMine.test.ts`) plus the existing 33
+lane-12 dataset tests, all green, all against small embedded samples
+in each dataset's own real shape, never the downloaded files;
+`registry.json`'s own consistency test (`datasetsRegistry.test.ts`)
+confirms the three new `loader` entries resolve to real files; a live
+run against the real downloaded datasets, reported above, generated
+the sheet and confirmed every rule finds real matches. Nothing under
+`backend/src/` touched; the bench runner and fixture untouched
+(Session A is in them for ACT-01).
