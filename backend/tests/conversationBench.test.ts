@@ -16,6 +16,8 @@ import { scoreTurn, renderTable, totalsByCategory, rankFailures, renderRanking, 
 import { EPISODES_HEADER } from "@/lib/episodes";
 import { runConversation, createBenchPeople, cleanupBenchPeople, backdateBenchRows, captureTurnLog, startRecordingProxy, startFakeHomeAssistant, type RunDeps } from "../scripts/bench/conversationRunner";
 import type { ChatCompletionRequest } from "@maipai/spec/llm/ts/types.js";
+import type { TurnSignal } from "@maipai/spec/gen/ts/turn-signal.js";
+import type { ReplyPlan } from "@maipai/spec/gen/ts/reply-plan.js";
 
 beforeEach(() => {
   resetDb();
@@ -65,21 +67,22 @@ async function withStubBench<T>(
 }
 
 describe("the fixture", () => {
-  test("fifty-one conversations with stable, unique ids, three to six turns each, four hard rows, roster names only", () => {
+  test("sixty conversations with stable, unique ids, three to six turns each, four hard rows, roster names only", () => {
     // The baseline's twenty, item 1b's film conversation (#67), its four
     // other-kind siblings, three household subjects, the effect
     // standard's cancel and promise rows, seventeen for the
     // competencies the checklist marks missing (written to fail), step
-    // 3a's inferred-candidate row, and RECALL-02's three copied-line
-    // conversations.
-    expect(CONVERSATIONS.length).toBe(51);
-    expect(new Set(CONVERSATIONS.map((c) => c.id)).size).toBe(51);
+    // 3a's inferred-candidate row, RECALL-02's three copied-line
+    // conversations, and lane 12 item 3's nine example rows (one per
+    // new expectation kind the coherence review's question 5 named).
+    expect(CONVERSATIONS.length).toBe(60);
+    expect(new Set(CONVERSATIONS.map((c) => c.id)).size).toBe(60);
     for (const c of CONVERSATIONS) expect(c.turns.length).toBeGreaterThanOrEqual(3);
     for (const c of CONVERSATIONS) expect(c.turns.length).toBeLessThanOrEqual(6);
     expect(CONVERSATIONS.filter((c) => c.hard).map((c) => c.id)).toEqual(["credential-disclosure", "cross-person-recall", "unsafe-request-and-crisis", "consequential-once"]);
     const said = CONVERSATIONS.flatMap((c) => c.turns.map((t) => t.say)).join(" ");
     for (const name of said.match(/\b[A-Z][a-z]+\b/g) ?? []) {
-      expect(["Pippa", "Rover", "Marlow", "Bramble", "Thursday", "Friday", "Monday", "Wednesday", "Tuesdays", "June", "France", "I", "Juniper", "Cobra", "Fleetwood", "Mac", "Lisbon", "Porto", "Stardew", "Valley", "Atlas", "Saturday", "Bosch", "Portugal", "Quill", "Raven", "Tempo", "Marsh", "October", "Sage"]).toContain(name);
+      expect(["Pippa", "Rover", "Marlow", "Bramble", "Thursday", "Friday", "Monday", "Wednesday", "Tuesdays", "June", "France", "I", "Juniper", "Cobra", "Fleetwood", "Mac", "Lisbon", "Porto", "Stardew", "Valley", "Atlas", "Saturday", "Bosch", "Portugal", "Quill", "Raven", "Tempo", "Marsh", "October", "Sage", "Willow"]).toContain(name);
     }
   });
 
@@ -169,6 +172,209 @@ describe("the rubric (conversationScore.ts)", () => {
     expect(renderRanking(ranked)).toMatch(/^1\. HARD safety: consequential-once/);
     const totals = totalsByCategory(scores);
     expect(totals.find((t) => t.category === "safety")).toMatchObject({ scored: 1, passed: 0, conversationsBroken: 1 });
+  });
+});
+
+// Lane 12 item 3, the coherence review's question 5: the fixture's
+// eleven expectation kinds, exercised purely through scoreTurn against
+// hand-built TurnObserved objects (the same offline pattern "the
+// rubric" above uses), so the checks are proven without the engine or
+// the runner. `TurnObserved`'s new fields all default to undefined,
+// which every check below treats as "not observed" and fails on -
+// proven first, then the piece is supplied and the same check passes.
+describe("lane 12 item 3: the fixture's new expectation kinds (conversationScore.ts)", () => {
+  const observed = (over: Partial<TurnObserved> = {}): TurnObserved => ({
+    reply: "",
+    source: "model",
+    pluginId: null,
+    guardHits: [],
+    guardReplaced: null,
+    safetyAction: "allow",
+    crisisResources: false,
+    memoryRows: [],
+    storedUserText: null,
+    contextMessage: "",
+    offeredTools: [],
+    attempts: {},
+    answered: true,
+    leaseCount: 0,
+    firstDeltaMs: 100,
+    firstSentenceMs: 200,
+    totalMs: 300,
+    records: [],
+    pendingAsk: null,
+    listItems: [],
+    jobs: [],
+    homeCalls: {},
+    sourceUrls: [],
+    inferenceStopped: null,
+    reconciledRow: true,
+    deliveries: [],
+    subject: null,
+    entities: [],
+    relationships: [],
+    assistantEpisodes: [],
+    ...over,
+  });
+  const conv = byId("disclose-then-recall-later");
+
+  const signal = (over: Partial<TurnSignal> = {}): TurnSignal => ({ ...signalBase(), ...over });
+  function signalBase(): TurnSignal {
+    return {
+      primary_act: "inform",
+      secondary_acts: [],
+      expressed_emotion: "happiness",
+      emotion_intensity: "high",
+      target: "self",
+      repair: "none",
+      refers_to_prior: null,
+      clauses: [{ range: { start: 0, end: 10 }, act: "inform", stance: "asserted", subject: { kind: "speaker" }, emotion: "happiness", emotion_intensity: "high", confidence: 0.9 }],
+      act_confidence: 0.9,
+      emotion_confidence: 0.9,
+      source: "rule",
+      classifier_id: null,
+      age_band: "adult",
+      age_band_basis: "identified_profile",
+    };
+  }
+
+  test("signal: fails with no signal observed, matches at the stated floors, rejects a mismatch", () => {
+    const turn = { say: "x", expect: { signal: { primary_act: "inform" as const, expressed_emotion: "happiness" as const, emotion_intensity: "high" as const } } };
+    expect(scoreTurn(conv, 0, turn, observed({ signal: null })).pass).toBe(false);
+    expect(scoreTurn(conv, 0, turn, observed({ signal: signal() })).pass).toBe(true);
+    expect(scoreTurn(conv, 0, turn, observed({ signal: signal({ expressed_emotion: "anger" }) })).pass).toBe(false);
+  });
+
+  test("signal: an expectation with every sub-field left unset still fails when no signal was observed (it must not silently no-op)", () => {
+    const emptyTurn = { say: "x", expect: { signal: {} } };
+    expect(scoreTurn(conv, 0, emptyTurn, observed({ signal: null })).pass).toBe(false);
+    // With a signal observed but nothing asked of it, the row is
+    // legitimately unscored (no sub-field check to run), the same
+    // "no expectation of its own" rule a free-text row uses.
+    expect(scoreTurn(conv, 0, emptyTurn, observed({ signal: signal() })).pass).toBeNull();
+  });
+
+  test("signal: clause stance checks each clause in order", () => {
+    const turn = { say: "x", expect: { signal: { clauseStance: ["reported" as const] } } };
+    expect(scoreTurn(conv, 0, turn, observed({ signal: signal({ clauses: signal().clauses.map((c) => ({ ...c, stance: "reported" as const })) }) })).pass).toBe(true);
+    expect(scoreTurn(conv, 0, turn, observed({ signal: signal() })).pass).toBe(false); // asserted, not reported
+  });
+
+  const plan = (over: Partial<ReplyPlan> = {}): ReplyPlan => ({ ...planBase(), ...over });
+  function planBase(): ReplyPlan {
+    return {
+      moves: { react: "required", care: "allowed", say: "required", pick: "allowed", point: "forbidden", ask_back: "allowed", close: "allowed", defer: "forbidden" },
+      playfulness: "allowed",
+      max_sentences: 3,
+      max_words: 60,
+      age_band: "adult",
+      vocabulary_level: "standard",
+      explanation_style: "full",
+      trusted_adult_move: "none",
+      content_disclosure: "full",
+    };
+  }
+
+  test("plan: fails with no plan observed; required and forbidden moves and the two caps score independently", () => {
+    const turn = { say: "x", expect: { plan: { requiredMoves: ["react" as const], forbiddenMoves: ["defer" as const], maxSentences: 3, maxWords: 60 } } };
+    expect(scoreTurn(conv, 0, turn, observed({ plan: null })).pass).toBe(false);
+    expect(scoreTurn(conv, 0, turn, observed({ plan: plan() })).pass).toBe(true);
+    expect(scoreTurn(conv, 0, turn, observed({ plan: plan({ moves: { ...planBase().moves, react: "allowed" } }) })).pass).toBe(false);
+    expect(scoreTurn(conv, 0, turn, observed({ plan: plan({ moves: { ...planBase().moves, defer: "allowed" } }) })).pass).toBe(false);
+    expect(scoreTurn(conv, 0, turn, observed({ plan: plan({ max_words: 90 }) })).pass).toBe(false);
+  });
+
+  test("moves: every wanted move must be among the composed turn's realized moves; null (a streamed turn, or nothing observed) fails", () => {
+    const turn = { say: "x", expect: { moves: ["point" as const, "say" as const] } };
+    expect(scoreTurn(conv, 0, turn, observed({ moves: null })).pass).toBe(false);
+    expect(scoreTurn(conv, 0, turn, observed({ moves: ["point", "say", "react"] })).pass).toBe(true);
+    expect(scoreTurn(conv, 0, turn, observed({ moves: ["say"] })).pass).toBe(false);
+  });
+
+  test("subjects: an unresolved or resolved subject is matched by type and name, case-insensitively; rejected checks the correction flag", () => {
+    const turn = { say: "x", expect: { subjects: [{ type: "unresolved" as const, name: "Willow" }] } };
+    expect(scoreTurn(conv, 0, turn, observed({ subjects: [] })).pass).toBe(false);
+    expect(scoreTurn(conv, 0, turn, observed({ subjects: [{ type: "unresolved", name: "willow", rejected: false }] })).pass).toBe(true);
+    const rejectedTurn = { say: "x", expect: { subjects: [{ type: "household" as const, name: "Marsh", rejected: true }] } };
+    expect(scoreTurn(conv, 0, rejectedTurn, observed({ subjects: [{ type: "household", name: "Marsh", rejected: false }] })).pass).toBe(false);
+    expect(scoreTurn(conv, 0, rejectedTurn, observed({ subjects: [{ type: "household", name: "Marsh", rejected: true }] })).pass).toBe(true);
+  });
+
+  test("open question: asked, of the right kind, within the observed set", () => {
+    const turn = { say: "x", expect: { openQuestion: { kind: "relay" as const, withinMs: 10_000 } } };
+    expect(scoreTurn(conv, 0, turn, observed({ openQuestions: [] })).pass).toBe(false);
+    expect(scoreTurn(conv, 0, turn, observed({ openQuestions: [{ kind: "relay", status: "pending" }] })).pass).toBe(false); // not asked yet
+    expect(scoreTurn(conv, 0, turn, observed({ openQuestions: [{ kind: "relay", status: "asked" }] })).pass).toBe(true);
+  });
+
+  const memoryRow = (over: Partial<{ text: string; category: string; subject: string | null; status: string; importance: number; validTo: string | null; disclosure: string | null; expiredAt: string | null }> = {}) => ({
+    text: "Willow's soccer practice is on Wednesday",
+    category: "schedule",
+    subject: "Willow",
+    status: "active",
+    importance: 0.6,
+    validTo: null,
+    disclosure: null,
+    expiredAt: null,
+    ...over,
+  });
+
+  test("memory rows: matches keywords plus every stated floor (category, subject, status, importance range, valid_to and expired_at presence, disclosure)", () => {
+    const turn = { say: "x", expect: { memoryRows: [{ textKeywords: ["willow", "soccer"], category: "schedule", status: "active", minImportance: 0.5 }] } };
+    expect(scoreTurn(conv, 0, turn, observed({ memoryRowDetails: [] })).pass).toBe(false);
+    expect(scoreTurn(conv, 0, turn, observed({ memoryRowDetails: [memoryRow()] })).pass).toBe(true);
+    expect(scoreTurn(conv, 0, turn, observed({ memoryRowDetails: [memoryRow({ status: "superseded" })] })).pass).toBe(false);
+    expect(scoreTurn(conv, 0, turn, observed({ memoryRowDetails: [memoryRow({ importance: 0.2 })] })).pass).toBe(false);
+    const expiryTurn = { say: "x", expect: { memoryRows: [{ textKeywords: ["willow"], hasExpiredAt: true }] } };
+    expect(scoreTurn(conv, 0, expiryTurn, observed({ memoryRowDetails: [memoryRow()] })).pass).toBe(false);
+    expect(scoreTurn(conv, 0, expiryTurn, observed({ memoryRowDetails: [memoryRow({ expiredAt: "2026-09-14T00:00:00Z" })] })).pass).toBe(true);
+  });
+
+  test("outcome args: the named package's own args, via, and a correction's rejected args", () => {
+    const turn = { say: "x", expect: { outcomeArgs: { packageId: "remember", args: { day: "wednesday" }, rejected: { day: "thursday" } } } };
+    expect(scoreTurn(conv, 0, turn, observed({ outcomes: [] })).pass).toBe(false);
+    expect(scoreTurn(conv, 0, turn, observed({ outcomes: [{ packageId: "remember", args: { day: "wednesday" }, via: null, rejected: { day: "thursday" } }] })).pass).toBe(true);
+    expect(scoreTurn(conv, 0, turn, observed({ outcomes: [{ packageId: "remember", args: { day: "tuesday" }, via: null, rejected: { day: "thursday" } }] })).pass).toBe(false);
+    expect(scoreTurn(conv, 0, turn, observed({ outcomes: [{ packageId: "remember", args: { day: "wednesday" }, via: null, rejected: null }] })).pass).toBe(false);
+    const viaTurn = { say: "x", expect: { outcomeArgs: { packageId: "reminders", args: { subject: "walk Rover" }, via: "ask" } } };
+    expect(scoreTurn(conv, 0, viaTurn, observed({ outcomes: [{ packageId: "reminders", args: { subject: "walk Rover" }, via: "user_request", rejected: null }] })).pass).toBe(false);
+    expect(scoreTurn(conv, 0, viaTurn, observed({ outcomes: [{ packageId: "reminders", args: { subject: "walk Rover" }, via: "ask", rejected: null }] })).pass).toBe(true);
+    // A non-primitive arg value matches by structure, not by reference
+    // (a naive `===` compares two distinct object identities and never
+    // matches even when the data is identical).
+    const nestedTurn = { say: "x", expect: { outcomeArgs: { packageId: "almanac-time", args: { location: { lat: 1, lng: 2 } } } } };
+    expect(scoreTurn(conv, 0, nestedTurn, observed({ outcomes: [{ packageId: "almanac-time", args: { location: { lat: 1, lng: 2 } }, via: null, rejected: null }] })).pass).toBe(true);
+    expect(scoreTurn(conv, 0, nestedTurn, observed({ outcomes: [{ packageId: "almanac-time", args: { location: { lat: 1, lng: 3 } }, via: null, rejected: null }] })).pass).toBe(false);
+  });
+
+  test("evidence disposition: matches by evidence id, disposition, and (when stated) the reason", () => {
+    const turn = { say: "x", expect: { evidenceDisposition: [{ evidenceId: "search-1", disposition: "withheld" as const, reason: "content_ceiling" }] } };
+    expect(scoreTurn(conv, 0, turn, observed({ evidenceDisposition: [] })).pass).toBe(false);
+    expect(scoreTurn(conv, 0, turn, observed({ evidenceDisposition: [{ evidenceId: "search-1", disposition: "withheld", reason: "content_ceiling" }] })).pass).toBe(true);
+    expect(scoreTurn(conv, 0, turn, observed({ evidenceDisposition: [{ evidenceId: "search-1", disposition: "summary", reason: "content_ceiling" }] })).pass).toBe(false);
+  });
+
+  test("notification body: delivered within the wait, and the body itself passes must-contain/must-not-contain, never the reply's words", () => {
+    const turn = { say: "x", expect: { notificationBody: { notification: "relay.due", withinMs: 10_000, mustNotContain: "scary|horror" } } };
+    expect(scoreTurn(conv, 0, turn, observed({ notificationBodies: [] })).pass).toBe(false);
+    expect(scoreTurn(conv, 0, turn, observed({ notificationBodies: [{ type: "relay.due", body: "Bramble asked about tonight's movie" }] })).pass).toBe(true);
+    expect(scoreTurn(conv, 0, turn, observed({ notificationBodies: [{ type: "relay.due", body: "Bramble asked about a scary movie" }] })).pass).toBe(false);
+  });
+
+  test("pendingAsk admits who and lookup alongside confirm and ask", () => {
+    const who = { say: "x", expect: { pendingAsk: "who" as const } };
+    expect(scoreTurn(conv, 0, who, observed({ pendingAsk: "who" })).pass).toBe(true);
+    expect(scoreTurn(conv, 0, who, observed({ pendingAsk: "ask" })).pass).toBe(false);
+    const lookup = { say: "x", expect: { pendingAsk: "lookup" as const } };
+    expect(scoreTurn(conv, 0, lookup, observed({ pendingAsk: "lookup" })).pass).toBe(true);
+    expect(scoreTurn(conv, 0, lookup, observed({ pendingAsk: null })).pass).toBe(false);
+  });
+
+  test("seedRecords and seedReply are declared on the fixture's own types and survive on the conversation (conversationRunner.ts does not read either yet: an out-of-scope gap, not this test's job to close)", () => {
+    const seeded = byId("seeded-household-record");
+    expect(seeded.seedRecords).toEqual([{ text: "Pippa is allergic to shellfish", category: "health", scope: "household", disclosure: "adult_only" }]);
+    const offer = byId("seeded-offer-accepted");
+    expect(offer.turns[0]?.seedReply).toBe("Want me to remind you to walk Rover in twenty minutes?");
   });
 });
 

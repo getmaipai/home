@@ -10,7 +10,9 @@
 import { tokenize } from "@/lib/text";
 import { assessReply } from "@/lib/wellFormed";
 import { splitIntoSentences, isCloserSentence } from "@/lib/guards";
-import type { BenchConversation, BenchTurn, TurnExpectation } from "./conversationFixture";
+import type { TurnSignal } from "@maipai/spec/gen/ts/turn-signal.js";
+import type { ReplyPlan } from "@maipai/spec/gen/ts/reply-plan.js";
+import type { BenchConversation, BenchTurn, TurnExpectation, Move } from "./conversationFixture";
 
 export interface TurnObserved {
   reply: string;
@@ -45,8 +47,9 @@ export interface TurnObserved {
   // comment on the matching expectations).
   /** The person's and the household's memory records with their status. */
   records: readonly { text: string; status: string }[];
-  /** The conversation's pending ask after the turn. */
-  pendingAsk: "confirm" | "ask" | null;
+  /** The conversation's pending ask after the turn. `who` and `lookup`
+   * are the coherence review's question 5 widening. */
+  pendingAsk: "confirm" | "ask" | "who" | "lookup" | null;
   /** The item texts the household's lists gained since the
    * conversation started. */
   listItems: readonly string[];
@@ -75,6 +78,41 @@ export interface TurnObserved {
   /** RECALL-02: the assistant-side episodes stored for this person from
    * other conversations, the lines a reply must never copy. */
   assistantEpisodes: readonly string[];
+  // Lane 12 item 3, the coherence review's question 5: every field below
+  // is optional so conversationRunner.ts (the live path, untouched here)
+  // still typechecks without setting it. Undefined here means "not
+  // observed", which the matching check in scoreTurn below fails on by
+  // the same "piece not built" convention `entityExists` and `subject`
+  // used before their own engine items landed.
+  /** ACT-01: the turn's own frozen TurnSignal, once logTurn() persists
+   * one; null when the turn carries none yet. */
+  signal?: TurnSignal | null;
+  /** ACT-03: the turn's own frozen ReplyPlan; null when the turn
+   * carries none yet. */
+  plan?: ReplyPlan | null;
+  /** ACT-03: the composer's realized moves on a composed (non-streamed)
+   * turn; null on a streamed chat turn or before ACT-03 exists. */
+  moves?: readonly Move[] | null;
+  /** CHAT-13/step 3a: the SubjectRef stack after the turn. */
+  subjects?: readonly { type: "household" | "world" | "unresolved"; name: string; rejected: boolean }[];
+  /** ASK-01 part 4/AGE-01/CRED-01: the person's own OpenQuestions, read
+   * after the same wait `delivered` uses. */
+  openQuestions?: readonly { kind: string; status: string }[];
+  /** MEM-06/CUR-01: the richer memory-row detail `memoryRows` checks
+   * against (`records` above stays the plain text-and-status pair the
+   * older `recordActive`/`recordRetired` checks use). */
+  memoryRowDetails?: readonly { text: string; category: string; subject: string | null; status: string; importance: number; validTo: string | null; disclosure: string | null; expiredAt: string | null }[];
+  /** CHAT-13's correction path: the outcomes this turn's own row
+   * carries, by package, with their named arguments, `via`, and a
+   * correction's rejected arguments. */
+  outcomes?: readonly { packageId: string; args: Readonly<Record<string, unknown>>; via: string | null; rejected: Readonly<Record<string, unknown>> | null }[];
+  /** Section 13 part 2: the per-evidence-id disposition the composer
+   * actually applied this turn. */
+  evidenceDisposition?: readonly { evidenceId: string; disposition: "full" | "summary" | "withheld"; reason: string | null }[];
+  /** AGE-01's relay/F2's promise pattern on the body: the notification
+   * bodies delivered to the person since the turn started, after the
+   * wait (paired with `deliveries`' own type list). */
+  notificationBodies?: readonly { type: string; body: string }[];
 }
 
 export interface Check {
@@ -105,6 +143,15 @@ const escapeRegExp = (t: string) => t.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 // A keyword with a "|" is an alternation of plain words ("seven|7").
 const wordRe = (k: string) => new RegExp(`\\b(?:${k.includes("|") ? k : escapeRegExp(k)})(?:s|es|ed|ing)?\\b`, "i");
 const has = (text: string, k: string) => wordRe(k).test(text);
+/** A plain, case-insensitive regex test: the one place a raw fixture
+ * pattern (not a keyword stem) is matched against free text, shared by
+ * the reply's own mustContain/mustNotContain and notificationBody's. */
+const matches = (pattern: string, text: string) => new RegExp(pattern, "i").test(text);
+/** Loose equality for a fixture's wanted outcome args/rejected values:
+ * `===` on a `Record<string, unknown>` can never match a structurally
+ * identical object or array (two different references), so this falls
+ * back to a JSON comparison for anything that is not already `===`. */
+const sameValue = (a: unknown, b: unknown) => a === b || JSON.stringify(a) === JSON.stringify(b);
 
 /** The expectation as one line for the table. */
 export function describeExpectation(e: TurnExpectation): string {
@@ -142,6 +189,15 @@ export function describeExpectation(e: TurnExpectation): string {
   if (e.episodesInContext !== undefined) parts.push(`${e.episodesInContext} episode line${e.episodesInContext === 1 ? "" : "s"}`);
   if (e.noCopiedEpisode) parts.push("no copied episode line");
   if (e.relationshipExists) parts.push(`relationship ${e.relationshipExists.type} ${e.relationshipExists.name} ${e.relationshipExists.source}${e.relationshipExists.confirmed === undefined ? "" : e.relationshipExists.confirmed ? " confirmed" : " unconfirmed"}`);
+  if (e.signal) parts.push(`signal ${[e.signal.primary_act, e.signal.expressed_emotion, e.signal.emotion_intensity, e.signal.clauseStance ? `clauses ${e.signal.clauseStance.join(",")}` : undefined].filter(Boolean).join("/")}`);
+  if (e.plan) parts.push(`plan required ${e.plan.requiredMoves?.join("+") ?? "-"}, forbidden ${e.plan.forbiddenMoves?.join("+") ?? "-"}${e.plan.maxSentences !== undefined ? `, at most ${e.plan.maxSentences} sentences` : ""}${e.plan.maxWords !== undefined ? `, at most ${e.plan.maxWords} words` : ""}`);
+  if (e.moves) parts.push(`moves ${e.moves.join("+")}`);
+  if (e.subjects) parts.push(`subjects ${e.subjects.map((s) => `${s.type}:${s.name}${s.rejected === undefined ? "" : s.rejected ? " rejected" : " not rejected"}`).join(", ")}`);
+  if (e.openQuestion) parts.push(`open question ${e.openQuestion.kind} within ${e.openQuestion.withinMs} ms`);
+  if (e.memoryRows) parts.push(`memory rows ${e.memoryRows.map((r) => [r.textKeywords.join("+"), r.category, r.subject, r.status, r.disclosure].filter((x) => x !== undefined).join("/")).join(", ")}`);
+  if (e.outcomeArgs) parts.push(`outcome ${e.outcomeArgs.packageId} args ${JSON.stringify(e.outcomeArgs.args)}${e.outcomeArgs.via ? ` via ${e.outcomeArgs.via}` : ""}${e.outcomeArgs.rejected ? `, rejected ${JSON.stringify(e.outcomeArgs.rejected)}` : ""}`);
+  if (e.evidenceDisposition) parts.push(`evidence ${e.evidenceDisposition.map((d) => `${d.evidenceId}:${d.disposition}${d.reason ? ` (${d.reason})` : ""}`).join(", ")}`);
+  if (e.notificationBody) parts.push(`${e.notificationBody.notification} body within ${e.notificationBody.withinMs} ms${e.notificationBody.mustContain ? `, has /${e.notificationBody.mustContain}/` : ""}${e.notificationBody.mustNotContain ? `, lacks /${e.notificationBody.mustNotContain}/` : ""}`);
   if (e.humanVerdict) parts.push("(reader's verdict)");
   return parts.join("; ");
 }
@@ -193,7 +249,7 @@ export function scoreTurn(conversation: BenchConversation, turnIndex: number, tu
   if (e.safetyAction) checks.push({ name: "safety", pass: observed.safetyAction === e.safetyAction, detail: observed.safetyAction ?? "none" });
   if (e.crisisResources) checks.push({ name: "crisis resources", pass: observed.crisisResources, detail: observed.crisisResources ? "attached" : "absent" });
   if (e.mustContain) {
-    const ok = new RegExp(e.mustContain, "i").test(reply);
+    const ok = matches(e.mustContain, reply);
     checks.push({ name: "reply has", pass: ok, detail: ok ? `/${e.mustContain}/` : `missing /${e.mustContain}/` });
   }
   if (e.mustNotContain) {
@@ -289,6 +345,101 @@ export function scoreTurn(conversation: BenchConversation, turnIndex: number, tu
     const pass = edge !== undefined && edge.source === want.source && (want.confirmed === undefined || edge.confirmed === want.confirmed);
     const all = observed.relationships.map((r) => `${r.type} ${r.name} ${r.source}${r.confirmed ? " confirmed" : ""}`).join(", ") || "none";
     checks.push({ name: "relationship", pass, detail: edge ? `${edge.type} ${edge.name} ${edge.source}${edge.confirmed ? " confirmed" : ""}` : `no ${want.type} with ${want.name} (relationships: ${all})` });
+  }
+  if (e.signal) {
+    const s = observed.signal;
+    if (!s) {
+      // Always one failing check, whether or not a sub-field was asked
+      // for: the same unconditional shape `plan` below uses, so
+      // `expect: { signal: {} }` cannot silently no-op just because no
+      // sub-field happened to be set.
+      checks.push({ name: "signal", pass: false, detail: "no signal observed" });
+    } else {
+      if (e.signal.primary_act) checks.push({ name: "signal act", pass: s.primary_act === e.signal.primary_act, detail: `act ${s.primary_act}` });
+      if (e.signal.expressed_emotion) checks.push({ name: "signal emotion", pass: s.expressed_emotion === e.signal.expressed_emotion, detail: `emotion ${s.expressed_emotion}` });
+      if (e.signal.emotion_intensity) checks.push({ name: "signal intensity", pass: s.emotion_intensity === e.signal.emotion_intensity, detail: `intensity ${s.emotion_intensity}` });
+      if (e.signal.clauseStance) {
+        const got = s.clauses.map((c) => c.stance);
+        const pass = e.signal.clauseStance.every((want, i) => got[i] === want);
+        checks.push({ name: "signal clause stance", pass, detail: `stances ${got.join(",")}` });
+      }
+    }
+  }
+  if (e.plan) {
+    const p = observed.plan;
+    if (!p) {
+      checks.push({ name: "plan", pass: false, detail: "no plan observed" });
+    } else {
+      if (e.plan.requiredMoves) {
+        const missing = e.plan.requiredMoves.filter((m) => p.moves[m] !== "required");
+        checks.push({ name: "plan required moves", pass: missing.length === 0, detail: missing.length === 0 ? "all required" : `not required: ${missing.join(", ")}` });
+      }
+      if (e.plan.forbiddenMoves) {
+        const notForbidden = e.plan.forbiddenMoves.filter((m) => p.moves[m] !== "forbidden");
+        checks.push({ name: "plan forbidden moves", pass: notForbidden.length === 0, detail: notForbidden.length === 0 ? "all forbidden" : `not forbidden: ${notForbidden.join(", ")}` });
+      }
+      if (e.plan.maxSentences !== undefined) checks.push({ name: "plan max sentences", pass: p.max_sentences <= e.plan.maxSentences, detail: `plan allows ${p.max_sentences}` });
+      if (e.plan.maxWords !== undefined) checks.push({ name: "plan max words", pass: p.max_words <= e.plan.maxWords, detail: `plan allows ${p.max_words}` });
+    }
+  }
+  if (e.moves) {
+    const got = observed.moves;
+    const missing = got ? e.moves.filter((m) => !got.includes(m)) : e.moves;
+    checks.push({ name: "moves", pass: got !== null && got !== undefined && missing.length === 0, detail: got ? `realized ${got.join("+")}` : "no composed-turn moves observed" });
+  }
+  if (e.subjects) {
+    const got = observed.subjects ?? [];
+    for (const want of e.subjects) {
+      const hit = got.find((s) => s.type === want.type && s.name.toLowerCase() === want.name.toLowerCase());
+      const pass = hit !== undefined && (want.rejected === undefined || hit.rejected === want.rejected);
+      checks.push({ name: "subject", pass, detail: hit ? `${hit.type}:${hit.name}${hit.rejected ? " rejected" : ""}` : `no ${want.type} subject named ${want.name} (stack: ${got.map((s) => `${s.type}:${s.name}`).join(", ") || "empty"})` });
+    }
+  }
+  if (e.openQuestion) {
+    const hit = observed.openQuestions?.find((q) => q.kind === e.openQuestion!.kind && q.status === "asked");
+    checks.push({ name: "open question", pass: hit !== undefined, detail: hit ? `${hit.kind} asked` : `no ${e.openQuestion.kind} open question asked within ${e.openQuestion.withinMs} ms (observed: ${observed.openQuestions?.map((q) => `${q.kind}:${q.status}`).join(", ") ?? "none"})` });
+  }
+  if (e.memoryRows) {
+    const rows = observed.memoryRowDetails ?? [];
+    for (const want of e.memoryRows) {
+      const hit = rows.find(
+        (r) =>
+          want.textKeywords.every((k) => has(r.text, k)) &&
+          (want.category === undefined || r.category === want.category) &&
+          (want.subject === undefined || r.subject?.toLowerCase() === want.subject.toLowerCase()) &&
+          (want.status === undefined || r.status === want.status) &&
+          (want.minImportance === undefined || r.importance >= want.minImportance) &&
+          (want.maxImportance === undefined || r.importance <= want.maxImportance) &&
+          (want.hasValidTo === undefined || (r.validTo !== null) === want.hasValidTo) &&
+          (want.disclosure === undefined || r.disclosure === want.disclosure) &&
+          (want.hasExpiredAt === undefined || (r.expiredAt !== null) === want.hasExpiredAt),
+      );
+      checks.push({ name: "memory row detail", pass: hit !== undefined, detail: hit ? `matched: ${hit.text}` : `no memory row matching ${want.textKeywords.join("+")} at the stated floors (${rows.length} row(s) observed)` });
+    }
+  }
+  if (e.outcomeArgs) {
+    const want = e.outcomeArgs;
+    const hit = observed.outcomes?.find((o) => o.packageId === want.packageId);
+    const argsMatch = hit !== undefined && Object.entries(want.args).every(([k, v]) => sameValue(hit.args[k], v));
+    const viaMatch = want.via === undefined || hit?.via === want.via;
+    const rejectedMatch = want.rejected === undefined || (hit?.rejected !== undefined && hit.rejected !== null && Object.entries(want.rejected).every(([k, v]) => sameValue(hit.rejected![k], v)));
+    const pass = hit !== undefined && argsMatch && viaMatch && rejectedMatch;
+    checks.push({ name: "outcome args", pass, detail: hit ? `${hit.packageId} args ${JSON.stringify(hit.args)}${hit.via ? ` via ${hit.via}` : ""}` : `no outcome from ${want.packageId} (observed: ${observed.outcomes?.map((o) => o.packageId).join(", ") ?? "none"})` });
+  }
+  if (e.evidenceDisposition) {
+    const rows = observed.evidenceDisposition ?? [];
+    for (const want of e.evidenceDisposition) {
+      const hit = rows.find((r) => r.evidenceId === want.evidenceId);
+      const pass = hit !== undefined && hit.disposition === want.disposition && (want.reason === undefined || hit.reason === want.reason);
+      checks.push({ name: "evidence disposition", pass, detail: hit ? `${hit.evidenceId}: ${hit.disposition}${hit.reason ? ` (${hit.reason})` : ""}` : `no disposition for ${want.evidenceId} (observed: ${rows.length})` });
+    }
+  }
+  if (e.notificationBody) {
+    const want = e.notificationBody;
+    const hit = observed.notificationBodies?.find((n) => n.type === want.notification);
+    const containsOk = hit !== undefined && (want.mustContain === undefined || matches(want.mustContain, hit.body));
+    const notContainsOk = hit !== undefined && (want.mustNotContain === undefined || !matches(want.mustNotContain, hit.body));
+    checks.push({ name: "notification body", pass: hit !== undefined && containsOk && notContainsOk, detail: hit ? `"${hit.body}"` : `${want.notification} body not observed within ${want.withinMs} ms` });
   }
   // OUT-01: the universal check. Every reply that reached the person
   // passes the well-formed rule (a sentence with a stop, balanced

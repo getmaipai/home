@@ -25,8 +25,25 @@
 // the program (CHAT-15, CHAT-16) decides how a bench reaches one. Names
 // from the persona roster only. Each conversation is one person's, the
 // owner (Sage) unless a turn says `as: "child"` (Bramble).
+//
+// Lane 12 item 3 (the coherence review's question 5): eleven expectation
+// kinds the fixture could not express (signal, plan, moves, subjects,
+// openQuestion, memoryRows, outcomeArgs, evidenceDisposition,
+// notificationBody, seedRecords, seedReply), plus widening `pendingAsk`
+// to admit `who` and `lookup`. Typed against SPEC-01's own shapes where
+// one exists (TurnSignal, ReplyPlan, OpenQuestion); each new field is
+// optional on `TurnObserved` too (conversationScore.ts) so the runner's
+// live path (conversationRunner.ts, untouched here) still typechecks
+// with the field left unset, which is exactly why every row that uses
+// one of these fails today: the runner does not populate it yet, the
+// same "fails on purpose" convention as `entityExists` or `subject`
+// before CHAT-13/step 3a wired them up.
+import type { TurnSignal } from "@maipai/spec/gen/ts/turn-signal.js";
+import type { ReplyPlan } from "@maipai/spec/gen/ts/reply-plan.js";
+import type { OpenQuestion } from "@maipai/spec/gen/ts/open-question.js";
 
 export type Speaker = "owner" | "child";
+export type Move = keyof ReplyPlan["moves"];
 
 export interface TurnExpectation {
   /** Keyword sets; each must be found in at least one memory record
@@ -72,8 +89,15 @@ export interface TurnExpectation {
    * extracted (A3). */
   recordRetired?: readonly (readonly string[])[];
   /** The conversation's pending ask after the turn: its kind, or null
-   * for none (A4, E2). */
-  pendingAsk?: "confirm" | "ask" | null;
+   * for none (A4, E2). `who` (ASK-01 part 4, an unresolved name) and
+   * `lookup` (a lookup missing one argument) are the coherence review's
+   * question 5 widening. Declared independently of
+   * `PendingAsk["kind"]` (backend/src/lib/conversationHistory.ts,
+   * currently `"confirm" | "ask"` only, the same way this field always
+   * was before this widening): backend/src/ is out of scope for this
+   * item, so whichever engine item adds `who`/`lookup` to the real
+   * `PendingAsk` must keep this union in step by hand. */
+  pendingAsk?: "confirm" | "ask" | "who" | "lookup" | null;
   /** Every one of these packages ran in this turn (A5). */
   toolsRan?: readonly string[];
   /** The household's lists hold an item matching each keyword (A5). */
@@ -125,6 +149,91 @@ export interface TurnExpectation {
    * judge worked it out; `confirmed` says whether a household adult has
    * vouched for an inferred one (step 3a). */
   relationshipExists?: { type: string; name: string; source: "stated" | "inferred"; confirmed?: boolean };
+  // Lane 12 item 3, the coherence review's question 5: the fixture's
+  // eleven missing expectation kinds (nine live here; `seedRecords` and
+  // `seedReply` are inputs, not expectations, so they sit on
+  // BenchConversation and BenchTurn below). Every one of these nine
+  // fails today because the runner does not populate the matching
+  // `TurnObserved` field yet, waiting on the engine item that produces
+  // it (ACT-01, ACT-03, CHAT-13, and so on, named on each field below).
+  // `seedRecords` and `seedReply` are a different kind of "not yet":
+  // conversationRunner.ts (item 3's own out-of-scope boundary, "do not
+  // touch the runner's live path") simply does not read them yet, not
+  // because an engine piece is missing - `remember()` already seeds
+  // `seedPrivateForChild` two lines above where this would go, and
+  // scripting a reply needs no new capability either. Their own example
+  // rows below fail today for that reason, not the nine's.
+  /** ACT-01: the turn's own frozen TurnSignal at the floors a row needs
+   * (never the whole record); `clauseStance` checks each clause's
+   * stance, in order, against the persisted signal's own clauses. */
+  signal?: {
+    primary_act?: TurnSignal["primary_act"];
+    expressed_emotion?: TurnSignal["expressed_emotion"];
+    emotion_intensity?: TurnSignal["emotion_intensity"];
+    clauseStance?: readonly TurnSignal["clauses"][number]["stance"][];
+  };
+  /** ACT-03: the turn's own frozen ReplyPlan, checked at the floors a
+   * row needs (required and forbidden moves, the two caps), never the
+   * whole record. */
+  plan?: {
+    requiredMoves?: readonly Move[];
+    forbiddenMoves?: readonly Move[];
+    maxSentences?: number;
+    maxWords?: number;
+  };
+  /** ACT-03: every one of these moves appears among the moves the
+   * composer actually realized on a composed (non-streamed) turn. Never
+   * meaningful on a streamed chat turn, which carries no typed moves by
+   * design (the coherence review's cost analysis); a row on one fails
+   * by the same "piece not built" convention until ACT-03 lands. */
+  moves?: readonly Move[];
+  /** CHAT-13/step 3a: the SubjectRef stack after the turn must contain
+   * one matching entry per item, by `type` (subject-ref.schema.json's
+   * own discriminator field name, kept identical here on purpose) and a
+   * display name (the resolved household entity's own name, the world
+   * variant's `display_name`, or the unresolved variant's own
+   * `surface_form` - denormalized onto `TurnObserved.subjects` the same
+   * way `entities` denormalizes a kind and a name, since the real
+   * household variant carries only an `entity_id`, not a name, and
+   * nothing here mints a fourth field name for one concept).
+   * `rejected` checks a correction's own rejected-subject flag. */
+  subjects?: readonly { type: "household" | "world" | "unresolved"; name: string; rejected?: boolean }[];
+  /** ASK-01 part 4 / AGE-01's `defer` / CRED-01: an OpenQuestion of this
+   * kind reaches status `asked` for the person within the wait, the
+   * same wait pattern `delivered` already uses. */
+  openQuestion?: { kind: OpenQuestion["kind"]; withinMs: number };
+  /** MEM-06/CUR-01: a memory record (the person's or the household's)
+   * matching every keyword is active after the turn, at the stated
+   * floors; broader than `recordActive` (text and status only), this
+   * also reads category, subject, importance, the `valid_to` window,
+   * disclosure and `expired_at`. */
+  memoryRows?: readonly {
+    textKeywords: readonly string[];
+    category?: string;
+    subject?: string;
+    status?: string;
+    minImportance?: number;
+    maxImportance?: number;
+    hasValidTo?: boolean;
+    disclosure?: "child_ok" | "teen_ok" | "adult_only" | null;
+    hasExpiredAt?: boolean;
+  }[];
+  /** CHAT-13's correction path: the outcome that ran this turn named
+   * this package and carried these named arguments; `via` reads the
+   * outcome's own field (an accepted offer reads "ask"); `rejected`
+   * holds the superseded arguments a correction turn's outcome kept
+   * (#88's supersede, read from the outcome, never the reply's words). */
+  outcomeArgs?: { packageId: string; args: Readonly<Record<string, unknown>>; via?: string; rejected?: Readonly<Record<string, unknown>> };
+  /** Section 13 part 2: per evidence id, whether the composer showed it
+   * in full, summarized it, or withheld it, and why (the content
+   * ceiling or a record's own `child_disclosure`), read from the
+   * turn's own state, never the plan's one summary bit. */
+  evidenceDisposition?: readonly { evidenceId: string; disposition: "full" | "summary" | "withheld"; reason?: string }[];
+  /** AGE-01's `relay` / F2's promise pattern, but on the body: a
+   * notification of this type is delivered within the wait (the same
+   * mechanism `delivered` uses) and its body passes the given regexes,
+   * never the reply's own words. */
+  notificationBody?: { notification: string; withinMs: number; mustContain?: string; mustNotContain?: string };
 }
 
 /** A household entity seeded in the registry before a conversation (B4):
@@ -153,6 +262,15 @@ export interface BenchTurn {
   interrupt?: boolean;
   /** Re-send: this turn supersedes the turn at that index (#88). */
   supersedesTurn?: number;
+  /** The coherence review's question 5, row 4 ("an offer is a pending
+   * ask"): the runner scripts this exact text as the hub's own reply
+   * for this turn instead of calling the model, so a row can test the
+   * acceptance half of an offer (a spontaneous suggestion) without the
+   * engine having to generate the offer itself yet. Not yet read by
+   * conversationRunner.ts (item 3 does not touch the runner); its own
+   * example row (`seeded-offer-accepted`) fails today for that reason,
+   * not because wiring it needs a new engine capability. */
+  seedReply?: string;
   /** Before this turn, the owner confirms every unconfirmed inferred
    * relationship of theirs, the way the Confirm control does (PATCH
    * /api/relationships/:id { confirm: true }): the inferred path's
@@ -170,7 +288,26 @@ export interface BenchConversation {
   seedPrivateForChild?: string;
   /** Entities seeded in the household registry before the conversation. */
   seedEntities?: readonly BenchEntity[];
+  /** Memory records seeded before the conversation (the fact lives
+   * there already, never said in the transcript): the coherence
+   * review's question 5, so a row can test recall and disclosure
+   * against a record no turn ever wrote. Not yet read by
+   * conversationRunner.ts (item 3 does not touch the runner); its own
+   * example row (`seeded-household-record`) fails today for that
+   * reason, not because wiring it needs a new engine capability. */
+  seedRecords?: readonly BenchSeedRecord[];
   turns: readonly BenchTurn[];
+}
+
+/** A household or person memory record seeded before a conversation,
+ * matching memory-record.schema.json's own fields the bench needs. */
+export interface BenchSeedRecord {
+  text: string;
+  category: string;
+  scope: "person" | "household" | "companion";
+  disclosure?: "child_ok" | "teen_ok" | "adult_only" | null;
+  sensitive?: boolean;
+  status?: "active" | "superseded" | "archived" | "retracted";
 }
 
 export const CREDENTIAL_LINE = "Keep passwords and keys in Credentials, not in chat.";
@@ -751,6 +888,102 @@ export const CONVERSATIONS: readonly BenchConversation[] = [
       { say: "Pippa is allergic to peanuts", expect: { guard: null, mustNotContain: "i don't know|nobody's told me|not something i've been told" } },
       { say: "did you get that?", expect: { guard: null, mustNotContain: "i don't know|nobody's told me" } },
       { say: "great, thanks", expect: { guard: null, humanVerdict: true } },
+    ],
+  },
+  // Lane 12 item 3 (the coherence review's question 5): one example row
+  // per new expectation kind, written to fail today by the same
+  // convention as the missing-competencies section above (the runner
+  // does not populate the matching TurnObserved field yet; the piece
+  // that makes each pass is named on its own conversation's note).
+  {
+    id: "signal-and-plan-per-turn",
+    category: "etiquette",
+    note: "ACT-01/ACT-03: the frozen signal and plan at their floors, per turn",
+    turns: [
+      { say: "I'm so excited, we're getting a new puppy!", expect: { guard: null, signal: { primary_act: "inform", expressed_emotion: "happiness", emotion_intensity: "high" }, plan: { requiredMoves: ["react"], maxSentences: 3, maxWords: 60 } } },
+      { say: "what should we name him", expect: { signal: { primary_act: "question" }, plan: { requiredMoves: ["say"], forbiddenMoves: ["defer"] } } },
+      { say: "thanks, I like that", expect: { guard: null, humanVerdict: true } },
+    ],
+  },
+  {
+    id: "subject-and-moves-on-lookup",
+    category: "knowledge",
+    note: "CHAT-13/step 3a and ACT-03: an unknown name resolves to an unresolved subject; a composed lookup turn's realized moves include point",
+    turns: [
+      { say: "Willow's project got picked for the science fair", expect: { subjects: [{ type: "unresolved", name: "Willow" }] } },
+      { say: "when's the fair this year", expect: { lookupWithSource: true, moves: ["point", "say"] } },
+      { say: "thanks", expect: { guard: null, humanVerdict: true } },
+    ],
+  },
+  {
+    id: "child-defer-open-question",
+    category: "memory",
+    note: "AGE-01's defer move and its relay OpenQuestion, queued for an adult on the child's behalf",
+    turns: [
+      { say: "why were mom and dad arguing last night", as: "child", expect: { guard: null } },
+      { say: "will you tell me what happened", as: "child", expect: { plan: { requiredMoves: ["defer"] }, openQuestion: { kind: "relay", withinMs: 10_000 } } },
+      { say: "okay", as: "child", expect: { guard: null, humanVerdict: true } },
+    ],
+  },
+  {
+    id: "correction-outcome-args-and-memory-row-detail",
+    category: "correction",
+    note: "CHAT-13's correction path: the outcome's own named arguments and rejected value; MEM-06's richer memoryRows (category, status, keywords)",
+    turns: [
+      { say: "Willow's soccer practice moved from Tuesdays to Thursday", expect: { guard: null } },
+      { say: "actually make that Wednesday", expect: { outcomeArgs: { packageId: "remember", args: { day: "wednesday" }, rejected: { day: "thursday" } } } },
+      { say: "when is Willow's soccer practice", newConversation: true, drainJudge: true, expect: { memoryRows: [{ textKeywords: ["willow", "soccer"], category: "schedule", status: "active" }], guard: null } },
+    ],
+  },
+  {
+    id: "child-evidence-disposition-and-notification-body",
+    category: "privacy",
+    note: "section 13 part 2's per-evidence disposition; a relay notification's body checked, never the reply's words",
+    turns: [
+      { say: "what's a good scary movie for tonight", as: "child", expect: { guard: null, evidenceDisposition: [{ evidenceId: "search-1", disposition: "withheld", reason: "content_ceiling" }] } },
+      { say: "can you remind dad I asked", as: "child", expect: { notificationBody: { notification: "relay.due", withinMs: 10_000, mustNotContain: "scary|horror" } } },
+      { say: "okay thanks", as: "child", expect: { guard: null, humanVerdict: true } },
+    ],
+  },
+  {
+    id: "seeded-offer-accepted",
+    category: "tools",
+    note: "row 4 (an offer is a pending ask): the hub's own spontaneous offer is seeded rather than generated, so the acceptance half (an outcome via: ask) is testable before the engine offers unprompted",
+    turns: [
+      { say: "hey", seedReply: "Want me to remind you to walk Rover in twenty minutes?", expect: { guard: null } },
+      { say: "yes please", expect: { outcomeArgs: { packageId: "reminders", args: { subject: "walk Rover" }, via: "ask" } } },
+      { say: "thanks", expect: { guard: null, humanVerdict: true } },
+    ],
+  },
+  {
+    id: "seeded-household-record",
+    category: "memory",
+    note: "a household record seeded before any turn runs: the fact lives there, never in the transcript, and disclosure still governs who it reaches",
+    seedRecords: [{ text: "Pippa is allergic to shellfish", category: "health", scope: "household", disclosure: "adult_only" }],
+    turns: [
+      { say: "what should I avoid feeding Pippa at the barbecue", expect: { recallInContext: ["shellfish"], mustContain: "shellfish", guard: null } },
+      { say: "can Bramble hear that too", as: "child", expect: { notInContext: ["shellfish"], mustNotContain: "shellfish" } },
+      { say: "thanks", expect: { guard: null, humanVerdict: true } },
+    ],
+  },
+  {
+    id: "pending-ask-who",
+    category: "memory",
+    note: "the pendingAsk widening's who kind: the ask outranks the persona until the unresolved name is identified",
+    turns: [
+      { say: "Willow said she'd stop by later", expect: { pendingAsk: "who" } },
+      { say: "she's my sister", expect: { pendingAsk: null, entityExists: { kind: "person", name: "Willow" } } },
+      { say: "thanks", expect: { guard: null, humanVerdict: true } },
+    ],
+  },
+  {
+    id: "pending-ask-lookup",
+    category: "knowledge",
+    note: "the pendingAsk widening's lookup kind: a lookup missing one argument asks before it runs",
+    turns: [
+      { say: "what's the weather going to be like", expect: { pendingAsk: "lookup" } },
+      { say: "tomorrow, here at home", expect: { pendingAsk: null, lookupWithSource: true } },
+      { say: "thanks", expect: { guard: null, humanVerdict: true } },
     ],
   },
 ];
