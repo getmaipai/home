@@ -13,7 +13,7 @@ import { eq, and, or, ne, isNull } from "drizzle-orm";
 import { db, sqlite } from "@/db";
 import { conversationTurns, memoryRecords, people, lists, entities, relationships, episodes as episodesTable } from "@/db/schema";
 import { runTurnStream, type TurnStreamResult } from "@/lib/turnEngine";
-import { createConversation, getPendingAsk } from "@/lib/conversationHistory";
+import { createConversation, getPendingAsk, turnSignalOf } from "@/lib/conversationHistory";
 import { activeTurnCount } from "@/lib/turnActivity";
 import { remember } from "@/lib/memory";
 import { deleteEpisodesForPerson } from "@/lib/episodes";
@@ -29,6 +29,7 @@ import type { PersonRow } from "@/types";
 import type { TurnValue } from "@/wire";
 import type { BenchConversation, Speaker } from "./conversationFixture";
 import { scoreTurn, type TurnObserved, type TurnScore } from "./conversationScore";
+import type { TurnTimings } from "@/lib/turnContext";
 
 // ==== The [turn] / [route] log capture ====
 
@@ -40,6 +41,9 @@ interface TurnLine {
   safety_action?: string;
   /** The subject tracker's resolved subject, once one writes it (CHAT-13). */
   subject?: string;
+  /** ACT-01: the frozen signal's headline and the per-stage timings. */
+  signal?: { act: string; secondary: string[]; emotion: string; intensity: string; target: string; repair: string; source: string };
+  timings?: TurnTimings;
 }
 interface RouteLine {
   turn_id: string;
@@ -273,6 +277,19 @@ function attemptsIn(conversationId: string): Record<string, number> {
 
 /** The person's and the household's memory records with their status
  * (A3: a correction retires the old record and activates the new one). */
+function memoryRowDetailsFor(actor: PersonRow): TurnObserved["memoryRowDetails"] {
+  const subjectNames = new Map(db.select({ id: entities.id, name: entities.name }).from(entities).all().map((e) => [e.id, e.name]));
+  return db
+    .select({ text: memoryRecords.text, category: memoryRecords.category, subjectId: memoryRecords.subjectId, status: memoryRecords.status, importance: memoryRecords.importance, validTo: memoryRecords.validTo, expiredAt: memoryRecords.expiredAt })
+    .from(memoryRecords)
+    .where(or(eq(memoryRecords.person, actor.id), eq(memoryRecords.scope, "household")))
+    .all()
+    .filter((r) => r.text.length > 0)
+    // `disclosure` is AGE-01's column (spec'd by SPEC-01, not stored
+    // yet): null until the table carries it.
+    .map((r) => ({ text: r.text, category: r.category, subject: r.subjectId ? (subjectNames.get(r.subjectId) ?? null) : null, status: r.status, importance: r.importance, validTo: r.validTo, disclosure: null, expiredAt: r.expiredAt }));
+}
+
 function recordsFor(actor: PersonRow): { text: string; status: string }[] {
   return db
     .select({ text: memoryRecords.text, status: memoryRecords.status })
@@ -448,7 +465,7 @@ export async function runConversation(conv: BenchConversation, deps: RunDeps): P
     const requests = deps.proxy?.requests ?? [];
     // A row that reads memory (written, or nothing written) is read
     // after the judge has had its turn, so the judge's own rows count.
-    if (turn.expect.memoryWritten || turn.expect.storesNothing || turn.expect.recordActive || turn.expect.recordRetired || turn.expect.entityExists || turn.expect.relationshipExists) await deps.drainJudge();
+    if (turn.expect.memoryWritten || turn.expect.storesNothing || turn.expect.recordActive || turn.expect.recordRetired || turn.expect.entityExists || turn.expect.relationshipExists || turn.expect.memoryRows) await deps.drainJudge();
     // The jobs this turn scheduled, read before the delivery wait: a
     // promise row sees its own job pending, then the scheduler's own
     // delivery of it.
@@ -478,6 +495,11 @@ export async function runConversation(conv: BenchConversation, deps: RunDeps): P
       interrupted: driven.interrupted,
       rawModelText: requests.length ? (requests[requests.length - 1]?.responseText ?? null) : null,
       records: recordsFor(actor),
+      // ACT-01: the frozen signal off the turn row (never the log line),
+      // and the memory rows in the detail MEM-06's memoryRows expectation
+      // reads (category, subject, importance, the valid_to window).
+      signal: row ? turnSignalOf(row) : null,
+      memoryRowDetails: memoryRowDetailsFor(actor),
       pendingAsk: getPendingAsk(conversationId)?.kind ?? null,
       listItems: since(listItemsAtStart, listItemsNow()),
       jobs,
@@ -567,6 +589,9 @@ export function backdateBenchRows(peopleRows: BenchPeople, days: number, turnIds
       ["conversations", "person_id", "updated_at"],
       ["memory_records", "person", "created_at"],
       ["memory_records", "person", "valid_from"],
+      // ACT-01: a bounded state's window moves with the clock too, so a
+      // backdated record that was a day from expiring is expired now.
+      ["memory_records", "person", "valid_to"],
       ["episodes", "person_id", "created_at"],
     ] as const) {
       const rows = sqlite.query(`SELECT id, ${column} AS v FROM ${table} WHERE ${owner} = ? AND ${column} IS NOT NULL`).all(person.id) as { id: string; v: string }[];

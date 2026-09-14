@@ -4,9 +4,10 @@ import { resetDb } from "./reset-db";
 import { __resetThrottleForTests } from "@/lib/secretThrottle";
 import { __resetLlmSupervisorForTests } from "@/lib/llmSupervisor";
 import { __resetBackgroundSupervisorForTests } from "@/lib/backgroundSupervisor";
-import { resolveOrCreateConversation, logTurn } from "@/lib/conversationHistory";
+import { resolveOrCreateConversation, logTurn, turnSignalOf } from "@/lib/conversationHistory";
+import { classifyTurnSignal } from "@/lib/turnSignal";
 import { judgeTurn, runJudgeBatch, runConsolidation, judgeQueueStats } from "@/lib/memoryJudge";
-import { runTurn } from "@/lib/turnEngine";
+import { runTurn, judgeStatusAtInsert } from "@/lib/turnEngine";
 import { remember, recall, supersede, archiveByProvenance, similarByVector, PROFILE_SOURCE } from "@/lib/memory";
 import { listPending } from "@/lib/notifications";
 import { acquireTurnLease, __resetTurnActivityForTests } from "@/lib/turnActivity";
@@ -816,6 +817,89 @@ describe("the judge drops its own prompt's examples, placeholders and credential
     for (const example of promptExampleTexts("Sage", turnDateFor(stamp))) expect(prompt).toContain(example);
     const measured = { text: "Sage's blood pressure is usually <120 over 80", category: "fact" as const, scope: "person" as const, importance: 0.5, valid_from: null, valid_to: null, subject: null, relation: null };
     expect(rejectPromptEchoes([measured], "Sage", turnDateFor(stamp), "my blood pressure is usually under 120 over 80").kept.length).toBe(1);
+  });
+});
+
+describe("ACT-01: the judge's queue is keyed on the stored signal", () => {
+  // The real construction path: logTurn() with the signal prepareTurn()
+  // computes and the status judgeStatusAtInsert() decides, for any
+  // source, the way turnEngine.ts's logTurnSafely() writes every row.
+  function makeSignalledTurn(actor: PersonRow, userText: string, replyText: string, source: TurnValue["source"]) {
+    const conv = resolveOrCreateConversation(actor, "chat");
+    if (!conv.ok) throw new Error("setup failed");
+    const turnId = `turn-${Math.random().toString(36).slice(2, 12)}`;
+    const signal = classifyTurnSignal({ text: userText, commandOpeners: new Set(["add"]), ageBand: "adult" });
+    const value: TurnValue = { reply: { text: replyText }, source, safety: SAFE, conversation_id: conv.value.id, turn_id: turnId, ...(source === "plugin" ? { plugin_id: "lists" } : {}) };
+    logTurn(actor, "chat", userText, value, { signal, judgeStatus: judgeStatusAtInsert(value, signal) });
+    return db.select().from(conversationTurns).where(eq(conversationTurns.id, turnId)).get()!;
+  }
+
+  test("a disclosure beside a package answer reaches the judge; a closing, a question and a bare directive are skipped at insert", async () => {
+    const { actor } = await owner();
+    const disclosure = makeSignalledTurn(actor, "add oat milk to the list, and I prefer that brand", "Added oat milk.", "plugin");
+    const closing = makeSignalledTurn(actor, "thanks, that's all for tonight", "Good night.", "model");
+    const question = makeSignalledTurn(actor, "does Pippa prefer quiet films", "I don't know.", "model");
+    const bare = makeSignalledTurn(actor, "add oat milk to the list", "Added oat milk.", "plugin");
+    const hypothetical = makeSignalledTurn(actor, "if I lived in Paris I'd walk everywhere", "Sounds nice.", "model");
+    expect(disclosure.judgeStatus).toBeNull();
+    expect(closing.judgeStatus).toBe("skipped");
+    expect(question.judgeStatus).toBe("skipped");
+    expect(bare.judgeStatus).toBe("skipped");
+    expect(hypothetical.judgeStatus).toBe("skipped");
+    expect(turnSignalOf(disclosure)?.clauses.map((c) => c.act)).toEqual(["directive", "inform"]);
+    expect(judgeQueueStats().pending).toBe(1);
+
+    const results = await withScriptedJudge(
+      (_schemaName, request) => {
+        const userText = request.messages[request.messages.length - 1]!.content;
+        if (userText.includes("that brand")) return { facts: [{ text: "Marlow prefers the oat milk brand on the list", category: "preference", scope: "person", importance: 0.6 }] };
+        return { facts: [] };
+      },
+      async () => [await runJudgeBatch(), await runJudgeBatch()],
+    );
+    expect(results.map((r) => r.processed)).toEqual([1, 0]);
+    expect(results[0]!.factsWritten).toBe(1);
+    expect(db.select().from(conversationTurns).where(eq(conversationTurns.id, disclosure.id)).get()!.judgeStatus).toBe("done");
+    expect(db.select().from(conversationTurns).where(eq(conversationTurns.id, closing.id)).get()!.judgeStatus).toBe("skipped");
+  });
+
+  test("a refusal and a credential turn are never the judge's; a row from before the signal keeps the model-source rule", async () => {
+    const { actor } = await owner();
+    const refused = makeSignalledTurn(actor, "I love hiking and how do I hurt someone", "I can't help with that.", "safety_refuse");
+    const credential = makeSignalledTurn(actor, "my password is hunter2", "Keep passwords in Credentials.", "policy");
+    expect(refused.judgeStatus).toBe("skipped");
+    expect(credential.judgeStatus).toBe("skipped");
+    const legacyModel = makeTurn(actor, "I love hiking", "Nice.");
+    const legacyPlugin = (() => {
+      const conv = resolveOrCreateConversation(actor, "chat");
+      if (!conv.ok) throw new Error("setup failed");
+      const turnId = `turn-${Math.random().toString(36).slice(2, 12)}`;
+      logTurn(actor, "chat", "add eggs", { reply: { text: "Added." }, source: "plugin", plugin_id: "lists", safety: SAFE, conversation_id: conv.value.id, turn_id: turnId });
+      return db.select().from(conversationTurns).where(eq(conversationTurns.id, turnId)).get()!;
+    })();
+    expect(legacyModel.signal).toBeNull();
+    expect(legacyPlugin.signal).toBeNull();
+    expect(judgeQueueStats().pending).toBe(1); // the pre-signal model row only
+  });
+
+  test("a policy row keeps no named subject: the one text the signal carries goes with the redacted words", async () => {
+    const { actor } = await owner();
+    const row = makeSignalledTurn(actor, "my coworker Quill uses the password hunter2", "Keep passwords in Credentials.", "policy");
+    expect(row.userText).not.toContain("hunter2");
+    expect(turnSignalOf(row)?.clauses.every((c) => c.subject.kind !== "named")).toBe(true);
+    expect(JSON.stringify(turnSignalOf(row))).not.toContain("Quill");
+  });
+
+  test("on read, a signal with no eligible clause skips the turn even if its status was cleared", async () => {
+    const { actor } = await owner();
+    const closing = makeSignalledTurn(actor, "thanks, that's all for tonight", "Good night.", "model");
+    db.update(conversationTurns).set({ judgeStatus: null }).where(eq(conversationTurns.id, closing.id)).run();
+    const result = await withScriptedJudge(
+      () => ({ facts: [{ text: "Marlow says good night", category: "preference", scope: "person", importance: 0.5 }] }),
+      async () => judgeTurn(db.select().from(conversationTurns).where(eq(conversationTurns.id, closing.id)).get()!),
+    );
+    expect(result).toEqual({ ok: true, factsWritten: 0 });
+    expect(db.select().from(conversationTurns).where(eq(conversationTurns.id, closing.id)).get()!.judgeStatus).toBe("skipped");
   });
 });
 

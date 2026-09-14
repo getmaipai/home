@@ -18,6 +18,7 @@
 import { createHash } from "node:crypto";
 import { createReadStream, existsSync } from "node:fs";
 import { startRecordingProxy } from "./recordingProxy";
+import type { TurnTimings } from "@/lib/turnContext";
 
 const upstream = process.env.MAIPAI_LLAMA_SERVER_URL;
 if (!upstream) {
@@ -201,6 +202,7 @@ async function main(): Promise<{ executed: number; engine: string }> {
   const people = runner.createBenchPeople();
   const homeAssistant = runner.startFakeHomeAssistant();
   const scores: Awaited<ReturnType<typeof runner.runConversation>>["scores"] = [];
+  const stageTimings: TurnTimings[] = [];
   const started = Date.now();
   try {
     for (const conv of SELECTED) {
@@ -221,7 +223,13 @@ async function main(): Promise<{ executed: number; engine: string }> {
       scores.push(...run.scores);
       // One JSON line per turn for a later reading of the run (the
       // reply, the checks, the timings), beside the table.
-      for (const sc of run.scores) console.log(`[bench-turn] ${JSON.stringify({ conversation: sc.conversationId, turn: sc.turnIndex + 1, said: sc.say, pass: sc.pass, checks: sc.checks, reply: sc.observed.reply, source: sc.observed.source, pluginId: sc.observed.pluginId, guardHits: sc.observed.guardHits, rawModelText: sc.observed.rawModelText ?? null, memoryRows: sc.observed.memoryRows, offeredTools: sc.observed.offeredTools, firstDeltaMs: sc.observed.firstDeltaMs, totalMs: sc.observed.totalMs })}`);
+      // ACT-01: the signal's headline and the engine's own stage timings
+      // ride on the line too, read off the `[turn]` line by turn id.
+      for (const sc of run.scores) {
+        const line = run.turnIds[sc.turnIndex] ? log.turns.get(run.turnIds[sc.turnIndex]!) : undefined;
+        if (line?.timings) stageTimings.push(line.timings);
+        console.log(`[bench-turn] ${JSON.stringify({ conversation: sc.conversationId, turn: sc.turnIndex + 1, said: sc.say, pass: sc.pass, checks: sc.checks, reply: sc.observed.reply, source: sc.observed.source, pluginId: sc.observed.pluginId, guardHits: sc.observed.guardHits, rawModelText: sc.observed.rawModelText ?? null, memoryRows: sc.observed.memoryRows, offeredTools: sc.observed.offeredTools, firstDeltaMs: sc.observed.firstDeltaMs, totalMs: sc.observed.totalMs, signal: line?.signal ?? null, timings: line?.timings ?? null })}`);
+      }
     }
   } finally {
     log.stop();
@@ -241,6 +249,18 @@ async function main(): Promise<{ executed: number; engine: string }> {
   console.log(score.renderRanking(score.rankFailures(scores)));
   const timed = scores.filter((s) => s.observed.firstDeltaMs !== null);
   const median = (xs: number[]) => (xs.length ? [...xs].sort((a, b) => a - b)[Math.floor(xs.length / 2)]! : NaN);
+  const p95 = (xs: number[]) => (xs.length ? [...xs].sort((a, b) => a - b)[Math.min(xs.length - 1, Math.floor(xs.length * 0.95))]! : NaN);
+  // ACT-01: the per-stage timings the engine measured (the `[turn]`
+  // line's own), so a first-text budget is a measured row: median and
+  // p95 per stage, the retries summed.
+  const stage = (pick: (t: TurnTimings) => number | null) => {
+    const xs = stageTimings.map(pick).filter((x): x is number => x !== null);
+    return `${Math.round(median(xs))}/${Math.round(p95(xs))}`;
+  };
+  console.log("\n## Stage timings (median/p95)\n");
+  console.log(
+    `signal ${stage((t) => t.signal_us)} us; routing ${stage((t) => t.routing_ms)} ms; recall ${stage((t) => t.recall_ms)} ms; prompt ${stage((t) => t.prompt_ms)} ms; first token ${stage((t) => t.first_token_ms)} ms; finalize ${stage((t) => t.finalize_ms)} ms; retries ${stageTimings.reduce((n, t) => n + t.retries, 0)} over ${stageTimings.length} turns; subjects ${stage((t) => t.subjects_ms)} ms (CHAT-13's slot)`,
+  );
   runner.cleanupBenchPeople(people); // after the output: the table is the run's product, the cleanup a courtesy
   __resetEmbedSupervisorForTests();
   console.log(`\nturns ${scores.length}; median first delta ${Math.round(median(timed.map((s) => s.observed.firstDeltaMs!)))} ms; median total ${Math.round(median(scores.map((s) => s.observed.totalMs)))} ms; wall ${Math.round((Date.now() - started) / 1000)} s`);

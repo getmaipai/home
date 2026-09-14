@@ -15,22 +15,24 @@ import { evaluateSafety, evaluateReply, forOutput, carriesCrisisSignal } from "@
 import { detectCredential, CREDENTIAL_SAFE_MESSAGE } from "@/lib/memoryContentPolicy";
 import { speakerAgeBand } from "@/lib/ageBand";
 import { listPackageIds, loadManifestOnly, meetsMinRole, runPlugin, safeFailureMessage, validatePackageArgs } from "@/lib/plugins";
-import { ensureRoutingEmbeddings, embedUtterance, scoreByEmbedding, pickTier1Winner, pickTier1WinnerAmong, utteranceShape, commandOpenersFrom, type UtteranceShape } from "@/lib/routing";
+import { ensureRoutingEmbeddings, embedUtterance, scoreByEmbedding, pickTier1Winner, pickTier1WinnerAmong, commandOpenersFrom, type UtteranceShape } from "@/lib/routing";
 import { loadAllSkills, type LoadedSkill } from "@/lib/skills";
 import { matchCommand, runCommand } from "@/lib/commands";
 import { notifyIfFlagged } from "@/lib/notifications";
 import { recall, bumpUsage, getProfileParagraph, type RecallMatch } from "@/lib/memory";
-import { subjectLabel, subjectRosterFor } from "@/lib/subjects";
+import { findEntityByName, subjectLabel, subjectRosterFor } from "@/lib/subjects";
 import { AFFIRMATIVE_RE, NEGATIVE_RE } from "@/lib/consentVocab";
 import { repairReply, assessReply, isShortMalformed, repairTail, closeDanglingClause, visibleText, RETRY_TOKEN_CAP } from "@/lib/wellFormed";
 import { recallEpisodes, formatEpisodesForPrompt, formatEpisodeLine, episodeQuote, episodeQueryEligible, asksWhatHubSaid, PROMPT_BLOCK_MAX_LINES, type EpisodeMatch } from "@/lib/episodes";
-import { intentFor, markIncluded, guardContextFrom, outcomeOf, type TurnContext, type TurnEvidence, type ToolExecutionOutcome, type RejectedReason } from "@/lib/turnContext";
+import { intentFor, markIncluded, guardContextFrom, outcomeOf, emptyTimings, type TurnContext, type TurnEvidence, type ToolExecutionOutcome, type RejectedReason, type TurnTimings } from "@/lib/turnContext";
 import { newConversationTurnId } from "@/lib/id";
 import { complete, startCompleteStream, type LlmMessage, type ToolSpec, type ToolCall } from "@/lib/llm";
 import { guardReply, guardSentence, replacementFor, isCuttable, isSkippable, splitIntoSentences, type GuardContext, type GuardReason } from "@/lib/guards";
 import { tokenize } from "@/lib/text";
 import { unspokenArgument, askPromptFor, isActionPackage } from "@/lib/unspokenArgs";
 import { COURTESY_PREFIX } from "@/lib/utteranceShape";
+import { classifyTurnSignal, fallbackSignal, freezeDirective, hasEligibleClause, shapeOf, type ProtocolAnswer } from "@/lib/turnSignal";
+import type { TurnSignal } from "@maipai/spec/gen/ts/turn-signal.js";
 import { FORGET_COMMAND_ID, forgetFromConversation, parseForgetCommand } from "@/lib/forgetCommand";
 import { promptNow } from "@/lib/benchSampling";
 import { sanitizeForPrompt } from "@/lib/promptSanitize";
@@ -141,9 +143,13 @@ interface TurnLogRecord {
   safety_action: string;
   duration_ms: number;
   outcomes?: { package: string; status: string; reason?: string; code?: string }[];
+  /** ACT-01: the frozen signal's headline (never the clauses' text) and
+   * the per-stage timings. */
+  signal?: { act: string; secondary: string[]; emotion: string; intensity: string; target: string; repair: string; source: string };
+  timings?: TurnTimings;
 }
 
-function logTurnLine(surface: Surface, value: TurnValue, startedAt: number, guardHits: readonly GuardReason[], outcomes: readonly ToolExecutionOutcome[] = []): void {
+function logTurnLine(surface: Surface, value: TurnValue, startedAt: number, guardHits: readonly GuardReason[], outcomes: readonly ToolExecutionOutcome[] = [], signal?: TurnSignal, timings?: TurnTimings): void {
   const record: TurnLogRecord = {
     turn_id: value.turn_id,
     conversation_id: value.conversation_id,
@@ -159,6 +165,8 @@ function logTurnLine(surface: Surface, value: TurnValue, startedAt: number, guar
     // whole), so a [turn] line says what ran, what was parked and what
     // was refused, and why.
     ...(outcomes.length > 0 ? { outcomes: outcomes.map((o) => ({ package: o.packageId, status: o.status, ...(o.reason ? { reason: o.reason } : {}), ...(o.errorCode ? { code: o.errorCode } : {}) })) } : {}),
+    ...(signal ? { signal: { act: signal.primary_act, secondary: signal.secondary_acts, emotion: signal.expressed_emotion, intensity: signal.emotion_intensity, target: signal.target, repair: signal.repair, source: signal.source } } : {}),
+    ...(timings ? { timings } : {}),
   };
   const line = `[turn] ${JSON.stringify(record)}`;
   // One writer (#73): the hub's console mirror (lib/log.ts, installed
@@ -169,12 +177,24 @@ function logTurnLine(surface: Surface, value: TurnValue, startedAt: number, guar
   console.log(line);
 }
 
+/** ACT-01 (section 12 part 6): the judge's queue is keyed on the stored
+ * signal. A turn with no eligible clause (only questions, directives,
+ * greetings, closings, backchannels, or quoted, hypothetical, joking or
+ * unknown clauses) is skipped before it is queued, about a third of
+ * turns; a safety refusal and a credential turn (its text redacted)
+ * are never the judge's whatever the clauses say. Null leaves the turn
+ * for the judge. */
+export function judgeStatusAtInsert(value: Pick<TurnValue, "source">, signal: TurnSignal): "skipped" | null {
+  if (value.source === "safety_refuse" || value.source === "policy") return "skipped";
+  return hasEligibleClause(signal) ? null : "skipped";
+}
+
 function logTurnSafely(
   actor: PersonRow,
   surface: Surface,
   userText: string,
   value: TurnValue,
-  meta: { startedAt: number; guardHits: readonly GuardReason[]; guardReplaced?: boolean; supersedes?: string | null; ephemeral?: boolean; outcomes?: readonly ToolExecutionOutcome[] },
+  meta: { startedAt: number; guardHits: readonly GuardReason[]; guardReplaced?: boolean; supersedes?: string | null; ephemeral?: boolean; outcomes?: readonly ToolExecutionOutcome[]; signal: TurnSignal; timings: TurnTimings },
 ): void {
   // `ephemeral` (a widget's own fixed-utterance query, e.g. Home's
   // weather card, never a household member's own words): the ONE choke
@@ -194,12 +214,16 @@ function logTurnSafely(
       // REPLACED the reply; a cut that kept the model's own prefix leaves
       // a real (shortened) answer on the row, and the episode store may
       // recall it.
-      logTurn(actor, surface, userText, value, { guardReasons: meta.guardReplaced ? meta.guardHits : [], supersedes: meta.supersedes, outcomes: meta.outcomes });
+      // ACT-01: the signal rides to the row; a turn with no eligible
+      // clause (or a source the judge never reads) is marked skipped at
+      // insert, so the judge's queue is keyed on the signal, not on the
+      // reply's source.
+      logTurn(actor, surface, userText, value, { guardReasons: meta.guardReplaced ? meta.guardHits : [], supersedes: meta.supersedes, outcomes: meta.outcomes, signal: meta.signal, judgeStatus: judgeStatusAtInsert(value, meta.signal) });
     } catch (err) {
       console.error(`[turn] logTurn failed for an otherwise-successful turn: ${(err as Error).message}`);
     }
   }
-  logTurnLine(surface, value, meta.startedAt, meta.guardHits, meta.outcomes);
+  logTurnLine(surface, value, meta.startedAt, meta.guardHits, meta.outcomes, meta.signal, meta.timings);
   if (meta.ephemeral) return;
   // Post-turn, fire-and-forget (step 3: "it never runs in the request
   // path"): whether this conversation's rolling summary needs a refresh.
@@ -1279,6 +1303,9 @@ type PreparedTurn =
       kind: "immediate";
       value: TurnValue;
       turnId: string;
+      /** ACT-01: the frozen signal, whichever path answered. */
+      signal: TurnSignal;
+      timings: TurnTimings;
       /** CHAT-15: the direct paths' outcomes (a literal or fuzzy winner,
        * an answered confirmation or ask, a household command), retained
        * on the turn row like a model turn's. */
@@ -1290,6 +1317,8 @@ type PreparedTurn =
       safety: SafetyResult;
       crisisResources?: string;
       turnId: string;
+      signal: TurnSignal;
+      timings: TurnTimings;
       /** CHAT-01: the one turn context the prompt and the guards were
        * built from; runTurn()/runTurnStream() push tool outcomes onto
        * it as they resolve, and every guard call derives its context
@@ -1418,6 +1447,10 @@ export async function resolvePendingAsk(
   // CHAT-15: the turn's outcomes; an answered confirmation or ask runs a
   // package and leaves the same evidence the tool path does.
   outcomes: ToolExecutionOutcome[] = [],
+  // ACT-01: the state machine's own reading of the answer, for the
+  // protocol layer of the signal; left unset when the turn was neither
+  // a yes nor a no (the re-ask) or fell through to routing.
+  protocol: { answer?: ProtocolAnswer } = {},
 ): Promise<TurnValue | null> {
   const pending = getPendingAsk(conversation.id);
   if (!pending) return null;
@@ -1426,6 +1459,7 @@ export async function resolvePendingAsk(
     if (AFFIRMATIVE_RE.test(text.trim())) {
       // Consumed once, bound to the exact package and arguments the
       // proposal carried; a retry of the same "yes" finds no pending ask.
+      protocol.answer = { kind: "confirm", answer: "affirmative" };
       setPendingAsk(conversation.id, null);
       const result = await runPlugin(pending.packageId, actor, pending.args, turnId);
       outcomes.push(
@@ -1456,6 +1490,7 @@ export async function resolvePendingAsk(
       };
     }
     if (NEGATIVE_RE.test(text.trim())) {
+      protocol.answer = { kind: "confirm", answer: "negative" };
       setPendingAsk(conversation.id, null);
       return { reply: { text: "Okay, I won't do that." }, source: "confirm", safety, crisis_resources: crisisResources, conversation_id: conversation.id, turn_id: turnId };
     }
@@ -1487,6 +1522,7 @@ export async function resolvePendingAsk(
   // with "no" ("no-salt crackers", "no more than ten minutes") binds (a
   // review).
   if (ASK_CANCEL_RE.test(text.trim())) {
+    protocol.answer = { kind: "ask", answer: "negative" };
     return { reply: { text: "Okay, I'll leave it." }, source: "confirm", safety, crisis_resources: crisisResources, conversation_id: conversation.id, turn_id: turnId };
   }
   // A whole new command in place of an answer ("add eggs to the list"
@@ -1514,6 +1550,7 @@ export async function resolvePendingAsk(
     ),
   );
   if (!result.ok) return null; // the continuation attempt failed - fall through rather than report a confusing error for an utterance that wasn't really about this
+  protocol.answer = { kind: "ask", answer: "value" }; // ACT-01: only a consumed answer is the protocol layer's (a review)
   return { reply: result.value.reply ?? { text: "Done." }, source: "plugin", plugin_id: pending.packageId, safety, crisis_resources: crisisResources, conversation_id: conversation.id, turn_id: turnId };
 }
 
@@ -1562,16 +1599,45 @@ async function prepareTurn(
   // CHAT-15: every package call a direct path runs, parks or refuses on
   // this turn lands here, and rides out with the immediate return.
   const directOutcomes: ToolExecutionOutcome[] = [];
+  // CHAT-01: one clock per turn, shared by the safety check's age band,
+  // the prompt's speaker line and clock line, and the turn context.
+  const frozen = frozenClock();
+  const ageBand = speakerAgeBand(actor, frozen.now);
+  // ACT-01: the turn signal, the rule layer, before anything routes or
+  // refuses: every turn carries one (a refusal, a credential line and a
+  // package answer included), frozen here and never recomputed. The
+  // protocol layer replaces it below when the pending ask consumes the
+  // turn; a literal-pattern win freezes a directive. The roster here is
+  // the household's and the speaker's own people and pets, the same
+  // list the guards read; a household name resolves to no entity (a
+  // person row), a subject name to its entity.
+  const timings = emptyTimings();
+  const signalStart = performance.now();
+  const household = listActivePeople();
+  const rosterNames = household.flatMap((p) => (p.nickname ? [p.displayName, p.nickname] : [p.displayName]));
+  const subjectRoster = subjectRosterFor(actor);
+  let signal: TurnSignal;
+  try {
+    signal = classifyTurnSignal({
+      text,
+      commandOpeners: commandOpeners(loaded),
+      roster: [...rosterNames, ...subjectRoster],
+      resolveEntity: (name) => (rosterNames.includes(name) ? null : (findEntityByName(actor, name)?.id ?? null)),
+      ageBand,
+    });
+  } catch (err) {
+    console.error(`[turn] classifyTurnSignal failed, the fallback stands: ${(err as Error).message}`);
+    signal = fallbackSignal(text, ageBand);
+  }
+  timings.signal_us = Math.round((performance.now() - signalStart) * 1000);
   const immediate = (value: Omit<TurnValue, "conversation_id" | "turn_id">): PreparedTurn => ({
     kind: "immediate",
     value: { ...value, conversation_id: conversation.id, turn_id: turnId },
     turnId,
     outcomes: directOutcomes,
+    signal,
+    timings,
   });
-  // CHAT-01: one clock per turn, shared by the safety check's age band,
-  // the prompt's speaker line and clock line, and the turn context.
-  const frozen = frozenClock();
-  const ageBand = speakerAgeBand(actor, frozen.now);
   const safety = evaluateSafety(text, ageBand);
   // SafetyResult's own schema comment named this exact wiring as a
   // "later hub release" gap the day the field was written: notify_parent
@@ -1614,8 +1680,13 @@ async function prepareTurn(
   // replaced reply asked; the replaced exchange's pending ask is dropped
   // rather than bound to the edited text.
   if (supersedes) setPendingAsk(conversation.id, null);
-  const pendingAskValue = await resolvePendingAsk(text, actor, conversation, loaded, turnId, safety, crisisResources, directOutcomes);
-  if (pendingAskValue) return { kind: "immediate", value: pendingAskValue, turnId, outcomes: directOutcomes };
+  const protocol: { answer?: ProtocolAnswer } = {};
+  const pendingAskValue = await resolvePendingAsk(text, actor, conversation, loaded, turnId, safety, crisisResources, directOutcomes, protocol);
+  // ACT-01: the protocol layer wins when the state machine read the
+  // answer; the re-ask ("Yes or no?") keeps the rule signal, since the
+  // person said something else.
+  if (protocol.answer && pendingAskValue) signal = classifyTurnSignal({ text, protocol: protocol.answer, ageBand });
+  if (pendingAskValue) return { kind: "immediate", value: pendingAskValue, turnId, outcomes: directOutcomes, signal, timings };
 
   // Item 4b: "forget that" / "forget what I told you about X" is the
   // engine's own command (lib/forgetCommand.ts), answered here before
@@ -1700,13 +1771,15 @@ async function prepareTurn(
   // embedQueryForRecall() stays in memory.ts for its other real caller
   // (packageHost.ts's Host.memory.recall).
   let utteranceVector: Float32Array | undefined;
-  // #92: the roster is read here, before routing, so a literal pattern
-  // of an outside-looking package can yield on a household name; the
-  // same list feeds the prompt and the guards below.
-  const household = listActivePeople();
-  const rosterNames = household.flatMap((p) => (p.nickname ? [p.displayName, p.nickname] : [p.displayName]));
+  // #92: the roster (read above, with the signal) feeds routing, so a
+  // literal pattern of an outside-looking package can yield on a
+  // household name; the same list feeds the prompt and the guards below.
+  const routingStart = performance.now();
   let literalYielded: LiteralYield | null = null;
   let { winner: routed, ranked }: RouteResult = routeLiteral(text, actor, loaded, rosterNames, (y) => (literalYielded = y)) ?? { winner: null, ranked: [] };
+  // ACT-01: a literal-pattern win is a directive by construction, frozen
+  // on the signal before the package runs.
+  if (routed?.viaPattern) signal = freezeDirective(signal);
   if (!routed) {
     utteranceVector = await embedUtterance(text);
     ({ winner: routed, ranked } = await routeSemantic(text, actor, loaded, utteranceVector));
@@ -1725,7 +1798,8 @@ async function prepareTurn(
   // trigger phrase always still can.
   const routedViaFuzzyMatch = routed && !routed.viaPattern;
   const bestSkillScore = routedViaFuzzyMatch ? (matchingSkills(text, skills)[0]?.score ?? 0) : 0;
-  const shape = utteranceShape(text, commandOpeners(loaded));
+  // The router's reading is the signal's projection: one classification.
+  const shape = shapeOf(signal, text);
   const outscoredBySkill = routed && routedViaFuzzyMatch && bestSkillScore > routed.score ? routed.id : null;
   // #92: a Tier 0 pattern winner that reports the typed "not found"
   // (a summary 404, a page with nothing to say, a recipe's not_found)
@@ -1826,6 +1900,8 @@ async function prepareTurn(
     ({ ranked } = await routeSemantic(text, actor, loaded, utteranceVector));
     ranked = ranked.filter((r) => r.id !== tier0Miss?.packageId);
   }
+  timings.routing_ms = Math.round(performance.now() - routingStart);
+  const recallStart = performance.now();
 
   // selfOnly: true (step 2's privacy fix) - a person's own turn must
   // never surface another person's person-scope memories into the
@@ -1850,6 +1926,8 @@ async function prepareTurn(
   const episodeMatches = episodeQueryEligible(text)
     ? recallEpisodes(actor, text, utteranceVector, { excludeConversationId: conversation.id, excludeWholeConversation: true, limit: PROMPT_BLOCK_MAX_LINES, ...(asksWhatHubSaid(text) ? { sides: "both" as const, preferHubSide: true } : { sides: "user" as const }) })
     : [];
+  timings.recall_ms = Math.round(performance.now() - recallStart);
+  const promptStart = performance.now();
   const persona = resolvePersona(getPersonSettingValue(actor, "persona.active_id"));
   // The follow-up-turn context (step 3): "and tomorrow?" needs the prior
   // exchange in the messages array, not just in the system prompt's own
@@ -1905,7 +1983,7 @@ async function prepareTurn(
     // #92 lookup miss, an answered ask whose run failed) rides on; the
     // tool calls below push after it.
     outcomes: [...directOutcomes],
-    intent: intentFor(text, shape),
+    intent: intentFor(text, signal),
     persona: { id: persona.id, displayName: persona.display_name, examples: persona.examples ?? [] },
     ageBand,
     now: frozen.now,
@@ -1915,8 +1993,8 @@ async function prepareTurn(
     // is not read as an invented household member. The routing roster
     // above stays the household's: a place entity would make a weather
     // pattern yield.
-    roster: [...rosterNames, ...subjectRosterFor(actor)],
-    shape,
+    roster: [...rosterNames, ...subjectRoster],
+    signal,
   };
   markIncluded(turnContext, promptParts.context);
   const includedMemoryIds = new Set(turnContext.includedEvidenceIds);
@@ -1994,7 +2072,8 @@ async function prepareTurn(
   // alone (turnContext.ts's guardContextFrom()) at each check, so the
   // outcomes a Tier 2 call pushes inside runTurn()/runTurnStream() are
   // seen on both paths.
-  return { kind: "model", messages, safety, crisisResources, turnId, tools, ranked, lookupTools, turnContext };
+  timings.prompt_ms = Math.round(performance.now() - promptStart);
+  return { kind: "model", messages, safety, crisisResources, turnId, tools, ranked, lookupTools, turnContext, signal, timings };
 }
 
 // This floor's own gate now lives in prepareTurn() (Fix E moved the
@@ -2607,6 +2686,10 @@ async function runTurnHoldingLease(
   const prepared = await prepareTurn(actor, surface, text, loaded, conversation, lease, resolveSupersedes(opts.supersedes, conversation.id));
 
   let value: TurnValue;
+  // ACT-01: the blocking path has no first token; its `first_token_ms`
+  // is the whole first completion, and `finalize_ms` runs from the last
+  // generation's return through the guards and the reply boundary.
+  let generationDone = Date.now();
   const guardHits: GuardReason[] = [];
   // getmaipai/home#78: whether the reply the household got is a guard's
   // own line (stored on the turn row) rather than the model's words.
@@ -2679,11 +2762,14 @@ async function runTurnHoldingLease(
       if (!mayRetry || !isShortMalformed(raw)) return repaired;
       // Thinking off for the regeneration: under the cap a think block
       // would be the whole output, and its tags travel to the client.
+      prepared.timings.retries++;
       const again = await complete("chat", prepared.messages, { thinking: false, max_tokens: RETRY_TOKEN_CAP });
+      generationDone = Date.now();
       if (!again.ok) return repaired;
       const second = repairReply(again.value.text);
       return assessReply(second) === null ? second : "";
     };
+
 
     // Fix E (docs/dev.md's "Chat reliability" - native tool calling, one
     // round trip): `tools` rides on the SAME completion call that would
@@ -2698,6 +2784,8 @@ async function runTurnHoldingLease(
       thinking: opts.thinking,
       ...(offeringTools ? { tools: prepared.tools, tool_choice: "auto" as const } : {}),
     });
+    prepared.timings.first_token_ms = Date.now() - startedAt;
+    generationDone = Date.now();
     if (!completion.ok) {
       return { ok: false, status: 503, code: "unavailable", error: completion.error }; // the lease releases in runTurn()'s finally
     }
@@ -2720,7 +2808,9 @@ async function runTurnHoldingLease(
         // named a tool that wasn't actually offered) - the exact "ask
         // again, never a silent drop" contract: one retry, this time
         // without tools, answered as an ordinary reply.
+        prepared.timings.retries++;
         const retry = await complete("chat", prepared.messages, { thinking: opts.thinking });
+        generationDone = Date.now();
         if (!retry.ok) {
           return { ok: false, status: 503, code: "unavailable", error: retry.error };
         }
@@ -2802,7 +2892,9 @@ async function runTurnHoldingLease(
 
       if (offeringTools && looksInvented && prepared.lookupTools.length > 0) {
         const lookupIds = new Set(prepared.lookupTools.map((t) => t.id));
+        prepared.timings.retries++;
         const forced = await complete("chat", prepared.messages, { thinking: opts.thinking, tools: prepared.lookupTools, tool_choice: "required" });
+        generationDone = Date.now();
         const resolved =
           forced.ok && forced.value.tool_calls && forced.value.tool_calls.length > 0
             ? await resolveOffered(forced.value.tool_calls, lookupIds)
@@ -2821,7 +2913,8 @@ async function runTurnHoldingLease(
 
   const trace: ReplyTrace = { hits: guardHits, replaced: guardReplaced };
   value = finalizeReply(actor, value, trace);
-  logTurnSafely(actor, surface, text, value, { startedAt, guardHits, guardReplaced: trace.replaced, supersedes: opts.supersedes, outcomes: prepared.kind === "immediate" ? prepared.outcomes : prepared.turnContext.outcomes });
+  if (prepared.kind === "model") prepared.timings.finalize_ms = Date.now() - generationDone;
+  logTurnSafely(actor, surface, text, value, { startedAt, guardHits, guardReplaced: trace.replaced, supersedes: opts.supersedes, outcomes: prepared.kind === "immediate" ? prepared.outcomes : prepared.turnContext.outcomes, signal: prepared.signal, timings: prepared.timings });
   return { ok: true, value };
 }
 
@@ -3312,7 +3405,7 @@ async function runTurnStreamHoldingLease(
     const trace: ReplyTrace = { hits: [], replaced: false };
     const value = finalizeReply(actor, prepared.value, trace);
     lease.release(); // the caller's finally would too; released here so the log line below carries the finished state
-    logTurnSafely(actor, surface, text, value, { startedAt, guardHits: trace.hits, guardReplaced: trace.replaced, supersedes: opts.supersedes, ephemeral: opts.ephemeral, outcomes: prepared.outcomes });
+    logTurnSafely(actor, surface, text, value, { startedAt, guardHits: trace.hits, guardReplaced: trace.replaced, supersedes: opts.supersedes, ephemeral: opts.ephemeral, outcomes: prepared.outcomes, signal: prepared.signal, timings: prepared.timings });
     return { ok: true, kind: "immediate", value };
   }
 
@@ -3409,6 +3502,9 @@ async function runTurnStreamHoldingLease(
       let buffer = "";
       let released = false;
       let step = await iterator.next();
+      // ACT-01: the first model delta, wherever it came from (the peek
+      // replays it), is the turn's first token.
+      if (!step.done && prepared.timings.first_token_ms === null) prepared.timings.first_token_ms = Date.now() - startedAt;
       while (!step.done) {
         if (released) {
           yield step.value;
@@ -3483,6 +3579,11 @@ async function runTurnStreamHoldingLease(
       ),
       finalize: (replyText: string, outcome?: StreamOutcome): TurnValue => {
         if (finalized) return finalized;
+        // ACT-01: the boundary's own cost on the streaming path (the
+        // guards ran inline as the text flowed); retries are the extra
+        // generations this turn spent.
+        const finalizeStart = Date.now();
+        prepared.timings.retries = generations - 1;
         // CHAT-18: idempotent; normally already released by the
         // generator's own exhaustion, this covers a consumer that
         // finalizes without draining.
@@ -3494,7 +3595,8 @@ async function runTurnStreamHoldingLease(
         // place logTurnSafely() runs for it.
         if (outcome && "resolved" in outcome) {
           finalized = outcome.resolved;
-          logTurnSafely(actor, surface, text, outcome.resolved, { startedAt, guardHits: resolvedTrace.hits, guardReplaced: resolvedTrace.replaced, supersedes: opts.supersedes, ephemeral: opts.ephemeral, outcomes: prepared.turnContext.outcomes });
+          prepared.timings.finalize_ms = Date.now() - finalizeStart;
+          logTurnSafely(actor, surface, text, outcome.resolved, { startedAt, guardHits: resolvedTrace.hits, guardReplaced: resolvedTrace.replaced, supersedes: opts.supersedes, ephemeral: opts.ephemeral, outcomes: prepared.turnContext.outcomes, signal: prepared.signal, timings: prepared.timings });
           return outcome.resolved;
         }
         const outputSafety = outcome;
@@ -3568,7 +3670,8 @@ async function runTurnStreamHoldingLease(
         // finalize() no longer leaks anything, since holdLease()'s
         // `finally` releases on the aborted fetch's throw.
         finalized = value;
-        logTurnSafely(actor, surface, text, value, { startedAt, guardHits, guardReplaced: trace.replaced, supersedes: opts.supersedes, ephemeral: opts.ephemeral, outcomes: prepared.turnContext.outcomes });
+        prepared.timings.finalize_ms = Date.now() - finalizeStart;
+        logTurnSafely(actor, surface, text, value, { startedAt, guardHits, guardReplaced: trace.replaced, supersedes: opts.supersedes, ephemeral: opts.ephemeral, outcomes: prepared.turnContext.outcomes, signal: prepared.signal, timings: prepared.timings });
         return value;
       },
     };

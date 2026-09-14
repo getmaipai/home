@@ -17,7 +17,8 @@ import type { Surface } from "@/lib/turnEngine";
 import type { LlmMessage } from "@/lib/llm";
 import type { GuardContext } from "@/lib/guards";
 import type { PluginResult } from "@maipai/spec/interpreters/ts/recipe-interpreter.js";
-import type { UtteranceShape } from "@/lib/routing";
+import type { TurnSignal } from "@maipai/spec/gen/ts/turn-signal.js";
+import { shapeOf } from "@/lib/turnSignal";
 
 /** The record's kinds, plus `episode`: JOIN-01's recalled turns postdate
  * the record, ground a reply the way a memory line does, and are held
@@ -161,15 +162,36 @@ export interface TurnContext {
   /** Display names and nicknames of the household, for the guard's
    * household-subject test. */
   roster: string[];
-  /** ROUTE-01's shape of the utterance as the router read it (with the
-   * installed packages' command openers), so the guards read the same
-   * shape and never recompute it with a different opener set (CHAT-04). */
-  shape: UtteranceShape;
+  /** ACT-01: the turn's frozen signal (the act, the emotion, the
+   * clauses), computed before routing and never recomputed; the
+   * router's and the guards' `UtteranceShape` is a projection of it
+   * (turnSignal.ts's shapeOf()), so no consumer reads a second shape. */
+  signal: TurnSignal;
+}
+
+/** ACT-01: per-stage timings for the `[turn]` line and the bench
+ * header, so a first-text budget is a measured row. `signal_us` is the
+ * classifier's own cost in microseconds (the design's claim, printed);
+ * `subjects_ms` is CHAT-13's slot, null until it fills it. */
+export interface TurnTimings {
+  signal_us: number;
+  routing_ms: number;
+  recall_ms: number;
+  prompt_ms: number;
+  first_token_ms: number | null;
+  finalize_ms: number;
+  retries: number;
+  subjects_ms: number | null;
+}
+
+export function emptyTimings(): TurnTimings {
+  return { signal_us: 0, routing_ms: 0, recall_ms: 0, prompt_ms: 0, first_token_ms: null, finalize_ms: 0, retries: 0, subjects_ms: null };
 }
 
 const DETAIL_PHRASES = [/\bin detail\b/i, /\bdetailed explanation\b/i, /\bstep by step\b/i];
 
-export function intentFor(utterance: string, shape: UtteranceShape): TurnIntent {
+export function intentFor(utterance: string, signal: TurnSignal): TurnIntent {
+  const shape = shapeOf(signal, utterance);
   return {
     kind: shape === "question" ? "lookup" : shape === "command" ? "action" : "chat",
     query: utterance,
@@ -212,6 +234,6 @@ export function guardContextFrom(ctx: TurnContext): Omit<GuardContext, "personId
     outcomes: ctx.outcomes.map((o) => ({ packageId: o.packageId, status: o.status, ...(o.reason ? { reason: o.reason } : {}) })),
     personaExamples: ctx.persona.examples,
     roster: ctx.roster,
-    shape: ctx.shape,
+    shape: shapeOf(ctx.signal, ctx.utterance),
   };
 }

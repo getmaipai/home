@@ -2240,6 +2240,20 @@ describe("CHAT-15: the direct paths retain the same outcome evidence, and the ro
     const asked = retained(answered.ok ? answered.value.turn_id : "");
     expect(asked?.map((o) => [o.packageId, o.status, o.via])).toEqual([["remember", "succeeded", "ask"]]);
     expect(asked?.[0]?.args).toEqual({ fact: "the dentist is Tuesday" });
+    // ACT-01: the consumed answers carry the protocol layer's signal (the
+    // parked directive); the refused confirmation too (it consumed the
+    // "yes"); the answered ask is a directive by the protocol.
+    const { turnSignalOf } = await import("@/lib/conversationHistory");
+    const signalOf = (turnId: string) => turnSignalOf(db.select().from(conversationTurns).where(eq(conversationTurns.id, turnId)).get()!);
+    expect([signalOf(yes.ok ? yes.value.turn_id : "")?.source, signalOf(yes.ok ? yes.value.turn_id : "")?.primary_act]).toEqual(["protocol", "directive"]);
+    expect(signalOf(answered.ok ? answered.value.turn_id : "")?.source).toBe("protocol");
+    // An ask whose bound run fails falls through to routing: the rule
+    // signal stands, never the protocol's (a review).
+    setPendingAsk(conv.value.id, { kind: "ask", prompt: "Remember what?", packageId: "remember", args: {}, argName: "fct" });
+    const fell = await runTurn(actor, "chat", "I prefer quiet films", { conversationId: conv.value.id });
+    expect(fell.ok && fell.value.source).not.toBe("plugin");
+    const fellSignal = signalOf(fell.ok ? fell.value.turn_id : "");
+    expect([fellSignal?.source, fellSignal?.primary_act]).toEqual(["rule", "inform"]);
   });
 
   test("the streaming path retains the model's tool calls on the row, and a list-add's argument the person never said stays pending", async () => {

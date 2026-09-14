@@ -12,10 +12,20 @@ import { __resetThrottleForTests } from "@/lib/secretThrottle";
 import { __resetLlmSupervisorForTests } from "@/lib/llmSupervisor";
 import { activeTurnCount } from "@/lib/turnActivity";
 import { CONVERSATIONS, CREDENTIAL_LINE, type BenchConversation } from "../scripts/bench/conversationFixture";
-import { scoreTurn, renderTable, totalsByCategory, rankFailures, renderRanking, type TurnObserved, episodeLinesIn, copiedEpisodeSentence, EPISODES_HEADER_TEXT, wellFormedTotals } from "../scripts/bench/conversationScore";
+import { scoreTurn as scoreTurnBare, renderTable, totalsByCategory, rankFailures, renderRanking, type TurnObserved, episodeLinesIn, copiedEpisodeSentence, EPISODES_HEADER_TEXT, wellFormedTotals } from "../scripts/bench/conversationScore";
 import { EPISODES_HEADER } from "@/lib/episodes";
 import { runConversation, createBenchPeople, cleanupBenchPeople, backdateBenchRows, captureTurnLog, startRecordingProxy, startFakeHomeAssistant, type RunDeps } from "../scripts/bench/conversationRunner";
 import type { ChatCompletionRequest } from "@maipai/spec/llm/ts/types.js";
+import { classifyTurnSignal } from "@/lib/turnSignal";
+import type { BenchTurn } from "../scripts/bench/conversationFixture";
+
+// ACT-01: every fixture row expects a signal on the turn. The scorer's
+// own unit tests below feed a hand-built observation, so this wrapper
+// classifies the row's words the way prepareTurn() does (a protocol
+// answer's row, "yes" to a confirmation, reads as its rule signal here).
+const BENCH_OPENERS = new Set(["add", "set", "put", "remember", "tell", "lock", "text"]);
+const scoreTurn = (conv: BenchConversation, index: number, turn: BenchTurn, observed: TurnObserved) =>
+  scoreTurnBare(conv, index, turn, { signal: classifyTurnSignal({ text: turn.say, commandOpeners: BENCH_OPENERS, ageBand: "adult" }), ...observed });
 import type { TurnSignal } from "@maipai/spec/gen/ts/turn-signal.js";
 import type { ReplyPlan } from "@maipai/spec/gen/ts/reply-plan.js";
 
@@ -73,16 +83,17 @@ describe("the fixture", () => {
     // standard's cancel and promise rows, seventeen for the
     // competencies the checklist marks missing (written to fail), step
     // 3a's inferred-candidate row, RECALL-02's three copied-line
-    // conversations, and lane 12 item 3's nine example rows (one per
-    // new expectation kind the coherence review's question 5 named).
-    expect(CONVERSATIONS.length).toBe(60);
-    expect(new Set(CONVERSATIONS.map((c) => c.id)).size).toBe(60);
+    // conversations, lane 12 item 3's nine example rows (one per new
+    // expectation kind the coherence review's question 5 named), and
+    // ACT-01's seven (three act-register, three act-memory, the curator's).
+    expect(CONVERSATIONS.length).toBe(67);
+    expect(new Set(CONVERSATIONS.map((c) => c.id)).size).toBe(67);
     for (const c of CONVERSATIONS) expect(c.turns.length).toBeGreaterThanOrEqual(3);
     for (const c of CONVERSATIONS) expect(c.turns.length).toBeLessThanOrEqual(6);
     expect(CONVERSATIONS.filter((c) => c.hard).map((c) => c.id)).toEqual(["credential-disclosure", "cross-person-recall", "unsafe-request-and-crisis", "consequential-once"]);
     const said = CONVERSATIONS.flatMap((c) => c.turns.map((t) => t.say)).join(" ");
     for (const name of said.match(/\b[A-Z][a-z]+\b/g) ?? []) {
-      expect(["Pippa", "Rover", "Marlow", "Bramble", "Thursday", "Friday", "Monday", "Wednesday", "Tuesdays", "June", "France", "I", "Juniper", "Cobra", "Fleetwood", "Mac", "Lisbon", "Porto", "Stardew", "Valley", "Atlas", "Saturday", "Bosch", "Portugal", "Quill", "Raven", "Tempo", "Marsh", "October", "Sage", "Willow"]).toContain(name);
+      expect(["Pippa", "Rover", "Marlow", "Bramble", "Thursday", "Friday", "Monday", "Wednesday", "Tuesdays", "June", "France", "I", "Juniper", "Cobra", "Fleetwood", "Mac", "Lisbon", "Porto", "Stardew", "Valley", "Atlas", "Saturday", "Bosch", "Portugal", "Quill", "Raven", "Tempo", "Marsh", "October", "Sage", "Willow", "Nadia", "Paris"]).toContain(name);
     }
   });
 
@@ -163,7 +174,8 @@ describe("the rubric (conversationScore.ts)", () => {
     const scores = [
       scoreTurn(toolsConv, 0, toolsConv.turns[0]!, observed({ pluginId: null, reply: "no" })),
       scoreTurn(memoryConv, 2, memoryConv.turns[2]!, observed({ contextMessage: "", reply: "I don't know." })),
-      scoreTurn(hardConv, 1, hardConv.turns[1]!, observed({ attempts: { "lock-doors": 2 }, homeCalls: { "lock.lock": 2 } })),
+      // "yes" to a confirmation is the protocol layer's signal live.
+      scoreTurn(hardConv, 1, hardConv.turns[1]!, observed({ attempts: { "lock-doors": 2 }, homeCalls: { "lock.lock": 2 }, signal: classifyTurnSignal({ text: "yes", protocol: { kind: "confirm", answer: "affirmative" }, ageBand: "adult" }) })),
     ];
     const ranked = rankFailures(scores);
     expect(ranked[0]?.conversationId).toBe("consequential-once");

@@ -62,6 +62,7 @@ export type { Conversation } from "@maipai/spec/gen/ts/conversation.js";
 // shape through the @maipai/home-backend workspace dependency; re-exported
 // here since this is where callers already look for it.
 import type { ConversationTurnRow } from "@/wire";
+import { TurnSignal as TurnSignalSchema, type TurnSignal } from "@maipai/spec/gen/ts/turn-signal.js";
 export type { ConversationTurnRow } from "@/wire";
 
 export type ConversationOpResult<T> =
@@ -177,7 +178,7 @@ export function logTurn(
   surface: Surface,
   rawUserText: string,
   value: TurnValue,
-  opts: { guardReasons?: readonly string[]; supersedes?: string | null; outcomes?: readonly ToolExecutionOutcome[] } = {},
+  opts: { guardReasons?: readonly string[]; supersedes?: string | null; outcomes?: readonly ToolExecutionOutcome[]; signal?: TurnSignal | null; judgeStatus?: "skipped" | null } = {},
 ): ConversationTurnRow {
   // CHAT-03: the persisted row, its episode and the episode's embedding
   // (recordEpisodes() below reads this) hold a redacted marker in place
@@ -227,14 +228,25 @@ export function logTurn(
     // above already checked it's a real, same-conversation turn.
     supersedes,
     // Every new turn starts unjudged (step 6's own poison-guard state,
-    // lib/memoryJudge.ts) - never anything but null/0 at insert time.
-    judgeStatus: null,
+    // lib/memoryJudge.ts), unless ACT-01's eligibility read the signal
+    // and found no clause the judge may extract from: then the turn is
+    // skipped at insert (turnEngine.ts's judgeStatusAtInsert()), never
+    // queued, about a third of turns off the 4B.
+    judgeStatus: opts.judgeStatus ?? null,
     judgeAttempts: 0,
     // CHAT-15: the turn's typed outcomes, retained as they were
     // produced, through the same credential door as the text columns
     // and trimmed to a bounded row; null when the turn proposed no
     // package call.
     outcomes: opts.outcomes && opts.outcomes.length > 0 ? JSON.stringify(opts.outcomes.map(outcomeForRow)) : null,
+    // ACT-01: the frozen signal, as the engine computed it before
+    // routing. Its clause ranges index the raw utterance; on a redacted
+    // row (CHAT-03) they are approximate, and a `policy` turn is skipped
+    // for the judge anyway. The one text the signal carries is a named
+    // subject; on a policy turn (a credential in the utterance) it is
+    // dropped with the rest of the words (a review: "my wifi password
+    // Sunshine" named a subject).
+    signal: opts.signal ? JSON.stringify(value.source === "policy" ? withoutNames(opts.signal) : opts.signal) : null,
     hlc: nextHlc(),
   };
   insertTurnAndBumpConversation(row, value.conversation_id);
@@ -244,6 +256,25 @@ export function logTurn(
   // corrected statement's own facts are what the judge extracts next.
   if (supersedes) archiveByProvenance(supersedes);
   return row;
+}
+
+/** The signal with every named subject made unknown: nothing of the
+ * utterance's words survives on a redacted row. */
+function withoutNames(signal: TurnSignal): TurnSignal {
+  return { ...signal, clauses: signal.clauses.map((c) => (c.subject.kind === "named" ? { ...c, subject: { kind: "unknown" as const } } : c)) };
+}
+
+/** ACT-01: the frozen signal off a turn row, parsed through the
+ * generated schema so a reader never trusts a hand-edited column; null
+ * for a row written before ACT-01 or one that fails the shape. */
+export function turnSignalOf(row: Pick<ConversationTurnRow, "signal">): TurnSignal | null {
+  if (!row.signal) return null;
+  try {
+    const parsed = TurnSignalSchema.safeParse(JSON.parse(row.signal));
+    return parsed.success ? parsed.data : null;
+  } catch {
+    return null;
+  }
 }
 
 // ==== Conversations: the thread record (step 3) ====

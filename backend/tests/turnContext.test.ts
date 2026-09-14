@@ -4,6 +4,13 @@
 // scripted completions.
 import { describe, expect, test } from "bun:test";
 import { guardContextFrom, intentFor, markIncluded, includedEvidence, type TurnContext, type TurnEvidence } from "@/lib/turnContext";
+import { classifyTurnSignal } from "@/lib/turnSignal";
+
+// ACT-01: the intent and the guards' shape read the frozen signal; the
+// tests classify the utterance the way prepareTurn() does, with the
+// bundled command openers a test needs.
+const openers = new Set(["set", "explain", "give", "walk", "tell"]);
+const signalFor = (text: string) => classifyTurnSignal({ text, commandOpeners: openers, ageBand: "adult" });
 
 const evidence = (id: string, kind: TurnEvidence["kind"], text: string, rendered = text): TurnEvidence => ({ id, kind, text, rendered, entityIds: [] });
 
@@ -19,13 +26,13 @@ function context(overrides: Partial<TurnContext> = {}): TurnContext {
     includedEvidenceIds: [],
     offeredToolIds: [],
     outcomes: [],
-    intent: intentFor("where is Pippa", "question"),
+    intent: intentFor("where is Pippa", signalFor("where is Pippa")),
     persona: { id: "default", displayName: "MaiPai", examples: ["Pippa is at the zoo today."] },
     ageBand: "adult",
     now: new Date("2026-09-13T15:00:00Z"),
     locale: "en-US",
     roster: ["Sage", "Pippa"],
-    shape: "question",
+    signal: signalFor("where is Pippa"),
     ...overrides,
   };
 }
@@ -96,18 +103,18 @@ describe("guardContextFrom(): the guard input from the included evidence alone",
 
 describe("intentFor(): the provisional intent", () => {
   test("kind reads the shape and defaults to chat; query is the utterance", () => {
-    expect(intentFor("who won the 1998 world cup", "question").kind).toBe("lookup");
-    expect(intentFor("set a timer for ten minutes", "command").kind).toBe("action");
-    expect(intentFor("good morning", "statement").kind).toBe("chat");
-    expect(intentFor("I'm feeling kind of down", "first_person").kind).toBe("chat");
-    expect(intentFor("who won the 1998 world cup", "question").query).toBe("who won the 1998 world cup");
+    expect(intentFor("who won the 1998 world cup", signalFor("who won the 1998 world cup")).kind).toBe("lookup");
+    expect(intentFor("set a timer for ten minutes", signalFor("set a timer for ten minutes")).kind).toBe("action");
+    expect(intentFor("good morning", signalFor("good morning")).kind).toBe("chat");
+    expect(intentFor("I'm feeling kind of down", signalFor("I'm feeling kind of down")).kind).toBe("chat");
+    expect(intentFor("who won the 1998 world cup", signalFor("who won the 1998 world cup")).query).toBe("who won the 1998 world cup");
   });
 
   test("the detail flag is set only for the three phrasings, case-insensitive", () => {
-    expect(intentFor("explain photosynthesis in detail", "command").explicitDetailedAnswer).toBe(true);
-    expect(intentFor("give me a DETAILED EXPLANATION of the rules", "command").explicitDetailedAnswer).toBe(true);
-    expect(intentFor("walk me through it step by step", "command").explicitDetailedAnswer).toBe(true);
-    expect(intentFor("tell me about photosynthesis", "command").explicitDetailedAnswer).toBe(false);
-    expect(intentFor("what are the details of the plan", "question").explicitDetailedAnswer).toBe(false);
+    expect(intentFor("explain photosynthesis in detail", signalFor("explain photosynthesis in detail")).explicitDetailedAnswer).toBe(true);
+    expect(intentFor("give me a DETAILED EXPLANATION of the rules", signalFor("give me a DETAILED EXPLANATION of the rules")).explicitDetailedAnswer).toBe(true);
+    expect(intentFor("walk me through it step by step", signalFor("walk me through it step by step")).explicitDetailedAnswer).toBe(true);
+    expect(intentFor("tell me about photosynthesis", signalFor("tell me about photosynthesis")).explicitDetailedAnswer).toBe(false);
+    expect(intentFor("what are the details of the plan", signalFor("what are the details of the plan")).explicitDetailedAnswer).toBe(false);
   });
 });

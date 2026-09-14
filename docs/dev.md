@@ -12766,6 +12766,14 @@ other's section once (147cd28, f4779a6).
   clearance Shell.tsx already reserves for it), proven to fail then
   fixed with a real-layout check in scripts/screenshot.ts:
   [docs/dev/session-b.md](dev/session-b.md) (2026-09-13).
+- ACT-01, the turn signal: `classifyTurnSignal()` in `lib/turnSignal.ts`
+  (the protocol layer on a consumed pending ask, the high-precision
+  rules over `utteranceShape()`'s own clause split, the conservative
+  fallback), computed before routing and frozen on the turn row's new
+  `signal` column; `UtteranceShape` a projection of it; the judge's
+  queue keyed on an eligible clause; per-stage timings on the `[turn]`
+  line and the bench; the DailyDialog baseline (research only):
+  [docs/dev/session-a.md](dev/session-a.md) (2026-09-14).
 - OUT-01, one validated reply boundary after every producer: the
   well-formed rule and its repair in `lib/wellFormed.ts`, run in
   `finalizeReply()` on a model reply, a package, a command, a confirm

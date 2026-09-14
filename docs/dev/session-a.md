@@ -4208,3 +4208,189 @@ on the absence of "June" alone. `coworker-likes-seltzer` turn 4 is
 logged on ASK-01 as a target row for the false-familiarity family. No
 seeded set for this item, by the coordinator's rule; the household
 bench's unit scorer is the check.
+
+## ACT-01: the turn signal, the producer's first layers, and the rows (2026-09-14)
+
+Section 12 of the design pass made real on the engine side: the hub
+records, before routing and frozen for the turn, what kind of turn the
+person made and what the words expressed, on the shared turn record
+SPEC-01 settled (29ac71f, 7705ed5), and every consumer that read a
+shape reads the signal or a projection of it.
+
+**The producer.** `classifyTurnSignal()` in `lib/turnSignal.ts`, pure
+(no engine, no store; the roster and an entity resolver come in as
+arguments, so the robot and a test run the same function). The
+precedence is the design's: the protocol layer when the pending ask's
+state machine consumed the turn (`resolvePendingAsk()` now reports its
+reading: an affirmative or negative confirm, an ask's value or its
+cancel; the signal is the parked directive, `source: protocol`, a
+negative confirm carrying `repair: retraction`; the re-ask "Yes or
+no?" keeps the rule signal since the person said something else); the
+rules over every clause of one split; the fallback (inform, neutral,
+every clause `unknown`) for empty text or a classification error. The
+split is `readClauses()` in `utteranceShape.ts`, the router's own cut
+with character ranges into the original utterance, so the signal's
+clause ranges and `utteranceShape()` come from one reading; the cut
+gained three refinements the signal needed and the router never did:
+an interjection or an acknowledgment in front ("ugh,", "no,",
+"thanks,") is a clause of its own, not a vocative to strip; a comma
+inside a quotation or after a speech verb is punctuation; an "and"
+after a single word joins a compound subject ("Marsh and I are
+training"). Per clause: the act (a command opener or a courtesy prefix
+is a directive, a question opener or a trailing question mark a
+question, an exact greeting, a bare thank-you or goodbye, a one-to-
+three-word acknowledgment, a first-person future or promise a
+commissive, a proposal or advice a directive, inform the residual), the
+stance from the unmistakable markers (quotation marks beside a speech
+verb, "says", "according to", "I heard from", "if", "what if",
+"imagine", "suppose", a laugh token or "jk", with a laugh opening the
+turn marking every clause), the subject (a roster name, the source of a
+report or a quote, a relation phrase's name, first person, "we",
+otherwise the world), the emotion from a lexicon of unmistakable cues
+at a band (a strong word high, an ordinary one moderate, an occasion
+word low; an intensifier, shouting, repeated punctuation, an expletive
+or a repeated word raise one band, a diminisher lowers one, a negated
+cue is neutral). The turn-level fields derive from the clauses: the
+primary act by the design's precedence, the strongest marked emotion
+with its target read from the clause the feeling is about (the clause
+after an interjection), `repair` from the retraction phrases on any
+turn and the correction phrases only on a turn that states something
+(a request in the negative, "don't forget to lock up", is a directive;
+"what's wrong with the lights" asks), `refers_to_prior` and
+`classifier_id` null. Everything the
+rules cannot read stays neutral or inform at a lower confidence: the
+common-case emotion and inform-versus-commissive are ACT-02's heads.
+
+**One classification.** `TurnContext.signal` replaces `shape`;
+`intentFor()` and `guardContextFrom()` read `shapeOf(signal, text)`,
+and so does routing (`selectOfferedTools`, the `[route]` line), so no
+consumer reads a second shape on the turn path (guards.ts keeps its
+`utteranceShape()` fallback for a caller with no context, the same
+function). Two deliberate changes to what the router sees: the everyday
+imperative verbs guards.ts's REQUEST_RE already trusts ("lock the
+front door", "text Nadia", "take the second one off") are directives
+beside the packages' declared openers, a bounded list, never every
+opener-less fragment; and an exclamative "what a long day" is not a
+question. A proposal or advice ("let's plan the trip", "you should see
+the sunset") is a directive for the plan and the judge but stays
+conversation-shaped for the router: `shapeOf()` reads a command only
+from a directive by construction (an opener, a courtesy prefix, a
+literal win, a consumed ask, confidence 0.9 or more), so the offered
+tools and the command-only guards never widened past what ROUTE-01's
+review allowed (the outside review of this item). A literal-pattern win freezes a directive on the clause the
+router matched, and only a non-question clause: "what time is it"
+answered by a package's own pattern still asks, the package outcome
+riding on the turn either way (the first cut froze it and turned every
+pattern-answered question into a command for the guards and the
+offered tools). The signal is computed at the top of `prepareTurn()`,
+before the safety check, so a refusal and a credential line carry one
+too (a `policy` turn's ranges index the raw text; the row's text is
+redacted and the turn is skipped for the judge; the one text a signal carries, a
+named subject, is dropped on a policy row so nothing of a credential
+survives beside the redacted words, the review's "my wifi password
+Sunshine"). The protocol layer applies only when the state machine
+consumed the turn: an ask whose bound run failed falls through to
+routing with its rule signal (the review's second finding).
+
+**The row and the judge.** `conversation_turns.signal` (migration
+0034, schema version 33) holds the frozen signal as JSON; `logTurn()`
+writes it and sets `judge_status` to `skipped` at insert when
+`judgeStatusAtInsert()` finds no eligible clause (an inform or a
+commissive with stance asserted or reported) or a source the judge
+never reads (`safety_refuse`, `policy`). `pendingTurnWhere()` is keyed
+on the signal, not the reply's source: any unjudged turn carrying one
+is queued, so a disclosure beside a package answer ("add oat milk, and
+I prefer that brand") reaches the judge (CHAT-07's gap), and a row
+written before the signal existed keeps the model-source rule.
+`judgeTurn()` re-checks eligibility on read through `turnSignalOf()`
+(the generated schema parses the column; a malformed value is null).
+The judge's prompt keeps the reply line for now; MEM-06's clause
+contract is where the hub's own words stop being attributable to the
+speaker (the coordinator's ruling).
+
+**Timings.** Every `[turn]` line carries `signal` (the headline, never
+the clauses' text) and `timings`: `signal_us`, `routing_ms`,
+`recall_ms`, `prompt_ms`, `first_token_ms` (the first streamed delta;
+the whole first completion on the blocking path), `finalize_ms` (the
+reply boundary and the row on the streaming path; the last
+generation's return through the guards and the boundary on the
+blocking path), `retries` (the extra generations), and `subjects_ms`
+null until CHAT-13. The live bench prints them per turn on the
+`[bench-turn]` line and a "Stage timings (median/p95)" section at the
+end. The classifier measured 0.013 ms per turn over DailyDialog's test
+split with no roster, and 250 to 900 microseconds on the first turns
+of a bench run with the household roster (the compiled name patterns
+are cached across turns).
+
+**The fixture.** Every turn carries a `signal.primary_act` expectation
+(239 turns, 67 conversations), hand-labeled from the classifier's
+reading and corrected where it was wrong (which is how "and why is a
+sunset red", "ugh, what a long day", "thanks, that makes sense",
+"never mind" and "yes please" got their rules); the three protocol
+rows expect the parked directive. Seven conversations from section 12:
+`act-register-feelings`, `act-register-requests` and
+`act-register-closing` (the signal on each turn with the emotion where
+a cue carries it, the move read from the reply's effect as B7 and D2
+do, reader's rows until ACT-03's plan enforces them);
+`act-memory-eligibility` (what writes nothing under ACT-01 alone);
+`act-memory-stance` and `act-memory-state` (the clause contract's and
+the intensity bands' rows, MEM-06's, failing on purpose until it
+lands); `act-memory-curator` (CUR-01's rows, driven with `daysLater`,
+which now backdates `valid_to` too). The runner fills `signal` from
+the turn row and `memoryRowDetails` from the memory table (disclosure
+null until AGE-01's column exists), never from the log line.
+
+**The DailyDialog baseline** (`scripts/bench/turn-signal.ts`,
+research use only, nothing ships from it; the three zips in
+`data-scratch/datasets/dailydialog`; the everyday imperative verbs
+stand in for a household's declared openers since DailyDialog has no
+packages). The reference across the three splits: 13,118 dialogues,
+102,979 turns; acts inform 45.2 percent, question 28.6, directive 16.8,
+commissive 9.4; emotions neutral 83.1, happiness 12.5, surprise 1.8,
+sadness 1.1, anger 1.0, disgust 0.3, fear 0.2; in the training split,
+after an inform the next turn is an inform 47.2 percent of the time and
+a question 37.2, and carries a question mark 42.8 percent; after a
+question, an inform 75.5 and a question 11.4; after a directive, a
+commissive 57.2 (the design's numbers, reproduced). On the test split
+(7,740 turns; the rules read greeting 7, closing 121, backchannel 70,
+132 of them on a DailyDialog inform, scored folded into inform, which
+on the four classes is the design's relabel): the rule pass scores
+macro F1 0.518, accuracy 0.722 (inform p 0.715 r 0.905; question p
+0.810 r 0.925; directive p 0.519 r 0.246; commissive p 0.229 r 0.045);
+the current lexical shape folded to three classes scores macro F1
+0.493, accuracy 0.726 (commissive 0). The gap is inform-versus-
+commissive and DailyDialog's broad directive (offers, suggestions and
+"would you like" forms it labels directive), which is the head's job
+(ACT-02); the rules are a 0.025 macro-F1 gain over the shape with a
+commissive class that exists. Emotions, the rule pass alone: macro F1
+0.220, accuracy 0.803 against an always-neutral 0.817; neutral marked
+as an emotion on 4.0 percent of neutral turns (precision first: the
+cues were pruned on the false positives, "I'm afraid there's been a
+mistake", "the wrong number", "gross weight", "won't" split into
+"won"); happiness p 0.427 r 0.127, the recall the head must supply.
+DailyDialog's tokenization (spaces around punctuation and
+apostrophes) depresses the greeting and closing reads; the management
+acts are validated on the fixture's rows, not here.
+
+**The outside review, taken.** Seven findings on the first cut, all
+taken: the credential subject on a policy row; the protocol signal on a
+fall-through; a sentence-initial pronoun read as a report's source
+("He said"); "my trip to Paris" read as a person (the relation nouns
+now come from the relationship vocabulary's own said_as phrases plus a
+short list, never any two words); the occasion cue preempting a marked
+feeling ("I can't believe they cancelled the party" is surprise, now
+last in the cue order); corrections read on requests and questions;
+and the proposal widening the router's command shape. Each has a test.
+
+**Tests.** `tests/turnSignal.test.ts` (the act-register rows, the
+management acts, the precedence, the freeze, the protocol layer, the
+fallback, the bands and the target, the clauses' stance and subject,
+eligibility, the ranges, the schema, the projection equal to
+`utteranceShape()` over the merged openers on every row, the cost);
+`tests/utteranceShape.test.ts` (the cut with ranges); the judge suite's
+"ACT-01" block (a disclosure beside a package answer reaches the
+judge, a closing, a question, a bare directive and a hypothetical are
+skipped at insert, a refusal and a credential turn never queued, a
+pre-signal row on the old rule, the re-check on read);
+`tests/turnContext.test.ts` and the scorer's unit tests classify the
+row's words the way `prepareTurn()` does.

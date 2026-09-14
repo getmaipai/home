@@ -374,6 +374,11 @@ export const conversationTurns = sqliteTable(
     // outcomesForConversation() for the composer (CHAT-16) and the
     // guards, never by the judge, never a memory record.
     outcomes: text("outcomes"),
+    // ACT-01: the turn's frozen TurnSignal (spec/schemas/turn-signal.
+    // schema.json as JSON), computed before routing and never
+    // recomputed, the judge's queue key and REVIEW-01's record of what
+    // the engine believed. Null on every row written before ACT-01.
+    signal: text("signal"),
     // Session C step 1: null for every non-plugin turn (a command, the
     // model, a safety refusal). "pattern"/"embedding"/"keyword" for a
     // plugin turn - which tier of route()'s decision actually fired it,

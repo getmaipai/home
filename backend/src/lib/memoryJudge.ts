@@ -1,7 +1,8 @@
 // The memory judge (platform plan 4.4's "judge" half, session-a-
 // intelligence.md step 6): a post-turn core job that reads a completed
-// `source: "model"` turn and decides what, if anything, is worth
-// remembering from it - the "sleep-time" pattern (Letta), adapted from
+// turn whose frozen signal carries an eligible clause (ACT-01; before
+// the signal, a `source: "model"` turn) and decides what, if anything,
+// is worth remembering from it - the "sleep-time" pattern (Letta), adapted from
 // the legacy hub's memory/judge.ts but re-scoped to this platform's real
 // differences from it:
 //
@@ -55,7 +56,9 @@
 // round failure never does (it just defaults to ADD, matching legacy's
 // own catch block) - dedupe deciding "keep both" safely is never wrong
 // enough to burn a turn's whole budget over.
-import { eq, and, isNull, isNotNull, notInArray, ne, asc } from "drizzle-orm";
+import { eq, and, or, isNull, isNotNull, notInArray, ne, asc } from "drizzle-orm";
+import { hasEligibleClause } from "@/lib/turnSignal";
+import { turnSignalOf } from "@/lib/conversationHistory";
 import { detectCredential } from "@/lib/memoryContentPolicy";
 import { tokenize } from "@/lib/text";
 import { relationshipTypes } from "@maipai/spec/records/ts/validate.js";
@@ -698,6 +701,15 @@ export async function judgeTurn(turn: ConversationTurnRow): Promise<JudgeTurnRes
     return { ok: true, factsWritten: 0 };
   }
   if (isSkippedTurn(turn.id)) return { ok: true, factsWritten: 0 };
+  // ACT-01 (section 12 part 6): the stored signal decides whether the
+  // turn's speech can be evidence at all. logTurn() already skipped a
+  // turn with no eligible clause at insert; this is the same test on
+  // read, for a row whose status was cleared or written another way.
+  const signal = turnSignalOf(turn);
+  if (signal && !hasEligibleClause(signal)) {
+    markSkipped(turn.id);
+    return { ok: true, factsWritten: 0 };
+  }
   // CHAT-03: a turn row that carries a credential (written before the
   // policy existed; a new one is logged redacted) is never sent to the
   // model. Marked done with nothing written, so it is not retried.
@@ -936,8 +948,16 @@ function isSkippedTurn(turnId: string): boolean {
   const row = db.select({ status: conversationTurns.judgeStatus }).from(conversationTurns).where(eq(conversationTurns.id, turnId)).get();
   return row?.status === "skipped";
 }
+// ACT-01: the queue is keyed on the stored signal, not on the reply's
+// source: any unjudged turn that carries one is the judge's (logTurn()
+// marked the ineligible ones skipped at insert), so a disclosure beside
+// a package answer is judged (CHAT-07's gap). A row written before the
+// signal existed keeps the old rule, model turns only.
 function pendingTurnWhere() {
-  return and(eq(conversationTurns.source, "model"), isNull(conversationTurns.judgeStatus), notInArray(conversationTurns.id, supersededTurnIdsQuery()));
+  return and(or(isNotNull(conversationTurns.signal), eq(conversationTurns.source, "model")), isNull(conversationTurns.judgeStatus), notInArray(conversationTurns.id, supersededTurnIdsQuery()));
+}
+function markSkipped(turnId: string): void {
+  db.update(conversationTurns).set({ judgeStatus: "skipped", hlc: nextHlc() }).where(and(eq(conversationTurns.id, turnId), isNull(conversationTurns.judgeStatus))).run();
 }
 
 export function judgeQueueStats(): JudgeQueueStats {
