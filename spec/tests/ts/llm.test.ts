@@ -3,7 +3,7 @@
 // code the hub's llmSupervisor.ts points at a real llama-server when one
 // is configured. See spec/llm/README.md for what this pass covers.
 import { describe, expect, test, afterEach } from "bun:test";
-import { LlamaServerClient, LlmClientError } from "../../llm/ts/client.js";
+import { LlamaServerClient, LlmClientError, engineLabel } from "../../llm/ts/client.js";
 import { startStubLlmServer, type StubLlmServerHandle } from "../../llm/ts/stubServer.js";
 import type { ChatCompletionRequest } from "../../llm/ts/types.js";
 
@@ -321,6 +321,50 @@ describe("LlamaServerClient against the stub server", () => {
       }
       expect(capturedRequest?.cache_prompt).toBe(true);
       expect(capturedRequest?.id_slot).toBe(0);
+    });
+  });
+
+  describe("engineLabel and the error text", () => {
+    test("loopback base URLs are named by their own address", () => {
+      expect(engineLabel("http://127.0.0.1:8788")).toBe("http://127.0.0.1:8788");
+      expect(engineLabel("http://localhost:8788")).toBe("http://localhost:8788");
+      expect(engineLabel("http://[::1]:8788")).toBe("http://[::1]:8788");
+    });
+
+    test("any other hostname - or an unparseable URL - is named by label", () => {
+      expect(engineLabel("http://192.0.2.10:8788")).toBe("the external engine");
+      expect(engineLabel("http://engine.example.com")).toBe("the external engine");
+      expect(engineLabel("not a url")).toBe("the external engine");
+    });
+
+    test("a client on a documentation-range address fails without ever naming that address", async () => {
+      const client = new LlamaServerClient("http://192.0.2.10:9", { chatTimeoutMs: 5 });
+      let err: unknown;
+      try {
+        await client.chatComplete({ model: "chat", messages: [{ role: "user", content: "hi" }] });
+      } catch (e) {
+        err = e;
+      }
+      expect(err).toBeInstanceOf(LlmClientError);
+      const message = (err as LlmClientError).message;
+      expect(message.startsWith("could not reach ") || message.includes("timed out")).toBe(true);
+      expect(message).not.toContain("192.0.2.10");
+    });
+
+    test("a stopped loopback stub still names its address in the error", async () => {
+      handle = startStubLlmServer();
+      const client = new LlamaServerClient(handle.url, { chatTimeoutMs: 5 });
+      handle.stop();
+      let err: unknown;
+      try {
+        await client.chatComplete({ model: "chat", messages: [{ role: "user", content: "hi" }] });
+      } catch (e) {
+        err = e;
+      }
+      expect(err).toBeInstanceOf(LlmClientError);
+      const message = (err as LlmClientError).message;
+      expect(message.startsWith("could not reach ") || message.includes("timed out")).toBe(true);
+      expect(message).toContain("127.0.0.1");
     });
   });
 });

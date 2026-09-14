@@ -47,11 +47,25 @@ export interface LlamaServerClientOptions {
   embedTimeoutMs?: number;
 }
 
-function timeoutError(baseUrl: string, path: string, timeoutMs: number, err: unknown): LlmClientError {
-  if (err instanceof Error && err.name === "TimeoutError") {
-    return new LlmClientError(`${path} on ${baseUrl} timed out after ${timeoutMs}ms`, err);
+// A remote engine's address must not reach the hub's log or a 503 body, so
+// error text names it by label rather than by URL.
+export function engineLabel(baseUrl: string): string {
+  try {
+    const host = new URL(baseUrl).hostname.replace(/^\[|\]$/g, "");
+    if (host === "localhost" || host === "::1") return baseUrl;
+    if (/^127(\.\d{1,3}){3}$/.test(host)) return baseUrl;
+  } catch {
+    // unparseable URL - treat as remote
   }
-  return new LlmClientError(`could not reach ${baseUrl}`, err);
+  return "the external engine";
+}
+
+function timeoutError(baseUrl: string, path: string, timeoutMs: number, err: unknown): LlmClientError {
+  const label = engineLabel(baseUrl);
+  if (err instanceof Error && err.name === "TimeoutError") {
+    return new LlmClientError(`${path} on ${label} timed out after ${timeoutMs}ms`, err);
+  }
+  return new LlmClientError(`could not reach ${label}`, err);
 }
 
 export class LlamaServerClient {
