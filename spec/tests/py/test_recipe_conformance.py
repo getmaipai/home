@@ -40,6 +40,10 @@ async def test_recipe_conformance(fixture_path: Path):
     assert result.get("reply") == fixture["expected"]["reply"]
     assert result["actions"] == fixture["expected"]["actions"]
     assert result.get("ask") == fixture["expected"].get("ask")
+    # `data` (a format step's named fields) is compared whole when the
+    # fixture expects it: a number has to arrive as a number.
+    if "data" in fixture["expected"]:
+        assert result.get("data") == fixture["expected"]["data"]
     assert [
         {"when": j["when"], "job": j["job"], "inputs": j["inputs"]}
         for j in host.scheduled_jobs

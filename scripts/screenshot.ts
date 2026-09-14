@@ -181,27 +181,12 @@ async function waitForHealth(timeoutMs = 15000): Promise<void> {
 // this one constant now, so there's only one place to change).
 const WEATHER_HOUSEHOLD_PLACE = "Seattle, WA";
 
-// The exact "place" the weather package's deterministic floor captures
-// out of the Home page's OTHER weather touchpoint, its fixed question
-// (`TodayCard`'s "Weather"), found live (2026-09-13) while chasing why
-// that card still failed with a real `household.home_place` seeded:
-// `weatherCardQuestion("Seattle, WA")` (backend/src/homeCardQuestions.ts)
-// reads "What's the weather like in Seattle, WA today?", and
-// weather/manifest.json's own routing pattern ("what's the weather like
-// in *") has nothing after the `*` to anchor against, so
-// `matchPattern()` (backend/src/lib/turnEngine.ts) captures everything
-// to the end of the sentence - "Seattle, WA today", trailing "today" and
-// all, not "Seattle, WA" - confirmed by calling that exact function
-// against that exact question. Filed as getmaipai/home#98 (the same
-// shape as #92, a literal pattern claiming more than its argument; out
-// of this lane's scope to fix). Derived from `WEATHER_HOUSEHOLD_PLACE`
-// rather than a second hand-typed literal (a code review, 2026-09-13,
-// caught the first draft risking the two drifting apart), and kept as
-// its OWN cache key below rather than folded into that one, so this
-// fixture matches today's real, buggy capture; kept alongside the plain
-// key, not instead of it, so the fixture still answers once #98 is
-// fixed and the capture goes back to the plain place.
-const WEATHER_CAPTURED_PLACE = `${WEATHER_HOUSEHOLD_PLACE} today`;
+// The Home page's fixed weather question ("What's the weather like in
+// Seattle, WA today?", backend/src/homeCardQuestions.ts) captured
+// "Seattle, WA today" as the place until getmaipai/home#98 taught
+// matchPattern() that a trailing "today" after a locative preposition
+// is not part of the place, so one geocode entry for the household
+// place now answers both weather touchpoints.
 
 // Matches backend/src/lib/packageCache.ts's own cacheKey(): sha256 of
 // `${method}\n${url}\n${headers}\n${body}`, GET with no headers/body
@@ -216,7 +201,7 @@ function weatherCacheKey(url: string): string {
 
 // Pre-seeds backend/src/lib/packageCache.ts's file-based fetch cache with
 // canned geocode/forecast responses for both weather touchpoints on Home
-// (`WEATHER_CAPTURED_PLACE`, `WEATHER_HOUSEHOLD_PLACE`), so the weather
+// (both geocode `WEATHER_HOUSEHOLD_PLACE`), so the weather
 // package's `host.fetch` calls (weather/recipe.json's two `fetch` steps)
 // are answered from disk and never reach the real network -
 // getmaipai/.github/CLAUDE.md's testing standard ("deterministic and
@@ -241,11 +226,18 @@ function seedWeatherCache(dataDir: string): void {
   // byte for byte, or its forecast fetch misses this entry and falls
   // through to the real network. Both places geocode to the same real
   // Seattle coordinates, so one forecast entry covers both.
-  const forecastUrl = "https://api.open-meteo.com/v1/forecast?latitude=47.60621&longitude=-122.33207&current=temperature_2m&temperature_unit=fahrenheit";
-  const forecastValue = { current: { time: new Date().toISOString().slice(0, 16), temperature_2m: 57.3 } };
+  // The recipe's own URL (backend/packages/weather/recipe.json; the
+  // conformance fixture spec/fixtures/recipes/weather-geocoded.json
+  // carries the same shape): current temperature and weather_code, plus
+  // today's high, low and rain chance.
+  const forecastUrl =
+    "https://api.open-meteo.com/v1/forecast?latitude=47.60621&longitude=-122.33207&current=temperature_2m,weather_code&daily=temperature_2m_max,temperature_2m_min,precipitation_probability_max&forecast_days=1&timezone=auto&temperature_unit=fahrenheit";
+  const forecastValue = {
+    current: { time: new Date().toISOString().slice(0, 16), temperature_2m: 57.3, weather_code: 2 },
+    daily: { time: [new Date().toISOString().slice(0, 10)], temperature_2m_max: [64.2], temperature_2m_min: [52.1], precipitation_probability_max: [20] },
+  };
 
   const entries: Array<[string, unknown]> = [
-    [`https://geocoding-api.open-meteo.com/v1/search?count=1&name=${WEATHER_CAPTURED_PLACE}`, geocodeValue],
     [`https://geocoding-api.open-meteo.com/v1/search?count=1&name=${WEATHER_HOUSEHOLD_PLACE}`, geocodeValue],
     [forecastUrl, forecastValue],
   ];
@@ -295,8 +287,7 @@ async function seedHousehold(): Promise<string> {
   // (`Your packages > Weather`), so both weather cards on this same
   // page now agree instead of naming two different cities. This literal
   // "Seattle, WA" is `seedWeatherCache()`'s own `WEATHER_HOUSEHOLD_PLACE`
-  // above (and, with " today" appended, its `WEATHER_CAPTURED_PLACE` too)
-  // - change this and change those.
+  // above - change this and change that.
   const place = await fetch(`${BASE_URL}/api/settings`, {
     method: "PUT",
     headers: { "Content-Type": "application/json", Cookie: `session=${sessionValue}` },

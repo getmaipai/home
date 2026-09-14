@@ -4,6 +4,14 @@ All notable changes to the Weather package, in [Keep a Changelog](https://keepac
 
 ## [Unreleased]
 
+### Added
+
+- Conditions ("rainy", "partly cloudy"), today's high and low, and the
+  chance of rain, in the reply and as typed data beside it (`place`,
+  `temperature`, `conditions`, `high`, `low`, `precipitation_chance`,
+  `unit`), so "is it going to rain today" has an answer. Same
+  Open-Meteo endpoint, so the privacy row is unchanged.
+
 ### Changed
 
 - The one-line description now says what the package does for the

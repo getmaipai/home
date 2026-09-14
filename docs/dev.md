@@ -12766,6 +12766,13 @@ other's section once (147cd28, f4779a6).
   clearance Shell.tsx already reserves for it), proven to fail then
   fixed with a real-layout check in scripts/screenshot.ts:
   [docs/dev/session-b.md](dev/session-b.md) (2026-09-13).
+- #99 (a blank line between two sentences reaches storage and the
+  screen) and #98 (a wildcard after a locative preposition does not
+  capture a trailing "today"; the Home weather card's place is
+  "Seattle, WA"), with the weather package answering conditions, high,
+  low and the rain chance as typed `data` (two new recipe primitives,
+  `lookup` and `format.data`, in the spec and both interpreters):
+  [docs/dev/session-a.md](dev/session-a.md) (2026-09-13).
 - BENCH-01, the live conversation bench pins llama-server's sampler
   seed and the prompt's clock (a bench-only pin, production unseeded),
   records both in its header, and measures the residual run-to-run

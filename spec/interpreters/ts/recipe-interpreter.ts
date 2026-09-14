@@ -1,6 +1,6 @@
 // Interprets a Tier 0 Recipe (spec/schemas/recipe.schema.json) natively,
 // executing each step against a host (platform plan 5.2). No process, no
-// eval: every step is one of the sixteen declared primitives. This must
+// eval: every step is one of the seventeen declared primitives. This must
 // stay behaviorally identical to spec/interpreters/py/recipe_interpreter.py;
 // the conformance fixtures in spec/fixtures/recipes/ prove that.
 import { decode } from "he";
@@ -10,6 +10,9 @@ import { evaluateExpression } from "./compute.js";
 
 export interface PluginResult {
   reply?: { text: string; speech?: string };
+  /** Named fields beside the reply (a `format` step's `data`): what a
+   * composer phrases from, typed as the recipe bound them. */
+  data?: Record<string, unknown>;
   actions: { kind: string; payload?: unknown }[];
   ask?: { prompt: string; expects?: string };
   /** Fix B (docs/dev.md's "Chat reliability: the 2026-09-07 incident"
@@ -32,12 +35,13 @@ type Scope = Record<string, unknown>;
 // throughout the switch (a typo'd property would have compiled). Found
 // when backend/ first imported this file and its `tsc --noEmit` actually
 // walked it (spec/ itself has never run a standalone typecheck). Hand-
-// written here, mirroring recipe.schema.json's 16 step defs exactly, so
+// written here, mirroring recipe.schema.json's 17 step defs exactly, so
 // the switch gets real per-branch types and a real `never` check back.
 type RecipeStep =
   | { op: "fetch"; as: string; url: string; method?: "GET" | "POST"; headers?: Record<string, string>; body?: unknown }
   | { op: "pick"; as: string; from: string; path?: string }
-  | { op: "format"; as: string; text: string; speech?: string }
+  | { op: "lookup"; as: string; from: string; table: Record<string, string>; default?: string }
+  | { op: "format"; as: string; text: string; speech?: string; data?: Record<string, string> }
   | { op: "home.call_service"; domain: string; service: string; target: Record<string, unknown>; data?: Record<string, unknown> }
   | { op: "action"; kind: string; payload?: Record<string, unknown> }
   | { op: "remember"; text: string; category?: string; scope?: string }
@@ -122,6 +126,7 @@ export async function runRecipe(recipe: Recipe, inputs: Scope, host: Host): Prom
   const scope: Scope = { ...inputs };
   const actions: { kind: string; payload?: unknown }[] = [];
   let reply: { text: string; speech?: string } | undefined;
+  let data: Record<string, unknown> | undefined;
   let ask: { prompt: string; expects?: string } | undefined;
 
   for (const step of recipe.steps as RecipeStep[]) {
@@ -135,11 +140,34 @@ export async function runRecipe(recipe: Recipe, inputs: Scope, host: Host): Prom
         scope[step.as] = pickPath(scope[step.from], step.path);
         break;
       }
+      case "lookup": {
+        // A code from an upstream API to the household's word for it.
+        // The key is the variable's value as text, so a numeric
+        // weather_code finds its "61" row.
+        const key = String(scope[step.from] ?? "");
+        scope[step.as] = Object.prototype.hasOwnProperty.call(step.table, key) ? step.table[key] : (step.default ?? key);
+        break;
+      }
       case "format": {
         const text = interpolate(step.text, scope);
         const speech = step.speech ? interpolate(step.speech, scope) : text;
         scope[step.as] = { text, speech };
         reply = { text, speech };
+        // Named fields beside the text (result.schema.json's `data`): a
+        // template that is exactly one {variable} keeps the variable's
+        // own type, so a temperature stays a number for whoever phrases
+        // it (CHAT-16); anything else is interpolated text.
+        if (step.data) {
+          data = {};
+          for (const [name, template] of Object.entries(step.data)) {
+            const single = /^\{([a-zA-Z_][a-zA-Z0-9_]*)\}$/.exec(template);
+            // A bound variable keeps its own value, and a bound-but-empty
+            // one (a pick that found nothing) is null, the same in both
+            // interpreters; an unbound one interpolates to its literal
+            // placeholder.
+            data[name] = single && single[1]! in scope ? (scope[single[1]!] ?? null) : interpolate(template, scope);
+          }
+        }
         break;
       }
       case "home.call_service": {
@@ -270,5 +298,5 @@ export async function runRecipe(recipe: Recipe, inputs: Scope, host: Host): Prom
     }
   }
 
-  return { reply, actions, ...(ask ? { ask } : {}) };
+  return { reply, actions, ...(ask ? { ask } : {}), ...(data ? { data } : {}) };
 }

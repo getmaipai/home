@@ -39,6 +39,7 @@
       "oneOf": [
         { "$ref": "#/$defs/fetch_step" },
         { "$ref": "#/$defs/pick_step" },
+        { "$ref": "#/$defs/lookup_step" },
         { "$ref": "#/$defs/format_step" },
         { "$ref": "#/$defs/home_call_service_step" },
         { "$ref": "#/$defs/action_step" },
@@ -88,7 +89,28 @@
         "op": { "const": "format" },
         "as": { "type": "string" },
         "text": { "type": "string", "description": "A template with {variable} interpolation for the on-screen reply." },
-        "speech": { "type": "string", "description": "A template for the spoken form. Falls back to text if omitted." }
+        "speech": { "type": "string", "description": "A template for the spoken form. Falls back to text if omitted." },
+        "data": {
+          "type": "object",
+          "additionalProperties": { "type": "string" },
+          "description": "Named fields for the result's `data` (result.schema.json): each value is a template; a template that is exactly one {variable} keeps that variable's own type (a number stays a number), anything else is interpolated text. What a composer (CHAT-16) phrases from, beside the reply text."
+        }
+      }
+    },
+    "lookup_step": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["op", "as", "from", "table"],
+      "properties": {
+        "op": { "const": "lookup" },
+        "as": { "type": "string" },
+        "from": { "type": "string", "description": "A variable name whose value, as text, is the key." },
+        "table": {
+          "type": "object",
+          "additionalProperties": { "type": "string" },
+          "description": "Key to value; a code from an upstream API to the household's word for it (Open-Meteo's weather_code 61 to \"rain\")."
+        },
+        "default": { "type": "string", "description": "Bound when the key is not in the table; without it, the key itself." }
       }
     },
     "home_call_service_step": {

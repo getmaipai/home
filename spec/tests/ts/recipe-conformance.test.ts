@@ -58,6 +58,9 @@ describe("recipe conformance", () => {
       expect(result.reply ?? null).toEqual(fixture.expected.reply);
       expect(result.actions).toEqual(fixture.expected.actions);
       expect(result.ask ?? null).toEqual(fixture.expected.ask ?? null);
+      // `data` (a format step's named fields) is compared whole when the
+      // fixture expects it: a number has to arrive as a number.
+      if (fixture.expected.data !== undefined) expect(result.data).toEqual(fixture.expected.data);
       expect(host.scheduledJobs.map(({ when, job, inputs }) => ({ when, job, inputs }))).toEqual(
         fixture.expected.scheduled_jobs,
       );

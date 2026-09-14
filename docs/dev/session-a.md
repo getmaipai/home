@@ -3200,7 +3200,91 @@ pair rerun on it: 125 and 127 of 159; 31 of 47 conversations
 identical turn for turn (from 15), 28 of 159 replies differing
 anywhere (from 75), two rows flipping (never-mind-on-an-ask#3,
 running-thing-follow-up#2; from nine), and the judge's total drain
-time per run 162 s (from 333 s), the cache hits made visible. What
+time per run 162 s (from 333 s), the cache hits made visible: a
+product win first (the household's judge does half the work on every
+turn, all day), a bench one second. What
 still differs is the timer, interrupt and promise rows (real time),
 compound-request, and the rows whose later turns read a judge-written
 memory that landed in a different dedupe decision.
+
+## #99 and #98: a blank line kept, a trailing "today" not captured (2026-09-13)
+
+**#99.** A paragraph break vanished from replies ("...feels
+dry.How much space do you have?"), before storage. `gateOutputSafety()`
+splits the stream at `nextSentenceBoundary()`'s boundaries, and a
+blank line after a terminator and before a capital is a boundary of
+its own, so it reached the loop as a whitespace-only span, where the
+"nothing to check" skip also skipped the yield. The span now goes
+downstream like every other sentence's raw text (nothing is
+classified). The review of that fix found three places that read
+"anything delivered" as "any text": `gateGuards` counted the blank
+line as something spoken, so a reply whose every sentence the guards
+skip would have ended as a bare blank line instead of the honest line;
+`wholeRefusal` and `refusedWithNothingDelivered` (and the route's
+finalize) took whitespace as a delivered reply. All three now read
+trimmed text. Tests: the reply reassembles with its blank line,
+streamed word by word and as one delta; two skipped sentences around a
+blank line still end in the honest line.
+
+**#98.** The Home weather card asks "What's the weather like in
+Seattle, WA today?" and `matchPattern()`'s wildcard captured "Seattle,
+WA today", which the floor bound whole to the package's place. The
+general mechanism, not a card-side rewording: a wildcard that follows
+a locative preposition (in, at, near, around) captures a place, and a
+present-time adverb at the sentence's end (today, tonight, right now,
+now, at the moment, currently, this morning) is not part of it. Every
+other capture keeps its time word: the review walked every bundled
+pattern and found "search the web for *", "tell me about *", "what's
+the definition of *", "set a timer for *" and four more behind
+non-locative prepositions, where "election results today" is the
+query and "right now" is the word to define; a clause capture
+("remember that *") keeps "the trash goes out today" whole. "Tomorrow"
+is left in everywhere, so today's-weather pattern does not fire a
+forecast ask with a wrong place. Tests: the card's exact question
+captures "Seattle, WA"; "right now" and "at the moment" the same;
+"Boston tomorrow" stays; the remember clause, the search query and
+the definition keep their words.
+
+**The weather fields, beside #98 (the program's "Small item beside
+#98").** The recipe fetched only `current=temperature_2m`, so "is it
+going to rain today" could only ever be answered with a temperature
+("78.5 degrees in Here"). Two recipe primitives grew for it, in the
+spec first and both interpreters: a `lookup` step (a variable's value
+as text, a table, a default; Open-Meteo's WMO `weather_code` 61 to
+"rainy") and a `data` map on `format` (named fields for the result's
+`data`, result.schema.json's existing free field; a template that is
+exactly one `{variable}` keeps the variable's own type, so a
+temperature stays a number for whoever phrases it under CHAT-16).
+The weather recipe asks the same endpoint for
+`current=temperature_2m,weather_code` and
+`daily=temperature_2m_max,temperature_2m_min,precipitation_probability_max`
+for one day in the place's own timezone, and answers "It's 57.3
+degrees and rainy in Seattle. Today: high 64.2, low 52.1, 70% chance
+of rain." with `data` {place, temperature, conditions, high, low,
+precipitation_chance, unit}. Same endpoint, so the package's privacy
+row is unchanged; the manifest's description, examples, store card and
+changelog say what it now does. Conformance: the weather fixture
+carries the captured daily shape and the `data` expectation, and a
+`lookup-default` fixture covers a miss taking the default and a hit,
+in TS and Python alike; the package's smoke fixture and the screenshot
+pipeline's seeded cache carry the new URL and shape. The package's
+canonical source is the catalog (`plugins/utilities/weather`,
+getmaipai/catalog 78be29f, its schema mirror refreshed with the two
+primitives), and `backend/packages/weather` is the refreshed copy
+with its provenance hash re-recorded, since a hand-edited copy fails
+the provenance test. The review of the diff found the two interpreters
+apart in three places and the promise untested: Python rendered a
+null single-variable field as the string "null" and a whole-number
+float key as "61.0" (JavaScript says "61"), and neither conformance
+runner asserted `expected.data`. Both runners assert it now, Python
+spells numbers, booleans and a bound-but-empty field the way
+JavaScript's String() does (a `lookup-default` fixture feeds 61.0 and
+a missing pick through both), and the rain chance, nullable upstream,
+reads "no rain forecast for today" instead of "null% chance of rain"
+(a `weather-no-rain-chance` fixture). An unknown weather code reads
+"mixed", recorded as the one soft spot. The re-review's one note: the
+store card's "is it going to rain in Portland today" matched no
+pattern, so it reached the package only when the model proposed the
+tool; "is it going to rain in *" and "will it rain in *" are patterns
+now (catalog 0a05307), and the trailing "today" comes off the place by
+the #98 rule.

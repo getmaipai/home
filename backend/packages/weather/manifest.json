@@ -4,7 +4,7 @@
   "kind": "plugin",
   "category": "Utilities",
   "display": "Weather",
-  "description": "Get the current weather for a named place.",
+  "description": "Get the weather for a named place: temperature, conditions, today's high and low, and the chance of rain.",
   "author": "MaiPai",
   "license": "AGPL-3.0",
   "homepage": "https://github.com/getmaipai/home",
@@ -14,9 +14,10 @@
       "how's the weather in Chicago",
       "what's the weather like in Portland",
       "weather in Denver",
-      "how's the weather in Miami today"
+      "how's the weather in Miami today",
+      "is it going to rain in Portland today"
     ],
-    "patterns": ["what's the weather in *", "weather in *", "how's the weather in *", "what's the weather like in *"]
+    "patterns": ["what's the weather in *", "weather in *", "how's the weather in *", "what's the weather like in *", "is it going to rain in *", "will it rain in *"]
   },
   "args": {
     "type": "object",

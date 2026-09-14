@@ -74,6 +74,31 @@ class FormatStep(BaseModel):
         None,
         description='A template for the spoken form. Falls back to text if omitted.',
     )
+    data: dict[str, str] | None = Field(
+        None,
+        description="Named fields for the result's `data` (result.schema.json): each value is a template; a template that is exactly one {variable} keeps that variable's own type (a number stays a number), anything else is interpolated text. What a composer (CHAT-16) phrases from, beside the reply text.",
+    )
+
+
+class LookupStep(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    op: Literal['lookup']
+    as_: str = Field(..., alias='as')
+    from_: str = Field(
+        ...,
+        alias='from',
+        description='A variable name whose value, as text, is the key.',
+    )
+    table: dict[str, str] = Field(
+        ...,
+        description='Key to value; a code from an upstream API to the household\'s word for it (Open-Meteo\'s weather_code 61 to "rain").',
+    )
+    default: str | None = Field(
+        None,
+        description='Bound when the key is not in the table; without it, the key itself.',
+    )
 
 
 class HomeCallServiceStep(BaseModel):
@@ -346,6 +371,7 @@ class Recipe(BaseModel):
     steps: list[
         FetchStep
         | PickStep
+        | LookupStep
         | FormatStep
         | HomeCallServiceStep
         | ActionStep

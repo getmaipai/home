@@ -1,6 +1,11 @@
 {
   "id": "weather",
-  "inputs": [{ "name": "place", "selector": "text" }],
+  "inputs": [
+    {
+      "name": "place",
+      "selector": "text"
+    }
+  ],
   "steps": [
     {
       "op": "fetch",
@@ -8,21 +13,127 @@
       "url": "https://geocoding-api.open-meteo.com/v1/search?count=1&name={place}",
       "method": "GET"
     },
-    { "op": "pick", "as": "lat", "from": "geo", "path": "results.0.latitude" },
-    { "op": "pick", "as": "lon", "from": "geo", "path": "results.0.longitude" },
-    { "op": "pick", "as": "place_name", "from": "geo", "path": "results.0.name" },
+    {
+      "op": "pick",
+      "as": "lat",
+      "from": "geo",
+      "path": "results.0.latitude"
+    },
+    {
+      "op": "pick",
+      "as": "lon",
+      "from": "geo",
+      "path": "results.0.longitude"
+    },
+    {
+      "op": "pick",
+      "as": "place_name",
+      "from": "geo",
+      "path": "results.0.name"
+    },
     {
       "op": "fetch",
       "as": "wx",
-      "url": "https://api.open-meteo.com/v1/forecast?latitude={lat}&longitude={lon}&current=temperature_2m&temperature_unit=fahrenheit",
+      "url": "https://api.open-meteo.com/v1/forecast?latitude={lat}&longitude={lon}&current=temperature_2m,weather_code&daily=temperature_2m_max,temperature_2m_min,precipitation_probability_max&forecast_days=1&timezone=auto&temperature_unit=fahrenheit",
       "method": "GET"
     },
-    { "op": "pick", "as": "temp", "from": "wx", "path": "current.temperature_2m" },
+    {
+      "op": "pick",
+      "as": "temp",
+      "from": "wx",
+      "path": "current.temperature_2m"
+    },
+    {
+      "op": "pick",
+      "as": "code",
+      "from": "wx",
+      "path": "current.weather_code"
+    },
+    {
+      "op": "lookup",
+      "as": "conditions",
+      "from": "code",
+      "table": {
+        "0": "clear",
+        "1": "mostly clear",
+        "2": "partly cloudy",
+        "3": "overcast",
+        "45": "foggy",
+        "48": "foggy",
+        "51": "drizzly",
+        "53": "drizzly",
+        "55": "drizzly",
+        "56": "freezing drizzle",
+        "57": "freezing drizzle",
+        "61": "rainy",
+        "63": "rainy",
+        "65": "heavy rain",
+        "66": "freezing rain",
+        "67": "freezing rain",
+        "71": "snowy",
+        "73": "snowy",
+        "75": "heavy snow",
+        "77": "snow grains",
+        "80": "showers",
+        "81": "showers",
+        "82": "heavy showers",
+        "85": "snow showers",
+        "86": "snow showers",
+        "95": "thunderstorms",
+        "96": "thunderstorms with hail",
+        "99": "thunderstorms with hail"
+      },
+      "default": "mixed"
+    },
+    {
+      "op": "pick",
+      "as": "high",
+      "from": "wx",
+      "path": "daily.temperature_2m_max.0"
+    },
+    {
+      "op": "pick",
+      "as": "low",
+      "from": "wx",
+      "path": "daily.temperature_2m_min.0"
+    },
+    {
+      "op": "pick",
+      "as": "rain_chance",
+      "from": "wx",
+      "path": "daily.precipitation_probability_max.0"
+    },
+    {
+      "op": "lookup",
+      "as": "rain_pct",
+      "from": "rain_chance",
+      "table": {
+        "": ""
+      }
+    },
+    {
+      "op": "lookup",
+      "as": "rain_words",
+      "from": "rain_chance",
+      "table": {
+        "": "no rain forecast for today"
+      },
+      "default": "% chance of rain"
+    },
     {
       "op": "format",
       "as": "reply",
-      "text": "It's {temp} degrees in {place_name}.",
-      "speech": "It's {temp} degrees in {place_name} right now."
+      "text": "It's {temp} degrees and {conditions} in {place_name}. Today: high {high}, low {low}, {rain_pct}{rain_words}.",
+      "speech": "It's {temp} degrees and {conditions} in {place_name} right now. Today's high is {high}, the low {low}, {rain_pct}{rain_words}.",
+      "data": {
+        "place": "{place_name}",
+        "temperature": "{temp}",
+        "conditions": "{conditions}",
+        "high": "{high}",
+        "low": "{low}",
+        "precipitation_chance": "{rain_chance}",
+        "unit": "fahrenheit"
+      }
     }
   ]
 }

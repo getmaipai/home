@@ -1,5 +1,5 @@
 {
-  "description": "The real backend/packages/weather/recipe.json (2026-09-05, the first real plugin built on host.fetch; 2026-09-13, conditions, today's high and low and the rain chance as typed data beside the text, so \"is it going to rain today\" has an answer): geocode a place name, then forecast its coordinates, using response shapes captured from a real Open-Meteo call. The rain chance is nullable upstream, so its percent and its phrase come from two lookups on the same value: a number reads \"70% chance of rain\", a null reads \"no rain forecast for today\".",
+  "description": "The weather recipe when Open-Meteo has no precipitation probability for the place (a null in the daily block): the reply says so instead of \"null% chance of rain\", and data carries the null.",
   "recipe": {
     "id": "weather",
     "inputs": [
@@ -172,7 +172,7 @@
             52.1
           ],
           "precipitation_probability_max": [
-            70
+            null
           ]
         }
       }
@@ -180,8 +180,8 @@
   },
   "expected": {
     "reply": {
-      "text": "It's 57.3 degrees and rainy in Seattle. Today: high 64.2, low 52.1, 70% chance of rain.",
-      "speech": "It's 57.3 degrees and rainy in Seattle right now. Today's high is 64.2, the low 52.1, 70% chance of rain."
+      "text": "It's 57.3 degrees and rainy in Seattle. Today: high 64.2, low 52.1, no rain forecast for today.",
+      "speech": "It's 57.3 degrees and rainy in Seattle right now. Today's high is 64.2, the low 52.1, no rain forecast for today."
     },
     "data": {
       "place": "Seattle",
@@ -189,7 +189,7 @@
       "conditions": "rainy",
       "high": 64.2,
       "low": 52.1,
-      "precipitation_chance": 70,
+      "precipitation_chance": null,
       "unit": "fahrenheit"
     },
     "actions": [],

@@ -1,6 +1,6 @@
 """Interprets a Tier 0 Recipe (spec/schemas/recipe.schema.json) natively,
 executing each step against a host (platform plan 5.2). No process, no
-eval: every step is one of the sixteen declared primitives. This must stay
+eval: every step is one of the seventeen declared primitives. This must stay
 behaviorally identical to spec/interpreters/ts/recipe-interpreter.ts; the
 conformance fixtures in spec/fixtures/recipes/ prove that.
 """
@@ -32,6 +32,24 @@ NOTHING_RECALLED = "I don't remember anything about that."
 # encodes every response unconditionally). `html.unescape` is the standard
 # library's own complete HTML5 entity decoder - no dependency needed, must
 # stay behaviorally equivalent to the TS side's `he` usage.
+_SINGLE_VARIABLE = re.compile(r"\{([a-zA-Z_][a-zA-Z0-9_]*)\}")
+
+
+def _js_text(value: Any) -> str:
+    """A value as JavaScript's String() would spell it, so both
+    interpreters render the same text: 61.0 is "61", True is "true"."""
+    if isinstance(value, bool):
+        return "true" if value else "false"
+    if isinstance(value, float) and value.is_integer():
+        return str(int(value))
+    return str(value)
+
+
+def _key_text(value: Any) -> str:
+    """A lookup key, the same way: None is the empty key."""
+    return "" if value is None else _js_text(value)
+
+
 def interpolate(template: str, scope: dict[str, Any]) -> str:
     def repl(m: re.Match) -> str:
         name = m.group(1)
@@ -44,7 +62,11 @@ def interpolate(template: str, scope: dict[str, Any]) -> str:
         # a caller might plausibly pass a null value through): matched to
         # the TS interpreter's own literal exactly rather than picking a
         # third string neither side used before.
-        return html.unescape("null" if value is None else str(value))
+        # The same goes for a whole-number float ("61.0" here, "61"
+        # there: json parses Open-Meteo's 61.0 as a float on this side
+        # only) and a boolean ("True" against "true"), spelled as
+        # JavaScript's String() spells them.
+        return html.unescape("null" if value is None else _js_text(value))
 
     return INTERP_RE.sub(repl, template)
 
@@ -98,6 +120,7 @@ async def run_recipe(recipe: Any, inputs: dict[str, Any], host: Any) -> dict[str
     actions: list[dict[str, Any]] = []
     reply: dict[str, str] | None = None
     ask: dict[str, Any] | None = None
+    data: dict[str, Any] | None = None
 
     for step in recipe.steps:
         op = step.op
@@ -108,11 +131,34 @@ async def run_recipe(recipe: Any, inputs: dict[str, Any], host: Any) -> dict[str
             )
         elif op == "pick":
             scope[step.as_] = pick_path(scope.get(step.from_), step.path)
+        elif op == "lookup":
+            # A code from an upstream API to the household's word for it;
+            # the key is the value as text, so a numeric weather_code
+            # finds its "61" row. Twin of recipe-interpreter.ts's case.
+            key = _key_text(scope.get(step.from_))
+            table = dict(step.table) if step.table else {}
+            scope[step.as_] = table.get(
+                key, step.default if step.default is not None else key
+            )
         elif op == "format":
             text = interpolate(step.text, scope)
             speech = interpolate(step.speech, scope) if step.speech else text
             scope[step.as_] = {"text": text, "speech": speech}
             reply = {"text": text, "speech": speech}
+            # Named fields beside the text (result.schema.json's `data`): a
+            # template that is exactly one {variable} keeps the variable's
+            # own type; anything else is interpolated text.
+            if step.data is not None:
+                data = {}
+                for name, template in dict(step.data).items():
+                    single = _SINGLE_VARIABLE.fullmatch(template)
+                    # A bound variable keeps its own value, None included
+                    # (the twin's `!== undefined`); an unbound one
+                    # interpolates to its literal placeholder.
+                    if single and single.group(1) in scope:
+                        data[name] = scope[single.group(1)]
+                    else:
+                        data[name] = interpolate(template, scope)
         elif op == "home.call_service":
             # target/data interpolation (session-d-packages-and-store.md
             # step 9). Must stay behaviorally identical to
@@ -198,6 +244,8 @@ async def run_recipe(recipe: Any, inputs: dict[str, Any], host: Any) -> dict[str
     result: dict[str, Any] = {"actions": actions}
     if reply is not None:
         result["reply"] = reply
+    if data is not None:
+        result["data"] = data
     if ask is not None:
         result["ask"] = ask
     return result

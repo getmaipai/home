@@ -1,0 +1,89 @@
+{
+  "description": "The lookup step (2026-09-13): a code from an upstream API becomes the household's word for it; a code not in the table takes the default; a whole-number float finds its integer row in both interpreters. Beside it, format's data keeps a single-variable field's own type (a number stays a number, a null stays null) and interpolates a mixed one.",
+  "recipe": {
+    "id": "lookup-demo",
+    "inputs": [
+      {
+        "name": "code",
+        "selector": "text"
+      }
+    ],
+    "steps": [
+      {
+        "op": "fetch",
+        "as": "wx",
+        "url": "https://example.com/wx",
+        "method": "GET"
+      },
+      {
+        "op": "pick",
+        "as": "code_num",
+        "from": "wx",
+        "path": "code"
+      },
+      {
+        "op": "pick",
+        "as": "missing",
+        "from": "wx",
+        "path": "absent"
+      },
+      {
+        "op": "lookup",
+        "as": "word",
+        "from": "code_num",
+        "table": {
+          "61": "rainy",
+          "0": "clear"
+        },
+        "default": "mixed"
+      },
+      {
+        "op": "lookup",
+        "as": "other",
+        "from": "code",
+        "table": {
+          "61": "rainy",
+          "0": "clear"
+        },
+        "default": "mixed"
+      },
+      {
+        "op": "format",
+        "as": "reply",
+        "text": "It is {word}, not {other}.",
+        "data": {
+          "word": "{word}",
+          "code": "{code_num}",
+          "missing": "{missing}",
+          "label": "code {code_num}"
+        }
+      }
+    ]
+  },
+  "inputs": {
+    "code": "999"
+  },
+  "host_setup": {
+    "fetch": {
+      "https://example.com/wx": {
+        "code": 61.0
+      }
+    }
+  },
+  "expected": {
+    "reply": {
+      "text": "It is rainy, not mixed.",
+      "speech": "It is rainy, not mixed."
+    },
+    "data": {
+      "word": "rainy",
+      "code": 61.0,
+      "missing": null,
+      "label": "code 61"
+    },
+    "actions": [],
+    "scheduled_jobs": [],
+    "home_calls": [],
+    "memory_added": []
+  }
+}

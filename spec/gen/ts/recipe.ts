@@ -76,6 +76,31 @@ export const Recipe = z
               .strict(),
             z
               .object({
+                op: z.literal("lookup"),
+                as: z.string(),
+                /**A variable name whose value, as text, is the key.*/
+                from: z
+                  .string()
+                  .describe(
+                    "A variable name whose value, as text, is the key.",
+                  ),
+                /**Key to value; a code from an upstream API to the household's word for it (Open-Meteo's weather_code 61 to "rain").*/
+                table: z
+                  .record(z.string(), z.string())
+                  .describe(
+                    "Key to value; a code from an upstream API to the household's word for it (Open-Meteo's weather_code 61 to \"rain\").",
+                  ),
+                /**Bound when the key is not in the table; without it, the key itself.*/
+                default: z
+                  .string()
+                  .describe(
+                    "Bound when the key is not in the table; without it, the key itself.",
+                  )
+                  .optional(),
+              })
+              .strict(),
+            z
+              .object({
                 op: z.literal("format"),
                 as: z.string(),
                 /**A template with {variable} interpolation for the on-screen reply.*/
@@ -89,6 +114,13 @@ export const Recipe = z
                   .string()
                   .describe(
                     "A template for the spoken form. Falls back to text if omitted.",
+                  )
+                  .optional(),
+                /**Named fields for the result's `data` (result.schema.json): each value is a template; a template that is exactly one {variable} keeps that variable's own type (a number stays a number), anything else is interpolated text. What a composer (CHAT-16) phrases from, beside the reply text.*/
+                data: z
+                  .record(z.string(), z.string())
+                  .describe(
+                    "Named fields for the result's `data` (result.schema.json): each value is a template; a template that is exactly one {variable} keeps that variable's own type (a number stays a number), anything else is interpolated text. What a composer (CHAT-16) phrases from, beside the reply text.",
                   )
                   .optional(),
               })
