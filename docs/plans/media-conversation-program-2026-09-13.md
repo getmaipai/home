@@ -87,6 +87,18 @@ these need household evidence and may honestly say "I don't know").
 | 4 | CHAT-16: one composer for every factual result, phrased through the selected companion with the active subject and recent turns as context; no package text spoken as-is. Evidence ladder for a world subject: the typed source first (media-lookup, weather, knowledge), then websearch through the household's own SearXNG when the typed source misses or the field is null or the question is about opinion or currency ("is it any good", "what's on tonight", a film too new to be catalogued), then the model's own knowledge, and never a "don't know" while a rung remains. | A | 2, 3 |
 | 5 | The film conversation and four more of the same shape on other subject kinds (a band, a city, a historical event, a video game: an opening statement, "have you heard of it", two factual follow-ups with pronouns, one opinion question) plus three household-subject conversations of the same shape (the family dog, a family member, a thing in the house: an opening statement that carries a fact, a friend-like reaction, a pronoun follow-up answered from what was just said, a follow-up two turns later that must not confuse the household subject with a world one of the same name) pass three identical runs end to end, with the four categories each shown by a row; the general subjects go through the knowledge package or model knowledge, proving the mechanism is not media-specific | A | 0 to 4 |
 
+**Step 3a, amended 2026-09-13 (the design pass, dev.md sections 3, 8
+and 10):** a kind or a relationship the judge model inferred rather
+than the speaker stated is a candidate, never knowledge. It is written
+with an open question on the conversation (ASK-01's slot), asked once
+at the end of the next reply; until the person answers it is not
+rendered to the model (the hedge line "I think your coworker, not
+confirmed" goes), recall never reads it, and the guards and the
+resolver treat the name as unknown-kind. The answer promotes it through
+the confirm transition 3a already built. A world subject (a film, a
+band, a game, a product) never becomes a household entity on the
+judge's path or any other; it is a world `SubjectRef`.
+
 CHAT-12 (budgets) is a technical prerequisite CHAT-16 names; take it
 inside step 4 if the composer needs it, not before. The judge's
 subject-resolution item (baseline-fixes 3) follows this program; #98

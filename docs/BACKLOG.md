@@ -480,29 +480,36 @@ not permission to expand scope.
     Checks: routing/turn/tier2 suites and full exit gate.
 
     **Amended 2026-09-13 (the design pass, dev.md "The chat design
-    pass", sections 3 and 4).** The subject is a stack of depth two
-    with a `rejected` list per conversation, and the resolver's first
-    half is ASK-01's name resolver (the roster, the registry, the
-    typed sources; a name outside them is `unknown`, never guessed).
-    The resolved subject carries `recency` (`current | dated |
-    unknown`, from the utterance's own words or a typed source's date),
-    and `intent.kind` is `lookup` when a world subject's exact field is
-    asked (a date, a count, a day, a schedule, reviews, a rating, a
-    runtime, a price, "is it out") and the subject is not `dated`: the
-    engine decides, the model's knowledge is a rung only for a dated
-    subject. A correction ("wrong show", "no, not that one", "I meant
-    X") pops the subject onto `rejected`, keeps the unresolved question
-    (TURN-01's slot, pulled forward here) and re-asks it against the
-    corrected subject on the next turn or a bare "do it"; a reply
-    sentence naming a rejected subject is cut (`rejected_subject`); the
-    window annotates the turn that answered about it with a system
-    note. A reflected question ("you?", "what about you") after the hub
-    asked one is that question addressed to the hub; a reply that only
-    repeats the hub's own previous question is `repeat_question`.
-    "What were we talking about" answers from the stack and recalls no
-    episodes. Acceptance adds the `new-release` and `correction`
-    conversations (design note, section 4) beside the rows already
-    named; three seeded runs.
+    pass", sections 3, 4 and 10).** The subject is a stack (depth two
+    to start, measured, return by name) of one spec shape, `SubjectRef`
+    (its own S item below: a household reference with an `entity_id`;
+    a world reference with kind, name, optional year, the typed source
+    and its key, and `recency: current | dated | unknown`; an
+    unresolved reference with candidates and confidence), with a
+    `rejected` list per conversation. Resolution returns `resolved`,
+    `ambiguous` or `unknown`; the engine blocks on a clarification only
+    when the reply depends on the missing distinction (ASK-01's rule),
+    and a world subject never becomes a household entity on any path.
+    The resolver's first half is ASK-01's name resolver (the roster,
+    the registry, the typed sources; a name outside them is `unknown`,
+    never guessed). `intent.kind` is `lookup` when a world subject's
+    exact field is asked (a date, a count, a day, a schedule, reviews,
+    a rating, a runtime, a price, "is it out") and the subject is not
+    `dated`: the engine decides, the model's knowledge is a rung only
+    for a dated subject. A correction ("no, the other one", "not that
+    one", "I meant X") replaces the active subject (the wrong one goes
+    onto `rejected`, never stays as a second candidate), keeps the
+    unresolved question (TURN-01's slot, pulled forward here) and
+    re-asks it against the corrected subject on the next turn or a bare
+    "go on"; a reply sentence naming a rejected subject is cut
+    (`rejected_subject`); the window annotates the turn that answered
+    about it with a system note. A reflected question ("you?", "what
+    about you") after the hub asked one is that question addressed to
+    the hub; a reply that only repeats the hub's own previous question
+    is `repeat_question`. "What were we talking about" answers from the
+    stack and recalls no episodes. Acceptance adds the `new-album` and
+    `correction` conversations (design note, section 4) beside the rows
+    already named, lookups from recorded fixtures; three seeded runs.
 
 <a id="chat-14"></a>
 
@@ -600,7 +607,7 @@ not permission to expand scope.
     checks and full exit gate.
 
     **Amended 2026-09-13 (the design pass, dev.md "The chat design
-    pass", sections 4, 6 and 7).** The verdict: one composer is
+    pass", sections 4, 6, 7 and 10).** The verdict: one composer is
     necessary and not sufficient. The composer has a contract of four
     moves in order (react in the companion's register; pick the one or
     two results that answer, never the list; say it as a person who
@@ -612,21 +619,32 @@ not permission to expand scope.
     "the search results", "according to the results", "based on my
     search", "the results show", "I found that", "some recommended",
     "include options such as"; a reply that loses every sentence is
-    recomposed once, then takes OUT-01's `malformed` line). A link ask
-    (a link, a URL, a trailer, "where can I watch") is a deliverable:
-    the reply's `sources` carry the URL, the line says it is there,
-    never "no link" and never a spoken URL; the decision table gains
-    the row. The websearch recipe's `llm_complete` step goes and the
-    recipe returns title, snippet and URL rows in `data`. The ladder
-    runs with the model's knowledge off it for a `current` subject
-    (CHAT-13's `recency`): a rung that finds nothing composes "I
-    couldn't find that" for a world fact, never a number. A question
-    about the hub's own experience ("have you seen it", "are you gonna
-    watch it", a reflected "you?") is composed from the experience
-    category: the experience line plus a familiarity clause from
-    evidence, never free prose about its plans. Acceptance adds the
-    `search-in-a-voice` conversation and the experience turns of
-    `new-release` (design note, sections 6 and 7); three seeded runs.
+    recomposed once, then takes OUT-01's `malformed` line). The ladder
+    runs by claim type, decided before composition: household (memory
+    and the registry only); exact, current, safety-sensitive or
+    source-requested (a typed source, then SearXNG, then an explicit
+    "I couldn't find that", the model's knowledge never a rung, so a
+    failed lookup stays a failed lookup); stable general knowledge (a
+    typed source or retained evidence, then the model's knowledge with
+    the evidence kind recorded on the outcome); opinion (SearXNG
+    candidates, a bounded pick with a reason); action result (the
+    typed outcome). The composer emits a typed `ComposedTurn` (one line
+    and an optional document reference, COMP-01), and every producer's
+    text reaches the person through OUT-01's boundary. A link ask (a
+    link, a URL, a review, "where can I watch") is a deliverable: the
+    reply's `sources` carry the URL, the line says it is there, never
+    "no link" and never a spoken URL; the decision table gains the row.
+    The websearch recipe's `llm_complete` step goes and the recipe
+    returns title, snippet and URL rows in `data`. A question about the
+    hub's own experience ("have you heard it", "are you gonna listen to
+    it", a reflected "you?") is composed from the experience category:
+    the experience line plus a familiarity clause from evidence, never
+    free prose about its plans. The subject line, the unknown-name line
+    and the composer's evidence sit ahead of the memory and episode
+    sections in the volatile zone until CHAT-12 packs by priority.
+    Acceptance adds the `search-in-a-voice` conversation and the
+    experience turns of `new-album` (design note, sections 6 and 7),
+    lookups from recorded fixtures; three seeded runs.
 
 - [ ] **Engine emits `status` events at lookup start (CHAT-16)** (S) -
       the visible "what MaiPai is doing" line during a turn is built and
@@ -1022,15 +1040,19 @@ not permission to expand scope.
 The design is [dev.md, "The chat design pass"](dev.md#the-chat-design-pass-findings-1-to-18-and-the-companions-brief-2026-09-13);
 the findings are in
 [docs/plans/media-conversation-program-2026-09-13.md](plans/media-conversation-program-2026-09-13.md).
-The execution contract above applies. **Order:** RECALL-02, OUT-01,
-REG-01, EXP-01, ASK-01 (spec, then engine), LOOKUP-01 and MEM-06 land
-before CHAT-13 is built; CHAT-13 and CHAT-16 carry their amendments
-(on the items themselves, above); COMP-01 to COMP-06, SPEAK-01 and
-WAKE-02 follow CHAT-16. Every item's acceptance is a bench conversation
-that fails on `main` today and passes three seeded runs when done
-(`scripts/bench/conversationLive.ts`, BENCH-01's pins); the rows are
-named in the design note and added to `conversationFixture.ts` as the
-first step of the item.
+The execution contract above applies. **Order:** RECALL-02 and OUT-01
+land with or before step 3a's engine half (3a itself carries the
+amendment on the program file); REG-01, EXP-01, ASK-01 (spec, then
+engine), LOOKUP-01, the `SubjectRef` spec and MEM-06 land before
+CHAT-13 is built; CHAT-13 and CHAT-16 carry their amendments (on the
+items themselves, above); COMP-01 to COMP-06, SPEAK-01 and WAKE-02
+follow CHAT-16. Every item's acceptance is a bench conversation that
+fails on `main` today and passes three seeded runs when done
+(`scripts/bench/conversationLive.ts`, BENCH-01's pins, lookups from
+recorded fixtures through the bench's `recordingProxy`, the live
+SearXNG run a separate check); the rows are named in the design note,
+invented for the roster's household, and added to
+`conversationFixture.ts` as the first step of the item.
 
 <a id="recall-02"></a>
 
@@ -1039,49 +1061,59 @@ first step of the item.
     Objective: a reply never copies a sentence from another
     conversation, and a short or meta turn recalls nothing. Files:
     `backend/src/lib/episodes.ts` (`recallEpisodes`, `formatEpisodeLine`,
-    `formatEpisodesForPrompt`), `backend/src/lib/guards.ts`
-    (`guardUnrelatedRecall`), `backend/src/lib/turnEngine.ts`
-    (`prepareTurn`'s episode call), `backend/scripts/bench/recall-floor.ts`,
-    `backend/tests/episodes.test.ts`, `guards.test.ts`. Mirror: the
-    vector floor `EPISODE_MIN_COSINE` and the `guardedTurnNote()` system-
-    note shape. Do: assistant-side episodes only on a recall-shaped
-    question (the recall package's routing examples define the shape),
-    rendered as a reported-speech system note, never `you replied: "..."`;
+    `formatEpisodesForPrompt`, the unused `pairedText`),
+    `backend/src/lib/guards.ts` (`guardUnrelatedRecall`),
+    `backend/src/lib/turnEngine.ts` (`prepareTurn`'s episode call),
+    `backend/scripts/bench/recall-floor.ts`, `backend/tests/episodes.test.ts`,
+    `guards.test.ts`. Mirror: the vector floor `EPISODE_MIN_COSINE` and
+    the `guardedTurnNote()` system-note shape. Do: assistant-side
+    episodes only on a recall-shaped question (the recall package's
+    routing examples define the shape), rendered as a reported-speech
+    system note with the paired user side, never `you replied: "..."`;
     a lexical floor (two shared content words, or one plus the vector
     floor), measured on the recall-floor bench and recorded; no episode
     block on a turn with fewer than three content words or a question
     about this conversation; at most three lines and 400 characters;
     `guardUnrelatedRecall` reads `ctx.episodes` beside `ctx.sources`.
-    Acceptance: the `copied-line` conversation (design note, section 1)
-    and the opening turns of household-subject-dog and household-subject-
-    person, three seeded runs. Out of scope: CHAT-10's bounded query
-    (the subject becomes the query when CHAT-13 lands). Exit:
-    `bun test tests/episodes.test.ts tests/guards.test.ts`, the recall-
-    floor bench's recorded floor, `bash scripts/check.sh`.
+    Acceptance: the `copied-line` conversation (design note, section 1,
+    the explicit-history third conversation included) and the opening
+    turns of household-subject-dog and household-subject-person, three
+    seeded runs. Out of scope: CHAT-10's bounded query (the subject
+    becomes the query when CHAT-13 lands). Exit: `bun test
+    tests/episodes.test.ts tests/guards.test.ts`, the recall-floor
+    bench's recorded floor, `bash scripts/check.sh`.
 
 <a id="out-01"></a>
 
-- [ ] **OUT-01: The well-formed reply gate** (S)
+- [ ] **OUT-01: One validated reply boundary after every producer** (S)
 
-    Objective: a fragment, a lone token or a reply with a stray
-    quotation mark is never sent. Files: `backend/src/lib/turnEngine.ts`
-    (`finalizeReply`, `runTurnStreamHoldingLease`'s `finalize` and
-    first-chunk hold, `runTurnHoldingLease`'s `answerWithSafetyAndGuards`),
+    Objective: a fragment, a lone token, an empty reply or a reply with
+    an unmatched quotation mark is never sent or stored, from any
+    producer. Files: `backend/src/lib/turnEngine.ts` (`finalizeReply`,
+    the one place every producer passes: `runTurnStreamHoldingLease`'s
+    `finalize` and first-chunk hold, `peekAndHandle`'s empty-reply
+    branch, `runTurnHoldingLease`'s `answerWithSafetyAndGuards`),
     `backend/src/lib/guards.ts` (a `malformed` reason and its bank),
     `backend/src/lib/persona.ts` (`examplesBlock` renders dash lines,
     no quotation marks), `backend/scripts/bench/conversationScore.ts`
     (a universal `wellFormed` check on every row),
     `backend/tests/turnEngine.test.ts`, `persona.test.ts`. Mirror: the
-    invention retry's one-retry bound. Do: two words and a terminator or
-    a fixed line; one regeneration for a fragment, then the `malformed`
-    line; unmatched edge quotes stripped; the streaming first chunk held
-    to two words or a boundary; the persona-eval bench rerun on the
+    invention retry's one-retry bound. Do: a complete sentence (a
+    terminator; two words, or one from the engine's short-answer
+    vocabulary; balanced quotes and brackets; no control markers),
+    checked before `logTurn`; one regeneration for a model fragment,
+    then the `malformed` line; a package or command line that fails is
+    logged loudly and replaced by the same line; the streaming first
+    chunk held to two words or a boundary and the final buffered span
+    repaired, never emitted raw; the persona-eval bench rerun on the
     unquoted examples. Acceptance: every fixture row passes `wellFormed`
-    in three seeded runs; a scripted engine that answers "I" then ends
-    yields the retry, then the fixed line; a reply ending in a stray
-    quote is stripped. Out of scope: sampler changes (record the
-    fragment rate per run instead). Exit: the named tests, the persona-
-    eval bench, `bash scripts/check.sh`.
+    in three seeded runs; a scripted engine that answers "I", an empty
+    string, an unmatched quote and a dangling connector yields the
+    retry then the fixed line, and none of the four raw forms is stored;
+    "Yes." on a confirmation stands; the check runs on the model, a
+    package, a command and a guard replacement. Out of scope: sampler
+    changes (record the fragment rate per run instead). Exit: the named
+    tests, the persona-eval bench, `bash scripts/check.sh`.
 
 <a id="reg-01"></a>
 
@@ -1112,54 +1144,64 @@ first step of the item.
 
 - [ ] **EXP-01: Experience and plan claims** (S)
 
-    Objective: the hub never says it has seen, played or plans to watch
-    anything. Files: `backend/src/lib/guards.ts` (`CLAIMED_EXPERIENCE_RE`),
-    `backend/tests/guards.test.ts`, `spec/llm/guard-corpus.json`,
-    `backend/scripts/bench/conversationFixture.ts` (`EXPERIENCE_CLAIM`).
-    Do: intent forms (going to, gonna, plan to, can't wait to, excited
-    to, looking forward to, curious to, with watch, see, play, read,
-    try, check out) and "haven't ... yet"; the negation exemption only
-    for a plain negation without "yet" or "but". Acceptance: the
-    `new-release` conversation's "are you gonna watch it" and "no, you?"
-    turns (design note, sections 4 and 7) show no claim in three seeded
-    runs; corpus rows for each new form and for the hearsay forms that
-    must stand ("I hear it's good", "I've never seen it"). Out of scope:
-    the composed experience answer (CHAT-16). Exit: `bun test
-    tests/guards.test.ts`, `bash scripts/check.sh`.
+    Objective: the hub never says it has seen, heard, played or plans
+    to watch anything. Files: `backend/src/lib/guards.ts`
+    (`CLAIMED_EXPERIENCE_RE`), `backend/tests/guards.test.ts`,
+    `spec/llm/guard-corpus.json`, `backend/scripts/bench/conversationFixture.ts`
+    (`EXPERIENCE_CLAIM`). Do: intent forms (going to, gonna, plan to,
+    can't wait to, excited to, looking forward to, curious to, with
+    watch, see, hear, listen, play, read, try, check out) and
+    "haven't ... yet"; the negation exemption only for a plain negation
+    without "yet" or "but". Acceptance: the `new-album` conversation's
+    "are you gonna listen to it" and "nope, you?" turns (design note,
+    sections 4 and 7) show no claim in three seeded runs; corpus rows
+    for each new form and for the hearsay forms that must stand ("I
+    hear it's good", "I've never heard it"). Out of scope: the composed
+    experience answer (CHAT-16). Exit: `bun test tests/guards.test.ts`,
+    `bash scripts/check.sh`.
 
 <a id="ask-01"></a>
 
 - [ ] **ASK-01: The unknown-name rule (ask, never assume)** (M; spec S first)
 
     Objective: a name the hub has never heard is asked about, never
-    assumed, and the answer creates the entity as stated. Spec first:
+    assumed, and the answer creates the entity as stated; an inference
+    is a candidate and an open question, never knowledge. Spec first:
     `spec/schemas/entity.schema.json` gains `pronouns` (nullable
     string); `spec/vocab/relationship-types.json` gains `relative_of`
     (person to person, symmetric, terminable); a new
     `spec/vocab/entity-kind-nouns.json` maps answer nouns to kinds;
     round-trip fixtures and both generated bindings. Then the engine:
     `backend/src/lib/turnEngine.ts` (`prepareTurn`: the name resolver,
-    the unknown line in the context, the appended ask),
+    the unknown line in the context ahead of the memory section, the
+    appended ask that outranks the persona's engagement dial),
     `backend/src/lib/turnContext.ts` (`unknownNames`),
     `backend/src/lib/conversationHistory.ts` (`PendingAsk.kind` gains
     `who`; `conversations.open_question`, a migration),
-    `backend/src/lib/subjects.ts` (the answer parser calling
-    `ensureSubjectEntity` and `writeRelation` with `stated: true`),
-    `backend/src/lib/memoryJudge.ts` (the open question on an inferred
-    entity whose kind the model guessed), `backend/src/lib/guards.ts`
-    (`false_familiarity`, `pronoun_mismatch`), their tests, the guard
-    corpus. Mirror: `resolvePendingAsk()` for the `who` kind; step 3a's
-    creation path; the `compromise` tagger as a dependency through bun
-    (the org's prebuilt rule), never a copied word list. Acceptance:
-    the three conversations in the design note, section 3
-    (`unknown-name-person`, `unknown-name-pet-lowercase`,
-    `unknown-name-birthday`), three seeded runs; unit tests per part
-    (the resolver's known set, the appended ask deduped against the
-    model's own question, the answer parser for a pet, a relative and
-    an unreadable answer, the judge's open question asked once, the two
-    guard shapes both ways). Out of scope: CHAT-13's subject stack (it
-    reuses this resolver). Exit: the spec round-trip tests, the named
-    backend tests, `bash scripts/check.sh`.
+    `backend/src/lib/subjects.ts` (the deterministic answer parser
+    calling `ensureSubjectEntity` and `writeRelation` with `stated:
+    true`; the hedge rendering in `subjectLabel` removed),
+    `backend/src/lib/memoryJudge.ts` (an inferred entity or
+    relationship becomes a candidate plus the open question, not a
+    rendered or recallable record, the step 3a amendment),
+    `backend/src/lib/memory.ts` (recall never reads an unconfirmed
+    inferred relationship), `backend/src/lib/guards.ts`
+    (`false_familiarity`, `pronoun_mismatch`; the acknowledgment bank
+    never replaces a sentence about an unknown name), their tests, the
+    guard corpus. Mirror: `resolvePendingAsk()` for the `who` kind; step
+    3a's creation and confirm paths (`promoteToStated`); the
+    `compromise` tagger as a dependency through bun (the org's prebuilt
+    rule), never a copied word list. Acceptance: the three conversations
+    in the design note, section 3 (`unknown-name-person`,
+    `unknown-name-pet-lowercase`, `unknown-name-marathon`), three seeded
+    runs; unit tests per part (the resolver's known set, the appended
+    ask deduped against the model's own question and appended under the
+    brief persona, the answer parser for a pet, a relative and an
+    unreadable answer, the judge's open question asked once and its
+    candidate unreadable by recall until confirmed, the two guard shapes
+    both ways). Out of scope: CHAT-13's subject stack (it reuses this
+    resolver). Exit: the spec round-trip tests, the named backend tests,
+    `bash scripts/check.sh`.
 
 <a id="lookup-01"></a>
 
@@ -1176,66 +1218,89 @@ first step of the item.
     `backend/tests/turnEngine.test.ts`, `tier2.test.ts`. Mirror: the
     invention retry in `runTurnHoldingLease` and `resolvePendingAsk`.
     Do: a promise or offer in the first sentence with no lookup outcome
-    is not sent; the forced lookup runs on the subject and question and
-    its result goes out as every lookup result does; a promise later in
-    the reply becomes a `lookup` pending ask that a consent word
-    resolves. Acceptance: the `new-release` "do you know when it comes
-    out" turn and the `offer-binding` conversation (design note,
+    is an invalid draft and is not sent; the forced lookup runs on the
+    subject and question and its result goes out as every lookup result
+    does; a promise later in the reply becomes a `lookup` pending ask
+    that a consent word resolves. Acceptance: the `new-album` "when is
+    it out" turn and the `offer-binding` conversation (design note,
     section 4), three seeded runs; a scripted-engine test for each path.
     Out of scope: the composer (CHAT-16) and the decision rule for
     exact fields (CHAT-13's amendment). Exit: the named tests, `bash
     scripts/check.sh`.
 
+<a id="subject-ref-spec"></a>
+
+- [ ] **The `SubjectRef` spec, for CHAT-13** (S, spec only)
+
+    Objective: one shape for what a conversation is about, shared by
+    the hub, the robot and Go. Files: a new
+    `spec/schemas/subject-ref.schema.json` (a discriminated union: a
+    household reference with an `entity_id`; a world reference with
+    kind, display name, optional year, the typed source and its stable
+    key when one answered, and `recency: current | dated | unknown`; an
+    unresolved reference with the surface form, candidate kinds,
+    provenance and confidence), fixtures, both generated bindings,
+    `spec/README.md`. Acceptance: the round-trip fixtures for all three
+    variants; the validator refuses a world reference carrying an
+    `entity_id`. Out of scope: any hub code (CHAT-13). Exit: the spec
+    suite, `bash scripts/check.sh`.
+
 <a id="mem-06"></a>
 
 - [ ] **MEM-06: The judge grounds every fact in the speaker's words** (S-M)
 
-    Objective: no reply text, lookup result or passing state becomes a
-    memory. Files: `backend/src/lib/memoryJudge.ts` (three rejections
-    after `rejectPromptEchoes`, counted on its log line),
-    `backend/src/lib/guards.ts` (the conversational-progressive list
-    exported, one definition), `backend/scripts/bench/judge-eval.ts` and
-    its fixture, `backend/tests/memoryJudge.test.ts`. Mirror: the echo
-    filter's anchor reading of the turn. Do: a fact shares half its
-    content words and every proper noun and number with the speaker's
-    words (or a confirmed assistant line) or is `ungrounded`; a `state`
-    with a conversational verb is `passing`; a fact whose subject is the
-    turn's world subject (a succeeded lookup or typed-source outcome's
-    title, read from the retained outcomes) is `world` unless it is the
-    speaker's own preference or plan. Acceptance: one judge-eval turn
-    per class with roster names at 100 percent precision on those rows;
-    the seeded bench's memory rows unchanged; the drop counts in the run
-    header. Out of scope: the prompt's wording. Exit: `bun test
-    tests/memoryJudge.test.ts`, the judge-eval bench, `bash
-    scripts/check.sh`.
+    Objective: no reply text, lookup result, passing state or model
+    inference becomes a memory. Files: `backend/src/lib/memoryJudge.ts`
+    (a deterministic validator after `rejectPromptEchoes`, three
+    rejections counted on its log line), `backend/src/lib/guards.ts`
+    (the conversational-progressive list exported, one definition),
+    `backend/scripts/bench/judge-eval.ts` and its fixture,
+    `backend/tests/memoryJudge.test.ts`. Mirror: the echo filter's
+    anchor reading of the turn. Do: a fact shares half its content words
+    and every proper noun and number with the speaker's words (or a
+    confirmed assistant line) or is `ungrounded`; a `state` with a
+    conversational verb is `passing`; a fact whose subject is the turn's
+    world subject (a succeeded lookup or typed-source outcome's title,
+    read from the retained outcomes; CHAT-13's world `SubjectRef` once
+    it exists) is `world` unless it is the speaker's own preference or
+    plan; an inferred kind or relationship is ASK-01's candidate, never
+    a record. Acceptance: one judge-eval turn per class with roster
+    names, plus "Quill was here" persisting no kind and no relation, at
+    100 percent precision on those rows; the seeded bench's memory rows
+    unchanged; the drop counts in the run header. Out of scope: the
+    prompt's wording. Exit: `bun test tests/memoryJudge.test.ts`, the
+    judge-eval bench, `bash scripts/check.sh`.
 
 <a id="comp-01"></a>
 
-- [ ] **COMP-01: The details pane and its documents** (M, after CHAT-16)
+- [ ] **COMP-01: The details pane and its documents** (M, spec first, after CHAT-16)
 
-    Objective: the bubble is the friend's line; the detail is a document
-    beside it, built only when opened. Files: `backend/src/lib/turnContext.ts`
+    Objective: the bubble is the friend's line; the detail is a
+    revisioned document beside it, built only when opened. Spec first:
+    `spec/schemas/turn-artifact.schema.json` (typed sections, sources,
+    provenance, the originating turn, a revision number, the evidence
+    version), fixtures and bindings. Then: `backend/src/lib/turnContext.ts`
     and `conversationHistory.ts` (a `document` JSON column beside
     `outcomes`, a migration), `backend/src/lib/turnEngine.ts` (the
-    composer builds `lookup`, `card`, `procedure`, `comparison` from
-    the retained outcomes), `backend/src/routes/conversations.ts`
+    composer builds `lookup`, `card`, `procedure`, `comparison` from the
+    retained outcomes), `backend/src/routes/conversations.ts`
     (`GET /api/conversations/turns/:id/document`, Zod and OpenAPI;
     `document_available` on `TurnValue`, additive), `frontend/src/apps/chat/`
     (a Details handle beside `chatSourcesCard.tsx`, a pane at desktop
-    widths, a bottom sheet on a phone, the living-document update on a
-    same-subject follow-up), `docs/user/chat.md`, the screenshot
-    pipeline. Mirror: `SourcesCard` and the lane 10 sources shape; the
-    shell's responsive rules in UI.md. Acceptance: a document exists
-    only for a turn with a lookup, a typed-source answer or a
-    procedural ask (effect: the column is null for the greeting and
-    timer rows and non-null for the world-knowledge rows); its content
-    equals the outcome's data (a typed card carries the source's fields
-    and sources, never model prose); "the whole recipe" opens it and the
-    line is one sentence; a same-subject follow-up recomposes it in
-    place; a voice-surface turn says where it is and never reads it;
+    widths, a bottom sheet on a phone, a new revision on a same-subject
+    follow-up), `docs/user/chat.md`, the screenshot pipeline. Mirror:
+    `SourcesCard` and the lane 10 sources shape; the shell's responsive
+    rules in UI.md. Acceptance: a document exists only for a turn with
+    a lookup, a typed-source answer or a procedural ask (effect: the
+    column is null for the greeting and timer rows and non-null for the
+    world-knowledge rows); its content equals the outcome's data (a
+    typed card carries the source's fields and sources, never model
+    prose); "the whole recipe" opens it and the line is one sentence; a
+    same-subject follow-up writes revision two with revision one kept;
+    a voice-surface turn says where it is and never reads it;
     screenshots opened and judged. Out of scope: research mode
-    (COMP-02). Exit: backend and frontend suites, the screenshot review,
-    `bash scripts/check.sh`.
+    (COMP-02). Exit: the spec suite, backend and frontend suites, the
+    screenshot review, `bash scripts/check.sh`.
 
 <a id="comp-02"></a>
 
@@ -1255,41 +1320,46 @@ first step of the item.
 - [ ] **COMP-03: The companion package's full shape** (M, spec first)
 
     Objective: a companion is a name, a personality, a directness, a
-    specialty, a voice, a wake word, a kid-safe flag and a rapport
-    flag, declared once in its manifest. Files:
+    specialty, a default voice, a kid-safe flag and a rapport flag,
+    declared once in its manifest; which wake word summons it is the
+    binding record's job alone (COMP-06). Files:
     `spec/schemas/manifest.schema.json` (the `companion` block:
-    `directness`, `specialty`, `voice`, `wake_word`, `kid_safe`,
-    `rapport`), fixtures and bindings, `backend/src/lib/persona.ts`
-    (`directness` rendered as one sentence; MaiPai `direct`, the
-    bundled personalities `conversational`), the four bundled
-    manifests, `backend/scripts/bench/persona-eval.ts` (a directness
-    row per companion; every correctness row of the conversation bench
-    once per companion), `docs/PACKAGES.md` in `.github` for the
-    catalog's admission review of `kid_safe`. Acceptance: the direct
-    companion answers the point first with no offer on the persona-eval
-    rows in three runs; the same correctness rows pass for every
-    bundled companion; no companion has its own engine, prompt path,
-    ladder, guard set or memory (a test asserts one composer and one
-    guard list). Exit: the spec round trip, persona-eval, `bash
+    `directness`, `specialty`, `voice`, `kid_safe`, `rapport`),
+    fixtures and bindings, `backend/src/lib/persona.ts` (`directness`
+    rendered as one sentence; MaiPai `direct`, the bundled
+    personalities `conversational`), the four bundled manifests,
+    `backend/scripts/bench/persona-eval.ts` (a directness row per
+    companion; every correctness row of the conversation bench once per
+    companion), `docs/PACKAGES.md` in `.github` for the catalog's
+    admission review of `kid_safe`. Acceptance: the direct companion
+    answers the point first with no offer on the persona-eval rows in
+    three runs; the same correctness rows pass for every bundled
+    companion; ASK-01's clarification is appended under every companion
+    (a test per bundled one); a test asserts one composer and one guard
+    list. Exit: the spec round trip, persona-eval, `bash
     scripts/check.sh`.
 
 <a id="comp-04"></a>
 
-- [ ] **COMP-04: Per-person companion sets and the kid-safe rule** (M, after COMP-03)
+- [ ] **COMP-04: Per-person companion sets, the kid-safe rule, and the voice per turn** (M, after COMP-03, spec first)
 
     Objective: each person has their own companions; a child's set is
     chosen by an adult from the kid-safe ones; a message may name the
-    companion. Files: `spec/settings/keys.json` (`companions.enabled`,
-    person scope, the generic renderer; `persona.active_id` becomes the
-    default), `backend/src/lib/settings*.ts` (validation: a child's list
-    holds only `kid_safe` ids, written by an adult), `backend/src/lib/
-    turnEngine.ts` (the companion on the turn from a header pick, a
-    name opener in text, or the wake word), `frontend/src/apps/chat/`
-    (the header pick), `docs/user/chat.md`. Acceptance: a child's write
-    of a non-kid-safe id is refused at the settings API; a named
-    companion answers one message and the next message returns to the
-    default; switching changes neither the conversation nor recall
-    (effect: the same memory rows in context before and after).
+    companion; the voice is resolved per turn. Files:
+    `spec/settings/keys.json` (`companions.enabled`, person scope, the
+    generic renderer; `persona.active_id` becomes the default;
+    `tts.voice_id` becomes the fallback behind the companion's own
+    voice), `backend/src/lib/settings*.ts` (validation: a child's list
+    holds only `kid_safe` ids, written by an adult),
+    `backend/src/lib/turnEngine.ts` (the companion on the turn from a
+    header pick, a name opener in text, or the wake word; the resolved
+    voice on the turn), `backend/src/routes/tts.ts` (reads the turn's
+    resolved voice, then the setting), `frontend/src/apps/chat/` (the
+    header pick), `docs/user/chat.md`. Acceptance: a child's write of a
+    non-kid-safe id is refused at the settings API; a named companion
+    answers one message in its own voice and the next message returns
+    to the default; switching changes neither the conversation nor
+    recall (effect: the same memory rows in context before and after).
     Exit: the suites, `bash scripts/check.sh`.
 
 <a id="comp-05"></a>
@@ -1318,19 +1388,33 @@ first step of the item.
 
     Objective: a wake word names a slot, the speaker names the person,
     the person's binding names the companion; shared devices carry an
-    admin-set default. Files: `spec/schemas/person.schema.json`
-    (`wake_bindings`), `spec/schemas/device.schema.json`
-    (`default_bindings`), fixtures and bindings, `backend/src/lib/`
+    admin-set default; nothing is declared twice. Spec first, three
+    things: a new `spec/schemas/companion-binding.schema.json`
+    (`scope: person | device | household`, `scope_id`,
+    `wakeword_package_id`, `companion_package_id`; no voice, no
+    register); device ownership for a shared device
+    (`device.schema.json` requires one `person_id` and treats
+    re-pairing as a new row, which a shared kitchen display
+    contradicts; settle the shape first); and a measured answer on
+    several wake words at once (the client loads one selected detector
+    today: CPU cost and false-activation rate on recorded audio
+    fixtures before the binding promises it). Then: `backend/src/lib/`
     (one `resolveCompanionForVoiceTurn()` with a unit-tested table:
-    speaker's binding, device's, household default; an unknown speaker
-    asked who is speaking only when a personal memory or a child-safety
-    decision depends on it), the voice route, the Settings UI for a
-    person's bindings and a device's defaults, `docs/user/`. Depends on
-    SPEAK-01 for identification on shared devices; until it lands, the
-    device binding alone. Acceptance: the resolution table as unit
-    tests (two people, one word, two companions; a personal device; an
-    unknown speaker and the two cases that ask); the records sync to
-    the robot as spec records. Exit: the spec round trip, the suites,
+    speaker's binding, device's, household default; identity per turn,
+    never sticky; an unknown or low-confidence speaker gets the
+    device's or household's binding, an anonymous context for a world
+    question, a who-is-speaking ask before a personal memory is read, a
+    personal state is changed or an age-dependent safety decision is
+    made, and the strictest applicable safety policy), the voice route,
+    the Settings UI for a person's bindings and a device's defaults,
+    `docs/user/`. Depends on SPEAK-01 for identification on shared
+    devices; until it lands, the device binding and the anonymous
+    context alone, and a shared device stays usable. Acceptance: the
+    resolution table as unit tests (two people, one word, two
+    companions; a personal device; an unknown speaker on a world
+    question, on a personal-memory question and on an age-gated
+    request); the records sync to the robot as spec records. Exit: the
+    spec round trip, the suites, the wake-runtime measurement recorded,
     `bash scripts/check.sh`.
 
 <a id="speak-01"></a>
@@ -1338,15 +1422,18 @@ first step of the item.
 - [ ] **SPEAK-01: Speaker identification on shared devices** (L, hardware)
 
     Objective: an enrolled voice print per household member, resolved
-    locally on a shared surface. Files: the bot's microphone pipeline
-    first (the reSpeaker array), then the hub's voice route; a
-    maintained speaker-embedding model fetched on demand (pinned URL,
-    checksum), never vendored; enrollment in Settings under the org's
-    training rules. Acceptance: a real-microphone check with three
-    enrolled roster voices recognized at a stated rate and an
-    unenrolled voice reported unknown, recorded with the engine build
-    and a sanitized hardware description; no household recording in
-    any repo. Exit: the bench record, `bash scripts/check.sh`.
+    locally per turn on a shared surface, as a confidence signal for
+    COMP-06 and never a prerequisite for a shared device's ordinary
+    use. Files: the bot's microphone pipeline first (the reSpeaker
+    array), then the hub's voice route; a maintained speaker-embedding
+    model fetched on demand (pinned URL, checksum), never vendored;
+    enrollment in Settings under the org's training rules. Acceptance:
+    a real-microphone check with three enrolled roster voices
+    recognized at a stated rate, an unenrolled voice reported unknown,
+    and a speaker change mid-conversation detected, recorded with the
+    engine build and a sanitized hardware description; no household
+    recording in any repo. Exit: the bench record, `bash
+    scripts/check.sh`.
 
 <a id="wake-02"></a>
 
