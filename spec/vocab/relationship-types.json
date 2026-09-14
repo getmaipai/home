@@ -1,5 +1,5 @@
 {
-  "$comment": "The relationship vocabulary. A closed list, the same way spec/vocab/capabilities.json and permissions.json are closed, and for the same reason: a free-text edge type turns a household graph into a swamp within one release, and nothing downstream can render a tense or a status it has never heard of.\n\nEach type declares what it may join, whether it can end, what statuses it admits, and its inverse. Two things this file exists to prevent, both from real examples Jesse raised (2026-09-05): an 'ex-daughter' (daughter_of is not terminable, only its status changes), and the hub saying 'your boyfriend Alex' three weeks after a breakup (partner_of IS terminable, and a renderer must read valid_to before speaking).\n\nNOTE: nothing here grants access to anything. Authorization is a Grant (grant.schema.json), a separate store that is never inferred. Relationship-based access control (Google's Zanzibar and the ReBAC family) models permissions as exactly this shape, which is precisely why the two must not share a table here: these edges can be machine-inferred and wrong, and an inference bug that reached a permission resolver would be a privilege escalation. Same shape, separate stores, opposite trust.",
+  "$comment": "The relationship vocabulary. A closed list, the same way spec/vocab/capabilities.json and permissions.json are closed, and for the same reason: a free-text edge type turns a household graph into a swamp within one release, and nothing downstream can render a tense or a status it has never heard of.\n\nEach type declares what it may join, whether it can end, what statuses it admits, and its inverse. Two things this file exists to prevent, both from real examples Jesse raised (2026-09-05): an 'ex-daughter' (daughter_of is not terminable, only its status changes), and the hub saying 'your boyfriend Alex' three weeks after a breakup (partner_of IS terminable, and a renderer must read valid_to before speaking).\n\nNOTE: nothing here grants access to anything. Authorization is a Grant (grant.schema.json), a separate store that is never inferred. Relationship-based access control (Google's Zanzibar and the ReBAC family) models permissions as exactly this shape, which is precisely why the two must not share a table here: these edges can be machine-inferred and wrong, and an inference bug that reached a permission resolver would be a privilege escalation. Same shape, separate stores, opposite trust.\n\nsaid_as (step 3a, 2026-09-14): the phrases a person uses to state a relationship from their own side (the speaker is the from end), lowercase; a relationship counts as stated by the speaker only when their own sentence carries one of them, so a model that reads 'we got the same manager' as a colleague never makes that the person's statement. Only the types a speaker states from their side carry a list; the inverse types whose from end is never a person (owned_by, home_of, workplace_of, attended_by) are written by the hub as the stored inverse and never stated directly, and a rarely stated one (employs, cared_for_by) may gain a list when the phrases are known. One definition, read by the hub and the robot.",
   "statuses": {
     "$comment": "Status answers 'what kind of true is this?', never 'is it still true?'. Existence over time is valid_from/valid_to on the relationship itself. A former job has valid_to set and needs no status; an estranged daughter has valid_to null and status `estranged`, because she is still his daughter.",
     "values": [
@@ -20,7 +20,8 @@
       "inverse": "child_of",
       "terminable": false,
       "statuses": ["normal", "close", "strained", "estranged"],
-      "description": "Biological or legal parenthood. Cannot end: an estranged daughter is still a daughter, so this changes status, never valid_to."
+      "description": "Biological or legal parenthood. Cannot end: an estranged daughter is still a daughter, so this changes status, never valid_to.",
+      "said_as": ["my son", "my daughter", "my kid", "my child", "my kids", "my children", "my boy", "my girl", "my stepson", "my stepdaughter"]
     },
     {
       "id": "child_of",
@@ -29,7 +30,8 @@
       "inverse": "parent_of",
       "terminable": false,
       "statuses": ["normal", "close", "strained", "estranged"],
-      "description": "The inverse of parent_of. Stored explicitly rather than derived, so a query in either direction is a lookup, not a scan."
+      "description": "The inverse of parent_of. Stored explicitly rather than derived, so a query in either direction is a lookup, not a scan.",
+      "said_as": ["my mom", "my mother", "my dad", "my father", "my parent", "my parents", "my mum", "my stepmom", "my stepdad", "my stepmother", "my stepfather"]
     },
     {
       "id": "sibling_of",
@@ -39,7 +41,8 @@
       "terminable": false,
       "symmetric": true,
       "statuses": ["normal", "close", "strained", "estranged"],
-      "description": "Symmetric: its inverse is itself."
+      "description": "Symmetric: its inverse is itself.",
+      "said_as": ["my sister", "my brother", "my sibling", "my sis", "my bro", "my little sister", "my big sister", "my little brother", "my big brother"]
     },
     {
       "id": "partner_of",
@@ -49,7 +52,8 @@
       "terminable": true,
       "symmetric": true,
       "statuses": ["normal", "close", "strained"],
-      "description": "Any romantic partnership, named without assuming its shape. Terminable: an ex-partner is a partner_of with valid_to set, which is what stops the hub referring to someone's ex in the present tense."
+      "description": "Any romantic partnership, named without assuming its shape. Terminable: an ex-partner is a partner_of with valid_to set, which is what stops the hub referring to someone's ex in the present tense.",
+      "said_as": ["my partner", "my wife", "my husband", "my boyfriend", "my girlfriend", "my spouse", "my fiance", "my fiancee", "my fiancé", "my fiancée"]
     },
     {
       "id": "guardian_of",
@@ -58,7 +62,8 @@
       "inverse": "ward_of",
       "terminable": true,
       "statuses": ["normal", "primary", "secondary"],
-      "description": "Responsibility for someone, which may or may not coincide with parent_of, and which does end (a child grows up)."
+      "description": "Responsibility for someone, which may or may not coincide with parent_of, and which does end (a child grows up).",
+      "said_as": ["my ward", "i'm the guardian of", "i am the guardian of", "i'm guardian of"]
     },
     {
       "id": "ward_of",
@@ -67,7 +72,8 @@
       "inverse": "guardian_of",
       "terminable": true,
       "statuses": ["normal", "primary", "secondary"],
-      "description": "The inverse of guardian_of."
+      "description": "The inverse of guardian_of.",
+      "said_as": ["my guardian", "my foster mom", "my foster dad", "my foster parent", "my foster parents"]
     },
     {
       "id": "friend_of",
@@ -77,7 +83,8 @@
       "terminable": true,
       "symmetric": true,
       "statuses": ["normal", "close", "strained"],
-      "description": "A stated friendship. Terminable, and deliberately not inferred by default: guessing at friendships from conversation is low value and high embarrassment."
+      "description": "A stated friendship. Terminable, and deliberately not inferred by default: guessing at friendships from conversation is low value and high embarrassment.",
+      "said_as": ["my friend", "my buddy", "my best friend", "my pal", "my mate", "our friend", "a friend of mine", "friend of mine"]
     },
     {
       "id": "colleague_of",
@@ -87,7 +94,8 @@
       "terminable": true,
       "symmetric": true,
       "statuses": ["normal", "close"],
-      "description": "A coworker, as people say it (\"my coworker Quill\"). Symmetric and terminable. The one person-to-person type the judge may infer from conversation (step 3a): a coworker is said in passing far more often than any other relation and carries the least weight; it starts inferred and unconfirmed like any inference, and is asked, never asserted, until a household adult confirms it."
+      "description": "A coworker, as people say it (\"my coworker Quill\"). Symmetric and terminable. The one person-to-person type the judge may infer from conversation (step 3a): a coworker is said in passing far more often than any other relation and carries the least weight; it starts inferred and unconfirmed like any inference, and is asked, never asserted, until a household adult confirms it.",
+      "said_as": ["my coworker", "my co-worker", "my colleague", "my workmate", "i work with", "we work together", "our coworker", "our colleague"]
     },
     {
       "id": "owns",
@@ -96,7 +104,8 @@
       "inverse": "owned_by",
       "terminable": true,
       "statuses": ["normal", "primary", "secondary"],
-      "description": "Ownership, as an edge rather than a system of its own. schema.org models ownership the same way, as an `owns` property alongside `knows`. Deliberately available to any entity and required by none: a place is not owned in any useful household sense, it is lived at."
+      "description": "Ownership, as an edge rather than a system of its own. schema.org models ownership the same way, as an `owns` property alongside `knows`. Deliberately available to any entity and required by none: a place is not owned in any useful household sense, it is lived at.",
+      "said_as": ["my dog", "our dog", "my cat", "our cat", "my pet", "our pet", "my puppy", "our puppy", "my kitten", "our kitten", "my rabbit", "our rabbit", "my hamster", "my bird", "my car", "our car", "my truck", "our truck", "my bike", "my bicycle", "my phone", "my laptop", "my computer"]
     },
     {
       "id": "owned_by",
@@ -114,7 +123,8 @@
       "inverse": "cared_for_by",
       "terminable": true,
       "statuses": ["normal", "primary", "secondary"],
-      "description": "Day-to-day responsibility, which is often not the owner: the child who walks the dog, the adult who looks after a parent."
+      "description": "Day-to-day responsibility, which is often not the owner: the child who walks the dog, the adult who looks after a parent.",
+      "said_as": ["i look after", "i take care of", "i care for", "i'm looking after", "i am looking after"]
     },
     {
       "id": "cared_for_by",
@@ -132,7 +142,8 @@
       "inverse": "home_of",
       "terminable": true,
       "statuses": ["normal", "primary", "secondary", "seasonal"],
-      "description": "Where someone lives. Many-to-many with dates, which is the whole reason residence is an edge and not a `home_location` field: a person can have several homes at once, and 'primary residence since 2024' or 'weekends only' cannot be said by a single-valued property. schema.org's own long-running ambiguity between `location`, `homeLocation` and `workLocation` (issue 823) is what that shortcut costs."
+      "description": "Where someone lives. Many-to-many with dates, which is the whole reason residence is an edge and not a `home_location` field: a person can have several homes at once, and 'primary residence since 2024' or 'weekends only' cannot be said by a single-valued property. schema.org's own long-running ambiguity between `location`, `homeLocation` and `workLocation` (issue 823) is what that shortcut costs.",
+      "said_as": ["i live at", "i live in", "i live on", "we live at", "we live in", "we live on", "my home", "our home", "my house", "our house", "my apartment", "our apartment", "my flat", "our flat"]
     },
     {
       "id": "home_of",
@@ -150,7 +161,8 @@
       "inverse": "employs",
       "terminable": true,
       "statuses": ["normal", "primary", "secondary", "seasonal"],
-      "description": "A job. Terminable, and the reason status and validity are two fields rather than one: a former job has valid_to set, and needs no status to say it went badly."
+      "description": "A job. Terminable, and the reason status and validity are two fields rather than one: a former job has valid_to set, and needs no status to say it went badly.",
+      "said_as": ["my boss", "my employer", "i work for", "my manager", "my company"]
     },
     {
       "id": "employs",
@@ -168,7 +180,8 @@
       "inverse": "workplace_of",
       "terminable": true,
       "statuses": ["normal", "primary", "secondary", "seasonal"],
-      "description": "Where someone works, kept separate from who employs them: one employer can have several sites, and a person can work at a place nobody employs them at."
+      "description": "Where someone works, kept separate from who employs them: one employer can have several sites, and a person can work at a place nobody employs them at.",
+      "said_as": ["i work at", "where i work", "my office", "my workplace", "my job at", "my job is at", "i'm at work at"]
     },
     {
       "id": "workplace_of",
@@ -186,7 +199,8 @@
       "inverse": "attended_by",
       "terminable": true,
       "statuses": ["normal", "primary", "secondary", "seasonal"],
-      "description": "School, nursery, a club. The child equivalent of employed_by, and needed for the same reason: a school run is a routine the hub should understand without being told twice."
+      "description": "School, nursery, a club. The child equivalent of employed_by, and needed for the same reason: a school run is a routine the hub should understand without being told twice.",
+      "said_as": ["i go to", "i attend", "my school", "my gym", "my church", "my class", "my college", "my university", "my club"]
     },
     {
       "id": "attended_by",

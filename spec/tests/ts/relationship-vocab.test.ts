@@ -46,6 +46,29 @@ describe("the relationship vocabulary is internally consistent", () => {
     }
   });
 
+  test("said_as phrases are lowercase, non-empty, and sit only on the types a speaker states from their side (the ones whose from end admits a person)", () => {
+    const types = relationshipTypes();
+    const byId = new Map(types.map((t) => [t.id, t]));
+    for (const t of types) {
+      if (!t.said_as) continue;
+      expect(t.said_as.length).toBeGreaterThan(0);
+      for (const phrase of t.said_as) {
+        expect(phrase).toBe(phrase.toLowerCase().trim());
+        expect(phrase.length).toBeGreaterThan(1);
+      }
+      expect(t.from).toContain("person");
+    }
+    // An inverse whose from end is never a person (owned_by, home_of,
+    // workplace_of, attended_by) is written by the hub, not said.
+    for (const t of types) {
+      if (!t.from.includes("person")) expect(t.said_as).toBeUndefined();
+    }
+    // Every type a person can state from their side has a list.
+    for (const id of ["parent_of", "child_of", "sibling_of", "partner_of", "friend_of", "colleague_of", "owns", "lives_at", "works_at", "employed_by", "attends"]) {
+      expect(byId.get(id)?.said_as?.length ?? 0).toBeGreaterThan(0);
+    }
+  });
+
   test("a symmetric type is its own inverse, and only symmetric types are", () => {
     for (const t of vocabTypes) {
       if (t.symmetric) expect(t.inverse, `${t.id} is symmetric but its inverse is ${t.inverse}`).toBe(t.id);

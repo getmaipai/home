@@ -354,7 +354,28 @@ describe("the review's cases", () => {
     ]);
     const edges = db.select().from(relationships).all();
     expect(edges.map((e) => e.type)).toEqual(["sibling_of"]);
+    // Said by nickname is still said.
+    expect(edges[0]!.source).toBe("stated");
     expect(db.select().from(entities).where(eq(entities.name, "Nadia")).all().length).toBe(1);
+  });
+
+  test("the phrase gate reads whole words beside the name, and a phone's apostrophe", async () => {
+    const { actor } = await owner();
+    // "my boy" is not "my boyfriend": parent_of is the model's mislabel here, so inferred.
+    await judgeWith(actor, "my boyfriend Nova cooked dinner", [
+      { text: "Nova cooked dinner", category: "event", scope: "person", importance: 0.5, subject: { name: "Nova", kind: "person" }, relation: { type: "parent_of", name: "Nova", stated: true } },
+    ]);
+    expect(db.select().from(relationships).all().every((e) => e.source === "inferred")).toBe(true);
+    // A phrase in another clause, far from the name, does not state it.
+    await judgeWith(actor, "my coworker Quill says that after the reorg last quarter and all the meetings since, Raven ended up on the same team", [
+      { text: "Raven is on the same team", category: "event", scope: "person", importance: 0.5, subject: { name: "Raven", kind: "person" }, relation: { type: "colleague_of", name: "Raven", stated: true } },
+    ]);
+    expect(db.select().from(relationships).all().find((e) => e.type === "colleague_of")?.source).toBe("inferred");
+    // The smart apostrophe.
+    await judgeWith(actor, "I\u2019m looking after Iris this week", [
+      { text: "Marlow looks after Iris this week", category: "event", scope: "person", importance: 0.5, subject: { name: "Iris", kind: "person" }, relation: { type: "cares_for", name: "Iris", stated: true } },
+    ]);
+    expect(db.select().from(relationships).all().find((e) => e.type === "cares_for")?.source).toBe("stated");
   });
 
   test("the last record citing an entity takes it with it, however long ago it was made", async () => {
@@ -393,6 +414,63 @@ describe("the review's cases", () => {
     // the member's newer entity.
     await judgeWith(actor, "Sprout the cat is asleep", [{ text: "Sprout the cat is asleep", category: "state", scope: "person", importance: 0.3, subject: { name: "Sprout", kind: "thing" } }]);
     expect(db.select().from(entities).where(eq(entities.name, "Sprout")).all().length).toBe(2);
+  });
+
+  test("the model's stated flag is not enough: the sentence must carry the type's own phrase", async () => {
+    const { actor } = await owner();
+    await judgeWith(actor, "Raven and I got the same manager this week", [
+      { text: "Raven and Marlow share a manager", category: "person", scope: "person", importance: 0.5, subject: { name: "Raven", kind: "person" }, relation: { type: "colleague_of", name: "Raven", stated: true } },
+    ]);
+    const edge = db.select().from(relationships).all()[0]!;
+    expect(edge.source).toBe("inferred");
+    expect(edge.confidence).toBe(0.5);
+    // The entity is local (the speaker named Raven); only the relation is the model's.
+    expect(db.select().from(entities).where(eq(entities.name, "Raven")).get()!.source).toBe("local");
+  });
+
+  test("a directed relation written from the subject's side is stored from the speaker's, through the inverse", async () => {
+    const { actor } = await owner();
+    await judgeWith(actor, "my son Quill got an A", [
+      { text: "Quill got an A", category: "event", scope: "person", importance: 0.6, subject: { name: "Quill", kind: "person" }, relation: { type: "child_of", name: "Marlow", stated: true } },
+    ]);
+    const quill = db.select().from(entities).where(eq(entities.name, "Quill")).get()!;
+    const self = db.select().from(entities).where(eq(entities.accountPersonId, actor.id)).get()!;
+    const parent = db.select().from(relationships).all().find((e) => e.type === "parent_of")!;
+    expect(parent.fromId).toBe(self.id);
+    expect(parent.toId).toBe(quill.id);
+    expect(parent.source).toBe("stated");
+  });
+
+  test("a relation that names the speaker but keeps the speaker's side is read by the phrase beside the name", async () => {
+    const { actor } = await owner();
+    await judgeWith(actor, "my son Quill got an A", [
+      { text: "Quill got an A", category: "event", scope: "person", importance: 0.6, subject: { name: "Quill", kind: "person" }, relation: { type: "parent_of", name: "Marlow", stated: true } },
+    ]);
+    const self = db.select().from(entities).where(eq(entities.accountPersonId, actor.id)).get()!;
+    const parent = db.select().from(relationships).all().find((e) => e.type === "parent_of")!;
+    expect(parent.fromId).toBe(self.id);
+    expect(parent.source).toBe("stated");
+  });
+
+  test("a parent nicknamed by the relation word is still stated by it", async () => {
+    const { client, actor } = await owner();
+    await client.post("/api/people", { displayName: "Nadia", nickname: "Mom", role: "adult", secret: "0000" });
+    await judgeWith(actor, "my mom made dinner", [
+      { text: "Nadia made dinner", category: "event", scope: "person", importance: 0.4, subject: { name: "Mom", kind: "person" }, relation: { type: "child_of", name: "Mom", stated: true } },
+    ]);
+    expect(db.select().from(relationships).all().find((e) => e.type === "child_of")!.source).toBe("stated");
+  });
+
+  test("a relation the model pointed at the speaker joins the subject instead", async () => {
+    const { actor } = await owner();
+    await judgeWith(actor, "my coworker Quill likes seltzer", [
+      { text: "Quill likes seltzer, Marlow's coworker", category: "preference", scope: "person", importance: 0.7, subject: { name: "Quill", kind: "person" }, relation: { type: "colleague_of", name: "Marlow", stated: true } },
+    ]);
+    const quill = db.select().from(entities).where(eq(entities.name, "Quill")).get()!;
+    const self = db.select().from(entities).where(eq(entities.accountPersonId, actor.id)).get()!;
+    const edge = db.select().from(relationships).all()[0]!;
+    expect([edge.fromId, edge.toId].sort()).toEqual([quill.id, self.id].sort());
+    expect(edge.source).toBe("stated");
   });
 
   test("an entity another active record still cites stays when one record is forgotten", async () => {

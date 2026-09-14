@@ -3661,8 +3661,24 @@ in the direction the vocabulary allows (`writeRelation()`): a pair
 that already has a live edge of the type gets no second one; a
 symmetric type is stored once and found in either direction. The
 relation's `stated` is the model's flag only when the speaker's own
-words name the entity, the same rule the subject path applies, so a
-name the model supplied is never asserted as the speaker's statement.
+words name the entity and carry one of the type's own phrases
+(`said_as` in `spec/vocab/relationship-types.json`, "my coworker",
+"my sister", "our dog", the speaker's side of each type a person
+states, one definition the robot reads too, and the source of the
+prompt's own guide to the types, so the two cannot drift; matched as
+whole words beside any name the speaker could use for the entity,
+the slot's, its aliases or a member's nickname, with a phone's
+apostrophe read as the plain one; a heuristic beside a name, not a
+parse, which ASK-01's answer parser owns): the first seeded set
+showed the 4B calling "Raven and I got the same manager" a stated
+colleague in all three runs, and a relationship the person did not
+say is a candidate, not their statement. A relation the model pointed
+at the speaker themselves ("Quill is Sage's coworker" read with Sage
+as the name, the same set) joins the fact's subject instead, since the
+speaker is always one end and never the other; the rule paragraph in
+the extraction prompt names no persona (the set also showed the 4B
+echoing "Quill is Sage's coworker" from the rule's own example into an
+unrelated fact, the echo filter's class one line further up).
 The prompt says the type is read from the speaker's side ("my mom" is
 `child_of`, "my son" `parent_of`, "my boss" `employed_by`), since the
 writer and the prompt's phrases both take the speaker as `from`. A
@@ -3749,7 +3765,7 @@ weather pattern yield. The two ways out of candidate are the
 person's: the speaker stating it (`promoteToStated`) and an adult's
 confirm; ASK-01 adds the open question that asks.
 
-**Tests and the bench.** `backend/tests/subjects.test.ts` (29): the
+**Tests and the bench.** `backend/tests/subjects.test.ts` (35): the
 stated coworker (local entity, stated edge by the speaker, no
 confidence, the record's subject), the inferred relation (confidence,
 evidence, nobody named as stating it), model-named against
@@ -3767,7 +3783,10 @@ a restored fact keeping its subject, a refused write, a confirmed
 entity surviving a forget, the per-person erasure, a dog in an owns
 slot, a relation slot never making a second entity, a stated flag
 without the speaker's words, a nicknamed member, a pet sharing a
-nickname, the last citing record) and the amendment's (a candidate: no label, not in the roster,
+nickname, the last citing record, the phrase gate and its word
+boundary, reach and apostrophe, a self-pointed relation through its inverse or the side the phrase names,
+a parent nicknamed by the relation word) and the
+amendment's (a candidate: no label, not in the roster,
 not recalled by identity; an unconfirmed relation never said). The
 bench gains
 `relationshipExists` (type, the other end's name, provenance,

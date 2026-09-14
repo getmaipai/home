@@ -210,6 +210,60 @@ export function speakerNamed(userText: string, name: string): boolean {
   return namedIn(userText, name);
 }
 
+/** Whether the speaker's own words state this relationship: one of the
+ * type's `said_as` phrases (spec/vocab/relationship-types.json) is in
+ * the sentence. The model's own "stated" flag is not enough: on the
+ * bench the 4B called "we got the same manager" a stated colleague, and
+ * a relationship the person did not say is a candidate, not their
+ * statement. A type with no phrases (the hub-written inverses) is never
+ * stated. */
+export function speakerStated(userText: string, type: string, names: readonly string[] = []): boolean {
+  const phrases = saidAs(type);
+  // Smart apostrophes from a phone are the plain one here.
+  const text = userText.replace(/[\u2018\u2019]/g, "'");
+  return phrases.some((p) => {
+    const re = new RegExp(`(?<![\\p{L}\\p{N}])${escapeRe(p)}(?![\\p{L}\\p{N}])`, "giu");
+    for (const m of text.matchAll(re)) {
+      if (names.length === 0) return true;
+      // Beside the name: within a short reach of any way the speaker
+      // could have said it ("my coworker Quill", "Quill, my coworker").
+      // A heuristic, not a parse: a phrase in another clause of a
+      // long sentence can still pass, and ASK-01's parser owns the
+      // exact shape.
+      const at = m.index ?? 0;
+      if (names.some((n) => nearby(text, at, m[0].length, n))) return true;
+    }
+    return false;
+  });
+}
+
+/** The type's `said_as` phrases from the vocabulary. */
+export function saidAs(type: string): string[] {
+  return (relationshipTypes().find((t: { id: string }) => t.id === type) as { said_as?: string[] } | undefined)?.said_as ?? [];
+}
+
+const REACH = 40;
+function nearby(text: string, at: number, length: number, name: string): boolean {
+  // The text had its smart apostrophes made plain; the name gets the same.
+  const n = name.trim().replace(/[\u2018\u2019]/g, "'");
+  if (n.length < 2) return false;
+  const re = new RegExp(`(?<![\\p{L}\\p{N}])${escapeRe(n)}(?![\\p{L}\\p{N}])`, "giu");
+  for (const m of text.matchAll(re)) {
+    const i = m.index ?? 0;
+    // Inside the phrase counts too: a parent nicknamed "Mom" is named
+    // by "my mom" itself.
+    if (i >= at && i < at + length) return true;
+    if (i >= at + length && i - (at + length) <= REACH) return true;
+    if (at >= i + n.length && at - (i + n.length) <= REACH) return true;
+  }
+  return false;
+}
+
+/** Whether the speaker's own words use any of these names. */
+export function speakerNamedAny(userText: string, names: readonly string[]): boolean {
+  return names.some((n) => namedIn(userText, n));
+}
+
 /** The known entity a plain fact names (the longest name wins when one
  * name contains another): the speaker's own or the household's, by name
  * or alias. Never the speaker's own entity: the judge writes facts in

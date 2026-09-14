@@ -34,6 +34,11 @@ export interface RelationshipType {
   symmetric?: boolean;
   statuses: string[];
   description: string;
+  /** The phrases a person uses to state this relationship from their
+   * own side, lowercase ("my coworker"); absent on the inverse types
+   * the hub writes itself. A relationship is the speaker's own
+   * statement only when their sentence carries one. */
+  said_as?: string[];
 }
 
 interface RelationshipVocab {

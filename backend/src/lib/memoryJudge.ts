@@ -59,7 +59,7 @@ import { eq, and, isNull, isNotNull, notInArray, ne, asc } from "drizzle-orm";
 import { detectCredential } from "@/lib/memoryContentPolicy";
 import { tokenize } from "@/lib/text";
 import { relationshipTypes } from "@maipai/spec/records/ts/validate.js";
-import { ensureSubjectEntity, findEntityNamedIn, findSubjectByName, kindForRelation, retireOrphanSubjects, speakerNamed, writeRelation } from "@/lib/subjects";
+import { ensureSubjectEntity, findEntityNamedIn, findSubjectByName, kindForRelation, retireOrphanSubjects, saidAs, speakerNamed, speakerNamedAny, speakerStated, writeRelation } from "@/lib/subjects";
 import type { Entity } from "@maipai/spec/gen/ts/entity.js";
 import { db } from "@/db";
 import { conversationTurns, people, memoryRecords } from "@/db/schema";
@@ -161,6 +161,12 @@ export function categoryToRecordKind(category: Category): "memory" | "entity" {
  * `relation` slot (spec/vocab/relationship-types.json, the same list
  * relationships.ts validates against). */
 const RELATION_TYPE_IDS: string[] = relationshipTypes().map((t: { id: string }) => t.id);
+/** The prompt's own guide to the types, from the same `said_as` lists
+ * the stated gate reads (one definition): the first phrase of each
+ * type a person states from their side. */
+const RELATION_PHRASE_GUIDE: string = RELATION_TYPE_IDS.filter((id) => saidAs(id).length > 0)
+  .map((id) => `"${saidAs(id)[0]}" is ${id}`)
+  .join(", ");
 
 const EXTRACTION_SCHEMA = {
   name: "memory_extraction",
@@ -283,7 +289,7 @@ CRITICAL - do NOT extract:
 - Trivia or facts about the world that reveal nothing about ${speakerName}
 - Trivially-true or contentless observations ("${speakerName} said hi")
 
-SUBJECT AND RELATION - when a fact is about a named person, pet, place, organization or thing, set "subject" to that name and kind (the person the fact is about, never ${speakerName} for ${speakerName}'s own preferences; null when the fact is about ${speakerName} alone or about the world). When ${speakerName}'s own sentence states how a named person or thing relates to ${speakerName} ("my coworker Quill", "my sister Nadia", "our dog Rover"), set "relation" with the vocabulary type read from ${speakerName}'s side (${speakerName} is the "from" end: "my coworker" is colleague_of, "my sister" sibling_of, "my mom" child_of, "my son" parent_of, "my boss" employed_by, "our dog" owns, "where I work" works_at), the name, and "stated": true; "stated": false only when you worked the relation out from context rather than ${speakerName} saying it. Null when there is none.
+SUBJECT AND RELATION - when a fact is about a named person, pet, place, organization or thing, set "subject" to that name and kind (the person the fact is about, never ${speakerName} for ${speakerName}'s own preferences; null when the fact is about ${speakerName} alone or about the world). When ${speakerName}'s own sentence states how a named person or thing relates to ${speakerName} ("my coworker ...", "my sister ...", "our dog ..." followed by the name), set "relation" with the vocabulary type read from ${speakerName}'s side (${speakerName} is the "from" end: ${RELATION_PHRASE_GUIDE}), the name, and "stated": true; "stated": false only when you worked the relation out from context rather than ${speakerName} saying it. Null when there is none.
 
 SCOPE - "person": a fact about ${speakerName} specifically. "household": a fact the whole family should know (the wifi password, the dog's name, the trash pickup day) - use household only when a new family member would need to be told it too.
 
@@ -631,15 +637,39 @@ function resolveSubject(speaker: PersonRow, fact: ExtractedFact, turn: Conversat
  * and goes with it. `stated` is the model's flag only when the speaker's
  * own words name the entity, the same rule the subject path applies. */
 function writeFactRelation(speaker: PersonRow, fact: ExtractedFact, subject: Entity | null, turn: ConversationTurnRow): void {
-  const relation = { ...fact.relation!, stated: fact.relation!.stated && speakerNamed(turn.userText, fact.relation!.name) };
+  const slot = fact.relation!;
   // The subject when the fact has no subject of its own (it was made
   // from this name) or the names agree; else what the name already
   // refers to (a household member by nickname included), never a new
-  // entity.
-  const other = subject && (!fact.subject || subject.name.trim().toLowerCase() === relation.name.trim().toLowerCase()) ? subject : (findSubjectByName(speaker, relation.name)?.value ?? null);
+  // entity. A relation the model pointed at the speaker themselves
+  // ("Quill is Sage's coworker" read with Sage as the name) is the
+  // subject's: the speaker is always one end, never the other.
+  let other = subject && (!fact.subject || subject.name.trim().toLowerCase() === slot.name.trim().toLowerCase()) ? subject : (findSubjectByName(speaker, slot.name)?.value ?? null);
+  const redirected = other !== null && other.account_person_id === speaker.id && subject !== null && subject.account_person_id !== speaker.id;
+  if (redirected) other = subject!;
   if (!other) return;
+  const names = [...(redirected ? [] : [slot.name]), other.name, ...other.aliases, ...(other.account_person_id ? memberNicknames(other.account_person_id) : [])];
+  // A relation written from the subject's side ("Quill is Sage's
+  // child" with Sage as the name) is the inverse from the speaker's
+  // side, which is the side writeRelation() stores; a symmetric type is
+  // its own. When the model named the speaker but kept the speaker's
+  // own side ("my son Quill" as parent_of Marlow), the phrase beside
+  // the name says which side it meant; the inverse otherwise.
+  const inverse = relationshipTypes().find((t: { id: string }) => t.id === slot.type)?.inverse ?? slot.type;
+  const type = !redirected ? slot.type : speakerStated(turn.userText, slot.type, names) && !speakerStated(turn.userText, inverse, names) ? slot.type : inverse;
+  // Stated only when the speaker's words name the entity (by any name
+  // they could use: the slot's, the entity's, an alias, a member's
+  // nickname) and carry one of the type's own phrases ("my coworker")
+  // beside it: the model's flag alone over-fires on an implied
+  // relation.
+  const relation = { ...slot, type, stated: slot.stated && speakerNamedAny(turn.userText, names) && speakerStated(turn.userText, type, names) };
   const result = writeRelation(speaker, relation, other, turn.id, fact.importance);
   if (!result.ok) console.error(`[memoryJudge] relation ${relation.type} failed for turn ${turn.id}: ${result.error}`);
+}
+
+function memberNicknames(personId: string): string[] {
+  const row = db.select({ nickname: people.nickname }).from(people).where(eq(people.id, personId)).get();
+  return row?.nickname ? [row.nickname] : [];
 }
 
 export async function judgeTurn(turn: ConversationTurnRow): Promise<JudgeTurnResult> {
