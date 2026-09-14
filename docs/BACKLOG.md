@@ -1560,6 +1560,112 @@ invented for the roster's household, and added to
     restores the default and clears the provenance. Exit: the settings
     suite, `bash scripts/check.sh`.
 
+<a id="act-01"></a>
+
+- [ ] **ACT-01: The act and emotion of a turn, the spec and the rule pass** (S, before REG-01)
+
+    Objective: the engine records what kind of turn the person made
+    and how they feel, one definition for every consumer. Spec first:
+    `spec/schemas/turn-act.schema.json` (`act`: inform, question,
+    directive, commissive, greeting, closing, backchannel; `emotion`:
+    neutral, happiness, surprise, sadness, anger, disgust, fear;
+    `intensity`; `target`: self, other, hub, world; `refersToPrior`;
+    `corrects`; `confidence` per axis; `source`: rule, head,
+    fallback), fixtures, both bindings. Then: `backend/src/lib/turnAct.ts`
+    (the deterministic pass: greeting and closing from the near-echo
+    guard's own vocabulary plus thanks and goodbyes; backchannel as a
+    one-to-three-word turn with no content word; question and
+    directive from `utteranceShape()`; `corrects` from the negation
+    and correction phrases the consent and cancel vocabularies list;
+    intensity from surface cues; target from the pronoun and the
+    roster; emotion only on an unmistakable cue), `backend/src/lib/
+    turnContext.ts` (`TurnContext.act`; `UtteranceShape` becomes a
+    projection of it, one reading for the router and the guards),
+    `backend/src/lib/turnEngine.ts` (filled in `prepareTurn()` after
+    the subject; a literal-pattern turn is a directive), `backend/
+    scripts/bench/conversationFixture.ts` (an `act` and `emotion`
+    expectation on every existing turn) and `conversationScore.ts`
+    (the effect check, like `subject`), `backend/tests/turnAct.test.ts`.
+    Mirror: `utteranceShape.ts` and `intentFor()`. Acceptance: every
+    fixture turn's recorded act matches its expectation at 95 percent
+    or better across three seeded runs; the rule pass scored on
+    DailyDialog's test split (research use, never shipped) with the
+    greeting and closing relabel, macro F1 per act recorded in the
+    dev docs; no consumer reads a second shape. Out of scope: the
+    head (ACT-02), the register table (ACT-03). Exit: the spec suite,
+    `bun test tests/turnAct.test.ts tests/utteranceShape.test.ts`,
+    `bash scripts/check.sh`.
+
+<a id="act-02"></a>
+
+- [ ] **ACT-02: The act and emotion head on the utterance embedding** (M, after ACT-01)
+
+    Objective: inform versus commissive, an unpunctuated question, and
+    the emotion in the common case, decided in microseconds from the
+    vector the turn already computes, with a license-clean artifact.
+    Files: `backend/scripts/train/act-head.ts` (dev-time only: labels
+    the act corpus with the 4B under the DailyDialog definitions over
+    Taskmaster-1, CCPE-M, the bench fixture and synthetic roster
+    dialogues; trains two multinomial heads over the nomic vector, the
+    emotion head on GoEmotions with its published Ekman mapping;
+    writes the artifact with the embedding identity and the validation
+    numbers), `backend/src/lib/actAssets.ts` (the `embedAssets.ts`
+    pattern: pinned URL, pinned checksum, a clear offline message),
+    `backend/src/lib/turnAct.ts` (the head after the rules; refused at
+    load when the embedding identity differs, CHAT-09; `source:
+    fallback` when the embed engine is down), `home/data-scratch/
+    datasets/SOURCES.md` (GoEmotions, Apache 2.0, added to the
+    downloads; the 500-turn reviewed sample recorded), the catalog
+    model package. Mirror: `wakewordAssets.ts` for a small trained
+    artifact fetched on demand; the org's training rules (verify the
+    data landed, validate on held-out real data, never a household
+    recording or transcript in the set). Acceptance: on DailyDialog's
+    test split, rules plus head beat the rule pass alone on macro F1
+    for acts and for the neutral-versus-not emotion split by a stated
+    margin, else the head does not ship; the fixture floor of ACT-01
+    holds; the artifact loads only against its embedding identity;
+    the per-turn cost is measured under one millisecond. Out of scope:
+    a separate encoder model, any training in the house. Exit: the
+    training script's own validation report checked into the dev
+    docs, `bun test tests/turnAct.test.ts tests/actAssets.test.ts`,
+    `bash scripts/check.sh`.
+
+<a id="act-03"></a>
+
+- [ ] **ACT-03: The register table, from act and emotion to the composer's moves** (M, rides with CHAT-16)
+
+    Objective: the engine chooses the moves and the length from the
+    act and emotion; the companion chooses the wording; the model
+    writes the words. Files: `backend/src/lib/register.ts` (the table
+    in dev.md section 12, one definition: moves in order, length, the
+    never list, the emotion and companion modulations),
+    `backend/src/lib/turnEngine.ts` (one context line per turn from
+    the table, placed ahead of the memory section; the length into
+    CHAT-12's reserve; the ask-back, care and close moves beside
+    CHAT-16's four), `backend/src/lib/persona.ts` (`engagement` and
+    `directness` read by the table, the "no follow-up question" prose
+    retired in favor of the table), `backend/src/lib/guards.ts`
+    (REG-01's statement rule reads the act; `near_echo` and
+    `repeat_question` read it; a `wrong_move` check for the bench),
+    `backend/src/lib/personaJudge.ts` (the rubric line, with the
+    recorded act and emotion printed per exchange),
+    `backend/scripts/bench/conversationFixture.ts` (the `act-register`
+    conversation; the act assertion on feeling-before-task, asks-back,
+    child-register, length-matches-the-moment and greeting-and-thanks),
+    `docs/user/chat.md`. Mirror: the composer's four moves and the
+    claim-type ladder (CHAT-16), `composePersonaPrompt()`. Acceptance:
+    the `act-register` conversation (design note, section 12, part 4)
+    and the five existing register rows, three seeded runs, every
+    turn's act recorded and every move read from the reply's effect
+    (a question mark present or absent, a sentence count, no offer, no
+    play word, no closer); the persona-eval judge scores the fit line
+    per bundled companion; the direct companion drops react on
+    questions and keeps care on sadness; the crisis overlay and every
+    guard unchanged on every row. Out of scope: canned replies per
+    label, a second prompt path, any register rule over a safety or
+    privacy decision. Exit: the named tests, the persona-eval bench,
+    `bash scripts/check.sh`.
+
 ## Chat direction 2026-09-12: the next block, two tracks
 
 The [2026-09-12 review](dev.md#chat-direction-review-and-the-two-track-plan-2026-09-12)

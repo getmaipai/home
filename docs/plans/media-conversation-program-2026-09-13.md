@@ -347,6 +347,12 @@ about 100 rewritten scenarios, a few hours for a person reading the
 model's proposals; that is Jesse's or a design-pass session's, never a
 coder session's.
 
+Amended 2026-09-14 (dev.md section 12): DailyDialog's act and emotion
+labels validate the turn-act classifier (ACT-01, ACT-02) and set the
+"what a person does next" reference, and train nothing that ships
+(CC BY-NC-SA); GoEmotions (Apache 2.0) joins the downloads for the
+emotion head's training data.
+
 Order: LongMemEval-cleaned first (MIT, and abstention is our weakest
 class), then LoCoMo, then the phenomenon mining on Taskmaster-1 and
 CCPE-M, then QuAC and MultiWOZ; MSC (license to confirm) and CANDOR
