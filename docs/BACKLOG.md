@@ -644,7 +644,18 @@ not permission to expand scope.
     sections in the volatile zone until CHAT-12 packs by priority.
     Acceptance adds the `search-in-a-voice` conversation and the
     experience turns of `new-album` (design note, sections 6 and 7),
-    lookups from recorded fixtures; three seeded runs.
+    lookups from recorded fixtures; three seeded runs. **Amended
+    2026-09-14 (dev.md section 13, part 2):** the band's content ceiling
+    (`getCeilingForBand()`, no consumer today) is applied to the
+    evidence set before the composer phrases it, by the one output
+    category scorer run over evidence text: an item over a dial is
+    dropped from a child's evidence with a marker the composer reads
+    and stays for an adult; a rating question from a child is answered
+    as a parent would from the typed field and the band, never the
+    rating's own words; sources and links are never shown on the child
+    band and stay on the outcome; the ladder is unchanged. Acceptance
+    adds `child-goldfish`'s adult twin and a rating question asked by
+    the child and by the owner on the film row, three seeded runs.
 
 - [ ] **Engine emits `status` events at lookup start (CHAT-16)** (S) -
       the visible "what MaiPai is doing" line during a turn is built and
@@ -1315,8 +1326,12 @@ invented for the roster's household, and added to
     an explicit time always winning, `none` or `low` yielding nothing,
     and one utterance may split into an event and a state; the
     rejections `ineligible_act`, `quoted`, `hypothetical`, `joking`,
-    `unknown_grounding`, `subject_mismatch`, `invalid_emotion_category`
-    and `missing_valid_to` counted beside the rest. Acceptance: one
+    `unknown_grounding`, `subject_mismatch`, `invalid_emotion_category`,
+    `missing_valid_to` and `child_about_adult` (a child-band speaker's
+    clause whose subject is an adult writes nothing about the adult and
+    at most a `state` about the child, `sensitive`, person scope; a
+    child's turn never writes an `adults`-audience record; dev.md
+    section 13, part 5) counted beside the rest. Acceptance: one
     judge-eval turn per class with roster names, plus "Quill was here"
     persisting no kind and no relation, at 100 percent precision on
     those rows; the `act-memory` conversation (section 12, part 6),
@@ -1414,7 +1429,16 @@ invented for the roster's household, and added to
     answers one message in its own voice and the next message returns
     to the default; switching changes neither the conversation nor
     recall (effect: the same memory rows in context before and after).
-    Exit: the suites, `bash scripts/check.sh`.
+    **Amended 2026-09-14 (dev.md section 13, parts 6 and 7):** every
+    key this item and section 13 name for a child (the companion set,
+    the audience default, the teen's audience, the notification rule)
+    is adult-written, and a child-role write to any of them is refused
+    at the settings API (a test per key); a child's companion set is
+    the band's register first and the personality's second; an
+    unidentified speaker on a shared device gets the child band's plan,
+    ceiling and audience and no person-scope recall (COMP-06's rule),
+    and a guest reads as adult for register and as child for audience
+    and ceiling. Exit: the suites, `bash scripts/check.sh`.
 
 <a id="comp-05"></a>
 
@@ -1738,11 +1762,96 @@ invented for the roster's household, and added to
     acknowledgment on sadness; "just the numbers" suppresses the
     optional moves under every companion; the crisis overlay and every
     guard unchanged on every row; one authority for register (a test
-    that the persona prose carries no move decision). Out of scope:
+    that the persona prose carries no move decision). **Amended
+    2026-09-14 (dev.md section 13):** the age band is the plan's third
+    axis (`lib/register.ts` reads `ageBand` beside act and emotion: the
+    child envelope with care required on any negative emotion, `point`
+    and `pick` forbidden, one sentence and 20 words, `complexity`
+    forced simple; the teen cap; the companion's dials within the band,
+    never across it), the `band_claim` guard row, and the three child
+    conversations (`child-family-conflict`, `child-grandma`,
+    `child-goldfish`, section 13 part 8) plus the adult twins, run
+    under every bundled companion, three seeded runs. Out of scope:
     canned replies per label, a second prompt path, any plan rule over
     a safety, authorization, confirmation, evidence or privacy
     decision. Exit: the named tests, the persona-eval bench, `bash
     scripts/check.sh`.
+
+<a id="age-01"></a>
+
+- [ ] **AGE-01: Household facts a child may hear, the audience on the record and the defer move** (spec S, engine S-M; after ASK-01, before CHAT-16's composer work)
+
+    Objective: a household fact that is an adult's to tell never
+    reaches a child from the hub, by a field an adult sets with a safe
+    default, and the child is deferred to a parent with care, never
+    lied to and never recited a record. Spec first:
+    `spec/schemas/memory-record.schema.json` gains `audience:
+    household | adults` (default `household`), a new
+    `spec/vocab/adult-to-tell.json` (the classes: a death or a funeral,
+    an illness or a diagnosis, a pregnancy, a separation or a divorce,
+    money and debt, a legal or police matter, a job loss, an adult's
+    private plan to leave or move), fixtures, both bindings. Then:
+    `backend/src/lib/memoryJudge.ts` (the deterministic default at
+    write time: `adults` when the subject is a memorialized person or
+    the text falls in a class or the sensitivity detector flags it,
+    never the judge model's call), `backend/src/lib/memory.ts`
+    (`canRead()` gains the band: a child reads their own person-scope
+    records and household records with audience `household` and not
+    `sensitive`; recall, the profile paragraph and episode recall all
+    through it; a teen reads as adult unless an adult-written key sets
+    the teen's audience to child), `backend/src/lib/turnEngine.ts` and
+    `register.ts` (the `defer` move when a child's question resolves
+    to a subject only `adults` records could answer: care first, "a
+    question for mom or dad" in the child's words, an offer to help
+    ask that queues ASK-01's open question for the adults' next turn,
+    never the record's content, never a lie, never the honesty
+    vocabulary), the Memory page (an adult flips the audience either
+    way, a record edit with provenance), `backend/src/lib/guards.ts`
+    (a `false_comfort` row: "she's on a trip", "away for a while" on a
+    deferred subject), `docs/user/memory.md` and the user privacy page.
+    Mirror: `canRead()`'s `sensitive` rule; `ensureSubjectEntity` for
+    the memorialized-person check; ASK-01's open question. Acceptance:
+    the `child-grandma` conversation (dev.md section 13, part 8) with
+    its adult twin, three seeded runs, the effects on the context
+    message and the memory table; unit tests for the default per class
+    and for the memorialized subject, the band in `canRead()` for
+    child, teen, adult and guest, and the adult's flip. Out of scope:
+    the notification (AGE-02), the plan's band axis (ACT-03). Exit:
+    the spec suite, `bun test tests/memory.test.ts
+    tests/memoryJudge.test.ts tests/turnEngine.test.ts`, `bash
+    scripts/check.sh`.
+
+<a id="age-02"></a>
+
+- [ ] **AGE-02: The worrying-conversation notice to the household's adults** (S, after AGE-01; gated on Jesse's option)
+
+    Objective: when a child's turn falls in the worrying class, the
+    household's adults learn that a worrying conversation happened,
+    never the child's words, and the child is told the hub may mention
+    it; which option applies (dev.md section 13, part 4: never beyond
+    the safety categories; notify and tell the child; or that plus an
+    adult-set off switch) is Jesse's product decision, recorded on this
+    item before it is built (the recommendation is the second). Files:
+    `backend/src/lib/notificationTypes.ts` (`child.worrying_conversation`,
+    level warning, audience `adults`, fixed copy with no slot for the
+    child's text), `backend/src/lib/turnEngine.ts` (`notifyOncePerTurn()`
+    fires it from the stored signal and the subject: the child band,
+    sadness, fear or anger at moderate or high intensity with `target:
+    other` naming a household adult or an unknown person, or a subject
+    in the fixed list, or today's `notify_parent`), `lib/register.ts`
+    (the "I might mention to a grown-up that you seemed sad" clause in
+    the child's plan when the notice fires), `spec/settings/keys.json`
+    (the per-child switch, adult-written, only under the third option),
+    `docs/user/privacy.md` (what the notice carries, in plain words).
+    Mirror: `safety.flagged_turn` and its delivery. Acceptance: the
+    `child-family-conflict` conversation (section 13, part 8), three
+    seeded runs: the notification exists for the adults with no
+    fragment of the child's words or the reply in its body, the child's
+    reply carries the clause, a teen's identical turn produces no
+    notice, and under the third option an adult-set off switch stops
+    it while a child-role write to the switch is refused. Out of
+    scope: any reading of the child's words by a model to decide.
+    Exit: the named tests, `bash scripts/check.sh`.
 
 ## Chat direction 2026-09-12: the next block, two tracks
 
