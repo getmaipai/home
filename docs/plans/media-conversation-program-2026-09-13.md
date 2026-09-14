@@ -284,7 +284,14 @@ rule, classes only):
     than a plain inform; a backchannel or a closing never), and the
     bench header prints the question rate per run beside the reference
     so every item shows its effect. Jesse's observation, confirmed by
-    the numbers.
+    the numbers. How the rate is set, Jesse's question 2026-09-14:
+    never a percent a household member sets. The table's baseline is
+    the human reference; a companion's engagement dial (COMP-03's
+    register fields) selects a band above or below it; a person's own
+    words ("you ask too many questions") become a PREF-01 preference
+    with provenance, shown in settings, read per person by the table;
+    an exact figure exists only at the expert disclosure level per
+    companion (SETTINGS.md's three levels).
 
 Read together: the hub never asks about what it does not know, acts as
 if it knows what it was never told, copies other conversations into
