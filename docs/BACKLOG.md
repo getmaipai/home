@@ -700,14 +700,28 @@ not permission to expand scope.
     turns endpoint runs only while something in the open conversation is
     pending, paused while the tab is hidden, stopped once nothing is
     pending or the conversation changes. Ten-minute stall: a client-side
-    flag, "Still waiting to process memory" plus a manual Refresh, never
-    a false "failed". Replaces #64's narrower notifications-poll path
+    flag, tracked exactly as before. Replaces #64's narrower notifications-poll path
     (chatMemoryChip.tsx), which only ever produced "saved" with no
     forget wiring. Backend half (routes/conversations.ts,
     lib/conversationHistory.ts's own remaining CHAT-20 acceptance,
     session-a-intelligence.md's contract) not audited here - out of
     scope for lane 8, Session A's files. Full writeup: docs/dev/
     session-b.md, "Lane 8 item 2: CHAT-20's frontend half".
+
+    **Chip text reduced, 2026-09-13 (Jesse's call).** `chatMemoryChip.tsx`
+    no longer renders anything for `pending` or the ten-minute-stall
+    flag - "Checking for memories" and "Still waiting to process memory"
+    (plus its manual Refresh) are gone; a person sees the chip only on
+    an outcome ("Memory updated"/"Memory wasn't saved"). The state
+    machine and the 5s poll are unchanged - a turn that resolves before
+    the ten-minute stall still updates the open chip live. One real,
+    accepted gap: because the poll itself stops once a turn is marked
+    stalled (its own established design, unchanged here) and the chip's
+    only recovery action (Refresh) went with the removed UI, a turn
+    that's still unresolved past ten minutes won't update in an
+    already-open tab until the conversation is reloaded (which reseeds
+    from the real row and shows the correct outcome). Full writeup:
+    docs/dev/session-b.md, "Chip text reduced".
 
     Depends on: CHAT-07. Files: `backend/src/wire.ts`,
     `routes/conversations.ts`, `lib/conversationHistory.ts`,
@@ -718,13 +732,17 @@ not permission to expand scope.
     turns endpoint to poll every five seconds only while the visible thread
     has pending memory processing. Pause when hidden, abort on thread
     switch/unmount, stop at terminal status, and resume pending work when
-    the thread becomes visible. After ten minutes pending, stop polling and
-    display "Still waiting to process memory" with an explicit Refresh
-    action; do not falsely mark failed. Merge metadata by stable turn ID,
-    never replace the current message repository or disrupt a running turn.
+    the thread becomes visible. After ten minutes pending, stop polling
+    (still true); the visible "Still waiting to process memory" plus
+    Refresh this line originally asked for is gone as of 2026-09-13
+    (the amendment above) - do not falsely mark failed still holds, it
+    just has no chip text to hold it against anymore. Merge metadata by
+    stable turn ID, never replace the current message repository or
+    disrupt a running turn.
 
-    Saved shows the existing linked chip; pending says "Checking for
-    memories"; not_saved shows no chip; failed says "Memory wasn't saved"
+    Saved shows the existing linked chip; pending shows no chip as of
+    2026-09-13 (originally "Checking for memories," see the amendment
+    above); not_saved shows no chip; failed says "Memory wasn't saved"
     with a link to the memory page. Per-message save/forget use CHAT-06 and
     the existing memory action adapter, target exact returned IDs, and
     invalidate that metadata after success. Never fabricate notification

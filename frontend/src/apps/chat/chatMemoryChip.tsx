@@ -1,11 +1,9 @@
 import { useAuiState } from "@assistant-ui/react";
 import { Link } from "react-router-dom";
 import { getIcon } from "@/kit/icons";
-import { Button } from "@/kit/ui/button";
-import { useMemoryState, refreshTurnMemoryStatus } from "@/apps/chat/chatMemoryState";
+import { useMemoryState } from "@/apps/chat/chatMemoryState";
 
 const Brain = getIcon("brain");
-const Loader = getIcon("loader");
 
 // `bg-secondary`/`text-secondary-foreground`, not `bg-muted`/
 // `text-muted-foreground`: found live regenerating lane 9's screenshots
@@ -57,34 +55,14 @@ export function MemoryUpdatedChip() {
     );
   }
 
-  if (state.status === "pending" && state.stalled) {
-    return (
-      <span className={CHIP_CLASS}>
-        <Brain className="size-3" />
-        Still waiting to process memory
-        <Button
-          type="button"
-          variant="link"
-          size="xs"
-          className="h-auto p-0 text-inherit underline hover:no-underline focus-visible:no-underline"
-          onClick={() => {
-            if (turnId && conversationId) void refreshTurnMemoryStatus(conversationId, turnId);
-          }}
-        >
-          Refresh
-        </Button>
-      </span>
-    );
-  }
-
-  if (state.status === "pending") {
-    return (
-      <span className={CHIP_CLASS}>
-        <Loader className="size-3 animate-spin" />
-        Checking for memories
-      </span>
-    );
-  }
-
-  return null; // not_saved: no chip
+  // Jesse, 2026-09-13: a person should see this chip only when something
+  // actually happened - "pending" (the judge hasn't run yet) and
+  // "stalled" (ten minutes with no answer) are both process, not an
+  // outcome, and showing "Checking for memories" for every ordinary
+  // reply read as chatter rather than information. The state machine
+  // itself is untouched (chatMemoryState.ts's own polling, the stall
+  // timer, `refreshTurnMemoryStatus`) - this chip still appears the
+  // moment the judge finishes late, exactly as before; only the
+  // in-between text is gone.
+  return null; // pending, stalled, not_saved: no chip
 }

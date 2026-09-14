@@ -2426,3 +2426,59 @@ in frontend, 580 passing. The full gate (`bash scripts/check.sh`),
 `--a11y-only`, and the full screenshot run were paused mid-verification
 for a quiet-machine bench window another session needed, resumed once
 clear.
+
+## Chip text reduced
+
+Jesse, 2026-09-13, an own-commit S: the memory chip's `pending` state
+(`chatMemoryChip.tsx`) rendered "Checking for memories" under every
+model reply the instant it streamed in, and the ten-minute stall state
+rendered "Still waiting to process memory" plus a manual Refresh. Both
+are process, not an outcome - a person should see the chip only once
+something actually happened. Both branches now `return null`, folded
+into the same catch-all the file's own pre-existing `not_saved: no
+chip` case already used. `chatMemoryState.ts` (the polling, the 5s
+interval, the ten-minute stall flag, `refreshTurnMemoryStatus`) is
+untouched, per the instruction - the state machine keeps computing
+exactly what it always did, only the chip's own rendering of two of
+its four states changed.
+
+Tests (`chatMemoryChip.test.tsx`): both `pending` cases now assert the
+container's full text content is empty rather than finding "Checking
+for memories"; the two `not_saved` cases (which already asserted no
+chip) simplified to drop their now-always-true "Checking for memories"
+absence check alongside the real one. No dedicated stalled-state test
+exists (there never was one at the chip level - simulating the real
+ten-minute timer needs fake timers this test file has no precedent
+for) - not added here, since the code path a stalled turn takes is the
+identical `return null` the plain-pending tests already exercise, not
+a separate branch to miss.
+
+`docs/user/chat.md` already only described the "Memory updated" chip
+by name, never claimed a checking state existed - nothing to correct
+there.
+
+**A real tradeoff, found by a code review, reported rather than
+silently accepted or unilaterally fixed:** `useMemoryStatusPoll`'s own
+existing design stops polling entirely the moment a turn is marked
+stalled (`pendingUnstalledTurnIds` excludes it) - previously, the
+visible Refresh button was the only way to check again after that
+point. With the button gone, a turn that genuinely takes longer than
+ten minutes to judge will not update in an already-open tab until the
+conversation is reloaded (a reload reseeds from the real row and shows
+the correct outcome, so nothing is ever wrong, just stale in that one
+open tab until then). Fixing this for real means changing the poll/
+stall architecture itself (keep polling past the stall point, silently
+now that there's no UI left to gate it on) - directly against this
+item's own "keep the polling and the state machine as they are"
+instruction, so left as a documented, accepted gap
+(`docs/BACKLOG.md`'s own CHAT-20 amendment) rather than expanded
+unilaterally. A ten-minute-plus judge run is already the rare,
+anomalous case the stall design exists for in the first place.
+
+Verified: gated in a throwaway worktree (`../home-gate-b6`, isolated
+from Session A's own in-progress, uncommitted spec regeneration that
+was breaking typecheck for unrelated files in the shared checkout at
+the time) - full `check.sh` clean (2317 backend + 580 frontend
+passing), code review clean apart from the two findings above (the
+tradeoff, addressed by documenting it; the BACKLOG drift, fixed in the
+same commit).

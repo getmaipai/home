@@ -79,21 +79,29 @@ describe("MemoryUpdatedChip", () => {
     }
   });
 
-  test("pending: a model turn not yet judged shows 'Checking for memories'", async () => {
+  // Jesse, 2026-09-13: pending is process, not an outcome - a person
+  // should see this chip only once something has actually happened
+  // ("Memory updated"/"Memory wasn't saved"), never a mid-flight
+  // "Checking for memories". The state machine (chatMemoryState.ts)
+  // still tracks pending exactly as before; only the chip's own
+  // rendering of it changed, to nothing.
+  test("pending: a model turn not yet judged renders no chip at all", async () => {
     const restore = stubFetchNeverCalled();
     try {
-      const { findByText } = renderChip(replyMessage("turn-pending", { conversationId: "conv-1", source: "model", judgeStatus: null, memoryIds: [] }));
-      await findByText("Checking for memories");
+      const { container } = renderChip(replyMessage("turn-pending", { conversationId: "conv-1", source: "model", judgeStatus: null, memoryIds: [] }));
+      await new Promise((resolve) => setTimeout(resolve, 20));
+      expect(container.textContent).toBe("");
     } finally {
       restore();
     }
   });
 
-  test("pending: a live reply with no judgeStatus field at all reads the same as a fresh unjudged row", async () => {
+  test("pending: a live reply with no judgeStatus field at all also renders nothing", async () => {
     const restore = stubFetchNeverCalled();
     try {
-      const { findByText } = renderChip(replyMessage("turn-live", { conversationId: "conv-1", source: "model" }));
-      await findByText("Checking for memories");
+      const { container } = renderChip(replyMessage("turn-live", { conversationId: "conv-1", source: "model" }));
+      await new Promise((resolve) => setTimeout(resolve, 20));
+      expect(container.textContent).toBe("");
     } finally {
       restore();
     }
@@ -107,7 +115,6 @@ describe("MemoryUpdatedChip", () => {
       );
       await new Promise((resolve) => setTimeout(resolve, 20));
       expect(queryByText("Memory updated")).toBeNull();
-      expect(queryByText("Checking for memories")).toBeNull();
     } finally {
       restore();
     }
@@ -116,11 +123,11 @@ describe("MemoryUpdatedChip", () => {
   test("not_saved: a plugin-sourced turn (never queued for judging) shows no chip", async () => {
     const restore = stubFetchNeverCalled();
     try {
-      const { queryByText } = renderChip(
+      const { container } = renderChip(
         replyMessage("turn-plugin", { conversationId: "conv-1", source: "plugin", judgeStatus: null, memoryIds: [] }),
       );
       await new Promise((resolve) => setTimeout(resolve, 20));
-      expect(queryByText("Checking for memories")).toBeNull();
+      expect(container.textContent).toBe("");
     } finally {
       restore();
     }
