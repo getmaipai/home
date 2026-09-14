@@ -262,6 +262,23 @@ rule, classes only):
     across revisions, and CUR-01's a row where supersede never removes
     content the person stated.
 
+23. The hub asks a question back far more often than a person does.
+    Measured 2026-09-14: 48 percent of live replies since the previous
+    evening carried a question (45 of 93); 31 percent on the bench's
+    last full run (80 of 261). The human reference
+    (backend/scripts/bench/datasets/reference/dailydialog.json): a
+    question after a statement 11.4 percent of the time at the act
+    level, 16.3 percent counting any question mark in the next turn.
+    Causes: the persona prose asks for a follow-up on anything
+    personal; bench rows reward a question back; the register work
+    removed closers but set no rate. Rule for ACT-03: the register
+    table carries an ask-back rate per act and emotion calibrated to
+    the reference (a disclosure of feeling earns a question more often
+    than a plain inform; a backchannel or a closing never), and the
+    bench header prints the question rate per run beside the reference
+    so every item shows its effect. Jesse's observation, confirmed by
+    the numbers.
+
 Read together: the hub never asks about what it does not know, acts as
 if it knows what it was never told, copies other conversations into
 this one, sends broken text, and reads search results aloud like an
