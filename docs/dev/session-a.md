@@ -4458,3 +4458,70 @@ one the row never saw while the polite remember went to the model.
 call; the row uses the literal form now so it tests eligibility, not
 tool-call reliability. The rest of the rerun's misses are the same
 on-purpose rows as the set's.
+
+## REG-01: a statement is not a request, and the assistant register is stripped (2026-09-14)
+
+Section 5 of the design pass (findings 12, 14 in part, 10's loop), as
+the guard half; the plan half (a plan that forbids the claim before
+generation, the `plan_violation` family) is ACT-03's, per section 12
+part 3. Three deterministic rules at the output boundary, no prompt
+change, reading ACT-01's signal.
+
+**Rule 1, statements take no action claims.** `GuardContext` gains
+`act` (the frozen signal's primary act) and `isStatementTurn()`: an
+inform, a commissive, a greeting, a closing or a backchannel is a
+statement (a statement or first-person shape without a signal). On a
+statement with no outcome and no request verb, an `unsupported_action`
+hit is skippable (`isSkippable(reason, ctx)` reads the context now):
+the sentence is dropped, the rest stands, and the narrated line, which
+would name a list or a memory nobody mentioned, is never spoken. When
+nothing remains, `guardReply()` and `gateGuards()` put the malformed
+line in place of any honest line about an action, and the engine
+retries once first: `runTurn()` and `runTurnStream()` (a `regenerate`
+callback on `gateGuards()`, within the turn's two generations, thinking
+off) run one completion with the system note "Nothing was asked;
+respond to what they said" (`STATEMENT_RETRY_NOTE`) appended, gated the
+same way; a second empty result keeps the malformed line (OUT-01's
+bound). After a request the narration stays, as CHAT-04 always had it.
+
+**Rule 2, the assistant register.** One list beside the closers
+(`REGISTER_PHRASE_RE` and `CLOSER_RE`, the same definition extended):
+"I've noted that", "noted", "I'm still learning", "I'm here to help",
+"as an AI", "sorry if I confused you", "let me know what you need",
+"happy to help", "hope that helps", "feel free to ask", "is there
+anything else", the closers. A sentence that is only these (the
+phrases, their connective words, a courtesy aside, an addressee) is
+skipped wherever it sits (`assistant_register`, skippable); a register
+tail behind a comma ("That's a big day, let me know if you need
+anything else") or a register lead ("As an AI, I can't taste it",
+"Noted, I'll keep that in mind") is cut and the rest kept, recorded as
+a hit that replaced nothing (the streaming path cuts the span before
+it is judged; a span the chunker flushed at the comma arrives as its
+own sentence and is skipped whole). The acknowledgment half ("Noted.",
+"Will do.", "No problem.", "You're welcome") is the answer to a
+request, a greeting or a thank-you and stays there; on a statement it
+is register. A register word inside content ("you're learning the feel
+of the dough") is content. RECALL-02b's closer rule stands underneath:
+a closer is never a copied line, and it is register.
+
+**Rule 3, no question said twice.** `previousReply` (the hub's last
+assistant message in the window, from `guardContextFrom()`) gives
+`repeat_question`: a reply sentence with a question mark that shares
+four in five of the shorter sentence's words with a question sentence
+of the previous reply, the longer at most twice the shorter, is
+skipped; a different question is a new one.
+
+**Rows and corpus.** `spec/llm/guard-corpus.json` gains ten rows both
+ways (the statement skip and the request narration, the whole
+sentence, the tail, "Noted." after a request, "No problem" after
+thanks, a register word in content, the repeated and the new
+question), and the corpus test threads `act` and `previousReply`;
+`restated-disclosure-with-source` now expects `assistant_register`
+(the "Noted," lead cut, the rest standing). The fixture gains
+`statement-not-request` (section 5's three turns). Tests:
+`tests/guards.test.ts` "REG-01" (the three rules, the exemptions, the
+lead and tail cuts), `tests/turnEngine.test.ts` (the blocking retry
+with the note and its good reply standing, the streaming regeneration
+with the tail cut on the wire, the request narration unchanged), and
+the two CHAT-04 tests that asserted the old behavior on a statement
+("Got it, noted.", "I saved that.") now assert this one.

@@ -1091,4 +1091,18 @@ export const CONVERSATIONS: readonly BenchConversation[] = [
       { say: "I'm not stressed anymore", expect: { signal: { primary_act: "inform" }, memoryRows: [{ textKeywords: ["stressed"], status: "superseded" }], guard: null } },
     ],
   },
+  // REG-01 (dev.md section 5): a statement is not a request, and the
+  // assistant register is stripped. `guard: null` reads "nothing
+  // replaced": a skipped action claim or a cut register sentence is a
+  // hit that replaced nothing, which the row allows.
+  {
+    id: "statement-not-request",
+    category: "etiquette",
+    note: "section 5 (findings 12, 14, 10's loop): a first-person statement never gets 'I've noted that' or an action claim; a guard replacement never names a family the person did not mention; no question said twice",
+    turns: [
+      { say: "I told Quill I'm done with sourdough, too much fuss", expect: { signal: { primary_act: "inform" }, toolRan: null, guard: null, mustContain: "\\?|that|why|how|fuss|sourdough", mustNotContain: "noted|i've (?:added|saved)|added (?:it|that)|still learning|" + NO_CLOSER, humanVerdict: true } },
+      { say: "I wasn't asking you to do anything, just talking", expect: { signal: { primary_act: "inform" }, toolRan: null, guard: null, mustNotContain: "\\blist\\b|timer|reminder|noted|" + NO_CLOSER, humanVerdict: true } },
+      { say: "anyway, Quill was going to lend me her starter but now she's not", expect: { signal: { primary_act: "inform" }, toolRan: null, guard: null, noCopiedEpisode: true, mustNotContain: NO_CLOSER, humanVerdict: true } },
+    ],
+  },
 ];

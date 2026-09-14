@@ -1307,7 +1307,20 @@ invented for the roster's household, and added to
 
 <a id="reg-01"></a>
 
-- [ ] **REG-01: A statement is not a request, and the assistant register is stripped** (S)
+- [x] **REG-01: A statement is not a request, and the assistant register is stripped** (S)
+
+    Done 2026-09-14 (docs/dev/session-a.md "REG-01"): the three rules in
+    `lib/guards.ts` reading ACT-01's signal (`act` on the guard
+    context): on a statement with no outcome an action claim is skipped,
+    never narrated (`isSkippable(reason, ctx)`); the assistant register
+    beside the closers, one list, a sentence that is only register
+    skipped and a register lead or tail cut (`assistant_register`); the
+    hub's previous question said back skipped (`repeat_question`, the
+    previous reply on the context). The engine's one retry with the
+    note on both paths when nothing remains, then the malformed line.
+    Corpus rows both ways; the `statement-not-request` conversation.
+    The plan half (a plan forbidding the claim before generation, the
+    `plan_violation` family) is ACT-03's.
 
     Objective: a first-person statement never gets "I've noted that",
     a guard replacement never names a package family the person did not

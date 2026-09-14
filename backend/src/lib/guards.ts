@@ -60,7 +60,15 @@ export type GuardReason =
    * was unknown, the output broke. Set by the reply boundary
    * (turnEngine.ts's finalizeReply and the streaming hold), not by
    * guardSentence(). */
-  | "malformed";
+  | "malformed"
+  /** REG-01: a sentence that is only the assistant register ("I've noted
+   * that", "Let me know if you need anything else", "I'm still
+   * learning"), skipped wherever it sits; a register tail on a real
+   * sentence is cut and the head kept. */
+  | "assistant_register"
+  /** REG-01 (section 4): a reply sentence that is the hub's previous
+   * reply's question said back, skipped. */
+  | "repeat_question";
 
 export interface GuardContext {
   utterance: string;
@@ -102,6 +110,14 @@ export interface GuardContext {
    * shape themselves with no openers, which can differ from the router
    * on a package-declared opener; the turn engine always passes it. */
   shape?: UtteranceShape;
+  /** ACT-01: the turn's primary act off the frozen signal (REG-01's
+   * statement rule reads it: an inform, a commissive, a greeting, a
+   * closing or a backchannel is a statement, and a statement takes no
+   * action claim). Absent, the shape decides. */
+  act?: "inform" | "question" | "directive" | "commissive" | "greeting" | "closing" | "backchannel";
+  /** REG-01: the hub's own previous reply in this conversation, whose
+   * question sentences a reply may not say back. */
+  previousReply?: string;
   /** The active persona's own few-shot voice lines (persona.ts's
    * `Persona.examples`) - borrowed for TONE, never handed back verbatim. */
   personaExamples?: readonly string[];
@@ -139,6 +155,10 @@ export interface Guarded {
    * reason only for the replaced case, so the episode store can tell a
    * canned line from an answer by the row alone. */
   replaced: boolean;
+  /** REG-01: true when every sentence was skipped as register, a
+   * repeated question or a statement's action claim and `reply` is the
+   * malformed line: the engine's cue for its one retry with the note. */
+  emptied?: boolean;
 }
 
 // ==== Honest replacement lines, one small rotating bank per reason ====
@@ -615,6 +635,86 @@ export function isCloserSentence(sentence: string): boolean {
   // Nothing left: a closer that names a subject ("Feel free to ask
   // about Tempo") is a line about that subject, and the guard reads it.
   return tokenize(residual).size === 0;
+}
+
+// ==== REG-01: the assistant register, and a question said twice ====
+// One list beside the closers (CLOSER_RE above, the same definition
+// extended): the phrases an assistant says and a friend never does.
+// A sentence that is only these (their connective words and a
+// courtesy aside) is skipped; a tail of them behind a comma or a
+// dash on a real sentence is cut. "Got it, noted" on a statement is
+// the same register; "noted" as an acknowledgment of a request stays.
+const REGISTER_PHRASE_RE =
+  /\b(?:i'?ve (?:noted|got|made a note of) (?:that|it|this)|noted|i'?m (?:still )?learning|i'?m here (?:to help|for you|if you need)|as an ai(?: (?:assistant|model))?|as a language model|sorry (?:if|that) i (?:confused|misunderstood|missed)(?: you| that)?|let me know (?:what you need|how (?:i can|else i can) help|if (?:you need|there'?s|you'?d like|you want)[^.!?,]*|when you'?re ready[^.!?,]*)|happy to help(?: (?:with|out|if|when|whenever|any ?time)[^.!?,]*)?|glad (?:to|i could) help|i'?m happy to assist|how (?:else )?can i (?:help|assist)(?: you)?(?: today)?|is there anything else(?: i can (?:help|do)[^.!?,]*)?|anything else (?:you need|i can (?:help|do)[^.!?,]*)|feel free to (?:ask|reach out|let me know)[^.!?,]*|don'?t hesitate to (?:ask|reach out)[^.!?,]*|hope (?:that|this) helps|you'?re welcome|no problem(?: at all)?|got it,? noted|will do)\b/i;
+const REGISTER_FILLER_RE = /\b(?:okay|ok|sure|alright|great|of course|absolutely|certainly|just|so|and|or|but|then|now|also|too|again|anytime|always|please|thanks|thank you|though|at all|for now|for today|tonight|today)\b/gi;
+function isRegisterSentence(sentence: string): boolean {
+  if (!REGISTER_PHRASE_RE.test(sentence) && !CLOSER_RE.test(sentence)) return false;
+  const residual = sentence
+    .replace(/’/g, "'")
+    .replace(new RegExp(REGISTER_PHRASE_RE.source, "gi"), " ")
+    .replace(new RegExp(CLOSER_RE.source, "gi"), " ")
+    .replace(/'(?:s|d|m|re|ll|ve|t)\b/gi, " ") // the contractions' tails are not subjects, once the phrases are out
+    .replace(CLOSER_FILLER_RE, " ")
+    .replace(REGISTER_FILLER_RE, " ")
+    .replace(/[,\s]+(?:\p{Lu}\p{L}*)(?=[\s!.,?]*$)/u, " "); // an addressee at the end
+  return tokenize(residual).size === 0;
+}
+// The acknowledgment half of the register ("Noted.", "Will do.", "No
+// problem.") is the right answer to a request and a thank-you; it is
+// register only on a statement, where nothing was asked.
+const ACK_REGISTER_RE = /^\W*(?:okay|ok|sure|alright|got it)?[,.! ]*(?:noted|i'?ve (?:noted|got|made a note of) (?:that|it|this)|will do|you'?re welcome|no problem(?: at all)?|got it,? noted)\W*$/i;
+/** The register test with the acknowledgment exemption: "Noted." after
+ * a request, a greeting or a thank-you is the answer. */
+function isRegisterFor(sentence: string, ctx: Pick<GuardContext, "act" | "shape" | "utterance">): boolean {
+  if (!isRegisterSentence(sentence)) return false;
+  if (ACK_REGISTER_RE.test(sentence) && (!isStatementTurn(ctx) || ctx.act === "closing" || ctx.act === "greeting")) return false;
+  return true;
+}
+function guardAssistantRegister(sentence: string, ctx: GuardContext): GuardReason | null {
+  return isRegisterFor(sentence, ctx) ? "assistant_register" : null;
+}
+/** A register tail behind a comma, a semicolon, a colon or a spaced
+ * dash ("Sounds fun, let me know if you need anything else.") is taken
+ * off and the head kept, with its own stop. */
+export function stripRegisterTail(sentence: string, ctx: Pick<GuardContext, "act" | "shape" | "utterance">): string {
+  // A register lead behind a comma ("As an AI, I can't taste it",
+  // "Sorry if I confused you, the recital is Friday") goes the same way:
+  // the rest stands on its own, capitalized.
+  const lead = /^\s*([^,;:]+?)\s*(?:[,;:]|\s[-–—])\s*(\S.*)$/s.exec(sentence);
+  // A rest that is only an addressee ("Hope that helps, Sage!") makes
+  // the whole sentence register, left to the sentence rule (a review).
+  if (lead && isRegisterFor(lead[1]!, ctx) && tokenize(lead[2]!.replace(/^\s*(?:\p{Lu}\p{L}*|everyone|everybody|all|guys|folks|there)[\s!.,?]*$/u, "")).size > 0) {
+    const rest = lead[2]!;
+    return rest.charAt(0).toUpperCase() + rest.slice(1);
+  }
+  const m = /^(.*?[^\s,;:-])\s*(?:[,;:]|\s[-–—])\s*(?:and\s+|but\s+|so\s+)?([^,;:]+?)([.!?]*)\s*$/i.exec(sentence);
+  if (!m) return sentence;
+  const head = m[1]!;
+  const tail = m[2]!;
+  // A head that is only an acknowledgment ("Okay, I've noted that")
+  // leaves the whole sentence to the register rule.
+  const headContent = tokenize(head.replace(ACK_LEAD_RE, "").replace(REGISTER_FILLER_RE, " "));
+  if (!isRegisterFor(tail, ctx) || headContent.size === 0) return sentence;
+  return /[.!?]$/.test(head) ? head : `${head}.`;
+}
+/** REG-01 (section 4): a reply sentence that says the hub's previous
+ * question back (the same words, or four in five of them) is skipped. */
+function guardRepeatQuestion(sentence: string, ctx: GuardContext): GuardReason | null {
+  if (!sentence.includes("?") || !ctx.previousReply) return null;
+  const said = tokenize(sentence);
+  if (said.size < 2) return null;
+  for (const earlier of splitIntoSentences(ctx.previousReply)) {
+    if (!earlier.includes("?")) continue;
+    const had = tokenize(earlier);
+    if (had.size === 0) continue;
+    const overlap = [...said].filter((w) => had.has(w)).length;
+    // Four in five of the shorter sentence's words, and the longer no
+    // more than twice the shorter: a paraphrase with a filler ("So what
+    // made you decide to stop, then?") is the same question.
+    const shorter = Math.min(said.size, had.size);
+    if (Math.max(said.size, had.size) <= 2 * shorter && overlap >= Math.max(2, Math.ceil(0.8 * shorter))) return "repeat_question";
+  }
+  return null;
 }
 
 function guardUnrelatedRecall(sentence: string, ctx: GuardContext): GuardReason | null {
@@ -1163,7 +1263,33 @@ export function withoutHonestyLines(text: string): string {
 // Item 1b: a reason whose sentence is dropped wherever it sits, first
 // sentence included, and the rest of the reply goes on; the honest
 // line stands in only when nothing else was said.
-const SKIPPABLE: ReadonlySet<GuardReason> = new Set(["claimed_experience"]);
+const SKIPPABLE: ReadonlySet<GuardReason> = new Set(["claimed_experience", "assistant_register", "repeat_question"]);
+
+/** REG-01: a statement (an inform, a commissive, a greeting, a closing
+ * or a backchannel by the signal; a statement or first-person shape
+ * without one) is not a request. */
+export function isStatementTurn(ctx: Pick<GuardContext, "act" | "shape" | "utterance">): boolean {
+  if (ctx.act) return ctx.act !== "question" && ctx.act !== "directive";
+  const shape = shapeOf(ctx as GuardContext);
+  return shape === "statement" || shape === "first_person";
+}
+
+/** REG-01, rule 1: on a statement turn with no outcome, an action claim
+ * is padding the model added ("Okay, I've noted that"), skipped rather
+ * than narrated, since the narrated line would name a package family
+ * the person never mentioned. */
+function statementActionSkip(reason: GuardReason, ctx: GuardContext): boolean {
+  return reason === "unsupported_action" && isStatementTurn(ctx) && (ctx.outcomes ?? []).length === 0 && !REQUEST_RE.test(ctx.utterance);
+}
+
+/** REG-01's own skips: the register, a repeated question, a statement's
+ * action claim. When one of these emptied the reply, no honest line
+ * about an action or an experience fits (nothing was asked), so the
+ * malformed line stands and the engine retries once with its note;
+ * `claimed_experience` keeps its own line and its own rule (item 1b). */
+export function isRegisterSkip(reason: GuardReason, ctx: GuardContext): boolean {
+  return reason === "assistant_register" || reason === "repeat_question" || statementActionSkip(reason, ctx);
+}
 
 /** Exported so turnEngine.ts's streaming path (`gateGuards()`) makes the
  * SAME cut-vs-replace-the-rest distinction guardReply() does below - one
@@ -1173,9 +1299,10 @@ export function isCuttable(reason: GuardReason): boolean {
   return CUTTABLE.has(reason);
 }
 
-/** Exported for the streaming path for the same reason as isCuttable(). */
-export function isSkippable(reason: GuardReason): boolean {
-  return SKIPPABLE.has(reason);
+/** Exported for the streaming path for the same reason as isCuttable().
+ * With the context, REG-01's statement rule applies too. */
+export function isSkippable(reason: GuardReason, ctx?: GuardContext): boolean {
+  return SKIPPABLE.has(reason) || (ctx !== undefined && statementActionSkip(reason, ctx));
 }
 
 // Per-reason lines, not one generic fallback - bot-legacy's own
@@ -1194,6 +1321,11 @@ const REPLACEMENT_FOR: Record<GuardReason, readonly string[]> = {
   placeholder_echo: DONT_KNOW,
   claimed_experience: CANNOT_EXPERIENCE,
   malformed: MALFORMED,
+  // REG-01: a reply that was only register or a repeated question has
+  // nothing left; the engine retries once with its note first, and the
+  // malformed line is what stands when that fails too (OUT-01's bound).
+  assistant_register: MALFORMED,
+  repeat_question: MALFORMED,
 };
 
 /** The honest line a guard hit replaces text with, for a given reason -
@@ -1234,6 +1366,8 @@ export function guardSentence(sentence: string, ctx: GuardContext, isFirstSenten
   if (!s) return null;
   return (
     guardPlaceholderEcho(s) ??
+    guardAssistantRegister(s, ctx) ??
+    guardRepeatQuestion(s, ctx) ??
     guardUnsupportedAction(s, ctx) ??
     guardCapabilityClaim(s, ctx) ??
     guardMedicationDose(s) ??
@@ -1267,14 +1401,20 @@ export function guardReply(reply: string, ctx: GuardContext): Guarded {
   const fullReplyCtx: GuardContext = { ...ctx, replyHasQuestion: (reply || "").includes("?") };
   const kept: string[] = [];
   let skipped: { reason: GuardReason; sentence: string } | null = null;
+  let tailCut: GuardReason | null = null;
   for (let i = 0; i < sentences.length; i++) {
-    const sentence = sentences[i]!;
+    const whole = sentences[i]!;
+    // REG-01, rule 2: a register tail ("Sounds fun, let me know if you
+    // need anything else.") is cut and the head kept; recorded as a hit
+    // that replaced nothing.
+    const sentence = stripRegisterTail(whole, fullReplyCtx);
+    if (sentence !== whole) tailCut ??= "assistant_register";
     const reason = guardSentence(sentence, fullReplyCtx, i === 0);
     if (reason === null) {
       kept.push(sentence);
       continue;
     }
-    if (SKIPPABLE.has(reason)) {
+    if (isSkippable(reason, fullReplyCtx)) {
       // Item 1b: dropped wherever it sits, the rest of the reply goes on.
       skipped ??= { reason, sentence };
       continue;
@@ -1286,7 +1426,13 @@ export function guardReply(reply: string, ctx: GuardContext): Guarded {
   }
   if (skipped) {
     if (kept.length > 0) return { reply: kept.join(" "), reason: skipped.reason, replaced: false };
+    // REG-01: nothing was asked, so no honest line about an action
+    // fits; the malformed line stands and the engine retries once with
+    // its note before accepting it. Item 1b's claimed_experience keeps
+    // its own line.
+    if (isRegisterSkip(skipped.reason, fullReplyCtx)) return { reply: replacementFor("malformed", ctx.personId), reason: skipped.reason, replaced: true, emptied: true };
     return { reply: replacementFor(skipped.reason, ctx.personId, { sentence: skipped.sentence, ctx: fullReplyCtx }), reason: skipped.reason, replaced: true };
   }
+  if (tailCut) return { reply: kept.join(" "), reason: tailCut, replaced: false };
   return { reply, reason: null, replaced: false };
 }

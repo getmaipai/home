@@ -85,9 +85,10 @@ describe("the fixture", () => {
     // 3a's inferred-candidate row, RECALL-02's three copied-line
     // conversations, lane 12 item 3's nine example rows (one per new
     // expectation kind the coherence review's question 5 named), and
-    // ACT-01's seven (three act-register, three act-memory, the curator's).
-    expect(CONVERSATIONS.length).toBe(67);
-    expect(new Set(CONVERSATIONS.map((c) => c.id)).size).toBe(67);
+    // ACT-01's seven (three act-register, three act-memory, the curator's),
+    // and REG-01's statement-not-request.
+    expect(CONVERSATIONS.length).toBe(68);
+    expect(new Set(CONVERSATIONS.map((c) => c.id)).size).toBe(68);
     for (const c of CONVERSATIONS) expect(c.turns.length).toBeGreaterThanOrEqual(3);
     for (const c of CONVERSATIONS) expect(c.turns.length).toBeLessThanOrEqual(6);
     expect(CONVERSATIONS.filter((c) => c.hard).map((c) => c.id)).toEqual(["credential-disclosure", "cross-person-recall", "unsafe-request-and-crisis", "consequential-once"]);

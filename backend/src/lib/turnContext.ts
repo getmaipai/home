@@ -235,5 +235,9 @@ export function guardContextFrom(ctx: TurnContext): Omit<GuardContext, "personId
     personaExamples: ctx.persona.examples,
     roster: ctx.roster,
     shape: shapeOf(ctx.signal, ctx.utterance),
+    // REG-01: the act for the statement rule, and the hub's previous
+    // reply for the repeated-question check.
+    act: ctx.signal.primary_act,
+    previousReply: [...ctx.history].reverse().find((m) => m.role === "assistant")?.content,
   };
 }

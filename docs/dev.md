@@ -14322,10 +14322,13 @@ policy under every companion. The persona prose in `persona.ts` that
 decides reaction and follow-up today is retired when the plan is
 enforced, so there is one authority; the remaining sentences describe
 realization only. The DailyDialog transitions are the reference the
-table was set against, not a rule: a person answers an inform with a
-question 43 percent of the time and a question with a question 16
-percent, which is why ask-back is the default after an inform and the
-exception after a question.
+table was set against, not a rule (`reference/dailydialog.json`):
+after an inform, the next turn is act-labeled a question 37 percent
+of the time and its own text carries a question mark 43 percent of
+the time; after a question, the next turn is act-labeled a question
+11.4 percent of the time but still carries a question mark 16
+percent of the time - which is why ask-back is the default after an
+inform and the exception after a question.
 
 *What REG-01 and REVIEW-01 become.* REG-01 becomes two layers: before
 generation, the plan itself (an inform, a commissive or a closing
@@ -14355,8 +14358,9 @@ weekly report.
   surprise 1.8, sadness 1.1, anger 1.0, disgust 0.3, fear 0.2; in the
   training split, after an inform the next turn is an inform 47
   percent of the time and a question 37, and carries a question mark
-  43 percent of the time; after a question, an inform 76 percent and a
-  question 16; after a directive, a commissive 57 percent. These are
+  43 percent of the time; after a question, an inform 76 percent and
+  a question 11.4, and carries a question mark 16 percent of the
+  time; after a directive, a commissive 57 percent. These are
   what a person does next; the hub's own transition table (REVIEW-01)
   is read beside them, and a large gap on a row is a finding (a hub
   that asks back after 80 percent of informs is nagging; after 5

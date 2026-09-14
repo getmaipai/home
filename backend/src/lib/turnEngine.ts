@@ -27,11 +27,14 @@ import { recallEpisodes, formatEpisodesForPrompt, formatEpisodeLine, episodeQuot
 import { intentFor, markIncluded, guardContextFrom, outcomeOf, emptyTimings, type TurnContext, type TurnEvidence, type ToolExecutionOutcome, type RejectedReason, type TurnTimings } from "@/lib/turnContext";
 import { newConversationTurnId } from "@/lib/id";
 import { complete, startCompleteStream, type LlmMessage, type ToolSpec, type ToolCall } from "@/lib/llm";
-import { guardReply, guardSentence, replacementFor, isCuttable, isSkippable, splitIntoSentences, type GuardContext, type GuardReason } from "@/lib/guards";
+import { guardReply, guardSentence, replacementFor, isCuttable, isSkippable, isRegisterSkip, isStatementTurn, stripRegisterTail, splitIntoSentences, type GuardContext, type GuardReason } from "@/lib/guards";
 import { tokenize } from "@/lib/text";
 import { unspokenArgument, askPromptFor, isActionPackage } from "@/lib/unspokenArgs";
 import { COURTESY_PREFIX } from "@/lib/utteranceShape";
 import { classifyTurnSignal, fallbackSignal, freezeDirective, hasEligibleClause, shapeOf, type ProtocolAnswer } from "@/lib/turnSignal";
+/** REG-01: the system note on the one retry a statement turn gets when
+ * every sentence of the reply was register or an action claim. */
+export const STATEMENT_RETRY_NOTE = "Nothing was asked; respond to what they said.";
 import type { TurnSignal } from "@maipai/spec/gen/ts/turn-signal.js";
 import { FORGET_COMMAND_ID, forgetFromConversation, parseForgetCommand } from "@/lib/forgetCommand";
 import { promptNow } from "@/lib/benchSampling";
@@ -2709,6 +2712,9 @@ async function runTurnHoldingLease(
   const prepared = await prepareTurn(actor, surface, text, loaded, conversation, lease, resolveSupersedes(opts.supersedes, conversation.id));
 
   let value: TurnValue;
+  // REG-01: set by answerWithSafetyAndGuards() when the guards emptied
+  // the reply (register, a repeated question, a statement's claim).
+  let emptiedBySkips = false;
   // ACT-01: the blocking path has no first token; its `first_token_ms`
   // is the whole first completion, and `finalize_ms` runs from the last
   // generation's return through the guards and the reply boundary.
@@ -2760,6 +2766,7 @@ async function runTurnHoldingLease(
       const guarded = guardReply(text, { ...guardContextFrom(prepared.turnContext), personId: actor.id });
       if (guarded.reason) guardHits.push(guarded.reason); // Fix A4: fed into the `[turn]` log's own `guard` array below
       if (guarded.replaced) guardReplaced = true;
+      emptiedBySkips = guarded.emptied === true;
       return {
         reply: { text: guarded.reply },
         source: "model",
@@ -2907,7 +2914,7 @@ async function runTurnHoldingLease(
       const sentences = splitIntoSentences(rawText);
       for (let i = 0; i < sentences.length; i++) {
         const reason = guardSentence(sentences[i]!, precheckCtx, i === 0);
-        if (reason && isSkippable(reason)) continue;
+        if (reason && isSkippable(reason, precheckCtx)) continue;
         firstReason = reason;
         break;
       }
@@ -2930,6 +2937,28 @@ async function runTurnHoldingLease(
         value = resolved ? resolved : answerWithSafetyAndGuards(rawText);
       } else {
         value = answerWithSafetyAndGuards(rawText);
+        // REG-01, rule 1: every sentence of a reply to a statement was
+        // register or an action claim; one retry with the note (the
+        // turn's second generation), its own reply guarded the same way;
+        // a second empty result keeps the malformed line already set.
+        // The same fact the streaming path regenerates on: the guards
+        // emptied the reply (never a narrated line, which stands).
+        if (emptiedBySkips && prepared.timings.retries < 1) {
+          prepared.timings.retries++;
+          const again = await complete("chat", [...prepared.messages, { role: "system", content: STATEMENT_RETRY_NOTE }], { thinking: false });
+          generationDone = Date.now();
+          if (again.ok) {
+            const before = guardHits.length;
+            guardReplaced = false;
+            const second = answerWithSafetyAndGuards(await shapeModelText(again.value.text, false));
+            if (!guardReplaced) {
+              value = second;
+            } else {
+              guardHits.length = before; // the first reply's line stands; its hits are the record
+              guardReplaced = true;
+            }
+          }
+        }
       }
     }
   }
@@ -3232,6 +3261,12 @@ export async function* gateGuards(
   // `[turn]` log line's own `guard` array - this generator's per-sentence
   // internals have no other channel back to whoever is draining it.
   onGuardHit?: (reason: GuardReason, replaced: boolean) => void,
+  // REG-01: when every sentence was skipped on a statement turn, one
+  // regeneration with the engine's note ("Nothing was asked; respond to
+  // what they said"), gated the same way; null when the turn already
+  // spent its second generation. The regenerated stream never
+  // regenerates again.
+  regenerate?: () => Promise<AsyncGenerator<string, StreamOutcome, void> | null>,
 ): AsyncGenerator<string, StreamOutcome, void> {
   const iterator = tokens[Symbol.asyncIterator]();
   let step = await iterator.next();
@@ -3240,11 +3275,16 @@ export async function* gateGuards(
   let skipped: { reason: GuardReason; sentence: string } | null = null;
   const liveCtx = (): GuardContext => ({ ...(typeof ctx === "function" ? ctx() : ctx), personId });
   while (!step.done) {
-    const rawSpan = step.value;
+    // REG-01, rule 2: a register tail on a spoken span is cut before the
+    // span is judged (a span the chunker flushed at the comma arrives
+    // as its own sentence and is skipped whole below).
+    const whole = step.value;
+    const rawSpan = whole.trim() ? stripRegisterTail(whole.trimEnd(), liveCtx()) + (/\s$/.test(whole) ? " " : "") : whole;
+    if (rawSpan.trim() !== whole.trim()) onGuardHit?.("assistant_register", false);
     const trimmed = rawSpan.trim();
     const reason = trimmed ? guardSentence(trimmed, liveCtx(), isFirstSentence) : null;
     if (trimmed) isFirstSentence = false;
-    if (reason && isSkippable(reason)) {
+    if (reason && isSkippable(reason, liveCtx())) {
       // Item 1b: the sentence is dropped wherever it sits and the rest
       // streams on; if nothing else is ever spoken, the honest line
       // stands in at the end (guardReply()'s own rule).
@@ -3275,6 +3315,38 @@ export async function* gateGuards(
     step = await iterator.next();
   }
   if (skipped && !spokeAnything) {
+    // REG-01, rule 1: nothing remained of a reply to a statement; one
+    // retry with the note, then the malformed line (OUT-01's bound).
+    if (isRegisterSkip(skipped.reason, liveCtx())) {
+      const again = regenerate ? await regenerate() : null;
+      let spoke = false;
+      if (again) {
+        const nested = gateGuards(again, ctx, personId, onGuardHit);
+        try {
+          let n = await nested.next();
+          while (!n.done) {
+            spoke = true;
+            yield n.value;
+            n = await nested.next();
+          }
+          // The regeneration's own outcome (an output-safety flag) is
+          // the turn's; an empty second reply falls to the line below.
+          if (spoke) return n.value ?? step.value;
+        } catch (err) {
+          // A regeneration that fails before any text takes the
+          // malformed line; after text, what was said stands.
+          console.error(`[turn] the statement retry failed: ${(err as Error).message}`);
+          if (spoke) return step.value;
+        } finally {
+          // A consumer that stopped early (a disconnect) closes the
+          // regeneration too, so the engine is not drained for nobody.
+          await nested.return(undefined).catch(() => undefined);
+        }
+      }
+      onGuardHit?.("malformed", true);
+      yield `${replacementFor("malformed", personId)} `;
+      return step.value;
+    }
     onGuardHit?.(skipped.reason, true);
     yield `${replacementFor(skipped.reason, personId, { sentence: skipped.sentence, ctx: liveCtx() })} `;
   }
@@ -3586,18 +3658,32 @@ async function runTurnStreamHoldingLease(
       startedAt,
       tokens: holdLease(
         sentenceCaseStream(
-          gateGuards(gateOutputSafety(guardFirstStep(holdOpening(tokens, true)), actor, prepared.turnId), () => guardContextFrom(prepared.turnContext), actor.id, (reason, replaced) => {
-            // The reason that replaced is the one the row records
-            // (guard_reason reads the first hit, #78): a skipped
-            // sentence's hit (item 1b) can come before it, and the
-            // blocking path's guardReply() reports the replacing one.
-            if (replaced) {
-              guardReplaced = true;
-              guardHits.unshift(reason);
-            } else {
-              guardHits.push(reason);
-            }
-          }),
+          gateGuards(
+            gateOutputSafety(guardFirstStep(holdOpening(tokens, true)), actor, prepared.turnId),
+            () => guardContextFrom(prepared.turnContext),
+            actor.id,
+            (reason, replaced) => {
+              // The reason that replaced is the one the row records
+              // (guard_reason reads the first hit, #78): a skipped
+              // sentence's hit (item 1b) can come before it, and the
+              // blocking path's guardReply() reports the replacing one.
+              if (replaced) {
+                guardReplaced = true;
+                guardHits.unshift(reason);
+              } else {
+                guardHits.push(reason);
+              }
+            },
+            // REG-01: the statement-turn retry, within the turn's two
+            // generations; thinking off, like OUT-01's hold.
+            async () => {
+              if (generations >= 2) return null;
+              generations++;
+              const again = await startCompleteStream("chat", [...modelMessages, { role: "system", content: STATEMENT_RETRY_NOTE }], { thinking: false }, opts.signal);
+              if (!again.ok) return null;
+              return gateOutputSafety(holdOpening(again.tokens, false), actor, prepared.turnId);
+            },
+          ),
         ),
       ),
       finalize: (replyText: string, outcome?: StreamOutcome): TurnValue => {

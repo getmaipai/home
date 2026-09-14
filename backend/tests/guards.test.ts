@@ -4,7 +4,7 @@
 // 2026-09-03), adapted to this hub's context shape (sources/history as
 // plain strings, no robot-specific Iterable-of-tuples).
 import { describe, expect, test } from "bun:test";
-import { guardReply, guardSentence, replacementFor, withoutHonestyLines, type GuardContext } from "@/lib/guards";
+import { guardReply, guardSentence, replacementFor, withoutHonestyLines, stripRegisterTail, MALFORMED, type GuardContext } from "@/lib/guards";
 
 function ctx(overrides: Partial<GuardContext> = {}): GuardContext {
   return { utterance: "", personId: "person-test", ...overrides };
@@ -340,15 +340,18 @@ describe("unrelated recall (bot-legacy's own test: eye exam answered from the de
     expect(ownUnasked.reason).toBe("unrelated_recall");
   });
 
-  test("RECALL-02b: a closer is never a copied line, whatever it overlaps", () => {
+  test("RECALL-02b: a closer is never a copied line, whatever it overlaps (REG-01 then scrubs it as register, never as recall)", () => {
     const closer = "Is there anything specific you need help with?";
     const g = guardReply(`Bread is a classic at school fairs. ${closer}`, ctx({ utterance: "Marlow has been up since five baking bread for the school fair", episodes: [closer, "Let me know if you need anything else."] }));
-    expect(g.reason).toBeNull();
-    expect(g.reply).toContain(closer);
-    // The everyday closers, whole.
+    expect(g.reason).toBe("assistant_register");
+    expect(g.replaced).toBe(false);
+    expect(g.reply).toBe("Bread is a classic at school fairs.");
+    // The everyday closers, whole: never a copied line; register, and
+    // with nothing else said the malformed line stands in (the engine
+    // retries once before that).
     for (const line of ["Let me know if you need anything else.", "Is there anything else I can help you with?", "Feel free to ask if you need anything else.", "Let me know if you have any other questions.", "Hope that helps!", "Let me know if there's anything else you'd like.", "I'm happy to help if there's anything else you'd like to know."]) {
       const whole = guardReply(line, ctx({ utterance: "what should I cook tonight", episodes: [line] }));
-      expect([line, whole.reason]).toEqual([line, null]);
+      expect([line, whole.reason]).toEqual([line, "assistant_register"]);
     }
     // A closer phrase in front of a copied line is not a closer.
     const prefixed = guardReply("Enjoy the second album, the drumming is unreal.", ctx({ utterance: "what should I cook tonight", episodes: ["Tempo's second album is the one to start with, the drumming is unreal"] }));
@@ -556,11 +559,18 @@ describe("code review fixes (2026-09-06)", () => {
 describe("action claims are matched per package family (CHAT-04)", () => {
   const succeeded = (packageId: string) => [{ packageId, status: "succeeded" as const }];
 
-  test("a completed save claim with no remember outcome is unsupported_action, replaced with the narrated line (nothing ran)", () => {
-    const g = guardReply("I saved that.", ctx({ utterance: "Pippa is allergic to peanuts" }));
-    expect(g.reason).toBe("unsupported_action");
-    expect(g.replaced).toBe(true);
-    expect(g.reply).toBe("I haven't saved that as a memory.");
+  test("a completed save claim with no remember outcome is unsupported_action: narrated after a request, skipped on a statement (REG-01)", () => {
+    // After a request, the narrated line (nothing ran).
+    const asked = guardReply("I saved that.", ctx({ utterance: "please save that Pippa is allergic to peanuts", act: "directive" }));
+    expect([asked.reason, asked.replaced, asked.reply]).toEqual(["unsupported_action", true, "I haven't saved that as a memory."]);
+    // On a statement nothing was asked: the claim is skipped, and with
+    // nothing left the malformed line stands (the engine retries first);
+    // the narrated line would name a memory nobody mentioned.
+    const stated = guardReply("I saved that.", ctx({ utterance: "Pippa is allergic to peanuts" }));
+    expect([stated.reason, stated.replaced]).toEqual(["unsupported_action", true]);
+    expect(MALFORMED).toContain(stated.reply);
+    const withContent = guardReply("I saved that. Peanuts are a tricky one at school.", ctx({ utterance: "Pippa is allergic to peanuts" }));
+    expect([withContent.reason, withContent.replaced, withContent.reply]).toEqual(["unsupported_action", false, "Peanuts are a tricky one at school."]);
   });
 
   test("a save claim with a failed remember outcome is unsupported, and the line narrates the failure, never a pooled cannot-do", () => {
@@ -587,9 +597,14 @@ describe("action claims are matched per package family (CHAT-04)", () => {
 
   test("future intent and remembering are acknowledgments, not claims: 'I'll remember that', 'Remembered.', 'Noted' pass with no outcome (the judge remembers on its own)", () => {
     expect(guardReply("I'll remember that.", ctx({ utterance: "Pippa is allergic to peanuts" })).reason).toBeNull();
-    expect(guardReply("Noted, I'll keep that in mind.", ctx({ utterance: "Pippa is allergic to peanuts" })).reason).toBeNull();
+    // REG-01: the "Noted," lead on a statement is register; the rest stands.
+    const led = guardReply("Noted, I'll keep that in mind.", ctx({ utterance: "Pippa is allergic to peanuts" }));
+    expect([led.reason, led.replaced, led.reply]).toEqual(["assistant_register", false, "I'll keep that in mind."]);
     expect(guardReply("Remembered. I'll make sure to keep that in mind.", ctx({ utterance: "Pippa is allergic to peanuts" })).reason).toBeNull(); // the live 8B's own reply, 2026-09-13
-    expect(guardReply("Got it, noted.", ctx({ utterance: "Pippa is allergic to peanuts" })).reason).toBeNull();
+    // REG-01: on a statement "Got it, noted." is the assistant register
+    // (finding 12), skipped; after a request it is the acknowledgment.
+    expect(guardReply("Got it, noted.", ctx({ utterance: "Pippa is allergic to peanuts" })).reason).toBe("assistant_register");
+    expect(guardReply("Got it, noted.", ctx({ utterance: "remember that Pippa is allergic to peanuts", act: "directive" })).reason).toBeNull();
   });
 
   test("a search that ran does not license an invented list claim: the family has to match", () => {
@@ -906,5 +921,71 @@ describe("item 1b's own regressions", () => {
     expect(withoutHonestyLines("I don't know, sorry.")).toBe("");
     expect(withoutHonestyLines("It's a Pixar film. I don't know, sorry.")).toBe("It's a Pixar film.");
     expect(withoutHonestyLines("I haven't added anything to your list.")).toBe("I haven't added anything to your list.");
+  });
+});
+
+describe("REG-01: a statement is not a request, and the assistant register is stripped", () => {
+  const stated = (over: Partial<GuardContext> = {}) => ctx({ utterance: "I told Quill I'm done with sourdough, too much fuss", act: "inform", ...over });
+
+  test("rule 1: on a statement with no outcome an action claim is skipped, never narrated; after a request it is narrated; with an outcome the family rule stands", () => {
+    const skipped = guardReply("I've added that to your list. Sourdough is a lot of babysitting.", stated());
+    expect([skipped.reason, skipped.replaced, skipped.reply]).toEqual(["unsupported_action", false, "Sourdough is a lot of babysitting."]);
+    const alone = guardReply("I've added that to your list.", stated());
+    expect([alone.reason, alone.replaced]).toEqual(["unsupported_action", true]);
+    expect(alone.reply).not.toMatch(/list|memory|timer|reminder/i);
+    expect(MALFORMED).toContain(alone.reply);
+    const asked = guardReply("I've added that to your list.", ctx({ utterance: "add sourdough to the list", act: "directive" }));
+    expect([asked.reason, asked.replaced]).toEqual(["unsupported_action", true]);
+    expect(asked.reply).toMatch(/list/i);
+    // A statement that is a request by its verbs (REQUEST_RE) keeps the narration.
+    const verb = guardReply("I've added that to your list.", ctx({ utterance: "put sourdough on the list", act: "inform" }));
+    expect(verb.replaced).toBe(true);
+    // The shape decides without a signal: a first-person statement.
+    const noAct = guardReply("Okay, I've saved that. Sourdough is a lot of work.", ctx({ utterance: "I'm done with sourdough" }));
+    expect([noAct.reason, noAct.reply]).toEqual(["unsupported_action", "Sourdough is a lot of work."]);
+  });
+
+  test("rule 2: a sentence that is only register is skipped wherever it sits; a tail is cut and the head kept; content with a register word stands", () => {
+    for (const line of ["I've noted that.", "Okay, I've noted that.", "I'm still learning!", "Let me know if you need anything else.", "I'm here to help if you need anything else!", "As an AI assistant, I'm here to help.", "Sorry if I confused you.", "Let me know what you need.", "Happy to help!", "Hope that helps.", "Feel free to ask if you have more questions.", "Is there anything else I can help with?"]) {
+      const g = guardReply(`Sourdough is a lot of babysitting. ${line}`, stated());
+      expect([line, g.reason, g.replaced, g.reply]).toEqual([line, "assistant_register", false, "Sourdough is a lot of babysitting."]);
+    }
+    const tail = guardReply("That's a big day, let me know if you need anything else.", stated({ utterance: "we picked up the new puppy today" }));
+    expect([tail.reason, tail.replaced, tail.reply]).toEqual(["assistant_register", false, "That's a big day."]);
+    expect(stripRegisterTail("Sounds fun, happy to help if you get stuck!", stated())).toBe("Sounds fun.");
+    expect(stripRegisterTail("Okay, I've noted that.", stated())).toBe("Okay, I've noted that."); // an acknowledgment head leaves it whole
+    expect(stripRegisterTail("As an AI, I can't taste it.", stated())).toBe("I can't taste it."); // a register lead goes the same way
+    // The review's cases: an addressee after the register is not content; a spaced dash is a separator.
+    expect(stripRegisterTail("Hope that helps, Sage!", ctx({ utterance: "what's the capital of Portugal", act: "question" }))).toBe("Hope that helps, Sage!");
+    expect(guardReply("Lisbon. Hope that helps, Sage!", ctx({ utterance: "what's the capital of Portugal", act: "question" })).reply).toBe("Lisbon.");
+    expect(stripRegisterTail("Sounds fun - let me know if you need anything else.", stated())).toBe("Sounds fun.");
+    expect(stripRegisterTail("Sorry if I confused you, the recital is Friday.", stated())).toBe("The recital is Friday.");
+    for (const line of ["Start with a no-knead loaf; you're learning the feel of the dough.", "The note on the fridge says Friday.", "I noted the time on the calendar entry you shared.", "Pippa needs help with fractions tonight."]) {
+      expect([line, guardReply(line, stated()).reason]).toEqual([line, null]);
+    }
+  });
+
+  test("the acknowledgment half of the register stays after a request, a greeting or a thank-you", () => {
+    expect(guardReply("Noted.", ctx({ utterance: "remember that Pippa's recital is Friday", act: "directive" })).reason).toBeNull();
+    expect(guardReply("Will do.", ctx({ utterance: "set a timer for ten minutes", act: "directive", outcomes: [{ packageId: "timer", status: "succeeded" }] })).reason).toBeNull();
+    expect(guardReply("No problem.", ctx({ utterance: "thanks", act: "closing" })).reason).toBeNull();
+    expect(guardReply("You're welcome!", ctx({ utterance: "thanks a lot", act: "closing" })).reason).toBeNull();
+    expect(guardReply("Noted.", stated()).reason).toBe("assistant_register");
+    // Item 1b's claimed_experience keeps its own line on a statement (a review).
+    const seen = guardReply("I've seen it a few times!", ctx({ utterance: "we watched Finding Nemo tonight", act: "inform" }));
+    expect([seen.reason, seen.replaced, seen.emptied]).toEqual(["claimed_experience", true, undefined]);
+    expect(MALFORMED).not.toContain(seen.reply);
+    expect(guardReply("I've noted that.", stated()).emptied).toBe(true);
+  });
+
+  test("rule 3: the hub's previous question said back is skipped; a new question stands", () => {
+    const previous = "That sounds like a lot of fuss. What made you decide to stop?";
+    const repeated = guardReply("Fair enough. What made you decide to stop?", stated({ utterance: "I wasn't asking you to do anything, just talking", previousReply: previous }));
+    expect([repeated.reason, repeated.replaced, repeated.reply]).toEqual(["repeat_question", false, "Fair enough."]);
+    const paraphrased = guardReply("So what made you decide to stop, then?", stated({ utterance: "just talking", previousReply: previous }));
+    expect(paraphrased.reason).toBe("repeat_question");
+    const fresh = guardReply("Fair enough. Will you miss the bread, or just the fuss?", stated({ utterance: "just talking", previousReply: previous }));
+    expect(fresh.reason).toBeNull();
+    expect(guardReply("What made you decide to stop?", stated({ previousReply: undefined })).reason).toBeNull();
   });
 });

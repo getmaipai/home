@@ -3959,14 +3959,102 @@ describe("CHAT-04: acknowledgments pass, action claims need their outcome, opene
     });
   });
 
-  test("runTurn(): a completed save claim with nothing having run is replaced, never spoken as if the write happened", async () => {
+  test("runTurn(): a completed save claim with nothing having run is replaced, never spoken as if the write happened; on a statement it is skipped and the turn retried once (REG-01)", async () => {
     const { actor } = await owner();
+    // After a request, the narrated line (nothing ran).
     await withScriptedReply("I saved that to your memory.", async () => {
+      const result = await runTurn(actor, "chat", "please save that Pippa is allergic to peanuts");
+      expect(result.ok).toBe(true);
+      if (!result.ok) return;
+      expect(result.value.reply.text).toBe("I haven't saved that as a memory.");
+    });
+    // On a statement, the claim is skipped; the retry with the note gets
+    // the same claim from the stub, so the malformed line stands and the
+    // turn spent exactly two generations.
+    const { MALFORMED } = await import("@/lib/guards");
+    __resetLlmSupervisorForTests();
+    const { startStubLlmServer } = await import("@maipai/spec/llm/ts/stubServer.js");
+    let generations = 0;
+    const stub = startStubLlmServer(0, {
+      scriptedChatReply: () => {
+        generations++;
+        return "I saved that to your memory.";
+      },
+    });
+    process.env.MAIPAI_LLAMA_SERVER_URL = stub.url;
+    try {
       const result = await runTurn(actor, "chat", "Pippa is allergic to peanuts");
       expect(result.ok).toBe(true);
       if (!result.ok) return;
-      expect(result.value.reply.text).toBe("I haven't saved that as a memory."); // narrated from the outcome (nothing ran), not a pooled line
+      expect(MALFORMED).toContain(result.value.reply.text);
+      expect(result.value.reply.text).not.toMatch(/memory|saved|list/i);
+      expect(generations).toBe(2);
+    } finally {
+      stub.stop();
+      delete process.env.MAIPAI_LLAMA_SERVER_URL;
+      __resetLlmSupervisorForTests();
+    }
+  });
+
+  test("runTurnStream(): a reply that was only register on a statement is regenerated once with the note; a register tail is cut on the wire (REG-01)", async () => {
+    const { actor } = await owner();
+    __resetLlmSupervisorForTests();
+    const { startStubLlmServer } = await import("@maipai/spec/llm/ts/stubServer.js");
+    const { STATEMENT_RETRY_NOTE, runTurnStream } = await import("@/lib/turnEngine");
+    const seen: boolean[] = [];
+    const stub = startStubLlmServer(0, {
+      scriptedChatReply: (request) => {
+        const noted = request.messages.some((m) => m.role === "system" && m.content === STATEMENT_RETRY_NOTE);
+        seen.push(noted);
+        return noted ? "That's a big day, let me know if you need anything else." : "Okay, I've noted that.";
+      },
     });
+    process.env.MAIPAI_LLAMA_SERVER_URL = stub.url;
+    try {
+      const result = await runTurnStream(actor, "chat", "we picked up the new puppy today");
+      expect(result.ok).toBe(true);
+      if (!result.ok || result.kind !== "stream") return;
+      const deltas: string[] = [];
+      for await (const delta of result.tokens) deltas.push(delta);
+      const text = deltas.join("").trim();
+      expect(text).toBe("That's a big day.");
+      expect(seen).toEqual([false, true]);
+      const value = result.finalize(deltas.join(""));
+      expect(value.reply.text.trim()).toBe("That's a big day.");
+      const row = db.select().from(conversationTurns).where(eq(conversationTurns.id, value.turn_id)).get()!;
+      expect(row.guardReason).toBeNull(); // nothing replaced: the hits were skips and a cut
+    } finally {
+      stub.stop();
+      delete process.env.MAIPAI_LLAMA_SERVER_URL;
+      __resetLlmSupervisorForTests();
+    }
+  });
+
+  test("runTurn(): the statement retry carries the note and its good reply stands (REG-01)", async () => {
+    const { actor } = await owner();
+    __resetLlmSupervisorForTests();
+    const { startStubLlmServer } = await import("@maipai/spec/llm/ts/stubServer.js");
+    const { STATEMENT_RETRY_NOTE } = await import("@/lib/turnEngine");
+    const seen: boolean[] = [];
+    const stub = startStubLlmServer(0, {
+      scriptedChatReply: (request) => {
+        const noted = request.messages.some((m) => m.role === "system" && m.content === STATEMENT_RETRY_NOTE);
+        seen.push(noted);
+        return noted ? "Peanuts are a tricky one, school lunches especially." : "Okay, I've noted that.";
+      },
+    });
+    process.env.MAIPAI_LLAMA_SERVER_URL = stub.url;
+    try {
+      const result = await runTurn(actor, "chat", "Pippa is allergic to peanuts");
+      expect(result.ok).toBe(true);
+      if (!result.ok) return;
+      expect(result.value.reply.text).toBe("Peanuts are a tricky one, school lunches especially.");
+      expect(seen).toEqual([false, true]);
+    } finally {
+      stub.stop();
+      delete process.env.MAIPAI_LLAMA_SERVER_URL;
+      __resetLlmSupervisorForTests();
+    }
   });
 
   test("#81: a lowercase model opener is sentence-cased on the blocking path, and only the model's text (a package reply and speech are left as authored)", async () => {
