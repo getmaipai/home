@@ -8,6 +8,8 @@ the hub refuses.
 import json
 from pathlib import Path
 
+from pydantic import ValidationError
+
 from gen.py.memory_record_schema import MemoryRecord, RetrievalFeedback
 from gen.py.open_question_schema import OpenQuestion
 from gen.py.subject_ref_schema import Household, Unresolved, World
@@ -288,3 +290,33 @@ def test_world_ref_source_kind_and_stable_key_move_together():
     assert (
         validate_subject_ref(world_subject_ref(source_kind=None, stable_key=None)) == []
     )
+
+
+def test_shared_cross_language_validation_conformance():
+    validation_file = FIXTURES.parent / "validation" / "cross-field.json"
+    cases = json.loads(validation_file.read_text())["cases"]
+    for case in cases:
+        raw = load(case["base"])
+        raw.update(case.get("overrides", {}))
+        utterance = raw.pop("utterance_text", None)
+        problems: list[str] = []
+        schema_refused = False
+        try:
+            if case["kind"] == "memory":
+                problems = validate_memory_record(MemoryRecord.model_validate(raw))
+            elif case["kind"] == "turn":
+                problems = validate_turn_signal(
+                    TurnSignal.model_validate(raw), utterance
+                )
+            elif case["kind"] == "question":
+                problems = validate_open_question(OpenQuestion.model_validate(raw))
+            elif case["kind"] == "subject":
+                problems = validate_subject_ref(World.model_validate(raw))
+        except ValidationError:
+            schema_refused = True
+        if case["expected"] == "accept":
+            assert not schema_refused and problems == [], case["name"]
+        else:
+            assert schema_refused or any(
+                case["rule"] in problem for problem in problems
+            ), case["name"]

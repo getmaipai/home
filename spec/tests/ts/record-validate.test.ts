@@ -29,6 +29,10 @@ import type { MemoryRecord } from "../../gen/ts/memory-record.js";
 import type { TurnSignal } from "../../gen/ts/turn-signal.js";
 import type { OpenQuestion } from "../../gen/ts/open-question.js";
 import type { SubjectRef } from "../../gen/ts/subject-ref.js";
+import { MemoryRecord as MemoryRecordSchema } from "../../gen/ts/memory-record.js";
+import { TurnSignal as TurnSignalSchema } from "../../gen/ts/turn-signal.js";
+import { OpenQuestion as OpenQuestionSchema } from "../../gen/ts/open-question.js";
+import { SubjectRef as SubjectRefSchema } from "../../gen/ts/subject-ref.js";
 
 const FIXTURES = join(import.meta.dir, "..", "..", "fixtures", "records");
 const load = <T>(name: string): T => JSON.parse(readFileSync(join(FIXTURES, name), "utf-8")) as T;
@@ -48,6 +52,14 @@ const worldSubjectRef = () => load<SubjectRef>("subject-ref.world.example.json")
 const shoppingList = () => load<List>("list.shopping.example.json");
 const todoList = () => load<List>("list.todo.example.json");
 const customList = () => load<List>("list.custom.example.json");
+
+const VALIDATION_FIXTURES = join(import.meta.dir, "..", "..", "fixtures", "validation");
+type ValidationCase = { name: string; kind: string; base: string; overrides?: Record<string, unknown>; expected: "accept" | "refuse"; rule?: string };
+const validationCases = (JSON.parse(readFileSync(join(VALIDATION_FIXTURES, "cross-field.json"), "utf-8")) as { cases: ValidationCase[] }).cases;
+const mergedValidationRecord = (fixture: ValidationCase): Record<string, unknown> => ({
+  ...(load<Record<string, unknown>>(fixture.base)),
+  ...(fixture.overrides ?? {}),
+});
 
 describe("every shipped fixture is valid", () => {
   test("entities", () => {
@@ -252,6 +264,31 @@ describe("turn signal rules", () => {
     const bad = { ...signal, clauses: [{ ...base, range: { start: 0, end: 10 } }, { ...base, range: { start: 5, end: 15 } }] };
     expect(validateTurnSignal(bad)).toContainEqual(expect.stringContaining("overlap"));
   });
+});
+
+describe("shared cross-language validation conformance", () => {
+  for (const fixture of validationCases) {
+    test(fixture.name, () => {
+      const raw = mergedValidationRecord(fixture);
+      const utterance = raw.utterance_text as string | undefined;
+      delete raw.utterance_text;
+      let problems: string[] = [];
+      let schemaRefused = false;
+      try {
+        if (fixture.kind === "memory") problems = validateMemoryRecord(MemoryRecordSchema.parse(raw));
+        else if (fixture.kind === "turn") problems = validateTurnSignal(TurnSignalSchema.parse(raw), utterance);
+        else if (fixture.kind === "question") problems = validateOpenQuestion(OpenQuestionSchema.parse(raw));
+        else if (fixture.kind === "subject") {
+          const subject = SubjectRefSchema.parse(raw);
+          problems = validateSubjectRef(subject);
+        }
+      } catch {
+        schemaRefused = true;
+      }
+      if (fixture.expected === "accept") expect(schemaRefused ? ["schema"] : problems).toEqual([]);
+      else expect(schemaRefused || problems.some((problem) => problem.includes(fixture.rule!))).toBe(true);
+    });
+  }
 });
 
 describe("open question rules", () => {
