@@ -773,7 +773,21 @@ const EXAMPLE_MATCH_THRESHOLD = 0.6;
 // make sure to remember it" and "can you please remember that" fall
 // through to the model instead of storing "yes" or "can you" as the
 // fact (a two-word fact falls through too, offered to the model with
-// `remember` as before).
+// `remember` as before). getmaipai/home#98 (2026-09-13): a present-time
+// adverb at the sentence's end ("...in Seattle, WA today?", "right
+// now", "at the moment") is not part of the capture, since the floor
+// binds the capture whole to the package's one argument and "Seattle,
+// WA today" is no place. Only for a wildcard that follows a locative
+// preposition (in, at, near, around), which captures a place; every
+// other capture keeps its time word, since "search the web for
+// election results today" wants the "today" and "remember that the
+// trash goes out today" is the fact (the review of this diff walked
+// every bundled pattern). A word that changes the ask ("tomorrow") is left
+// in, so the pattern for today's weather does not fire a forecast
+// question with a wrong place either.
+const TRAILING_PRESENT_TIME = String.raw`(?:[,\s]+(?:today|tonight|right now|now|at the moment|currently|this (?:morning|afternoon|evening)))?`;
+const PLACE_WILDCARD_RE = /\b(?:in|at|near|around)\s*$/i;
+
 export function matchPattern(text: string, pattern: string): string | null {
   const parts = pattern.split("*");
   if (parts.length > 2) return null;
@@ -782,7 +796,8 @@ export function matchPattern(text: string, pattern: string): string | null {
     return trimmedText.toLowerCase() === pattern.trim().toLowerCase() ? "" : null;
   }
   const escaped = parts.map((p) => p.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"));
-  const regex = new RegExp(`^${escaped[0]}(.+)${escaped[1]}$`, "is");
+  const trailing = PLACE_WILDCARD_RE.test(parts[0]!) ? TRAILING_PRESENT_TIME : "";
+  const regex = new RegExp(`^${escaped[0]}(.+?)${escaped[1]}${trailing}$`, "is");
   const match = trimmedText.match(regex);
   if (!match) return null;
   const captured = match[1]!.trim();

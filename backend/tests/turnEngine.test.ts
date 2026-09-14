@@ -2842,6 +2842,21 @@ describe("matchPattern()", () => {
     expect(matchPattern("remember that pizza night is Friday", "remember that *")).toBe("pizza night is Friday");
   });
 
+  // getmaipai/home#98: the Home weather card asks "What's the weather
+  // like in Seattle, WA today?" and the capture bound "Seattle, WA
+  // today" to the package's place, which is no place.
+  test("a trailing present-time adverb is not part of the capture; 'tomorrow' still is (#98)", () => {
+    expect(matchPattern("What's the weather like in Seattle, WA today?", "what's the weather like in *")).toBe("Seattle, WA");
+    expect(matchPattern("what's the weather in Boston right now", "what's the weather in *")).toBe("Boston");
+    expect(matchPattern("how's the weather in Lisbon at the moment?", "how's the weather in *")).toBe("Lisbon");
+    expect(matchPattern("what's the weather in Boston, right now?", "what's the weather in *")).toBe("Boston");
+    expect(matchPattern("is it going to rain in Portland today?", "is it going to rain in *")).toBe("Portland"); // the store card's own phrase, on the floor
+    expect(matchPattern("what's the weather in Boston tomorrow", "what's the weather in *")).toBe("Boston tomorrow");
+    expect(matchPattern("remember that the trash goes out today", "remember that *")).toBe("the trash goes out today"); // a clause keeps its "today"
+    expect(matchPattern("search the web for election results today", "search the web for *")).toBe("election results today"); // a query keeps it too
+    expect(matchPattern("what's the definition of right now", "what's the definition of *")).toBe("right now");
+  });
+
   test("a literal pattern with no wildcard is a real exact match, case-insensitive and trimmed", () => {
     expect(matchPattern("Lock The Front Door", "lock the front door")).toBe("");
     expect(matchPattern("  lock the front door  ", "lock the front door")).toBe("");
