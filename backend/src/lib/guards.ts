@@ -650,6 +650,14 @@ const GREETING_ONLY_RE =
  * week's greeting. Built from the same vocabularies the near-echo and
  * greeting exemptions use, one definition. */
 const BARE_ACK_RE = new RegExp(`^(?:${ACK_WORDS}|yep|nope|no|great|perfect|sounds good|sounds great|will do|thanks|thank you|thanks a lot|see you|bye|goodbye|good ?bye|later)\\b(?:\\s+(?:then|thanks|so much|a lot))*[\\s!.,]*$`, "i");
+/** A leading acknowledgment ("Cool, ...", "Okay so ...") taken off,
+ * the near-echo's own first step, for a reader that wants the content
+ * behind it (RECALL-02's answer topics). */
+export function stripAckLead(text: string): string {
+  // Twice: "Oh, nice! A Tempo treadmill" carries two.
+  return text.trim().replace(ACK_LEAD_RE, "").replace(ACK_LEAD_RE, "");
+}
+
 export function isBareSocialTurn(text: string): boolean {
   const t = text.trim();
   if (GREETING_ONLY_RE.test(t) || BARE_ACK_RE.test(t)) return true;

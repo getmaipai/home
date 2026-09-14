@@ -18,6 +18,7 @@ import {
   episodeQueryEligible,
   contentTerms,
   formatEpisodeLine,
+  answerTerms,
 } from "@/lib/episodes";
 import { forget, vectorToBuffer } from "@/lib/memory";
 import { TestClient } from "./client";
@@ -557,7 +558,7 @@ describe("MEM-04 formatEpisodesForPrompt()", () => {
     // RECALL-02: the hub's side is reported (the person's paired words
     // quoted, the answer as the words it covered), never "you replied".
     expect(block).not.toContain("you replied");
-    expect(block).toMatch(/\(7 days ago\), when Marlow said ".*", your answer covered: .*risotto/);
+    expect(block).toMatch(/\(7 days ago\), when Marlow said ".*", your answer touched on .*risotto/);
     expect(block.length).toBeLessThanOrEqual(400);
     expect(block.split("\n").length).toBeLessThanOrEqual(4);
     expect(formatEpisodesForPrompt([], "Marlow", "en-US", NOW)).toBe("");
@@ -591,7 +592,8 @@ describe("RECALL-02: episodes are evidence, never lines", () => {
     const line = formatEpisodeLine(reply, "Marlow", "en-US", NOW);
     expect(line).not.toContain("you replied");
     expect(line).toContain('when Marlow said "what should we cook for the visitors"');
-    expect(line).toContain("your answer covered: try, mushroom, risotto, recipe");
+    expect(line).toContain("your answer touched on try, mushroom, risotto, recipe");
+    expect(line).toContain("(topics, not its words)");
     expect(line).not.toContain("Try a mushroom risotto recipe, it feeds six");
   });
 
@@ -601,6 +603,13 @@ describe("RECALL-02: episodes are evidence, never lines", () => {
     say(actor, conv, 5, "the wifi password is hunter2hunter2 by the way", "Got it, I will remember the wifi password.", "t-wifi");
     expect(recallEpisodes(actor, "what did you say about the wifi password", undefined, { now: NOW, sides: "both", preferHubSide: true })).toEqual([]);
     expect(recallEpisodes(actor, "the wifi password we talked about", undefined, { now: NOW, sides: "user" })).toEqual([]);
+  });
+
+  test("the answer's topics drop a leading acknowledgment and read as a phrase, not a list to quote", () => {
+    expect(answerTerms("Cool, a Tempo treadmill could help Sage stay active during work hours.")).toBe("tempo, treadmill, could, help, sage, stay, active, during, work and hours");
+    expect(answerTerms("Okay.")).toBe("nothing of substance");
+    expect(answerTerms("Oh, nice! A Tempo treadmill for the office.")).toBe("tempo, treadmill and office");
+    expect(answerTerms("Baked apples.")).toBe("baked and apples");
   });
 
   test("the shapes that ask what the hub said, and the ones that do not", () => {
@@ -651,6 +660,19 @@ describe("RECALL-02: episodes are evidence, never lines", () => {
     const row = db.select({ id: episodes.id }).from(episodes).where(eq(episodes.turnId, "t-band")).all()[0]!;
     sqlite.query("INSERT INTO episode_embeddings (episode_id, space, dims, vector, hlc) VALUES (?, 'test', 3, ?, 'test-hlc')").run(row.id, Buffer.from(new Float32Array([1, 0, 0]).buffer));
     expect(recallEpisodes(actor, "Sage is getting a Tempo treadmill for the office", new Float32Array([1, 0, 0]), { now: NOW }).map((m) => m.episode.turnId)).toEqual(["t-band"]);
+  });
+
+  test("a hub-side line at its longest fits the cap, and a line that would breach it is skipped, not the block", () => {
+    const paired = "word ".repeat(40).trim();
+    const answer = "consideration ".repeat(30).trim();
+    const hub = { episode: { id: "e-hub", turnId: "t-hub", conversationId: null, speaker: "assistant" as const, text: answer, createdAt: daysAgo(3) }, pairedText: paired, score: 2 };
+    const short = { episode: { id: "e-short", turnId: "t-short", conversationId: null, speaker: "user" as const, text: "a short thing", createdAt: daysAgo(3) }, pairedText: "", score: 1 };
+    const one = formatEpisodesForPrompt([hub], "Marlow", "en-US", NOW);
+    expect(one.length).toBeLessThanOrEqual(400);
+    expect(one).toContain("touched on");
+    const long = { ...hub, pairedText: "word ".repeat(120).trim() };
+    const block = formatEpisodesForPrompt([long, short], "Marlow", "en-US", NOW);
+    expect(block).toContain("a short thing");
   });
 
   test("at most three lines and 400 characters", () => {

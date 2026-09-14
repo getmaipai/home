@@ -63,6 +63,32 @@ function benchSeedFromArgv(argv: readonly string[]): number | null {
   return Number(raw);
 }
 const benchSeed = benchSeedFromArgv(process.argv);
+/** `--only id,id`: the rows to run, for a rerun of the rows an item
+ * changed after a set that was otherwise green (the coordinator's
+ * rule); the header names them, so a partial run never reads as a
+ * full one. */
+function onlyFromArgv(argv: readonly string[]): Set<string> | null {
+  const equals = argv.find((a) => a.startsWith("--only="));
+  if (equals) throw new Error("--only takes its list as the next argument (--only a,b), not --only=a,b");
+  const at = argv.indexOf("--only");
+  if (at < 0) return null;
+  const raw = argv[at + 1];
+  const ids = new Set((raw ?? "").split(",").map((s) => s.trim()).filter(Boolean));
+  if (ids.size === 0) throw new Error("--only needs a comma-separated list of conversation ids");
+  return ids;
+}
+const only = onlyFromArgv(process.argv);
+const SELECTED = only ? CONVERSATIONS.filter((c) => only.has(c.id)) : CONVERSATIONS;
+if (only && SELECTED.length !== only.size) throw new Error(`--only names an unknown conversation: ${[...only].filter((id) => !CONVERSATIONS.some((c) => c.id === id)).join(", ")}`);
+// A row that recalls what an earlier row stored in the same bench
+// household runs only with that row: a partial run without it would
+// report the harness's miss as the retrieval's.
+const DEPENDS_ON: Record<string, string> = { "copied-line-history": "copied-line" };
+if (only) {
+  for (const [row, on] of Object.entries(DEPENDS_ON)) {
+    if (only.has(row) && !only.has(on)) throw new Error(`--only ${row} needs ${on} in the same run (it recalls what ${on} stored)`);
+  }
+}
 __setSamplingSeedForBench(benchSeed);
 // The prompt's "Local time" line is pinned with the seed (a run's
 // prompts must be the same tokens as the last run's, or the seed buys
@@ -163,7 +189,8 @@ async function main(): Promise<{ executed: number; engine: string }> {
             : "a chosen seed; may differ from a default-seed run of this commit",
     },
     ordinaryTools: ordinaryToolIds(loadAllManifests(), { byPlugin: [] }),
-    fixtures: CONVERSATIONS.map((c) => c.id),
+    fixtures: SELECTED.map((c) => c.id),
+    ...(only ? { partial: `--only ${[...only].join(",")}: ${SELECTED.length} of ${CONVERSATIONS.length} conversations` } : {}),
   };
   console.log("\n## Run header\n");
   console.log("```json");
@@ -176,7 +203,7 @@ async function main(): Promise<{ executed: number; engine: string }> {
   const scores: Awaited<ReturnType<typeof runner.runConversation>>["scores"] = [];
   const started = Date.now();
   try {
-    for (const conv of CONVERSATIONS) {
+    for (const conv of SELECTED) {
       console.log(`[bench] ${conv.id}`);
       const run = await runner.runConversation(conv, {
         people,

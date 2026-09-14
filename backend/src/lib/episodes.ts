@@ -15,7 +15,7 @@ import * as chrono from "chrono-node";
 import type { ConversationTurnRow } from "@/wire";
 import type { PersonRow } from "@/types";
 import { asksWhatHubSaid, asksAboutEarlierTalk } from "@/lib/recallShapes";
-import { isBareSocialTurn } from "@/lib/guards";
+import { isBareSocialTurn, stripAckLead } from "@/lib/guards";
 export { asksWhatHubSaid, asksAboutEarlierTalk };
 
 /** getmaipai/home#78: whether a turn's reply text is something MaiPai
@@ -570,7 +570,10 @@ export function formatEpisodesForPrompt(matches: EpisodeMatch[], displayName: st
   for (const m of matches) {
     if (lines.length > PROMPT_BLOCK_MAX_LINES) break;
     const line = formatEpisodeLine(m, displayName, locale, now);
-    if ([...lines, line].join("\n").length > PROMPT_BLOCK_MAX_CHARS) break;
+    // A line that would breach the cap is skipped, not the rest of the
+    // block with it: a long top match must not empty the block of the
+    // shorter ones ranked behind it.
+    if ([...lines, line].join("\n").length > PROMPT_BLOCK_MAX_CHARS) continue;
     lines.push(line);
   }
   return lines.length === 1 ? "" : lines.join("\n");
@@ -591,14 +594,18 @@ export function formatEpisodeLine(m: EpisodeMatch, displayName: string, locale: 
   // answer as the words it covered, not a sentence in the hub's voice
   // that a short turn would copy back.
   const asked = m.pairedText ? `when ${displayName} said "${cutAtWord(m.pairedText, QUOTE_MAX_CHARS / 2)}", ` : "";
-  return `- ${dateFmt.format(when)} (${ago}), ${asked}your answer covered: ${answerTerms(m.episode.text)}`;
+  return `- ${dateFmt.format(when)} (${ago}), ${asked}your answer touched on ${answerTerms(m.episode.text)} (topics, not its words)`;
 }
 
-/** The words an answer covered, in their order, stopwords out, capped:
- * evidence of what was said, not a line to say again. */
+/** The topics an answer touched on: its content words in their order,
+ * a leading acknowledgment ("Cool,") and stopwords out, capped, joined
+ * as a phrase rather than a list. The first seeded set had the 8B read
+ * a comma list as a quotation ("I said 'Cool, Tempo, treadmill, ...'");
+ * evidence of what was said, never a line to say again. */
 export function answerTerms(text: string): string {
-  const terms = contentTerms(text).slice(0, NOTE_TERMS_MAX);
-  return terms.length > 0 ? terms.join(", ") : "(nothing of substance)";
+  const terms = contentTerms(stripAckLead(text)).slice(0, NOTE_TERMS_MAX);
+  if (terms.length === 0) return "nothing of substance";
+  return terms.length === 1 ? terms[0]! : `${terms.slice(0, -1).join(", ")} and ${terms[terms.length - 1]}`;
 }
 
 // One formatter per locale (a code review: this ran per episode and now

@@ -489,6 +489,9 @@ describe("the runner against the stub (control-flow rows)", () => {
     expect(scoreTurn(row, 3, row.turns[3]!, observedFor({ reply: "A standing desk helps if you switch often.", contextMessage: "Nothing stored here bears on this message.", assistantEpisodes: earlier })).pass).toBe(true);
     expect(scoreTurn(row, 3, row.turns[3]!, observedFor({ reply: "Tempo's second album is the one to start with, the drumming is unreal.", contextMessage: "Nothing stored here bears on this message.", assistantEpisodes: earlier })).pass).toBe(false);
     expect(scoreTurn(row, 4, row.turns[4]!, observedFor({ reply: "Nice, a treadmill for the office.", contextMessage: context, assistantEpisodes: earlier })).pass).toBe(false);
+    // "what were we talking about": the current subject is the treadmill, the band's talk is not.
+    expect(scoreTurn(row, 5, row.turns[5]!, observedFor({ reply: "We were talking about the Tempo treadmill for the office.", contextMessage: "Nothing stored here bears on this message." })).pass).toBe(true);
+    expect(scoreTurn(row, 5, row.turns[5]!, observedFor({ reply: "You were listening to the band all morning.", contextMessage: "Nothing stored here bears on this message." })).pass).toBe(false);
     expect(scoreTurn(row, 4, row.turns[4]!, observedFor({ reply: "Nice, a treadmill for the office.", contextMessage: "Nothing stored here bears on this message.", assistantEpisodes: earlier })).pass).toBe(true);
   });
 

@@ -715,12 +715,12 @@ export const CONVERSATIONS: readonly BenchConversation[] = [
     category: "memory",
     note: "RECALL-02 (findings 1, 9, 16): a band talked about in one conversation never leaks a line into a later one that shares only a word; the hub's own sentences are never rendered as dialogue, a short or meta turn recalls nothing",
     turns: [
-      { say: "I've been listening to Tempo all morning", expect: { guard: null, humanVerdict: true } },
+      { say: "have you heard of the band Tempo? I've been listening to them all morning", expect: { guard: null, humanVerdict: true } },
       { say: "what do you make of their drumming", expect: { humanVerdict: true } },
       { say: "give me your one-line review of their second album", expect: { humanVerdict: true } },
-      { say: "is a standing desk worth it", newConversation: true, expect: { noCopiedEpisode: true, notInContext: ["your answer covered"], mustNotContain: "tempo|album|drum|band", guard: null } },
+      { say: "is a standing desk worth it", newConversation: true, expect: { noCopiedEpisode: true, notInContext: ["your answer touched on"], mustNotContain: "tempo|album|drum|band", guard: null } },
       { say: "Sage is getting a Tempo treadmill for the office", expect: { episodesInContext: 0, noCopiedEpisode: true, mustNotContain: "album|drum|band|song|track|record|listen", guard: null } },
-      { say: "what were we talking about", expect: { episodesInContext: 0, mustContain: "desk|treadmill", mustNotContain: "tempo|album|band|drum" } },
+      { say: "what were we talking about", expect: { episodesInContext: 0, mustContain: "desk|treadmill", mustNotContain: "album|band|drum|listening" } },
     ],
   },
   {
@@ -728,8 +728,8 @@ export const CONVERSATIONS: readonly BenchConversation[] = [
     category: "memory",
     note: "RECALL-02, the explicit-history shape: asked what the hub said about the band, the earlier answer comes back as a reported note with the person's paired words, never as a first-person line; nothing else does",
     turns: [
-      { say: "what did you say about Tempo the other day", newConversation: true, expect: { recallInContext: ["your answer covered", "listening to Tempo all morning"], mustNotContain: HONESTY_LINES } },
-      { say: "and what did I say about Tempo's second album", expect: { recallInContext: ["listening to Tempo all morning|second album"], mustContain: "listening|morning|tempo|album" } },
+      { say: "what did you say about the band Tempo before", newConversation: true, expect: { recallInContext: ["your answer touched on", "band Tempo"], mustNotContain: HONESTY_LINES + "|touched on|i said\\b", guard: null } },
+      { say: "and what did I say about Tempo's second album", expect: { recallInContext: ["band Tempo|second album"], mustContain: "listening|morning|tempo|album" } },
       { say: "thanks", expect: { episodesInContext: 0, guard: null, humanVerdict: true } },
     ],
   },

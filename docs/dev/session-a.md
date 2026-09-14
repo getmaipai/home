@@ -3915,7 +3915,9 @@ is on Thursday" while the gate was three; it stays, three words and
 two shared, the floor with no vector to help.
 
 **Volume.** Three lines and 400 characters, from five and 600;
-`prepareTurn()` asks for three.
+`prepareTurn()` asks for three. A line that would breach the cap is
+skipped, not the rest of the block with it (a review: a long top
+match was emptying the block of the shorter ones behind it).
 
 **The shapes live apart from the store.** `asksWhatHubSaid()` and
 `asksAboutEarlierTalk()` sit in `lib/recallShapes.ts`, free of the
@@ -3951,5 +3953,34 @@ band in one conversation; a standing desk, a Tempo treadmill and
 (the explicit-history shape, the reported note with the person's
 paired words), `copied-line-name` (Marsh the person, the marsh trail,
 the coordinator's addition), and `noCopiedEpisode` on the opening
-turns of `household-subject-dog` and `household-subject-person`.
-Three seeded runs below.
+turns of `household-subject-dog` and `household-subject-person`. The
+live bench gained `--only id,id` for a rerun of the rows an item
+changed after a set that was otherwise green (the header names the
+partial run).
+
+**The seeded set (2026-09-14, on 604b2b8, three runs, quiet machine,
+the same engines and seed as 3a's sets).** 135, 134 and 132 of 171
+scored turns; the four hard rows green in every run; the defect the
+item exists for is gone in every run: `copied-line` turns 4 and 5 (a
+standing desk, then a Tempo treadmill, after a band called Tempo in
+an earlier conversation) with no copied line, no episode line, no
+album or drumming in the reply, 6 of 6; `copied-line-name` turn 3
+(the marsh trail after Marsh's training plan) 3 of 3 with no
+episode line; both household-subject openers 6 of 6 with no copied
+line, where the first live run had answered the dog with another
+conversation's cake. Three misses, all the fixture's or the model's,
+not the retrieval's: turn 6 "what were we talking about" answered
+"the Tempo treadmill" correctly and the row's own regex forbade the
+band's name (fixed: the name is the current subject); turn 1 "I've
+been listening to Tempo all morning" drew "Got it, added to the list"
+from the 8B and the unsupported-action guard replaced it (the
+acknowledgment-claim defect the design pass assigns to OUT-01 and
+ACT-01), so no hub-side reaction was stored for the history row to
+find (the row now opens with a question, so the hub answers); and
+the history row found the treadmill turn instead and the 8B read the
+note's comma list as a quotation ("I said 'Cool, Tempo, treadmill,
+could, help...'"), a finding about the rendering: the note now reads
+"your answer touched on tempo, treadmill, ... and hours (topics, not
+its words)", the leading acknowledgment stripped by the near-echo's
+own rule, and the history row forbids the quoted form. The rerun of
+the three copied-line rows on that fix follows.
