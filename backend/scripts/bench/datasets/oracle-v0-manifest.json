@@ -2,56 +2,101 @@
   "seed": 20260914,
   "perClass": 5,
   "sourceDataset": "longmemeval_oracle.json",
+  "samplingRule": "each class's own abstention share is proportional to that type's real abstention rate in the source set (round(perClass * rate), clamped to the pool), never prioritized ahead of it - see strata for the computed rate and target per class",
+  "strata": [
+    {
+      "questionType": "knowledge-update",
+      "poolSize": 78,
+      "abstentionPoolSize": 6,
+      "abstentionRate": 0.077,
+      "abstentionTarget": 0
+    },
+    {
+      "questionType": "multi-session",
+      "poolSize": 133,
+      "abstentionPoolSize": 12,
+      "abstentionRate": 0.09,
+      "abstentionTarget": 0
+    },
+    {
+      "questionType": "single-session-assistant",
+      "poolSize": 56,
+      "abstentionPoolSize": 0,
+      "abstentionRate": 0,
+      "abstentionTarget": 0
+    },
+    {
+      "questionType": "single-session-preference",
+      "poolSize": 30,
+      "abstentionPoolSize": 0,
+      "abstentionRate": 0,
+      "abstentionTarget": 0
+    },
+    {
+      "questionType": "single-session-user",
+      "poolSize": 70,
+      "abstentionPoolSize": 6,
+      "abstentionRate": 0.086,
+      "abstentionTarget": 0
+    },
+    {
+      "questionType": "temporal-reasoning",
+      "poolSize": 133,
+      "abstentionPoolSize": 6,
+      "abstentionRate": 0.045,
+      "abstentionTarget": 0
+    }
+  ],
   "entries": [
     {
-      "questionId": "0ddfec37_abs",
+      "questionId": "01493427",
       "questionType": "knowledge-update",
-      "isAbstention": true
+      "isAbstention": false
     },
     {
-      "questionId": "2133c1b5_abs",
+      "questionId": "41698283",
       "questionType": "knowledge-update",
-      "isAbstention": true
+      "isAbstention": false
     },
     {
-      "questionId": "6aeb4375_abs",
+      "questionId": "e493bb7c",
       "questionType": "knowledge-update",
-      "isAbstention": true
+      "isAbstention": false
     },
     {
-      "questionId": "031748ae_abs",
+      "questionId": "3ba21379",
       "questionType": "knowledge-update",
-      "isAbstention": true
+      "isAbstention": false
     },
     {
-      "questionId": "f685340e_abs",
+      "questionId": "72e3ee87",
       "questionType": "knowledge-update",
-      "isAbstention": true
+      "isAbstention": false
     },
     {
-      "questionId": "60bf93ed_abs",
+      "questionId": "2788b940",
       "questionType": "multi-session",
-      "isAbstention": true
+      "isAbstention": false
     },
     {
-      "questionId": "e5ba910e_abs",
+      "questionId": "4f54b7c9",
       "questionType": "multi-session",
-      "isAbstention": true
+      "isAbstention": false
     },
     {
-      "questionId": "2311e44b_abs",
+      "questionId": "ef9cf60a",
       "questionType": "multi-session",
-      "isAbstention": true
+      "isAbstention": false
     },
     {
-      "questionId": "ba358f49_abs",
+      "questionId": "eeda8a6d",
       "questionType": "multi-session",
-      "isAbstention": true
+      "isAbstention": false
     },
     {
-      "questionId": "6456829e_abs",
+      "questionId": "dd2973ad",
       "questionType": "multi-session",
-      "isAbstention": true
+      "isAbstention": false
     },
     {
       "questionId": "7e00a6cb",
@@ -104,54 +149,54 @@
       "isAbstention": false
     },
     {
-      "questionId": "29f2956b_abs",
+      "questionId": "e01b8e2f",
       "questionType": "single-session-user",
-      "isAbstention": true
+      "isAbstention": false
     },
     {
-      "questionId": "19b5f2b3_abs",
+      "questionId": "af8d2e46",
       "questionType": "single-session-user",
-      "isAbstention": true
+      "isAbstention": false
     },
     {
-      "questionId": "0862e8bf_abs",
+      "questionId": "6ade9755",
       "questionType": "single-session-user",
-      "isAbstention": true
+      "isAbstention": false
     },
     {
-      "questionId": "15745da0_abs",
+      "questionId": "66f24dbb",
       "questionType": "single-session-user",
-      "isAbstention": true
+      "isAbstention": false
     },
     {
-      "questionId": "f4f1d8a4_abs",
+      "questionId": "58ef2f1c",
       "questionType": "single-session-user",
-      "isAbstention": true
+      "isAbstention": false
     },
     {
-      "questionId": "gpt4_c27434e8_abs",
+      "questionId": "8077ef71",
       "questionType": "temporal-reasoning",
-      "isAbstention": true
+      "isAbstention": false
     },
     {
-      "questionId": "c8090214_abs",
+      "questionId": "gpt4_a2d1d1f6",
       "questionType": "temporal-reasoning",
-      "isAbstention": true
+      "isAbstention": false
     },
     {
-      "questionId": "gpt4_70e84552_abs",
+      "questionId": "gpt4_78cf46a3",
       "questionType": "temporal-reasoning",
-      "isAbstention": true
+      "isAbstention": false
     },
     {
-      "questionId": "gpt4_93159ced_abs",
+      "questionId": "gpt4_7abb270c",
       "questionType": "temporal-reasoning",
-      "isAbstention": true
+      "isAbstention": false
     },
     {
-      "questionId": "gpt4_fe651585_abs",
+      "questionId": "gpt4_f49edff3",
       "questionType": "temporal-reasoning",
-      "isAbstention": true
+      "isAbstention": false
     }
   ]
 }

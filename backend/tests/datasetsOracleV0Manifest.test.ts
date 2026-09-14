@@ -8,10 +8,20 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { SAMPLE_SEED } from "../scripts/bench/datasets/sample";
 
+interface StratumInfo {
+  questionType: string;
+  poolSize: number;
+  abstentionPoolSize: number;
+  abstentionRate: number;
+  abstentionTarget: number;
+}
+
 interface OracleV0Manifest {
   seed: number;
   perClass: number;
   sourceDataset: string;
+  samplingRule: string;
+  strata: StratumInfo[];
   entries: { questionId: string; questionType: string; isAbstention: boolean }[];
 }
 
@@ -51,5 +61,26 @@ describe("oracle-v0-manifest.json", () => {
   test("every entry's id is unique - no question counted twice toward its own class's target", () => {
     const ids = manifest.entries.map((e) => e.questionId);
     expect(new Set(ids).size).toBe(ids.length);
+  });
+
+  // The coordinator's own fix, 2026-09-14: the first version of this
+  // manifest prioritized every abstention question ahead of the rest of
+  // its class (selectLongMemEvalSample's own rule, right for a 40-per-
+  // class sample, wrong at 5), which made several classes come out
+  // entirely abstention. This version draws each class's abstention
+  // share proportional to its own real rate instead, recorded here.
+  test("the sampling rule is recorded, and each stratum's own math checks out against the entries actually chosen", () => {
+    expect(manifest.samplingRule).toContain("proportional");
+    expect(manifest.strata).toHaveLength(6);
+    for (const s of manifest.strata) {
+      expect(s.abstentionTarget).toBe(Math.min(Math.round(manifest.perClass * s.abstentionRate), s.abstentionPoolSize, manifest.perClass));
+      const inClass = manifest.entries.filter((e) => e.questionType === s.questionType);
+      expect(inClass.filter((e) => e.isAbstention)).toHaveLength(s.abstentionTarget);
+    }
+  });
+
+  test("the oracle set's own real per-type abstention rates are small enough that every class rounds to zero abstention questions at perClass=5 - proportional, not forced, and never the all-abstention class the previous version produced", () => {
+    expect(manifest.strata.every((s) => s.abstentionTarget === 0)).toBe(true);
+    expect(manifest.entries.every((e) => !e.isAbstention)).toBe(true);
   });
 });

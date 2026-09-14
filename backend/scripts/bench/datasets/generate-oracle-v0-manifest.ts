@@ -14,11 +14,22 @@
 // held-out concern applies here the way sample.ts's own S-set doc note
 // describes.
 //
+// Uses selectStratifiedLongMemEvalSample, not selectLongMemEvalSample:
+// the first version of this manifest used the latter (built for the
+// 40-per-class S-set sample, where every abstention question is
+// prioritized ahead of the rest of its class), and at 5-per-class that
+// made several classes come out entirely abstention - unrepresentative
+// of the actual eval. The stratified version draws each class's own
+// abstention share proportional to that type's real rate in the oracle
+// set instead (the coordinator's own fix, 2026-09-14), and the computed
+// rate and target for every class are recorded in the manifest's own
+// `strata` field, not just implied by which ids got picked.
+//
 // Usage: bun run backend/scripts/bench/datasets/generate-oracle-v0-manifest.ts
 import { readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { loadLongMemEval } from "./longmemeval";
-import { selectLongMemEvalSample, SAMPLE_SEED } from "./sample";
+import { selectStratifiedLongMemEvalSample, SAMPLE_SEED } from "./sample";
 import { absolutePath } from "./registry";
 
 const PER_CLASS = 5;
@@ -26,22 +37,27 @@ const PER_CLASS = 5;
 function main() {
   const raw = JSON.parse(readFileSync(absolutePath("longmemeval_oracle.json"), "utf-8")) as unknown[];
   const { questions } = loadLongMemEval(raw);
-  const entries = selectLongMemEvalSample(questions, PER_CLASS, SAMPLE_SEED);
-
-  const byType = new Map<string, number>();
-  for (const entry of entries) byType.set(entry.questionType, (byType.get(entry.questionType) ?? 0) + 1);
+  const { entries, strata } = selectStratifiedLongMemEvalSample(questions, PER_CLASS, SAMPLE_SEED);
 
   // The seed is recorded IN the manifest, not only implied by sample.ts's
   // own SAMPLE_SEED constant matching by coincidence (the coordinator's
   // own requirement: "so it reruns identically") - a reader of this file
   // alone can reproduce the exact selection without reading the code that
   // made it.
-  const manifest = { seed: SAMPLE_SEED, perClass: PER_CLASS, sourceDataset: "longmemeval_oracle.json", entries };
+  const manifest = {
+    seed: SAMPLE_SEED,
+    perClass: PER_CLASS,
+    sourceDataset: "longmemeval_oracle.json",
+    samplingRule:
+      "each class's own abstention share is proportional to that type's real abstention rate in the source set (round(perClass * rate), clamped to the pool), never prioritized ahead of it - see strata for the computed rate and target per class",
+    strata,
+    entries,
+  };
 
   const outPath = join(import.meta.dir, "oracle-v0-manifest.json");
   writeFileSync(outPath, `${JSON.stringify(manifest, null, 2)}\n`);
   console.log(`Wrote ${entries.length} sampled ids (seed ${SAMPLE_SEED}) to ${outPath}`);
-  for (const [type, count] of byType) console.log(`  ${type}: ${count}`);
+  for (const s of strata) console.log(`  ${s.questionType}: ${s.abstentionTarget} abstention (rate ${s.abstentionRate}) of ${PER_CLASS}`);
 }
 
 main();
