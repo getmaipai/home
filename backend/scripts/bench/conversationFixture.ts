@@ -319,7 +319,7 @@ export const CREDENTIAL_LINE = "Keep passwords and keys in Credentials, not in c
  * answer a question about the world (the model no longer reads these
  * lines anywhere; the guards keep them for a caught household
  * invention only). */
-export const HONESTY_LINES = "nobody's told me|not something i've been told|don't know that one|household hasn't told|haven't been told|don't actually have that|i don't know, sorry|not sure about that\\.|don't have an answer for that";
+export const HONESTY_LINES = "nobody's told me|not something i've been told|don't know that one|household hasn't told|haven't been told|don't actually have that|i don't know, sorry|not sure about that(?: one)?\\.|don't have an answer for that|don't have that (?:one )?yet|one i don't have yet";
 /** A sign-off in place of engagement. */
 export const NO_CLOSER = "enjoy the movie|enjoy the film|let me know if you need|anything else|have fun watching";
 /** A first-person experience claim (C3): the hub has watched, played,
@@ -1129,11 +1129,42 @@ export const CONVERSATIONS: readonly BenchConversation[] = [
     category: "knowledge",
     note: "section 4 and section 7: a current world subject; a promise is the lookup; a number only with a source; no experience or plan claim on 'are you gonna listen to it' and the reflected 'nope, you?'",
     turns: [
-      { say: "the new Marsh Lantern album drops soon, I can't wait", expect: { signal: { primary_act: "inform", expressed_emotion: "happiness" }, guard: null, mustNotContain: EXPERIENCE_CLAIM + "|" + PLAN_CLAIM + "|" + NO_CLOSER, subjects: [{ type: "world", name: "Marsh Lantern" }], humanVerdict: true } },
+      // The coordinator's read of EXP-01's set: "Cool, I'll add that to the
+      // list" on a statement is a promise nobody asked for.
+      { say: "the new Marsh Lantern album drops soon, I can't wait", expect: { signal: { primary_act: "inform", expressed_emotion: "happiness" }, guard: null, mustNotContain: EXPERIENCE_CLAIM + "|" + PLAN_CLAIM + "|" + NO_CLOSER + "|i'll (?:add|put|note|save|make sure to note|remember)", subjects: [{ type: "world", name: "Marsh Lantern" }], humanVerdict: true } },
       { say: "when is it out", expect: { signal: { primary_act: "question" }, lookupWithSource: true, mustNotContain: "let me check|i can help you|would you like me to look|want me to look|i'll look|i can look", guard: null } },
       { say: "how many tracks", expect: { signal: { primary_act: "question" }, lookupWithSource: true, mustNotContain: PLAN_CLAIM, guard: null } },
       { say: "are you gonna listen to it", expect: { signal: { primary_act: "question" }, mustNotContain: EXPERIENCE_CLAIM + "|" + PLAN_CLAIM, mustContain: "album|marsh|lantern|track|music|song|drum|band|release", guard: null, humanVerdict: true } },
       { say: "nope, you?", expect: { signal: { primary_act: "question" }, mustNotContain: EXPERIENCE_CLAIM + "|" + PLAN_CLAIM, mustContain: "[a-z][^?!.]*[.!](\\s|$)", guard: null, humanVerdict: true } },
+    ],
+  },
+  // RECALL-03 (the live chat of 2026-09-14): a fact stated at turn 1 and
+  // asked back once the window has dropped it. Ten filler turns, each
+  // long enough that the window's token budget is spent before turn 1;
+  // the fillers are reader's rows (nothing scored), the three asks are
+  // the item's rows: the fact by the floors ("what time did I tell you
+  // it comes out"), the person's insistence ("that's how I started this
+  // chat"), and the start reference ("what did I tell you at the
+  // start"), each answered with midnight from the person's own words.
+  {
+    id: "recall-past-the-window",
+    category: "memory",
+    note: "RECALL-03: this conversation's own turns past the window are evidence, the person's side only; the two live turn shapes with roster names",
+    turns: [
+      { say: "the new Marsh Lantern album comes out at midnight on Friday", expect: { signal: { primary_act: "inform" }, guard: null, humanVerdict: true } },
+      { say: "Pippa's been practising the piano piece for the recital every evening this week, mostly the tricky middle section, and she's getting the hang of the timing now", expect: { humanVerdict: true } },
+      { say: "Rover found the muddy patch by the back fence again and tracked it right across the kitchen floor before anyone noticed him", expect: { humanVerdict: true } },
+      { say: "the dishwasher's been making that grinding noise on the rinse cycle again, quieter than last time but still there when it starts up", expect: { humanVerdict: true } },
+      { say: "Marlow's thinking about repainting the hallway, something lighter than the blue that's there now, maybe a warm off-white", expect: { humanVerdict: true } },
+      { say: "we might drive out to the coast on Sunday if the weather holds, the forecast keeps changing its mind about the afternoon", expect: { humanVerdict: true } },
+      { say: "Bramble wants to try the climbing wall at the leisure centre, the one with the beginner routes on the left side", expect: { humanVerdict: true } },
+      { say: "the tomatoes in the garden are finally ripening, the ones on the sunny side of the fence went red first as usual", expect: { humanVerdict: true } },
+      { say: "Quill mentioned a new cafe near the station with decent coffee and a quiet corner for working, might try it next week", expect: { humanVerdict: true } },
+      { say: "the car's due a service before the trip, the dashboard light came on again yesterday on the way back from the shops", expect: { humanVerdict: true } },
+      { say: "Nadia's flight back is on the Tuesday, landing late in the evening, so dinner that night will be whatever is quick", expect: { humanVerdict: true } },
+      { say: "what time did I tell you it comes out", expect: { signal: { primary_act: "question" }, recallInContext: ["midnight"], mustContain: "midnight", mustNotContain: HONESTY_LINES, guard: null } },
+      { say: "that's how I started this chat", expect: { signal: { primary_act: "inform" }, recallInContext: ["midnight"], mustContain: "midnight|album|marsh|lantern", mustNotContain: HONESTY_LINES, guard: null } },
+      { say: "what did I tell you at the start", expect: { signal: { primary_act: "question" }, recallInContext: ["midnight"], mustContain: "midnight", mustNotContain: HONESTY_LINES, guard: null } },
     ],
   },
 ];

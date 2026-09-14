@@ -4727,3 +4727,90 @@ its verbs lacked the object exclusions ("we can read through your
 essay together" was an experience), the fixture's copy drifted from
 the guard's, and "I've been listening to every word" was not the ear;
 all four taken with tests.
+
+## RECALL-03 and GUARD-LINES: the live chat of 2026-09-14 (2026-09-14)
+
+Two S items from Jesse's live chat on the restarted hub (main
+137635d), the coordinator's work order.
+
+**RECALL-03, within-conversation recall past the window.** A fact
+stated at turn 1 ("comes out at midnight") and asked back at turn 12
+("what time did I tell you it comes out") was cut to the honesty line:
+the window no longer held turn 1, RECALL-02 excluded the current
+conversation from episode recall whole (`excludeWholeConversation`,
+right for the turns the window holds, wrong for the ones it dropped),
+and the invention guard read the answer as ungrounded; "that's how I
+started this chat" drew the same line. The fix at the source: the
+current conversation's own person-side turns that fell out of the
+window are evidence for the turn. `buildConversationWindow()` reports
+its `turnIds` and `droppedOlder`; `recallEpisodes()` gains
+`withinConversationId` and `excludeTurnIds` (this conversation only,
+the window's turns out, the person's side, the same lexical and vector
+floors as an earlier conversation's episodes, limit two); and when the
+question is about how the chat began (`ASKS_ABOUT_START_RE`: "at the
+start", "when I started", "how I started this chat", "earlier in this
+conversation", "what did I tell you earlier"), the earliest dropped
+turn is evidence whatever the floors say (`earliestDroppedTurn()`, the
+stored episode row, a credential-carrying turn never). The block
+renders under its own header, "Earlier in this conversation (before
+the messages above; the person's own words)", each line `earlier,
+<name> said: "..."` with no date, ahead of the earlier-conversations
+block; the lines are `episode` evidence, so the guards ground on them
+and the person's own words can be said back. Never the hub's side.
+Tests in `tests/turnEngine.test.ts`: a fourteen-turn conversation
+whose turn 1 states the fact and twelve long fillers spend the window;
+"what did I tell you at the start of this chat" shows the block with
+the person's words and not the hub's reply, and the scripted answer
+with "midnight" stands; "what time did I tell you the album comes out"
+recalls the turn by the floors; "is a standing desk worth it" recalls
+nothing. The fixture gains `recall-past-the-window`: the fact, ten
+filler statements (reader's rows), then the two live turn shapes with
+roster names and the start reference, each answered with midnight from
+the person's own words.
+
+**GUARD-LINES, the replacement bank.** Jesse ruled "told" and "nobody"
+out on 2026-09-13; #67 removed them from the prompt and the bank kept
+them. Every line the guards can speak now says the plain honest line:
+`NOT_TOLD` (a household fact) is "I don't have that one yet." with two
+variants, `DONT_KNOW` (a world fact) "I don't know that one." with two,
+the chat-loop lines without the dash; the act-aware lines of an
+emptied reply stand as REG-01 and EXP-01 left them. The legacy lines
+stay in the honesty vocabulary so a window over a conversation written
+before the change still strips them (never spoken again, still
+recognized). `allReplacementLines()` gathers every line any guard can
+speak (the banks, the families' narrated lines, the acknowledgments,
+the emptied lines), and a test asserts none carries the words and that
+the two design lines are in their banks. The fixture's
+`HONESTY_LINES` names the new lines beside the old for the rows that
+forbid an honesty replacement.
+
+**Two folds from EXP-01's set** (the coordinator's read). "Cool, I'll
+add that to the list" on a statement is a promise to act that nobody
+asked for, the same padding as "I've noted that": on a statement with
+no outcome and no request verb a future-tense action promise
+(`FUTURE_ACTION_RE`: I'll add, put, note, save, remember, set a
+reminder, keep that in mind) is an `unsupported_action` hit and is
+skipped like a completed claim; after a request the future tense stays
+the acceptance CHAT-04 allows; "Remembered." on a statement joins the
+acknowledgment register. And a sentence that followed a skipped one on
+a conjunction ("But we can look up the showtimes") loses the lead
+(`dropConjunctionLead()`, on both paths). The `new-album` first turn
+forbids the promise in its own regex too; item 1b's test that "I'll
+remember that" passes on a statement now asserts the opposite, with
+the request case kept.
+
+**The outside review, taken.** Eight findings on the first cut, all
+taken: an edited-and-resent message's original could be recalled as
+"earlier, X said" (the superseded turn is excluded from the within-
+conversation recall and the start rule); "So far the forecast says
+rain" lost its "So" after a skip (a phrase is not a lead); the future-
+tense skip lacked the remember-request exemption when the signal fell
+back to inform; the streaming path cleared its just-skipped flag on a
+paragraph break and ate the break; `ASKS_ABOUT_START_RE` fired on "at
+the top of the league" and "when I started the car" (it needs the
+chat or the conversation named, or "at the start" closing the
+question); the by-floors within recall skipped the bare-social gate
+and scanned the whole vector table (it scopes the scan to the
+conversation now); the fixture's "not sure about that" lost its stop;
+and the note claimed the `new-album` row forbade the promise before
+the row did.

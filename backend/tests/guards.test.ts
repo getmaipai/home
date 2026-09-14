@@ -4,7 +4,7 @@
 // 2026-09-03), adapted to this hub's context shape (sources/history as
 // plain strings, no robot-specific Iterable-of-tuples).
 import { describe, expect, test } from "bun:test";
-import { guardReply, guardSentence, replacementFor, withoutHonestyLines, stripRegisterTail, MALFORMED, EMPTIED_LINES, type GuardContext } from "@/lib/guards";
+import { guardReply, guardSentence, replacementFor, withoutHonestyLines, stripRegisterTail, dropConjunctionLead, MALFORMED, EMPTIED_LINES, type GuardContext } from "@/lib/guards";
 
 function ctx(overrides: Partial<GuardContext> = {}): GuardContext {
   return { utterance: "", personId: "person-test", ...overrides };
@@ -595,12 +595,17 @@ describe("action claims are matched per package family (CHAT-04)", () => {
     expect(g.reason).toBeNull();
   });
 
-  test("future intent and remembering are acknowledgments, not claims: 'I'll remember that', 'Remembered.', 'Noted' pass with no outcome (the judge remembers on its own)", () => {
-    expect(guardReply("I'll remember that.", ctx({ utterance: "Pippa is allergic to peanuts" })).reason).toBeNull();
-    // REG-01: the "Noted," lead on a statement is register; the rest stands.
-    const led = guardReply("Noted, I'll keep that in mind.", ctx({ utterance: "Pippa is allergic to peanuts" }));
-    expect([led.reason, led.replaced, led.reply]).toEqual(["assistant_register", false, "I'll keep that in mind."]);
-    expect(guardReply("Remembered. I'll make sure to keep that in mind.", ctx({ utterance: "Pippa is allergic to peanuts" })).reason).toBeNull(); // the live 8B's own reply, 2026-09-13
+  test("future intent and remembering are acknowledgments after a request; on a statement they are the padding REG-01 and EXP-01's set remove", () => {
+    // After a request to remember, the promise is the acceptance.
+    expect(guardReply("I'll remember that.", ctx({ utterance: "remember that Pippa is allergic to peanuts", act: "directive" })).reason).toBeNull();
+    expect(guardReply("Noted, I'll keep that in mind.", ctx({ utterance: "remember that Pippa is allergic to peanuts", act: "directive" })).reason).toBeNull();
+    // On a statement, "I'll remember that" and "I'll keep that in mind"
+    // are a promise nobody asked for (the coordinator's read of
+    // EXP-01's set), skipped like "I've noted that".
+    expect(guardReply("I'll remember that.", ctx({ utterance: "Pippa is allergic to peanuts" })).replaced).toBe(true);
+    const led = guardReply("Noted, I'll keep that in mind. Peanuts are a tricky one at school.", ctx({ utterance: "Pippa is allergic to peanuts" }));
+    expect([led.replaced, led.reply]).toEqual([false, "Peanuts are a tricky one at school."]);
+    expect(guardReply("Remembered. I'll make sure to keep that in mind.", ctx({ utterance: "Pippa is allergic to peanuts" })).replaced).toBe(true); // the live 8B's own reply, 2026-09-13
     // REG-01: on a statement "Got it, noted." is the assistant register
     // (finding 12), skipped; after a request it is the acknowledgment.
     expect(guardReply("Got it, noted.", ctx({ utterance: "Pippa is allergic to peanuts" })).reason).toBe("assistant_register");
@@ -1083,5 +1088,44 @@ describe("EXP-01: the outside review's cases", () => {
     expect(guardReply("I said I'd remind you at six.", asked({ utterance: "did you set the reminder", previousReply: "Paris is the capital of France." })).reason).toBe("claimed_statement");
     const emptied = guardReply("Let me know if you need anything else!", ctx({ utterance: "add milk to the list", act: "directive" }));
     expect([emptied.reason, emptied.reply]).toEqual(["assistant_register", "I haven't actually done that."]);
+  });
+});
+
+describe("GUARD-LINES: the replacement bank says the plain honest line", () => {
+  test("no line any guard can speak carries 'told' or 'nobody', and the household and world lines are the design's", async () => {
+    const { allReplacementLines } = await import("@/lib/guards");
+    const lines = allReplacementLines();
+    expect(lines.length).toBeGreaterThan(20);
+    for (const line of lines) expect([line, /\btold\b|\bnobody\b|\bnobody's\b/i.test(line)]).toEqual([line, false]);
+    const household = new Set(Array.from({ length: 6 }, (_, i) => replacementFor("invention", `person-${i}`)));
+    expect(household.has("I don't have that one yet.")).toBe(true);
+    const world = new Set(Array.from({ length: 6 }, (_, i) => replacementFor("unrelated_recall", `person-${i}`)));
+    expect(world.has("I don't know that one.")).toBe(true);
+    // The legacy lines are still recognized by the window's strip.
+    expect(withoutHonestyLines("I don't actually have that - nobody's told me.")).toBe("");
+    expect(withoutHonestyLines("I don't have that one yet.")).toBe("");
+  });
+});
+
+describe("EXP-01's set, the coordinator's two folds", () => {
+  test("a future-tense promise to act on a statement is skipped like a completed claim; after a request it is the acceptance", () => {
+    const stated = ctx({ utterance: "the new Marsh Lantern album drops soon, I can't wait", act: "inform" });
+    const g = guardReply("Cool, I'll add that to the list. Any chance you've heard the single?", stated);
+    expect([g.reason, g.replaced, g.reply]).toEqual(["unsupported_action", false, "Any chance you've heard the single?"]);
+    expect(guardReply("I'll make sure to note that.", stated).replaced).toBe(true);
+    // A request to remember keeps its promise even when the signal fell back to inform (a review).
+    expect(guardReply("Okay, I'll remember that.", ctx({ utterance: "remember that Pippa is allergic to peanuts", act: "inform" })).reason).toBeNull();
+    expect(guardReply("Sure, I'll add that to the list.", ctx({ utterance: "add oat milk to the list", act: "directive", outcomes: [{ packageId: "list-add", status: "succeeded" }] })).reason).toBeNull();
+  });
+  test("a sentence that followed a skipped one on a conjunction loses the lead", () => {
+    const g = guardReply("You're not, I'm watching it. But we can look up the showtimes if you like.", ctx({ utterance: "we're watching the movie Cobra tonight", act: "inform" }));
+    expect([g.reason, g.reply]).toEqual(["claimed_experience", "We can look up the showtimes if you like."]);
+    expect(dropConjunctionLead("But we can look it up.")).toBe("We can look it up.");
+    expect(dropConjunctionLead("But.")).toBe("But.");
+    // The review's cases: "so far" and "so long as" are phrases, not leads.
+    expect(dropConjunctionLead("So far the forecast says rain.")).toBe("So far the forecast says rain.");
+    expect(dropConjunctionLead("So long as it's dry we'll go.")).toBe("So long as it's dry we'll go.");
+    expect(dropConjunctionLead("And then she left.")).toBe("And then she left.");
+    expect(dropConjunctionLead("We can look it up.")).toBe("We can look it up.");
   });
 });

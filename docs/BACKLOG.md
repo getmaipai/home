@@ -1199,6 +1199,38 @@ invented for the roster's household, and added to
     tests/episodes.test.ts tests/guards.test.ts`, the recall-floor
     bench's recorded floor, `bash scripts/check.sh`.
 
+<a id="recall-03"></a>
+
+- [x] **RECALL-03: Within-conversation recall past the window** (S)
+    Done 2026-09-14 (docs/dev/session-a.md "RECALL-03 and GUARD-LINES";
+    from Jesse's live chat of 2026-09-14): the current conversation's
+    own person-side turns that fell out of the window are evidence for
+    the turn, recalled by the same floors as an earlier conversation's
+    episodes (`recallEpisodes()` gains `withinConversationId` and
+    `excludeTurnIds`, the window reporting its `turnIds`), plus the
+    earliest dropped turn whatever the floors say when the question is
+    about how the chat began (`ASKS_ABOUT_START_RE`,
+    `earliestDroppedTurn()`); rendered under "Earlier in this
+    conversation" as the person's words, never the hub's side; the
+    guards read them as evidence. The `recall-past-the-window`
+    conversation (fourteen turns, the two live turn shapes with roster
+    names). One seeded set, GUARD-LINES riding on it.
+
+<a id="guard-lines"></a>
+
+- [x] **GUARD-LINES: The replacement bank says the plain honest line** (S)
+    Done 2026-09-14 (docs/dev/session-a.md "RECALL-03 and GUARD-LINES"):
+    every bank line without "told" or "nobody" (Jesse's rule of
+    2026-09-13, applied to the bank itself): "I don't have that one
+    yet." for a household fact, "I don't know that one." for a world
+    fact, the act-aware lines for an emptied reply; the legacy lines
+    stay recognized by the window's strip; `allReplacementLines()` and
+    a test that none carries the words; the fixture's `HONESTY_LINES`
+    updated. Also here, two folds from EXP-01's set: a future-tense
+    promise to act on a statement ("I'll add that to the list") is
+    skipped like a completed claim, and a sentence that followed a
+    skipped one on a conjunction loses the lead.
+
 <a id="out-01"></a>
 
 - [x] **OUT-01: One validated reply boundary after every producer** (S)

@@ -1,7 +1,7 @@
 // Episodes: every turn verbatim as one or two searchable records (user and
 // assistant sides), indexed by full-text and vector for hybrid recall
 // ("what recipe did you suggest last week"). Mirrored after memory embeddings.
-import { eq, and, inArray, notInArray, isNull, isNotNull, desc, gte, lt } from "drizzle-orm";
+import { eq, and, inArray, notInArray, isNull, isNotNull, desc, asc, gte, lt } from "drizzle-orm";
 import { detectCredential } from "@/lib/memoryContentPolicy";
 import { db, sqlite } from "@/db";
 import { episodes, episodeEmbeddings, pendingEpisodeEmbeddings, conversationTurns } from "@/db/schema";
@@ -182,6 +182,9 @@ export interface EpisodeMatch {
    * what they said before the reply), so a match is never a lone half. */
   pairedText: string;
   score: number;
+  /** RECALL-03: the match is one of this conversation's own turns that
+   * fell out of the window; rendered as "earlier", never with a date. */
+  earlierInThisConversation?: boolean;
 }
 
 export interface RecallEpisodesOptions {
@@ -210,6 +213,12 @@ export interface RecallEpisodesOptions {
    * The conversations search and the memory bench ask for `both`
    * explicitly: a person searching their history wants both sides. */
   sides?: "user" | "both";
+  /** RECALL-03: recall only this conversation's own turns (the ones
+   * that fell out of the window, `excludeTurnIds` being the window's),
+   * the person's side; the current conversation's earlier words are
+   * evidence for the turn the same way an earlier conversation's are. */
+  withinConversationId?: string;
+  excludeTurnIds?: readonly string[];
   /** RECALL-02, the prompt's "what did you say" turn: a turn found by
    * the person's words ("what did you suggest for the six visitors"
    * shares nothing with the recipe itself) is shown from the hub's
@@ -394,8 +403,9 @@ export function recallEpisodes(actor: PersonRow, query: string, queryVector: Flo
   const now = opts.now ?? new Date();
   const window = dateWindowForQuery(query, now);
 
-  const excludedTurnIds = new Set<string>(
-    opts.excludeConversationId
+  const excludedTurnIds = new Set<string>([
+    ...(opts.excludeTurnIds ?? []),
+    ...(opts.excludeConversationId
       ? db
           .select({ id: conversationTurns.id })
           .from(conversationTurns)
@@ -404,8 +414,9 @@ export function recallEpisodes(actor: PersonRow, query: string, queryVector: Flo
           .limit(opts.excludeWholeConversation ? Number.MAX_SAFE_INTEGER : WINDOW_TURNS_EXCLUDED)
           .all()
           .map((r) => r.id)
-      : [],
-  );
+      : []),
+  ]);
+  const within = opts.withinConversationId;
 
   // Lexical: BM25 over the person's own rows (bm25() is lower-is-better).
   // The date window and the excluded turns are part of the SQL, so a
@@ -429,12 +440,13 @@ export function recallEpisodes(actor: PersonRow, query: string, queryVector: Flo
          FROM episodes_fts f JOIN episodes e ON e.rowid = f.rowid
          WHERE episodes_fts MATCH ? AND e.person_id = ?
            AND (? IS NULL OR e.created_at >= ?) AND (? IS NULL OR e.created_at < ?)
+           ${within ? "AND e.conversation_id = ?" : ""}
            ${opts.includeSuperseded ? "" : "AND e.turn_id NOT IN (SELECT supersedes FROM conversation_turns WHERE supersedes IS NOT NULL)"}
            ${excluded.length ? `AND e.turn_id NOT IN (${placeholders})` : ""}
            ${sides === "user" ? "AND e.speaker = 'user'" : ""}
          ORDER BY bm25(episodes_fts) LIMIT ?`,
       )
-      .all(fts, actor.id, window?.start.toISOString() ?? null, window?.start.toISOString() ?? null, window?.end.toISOString() ?? null, window?.end.toISOString() ?? null, ...excluded, CANDIDATES_PER_SOURCE) as CandidateRow[];
+      .all(fts, actor.id, window?.start.toISOString() ?? null, window?.start.toISOString() ?? null, window?.end.toISOString() ?? null, window?.end.toISOString() ?? null, ...(within ? [within] : []), ...excluded, CANDIDATES_PER_SOURCE) as CandidateRow[];
     lexical.push(...rows);
   }
 
@@ -458,9 +470,8 @@ export function recallEpisodes(actor: PersonRow, query: string, queryVector: Flo
       createdAt: episodes.createdAt,
       vector: episodeEmbeddings.vector,
     };
-    const scope = window
-      ? and(eq(episodes.personId, actor.id), gte(episodes.createdAt, window.start.toISOString()), lt(episodes.createdAt, window.end.toISOString()))
-      : eq(episodes.personId, actor.id);
+    const personScope = within ? and(eq(episodes.personId, actor.id), eq(episodes.conversationId, within)) : eq(episodes.personId, actor.id);
+    const scope = window ? and(personScope, gte(episodes.createdAt, window.start.toISOString()), lt(episodes.createdAt, window.end.toISOString())) : personScope;
     const rows = db
       .select(columns)
       .from(episodeEmbeddings)
@@ -471,7 +482,7 @@ export function recallEpisodes(actor: PersonRow, query: string, queryVector: Flo
       .all();
     __vectorRowsScanned += rows.length;
     const scored = rows
-      .filter((r) => inWindow(r, window) && !excludedTurnIds.has(r.turnId) && (sides === "both" || r.speaker === "user"))
+      .filter((r) => inWindow(r, window) && !excludedTurnIds.has(r.turnId) && (sides === "both" || r.speaker === "user") && (!within || r.conversationId === within))
       .map((r) => ({ row: r as CandidateRow & { vector: Buffer }, cosine: cosineSimilarity(queryVector, bufferToVector(r.vector as Buffer)) }))
       .filter((s) => s.cosine >= EPISODE_MIN_COSINE)
       .sort((a, b) => b.cosine - a.cosine)
@@ -552,6 +563,27 @@ export function recallEpisodes(actor: PersonRow, query: string, queryVector: Flo
   });
 }
 
+/** RECALL-03: the earliest turn of the conversation that the window no
+ * longer holds, as an episode match of the person's side (its stored
+ * episode row, so the quote is the redacted text the store keeps);
+ * null when every turn is in the window or the turn has no episode. */
+export function earliestDroppedTurn(actor: PersonRow, conversationId: string, windowTurnIds: readonly string[], supersedes: string | null = null): EpisodeMatch | null {
+  const rows = db
+    .select({ id: conversationTurns.id, createdAt: conversationTurns.createdAt })
+    .from(conversationTurns)
+    .where(and(eq(conversationTurns.conversationId, conversationId), eq(conversationTurns.personId, actor.id), notInArray(conversationTurns.id, supersededTurnIdsQuery())))
+    .orderBy(asc(conversationTurns.createdAt))
+    .limit(200)
+    .all();
+  const inWindow = new Set([...windowTurnIds, ...(supersedes ? [supersedes] : [])]);
+  const first = rows.find((r) => !inWindow.has(r.id));
+  if (!first) return null;
+  const side = db.select().from(episodes).where(and(eq(episodes.turnId, first.id), eq(episodes.speaker, "user"))).get();
+  if (!side || detectCredential(side.text).detected) return null;
+  const paired = db.select({ text: episodes.text }).from(episodes).where(and(eq(episodes.turnId, first.id), eq(episodes.speaker, "assistant"))).get();
+  return { episode: { id: side.id, turnId: side.turnId, conversationId: side.conversationId, speaker: "user", text: side.text, createdAt: side.createdAt }, pairedText: paired?.text ?? "", score: 1 };
+}
+
 /** RECALL-02: three lines and 400 characters (from five and 600): fewer
  * lines, each earned. */
 export const PROMPT_BLOCK_MAX_LINES = 3;
@@ -559,6 +591,13 @@ const PROMPT_BLOCK_MAX_CHARS = 400;
 const QUOTE_MAX_CHARS = 200;
 const NOTE_TERMS_MAX = 12;
 export const EPISODES_HEADER = "From earlier conversations (what was said, not necessarily true):";
+/** RECALL-03: the current conversation's own turns that fell out of the
+ * window, the person's words only, before the messages above. */
+export const EARLIER_HEADER = "Earlier in this conversation (before the messages above; the person's own words):";
+/** RECALL-03: the turn asks about how this conversation began, which
+ * the window may no longer hold: the earliest dropped turn is evidence
+ * whatever the floors say. */
+export const ASKS_ABOUT_START_RE = /\b(?:at the (?:start|beginning|top) of (?:this|the|our) (?:chat|conversation|talk)|at the (?:start|beginning)(?=\s*[,.!?]*\s*$)|when (?:i|we) (?:started|began|opened) (?:this|the|our) (?:chat|conversation|talk)|(?:how|what) (?:i|we) started (?:with|this|the chat|the conversation)|first thing i (?:said|told you|asked)|(?:i )?(?:started|opened|began) (?:this|the) (?:chat|conversation) with|earlier (?:in this|in the|on in this) (?:chat|conversation)|(?:what|when) did i (?:tell|say to) you (?:earlier|before|at the start|at first))\b/i;
 
 function cutAtWord(text: string, max: number): string {
   if (text.length <= max) return text;
@@ -570,9 +609,9 @@ function cutAtWord(text: string, max: number): string {
 /** The block the turn engine appends after the memory bullets (JOIN-01):
  * one line per match, dated, labeled by who said it, quotes cut at a word
  * boundary, the whole block capped. Empty string for no matches. */
-export function formatEpisodesForPrompt(matches: EpisodeMatch[], displayName: string, locale: string, now: Date = new Date()): string {
+export function formatEpisodesForPrompt(matches: EpisodeMatch[], displayName: string, locale: string, now: Date = new Date(), header: string = EPISODES_HEADER): string {
   if (matches.length === 0) return "";
-  const lines = [EPISODES_HEADER];
+  const lines = [header];
   for (const m of matches) {
     if (lines.length > PROMPT_BLOCK_MAX_LINES) break;
     const line = formatEpisodeLine(m, displayName, locale, now);
@@ -590,6 +629,8 @@ export function formatEpisodesForPrompt(matches: EpisodeMatch[], displayName: st
  * prompt can be checked, and the guard grounds on the quoted text as
  * shown, cut where the prompt cut it). */
 export function formatEpisodeLine(m: EpisodeMatch, displayName: string, locale: string, now: Date = new Date()): string {
+  // RECALL-03: a turn of this conversation is "earlier", not a date.
+  if (m.earlierInThisConversation) return `- earlier, ${displayName} said: "${episodeQuote(m)}"`;
   const dateFmt = shortDateFormat(locale || "en-US");
   const when = new Date(m.episode.createdAt);
   const days = Math.max(0, Math.floor((now.getTime() - when.getTime()) / DAY_MS));

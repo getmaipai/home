@@ -23,11 +23,11 @@ import { recall, bumpUsage, getProfileParagraph, type RecallMatch } from "@/lib/
 import { findEntityByName, subjectLabel, subjectRosterFor } from "@/lib/subjects";
 import { AFFIRMATIVE_RE, NEGATIVE_RE } from "@/lib/consentVocab";
 import { repairReply, assessReply, isShortMalformed, repairTail, closeDanglingClause, visibleText, RETRY_TOKEN_CAP } from "@/lib/wellFormed";
-import { recallEpisodes, formatEpisodesForPrompt, formatEpisodeLine, episodeQuote, episodeQueryEligible, asksWhatHubSaid, PROMPT_BLOCK_MAX_LINES, type EpisodeMatch } from "@/lib/episodes";
+import { recallEpisodes, formatEpisodesForPrompt, formatEpisodeLine, episodeQuote, episodeQueryEligible, asksWhatHubSaid, PROMPT_BLOCK_MAX_LINES, EARLIER_HEADER, ASKS_ABOUT_START_RE, contentTerms, earliestDroppedTurn, type EpisodeMatch } from "@/lib/episodes";
 import { intentFor, markIncluded, guardContextFrom, outcomeOf, emptyTimings, type TurnContext, type TurnEvidence, type ToolExecutionOutcome, type RejectedReason, type TurnTimings } from "@/lib/turnContext";
 import { newConversationTurnId } from "@/lib/id";
 import { complete, startCompleteStream, type LlmMessage, type ToolSpec, type ToolCall } from "@/lib/llm";
-import { guardReply, guardSentence, replacementFor, isCuttable, isSkippable, isRegisterSkip, isStatementTurn, stripRegisterTail, emptiedLine, splitIntoSentences, type GuardContext, type GuardReason } from "@/lib/guards";
+import { guardReply, guardSentence, replacementFor, isCuttable, isSkippable, isRegisterSkip, isStatementTurn, isBareSocialTurn, stripRegisterTail, dropConjunctionLead, emptiedLine, splitIntoSentences, type GuardContext, type GuardReason } from "@/lib/guards";
 import { tokenize } from "@/lib/text";
 import { unspokenArgument, askPromptFor, isActionPackage } from "@/lib/unspokenArgs";
 import { COURTESY_PREFIX } from "@/lib/utteranceShape";
@@ -716,6 +716,9 @@ export function buildPromptParts(
   // rendered text is the prompt's own line (markIncluded matches on it);
   // callers without a turn context resolve their own.
   subjectLabels: ReadonlyMap<string, string> = subjectLabelsFor(actor, memoryMatches.slice(0, MAX_MEMORY_SNIPPETS)),
+  // RECALL-03: this conversation's own dropped turns, under their own
+  // header, ahead of the earlier-conversations block.
+  earlierMatches: EpisodeMatch[] = [],
 ): { stablePrefix: string; context: string } {
   const stablePrefix = buildStablePrefix(persona);
 
@@ -735,8 +738,9 @@ export function buildPromptParts(
   } else {
     memorySection = `\n\n${NOTHING_STORED_LINE}`;
   }
+  const earlierBlock = formatEpisodesForPrompt(earlierMatches, sanitizeForPrompt(actor.displayName), locale, now, EARLIER_HEADER);
   const episodesBlock = formatEpisodesForPrompt(episodeMatches, sanitizeForPrompt(actor.displayName), locale, now);
-  const episodesSection = episodesBlock ? `\n\n${episodesBlock}` : "";
+  const episodesSection = (earlierBlock ? `\n\n${earlierBlock}` : "") + (episodesBlock ? `\n\n${episodesBlock}` : "");
   const reanchorSection = companionReanchorLine(persona);
   const summarySection = capSection(conversationSummaryLine ? `\n\n${conversationSummaryLine}` : "", MAX_SUMMARY_SECTION_CHARS);
   const skillsPart = capSection(skillsSection(text, skills), MAX_SKILLS_SECTION_CHARS);
@@ -1952,17 +1956,36 @@ async function prepareTurn(
   const episodeMatches = episodeQueryEligible(text)
     ? recallEpisodes(actor, text, utteranceVector, { excludeConversationId: conversation.id, excludeWholeConversation: true, limit: PROMPT_BLOCK_MAX_LINES, ...(asksWhatHubSaid(text) ? { sides: "both" as const, preferHubSide: true } : { sides: "user" as const }) })
     : [];
-  timings.recall_ms = Math.round(performance.now() - recallStart);
-  const promptStart = performance.now();
-  const persona = resolvePersona(getPersonSettingValue(actor, "persona.active_id"));
   // The follow-up-turn context (step 3): "and tomorrow?" needs the prior
   // exchange in the messages array, not just in the system prompt's own
   // text - buildConversationWindow() returns both the verbatim
   // user/assistant messages AND, when older turns exist beyond them, one
   // summary line for the system prompt's volatile zone.
   const window = buildConversationWindow(conversation, { supersedes });
+  // RECALL-03: this conversation's own turns that fell out of the
+  // window are evidence for the turn too (a fact stated at turn 1 and
+  // asked back at turn 12 was cut to the honesty line, the live chat of
+  // 2026-09-14): the person's side only, by the same floors as an
+  // earlier conversation's episodes, and the earliest dropped turn
+  // whatever the floors say when the question is about how the chat
+  // began ("what did I tell you at the start"). Never the hub's side.
+  const earlierMatches: EpisodeMatch[] = [];
+  if (window.droppedOlder) {
+    // #88: an edited-and-resent message's original is off the branch
+    // and never recalled here either (a review).
+    const excludeTurnIds = supersedes ? [...window.turnIds, supersedes] : window.turnIds;
+    const byFloors = contentTerms(text).length >= 2 && !isBareSocialTurn(text) ? recallEpisodes(actor, text, utteranceVector, { withinConversationId: conversation.id, excludeTurnIds, sides: "user", limit: 2 }) : [];
+    earlierMatches.push(...byFloors.map((m) => ({ ...m, earlierInThisConversation: true })));
+    if (ASKS_ABOUT_START_RE.test(text)) {
+      const first = earliestDroppedTurn(actor, conversation.id, excludeTurnIds, supersedes);
+      if (first && !earlierMatches.some((m) => m.episode.turnId === first.episode.turnId)) earlierMatches.unshift({ ...first, earlierInThisConversation: true });
+    }
+  }
+  timings.recall_ms = Math.round(performance.now() - recallStart);
+  const promptStart = performance.now();
+  const persona = resolvePersona(getPersonSettingValue(actor, "persona.active_id"));
   const subjectLabels = subjectLabelsFor(actor, memoryMatches.slice(0, MAX_MEMORY_SNIPPETS));
-  const promptParts = buildPromptParts(actor, text, memoryMatches, loaded, persona, skills, window.summaryLine, household, episodeMatches, frozen, subjectLabels);
+  const promptParts = buildPromptParts(actor, text, memoryMatches, loaded, persona, skills, window.summaryLine, household, episodeMatches, frozen, subjectLabels, earlierMatches);
   // Bumping the top MAX_MEMORY_SNIPPETS candidates unconditionally was
   // wrong (a code review, 2026-09-05): buildPromptParts's own
   // MAX_MEMORY_SECTION_CHARS truncation, or the outer PROMPT_SYSTEM_CHAR_
@@ -1987,7 +2010,7 @@ async function prepareTurn(
       (m): TurnEvidence => ({ id: `memory:${m.record.id}`, kind: "memory", text: m.record.text, rendered: memoryBulletLine(m, frozen.locale, frozen.now, subjectLabels), sourceId: m.record.id, entityIds: [] }),
     ),
     ...(profile ? [{ id: `profile:${profile.id}`, kind: "profile" as const, text: profile.text, rendered: profile.text, sourceId: profile.id, entityIds: [] }] : []),
-    ...episodeMatches.map(
+    ...[...earlierMatches, ...episodeMatches].map(
       (m): TurnEvidence => ({ id: `episode:${m.episode.id}`, kind: "episode", text: episodeQuote(m), rendered: formatEpisodeLine(m, sanitizeForPrompt(actor.displayName), frozen.locale, frozen.now), sourceId: m.episode.turnId, entityIds: [] }),
     ),
     ...(window.summaryLine ? [{ id: `summary:${conversation.id}`, kind: "summary" as const, text: window.summaryLine, rendered: window.summaryLine, sourceId: conversation.id, entityIds: [] }] : []),
@@ -3273,18 +3296,26 @@ export async function* gateGuards(
   let isFirstSentence = true;
   let spokeAnything = false;
   let skipped: { reason: GuardReason; sentence: string } | null = null;
+  let justSkipped = false;
   const liveCtx = (): GuardContext => ({ ...(typeof ctx === "function" ? ctx() : ctx), personId });
   while (!step.done) {
     // REG-01, rule 2: a register tail on a spoken span is cut before the
     // span is judged (a span the chunker flushed at the comma arrives
     // as its own sentence and is skipped whole below).
-    const whole = step.value;
+    // EXP-01's set: a span that followed a skipped one on a conjunction
+    // ("But we can watch it together") loses the lead.
+    // A whitespace-only span (a paragraph break) neither clears the flag
+    // nor loses its whitespace (a review).
+    const lead = justSkipped && step.value.trim() ? /^\s*/.exec(step.value)![0] : "";
+    const whole = justSkipped && step.value.trim() ? lead + dropConjunctionLead(step.value.trim()) + (/\s$/.test(step.value) ? " " : "") : step.value;
+    if (step.value.trim()) justSkipped = false;
     const rawSpan = whole.trim() ? stripRegisterTail(whole.trimEnd(), liveCtx()) + (/\s$/.test(whole) ? " " : "") : whole;
     if (rawSpan.trim() !== whole.trim()) onGuardHit?.("assistant_register", false);
     const trimmed = rawSpan.trim();
     const reason = trimmed ? guardSentence(trimmed, liveCtx(), isFirstSentence) : null;
     if (trimmed) isFirstSentence = false;
     if (reason && isSkippable(reason, liveCtx())) {
+      justSkipped = true;
       // Item 1b: the sentence is dropped wherever it sits and the rest
       // streams on; if nothing else is ever spoken, the honest line
       // stands in at the end (guardReply()'s own rule).

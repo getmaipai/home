@@ -12766,6 +12766,11 @@ other's section once (147cd28, f4779a6).
   clearance Shell.tsx already reserves for it), proven to fail then
   fixed with a real-layout check in scripts/screenshot.ts:
   [docs/dev/session-b.md](dev/session-b.md) (2026-09-13).
+- RECALL-03 and GUARD-LINES, from the live chat of 2026-09-14: the
+  current conversation's own turns past the window recalled as the
+  person's words (never the hub's side), and the guards' replacement
+  bank without "told" or "nobody"; two folds from EXP-01's set:
+  [docs/dev/session-a.md](dev/session-a.md) (2026-09-14).
 - EXP-01, experience and plan claims: the plan forms and "haven't ...
   yet" are claims the hub cannot make, the negation exemption only for
   a plain negation, a claim about the hub's own past promise its own

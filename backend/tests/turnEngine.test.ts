@@ -2999,6 +2999,54 @@ describe("RECALL-02b: the prompt the model sees", () => {
     // the real prompt a turn sharing nothing with the line never has it
     // recalled, which is the floor doing the same job one step earlier.
   });
+
+  // RECALL-03: the current conversation's own turns past the window are
+  // evidence; the hub's side never is. The live shape of 2026-09-14:
+  // a fact stated at turn 1, asked back at turn 12, cut to the honesty
+  // line because the window had dropped it and episode recall excluded
+  // the conversation whole.
+  async function longConversation(actor: PersonRow, firstFact: string): Promise<string> {
+    const { logTurn, createConversation } = await import("@/lib/conversationHistory");
+    const conv = createConversation(actor, { surface: "chat" });
+    if (!conv.ok) throw new Error(conv.error);
+    const safe = { flagged: false, categories: [], action: "allow" as const, notify_parent: false, matched_signals: [], checked_at: new Date().toISOString() };
+    const say = (userText: string, replyText: string, i: number) => {
+      safe.checked_at = new Date(Date.now() - (20 - i) * 60_000).toISOString();
+      logTurn(actor, "chat", userText, { reply: { text: replyText }, source: "model", safety: { ...safe }, conversation_id: conv.value.id, turn_id: `turn-long-${i}-${Math.random().toString(36).slice(2, 8)}` });
+    };
+    say(firstFact, "Got it, midnight it is.", 1);
+    // Twelve filler turns, each long enough that the window's 1200-token
+    // budget is spent well before turn 1.
+    const filler = "and then we spent a good while talking about the weather for the weekend, the garden, the neighbours' new fence, the school run and whether the car needs a service before the trip ".repeat(3);
+    for (let i = 2; i <= 13; i++) say(`filler ${i}: ${filler}`, `Sure, ${filler}`, i);
+    return conv.value.id;
+  }
+
+  test("RECALL-03: a fact stated at turn 1 is evidence at turn 14 when asked what was said at the start, rendered as the person's words under its own header", async () => {
+    const { actor } = await owner();
+    const conversationId = await longConversation(actor, "the new Marsh Lantern album comes out at midnight on Friday");
+    const { EARLIER_HEADER } = await import("@/lib/episodes");
+    const { context, value } = await captureContext(actor, "what did I tell you at the start of this chat", conversationId, "You said the new Marsh Lantern album comes out at midnight on Friday.");
+    expect(context).toContain(EARLIER_HEADER);
+    expect(context).toMatch(/earlier, Sage said: "the new Marsh Lantern album comes out at midnight on Friday"/);
+    expect(context).not.toContain("midnight it is"); // never the hub's side
+    expect(value.reply.text).toContain("midnight"); // grounded, the invention guard let it stand
+  });
+
+  test("RECALL-03: a dropped turn is recalled by the floors too, and a question with no shared words and no start reference recalls nothing", async () => {
+    const { actor } = await owner();
+    const conversationId = await longConversation(actor, "the new Marsh Lantern album comes out at midnight on Friday");
+    const { EARLIER_HEADER } = await import("@/lib/episodes");
+    const byFloors = await captureContext(actor, "what time did I tell you the album comes out", conversationId, "Midnight on Friday.");
+    expect(byFloors.context).toContain(EARLIER_HEADER);
+    expect(byFloors.context).toContain("midnight on Friday");
+    const unrelated = await captureContext(actor, "is a standing desk worth it", conversationId, "Only if you switch often.");
+    expect(unrelated.context).not.toContain(EARLIER_HEADER);
+    // A start phrase about something else does not inject the first turn (a review).
+    const league = await captureContext(actor, "who's at the top of the league table", conversationId, "I don't know that one.");
+    expect(league.context).not.toContain(EARLIER_HEADER);
+  });
+
 });
 
 describe("JOIN-01: recalled episodes reach the prompt and the guards", () => {

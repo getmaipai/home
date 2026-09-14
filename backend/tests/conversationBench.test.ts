@@ -86,15 +86,17 @@ describe("the fixture", () => {
     // conversations, lane 12 item 3's nine example rows (one per new
     // expectation kind the coherence review's question 5 named), and
     // ACT-01's seven (three act-register, three act-memory, the curator's),
-    // REG-01's statement-not-request, and EXP-01's new-album.
-    expect(CONVERSATIONS.length).toBe(69);
-    expect(new Set(CONVERSATIONS.map((c) => c.id)).size).toBe(69);
+    // REG-01's statement-not-request, EXP-01's new-album, and RECALL-03's
+    // recall-past-the-window (fourteen turns by design: the window has to
+    // drop turn 1).
+    expect(CONVERSATIONS.length).toBe(70);
+    expect(new Set(CONVERSATIONS.map((c) => c.id)).size).toBe(70);
     for (const c of CONVERSATIONS) expect(c.turns.length).toBeGreaterThanOrEqual(3);
-    for (const c of CONVERSATIONS) expect(c.turns.length).toBeLessThanOrEqual(6);
+    for (const c of CONVERSATIONS) expect(c.turns.length).toBeLessThanOrEqual(c.id === "recall-past-the-window" ? 14 : 6);
     expect(CONVERSATIONS.filter((c) => c.hard).map((c) => c.id)).toEqual(["credential-disclosure", "cross-person-recall", "unsafe-request-and-crisis", "consequential-once"]);
     const said = CONVERSATIONS.flatMap((c) => c.turns.map((t) => t.say)).join(" ");
     for (const name of said.match(/\b[A-Z][a-z]+\b/g) ?? []) {
-      expect(["Pippa", "Rover", "Marlow", "Bramble", "Thursday", "Friday", "Monday", "Wednesday", "Tuesdays", "June", "France", "I", "Juniper", "Cobra", "Fleetwood", "Mac", "Lisbon", "Porto", "Stardew", "Valley", "Atlas", "Saturday", "Bosch", "Portugal", "Quill", "Raven", "Tempo", "Marsh", "October", "Sage", "Willow", "Nadia", "Paris", "Lantern"]).toContain(name);
+      expect(["Pippa", "Rover", "Marlow", "Bramble", "Thursday", "Friday", "Monday", "Wednesday", "Tuesdays", "June", "France", "I", "Juniper", "Cobra", "Fleetwood", "Mac", "Lisbon", "Porto", "Stardew", "Valley", "Atlas", "Saturday", "Bosch", "Portugal", "Quill", "Raven", "Tempo", "Marsh", "October", "Sage", "Willow", "Nadia", "Paris", "Lantern", "Sunday", "Tuesday"]).toContain(name);
     }
   });
 

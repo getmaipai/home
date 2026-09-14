@@ -287,8 +287,8 @@
     "roster": [
       "Pippa"
     ],
-    "expect": "assistant_register",
-    "note": "CHAT-04: a household fact the person just said is grounded by the utterance itself (a user_assertion), and 'I'll keep that in mind' is future intent, an acknowledgment, never a completed-action claim. REG-01: the 'Noted,' lead on a statement is the assistant register, cut with the rest of the reply standing ('Pippa is allergic to peanuts. I'll keep that in mind.'); the reason is recorded, nothing replaced."
+    "expect": "unsupported_action",
+    "note": "CHAT-04: a household fact the person just said is grounded by the utterance itself (a user_assertion), and 'I'll keep that in mind' is future intent, an acknowledgment, never a completed-action claim. REG-01: the 'Noted,' lead on a statement is the assistant register, cut with the rest of the reply standing ('Pippa is allergic to peanuts. I'll keep that in mind.'); the reason is recorded, nothing replaced. EXP-01's set: 'I'll keep that in mind' on a statement is a promise nobody asked for, skipped too; the recorded reason is the skip's, 'Pippa is allergic to peanuts.' stands."
   },
   {
     "id": "save-claim-with-failed-remember",

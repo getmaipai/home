@@ -177,21 +177,15 @@ const CANNOT_DO = [
   "I'm not able to do that yet, sorry.",
   "That's not something I can do right now.",
 ];
-const NOT_TOLD = [
-  "I don't actually have that - nobody's told me.",
-  "I don't know that one, sorry.",
-  "That's not something I've been told.",
-];
-const DONT_KNOW = [
-  "I don't know, sorry.",
-  "I'm not sure about that.",
-  "I don't have an answer for that.",
-];
-const CHAT_LOOP = [
-  "I keep landing on the same answer - ask me that another way?",
-  "Hmm, I'm going in circles. Try me a different way?",
-  "I'm stuck on that one, sorry. Ask me again some other way?",
-];
+// GUARD-LINES (2026-09-14, Jesse's rule of 2026-09-13 applied to the
+// bank itself, not only the prompt): the plain honest line, never "told"
+// or "nobody". A household fact the hub does not have: "I don't have
+// that one yet." A world fact it does not know: "I don't know that
+// one." Small variants keep the rotation; every line is checked against
+// the honesty vocabulary in the tests.
+const NOT_TOLD = ["I don't have that one yet.", "I don't have that yet, sorry.", "That's one I don't have yet."];
+const DONT_KNOW = ["I don't know that one.", "I'm not sure about that one.", "I don't know that one, sorry."];
+const CHAT_LOOP = ["I keep landing on the same answer, ask me that another way?", "Hmm, I'm going in circles. Try me a different way?", "I'm stuck on that one, sorry. Ask me again some other way?"];
 // #92: a placeholder echo on a statement (the model said a bracketed
 // note back after a disclosure) is replaced with the acknowledgment the
 // disclosure deserved, never "I don't know" about something the person
@@ -730,7 +724,7 @@ export function isCloserSentence(sentence: string): boolean {
 // dash on a real sentence is cut. "Got it, noted" on a statement is
 // the same register; "noted" as an acknowledgment of a request stays.
 const REGISTER_PHRASE_RE =
-  /\b(?:i'?ve (?:noted|got|made a note of) (?:that|it|this)|noted|i'?m (?:still )?learning|i'?m here (?:to help|for you|(?:if you (?:need|want|ever need)|whenever you need)[^.!?,]*)|as an ai(?: (?:assistant|model))?|as a language model|sorry (?:if|that) i (?:confused|misunderstood|missed)(?: you| that)?|let me know (?:what you need|how (?:i can|else i can) help|if (?:you need|there'?s|you'?d like|you want)[^.!?,]*|when you'?re ready[^.!?,]*)|happy to help(?: (?:with|out|if|when|whenever|any ?time)[^.!?,]*)?|glad (?:to|i could) help|i'?m happy to assist|how (?:else )?can i (?:help|assist)(?: you)?(?: today)?|is there anything else(?: i can (?:help|do)[^.!?,]*)?|anything else (?:you need|i can (?:help|do)[^.!?,]*)|feel free to (?:ask|reach out|let me know)[^.!?,]*|don'?t hesitate to (?:ask|reach out)[^.!?,]*|hope (?:that|this) helps|you'?re welcome|no problem(?: at all)?|got it,? noted|will do)\b/i;
+  /\b(?:i'?ve (?:noted|got|made a note of) (?:that|it|this)|noted|remembered|i'?m (?:still )?learning|i'?m here (?:to help|for you|(?:if you (?:need|want|ever need)|whenever you need)[^.!?,]*)|as an ai(?: (?:assistant|model))?|as a language model|sorry (?:if|that) i (?:confused|misunderstood|missed)(?: you| that)?|let me know (?:what you need|how (?:i can|else i can) help|if (?:you need|there'?s|you'?d like|you want)[^.!?,]*|when you'?re ready[^.!?,]*)|happy to help(?: (?:with|out|if|when|whenever|any ?time)[^.!?,]*)?|glad (?:to|i could) help|i'?m happy to assist|how (?:else )?can i (?:help|assist)(?: you)?(?: today)?|is there anything else(?: i can (?:help|do)[^.!?,]*)?|anything else (?:you need|i can (?:help|do)[^.!?,]*)|feel free to (?:ask|reach out|let me know)[^.!?,]*|don'?t hesitate to (?:ask|reach out)[^.!?,]*|hope (?:that|this) helps|you'?re welcome|no problem(?: at all)?|got it,? noted|will do)\b/i;
 const REGISTER_FILLER_RE = /\b(?:okay|ok|sure|alright|great|of course|absolutely|certainly|just|so|and|or|but|then|now|also|too|again|anytime|always|please|thanks|thank you|though|at all|for now|for today|tonight|today)\b/gi;
 function isRegisterSentence(sentence: string): boolean {
   if (!REGISTER_PHRASE_RE.test(sentence) && !CLOSER_RE.test(sentence)) return false;
@@ -754,7 +748,7 @@ const RECIPROCAL_RE = /^\W*(?:okay|ok|sure|alright|got it|aw+|oh)?[,.! ]*(?:you'
 // The acknowledgment half of the register ("Noted.", "Will do.", "No
 // problem.") is the right answer to a request and a thank-you; it is
 // register only on a statement, where nothing was asked.
-const ACK_REGISTER_RE = /^\W*(?:okay|ok|sure|alright|got it)?[,.! ]*(?:noted|i'?ve (?:noted|got|made a note of) (?:that|it|this)|will do|you'?re welcome|no problem(?: at all)?|got it,? noted)\W*$/i;
+const ACK_REGISTER_RE = /^\W*(?:okay|ok|sure|alright|got it)?[,.! ]*(?:noted|remembered|saved|i'?ve (?:noted|got|made a note of) (?:that|it|this)|will do|you'?re welcome|no problem(?: at all)?|got it,? noted)\W*$/i;
 /** The register test with the acknowledgment exemption: "Noted." after
  * a request, a greeting or a thank-you is the answer. */
 function isRegisterFor(sentence: string, ctx: Pick<GuardContext, "act" | "shape" | "utterance">): boolean {
@@ -801,6 +795,16 @@ export function stripRegisterTail(sentence: string, ctx: Pick<GuardContext, "act
   if (!isRegisterFor(tail, ctx) || headContent.size === 0) return sentence;
   return /[.!?]$/.test(head) ? head : `${head}.`;
 }
+/** The conjunction a sentence opened with when the sentence before it
+ * was skipped ("But we can watch it together" after "I'm watching it"
+ * went), taken off with the rest capitalized. */
+export function dropConjunctionLead(sentence: string): string {
+  // "So far", "so long as", "and then" are phrases, not leads (a review).
+  const m = /^\s*(?:but|and|so|or|yet|plus|also|though)\b(?!\s+(?:far|long|much|many|that|then|too|what|now|on|forth)\b)[,\s]*(\S.*)$/is.exec(sentence);
+  if (!m || tokenize(m[1]!).size === 0) return sentence;
+  return m[1]!.charAt(0).toUpperCase() + m[1]!.slice(1);
+}
+
 /** REG-01 (section 4): a reply sentence that says the hub's previous
  * question back (the same words, or four in five of them) is skipped. */
 function guardRepeatQuestion(sentence: string, ctx: GuardContext): GuardReason | null {
@@ -1239,9 +1243,19 @@ function familyOutcome(family: ActionFamily, ctx: GuardContext): "succeeded" | "
 
 /** CHAT-04: one decision, shared by both paths: the sentence claims a
  * completed action whose family has no succeeded outcome this turn. */
+// EXP-01's set (the coordinator's read): "Cool, I'll add that to the
+// list" on a statement is a promise to act that nobody asked for, the
+// same padding as "I've noted that"; on a statement with no outcome it
+// is skipped like a completed claim (statementActionSkip). After a
+// request the future tense is the acceptance CHAT-04 already allows.
+const FUTURE_ACTION_RE = /\bi(?:'ll| will|'m going to|'m gonna)(?: (?:just|also|go ahead and|make sure to|be sure to))? (?:add|put|note|save|remember|store|log|jot|write (?:it|that|this) down|set (?:a |the )?(?:timer|reminder)|remind|schedule|keep (?:that|it|this) (?:in mind|on file|noted))\b/i;
+
 function guardUnsupportedAction(sentence: string, ctx: GuardContext): GuardReason | null {
   if (sentence.includes("?")) return null;
   if (bareCompletion(sentence, ctx)) return "unsupported_action";
+  // A request to remember keeps its promise ("I'll remember that" after
+  // "remember that ...") even when the signal fell back to inform.
+  if (isStatementTurn(ctx) && (ctx.outcomes ?? []).length === 0 && !REQUEST_RE.test(ctx.utterance) && !REMEMBER_REQUEST_RE.test(ctx.utterance.replace(/^\s*(?:please\s+)?(?:can|could|would|will) you\s+/i, "")) && FUTURE_ACTION_RE.test(sentence)) return "unsupported_action";
   return actionFamiliesOf(sentence, ctx).some((f) => familyOutcome(f, ctx) !== "succeeded") ? "unsupported_action" : null;
 }
 
@@ -1359,7 +1373,24 @@ const CUTTABLE: ReadonlySet<GuardReason> = new Set(["invention", "unrelated_reca
 // this.]". Keyed on the text, not the stored reason: the streaming path
 // can store a spoken prefix beside the line, and the first recorded
 // reason is not always the one that replaced (a review).
-const HONESTY_VOCABULARY: ReadonlySet<string> = new Set([...NOT_TOLD, ...DONT_KNOW, ...CHAT_LOOP]);
+// GUARD-LINES: the lines the bank used to carry stay in the vocabulary
+// so a window over a conversation written before the change still
+// strips them (never spoken again, still recognized).
+const LEGACY_HONESTY_LINES = [
+  "I don't actually have that - nobody's told me.",
+  "That's not something I've been told.",
+  "I don't know, sorry.",
+  "I'm not sure about that.",
+  "I don't have an answer for that.",
+  "I keep landing on the same answer - ask me that another way?",
+];
+const HONESTY_VOCABULARY: ReadonlySet<string> = new Set([...NOT_TOLD, ...DONT_KNOW, ...CHAT_LOOP, ...LEGACY_HONESTY_LINES]);
+/** GUARD-LINES: every line any guard can speak, for the test that none
+ * carries the words Jesse ruled out ("told", "nobody"). */
+export function allReplacementLines(): string[] {
+  const families = ACTION_FAMILIES.flatMap((f) => [f.none, f.failed, f.pending ?? ""]).filter(Boolean);
+  return [...new Set([...Object.values(REPLACEMENT_FOR).flat(), ...CANNOT_EXPERIENCE, ...NO_RECORD_OF_SAYING, ...ACKNOWLEDGE, ...Object.values(EMPTIED_LINES).flat(), NOTHING_RAN, WAITING, ...families])];
+}
 export function withoutHonestyLines(text: string): string {
   return splitIntoSentences(text)
     .filter((s) => !HONESTY_VOCABULARY.has(s.trim()))
@@ -1518,8 +1549,12 @@ export function guardReply(reply: string, ctx: GuardContext): Guarded {
   const kept: string[] = [];
   let skipped: { reason: GuardReason; sentence: string } | null = null;
   let tailCut: GuardReason | null = null;
+  // EXP-01's set: a sentence that followed a skipped one on a
+  // conjunction ("But we can watch it together") loses the lead.
+  let justSkipped = false;
   for (let i = 0; i < sentences.length; i++) {
-    const whole = sentences[i]!;
+    const whole = justSkipped ? dropConjunctionLead(sentences[i]!) : sentences[i]!;
+    justSkipped = false;
     // REG-01, rule 2: a register tail ("Sounds fun, let me know if you
     // need anything else.") is cut and the head kept; recorded as a hit
     // that replaced nothing.
@@ -1533,6 +1568,7 @@ export function guardReply(reply: string, ctx: GuardContext): Guarded {
     if (isSkippable(reason, fullReplyCtx)) {
       // Item 1b: dropped wherever it sits, the rest of the reply goes on.
       skipped ??= { reason, sentence };
+      justSkipped = true;
       continue;
     }
     if (kept.length > 0 && CUTTABLE.has(reason)) {

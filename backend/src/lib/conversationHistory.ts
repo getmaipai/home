@@ -759,6 +759,12 @@ function excludeSupersededRows(rows: readonly ConversationTurnRow[], alsoSuperse
 
 export interface ConversationWindow {
   messages: LlmMessage[];
+  /** RECALL-03: the turns the window holds verbatim, so the turns that
+   * fell out of it can be recalled as evidence and never duplicated. */
+  turnIds: string[];
+  /** RECALL-03: true when the conversation has turns older than the
+   * window (the summary line may or may not cover them). */
+  droppedOlder: boolean;
   /** One system-side line covering everything older than the window,
    * only when older turns actually exist AND a summary already covers
    * them - never a placeholder for "there's more but no summary yet". */
@@ -878,7 +884,7 @@ export function buildConversationWindow(conversation: Conversation, opts: { supe
     .all();
   rows.sort((a, b) => a.createdAt.localeCompare(b.createdAt));
   const liveRows = excludeSupersededRows(rows, opts.supersedes);
-  if (liveRows.length === 0) return { messages: [] };
+  if (liveRows.length === 0) return { messages: [], turnIds: [], droppedOlder: false };
 
   const newest = liveRows.slice(-WINDOW_NEWEST_TURNS_KEPT);
   const older = liveRows.slice(0, Math.max(0, liveRows.length - WINDOW_NEWEST_TURNS_KEPT));
@@ -928,7 +934,7 @@ export function buildConversationWindow(conversation: Conversation, opts: { supe
   const summaryLine =
     hasUncoveredOlder && conversation.summary ? `Summary of earlier conversation: ${redactCredentials(conversation.summary)}` : undefined;
 
-  return { messages, summaryLine };
+  return { messages, summaryLine, turnIds: windowTurns.map((t) => t.id), droppedOlder: hasUncoveredOlder };
 }
 
 // ==== The rolling summary refresh (step 3) ====
