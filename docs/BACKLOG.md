@@ -1877,6 +1877,24 @@ invented for the roster's household, and added to
     design session's review of the sheet, and the rewrite into bench
     scenarios (after CHAT-16).
 
+    Reference distributions shipped 2026-09-14, Session B (lane 13
+    item 2): `reference.ts` computes DailyDialog's act and emotion
+    distributions and their transition tables (train+validation for
+    the distributions, honoring the test split's own held-out note;
+    train alone for the transitions, matching dev.md's own wording),
+    committed to `reference/dailydialog.json` with the registry's
+    version and checksums inside; a test pins the numbers to dev.md
+    section 12's own quoted figures within one point. A live check
+    found one of dev.md's own quoted figures ("a question 16 percent"
+    after a question) does not match the act-based transition (11.4
+    percent, a real 4.6-point gap) - it matches a different, surface
+    measurement (the next turn's own text carrying a "?", 16.3
+    percent) dev.md's prose folds into the same sentence without
+    naming it; both numbers are now reported correctly, never
+    conflated. Design note: `docs/dev/session-b.md`, "Lane 13 item 2".
+    No child-length reference file: no public source supports the
+    design's own child/teen word-and-sentence caps, recorded as such.
+
 <a id="cur-01"></a>
 
 - [ ] **CUR-01: The memory curator** (S-M, after MEM-06)

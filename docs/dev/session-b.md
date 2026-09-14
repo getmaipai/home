@@ -2900,3 +2900,89 @@ run against the real downloaded datasets, reported above, generated
 the sheet and confirmed every rule finds real matches. Nothing under
 `backend/src/` touched; the bench runner and fixture untouched
 (Session A is in them for ACT-01).
+
+## Lane 13 item 2: the reference distributions, reproducible
+
+dev.md section 12 quotes DailyDialog's act and emotion distribution
+and its transition table ("a question back after an inform 43
+percent"), computed by hand once. `reference.ts` makes it
+reproducible: `computeActDistribution`/`computeEmotionDistribution`
+(a turn's own label, counted across every turn), `computeActTransition`/
+`computeEmotionTransition` (the label on a turn and the label on the
+very next turn in the same session, never crossing a session
+boundary), and `computeNextTurnQuestionMarkRate` (whether the next
+turn's own text carries a "?", by the current turn's act - a surface
+measurement dev.md's prose also names, distinct from the act-based
+transition to a question-labeled turn). `buildReference()` assembles
+these plus `registry.json`'s own version and checksums for the
+dailydialog entry into the committed `reference/dailydialog.json`.
+
+**Split choice, resolved without asking** (docs/BACKLOG's own "resolve
+before asking" rule): the item's own text says compute everything "on
+DailyDialog's training split"; dev.md's own methodology note says the
+act and emotion distributions are "across its three splits" while the
+transition table is "in the training split" - two different scopes.
+Checked live, 2026-09-14: all three splits combined reproduces dev.md's
+13,118 dialogues, 102,979 turns and every distribution figure exactly.
+`registry.json`'s own heldOut note for dailydialog says the test split
+is never used for register-reference sampling in this project, so the
+committed file uses train+validation for the distributions (12,118
+dialogues, 95,239 turns) and train alone for the transitions, matching
+dev.md's own explicit "in the training split" wording. The held-out
+distributions land within 0.1 percentage point of dev.md's quoted
+figures either way, so honoring the held-out split costs nothing.
+
+**One figure did not reproduce, and that is exactly what this item is
+for.** dev.md's own five other quoted transition figures reproduce
+within 0.5 point (inform->inform 47.2 vs 47, inform->question 37.2 vs
+37, question->inform 75.5 vs 76, directive->commissive 57.2 vs 57) but
+"after a question, ... a question 16 [percent]" does not: the real
+act-based question->question transition is 11.4 percent, a 4.6-point
+gap. Tracing it: dev.md's own prose for the "after an inform" row
+gives THREE figures (inform 47, question 37 - both act-based - and
+"carries a question mark 43 percent," a surface measurement of the
+next turn's own text); the "after a question" row's prose drops the
+act-based figure and keeps only the surface one, still calling it "a
+question 16" without repeating "carries a question mark." Computed
+live: the next turn after an inform carries a "?" 42.8 percent of the
+time (matches "43" to 0.2 point) and after a question, 16.3 percent
+(matches "16" to 0.3 point) - both surface measurements, not act
+transitions. `reference.ts` reports both kinds honestly
+(`actTransition.question.question`: 11.4, the real act-based rate;
+`nextTurnQuestionMarkRate.question`: 16.3, the surface rate dev.md's
+prose actually quoted), and the pinning test asserts the surface
+figure matches "16" while explicitly asserting the act-based figure
+does NOT match it within one point - so a future reader of dev.md's
+own ambiguous sentence, or of this file, sees the real numbers instead
+of one made to look like it matches something it does not measure.
+
+**The child-length baselines** (design: child two sentences and 40
+words, teen two and 55) have no public source - DailyDialog carries no
+age or audience label, and nothing else downloaded does either. Per
+the item's own instruction, no second reference file: these stay the
+design's own figures (section 13's own envelope table), with no public
+reference to pin them against.
+
+**Testing shape** (the org's "deterministic and offline by default"
+rule): `datasetsReference.test.ts` proves every compute function's own
+arithmetic against a ten-turn hand-built sample with a hand-counted
+answer (never the real ~95k-turn corpus); a second describe block
+reads the COMMITTED `reference/dailydialog.json` and pins its own
+numbers to dev.md's quoted figures within one point, which stays
+deterministic (one small JSON file, no download) while still catching
+drift - a future re-run of `reference.ts` against a changed dataset or
+loader is what would move the committed numbers, and this test would
+then fail until reference/dailydialog.json is regenerated and
+re-checked, the same "regenerate and commit, a test pins the result"
+shape `generate-sample-manifest.ts` and `sample-manifest.json` already
+use.
+
+Live run, 2026-09-14: 12,118 dialogues, 95,239 turns; act distribution
+inform 45.1, question 28.6, directive 16.8, commissive 9.5; emotion
+distribution neutral 83.2, happiness 12.5, surprise 1.8, sadness 1.1,
+anger 0.9, disgust 0.3, fear 0.2 - all within 0.1 point of dev.md's own
+figures. Verified: `bun run lint` (`tsc --noEmit`) clean; 15 new tests
+in `datasetsReference.test.ts`, all green; the full datasets-directory
+suite (95 tests across 10 files) green. Nothing under `backend/src/`
+touched; the bench runner and fixture untouched (Session A is in ACT-01's
+seeded set).

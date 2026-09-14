@@ -1,0 +1,136 @@
+{
+  "datasetVersion": "Li et al. 2017 (roskoN mirror)",
+  "datasetChecksums": [
+    {
+      "path": "dailydialog/train.zip",
+      "sha256": "c5179ab5a9a86a77b9d29114087c6b82cc4cb366abea25a43a0c24be761133f7"
+    },
+    {
+      "path": "dailydialog/validation.zip",
+      "sha256": "1dbcb00a0b4fe709788ce6604b561ba76557c88fe41f049d7899287838f0ec6a"
+    },
+    {
+      "path": "dailydialog/test.zip",
+      "sha256": "cfffc0bab93a3697c2562a9ee35c4533f0de2a93e86a4e4d3ea45cbde4bea00f"
+    }
+  ],
+  "distributionSplits": [
+    "train",
+    "validation"
+  ],
+  "transitionSplit": "train",
+  "dialogueCount": 12118,
+  "turnCount": 95239,
+  "actDistribution": {
+    "inform": 45.1,
+    "question": 28.6,
+    "directive": 16.8,
+    "commissive": 9.5
+  },
+  "emotionDistribution": {
+    "neutral": 83.2,
+    "anger": 0.9,
+    "disgust": 0.3,
+    "fear": 0.2,
+    "happiness": 12.5,
+    "sadness": 1.1,
+    "surprise": 1.8
+  },
+  "actTransition": {
+    "inform": {
+      "inform": 47.2,
+      "question": 37.2,
+      "directive": 14.2,
+      "commissive": 1.4
+    },
+    "question": {
+      "inform": 75.5,
+      "question": 11.4,
+      "directive": 13,
+      "commissive": 0.1
+    },
+    "directive": {
+      "inform": 6.1,
+      "question": 23.7,
+      "directive": 13,
+      "commissive": 57.2
+    },
+    "commissive": {
+      "inform": 35.2,
+      "question": 24.7,
+      "directive": 38.2,
+      "commissive": 1.9
+    }
+  },
+  "emotionTransition": {
+    "neutral": {
+      "neutral": 88.2,
+      "anger": 0.9,
+      "disgust": 0.3,
+      "fear": 0.2,
+      "happiness": 7.4,
+      "sadness": 1.2,
+      "surprise": 1.9
+    },
+    "anger": {
+      "neutral": 79.2,
+      "anger": 11.9,
+      "disgust": 0.4,
+      "fear": 0.1,
+      "happiness": 0.9,
+      "sadness": 5.2,
+      "surprise": 2.3
+    },
+    "disgust": {
+      "neutral": 78.1,
+      "anger": 2,
+      "disgust": 13.3,
+      "fear": 0,
+      "happiness": 2,
+      "sadness": 0.8,
+      "surprise": 3.9
+    },
+    "fear": {
+      "neutral": 86.3,
+      "anger": 0,
+      "disgust": 0,
+      "fear": 3.1,
+      "happiness": 5.3,
+      "sadness": 0,
+      "surprise": 5.3
+    },
+    "happiness": {
+      "neutral": 33.4,
+      "anger": 0,
+      "disgust": 0.1,
+      "fear": 0.1,
+      "happiness": 64.4,
+      "sadness": 0.2,
+      "surprise": 1.8
+    },
+    "sadness": {
+      "neutral": 81.5,
+      "anger": 3.6,
+      "disgust": 0.1,
+      "fear": 0.1,
+      "happiness": 4.3,
+      "sadness": 6.6,
+      "surprise": 3.6
+    },
+    "surprise": {
+      "neutral": 81.5,
+      "anger": 1.4,
+      "disgust": 0.8,
+      "fear": 0.3,
+      "happiness": 11,
+      "sadness": 1.1,
+      "surprise": 3.8
+    }
+  },
+  "nextTurnQuestionMarkRate": {
+    "inform": 42.8,
+    "question": 16.3,
+    "directive": 32.4,
+    "commissive": 36.9
+  }
+}
