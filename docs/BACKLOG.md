@@ -685,44 +685,6 @@ not permission to expand scope.
     when this lands).
     Checks: named suites, history/activity tests, shared client tests, and
     full exit gate; contention measurements belong to CHAT-23.
-    Note (2026-09-13, CONC-01 below): "one active operation" is
-    background against interactive, never one person against another;
-    the arbiter admits up to N interactive turns at once.
-
-<a id="conc-01"></a>
-
-- [ ] **CONC-01: Concurrent household conversations** (M)
-
-    Several people chat at once (a phone, the TV, the robot) and none
-    waits for the others. The chat engine runs N slots with
-    llama-server's continuous batching (N sized to the card: the 8B's
-    weights once, one context per slot); the arbiter admits up to N
-    interactive turns at once and still makes background work yield to
-    any of them; the prefix cache holds the shared system prompt across
-    slots; per-person rate limits stay (#102); the judge stays on its
-    own engine. Text and reasoning: `docs/plans/
-    media-conversation-program-2026-09-13.md`, "Requirement recorded
-    2026-09-13". Depends on: CHAT-19. Files: `backend/src/lib/
-    llmSupervisor.ts` (slots), `llm.ts` (`id_slot`), the arbiter,
-    `scripts/bench/conversation.ts`. Acceptance: two conversations
-    interleaved turn for turn on separate people, each reply under 1.5
-    times its solo latency, no reply from one conversation ever
-    containing the other's text, three seeded runs. Out of scope: a
-    second model, residency policy. Checks: llm and supervisor suites,
-    the bench, full exit gate.
-
-- [ ] **EVAL: One 8B, two slots, the judge yields** (M)
-
-    An experiment, after CHAT-19: the memory judge on a second slot of
-    the chat engine that runs only when no reply is in progress,
-    against today's separate 4B engine. Judged by reply latency under
-    load, judge precision (the judge eval's scorer), and drain time
-    per bench run; kept only if it wins on all three. It does not
-    change CONC-01's requirement (`docs/plans/
-    media-conversation-program-2026-09-13.md`). Depends on: CHAT-19,
-    CONC-01. Files: `backend/src/lib/backgroundSupervisor.ts`,
-    `llmSupervisor.ts`, `scripts/bench/judge-eval.ts`. Checks: the
-    judge eval and the seeded bench, three runs each way.
 
 <a id="chat-20"></a>
 
@@ -1684,21 +1646,7 @@ Track B: MEM-01, MEM-02, MEM-03, MEM-04, MEM-05. Then JOIN-01, JOIN-02.
 
 <a id="mem-05"></a>
 
-- [x] **MEM-05: Prove the small judge, or fall back to the 4B pin** (S)
-    Resolved as switch, 2026-09-13 (Jesse's decision), verified at the
-    commit that carries this line: the household default background
-    model is qwen3-4b-q4-k-m; the 1.7B stays behind
-    `MAIPAI_BACKGROUND_MODEL=qwen3-1.7b`. Live use showed the 1.7B
-    re-emitting its extraction prompt's few-shot examples as memories,
-    attributing the hub's replies and world facts to the speaker, and
-    saving a conversation's passing state instead of the durable fact,
-    about one record in ten real. judge-eval (real scorer, n=2, this
-    machine): 1.7B precision 66.7%, recall 100%, 3.19 s/turn; 4B
-    precision 100%, recall 100%, 7.31 s/turn cold. On the seeded bench
-    with the judge's prompt cache: 1.8 s per judged turn (218 s for 120
-    turns) against the 1.7B's 1.2 s, and one echo drop per run against
-    13 to 19. Numbers and the CHAT-15 three-run set in
-    docs/dev/session-a.md "MEM-05".
+- [ ] **MEM-05: Prove the small judge, or fall back to the 4B pin** (S)
 
     Status (2026-09-13, measured with the real scorer, left open): the
     1.7B (a5015c1's own number), the 4B, and the 8B baseline all now run
