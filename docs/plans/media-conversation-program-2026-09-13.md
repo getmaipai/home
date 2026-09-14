@@ -192,6 +192,27 @@ credential class is fixed now as a bug (a rejection at the judge's
 output) or waits for the pass; and MEM-05 ("prove the small judge or
 fall back to the 4B pin"), for which this is the re-run evidence.
 
+## Requirement recorded 2026-09-13: concurrent household conversations
+
+Jesse's standing requirement: several people in the house chat at the
+same time (a phone, the TV, the robot) and none of them waits for the
+others. Today the chat engine runs one slot (`llmSupervisor.ts`,
+`id_slot: 0`) and CHAT-19's arbiter is written as one active operation
+with FIFO queues, which serializes people, not only background work.
+The item to add beside CHAT-19, owned by Session A, named CONC-01: the
+chat engine runs N slots with llama-server's continuous batching (N
+sized to the card: the 8B's weights once, one context per slot), the
+arbiter admits up to N interactive turns at once and still makes
+background work yield to any of them, the prefix cache holds the
+shared system prompt across slots, per-person rate limits stay as they
+are (#102). Acceptance on the bench: two conversations interleaved
+turn for turn on separate people, each reply under 1.5 times its solo
+latency, no reply from one conversation ever containing the other's
+text, three seeded runs. The judge stays on its own engine so
+background never competes for the chat card. The "one 8B, two slots,
+judge yields" experiment (EVAL, after CHAT-19) is a separate question
+and does not change this requirement.
+
 ## Rules
 
 Each step's acceptance is three identical bench runs; the film rows
