@@ -33,6 +33,7 @@
 // false call. The two #77 phrasings ride along as extra positive rows.
 //
 // Usage: bun run scripts/bench/tool-calling.ts
+import { sanitizeEngineUrl } from "@/lib/engineIdentity";
 import "./setup"; // CHAT-22: must come before anything that reaches "@/db"
 import { finishBench, startBench } from "./setup";
 import { readFileSync } from "node:fs";
@@ -117,7 +118,7 @@ async function main(): Promise<{ executed: number; engine: string }> {
   await complete("chat", [{ role: "user", content: "hello" }]);
   const status = getEngineStatus();
   console.log(`Chat engine: ${status.kind}, model ${status.modelId ?? "n/a"}`);
-  const engine = `chat ${status.kind} at ${process.env.MAIPAI_LLAMA_SERVER_URL}`; // before the reset below
+  const engine = `chat ${status.kind} at ${sanitizeEngineUrl(process.env.MAIPAI_LLAMA_SERVER_URL)}`; // before the reset below
   console.log(`Running ${corpus.length} tool-call-corpus rows, ${REPEATS} repeats each...\n`);
 
   let falseCallAttempts = 0; // every repeat of a negative row (expect_calls: [])

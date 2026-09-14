@@ -12766,6 +12766,11 @@ other's section once (147cd28, f4779a6).
   clearance Shell.tsx already reserves for it), proven to fail then
   fixed with a real-layout check in scripts/screenshot.ts:
   [docs/dev/session-b.md](dev/session-b.md) (2026-09-13).
+- ENGINE-HOST-01, external engines: the supervisors' URL tiers probe the
+  engine they point at and read its identity from `/props` (the host as
+  a label only), the `[turn]` line and the bench header carry it, so the
+  hub and the seeded sets run against engines on another machine in the
+  house: [docs/dev/session-a.md](dev/session-a.md) (2026-09-14).
 - LOOKUP-01, a promise is the lookup, an offer is a pending ask: a
   first-sentence promise to look something up is never sent (the
   forced lookup runs, its answer or the honest line goes out, on both

@@ -12,6 +12,7 @@
 // refusals: a fresh temp data directory, engines already running, never
 // a spawn). Usage: MAIPAI_DATA_DIR=<fresh> MAIPAI_LLAMA_SERVER_URL=<chat>
 // MAIPAI_EMBED_URL=<embed> bun run scripts/bench/recall-floor.ts
+import { sanitizeEngineUrl } from "@/lib/engineIdentity";
 import "./setup"; // CHAT-22: must come before anything that reaches "@/db"
 import { finishBench, startBench } from "./setup";
 import { eq, inArray } from "drizzle-orm";
@@ -369,7 +370,7 @@ async function main(): Promise<{ executed: number; engine: string }> {
   console.log(`\n  signal: ${signalHits} of ${EPISODE_SIGNAL_QUERIES.length} recalled first; weakest cosine ${f(Math.min(...signalCosines))}`);
   return {
     executed: UNRELATED_QUERIES.length + NAMED_NULL_QUERIES.length + RELATED_QUERIES.length + INDIRECT_QUERIES.length + EPISODE_NULL_QUERIES.length + EPISODE_SIGNAL_QUERIES.length,
-    engine: `embed url at ${process.env.MAIPAI_EMBED_URL}`,
+    engine: `embed url at ${sanitizeEngineUrl(process.env.MAIPAI_EMBED_URL)}`,
   };
 }
 

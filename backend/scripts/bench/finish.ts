@@ -2,6 +2,7 @@
 // can import it without tripping setup.ts's import-time guard (which
 // exits the process the moment it runs outside a bench's own
 // environment).
+import { sanitizeEngineUrl } from "@/lib/engineIdentity";
 
 export interface BenchSummary {
   /** How many cases actually ran (rows, or rows times repeats). Zero is
@@ -19,7 +20,7 @@ export interface BenchSummary {
  * hanging on the timers the turn engine's imports start (FAST-06's
  * finding). `exit` is injectable so a test can observe the code. */
 export function finishBench(summary: BenchSummary, exit: (code: number) => void = (code) => process.exit(code)): void {
-  const engine = summary.engine ?? `${process.env.MAIPAI_LLAMA_SERVER_URL} (chat), ${process.env.MAIPAI_EMBED_URL} (embed)`;
+  const engine = summary.engine ?? `${sanitizeEngineUrl(process.env.MAIPAI_LLAMA_SERVER_URL)} (chat), ${sanitizeEngineUrl(process.env.MAIPAI_EMBED_URL)} (embed)`;
   console.log(`\nbench finished: engine ${engine}; executed ${summary.executed} cases; data directory ${process.env.MAIPAI_DATA_DIR} (disposable)`);
   if (!Number.isFinite(summary.executed) || summary.executed <= 0) {
     console.error("bench failed: zero cases executed, which cannot count as a pass.");

@@ -1,5 +1,5 @@
 import { describe, expect, test, beforeEach, afterEach } from "bun:test";
-import { getBackgroundClient, getBackgroundBackendKind, backgroundLaunchArgs, __resetBackgroundSupervisorForTests } from "@/lib/backgroundSupervisor";
+import { getBackgroundClient, getBackgroundBackendKind, getBackgroundEngineIdentity, backgroundLaunchArgs, __resetBackgroundSupervisorForTests } from "@/lib/backgroundSupervisor";
 import { LlamaServerClient } from "@maipai/spec/llm/ts/client.js";
 
 beforeEach(() => {
@@ -34,6 +34,26 @@ describe("backgroundSupervisor getBackgroundClient()", () => {
       expect(await client.health()).toBe(true);
     } finally {
       stub.stop();
+    }
+  });
+
+  test("ENGINE-HOST-01: the URL tier reads the engine's identity (build, model file, health) and spawns nothing", async () => {
+    const fake = Bun.serve({
+      port: 0,
+      fetch: (req) => {
+        const path = new URL(req.url).pathname;
+        if (path === "/health") return Response.json({ status: "ok" });
+        if (path === "/props") return Response.json({ build_info: "b10797-832fd6f17", model_path: "/srv/models/qwen3-4b-q4-k-m.gguf" });
+        return new Response("not found", { status: 404 });
+      },
+    });
+    try {
+      process.env.MAIPAI_BACKGROUND_URL = `http://127.0.0.1:${fake.port}`;
+      await getBackgroundClient();
+      expect(getBackgroundBackendKind()).toBe("url");
+      expect(getBackgroundEngineIdentity()).toEqual({ host: "local", build: "b10797-832fd6f17", model: "qwen3-4b-q4-k-m.gguf", healthy: true });
+    } finally {
+      fake.stop(true);
     }
   });
 

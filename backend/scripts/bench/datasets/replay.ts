@@ -23,6 +23,7 @@
 // Usage: bun run backend/scripts/bench/datasets/replay.ts --dataset
 // longmemeval-oracle|longmemeval-oracle-v0|longmemeval-sample|locomo
 // [--only id,id] [--seed N]
+import { sanitizeEngineUrl } from "@/lib/engineIdentity";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { readFileSync } from "node:fs";
@@ -513,7 +514,7 @@ async function main() {
   await getBackgroundClient();
   const judge = await probeBackgroundEngine();
   if (!judge.alive) {
-    console.error(`replay setup refused: no memory judge answers at MAIPAI_BACKGROUND_URL (${process.env.MAIPAI_BACKGROUND_URL}); the replay needs the judge for ingestion.`);
+    console.error(`replay setup refused: no memory judge answers at MAIPAI_BACKGROUND_URL (${sanitizeEngineUrl(process.env.MAIPAI_BACKGROUND_URL)}); the replay needs the judge for ingestion.`);
     process.exit(2);
   }
 

@@ -34,6 +34,7 @@
 // Processed and cached token counts come from llama-server's own final
 // stream chunk (`timings.prompt_n` and `timings.cache_n`, confirmed live on
 // the pinned b10797 build, 2026-09-12), never inferred from a stable string.
+import { sanitizeEngineUrl } from "@/lib/engineIdentity";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -326,10 +327,10 @@ async function main(tmpDir: string): Promise<void> {
     buildSystemPrompt: (actor, text, matches) => engine.buildSystemPrompt(actor, text, matches, loaded, undefined, skills),
     buildPromptParts: (actor, text, matches) => engine.buildPromptParts(actor, text, matches, loaded, undefined, skills),
   };
-  console.log(`engine ${url}, layout ${layoutArg}, slot ${slot}, stable prefix ${engine.buildStablePrefix().length} chars, 3 warm-ups then ${USER_MESSAGES.length} turns`);
+  console.log(`engine ${sanitizeEngineUrl(url)}, layout ${layoutArg}, slot ${slot}, stable prefix ${engine.buildStablePrefix().length} chars, 3 warm-ups then ${USER_MESSAGES.length} turns`);
   const summary = await runBench(url, layoutArg, builders, (line) => console.log(line), slot);
   console.log("");
-  console.log(formatTable(url, layoutArg, summary));
+  console.log(formatTable(sanitizeEngineUrl(url), layoutArg, summary));
   console.log(JSON.stringify({ url, layout: layoutArg, ...summary }));
 }
 

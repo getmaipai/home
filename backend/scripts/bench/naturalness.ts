@@ -21,6 +21,7 @@
 // exact same reason.
 //
 // Usage: bun run scripts/bench/naturalness.ts
+import { sanitizeEngineUrl } from "@/lib/engineIdentity";
 import "./setup"; // CHAT-22: must come before anything that reaches "@/db"
 import { finishBench, startBench } from "./setup";
 import { readFileSync } from "node:fs";
@@ -121,4 +122,4 @@ try {
 }
 // CHAT-22: the explicit exit is also what stops the process hanging on
 // the timers the turn engine's imports start (FAST-06's finding).
-finishBench({ executed, engine: `chat ${getEngineStatus().kind} at ${process.env.MAIPAI_LLAMA_SERVER_URL}` });
+finishBench({ executed, engine: `chat ${getEngineStatus().kind} at ${sanitizeEngineUrl(process.env.MAIPAI_LLAMA_SERVER_URL)}` });

@@ -19,6 +19,7 @@
 // refine).
 //
 // Usage: bun run scripts/bench/memory/run.ts
+import { sanitizeEngineUrl } from "@/lib/engineIdentity";
 import "../setup"; // CHAT-22: must come before anything that reaches "@/db"
 import { finishBench, startBench } from "../setup";
 import { eq } from "drizzle-orm";
@@ -220,7 +221,7 @@ async function main(): Promise<{ executed: number; engine: string }> {
   console.log(`\n${totalPass}/${results.length} passed overall`);
   // Read after the turns above selected the engine (it reads "none"
   // before the first turn) and before the finally block resets it.
-  const engine = `chat ${getEngineStatus().kind} at ${process.env.MAIPAI_LLAMA_SERVER_URL}`;
+  const engine = `chat ${getEngineStatus().kind} at ${sanitizeEngineUrl(process.env.MAIPAI_LLAMA_SERVER_URL)}`;
   return { executed: results.length, engine };
 }
 

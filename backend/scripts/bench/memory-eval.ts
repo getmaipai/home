@@ -27,6 +27,7 @@
 //   legacy's 0-9; every seed's importance below is the legacy value / 9.
 //
 // Usage: bun run scripts/bench/memory-eval.ts
+import { sanitizeEngineUrl } from "@/lib/engineIdentity";
 import "./setup"; // CHAT-22: must come before anything that reaches "@/db"
 import { finishBench, startBench } from "./setup";
 import { eq } from "drizzle-orm";
@@ -171,7 +172,7 @@ async function main(): Promise<{ executed: number; engine: string }> {
   // getEmbedBackendKind() would still read back "starting".
   await embedQueryForRecall("warm the embed backend");
   console.log(`Embed backend: ${getEmbedBackendKind()}`);
-  const engine = `embed ${getEmbedBackendKind()} at ${process.env.MAIPAI_EMBED_URL}`; // before the reset below
+  const engine = `embed ${getEmbedBackendKind()} at ${sanitizeEngineUrl(process.env.MAIPAI_EMBED_URL)}`; // before the reset below
   console.log(`Running ${CASES.length} recall probes...\n`);
   let pass = 0;
   for (const c of CASES) {

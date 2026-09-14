@@ -21,6 +21,7 @@ import { hotReloadState } from "@/lib/hotReloadState";
 import { assertNotInCrashBootHold } from "@/lib/dirtyBoot";
 import { backgroundModelPath, ensureBackgroundModel } from "@/lib/backgroundAssets";
 import { LlamaServerClient } from "@maipai/spec/llm/ts/client.js";
+import { readEngineIdentity, formatEngineIdentity, identityIncomplete, type EngineIdentity } from "@/lib/engineIdentity";
 import { startStubLlmServer } from "@maipai/spec/llm/ts/stubServer.js";
 import { seedFields } from "@/lib/benchSampling";
 
@@ -35,6 +36,10 @@ interface BackgroundBackend {
   pid?: number;
   kind: BackgroundBackendKind;
   startedAt: string;
+  /** ENGINE-HOST-01: the URL tier's reading of what answered. */
+  identity?: EngineIdentity;
+  /** A re-read in flight for an incomplete identity, one at a time. */
+  identityRefresh?: Promise<void>;
 }
 
 interface BackgroundSupervisorState {
@@ -129,7 +134,11 @@ export async function probeBackgroundEngine(): Promise<EngineHealth> {
 async function startBackgroundBackend(): Promise<BackgroundBackend> {
   const configuredUrl = process.env.MAIPAI_BACKGROUND_URL;
   if (configuredUrl) {
-    return { client: new LlamaServerClient(configuredUrl), stop: () => {}, kind: "url", startedAt: new Date().toISOString() };
+    // ENGINE-HOST-01: nothing is spawned; the engine already running is
+    // probed and its identity read (never its address: the label only).
+    const identity = await readEngineIdentity(configuredUrl);
+    console.log(`[engine] background: ${formatEngineIdentity(identity)}; health ${identity.healthy ? "ok" : "down"}`);
+    return { client: new LlamaServerClient(configuredUrl), stop: () => {}, kind: "url", startedAt: new Date().toISOString(), identity };
   }
 
   const hw = await detectHardware();
@@ -168,6 +177,26 @@ export function getBackgroundBackendKind(): BackgroundBackendKind | "starting" |
   if (state.backgroundBackend) return state.backgroundBackend.kind;
   if (state.startingPromise) return "starting";
   return "none";
+}
+
+/** ENGINE-HOST-01: the background engine's identity, the URL tier's own
+ * reading, a spawned engine as "local", the stub as "stub"; null before
+ * the backend is up. */
+export function getBackgroundEngineIdentity(): EngineIdentity | null {
+  const backend = state.backgroundBackend;
+  if (!backend) return null;
+  if (backend.identity) {
+    // A reading the engine did not answer (it was still loading) is
+    // taken again, once at a time, so the line fills in (a review).
+    if (identityIncomplete(backend.identity) && !backend.identityRefresh && backend.kind === "url" && process.env.MAIPAI_BACKGROUND_URL) {
+      backend.identityRefresh = readEngineIdentity(process.env.MAIPAI_BACKGROUND_URL).then((fresh) => {
+        backend.identity = fresh;
+        backend.identityRefresh = undefined;
+      });
+    }
+    return backend.identity;
+  }
+  return { host: backend.kind === "stub" ? "stub" : "local", build: null, model: null, healthy: null };
 }
 
 export function getBackgroundLivePid(): number | null {

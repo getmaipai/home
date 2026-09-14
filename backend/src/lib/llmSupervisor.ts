@@ -38,6 +38,7 @@ import { modelsDir, enginesDir } from "@/lib/paths";
 import { resolveLaunchFlags, launchFlagsToArgs, type LaunchFlags, type LaunchFlagOverrides } from "@/lib/engineAutotune";
 import { runPostLoadCheck, type PostLoadCheckResult } from "@/lib/enginePostLoadCheck";
 import { getHouseholdSettingValue } from "@/lib/settings";
+import { readEngineIdentity, formatEngineIdentity, identityIncomplete, type EngineIdentity } from "@/lib/engineIdentity";
 import { spawnAndWaitHealthy, freePort, sweepOrphanProcesses, watchEngine, probeAlive, engineHealthKind, cancelEngineRespawn, type EngineWatch, type EngineHealth } from "@/lib/sidecars";
 import { hotReloadState } from "@/lib/hotReloadState";
 import { assertNotInCrashBootHold } from "@/lib/dirtyBoot";
@@ -63,6 +64,11 @@ interface ChatBackend {
   kind: BackendKind;
   modelId?: string;
   startedAt: string;
+  /** ENGINE-HOST-01: what answered, for the [turn] line and the health
+   * page; read from the engine on the URL tier, derived on the others. */
+  identity?: EngineIdentity;
+  /** A re-read in flight for an incomplete identity, one at a time. */
+  identityRefresh?: Promise<void>;
 }
 
 export interface EngineStatus {
@@ -397,7 +403,11 @@ async function trySpawnFromSelection(): Promise<ChatBackend | null> {
 async function startChatBackend(): Promise<ChatBackend> {
   const configuredUrl = process.env.MAIPAI_LLAMA_SERVER_URL;
   if (configuredUrl) {
-    return { client: new LlamaServerClient(configuredUrl), stop: () => {}, kind: "url", startedAt: new Date().toISOString() };
+    // ENGINE-HOST-01: nothing is spawned; the engine already running is
+    // probed and its identity read (never its address: the label only).
+    const identity = await readEngineIdentity(configuredUrl);
+    console.log(`[engine] chat: ${formatEngineIdentity(identity)}; health ${identity.healthy ? "ok" : "down"}`);
+    return { client: new LlamaServerClient(configuredUrl), stop: () => {}, kind: "url", startedAt: new Date().toISOString(), identity };
   }
 
   const bin = process.env.MAIPAI_LLAMA_SERVER_BIN;
@@ -582,6 +592,27 @@ export function getEngineStatus(): EngineStatus {
   }
   if (state.startingPromise) return { kind: "starting", modelId: null, pid: null, startedAt: null };
   return { kind: "none", modelId: null, pid: null, startedAt: null };
+}
+
+/** ENGINE-HOST-01: the chat engine's identity for the [turn] line: the
+ * URL tier's own reading, a spawned model's id as "local", the stub as
+ * "stub"; null before the backend is up. */
+export function getChatEngineIdentity(): EngineIdentity | null {
+  const backend = state.chatBackend;
+  if (!backend) return null;
+  if (backend.identity) {
+    // A reading the engine did not answer (it was still loading) is
+    // taken again, once at a time, so the line fills in (a review).
+    if (identityIncomplete(backend.identity) && !backend.identityRefresh && backend.kind === "url" && process.env.MAIPAI_LLAMA_SERVER_URL) {
+      backend.identityRefresh = readEngineIdentity(process.env.MAIPAI_LLAMA_SERVER_URL).then((fresh) => {
+        backend.identity = fresh;
+        backend.identityRefresh = undefined;
+      });
+    }
+    return backend.identity;
+  }
+  if (backend.kind === "stub") return { host: "stub", build: null, model: null, healthy: null };
+  return { host: "local", build: null, model: backend.modelId ?? null, healthy: null };
 }
 
 /** The most recent post-load check's result, for the select job (and

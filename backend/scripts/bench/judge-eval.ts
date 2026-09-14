@@ -25,6 +25,7 @@
 // MAIPAI_LLAMA_SERVER_BIN + MAIPAI_CHAT_MODEL_PATH to point at the judge
 // model). Record the precision/recall/seconds output; keep 1.7B if recall
 // is at least 85% of the 8B baseline and precision within 5 points.
+import { sanitizeEngineUrl } from "@/lib/engineIdentity";
 import "./setup"; // CHAT-22: must come before anything that reaches "@/db"
 import { finishBench, startBench } from "./setup";
 import { scoreExtraction, formatPercent } from "./judgeScore";
@@ -111,10 +112,10 @@ async function main(): Promise<{ executed: number; engine: string }> {
   await getBackgroundClient(); // selects the URL tier; the probe reads what is selected
   const probe = await probeBackgroundEngine();
   if (!probe.alive) {
-    console.error(`bench setup refused: no memory judge answers at MAIPAI_BACKGROUND_URL (${process.env.MAIPAI_BACKGROUND_URL}); judge-eval needs a running background engine.`);
+    console.error(`bench setup refused: no memory judge answers at MAIPAI_BACKGROUND_URL (${sanitizeEngineUrl(process.env.MAIPAI_BACKGROUND_URL)}); judge-eval needs a running background engine.`);
     process.exit(2);
   }
-  const engine = `background ${probe.kind} at ${process.env.MAIPAI_BACKGROUND_URL}`; // before the reset below
+  const engine = `background ${probe.kind} at ${sanitizeEngineUrl(process.env.MAIPAI_BACKGROUND_URL)}`; // before the reset below
 
   const startTime = Date.now();
   const batchResult = await runJudgeBatch();

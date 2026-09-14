@@ -27,6 +27,8 @@ import { recallEpisodes, formatEpisodesForPrompt, formatEpisodeLine, episodeQuot
 import { intentFor, markIncluded, guardContextFrom, outcomeOf, emptyTimings, type TurnContext, type TurnEvidence, type ToolExecutionOutcome, type RejectedReason, type TurnTimings } from "@/lib/turnContext";
 import { newConversationTurnId } from "@/lib/id";
 import { complete, startCompleteStream, type LlmMessage, type ToolSpec, type ToolCall } from "@/lib/llm";
+import { getChatEngineIdentity } from "@/lib/llmSupervisor";
+import { formatEngineIdentity } from "@/lib/engineIdentity";
 import { guardReply, guardSentence, replacementFor, isCuttable, isSkippable, isRegisterSkip, isStatementTurn, isBareSocialTurn, stripRegisterTail, dropConjunctionLead, emptiedLine, splitIntoSentences, lookupShapeOf, lookupAnswered, type GuardContext, type GuardReason } from "@/lib/guards";
 import { tokenize } from "@/lib/text";
 import { unspokenArgument, askPromptFor, isActionPackage } from "@/lib/unspokenArgs";
@@ -150,6 +152,9 @@ interface TurnLogRecord {
    * the per-stage timings. */
   signal?: { act: string; secondary: string[]; emotion: string; intensity: string; target: string; repair: string; source: string };
   timings?: TurnTimings;
+  /** ENGINE-HOST-01: which chat engine answered ("external b10797
+   * qwen3-8b...", "local ...", "stub"), the host as a label only. */
+  engine?: string;
 }
 
 function logTurnLine(surface: Surface, value: TurnValue, startedAt: number, guardHits: readonly GuardReason[], outcomes: readonly ToolExecutionOutcome[] = [], signal?: TurnSignal, timings?: TurnTimings): void {
@@ -170,6 +175,10 @@ function logTurnLine(surface: Surface, value: TurnValue, startedAt: number, guar
     ...(outcomes.length > 0 ? { outcomes: outcomes.map((o) => ({ package: o.packageId, status: o.status, ...(o.reason ? { reason: o.reason } : {}), ...(o.errorCode ? { code: o.errorCode } : {}) })) } : {}),
     ...(signal ? { signal: { act: signal.primary_act, secondary: signal.secondary_acts, emotion: signal.expressed_emotion, intensity: signal.emotion_intensity, target: signal.target, repair: signal.repair, source: signal.source } } : {}),
     ...(timings ? { timings } : {}),
+    // Only when the chat engine answered (a model turn, or a package the
+    // model's own call resolved: a first token was measured), never on a
+    // deterministic tier's turn (a review).
+    ...(value.source === "model" || (timings?.first_token_ms ?? null) !== null ? { engine: formatEngineIdentity(getChatEngineIdentity()) } : {}),
   };
   const line = `[turn] ${JSON.stringify(record)}`;
   // One writer (#73): the hub's console mirror (lib/log.ts, installed

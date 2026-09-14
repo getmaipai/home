@@ -36,6 +36,7 @@
 // reading the stub's own echoed-back user text is judging the user's
 // phrasing, not any persona - this flag is only informative once a real
 // chat model is configured (MAIPAI_LLAMA_SERVER_URL or a spawned engine).
+import { sanitizeEngineUrl } from "@/lib/engineIdentity";
 import "./setup"; // CHAT-22: must come before anything that reaches "@/db"
 import { finishBench, startBench } from "./setup";
 import { eq } from "drizzle-orm";
@@ -204,4 +205,4 @@ try {
   __resetEmbedSupervisorForTests();
 }
 // CHAT-22: see naturalness.ts on why the bench exits explicitly.
-finishBench({ executed, engine: `chat ${getEngineStatus().kind} at ${process.env.MAIPAI_LLAMA_SERVER_URL}` });
+finishBench({ executed, engine: `chat ${getEngineStatus().kind} at ${sanitizeEngineUrl(process.env.MAIPAI_LLAMA_SERVER_URL)}` });

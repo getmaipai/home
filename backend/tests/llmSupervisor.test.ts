@@ -1,5 +1,5 @@
 import { describe, expect, test, afterEach } from "bun:test";
-import { getChatClient, restartChatBackend, stopChatBackend, getEngineStatus, getChatLivePid, sweepOrphanEngineProcesses, reportChatBackendUnreachable, __resetLlmSupervisorForTests } from "@/lib/llmSupervisor";
+import { getChatClient, restartChatBackend, stopChatBackend, getEngineStatus, getChatEngineIdentity, getChatLivePid, sweepOrphanEngineProcesses, reportChatBackendUnreachable, __resetLlmSupervisorForTests } from "@/lib/llmSupervisor";
 import { enginesDir } from "@/lib/paths";
 import { setHouseholdSettingValue } from "@/lib/settings";
 import { __setCrashBootHoldForTests } from "@/lib/dirtyBoot";
@@ -64,6 +64,32 @@ describe("llmSupervisor getChatClient()", () => {
     // A second call reuses the same cached backend, not a new one.
     const second = await getChatClient();
     expect(second).toBe(client);
+  });
+
+  test("ENGINE-HOST-01: MAIPAI_LLAMA_SERVER_URL spawns nothing and reads the engine's identity (build, model file, health); the stub reads as stub", async () => {
+    const stubClient = await getChatClient();
+    expect(await stubClient.health()).toBe(true);
+    expect(getChatEngineIdentity()).toEqual({ host: "stub", build: null, model: null, healthy: null });
+    __resetLlmSupervisorForTests();
+    const fake = Bun.serve({
+      port: 0,
+      fetch: (req) => {
+        const path = new URL(req.url).pathname;
+        if (path === "/health") return Response.json({ status: "ok" });
+        if (path === "/props") return Response.json({ build_info: "b10797-832fd6f17", model_path: "/srv/models/qwen3-8b-instruct-q4-k-m.gguf" });
+        return new Response("not found", { status: 404 });
+      },
+    });
+    try {
+      process.env.MAIPAI_LLAMA_SERVER_URL = `http://127.0.0.1:${fake.port}`;
+      await getChatClient();
+      expect(getEngineStatus().kind).toBe("url");
+      expect(getEngineStatus().pid).toBeNull();
+      expect(getChatEngineIdentity()).toEqual({ host: "local", build: "b10797-832fd6f17", model: "qwen3-8b-instruct-q4-k-m.gguf", healthy: true });
+    } finally {
+      fake.stop(true);
+      delete process.env.MAIPAI_LLAMA_SERVER_URL;
+    }
   });
 
   // The crash-boot hold only gates a real spawn (trySpawnFromSelection) -

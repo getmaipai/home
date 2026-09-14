@@ -20,6 +20,7 @@ import { createReadStream, existsSync } from "node:fs";
 import { startRecordingProxy } from "./recordingProxy";
 import type { TurnTimings } from "@/lib/turnContext";
 import { questionRateSummary } from "./questionRate";
+import { sanitizeEngineUrl, hostLabel, modelFileName } from "@/lib/engineIdentity";
 
 const upstream = process.env.MAIPAI_LLAMA_SERVER_URL;
 if (!upstream) {
@@ -115,6 +116,14 @@ async function engineProps(url: string): Promise<EngineProps> {
   }
 }
 
+async function engineLine(url: string, props: EngineProps): Promise<{ url: string; host: string; build: string; model: string; sha256: string }> {
+  const external = hostLabel(url) === "external";
+  const model = props.model_path ?? "n/a";
+  // The hash only for a file this machine has (a review: an external
+  // engine's path can name a look-alike file here, hashed for nothing).
+  return { url: sanitizeEngineUrl(url), host: hostLabel(url), build: props.build_info ?? "n/a", model: external ? modelFileName(model) : model, sha256: external ? "n/a (the file is not on this machine)" : await sha256Of(props.model_path) };
+}
+
 async function sha256Of(path: string | undefined): Promise<string> {
   if (!path || !existsSync(path)) return "n/a";
   const hash = createHash("sha256");
@@ -155,7 +164,7 @@ async function main(): Promise<{ executed: number; engine: string }> {
   await getBackgroundClient();
   const judge = await probeBackgroundEngine();
   if (!judge.alive) {
-    console.error(`bench setup refused: no memory judge answers at MAIPAI_BACKGROUND_URL (${process.env.MAIPAI_BACKGROUND_URL}); the baseline bench needs the judge for its recall rows.`);
+    console.error(`bench setup refused: no memory judge answers at MAIPAI_BACKGROUND_URL (${sanitizeEngineUrl(process.env.MAIPAI_BACKGROUND_URL)}); the baseline bench needs the judge for its recall rows.`);
     process.exit(2);
   }
 
@@ -169,9 +178,14 @@ async function main(): Promise<{ executed: number; engine: string }> {
     // process, as every bench through setup.ts does); no hub backend is
     // involved, only the engines by URL.
     pid: process.pid,
-    chat: { url: upstream, build: chat.build_info ?? "n/a", model: chat.model_path ?? "n/a", sha256: await sha256Of(chat.model_path) },
-    judge: { url: process.env.MAIPAI_BACKGROUND_URL, build: background.build_info ?? "n/a", model: background.model_path ?? "n/a", sha256: await sha256Of(background.model_path) },
-    embed: { url: process.env.MAIPAI_EMBED_URL, build: embed.build_info ?? "n/a", model: embed.model_path ?? "n/a", sha256: await sha256Of(embed.model_path) },
+    // ENGINE-HOST-01: an engine on another machine (the household's
+    // own, on the LAN) shows as "external" with its model's file name;
+    // its address and its directory never reach the header, and the
+    // sha256 is computed only for a file this machine has (llama-server
+    // exposes no hash on /props).
+    chat: await engineLine(upstream!, chat),
+    judge: await engineLine(process.env.MAIPAI_BACKGROUND_URL!, background),
+    embed: await engineLine(process.env.MAIPAI_EMBED_URL!, embed),
     sampling: {
       hub: CHAT_SAMPLING,
       engineDefaults: chat.default_generation_settings?.params ?? {},

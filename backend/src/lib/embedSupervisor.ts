@@ -29,6 +29,7 @@ import { hotReloadState } from "@/lib/hotReloadState";
 import { assertNotInCrashBootHold } from "@/lib/dirtyBoot";
 import { embedModelPath, ensureEmbedModel } from "@/lib/embedAssets";
 import { LlamaServerClient } from "@maipai/spec/llm/ts/client.js";
+import { readEngineIdentity, formatEngineIdentity, identityIncomplete, type EngineIdentity } from "@/lib/engineIdentity";
 import { startStubLlmServer } from "@maipai/spec/llm/ts/stubServer.js";
 
 export type EmbedBackendKind = "url" | "spawned" | "stub";
@@ -45,6 +46,10 @@ interface EmbedBackend {
   pid?: number;
   kind: EmbedBackendKind;
   startedAt: string;
+  /** ENGINE-HOST-01: the URL tier's reading of what answered. */
+  identity?: EngineIdentity;
+  /** A re-read in flight for an incomplete identity, one at a time. */
+  identityRefresh?: Promise<void>;
 }
 
 // Fix A (docs/dev.md, "Chat reliability: the 2026-09-07 incident"):
@@ -125,7 +130,11 @@ export async function probeEmbedEngine(): Promise<EngineHealth> {
 async function startEmbedBackend(): Promise<EmbedBackend> {
   const configuredUrl = process.env.MAIPAI_EMBED_URL;
   if (configuredUrl) {
-    return { client: new LlamaServerClient(configuredUrl), stop: () => {}, kind: "url", startedAt: new Date().toISOString() };
+    // ENGINE-HOST-01: nothing is spawned; the engine already running is
+    // probed and its identity read (never its address: the label only).
+    const identity = await readEngineIdentity(configuredUrl);
+    console.log(`[engine] embed: ${formatEngineIdentity(identity)}; health ${identity.healthy ? "ok" : "down"}`);
+    return { client: new LlamaServerClient(configuredUrl), stop: () => {}, kind: "url", startedAt: new Date().toISOString(), identity };
   }
 
   const hw = await detectHardware();
@@ -186,6 +195,26 @@ export function getEmbedBackendKind(): EmbedBackendKind | "starting" | "none" {
   if (state.embedBackend) return state.embedBackend.kind;
   if (state.startingPromise) return "starting";
   return "none";
+}
+
+/** ENGINE-HOST-01: the embed engine's identity, the URL tier's own
+ * reading, a spawned engine as "local", the stub as "stub"; null before
+ * the backend is up. */
+export function getEmbedEngineIdentity(): EngineIdentity | null {
+  const backend = state.embedBackend;
+  if (!backend) return null;
+  if (backend.identity) {
+    // A reading the engine did not answer (it was still loading) is
+    // taken again, once at a time, so the line fills in (a review).
+    if (identityIncomplete(backend.identity) && !backend.identityRefresh && backend.kind === "url" && process.env.MAIPAI_EMBED_URL) {
+      backend.identityRefresh = readEngineIdentity(process.env.MAIPAI_EMBED_URL).then((fresh) => {
+        backend.identity = fresh;
+        backend.identityRefresh = undefined;
+      });
+    }
+    return backend.identity;
+  }
+  return { host: backend.kind === "stub" ? "stub" : "local", build: null, model: null, healthy: null };
 }
 
 /** The embed backend's own pid, when one is genuinely spawned and running

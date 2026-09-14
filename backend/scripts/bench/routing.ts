@@ -12,6 +12,7 @@
 // fire) is actually driving a bad number.
 //
 // Usage: bun run scripts/bench/routing.ts
+import { sanitizeEngineUrl } from "@/lib/engineIdentity";
 import "./setup"; // CHAT-22: must come before anything that reaches "@/db"
 import { finishBench, startBench } from "./setup";
 import { readFileSync } from "node:fs";
@@ -85,7 +86,7 @@ async function main(): Promise<{ executed: number; engine: string }> {
   console.log(`Embed backend: ${getEmbedBackendKind()}`);
   // Read here, before the finally block below resets the supervisor and
   // the kind reads "none" (a code review on CHAT-22).
-  const engine = `embed ${getEmbedBackendKind()} at ${process.env.MAIPAI_EMBED_URL}`;
+  const engine = `embed ${getEmbedBackendKind()} at ${sanitizeEngineUrl(process.env.MAIPAI_EMBED_URL)}`;
   console.log(`Running ${corpus.length} routing-corpus rows...\n`);
 
   const stats = new Map<string, PackageStats>();

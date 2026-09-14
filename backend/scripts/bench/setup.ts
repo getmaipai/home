@@ -37,6 +37,7 @@ import { existsSync, readdirSync, statSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { resolve, sep } from "node:path";
 import { LlamaServerClient } from "@maipai/spec/llm/ts/client.js";
+import { sanitizeEngineUrl } from "@/lib/engineIdentity";
 
 const CLOSED_PORT_URL = "http://127.0.0.1:1";
 
@@ -71,7 +72,7 @@ if (!process.env.MAIPAI_EMBED_URL) refuse("MAIPAI_EMBED_URL is not set; a bench 
  * nothing that matters. */
 export async function startBench(): Promise<void> {
   for (const [name, url] of [["MAIPAI_LLAMA_SERVER_URL", process.env.MAIPAI_LLAMA_SERVER_URL], ["MAIPAI_EMBED_URL", process.env.MAIPAI_EMBED_URL]] as const) {
-    if (!url || !(await new LlamaServerClient(url).health())) refuse(`no engine answers at ${name} (${url}); a bench needs an engine that is already running and ready.`);
+    if (!url || !(await new LlamaServerClient(url).health())) refuse(`no engine answers at ${name} (${sanitizeEngineUrl(url)}); a bench needs an engine that is already running and ready.`);
   }
 }
 if (!process.env.MAIPAI_BACKGROUND_URL) process.env.MAIPAI_BACKGROUND_URL = CLOSED_PORT_URL;

@@ -5110,3 +5110,73 @@ calls named, the robot pinning a version and a digest), SURFACE-01
 records withheld unless present and alone, the `present` list) and
 WIRE-01 (`signal` after `turn_meta`, `plan` before the first delta once
 ACT-03 lands, `cancel` with the real abort).
+
+## ENGINE-HOST-01: external engines for the hub and the bench (2026-09-14)
+
+The coordinator's S item after LOOKUP-01's set: the bench machine
+holds the dev hub's three engines, a second set for a replay or a
+seeded set, and the apps, and macOS killed a replay at 140 MB free;
+another machine in the house now serves the same three engines on the
+LAN (the same models and flags). The supervisors already took an
+external base URL and spawned nothing (`MAIPAI_LLAMA_SERVER_URL` for
+chat, `MAIPAI_BACKGROUND_URL`, `MAIPAI_EMBED_URL`; one name per engine,
+no alias); what was missing was the other half.
+
+**The identity, read from the engine.** `lib/engineIdentity.ts`:
+`readEngineIdentity(url)` probes `/health` and reads `/props`, each
+bounded and never throwing, into `{ host, build, model, healthy }`: the
+build (`b10797-832fd6f17`), the model's file name (never its
+directory), the health answer, and the host as a label only, `local`
+for a loopback URL and `external` for any other. The address itself
+never reaches a log, a header or a doc: an engine on the LAN is the
+household's own machine and its address is not the repo's to print
+(`sanitizeEngineUrl()` shows a loopback URL as is and reduces any other
+to the label). llama-server exposes no model hash on `/props`; the
+model is its file name, and the bench hashes the file only when it is
+on this machine. Each supervisor's URL tier reads the identity at
+start, logs one `[engine] <role>: <identity>; health ok|down` line and
+keeps it on the backend; `getChatEngineIdentity()`,
+`getBackgroundEngineIdentity()` and `getEmbedEngineIdentity()` return
+it (a spawned engine as `local` with its model id, the stub as `stub`).
+The `[turn]` line gains `engine` on a model or package turn
+(`"external b10797-832fd6f17 qwen3-8b-instruct-q4-k-m.gguf"`). The
+bench header's three engine blocks carry `host`, the sanitized `url`,
+the build, the model's file name for an external engine (the path for a
+local one) and the sha256 only for a local file; setup's and the
+bench's refusals print the label. The recording proxy fronts the
+external chat engine as it fronts a local one (it sits on the loopback
+and forwards). A health probe that fails is logged and reported, never
+fatal at start: the request path's own errors carry the failure as
+before. Tests: `tests/engineIdentity.test.ts` (the labels with a
+documentation-range address, the read from a fake engine, the dead
+engine), and one per supervisor (the URL tier reads a fake engine's
+build and model file, spawns nothing; the stub reads as stub).
+
+**The review, taken.** Nine findings on the first cut, seven taken.
+The address still reached a log through every other bench's own
+"engine" summary and refusal (`finish.ts`'s fallback, the replay's
+judge refusal, judge-eval, tool-calling, memory-eval, routing,
+naturalness, persona-eval, the memory bench, recall-floor, latency's
+table): each prints the label now, so the promise covers every bench,
+not the conversation bench alone. A reading taken while the engine was
+still loading froze "unhealthy" with no build into every `[turn]` line
+after: health is the probe's to report at the time asked and never the
+line's, and an identity that answered neither probe is read again, one
+at a time, on the next ask. A Windows engine's `model_path` has
+backslashes (`modelFileName()` splits on either). The two probes run
+at once (a hung engine cost their sum). The header hashes only a file
+this machine has, instead of hashing a look-alike and discarding it.
+The `[turn]` line carries `engine` only when the chat engine answered
+(a model turn, or a first token measured), never on a deterministic
+tier's turn. Read and left: in a bench the supervisor reaches the chat
+engine through the recording proxy on the loopback, so the `[turn]`
+lines say `local` while the header says `external` (two labels for one
+engine in one log, the header's the true one).
+
+Unchanged by decision: the privacy page (an engine on the LAN is the
+household's own machine, reached only when the household points the
+hub at it), and the engines' behavior. One follow-up on record: the
+client's own error text ("could not reach http://...", spec/llm/ts/
+client.ts) still carries the address into the hub's local log and the
+503's error string; a spec change to label it is a small item of its
+own.

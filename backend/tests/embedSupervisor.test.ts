@@ -1,5 +1,5 @@
 import { describe, expect, test, beforeEach, afterEach } from "bun:test";
-import { getEmbedClient, getEmbedBackendKind, __resetEmbedSupervisorForTests } from "@/lib/embedSupervisor";
+import { getEmbedClient, getEmbedBackendKind, getEmbedEngineIdentity, __resetEmbedSupervisorForTests } from "@/lib/embedSupervisor";
 import { LlamaServerClient } from "@maipai/spec/llm/ts/client.js";
 
 // beforeEach too, not just afterEach (step 5, session-a-intelligence.md:
@@ -54,6 +54,26 @@ describe("embedSupervisor getEmbedClient()", () => {
       expect(await client.health()).toBe(true);
     } finally {
       stub.stop();
+    }
+  });
+
+  test("ENGINE-HOST-01: the URL tier reads the engine's identity (build, model file, health) and spawns nothing", async () => {
+    const fake = Bun.serve({
+      port: 0,
+      fetch: (req) => {
+        const path = new URL(req.url).pathname;
+        if (path === "/health") return Response.json({ status: "ok" });
+        if (path === "/props") return Response.json({ build_info: "b10797-832fd6f17", model_path: "/srv/models/nomic-embed-text-v1.5.Q4_K_M.gguf" });
+        return new Response("not found", { status: 404 });
+      },
+    });
+    try {
+      process.env.MAIPAI_EMBED_URL = `http://127.0.0.1:${fake.port}`;
+      await getEmbedClient();
+      expect(getEmbedBackendKind()).toBe("url");
+      expect(getEmbedEngineIdentity()).toEqual({ host: "local", build: "b10797-832fd6f17", model: "nomic-embed-text-v1.5.Q4_K_M.gguf", healthy: true });
+    } finally {
+      fake.stop(true);
     }
   });
 

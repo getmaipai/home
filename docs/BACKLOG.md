@@ -1610,6 +1610,37 @@ invented for the roster's household, and added to
     exact fields (CHAT-13's amendment). Exit: the named tests, `bash
     scripts/check.sh`.
 
+<a id="engine-host-01"></a>
+
+- [x] **ENGINE-HOST-01: External engines for the hub and the bench** (S)
+    Done 2026-09-14 (docs/dev/session-a.md "ENGINE-HOST-01"): the
+    three supervisors' URL tiers (`MAIPAI_LLAMA_SERVER_URL`,
+    `MAIPAI_BACKGROUND_URL`, `MAIPAI_EMBED_URL`, one name per engine,
+    already spawning nothing) now probe the engine they point at and
+    read its identity from `/props` (`lib/engineIdentity.ts`: the
+    build, the model's file name, the health answer, the host as a
+    label only, `local` or `external`, never an address); the `[turn]`
+    line carries `engine`; the bench header and setup's refusals print
+    the label for a non-loopback engine, the model's file name, and no
+    hash for a file this machine does not have (llama-server exposes
+    none); the recording proxy fronts the external chat engine as it
+    fronts a local one. A test per supervisor and for the identity
+    module. The privacy page is unchanged: an engine on the LAN is the
+    household's own machine, and the hub talks to it only when the
+    household points it there.
+
+    Objective: run the hub and the seeded sets against engines on
+    another machine in the house, so the bench machine's memory stops
+    mattering and a set holds nothing else. Files:
+    `backend/src/lib/llmSupervisor.ts`, `backgroundSupervisor.ts`,
+    `embedSupervisor.ts`, `engineIdentity.ts`, `turnEngine.ts` (the
+    `[turn]` line), `backend/scripts/bench/setup.ts`,
+    `conversationLive.ts`, their tests. Out of scope: any change in
+    what the engines do; a settings key for the URLs (the env keys are
+    the developer's override, a household setting is its own item).
+    Exit: `tests/engineIdentity.test.ts`, the three supervisor suites,
+    `bash scripts/check.sh`.
+
 <a id="subject-ref-spec"></a>
 
 - **The `SubjectRef` spec, for CHAT-13** (folded into SPEC-01 by the coherence review, 2026-09-14; the shape is recorded here and lands there)
@@ -2009,7 +2040,9 @@ invented for the roster's household, and added to
     separately; then LoCoMo (CC BY-NC, research only); DailyDialog for
     register through phenomena rewritten into the fixture shape, never
     scored against the human reply. Mirror: `scripts/bench/
-    conversationLive.ts` and BENCH-01's pins; `backgroundAssets.ts` for
+    conversationLive.ts` and BENCH-01's pins (ENGINE-HOST-01: a replay
+    points its three URLs at engines on another machine, so a second
+    engine set never sits in this machine's memory); `backgroundAssets.ts` for
     the pinned download with a checksum. Acceptance: the first run is
     the baseline recorded in docs/dev/session-a.md with the engine
     build, model files and a sanitized hardware line; later items
