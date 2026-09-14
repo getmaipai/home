@@ -4106,5 +4106,42 @@ repaired; the rule on a package line, a command line and a refusal);
 `tests/persona.test.ts` (dash lines, never quoted);
 `tests/conversationBench.test.ts` (the universal check and the run's
 count). RECALL-02's history-row regex fix (a quotation mark after "I
-said") rides here, as the coordinator directed. Three seeded runs
-below.
+said") rides here, as the coordinator directed.
+
+**The seeded set (2026-09-14, on a977110 with d8e4743 in it, three
+runs; the machine was not quiet: Session B ran a full check.sh
+during the first run and an outside embedder may have been on the
+embed engine for part of it; the coordinator's rule for such a set:
+every target row green in all three accepts it with the load noted).**
+140, 135 and 134 of 173 scored turns; the four hard rows green in
+every run. The item's own check: well-formed replies 173 of 173 in
+every run, no `malformed` hit anywhere, no regeneration spent: on
+this seed the 8B produced no fragment, and the rule stood on every
+reply the person got. The rows that failed in every run are the
+designed misses on queued items (the household-subject registry
+reads, the child register, the world-knowledge and how-do-you-know
+lookups, the interruption, the personalization rows, the subject
+switch, the promise shape) plus two that RECALL-02's set had green
+and this set has red in all three runs: `coworker-likes-seltzer`
+turn 4 ("who is Quill" answered "the child in the house, Bramble's
+sibling" with the coworker label in the context) and
+`copied-line-history` turn 2 (the 8B invented a review the person
+never gave, the invention guard caught it, and the honest line stood
+where the row wanted the person's own words). Both are the same
+context as before with a different stable prefix: the companion
+examples now render as dash lines (this item's part 4), and under the
+pinned seed the 8B's path moved. Checked directly: the two rows run
+with the quoted examples put back (a temporary edit, reverted) pass
+as they did in RECALL-02's set, and with the dash lines they fail; a
+prefix-sensitive pair on this seed, not a retrieval or boundary
+change. The dash lines stay as designed (the quoted form was the
+stray-quote defect's cause, and the persona-eval's framing repeats
+went from four to zero); the two rows go to the coordinator as
+prefix-sensitive with the evidence, and the seltzer reply is also a
+household invention the guards did not catch ("the child in the
+house"), a shape for ASK-01's false-familiarity family. The rows that
+differed between runs (never in all three: correction-then-recall,
+edit-then-recall, household-location, household-subject-person#1,
+inferred-coworker-candidate#3, memory-control-in-chat, memory-
+driven-prompt#2, never-mind-on-an-ask#3, prior-reply-grounding#5,
+pronoun-follow-up#1) are the seed's residue under load.
