@@ -15243,14 +15243,26 @@ about the person's own life only: `life_event`, `money`, `health`,
 `achievement`, `plan` (the classes are the life-events vocabulary's
 own groups, `spec/vocab/life-events.json`, so a class is declared once).
 MaiPai, the default companion, is `ordinary` with no overrides. The
-profile decides three things and nothing else:
+manifest validator accepts only those five keys under `overrides` and
+refuses anything else (a world domain, politics, religion, a household
+member, a named person, a free topic string), which is what makes the
+neutrality rule structural rather than a review note. The effective
+disposition for a turn is resolved in one order (the class override,
+else the package default, then the rapport calibration of part 3, then
+the age-band clamp) and mapped through one engine-owned table; a
+package never supplies behavioral instructions of its own. The profile
+decides three things and nothing else:
 
 - *The surprise move's flavor* on a `major_new` claim (section 14,
-  part 5): `trusting` reacts with delight and asks one question about
-  what comes next; `ordinary` reacts with curiosity and asks one
-  question for the one detail that would settle the news; `skeptical`
-  reacts with curiosity or, on a happy claim under a playful register,
-  a light tease, and asks one question for a detail. The reaction is
+  part 5): `trusting` reacts with delight and may add an interested
+  invitation ("tell me everything") in place of a verification-shaped
+  question, since for it the assertion is enough; `ordinary` reacts
+  with curiosity and asks one question for the one detail that would
+  settle the news; `skeptical` reacts with curiosity or, on a happy
+  claim under a playful register, a light tease ("well, that
+  escalated"), and asks one question for a concrete detail. `react`
+  stays required on every setting; the verification-shaped question is
+  required on ordinary and skeptical only. The reaction is
   never skeptical of the person; a tease is about the size of the news,
   never its truth, and is off on any negative emotion and on the child
   band.
@@ -15265,9 +15277,11 @@ profile decides three things and nothing else:
   the details raise the fact's confidence through the household
   function, the same for every companion.
 - *How a contradiction is phrased:* the one clarification of section
-  14, part 5, in the companion's words. `trusting`: "oh, it's Thursday
-  now?"; `ordinary`: "did that change recently?"; `skeptical`: "hang
-  on, I had Friday from you last week, is Thursday the new one?". Every
+  14, part 5, in the companion's words. the plan records the style:
+  `assume_change` for `trusting` ("oh, it's Thursday now?"),
+  `compare_versions` for `ordinary` ("I have Friday from earlier and
+  Thursday now, which is current?"), `light_plot_twist` for
+  `skeptical` ("that's quite a plot twist, is Thursday the new one?"). Every
   phrasing names the hub's own record as the thing that might be
   wrong, asks once, and never "are you sure".
 
@@ -15290,27 +15304,31 @@ child band never gets the skeptical setting: on a child's turn the
 effective profile is `ordinary` at most, the tease is off, and the
 surprise move is delight or curiosity (section 13's envelope).
 
-**3. Earned trust, per companion per person, in the rapport scope
-(COMP-05).** A rapport-scope memory record of category `rapport`
-(scope `companion`, `companion_id`, `person`) carries `trust`: an
-integer from -2 to +2, starting at 0, moved by the curator from
-evidence and never by a model: +1 when a big claim the person made to
-this companion is later corroborated or re-asserted into `certain`
-(section 14's evidence entries name the turn, so the companion that
-heard it is known); -1 when a big claim is later retracted as
-hyperbole by the person's own words or archived as a rejected
-contradiction; never moved by silence, by a routine claim, or by
-another companion's conversations. The effective profile for a turn is
-the package's profile shifted one step by `trust` at the extremes
-(`+2` shifts skeptical to ordinary or ordinary to trusting for that
-person; `-2` shifts trusting to ordinary or ordinary to skeptical), so
-a person who has been right about big news for a while gets fewer
-questions from a skeptical companion, and one who exaggerates gets one
-more from a trusting one. Trust is rapport, not reliability: it is
-never read by recall, never written to the fact, never shown as a score
-about the person, resettable from the Memory page under the
-companion's name like any rapport record, and it never crosses
-companions or people.
+**3. Earned trust, per companion per person per claim class, in the
+rapport scope (COMP-05).** A typed calibration record in the rapport
+scope, `{ companion_id, person_id, claim_class, adjustment:
+earned_trusting | baseline | earned_cautious, observations[], updated_at,
+hlc }`, one per companion, person and class, never a memory about the
+person's character and never rendered in recall or the profile
+paragraph. Only mechanically resolved outcomes are observations, each
+citing its turn ids and its resolution time: `provisional_later_corroborated`
+(a big claim the person made to this companion later reached
+`certain` through eligible detail, a later-day re-assertion, an
+authoritative source or another authorized household assertion) and
+`exaggeration_acknowledged` (the person later marked the earlier claim
+as a joke, hyperbole or an exaggeration in their own words, or
+corrected it themselves). A model's sense that something "sounds
+exaggerated" is never an observation, and an external contradiction
+without the person's own acknowledgment is not one either. The window
+is bounded (the most recent twelve resolved observations per class, a
+starting value to measure); three in one direction move the adjustment
+one step, mixed evidence returns it toward `baseline`, and the curator
+lets old observations fall out of the window and never synthesizes
+them into a trait. The adjustment moves only the social provisional
+boundary, one rung less or more likely to probe; it never changes the
+fact's confidence, recall's attribution, the evidence requirements,
+action execution, safety or privacy, another companion's behavior, or
+another person or claim class.
 
 **4. Invariants, within the row.** No companion accuses: the
 skeptical profile changes the question's wording and count, never its
@@ -15320,11 +15338,13 @@ directive runs under every profile whatever the claim state. None
 writes a different confidence: the record's number comes from the
 household function alone, one per fact, and a bench check reads the
 same value on the memory table after the same claim to three
-companions. The child band never gets the skeptical setting. A
-companion package that declares `skeptical` and is not `kid_safe` is
-consistent; one that declares `skeptical` and `kid_safe` is admitted
-with the note that the child band reads it as `ordinary`, since the
-band floor is the engine's, not the package's.
+companions. The child band never gets the skeptical setting. The
+child clamp is a fixed map (trusting stays trusting, ordinary stays
+ordinary, skeptical reads as ordinary), so a child never gets a tease,
+proof-seeking, a cautious cross-examination or the skeptical
+contradiction style; a `kid_safe` package that declares `skeptical`
+fails catalog review, and the runtime clamp stays as the guard for
+one that slips through.
 
 **5. Bench rows** (`credulity`, roster names, three seeded runs, the
 same turns under the three bundled profiles, which COMP-03 assigns:
@@ -15363,6 +15383,33 @@ weekend trip") (effects: `trust` at -1, the record archived, nothing
 about the person's reliability anywhere in recall or the profile
 paragraph). A directive under the skeptical profile after a provisional
 claim (effect: the package outcome on the turn).
+
+**6. The outside review, reconciled (Codex, 2026-09-14).** Taken, and
+folded in above: the manifest validator that admits only the five
+own-life classes, which makes the neutrality rule structural; the one
+resolution order and the one engine-owned mapping table; the trusting
+companion's delighted invitation in place of a verification-shaped
+question (the earlier "react plus ask-back required on every profile"
+narrowed to react required everywhere and the question required on
+ordinary and skeptical); the named contradiction styles; the tease's
+bounds (adult or teen band only, never under sadness, fear, anger,
+grief, health distress or a safety-sensitive turn, never about another
+member, never phrased as disbelief, dishonesty, impossibility or a
+request for proof, falling back to curiosity whenever the plan forbids
+playfulness; "I don't buy it" and "prove it" are guard rows); the
+calibration record per companion, person and claim class with its
+observations in place of one trust integer, only mechanically resolved
+outcomes counting, a bounded rolling window with three-in-a-row steps;
+the plan's own `credulity` block (`applicable`, `effective_disposition`,
+`surprise_move`, `detail_state`, `contradiction_style`) so the review
+can check what the engine decided; the fixed child clamp and the
+catalog-review failure for a `kid_safe` skeptical package; "never act as
+that other person" on a reported claim; a joke never counting as
+negative rapport unless the person later names it as one; and the row
+set (a big claim under three profiles, earned trust, a caught
+exaggeration, a reported claim, world neutrality, the child control),
+which replaces mine below in the items. Kept: the rows use this
+household's own invented claims and roster names.
 
 **Sequence and sizes.** The `credulity` field and the three bundled
 profiles inside COMP-03 (amended, S on top); the `rapport` record's

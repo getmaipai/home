@@ -1447,7 +1447,8 @@ invented for the roster's household, and added to
     `credulity` with a `default` of trusting, ordinary or skeptical and
     per-class `overrides` for claims about the person's own life,
     `life_event`, `money`, `health`, `achievement`, `plan`, the classes
-    declared once in `spec/vocab/life-events.json`; dev.md section 15),
+    declared once in `spec/vocab/life-events.json`, the validator
+    refusing any other key; dev.md section 15),
     fixtures and bindings, `backend/src/lib/persona.ts` (`directness`
     rendered as one sentence; MaiPai `direct`, the bundled
     personalities `conversational`), the four bundled manifests,
@@ -1463,8 +1464,10 @@ invented for the roster's household, and added to
     Tutor skeptical with `achievement: ordinary`) and the `credulity`
     conversation (section 15, part 5) under all three, the same
     record at the same confidence on the memory table under each,
-    three seeded runs; a `skeptical` package that is `kid_safe` is
-    admitted with the note that the child band reads it as ordinary.
+    three seeded runs; a `skeptical` package that is `kid_safe` fails
+    catalog review, and the runtime clamp (skeptical reads as ordinary
+    on the child band) stays as the guard; a manifest with an override
+    key outside the five classes is refused by the validator (a test).
     Exit: the spec round trip, persona-eval, `bash
     scripts/check.sh`.
 
@@ -1524,16 +1527,21 @@ invented for the roster's household, and added to
     absent from companion B's context, the B5 shape). Acceptance: the
     hard row in three seeded runs; the judge writes a rapport fact at
     the companion scope and a household fact at its own; the Memory
-    page lists rapport under the companion's name; a `rapport` record
-    per companion per person carries `trust` (-2 to +2, from 0), moved
-    by the curator alone (+1 when a big claim made to this companion is
-    later corroborated or re-asserted into certain, -1 when one is
-    retracted as hyperbole or archived as a rejected contradiction,
-    never by silence, a routine claim or another companion's
-    conversations), shifting the effective credulity one step at the
-    extremes for that person, never read by recall, never written to
-    the fact, never shown as a score about the person, resettable
-    from the Memory page (dev.md section 15, part 3); the earned-trust
+    page lists rapport under the companion's name; a typed calibration
+    record per companion, person and claim class in the rapport scope
+    (`adjustment: earned_trusting | baseline | earned_cautious` with
+    its `observations`, each a mechanically resolved outcome citing
+    its turn ids: `provisional_later_corroborated` or
+    `exaggeration_acknowledged` by the person's own words; a model's
+    impression never counts, nor an external contradiction without the
+    person's acknowledgment), a bounded window of the most recent
+    twelve per class, three in one direction moving the adjustment one
+    step and mixed evidence returning it toward baseline, moving only
+    the social provisional boundary one rung, never the fact's
+    confidence, recall, evidence requirements, actions, safety, privacy,
+    another companion, person or class, never rendered in recall or the
+    profile, resettable from the Memory page (dev.md section 15, part 3
+    and part 6); the earned-trust
     rows of section 15, part 5, three seeded runs. Exit: the spec round
     trip, the named tests, `bash scripts/check.sh`.
 
@@ -1888,21 +1896,33 @@ invented for the roster's household, and added to
     `repeated_credence_question`, `silent_contradiction_overwrite`,
     `action_blocked_by_credence`, `joke_stored_as_fact`; the `credence`
     conversations (section 14, part 7), three seeded runs. **Amended
-    2026-09-14 (dev.md section 15):** the table reads the companion's
-    effective credulity (the package profile shifted by the rapport
-    `trust`, never past `ordinary` on the child band) for three things
-    only: the surprise move's flavor (delight, curiosity, or a tease on
-    a happy claim under a playful register, never on a negative emotion
-    or a child), how many grounded details across turns end the news
-    (one question per reply on every setting; a skeptical second
-    question waits for a later same-subject turn), and the
-    contradiction phrasing (every phrasing naming the hub's own
-    record, never "are you sure"); a claim about another member is
-    reported and cautious under every profile, a world claim takes the
-    ladder's stance under every profile with no companion adopting a
-    false belief or a political stance of its own; `skeptical_of_person`
-    fires the same under every profile; the `credulity` rows (section
-    15, part 5), three seeded runs. Out of scope:
+    2026-09-14 (dev.md section 15):** the plan gains a `credulity` block
+    (`applicable`, `effective_disposition`, `surprise_move`: delight,
+    curiosity, tease or none, `detail_state`: complete, invite,
+    one_detail or two_details, `contradiction_style`: assume_change,
+    compare_versions, light_plot_twist or none), resolved in one order
+    (the class override, the package default, the rapport calibration,
+    the child clamp: skeptical reads as ordinary) and read for three
+    things only: the surprise move (react required on every setting; a
+    trusting companion may use a delighted invitation, ordinary and
+    skeptical ask one concrete detail; a tease only on the adult or
+    teen band, on a happy claim under a playful register, never about
+    another member, never phrased as disbelief or a request for proof,
+    falling back to curiosity; "I don't buy it" and "prove it" guard
+    rows), how many grounded details across turns end the news (one
+    question per reply on every setting; a skeptical second question
+    waits for a later same-subject turn), and the contradiction
+    phrasing (every style naming the hub's own record, never "are you
+    sure"); a claim about another member is reported and cautious
+    under every profile and never makes the hub act as the other
+    person, a world claim takes the ladder's stance under every
+    profile with no companion adopting a false belief or a political
+    stance of its own; `skeptical_of_person` fires the same under every
+    profile; the rows `credulity-big-claim`, `credulity-earned-trust`,
+    `credulity-caught-exaggeration`, `credulity-reported-household`,
+    `credulity-world-neutrality` and the child control (section 15,
+    parts 5 and 6), three seeded runs under the three bundled profiles.
+    Out of scope:
     canned replies per label, a second prompt path, any plan rule over
     a safety, authorization, confirmation, evidence or privacy
     decision. Exit: the named tests, the persona-eval bench, `bash
