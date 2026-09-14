@@ -164,3 +164,88 @@ export function selectStratifiedLongMemEvalSample(questions: readonly LongMemEva
 
   return { entries, strata };
 }
+
+/** The dedicated abstention stratum's own math, alongside the six
+ * per-type strata - the same "record the rule, not just its result"
+ * reasoning StratumInfo already applies per type. */
+export interface AbstentionStratumInfo {
+  /** Every abstention question in the whole source set (context: how
+   * large a pool this stratum drew from before any exclusion) - NOT
+   * reduced by ids a per-type stratum already picked; `target` is the
+   * number actually reserved for this stratum after that exclusion, so
+   * a gap between the two here means the type strata's own proportional
+   * math (usually, but not guaranteed to be, zero) already spent some
+   * of this pool. */
+  poolSize: number;
+  /** How many abstention questions this stratum actually selected,
+   * clamped to what remained after excluding ids the type strata already
+   * chose - this stratum never double-picks one of those. */
+  target: number;
+}
+
+/** A baseline-v0 entry carries which stratum actually picked it,
+ * explicitly - a review found the alternative (recovering this from
+ * `questionType` plus the type stratum's own `abstentionTarget`)
+ * actively wrong: the dedicated stratum's own picks keep their real
+ * `questionType` (a knowledge-update question the dedicated stratum
+ * drew still reads `questionType: "knowledge-update"`), so a reader
+ * checking `abstentionTarget === 0` for that type would misattribute
+ * the pick to the type stratum instead. */
+export interface BaselineV0Entry extends SampleManifestEntry {
+  fromAbstentionStratum: boolean;
+}
+
+export interface BaselineV0Sample {
+  entries: BaselineV0Entry[];
+  strata: StratumInfo[];
+  abstentionStratum: AbstentionStratumInfo;
+}
+
+/** Baseline v0's actual shape (the coordinator, 2026-09-14, second
+ * pass): proportional representation alone left abstention - "the
+ * answer is that nothing was said", the class that maps onto the
+ * project's worst defect class - measured by zero questions in a
+ * 30-question sample, since the oracle set's own real per-type rates
+ * all round to 0 at perClass=5 (selectStratifiedLongMemEvalSample's own
+ * documented, correct behavior; not touched here). This layers a
+ * SEVENTH stratum on top: a fixed number of abstention questions drawn
+ * from the whole source set regardless of type, so v0 always measures
+ * something on that class. 35 total at the default sizing (30 from the
+ * six type strata + 5 dedicated), not 30 - a real change from the
+ * first version of this manifest, recorded via `abstentionStratum`
+ * exactly the way `strata` already records the per-type rule.
+ *
+ * A dedicated-stratum pick keeps its own real `questionType` (it is a
+ * real question of that type, just drawn by a different rule), so
+ * grouping the returned `entries` by `questionType` alone no longer
+ * gives a uniform `perClass` per type the way the six strata's own
+ * output would on its own - some types end up with more than `perClass`
+ * once the dedicated stratum's own picks land on them. `fromAbstentionStratum`
+ * on each entry is the one reliable way to tell which stratum picked
+ * it; never infer it from `questionType` plus a type stratum's own
+ * `abstentionTarget`. */
+export function selectBaselineV0Sample(questions: readonly LongMemEvalQuestion[], perClass = 5, abstentionStratumSize = 5, seed = SAMPLE_SEED): BaselineV0Sample {
+  const { entries: typeEntries, strata } = selectStratifiedLongMemEvalSample(questions, perClass, seed);
+  const alreadySelected = new Set(typeEntries.map((e) => e.questionId));
+  const abstentionPool = questions.filter((q) => q.isAbstention && !alreadySelected.has(q.questionId));
+  // seed + 2: selectStratifiedLongMemEvalSample already spends seed and
+  // seed + 1 on its own per-type abstention/rest shuffles, so this
+  // stratum's own shuffle order needs a third, independent offset -
+  // reusing either of the first two would make this stratum's picks a
+  // deterministic function of one type's own shuffle rather than its
+  // own thing.
+  const shuffled = seededShuffle(abstentionPool, seed + 2);
+  const target = Math.min(abstentionStratumSize, shuffled.length);
+  const abstentionEntries = shuffled.slice(0, target).map((q) => ({ questionId: q.questionId, questionType: q.questionType, isAbstention: q.isAbstention, fromAbstentionStratum: true }));
+
+  return {
+    entries: [...typeEntries.map((e) => ({ ...e, fromAbstentionStratum: false })), ...abstentionEntries],
+    strata,
+    // Summed from the strata this call already computed, not a second
+    // independent `questions.filter()` scan - a review found the two
+    // duplicating each other, agreeing only because every question
+    // belongs to exactly one type bucket today; one source of truth
+    // instead of two that have to agree by coincidence.
+    abstentionStratum: { poolSize: strata.reduce((sum, s) => sum + s.abstentionPoolSize, 0), target },
+  };
+}

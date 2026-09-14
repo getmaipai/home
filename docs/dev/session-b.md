@@ -3092,4 +3092,86 @@ Verified so far (no engine, per the hold): `bun run lint` (`tsc
 suite, 120 tests across 12 files, all green. Left, on the
 coordinator's "clear": the dry run (one oracle question, ingested and
 asked for real) and, once that's read, the first full oracle baseline
+
+## Lane 14 item 2 follow-up: recall diagnostics, and baseline v0
+
+After the dry run read clean (the clock and cleanup fixes both held
+live), the coordinator asked for one more thing before the baseline: a
+failing question's row needed to carry what the household bench's own
+`[bench-turn]` already carries for a recall check, so a miss reads as
+retrieval (never reached context, or never stored) versus reasoning
+(reached context, the reply still got it wrong) rather than one
+undifferentiated "incorrect". `replayScore.ts` gained `RecallHit`,
+`JudgeWrittenRecord` and `computeRecallHits()` (a one-sided word-overlap
+check, threshold 0.6, against the live question turn's own
+`contextMessage`); `replay.ts` now resets the recording proxy before
+each question, reads its own `systemText` back for `contextMessage`,
+resolves each dataset-named evidence turn against the ingested
+conversation, and queries `memory_records` (person + household scope)
+after `drainJudge()` and before `resetReplayDatabase()` wipes it, for
+`judgeWrittenRecords`. Verified live on `gpt4_2487a7cb` ("which did I
+attend first"): both evidence turns read `foundInContext: false`, and
+of the two facts the question needs, one (a workshop) was never
+written by the judge at all and the other (a webinar) was written, then
+edited away across four superseded revisions until its final consolidated
+record kept only an unrelated later fact - exactly the retrieval-versus-
+reasoning split this was built to show.
+
+**The full oracle set's real per-question rate, measured live**: 142s
+to 601s per question, haystack-size dependent (more sessions/turns to
+ingest and judge before the question is even asked). 500 questions at
+that rate is roughly 20-41 hours, which cannot sit on the machine while
+other sessions' own engine items are landing - the coordinator stopped
+the run after 3 questions (kept; not discarded) and sized a baseline v0
+instead: a small, fixed, seeded sample, not the full set, reported per
+type the same as a full run would be, with room to grow (10 per type,
+then the 230-id S sample) in later overnight slots.
+
+**Baseline v0's own manifest** (`oracle-v0-manifest.json`, committed;
+`generate-oracle-v0-manifest.ts` regenerates it, same "regenerate and
+commit the result" shape `generate-sample-manifest.ts` already uses for
+the S-set sample) went through two corrections the same session, both
+the coordinator's own call, both recorded in the manifest itself
+(`samplingRule`, `strata`, `abstentionStratum` fields - never left only
+implied by which ids happen to have been picked):
+
+1. **First cut**: `selectLongMemEvalSample()` (`sample.ts`, already
+   built for the 40-per-class S-set sample) reused directly with
+   `perClass=5`. Its own rule prioritizes every abstention question in
+   a class ahead of the rest of it - correct at 40 (there is room for
+   both), wrong at 5: every class with an abstention pool of 5 or more
+   came out *entirely* abstention. Not representative of anything.
+2. **Second cut**: a new `selectStratifiedLongMemEvalSample()` draws
+   each class's own abstention share *proportional* to that type's real
+   abstention rate in the oracle set instead (`round(perClass * rate)`,
+   clamped to the pool). The oracle set's own real per-type rates are
+   small (roughly 4.5%-9%), so this rounds to *zero* abstention
+   questions in every one of the six classes - the honest, correct
+   result of proportional representation at this size, not a bug, and
+   exactly why `strata` records the computed rate and target instead of
+   leaving a reader to wonder.
+3. **Third cut**, the same day: zero abstention questions measures
+   nothing on the class LongMemEval's own convention already treats as
+   its own bucket (`longMemEvalTotalsByType()`, "abstention is its own
+   bucket, never folded into whichever question_type") - and the class
+   the coordinator named as mapping onto the project's own worst defect
+   class. `selectBaselineV0Sample()` keeps the six type strata exactly
+   as cut 2 built them (unchanged) and layers a *seventh, dedicated*
+   abstention stratum on top: up to 5 more abstention questions drawn
+   from the *whole* oracle set regardless of type, excluding any id a
+   type stratum already picked. Final shape: 35 total, not 30 - 30 from
+   the six type strata (still proportional, still correctly zero on
+   their own) plus 5 dedicated abstention questions the type strata
+   never would have surfaced on their own.
+
+All three cuts (and the four review findings the third one triggered -
+a stale double-parsed manifest read, the per-type entry count no longer
+being uniformly 5 once the dedicated stratum scatters extra abstention
+picks across types, `poolSize` computed by a second independent scan
+instead of summing the strata that already computed it, and no field
+marking which stratum actually picked a given entry) were built and
+tested (138-144 datasets-directory tests across the three commits, `tsc
+--noEmit` clean each time) entirely without the engine, under Session
+A's own concurrent hold - edits and this directory's own scoped test
+runs only, `check.sh` and the actual v0 run both waiting on "clear".
 on a quiet machine, reported here per type with the log path.

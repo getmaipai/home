@@ -3,7 +3,7 @@
 // within its class, deterministic for a given seed, and knowledge-update
 // ordered first among classes.
 import { describe, expect, test } from "bun:test";
-import { selectLongMemEvalSample, selectStratifiedLongMemEvalSample, SAMPLE_SEED } from "../scripts/bench/datasets/sample";
+import { selectLongMemEvalSample, selectStratifiedLongMemEvalSample, selectBaselineV0Sample, SAMPLE_SEED } from "../scripts/bench/datasets/sample";
 import type { LongMemEvalQuestion } from "../scripts/bench/datasets/types";
 
 function question(overrides: Partial<LongMemEvalQuestion>): LongMemEvalQuestion {
@@ -132,5 +132,80 @@ describe("selectStratifiedLongMemEvalSample", () => {
     const { entries, strata } = selectStratifiedLongMemEvalSample(questions, 5);
     expect(strata.map((s) => s.questionType).sort()).toEqual(["knowledge-update", "single-session-user"]);
     expect(new Set(entries.map((e) => e.questionType))).toEqual(new Set(["knowledge-update", "single-session-user"]));
+  });
+});
+
+// The coordinator's own second pass, 2026-09-14: proportional
+// representation alone left abstention (the class mapping onto the
+// project's worst defect) measured by zero questions - a dedicated
+// seventh stratum, layered on top of the six type strata, fixes that
+// without changing how the six are drawn.
+describe("selectBaselineV0Sample", () => {
+  test("35 total at the default sizing: 30 from the six type strata plus a dedicated 5-question abstention stratum", () => {
+    // Mirrors the oracle set's own real shape - small per-type rates,
+    // so the six strata alone would carry no abstention question.
+    const questions = [
+      ...pool("temporal-reasoning", 133, 6),
+      ...pool("multi-session", 133, 12),
+      ...pool("knowledge-update", 78, 6),
+      ...pool("single-session-preference", 30, 0),
+      ...pool("single-session-assistant", 56, 0),
+      ...pool("single-session-user", 70, 6),
+    ];
+    const { entries, strata, abstentionStratum } = selectBaselineV0Sample(questions, 5, 5);
+    expect(entries).toHaveLength(35);
+    expect(strata.every((s) => s.abstentionTarget === 0)).toBe(true);
+    expect(abstentionStratum).toEqual({ poolSize: 30, target: 5 });
+    expect(entries.filter((e) => e.isAbstention)).toHaveLength(5);
+    // The reliable way to tell which stratum picked an entry: not its
+    // questionType plus the type stratum's own (correctly zero)
+    // abstentionTarget, which would misattribute every one of these.
+    expect(entries.filter((e) => e.fromAbstentionStratum)).toHaveLength(5);
+    expect(entries.filter((e) => e.fromAbstentionStratum).every((e) => e.isAbstention)).toBe(true);
+    expect(entries.filter((e) => !e.fromAbstentionStratum).every((e) => !e.isAbstention)).toBe(true);
+  });
+
+  test("the abstention stratum never repeats an id a type stratum already chose", () => {
+    // 8 abstention out of 10 (rate 0.8): the type stratum's own
+    // proportional math picks round(5*0.8)=4 of them, leaving only 4 of
+    // the 8 for the dedicated stratum to draw from.
+    const questions = pool("knowledge-update", 10, 8);
+    const { entries, abstentionStratum } = selectBaselineV0Sample(questions, 5, 5);
+    const ids = entries.map((e) => e.questionId);
+    expect(new Set(ids).size).toBe(ids.length);
+    expect(abstentionStratum).toEqual({ poolSize: 8, target: 4 });
+    // Every entry carries this type's own questionType regardless of
+    // which stratum picked it, and both strata contribute abstention
+    // questions here - fromAbstentionStratum is what actually
+    // distinguishes the type stratum's own 4 from the dedicated
+    // stratum's own 4, not questionType (identical on both) or
+    // isAbstention (true on both).
+    expect(entries.filter((e) => e.fromAbstentionStratum)).toHaveLength(4);
+    expect(entries.filter((e) => !e.fromAbstentionStratum && e.isAbstention)).toHaveLength(4);
+  });
+
+  test("the dedicated stratum's own target is clamped to whatever abstention pool remains after the type stratum's own exclusion", () => {
+    // 2 abstention out of 20 (rate 0.1): the type stratum's own
+    // proportional math picks round(5*0.1)=1 of them (JS rounds .5 up),
+    // leaving only 1 of the 2 for the dedicated stratum.
+    const questions = pool("single-session-user", 20, 2);
+    const { abstentionStratum } = selectBaselineV0Sample(questions, 5, 5);
+    expect(abstentionStratum).toEqual({ poolSize: 2, target: 1 });
+  });
+
+  test("deterministic for a given seed; the abstention stratum's own shuffle is independent of the per-type ones", () => {
+    const questions = [...pool("knowledge-update", 78, 6), ...pool("single-session-user", 70, 6)];
+    const a = selectBaselineV0Sample(questions, 5, 5, SAMPLE_SEED);
+    const b = selectBaselineV0Sample(questions, 5, 5, SAMPLE_SEED);
+    expect(a.entries.map((e) => e.questionId)).toEqual(b.entries.map((e) => e.questionId));
+    const c = selectBaselineV0Sample(questions, 5, 5, SAMPLE_SEED + 1000);
+    expect(a.entries.map((e) => e.questionId)).not.toEqual(c.entries.map((e) => e.questionId));
+  });
+
+  test("a source set with no abstention questions at all yields a zero-size, never-broken abstention stratum", () => {
+    const questions = pool("single-session-preference", 30, 0);
+    const { entries, abstentionStratum } = selectBaselineV0Sample(questions, 5, 5);
+    expect(abstentionStratum).toEqual({ poolSize: 0, target: 0 });
+    expect(entries).toHaveLength(5); // just the type stratum's own 5
   });
 });

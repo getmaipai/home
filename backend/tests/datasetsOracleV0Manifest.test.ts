@@ -16,13 +16,20 @@ interface StratumInfo {
   abstentionTarget: number;
 }
 
+interface AbstentionStratumInfo {
+  poolSize: number;
+  target: number;
+}
+
 interface OracleV0Manifest {
   seed: number;
   perClass: number;
+  abstentionStratumSize: number;
   sourceDataset: string;
   samplingRule: string;
   strata: StratumInfo[];
-  entries: { questionId: string; questionType: string; isAbstention: boolean }[];
+  abstentionStratum: AbstentionStratumInfo;
+  entries: { questionId: string; questionType: string; isAbstention: boolean; fromAbstentionStratum: boolean }[];
 }
 
 const manifest = JSON.parse(
@@ -34,18 +41,24 @@ describe("oracle-v0-manifest.json", () => {
     expect(manifest.seed).toBe(SAMPLE_SEED);
   });
 
-  test("5 per class, 30 total (the coordinator's own baseline v0 sizing, 2026-09-14)", () => {
+  // The coordinator's own second pass, 2026-09-14: 35, not 30 - 30 from
+  // the six type strata plus a dedicated 5-question abstention stratum,
+  // because proportional representation alone left abstention ("the
+  // answer is that nothing was said", the class mapping onto the
+  // project's worst defect) measured by zero questions.
+  test("5 per type plus a dedicated 5-question abstention stratum, 35 total", () => {
     expect(manifest.perClass).toBe(5);
-    expect(manifest.entries).toHaveLength(30);
+    expect(manifest.abstentionStratumSize).toBe(5);
+    expect(manifest.entries).toHaveLength(35);
   });
 
   test("drawn from the oracle set, not the S set", () => {
     expect(manifest.sourceDataset).toBe("longmemeval_oracle.json");
   });
 
-  test("every one of the six question types gets exactly 5 entries", () => {
+  test("every one of the six question types has at least its own 5 non-abstention entries from its own type stratum", () => {
     const byType = new Map<string, number>();
-    for (const e of manifest.entries) byType.set(e.questionType, (byType.get(e.questionType) ?? 0) + 1);
+    for (const e of manifest.entries) if (!e.isAbstention) byType.set(e.questionType, (byType.get(e.questionType) ?? 0) + 1);
     expect(byType).toEqual(
       new Map([
         ["knowledge-update", 5],
@@ -58,29 +71,40 @@ describe("oracle-v0-manifest.json", () => {
     );
   });
 
-  test("every entry's id is unique - no question counted twice toward its own class's target", () => {
+  test("every entry's id is unique - the dedicated abstention stratum never repeats a type stratum's own pick", () => {
     const ids = manifest.entries.map((e) => e.questionId);
     expect(new Set(ids).size).toBe(ids.length);
   });
 
-  // The coordinator's own fix, 2026-09-14: the first version of this
-  // manifest prioritized every abstention question ahead of the rest of
-  // its class (selectLongMemEvalSample's own rule, right for a 40-per-
-  // class sample, wrong at 5), which made several classes come out
-  // entirely abstention. This version draws each class's abstention
-  // share proportional to its own real rate instead, recorded here.
-  test("the sampling rule is recorded, and each stratum's own math checks out against the entries actually chosen", () => {
+  test("the per-type sampling rule is recorded, and each stratum's own math checks out against the entries actually chosen", () => {
     expect(manifest.samplingRule).toContain("proportional");
     expect(manifest.strata).toHaveLength(6);
     for (const s of manifest.strata) {
       expect(s.abstentionTarget).toBe(Math.min(Math.round(manifest.perClass * s.abstentionRate), s.abstentionPoolSize, manifest.perClass));
-      const inClass = manifest.entries.filter((e) => e.questionType === s.questionType);
-      expect(inClass.filter((e) => e.isAbstention)).toHaveLength(s.abstentionTarget);
     }
   });
 
-  test("the oracle set's own real per-type abstention rates are small enough that every class rounds to zero abstention questions at perClass=5 - proportional, not forced, and never the all-abstention class the previous version produced", () => {
+  test("the oracle set's own real per-type abstention rates are small enough that every type stratum rounds to zero abstention questions on its own - proportional, not forced", () => {
     expect(manifest.strata.every((s) => s.abstentionTarget === 0)).toBe(true);
-    expect(manifest.entries.every((e) => !e.isAbstention)).toBe(true);
+  });
+
+  // The fix this second pass makes: abstention is no longer measured by
+  // zero, because the dedicated stratum exists independent of the
+  // (correctly) zero per-type targets above.
+  test("the dedicated abstention stratum is recorded and actually contributes real abstention questions to entries", () => {
+    expect(manifest.abstentionStratum).toEqual({ poolSize: 30, target: 5 });
+    const abstentionEntries = manifest.entries.filter((e) => e.isAbstention);
+    expect(abstentionEntries).toHaveLength(5);
+  });
+
+  // fromAbstentionStratum is the one reliable way to tell which stratum
+  // picked an entry - not questionType (a dedicated pick keeps its own
+  // real type) and not isAbstention alone if a type stratum's own math
+  // ever picks a nonzero abstentionTarget in the future.
+  test("fromAbstentionStratum exactly identifies the dedicated stratum's own picks, matching abstentionStratum.target", () => {
+    const marked = manifest.entries.filter((e) => e.fromAbstentionStratum);
+    expect(marked).toHaveLength(manifest.abstentionStratum.target);
+    expect(marked.every((e) => e.isAbstention)).toBe(true);
+    expect(manifest.entries.filter((e) => !e.fromAbstentionStratum).every((e) => !e.isAbstention)).toBe(true);
   });
 });
