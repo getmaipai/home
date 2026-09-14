@@ -13875,6 +13875,128 @@ pending asks, open questions, bindings and documents are keyed per
 conversation and turn so that more slots never becomes cross-
 conversation state; the multi-detector wake runtime is unmeasured.
 
+### 11. Learning: what adapts, and what never trains (2026-09-13)
+
+From Jesse's two questions to this session and to the outside
+reviewer (Codex), whose answers agreed and are merged here: does the
+system need custom training or reinforcement learning, and should
+something review transcripts, replies, memories, captures and prompts
+and adjust.
+
+**The hard rule.** Production conversations never modify model
+weights. No per-household fine-tune, no reinforcement learning from
+household chat, no online adapter, no silent update of anything
+learned from an uncertain signal. The defects this pass designed
+against are engine defects (what is known, what the subject is,
+whether a lookup runs, whether a reply is a sentence); training would
+mask them. A model file that had absorbed household facts could not
+honor "forget that", the Memory page, retention or a person leaving,
+and a family cannot validate a fine-tuned chat model in their kitchen
+(the wake-word lesson: a number from the generator that made the
+training set is not evidence). Any future fine-tune is ours, done
+once, offline, on a reviewed dataset of synthetic and roster-name
+conversations, versioned as a catalog model package with a pinned
+checksum, and it ships only if the full conversation bench passes
+against the unchanged baseline. The candidates, in order of likely
+payoff, none scheduled: the memory extractor for cost once MEM-06's
+validator holds (a 1.7B trained on the extraction task with the
+validator behind it against the 4B's 1.8 s per turn; training is
+never a substitute for the validator); a small classifier for
+utterance shape, claim type and intent on the routing and guard
+corpora, deterministic at inference; a companion adapter only if
+EVAL-03's activation steering is shown, repeatedly, unable to make a
+companion distinct. Reinforcement learning is considered only for a
+measured problem that routing, constrained outputs, retrieval and a
+small supervised adapter cannot solve, and nothing meets that bar.
+The two things that are trained or enrolled in the house stay narrow:
+wake words (a small audio classifier under the org's training rules,
+the household's false triggers as negatives) and speaker prints
+(SPEAK-01: enrollment with consent, a local embedding per person,
+compared at turn time, never updated from an uncertain match).
+
+**What adapts.** Records and bounded configuration the engine reads,
+each with provenance the person can see and undo, never a generated
+prompt fragment and never a rule of the engine. Four pieces, three of
+them items:
+
+1. *REVIEW-01, the conversation quality controller.* A typed
+   `TurnReview` record, spec first (`turn-review.schema.json`, since
+   the robot runs the same loop): defect codes (`wrong_subject`,
+   `false_familiarity`, `unsupported_claim`, `missed_lookup`,
+   `copied_line`, `malformed_reply`, `search_voice`,
+   `assistant_register`, `overlong`, `unasked_unknown`), the evidence
+   ids behind the finding, whether the person corrected it, the
+   responsible layer (routing, retrieval, package, composer, guard,
+   judge, model), which retrieved items helped and which did not, a
+   proposed adjustment of a bounded type, its evaluation result,
+   status and provenance. Produced two ways: immediate deterministic
+   checks on every turn (a guard hit, a lookup with no source, a
+   correction, a forget after a remember, a repeated question, a
+   thumb) and a nightly review pass on the background engine, where
+   the 4B drafts a review and every finding is confirmed mechanically
+   before anything moves, because a 4B judging an 8B is a weak judge
+   and the effect standard applies here as on the bench. Auto-applied,
+   because reversible and data-only: lower the retrieval rank of a
+   memory or episode that repeatedly led to a correction (a per-record
+   signal in the spec); merge exact duplicates keeping provenance; mark
+   a contradicted record disputed and stop presenting it as fact; add a
+   household routing example from a confirmed correction (CHAT-09's
+   versioning); prefer a package that succeeded for the same typed
+   intent; stop retrieving the hub's own prose for a person when it
+   proved unhelpful; refresh stale world evidence through SearXNG;
+   queue an open question for a name that keeps confusing it. Proposed
+   only, behind a replay gate: a routing threshold, a guard rule, the
+   stable prompt, an extraction rule, a companion's register, safety
+   behavior, a model. For those the controller builds a candidate,
+   replays the shipped fixture (roster rows, recorded lookups) and the
+   household's own recent turns locally, keeps the candidate only if
+   the targeted measure improves and no protected row regresses, and
+   surfaces it as a versioned proposal. Engine rules are never
+   per-household state: the prompt stays byte-identical in every house
+   (the prefix cache and the bench depend on it), so a proposal about a
+   rule is a report the household reads and may send us as a
+   roster-name issue by their own choice; nothing leaves the house on
+   its own, and the rule changes by a release. The household's own
+   report is the product face of it: what the hub got wrong this week,
+   in plain words, and what it changed.
+2. *CUR-01, the memory curator.* `runConsolidation()` grows into the
+   curator: exact and semantic duplicates; conflicting active records
+   marked disputed; time-sensitive facts expired; provenance verified
+   (every active record traces to the speaker's own words or an
+   authoritative integration; an assistant-derived record is
+   quarantined, MEM-06's rule applied to the store); unknown-kind
+   entities turned into open questions (ASK-01); confidence lowered
+   when later turns contradict a record. It repairs indexes and
+   statuses on its own and never invents the resolution of a conflict:
+   the next relevant conversation asks the person.
+3. *PREF-01, explicit preferences.* Personal adaptation is a settings
+   key with a provenance field, never a hidden profile: reply length,
+   directness, register, whether optional follow-up questions are
+   welcome, the preferred companion per surface and per wake word,
+   source preferences per task. Each shows why it exists and resets in
+   one click; repeated behavior creates a proposed preference the
+   person accepts, and silence is never consent.
+4. *Retrieval feedback* rides on the `TurnReview`: which memory bullet,
+   episode or outcome helped, read from the reply's grounding and the
+   person's next turn, and it is the signal the rank adjustment above
+   reads.
+
+**What the loop must never do.** Rewrite a prompt from transcript
+criticism; treat the hub's own reply as proof a household fact is
+true; turn an inferred relationship into an accepted memory; update
+weights from conversations; reinforce a reply because nobody corrected
+it; use household transcripts as an untracked dataset; delete
+contradictory evidence to look consistent; let one companion's
+behavior change the shared engine, guards or evidence policy.
+
+**Why this is the platform's shape.** Every lever already exists as a
+record or a setting (memory status and provenance, routing examples,
+the open question, the approvals path, person-scope settings); the
+controller and the curator are the judge's own mechanism (a background
+pass on the 4B with a deterministic gate) pointed at quality instead of
+extraction. The model stays a fixed, measurable quantity, and what a
+family sees improving is their data, with a paper trail.
+
 ### The sequence, all items
 
 1. **With or before step 3a's engine half:** RECALL-02 and OUT-01
@@ -13898,3 +14020,6 @@ conversation state; the multi-detector wake runtime is unmeasured.
    lookup offer made rare by the ladder.
 5. **After CHAT-16:** COMP-01, COMP-02, COMP-03 to COMP-05, COMP-06,
    SPEAK-01, WAKE-02, the robot parity line.
+6. **Learning (section 11), after MEM-06 and ASK-01:** CUR-01, then
+   REVIEW-01 (spec first), then PREF-01 (spec first); the training
+   policy is a standing rule from today, with no item.

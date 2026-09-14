@@ -1424,7 +1424,8 @@ invented for the roster's household, and added to
     Objective: an enrolled voice print per household member, resolved
     locally per turn on a shared surface, as a confidence signal for
     COMP-06 and never a prerequisite for a shared device's ordinary
-    use. Files: the bot's microphone pipeline first (the reSpeaker
+    use; enrollment is with the person's consent, and the
+    print is never updated from an uncertain match. Files: the bot's microphone pipeline first (the reSpeaker
     array), then the hub's voice route; a maintained speaker-embedding
     model fetched on demand (pinned URL, checksum), never vendored;
     enrollment in Settings under the org's training rules. Acceptance:
@@ -1446,6 +1447,80 @@ invented for the roster's household, and added to
     gates (real speech, near misses, verified data) plus a binding
     resolved through COMP-06's table. Exit: the pipeline's checks,
     `bash scripts/check.sh`.
+
+<a id="review-01"></a>
+
+- [ ] **REVIEW-01: The conversation quality controller** (M, spec first, after MEM-06 and ASK-01)
+
+    Objective: the hub reviews its own turns and adjusts records and
+    bounded settings, never weights, prompts or engine rules. Spec
+    first: `spec/schemas/turn-review.schema.json` (defect codes,
+    evidence ids, corrected-by-person, responsible layer, retrieved
+    items that helped, a proposed adjustment of a bounded type,
+    evaluation result, status, provenance) and a per-record retrieval
+    signal on `memory-record.schema.json`; fixtures and bindings.
+    Then: `backend/src/lib/turnReview.ts` (the immediate deterministic
+    checks on every turn, from the turn context and the retained
+    outcomes; the nightly pass on the background engine with the 4B
+    drafting and every finding confirmed mechanically), the auto-apply
+    set (rank, duplicates, disputed, a household routing example,
+    package preference, the assistant-prose flag, stale evidence
+    refresh, an open question), the replay gate for proposals (the
+    shipped fixture plus the household's recent turns, run locally
+    against a candidate; kept only if the targeted measure improves
+    and no protected row regresses), the household's weekly report in
+    plain words (`docs/user/`), the approvals path for proposals.
+    Mirror: the judge's queue and `runConsolidation()`; the effect
+    standard of the bench. Acceptance: a seeded week of fixture
+    conversations with planted defects yields one `TurnReview` per
+    planted turn with the right code and layer (effect: the rows); the
+    auto-applied changes are visible with provenance and reversible
+    from the Memory page; a planted correction lowers the offending
+    record's rank on the next recall; a proposal for a guard rule
+    never changes the guard and appears as a report; the stable prompt
+    is byte-identical before and after a week. Out of scope: any model
+    training. Exit: the spec suite, the named tests, `bash
+    scripts/check.sh`.
+
+<a id="cur-01"></a>
+
+- [ ] **CUR-01: The memory curator** (S-M, after MEM-06)
+
+    Objective: the store stays clean and honest without inventing
+    anything. Files: `backend/src/lib/memoryJudge.ts`
+    (`runConsolidation()` grows into the curator), `memory.ts`,
+    `entities.ts`, `relationships.ts`, `backend/tests/memoryJudge.test.ts`.
+    Do: exact and semantic duplicates merged with provenance kept;
+    conflicting active records marked disputed and not presented as
+    fact; time-sensitive facts expired; every active record verified
+    to trace to the speaker's words or an authoritative integration,
+    assistant-derived ones quarantined; unknown-kind entities turned
+    into ASK-01 open questions; confidence lowered on contradiction.
+    Never resolves a conflict itself: the next relevant conversation
+    asks. Acceptance: a seeded store with each defect class comes out
+    with the right statuses and no invented resolution; a disputed
+    record is absent from the next prompt; the open question is asked
+    on the next turn. Exit: the named tests, `bash scripts/check.sh`.
+
+<a id="pref-01"></a>
+
+- [ ] **PREF-01: Explicit, inspectable preferences** (M, spec first)
+
+    Objective: personal adaptation is a setting with a reason, never a
+    hidden profile. Spec first: `spec/settings/keys.json` gains
+    person-scope keys for reply length, directness, register, whether
+    follow-up questions are welcome, the preferred companion per
+    surface and per wake word, and source preferences per task, and
+    `setting-value.schema.json` gains a `provenance` field (who or
+    what set it, from which review, when). Then: the generic settings
+    renderer shows the reason and a reset; REVIEW-01 may create a
+    proposed preference from repeated behavior that the person
+    accepts, and silence is never consent; the composer and the
+    companion resolution read them. Acceptance: a repeated behavior
+    in the fixture yields a proposal, not a change; accepting it
+    changes the next reply's length (effect: `maxWords`); reset
+    restores the default and clears the provenance. Exit: the settings
+    suite, `bash scripts/check.sh`.
 
 ## Chat direction 2026-09-12: the next block, two tracks
 
