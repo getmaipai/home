@@ -123,6 +123,15 @@ The shape the coordinator proposes for the pass to judge:
   registered the same way. A person may bind any installed wake word
   to any of their companions, and two people may bind the same word
   to different companions.
+- Shared devices (the robot, a kitchen display, a TV) get a device
+  binding set by an admin: which companion answers on that device by
+  default, per wake word. Resolution order for a voice turn: the
+  identified speaker's own binding of the name; otherwise the
+  device's admin-assigned binding; otherwise the household default.
+  A device can also be marked personal (an office display) so its
+  default is one person's binding without identification. The device
+  registry already exists (spec `device.schema.json`); the binding is
+  a field on it, one definition, synced to the robot.
 - Consequences for the pass to weigh: speaker identification is now
   on the critical path for voice (it was a later item); wake-word
   training becomes a household feature with a UI; the robot needs the
