@@ -257,7 +257,7 @@ export function scoreTurn(conversation: BenchConversation, turnIndex: number, tu
     checks.push({ name: "reply lacks", pass: m === null, detail: m ? `found "${m[0]}"` : `/${e.mustNotContain}/ absent` });
   }
   if (e.fixedLine) checks.push({ name: "fixed line", pass: reply.trim() === e.fixedLine, detail: reply.trim() === e.fixedLine ? "exact" : `got "${reply.trim()}"` });
-  if (e.storesNothing && observed.storedUserText !== null) {
+  if (e.transcriptRedacted && observed.storedUserText !== null) {
     // The credential value itself must not survive in the transcript.
     const value = /\S+\d\S*|\S{8,}/.exec(turn.say.replace(/^.*?\b(?:is|=|:)\s*/i, ""))?.[0];
     const leaked = value !== undefined && observed.storedUserText.includes(value);

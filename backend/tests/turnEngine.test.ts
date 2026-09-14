@@ -3628,6 +3628,23 @@ describe("FAST-04: literal patterns before the embed, a stream that starts befor
     const { routeLiteral } = await import("@/lib/turnEngine");
     expect(routeLiteral("remember that I like tea", child, gated)).toBeNull();
     expect(routeLiteral("remember that I like tea", actor, gated)?.winner?.id).toBe("remember");
+    // ACT-01's set: a courtesy prefix is stripped before the literal
+    // match, so a polite remember is the package's, never the model's
+    // claim (the judge no longer stores a directive's wording).
+    const polite = routeLiteral("can you remember that Marlow's birthday is in June", actor, loadAllManifests());
+    expect([polite?.winner?.id, polite?.winner?.viaPattern, polite?.winner?.args]).toEqual(["remember", true, { fact: "Marlow's birthday is in June" }]);
+    expect(routeLiteral("please, set a timer for ten minutes", actor, loadAllManifests())?.winner?.id).toBe("timer");
+    expect(routeLiteral("can you tell me a joke about cats", actor, loadAllManifests())?.winner?.id).not.toBe("remember");
+    // A polite question behind the open "remember *" pattern asks; it
+    // never becomes a stored fact (the follow-up's review).
+    expect(routeLiteral("can you remember where we parked?", actor, loadAllManifests())).toBeNull();
+    expect(routeLiteral("could you remember what my dentist's number is", actor, loadAllManifests())).toBeNull();
+    // The open "remember *" pattern stays the model's behind a courtesy
+    // prefix (the routing corpus's documented gap): a polite recall
+    // question and an unmarked fact both fall through.
+    expect(routeLiteral("can you remember our first conversation", actor, loadAllManifests())).toBeNull();
+    expect(routeLiteral("can you remember I have a dentist appointment next week", actor, loadAllManifests())).toBeNull();
+    expect(routeLiteral("please add eggs to the shopping list", actor, loadAllManifests())?.winner?.id).toBe("list-add");
   });
 
   test("a tools-offered turn whose first token takes 1,200 ms yields turn_meta, then spoken_cue, then deltas, in that order", async () => {

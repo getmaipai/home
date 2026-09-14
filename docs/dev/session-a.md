@@ -4394,3 +4394,67 @@ skipped at insert, a refusal and a credential turn never queued, a
 pre-signal row on the old rule, the re-check on read);
 `tests/turnContext.test.ts` and the scorer's unit tests classify the
 row's words the way `prepareTurn()` does.
+
+**The seeded set** (2026-09-14, after 52178cd; the 8B chat engine, the
+4B judge, seed 20260913, three runs). Every turn's recorded act matched
+its expectation in every run: 238 of 238 on each (the interrupted turn
+has no row by design), with the emotion (16 of 16), intensity (7 of 7)
+and clause-stance (8 of 8) checks green too; well-formed 238 of 238.
+Scored turns 167, 169 and 168 of 239, the difference from OUT-01's set
+(140/135/134 of 173) being the 66 new turns: B's nine example rows and
+this item's seven conversations, whose clause-contract and curator
+checks fail on purpose until MEM-06 and CUR-01. The stage timings:
+signal 368/746, 347/705 and 336/747 microseconds median/p95 (the
+roster's name patterns; 13 microseconds with none), routing 7/19 ms,
+recall 1/2 ms, prompt 1/1 ms, first token 422/1228, 421/994 and 424/935
+ms, finalize 0/1 ms, retries 4, 4 and 3 over 238 turns. Against OUT-01's
+set, three rows failed here that never failed there: `polite-command`
+turn 1 in every run (a real consequence of the design: the judge no
+longer reads a directive, and "can you remember that Marlow's birthday
+is in June" was never the package's, the model answered it with a claim
+and the judge used to store the fact; fixed below), `fact-asked-next-
+day` turn 1 once (the `unsupported_action` guard on "Got it, added to
+the list", REG-01's class) and `running-thing-follow-up` turn 3 once
+(the `example_parrot` guard on a closer, the same class); four rows that
+failed there passed here in every run. Among the new rows, three
+fixture mistakes of this item's own: `toolsRan` named the package
+families ("lists", "timers") where the runner records the package ids
+("list-add", "timer"), and `storesNothing` doubled as the credential
+row's redaction check, which any eight-letter word tripped; the check
+is its own flag (`transcriptRedacted`) now. "Quill is furious about the
+delay" wrote a bounded state about Quill, which the design allows (the
+row now checks the signal alone until MEM-06 draws the floor); "Quill
+said he was furious, but I think he was joking" wrote a settled fact,
+MEM-06's row. The act-register rows' misses are the classes they exist
+for: no question back after an inform, an exclamation on a fearful
+disclosure, "Let me know if you need anything else" after a commitment
+and a backchannel (REG-01 and ACT-03). Logs: the scratchpad's
+`bench-act01-set1-seed-{a,b,c}.log`.
+
+**The follow-up.** `routeLiteral()` matches an anchored literal
+pattern behind a courtesy prefix too ("can you remember that ...",
+"please, set a timer for ...", "please add ... to the shopping list":
+two literal words before the wildcard or a literal tail after it),
+ROUTE-01's rule for the shape applied to the literal match, so a polite
+remember is the package's own write. An open pattern ("remember *")
+stays the model's behind a courtesy prefix, the routing corpus's own
+documented gap ("can you remember our first conversation" asks, "can
+you remember where we parked" would have stored the question as a
+fact: the follow-up's review and the corpus's three rows caught the
+first cut, which took every pattern); a capture that opens with a
+question word is refused besides. Then the three fixture mistakes
+above. The partial rerun (the seven touched conversations,
+three runs, logs `bench-act01-rerun-seed-{a,b,c}.log`): `polite-
+command` turn 1 is the remember package's in every run (source
+plugin, the June record written by the package, turn 3 recalling it);
+its turn 2 ("and that he likes chocolate cake") now fails in every run
+on the `placeholder_echo` guard, the 8B parroting the window's own
+rendering of the package answer (`[Remember answered: "Got it"]`), a
+class the guard already catches and REG-01's register scrub owns, and
+one the row never saw while the polite remember went to the model.
+`act-memory-eligibility` turn 4 ran no tool in the rerun (the 8B's
+"Got it, added oat milk to the list" without the call, the
+`unsupported_action` guard's honest line), where the full set had the
+call; the row uses the literal form now so it tests eligibility, not
+tool-call reliability. The rest of the rerun's misses are the same
+on-purpose rows as the set's.

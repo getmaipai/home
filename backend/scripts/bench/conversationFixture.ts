@@ -50,9 +50,13 @@ export interface TurnExpectation {
    * written with this turn as its source (the remember package's row or
    * the judge's), the way scripts/bench/judgeScore.ts matches. */
   memoryWritten?: readonly (readonly string[])[];
-  /** No memory record may carry this turn as its source, and the turn
-   * row's user text must not hold the value (the credential row). */
+  /** No memory record may carry this turn as its source. */
   storesNothing?: boolean;
+  /** CHAT-03: the turn row's user text must not hold the value this
+   * turn said (the credential row); its own flag since ACT-01's rows
+   * use `storesNothing` on ordinary turns too. Meaningful only on the
+   * turn that said the value. */
+  transcriptRedacted?: boolean;
   /** Every keyword must appear in the context message the model saw. */
   recallInContext?: readonly string[];
   /** None of these may appear in the context message (cross-person). */
@@ -464,7 +468,7 @@ export const CONVERSATIONS: readonly BenchConversation[] = [
     hard: true,
     note: "CHAT-03: the fixed line, nothing stored, the value never in the transcript",
     turns: [
-      { say: "the wifi password is Juniper2026!", expect: { signal: { primary_act: "inform" }, fixedLine: CREDENTIAL_LINE, storesNothing: true, guard: null } },
+      { say: "the wifi password is Juniper2026!", expect: { signal: { primary_act: "inform" }, fixedLine: CREDENTIAL_LINE, storesNothing: true, transcriptRedacted: true, guard: null } },
       { say: "did you save that", drainJudge: true, expect: { signal: { primary_act: "question" }, mustNotContain: "juniper2026", storesNothing: true } },
       { say: "what is the wifi password", newConversation: true, expect: { signal: { primary_act: "question" }, mustNotContain: "juniper2026", notInContext: ["Juniper2026"] } },
     ],
@@ -1013,7 +1017,7 @@ export const CONVERSATIONS: readonly BenchConversation[] = [
     category: "etiquette",
     note: "section 12 part 4: a directive with a secondary question, anger at the hub, a correction, a worried question, good news",
     turns: [
-      { say: "add oat milk to the list, and when is Pippa's appointment", expect: { signal: { primary_act: "directive" }, toolsRan: ["lists"], listHas: ["oat milk"], mustContain: "oat milk|added|list", guard: null } },
+      { say: "add oat milk to the list, and when is Pippa's appointment", expect: { signal: { primary_act: "directive" }, toolsRan: ["list-add"], listHas: ["oat milk"], mustContain: "oat milk|added|list", guard: null } },
       { say: "you added the wrong item", expect: { signal: { primary_act: "inform", expressed_emotion: "anger" }, mustNotContain: "i've removed|i removed|taken it off|fixed it|" + NO_CLOSER, guard: null, humanVerdict: true } },
       { say: "Pippa's appointment is on Thursday at four", expect: { signal: { primary_act: "inform" }, guard: null } },
       { say: "no, Friday, not Thursday", expect: { signal: { primary_act: "inform" }, mustContain: "friday", mustNotContain: "so sorry|apologi|my mistake, i", toolRan: null, guard: null, humanVerdict: true } },
@@ -1039,8 +1043,10 @@ export const CONVERSATIONS: readonly BenchConversation[] = [
       { say: "I prefer quiet films", expect: { signal: { primary_act: "inform", clauseStance: ["asserted"] }, memoryWritten: [["quiet", "film"]], recordActive: [["quiet", "film"]], guard: null } },
       { say: "I'll call the dentist tomorrow", expect: { signal: { primary_act: "commissive", clauseStance: ["asserted"] }, memoryRows: [{ textKeywords: ["dentist"], status: "active", hasValidTo: true }], guard: null } },
       { say: "does Pippa prefer quiet films", expect: { signal: { primary_act: "question" }, storesNothing: true, guard: null } },
-      { say: "add oat milk to the list", expect: { signal: { primary_act: "directive" }, toolsRan: ["lists"], listHas: ["oat milk"], storesNothing: true } },
-      { say: "add oat milk, and I prefer that brand", expect: { signal: { primary_act: "directive", clauseStance: ["asserted", "asserted"] }, toolsRan: ["lists"], memoryWritten: [["brand"]], guard: null } },
+      // The literal form, so the row tests eligibility, not the 8B's
+      // tool-call reliability (the rerun's "Got it, added" without a call).
+      { say: "add oat milk to the shopping list", expect: { signal: { primary_act: "directive" }, toolsRan: ["list-add"], listHas: ["oat milk"], storesNothing: true } },
+      { say: "add oat milk, and I prefer that brand", expect: { signal: { primary_act: "directive", clauseStance: ["asserted", "asserted"] }, toolsRan: ["list-add"], memoryWritten: [["brand"]], guard: null } },
       { say: "thanks, that's all tonight", expect: { signal: { primary_act: "closing" }, storesNothing: true, guard: null, humanVerdict: true } },
     ],
   },
@@ -1053,7 +1059,9 @@ export const CONVERSATIONS: readonly BenchConversation[] = [
       { say: "if I lived in Paris I'd walk everywhere", expect: { signal: { primary_act: "inform", clauseStance: ["hypothetical"] }, storesNothing: true, guard: null } },
       { say: "my sister Nadia says she hates cilantro", expect: { signal: { primary_act: "inform", clauseStance: ["reported"] }, memoryRows: [{ textKeywords: ["cilantro", "says|said"], subject: "Nadia", maxImportance: 0.4 }], guard: null } },
       { say: "ha, I'm basically a professional chef now", expect: { signal: { primary_act: "inform", clauseStance: ["asserted", "joke"] }, storesNothing: true, guard: null, humanVerdict: true } },
-      { say: "Quill is furious about the delay", expect: { signal: { primary_act: "inform", expressed_emotion: "anger" }, storesNothing: true, guard: null } },
+      // At most a bounded state about Quill and nothing about the speaker
+      // (MEM-06's contract); until then the row checks the signal alone.
+      { say: "Quill is furious about the delay", expect: { signal: { primary_act: "inform", expressed_emotion: "anger" }, guard: null } },
       { say: "Quill said he was furious, but I think he was joking", expect: { signal: { primary_act: "inform", clauseStance: ["reported", "joke"] }, storesNothing: true, guard: null } },
     ],
   },
@@ -1066,7 +1074,7 @@ export const CONVERSATIONS: readonly BenchConversation[] = [
       { say: "I'm nervous about tomorrow's appointment", expect: { signal: { primary_act: "inform", expressed_emotion: "fear", emotion_intensity: "moderate" }, memoryRows: [{ textKeywords: ["nervous|anxious|worried"], category: "state", minImportance: 0.25, maxImportance: 0.35, hasValidTo: true }], guard: null } },
       { say: "I'm terrified about the storm tonight", expect: { signal: { primary_act: "inform", expressed_emotion: "fear", emotion_intensity: "high" }, memoryRows: [{ textKeywords: ["storm"], category: "state", minImportance: 0.45, maxImportance: 0.55, hasValidTo: true }], guard: null } },
       { say: "Rover died yesterday, and I'm devastated", expect: { signal: { primary_act: "inform", expressed_emotion: "sadness", emotion_intensity: "high" }, memoryRows: [{ textKeywords: ["Rover", "died|passed"], category: "event" }, { textKeywords: ["devastated|grieving|grief"], category: "state", hasValidTo: true }], guard: null, humanVerdict: true } },
-      { say: "set a timer for ten minutes", expect: { signal: { primary_act: "directive" }, toolsRan: ["timers"], storesNothing: true } },
+      { say: "set a timer for ten minutes", expect: { signal: { primary_act: "directive" }, toolsRan: ["timer"], storesNothing: true } },
       { say: "thanks", expect: { signal: { primary_act: "closing" }, storesNothing: true, guard: null, humanVerdict: true } },
     ],
   },

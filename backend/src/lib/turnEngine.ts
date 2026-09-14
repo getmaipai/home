@@ -1178,7 +1178,30 @@ export function literalYield(id: string, manifest: PackageManifest, text: string
   return null;
 }
 
+// The polite path takes only an anchored pattern: two literal words
+// before the wildcard ("remember that *", "set a timer for *") or a
+// literal tail after it ("add * to the shopping list"). An open pattern
+// ("remember *") behind a courtesy prefix is the routing corpus's own
+// documented gap, left to the model's tool call: "can you remember our
+// first conversation" asks, and "can you remember where we parked"
+// would have stored the question as a fact (the follow-up's review).
+function anchoredPattern(pattern: string): boolean {
+  const [head = "", tail = ""] = pattern.split("*");
+  return head.trim().split(/\s+/).filter(Boolean).length >= 2 || tail.trim().length > 0;
+}
+const QUESTION_CAPTURE_RE = /^\s*(?:who|whose|what|when|where|which|why|how|if|whether)\b/i;
+function politeCapture(captured: string | null): string | null {
+  return captured !== null && QUESTION_CAPTURE_RE.test(captured) ? null : captured;
+}
+
 export function routeLiteral(text: string, actor: PersonRow, loaded: LoadedManifest[], roster: readonly string[] = [], onYield?: (y: LiteralYield) => void): RouteResult | null {
+  // ACT-01's set: a polite request ("can you remember that Marlow's
+  // birthday is in June") is the pattern behind its courtesy prefix,
+  // ROUTE-01's own rule for the shape applied to the literal match. The
+  // model used to answer it with a claim and the judge quietly stored
+  // the fact from a directive it should never read; the judge is keyed
+  // on the signal now, so the package has to be the one that stores it.
+  const bare = text.replace(COURTESY_PREFIX, "");
   for (const { id, manifest } of loaded) {
     if (!meetsMinRole(actor.role, manifest.min_role)) continue;
     // The spec's own kind doc comment (spec/schemas/manifest.schema.json):
@@ -1215,7 +1238,7 @@ export function routeLiteral(text: string, actor: PersonRow, loaded: LoadedManif
     // confirmation, same as before.
     if (!manifest.consequential) {
       for (const pattern of manifest.routing?.patterns ?? []) {
-        const captured = matchPattern(text, pattern);
+        const captured = matchPattern(text, pattern) ?? (bare !== text && anchoredPattern(pattern) ? politeCapture(matchPattern(bare, pattern)) : null);
         if (captured === null) continue;
         const args = deterministicArgs(manifest.args, captured);
         if (!args) continue;
