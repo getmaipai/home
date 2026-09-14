@@ -440,6 +440,14 @@ export const api = {
   updateEntity: (id: string, edit: { name?: string }) =>
     request<Entity>(`/api/entities/${encodeURIComponent(id)}`, { method: "PATCH", body: JSON.stringify(edit) }),
   deleteEntity: (id: string) => request<{ id: string }>(`/api/entities/${encodeURIComponent(id)}`, { method: "DELETE" }),
+  // home#119, the entity half of confirmRelationship() below: the one
+  // way an inferred entity's confirmed_by_person_id/confirmed_at ever
+  // get set (backend/src/lib/entities.ts's confirmTransition(), step
+  // 3a). Sends exactly this body and nothing else - PATCH
+  // /api/entities/:id's schema is `.strict()`, and confirm alongside
+  // any other edit field would stop being the adult-open path.
+  confirmEntity: (id: string) =>
+    request<Entity>(`/api/entities/${encodeURIComponent(id)}`, { method: "PATCH", body: JSON.stringify({ confirm: true }) }),
   relationships: () => request<Relationship[]>("/api/relationships"),
   createRelationship: (input: { type: string; from_id: string; to_id: string; scope?: "household" | "person" }) =>
     request<Relationship>("/api/relationships", { method: "POST", body: JSON.stringify(input) }),

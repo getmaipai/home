@@ -70,7 +70,10 @@ interface EntityRelationshipLine {
  * entity or relationship": step 3a's `PATCH .../confirm` route,
  * hidden rather than disabled for a child - the route itself would
  * 403 them, but a button a child can tap into a wall is worse than no
- * button). */
+ * button). getmaipai/home#119 adds the identical mark and control to
+ * the entity's own name line (source: inferred, not just an inferred
+ * relationship about it) - same adult-only, hidden-not-disabled rule,
+ * PATCH /api/entities/:id { confirm: true }. */
 function EntityRow({
   entity,
   lines,
@@ -86,6 +89,8 @@ function EntityRow({
   canConfirm,
   onConfirmRelationship,
   confirmingRelationshipId,
+  onConfirmEntity,
+  confirmingEntityId,
 }: {
   entity: Entity;
   lines: EntityRelationshipLine[];
@@ -101,6 +106,8 @@ function EntityRow({
   canConfirm: boolean;
   onConfirmRelationship: (id: string) => void;
   confirmingRelationshipId: string | null;
+  onConfirmEntity: (id: string) => void;
+  confirmingEntityId: string | null;
 }) {
   if (editing) {
     return (
@@ -122,10 +129,41 @@ function EntityRow({
     );
   }
 
+  // home#119, the entity half of the relationship line's own unconfirmed
+  // mark just below: an entity the judge inferred and nobody has stated
+  // (source: inferred, confirmed_by_person_id still null) is never spoken
+  // as fact until a household adult confirms it, same rule and same
+  // hidden-for-a-child posture as the relationship control.
+  const entityUnconfirmed = entity.source === "inferred" && !entity.confirmed_by_person_id;
+
   return (
     <div className="flex min-w-0 flex-1 flex-col gap-1">
       <div className="flex min-w-0 flex-col">
-        <span className="truncate text-base">{entity.name}</span>
+        <div className="flex min-w-0 items-center gap-2">
+          {/* min-w-0 flex-1: a flex item's default min-width is its own
+          content width, which defeats `truncate` the moment it shares a
+          row with a sibling (the badge/button below) - a review caught a
+          long name pushing those off-row instead of ellipsizing. */}
+          <span className="min-w-0 flex-1 truncate text-base">{entity.name}</span>
+          {entityUnconfirmed ? (
+            // Deliberate type-floor exception (docs/UI.md, lane 7 item 3,
+            // 2026-09-13): the identical compact badge the relationship
+            // line's own "Unconfirmed" mark already gets the exception
+            // for, just below - a badge, not a line of body text.
+            <span className="shrink-0 rounded-full bg-muted px-1.5 py-0.5 text-xs">Unconfirmed</span>
+          ) : null}
+          {entityUnconfirmed && canConfirm ? (
+            <Button
+              variant="ghost"
+              size="xs"
+              className="shrink-0"
+              disabled={confirmingEntityId === entity.id}
+              onClick={() => onConfirmEntity(entity.id)}
+            >
+              {confirmingEntityId === entity.id ? "Confirming…" : "Confirm"}
+            </Button>
+          ) : null}
+        </div>
         <span className="text-sm text-muted-foreground">{subtitleFor(entity)}</span>
       </div>
       {lines.length > 0 ? (
@@ -241,6 +279,7 @@ export function PeopleAndThings({ actorRole }: { actorRole: Role }) {
   const [actionError, setActionError] = useState<string | null>(null);
   const [removingRelationshipId, setRemovingRelationshipId] = useState<string | null>(null);
   const [confirmingRelationshipId, setConfirmingRelationshipId] = useState<string | null>(null);
+  const [confirmingEntityId, setConfirmingEntityId] = useState<string | null>(null);
 
   // Backend's own CONFIRMING_ROLES (backend/src/lib/entities.ts): owner,
   // admin, adult - never teen or child. meetsMinRole against "adult"
@@ -340,6 +379,23 @@ export function PeopleAndThings({ actorRole }: { actorRole: Role }) {
       setActionError(err instanceof ApiError ? err.message : "Could not confirm that.");
     } finally {
       setConfirmingRelationshipId(null);
+    }
+  }
+
+  async function confirmEntity(id: string) {
+    setConfirmingEntityId(id);
+    setActionError(null);
+    try {
+      await api.confirmEntity(id);
+      await refresh();
+    } catch (err) {
+      // Same shape as confirmRelationship() above: a 409 (already
+      // confirmed, or not actually inferred) or a 403 (not an adult -
+      // shouldn't be reachable with the button hidden, but the server is
+      // the real gate) leaves the mark in place and says why.
+      setActionError(err instanceof ApiError ? err.message : "Could not confirm that.");
+    } finally {
+      setConfirmingEntityId(null);
     }
   }
 
@@ -561,6 +617,8 @@ export function PeopleAndThings({ actorRole }: { actorRole: Role }) {
                         canConfirm={canConfirm}
                         onConfirmRelationship={confirmRelationship}
                         confirmingRelationshipId={confirmingRelationshipId}
+                        onConfirmEntity={confirmEntity}
+                        confirmingEntityId={confirmingEntityId}
                       />
                     </div>
                   )}

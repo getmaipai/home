@@ -263,6 +263,140 @@ describe("PeopleAndThings (lane 11 item 2)", () => {
     }
   });
 
+  // home#119: the same four promises the relationship confirm control
+  // above already keeps, now for the entity itself (source: inferred,
+  // confirmed_by_person_id still null - PATCH /api/entities/:id { confirm:
+  // true }, backend/src/lib/entities.ts's confirmTransition()).
+  test("an inferred, unconfirmed entity is marked, and Confirm shows for an adult", async () => {
+    const guess = entity({ id: "ent-guess", name: "Marsh", source: "inferred" });
+    const restore = stubFetch({ "/api/entities": [guess], "/api/relationships": [], "/api/people": [] });
+    try {
+      const { findByText, findAllByText } = render("adult");
+      await findByText("Marsh");
+      expect((await findAllByText("Unconfirmed")).length).toBeGreaterThan(0);
+      expect((await findAllByText("Confirm")).length).toBeGreaterThan(0);
+    } finally {
+      restore();
+    }
+  });
+
+  test("entity Confirm is hidden, not shown-and-disabled, for a child", async () => {
+    const guess = entity({ id: "ent-guess", name: "Marsh", source: "inferred" });
+    const restore = stubFetch({ "/api/entities": [guess], "/api/relationships": [], "/api/people": [] });
+    try {
+      const { findByText, findAllByText, queryByText } = render("child");
+      await findByText("Marsh");
+      expect((await findAllByText("Unconfirmed")).length).toBeGreaterThan(0);
+      expect(queryByText("Confirm")).toBeNull();
+    } finally {
+      restore();
+    }
+  });
+
+  // Two still-unconfirmed entities, not one (a review caught the
+  // original version of this test unable to prove the right entity's id
+  // was sent - a handler hardcoding "ent-guess" instead of threading
+  // entity.id through would have passed it just as well, since that was
+  // the only entity in play). Marsh (person) renders before Nova (pet) -
+  // KIND_ORDER - so the first "Confirm" button is deterministically his.
+  test("tapping an entity's Confirm sends exactly { confirm: true } to that entity, and no other unconfirmed one is touched", async () => {
+    const guess = entity({ id: "ent-guess", name: "Marsh", kind: "person", source: "inferred" });
+    const other = entity({ id: "ent-other", name: "Nova", kind: "pet", source: "inferred" });
+    const confirmed: Entity = { ...guess, source: "local", confirmed_by_person_id: "person-sage", confirmed_at: "2026-09-14T00:00:00.000Z" };
+    let entitiesState: Entity[] = [guess, other];
+    let sawBody: unknown;
+    let wrongEntityPatched = false;
+    const original = globalThis.fetch;
+    globalThis.fetch = mock((input: RequestInfo | URL, init?: RequestInit) => {
+      const url = typeof input === "string" ? input : input.toString();
+      if (init?.method === "PATCH" && url.includes("/api/entities/ent-guess")) {
+        sawBody = JSON.parse(String(init.body));
+        entitiesState = [confirmed, other];
+        return Promise.resolve(new Response(JSON.stringify(confirmed), { status: 200 }));
+      }
+      if (init?.method === "PATCH" && url.includes("/api/entities/ent-other")) {
+        wrongEntityPatched = true;
+        return Promise.resolve(new Response(JSON.stringify(other), { status: 200 }));
+      }
+      if (url.includes("/api/entities")) return Promise.resolve(new Response(JSON.stringify(entitiesState), { status: 200 }));
+      if (url.includes("/api/relationships")) return Promise.resolve(new Response(JSON.stringify([]), { status: 200 }));
+      if (url.includes("/api/people")) return Promise.resolve(new Response(JSON.stringify([]), { status: 200 }));
+      throw new Error(`unstubbed fetch: ${url}`);
+    }) as unknown as typeof fetch;
+    try {
+      const { findByText, findAllByText, queryAllByText } = render("adult");
+      await findByText("Marsh");
+      await findByText("Nova");
+      const [marshConfirm] = await findAllByText("Confirm");
+      fireEvent.click(marshConfirm!);
+      // Marsh's own mark clears; Nova's - still genuinely inferred and
+      // unconfirmed - stays exactly one, never zero and never two.
+      await waitFor(() => expect(queryAllByText("Unconfirmed").length).toBe(1));
+      expect(sawBody).toEqual({ confirm: true });
+      expect(wrongEntityPatched).toBe(false);
+    } finally {
+      globalThis.fetch = original;
+    }
+  });
+
+  test("a 409 (nothing to confirm) on an entity leaves the mark in place and shows the error line", async () => {
+    const guess = entity({ id: "ent-guess", name: "Marsh", source: "inferred" });
+    // The backend's own real 409 body, same reasoning as the relationship
+    // version above: the point is that the SERVER'S OWN error text
+    // reaches the row, not a generic fallback string.
+    const original = globalThis.fetch;
+    globalThis.fetch = mock((input: RequestInfo | URL, init?: RequestInit) => {
+      const url = typeof input === "string" ? input : input.toString();
+      if (init?.method === "PATCH" && url.includes("/api/entities/ent-guess")) {
+        return Promise.resolve(new Response(JSON.stringify({ error: "already confirmed" }), { status: 409 }));
+      }
+      if (url.includes("/api/entities")) return Promise.resolve(new Response(JSON.stringify([guess]), { status: 200 }));
+      if (url.includes("/api/relationships")) return Promise.resolve(new Response(JSON.stringify([]), { status: 200 }));
+      if (url.includes("/api/people")) return Promise.resolve(new Response(JSON.stringify([]), { status: 200 }));
+      throw new Error(`unstubbed fetch: ${url}`);
+    }) as unknown as typeof fetch;
+    try {
+      const { findByText, findAllByText } = render("adult");
+      await findByText("Marsh");
+      const [confirmButton] = await findAllByText("Confirm");
+      fireEvent.click(confirmButton!);
+      await findByText("already confirmed");
+      expect((await findAllByText("Unconfirmed")).length).toBeGreaterThan(0);
+    } finally {
+      globalThis.fetch = original;
+    }
+  });
+
+  test("an already-confirmed inferred entity carries no Unconfirmed mark", async () => {
+    // The "unconfirmed" half of entityUnconfirmed's own check
+    // (source === "inferred" && !confirmed_by_person_id): a regression
+    // that dropped the confirmed_by_person_id half would keep showing
+    // this forever, and every other test here uses source: "hub" for
+    // its "no mark" case, never an inferred-but-already-confirmed one.
+    const settled = entity({ id: "ent-settled", name: "Rivet", source: "inferred", confirmed_by_person_id: "person-sage", confirmed_at: "2026-09-01T00:00:00.000Z" });
+    const restore = stubFetch({ "/api/entities": [settled], "/api/relationships": [], "/api/people": [] });
+    try {
+      const { findByText, queryByText } = render("adult");
+      await findByText("Rivet");
+      expect(queryByText("Unconfirmed")).toBeNull();
+      expect(queryByText("Confirm")).toBeNull();
+    } finally {
+      restore();
+    }
+  });
+
+  test("a hub-sourced entity (the normal case) carries no Unconfirmed mark", async () => {
+    const cosmo = entity({ id: "ent-cosmo", name: "Cosmo", source: "hub" });
+    const restore = stubFetch({ "/api/entities": [cosmo], "/api/relationships": [], "/api/people": [] });
+    try {
+      const { findByText, queryByText } = render("adult");
+      await findByText("Cosmo");
+      expect(queryByText("Unconfirmed")).toBeNull();
+    } finally {
+      restore();
+    }
+  });
+
   test("household-scoped shows no extra label; person-scoped is labeled 'Just you'", async () => {
     const household = entity({ id: "ent-household-thing", kind: "thing", name: "The good couch", scope: "household" });
     const personScoped = entity({ id: "ent-private-thing", kind: "thing", name: "Sage's notebook", scope: "person", person: "person-sage" });
