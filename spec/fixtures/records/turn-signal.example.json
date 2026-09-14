@@ -1,0 +1,26 @@
+{
+  "primary_act": "inform",
+  "secondary_acts": [],
+  "expressed_emotion": "happiness",
+  "emotion_intensity": "moderate",
+  "target": "self",
+  "repair": "none",
+  "refers_to_prior": null,
+  "clauses": [
+    {
+      "range": { "start": 0, "end": 24 },
+      "act": "inform",
+      "stance": "asserted",
+      "subject": { "kind": "speaker" },
+      "emotion": "happiness",
+      "emotion_intensity": "moderate",
+      "confidence": 0.92
+    }
+  ],
+  "act_confidence": 0.9,
+  "emotion_confidence": 0.85,
+  "source": "rule",
+  "classifier_id": null,
+  "age_band": "adult",
+  "age_band_basis": "identified_profile"
+}

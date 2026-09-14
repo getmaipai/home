@@ -19,6 +19,7 @@ function entity(overrides: Partial<Entity> = {}): Entity {
     source: "hub",
     confirmed_by_person_id: null,
     confirmed_at: null,
+    pronouns: null,
     scope: "household",
     person: null,
     sensitive: false,

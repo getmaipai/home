@@ -21,6 +21,26 @@ evidence-ladder replies, `[N]` markers in the reply text) - lives on the
 assistant turn (`backend/src/wire.ts`'s `TurnValue`, additive), not a
 shape chapter 3 names.
 
+Added 2026-09-14 (SPEC-01, `home/docs/dev.md` sections 12-14 and
+"Coherence review, 2026-09-14"): the design pass's own turn-and-memory
+migration, one spec bump, declared before any engine item reads a field
+of it. **TurnSignal**, **ReplyPlan** and **SubjectRef** (value shapes,
+never synced on their own - carried on the new **ConversationTurn**,
+the shared turn record the robot syncs, promoting `conversation_turns`
+from hub-internal to spec-shaped); **OpenQuestion** (one of the design
+pass's four ask mechanisms, the one that needed its own record).
+`MemoryRecord` gains `child_disclosure` (a child's own read of a
+household fact, separate from `sensitive` and `scope`), `fact_confidence`
+plus `confidence_evidence` and `conflicts_with` (credence: how much
+support a proposition has, computed later by CRED-01, no writer yet),
+`companion` scope, and `retrieval_feedback` (REVIEW-01's own signal, no
+writer yet). `Entity` gains `pronouns`. Three new vocabularies:
+`entity-kind-nouns.json`, `life-events.json` (serving both AGE-01's
+disclosure default and CRED-01's confidence weights, one list), and
+`defect-codes.json` (the guard reason enum, the plan-violation
+sub-kinds, and REVIEW-01's own review-only codes, declared once).
+Additive only: every existing fixture still validates unchanged.
+
 The error catalogue's *shape* (`ErrorEntry`) and the privacy row shape
 (`PrivacyRow`, used by the manifest's `data_sources[]`) are owned by
 `@maipai/standards` (std-v0.2.0) and imported by `$ref`, not defined here;
@@ -41,6 +61,9 @@ see "Cross-repo schemas" below. The populated error catalogue itself
 | `vocab/permissions.json` | The permissions vocabulary, the install prompt's fixed enum (3.2) | hand-written |
 | `vocab/relationship-types.json` | What may relate to what, whether it can end, and which statuses it admits | hand-written |
 | `vocab/grant-actions.json` | Everything a household can allow or deny per person | hand-written |
+| `vocab/entity-kind-nouns.json` | SPEC-01: the nouns a person answers ASK-01's unknown-name question with, mapped to an entity kind | hand-written |
+| `vocab/life-events.json` | SPEC-01: the classes AGE-01's disclosure default and CRED-01's confidence weights both read, one list | hand-written |
+| `vocab/defect-codes.json` | SPEC-01: the guard reason enum, the plan-violation sub-kinds, and REVIEW-01's own review-only codes, declared once | hand-written |
 | `ui/schema.json`, `ui/pages/*.json` | UI schema v0 (Chat only) and the Chat page itself | hand-written; see `ui/README.md` for why this isn't codegen'd |
 | `records/ts/` | The cross-field rules for Entity, Relationship and Grant that JSON Schema conditionals cannot carry (neither generator preserves them); TS only for now, like `safety/` | hand-written |
 | `interpreters/ts/`, `interpreters/py/` | The Tier 0 recipe interpreter, one per language, kept behaviorally identical | hand-written |
@@ -114,6 +137,13 @@ Per platform plan chapter 3, once this reaches `spec-v0.1.0`, `bot` pins it
 as `maipai-spec @ git+https://github.com/getmaipai/home@spec-v0.1.0#subdirectory=spec`
 and runs the same fixtures in `tests/py/` against its own stores. No tag
 has been cut yet; this is still pre-release, unversioned spec work.
+
+SPEC-01 (2026-09-14) lands inside that same still-uncut `spec-v0.1.0`
+target: `bot`'s own docs (`AGENTS.md`, `docs/dev.md`, `docs/BACKLOG.md`)
+already name `spec-v0.1.0` as the one version to pin, before this
+migration and after it alike, so nothing in `bot` changes because of it -
+one pin note for the whole of spec v0.1, not a second bump per migration
+that lands inside it.
 
 ## Why two generated model sets for the same JSON Schema
 

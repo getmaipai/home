@@ -1,0 +1,44 @@
+{
+  "$comment": "SPEC-01 (ASK-01's design, dev.md section 3 part 1: 'A new vocab/entity-kind-nouns.json maps the nouns a person answers with to a kind'). When the hub asks 'Who's Quill?' and the person answers with a noun ('my coworker', 'our neighbor's dog'), the noun in the answer - or in the original relation phrase that raised the ask - hints the new entity's kind (entity.schema.json's own closed enum: person, pet, place, organization, thing), so ASK-01's deterministic answer parser can create it without asking a second question just for that. A hint, not a guarantee: a person's own explicit answer always wins over a noun guess, and a noun not on this list leaves the kind unset rather than invented. One definition, read by the hub and the robot.",
+  "kinds": [
+    {
+      "kind": "person",
+      "nouns": [
+        "cousin", "aunt", "uncle", "niece", "nephew", "grandma", "grandpa", "grandmother", "grandfather",
+        "coworker", "co-worker", "colleague", "workmate", "boss", "manager", "employer",
+        "neighbor", "neighbour", "friend", "buddy", "pal", "mate", "classmate", "teammate",
+        "teacher", "tutor", "coach", "babysitter", "nanny", "doctor", "dentist", "vet"
+      ]
+    },
+    {
+      "kind": "pet",
+      "nouns": [
+        "dog", "puppy", "cat", "kitten", "rabbit", "bunny", "hamster", "guinea pig",
+        "bird", "parrot", "fish", "turtle", "tortoise", "lizard", "snake", "horse", "pony"
+      ]
+    },
+    {
+      "kind": "place",
+      "nouns": [
+        "shop", "store", "school", "nursery", "preschool", "park", "gym", "church", "clinic",
+        "hospital", "restaurant", "cafe", "office", "house", "apartment", "flat", "cabin", "beach"
+      ]
+    },
+    {
+      "kind": "organization",
+      "nouns": [
+        "company", "business", "team", "club", "league", "band", "choir", "charity",
+        "nonprofit", "non-profit", "agency", "firm", "studio", "gym chain", "franchise"
+      ]
+    },
+    {
+      "kind": "thing",
+      "nouns": [
+        "car", "truck", "van", "bike", "bicycle", "motorcycle", "scooter", "boat",
+        "phone", "laptop", "computer", "tablet", "console", "tv", "television",
+        "fridge", "refrigerator", "washer", "dryer", "dishwasher", "oven", "microwave",
+        "watch", "camera", "guitar", "piano", "instrument"
+      ]
+    }
+  ]
+}

@@ -21,6 +21,11 @@ import { Conversation } from "../../gen/ts/conversation.js";
 import { Device } from "../../gen/ts/device.js";
 import { ContentCeiling } from "../../gen/ts/content-ceiling.js";
 import { Source } from "../../gen/ts/source.js";
+import { TurnSignal } from "../../gen/ts/turn-signal.js";
+import { ReplyPlan } from "../../gen/ts/reply-plan.js";
+import { SubjectRef } from "../../gen/ts/subject-ref.js";
+import { ConversationTurn } from "../../gen/ts/conversation-turn.js";
+import { OpenQuestion } from "../../gen/ts/open-question.js";
 // ErrorEntry is standards-owned (std-v0.2.0), not generated here; the error
 // catalogue's shape is imported from the sibling .github checkout, the same
 // way spec/schemas/manifest.schema.json imports PrivacyRow by $ref.
@@ -132,6 +137,36 @@ describe("record fixtures validate against their generated Zod models", () => {
     );
     expect(floors[0]).toEqual(floors[1]);
     expect(floors[1]).toEqual(floors[2]);
+  });
+
+  test("turn-signal.example.json", () => {
+    expect(() => TurnSignal.parse(loadFixture("turn-signal.example.json"))).not.toThrow();
+  });
+
+  test("reply-plan.example.json", () => {
+    expect(() => ReplyPlan.parse(loadFixture("reply-plan.example.json"))).not.toThrow();
+  });
+
+  // SPEC-01's own acceptance: round-trip fixtures for all three SubjectRef
+  // variants, and the validator refuses a world reference carrying an
+  // entity_id (the second test below).
+  for (const kind of ["household", "world", "unresolved"]) {
+    test(`subject-ref.${kind}.example.json`, () => {
+      expect(() => SubjectRef.parse(loadFixture(`subject-ref.${kind}.example.json`))).not.toThrow();
+    });
+  }
+
+  test("a world SubjectRef carrying an entity_id is refused", () => {
+    const world = loadFixture("subject-ref.world.example.json") as Record<string, unknown>;
+    expect(() => SubjectRef.parse({ ...world, entity_id: "ent-p7q8r9" })).toThrow();
+  });
+
+  test("conversation-turn.example.json", () => {
+    expect(() => ConversationTurn.parse(loadFixture("conversation-turn.example.json"))).not.toThrow();
+  });
+
+  test("open-question.example.json", () => {
+    expect(() => OpenQuestion.parse(loadFixture("open-question.example.json"))).not.toThrow();
   });
 
   test("error catalogue entries", () => {

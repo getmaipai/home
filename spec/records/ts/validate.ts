@@ -22,6 +22,7 @@ import type { Entity } from "../../gen/ts/entity.js";
 import type { Relationship } from "../../gen/ts/relationship.js";
 import type { Grant } from "../../gen/ts/grant.js";
 import type { List } from "../../gen/ts/list.js";
+import type { MemoryRecord } from "../../gen/ts/memory-record.js";
 
 const VOCAB_DIR = join(import.meta.dir, "..", "..", "vocab");
 
@@ -297,6 +298,45 @@ function scopeProblems(scope: string, person: string | null | undefined): Proble
   if (scope === "person" && !person) return ["a person-scoped record must name its person"];
   if (scope !== "person" && person) return [`a ${scope}-scoped record must not name a person`];
   return [];
+}
+
+/** SPEC-01's own cross-field rules (dev.md 'Coherence review', question 1;
+ * BACKLOG's SPEC-01 acceptance names two of these three refusals
+ * explicitly): a companion-scoped record without a companion_id, and a
+ * child_disclosure set on a scope where it is meaningless. The third
+ * named refusal (a world SubjectRef carrying an entity_id) needs no
+ * function here - `additionalProperties: false` on each branch of
+ * subject-ref.schema.json's own `oneOf` already refuses it at the
+ * generated-model level, the same way recipe.schema.json's own step
+ * union already proves this pattern works through both generators. */
+export function validateMemoryRecord(record: MemoryRecord): Problems {
+  const problems: Problems = [];
+
+  if (record.scope === "companion") {
+    if (!record.companion_id) problems.push("a companion-scoped record must name its companion_id");
+  } else if (record.companion_id) {
+    problems.push(`companion_id is only meaningful on companion scope, not on ${record.scope}`);
+  }
+
+  problems.push(...scopeProblems(record.scope, record.person));
+
+  if (record.scope === "person" || record.scope === "self") {
+    if (record.child_disclosure !== null) {
+      problems.push(`child_disclosure is meaningless on ${record.scope} scope and must stay null`);
+    }
+  }
+
+  // Section 14: fact credence exists only where a proposition can be
+  // credited or doubted. An entity or an episode never acquires it by
+  // accident.
+  if (record.record_kind === "memory") {
+    if (record.fact_confidence === null) problems.push("a memory record must carry a fact_confidence");
+  } else {
+    if (record.fact_confidence !== null) problems.push(`fact_confidence is only meaningful on a memory record, not a ${record.record_kind}`);
+    if (record.confidence_evidence.length > 0) problems.push(`confidence_evidence is only meaningful on a memory record, not a ${record.record_kind}`);
+  }
+
+  return problems;
 }
 
 /** Step 8's own cross-field rule, the same shape Entity's place_kind

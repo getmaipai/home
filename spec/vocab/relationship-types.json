@@ -210,6 +210,17 @@
       "terminable": true,
       "statuses": ["normal", "primary", "secondary", "seasonal"],
       "description": "The inverse of attends."
+    },
+    {
+      "id": "relative_of",
+      "from": ["person"],
+      "to": ["person"],
+      "inverse": "relative_of",
+      "terminable": true,
+      "symmetric": true,
+      "statuses": ["normal", "close", "strained"],
+      "description": "SPEC-01 (ASK-01's household-frame rule, dev.md section 3): family a person names without one of the closer, typed relations above fitting (\"my aunt\", \"my cousin\", \"my uncle\") - a real family tie the vocabulary would otherwise force into no relation at all, or a wrong specific one. Symmetric and terminable, unlike parent_of/child_of/sibling_of: a family tie stated this loosely can also end (a step-relation through a divorce), where the closer types cannot; ending it is valid_to, the same as any other terminable type, never an `estranged` status (this vocabulary's own invariant: estranged is offered only where a relationship cannot end).",
+      "said_as": ["my aunt", "my uncle", "my cousin", "my niece", "my nephew", "my grandma", "my grandpa", "my grandmother", "my grandfather", "my granddaughter", "my grandson", "my in-law", "my mother-in-law", "my father-in-law", "my sister-in-law", "my brother-in-law", "my relative", "my family member"]
     }
   ]
 }

@@ -1228,7 +1228,7 @@ invented for the roster's household, and added to
 
 <a id="spec-01"></a>
 
-- [ ] **SPEC-01: The design pass's spec migration, one bump** (S-M, spec only; after OUT-01, before every engine item that reads a new field)
+- [x] **SPEC-01: The design pass's spec migration, one bump** (S-M, spec only; after OUT-01, before every engine item that reads a new field) - shipped 2026-09-14, Session B
 
     Objective: every record the pass changes is declared once, with a
     default, in one spec release, so the robot pins one bump and no

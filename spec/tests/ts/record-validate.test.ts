@@ -15,12 +15,14 @@ import {
   validateRelationshipEndpoints,
   validateGrant,
   validateList,
+  validateMemoryRecord,
   inverseRelationship,
 } from "../../records/ts/validate.js";
 import type { Entity } from "../../gen/ts/entity.js";
 import type { Relationship } from "../../gen/ts/relationship.js";
 import type { Grant } from "../../gen/ts/grant.js";
 import type { List } from "../../gen/ts/list.js";
+import type { MemoryRecord } from "../../gen/ts/memory-record.js";
 
 const FIXTURES = join(import.meta.dir, "..", "..", "fixtures", "records");
 const load = <T>(name: string): T => JSON.parse(readFileSync(join(FIXTURES, name), "utf-8")) as T;
@@ -32,6 +34,7 @@ const statedRel = () => load<Relationship>("relationship.stated.example.json");
 const estrangedRel = () => load<Relationship>("relationship.estranged.example.json");
 const inferredRel = () => load<Relationship>("relationship.inferred.example.json");
 const grant = () => load<Grant>("grant.example.json");
+const memoryRecord = () => load<MemoryRecord>("memory-record.memory.example.json");
 const shoppingList = () => load<List>("list.shopping.example.json");
 const todoList = () => load<List>("list.todo.example.json");
 const customList = () => load<List>("list.custom.example.json");
@@ -48,6 +51,9 @@ describe("every shipped fixture is valid", () => {
   });
   test("lists", () => {
     for (const l of [shoppingList(), todoList(), customList()]) expect(validateList(l)).toEqual([]);
+  });
+  test("memory record", () => {
+    expect(validateMemoryRecord(memoryRecord())).toEqual([]);
   });
 });
 
@@ -105,6 +111,57 @@ describe("list rules", () => {
     expect(validateList({ ...shoppingList(), scope: "household", person: "person-a1b2c3" })).toContainEqual(
       expect.stringContaining("must not name a person"),
     );
+  });
+});
+
+// SPEC-01's own acceptance names two of these refusals explicitly: a
+// companion scope without a companion_id, and a child_disclosure on
+// person scope (the third, a world SubjectRef carrying an entity_id,
+// is proven in fixtures.test.ts at the generated-model level).
+describe("memory record rules", () => {
+  test("a companion-scoped record must name its companion_id", () => {
+    expect(
+      validateMemoryRecord({ ...memoryRecord(), scope: "companion", person: null, companion_id: null }),
+    ).toContainEqual(expect.stringContaining("must name its companion_id"));
+  });
+
+  test("companion_id is only meaningful on companion scope", () => {
+    expect(
+      validateMemoryRecord({ ...memoryRecord(), scope: "person", companion_id: "comp-marlow" }),
+    ).toContainEqual(expect.stringContaining("only meaningful on companion scope"));
+  });
+
+  test("child_disclosure must stay null on person and self scope", () => {
+    expect(
+      validateMemoryRecord({ ...memoryRecord(), scope: "person", child_disclosure: "adult_only" }),
+    ).toContainEqual(expect.stringContaining("meaningless on person scope"));
+    expect(
+      validateMemoryRecord({ ...memoryRecord(), scope: "self", person: null, child_disclosure: "child_ok" }),
+    ).toContainEqual(expect.stringContaining("meaningless on self scope"));
+  });
+
+  test("child_disclosure is fine on household and companion scope", () => {
+    expect(
+      validateMemoryRecord({ ...memoryRecord(), scope: "household", person: null, child_disclosure: "adult_only" }),
+    ).toEqual([]);
+  });
+
+  test("a memory record must carry a fact_confidence", () => {
+    expect(validateMemoryRecord({ ...memoryRecord(), fact_confidence: null })).toContainEqual(
+      expect.stringContaining("must carry a fact_confidence"),
+    );
+  });
+
+  test("an entity or episode record never carries fact credence", () => {
+    const asEntity: MemoryRecord = { ...memoryRecord(), record_kind: "entity", fact_confidence: 0.9 };
+    expect(validateMemoryRecord(asEntity)).toContainEqual(expect.stringContaining("only meaningful on a memory record"));
+    const withEvidence: MemoryRecord = {
+      ...memoryRecord(),
+      record_kind: "episode",
+      fact_confidence: null,
+      confidence_evidence: [{ source_id: "turn-1", source_person_id: null, kind: "initial_assertion", observed_at: "2026-09-14T00:00:00Z" }],
+    };
+    expect(validateMemoryRecord(withEvidence)).toContainEqual(expect.stringContaining("confidence_evidence is only meaningful"));
   });
 });
 

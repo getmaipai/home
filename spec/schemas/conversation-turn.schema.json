@@ -1,0 +1,102 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://getmaipai.github.io/home/spec/schemas/conversation-turn.schema.json",
+  "title": "ConversationTurn",
+  "description": "SPEC-01 (dev.md section 12, 'What exists today': 'conversation_turns is hub-internal while the conversation spec says robot turns sync through the hub: a shared turn record is a debt this item pays, because the signal has to live on it'). One completed turn, spec-shaped so the hub and the robot agree on its fields (backend/src/db/schema.ts's own conversationTurns table stays the hub's storage; this is the shape a sync payload and a fixture agree on, additive to what that table already carries - the fields this migration adds are signal, plan, subjects, outcomes typed, document, review_id and notice_ids; ACT-01 onward writes them, no writer yet). `signal` is required (ACT-01 computes it for every turn, package and command turns included, before routing); `plan`, `subjects`, `outcomes`, `document`, `review_id` and `notice_ids` stay null until the items that write them (ACT-03, CHAT-13, existing package handling, COMP-01, REVIEW-01, AGE-02) land.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "id", "conversation_id", "person", "surface", "user_text", "reply_text", "source",
+    "signal", "plan", "subjects", "outcomes", "document", "review_id", "notice_ids",
+    "created_at", "hlc"
+  ],
+  "$defs": {
+    "outcome": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["call_id", "package_id", "status"],
+      "properties": {
+        "call_id": { "type": "string", "minLength": 1 },
+        "package_id": { "type": "string", "minLength": 1 },
+        "status": { "type": "string", "enum": ["succeeded", "failed", "pending", "rejected"] },
+        "reason": { "type": ["string", "null"], "default": null, "description": "Only meaningful with status rejected." },
+        "args": { "type": ["object", "null"], "default": null, "description": "The exact arguments the call was bound to." },
+        "via": {
+          "type": ["string", "null"],
+          "enum": ["tool_call", "pattern", "confirm", "ask", "command", null],
+          "default": null,
+          "description": "Which path produced this outcome."
+        },
+        "at": { "type": ["string", "null"], "format": "date-time", "default": null },
+        "result": { "anyOf": [{ "$ref": "result.schema.json" }, { "type": "null" }], "default": null },
+        "error_code": { "type": ["string", "null"], "default": null },
+        "user_message": { "type": ["string", "null"], "default": null, "description": "Safe for the household; never a developer diagnostic." },
+        "source": {
+          "type": ["object", "null"],
+          "additionalProperties": false,
+          "default": null,
+          "properties": {
+            "title": { "type": "string" },
+            "url": { "type": "string" },
+            "site": { "type": "string" },
+            "snippet": { "type": ["string", "null"] }
+          },
+          "required": ["title"]
+        }
+      }
+    }
+  },
+  "properties": {
+    "id": { "type": "string", "pattern": "^turn-[a-z0-9]{6,}$" },
+    "conversation_id": { "type": "string", "pattern": "^conv-[a-z0-9]{6,}$" },
+    "person": { "type": "string", "pattern": "^person-[a-z0-9]{6,}$", "description": "Who spoke, captured at write time (a role can change later)." },
+    "surface": { "type": "string", "enum": ["chat", "overlay", "pod", "robot", "tv", "phone"] },
+    "user_text": { "type": "string" },
+    "reply_text": { "type": "string" },
+    "source": {
+      "type": "string",
+      "enum": ["safety_refuse", "plugin", "plugin_error", "command", "command_error", "model", "confirm", "policy"],
+      "description": "Matches backend/src/wire.ts's TurnValue.source."
+    },
+    "signal": { "$ref": "turn-signal.schema.json" },
+    "plan": {
+      "anyOf": [{ "$ref": "reply-plan.schema.json" }, { "type": "null" }],
+      "default": null
+    },
+    "subjects": {
+      "type": ["array", "null"],
+      "items": { "$ref": "subject-ref.schema.json" },
+      "default": null,
+      "description": "CHAT-13's stack of what the conversation is about, as it stood after this turn."
+    },
+    "outcomes": {
+      "type": ["array", "null"],
+      "items": { "$ref": "#/$defs/outcome" },
+      "default": null,
+      "description": "The typed outcomes of every package call this turn ran, parked, or rejected. Null for a turn that proposed none."
+    },
+    "document": {
+      "type": ["string", "null"],
+      "default": null,
+      "description": "COMP-01: a linked document this turn produced or referenced, when that exists. Null until COMP-01."
+    },
+    "review_id": {
+      "type": ["string", "null"],
+      "minLength": 1,
+      "default": null,
+      "description": "REVIEW-01's own TurnReview id, once one exists for this turn. Null until REVIEW-01."
+    },
+    "notice_ids": {
+      "type": ["array", "null"],
+      "items": { "type": "string", "minLength": 1 },
+      "default": null,
+      "description": "AGE-02 (dev.md section 13 part 4, the outside review reconciled): the notification ids this turn raised, so a dedupe check and an audit trail both read the turn record rather than a separate index. Null until AGE-02."
+    },
+    "created_at": { "type": "string", "format": "date-time" },
+    "hlc": {
+      "type": "string",
+      "pattern": "^[0-9]+:[0-9]+:[a-z0-9]{6,}$",
+      "description": "Hybrid logical clock: wall_ms:counter:node (7.3), the same shape every other synced record type uses."
+    }
+  }
+}

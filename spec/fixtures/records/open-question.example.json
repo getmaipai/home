@@ -1,0 +1,14 @@
+{
+  "id": "oq-a1b2c3",
+  "person": "person-a1b2c3",
+  "conversation_id": "conv-d4e5f6",
+  "kind": "who",
+  "text": "Is Quill your coworker?",
+  "subject_id": "ent-p7q8r9",
+  "status": "pending",
+  "source": "judge-run-9042",
+  "created_at": "2026-09-14T10:05:00Z",
+  "asked_at": null,
+  "resolved_at": null,
+  "hlc": "1757837100000:0:a1b2c3"
+}

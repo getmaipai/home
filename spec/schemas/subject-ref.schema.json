@@ -1,0 +1,91 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://getmaipai.github.io/home/spec/schemas/subject-ref.schema.json",
+  "title": "SubjectRef",
+  "description": "SPEC-01, folded in from ASK-01 and CHAT-13's own design by the coherence review, 2026-09-14 (dev.md section 3 part 1, section 4's CHAT-13 amendment, 'Coherence review' question 1). One shape for what a conversation is about, shared by the hub, the robot and Go: a household reference (an authoritative entity_id - a world subject never becomes a household entity, on any path), a world reference (a real-world thing the household does not own an entity for: a film, an album, a place that is not the household's own), or an unresolved reference (a name the turn could not resolve yet). `TurnContext.subjects: SubjectRef[]` is the stack CHAT-13 keeps (depth two to start); `carried_question` is meaningful only on a stack entry, not on a SubjectRef embedded elsewhere (a TurnSignal clause's `subject`, MEM-06's grounding), where it is always null.",
+  "oneOf": [
+    { "$ref": "#/$defs/household" },
+    { "$ref": "#/$defs/world" },
+    { "$ref": "#/$defs/unresolved" }
+  ],
+  "$defs": {
+    "household": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "entity_id", "carried_question"],
+      "properties": {
+        "type": { "const": "household" },
+        "entity_id": {
+          "type": "string",
+          "pattern": "^ent-[a-z0-9]{6,}$",
+          "description": "Authoritative: the turn resolved this to a real entity in the household's graph."
+        },
+        "carried_question": { "$ref": "#/$defs/carried_question" }
+      }
+    },
+    "world": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "kind", "display_name", "year", "source_kind", "stable_key", "recency", "carried_question"],
+      "properties": {
+        "type": { "const": "world" },
+        "kind": {
+          "type": "string",
+          "minLength": 1,
+          "description": "What sort of world thing this is (film, album, book, show, game, band, product, place, event, ...). Free text, not a closed enum: the space of things a household might ask about is far larger than entity.schema.json's own household kinds, and nothing downstream branches on it beyond display."
+        },
+        "display_name": { "type": "string", "minLength": 1 },
+        "year": { "type": ["integer", "null"], "default": null },
+        "source_kind": {
+          "type": ["string", "null"],
+          "enum": ["web", "wikidata", "wikipedia", "weather", "package", null],
+          "default": null,
+          "description": "source.schema.json's own `kind` enum: which typed lookup answered, when one did. Null when nothing has answered yet (a subject named in the utterance before any lookup ran)."
+        },
+        "stable_key": {
+          "type": ["string", "null"],
+          "default": null,
+          "description": "The typed source's own stable identifier for this subject (a Wikidata QID, a Wikipedia page title), when source_kind is set. Null otherwise."
+        },
+        "recency": {
+          "type": "string",
+          "enum": ["current", "dated", "unknown"],
+          "description": "`current` when the utterance's own words (new, upcoming, latest, this season, coming out, just dropped, the remake, the sequel) or a typed source date this within the last year; `dated` when a typed source dates it earlier; `unknown` otherwise. CHAT-13's rule: only a `dated` subject may take an exact field from the model's own knowledge."
+        },
+        "carried_question": { "$ref": "#/$defs/carried_question" }
+      }
+    },
+    "unresolved": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "surface_form", "candidate_kinds", "provenance", "confidence", "carried_question"],
+      "properties": {
+        "type": { "const": "unresolved" },
+        "surface_form": {
+          "type": "string",
+          "minLength": 1,
+          "description": "The name exactly as the person said it."
+        },
+        "candidate_kinds": {
+          "type": "array",
+          "items": { "type": "string", "enum": ["person", "pet", "place", "organization", "thing"] },
+          "minItems": 0,
+          "default": [],
+          "description": "ASK-01's own hint: entity.schema.json kinds this name plausibly refers to, read from a relation phrase's noun via vocab/entity-kind-nouns.json. Empty when nothing hinted a kind."
+        },
+        "provenance": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Where this reference came from (a turn id, a conversation id): free-text, matching memory-record.schema.json's own `source` field's convention."
+        },
+        "confidence": { "type": "number", "minimum": 0, "maximum": 1 },
+        "carried_question": { "$ref": "#/$defs/carried_question" }
+      }
+    },
+    "carried_question": {
+      "type": ["string", "null"],
+      "default": null,
+      "description": "CHAT-13's rejected-subject rule (dev.md section 4): after a correction replaces the active subject, the unresolved question from before the correction is carried here (its text) so the engine re-asks it against the corrected subject on the next turn, or on a bare 'do it'/'go on', without the person repeating it. Null once answered, and always null outside a stack entry."
+    }
+  }
+}

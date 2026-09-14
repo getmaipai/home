@@ -13,6 +13,7 @@ from pydantic import ValidationError
 
 from gen.py.content_ceiling_schema import ContentCeiling
 from gen.py.conversation_schema import Conversation
+from gen.py.conversation_turn_schema import ConversationTurn
 from gen.py.device_schema import Device
 from gen.py.entity_schema import Entity
 from gen.py.grant_schema import Grant
@@ -21,12 +22,16 @@ from gen.py.list_schema import List
 from gen.py.manifest_schema import PackageManifest
 from gen.py.memory_record_schema import MemoryRecord
 from gen.py.model_capabilities_schema import ModelCapabilities
+from gen.py.open_question_schema import OpenQuestion
 from gen.py.person_schema import Person
 from gen.py.relationship_schema import Relationship
+from gen.py.reply_plan_schema import ReplyPlan
 from gen.py.safety_result_schema import SafetyResult
 from gen.py.setting_value_schema import SettingValue
 from gen.py.settings_key_schema import SettingsKey
 from gen.py.source_schema import Source
+from gen.py.subject_ref_schema import Household, Unresolved, World
+from gen.py.turn_signal_schema import TurnSignal
 
 # ErrorEntry is standards-owned (std-v0.2.0), not generated here; loaded
 # from the sibling .github checkout the same way spec/schemas/manifest
@@ -130,6 +135,47 @@ def test_model_capabilities_fixtures(kind):
     ModelCapabilities.model_validate(
         load_fixture(f"model-capabilities.{kind}.example.json")
     )
+
+
+def test_turn_signal_fixture():
+    TurnSignal.model_validate(load_fixture("turn-signal.example.json"))
+
+
+def test_reply_plan_fixture():
+    ReplyPlan.model_validate(load_fixture("reply-plan.example.json"))
+
+
+# SubjectRef's root is a bare oneOf (no wrapping object), which
+# datamodel-codegen collapses away rather than emitting a combined union
+# type on the Python side (json-schema-to-zod does emit one for TS - see
+# spec/tests/ts/fixtures.test.ts's own SubjectRef.parse() calls). Each
+# variant's own generated class round-trips its fixture just as well; this
+# is a documented generator asymmetry, not a schema bug (README, "Why two
+# generated model sets").
+def test_subject_ref_household_fixture():
+    Household.model_validate(load_fixture("subject-ref.household.example.json"))
+
+
+def test_subject_ref_world_fixture():
+    World.model_validate(load_fixture("subject-ref.world.example.json"))
+
+
+def test_subject_ref_world_with_entity_id_is_rejected():
+    bad = {**load_fixture("subject-ref.world.example.json"), "entity_id": "ent-p7q8r9"}
+    with pytest.raises(ValidationError):
+        World.model_validate(bad)
+
+
+def test_subject_ref_unresolved_fixture():
+    Unresolved.model_validate(load_fixture("subject-ref.unresolved.example.json"))
+
+
+def test_conversation_turn_fixture():
+    ConversationTurn.model_validate(load_fixture("conversation-turn.example.json"))
+
+
+def test_open_question_fixture():
+    OpenQuestion.model_validate(load_fixture("open-question.example.json"))
 
 
 def test_person_missing_required_field_is_rejected():

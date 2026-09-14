@@ -1,0 +1,10 @@
+{
+  "type": "world",
+  "kind": "album",
+  "display_name": "the new Marsh Lantern album",
+  "year": 2026,
+  "source_kind": "wikidata",
+  "stable_key": "Q123456789",
+  "recency": "current",
+  "carried_question": null
+}

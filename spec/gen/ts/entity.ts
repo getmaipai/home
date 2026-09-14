@@ -182,6 +182,25 @@ export const Entity = z
         "Withheld on shared surfaces and, on the robot, unless the person is confirmed present and alone. Same meaning as MemoryRecord.sensitive.",
       )
       .default(false),
+    /**SPEC-01 (ASK-01's deterministic answer parser, dev.md section 3 part 2): how to refer to this entity, in the household's own words ('she/her', 'they/them'), not a closed enum - a household states this about a person the same way it states a name. Meaningful mainly on kind: person; nothing stops it being set on a pet. Declared here, no writer until ASK-01: `PATCH /api/entities/:id`'s own body schema is `.strict()` and does not yet accept this key (a client trying to set it gets a real 400, never a silent drop), the same additive-first posture every other new SPEC-01 field takes.*/
+    pronouns: z
+      .union([
+        z
+          .string()
+          .max(100)
+          .describe(
+            "SPEC-01 (ASK-01's deterministic answer parser, dev.md section 3 part 2): how to refer to this entity, in the household's own words ('she/her', 'they/them'), not a closed enum - a household states this about a person the same way it states a name. Meaningful mainly on kind: person; nothing stops it being set on a pet. Declared here, no writer until ASK-01: `PATCH /api/entities/:id`'s own body schema is `.strict()` and does not yet accept this key (a client trying to set it gets a real 400, never a silent drop), the same additive-first posture every other new SPEC-01 field takes.",
+          ),
+        z
+          .null()
+          .describe(
+            "SPEC-01 (ASK-01's deterministic answer parser, dev.md section 3 part 2): how to refer to this entity, in the household's own words ('she/her', 'they/them'), not a closed enum - a household states this about a person the same way it states a name. Meaningful mainly on kind: person; nothing stops it being set on a pet. Declared here, no writer until ASK-01: `PATCH /api/entities/:id`'s own body schema is `.strict()` and does not yet accept this key (a client trying to set it gets a real 400, never a silent drop), the same additive-first posture every other new SPEC-01 field takes.",
+          ),
+      ])
+      .describe(
+        "SPEC-01 (ASK-01's deterministic answer parser, dev.md section 3 part 2): how to refer to this entity, in the household's own words ('she/her', 'they/them'), not a closed enum - a household states this about a person the same way it states a name. Meaningful mainly on kind: person; nothing stops it being set on a pet. Declared here, no writer until ASK-01: `PATCH /api/entities/:id`'s own body schema is `.strict()` and does not yet accept this key (a client trying to set it gets a real 400, never a silent drop), the same additive-first posture every other new SPEC-01 field takes.",
+      )
+      .default(null),
     created_at: z.string().datetime({ offset: true }),
     updated_at: z.string().datetime({ offset: true }),
     /**A tombstone, not a removal: a row that simply vanishes is indistinguishable to a robot syncing later from one it has not been told about yet.*/

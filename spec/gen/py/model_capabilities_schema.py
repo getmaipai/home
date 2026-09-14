@@ -87,14 +87,18 @@ class ModelCapabilities(BaseModel):
         'tts',
         'stt',
         'wakeword',
-    ] = Field(..., description="Matches backend/src/lib/llm.ts's LlmRole.")
+        'turn-signal',
+    ] = Field(
+        ...,
+        description="Matches backend/src/lib/llm.ts's LlmRole, with one addition ahead of that hub code: turn-signal (SPEC-01, dev.md section 12 part 2, the small classifier heads over the turn's existing embedding that ACT-02 fetches on demand, not wired to a real backend yet, same as image/video below). A code review on this migration caught the original wording claiming an exact match already - ACT-02 is what adds turn-signal to LlmRole itself; this is spec-only, declared here first per the migration's own no-hub-code scope.",
+    )
     label: constr(min_length=1) = Field(
         ..., description="Display name, e.g. 'Qwen3 8B Instruct'."
     )
     license: constr(min_length=1)
-    engine: Literal['llama-server', 'comfyui'] = Field(
+    engine: Literal['llama-server', 'comfyui', 'head'] = Field(
         ...,
-        description='Which runtime hosts this model. Only llama-server is wired to a real backend today (llmSupervisor.ts); comfyui entries are catalog data ahead of that package existing.',
+        description="Which runtime hosts this model. Only llama-server is wired to a real backend today (llmSupervisor.ts); comfyui entries are catalog data ahead of that package existing. head (SPEC-01, dev.md section 12 part 2): a small classifier run as a matrix multiply over an embedding the turn already computes, not a served model process at all - ACT-02's own gap when it lands is that this engine kind has no sizing shape yet ($defs/sizing below only covers transformer_gguf and diffusion).",
     )
     implemented: bool = Field(
         ...,
