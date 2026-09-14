@@ -327,13 +327,20 @@ not permission to expand scope.
     memory/judge tests, changed shared record fixtures, full exit gate.
 
     **Amended 2026-09-14 (dev.md section 14, part 4):** the same reader
-    renders credence into the bullet: a certain record plainly, a
-    provisional one (confidence below 0.8) with its source and its
-    softness on the hub's knowledge, a disputed pair with both sources;
-    the guards read the record's level (`overclaimed_fact` when the
-    model states a provisional fact flatly; `doubt_of_person`, cuttable,
-    on "if that's true", "supposedly", "you claimed"). Acceptance adds
-    the recall turns of the `credence` conversation, three seeded runs.
+    applies, in order, privacy and disclosure, validity at the frozen
+    time, active versus superseded or archived, unresolved conflict,
+    confidence presentation, then ranking, and returns a typed
+    `FactPresentation` per bullet (`plain | attributed | conflicted`
+    with `source_ids`), never a bare float: a certain record plainly, a
+    provisional one (below 0.85) with its source and tense, a
+    conflicted pair as both with neither called wrong; confidence may
+    lower a provisional fact's rank and never removes it; the guards
+    read the band (`overclaimed_fact` when the model states a
+    provisional fact flatly; `doubt_of_person`, cuttable, on "if
+    that's true", "supposedly", "you claim", "are you sure", "that
+    seems unlikely"); a historical `as_of` read uses current support
+    for the fact valid then. Acceptance adds the recall turns of the
+    `credence` conversations, three seeded runs.
 
 <a id="chat-09"></a>
 
@@ -1358,13 +1365,24 @@ invented for the roster's household, and added to
     the rejections `question_proposition`, `emotion_subject_mismatch`,
     `minor_state_about_other` and `disclosure_escalation` (the judge
     never raises a record's disclosure; section 13, part 9). **Amended
-    2026-09-14 (dev.md section 14):** `confidence` and
-    `corroborated_by` on the memory record (spec first) and the
-    deterministic write-time rule: 1.0 for a routine claim, 0.6 for a
-    life-events class, a contradiction of an active certain record or
-    an unknown subject, plus 0.1 per date, place or name to a cap of
-    0.8; a reported record keeps its cap; the judge model never sets
-    it. Acceptance: one judge-eval turn per class with roster names, plus "Quill was here"
+    2026-09-14 (dev.md section 14):** `confidence` (required on
+    `record_kind: memory`, existing records migrated to 1.0 with a
+    `legacy_assertion` evidence entry), `confidence_evidence` (source
+    id, source person, kind, observed_at; merged on sync as a set union
+    by source and kind, then recomputed) and `conflicts_with` on the
+    memory record (spec first), and one engine-owned
+    `computeFactConfidence()` the judge, the remember package, a
+    correction, the curator, recall and the robot all call: 0.95 for a
+    routine self-report, 0.50 for a life-events class, a contradiction
+    of an active certain record or an unknown subject, +0.15 once for a
+    grounded detail, +0.20 for a re-assertion on another calendar day,
+    +0.30 for an independent corroboration at the same authorized
+    scope, -0.30 for an unresolved contradiction, clamped to 0.10 and
+    1.00; the judge model may nominate routine, major, same or
+    contradiction and never returns the number; a reported record
+    keeps its cap; rejection codes `invalid_confidence_source`,
+    `private_corroboration`, `confidence_without_evidence` and
+    `stance_not_asserted`. Acceptance: one judge-eval turn per class with roster names, plus "Quill was here"
     persisting no kind and no relation, at 100 percent precision on
     those rows; the `act-memory` conversation (section 12, part 6),
     three seeded runs, effects on the memory table; the seeded bench's memory rows
@@ -1626,12 +1644,18 @@ invented for the roster's household, and added to
     surviving the state it came with, a dated `goal` or `event` fading
     the day after, a `reported` record superseded and never extended by
     the speaker's own later words (dev.md section 12, part 6); credence
-    moved by evidence only (dev.md section 14, part 3): +0.2 on a
-    re-assertion on a different day, +0.3 and `corroborated_by` on the
-    same claim from another household member, the supersede path on a
-    contradiction by the same person, `disputed` with both sources
-    rendered on one by another member, and never a decay with time.
-    Never resolves a conflict itself: the next relevant
+    recomputed from evidence, never incremented (dev.md section 14,
+    part 3): exact re-assertions merged with every source kept,
+    distinct calendar days and distinct authorized speakers counted
+    (never repeated turns in one conversation), corroboration only at
+    the same authorized scope and never across one person's private
+    memory and another's turn, an authoritative integration counting
+    and a web snippet or the hub's reply never, an unresolved
+    contradiction marked through `conflicts_with` and an open question
+    and never resolved from model preference, provisional and
+    conflicted records excluded from profile synthesis, a later
+    contradiction lowering without deleting evidence, and never a decay
+    with time. Never resolves a conflict itself: the next relevant
     conversation asks. Acceptance: a seeded store with each defect class comes out
     with the right statuses and no invented resolution; a disputed
     record is absent from the next prompt; the open question is asked
@@ -1824,14 +1848,26 @@ invented for the roster's household, and added to
     `plan_violation` family gains `age_register_violation`,
     `missing_child_care`, `missing_trusted_adult`, `patronizing_register`
     and `disclosure_violation` (section 13, part 9). **Amended
-    2026-09-14 (dev.md section 14):** the surprise move (an inform in a
-    life-events class or against an active certain record sets `react`
-    and `ask_back` required whatever the engagement dial, the question
-    about the claim never its truth) and the contradiction move (one
-    light clarifying question naming the hub's own record, asked once
-    per pair, the answer superseding or leaving the old record, never
-    an argument, never a silent overwrite), with the `credence`
-    conversation (section 14, part 7), three seeded runs. Out of scope:
+    2026-09-14 (dev.md section 14):** the plan gains `claim_state:
+    routine | major_new | contradiction | none`, set by the engine from
+    the clause, the life-events vocabulary and the dedupe pass; the
+    surprise move (`major_new`: `react` required and never skeptical,
+    `ask_back` required once for one useful detail and never about
+    truth, `say` a brief acknowledgment with no independent assertion
+    the event happened, two sentences, the engagement dial unable to
+    remove the question; a major claim followed by a closing saves
+    provisionally and still closes); the contradiction move (a light
+    acknowledgment, exactly one clarification about change, identity or
+    date, never "are you sure", never an argument; before the answer
+    both records conflicted and neither recalled plainly; a
+    confirmation superseding with `valid_to` at the change time and no
+    second question, a rejection archiving the provisional record; a
+    mixed directive running under the normal rules before any
+    clarification); plan defects `skeptical_of_person`,
+    `missing_surprise_reaction`, `missing_credence_question`,
+    `repeated_credence_question`, `silent_contradiction_overwrite`,
+    `action_blocked_by_credence`, `joke_stored_as_fact`; the `credence`
+    conversations (section 14, part 7), three seeded runs. Out of scope:
     canned replies per label, a second prompt path, any plan rule over
     a safety, authorization, confirmation, evidence or privacy
     decision. Exit: the named tests, the persona-eval bench, `bash

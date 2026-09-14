@@ -14968,144 +14968,260 @@ lightly the bigger and newer it is, and firms it up as the details
 arrive, as it is said again, as someone else says it too; and when a
 new claim collides with something well established, a person asks one
 light question, not "if that's true". This section puts that credence
-on the record, in the platform's shape: a number set deterministically
-at write time, moved by evidence the engine can see, read by recall
+on the record, in the platform's shape: a number recomputed
+deterministically from evidence the engine can see, read by recall
 into how the fact is said and by the plan into one move, and never a
 reason to doubt the person to their face or to withhold an action on
-their own words.
+their own words. Credence means how much support a stored proposition
+has, never how believable a person is: there is no person-level
+reliability score, no speaker trust history, and no wording that
+suggests the hub doubts anyone's honesty. Written first by this
+session, then reconciled with an outside reading (Codex; part 8).
 
 **What exists.** `memory-record.schema.json` carries `importance` and
 no confidence; an inferred relationship carries `confidence` and
-`evidence` (step 3a) and is now a candidate for the open question
-(section 3). Recall renders every bullet the same way ("<text> (as of
-<date>, <n> days ago)"). The supersede path (#88, CHAT-06) replaces a
-record when the person corrects it, and CUR-01 marks a conflict
-`disputed`. CHAT-08 is the read-time validity item on the one recall
-reader, which is where a read-time rendering rule belongs.
+`evidence` (step 3a), which is inference confidence on an edge, a
+different meaning that shares only the range, and is now a candidate
+for the open question (section 3). Recall renders every bullet the
+same way ("<text> (as of <date>, <n> days ago)"), and the profile
+paragraph is built from every selected active fact. The judge's
+high-similarity shortcut supersedes a record at once
+(`memoryJudge.ts`, `decideDedupe()`'s near-duplicate path) and its
+contradiction verdict closes the old record the moment it is reported:
+that is the silent-overwrite path this section replaces. CUR-01 marks
+a conflict `disputed`. CHAT-08 is the read-time validity item on the
+one recall reader, which is where a read-time rendering rule belongs.
 
-**1. The representation.** `memory-record.schema.json` gains
-`confidence` (0 to 1, nullable; null on records written before it
-existed, read as certain) and `corroborated_by` (person ids, default
-empty), on asserted records only: a reported record keeps its cap
-(section 12, part 6) and its named source, and a candidate inferred by
-the judge is not a record at all. Two levels are what recall and the
-plan read: `provisional` (below 0.8) and `certain` (0.8 and above);
-the number is what the curator moves.
+**1. The representation, spec first.** `memory-record.schema.json`
+gains, on `record_kind: memory` only (an entity or an episode never
+acquires fact credence by accident): `confidence` (0 to 1, required;
+records written before it existed migrate to 1.0 with one synthetic
+`legacy_assertion` evidence entry, because the product already said
+them plainly and a migration that invents doubt about every old memory
+would be wrong); `confidence_evidence`, a list of `{ source_id (a turn,
+an integration result or an explicit confirmation), source_person_id,
+kind: initial_assertion | detail | reassertion | corroboration |
+contradiction | clarification | legacy_assertion, observed_at }`, the
+reason the number is what it is, merged on sync as a set union by
+`(source_id, kind)` followed by recomputation, so a corroboration seen
+on the robot is never lost when the hub and the robot reconcile (no
+data debt); and `conflicts_with`, the ids of unresolved contradicting
+records. A reported record keeps its cap (section 12, part 6) and its
+named source. Two presentation bands are what recall and the plan
+read: `provisional` below 0.85 and `certain` at 0.85 and above; the
+threshold and every weight below are proposed baselines to measure
+against family use, not product law. Four quantities stay distinct and
+never feed one another: the classifier's confidence (how sure the
+signal is), the emotion's intensity, a record's importance (retention
+and ranking) and a fact's confidence (assertion style).
 
-**2. Set at write time by how ordinary the claim is, deterministically.**
-The judge model never sets it. A routine claim (a preference, a
-habit, a fact about a thing, a dated appointment, a plan for the
-week) is certain on one telling: 1.0. A claim is provisional on one
-telling, at 0.6, when it is life-changing or surprising relative to
-what the hub knows: its text falls in a life-events class (a new
-member of the household or a departure, a move, a marriage or a
-separation, a pregnancy or a birth, a death, a diagnosis, a job change,
-a large purchase, a new pet; one vocabulary, `spec/vocab/life-events.json`,
-which also carries the adult-to-tell classes of section 13 so one list
-serves both), or it contradicts an active certain record about the
-same subject (the dedupe pass already finds that pair), or its subject
-is an entity the hub has never heard of (ASK-01's unknown). Detail in
-the same clause raises the start: a date, a place or a name each add
-0.1, to a cap of 0.8, since a claim with particulars is the way people
-say a thing that is true.
+**2. Computed, never incremented, by one engine-owned function.**
+`computeFactConfidence()` recomputes the number from the evidence list
+every time, order-independent, and serves the judge's extraction, the
+remember package, a correction, the curator, recall and the robot alike;
+the judge model may nominate a claim as routine, major, the same or a
+contradiction, and never returns the number. The weights: an ordinary
+direct assertion about the speaker's own preference, plan, possession
+or routine starts at 0.95 (no external proof could be more
+authoritative about what a person prefers); a consequential or
+unusually large new event starts at 0.50, where "large" is a
+life-events class (a new member of the household or a departure, a
+move, a marriage or a separation, a pregnancy or a birth, a death, a
+diagnosis, a job change, a large purchase, a new pet, a windfall; one
+vocabulary, `spec/vocab/life-events.json`, which also carries the
+adult-to-tell classes of section 13 so one list serves both), a claim
+contradicting an active certain record about the same subject, or a
+subject the hub has never heard of (ASK-01's unknown); a grounded
+detail in the same clause (a date, a place, a named event, a concrete
+consequence) adds 0.15, once; a re-assertion by the same person on a
+different calendar day adds 0.20; an independent corroboration by
+another authorized household member adds 0.30; an unresolved
+contradiction from an eligible assertion subtracts 0.30; the result is
+clamped to 0.10 and 1.00. What never moves it: length, emotional
+intensity, capitals, repeated insistence within one exchange, extra
+adjectives, importance. Corroboration counts only when both people made
+the proposition available at the same authorized scope (a household
+record, or each person's own scope on the same claim where both may be
+read by the curator under the normal permission rules); the curator
+never compares one person's private memory with another person's turn,
+and automatic capture stays person-scoped. An authoritative integration
+result (a calendar entry for the appointment, a typed source for a
+public fact) counts as corroboration for that field; a web snippet, the
+hub's own reply and a model inference never do.
 
-**3. Moved by evidence the engine can see (CUR-01).** Raised by a
-re-assertion on a different day (the same subject and claim, any
-conversation, +0.2), and by corroboration by another household member
-(a record of the same claim in their own scope or the household's,
-`corroborated_by` gains their id, +0.3, which makes any provisional
-claim certain); lowered by a contradiction: from the same person it is
-the supersede path (the old record `superseded_by` the new, never a
-number game), from another member it is `disputed` (both stand, both
-render with their sources, the next relevant conversation asks). A
-provisional record that is never re-asserted or corroborated keeps its
-number; the curator never decays confidence with time, because
-silence is not evidence.
+**3. Moved by evidence the engine can see (CUR-01).** The curator
+recomputes rather than increments; merges exact re-assertions while
+preserving every source; counts distinct calendar days and distinct
+authorized speakers, never repeated turns in one conversation; marks an
+unresolved contradiction through `conflicts_with` and an open question;
+never resolves a semantic conflict from model preference; excludes
+provisional and conflicted records from profile synthesis (the profile
+path today folds every selected active fact into identity prose, which
+would turn one large claim into settled character); never decays
+confidence with time (validity and retention own time; silence is not
+evidence); lowers on a later contradiction without deleting the
+supporting evidence; and lets a reported record be superseded, never
+extended, by the subject's own words (section 12, part 6).
 
-**4. How it reads at recall (CHAT-08).** The one recall reader renders
-credence into the bullet, and the composer says it that way: a
-certain fact plainly ("Rover is a rabbit"); a provisional one with its
-source and its softness ("you mentioned the other day that you're
-moving in June", "Sage said Quill's getting married"), with the
-softness on the hub's knowledge, never on the person: "if that's
-true", "supposedly", "you claimed" are guard rows (`doubt_of_person`,
-cuttable). A disputed pair renders both with their sources. The
-context message's bullet form gains the rendering, so the model reads
-the softness rather than being told to hedge; the guards read the
-record's level, so a provisional fact stated as flat certainty by the
-model is the `overclaimed_fact` cut, and a certain one hedged ("I
-think you said") is not a defect.
+**4. How it reads at recall (CHAT-08).** The one recall reader applies,
+in order: privacy and disclosure (section 13), validity at the turn's
+frozen time, active versus superseded or archived, unresolved conflict,
+confidence presentation, then ranking. It returns a typed
+`FactPresentation` per bullet (`plain | attributed | conflicted`, each
+with `source_ids`), never a bare float for the 8B to wrap in wording.
+A certain fact reads plainly ("Rover's appointment is Thursday"); a
+provisional one keeps its source and its tense ("you told me last time
+that you're moving in June", "Sage said Quill's getting married"), with
+the softness on the hub's knowledge, never on the person: "if that's
+true", "supposedly", "you claim", "I'm not sure I believe that", "can
+you prove it", "that seems unlikely" are the `doubt_of_person` guard
+row, cuttable; a conflicted fact is never selected silently and reads
+as both ("I have Friday from earlier, and you just said Thursday"),
+followed by the one clarification of part 5, and says neither source is
+wrong. Confidence may lower a provisional fact's rank among equally
+relevant facts and never removes it from recall; importance keeps
+governing retention and ranking value, and a high-importance provisional
+fact is still provisional. The guards read the record's band: a
+provisional fact stated flatly by the model is the `overclaimed_fact`
+cut, and a certain one hedged is not a defect. A historical read
+(CHAT-08's `as_of`) uses the current support for the fact valid at that
+time; reconstructing what the hub believed on an earlier date is out
+of scope.
 
-**5. Two moves on the plan (ACT-03).** *The surprise move:* an inform
-whose clause falls in a life-events class, or contradicts an active
-certain record, sets `react` and `ask_back` required whatever the
-companion's engagement dial says (a big claim gets a reaction and one
-question, because that is how the details arrive: "wait, June? where
-to?"), with the question about the claim, never about whether it is
-true. *The contradiction move:* a claim against a well-established
-fact (a certain record re-asserted or corroborated at least once) gets
-one light clarifying question in the same reply ("hang on, I had Rover
-down as a rabbit, did I get that wrong?"), and the person's answer
-decides: a confirmation supersedes the old record at once (provenance
-kept, the person's words as the evidence), a retraction leaves it; the
-question is asked once, never twice on the same pair, and a second
-telling of the new claim in any later turn supersedes without a
-question. Never an argument, never a silent overwrite. The judge holds
-the new claim as a candidate until the answer, the same shape as the
-open question.
+**5. Two moves on the plan (ACT-03).** The plan gains `claim_state:
+routine | major_new | contradiction | none`, set by the engine from the
+clause, the vocabulary and the dedupe pass, never by the model. *The
+surprise move* (`major_new`): `react` required, proportionate and never
+skeptical; `care` by the emotion rules; `say` a brief acknowledgment
+with no independent assertion that the event happened; `ask_back`
+required once, for one useful detail (what happened, when, what comes
+next: "that's huge, when did you find out?"), never whether it is true;
+playfulness only where stance, emotion, band and companion allow; two
+sentences; and the companion's engagement dial cannot remove the
+required question. A major claim followed at once by a closing is saved
+provisionally and the closing still closes; the question waits for the
+next conversation. *The contradiction move* (`contradiction`, a claim
+against a certain active record): a light acknowledgment, then exactly
+one clarification about change, identity or date ("did that change
+recently?", "is Thursday the new date?", "do you mean the other
+Rover?"), never "are you sure" (it shifts from the proposition to the
+person), never an argument, never a repeated challenge. Before the
+answer: the old record stays active and conflicted, the new assertion
+is written provisional with `conflicts_with`, the old record's
+confidence carries the contradiction evidence, and neither is recalled
+plainly. A confirmation supersedes the old record (its `valid_to`
+closed at the stated change time, or the confirming turn's time),
+clears the link, adds clarification evidence and recomputes, and asks
+no second question; a rejection or a correction archives the
+provisional record and removes the contradiction effect from the
+established one, both provenances kept. When contradiction detection is
+unavailable or ambiguous, both records stay provisional and conflicted
+and the clarification is queued: failure never defaults to overwriting
+the existing fact. A mixed assertion and directive still performs the
+authorized action from the current words ("remind me Thursday" runs
+under the normal argument and confirmation rules); memory clarification
+never delays it.
 
-**6. Invariants.** The hub never accuses: no sentence tells the person
-they are wrong, lying or inconsistent (the clarifying question names
-the hub's own record as the thing that might be wrong). The hub never
-withholds an action on the person's own words: a directive runs
-whatever the confidence of anything it touches ("add Quill's wedding
-to the calendar" runs; the record's credence is the memory's business).
-Hyperbole and a joke are a stance, not a low-confidence fact: "I've
-told you a million times" writes nothing with "million" and lowers
-nothing; a `joke` clause writes nothing (section 12, part 6); an
-exaggeration on a certain claim changes no number. Credence never
-changes what a child may hear (section 13's disclosure is a separate
-axis), never changes safety, and is never a memory about the person's
-reliability: it sits on the fact.
+**6. Invariants.** Confidence describes one proposition, never a
+person; no aggregate reliability or honesty score exists anywhere. The
+hub never accuses, cross-examines or says "if that's true": no sentence
+tells the person they are wrong, lying or inconsistent (the clarifying
+question names the hub's own record as the thing that might be wrong).
+The hub never withholds an action on the person's own words: a
+directive runs whatever the confidence of anything it touches. A
+routine self-report is certain after one telling; a provisional fact
+stays attributable and recallable. Contradiction triggers one
+clarification, never an argument; confirmation supersedes with
+provenance, never silently. Confidence cannot widen privacy scope or
+household disclosure; private memories cannot corroborate across
+people; importance cannot make a provisional fact certain; emotional
+intensity cannot raise confidence; repetition within one exchange is
+not re-assertion. Hyperbole and a joke are a stance, not a low-
+confidence fact: "I've told you a million times" writes nothing with
+"million" and lowers nothing; a `joke` clause writes nothing (section
+12, part 6). A model may nominate a semantic relationship between two
+records; deterministic policy owns storage, evidence eligibility, the
+number and supersession.
 
-**7. Bench rows** (`credence`, roster names, three seeded runs, effects
-on the memory table, the context message and the plan): "we're moving
-to Lisbon in June" (effects: one record at confidence between 0.6 and
-0.8, `provisional`; the plan has `react` and `ask_back` required; the
-reply asks one question about the move and none about its truth,
-`mustNotContain` "really|sure|if that's"); the next day, "the Lisbon
-move is the 14th, we signed today" (effects: the record's confidence
-raised by the re-assertion and the date, `certain`; a recall turn after
-it renders the fact plainly, `mustNotContain` "you mentioned|you
-said"); before that, a recall turn ("when are we moving") on the
-provisional record (effects: the bullet carries the source and the
-softness, the reply says it softly and never "if that's true", guard
-null); `corroborated`: Sage says "Rover's been limping since Sunday",
-then Bramble in another conversation says "Rover is limping" (effects:
-Sage's record `corroborated_by` carries Bramble's id and is `certain`;
-Bramble's own record is not a duplicate of Sage's in Sage's scope);
-`contradicted`: with a certain, re-asserted record that Rover is a
-rabbit, "Rover the cat knocked the plant over" (effects: one clarifying
-question in the reply naming the hub's record, the old record still
-active, the new claim held as a candidate); "yeah, Rover's a cat, I
-must have said rabbit by mistake" (effects: the old record
-`superseded_by` the new, the new active and certain, no second
-question on a later Rover turn); a variant where the person answers
-"no, rabbit" (effects: the old record active, no new record); `joke`:
-"I've told you a million times, the recycling is Tuesday" (effects: one
-record about Tuesday, none with "million", the Tuesday record's
-confidence unchanged); and the section 12 joke row unchanged. A
-directive touching a provisional subject ("add the Lisbon move to the
-calendar") runs (effect: the package outcome on the turn, no
-confirmation beyond the package's own). Three seeded runs.
+**7. Bench rows** (`credence`, roster names, three seeded runs; the
+assertions read the signal's stance, the plan's `claim_state`, the
+typed moves, the memory rows and their evidence lists, the supersession
+links, the recall presentation and the action outcomes). `credence-big-
+claim`: "we're moving to Lisbon in June" (effects: inform, asserted,
+`claim_state: major_new`; `react` and `ask_back` required and present;
+no skeptical phrase, `mustNotContain` "really|sure|if that's|claim";
+one provisional record about the move at about 0.50 with one
+`initial_assertion` entry; no identity or trait record); the next day,
+"the Lisbon move is the 14th, we signed today" (effects: a `detail` and
+a `reassertion` entry, the confidence recomputed to about 0.85,
+`certain`; a later recall turn renders it plainly); before that, a
+recall turn ("when are we moving") on the provisional record (effects:
+`attributed` presentation, the reply keeps the source and the softness,
+`mustNotContain` the doubt rows, guard null). `credence-corroborated`:
+Sage's detailed assertion that Rover is limping, at household scope;
+on a later day Bramble says the same in another conversation (effects:
+two distinct source people and turns, one `corroboration` entry, the
+confidence at 0.85 or above, a later recall plain; neither person's
+unrelated private records enter the comparison or the context, the
+canary check). `credence-contradiction`: a certain record that Rover's
+appointment is Friday with two eligible sources; "no, it's Thursday
+now" (effects: inform, `repair: correction`, `claim_state:
+contradiction`; one light question about whether Thursday is the new
+date, `mustNotContain` "are you sure|really|wrong"; both records
+carrying the conflict link, neither recalled plainly); "yes, it changed
+this morning" (effects: the old record superseded with `valid_to` at
+the change time, the new record active with `clarification` evidence,
+one active appointment fact, a later recall plain, no second question
+on a later Rover turn); a variant answering "no, Friday, I misspoke"
+(effects: the provisional record archived, the old record's
+contradiction effect removed, both provenances kept); a mixed variant
+adding "and remind me the day before" to the first turn (effect: the
+reminder outcome completes under the normal rules before any
+clarification). `credence-joke`: "sure, and Rover is my financial
+adviser" after a joke marker (effects: stance `joke`, `claim_state:
+none`, no record, no evidence, no conflict, no open question, a brief
+playful reaction where band and emotion allow); "I've told you a
+million times, the recycling is Tuesday" (effects: one record about
+Tuesday with its confidence unchanged, none with "million").
+`credence-then-closing`: "we're moving to Lisbon in June, anyway,
+goodnight" (effects: the provisional record written, the closing plan,
+no question in the reply, the open question queued for the next
+conversation).
 
-**Sequence and sizes.** The spec fields and the write-time rule ride
-inside MEM-06 (amended, S on top); the raise, corroborate and dispute
-rules inside CUR-01 (amended); the rendering and the two guard rows
+**8. The outside review, reconciled (Codex, 2026-09-14).** Taken, and
+folded in above: the evidence list and the recomputation from it in
+place of a stored number that is incremented (a mutable number cannot
+prove why it changed, and set-union merging is what survives a
+hub-and-robot sync); `conflicts_with` as an explicit link; the
+migration rule for existing records; the weights and the 0.85
+threshold as baselines (in place of my 0.6 start, 0.1 per detail to a
+cap of 0.8 and a 0.8 band); the scope rule on corroboration and the
+authoritative-integration case; the ordered read steps and the typed
+`FactPresentation`; the conflicted rendering; profile synthesis
+excluding provisional and conflicted records; the claim-state on the
+plan, the forbidden "are you sure", the closing that still closes, the
+mixed-directive rule; the process for a contradiction before and after
+the answer and the rule that an unavailable detector never overwrites;
+the naming of the judge's near-duplicate shortcut and its contradiction
+write as the current silent-overwrite path; the four-quantity
+separation; the plan defects and the rejection codes on the items; and
+the invariants on aggregate scores, importance, intensity and
+repetition. Kept as designed here: the `credence` rows use this
+household's own invented claims (a move, a limp, an appointment, a
+joke) rather than the review's lottery, since the mechanism is the
+claim's size and support, never its subject; and no new item, because
+every rule lands on an item that already owns the store, the curator,
+the reader or the plan.
+
+**Sequence and sizes.** The spec fields, the migration and
+`computeFactConfidence()` ride inside MEM-06 (amended, S-M on top); the
+recompute, merge, corroborate, conflict and profile rules inside CUR-01
+(amended); the ordered read, the presentation and the two guard rows
 inside CHAT-08 (amended, which becomes the read-time item for both
-validity and credence); the two moves and the rows inside ACT-03
-(amended); the life-events vocabulary lands with AGE-01's adult-to-tell
-list as one file. No new item.
+validity and credence); the claim state, the two moves, the plan
+defects and the rows inside ACT-03 (amended); the life-events
+vocabulary lands with AGE-01's adult-to-tell list as one file. No new
+item.
 
 ### The sequence, all items
 
