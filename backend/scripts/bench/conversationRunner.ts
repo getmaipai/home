@@ -20,7 +20,7 @@ import { deleteEpisodesForPerson } from "@/lib/episodes";
 import { newPersonId, randomSuffix } from "@/lib/id";
 import { nextHlc } from "@/lib/hlc";
 import { createEntity } from "@/lib/entities";
-import { createRelationship } from "@/lib/relationships";
+import { createRelationship, updateRelationship } from "@/lib/relationships";
 import { listJobs, runDueJobs } from "@/lib/scheduler";
 import { runPlugin, registerAllPackageNotificationTypes } from "@/lib/plugins";
 import { listPending } from "@/lib/notifications";
@@ -328,6 +328,39 @@ function seedEntities(conv: BenchConversation, owner: PersonRow): void {
   }
 }
 
+/** The live relationships touching the person's own entity, the other
+ * end named, for the relationship rows (step 3a). */
+function relationshipsOf(actor: PersonRow): { type: string; name: string; source: string; confirmed: boolean }[] {
+  const self = db.select({ id: entities.id }).from(entities).where(and(eq(entities.accountPersonId, actor.id), isNull(entities.deletedAt))).get();
+  if (!self) return [];
+  const names = new Map(db.select({ id: entities.id, name: entities.name }).from(entities).where(isNull(entities.deletedAt)).all().map((e) => [e.id, e.name]));
+  return db
+    .select()
+    .from(relationships)
+    .where(and(isNull(relationships.deletedAt), or(eq(relationships.fromId, self.id), eq(relationships.toId, self.id))))
+    .all()
+    .filter((r) => r.validTo === null)
+    .map((r) => ({ type: r.type, name: names.get(r.fromId === self.id ? r.toId : r.fromId) ?? "?", source: r.source, confirmed: r.confirmedByPersonId !== null }));
+}
+
+/** The Confirm control, driven from the bench: every unconfirmed
+ * inferred relationship of the person's, confirmed by them (the bench's
+ * owner is an adult). */
+function confirmInferredRelationships(actor: PersonRow): void {
+  const rows = db
+    .select({ id: relationships.id })
+    .from(relationships)
+    .where(and(isNull(relationships.deletedAt), eq(relationships.person, actor.id), eq(relationships.source, "inferred"), isNull(relationships.confirmedByPersonId)))
+    .all();
+  for (const row of rows) {
+    // A directed pair is confirmed together with its first edge, so the
+    // second is already confirmed by the time its turn comes: not an
+    // error.
+    const result = updateRelationship(actor, row.id, { confirm: true });
+    if (!result.ok && result.status !== 409) throw new Error(`confirming ${row.id}: ${result.error}`);
+  }
+}
+
 /** Waits for the due time, ticks the scheduler the way the hub does
  * every minute, and returns the notification types delivered to the
  * person since the turn started (F2: the scheduler's own later
@@ -389,6 +422,7 @@ export async function runConversation(conv: BenchConversation, deps: RunDeps): P
     const actor = deps.people[speaker];
     // The judge first, so the rows it writes are the ones backdated.
     if (turn.drainJudge) await deps.drainJudge();
+    if (turn.confirmInferred) confirmInferredRelationships(actor);
     if (turn.daysLater) deps.backdate(turn.daysLater, turnIds.filter(Boolean));
     if (i === 0 || turn.newConversation || !conversationIds[speaker]) {
       const created = createConversation(actor, { surface: "chat" });
@@ -414,7 +448,7 @@ export async function runConversation(conv: BenchConversation, deps: RunDeps): P
     const requests = deps.proxy?.requests ?? [];
     // A row that reads memory (written, or nothing written) is read
     // after the judge has had its turn, so the judge's own rows count.
-    if (turn.expect.memoryWritten || turn.expect.storesNothing || turn.expect.recordActive || turn.expect.recordRetired) await deps.drainJudge();
+    if (turn.expect.memoryWritten || turn.expect.storesNothing || turn.expect.recordActive || turn.expect.recordRetired || turn.expect.entityExists || turn.expect.relationshipExists) await deps.drainJudge();
     // The jobs this turn scheduled, read before the delivery wait: a
     // promise row sees its own job pending, then the scheduler's own
     // delivery of it.
@@ -458,6 +492,7 @@ export async function runConversation(conv: BenchConversation, deps: RunDeps): P
         .from(entities)
         .where(isNull(entities.deletedAt))
         .all(),
+      relationships: relationshipsOf(actor),
     };
     if (driven.error) observed.reply = `[error: ${driven.error}]`;
     scores.push(scoreTurn(conv, i, turn, observed));
@@ -487,6 +522,10 @@ function cleanupBenchPeopleStrict(peopleRows: BenchPeople): void {
   }
   seededEntityIds.clear();
   for (const person of [peopleRows.owner, peopleRows.child]) {
+    // The judge's own registry rows (step 3a): the person's entities,
+    // their own person entity, and every edge touching either.
+    sqlite.query("DELETE FROM relationships WHERE person = ? OR from_id IN (SELECT id FROM entities WHERE person = ? OR account_person_id = ?) OR to_id IN (SELECT id FROM entities WHERE person = ? OR account_person_id = ?)").run(person.id, person.id, person.id, person.id, person.id);
+    sqlite.query("DELETE FROM entities WHERE person = ? OR account_person_id = ?").run(person.id, person.id);
     sqlite.query("DELETE FROM lists WHERE person = ?").run(person.id); // list-add's own rows
     sqlite.query("DELETE FROM notification_deliveries WHERE recipient_id = ?").run(person.id);
     sqlite.query("DELETE FROM scheduled_jobs WHERE person_id = ?").run(person.id);

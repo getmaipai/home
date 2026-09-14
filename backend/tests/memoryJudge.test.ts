@@ -795,7 +795,7 @@ describe("the judge drops its own prompt's examples, placeholders and credential
   test("the review's cases: a first-person trip resolved to 'his', a wedding said as 'wedding', a confirmation of the assistant's line, all kept", async () => {
     const { rejectPromptEchoes, turnDateFor } = await import("@/lib/memoryJudge");
     const date = turnDateFor(new Date(2026, 8, 13, 12).toISOString());
-    const fact = (text: string) => ({ text, category: "fact" as const, scope: "person" as const, importance: 0.5, valid_from: null, valid_to: null });
+    const fact = (text: string) => ({ text, category: "fact" as const, scope: "person" as const, importance: 0.5, valid_from: null, valid_to: null, subject: null, relation: null });
     expect(rejectPromptEchoes([fact(`Sage was in Ohio visiting his parents, ${date}`)], "Sage", date, "we drove out to see my parents in Ohio").kept.length).toBe(1);
     expect(rejectPromptEchoes([fact("Sage is getting married in October 2026")], "Sage", date, "our wedding is in October").kept.length).toBe(1);
     expect(rejectPromptEchoes([fact("Sage dislikes cilantro")], "Sage", date, "yep, that's right\nso you still can't stand cilantro?").kept.length).toBe(1);
@@ -814,7 +814,7 @@ describe("the judge drops its own prompt's examples, placeholders and credential
     const stamp = new Date(2026, 8, 13, 12).toISOString();
     const prompt = buildExtractionPrompt("Sage", stamp);
     for (const example of promptExampleTexts("Sage", turnDateFor(stamp))) expect(prompt).toContain(example);
-    const measured = { text: "Sage's blood pressure is usually <120 over 80", category: "fact" as const, scope: "person" as const, importance: 0.5, valid_from: null, valid_to: null };
+    const measured = { text: "Sage's blood pressure is usually <120 over 80", category: "fact" as const, scope: "person" as const, importance: 0.5, valid_from: null, valid_to: null, subject: null, relation: null };
     expect(rejectPromptEchoes([measured], "Sage", turnDateFor(stamp), "my blood pressure is usually under 120 over 80").kept.length).toBe(1);
   });
 });

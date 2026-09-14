@@ -11,7 +11,7 @@ import { validateRelationship, validateRelationshipEndpoints, inverseRelationshi
 import { Relationship } from "@maipai/spec/gen/ts/relationship.js";
 import type { Relationship as RelationshipT } from "@maipai/spec/gen/ts/relationship.js";
 import type { Entity as EntityT } from "@maipai/spec/gen/ts/entity.js";
-import type { OpResult } from "@/lib/entities";
+import { confirmTransition, type OpResult } from "@/lib/entities";
 
 export type RelationshipRow = typeof relationships.$inferSelect;
 
@@ -29,6 +29,7 @@ function toRelationship(row: RelationshipRow): RelationshipT {
     stated_by_person_id: row.statedByPersonId,
     confidence: row.confidence,
     confirmed_by_person_id: row.confirmedByPersonId,
+    confirmed_at: row.confirmedAt,
     evidence: JSON.parse(row.evidence) as string[],
     scope: row.scope,
     person: row.person,
@@ -55,6 +56,7 @@ function toRow(rel: RelationshipT) {
     statedByPersonId: rel.stated_by_person_id,
     confidence: rel.confidence,
     confirmedByPersonId: rel.confirmed_by_person_id,
+    confirmedAt: rel.confirmed_at,
     evidence: JSON.stringify(rel.evidence),
     scope: rel.scope,
     person: rel.person,
@@ -78,16 +80,25 @@ export interface RelationshipCreate {
   scope?: "household" | "person";
   person?: string | null;
   sensitive?: boolean;
+  /** Provenance. The API route never sets it (a person typing a
+   * relationship in is stating it, so the route's default holds); the
+   * judge's subject writer (lib/subjects.ts, step 3a) passes `stated`
+   * for a relation the speaker said in so many words and `inferred`,
+   * with the confidence and the turn as evidence, for one it worked
+   * out. The spec's validator holds the pairing either way. */
+  source?: "stated" | "inferred";
+  stated_by_person_id?: string | null;
+  confidence?: number | null;
+  evidence?: string[];
 }
 
-/** Every relationship this hub stores today is a person's own statement
- * ("Alex is Marlow's partner"): `source: "stated"` naming the actor,
- * scope defaulting to "person" (spec/schemas/relationship.schema.json's
- * own default) since nobody has confirmed it for the household yet.
- * `source: "inferred"` exists in the spec for whatever later builds a
- * real inference pipeline - this hub-write path never produces one, the
- * same "storage without inference" scoping the platform plan calls out
- * for this wave. */
+/** A relationship a person states ("Alex is Marlow's partner") is
+ * `source: "stated"` naming the actor, scope defaulting to "person"
+ * (spec/schemas/relationship.schema.json's own default) since nobody has
+ * confirmed it for the household yet. Step 3a's judge is the one writer
+ * of `source: "inferred"` (lib/subjects.ts): a guess with a confidence
+ * and its evidence, hedged in chat until a household adult confirms it
+ * through updateRelationship's confirm transition. */
 export function createRelationship(actor: { id: string }, input: RelationshipCreate): OpResult<RelationshipT> {
   // entities.kind is stored as free text (sqlite has no enum type), but
   // every row was written through Entity.safeParse() in lib/entities.ts,
@@ -105,6 +116,7 @@ export function createRelationship(actor: { id: string }, input: RelationshipCre
 
   const type = relationshipTypes().find((t) => t.id === input.type);
   const now = new Date().toISOString();
+  const source = input.source ?? "stated";
   const candidate = Relationship.safeParse({
     id: newRelationshipId(),
     type: input.type,
@@ -114,11 +126,11 @@ export function createRelationship(actor: { id: string }, input: RelationshipCre
     valid_from: input.valid_from ?? null,
     valid_to: input.valid_to ?? null,
     expired_at: null,
-    source: "stated",
-    stated_by_person_id: actor.id,
-    confidence: null,
+    source,
+    stated_by_person_id: source === "stated" ? (input.stated_by_person_id ?? actor.id) : null,
+    confidence: source === "inferred" ? (input.confidence ?? null) : null,
     confirmed_by_person_id: null,
-    evidence: [],
+    evidence: source === "inferred" ? (input.evidence ?? []) : [],
     scope: input.scope ?? "person",
     person: input.scope === "household" ? null : (input.person ?? actor.id),
     sensitive: input.sensitive ?? false,
@@ -172,6 +184,12 @@ export interface RelationshipEdit {
   status?: string;
   valid_to?: string | null;
   note?: string | null;
+  /** Step 3a's confirm transition: a household adult vouches for an
+   * `inferred` relationship. The source, confidence and evidence stay
+   * (how it was learned is not what changed); confirmed_by_person_id
+   * and confirmed_at record who and when, and a renderer stops hedging.
+   * Only a household adult; only once; only an inferred one. */
+  confirm?: true;
 }
 
 /** The one edit this route allows: ending it (valid_to) or requalifying
@@ -185,11 +203,18 @@ export function updateRelationship(actor: { id: string; role: string }, id: stri
   const row = getOwnedRow(actor, id);
   if (!row) return { ok: false, status: 404, error: "no such relationship" };
 
+  let confirmed: Record<string, unknown> | null = null;
+  if (edit.confirm) {
+    const transition = confirmTransition(actor, row.source, row.confirmedByPersonId);
+    if (!transition.ok) return { ok: false, status: transition.status, error: transition.error };
+    confirmed = { ...transition.value! };
+  }
   const candidate = Relationship.safeParse({
     ...toRelationship(row),
     status: edit.status ?? row.status,
     valid_to: edit.valid_to !== undefined ? edit.valid_to : row.validTo,
     note: edit.note !== undefined ? edit.note : row.note,
+    ...(confirmed ?? {}),
     updated_at: new Date().toISOString(),
     hlc: nextHlc(),
   });
@@ -204,20 +229,114 @@ export function updateRelationship(actor: { id: string; role: string }, id: stri
   // type) carries the identical status/valid_to/note - a status or an
   // end date is a fact about the relationship, not about which side is
   // asking, so both rows must always agree.
-  const reciprocal = db
-    .select()
-    .from(relationships)
-    .where(and(eq(relationships.fromId, row.toId), eq(relationships.toId, row.fromId), isNull(relationships.deletedAt)))
-    .all()
-    .find((r) => relationshipTypes().find((t) => t.id === row.type)?.inverse === r.type);
+  const reciprocal = storedInverseOf(row);
+  // Provenance rides along the same way: confirming one direction of an
+  // inferred edge confirms the pair, or a renderer reading the inverse
+  // would still hedge a relationship an adult just vouched for.
   if (reciprocal) {
     db.update(relationships)
-      .set({ status: candidate.data.status, validTo: candidate.data.valid_to, note: candidate.data.note, updatedAt: candidate.data.updated_at, hlc: nextHlc() })
+      .set({
+        status: candidate.data.status,
+        validTo: candidate.data.valid_to,
+        note: candidate.data.note,
+        ...(confirmed ? provenanceColumns(candidate.data) : {}),
+        updatedAt: candidate.data.updated_at,
+        hlc: nextHlc(),
+      })
       .where(eq(relationships.id, reciprocal.id))
       .run();
   }
 
   return { ok: true, status: 200, value: candidate.data };
+}
+
+/** The stored inverse of a directed edge: the same pair the other way,
+ * the inverse type, the same scope and (for a person's own) the same
+ * person, since the inverse createRelationship() wrote is that
+ * person's own row and another household member's statement of the
+ * same pair is theirs, never this edit's. A symmetric type stores no
+ * inverse, so it has none: another person's own edge of the same type
+ * the other way is not it. */
+function storedInverseOf(row: RelationshipRow): { id: string } | undefined {
+  const type = relationshipTypes().find((t) => t.id === row.type);
+  if (!type || type.symmetric || !type.inverse) return undefined;
+  return db
+    .select({ id: relationships.id, person: relationships.person })
+    .from(relationships)
+    .where(and(eq(relationships.fromId, row.toId), eq(relationships.toId, row.fromId), eq(relationships.type, type.inverse), eq(relationships.scope, row.scope), isNull(relationships.deletedAt)))
+    .all()
+    .find((r) => row.scope === "household" || r.person === row.person);
+}
+
+function provenanceColumns(rel: RelationshipT) {
+  return {
+    source: rel.source,
+    statedByPersonId: rel.stated_by_person_id,
+    confidence: rel.confidence,
+    evidence: JSON.stringify(rel.evidence),
+    confirmedByPersonId: rel.confirmed_by_person_id,
+    confirmedAt: rel.confirmed_at,
+  };
+}
+
+/** Step 3a's other way out of `inferred`: the person the relationship
+ * is about says it themselves ("my coworker Quill" after the hub had
+ * only guessed). Their own statement is the schema's definition of
+ * `stated`, so the edge and its inverse become stated by them, with no
+ * confidence and no evidence (the validator's shape for a statement;
+ * the memory record's own source turn is the trail); nothing left to
+ * confirm. Only the person whose relationship it is (scope person,
+ * theirs) can do this, and only from inferred: a stated edge is left
+ * alone. */
+export function promoteToStated(speaker: { id: string }, id: string): OpResult<RelationshipT> {
+  const row = db.select().from(relationships).where(and(eq(relationships.id, id), isNull(relationships.deletedAt))).get();
+  if (!row) return { ok: false, status: 404, error: "no such relationship" };
+  if (row.scope !== "person" || row.person !== speaker.id) return { ok: false, status: 403, error: "only the person whose relationship this is can state it" };
+  if (row.source !== "inferred") return { ok: true, status: 200, value: toRelationship(row) };
+  const candidate = Relationship.safeParse({
+    ...toRelationship(row),
+    source: "stated",
+    stated_by_person_id: speaker.id,
+    confidence: null,
+    evidence: [],
+    updated_at: new Date().toISOString(),
+    hlc: nextHlc(),
+  });
+  if (!candidate.success) return { ok: false, status: 400, error: candidate.error.issues.map((i) => i.message).join("; ") };
+  const problems = validateRelationship(candidate.data);
+  if (problems.length > 0) return { ok: false, status: 400, error: problems.join("; ") };
+  db.update(relationships).set(toRow(candidate.data)).where(eq(relationships.id, id)).run();
+  const reciprocal = storedInverseOf(row);
+  if (reciprocal) {
+    db.update(relationships)
+      .set({ ...provenanceColumns(candidate.data), updatedAt: candidate.data.updated_at, hlc: nextHlc() })
+      .where(eq(relationships.id, reciprocal.id))
+      .run();
+  }
+  return { ok: true, status: 200, value: candidate.data };
+}
+
+/** The live edge of one type between two entities that this person
+ * can build on: their own (scope person, theirs) or the household's.
+ * The judge's check before writing a relation a fact carries, so a
+ * repeated "my coworker Quill" is one edge, not one per mention; a
+ * second household member stating the same relation from their side
+ * gets their own edge, since another person's statement is not theirs
+ * to read or to promote. */
+export function findRelationship(person: { id: string }, fromId: string, toId: string, type: string): RelationshipT | null {
+  const symmetric = relationshipTypes().find((t) => t.id === type)?.symmetric ?? false;
+  const row = db
+    .select()
+    .from(relationships)
+    .where(and(eq(relationships.type, type), isNull(relationships.deletedAt)))
+    .all()
+    .find(
+      (r) =>
+        r.validTo === null &&
+        (r.scope === "household" || r.person === person.id) &&
+        ((r.fromId === fromId && r.toId === toId) || (symmetric && r.fromId === toId && r.toId === fromId)),
+    );
+  return row ? toRelationship(row) : null;
 }
 
 /** Removes the edge and its stored inverse together - the same
@@ -228,12 +347,7 @@ export function deleteRelationship(actor: { id: string; role: string }, id: stri
   const now = new Date().toISOString();
   db.update(relationships).set({ deletedAt: now, updatedAt: now, hlc: nextHlc() }).where(eq(relationships.id, id)).run();
 
-  const inverseType = relationshipTypes().find((t) => t.id === row.type)?.inverse ?? "";
-  const reciprocal = db
-    .select({ id: relationships.id })
-    .from(relationships)
-    .where(and(eq(relationships.fromId, row.toId), eq(relationships.toId, row.fromId), eq(relationships.type, inverseType), isNull(relationships.deletedAt)))
-    .get();
+  const reciprocal = storedInverseOf(row);
   if (reciprocal) db.update(relationships).set({ deletedAt: now, updatedAt: now, hlc: nextHlc() }).where(eq(relationships.id, reciprocal.id)).run();
 
   return { ok: true, status: 200, value: { id } };

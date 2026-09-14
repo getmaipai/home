@@ -3559,3 +3559,223 @@ disclose-then-recall-later#3 (the 4a and CHAT-15 tool rows);
 prior-reply-grounding#4 and coworker-likes-seltzer#1 fail in all
 three, the designed misses, unchanged. The 4B's echo drops: one
 example echo per run.
+
+## Step 3a: entities and subjects from conversation (2026-09-13)
+
+The program row: a memory record gains an optional subject (an entity
+id) beside its text; the judge creates a person, pet, place,
+organization or thing entity when a sentence names a new one, and a
+relationship record when the sentence carries one ("my coworker
+Quill"), owned by the speaker like the memory; recall, the prompt and
+the guards use the subject id, not only the name in the text. Jesse's
+example is the bench row: "my coworker Quill likes seltzer", then "do
+I like seltzer" (does not know, no guess), "what does Quill drink"
+(seltzer), "who is Quill" (your coworker). This is also the first code
+path that writes a record with `source: "inferred"`, so it owns the
+confirmation transition.
+
+**Provenance, the ruling (the coordinator, relaying Jesse).** A
+relationship the speaker states in their own sentence ("my coworker
+Quill") is `source: stated`, `stated_by_person_id` = the speaker, no
+confidence, nothing to confirm: the schema's own definition of stated
+is a person in the household said so, and the speaker is one. Only a
+relation the hub works out without an explicit statement (lunch with
+Raven by the office, the same manager) is `inferred`: confidence from
+the extraction's importance, `evidence` = [the turn id], hedged until
+a household adult confirms it. Entities follow the same line: named
+by the speaker is `local`, supplied by the model is `inferred`. The
+check for "named by the speaker" is the name appearing in the
+speaker's own words for the turn (`speakerNamed()` in
+`backend/src/lib/subjects.ts`), not the reply's; the extraction does
+not carry a separate "the speaker said the kind" bit, and a relation
+slot the model marks `stated: true` is what says the relation was
+said. Everything the judge writes is the speaker's own data (scope
+person) until they say otherwise: the validator's rule for an
+unconfirmed inference, and the least surprising home for a stated
+one.
+
+**Spec (additive).** `memory-record.schema.json`: `subject_id`
+(`ent-...`, nullable, default null), the entity a record is about;
+null for a world fact, the speaker's own preference, and every record
+written before this existed. `entity.schema.json` and
+`relationship.schema.json`: `confirmed_at` (date-time, nullable,
+default null) beside the existing `confirmed_by_person_id`.
+`vocab/relationship-types.json`: `colleague_of` (person to person,
+symmetric, terminable, statuses normal | close); the vocabulary had no
+coworker type, `friend_of` says on itself that it is not inferred by
+default, and a coworker is the relation people say in passing. The
+validator (spec/records/ts/validate.ts) is unchanged: an inferred
+relationship must carry confidence and evidence and no
+`stated_by_person_id`; a stated one carries neither; an unconfirmed
+inferred record is never household-scoped.
+
+**The confirm transition, server side.** `confirmTransition()` in
+`backend/src/lib/entities.ts`, shared by `updateEntity()` and
+`updateRelationship()`, applied by one more edit, `confirm: true`. An
+entity moves `source` from `inferred` to `local` with
+`confirmed_by_person_id` = the actor and `confirmed_at` = now. A
+relationship keeps `source: inferred`, its confidence and its
+evidence (how it was learned does not change when someone vouches for
+it; the spec's own "once a person confirms it, it may be shared"
+fixture has this shape, and rewriting it to stated would have made
+the validator refuse the kept evidence) and gains the same two
+confirmation fields on the edge and its stored inverse together. Only
+a household adult (owner, admin or adult role) may confirm: any other
+role is 403; a record that is not inferred, or is already confirmed,
+is 409 ("nothing to confirm", "already confirmed"); the transition
+never runs backward; no PATCH body sets `source`,
+`confirmed_by_person_id` or `confirmed_at` directly (the routes' Zod
+bodies are `.strict()`, so an unknown key is a 400 rather than
+silently dropped, which Session B found it was). The routes are
+`PATCH /api/relationships/:id` and `PATCH /api/entities/:id` with
+body `{ "confirm": true }`, returning the updated record. The
+relationships PATCH now admits any signed-in person to the handler: a
+status, end or note edit still needs owner/admin or the
+`relationships.manage` grant, while a confirm-only body is open to
+every household adult, since confirming is the person's own record.
+Session B wires the Confirm control to these. The other way out of
+inferred is the speaker saying it: `promoteToStated()`
+(relationships.ts) turns an inferred edge and its inverse into a
+stated one by the speaker, confidence and evidence cleared, when the
+judge sees a stated relation slot for a pair that already has the
+inferred edge.
+
+**The judge (`backend/src/lib/subjects.ts`, wired in
+`memoryJudge.ts`).** The extraction schema gains two nullable slots
+on a fact, `subject` ({ name, kind }) and `relation` ({ type, name,
+stated }), the vocabulary's ids as the type enum, with one rule
+paragraph in the prompt and the examples untouched. After the echo
+filter, each kept fact resolves its subject before the write: a
+subject slot finds the entity by name or alias (case-folded) in the
+speaker's own scope or the household's, or creates it in the
+speaker's scope (`local` when the speaker named it, else `inferred`);
+a household member's own name resolves to their person entity
+(created on first need: kind person, `account_person_id`, household
+scope, source hub), never a second entity; a relation slot with no
+subject names its entity the same way, with the kind the type's other
+end admits; a plain fact naming an entity the speaker already has
+gets that one, and a plain mention creates nothing. The record's
+`subject_id` is written on `remember()` and `supersede()` alike. After
+the record, the relation is written from the speaker's person entity
+in the direction the vocabulary allows (`writeRelation()`): a pair
+that already has a live edge of the type gets no second one; a
+symmetric type is stored once and found in either direction. The
+relation's `stated` is the model's flag only when the speaker's own
+words name the entity, the same rule the subject path applies, so a
+name the model supplied is never asserted as the speaker's statement.
+The prompt says the type is read from the speaker's side ("my mom" is
+`child_of`, "my son" `parent_of`, "my boss" `employed_by`), since the
+writer and the prompt's phrases both take the speaker as `from`. A
+place the judge creates is a map place (the validator wants one or
+the other); an entity named only in an `owns` slot is a thing, not the
+first kind the type happens to admit (a pet would have joined the
+guards' roster); a plain fact's subject is never the speaker's own
+entity, whose name the judge writes into most third-person facts.
+
+**Nothing outlives its fact.** The subject is resolved after the
+judge's last skip check and right before the record write, and the
+relation is written only when the record was; so a "forget that" that
+lands mid-judge leaves no entity behind, and a record whose write the
+store refused (a child's fact deduping onto a pinned record) brings
+no edge and takes its fresh entity with it. When a record is later
+retired (a forget from chat or the Memory page, an edited turn's
+`archiveByProvenance()`, which runs its supersede-chain restore
+first so a fact that comes back keeps its subject),
+`retireOrphanSubjects()` removes its subject entity, with every live
+edge touching it, when nothing else keeps it: no other active record
+cites the entity, it is the speaker's own (scope person, source local
+or inferred, the judge's own sources, since the API writes `hub`), and
+nobody confirmed it or a relationship of its; however long ago it was
+made, the last record citing it takes it along (a fifth review found
+a same-write window leaving an entity behind when its records went in
+the other order). The record's subject is the whole link, and a fourth
+review made it one: a relation slot never creates
+an entity beside the fact's subject ("my sister Nadia's dog Rover is
+sick" is about Rover, and a Nadia the hub has never heard of is not
+made from a subordinate clause; a Nadia the speaker already has is
+joined), so every entity the judge makes is the subject of the record
+it was made for, and a wall-clock sweep of the speaker's registry,
+which would have taken another fact's entity, is not needed. A household entity, a person's
+own entity, a confirmed one, or one made by hand in People and things
+(source `hub`) and only matched by the fact stays. A relation to a
+household member said by nickname ("my sister Nads") joins their own
+person entity, and only when the name could be a member's (a dog that
+shares a child's nickname is the dog). A relationship a person typed
+in through the API to a judge-made entity has the judge's own stated
+shape and goes with the entity when its last fact does. The per-person erasure (`forget()`, the privacy right)
+is total for what is theirs: every entity the judge made in the
+person's scope and every person-scoped relationship of theirs, the
+judge's and the ones they typed in alike, go with their memories, the
+same tombstone shape, never their own person entity. A
+relationship is deduplicated within what the speaker can build on
+(their own or the household's): a second household member stating
+the same relation from their side gets their own edge, since another
+person's statement is not theirs to read or promote; the stored
+inverse an edit, a confirm, a promotion or a delete carries along is
+found by the same rule (the same pair, the inverse type, the same
+scope and person, and none for a symmetric type), and the prompt's
+subject label reads only the speaker's own or household edges even
+for an admin. The memory lines' subject labels are resolved once per
+turn and shared with the turn's evidence, so the evidence's rendered
+text is the prompt's own line and a labelled memory still counts as
+included for the usage bump and the guards' grounding. A relation
+slot whose type admits a person at the other end names a person by
+default ("my grandma" in `cares_for`, "my boss" in `employed_by`),
+a `thing` or `place` category names that, else the vocabulary's own
+order (pet first for `owns`).
+
+**Recall, the prompt and the guards; a candidate is never
+knowledge.** The design pass (dev.md, "The chat design pass", section
+3, part 4) amended this step before it landed: an inferred kind or
+relationship is a candidate for the engine's open question (ASK-01),
+never rendered, recalled by identity, or promoted without the
+person's answer. So `recall()` pulls the records whose `subject_id` is
+an entity the query names (by name or alias), ranked with the rest,
+but never by an unconfirmed inferred entity's identity: its records
+are found by their words like any other. The memory line the model
+sees says whose fact it is, from `subjectLabel()`: "Quill likes
+seltzer (about Quill (your coworker); as of ...)" for a stated or
+confirmed relationship, the bare name when the relationship is an
+unconfirmed inference (the hedge line the first design had is gone)
+or none is stored, and no label at all for an unconfirmed inferred
+entity or the speaker's own. The guards' roster grows the speaker's
+people and pets from the registry (`subjectRosterFor()`), so "what
+does Quill drink" is a question about someone the hub knows rather
+than an invented household member; an unconfirmed inferred entity
+stays out (its kind is a guess, and the guards treat the name as one
+of unknown kind), places and things stay out, and the routing roster
+stays the household's, because a place name in it would make a
+weather pattern yield. The two ways out of candidate are the
+person's: the speaker stating it (`promoteToStated`) and an adult's
+confirm; ASK-01 adds the open question that asks.
+
+**Tests and the bench.** `backend/tests/subjects.test.ts` (29): the
+stated coworker (local entity, stated edge by the speaker, no
+confidence, the record's subject), the inferred relation (confidence,
+evidence, nobody named as stating it), model-named against
+speaker-named entities, a plain fact naming a known entity, one edge
+for repeated statements and the promotion from inferred, a directed
+type's inverse carried along, a household member resolving to their
+own entity, recall by subject and the prompt line, the hedge and its
+removal on confirm, the roster, and the confirm rules per role (a
+child sees another person's edge as 404 and gets 403 on their own;
+409 twice; 400 on a provenance key), and the review's cases (a place
+subject, the speaker's own name in a plain fact, a thing in an owns
+slot, the orphan rule on forget and on edit, an entity another record
+still cites), the second review's (two members stating one relation,
+a restored fact keeping its subject, a refused write, a confirmed
+entity surviving a forget, the per-person erasure, a dog in an owns
+slot, a relation slot never making a second entity, a stated flag
+without the speaker's words, a nicknamed member, a pet sharing a
+nickname, the last citing record) and the amendment's (a candidate: no label, not in the roster,
+not recalled by identity; an unconfirmed relation never said). The
+bench gains
+`relationshipExists` (type, the other end's name, provenance,
+confirmed) read from the registry after the turn, and `confirmInferred`
+on a turn (the Confirm control driven from the bench). Rows:
+`coworker-likes-seltzer` (Jesse's, now also asserting the stated
+`colleague_of`) and `inferred-coworker-candidate` (the same manager
+and a borrowed stapler: an inferred `colleague_of` stored as a
+candidate, "who is Raven" with no coworker line in the context and no
+coworker claim in the reply, then plain after the confirm). Three
+seeded runs below.

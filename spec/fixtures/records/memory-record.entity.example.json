@@ -7,6 +7,7 @@
   "status": "active",
   "scope": "household",
   "person": null,
+  "subject_id": "ent-p7q8r9",
   "source": "onboarding-wizard",
   "importance": 0.6,
   "pinned": true,

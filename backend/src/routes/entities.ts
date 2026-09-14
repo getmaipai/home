@@ -92,34 +92,45 @@ const patchRoute = createRoute({
   method: "patch",
   path: "/{id}",
   tags: ["Entities"],
-  summary: "Edit an entity's name, aliases, description, containment, or sensitivity",
+  summary: "Edit an entity's name, aliases, description, containment, or sensitivity; or confirm an inferred one",
   middleware: [requireAuth] as const,
   request: {
     params: idParamSchema("id", "ent-a1b2c3"),
     body: {
       content: {
         "application/json": {
-          schema: z.object({
-            name: z.string().min(1).max(200).optional(),
-            aliases: z.array(z.string().min(1).max(200)).optional(),
-            description: z.string().nullable().optional(),
-            parent_id: z.string().nullable().optional(),
-            sensitive: z.boolean().optional(),
-          }),
+          // Step 3a: unknown keys are refused, not dropped (a body that
+          // tries to set `source` or `confirmed_by_person_id` directly is a
+          // 400); `confirm: true` is the one way an inferred entity becomes
+          // local, by a household adult (403 otherwise; 409 when there is
+          // nothing to confirm).
+          schema: z
+            .object({
+              name: z.string().min(1).max(200).optional(),
+              aliases: z.array(z.string().min(1).max(200)).optional(),
+              description: z.string().nullable().optional(),
+              parent_id: z.string().nullable().optional(),
+              sensitive: z.boolean().optional(),
+              confirm: z.literal(true).optional(),
+            })
+            .strict(),
         },
       },
     },
   },
   responses: {
     200: { content: { "application/json": { schema: Entity } }, description: "Updated." },
-    ...errorResponses({ 400: "Invalid edit", 401: "Not signed in", 404: "No such entity" }),
+    ...errorResponses({ 400: "Invalid edit", 401: "Not signed in", 403: "Only a household adult can confirm", 404: "No such entity", 409: "Nothing to confirm" }),
   },
 });
 entitiesRoutes.openapi(patchRoute, (c) => {
   const actor = c.get("person");
   const { id } = c.req.valid("param");
   const result = updateEntity(actor, id, c.req.valid("json"));
-  if (!result.ok || !result.value) return c.json({ error: result.error ?? "invalid edit" }, result.status === 404 ? 404 : 400);
+  if (!result.ok || !result.value) {
+    const status = result.status === 404 ? 404 : result.status === 403 ? 403 : result.status === 409 ? 409 : 400;
+    return c.json({ error: result.error ?? "invalid edit" }, status);
+  }
   return c.json(result.value, 200);
 });
 

@@ -17,12 +17,12 @@ export type EntityRow = typeof entities.$inferSelect;
 
 export interface OpResult<T> {
   ok: boolean;
-  status: 200 | 201 | 400 | 403 | 404;
+  status: 200 | 201 | 400 | 403 | 404 | 409;
   value?: T;
   error?: string;
 }
 
-function toEntity(row: EntityRow): EntityT {
+export function toEntity(row: EntityRow): EntityT {
   return Entity.parse({
     id: row.id,
     kind: row.kind,
@@ -34,6 +34,7 @@ function toEntity(row: EntityRow): EntityT {
     account_person_id: row.accountPersonId,
     source: row.source,
     confirmed_by_person_id: row.confirmedByPersonId,
+    confirmed_at: row.confirmedAt,
     scope: row.scope,
     person: row.person,
     sensitive: row.sensitive,
@@ -56,6 +57,7 @@ function toRow(entity: EntityT) {
     accountPersonId: entity.account_person_id,
     source: entity.source,
     confirmedByPersonId: entity.confirmed_by_person_id,
+    confirmedAt: entity.confirmed_at,
     scope: entity.scope,
     person: entity.person,
     sensitive: entity.sensitive,
@@ -74,6 +76,7 @@ export interface EntityCreate {
   place_kind?: "map" | "area" | null;
   parent_id?: string | null;
   account_person_id?: string | null;
+  source?: "hub" | "local" | "imported" | "inferred";
   scope?: "household" | "person";
   person?: string | null;
   sensitive?: boolean;
@@ -117,8 +120,13 @@ export function createEntity(actor: { id: string }, input: EntityCreate): OpResu
     place_kind: input.place_kind ?? null,
     parent_id: input.parent_id ?? null,
     account_person_id: input.account_person_id ?? null,
-    source: "hub",
+    // Step 3a: the judge creates an entity the speaker named with its
+    // kind as `local` (the speaker said so) and a guessed one as
+    // `inferred` (unconfirmed until a household adult confirms it);
+    // the API and every other caller create `hub` entities as before.
+    source: input.source ?? "hub",
     confirmed_by_person_id: null,
+    confirmed_at: null,
     scope: input.scope ?? "household",
     person: input.scope === "person" ? (input.person ?? actor.id) : null,
     sensitive: input.sensitive ?? false,
@@ -151,6 +159,23 @@ export interface EntityEdit {
   description?: string | null;
   parent_id?: string | null;
   sensitive?: boolean;
+  /** Step 3a's confirm transition: an `inferred` entity becomes `local`
+   * with the actor as its confirmer, now. Only a household adult; only
+   * forward; nothing else about the record moves. */
+  confirm?: true;
+}
+
+const CONFIRMING_ROLES = new Set(["owner", "admin", "adult"]);
+
+/** The one way `confirmed_by_person_id` and `confirmed_at` ever change
+ * after creation (step 3a): a household adult confirms an inferred
+ * record, once. Shared by entities (whose source becomes local) and
+ * relationships (whose source stays inferred, now vouched for). */
+export function confirmTransition(actor: { id: string; role: string }, source: string, confirmedBy: string | null = null): OpResult<{ confirmed_by_person_id: string; confirmed_at: string }> {
+  if (!CONFIRMING_ROLES.has(actor.role)) return { ok: false, status: 403, error: "only a household adult can confirm" };
+  if (source !== "inferred") return { ok: false, status: 409, error: "nothing to confirm: this record was not inferred" };
+  if (confirmedBy) return { ok: false, status: 409, error: "already confirmed" };
+  return { ok: true, status: 200, value: { confirmed_by_person_id: actor.id, confirmed_at: new Date().toISOString() } };
 }
 
 /** Deliberately narrow: kind, source, account_person_id, scope and
@@ -163,6 +188,12 @@ export function updateEntity(actor: { id: string; role: string }, id: string, ed
   if (!existing.ok || !existing.value) return existing;
   const target = existing.value;
 
+  let confirmed: { source: "local"; confirmed_by_person_id: string; confirmed_at: string } | null = null;
+  if (edit.confirm) {
+    const transition = confirmTransition(actor, target.source);
+    if (!transition.ok) return { ok: false, status: transition.status, error: transition.error };
+    confirmed = { source: "local", ...transition.value! };
+  }
   const candidate = Entity.safeParse({
     ...target,
     name: edit.name ?? target.name,
@@ -170,6 +201,7 @@ export function updateEntity(actor: { id: string; role: string }, id: string, ed
     description: edit.description !== undefined ? edit.description : target.description,
     parent_id: edit.parent_id !== undefined ? edit.parent_id : target.parent_id,
     sensitive: edit.sensitive ?? target.sensitive,
+    ...(confirmed ?? {}),
     updated_at: new Date().toISOString(),
     hlc: nextHlc(),
   });

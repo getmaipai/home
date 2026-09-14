@@ -162,6 +162,25 @@ export const Relationship = z
         "Who confirmed an inferred relationship. Until this is set, the relationship may be used to ask ('is Alex your partner?') but never asserted ('your partner Alex').",
       )
       .default(null),
+    /**When confirmed_by_person_id was set (step 3a's confirm transition): a household adult vouched for an inferred relationship at this moment. The source stays inferred, with its confidence and evidence (how it was learned never changes), and confirmed_by_person_id is what lets a renderer say it plainly instead of hedging. Null until then, and for a relationship that never needed confirming. A confirmed inferred relationship is refused a second confirmation.*/
+    confirmed_at: z
+      .union([
+        z
+          .string()
+          .datetime({ offset: true })
+          .describe(
+            "When confirmed_by_person_id was set (step 3a's confirm transition): a household adult vouched for an inferred relationship at this moment. The source stays inferred, with its confidence and evidence (how it was learned never changes), and confirmed_by_person_id is what lets a renderer say it plainly instead of hedging. Null until then, and for a relationship that never needed confirming. A confirmed inferred relationship is refused a second confirmation.",
+          ),
+        z
+          .null()
+          .describe(
+            "When confirmed_by_person_id was set (step 3a's confirm transition): a household adult vouched for an inferred relationship at this moment. The source stays inferred, with its confidence and evidence (how it was learned never changes), and confirmed_by_person_id is what lets a renderer say it plainly instead of hedging. Null until then, and for a relationship that never needed confirming. A confirmed inferred relationship is refused a second confirmation.",
+          ),
+      ])
+      .describe(
+        "When confirmed_by_person_id was set (step 3a's confirm transition): a household adult vouched for an inferred relationship at this moment. The source stays inferred, with its confidence and evidence (how it was learned never changes), and confirmed_by_person_id is what lets a renderer say it plainly instead of hedging. Null until then, and for a relationship that never needed confirming. A confirmed inferred relationship is refused a second confirmation.",
+      )
+      .default(null),
     /**What this was inferred from: conversation turn ids, memory record ids, an import job. A machine guess about someone's family that cannot be traced back is not reviewable, and this is the field that makes a wrong one correctable.*/
     evidence: z
       .array(z.string().min(1))

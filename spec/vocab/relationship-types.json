@@ -80,6 +80,16 @@
       "description": "A stated friendship. Terminable, and deliberately not inferred by default: guessing at friendships from conversation is low value and high embarrassment."
     },
     {
+      "id": "colleague_of",
+      "from": ["person"],
+      "to": ["person"],
+      "inverse": "colleague_of",
+      "terminable": true,
+      "symmetric": true,
+      "statuses": ["normal", "close"],
+      "description": "A coworker, as people say it (\"my coworker Quill\"). Symmetric and terminable. The one person-to-person type the judge may infer from conversation (step 3a): a coworker is said in passing far more often than any other relation and carries the least weight; it starts inferred and unconfirmed like any inference, and is asked, never asserted, until a household adult confirms it."
+    },
+    {
       "id": "owns",
       "from": ["person", "organization"],
       "to": ["pet", "thing", "place"],

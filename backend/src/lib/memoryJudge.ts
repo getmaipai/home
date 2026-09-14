@@ -58,6 +58,9 @@
 import { eq, and, isNull, isNotNull, notInArray, ne, asc } from "drizzle-orm";
 import { detectCredential } from "@/lib/memoryContentPolicy";
 import { tokenize } from "@/lib/text";
+import { relationshipTypes } from "@maipai/spec/records/ts/validate.js";
+import { ensureSubjectEntity, findEntityNamedIn, findSubjectByName, kindForRelation, retireOrphanSubjects, speakerNamed, writeRelation } from "@/lib/subjects";
+import type { Entity } from "@maipai/spec/gen/ts/entity.js";
 import { db } from "@/db";
 import { conversationTurns, people, memoryRecords } from "@/db/schema";
 import { complete, embed, type LlmMessage } from "@/lib/llm";
@@ -154,6 +157,11 @@ export function categoryToRecordKind(category: Category): "memory" | "entity" {
   return entityShaped.includes(category) ? "entity" : "memory";
 }
 
+/** The vocabulary's relationship types the model may name in a fact's
+ * `relation` slot (spec/vocab/relationship-types.json, the same list
+ * relationships.ts validates against). */
+const RELATION_TYPE_IDS: string[] = relationshipTypes().map((t: { id: string }) => t.id);
+
 const EXTRACTION_SCHEMA = {
   name: "memory_extraction",
   schema: {
@@ -171,6 +179,27 @@ const EXTRACTION_SCHEMA = {
             importance: { type: "number" },
             valid_from: { type: ["string", "null"] },
             valid_to: { type: ["string", "null"] },
+            // Step 3a: who or what the fact is about, and a relation the
+            // speaker stated in the sentence, each in its own slot so the
+            // judge writes the entity and the relationship from a name
+            // and a vocabulary id rather than guessing them from the text.
+            subject: {
+              type: ["object", "null"],
+              properties: {
+                name: { type: "string" },
+                kind: { type: "string", enum: ["person", "pet", "place", "organization", "thing"] },
+              },
+              required: ["name", "kind"],
+            },
+            relation: {
+              type: ["object", "null"],
+              properties: {
+                type: { type: "string", enum: RELATION_TYPE_IDS },
+                name: { type: "string" },
+                stated: { type: "boolean" },
+              },
+              required: ["type", "name", "stated"],
+            },
           },
           required: ["text", "category", "scope", "importance"],
         },
@@ -254,6 +283,8 @@ CRITICAL - do NOT extract:
 - Trivia or facts about the world that reveal nothing about ${speakerName}
 - Trivially-true or contentless observations ("${speakerName} said hi")
 
+SUBJECT AND RELATION - when a fact is about a named person, pet, place, organization or thing, set "subject" to that name and kind (the person the fact is about, never ${speakerName} for ${speakerName}'s own preferences; null when the fact is about ${speakerName} alone or about the world). When ${speakerName}'s own sentence states how a named person or thing relates to ${speakerName} ("my coworker Quill", "my sister Nadia", "our dog Rover"), set "relation" with the vocabulary type read from ${speakerName}'s side (${speakerName} is the "from" end: "my coworker" is colleague_of, "my sister" sibling_of, "my mom" child_of, "my son" parent_of, "my boss" employed_by, "our dog" owns, "where I work" works_at), the name, and "stated": true; "stated": false only when you worked the relation out from context rather than ${speakerName} saying it. Null when there is none.
+
 SCOPE - "person": a fact about ${speakerName} specifically. "household": a fact the whole family should know (the wifi password, the dog's name, the trash pickup day) - use household only when a new family member would need to be told it too.
 
 Category options: ${CATEGORY_VALUES.join(", ")}.
@@ -270,13 +301,22 @@ Examples (these exact names never recur in a real household - never copy them in
 Return ONLY a JSON object: {"facts": [...]} (an empty array if nothing qualifies). At most ${MAX_FACTS_PER_TURN} facts.`;
 }
 
-interface ExtractedFact {
+export type EntityKind = "person" | "pet" | "place" | "organization" | "thing";
+export interface ExtractedFact {
   text: string;
   category: Category;
   scope: "person" | "household";
   importance: number;
   valid_from: string | null;
   valid_to: string | null;
+  /** Step 3a: who or what the fact is about, when the model could name
+   * one (a person, pet, place, organization or thing by name). */
+  subject: { name: string; kind: EntityKind } | null;
+  /** Step 3a: a relation the sentence carries between the speaker and
+   * the named person or thing; `stated` when the speaker said it in so
+   * many words ("my coworker Quill"), false when the model worked it out
+   * (a co-occurrence, a context). */
+  relation: { type: string; name: string; stated: boolean } | null;
 }
 
 export function isCategory(value: unknown): value is Category {
@@ -309,6 +349,8 @@ function normalizeFact(raw: unknown): ExtractedFact | null {
   if (!isCategory(r.category)) return null;
   const scope = r.scope === "household" ? "household" : "person";
   const importance = typeof r.importance === "number" && Number.isFinite(r.importance) ? Math.min(1, Math.max(0, r.importance)) : 0.5;
+  const subject = normalizeSubject(r.subject);
+  const relation = normalizeRelation(r.relation);
   return {
     text: r.text.trim().slice(0, 500),
     category: r.category,
@@ -316,7 +358,25 @@ function normalizeFact(raw: unknown): ExtractedFact | null {
     importance,
     valid_from: normalizeDate(r.valid_from),
     valid_to: normalizeDate(r.valid_to),
+    subject,
+    relation,
   };
+}
+
+const ENTITY_KINDS: EntityKind[] = ["person", "pet", "place", "organization", "thing"];
+function normalizeSubject(raw: unknown): ExtractedFact["subject"] {
+  if (!raw || typeof raw !== "object") return null;
+  const s = raw as Record<string, unknown>;
+  const name = typeof s.name === "string" ? s.name.trim().slice(0, 120) : "";
+  if (!name || !ENTITY_KINDS.includes(s.kind as EntityKind)) return null;
+  return { name, kind: s.kind as EntityKind };
+}
+function normalizeRelation(raw: unknown): ExtractedFact["relation"] {
+  if (!raw || typeof raw !== "object") return null;
+  const s = raw as Record<string, unknown>;
+  const name = typeof s.name === "string" ? s.name.trim().slice(0, 120) : "";
+  if (!name || typeof s.type !== "string" || !RELATION_TYPE_IDS.includes(s.type)) return null;
+  return { type: s.type, name, stated: s.stated === true };
 }
 
 /** Content words with possessives folded ("Sage's" is "sage"), so the
@@ -542,6 +602,46 @@ export interface JudgeTurnResult {
  * anything was written, then mark the turn done. Never throws - every
  * failure mode either retries on a later tick (extraction) or safely
  * defaults to ADD (dedupe), per this file's own header. */
+/** Step 3a: the registry entity a fact is about, or null. A fact with a
+ * subject slot finds or creates it in the speaker's scope: `local` when
+ * the speaker's own words name it, `inferred` when only the model did.
+ * A plain fact naming an entity the speaker already has gets that one
+ * (no creation from a plain mention: a name the model never tagged as
+ * a subject is not evidence of a new person). A relation slot with no
+ * subject names its entity the same way, with the kind the type's
+ * other end admits. */
+function resolveSubject(speaker: PersonRow, fact: ExtractedFact, turn: ConversationTurnRow): Entity | null {
+  const named = fact.subject ?? (fact.relation ? { name: fact.relation.name, kind: kindForRelation(fact.relation.type, fact.category) } : null);
+  if (named) {
+    const stated = speakerNamed(turn.userText, named.name);
+    const result = ensureSubjectEntity(speaker, named, stated);
+    if (result.ok && result.value) return result.value;
+    console.error(`[memoryJudge] subject failed for turn ${turn.id}: ${result.error}`);
+    return null;
+  }
+  return findEntityNamedIn(speaker, fact.text);
+}
+
+/** The relation a fact carries, written after its record. The other
+ * end is the record's own subject, or an entity the speaker already
+ * has: a relation slot never creates an entity of its own beside the
+ * subject ("my sister Nadia's dog Rover is sick" is about Rover; a
+ * Nadia the hub has never heard of is not made from a subordinate
+ * clause), so every entity the judge makes is the subject of a record
+ * and goes with it. `stated` is the model's flag only when the speaker's
+ * own words name the entity, the same rule the subject path applies. */
+function writeFactRelation(speaker: PersonRow, fact: ExtractedFact, subject: Entity | null, turn: ConversationTurnRow): void {
+  const relation = { ...fact.relation!, stated: fact.relation!.stated && speakerNamed(turn.userText, fact.relation!.name) };
+  // The subject when the fact has no subject of its own (it was made
+  // from this name) or the names agree; else what the name already
+  // refers to (a household member by nickname included), never a new
+  // entity.
+  const other = subject && (!fact.subject || subject.name.trim().toLowerCase() === relation.name.trim().toLowerCase()) ? subject : (findSubjectByName(speaker, relation.name)?.value ?? null);
+  if (!other) return;
+  const result = writeRelation(speaker, relation, other, turn.id, fact.importance);
+  if (!result.ok) console.error(`[memoryJudge] relation ${relation.type} failed for turn ${turn.id}: ${result.error}`);
+}
+
 export async function judgeTurn(turn: ConversationTurnRow): Promise<JudgeTurnResult> {
   // isNull(deletedAt) matters here the same way it does everywhere else
   // a person id becomes a write target (remember()'s own person-exists
@@ -645,6 +745,14 @@ export async function judgeTurn(turn: ConversationTurnRow): Promise<JudgeTurnRes
     // decideDedupe() took seconds, and a "forget that" in that window
     // must win (forgetCommand.ts also sweeps a record that slips past).
     if (isSkippedTurn(turn.id)) return { ok: true, factsWritten: written };
+    // Step 3a: whose fact this is. Resolved after the last skip check
+    // and right before the write, so a forgotten turn leaves no entity
+    // behind; the relation follows a record that was written (a
+    // relation with no fact behind it is nothing to review), and both
+    // go with the record when it is later forgotten or its turn edited
+    // (retireOrphanSubjects in subjects.ts).
+    const subject = resolveSubject(speaker, fact, turn);
+    let recordWritten = false;
 
     if (decision.action === "SUPERSEDE" && decision.id) {
       // closeValidTo is "when did the OLD fact stop being true," which is
@@ -673,11 +781,13 @@ export async function judgeTurn(turn: ConversationTurnRow): Promise<JudgeTurnRes
           source: turn.id,
           valid_from: fact.valid_from,
           valid_to: fact.valid_to,
+          subject_id: subject?.id,
         },
         { ...(decision.contradiction ? { closeValidTo: turn.createdAt } : {}), enforcePrivilegedRoute: true },
       );
       if (result.ok) {
         written++;
+        recordWritten = true;
         writtenTexts.push(decision.mergedText ?? fact.text);
         writtenIds.push(result.value.created.id);
       } else {
@@ -718,6 +828,7 @@ export async function judgeTurn(turn: ConversationTurnRow): Promise<JudgeTurnRes
         importance: fact.importance,
         valid_from: fact.valid_from,
         valid_to: fact.valid_to,
+        subject_id: subject?.id ?? null,
         // Reuses the vector already computed above for this exact text
         // (safe here specifically: the ADD path always stores fact.text
         // verbatim, unlike SUPERSEDE's own decision.mergedText, which
@@ -727,12 +838,19 @@ export async function judgeTurn(turn: ConversationTurnRow): Promise<JudgeTurnRes
       });
       if (result.ok) {
         written++;
+        recordWritten = true;
         writtenTexts.push(fact.text);
         writtenIds.push(result.value.id);
       } else {
         console.error(`[memoryJudge] remember failed for turn ${turn.id}: ${result.error}`);
       }
     }
+    if (fact.relation && recordWritten) writeFactRelation(speaker, fact, subject, turn);
+    // A write the store refused (a child's fact deduping onto a pinned
+    // record, a validation) leaves no entity behind either: the one
+    // just made for it, with nothing citing it, goes by the same rule
+    // a forgotten record's does.
+    if (!recordWritten && subject) retireOrphanSubjects([{ subjectId: subject.id }]);
   }
 
   markDone(turn.id);

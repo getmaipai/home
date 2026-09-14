@@ -11,6 +11,7 @@
   "stated_by_person_id": null,
   "confidence": 0.62,
   "confirmed_by_person_id": null,
+  "confirmed_at": null,
   "evidence": [
     "turn-2026-09-05-0042"
   ],

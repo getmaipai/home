@@ -53,6 +53,7 @@ function record(overrides: Partial<MemoryRecord> = {}): MemoryRecord {
     status: "active",
     scope: "person",
     person: "person-abc123",
+    subject_id: null,
     source: "chat",
     importance: 0.5,
     pinned: false,

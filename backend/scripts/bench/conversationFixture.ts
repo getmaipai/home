@@ -112,6 +112,12 @@ export interface TurnExpectation {
   /** An entity of this kind and name exists in the registry after the
    * turn (step 3a of the program: the judge creates it). */
   entityExists?: { kind: string; name: string };
+  /** A live relationship of this type joins the speaker's own entity
+   * and the named one after the turn, with this provenance: `stated`
+   * when the speaker said it in their own sentence, `inferred` when the
+   * judge worked it out; `confirmed` says whether a household adult has
+   * vouched for an inferred one (step 3a). */
+  relationshipExists?: { type: string; name: string; source: "stated" | "inferred"; confirmed?: boolean };
 }
 
 /** A household entity seeded in the registry before a conversation (B4):
@@ -140,6 +146,11 @@ export interface BenchTurn {
   interrupt?: boolean;
   /** Re-send: this turn supersedes the turn at that index (#88). */
   supersedesTurn?: number;
+  /** Before this turn, the owner confirms every unconfirmed inferred
+   * relationship of theirs, the way the Confirm control does (PATCH
+   * /api/relationships/:id { confirm: true }): the inferred path's
+   * second half, the hedge gone. */
+  confirmInferred?: boolean;
   expect: TurnExpectation;
 }
 
@@ -676,10 +687,20 @@ export const CONVERSATIONS: readonly BenchConversation[] = [
     category: "memory",
     note: "step 3a of the program (Jesse's example): the subject is a person entity Quill, coworker of the speaker, and the preference is his; asked back, the hub knows what Quill drinks and who he is, and does not guess the speaker's own taste",
     turns: [
-      { say: "my coworker Quill likes seltzer", expect: { memoryWritten: [["quill", "seltzer"]], entityExists: { kind: "person", name: "Quill" }, guard: null } },
+      { say: "my coworker Quill likes seltzer", expect: { memoryWritten: [["quill", "seltzer"]], entityExists: { kind: "person", name: "Quill" }, relationshipExists: { type: "colleague_of", name: "Quill", source: "stated" }, guard: null } },
       { say: "do I like seltzer", newConversation: true, drainJudge: true, expect: { mustNotContain: "\\byes\\b|\\byep\\b|you (do|love|like|enjoy) seltzer|you're a fan", guard: null } },
       { say: "what does Quill drink", expect: { recallInContext: ["seltzer"], mustContain: "seltzer", mustNotContain: HONESTY_LINES } },
       { say: "who is Quill", expect: { mustContain: "coworker|co-worker|colleague|work", mustNotContain: HONESTY_LINES } },
+    ],
+  },
+  {
+    id: "inferred-coworker-candidate",
+    category: "memory",
+    note: "step 3a, the inferred path as amended by the design pass: nobody said Raven is a coworker, the judge works it out from the shared manager; the relation is stored inferred as a candidate, never rendered or asserted (the context carries no coworker line, the reply claims none), and said plainly once an adult confirms it",
+    turns: [
+      { say: "Raven and I got the same manager this week, and she keeps borrowing my stapler", expect: { memoryWritten: [["raven", "stapler"]], entityExists: { kind: "person", name: "Raven" }, relationshipExists: { type: "colleague_of", name: "Raven", source: "inferred", confirmed: false }, guard: null } },
+      { say: "who is Raven", newConversation: true, drainJudge: true, expect: { notInContext: ["coworker"], mustNotContain: "your (coworker|co-worker|colleague)|raven is (a|your) (coworker|co-worker|colleague)", guard: null } },
+      { say: "who is Raven again", newConversation: true, confirmInferred: true, expect: { relationshipExists: { type: "colleague_of", name: "Raven", source: "inferred", confirmed: true }, recallInContext: ["your coworker"], mustContain: "coworker|co-worker|colleague|work", mustNotContain: HONESTY_LINES } },
     ],
   },
   {

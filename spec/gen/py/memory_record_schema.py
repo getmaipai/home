@@ -53,6 +53,10 @@ class MemoryRecord(BaseModel):
         None,
         description='Required when scope is person; null for household or self scope.',
     )
+    subject_id: constr(pattern=r'^ent-[a-z0-9]{6,}$') | None = Field(
+        None,
+        description="The entity this record is about, when the judge or a person could name one (step 3a): a memory about a coworker names the coworker's entity, so recall and the guards find every record about them by id, not only by the name in the text. Null when the record is about nothing in the registry (a world fact, a preference of the speaker's own) or was written before this existed.",
+    )
     source: constr(min_length=1) = Field(
         ...,
         description='Free-text provenance (e.g. a conversation turn id, a package id, an import job id).',

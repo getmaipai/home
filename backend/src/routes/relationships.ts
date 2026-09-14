@@ -8,6 +8,7 @@ import { createRoute, z } from "@hono/zod-openapi";
 import { apiRouter, errorResponses, idParamSchema } from "@/lib/openapi";
 import { requireAuth, requireRoleOrGrant } from "@/middleware/auth";
 import { listRelationships, createRelationship, updateRelationship, deleteRelationship } from "@/lib/relationships";
+import { personIsGranted } from "@/lib/grants";
 import { Relationship } from "@maipai/spec/gen/ts/relationship.js";
 
 export const relationshipsRoutes = apiRouter();
@@ -72,32 +73,47 @@ const patchRoute = createRoute({
   method: "patch",
   path: "/{id}",
   tags: ["Relationships"],
-  summary: "End or requalify a relationship (never re-type or re-point it)",
-  middleware: [requireRoleOrGrant(["owner", "admin"], "relationships.manage")] as const,
+  summary: "End or requalify a relationship (never re-type or re-point it), or confirm an inferred one",
+  // Step 3a: any signed-in person reaches the handler; a status, end or
+  // note edit still needs owner/admin or the relationships.manage grant
+  // (checked below), while `{ confirm: true }` alone is open to every
+  // household adult, since confirming is the person's own record.
+  middleware: [requireAuth] as const,
   request: {
     params: idParamSchema("id", "rel-a1b2c3"),
     body: {
       content: {
         "application/json": {
-          schema: z.object({
-            status: z.string().optional(),
-            valid_to: z.string().nullable().optional(),
-            note: z.string().nullable().optional(),
-          }),
+          schema: z
+            .object({
+              status: z.string().optional(),
+              valid_to: z.string().nullable().optional(),
+              note: z.string().nullable().optional(),
+              confirm: z.literal(true).optional(),
+            })
+            .strict(),
         },
       },
     },
   },
   responses: {
     200: { content: { "application/json": { schema: Relationship } }, description: "Updated, along with its stored inverse." },
-    ...errorResponses({ 400: "Invalid edit", 403: "Not allowed to edit relationships", 404: "No such relationship" }),
+    ...errorResponses({ 400: "Invalid edit", 403: "Not allowed to edit relationships, or not an adult confirming", 404: "No such relationship", 409: "Nothing to confirm" }),
   },
 });
 relationshipsRoutes.openapi(patchRoute, (c) => {
   const actor = c.get("person");
   const { id } = c.req.valid("param");
-  const result = updateRelationship(actor, id, c.req.valid("json"));
-  if (!result.ok || !result.value) return c.json({ error: result.error ?? "invalid edit" }, result.status === 404 ? 404 : 400);
+  const edit = c.req.valid("json");
+  const confirmOnly = edit.confirm === true && edit.status === undefined && edit.valid_to === undefined && edit.note === undefined;
+  if (!confirmOnly && !["owner", "admin"].includes(actor.role) && !personIsGranted(actor.id, "relationships.manage")) {
+    return c.json({ error: "Forbidden" }, 403);
+  }
+  const result = updateRelationship(actor, id, edit);
+  if (!result.ok || !result.value) {
+    const status = result.status === 404 ? 404 : result.status === 403 ? 403 : result.status === 409 ? 409 : 400;
+    return c.json({ error: result.error ?? "invalid edit" }, status);
+  }
   return c.json(result.value, 200);
 });
 

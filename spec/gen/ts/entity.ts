@@ -130,6 +130,25 @@ export const Entity = z
         "Who confirmed this entity is real, and when that has happened. Meaningful mainly for `source: inferred`, which starts unconfirmed and is never stated as fact to anyone until this is set; an entity a person created through the UI (`source: hub`) is confirmed by the act of creating it, and records who. An earlier draft said 'null while source is inferred', which was self-contradictory - if it must stay null there is no way for a guess to ever become assertable (code review, 2026-09-05).",
       )
       .default(null),
+    /**When confirmed_by_person_id was set (step 3a's confirm transition): an inferred entity becomes local when a household adult confirms it, and this is the moment; null until then, and for a entity that never needed confirming.*/
+    confirmed_at: z
+      .union([
+        z
+          .string()
+          .datetime({ offset: true })
+          .describe(
+            "When confirmed_by_person_id was set (step 3a's confirm transition): an inferred entity becomes local when a household adult confirms it, and this is the moment; null until then, and for a entity that never needed confirming.",
+          ),
+        z
+          .null()
+          .describe(
+            "When confirmed_by_person_id was set (step 3a's confirm transition): an inferred entity becomes local when a household adult confirms it, and this is the moment; null until then, and for a entity that never needed confirming.",
+          ),
+      ])
+      .describe(
+        "When confirmed_by_person_id was set (step 3a's confirm transition): an inferred entity becomes local when a household adult confirms it, and this is the moment; null until then, and for a entity that never needed confirming.",
+      )
+      .default(null),
     /**Who this entity is visible to, following memory-record.schema.json's scoping, minus its `self` value: `self` is the companion's own memory of itself, which an entity in the household's graph never is. A person mentioned only in one person's conversations is theirs, not the household's; pooling it is the failure the org's per-person identity rule exists to prevent.*/
     scope: z
       .enum(["household", "person"])

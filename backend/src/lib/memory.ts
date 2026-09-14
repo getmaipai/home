@@ -11,7 +11,7 @@
 import { eq, and, ne, lt, isNull, isNotNull, inArray, notInArray } from "drizzle-orm";
 import { detectCredential, CREDENTIAL_SAFE_MESSAGE } from "@/lib/memoryContentPolicy";
 import { db, sqlite } from "@/db";
-import { memoryRecords, memoryEmbeddings, pendingEmbeddings, people, conversationTurns } from "@/db/schema";
+import { memoryRecords, memoryEmbeddings, pendingEmbeddings, people, conversationTurns, entities } from "@/db/schema";
 import { newMemoryRecordId } from "@/lib/memoryId";
 import { toMemoryRecord } from "@/lib/memoryShape";
 import { isOwnerOrAdmin, rolesById, canAccessPerson } from "@/lib/access";
@@ -20,6 +20,7 @@ import { embed } from "@/lib/llm";
 import { getEmbedBackendKind } from "@/lib/embedSupervisor";
 import { nextHlc } from "@/lib/hlc";
 import { deleteEpisodesForPerson } from "@/lib/episodes";
+import { retireOrphanSubjects } from "@/lib/subjects";
 import { MemoryRecord } from "@maipai/spec/gen/ts/memory-record.js";
 import type { PersonRow, MemoryRecordRow } from "@/types";
 
@@ -98,6 +99,9 @@ export interface RememberInput {
   tier: string;
   scope: string;
   person?: string | null;
+  /** Step 3a: the entity (entities.id) this record is about, when the
+   * judge or a person could name one. */
+  subject_id?: string | null;
   source: string;
   importance: number;
   pinned?: boolean;
@@ -161,6 +165,7 @@ export function remember(actor: PersonRow, input: RememberInput): MemoryOpResult
     status: "active",
     scope,
     person,
+    subject_id: input.subject_id ?? null,
     source: input.source,
     importance: input.importance,
     pinned: input.pinned ?? false,
@@ -195,6 +200,7 @@ export function remember(actor: PersonRow, input: RememberInput): MemoryOpResult
       status: parsed.data.status,
       scope: parsed.data.scope,
       person: parsed.data.person,
+      subjectId: parsed.data.subject_id ?? null,
       source: parsed.data.source,
       importance: parsed.data.importance,
       pinned: parsed.data.pinned,
@@ -600,6 +606,27 @@ export function recall(actor: PersonRow, query: string, opts: RecallOptions = {}
     .filter((r) => r.recordKind === "entity")
     .map((r) => entityNameWords(r.text))
     .filter((nameWords) => nameWords.size > 0 && [...nameWords].every((w) => queryWords.has(w)));
+  // Step 3a: the registry's own entities (lib/entities.ts) the question
+  // names, by name or alias; a record whose subject_id is one of them
+  // is an entity match the same way a text match is, so "what does
+  // Quill drink" finds every record about Quill by id, not only the
+  // ones that spell the name. An inferred entity nobody has confirmed
+  // is a candidate, not knowledge (the design pass's amendment to
+  // step 3a): its records are found by their words like any other,
+  // never by the guessed identity.
+  const subjectIds = new Set(
+    db
+      .select({ id: entities.id, name: entities.name, aliases: entities.aliases, scope: entities.scope, person: entities.person, source: entities.source, confirmedByPersonId: entities.confirmedByPersonId })
+      .from(entities)
+      .where(isNull(entities.deletedAt))
+      .all()
+      .filter((e) => (e.scope === "household" || e.person === actor.id) && !(e.source === "inferred" && e.confirmedByPersonId === null))
+      .filter((e) => [e.name, ...(JSON.parse(e.aliases) as string[])].some((n) => {
+        const words = tokenize(n);
+        return words.size > 0 && [...words].every((w) => queryWords.has(w));
+      }))
+      .map((e) => e.id),
+  );
 
   // One batched query for every candidate's stored vector, not one per
   // row (household scale is "hundreds of rows" per the plan's own
@@ -618,7 +645,7 @@ export function recall(actor: PersonRow, query: string, opts: RecallOptions = {}
   const scored: RecallMatch[] = [];
   for (const row of rows) {
     const words = tokenize(row.text);
-    const isEntityMatch = matchedEntityNameWords.some((nameWords) => [...nameWords].every((w) => words.has(w)));
+    const isEntityMatch = matchedEntityNameWords.some((nameWords) => [...nameWords].every((w) => words.has(w))) || (row.subjectId !== null && subjectIds.has(row.subjectId));
     const storedVector = vectorsByMemoryId.get(row.id);
 
     // Pinned and entity-matched candidates are deterministic overrides
@@ -809,7 +836,7 @@ export function archiveByProvenance(turnId: string): number {
   // judge's guess; an edit to the turn it came from does not retire it
   // (a review: a typo fix would otherwise silently unpin a kept fact).
   const rows = db
-    .select({ id: memoryRecords.id })
+    .select({ id: memoryRecords.id, subjectId: memoryRecords.subjectId })
     .from(memoryRecords)
     .where(and(eq(memoryRecords.source, turnId), eq(memoryRecords.status, "active"), eq(memoryRecords.pinned, false)))
     .all();
@@ -841,11 +868,17 @@ export function archiveByProvenance(turnId: string): number {
       ),
     )
     .run();
+  // Step 3a: the retracted statement's own entity and edges go too,
+  // when nothing else keeps them (subjects.ts has the rule); after the
+  // restore above, so a fact that came back still has its subject.
+  retireOrphanSubjects(rows);
   return rows.length;
 }
 
 export interface SupersedeInput {
   text: string;
+  /** Step 3a: the replacement's subject; the old record's when omitted. */
+  subject_id?: string | null;
   category?: string;
   tier?: string;
   importance?: number;
@@ -919,6 +952,7 @@ export function supersede(
     tier: input.tier ?? old.tier,
     scope: old.scope,
     person: old.person,
+    subject_id: input.subject_id ?? old.subjectId ?? null,
     source: input.source,
     importance: input.importance ?? old.importance,
     pinned: input.pinned ?? old.pinned,
@@ -1011,6 +1045,24 @@ const forgetTransaction = sqlite.transaction((personId: string): number => {
       .query("UPDATE memory_records SET status = 'archived', text = ?, embedding_space = NULL, deleted_at = ?, hlc = ? WHERE id = ?")
       .run(TOMBSTONE_TEXT, now, nextHlc(), row.id);
   }
+  // Step 3a: the person's registry rows go with their memories, since
+  // the erasure right is total for what is theirs: the entities the
+  // judge made in their scope (local or inferred, never their own
+  // person entity, which is the household's) and every person-scoped
+  // relationship of theirs, the judge's (whose evidence names their
+  // turns) and the ones they typed in alike. Same tombstone shape as
+  // the records; the same FK order personLifecycle keeps (edges before
+  // the entities they touch).
+  const ownEntityIds = (
+    sqlite.query("SELECT id FROM entities WHERE scope = 'person' AND person = ? AND source IN ('local', 'inferred') AND deleted_at IS NULL").all(personId) as Array<{ id: string }>
+  ).map((r) => r.id);
+  const edgeIds = new Set<string>();
+  for (const id of ownEntityIds) {
+    for (const r of sqlite.query("SELECT id FROM relationships WHERE deleted_at IS NULL AND (from_id = ? OR to_id = ?)").all(id, id) as Array<{ id: string }>) edgeIds.add(r.id);
+  }
+  for (const r of sqlite.query("SELECT id FROM relationships WHERE deleted_at IS NULL AND person = ?").all(personId) as Array<{ id: string }>) edgeIds.add(r.id);
+  for (const id of edgeIds) sqlite.query("UPDATE relationships SET deleted_at = ?, updated_at = ?, hlc = ? WHERE id = ?").run(now, now, nextHlc(), id);
+  for (const id of ownEntityIds) sqlite.query("UPDATE entities SET deleted_at = ?, updated_at = ?, hlc = ? WHERE id = ?").run(now, now, nextHlc(), id);
   return ids.length;
 });
 
@@ -1067,6 +1119,9 @@ export function forgetByIds(actor: PersonRow, ids: string[]): BatchForgetOutcome
     }
     tombstone(id);
     outcomes.push({ id, deleted: true });
+    // Step 3a: the entity and the edges this record brought go with it
+    // when nothing else keeps them (subjects.ts has the rule).
+    retireOrphanSubjects([{ subjectId: found.value.subjectId }]);
   }
   return outcomes;
 }

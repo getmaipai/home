@@ -6017,6 +6017,24 @@
                         "default": null,
                         "description": "Who confirmed this entity is real, and when that has happened. Meaningful mainly for `source: inferred`, which starts unconfirmed and is never stated as fact to anyone until this is set; an entity a person created through the UI (`source: hub`) is confirmed by the act of creating it, and records who. An earlier draft said 'null while source is inferred', which was self-contradictory - if it must stay null there is no way for a guess to ever become assertable (code review, 2026-09-05)."
                       },
+                      "confirmed_at": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "format": "date-time",
+                            "description": "When confirmed_by_person_id was set (step 3a's confirm transition): an inferred entity becomes local when a household adult confirms it, and this is the moment; null until then, and for a entity that never needed confirming."
+                          },
+                          {
+                            "nullable": true,
+                            "description": "When confirmed_by_person_id was set (step 3a's confirm transition): an inferred entity becomes local when a household adult confirms it, and this is the moment; null until then, and for a entity that never needed confirming."
+                          },
+                          {
+                            "nullable": true
+                          }
+                        ],
+                        "default": null,
+                        "description": "When confirmed_by_person_id was set (step 3a's confirm transition): an inferred entity becomes local when a household adult confirms it, and this is the moment; null until then, and for a entity that never needed confirming."
+                      },
                       "scope": {
                         "type": "string",
                         "enum": [
@@ -6337,6 +6355,24 @@
                       "default": null,
                       "description": "Who confirmed this entity is real, and when that has happened. Meaningful mainly for `source: inferred`, which starts unconfirmed and is never stated as fact to anyone until this is set; an entity a person created through the UI (`source: hub`) is confirmed by the act of creating it, and records who. An earlier draft said 'null while source is inferred', which was self-contradictory - if it must stay null there is no way for a guess to ever become assertable (code review, 2026-09-05)."
                     },
+                    "confirmed_at": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "format": "date-time",
+                          "description": "When confirmed_by_person_id was set (step 3a's confirm transition): an inferred entity becomes local when a household adult confirms it, and this is the moment; null until then, and for a entity that never needed confirming."
+                        },
+                        {
+                          "nullable": true,
+                          "description": "When confirmed_by_person_id was set (step 3a's confirm transition): an inferred entity becomes local when a household adult confirms it, and this is the moment; null until then, and for a entity that never needed confirming."
+                        },
+                        {
+                          "nullable": true
+                        }
+                      ],
+                      "default": null,
+                      "description": "When confirmed_by_person_id was set (step 3a's confirm transition): an inferred entity becomes local when a household adult confirms it, and this is the moment; null until then, and for a entity that never needed confirming."
+                    },
                     "scope": {
                       "type": "string",
                       "enum": [
@@ -6606,6 +6642,24 @@
                       "default": null,
                       "description": "Who confirmed this entity is real, and when that has happened. Meaningful mainly for `source: inferred`, which starts unconfirmed and is never stated as fact to anyone until this is set; an entity a person created through the UI (`source: hub`) is confirmed by the act of creating it, and records who. An earlier draft said 'null while source is inferred', which was self-contradictory - if it must stay null there is no way for a guess to ever become assertable (code review, 2026-09-05)."
                     },
+                    "confirmed_at": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "format": "date-time",
+                          "description": "When confirmed_by_person_id was set (step 3a's confirm transition): an inferred entity becomes local when a household adult confirms it, and this is the moment; null until then, and for a entity that never needed confirming."
+                        },
+                        {
+                          "nullable": true,
+                          "description": "When confirmed_by_person_id was set (step 3a's confirm transition): an inferred entity becomes local when a household adult confirms it, and this is the moment; null until then, and for a entity that never needed confirming."
+                        },
+                        {
+                          "nullable": true
+                        }
+                      ],
+                      "default": null,
+                      "description": "When confirmed_by_person_id was set (step 3a's confirm transition): an inferred entity becomes local when a household adult confirms it, and this is the moment; null until then, and for a entity that never needed confirming."
+                    },
                     "scope": {
                       "type": "string",
                       "enum": [
@@ -6711,7 +6765,7 @@
         "tags": [
           "Entities"
         ],
-        "summary": "Edit an entity's name, aliases, description, containment, or sensitivity",
+        "summary": "Edit an entity's name, aliases, description, containment, or sensitivity; or confirm an inferred one",
         "parameters": [
           {
             "schema": {
@@ -6752,8 +6806,15 @@
                   },
                   "sensitive": {
                     "type": "boolean"
+                  },
+                  "confirm": {
+                    "type": "boolean",
+                    "enum": [
+                      true
+                    ]
                   }
-                }
+                },
+                "additionalProperties": false
               }
             }
           }
@@ -6908,6 +6969,24 @@
                       "default": null,
                       "description": "Who confirmed this entity is real, and when that has happened. Meaningful mainly for `source: inferred`, which starts unconfirmed and is never stated as fact to anyone until this is set; an entity a person created through the UI (`source: hub`) is confirmed by the act of creating it, and records who. An earlier draft said 'null while source is inferred', which was self-contradictory - if it must stay null there is no way for a guess to ever become assertable (code review, 2026-09-05)."
                     },
+                    "confirmed_at": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "format": "date-time",
+                          "description": "When confirmed_by_person_id was set (step 3a's confirm transition): an inferred entity becomes local when a household adult confirms it, and this is the moment; null until then, and for a entity that never needed confirming."
+                        },
+                        {
+                          "nullable": true,
+                          "description": "When confirmed_by_person_id was set (step 3a's confirm transition): an inferred entity becomes local when a household adult confirms it, and this is the moment; null until then, and for a entity that never needed confirming."
+                        },
+                        {
+                          "nullable": true
+                        }
+                      ],
+                      "default": null,
+                      "description": "When confirmed_by_person_id was set (step 3a's confirm transition): an inferred entity becomes local when a household adult confirms it, and this is the moment; null until then, and for a entity that never needed confirming."
+                    },
                     "scope": {
                       "type": "string",
                       "enum": [
@@ -7007,8 +7086,28 @@
               }
             }
           },
+          "403": {
+            "description": "Only a household adult can confirm",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
           "404": {
             "description": "No such entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Nothing to confirm",
             "content": {
               "application/json": {
                 "schema": {
@@ -9199,6 +9298,24 @@
                         "default": null,
                         "description": "Who confirmed an inferred relationship. Until this is set, the relationship may be used to ask ('is Alex your partner?') but never asserted ('your partner Alex')."
                       },
+                      "confirmed_at": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "format": "date-time",
+                            "description": "When confirmed_by_person_id was set (step 3a's confirm transition): a household adult vouched for an inferred relationship at this moment. The source stays inferred, with its confidence and evidence (how it was learned never changes), and confirmed_by_person_id is what lets a renderer say it plainly instead of hedging. Null until then, and for a relationship that never needed confirming. A confirmed inferred relationship is refused a second confirmation."
+                          },
+                          {
+                            "nullable": true,
+                            "description": "When confirmed_by_person_id was set (step 3a's confirm transition): a household adult vouched for an inferred relationship at this moment. The source stays inferred, with its confidence and evidence (how it was learned never changes), and confirmed_by_person_id is what lets a renderer say it plainly instead of hedging. Null until then, and for a relationship that never needed confirming. A confirmed inferred relationship is refused a second confirmation."
+                          },
+                          {
+                            "nullable": true
+                          }
+                        ],
+                        "default": null,
+                        "description": "When confirmed_by_person_id was set (step 3a's confirm transition): a household adult vouched for an inferred relationship at this moment. The source stays inferred, with its confidence and evidence (how it was learned never changes), and confirmed_by_person_id is what lets a renderer say it plainly instead of hedging. Null until then, and for a relationship that never needed confirming. A confirmed inferred relationship is refused a second confirmation."
+                      },
                       "evidence": {
                         "type": "array",
                         "items": {
@@ -9522,6 +9639,24 @@
                       "default": null,
                       "description": "Who confirmed an inferred relationship. Until this is set, the relationship may be used to ask ('is Alex your partner?') but never asserted ('your partner Alex')."
                     },
+                    "confirmed_at": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "format": "date-time",
+                          "description": "When confirmed_by_person_id was set (step 3a's confirm transition): a household adult vouched for an inferred relationship at this moment. The source stays inferred, with its confidence and evidence (how it was learned never changes), and confirmed_by_person_id is what lets a renderer say it plainly instead of hedging. Null until then, and for a relationship that never needed confirming. A confirmed inferred relationship is refused a second confirmation."
+                        },
+                        {
+                          "nullable": true,
+                          "description": "When confirmed_by_person_id was set (step 3a's confirm transition): a household adult vouched for an inferred relationship at this moment. The source stays inferred, with its confidence and evidence (how it was learned never changes), and confirmed_by_person_id is what lets a renderer say it plainly instead of hedging. Null until then, and for a relationship that never needed confirming. A confirmed inferred relationship is refused a second confirmation."
+                        },
+                        {
+                          "nullable": true
+                        }
+                      ],
+                      "default": null,
+                      "description": "When confirmed_by_person_id was set (step 3a's confirm transition): a household adult vouched for an inferred relationship at this moment. The source stays inferred, with its confidence and evidence (how it was learned never changes), and confirmed_by_person_id is what lets a renderer say it plainly instead of hedging. Null until then, and for a relationship that never needed confirming. A confirmed inferred relationship is refused a second confirmation."
+                    },
                     "evidence": {
                       "type": "array",
                       "items": {
@@ -9652,7 +9787,7 @@
         "tags": [
           "Relationships"
         ],
-        "summary": "End or requalify a relationship (never re-type or re-point it)",
+        "summary": "End or requalify a relationship (never re-type or re-point it), or confirm an inferred one",
         "parameters": [
           {
             "schema": {
@@ -9680,8 +9815,15 @@
                   "note": {
                     "type": "string",
                     "nullable": true
+                  },
+                  "confirm": {
+                    "type": "boolean",
+                    "enum": [
+                      true
+                    ]
                   }
-                }
+                },
+                "additionalProperties": false
               }
             }
           }
@@ -9835,6 +9977,24 @@
                       "default": null,
                       "description": "Who confirmed an inferred relationship. Until this is set, the relationship may be used to ask ('is Alex your partner?') but never asserted ('your partner Alex')."
                     },
+                    "confirmed_at": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "format": "date-time",
+                          "description": "When confirmed_by_person_id was set (step 3a's confirm transition): a household adult vouched for an inferred relationship at this moment. The source stays inferred, with its confidence and evidence (how it was learned never changes), and confirmed_by_person_id is what lets a renderer say it plainly instead of hedging. Null until then, and for a relationship that never needed confirming. A confirmed inferred relationship is refused a second confirmation."
+                        },
+                        {
+                          "nullable": true,
+                          "description": "When confirmed_by_person_id was set (step 3a's confirm transition): a household adult vouched for an inferred relationship at this moment. The source stays inferred, with its confidence and evidence (how it was learned never changes), and confirmed_by_person_id is what lets a renderer say it plainly instead of hedging. Null until then, and for a relationship that never needed confirming. A confirmed inferred relationship is refused a second confirmation."
+                        },
+                        {
+                          "nullable": true
+                        }
+                      ],
+                      "default": null,
+                      "description": "When confirmed_by_person_id was set (step 3a's confirm transition): a household adult vouched for an inferred relationship at this moment. The source stays inferred, with its confidence and evidence (how it was learned never changes), and confirmed_by_person_id is what lets a renderer say it plainly instead of hedging. Null until then, and for a relationship that never needed confirming. A confirmed inferred relationship is refused a second confirmation."
+                    },
                     "evidence": {
                       "type": "array",
                       "items": {
@@ -9948,7 +10108,7 @@
             }
           },
           "403": {
-            "description": "Not allowed to edit relationships",
+            "description": "Not allowed to edit relationships, or not an adult confirming",
             "content": {
               "application/json": {
                 "schema": {
@@ -9959,6 +10119,16 @@
           },
           "404": {
             "description": "No such relationship",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Nothing to confirm",
             "content": {
               "application/json": {
                 "schema": {

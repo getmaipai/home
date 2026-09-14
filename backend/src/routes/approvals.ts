@@ -84,7 +84,7 @@ function decideRoute(action: "approve" | "deny") {
   });
 }
 
-function decideStatus(status: 200 | 201 | 400 | 403 | 404): 400 | 403 | 404 {
+function decideStatus(status: 200 | 201 | 400 | 403 | 404 | 409): 400 | 403 | 404 {
   if (status === 403) return 403;
   if (status === 404) return 404;
   return 400;

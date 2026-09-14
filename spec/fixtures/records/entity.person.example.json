@@ -12,6 +12,7 @@
   "account_person_id": null,
   "source": "hub",
   "confirmed_by_person_id": "person-a1b2c3",
+  "confirmed_at": "2026-09-05T12:30:00Z",
   "scope": "household",
   "person": null,
   "sensitive": false,

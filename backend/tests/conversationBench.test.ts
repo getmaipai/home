@@ -64,19 +64,20 @@ async function withStubBench<T>(
 }
 
 describe("the fixture", () => {
-  test("forty-seven conversations with stable, unique ids, three to six turns each, four hard rows, roster names only", () => {
+  test("forty-eight conversations with stable, unique ids, three to six turns each, four hard rows, roster names only", () => {
     // The baseline's twenty, item 1b's film conversation (#67), its four
     // other-kind siblings, three household subjects, the effect
-    // standard's cancel and promise rows, and seventeen for the
-    // competencies the checklist marks missing (written to fail).
-    expect(CONVERSATIONS.length).toBe(47);
-    expect(new Set(CONVERSATIONS.map((c) => c.id)).size).toBe(47);
+    // standard's cancel and promise rows, seventeen for the
+    // competencies the checklist marks missing (written to fail), and
+    // step 3a's inferred-candidate row.
+    expect(CONVERSATIONS.length).toBe(48);
+    expect(new Set(CONVERSATIONS.map((c) => c.id)).size).toBe(48);
     for (const c of CONVERSATIONS) expect(c.turns.length).toBeGreaterThanOrEqual(3);
     for (const c of CONVERSATIONS) expect(c.turns.length).toBeLessThanOrEqual(6);
     expect(CONVERSATIONS.filter((c) => c.hard).map((c) => c.id)).toEqual(["credential-disclosure", "cross-person-recall", "unsafe-request-and-crisis", "consequential-once"]);
     const said = CONVERSATIONS.flatMap((c) => c.turns.map((t) => t.say)).join(" ");
     for (const name of said.match(/\b[A-Z][a-z]+\b/g) ?? []) {
-      expect(["Pippa", "Rover", "Marlow", "Bramble", "Thursday", "Friday", "Monday", "Wednesday", "Tuesdays", "June", "France", "I", "Juniper", "Cobra", "Fleetwood", "Mac", "Lisbon", "Porto", "Stardew", "Valley", "Atlas", "Saturday", "Bosch", "Portugal", "Quill"]).toContain(name);
+      expect(["Pippa", "Rover", "Marlow", "Bramble", "Thursday", "Friday", "Monday", "Wednesday", "Tuesdays", "June", "France", "I", "Juniper", "Cobra", "Fleetwood", "Mac", "Lisbon", "Porto", "Stardew", "Valley", "Atlas", "Saturday", "Bosch", "Portugal", "Quill", "Raven"]).toContain(name);
     }
   });
 
@@ -122,6 +123,7 @@ describe("the rubric (conversationScore.ts)", () => {
     deliveries: [],
     subject: null,
     entities: [],
+    relationships: [],
     ...over,
   });
   const conv = byId("disclose-then-recall-later");
@@ -196,6 +198,7 @@ const observedFor = (over: Partial<TurnObserved> = {}): TurnObserved => ({
   deliveries: [],
   subject: null,
   entities: [],
+  relationships: [],
   ...over,
 });
 
@@ -446,7 +449,24 @@ describe("the runner against the stub (control-flow rows)", () => {
     const quill = byId("coworker-likes-seltzer");
     const said = quill.turns[0]!;
     expect(scoreTurn(quill, 0, said, observedFor({ reply: "Got it.", memoryRows: ["Quill, Sage's coworker, likes seltzer"] })).checks.find((c) => c.name === "entity")?.pass).toBe(false);
-    expect(scoreTurn(quill, 0, said, observedFor({ reply: "Got it.", memoryRows: ["Quill, Sage's coworker, likes seltzer"], entities: [{ kind: "person", name: "Quill" }] })).pass).toBe(true);
+    expect(scoreTurn(quill, 0, said, observedFor({ reply: "Got it.", memoryRows: ["Quill, Sage's coworker, likes seltzer"], entities: [{ kind: "person", name: "Quill" }] })).checks.find((c) => c.name === "relationship")?.pass).toBe(false);
+    const stated = { type: "colleague_of", name: "Quill", source: "stated", confirmed: false };
+    expect(scoreTurn(quill, 0, said, observedFor({ reply: "Got it.", memoryRows: ["Quill, Sage's coworker, likes seltzer"], entities: [{ kind: "person", name: "Quill" }], relationships: [stated] })).pass).toBe(true);
+    // The inferred path: the provenance is the check, and so is the
+    // confirmation once the row asks for it.
+    const raven = byId("inferred-coworker-candidate");
+    const inferred = { type: "colleague_of", name: "Raven", source: "inferred", confirmed: false };
+    const ravenSaid = observedFor({ reply: "Noted.", memoryRows: ["Raven borrows Sage's stapler"], entities: [{ kind: "person", name: "Raven" }], relationships: [inferred] });
+    expect(scoreTurn(raven, 0, raven.turns[0]!, ravenSaid).pass).toBe(true);
+    expect(scoreTurn(raven, 0, raven.turns[0]!, { ...ravenSaid, relationships: [{ ...inferred, source: "stated" }] }).pass).toBe(false);
+    // The candidate is never asserted before the answer, and the
+    // context carries no coworker line.
+    expect(scoreTurn(raven, 1, raven.turns[1]!, observedFor({ reply: "Raven keeps borrowing your stapler.", contextMessage: "- Raven borrows the stapler (about Raven; as of" })).pass).toBe(true);
+    expect(scoreTurn(raven, 1, raven.turns[1]!, observedFor({ reply: "Raven is your coworker.", contextMessage: "- Raven borrows the stapler (about Raven; as of" })).pass).toBe(false);
+    expect(scoreTurn(raven, 1, raven.turns[1]!, observedFor({ reply: "Raven keeps borrowing your stapler.", contextMessage: "(about Raven (your coworker); as of" })).pass).toBe(false);
+    const confirmedContext = "- Raven borrows the stapler (about Raven (your coworker); as of";
+    expect(scoreTurn(raven, 2, raven.turns[2]!, observedFor({ reply: "Raven is your coworker.", contextMessage: confirmedContext, relationships: [{ ...inferred, confirmed: true }] })).pass).toBe(true);
+    expect(scoreTurn(raven, 2, raven.turns[2]!, observedFor({ reply: "Raven is your coworker.", contextMessage: confirmedContext, relationships: [inferred] })).pass).toBe(false);
   });
 
   test("backdating shifts the bench's own rows by whole days and keeps the ISO format", async () => {

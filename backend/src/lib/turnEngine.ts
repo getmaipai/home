@@ -20,6 +20,7 @@ import { loadAllSkills, type LoadedSkill } from "@/lib/skills";
 import { matchCommand, runCommand } from "@/lib/commands";
 import { notifyIfFlagged } from "@/lib/notifications";
 import { recall, bumpUsage, getProfileParagraph, type RecallMatch } from "@/lib/memory";
+import { subjectLabel, subjectRosterFor } from "@/lib/subjects";
 import { recallEpisodes, formatEpisodesForPrompt, formatEpisodeLine, episodeQuote, type EpisodeMatch } from "@/lib/episodes";
 import { intentFor, markIncluded, guardContextFrom, outcomeOf, type TurnContext, type TurnEvidence, type ToolExecutionOutcome, type RejectedReason } from "@/lib/turnContext";
 import { newConversationTurnId } from "@/lib/id";
@@ -586,8 +587,27 @@ function daysAgoLabel(iso: string, now: Date): string {
   return `${days} day${days === 1 ? "" : "s"} ago`;
 }
 
-function memoryBulletLine(match: RecallMatch, locale: string, now: Date): string {
-  return `- ${match.record.text} (as of ${formatShortDate(match.record.created_at, locale)}, ${daysAgoLabel(match.record.created_at, now)})`;
+// Step 3a: a memory about a registry entity says so ("about Quill (your
+// coworker)"), from subjectLabel(): a stated or confirmed relationship
+// plainly, an unconfirmed inferred one hedged, none at all just the
+// name. Labels are resolved once per turn (one map for the lines) and
+// the speaker's own entity gets no label: their own facts read as
+// before.
+function memoryBulletLine(match: RecallMatch, locale: string, now: Date, subjectLabels: ReadonlyMap<string, string> = new Map()): string {
+  const label = match.record.subject_id ? subjectLabels.get(match.record.subject_id) : undefined;
+  const about = label ? `about ${label}; ` : "";
+  return `- ${match.record.text} (${about}as of ${formatShortDate(match.record.created_at, locale)}, ${daysAgoLabel(match.record.created_at, now)})`;
+}
+
+function subjectLabelsFor(actor: PersonRow, matches: RecallMatch[]): Map<string, string> {
+  const labels = new Map<string, string>();
+  for (const m of matches) {
+    const id = m.record.subject_id;
+    if (!id || labels.has(id)) continue;
+    const label = subjectLabel(actor, id);
+    if (label) labels.set(id, label);
+  }
+  return labels;
 }
 
 const MEMORY_TRUST_REMINDER = "Prefer these facts over guessing when they're relevant.";
@@ -662,6 +682,11 @@ export function buildPromptParts(
   // and the turn context (its rendered evidence, its clock line) agree;
   // callers without a turn context (benches, tests) get a fresh one.
   frozen: { now: Date; locale: string } = frozenClock(),
+  // Step 3a: the subject labels for the memory lines, resolved once by
+  // prepareTurn() and shared with the turn's evidence, so the evidence's
+  // rendered text is the prompt's own line (markIncluded matches on it);
+  // callers without a turn context resolve their own.
+  subjectLabels: ReadonlyMap<string, string> = subjectLabelsFor(actor, memoryMatches.slice(0, MAX_MEMORY_SNIPPETS)),
 ): { stablePrefix: string; context: string } {
   const stablePrefix = buildStablePrefix(persona);
 
@@ -671,7 +696,7 @@ export function buildPromptParts(
   let memorySection = "";
   if (profile || memoryMatches.length > 0) {
     const profileLine = profile ? `${profile.text}\n` : "";
-    const lines = memoryMatches.slice(0, MAX_MEMORY_SNIPPETS).map((m) => memoryBulletLine(m, locale, now));
+    const lines = memoryMatches.slice(0, MAX_MEMORY_SNIPPETS).map((m) => memoryBulletLine(m, locale, now, subjectLabels));
     // #93: an empty recall is said, not left blank, so the model answers
     // a general question from what it knows instead of reaching for the
     // recall tool to check what the context already checked.
@@ -1830,7 +1855,8 @@ async function prepareTurn(
   // user/assistant messages AND, when older turns exist beyond them, one
   // summary line for the system prompt's volatile zone.
   const window = buildConversationWindow(conversation, { supersedes });
-  const promptParts = buildPromptParts(actor, text, memoryMatches, loaded, persona, skills, window.summaryLine, household, episodeMatches, frozen);
+  const subjectLabels = subjectLabelsFor(actor, memoryMatches.slice(0, MAX_MEMORY_SNIPPETS));
+  const promptParts = buildPromptParts(actor, text, memoryMatches, loaded, persona, skills, window.summaryLine, household, episodeMatches, frozen, subjectLabels);
   // Bumping the top MAX_MEMORY_SNIPPETS candidates unconditionally was
   // wrong (a code review, 2026-09-05): buildPromptParts's own
   // MAX_MEMORY_SECTION_CHARS truncation, or the outer PROMPT_SYSTEM_CHAR_
@@ -1852,7 +1878,7 @@ async function prepareTurn(
   const evidence: TurnEvidence[] = [
     { id: `user:${turnId}`, kind: "user_assertion", text, rendered: text, entityIds: [] },
     ...memoryMatches.slice(0, MAX_MEMORY_SNIPPETS).map(
-      (m): TurnEvidence => ({ id: `memory:${m.record.id}`, kind: "memory", text: m.record.text, rendered: memoryBulletLine(m, frozen.locale, frozen.now), sourceId: m.record.id, entityIds: [] }),
+      (m): TurnEvidence => ({ id: `memory:${m.record.id}`, kind: "memory", text: m.record.text, rendered: memoryBulletLine(m, frozen.locale, frozen.now, subjectLabels), sourceId: m.record.id, entityIds: [] }),
     ),
     ...(profile ? [{ id: `profile:${profile.id}`, kind: "profile" as const, text: profile.text, rendered: profile.text, sourceId: profile.id, entityIds: [] }] : []),
     ...episodeMatches.map(
@@ -1882,7 +1908,12 @@ async function prepareTurn(
     ageBand,
     now: frozen.now,
     locale: frozen.locale,
-    roster: rosterNames,
+    // Step 3a: the guards' roster also knows the speaker's own people
+    // and pets (subjectRosterFor), so a question about a stored subject
+    // is not read as an invented household member. The routing roster
+    // above stays the household's: a place entity would make a weather
+    // pattern yield.
+    roster: [...rosterNames, ...subjectRosterFor(actor)],
     shape,
   };
   markIncluded(turnContext, promptParts.context);

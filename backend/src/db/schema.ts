@@ -128,6 +128,9 @@ export const memoryRecords = sqliteTable("memory_records", {
   status: text("status").notNull(),
   scope: text("scope").notNull(),
   person: text("person").references(() => people.id),
+  // Step 3a: the entity this record is about (entities.id), when the
+  // judge or a person could name one; null otherwise.
+  subjectId: text("subject_id"),
   source: text("source").notNull(),
   importance: real("importance").notNull(),
   pinned: integer("pinned", { mode: "boolean" }).notNull().default(false),
@@ -744,6 +747,8 @@ export const entities = sqliteTable("entities", {
   accountPersonId: text("account_person_id").references(() => people.id),
   source: text("source").notNull(), // "hub" | "local" | "imported" | "inferred"
   confirmedByPersonId: text("confirmed_by_person_id").references(() => people.id),
+  // Step 3a: when the confirm transition ran (inferred -> local).
+  confirmedAt: text("confirmed_at"),
   scope: text("scope").notNull().default("household"), // "household" | "person"
   person: text("person").references(() => people.id),
   sensitive: integer("sensitive", { mode: "boolean" }).notNull().default(false),
@@ -772,6 +777,8 @@ export const relationships = sqliteTable("relationships", {
   statedByPersonId: text("stated_by_person_id").references(() => people.id),
   confidence: real("confidence"),
   confirmedByPersonId: text("confirmed_by_person_id").references(() => people.id),
+  // Step 3a: when the confirm transition ran (inferred -> stated).
+  confirmedAt: text("confirmed_at"),
   evidence: text("evidence").notNull().default("[]"), // JSON string[]
   scope: text("scope").notNull().default("person"), // "household" | "person"
   person: text("person").references(() => people.id),

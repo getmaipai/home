@@ -7,6 +7,7 @@
   "status": "active",
   "scope": "person",
   "person": "person-a1b2c3",
+  "subject_id": null,
   "source": "conversation-turn-8901",
   "importance": 0.2,
   "pinned": false,

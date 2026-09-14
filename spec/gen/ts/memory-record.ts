@@ -56,6 +56,25 @@ export const MemoryRecord = z
         "Required when scope is person; null for household or self scope.",
       )
       .optional(),
+    /**The entity this record is about, when the judge or a person could name one (step 3a): a memory about a coworker names the coworker's entity, so recall and the guards find every record about them by id, not only by the name in the text. Null when the record is about nothing in the registry (a world fact, a preference of the speaker's own) or was written before this existed.*/
+    subject_id: z
+      .union([
+        z
+          .string()
+          .regex(new RegExp("^ent-[a-z0-9]{6,}$"))
+          .describe(
+            "The entity this record is about, when the judge or a person could name one (step 3a): a memory about a coworker names the coworker's entity, so recall and the guards find every record about them by id, not only by the name in the text. Null when the record is about nothing in the registry (a world fact, a preference of the speaker's own) or was written before this existed.",
+          ),
+        z
+          .null()
+          .describe(
+            "The entity this record is about, when the judge or a person could name one (step 3a): a memory about a coworker names the coworker's entity, so recall and the guards find every record about them by id, not only by the name in the text. Null when the record is about nothing in the registry (a world fact, a preference of the speaker's own) or was written before this existed.",
+          ),
+      ])
+      .describe(
+        "The entity this record is about, when the judge or a person could name one (step 3a): a memory about a coworker names the coworker's entity, so recall and the guards find every record about them by id, not only by the name in the text. Null when the record is about nothing in the registry (a world fact, a preference of the speaker's own) or was written before this existed.",
+      )
+      .default(null),
     /**Free-text provenance (e.g. a conversation turn id, a package id, an import job id).*/
     source: z
       .string()

@@ -66,6 +66,9 @@ export interface TurnObserved {
   subject: string | null;
   /** The registry's entities after the turn (kind and name). */
   entities: readonly { kind: string; name: string }[];
+  /** The live relationships touching the speaker's own entity after
+   * the turn: the other end's name, the provenance, whether confirmed. */
+  relationships: readonly { type: string; name: string; source: string; confirmed: boolean }[];
 }
 
 export interface Check {
@@ -130,6 +133,7 @@ export function describeExpectation(e: TurnExpectation): string {
   if (e.minWords) parts.push(`at least ${e.minWords} words`);
   if (e.listLacks) parts.push(`list lacks ${e.listLacks.join(", ")}`);
   if (e.entityExists) parts.push(`entity ${e.entityExists.kind} ${e.entityExists.name}`);
+  if (e.relationshipExists) parts.push(`relationship ${e.relationshipExists.type} ${e.relationshipExists.name} ${e.relationshipExists.source}${e.relationshipExists.confirmed === undefined ? "" : e.relationshipExists.confirmed ? " confirmed" : " unconfirmed"}`);
   if (e.humanVerdict) parts.push("(reader's verdict)");
   return parts.join("; ");
 }
@@ -262,6 +266,13 @@ export function scoreTurn(conversation: BenchConversation, turnIndex: number, tu
   if (e.entityExists) {
     const hit = observed.entities.find((x) => x.kind === e.entityExists!.kind && x.name.toLowerCase() === e.entityExists!.name.toLowerCase());
     checks.push({ name: "entity", pass: hit !== undefined, detail: hit ? `${hit.kind} ${hit.name} exists` : `no ${e.entityExists.kind} named ${e.entityExists.name} (entities: ${observed.entities.map((x) => `${x.kind} ${x.name}`).join(", ") || "none"})` });
+  }
+  if (e.relationshipExists) {
+    const want = e.relationshipExists;
+    const edge = observed.relationships.find((r) => r.type === want.type && r.name.toLowerCase() === want.name.toLowerCase());
+    const pass = edge !== undefined && edge.source === want.source && (want.confirmed === undefined || edge.confirmed === want.confirmed);
+    const all = observed.relationships.map((r) => `${r.type} ${r.name} ${r.source}${r.confirmed ? " confirmed" : ""}`).join(", ") || "none";
+    checks.push({ name: "relationship", pass, detail: edge ? `${edge.type} ${edge.name} ${edge.source}${edge.confirmed ? " confirmed" : ""}` : `no ${want.type} with ${want.name} (relationships: ${all})` });
   }
   const pass = checks.length === 0 ? null : checks.every((c) => c.pass);
   return {

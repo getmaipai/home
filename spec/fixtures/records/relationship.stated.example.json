@@ -11,6 +11,7 @@
   "stated_by_person_id": "person-a1b2c3",
   "confidence": null,
   "confirmed_by_person_id": null,
+  "confirmed_at": null,
   "evidence": [],
   "scope": "household",
   "person": null,
