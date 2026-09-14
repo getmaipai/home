@@ -481,7 +481,7 @@ export function MemoryPage({ person }: MemoryPageProps) {
             )}
           </TabsContent>
           <TabsContent value="people-and-things">
-            <PeopleAndThings />
+            <PeopleAndThings actorRole={person.role} />
           </TabsContent>
         </Tabs>
       </div>

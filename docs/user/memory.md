@@ -39,7 +39,7 @@ Tap **Add** to add someone or something new. Give it a name and pick what kind i
 
 To fix a name, tap **Edit name** under it. To remove something MaiPai shouldn't have, tap **Remove**, or **Select** to remove several at once.
 
-Sometimes a connection is marked **Unconfirmed**. That means MaiPai guessed it from a conversation and no one has said it's true yet. If it's wrong, tap the small **×** next to it to remove it.
+Sometimes a connection is marked **Unconfirmed**. That means MaiPai guessed it from a conversation and no one has said it's true yet. If it's right, an adult can tap **Confirm** to mark it as true. If it's wrong, tap the small **×** next to it to remove it.
 
 ## Passwords and keys
 

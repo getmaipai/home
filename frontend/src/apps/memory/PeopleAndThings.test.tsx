@@ -96,8 +96,8 @@ function stubFetch(byPath: Record<string, unknown>, onRequest?: (url: string, in
   };
 }
 
-function render() {
-  return renderWithQueryClient(<PeopleAndThings />);
+function render(actorRole: PersonRosterEntry["role"] = "adult") {
+  return renderWithQueryClient(<PeopleAndThings actorRole={actorRole} />);
 }
 
 describe("PeopleAndThings (lane 11 item 2)", () => {
@@ -149,23 +149,103 @@ describe("PeopleAndThings (lane 11 item 2)", () => {
     }
   });
 
-  test("an inferred, unconfirmed relationship is marked - and there is no Confirm action anywhere", async () => {
+  test("an inferred, unconfirmed relationship is marked, and Confirm shows for an adult", async () => {
     const marsh = entity({ id: "ent-marsh", kind: "person", name: "Marsh" });
     const sage = entity({ id: "ent-sage-person", kind: "person", name: "Sage" });
     const guess = relationship({ id: "rel-guess", type: "friend_of", from_id: "ent-marsh", to_id: "ent-sage-person", source: "inferred", confidence: 0.6 });
     const restore = stubFetch({ "/api/entities": [marsh, sage], "/api/relationships": [guess], "/api/people": [] });
     try {
-      const { findAllByText, queryByText } = render();
+      const { findAllByText } = render("adult");
       // friend_of is symmetric - one stored row surfaces under both
       // Marsh's and Sage's own rows (the test above's own reasoning),
-      // so "Unconfirmed" legitimately appears twice here.
+      // so "Unconfirmed" and "Confirm" legitimately appear twice here.
       expect((await findAllByText("Unconfirmed")).length).toBeGreaterThan(0);
-      // The coordinator's own ruling, 2026-09-13: no Confirm button until
-      // step 3a's real confirm route exists - a button that returns 200
-      // and silently does nothing is the thing never shipped.
+      expect((await findAllByText("Confirm")).length).toBeGreaterThan(0);
+    } finally {
+      restore();
+    }
+  });
+
+  // Lane 12 item 2's own acceptance: hidden, not disabled, for a child -
+  // the route itself would 403 them, but a tappable button into a wall
+  // is worse than none. queryByText (not findByText) since the point is
+  // that it never appears at all.
+  test("Confirm is hidden, not shown-and-disabled, for a child", async () => {
+    const marsh = entity({ id: "ent-marsh", kind: "person", name: "Marsh" });
+    const sage = entity({ id: "ent-sage-person", kind: "person", name: "Sage" });
+    const guess = relationship({ id: "rel-guess", type: "friend_of", from_id: "ent-marsh", to_id: "ent-sage-person", source: "inferred", confidence: 0.6 });
+    const restore = stubFetch({ "/api/entities": [marsh, sage], "/api/relationships": [guess], "/api/people": [] });
+    try {
+      const { findAllByText, queryByText } = render("child");
+      expect((await findAllByText("Unconfirmed")).length).toBeGreaterThan(0);
       expect(queryByText("Confirm")).toBeNull();
     } finally {
       restore();
+    }
+  });
+
+  test("tapping Confirm sends exactly { confirm: true } and the mark clears", async () => {
+    const marsh = entity({ id: "ent-marsh", kind: "person", name: "Marsh" });
+    const sage = entity({ id: "ent-sage-person", kind: "person", name: "Sage" });
+    const guess = relationship({ id: "rel-guess", type: "colleague_of", from_id: "ent-marsh", to_id: "ent-sage-person", source: "inferred", confidence: 0.6 });
+    const confirmed: Relationship = { ...guess, confirmed_by_person_id: "person-sage", confirmed_at: "2026-09-14T00:00:00.000Z" };
+    // Mutable, not the shared stubFetch helper: the row the list query
+    // returns has to change (unconfirmed to confirmed) once the PATCH
+    // lands, which a static byPath map can't express.
+    let relationshipsState: Relationship[] = [guess];
+    let sawBody: unknown;
+    const original = globalThis.fetch;
+    globalThis.fetch = mock((input: RequestInfo | URL, init?: RequestInit) => {
+      const url = typeof input === "string" ? input : input.toString();
+      if (init?.method === "PATCH" && url.includes("/api/relationships/rel-guess")) {
+        sawBody = JSON.parse(String(init.body));
+        relationshipsState = [confirmed];
+        return Promise.resolve(new Response(JSON.stringify(confirmed), { status: 200 }));
+      }
+      if (url.includes("/api/relationships")) return Promise.resolve(new Response(JSON.stringify(relationshipsState), { status: 200 }));
+      if (url.includes("/api/entities")) return Promise.resolve(new Response(JSON.stringify([marsh, sage]), { status: 200 }));
+      if (url.includes("/api/people")) return Promise.resolve(new Response(JSON.stringify([]), { status: 200 }));
+      throw new Error(`unstubbed fetch: ${url}`);
+    }) as unknown as typeof fetch;
+    try {
+      const { findAllByText, queryByText } = render("adult");
+      const [confirmButton] = await findAllByText("Confirm");
+      fireEvent.click(confirmButton!);
+      await waitFor(() => expect(queryByText("Unconfirmed")).toBeNull());
+      expect(sawBody).toEqual({ confirm: true });
+    } finally {
+      globalThis.fetch = original;
+    }
+  });
+
+  test("a 409 (nothing to confirm) leaves the mark in place and shows the error line", async () => {
+    const marsh = entity({ id: "ent-marsh", kind: "person", name: "Marsh" });
+    const sage = entity({ id: "ent-sage-person", kind: "person", name: "Sage" });
+    const guess = relationship({ id: "rel-guess", type: "colleague_of", from_id: "ent-marsh", to_id: "ent-sage-person", source: "inferred", confidence: 0.6 });
+    // The backend's own real 409 body (backend/src/lib/entities.ts's
+    // confirmTransition()), not the shared stubFetch helper's numeric-
+    // status shortcut (which sends an empty body): the point of this
+    // test is that the SERVER'S OWN error text reaches the row, not a
+    // generic fallback string.
+    const original = globalThis.fetch;
+    globalThis.fetch = mock((input: RequestInfo | URL, init?: RequestInit) => {
+      const url = typeof input === "string" ? input : input.toString();
+      if (init?.method === "PATCH" && url.includes("/api/relationships/rel-guess")) {
+        return Promise.resolve(new Response(JSON.stringify({ error: "already confirmed" }), { status: 409 }));
+      }
+      if (url.includes("/api/relationships")) return Promise.resolve(new Response(JSON.stringify([guess]), { status: 200 }));
+      if (url.includes("/api/entities")) return Promise.resolve(new Response(JSON.stringify([marsh, sage]), { status: 200 }));
+      if (url.includes("/api/people")) return Promise.resolve(new Response(JSON.stringify([]), { status: 200 }));
+      throw new Error(`unstubbed fetch: ${url}`);
+    }) as unknown as typeof fetch;
+    try {
+      const { findAllByText, findByText } = render("adult");
+      const [confirmButton] = await findAllByText("Confirm");
+      fireEvent.click(confirmButton!);
+      await findByText("already confirmed");
+      expect((await findAllByText("Unconfirmed")).length).toBeGreaterThan(0);
+    } finally {
+      globalThis.fetch = original;
     }
   });
 

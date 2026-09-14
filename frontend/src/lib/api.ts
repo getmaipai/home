@@ -444,6 +444,16 @@ export const api = {
   createRelationship: (input: { type: string; from_id: string; to_id: string; scope?: "household" | "person" }) =>
     request<Relationship>("/api/relationships", { method: "POST", body: JSON.stringify(input) }),
   deleteRelationship: (id: string) => request<{ id: string }>(`/api/relationships/${encodeURIComponent(id)}`, { method: "DELETE" }),
+  // Lane 12 item 2: the one way an inferred relationship's
+  // confirmed_by_person_id/confirmed_at ever get set (backend/src/lib/
+  // entities.ts's confirmTransition(), step 3a) - a household adult
+  // vouching for a guess the judge made. Sends exactly this body and
+  // nothing else: PATCH /api/relationships/:id's own schema is `.strict()`,
+  // and a confirm alongside any other edit field would stop being the
+  // adult-open "confirming is the person's own record" path and need
+  // owner/admin instead (relationships.ts's own confirmOnly check).
+  confirmRelationship: (id: string) =>
+    request<Relationship>(`/api/relationships/${encodeURIComponent(id)}`, { method: "PATCH", body: JSON.stringify({ confirm: true }) }),
   notifications: () => request<NotificationDeliveryView[]>("/api/notifications"),
   notificationHistory: () => request<NotificationDeliveryView[]>("/api/notifications/history"),
   markNotificationRead: (id: string) =>

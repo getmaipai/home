@@ -9,8 +9,9 @@ import { Checkbox } from "@/kit/ui/checkbox";
 import { Button } from "@/kit/ui/button";
 import { Input } from "@/kit/ui/input";
 import { getIcon } from "@/kit/icons";
-import { api, ApiError, type Entity, type Relationship, type PersonRosterEntry } from "@/lib/api";
+import { api, ApiError, type Entity, type Relationship, type PersonRosterEntry, type Role } from "@/lib/api";
 import { relationshipLinesFor, relationshipOptionsBetween } from "@/apps/memory/relationshipLabels";
+import { meetsMinRole } from "@/apps/people/roles";
 
 const XIcon = getIcon("x");
 
@@ -61,11 +62,15 @@ interface EntityRelationshipLine {
 }
 
 /** One entity row: name (or its inline edit form), scope, and its own
- * relationships in plain words - each with its own remove, and an
+ * relationships in plain words - each with its own remove, an
  * "Unconfirmed" mark for one the judge inferred and nobody has stated
  * (spec/schemas/relationship.schema.json: never spoken as fact until
- * then). No Confirm action yet: getmaipai/home's entities BACKLOG item
- * names why (waits on step 3a's own confirm route). */
+ * then), and, for an adult only, a Confirm control beside that mark
+ * (lane 12 item 2; getmaipai/home BACKLOG "Confirming an inferred
+ * entity or relationship": step 3a's `PATCH .../confirm` route,
+ * hidden rather than disabled for a child - the route itself would
+ * 403 them, but a button a child can tap into a wall is worse than no
+ * button). */
 function EntityRow({
   entity,
   lines,
@@ -78,6 +83,9 @@ function EntityRow({
   savingEdit,
   onRemoveRelationship,
   removingRelationshipId,
+  canConfirm,
+  onConfirmRelationship,
+  confirmingRelationshipId,
 }: {
   entity: Entity;
   lines: EntityRelationshipLine[];
@@ -90,6 +98,9 @@ function EntityRow({
   savingEdit: boolean;
   onRemoveRelationship: (id: string) => void;
   removingRelationshipId: string | null;
+  canConfirm: boolean;
+  onConfirmRelationship: (id: string) => void;
+  confirmingRelationshipId: string | null;
 }) {
   if (editing) {
     return (
@@ -119,30 +130,44 @@ function EntityRow({
       </div>
       {lines.length > 0 ? (
         <ul className="flex flex-col gap-0.5">
-          {lines.map(({ relationship, text }) => (
-            <li key={relationship.id} className="flex items-center gap-2 text-sm text-muted-foreground">
-              <span className="truncate">
-                {text}
-                {relationship.source === "inferred" && !relationship.confirmed_by_person_id ? (
-                  // Deliberate type-floor exception (docs/UI.md, lane 7
-                  // item 3, 2026-09-13): a compact rounded-full badge, the
-                  // same category chatMemoryChip.tsx's own chip already
-                  // gets an exception for, not a line of body text.
-                  <span className="ml-1.5 rounded-full bg-muted px-1.5 py-0.5 text-xs">Unconfirmed</span>
+          {lines.map(({ relationship, text }) => {
+            const unconfirmed = relationship.source === "inferred" && !relationship.confirmed_by_person_id;
+            return (
+              <li key={relationship.id} className="flex items-center gap-2 text-sm text-muted-foreground">
+                <span className="truncate">
+                  {text}
+                  {unconfirmed ? (
+                    // Deliberate type-floor exception (docs/UI.md, lane 7
+                    // item 3, 2026-09-13): a compact rounded-full badge, the
+                    // same category chatMemoryChip.tsx's own chip already
+                    // gets an exception for, not a line of body text.
+                    <span className="ml-1.5 rounded-full bg-muted px-1.5 py-0.5 text-xs">Unconfirmed</span>
+                  ) : null}
+                </span>
+                {unconfirmed && canConfirm ? (
+                  <Button
+                    variant="ghost"
+                    size="xs"
+                    className="shrink-0"
+                    disabled={confirmingRelationshipId === relationship.id}
+                    onClick={() => onConfirmRelationship(relationship.id)}
+                  >
+                    {confirmingRelationshipId === relationship.id ? "Confirming…" : "Confirm"}
+                  </Button>
                 ) : null}
-              </span>
-              <Button
-                variant="ghost"
-                size="icon-xs"
-                className="shrink-0"
-                aria-label={`Remove "${text}"`}
-                disabled={removingRelationshipId === relationship.id}
-                onClick={() => onRemoveRelationship(relationship.id)}
-              >
-                <XIcon className="size-3.5" aria-hidden />
-              </Button>
-            </li>
-          ))}
+                <Button
+                  variant="ghost"
+                  size="icon-xs"
+                  className="shrink-0"
+                  aria-label={`Remove "${text}"`}
+                  disabled={removingRelationshipId === relationship.id}
+                  onClick={() => onRemoveRelationship(relationship.id)}
+                >
+                  <XIcon className="size-3.5" aria-hidden />
+                </Button>
+              </li>
+            );
+          })}
         </ul>
       ) : null}
       <Button variant="link" size="xs" className="h-auto w-fit p-0 text-muted-foreground" onClick={onStartEdit}>
@@ -198,7 +223,7 @@ function RelateToPicker({
   );
 }
 
-export function PeopleAndThings() {
+export function PeopleAndThings({ actorRole }: { actorRole: Role }) {
   const queryClient = useQueryClient();
   const entitiesQuery = useQuery<Entity[]>({ queryKey: ["entities"], queryFn: () => api.entities() });
   const relationshipsQuery = useQuery<Relationship[]>({ queryKey: ["relationships"], queryFn: () => api.relationships() });
@@ -215,6 +240,14 @@ export function PeopleAndThings() {
   const [busy, setBusy] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
   const [removingRelationshipId, setRemovingRelationshipId] = useState<string | null>(null);
+  const [confirmingRelationshipId, setConfirmingRelationshipId] = useState<string | null>(null);
+
+  // Backend's own CONFIRMING_ROLES (backend/src/lib/entities.ts): owner,
+  // admin, adult - never teen or child. meetsMinRole against "adult"
+  // reads the identical set off the one role ladder rather than a second
+  // hand-copied list (roles.ts's own acknowledged-duplication pattern:
+  // worst case here is a hidden button, the server re-checks regardless).
+  const canConfirm = meetsMinRole(actorRole, "adult");
 
   // One object, not three separate hooks (a code review's own finding,
   // the same "confirmingDelete is already a discriminated union" shape
@@ -289,6 +322,24 @@ export function PeopleAndThings() {
       setActionError(err instanceof ApiError ? err.message : "Could not remove that relationship.");
     } finally {
       setRemovingRelationshipId(null);
+    }
+  }
+
+  async function confirmRelationship(id: string) {
+    setConfirmingRelationshipId(id);
+    setActionError(null);
+    try {
+      await api.confirmRelationship(id);
+      await refresh();
+    } catch (err) {
+      // A 409 (already confirmed, or not actually inferred) or a 403
+      // (not an adult - shouldn't be reachable with the button hidden,
+      // but the server is the real gate) leaves the mark in place and
+      // says why, the same shape every other action error in this file
+      // already uses.
+      setActionError(err instanceof ApiError ? err.message : "Could not confirm that.");
+    } finally {
+      setConfirmingRelationshipId(null);
     }
   }
 
@@ -507,6 +558,9 @@ export function PeopleAndThings() {
                         savingEdit={editing?.id === e.id ? editing.saving : false}
                         onRemoveRelationship={removeRelationship}
                         removingRelationshipId={removingRelationshipId}
+                        canConfirm={canConfirm}
+                        onConfirmRelationship={confirmRelationship}
+                        confirmingRelationshipId={confirmingRelationshipId}
                       />
                     </div>
                   )}

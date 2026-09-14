@@ -4652,11 +4652,44 @@ approvals are still real, unstarted work for a future session.
       unknown body key refused (400); an entity becomes `local`, a
       relationship keeps `source: inferred` and gains
       `confirmed_by_person_id` and `confirmed_at` on both directions.
-      Left: the Confirm control in "People and things" calling it, and
-      the "Unconfirmed" mark reading `confirmed_by_person_id`, not
-      `source`, for a relationship. Files: `frontend/src/apps/memory/`
-      (the entities section). Checks: the frontend suite and a
-      screenshot of a confirmed row.
+      The relationship half shipped 2026-09-14, Session B (lane 12 item
+      2): the Confirm control in "People and things," adult-only
+      (hidden for a child), calling `PATCH /api/relationships/:id`; the
+      "Unconfirmed" mark already read `confirmed_by_person_id`. Left:
+      the entity half - `subjects.ts`'s own `ensureSubjectEntity()`
+      writes real `source: inferred` entities in production
+      (unconfirmed pets, places, and people the judge guessed at from
+      conversation) and `listEntities()` returns them with no filter,
+      but "People and things" carries no Unconfirmed mark or Confirm
+      control on an entity's own row, only on its relationship lines -
+      an inferred entity has no UI path to ever leave that state (a
+      second code review on lane 12 item 2 found this; filed as
+      getmaipai/home#119 rather than folding into this item's own S
+      size). Files: `frontend/src/apps/memory/` (the entities section).
+      Checks: the frontend suite (green: 17 tests in
+      PeopleAndThings.test.tsx, the Confirm ones among them) and a
+      screenshot of a confirmed row - deferred (coordinator's ruling,
+      2026-09-14): no synchronous producer of an inferred relationship
+      exists to seed one for the screenshot pipeline honestly (POST
+      /api/relationships and /api/entities both hardcode `source`; the
+      only real producer is memoryJudge.ts's `ensureSubjectEntity()`,
+      the background judge after a real chat turn, not the turn
+      itself), and the ruling was not to add judge timing to that
+      pipeline for one picture. Lands as its own S line, "Screenshot
+      the Confirm row," once a deterministic producer exists (ASK-01's
+      open-question path or a seed hook, whichever comes first).
+- [ ] **Screenshot the Confirm row** (S, after ASK-01 or a deterministic
+      seed hook for an inferred relationship, whichever lands first) -
+      the Confirm control itself already shipped (above); once
+      something in the seeded demo household can produce a real
+      `source: inferred` relationship deterministically and fast (no
+      background-judge wait), extend `scripts/screenshot.ts`'s own
+      `capturePeopleAndThings()` to click Confirm and capture the row
+      before and after, the way `capturePaletteOpen()` and other small
+      dedicated captures in that file already work. Exit: the
+      screenshot opened and judged (getmaipai/.github/CLAUDE.md's own
+      screenshot rule), the image showing a real unconfirmed-then-
+      confirmed row, never a fabricated one.
 - [ ] **A speech profile per person** (M) - how to address someone
       (complexity, pace, vocabulary), distinct from persona, which is who
       the assistant is being. `persona.ts` already has a `complexity`
