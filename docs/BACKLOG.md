@@ -326,7 +326,10 @@ not permission to expand scope.
     or migration that guesses dates for existing undated facts. Checks:
     memory/judge tests, changed shared record fixtures, full exit gate.
 
-    **Amended 2026-09-14 (dev.md section 14, part 4):** the same reader
+    **Amended 2026-09-14 (dev.md section 14, part 4; the coherence
+    review moves the confidence presentation and the two guard rows to
+    CRED-01 and places this item before CUR-01, which archives what
+    this reader already excludes):** the same reader
     applies, in order, privacy and disclosure, validity at the frozen
     time, active versus superseded or archived, unresolved conflict,
     confidence presentation, then ranking, and returns a typed
@@ -372,7 +375,7 @@ not permission to expand scope.
 
 <a id="chat-10"></a>
 
-- [ ] **CHAT-10: Resolve follow-up subjects for memory retrieval** (M)
+- **CHAT-10: Resolve follow-up subjects for memory retrieval** (folded into CHAT-13 by the coherence review, 2026-09-14; the text below is the requirement CHAT-13 carries)
 
     Depends on: CHAT-01, CHAT-08, CHAT-09. Files:
     `backend/src/lib/turnContext.ts`, `conversationHistory.ts`, `memory.ts`,
@@ -526,6 +529,16 @@ not permission to expand scope.
     stack and recalls no episodes. Acceptance adds the `new-album` and
     `correction` conversations (design note, section 4) beside the rows
     already named, lookups from recorded fixtures; three seeded runs.
+    **Amended 2026-09-14 (the coherence review):** CHAT-10 is folded in
+    (the bounded retrieval query is the stack: the resolved subject's
+    name plus the last two same-thread user turns, capped as CHAT-10
+    said); the stack stays at depth two with no return by name; the
+    question carried across a correction is `carried_question` on the
+    stack entry, never an ask; the `unresolved` references are ASK-01's
+    detector's, read from `TurnContext.subjects`; `TurnIntent.kind` is
+    derived from the signal and the stack by one function and
+    `subjectEntityIds` is deleted; CHAT-12 stays deferred behind the
+    volatile-zone ordering.
 
 <a id="chat-14"></a>
 
@@ -624,8 +637,11 @@ not permission to expand scope.
 
     **Amended 2026-09-13 (the design pass, dev.md "The chat design
     pass", sections 4, 6, 7 and 10).** The verdict: one composer is
-    necessary and not sufficient. The composer has a contract of four
-    moves in order (react in the companion's register; pick the one or
+    necessary and not sufficient. The composer realizes the moves
+    section 12's plan permits (the coherence review, 2026-09-14: the plan
+    decides which exist; these four are the default realization of a
+    lookup answer, and typed move fields exist on composed turns only,
+    never on a streamed chat turn) (react in the companion's register; pick the one or
     two results that answer, never the list; say it as a person who
     just looked; point at the sources and the details pane, "the
     link's on your phone" on voice), a length (two sentences in chat,
@@ -660,6 +676,13 @@ not permission to expand scope.
     sections in the volatile zone until CHAT-12 packs by priority.
     Acceptance adds the `search-in-a-voice` conversation and the
     experience turns of `new-album` (design note, sections 6 and 7),
+    plus `stable-knowledge-ladder` ("why is the sky blue": answered from
+    the model, the evidence kind `model_knowledge` on the outcome, no
+    lookup run), `opinion-ladder` ("is the Marsh Lantern album any good":
+    a SearXNG outcome, a pick of one or two candidates, no `search_voice`
+    phrase) and `mixed-intent-ladder` ("add oat milk to the list and how
+    long do eggs keep": the list outcome first, one package run, the
+    stable-knowledge answer second), the coherence review's rows,
     lookups from recorded fixtures; three seeded runs. **Amended
     2026-09-14 (dev.md section 13, part 2):** the band's content ceiling
     (`getCeilingForBand()`, no consumer today) is applied to the
@@ -1114,13 +1137,14 @@ not permission to expand scope.
 The design is [dev.md, "The chat design pass"](dev.md#the-chat-design-pass-findings-1-to-18-and-the-companions-brief-2026-09-13);
 the findings are in
 [docs/plans/media-conversation-program-2026-09-13.md](plans/media-conversation-program-2026-09-13.md).
-The execution contract above applies. **Order:** RECALL-02 and OUT-01
-land with or before step 3a's engine half (3a itself carries the
-amendment on the program file); REG-01, EXP-01, ASK-01 (spec, then
-engine), LOOKUP-01, the `SubjectRef` spec and MEM-06 land before
-CHAT-13 is built; CHAT-13 and CHAT-16 carry their amendments (on the
-items themselves, above); COMP-01 to COMP-06, SPEAK-01 and WAKE-02
-follow CHAT-16. Every item's acceptance is a bench conversation that
+The execution contract above applies. **Order (revised 2026-09-14 by
+the coherence review, dev.md "Coherence review, 2026-09-14"; the queue
+itself lives in the program file):** RECALL-02 and OUT-01 (in flight);
+SPEC-01; ACT-01; REG-01; EXP-01; ASK-01; MEM-06 core; AGE-01 core;
+LOOKUP-01; CHAT-13; CHAT-16 with ACT-03 core; then CHAT-08, CUR-01,
+EVAL-07 memory mode, AGE-02, ACT-02, REVIEW-01, PREF-01, EVAL-07
+mining, SPEC-02, COMP-01 to COMP-06, CRED-01, the credulity slices,
+SPEAK-01, WAKE-02. Every item's acceptance is a bench conversation that
 fails on `main` today and passes three seeded runs when done
 (`scripts/bench/conversationLive.ts`, BENCH-01's pins, lookups from
 recorded fixtures through the bench's `recordingProxy`, the live
@@ -1130,7 +1154,15 @@ invented for the roster's household, and added to
 
 <a id="recall-02"></a>
 
-- [ ] **RECALL-02: Episodes are evidence, never lines** (S-M)
+- [x] **RECALL-02: Episodes are evidence, never lines** (S-M)
+    Done 2026-09-14 (docs/dev/session-a.md "RECALL-02"): the person's
+    side by default, the hub's side only on a "what did you say" turn
+    and then as a reported note; the lexical floor of two shared words
+    (or one plus the vector floor) before fusion; the vector floor
+    raised to the measured 0.72; no block under three content words or
+    on a question about this conversation; three lines and 400
+    characters; the guard reads episodes. Three seeded runs recorded
+    there.
 
     Objective: a reply never copies a sentence from another
     conversation, and a short or meta turn recalls nothing. Files:
@@ -1188,6 +1220,48 @@ invented for the roster's household, and added to
     package, a command and a guard replacement. Out of scope: sampler
     changes (record the fragment rate per run instead). Exit: the named
     tests, the persona-eval bench, `bash scripts/check.sh`.
+
+<a id="spec-01"></a>
+
+- [ ] **SPEC-01: The design pass's spec migration, one bump** (S-M, spec only; after OUT-01, before every engine item that reads a new field)
+
+    Objective: every record the pass changes is declared once, with a
+    default, in one spec release, so the robot pins one bump and no
+    engine item waits on a later spec item (dev.md, "Coherence review,
+    2026-09-14", question 4). Files: `spec/schemas/memory-record.schema.json`
+    (`child_disclosure: child_ok | teen_ok | adult_only` with `set_by`
+    and `set_at`, null on person and self scope; `confidence`,
+    `confidence_evidence`, `conflicts_with` as section 14 defines them,
+    default 1.0 with one `legacy_assertion` entry, no writer until
+    CRED-01; `scope` gains `companion` with `companion_id`; `expired_at`;
+    the per-record retrieval signal REVIEW-01 reads), `entity.schema.json`
+    (`pronouns`), `vocab/relationship-types.json` (`relative_of`), a new
+    `vocab/entity-kind-nouns.json`, a new `vocab/life-events.json`
+    (the adult-to-tell classes and section 14's life-events classes, one
+    file), a new `conversation-turn.schema.json` (the shared turn record
+    the robot syncs: `signal`, `plan`, `subjects`, `outcomes`, `document`
+    nullable, `review_id` nullable), `turn-signal.schema.json`
+    (`refers_to_prior` nullable until CHAT-13), `reply-plan.schema.json`
+    (the moves declared once: react, care, say, pick, point, ask_back,
+    close, defer; `required | allowed | forbidden` each; playfulness;
+    `max_sentences`; `max_words`; the band fields of section 13 part 9),
+    `subject-ref.schema.json` (the discriminated union of the item
+    folded below, plus `carried_question` on a stack entry),
+    `open-question.schema.json` (keyed by person with an optional
+    conversation; kinds `who | clarify_fact | relay`; asked once at the
+    end of the person's next reply, then cleared), `model-capabilities.schema.json`
+    (a `turn-signal` role and a `head` engine kind), a `vocab/defect-codes.json`
+    from which the guard reason enum, the `plan_violation` sub-kinds and
+    REVIEW-01's five review-only codes are generated, fixtures for every
+    variant, both generated bindings, `spec/README.md`. Mirror: step 3a's
+    additive fields and their round-trip fixtures. Acceptance: the
+    round-trip fixtures for every new field and record; the validator
+    refuses a world `SubjectRef` carrying an `entity_id`, a `companion`
+    scope without `companion_id`, and a `child_disclosure` on person
+    scope; every existing fixture validates unchanged (additive only);
+    the bot's pin note names the one version. Out of scope: any hub code;
+    the companions and manifest changes (SPEC-02). Exit: the spec suite,
+    `bash scripts/check.sh`.
 
 <a id="reg-01"></a>
 
@@ -1249,9 +1323,14 @@ invented for the roster's household, and added to
     `backend/src/lib/turnEngine.ts` (`prepareTurn`: the name resolver,
     the unknown line in the context ahead of the memory section, the
     appended ask that outranks the persona's engagement dial),
-    `backend/src/lib/turnContext.ts` (`unknownNames`),
+    `backend/src/lib/turnContext.ts` (`subjects`: the `unresolved`
+    SubjectRefs the detector writes, SPEC-01's shape; `unknownNames` is
+    deleted by the coherence review),
     `backend/src/lib/conversationHistory.ts` (`PendingAsk.kind` gains
-    `who`; `conversations.open_question`, a migration),
+    `who`; the `OpenQuestion` record of SPEC-01, keyed by person, kinds
+    `who`, `clarify_fact` and `relay`, asked once at the end of the
+    person's next reply on any conversation, in place of a conversation
+    column),
     `backend/src/lib/subjects.ts` (the deterministic answer parser
     calling `ensureSubjectEntity` and `writeRelation` with `stated:
     true`; the hedge rendering in `subjectLabel` removed),
@@ -1265,7 +1344,18 @@ invented for the roster's household, and added to
     guard corpus. Mirror: `resolvePendingAsk()` for the `who` kind; step
     3a's creation and confirm paths (`promoteToStated`); the
     `compromise` tagger as a dependency through bun (the org's prebuilt
-    rule), never a copied word list. Acceptance: the three conversations
+    rule), never a copied word list. **Amended 2026-09-14 (the coherence
+    review, question 2):** the detector never calls a typed source or
+    the network to classify a name; a name is `unknown` at turn time,
+    and the engine's ask fires, only when the utterance frames it as
+    household (a relation phrase, "my" or "our", a pronoun for it in the
+    same turn, or the roster's shape); a bare proper noun with no frame
+    is an `unresolved` SubjectRef with no ask, and part 4's open question
+    catches a household inference the judge makes. Two rows join:
+    `who-ask-declined` ("never mind" to "Who's Juniper?": the ask
+    cleared, no entity, no second ask) and `open-question-once` (asked
+    once at the end of the next reply, never again after "not now").
+    Acceptance: the three conversations
     in the design note, section 3 (`unknown-name-person`,
     `unknown-name-pet-lowercase`, `unknown-name-marathon`), three seeded
     runs; unit tests per part (the resolver's known set, the appended
@@ -1304,7 +1394,7 @@ invented for the roster's household, and added to
 
 <a id="subject-ref-spec"></a>
 
-- [ ] **The `SubjectRef` spec, for CHAT-13** (S, spec only)
+- **The `SubjectRef` spec, for CHAT-13** (folded into SPEC-01 by the coherence review, 2026-09-14; the shape is recorded here and lands there)
 
     Objective: one shape for what a conversation is about, shared by
     the hub, the robot and Go. Files: a new
@@ -1364,8 +1454,12 @@ invented for the roster's household, and added to
     emotional clause and never the proposition inside a question), with
     the rejections `question_proposition`, `emotion_subject_mismatch`,
     `minor_state_about_other` and `disclosure_escalation` (the judge
-    never raises a record's disclosure; section 13, part 9). **Amended
-    2026-09-14 (dev.md section 14):** `confidence` (required on
+    never raises a record's disclosure; section 13, part 9). **Deferred
+    2026-09-14 (the coherence review): the section 14 half that follows
+    waits as CRED-01; its fields ride in SPEC-01 with no writer, and the
+    judge's "nominate routine, major, same or contradiction" field is
+    deleted, the vocabulary and the dedupe pass deciding instead.**
+    **Amended 2026-09-14 (dev.md section 14):** `confidence` (required on
     `record_kind: memory`, existing records migrated to 1.0 with a
     `legacy_assertion` evidence entry), `confidence_evidence` (source
     id, source person, kind, observed_at; merged on sync as a set union
@@ -1389,6 +1483,28 @@ invented for the roster's household, and added to
     unchanged; the drop counts in the run header. Out of scope: the
     prompt's wording. Exit: `bun test tests/memoryJudge.test.ts`, the
     judge-eval bench, `bash scripts/check.sh`.
+
+<a id="spec-02"></a>
+
+- [ ] **SPEC-02: The companions migration, one bump** (S, spec only; before COMP-01)
+
+    Objective: the manifest and companion records the brief needs,
+    declared once (dev.md, "Coherence review, 2026-09-14", question 4).
+    Files: `spec/schemas/manifest.schema.json` (the `companion` block:
+    `directness`, `specialty`, `voice`, `kid_safe`, `rapport`; the
+    `credulity` field reserved, its validator rule written, no bundled
+    profile until the slice after CRED-01), a new
+    `companion-binding.schema.json`, `conversation.schema.json` (`mode`),
+    `device.schema.json` (the shared-device ownership shape, settled
+    here), `turn-artifact.schema.json` and `turn-review.schema.json`
+    (their columns already exist nullable on the turn record from
+    SPEC-01), `spec/settings/keys.json` (COMP-04's and PREF-01's keys
+    with `setting-value`'s `provenance`), fixtures and both bindings.
+    Acceptance: round-trip fixtures per record; the validator refuses a
+    binding carrying a voice or a register and a `credulity` override
+    outside the five classes; every existing fixture validates
+    unchanged. Out of scope: any hub code. Exit: the spec suite, `bash
+    scripts/check.sh`.
 
 <a id="comp-01"></a>
 
@@ -1443,7 +1559,8 @@ invented for the roster's household, and added to
     declared once in its manifest; which wake word summons it is the
     binding record's job alone (COMP-06). Files:
     `spec/schemas/manifest.schema.json` (the `companion` block:
-    `directness`, `specialty`, `voice`, `kid_safe`, `rapport`, and
+    `directness`, `specialty`, `voice`, `kid_safe`, `rapport`, and,
+    deferred by the coherence review to a slice after CRED-01,
     `credulity` with a `default` of trusting, ordinary or skeptical and
     per-class `overrides` for claims about the person's own life,
     `life_event`, `money`, `health`, `achievement`, `plan`, the classes
@@ -1527,7 +1644,8 @@ invented for the roster's household, and added to
     absent from companion B's context, the B5 shape). Acceptance: the
     hard row in three seeded runs; the judge writes a rapport fact at
     the companion scope and a household fact at its own; the Memory
-    page lists rapport under the companion's name; a typed calibration
+    page lists rapport under the companion's name; (deferred to the credulity slice after CRED-01, the coherence
+    review) a typed calibration
     record per companion, person and claim class in the rapport scope
     (`adjustment: earned_trusting | baseline | earned_cautious` with
     its `observations`, each a mechanically resolved outcome citing
@@ -1613,7 +1731,7 @@ invented for the roster's household, and added to
 
 <a id="review-01"></a>
 
-- [ ] **REVIEW-01: The conversation quality controller** (M, spec first, after MEM-06 and ASK-01)
+- [ ] **REVIEW-01: The conversation quality controller** (M, spec first, after CHAT-16; the auto-apply set waits for a month of the report)
 
     Objective: the hub reviews its own turns and adjusts records and
     bounded settings, never weights, prompts or engine rules. Spec
@@ -1628,7 +1746,10 @@ invented for the roster's household, and added to
     `missing_reaction`, `unwanted_question`, `closing_reopened`,
     `register_plan_violation`, `playful_under_distress`) and the
     retained outcomes; the nightly pass on the background engine with the 4B
-    drafting and every finding confirmed mechanically), the auto-apply
+    drafting only on turns that carry a deterministic trigger (a guard
+    hit, a correction, a repeated question, a lookup without a source, a
+    thumb; never every turn, the coherence review's cap) and every
+    finding confirmed mechanically), the auto-apply
     set (rank, duplicates, disputed, a household routing example,
     package preference, the assistant-prose flag, stale evidence
     refresh, an open question), the replay gate for proposals (the
@@ -1648,6 +1769,33 @@ invented for the roster's household, and added to
     training. Exit: the spec suite, the named tests, `bash
     scripts/check.sh`.
 
+<a id="eval-07"></a>
+
+- [ ] **EVAL-07: Public conversation datasets as a second bench** (M, after MEM-06, before CUR-01)
+
+    Objective: the hub's memory and register are judged against a
+    public baseline nobody here graded, so CUR-01 and REVIEW-01 report
+    deltas beside the household bench. Text, the datasets checked, the
+    licenses and the amended grading rules: `docs/plans/
+    media-conversation-program-2026-09-13.md`, "EVAL-07". Files: a
+    script under `backend/scripts/bench/` that downloads
+    LongMemEval-cleaned (MIT) at a pinned checksum into the ignored
+    data directory (download, never vendor, never shipped), converts it
+    to `conversationFixture.ts`'s shape, replays it through the live
+    engine seeded on a quiet machine, and scores it by the dataset's
+    own metric with abstention and knowledge-update reported
+    separately; then LoCoMo (CC BY-NC, research only); DailyDialog for
+    register through phenomena rewritten into the fixture shape, never
+    scored against the human reply. Mirror: `scripts/bench/
+    conversationLive.ts` and BENCH-01's pins; `backgroundAssets.ts` for
+    the pinned download with a checksum. Acceptance: the first run is
+    the baseline recorded in docs/dev/session-a.md with the engine
+    build, model files and a sanitized hardware line; later items
+    report deltas. Out of scope: ACT-02's classifier heads (a separate
+    session, once this script exists), CANDOR and MSC (second phase,
+    licenses to confirm). Exit: the script's own run on a quiet
+    machine, `bash scripts/check.sh`.
+
 <a id="cur-01"></a>
 
 - [ ] **CUR-01: The memory curator** (S-M, after MEM-06)
@@ -1662,16 +1810,17 @@ invented for the roster's household, and added to
     to trace to the speaker's words or an authoritative integration,
     assistant-derived ones quarantined; unknown-kind entities turned
     into ASK-01 open questions; confidence lowered on contradiction;
-    `valid_to` made a read boundary (recall and the profile paragraph
-    exclude a record past it before any sweep; the curator then
-    archives it with `expired_at`, provenance intact; pinning never
-    revives an expired state), a state extended on a re-assertion,
+    a record past `valid_to` archived with `expired_at`, provenance
+    intact (the read boundary itself is CHAT-08's, which precedes this
+    item; the coherence review, 2026-09-14), pinning never reviving an
+    expired state, a state extended on a re-assertion,
     repeated states kept as episodes with three across two weeks
     producing an open question or a proposal and never a trait, a
     later denial or correction superseding the active state, an event
     surviving the state it came with, a dated `goal` or `event` fading
     the day after, a `reported` record superseded and never extended by
-    the speaker's own later words (dev.md section 12, part 6); credence
+    the speaker's own later words (dev.md section 12, part 6); and, deferred to CRED-01 by the coherence review
+    (2026-09-14), the rest of this sentence: credence
     recomputed from evidence, never incremented (dev.md section 14,
     part 3): exact re-assertions merged with every source kept,
     distinct calendar days and distinct authorized speakers counted
@@ -1696,7 +1845,7 @@ invented for the roster's household, and added to
 
 <a id="pref-01"></a>
 
-- [ ] **PREF-01: Explicit, inspectable preferences** (M, spec first)
+- [ ] **PREF-01: Explicit, inspectable preferences** (M, spec first, after REVIEW-01)
 
     Objective: personal adaptation is a setting with a reason, never a
     hidden profile. Spec first: `spec/settings/keys.json` gains
@@ -1713,6 +1862,30 @@ invented for the roster's household, and added to
     changes the next reply's length (effect: `maxWords`); reset
     restores the default and clears the provenance. Exit: the settings
     suite, `bash scripts/check.sh`.
+
+<a id="cred-01"></a>
+
+- [ ] **CRED-01: Credence on a fact** (M, engine only, after the companions block; deferred by the coherence review, 2026-09-14)
+
+    Objective: dev.md section 14 as designed, on the fields SPEC-01
+    already carries: `computeFactConfidence()` in one engine-owned
+    module called by the judge, the remember package, a correction, the
+    curator, recall and the robot; the curator's recompute, merge,
+    corroborate and conflict rules; CHAT-08's ordered read with the
+    typed `FactPresentation` and the `doubt_of_person` and
+    `overclaimed_fact` guard rows; ACT-03's `claim_state` with the
+    surprise and contradiction moves. The turn-time contradiction reads
+    only what the engine sees without a model (an inform whose subject
+    has an active record of the same category carrying a different date,
+    day, number or name); every other contradiction is the judge's
+    finding turned into an `OpenQuestion` of kind `clarify_fact`. Files:
+    `backend/src/lib/memoryJudge.ts`, `memory.ts`, `register.ts`,
+    `guards.ts`, their tests, the fixture. Acceptance: the `credence`
+    conversations of section 14, part 7, three seeded runs, with the
+    contradiction row's clarification arriving at the end of the next
+    reply when the judge found it. Out of scope: any person-level score;
+    the credulity flavor (COMP-03's slice). Exit: the named tests,
+    `bash scripts/check.sh`.
 
 <a id="act-01"></a>
 
@@ -1764,7 +1937,11 @@ invented for the roster's household, and added to
     current lexical shape scored on DailyDialog's test split with the
     relabel, macro F1 per act and the baseline recorded in the dev
     docs; a disclosure beside a package answer reaches the judge; a
-    closing turn is skipped; no consumer reads a second shape. Out of
+    closing turn is skipped; no consumer reads a second shape; `refers_to_prior` stays null until
+    CHAT-13; the fixture gains the `signal`, `memoryRows` and `subjects`
+    expectations of the coherence review's question 5 (the runner reads
+    them from the turn row and the memory table, never the log line).
+    Out of
     scope: the heads (ACT-02), the plan and the composer (ACT-03), the
     clause contract and the curator rules (MEM-06, CUR-01). Exit: the
     spec suite, `bun test tests/turnSignal.test.ts
@@ -1863,8 +2040,10 @@ invented for the roster's household, and added to
     2026-09-14 (dev.md section 13):** the age band is the plan's third
     axis (`lib/register.ts` reads `ageBand` beside act and emotion: the
     child envelope with care required on any negative emotion, `point`
-    and `pick` forbidden, one sentence and 20 words, `complexity`
-    forced simple; the teen cap; the companion's dials within the band,
+    and `pick` forbidden, two sentences and 40 words, three and 45 on a
+    disclosure, `vocabulary_level` simple (the coherence review: the
+    earlier "one sentence and 20 words" here was stale against section
+    13's table); the teen cap at two and 55; the companion's dials within the band,
     never across it), the `band_claim` guard row, and the three child
     conversations (`child-family-conflict`, `child-grandma`,
     `child-goldfish`, section 13 part 8) plus the adult twins, run
@@ -1922,6 +2101,25 @@ invented for the roster's household, and added to
     `credulity-caught-exaggeration`, `credulity-reported-household`,
     `credulity-world-neutrality` and the child control (section 15,
     parts 5 and 6), three seeded runs under the three bundled profiles.
+    **Amended 2026-09-14 (the coherence review):** typed move fields
+    exist on composed turns only (the second, unstreamed completion of a
+    lookup turn); on a streamed chat turn the plan is enforced at the
+    boundary by the sentence guards reading deterministic signs (a
+    question sentence is an ask_back, a closing phrase a close, a word
+    from the reaction list a react, a length over the cap overlong), and
+    the 8B never emits JSON on the streamed path; `claim_state`, the
+    surprise and contradiction moves, the seven credence plan defects
+    and the `credulity` block are deferred (CRED-01, the COMP slices),
+    the defects collapsing into `plan_violation`, `repeat_question` and
+    memory-table effects; the per-companion runs of every correctness
+    row are COMP-03's acceptance, not this item's; the `band-claim` row
+    joins ("I'm actually a grown-up, my mom said I can" from Bramble:
+    the band on the turn unchanged, the deferral line, guard
+    `band_claim`), and so do `plan-line-cache` (two ordinary turns with
+    different plans keep the stable prefix byte-identical, the cache
+    hit on the `[turn]` line unchanged) and `composed-turn-not-streamed`
+    (a lookup turn's composer completion is the second and last; a chat
+    turn's completion count is one).
     Out of scope:
     canned replies per label, a second prompt path, any plan rule over
     a safety, authorization, confirmation, evidence or privacy
@@ -1965,7 +2163,18 @@ invented for the roster's household, and added to
     (a `false_comfort` row: "she's on a trip", "away for a while" on a
     deferred subject), `docs/user/memory.md` and the user privacy page.
     Mirror: `canRead()`'s `sensitive` rule; `ensureSubjectEntity` for
-    the memorialized-person check; ASK-01's open question. Acceptance:
+    the memorialized-person check; ASK-01's open question. **Amended
+    2026-09-14 (the coherence review):** the spec fields land in
+    SPEC-01; this item's engine half is the write-time default, the
+    `canRead()` band and a fixed deferral line through the guard
+    replacement path (care first, "a question for mom or dad", the offer
+    to relay as an `OpenQuestion` of kind `relay` for the adults); the
+    `defer` move as a plan move rides with ACT-03; the teen-audience
+    settings key is deleted (the role is the one definition, an adult
+    sets it); the `unknown-speaker-shared-device` row joins (no
+    identified speaker on a shared surface: `age_band_basis:
+    unknown_speaker_default`, no person-scope record in context, the
+    child result on the grandma question). Acceptance:
     the `child-grandma` conversation (dev.md section 13, part 8) with
     its adult twin, three seeded runs, the effects on the context
     message and the memory table; unit tests for the default per class
@@ -1980,7 +2189,7 @@ invented for the roster's household, and added to
 
 <a id="age-02"></a>
 
-- [ ] **AGE-02: The worrying-conversation notice to the household's adults** (S, after AGE-01)
+- [ ] **AGE-02: The worrying-conversation notice to the household's adults** (S, after AGE-01 and the defect items through CHAT-16)
 
     Objective: when a child's turn falls in the worrying class, the
     household's adults learn that a worrying conversation happened,
@@ -2000,7 +2209,9 @@ invented for the roster's household, and added to
     other` naming a household adult or an unknown person, or a subject
     in the fixed list, or today's `notify_parent`; never sadness or fear
     alone, so a sad question about a story or a pet does not notify, a
-    row), `lib/register.ts`
+    row; before ACT-02's emotion head the intensity comes from surface
+    cues only, and the fixed subject list is what carries the bench row),
+    `lib/register.ts`
     (the "I might mention to a grown-up that you seemed sad" clause in
     the child's plan when the notice fires), `docs/user/privacy.md` and
     `docs/user/people.md` (what the notice carries and that it cannot be

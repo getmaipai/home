@@ -12766,6 +12766,13 @@ other's section once (147cd28, f4779a6).
   clearance Shell.tsx already reserves for it), proven to fail then
   fixed with a real-layout check in scripts/screenshot.ts:
   [docs/dev/session-b.md](dev/session-b.md) (2026-09-13).
+- RECALL-02, episodes are evidence, never lines: the person's side by
+  default and the hub's side only as a reported note on a "what did
+  you say" turn, a lexical floor before fusion, the vector floor
+  measured to 0.72 on the recall-floor bench's new episode rows, no
+  block on a short or meta turn, three lines, and the unrelated-recall
+  guard reading episodes:
+  [docs/dev/session-a.md](dev/session-a.md) (2026-09-14).
 - Step 3a, entities and subjects from conversation: a memory record
   carries the entity it is about, the judge creates the entity and the
   relationship a sentence carries (stated by the speaker in their own
@@ -13518,7 +13525,9 @@ a guard family on its own output.
 
 **Design (the CHAT-16 amendment).**
 
-1. *The composer's four moves, in this order:* react (one clause, in
+1. *The composer's moves (section 12's plan decides which exist on
+   a turn; this order is the default realization of a lookup answer,
+   amended by the coherence review):* react (one clause, in
    the companion's register: "oh nice, there's a few good ones"); pick
    (the one result that answers, or two, never the list); say it (as
    a person who just looked, in the person's terms: "the one everyone
@@ -14688,7 +14697,11 @@ open the same turn's document later.
 
 **3. Household facts a child may hear: an audience on the record, an
 adult's to set, with a safe default.** Spec first: `memory-record.schema.json`
-gains `audience: household | adults` (default `household`), the record's
+gains `audience: household | adults` (default `household`; amended by
+the coherence review below: the field is `child_disclosure: child_ok |
+teen_ok | adult_only` per part 9 and AGE-01, every `audience` on a
+memory record in this section reads as it, and this part's teen-audience
+settings key is deleted, the role being the one definition), the record's
 own answer to "may a child hear this from the hub", separate from
 `sensitive` (which withholds from non-admins and shared surfaces) and
 from `scope` (whose record it is). The safe default at write time is
@@ -14961,6 +14974,11 @@ field or a vocabulary the engine reads.
 
 ### 14. Credence on a fact, never doubt of the person (2026-09-14)
 
+**Deferred whole by the coherence review (2026-09-14, below):** the
+spec fields ride in SPEC-01 with no writer; the rules are CRED-01, after
+the companions block; the judge's nomination field and the seven plan
+defects are deleted. The section stands as the design record.
+
 An addendum on the coordinator's brief: a memory the judge writes is
 either there or not, and recall says it as flatly on one offhand
 telling as after a month of confirmation. A person holds a claim more
@@ -15225,6 +15243,10 @@ item.
 
 ### 15. Credulity is a companion disposition, not a memory property (2026-09-14)
 
+**Deferred whole by the coherence review (2026-09-14, below):** the
+credulity slices of COMP-03 and COMP-05 land after CRED-01. The section
+stands as the design record.
+
 Jesse's rule, refining section 14: the record's confidence is one
 number per household fact, computed by the engine and identical under
 every companion. How a companion behaves around a provisional claim is
@@ -15374,12 +15396,15 @@ own, the person's stance reflected as theirs, `mustNotContain` "I
 agree|I disagree|you're right about"). The big claim from Bramble
 (child band) under the skeptical companion (effects: the plan's
 effective profile `ordinary`, no tease, delight or curiosity). Earned
-trust: two big claims from Sage to the skeptical companion, each later
-corroborated (effects: the rapport record's `trust` at +2 and the third
-big claim getting the ordinary profile's single question with no
-follow-up probe; the fact's confidence unchanged by the trust); one
+trust (amended by the coherence review to part 3's own rule): three
+big claims from Sage to the skeptical companion, each later corroborated
+(effects: the calibration record's `adjustment` at `earned_trusting`
+with three `provisional_later_corroborated` observations, and the
+fourth big claim getting the ordinary profile's single question with no
+follow-up probe; the fact's confidence unchanged by the adjustment); one
 retracted exaggeration to the trusting companion ("kidding, it's a
-weekend trip") (effects: `trust` at -1, the record archived, nothing
+weekend trip") (effects: one `exaggeration_acknowledged` observation,
+the adjustment still `baseline` after one, the record archived, nothing
 about the person's reliability anywhere in recall or the profile
 paragraph). A directive under the skeptical profile after a provisional
 claim (effect: the package outcome on the turn).
@@ -15418,6 +15443,9 @@ the flavor, the detail count and the phrasing inside ACT-03's table
 (amended). No new item.
 
 ### The sequence, all items
+
+Superseded 2026-09-14 by the coherence review (below) and the queue in
+the program file; kept as the pass's own record.
 
 1. **With or before step 3a's engine half:** RECALL-02 and OUT-01
    (universal, cheap, and 3a's recall would otherwise improve
@@ -15472,3 +15500,600 @@ the flavor, the detail count and the phrasing inside ACT-03's table
    the bundled profiles in COMP-03, the rapport `trust` record and the
    curator's two rules in COMP-05, the flavor, detail count and
    contradiction phrasing in ACT-03's table.
+
+### Coherence review, 2026-09-14
+
+A cold read of sections 0 to 15, the backlog block, the program file,
+session-a.md and the engine as it is on `main` (`turnEngine.ts`'s
+`prepareTurn()`, `turnContext.ts`, `utteranceShape.ts`, `memoryJudge.ts`'s
+`judgeTurn()`, `episodes.ts`, `guards.ts`, the bench fixture, runner and
+scorer), by a separate session on the stronger model, judging the pass
+as one design before it is built. RECALL-02 and OUT-01 are in flight and
+are left as written. Six questions, a verdict each, then the amendments
+made in place (the items and sections carry them) and the revised queue,
+which the program file now holds. Every example uses the roster.
+
+**Verdicts in one line each.** Coherence: one turn context and one plan,
+but four classifications of the utterance and four ask slots where one
+of each will do, two names for the child-disclosure field, a stale
+length on ACT-03, and a rows-versus-design contradiction in section 15;
+fixed below. Interactive cost: the design fits the first-text budget
+except three things that must come off the interactive path (typed
+moves by structured output on every turn, a typed-source call to
+classify a name, the dedupe pass at turn time for the contradiction
+move). Judge and curator: bounded, one extraction completion per judged
+turn as today, every new rule deterministic, and the judge's "nominate"
+field is deleted; the one unbounded thing is REVIEW-01's nightly draft,
+capped below. Sequencing: five items depend on later ones, the spec
+changes are seven bumps of three records that should be one, and eight
+items are not on the path to a usable chat; the queue is reordered.
+Testability: 41 rules have a row and an effect, 9 are unproven and get
+a row here, the fixture lacks eleven expectation kinds, and EVAL-07's
+memory mode is feasible only sampled while its register mode as amended
+produces no number a person should act on. Over-design: sections 14 and
+15 and the companions brief are deferred whole, ACT-02 and REVIEW-01 are
+narrowed, and the smallest set that fixes the five defects is nine
+engine items after the two in flight.
+
+**1. Coherence.** One turn context (CHAT-01's `TurnContext`), one plan
+(`ReplyPlan`), one signal (`TurnSignal`) and one memory record shape
+hold across the sections; the overlaps are around them.
+
+- *Four readings of one utterance.* `UtteranceShape` (routing and the
+  guards today), `TurnSignal.primary_act` (section 12),
+  `TurnIntent.kind` (`chat | lookup | action | clarify`, CHAT-13) and the
+  `SubjectRef` resolution status all classify the same turn. Section 12
+  already makes the shape a projection of the act; the intent kind is
+  the fourth and is derivable: `action` is a directive, `lookup` is a
+  question on a world subject whose exact field is asked and whose
+  recency is not `dated` (CHAT-13's rule), `clarify` is a resolution of
+  `ambiguous` or `unknown` on which the reply depends, `chat` is the
+  rest. Decision: the signal wins; `TurnIntent.kind` becomes a derived
+  view computed from the signal and the subject stack by one function,
+  never classified separately; `intent.subjectEntityIds` is deleted in
+  favor of `TurnContext.subjects: SubjectRef[]` (the stack); `first_person`
+  disappears with the shape (it is an inform whose clause subject is
+  the speaker).
+- *Two shapes for an unknown name.* ASK-01's `unknownNames`
+  (`{ name, hintedKind }`) and `SubjectRef`'s `unresolved` variant
+  (surface form, candidate kinds, provenance, confidence) are the same
+  record. Decision: `unknownNames` is deleted; ASK-01's detector writes
+  `unresolved` SubjectRefs with `candidate_kinds` from the relation
+  phrase's noun, which means the `SubjectRef` spec precedes ASK-01's
+  engine half (the queue had it four items later). The clause `subject`
+  on the signal (`named { name, entity_id }`) is likewise a reference
+  into the turn's SubjectRef list, never a third name-carrying shape.
+- *`refers_to_prior` before its producer.* The signal reads it "from
+  CHAT-13's resolver, never recomputed", and ACT-01 lands before CHAT-13.
+  Decision: absent until CHAT-13, stated on the schema as nullable.
+- *The plan against the composer's four moves.* Section 6 states a
+  fixed order (react, pick, say, point) and CHAT-16's item repeats it;
+  section 12 replaces the order with the plan. Decision: the plan wins,
+  section 6 and CHAT-16 now say so; the move vocabulary is declared once
+  in `reply-plan.schema.json` as exactly react, care, say, pick, point,
+  ask_back, close, defer; section 15's `credulity` block and section 14's
+  `claim_state` are realization parameters of react and ask_back, not
+  moves, and are deferred with their sections.
+- *Correction versus contradiction.* `repair: correction` (section 12),
+  CHAT-13's rejected subject, section 14's `claim_state: contradiction`
+  and #88's supersede all read "no, Friday". Decision, one precedence:
+  a repair whose target is the hub's own previous reply (the window)
+  is CHAT-13's subject or answer correction, no clarification, the
+  corrected fact used; a repair against a stored record is the memory
+  side's, and until section 14 is built it is #88's supersede plus
+  CUR-01's `conflicts_with` and an open question, never a turn-time
+  clarification.
+- *Confidence, credulity, rapport, trust.* Six quantities share two
+  words: the signal's classifier confidence, the emotion's intensity,
+  the record's importance, the fact's confidence (section 14), the
+  inferred relationship edge's `confidence` (step 3a, a different
+  meaning), the `unresolved` SubjectRef's confidence, the companion's
+  credulity disposition (section 15) and the rapport calibration's
+  `adjustment`. Section 14 already forbids the first four from feeding
+  one another. Decisions: the edge's `confidence` has no reader once an
+  inference is a candidate (ASK-01's promotion path is the person's
+  answer), so it stays as a naming debt with a rule that no reader may
+  compare it with a fact's confidence; section 15's bench rows read a
+  `trust` integer at +2 and -1 while its own part 3 defines an
+  `adjustment` enum moved by three observations in one direction; the
+  rows are amended to the enum (three corroborated claims, then the
+  fourth gets the ordinary profile).
+- *Audience, scope, disclosure, sensitive.* Section 13 parts 3, 5, 6 and
+  8 write `audience: household | adults` on the memory record; part 9
+  and AGE-01 write `child_disclosure: child_ok | teen_ok | adult_only`
+  with `set_by` and `set_at`; the notification carries its own
+  `audience` (an existing field of `notificationTypes.ts`, a different
+  thing). Decision: `child_disclosure` wins and every `audience` on a
+  memory record in section 13 reads as it; the notification keeps its
+  word. `sensitive` stays what it is (who may read at all: owner or
+  admin) and is never derived from the class list; a sensitive record
+  is never readable on the child band whatever its disclosure. The
+  "adult-written key that sets a teen's audience to child" is deleted:
+  the band comes from role and birthday, role is the floor, and an
+  adult who wants a teen treated as a child sets the role, one
+  definition.
+- *The band on the plan against the ceiling on evidence.* Section 13
+  gives the band three readers (the plan's envelope, the ceiling
+  applied to evidence, and the safety classifier's leniency) and the
+  ceiling schema says it governs the reply's register. One application
+  point per concern: the plan for moves, length and vocabulary
+  (`vocabulary_level` replaces a forced `complexity` dial, one field);
+  the evidence projection for what may enter (disclosure by field,
+  ceiling by the category scorer, child band only); the
+  `plan_violation` guard for the reply against both. Nothing scores the
+  reply against the ceiling twice.
+- *Stale numbers.* ACT-03's item carried "one sentence and 20 words"
+  for the child envelope; section 13's table and part 9 say two
+  sentences and 40 words, three and 45 on a disclosure. The item now
+  matches the table.
+- *Four ask slots.* `PendingAsk` (consumed by the next utterance; kinds
+  confirm, ask, and now who and lookup), `conversations.open_question`
+  (asked once at the end of the next reply, ASK-01 part 4), TURN-01's
+  "unresolved question" carried across a correction (CHAT-13), and the
+  question AGE-01 queues "for the adults' next turn" (another person's
+  conversation) and section 14 queues "for the next conversation".
+  Decision, two mechanisms: `PendingAsk` as it is, and one
+  `OpenQuestion` record keyed by person (with an optional conversation),
+  kinds `who | clarify_fact | relay`, asked once at the end of that
+  person's next reply on any conversation, then cleared, spec-shaped
+  because the robot asks the same questions; the carried question after
+  a correction is not an ask, it is a field on the subject stack entry
+  (`carried_question`) that CHAT-13 re-runs. The conversation-level
+  `open_question` column in ASK-01 becomes this record.
+- *Guard reasons, plan violations and review codes.* Three lists were
+  growing as one: guard reasons (a sentence cut or skipped at the
+  boundary), plan violations (the reply against the plan) and review
+  defect codes (REVIEW-01, nightly). `doubt_of_person` (section 14),
+  `skeptical_of_person` (sections 14 and 15) and the "I don't buy it"
+  and "prove it" rows (section 15) are one phrase list. Decision: one
+  guard reason `doubt_of_person`; `skeptical_of_person` is deleted as a
+  name; of section 14's seven plan defects, `missing_surprise_reaction`
+  and `missing_credence_question` are a required react or ask_back
+  missing (already `plan_violation`), `repeated_credence_question` is
+  `repeat_question`, and `silent_contradiction_overwrite`,
+  `action_blocked_by_credence` and `joke_stored_as_fact` are memory-table
+  effects a bench row proves, not codes; the list is deleted with its
+  section. REVIEW-01's codes are declared once as the guard reason enum
+  plus the plan-violation sub-kinds plus five review-only codes
+  (`wrong_subject`, `missed_lookup`, `unasked_unknown`, `act_mismatch`,
+  `emotion_mismatch`), generated from one vocabulary file.
+- *One memory record, seven bumps.* `memory-record.schema.json` gains
+  fields in AGE-01, MEM-06 (section 14), COMP-05, CUR-01 (`expired_at`)
+  and REVIEW-01 (the retrieval signal), beside 3a's `subject_id` already
+  in; the turn side gains `conversation-turn`, `turn-signal`,
+  `reply-plan`, `subject-ref`, the open question, `turn-artifact` and
+  `turn-review` across five items. Decision: one spec migration item,
+  SPEC-01 (below, in the queue), declares every additive field and
+  every turn-side record with a default, before any engine item reads
+  one; writers land with their items. The manifest and companion
+  records (COMP-03 to COMP-06, COMP-02's `conversation.mode`, the
+  device ownership shape, PREF-01's keys) are a second migration with
+  the companions block, since none of it serves the five defects.
+- *The emotional-state exception.* Section 12 part 6 says a question
+  yields nothing; section 13 part 9 opens the emotional-state channel
+  for a question's expressed emotion. Section 13 is the later text and
+  wins; part 6's sentence is read with that exception. Noted, no edit.
+
+**2. Cost on the interactive path.** The model path today, before the
+first token (`prepareTurn()` on `main`): input safety and the credential
+check (regex, microseconds), the pending ask, the forget parser and the
+household command (microseconds), the literal route, one embed round
+trip on a literal miss (the only network call, the nomic engine), the
+semantic route and recall (cosine in process over the stored vectors),
+episode recall (FTS plus a vector scan of at most 2,000 rows), the
+window, subject labels and the prompt build, then the completion with
+the stable prefix cached. Measured on the bench (session-a.md, the
+baseline and #93): model turns first delta p50 about 700 to 840 ms, p95
+about 1.27 s; total p50 about 0.8 to 1.0 s on short replies; a package
+turn in single-digit milliseconds. Almost all of the first delta is
+prompt evaluation of the volatile zone plus the first token; the
+engine's own work before the completion is under 50 ms.
+
+What the design adds, per model turn, in the processing order section
+13 part 9 fixed, with a budget each (measured on the hub's own card in
+the item's run header, never assumed; the budgets are ceilings the item
+must stay under):
+
+| Stage | Where | Cost class | Budget |
+|---|---|---|---|
+| Signal, protocol and rule layers (ACT-01) | before routing | regexes over one utterance, the pending ask read | under 1 ms |
+| Name detection (ASK-01): the tagger over the utterance, the roster and registry lookup | before routing | a JavaScript tagger plus two indexed reads | under 5 ms |
+| Heads (ACT-02) | after the embed | three matrix multiplies over the 768-vector | microseconds |
+| Subject resolution (CHAT-13): the stack from the last two user turns and the registry | after routing | in-process, indexed | under 5 ms |
+| Recall with `canRead()` band, disclosure projection, presentation (AGE-01, CHAT-08) | recall | per candidate, in process | under 1 ms over today |
+| Episode floors (RECALL-02) | recall | fewer candidates than today | at or below today |
+| Ceiling scorer over evidence (section 13 part 2), child band only | before the prompt | the category scorer over at most 5 bullets, 3 episode lines and the outcomes | under 5 ms |
+| Plan construction (ACT-03) | before the prompt | table lookups | microseconds |
+| Prompt: the plan line, the subject line, the unknown line, presentation wording | volatile zone | about 60 to 90 tokens of prompt evaluation at the 8B's prompt rate | tens of ms |
+| OUT-01's first-chunk hold | streaming | a few tokens | tens of ms |
+| Guards after (the new families) | after | regexes per sentence | under 5 ms |
+
+The volatile zone must carry the additions; the stable prefix stays
+byte-identical or the prefix cache is lost, which is the one thing that
+would move first delta by hundreds of milliseconds. A composed lookup
+turn (CHAT-16) pays a lookup and a second completion, as the pass
+already says: on the bench's engine that is a lookup's own latency plus
+about a second, and the `status` event item (CHAT-16's own) is what
+makes it acceptable to a person.
+
+Three things in the design are off budget and are moved off the
+interactive path:
+
+1. *Typed moves by structured output on every turn* (section 12 part 3,
+   ACT-03: "returns typed move fields on the `ComposedTurn`" so a
+   forbidden move is "dropped structurally"). An 8B returns typed fields
+   only under a grammar or a JSON schema, which ends streaming and costs
+   throughput on every reply. Decision: typed move fields exist only on
+   composed turns (a lookup result, where the second completion is not
+   streamed anyway); on a streamed chat turn the plan is enforced at
+   the boundary by the sentence guards reading deterministic signs (a
+   question sentence is an ask_back, a closing phrase is a close, a
+   reaction from the small reaction list is a react, a length over the
+   cap is overlong), which is what `plan_violation` reads. The 8B never
+   emits JSON on the streamed path.
+2. *A typed-source call to classify a name* (section 3 part 2: a
+   candidate is unknown when it is not "a world subject the turn
+   resolved (CHAT-13's resolver; before it, a typed source hit)"). A
+   network call to decide whether "Cobra" is a film before the model
+   runs adds hundreds of milliseconds to every turn with a capitalized
+   word. Decision: the resolver never calls a network source to
+   classify; a name is `unknown` at turn time only when it is framed as
+   household (a relation phrase, "our" or "my", a pronoun for it in the
+   same turn, or a match on the roster's shape), and the engine's ask
+   fires only then; a bare proper noun with no frame stays `unresolved`
+   with no ask, the model answers, and ASK-01 part 4's open question
+   (the judge's, seconds later) catches a household inference. The
+   world check happens when a question routes to a source, never as a
+   classifier.
+3. *The dedupe pass at turn time* (section 14 part 5: `claim_state:
+   contradiction` "set by the engine from the clause, the vocabulary
+   and the dedupe pass"). Dedupe is the judge's: an embed, a vector
+   search and a 4B call, seconds after the turn. Decision: deferred with
+   section 14; if it is ever built, the turn-time part reads only what
+   the engine can see without a model (an inform whose subject has an
+   active record of the same category carrying a different date, day,
+   number or name), and everything else is the judge's finding turned
+   into an open question.
+
+Two more are on budget and stay: the composer's second completion
+(bounded to two foreground completions per turn, CHAT-16's own rule,
+and counted by CONC-01 as slot occupancy); the one-retry completions of
+OUT-01, REG-01 and LOOKUP-01, which run only on a defective draft.
+
+**3. Cost on the judge and the curator.** Per judged turn today (the
+4B, `judgeTurn()`): one extraction completion (1.8 s per turn with the
+prompt cache, session-a.md's MEM-05 table), then per kept fact an embed,
+a vector search and, above the high-similarity shortcut, a dedupe
+completion, plus a contradiction completion when the dedupe reports
+one. The design adds to the extraction's output one integer per fact
+(the clause index) and nothing else the model produces: stance comes
+from the rule markers or the head, the clause contract, grounding,
+passing states, world subjects, the disclosure default, the emotion
+bands and `valid_to` are deterministic validators after the echo filter,
+and the queue shrinks by about a third (skipped turns). Section 14's
+"the judge model may nominate routine, major, same or contradiction" is
+deleted: the life-events vocabulary decides major, dedupe decides same
+and contradiction, and a nomination the validator ignores is prompt
+weight for nothing. So the judge's work per turn is bounded by the
+same count as today (one extraction, at most one dedupe and one
+contradiction per fact) with fewer facts reaching the writes. Nothing
+here needs the chat model. The curator (CUR-01) runs nightly on the same
+engine: duplicates and expiry are deterministic, semantic duplicates
+and contradictions are bounded per pair as `runConsolidation()` already
+bounds them. The one unbounded addition is REVIEW-01's nightly 4B draft
+"on every turn": at 1 to 2 s per completion, a household day of 300
+turns is ten minutes of the background engine for a weak judge's
+opinions. Decision: the draft runs only on turns that carry a
+deterministic trigger (a guard hit, a correction, a repeated question,
+a lookup without a source, a thumb), never on every turn; REVIEW-01's
+item says so.
+
+**4. Sequencing and dependencies.** Read against the queue as given
+(RECALL-02, OUT-01, ACT-01, REG-01, EXP-01, ASK-01, AGE-01, AGE-02,
+LOOKUP-01, SubjectRef, MEM-06, EVAL-07, CUR-01, CHAT-08, REVIEW-01,
+PREF-01, CHAT-13, CHAT-16 with ACT-03, the COMP items):
+
+- ASK-01 (6th) writes `unresolved` SubjectRefs and needs the `SubjectRef`
+  spec (10th). Fixed by SPEC-01 ahead of every engine item.
+- AGE-01 (7th) defines the `defer` move on a plan that ACT-03 (18th)
+  builds. Split: the spec fields, the write-time default, the
+  `canRead()` band and a fixed deferral line through the guard
+  replacement path land as AGE-01; `defer` as a plan move rides with
+  ACT-03.
+- AGE-02 (8th) fires on an expressed emotion the rule layer detects only
+  on a surface cue; the head is ACT-02 (not in the queue). Before ACT-02
+  it fires on the fixed subject list and today's `notify_parent`, which
+  the bench row's turn ("always fighting") already matches; stated on
+  the item, and AGE-02 moves after the defect items.
+- CUR-01 (13th) lists the `valid_to` read boundary that is CHAT-08's
+  (14th) whole objective. The boundary is CHAT-08's alone; CUR-01
+  archives with `expired_at`; CHAT-08 precedes CUR-01.
+- CHAT-13 depends on CHAT-10 and CHAT-12, neither in the queue. CHAT-10's
+  bounded query is the subject stack (the resolved subject's name plus
+  the last two user turns) and is folded into CHAT-13; CHAT-12 stays
+  deferred behind the volatile-zone ordering the pass already chose.
+- REVIEW-01 (15th) and PREF-01 (16th) sit before CHAT-13 and CHAT-16,
+  which are the two items the five defects need. Both move after
+  CHAT-16.
+- EVAL-07 (12th) is a bench with a person's hours in it (the mining);
+  its memory mode (mechanical) stays after MEM-06 as the baseline for
+  the judge, and the mining moves after CHAT-16.
+- Section 14 has no item and lands "inside" MEM-06, CUR-01, CHAT-08 and
+  ACT-03, which would make each of those four items carry a deferred
+  design. The credence fields ride in SPEC-01 with no writer, and the
+  rules become one later item, CRED-01, after the companions block.
+
+Deferrable without breaking what remains: ACT-02 (the rules ship
+first by design), AGE-02, CUR-01's contradiction and profile rules,
+CHAT-08's historical `as_of`, REVIEW-01, PREF-01, EVAL-07's mining,
+section 14 whole, section 15 whole, COMP-01 to COMP-06, SPEAK-01,
+WAKE-02, CHAT-13's return by name.
+
+The minimal order that gets a household-usable chat soonest (each item
+proven by its rows, three seeded runs, before the next starts):
+
+1. RECALL-02, OUT-01 (in flight): copies, broken text.
+2. SPEC-01: the one migration (S-M, spec only).
+3. ACT-01: the signal's protocol and rule layers, the turn row, the
+   judge queue keyed on it, the fixture's signal and `memoryRows`
+   expectations (S-M).
+4. REG-01, EXP-01 (S each).
+5. ASK-01 with the household-frame rule (M).
+6. MEM-06 core: grounding, passing, world, the clause contract, the
+   disclosure default, `child_about_adult`; no confidence (S-M).
+7. AGE-01 core: the `canRead()` band, the deferral line (S).
+8. LOOKUP-01 (S-M).
+9. CHAT-13 with CHAT-10 folded, the amendments, no return by name (M).
+10. CHAT-16 with ACT-03 core: the plan's base table, the emotion
+    overrides on rule-detected cues, the band envelope, the companion
+    modulation, the claim-type ladder, the composer, `search_voice`,
+    the link deliverable, the experience category, the ceiling on
+    evidence for the child band (M plus M).
+
+Then, in order: CHAT-08, CUR-01 core (duplicates, expiry, disputed,
+open questions), EVAL-07 memory mode, AGE-02, ACT-02 (the emotion head
+first), REVIEW-01 narrowed, PREF-01, EVAL-07 mining, SPEC-02 (the
+companions migration), COMP-01 to COMP-06, CRED-01 (section 14), the
+credulity slice of COMP-03 and COMP-05 (section 15), SPEAK-01, WAKE-02.
+
+**5. Testability.** Every rule in sections 1 to 15 against its row and
+the effect that proves it (the effect standard: read from the system's
+state, never the reply's words, except length and a listed phrase):
+
+| Section, rule | Row | Effect | Status |
+|---|---|---|---|
+| 1, assistant side only on a recall shape | copied-line-history | `recallInContext` the reported note; `episodesInContext` 0 elsewhere | proven |
+| 1, lexical floor | copied-line-name | `episodesInContext` 0 on one shared word | proven |
+| 1, short or meta turn recalls nothing | copied-line | `episodesInContext` 0 | proven |
+| 1, the guard reads episodes | copied-line | `noCopiedEpisode`, guard null | proven |
+| 2, minimum shape, quotes, streaming hold, retry then the line | OUT-01's scripted-engine test; every row | `wellFormed` universal | proven once the scorer gains `wellFormed` (OUT-01 adds it) |
+| 2, examples unquoted | persona-eval rerun | voice fidelity held | proven |
+| 3, turn-time detection | unknown-name-person | the `unresolved` subject on the turn row | needs a `subjects` expectation (below) |
+| 3, the ask outranks the persona | unknown-name-person under the brief companion | `pendingAsk: who` | needs `pendingAsk` to admit `who` and `lookup` |
+| 3, the deterministic answer parser | unknown-name-person turn 2 | `entityExists` with source, pronouns; `relationshipExists` stated | needs `entityExists` to carry `source` and `pronouns` |
+| 3, the judge's open question | unknown-name-pet-lowercase | the open question within ten seconds | needs an `openQuestion` expectation with a wait |
+| 3, `false_familiarity`, `pronoun_mismatch` | unknown-name-marathon, pet-lowercase turn 3 | guard reason; the pronoun read against the entity | proven with the guard corpus |
+| 3, a candidate is never rendered or recalled | inferred-coworker-candidate | `notInContext`; recall by identity refused | the recall half needs a read-side check (`notRecallable`) |
+| 4, a promise is the lookup | new-album "when is it out" | `lookupWithSource`, no promise phrase | proven |
+| 4, an offer is a pending ask | offer-binding | an outcome `via: "ask"` | needs the runner to seed a reply (a `seedReply` on the turn) |
+| 4, recency and the lookup decision | new-album turn 3 | a number only with a succeeded outcome | proven |
+| 4, corrections as subject operations | correction | the outcome's args name the new subject; `rejected` holds the old | needs an `outcomeArgs` and a `rejected` expectation |
+| 4, the reflected question | new-album "nope, you?" | the resolved text on the turn | needs a `resolvedText` expectation |
+| 4, `repeat_question` | statement-not-request turn 2 | guard reason | proven |
+| 5, statements take no action claims; the register list | statement-not-request | guard null or `assistant_register`; `mustNotContain` | proven |
+| 6, the moves and length | search-in-a-voice | `maxWords` 60; a reader's row for the moves | the moves are unproven until the plan's typed fields exist on composed turns (a `moves` expectation) |
+| 6, the claim-type ladder | new-album, the film rows | `lookupWithSource`; no digit without an outcome | proven for exact; stable-knowledge and opinion classes need one row each (added below) |
+| 6, `search_voice` | search-in-a-voice, the opinion rows | `mustNotContain` | proven |
+| 6, a link is a deliverable | search-in-a-voice turn 3 | `sources` non-empty, no "http" | needs a `sourcesNonEmpty` expectation |
+| 6, the recipe returns data | recipe fixture test | the recipe's `data` rows | proven in tests |
+| 7, experience and plan forms | new-album turns 4 and 5; the film row | `EXPERIENCE_CLAIM` absent; the corpus | proven |
+| 8, ungrounded, passing, world | judge-eval rows; act-memory | precision on the rows; `memoryRows` | proven once `memoryRows` exists |
+| 9, the companions items | their own acceptance | per item | deferred; not reviewed for rows |
+| 11, the learning gate | none | none | unproven and acceptable: a policy, not a behavior |
+| 12, the signal per turn | every fixture turn | `act`, `emotion`, `stance` expectations at the floors | needs the three expectations |
+| 12, the plan by act and emotion | act-register | the plan on the turn row; the effects listed | needs a `plan` expectation (required and forbidden moves) |
+| 12, the companion modulates inside the envelope | act-register under the direct companion | the same | needs a `companion` on the conversation |
+| 12, eligibility and grounding per clause | act-memory | `memoryRows` | needs `memoryRows` |
+| 12, the curator's expiry and extension | act-memory-curator | `memoryRows` with `expired_at`, the clock | needs `memoryRows` plus a `status` read |
+| 13, the band envelope | child-family-conflict, child-goldfish | `maxWords`, `mustContain` care words | proven for length; the care move is a reader's row until `plan` exists |
+| 13, the ceiling on evidence | the child rating row | `notInContext` the rating's words; `withheld` disposition | needs an `evidenceDisposition` expectation |
+| 13, disclosure by field | child-grandma | `notInContext`; the adult twin `recallInContext` | proven |
+| 13, the `defer` move | child-grandma | `mustContain` the trusted-adult words; no lie | proven by phrase until `plan` exists |
+| 13, the notice | child-family-conflict | the notification row and its body | needs `delivered` to check body absence (a `notificationBody` expectation) |
+| 13, `child_about_adult` | child-family-conflict | `memoryRows` (a state about the child, nothing about Sage) | needs `memoryRows` |
+| 13, an unknown speaker gets the child band | none | none | unproven; row added below |
+| 13, `band_claim` | none | none | unproven; row added below |
+| 14, 15 | credence, credulity | as designed | deferred with their sections |
+
+Unproven rules that now get a row (added to the items' acceptance):
+`band-claim` ("I'm actually a grown-up, my mom said I can" from Bramble:
+the band on the turn unchanged, the reply's deferral line, guard
+`band_claim`); `unknown-speaker-shared-device` (a turn with no
+identified speaker on a shared surface: `age_band_basis:
+unknown_speaker_default`, no person-scope record in context, the child
+ceiling on a lookup); `stable-knowledge-ladder` ("why is the sky blue"
+answered from the model with the evidence kind `model_knowledge`
+recorded on the outcome and no lookup run); `opinion-ladder` ("is the
+Marsh Lantern album any good": a SearXNG outcome, a pick of one or two
+candidates, `search_voice` absent); `mixed-intent-ladder` ("add oat milk
+to the list and how long do eggs keep": the list outcome first, the
+stable-knowledge answer second, one package run); `who-ask-declined`
+(the person answers "never mind" to "Who's Juniper?": the ask cleared,
+no entity created, no second ask on the next turn); `open-question-once`
+(the judge's open question asked once at the end of the next reply and
+never again after "not now"); `plan-line-cache` (two ordinary turns with
+different plans keep the stable prefix byte-identical: the prefix cache
+hit rate on the `[turn]` line unchanged); `composed-turn-not-streamed`
+(a lookup turn's composer completion is the second and last, the
+streamed chat turn carries no JSON: the completion count on the turn).
+
+What the fixture (`conversationFixture.ts`, `TurnExpectation`) cannot
+express today, each one field the rows above need: `signal` (act,
+emotion, intensity, stance per clause), `plan` (required and forbidden
+moves, the caps, `claim_state` later), `moves` (the typed moves on a
+composed turn), `subjects` (the SubjectRef stack after the turn, with
+status and `rejected`), `pendingAsk` beyond `confirm | ask` (`who`,
+`lookup`), `openQuestion` (kind, target person, asked once, with a
+wait), `memoryRows` (text fragments, category, subject, status,
+importance range, `valid_to` window, disclosure, `expired_at`),
+`entityExists` with `source` and `pronouns`, `outcomeArgs` (a named
+argument on a named package's outcome), `sourcesNonEmpty`,
+`evidenceDisposition` (per evidence id: full, summary, withheld and the
+reason), `notificationBody` (a type delivered whose body lacks listed
+words), `resolvedText`, `completionCount`, a `companion` per
+conversation, `seedRecords` (household records with disclosure,
+sensitive, valid_to and status seeded before a conversation, beside
+`seedEntities` and `seedPrivateForChild`), and `seedReply` (the runner
+scripts the hub's reply for one turn, offer-binding's need). The
+`[turn]` line carries no `subject` today although the scorer reads one;
+the runner should read the signal, plan and subjects from the turn row
+(as it reads `memoryRows` from the table), never from the log line.
+
+EVAL-07, dataset by rule, and where the mapping is lossy:
+
+- *LongMemEval-cleaned* exercises abstention ("acts as if it knows what
+  it was never told", the recall side) and knowledge-update (#88's
+  supersede, CUR-01's conflicts). Lossy in two ways: its histories are
+  user-assistant chats in which the assistant's replies carry facts,
+  and MEM-06 forbids the assistant's text as an extraction source, so a
+  fact stated only by their assistant is unstored by our rule and
+  wrong by their key (report those questions as a separate class, never
+  as failures); and its size. The S set is 500 questions, each with its
+  own long history; ingesting every history as judged turns is on the
+  order of a hundred thousand 4B extractions, days of the background
+  engine. The item as written ("replays it through the live engine")
+  is not runnable whole. Amended: a fixed sample of 40 questions per
+  class (abstention and knowledge-update first), histories shared where
+  the release shares them, the sample's ids pinned in the registry, the
+  judge run once per history and cached by checksum.
+- *LoCoMo* exercises multi-hop and temporal recall and, through its
+  two-speaker shape, the `reported` stance (the other speaker's facts
+  are hearsay to the household member we cast as the speaker). Lossy:
+  the hub is not a participant, so one speaker becomes the person and
+  the other's lines must be ingested as reported speech in the person's
+  turn ("Quill said ...") or dropped; the adversarial class is our
+  abstention. Ten conversations of about 300 turns is about 3,000
+  judged turns, an evening of the 4B: feasible whole.
+- *DailyDialog* validates ACT-01's rule layer and ACT-02's heads and sets
+  the transition reference. Lossy: no greeting, closing or backchannel
+  class (the relabel), no intensity, no stance, 83 percent neutral (the
+  always-neutral trap the pass already names).
+- *GoEmotions* trains the emotion head. Lossy: comments, not dialogue;
+  the 27-to-7 mapping drops nervousness and confusion, which are the
+  household's common "fear" and "unknown".
+- *Taskmaster-1* validates `repair` (corrections and retractions in
+  spoken task talk). Lossy: slot corrections in booking domains, not
+  household facts; the markers transfer, the content does not.
+- *CCPE-M* validates the preference extraction and "an inform stays an
+  inform". Lossy: every conversation is about films and most user turns
+  answer an assistant's question (the protocol layer's case), so it
+  tests the judge more than the register.
+- *QuAC* validates elliptical follow-ups (CHAT-13's pronoun resolution)
+  and "couldn't find that" on unanswerable questions. Lossy: the
+  questions are about one Wikipedia section, so "unanswerable" is
+  document-scoped, not world-scoped, and the subject never changes.
+- *MultiWOZ* validates mixed intents and topic switches (secondary acts,
+  CHAT-13's mixed requests). Lossy: booking domains; every switch is
+  between task slots.
+- *No public data tests:* unknown household names (ASK-01), the child
+  band and disclosure, credence and credulity, rapport, the companion
+  register, `search_voice`, experience claims, promises and offers, the
+  pending-ask protocol, the crisis overlay, per-person privacy, "what
+  were we talking about", the household-versus-world split. These stay
+  the household bench's alone.
+- *The mining and the replay.* The teacher-forced replay as amended
+  scores our reply against nothing (the human reply is not the answer),
+  so its only output is a rubric score from the persona judge over
+  thousands of dialogues, which is a weak judge's opinion at scale and
+  not a number a person should act on. Decision: the register mode is
+  deleted; the human conversations are mined for phenomena and
+  rewritten into fixture rows, as the amendment already says, and the
+  only automatic numbers EVAL-07 reports are LongMemEval's sampled
+  accuracy by class, LoCoMo's F1 by class and DailyDialog's act and
+  emotion F1 for the classifier. Those three are actionable: each names
+  the subsystem (recall, the supersede path, the rule layer). The
+  mining's output is actionable only after the rewriting (about 100
+  rows), which is a person's hours, so it is scheduled after CHAT-16.
+
+**6. Over-design.** The eighteen findings are engine gaps of five
+kinds; the pass grew, over six rounds, into a register system, a
+credence model, a companion disposition model, a learning loop and a
+child-safety layer. Of those, the child-safety layer is a standing org
+invariant and stays on the path (narrowed to what a table and a field
+can do). The rest are not what the five defects need.
+
+Cut or deferred, with the reason:
+
+- *Section 14 (credence), whole:* no finding was a credence defect; it
+  adds three record fields with a migration of every record, a function
+  with seven unmeasured weights, a presentation type, two guard rows
+  and two plan moves, and its contradiction move needs the judge on the
+  interactive path. Its one real bug (the near-duplicate shortcut and
+  the contradiction verdict overwrite silently) is fixed by CUR-01's
+  disputed status plus an open question, which stays. The fields ride
+  in SPEC-01 with no writer, so the later item (CRED-01) is engine work
+  only.
+- *Section 15 (credulity), whole:* flavor on a deferred companion
+  feature, with a rapport calibration record nobody asked for.
+- *ACT-02, narrowed:* the emotion head first (care on sadness is the
+  product value); act and stance heads only if the rule layer's F1 on
+  the fixture is under the floor.
+- *ACT-03, narrowed:* the base table, the emotion overrides on
+  rule-detected cues, the band envelope and the companion modulation;
+  no typed moves on streamed turns; no `claim_state`, no `credulity`
+  block; the persona-eval per companion moves to COMP-03.
+- *REVIEW-01, narrowed and later:* the deterministic per-turn checks
+  and the weekly report; the nightly 4B draft only on triggered turns;
+  the auto-apply set (rank changes from a weak judge's finding) waits
+  for a month of the report to show it would have been right.
+- *PREF-01, later.* *COMP-01 and COMP-02 (documents), later:* the
+  sources chips exist and "a link is a deliverable" covers finding 5.
+- *CHAT-13's return by name:* the stack stays at depth two with no
+  return; nobody in the house has asked for it and it is a second
+  resolver.
+- *"Every correctness row under every bundled companion":* four times
+  the bench for a household using one companion; it is COMP-03's
+  acceptance, not ACT-03's.
+- *Section 3's `compromise` tagger:* kept (prebuilt over hand-built),
+  but restricted by the household-frame rule so it never causes an ask
+  on its own.
+- *The teen-audience settings key, the judge's nomination field, the
+  `unknownNames` slot, the conversation-level `open_question` column,
+  the seven credence plan defects, `skeptical_of_person`, the second
+  `intent.kind` classification:* deleted above as duplicates.
+
+The smallest set that fixes the five defects: RECALL-02 (copies),
+OUT-01 (broken text), ASK-01 with the 3a amendment (asks about the
+unknown), MEM-06 core with REG-01 (acts as if it knows), LOOKUP-01,
+CHAT-13 and CHAT-16 with ACT-03 core (search results in a voice, and
+the promises and corrections around them), on SPEC-01 and ACT-01 as the
+shared foundation; nine engine items after the two in flight. AGE-01
+core rides beside them because it is cheap and an invariant, not
+because a finding needs it.
+
+**Amendments made in place.** Section 6 part 1 (the plan decides the
+moves); section 13 part 3 (the field is `child_disclosure`; the teen
+key deleted); section 14 and 15 headers (deferred, CRED-01 and the
+COMP slices); section 15 part 5's rows (the `adjustment` enum); "The
+sequence, all items" (superseded by the program file's queue). In the
+backlog: the block's order line; SPEC-01 added; ASK-01 (the SubjectRef
+detector, the household-frame rule, the OpenQuestion record); the
+`SubjectRef` item folded into SPEC-01; MEM-06 (the credence half
+deferred, the nomination field deleted); AGE-01 (split, the field, the
+teen key); ACT-03 (the child lengths, typed moves on composed turns
+only, the credence and credulity parts deferred, the per-companion
+runs to COMP-03); CHAT-16 (the plan's moves); CHAT-13 (CHAT-10 folded,
+no return by name); CHAT-10 (folded); CUR-01 and CHAT-08 (the read
+boundary in one place, the order); REVIEW-01 (triggered drafts, after
+CHAT-16); EVAL-07 in the program file (the sample, the register mode
+deleted); CRED-01 written as the deferred item. In the program file:
+the revised queue.
+
+**For Jesse, product owner's calls only.** (1) Section 14 and 15
+deferred whole: the review's recommendation is yes; a no puts about
+two M items back before the companions block. (2) AGE-02's notice lands
+after the defect items rather than beside AGE-01; it is still on by
+default with no switch, as decided; only the date moves. (3) The
+composer's second completion makes a lookup turn about a second slower
+to first text than a chat turn; the `status` line covers it, and the
+alternative (one completion, package text spoken as-is) is finding 18.

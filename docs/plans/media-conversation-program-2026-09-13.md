@@ -110,10 +110,42 @@ and #99 are small items between steps.
 [docs/dev.md, "The chat design pass"](../dev.md#the-chat-design-pass-findings-1-to-18-and-the-companions-brief-2026-09-13),
 one section per finding group, with the backlog items under
 [BACKLOG.md, "Design pass 2026-09-13"](../BACKLOG.md#design-pass-2026-09-13)
-and the amendments on CHAT-13 and CHAT-16 themselves. The order:
-RECALL-02, OUT-01, REG-01, EXP-01, ASK-01, LOOKUP-01 and MEM-06 before
-CHAT-13 is built; the amendments ride with CHAT-13 and CHAT-16; the
-companions items follow CHAT-16.
+and the amendments on CHAT-13 and CHAT-16 themselves.
+
+**The queue, revised 2026-09-14 by the coherence review** (dev.md,
+"Coherence review, 2026-09-14"; each item proven by its rows in three
+seeded runs before the next starts; the first block is the smallest set
+that fixes the five priority defects):
+
+| # | Item | Fixes | Size | Depends on |
+|---|---|---|---|---|
+| 1 | RECALL-02 (in flight) | copies other conversations | S-M | none |
+| 2 | OUT-01 (in flight) | sends broken text | S | none |
+| 3 | SPEC-01, the one spec migration | the foundation | S-M | none |
+| 4 | ACT-01, the signal's rule and protocol layers, the turn row, the judge queue, the fixture expectations | the foundation | S-M | SPEC-01 |
+| 5 | REG-01, EXP-01 | acts as if it knows (register), experience claims | S, S | ACT-01 |
+| 6 | ASK-01 with the household-frame rule | never asks about the unknown | M | SPEC-01, ACT-01 |
+| 7 | MEM-06 core (no confidence) | acts as if it knows (memory) | S-M | ACT-01, SPEC-01 |
+| 8 | AGE-01 core (the band in `canRead()`, the default, the deferral line) | the child invariant | S | SPEC-01, ASK-01 |
+| 9 | LOOKUP-01 | promises and offers | S-M | ACT-01 |
+| 10 | CHAT-13 with CHAT-10 folded | subject, corrections, the lookup decision | M | SPEC-01, ASK-01, LOOKUP-01 |
+| 11 | CHAT-16 with ACT-03 core | reads search results like an article | M plus M | CHAT-13, MEM-06 |
+| 12 | CHAT-08 | read-time validity | M | SPEC-01 |
+| 13 | CUR-01 core (duplicates, expiry, disputed, open questions) | store hygiene | S-M | MEM-06, CHAT-08 |
+| 14 | EVAL-07 memory mode (LongMemEval sampled, LoCoMo) | the public baseline | M | MEM-06 |
+| 15 | AGE-02 | the worrying-conversation notice | S | AGE-01, ACT-01 |
+| 16 | ACT-02, the emotion head first | care on the common case | M | ACT-01 |
+| 17 | REVIEW-01 narrowed | the weekly report | M | CHAT-16 |
+| 18 | PREF-01 | explicit preferences | M | REVIEW-01 |
+| 19 | EVAL-07 mining, rewritten rows | the phenomenon rows | a person's hours | CHAT-16 |
+| 20 | SPEC-02, the companions migration | the companions' foundation | S | none |
+| 21 | COMP-01 to COMP-06 | the brief | as sized | SPEC-02, CHAT-16 |
+| 22 | CRED-01 (section 14) | credence | M | CUR-01, ACT-03 |
+| 23 | the credulity slices of COMP-03 and COMP-05 (section 15) | credulity | S, S | CRED-01, COMP-05 |
+| 24 | SPEAK-01, WAKE-02 | hardware | L, L | the bot's pipeline |
+
+CHAT-12 stays deferred behind the volatile-zone ordering; CONC-01
+counts the composer's second completion when it lands.
 
 Defect classes observed by the coordinator in live household chat,
 recorded as findings, not designed. The rule: the design for these
@@ -352,6 +384,26 @@ labels validate the turn-act classifier (ACT-01, ACT-02) and set the
 "what a person does next" reference, and train nothing that ships
 (CC BY-NC-SA); GoEmotions (Apache 2.0) joins the downloads for the
 emotion head's training data.
+
+Amended 2026-09-14 (the coherence review, dev.md, question 5): the
+memory mode runs on a fixed sample, never the whole set (LongMemEval-S
+is 500 questions each with its own long history, on the order of a
+hundred thousand judged turns to ingest whole): 40 questions per class,
+abstention and knowledge-update first, the sample's ids pinned in the
+registry, the judge run once per history and cached by checksum;
+questions whose answer their assistant stated and the user never did
+are reported as their own class (MEM-06 forbids the assistant's text as
+a source), never as failures; LoCoMo is ingested whole with one speaker
+cast as the household member and the other's lines as reported speech
+in that person's turns. The register mode is deleted: with the human
+reply no longer the answer, a rubric score over thousands of dialogues
+is a weak judge's opinion at scale and not a number a person should act
+on. The automatic numbers EVAL-07 reports are three, each naming a
+subsystem: LongMemEval's sampled accuracy by class (recall, the
+supersede path), LoCoMo's F1 by class (recall, the reported stance),
+DailyDialog's act and emotion F1 (the rule layer, the heads). The
+mining's rewritten rows are the household bench's own mechanism and
+land after CHAT-16.
 
 Order: LongMemEval-cleaned first (MIT, and abstention is our weakest
 class), then LoCoMo, then the phenomenon mining on Taskmaster-1 and
