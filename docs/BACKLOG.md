@@ -719,6 +719,89 @@ not permission to expand scope.
       makes a "Checking that for you" line worth having in the first
       place), Session A's own work, wired to the exact shape above.
 
+<a id="runtime-01"></a>
+
+- [ ] **RUNTIME-01: The household runtime as a workspace package the hub runs** (L)
+
+    Filed by the robot's design pass (bot `docs/dev.md`, section 2 "The
+    shared-runtime boundary" and the "named hub items" list): the robot
+    runs the hub's own household runtime on Bun and pins the same code,
+    so the hub has to run it as a package first. Objective: the turn
+    engine, the turn context and signal, the guards and the output
+    boundary, the safety classifier, the memory store and judge, the
+    scheduler, people, settings and grants, the package host, the link
+    and the replica, and the schema UI service, as one workspace package
+    with an explicit API, the hub its first consumer. Files: a new
+    workspace package under `backend/` (the boundary around
+    `backend/src/lib`), `backend/src/index.ts` and the routes as the
+    consumer, `package.json` workspaces. Mirror: `spec/` as a workspace
+    package the hub imports as `@maipai/spec`; `turnSignal.ts` and
+    `turnContext.ts` are already leaf modules (no engine, no database),
+    and `hlc.ts` needs only its seed injected. Do: declare the injected
+    ports (the record store, the engine supervisors and their launch
+    adapter, the voice contract client, the package host, the data
+    directory, the surface, the clock) as explicit constructor inputs,
+    never `@/` reach-ins to the hub's database, settings or supervisors;
+    name the exposed calls (run a turn, stream a turn, cancel, the judge
+    tick, the scheduler tick, the link's apply and emit) and route the
+    hub through them; the robot's `runtime/` consumes only the API,
+    never a module path inside the package, and its pin is a version and
+    a digest in the lockfile (a boot check refuses a mismatch and a path
+    dependency). Acceptance: the hub boots and passes its suite through
+    the package API with no route or script importing a module inside
+    the package by path; the package's own tests run with fakes on every
+    port; the API is documented in dev.md. Out of scope: the robot's
+    pin itself (bot RT-00 and RT-01), `spec/link/`. Exit: `bash
+    scripts/check.sh`.
+
+<a id="surface-01"></a>
+
+- [ ] **SURFACE-01: The robot surface** (M)
+
+    Filed by the robot's design pass (bot `docs/dev.md`, "named hub
+    items"). Objective: `robot` admitted to `IMPLEMENTED_SURFACES`
+    (`backend/src/lib/turnEngine.ts:79`, rejected today at `:98`), with
+    the surface discriminator the platform plan promises. Files:
+    `backend/src/lib/turnEngine.ts`, `guards.ts`, `memory.ts` and the
+    prompt sections, `spec/` for the `present` field on the turn (spec
+    first), `backend/tests/turnEngine.test.ts`. Mirror: the `chat`
+    surface's own branches. Do: spoken presentation on `robot` (one
+    sentence, no link read aloud, "it's on your phone" for a
+    deliverable), memory sensitivity (a `sensitive` record withheld
+    unless the speaker is present and alone, bot dev.md section 6), and
+    the `present` list on the turn (who the body says is in the room,
+    the input the withholding reads). Acceptance: a robot-surface turn
+    runs end to end in the scripted-engine tests; a sensitive record
+    reaches the prompt on a `present: [speaker]` turn and never on a
+    turn with a second person present; the same turn on `chat` is
+    unchanged. Out of scope: the wire events (WIRE-01), the body's
+    presence evidence (the robot's own). Exit: the named tests, `bash
+    scripts/check.sh`.
+
+<a id="wire-01"></a>
+
+- [ ] **WIRE-01: The signal and the plan on the wire** (S-M)
+
+    Filed by the robot's design pass (bot `docs/dev.md`, "named hub
+    items"; section 5 is the consumer's contract). Objective: the robot
+    drives its expression from the turn's own signal and plan, so both
+    ride the stream. Files: `backend/src/wire.ts` (`TurnStreamEvent`,
+    today `turn_meta | delta | spoken_cue | done | error` at `:117`),
+    `backend/src/routes/turn.ts` (`streamTurnEvents()`),
+    `backend/src/lib/turnEngine.ts`, `spec/streaming/` (spec first),
+    `backend/tests/turnEngine.test.ts`, the frontend adapter tests.
+    Mirror: the `spoken_cue` event, added the same way. Do: a `signal`
+    event right after `turn_meta` (the signal is frozen before routing,
+    so it costs nothing and never waits on the model); a `plan` event
+    before the first delta once ACT-03 lands; a `cancel` event the
+    caller can send and the engine honors with the real abort of the
+    in-flight completion. Acceptance: the stream tests read `signal` as
+    the second event on every model turn and on every immediate turn;
+    `plan` is absent until ACT-03 and asserted there; a cancel mid-stream
+    ends the turn with the upstream completion aborted (the bench's
+    `inferenceStopped` check). Out of scope: the robot's rendering of
+    the cues. Exit: the named tests, `bash scripts/check.sh`.
+
 <a id="chat-17"></a>
 
 - [ ] **CHAT-17: Share streaming and blocking turn execution without dropping calls** (M)
@@ -1479,7 +1562,27 @@ invented for the roster's household, and added to
 
 <a id="lookup-01"></a>
 
-- [ ] **LOOKUP-01: A promise is the lookup, an offer is a pending ask** (S-M)
+- [x] **LOOKUP-01: A promise is the lookup, an offer is a pending ask** (S-M)
+    Done 2026-09-14 (docs/dev/session-a.md "LOOKUP-01"): the promise
+    and offer shapes in `lib/guards.ts` (`lookupShapeOf()`, one
+    definition for both paths); a first-sentence promise with no lookup
+    outcome is never sent, the forced lookup runs (the invention
+    retry's own mechanism) and its answer goes out, or the rest of the
+    draft without the promise, or the lookup family's honest line; the
+    streaming path holds the first sentence (`LOOKUP_HOLD_MAX_CHARS`)
+    and aborts the draft's request before the forced completion; an
+    offer or a promise that went out becomes a `lookup` pending ask
+    bound to the question (`notePendingLookup()`), which a consent word
+    runs through the websearch via ask, a refusal clears, and anything
+    else falls through. The `offer-binding` conversation, the bench's
+    fake SearXNG, EXP-01's two fold rows, and the bench's question rate
+    beside the DailyDialog reference (finding 23, a measurement only).
+    Until CHAT-13 gives the
+    forced lookup a subject, the forced completion is the invention
+    retry's own (the model writes the expression from the same
+    messages) and the pending ask binds the person's utterance
+    verbatim as the expression. The seeded set waits on the machine
+    (Session B's replay first).
 
     Objective: "let me check that for you" runs the check, and "do it"
     after an offer runs the offer. Files: `backend/src/lib/turnEngine.ts`

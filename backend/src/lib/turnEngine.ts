@@ -22,12 +22,12 @@ import { notifyIfFlagged } from "@/lib/notifications";
 import { recall, bumpUsage, getProfileParagraph, type RecallMatch } from "@/lib/memory";
 import { findEntityByName, subjectLabel, subjectRosterFor } from "@/lib/subjects";
 import { AFFIRMATIVE_RE, NEGATIVE_RE } from "@/lib/consentVocab";
-import { repairReply, assessReply, isShortMalformed, repairTail, closeDanglingClause, visibleText, RETRY_TOKEN_CAP } from "@/lib/wellFormed";
+import { repairReply, assessReply, isShortMalformed, repairTail, closeDanglingClause, visibleText, thinkingPrefix, RETRY_TOKEN_CAP } from "@/lib/wellFormed";
 import { recallEpisodes, formatEpisodesForPrompt, formatEpisodeLine, episodeQuote, episodeQueryEligible, asksWhatHubSaid, PROMPT_BLOCK_MAX_LINES, EARLIER_HEADER, ASKS_ABOUT_START_RE, contentTerms, earliestDroppedTurn, type EpisodeMatch } from "@/lib/episodes";
 import { intentFor, markIncluded, guardContextFrom, outcomeOf, emptyTimings, type TurnContext, type TurnEvidence, type ToolExecutionOutcome, type RejectedReason, type TurnTimings } from "@/lib/turnContext";
 import { newConversationTurnId } from "@/lib/id";
 import { complete, startCompleteStream, type LlmMessage, type ToolSpec, type ToolCall } from "@/lib/llm";
-import { guardReply, guardSentence, replacementFor, isCuttable, isSkippable, isRegisterSkip, isStatementTurn, isBareSocialTurn, stripRegisterTail, dropConjunctionLead, emptiedLine, splitIntoSentences, type GuardContext, type GuardReason } from "@/lib/guards";
+import { guardReply, guardSentence, replacementFor, isCuttable, isSkippable, isRegisterSkip, isStatementTurn, isBareSocialTurn, stripRegisterTail, dropConjunctionLead, emptiedLine, splitIntoSentences, lookupShapeOf, lookupAnswered, type GuardContext, type GuardReason } from "@/lib/guards";
 import { tokenize } from "@/lib/text";
 import { unspokenArgument, askPromptFor, isActionPackage } from "@/lib/unspokenArgs";
 import { COURTESY_PREFIX } from "@/lib/utteranceShape";
@@ -1400,6 +1400,55 @@ type PreparedTurn =
 // vocabularies live in consentVocab.ts (OUT-01 shares them with the
 // reply boundary's short-answer list).
 // Item 4a: the cancel of an ask is the whole utterance, never a prefix.
+/** LOOKUP-01: what a promised lookup says when the search itself
+ * failed or found nothing: the lookup family's own honest line. */
+export const LOOKUP_FAILED_LINE = "That lookup didn't work, sorry.";
+/** A hesitation fragment the sentence splitter ends on its own dots
+ * ("Hmm...", "Well.", "Okay, so..."): not the reply's first sentence. */
+const HESITATION_FRAGMENT_RE = /^\W*(?:h+m+|u+m+|u+h+|a+h+|o+h+|well|ok(?:ay)?|so|right|alright|let'?s see|sure)(?:[,\s]+(?:h+m+|u+m+|well|ok(?:ay)?|so|right|alright|let'?s see))*\W*$/i;
+/** The index of the first sentence that is not a hesitation fragment,
+ * or null when every sentence so far is one (a review). */
+export function firstSentenceIndex(sentences: readonly string[]): number | null {
+  const i = sentences.findIndex((sentence) => !HESITATION_FRAGMENT_RE.test(sentence));
+  return i === -1 ? null : i;
+}
+/** Whether the first real sentence has arrived whole: it ends on a stop
+ * of its own (the splitter hands back an unfinished tail as a sentence
+ * too). */
+export function firstSentenceComplete(sentences: readonly string[]): boolean {
+  const i = firstSentenceIndex(sentences);
+  return i !== null && /[.!?…]["')\]]*\s*$/.test(sentences[i]!);
+}
+/** The draft without its first sentence's promise (and any hesitation
+ * ahead of it): the rest when there is one, the honest line when the
+ * promise was the whole reply. */
+export function withoutPromise(text: string): string {
+  const sentences = splitIntoSentences(text);
+  const rest = sentences.slice((firstSentenceIndex(sentences) ?? 0) + 1).join(" ").trim();
+  return rest.length > 0 ? rest : LOOKUP_FAILED_LINE;
+}
+/** LOOKUP-01: an offer or a promise anywhere in the reply that went
+ * out, with no lookup that answered, becomes a `lookup` pending ask
+ * bound to the question, so "do it", "sure", "yes", "go ahead" run the
+ * websearch through resolvePendingAsk() rather than routing as a bare
+ * command. A first-sentence promise the forced lookup took never
+ * reaches here with the promise in it (the answer went out as the
+ * package's, or the draft lost its promise); one that did reach the
+ * wire (past the stream's hold bound, or after the turn's generation
+ * budget was spent) is bound like any other (a review). Exported for
+ * the bench's seeded-reply turns, which script the hub's reply and
+ * still need the offer bound. */
+export function notePendingLookup(conversationId: string, replyText: string, utterance: string, outcomes: readonly ToolExecutionOutcome[] = [], lookupIds?: readonly string[]): boolean {
+  if (lookupAnswered(outcomes)) return false;
+  // Nothing to run it with (websearch not among the turn's lookup
+  // tools: not installed, or above the speaker's role): no binding, so
+  // a "yes" never reaches a package that will refuse (a review).
+  if (lookupIds && !lookupIds.includes("websearch")) return false;
+  const offered = splitIntoSentences(replyText).find((sentence) => lookupShapeOf(sentence) !== null);
+  if (!offered) return false;
+  setPendingAsk(conversationId, { kind: "lookup", prompt: offered, packageId: "websearch", args: { expression: utterance } });
+  return true;
+}
 const ASK_CANCEL_RE = /^(?:(?:no|nah|nope|actually|ok(?:ay)?|oh)[,\s]+)*(?:no|nope|nah|cancel(?: (?:that|it))?|never ?mind(?: (?:that|it|about it))?|forget (?:it|that|about it)|stop|no thanks|no thank you|don'?t(?: bother| worry(?: about it)?)?|skip it|leave it)\s*[.!]?$/i;
 
 /** Session C step 2's pendingAsk continuation, either trigger
@@ -1538,6 +1587,34 @@ export async function resolvePendingAsk(
     // history never shows a consequential action parked forever.
     outcomes.push(outcomeOf({ callId: `${turnId}:confirm`, packageId: pending.packageId, status: "rejected", reason: "unconfirmed", args: pending.args, via: "confirm" }));
     return null;
+  }
+
+  // LOOKUP-01: an offer or a late promise in the hub's own reply, bound
+  // to the query. A consent word runs the websearch (via "ask", the
+  // outcome retained like any other), a refusal clears it, and anything
+  // else clears it and falls through to routing: the person moved on.
+  if (pending.kind === "lookup") {
+    setPendingAsk(conversation.id, null);
+    if (ASK_CANCEL_RE.test(text.trim())) {
+      protocol.answer = { kind: "lookup", answer: "negative" };
+      return { reply: { text: "Okay, I'll leave it." }, source: "confirm", safety, crisis_resources: crisisResources, conversation_id: conversation.id, turn_id: turnId };
+    }
+    if (!AFFIRMATIVE_RE.test(text.trim())) return null;
+    const result = await runPlugin(pending.packageId, actor, pending.args, turnId);
+    outcomes.push(
+      outcomeOf(
+        result.ok
+          ? { callId: `${turnId}:lookup`, packageId: pending.packageId, status: "succeeded", args: pending.args, via: "ask", result: result.value }
+          : { callId: `${turnId}:lookup`, packageId: pending.packageId, status: "failed", args: pending.args, via: "ask", errorCode: (result as { code?: string }).code ?? String(result.status), userMessage: safeFailureMessage(result) },
+      ),
+    );
+    protocol.answer = { kind: "lookup", answer: "affirmative" };
+    if (result.ok) {
+      return { reply: result.value.reply ?? { text: "Done." }, source: "plugin", plugin_id: pending.packageId, safety, crisis_resources: crisisResources, conversation_id: conversation.id, turn_id: turnId };
+    }
+    // The package's own honest line on a 502 (Fix B2, as the confirm
+    // branch above), the lookup family's otherwise (a review).
+    return { reply: (result.status === 502 ? result.fallback_reply.reply : undefined) ?? { text: LOOKUP_FAILED_LINE }, source: "plugin_error", plugin_id: pending.packageId, safety, crisis_resources: crisisResources, conversation_id: conversation.id, turn_id: turnId };
   }
 
   // kind: "ask" - the raw utterance is the answer; deterministicArgs()
@@ -2942,8 +3019,19 @@ async function runTurnHoldingLease(
         break;
       }
       const looksInvented = firstReason === "invention" || firstReason === "unrelated_recall";
+      // LOOKUP-01: a promise or an offer to look something up in the
+      // first sentence, with no lookup outcome on the turn, is an
+      // invalid draft: it is never sent, and the forced lookup runs (the
+      // invention retry's own mechanism). A promise later in the reply
+      // becomes a `lookup` pending ask (notePendingLookup below).
+      // The visible reply, never a think block's own "let me check what
+      // I know" (a review); the block travels on the text unchanged.
+      const visibleReply = visibleText(rawText);
+      const visibleSentences = splitIntoSentences(visibleReply);
+      const firstIndex = firstSentenceIndex(visibleSentences);
+      const promisesLookup = firstIndex !== null && lookupShapeOf(visibleSentences[firstIndex]!) !== null && !lookupAnswered(prepared.turnContext.outcomes);
 
-      if (offeringTools && looksInvented && prepared.lookupTools.length > 0) {
+      if (offeringTools && (looksInvented || promisesLookup) && prepared.lookupTools.length > 0) {
         const lookupIds = new Set(prepared.lookupTools.map((t) => t.id));
         prepared.timings.retries++;
         const forced = await complete("chat", prepared.messages, { thinking: opts.thinking, tools: prepared.lookupTools, tool_choice: "required" });
@@ -2957,7 +3045,9 @@ async function runTurnHoldingLease(
         // gets logged or flagged as one, and a resolved tool answer
         // never re-runs guardReply() on the text it replaced, matching
         // every other plugin reply in this function.
-        value = resolved ? resolved : answerWithSafetyAndGuards(rawText);
+        // A promise whose forced lookup failed keeps the rest of the
+        // draft without the promise, or the lookup family's honest line.
+        value = resolved ? resolved : answerWithSafetyAndGuards(promisesLookup ? `${thinkingPrefix(rawText)}${withoutPromise(visibleReply)}` : rawText);
       } else {
         value = answerWithSafetyAndGuards(rawText);
         // REG-01, rule 1: every sentence of a reply to a statement was
@@ -2988,6 +3078,9 @@ async function runTurnHoldingLease(
 
   const trace: ReplyTrace = { hits: guardHits, replaced: guardReplaced };
   value = finalizeReply(actor, value, trace);
+  // LOOKUP-01: an offer or a late promise in the reply that went out
+  // binds the next consent word to the lookup.
+  if (prepared.kind === "model" && value.source === "model") notePendingLookup(conversation.id, value.reply.text, text, prepared.turnContext.outcomes, prepared.lookupTools.map((t) => t.id));
   if (prepared.kind === "model") prepared.timings.finalize_ms = Date.now() - generationDone;
   logTurnSafely(actor, surface, text, value, { startedAt, guardHits, guardReplaced: trace.replaced, supersedes: opts.supersedes, outcomes: prepared.kind === "immediate" ? prepared.outcomes : prepared.turnContext.outcomes, signal: prepared.signal, timings: prepared.timings });
   return { ok: true, value };
@@ -3443,6 +3536,10 @@ export { closeDanglingClause };
  * boundary, or a bound of characters so a long unbroken opener never
  * waits (a few tokens at the chat engine's rate). */
 export const OPENING_HOLD_MAX_CHARS = 40;
+/** LOOKUP-01: the first sentence is read for a promise to look
+ * something up; a long first sentence is read at this many visible
+ * characters (about twelve tokens) instead. */
+export const LOOKUP_HOLD_MAX_CHARS = 72;
 /** With thinking on, the visible opening comes after the think block;
  * the hold reads the visible text and never waits past this much raw
  * text for it, so the block itself does not hold the wire. */
@@ -3551,6 +3648,19 @@ async function runTurnStreamHoldingLease(
   // The model turn's own messages, for the hold's regeneration below
   // (prepared is narrowed after this closure is defined).
   const modelMessages = (prepared as Extract<typeof prepared, { kind: "model" }>).messages;
+  // LOOKUP-01: the model turn's view for the lookup hold below, taken
+  // the same way (a review: reading `modelPrepared` from the hold's
+  // body threw on the no-tools branch, which returns before that
+  // narrowing is declared), and the draft's own abort. holdForLookup()
+  // closes the draft when its first sentence is a promise, and closing
+  // the JS iterator alone leaves llama-server generating the abandoned
+  // reply on the slot the forced completion then waits for; aborting
+  // the fetch is what stops the engine. The caller's signal forwards,
+  // an already-aborted one at once.
+  const modelTurn = prepared as Extract<typeof prepared, { kind: "model" }>;
+  const draftAbort = new AbortController();
+  if (opts.signal?.aborted) draftAbort.abort();
+  else opts.signal?.addEventListener("abort", () => draftAbort.abort(), { once: true });
 
   // Fix E (docs/dev.md's "Chat reliability" - native tool calling, one
   // round trip): shared by every branch below that ends up with a real
@@ -3602,6 +3712,81 @@ async function runTurnStreamHoldingLease(
     // all three sites (a code review, 2026-09-12, found the retry site
     // alone was covered). A failure after real text has streamed is
     // the route's catch and finalize() as before.
+    // LOOKUP-01: the first sentence is held (or the first
+    // LOOKUP_HOLD_MAX_CHARS of visible text, whichever comes first, on
+    // top of OUT-01's opening hold) and read for a promise or an offer
+    // to look something up. With no lookup outcome on the turn the
+    // sentence is never sent: the stream is closed and the forced lookup
+    // runs (the invention retry's own mechanism, a blocking completion
+    // with the lookup tools required), its result going out as every
+    // package answer does; a lookup that fails takes the honest line.
+    // A later promise or an offer becomes a pending ask in finalize().
+    const lookupIds = new Set(offeringTools ? modelTurn.lookupTools.map((t) => t.id) : []);
+    async function* holdForLookup(inner: AsyncGenerator<string, ToolCall[] | undefined | { resolved: TurnValue }, void>): AsyncGenerator<string, ToolCall[] | undefined | { resolved: TurnValue }, void> {
+      if (!offeringTools || lookupIds.size === 0 || lookupAnswered(modelTurn.turnContext.outcomes)) return yield* inner;
+      const iterator = inner[Symbol.asyncIterator]();
+      let buffer = "";
+      // A think block is not held (a review: OUT-01's rule that the
+      // block never holds the wire): its deltas pass through as they
+      // come, and the hold starts at the visible text after it.
+      let inThink = false;
+      let step = await iterator.next();
+      while (!step.done) {
+        if (inThink) {
+          const close = step.value.match(/<\/think>/i);
+          if (!close || close.index === undefined) {
+            yield step.value;
+            step = await iterator.next();
+            continue;
+          }
+          const end = close.index + close[0].length;
+          yield step.value.slice(0, end);
+          buffer = step.value.slice(end);
+          inThink = false;
+        } else {
+          buffer += step.value;
+          if (/<think>/i.test(buffer) && !/<\/think>/i.test(buffer)) {
+            yield buffer;
+            buffer = "";
+            inThink = true;
+            step = await iterator.next();
+            continue;
+          }
+        }
+        const visible = visibleText(buffer);
+        // The first real sentence, complete: a hesitation fragment
+        // ("Hmm...", "Well.") ahead of it is not the sentence, and its
+        // own stop is not the sentence's (a review).
+        if (visible.length >= LOOKUP_HOLD_MAX_CHARS || firstSentenceComplete(splitIntoSentences(visible))) break;
+        step = await iterator.next();
+      }
+      const sentences = splitIntoSentences(visibleText(buffer));
+      const first = sentences[firstSentenceIndex(sentences) ?? 0] ?? "";
+      const shape = lookupShapeOf(first);
+      if (shape && !lookupAnswered(modelTurn.turnContext.outcomes) && generations < 2) {
+        // The draft stops here; what the model was about to say is not
+        // an answer: the engine's request is aborted (the slot freed),
+        // then the iterator closed. Then the lookup, forced.
+        if (!step.done) {
+          draftAbort.abort();
+          await iterator.return(undefined).catch(() => undefined);
+        }
+        generations++;
+        prepared.timings.retries = generations - 1;
+        const forced = await complete("chat", modelMessages, { thinking: opts.thinking, tools: modelTurn.lookupTools, tool_choice: "required" });
+        const resolved =
+          forced.ok && forced.value.tool_calls && forced.value.tool_calls.length > 0
+            ? await resolveToolCalls(forced.value.tool_calls, lookupIds, modelTurn.ranked, actor, conversation.id, modelTurn.turnId, modelTurn.safety, modelTurn.crisisResources, modelTurn.turnContext.outcomes, text)
+            : null;
+        if (resolved) return { resolved: finalizeReply(actor, resolved, resolvedTrace) };
+        console.log(`[turn] a promised lookup for turn ${modelTurn.turnId} ran and found nothing; the honest line stands`);
+        yield `${LOOKUP_FAILED_LINE} `;
+        return undefined;
+      }
+      if (buffer) yield buffer;
+      if (step.done) return step.value;
+      return yield* iterator;
+    }
     async function* guardFirstStep(inner: AsyncGenerator<string, ToolCall[] | undefined | { resolved: TurnValue }, void>) {
       const iterator = inner[Symbol.asyncIterator]();
       let first: IteratorResult<string, ToolCall[] | undefined | { resolved: TurnValue }>;
@@ -3693,7 +3878,7 @@ async function runTurnStreamHoldingLease(
       tokens: holdLease(
         sentenceCaseStream(
           gateGuards(
-            gateOutputSafety(guardFirstStep(holdOpening(tokens, true)), actor, prepared.turnId),
+            gateOutputSafety(guardFirstStep(holdForLookup(holdOpening(tokens, true))), actor, prepared.turnId),
             () => guardContextFrom(prepared.turnContext),
             actor.id,
             (reason, replaced) => {
@@ -3813,6 +3998,9 @@ async function runTurnStreamHoldingLease(
         // finalize() no longer leaks anything, since holdLease()'s
         // `finally` releases on the aborted fetch's throw.
         finalized = value;
+        // LOOKUP-01: an offer or a late promise that went out on the
+        // wire binds the next consent word to the lookup.
+        if (value.source === "model" && !opts.ephemeral) notePendingLookup(conversation.id, value.reply.text, text, prepared.turnContext.outcomes, prepared.lookupTools.map((t) => t.id));
         prepared.timings.finalize_ms = Date.now() - finalizeStart;
         logTurnSafely(actor, surface, text, value, { startedAt, guardHits, guardReplaced: trace.replaced, supersedes: opts.supersedes, ephemeral: opts.ephemeral, outcomes: prepared.turnContext.outcomes, signal: prepared.signal, timings: prepared.timings });
         return value;
@@ -3864,12 +4052,12 @@ async function runTurnStreamHoldingLease(
   // TS does not carry `prepared`'s narrowing (kind: "model") or
   // `startResult`'s (ok: true) into a nested generator's body, hence
   // the two casts.
-  const modelPrepared = prepared as Extract<typeof prepared, { kind: "model" }>;
+  const modelPrepared = modelTurn;
   const startResult = await startCompleteStream(
     "chat",
     modelPrepared.messages,
     { thinking: opts.thinking, tools: modelPrepared.tools, tool_choice: "auto" },
-    opts.signal,
+    draftAbort.signal,
   );
   if (!startResult.ok) {
     return { ok: false, status: 503, code: "unavailable", error: startResult.error }; // released by the caller's finally

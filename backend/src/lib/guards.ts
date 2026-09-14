@@ -365,6 +365,11 @@ const EXPERIENCE_VERBS = String.raw`(?:watch(?:ing)?(?! (?:what|how|for|out for)
 const PLANNED_EXPERIENCE_RE = new RegExp(
   String.raw`\bi(?:'m| am|'ll| will|'d| would)?\s*(?:going to|gonna|plan(?:ning)? to|can'?t wait to|excited to|looking forward to|curious to|hoping to|love to|dying to|keen to|eager to|about to|try(?:ing)? to|want to|wanna)\s+` +
     EXPERIENCE_VERBS +
+    // "I'll make sure to check it out when it drops", "I'll give it a
+    // listen once it drops" (the coordinator's read of RECALL-03's set):
+    // the will form with or without a "make sure to".
+    String.raw`|\bi(?:'ll| will|'d| would)(?: (?:make sure to|be sure to|definitely|probably|certainly|have to|try to|try and))?\s+` +
+    EXPERIENCE_VERBS +
     String.raw`|^\W*(?:can'?t wait to|excited to|looking forward to|dying to)\s+` +
     EXPERIENCE_VERBS +
     // "We can watch it together" is the hub's own experience too (the
@@ -717,6 +722,49 @@ export function isCloserSentence(sentence: string): boolean {
   // Nothing left: a closer that names a subject ("Feel free to ask
   // about Tempo") is a line about that subject, and the guard reads it.
   return tokenize(residual).size === 0;
+}
+
+// ==== LOOKUP-01: a promise is the lookup, an offer is a pending ask ====
+// The shapes the design names (dev.md section 4): a promise to look
+// something up ("let me check that for you", "I'll look that up",
+// "I can check"), and an offer to ("want me to look it up?", "would you
+// like me to check?", "should I search?"). One definition, read by the
+// engine's first-sentence check on both paths, by its pending-ask scan
+// of the rest of the reply, and beside the lookup action family above
+// (which reads the past tense). Never a promise to remember, remind or
+// add: those are the other families' and REG-01's.
+// A lookup verb is one that reaches for a source. What the words also
+// mean is excluded where they overlap (a review): "check in", "check
+// on", "check with", "check back" are care, not lookups; "see what I
+// can do" and "I can see how that feels" are not "see what I can
+// find"; "confirm with Pippa" is a household act; and a verb whose
+// object is the household's own (the list, the calendar, a timer, a
+// memory) is a package's, never the websearch's, so it is no lookup
+// shape here.
+const HOUSEHOLD_OBJECT = String.raw`(?! (?:what'?s (?:on|in) )?(?:your|the|our|my|that|this) (?:lists?|shopping|grocery|groceries|calendar|schedule|timers?|reminders?|memory|memories|notes?)\b)`;
+// A clarification is not a lookup either: "let me see if I've got this
+// right", "let me double-check I understood", "can I check something
+// with you" (a review).
+const UNDERSTANDING = String.raw`(?! (?:i(?:'ve| have)? (?:got|understand|understood|follow|heard|read|have)|that i|what you|my understanding|i'm following|we're on the same page|this is right|this right|something with you|with you))`;
+const LOOKUP_VERB = String.raw`(?:check(?:ing)?(?! (?:it|that|this|them|those) out)(?! (?:in|on|with|back|up on)\b)(?! something\b)${UNDERSTANDING}|look(?:ing)?(?: (?:that|it|this|them|those))? up|look(?:ing)? into (?:that|it|this)|find(?:ing)? out${UNDERSTANDING}|see (?:if|whether)(?! (?:i can (?:do|help)|that|you|there'?s anything i can do))${UNDERSTANDING}|see what (?:i can find|comes up|the (?:web|internet|search) (?:says|has|turns up)|the (?:date|time|schedule|reviews?|results?) (?:is|are|say))|see about|search(?:ing)?(?: (?:for|online|the web))?|dig(?:ging)? (?:that|it|this) up|double[- ]check(?:ing)?${UNDERSTANDING}|verify(?:ing)?${UNDERSTANDING}|pull(?:ing)? (?:that|it|this) up|get (?:you )?(?:the|that|those|some) (?:details|info|numbers|dates?|times?|results?|answers?))${HOUSEHOLD_OBJECT}`;
+// A filler alone ("hang on", "give me a second") is no promise; it is
+// one only with the lookup verb behind it (a review).
+const LOOKUP_PROMISE_RE = new RegExp(String.raw`\b(?:let me (?:just |quickly |go (?:and )?)?${LOOKUP_VERB}|i(?:'ll| will|'m going to|'m gonna| can| could| should)(?: (?:just|quickly|go (?:and )?|try to|make sure to|double))? ${LOOKUP_VERB}|(?:give me a (?:second|sec|moment|minute)|one (?:second|sec|moment|minute)|hold on|hang on)(?: (?:while|and) i ${LOOKUP_VERB}))\b`, "i");
+const LOOKUP_OFFER_RE = new RegExp(String.raw`\b(?:(?:do you )?want me to|would you like me to|would you like (?:me )?to|shall i|should i|can i|need me to|like me to|happy to|i could)\s+(?:\w+ )?${LOOKUP_VERB}\b`, "i");
+// A promise that names what it will check for the person, in the
+// hub's own words ("I'll check the weather"), is still a promise; a
+// statement that the person can check is not ("you can check the
+// label").
+export type LookupShape = "promise" | "offer";
+export function lookupShapeOf(sentence: string): LookupShape | null {
+  if (LOOKUP_OFFER_RE.test(sentence)) return "offer";
+  if (LOOKUP_PROMISE_RE.test(sentence)) return "promise";
+  return null;
+}
+/** Whether the turn already ran a lookup that answered (the lookup
+ * family's own packages), so a promise beside it narrates, not lies. */
+export function lookupAnswered(outcomes: readonly Pick<ToolExecutionOutcome, "packageId" | "status">[] | undefined): boolean {
+  return (outcomes ?? []).some((o) => (o.packageId === "websearch" || o.packageId === "knowledge") && o.status === "succeeded");
 }
 
 // ==== REG-01: the assistant register, and a question said twice ====

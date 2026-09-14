@@ -19,6 +19,7 @@ import { createHash } from "node:crypto";
 import { createReadStream, existsSync } from "node:fs";
 import { startRecordingProxy } from "./recordingProxy";
 import type { TurnTimings } from "@/lib/turnContext";
+import { questionRateSummary } from "./questionRate";
 
 const upstream = process.env.MAIPAI_LLAMA_SERVER_URL;
 if (!upstream) {
@@ -201,6 +202,8 @@ async function main(): Promise<{ executed: number; engine: string }> {
   const log = runner.captureTurnLog();
   const people = runner.createBenchPeople();
   const homeAssistant = runner.startFakeHomeAssistant();
+  // LOOKUP-01: lookups answered from canned results, never the network.
+  const searxng = runner.startFakeSearxng();
   const scores: Awaited<ReturnType<typeof runner.runConversation>>["scores"] = [];
   const stageTimings: TurnTimings[] = [];
   const started = Date.now();
@@ -234,6 +237,7 @@ async function main(): Promise<{ executed: number; engine: string }> {
   } finally {
     log.stop();
     homeAssistant.stop();
+    searxng.stop();
   }
 
   console.log("\n## Table\n");
@@ -261,6 +265,10 @@ async function main(): Promise<{ executed: number; engine: string }> {
   console.log(
     `signal ${stage((t) => t.signal_us)} us; routing ${stage((t) => t.routing_ms)} ms; recall ${stage((t) => t.recall_ms)} ms; prompt ${stage((t) => t.prompt_ms)} ms; first token ${stage((t) => t.first_token_ms)} ms; finalize ${stage((t) => t.finalize_ms)} ms; retries ${stageTimings.reduce((n, t) => n + t.retries, 0)} over ${stageTimings.length} turns; subjects ${stage((t) => t.subjects_ms)} ms (CHAT-13's slot)`,
   );
+  // Finding 23 (the media program): how often the hub asks back, beside
+  // the human reference, so every item from here shows its effect.
+  console.log("\n## Question rate (finding 23)\n");
+  console.log(questionRateSummary(scores.map((s) => ({ reply: s.observed.reply, act: s.observed.signal?.primary_act ?? null }))));
   runner.cleanupBenchPeople(people); // after the output: the table is the run's product, the cleanup a courtesy
   __resetEmbedSupervisorForTests();
   console.log(`\nturns ${scores.length}; median first delta ${Math.round(median(timed.map((s) => s.observed.firstDeltaMs!)))} ms; median total ${Math.round(median(scores.map((s) => s.observed.totalMs)))} ms; wall ${Math.round((Date.now() - started) / 1000)} s`);

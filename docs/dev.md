@@ -12766,6 +12766,14 @@ other's section once (147cd28, f4779a6).
   clearance Shell.tsx already reserves for it), proven to fail then
   fixed with a real-layout check in scripts/screenshot.ts:
   [docs/dev/session-b.md](dev/session-b.md) (2026-09-13).
+- LOOKUP-01, a promise is the lookup, an offer is a pending ask: a
+  first-sentence promise to look something up is never sent (the
+  forced lookup runs, its answer or the honest line goes out, on both
+  paths), and an offer or a later promise binds the next consent word
+  to the websearch as a `lookup` pending ask; the `offer-binding`
+  conversation and the bench's fake SearXNG; the robot design pass's
+  three hub items filed (RUNTIME-01, SURFACE-01, WIRE-01):
+  [docs/dev/session-a.md](dev/session-a.md) (2026-09-14).
 - RECALL-03 and GUARD-LINES, from the live chat of 2026-09-14: the
   current conversation's own turns past the window recalled as the
   person's words (never the hub's side), and the guards' replacement

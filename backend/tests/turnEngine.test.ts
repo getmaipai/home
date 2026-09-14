@@ -4455,3 +4455,364 @@ describe("OUT-01: the well-formed reply boundary", () => {
     expect(errors.filter((e) => e.includes("is malformed")).length).toBe(2);
   });
 });
+
+// LOOKUP-01 (dev.md, "The chat design pass", section 4): a promise is
+// the lookup, an offer is a pending ask. A draft that opens with "let me
+// check" is never sent: the lookup it promises runs (the forced lookup,
+// the invention retry's own mechanism) and its answer goes out, or the
+// lookup family's honest line does. An offer ("want me to look it up?")
+// binds the next consent word to the websearch, so "do it" runs it
+// through resolvePendingAsk() instead of routing as a bare command.
+describe("LOOKUP-01: a promise is the lookup, an offer is a pending ask", () => {
+  const SEARCH_ANSWER = "It's out on September 22, with twelve tracks.";
+  const retained = (turnId: string) => {
+    const row = db.select({ outcomes: conversationTurns.outcomes }).from(conversationTurns).where(eq(conversationTurns.id, turnId)).get();
+    return row?.outcomes ? (JSON.parse(row.outcomes) as { packageId: string; status: string; via?: string; args?: Record<string, unknown> }[]) : null;
+  };
+
+  /** A stub whose plain reply is `draft`, whose forced lookup (tool_choice
+   * "required") calls websearch when `forcedCall` is set, and whose
+   * llm_complete step (the websearch recipe's summary) answers
+   * SEARCH_ANSWER; a fake SearXNG behind the real websearch recipe. */
+  async function withLookupStub<T>(opts: { draft: string | ((request: ChatCompletionRequest) => string); forcedCall?: boolean; searxng?: boolean }, fn: (seen: { forced: number; queries: string[] }) => Promise<T>): Promise<T> {
+    __resetLlmSupervisorForTests();
+    const { startStubLlmServer } = await import("@maipai/spec/llm/ts/stubServer.js");
+    const seen = { forced: 0, queries: [] as string[] };
+    const stub = startStubLlmServer(0, {
+      scriptedToolCalls: (request) => {
+        if (request.tool_choice !== "required") return undefined;
+        seen.forced++;
+        return opts.forcedCall === false ? undefined : [{ id: "call-lookup", type: "function", function: { name: "websearch", arguments: JSON.stringify({ expression: "when the new album is out" }) } }];
+      },
+      scriptedChatReply: (request) => {
+        if (request.messages.some((m) => typeof m.content === "string" && m.content.includes("BEGIN SEARCH RESULTS"))) return SEARCH_ANSWER;
+        return typeof opts.draft === "function" ? opts.draft(request) : opts.draft;
+      },
+    });
+    process.env.MAIPAI_LLAMA_SERVER_URL = stub.url;
+    const searxng =
+      opts.searxng === false
+        ? null
+        : Bun.serve({
+            port: 0,
+            fetch: (req) => {
+              seen.queries.push(new URL(req.url).searchParams.get("q") ?? "");
+              return Response.json({ results: [{ title: "The new album", url: "https://example.com/album", content: "Out on September 22 with twelve tracks." }] });
+            },
+          });
+    if (searxng) setHouseholdSettingValue("search.searxng_url", `http://127.0.0.1:${searxng.port}`);
+    try {
+      return await fn(seen);
+    } finally {
+      stub.stop();
+      searxng?.stop(true);
+      delete process.env.MAIPAI_LLAMA_SERVER_URL;
+      __resetLlmSupervisorForTests();
+    }
+  }
+
+  test("lookupShapeOf(): promises, offers, and the phrases that are neither", async () => {
+    const { lookupShapeOf } = await import("@/lib/guards");
+    for (const promise of ["Let me check that for you.", "I'll look it up.", "I'll look that up for you right now.", "Let me find out.", "Give me a second while I check.", "I'm going to search for that.", "Hold on, let me see what I can find.", "Let me see if I can find that.", "I'll check the weather for you."]) {
+      expect([promise, lookupShapeOf(promise)]).toEqual([promise, "promise"]);
+    }
+    for (const offer of ["Want me to look it up?", "Do you want me to check?", "Would you like me to find out?", "Shall I search for it?", "I could look that up if you like.", "Happy to check for you."]) {
+      expect([offer, lookupShapeOf(offer)]).toEqual([offer, "offer"]);
+    }
+    // The words' other meanings (a review): fillers alone, care and
+    // empathy verbs, and a household object that is a package's, not
+    // the websearch's.
+    for (const neither of [
+      "I'll make sure to check it out when it drops.", "Let me know how it goes.", "Check the fridge.", "I checked and it is out on Friday.", "Want to hear the tracklist?", "I'll look after the dog.",
+      "Hang on, that's not what you said yesterday.", "Hold on to that thought.", "Give me a second.", "One minute of stretching each morning helps.",
+      "I can see what you mean.", "I can see how that would be frustrating.", "I'll check in with you later.", "I'll check on Rover in a bit.", "I'll confirm with Pippa.", "I'll see what I can do.", "I could see how that helps.", "I'll see if that helps.",
+      "Would you like me to check the calendar?", "Want me to check your list?", "Let me check what's on your calendar.",
+      "Let me see if I've got this right: you want the blue one?", "Let me see if I understand.", "Let me double-check I understood you.", "Can I check something with you first?", "Let me verify I understood you.", "I'll find out what you meant.",
+    ]) {
+      expect([neither, lookupShapeOf(neither)]).toEqual([neither, null]);
+    }
+  });
+
+  test("withoutPromise() and notePendingLookup(): the rest of a draft, the honest line, and what binds", async () => {
+    const { withoutPromise, notePendingLookup, LOOKUP_FAILED_LINE } = await import("@/lib/turnEngine");
+    const { actor } = await owner();
+    expect(withoutPromise("Let me check that. It should be out soon.")).toBe("It should be out soon.");
+    expect(withoutPromise("Let me check that.")).toBe(LOOKUP_FAILED_LINE);
+    // A hesitation fragment ahead of the promise is not the first
+    // sentence (a review).
+    expect(withoutPromise("Hmm... let me check that. It should be out soon.")).toBe("It should be out soon.");
+    expect(withoutPromise("Well, okay. Let me check that.")).toBe(LOOKUP_FAILED_LINE);
+    const { firstSentenceIndex } = await import("@/lib/turnEngine");
+    expect(firstSentenceIndex(["Hmm...", "let me check that."])).toBe(1);
+    expect(firstSentenceIndex(["Hmm..."])).toBeNull();
+    expect(firstSentenceIndex(["Sure, it is out on Friday."])).toBe(0);
+    const { firstSentenceComplete } = await import("@/lib/turnEngine");
+    expect(firstSentenceComplete(["Hmm...", "let me"])).toBe(false);
+    expect(firstSentenceComplete(["Hmm...", "let me check that."])).toBe(true);
+    expect(firstSentenceComplete(["Let me check"])).toBe(false);
+    const conv = resolveOrCreateConversation(actor, "chat");
+    if (!conv.ok) throw new Error(conv.error);
+    // Nothing to run it with: no binding.
+    expect(notePendingLookup(conv.value.id, "Want me to look it up?", "when is it out", [], ["knowledge"])).toBe(false);
+    expect(getPendingAsk(conv.value.id)).toBeNull();
+    // A promise that reached the wire binds wherever it sits (the
+    // forced lookup's paths never leave one in the reply, a review).
+    expect(notePendingLookup(conv.value.id, "Let me check that for you.", "when is it out")).toBe(true);
+    expect(getPendingAsk(conv.value.id)?.kind).toBe("lookup");
+    setPendingAsk(conv.value.id, null);
+    // An offer anywhere binds; so does a promise past the first sentence.
+    expect(notePendingLookup(conv.value.id, "I'm not sure of the date. Want me to look it up?", "when is it out")).toBe(true);
+    expect(getPendingAsk(conv.value.id)).toMatchObject({ kind: "lookup", packageId: "websearch", args: { expression: "when is it out" }, prompt: "Want me to look it up?" });
+    setPendingAsk(conv.value.id, null);
+    expect(notePendingLookup(conv.value.id, "I don't have a date. I'll look it up.", "when is it out")).toBe(true);
+    expect(getPendingAsk(conv.value.id)?.kind).toBe("lookup");
+    setPendingAsk(conv.value.id, null);
+    // A lookup that already answered on the turn leaves nothing to bind.
+    const answered = [{ callId: "c", packageId: "websearch", status: "succeeded" as const, args: {}, via: "tool" as const, at: "2026-01-01T00:00:00.000Z" }];
+    expect(notePendingLookup(conv.value.id, "Want me to look it up?", "when is it out", answered as never)).toBe(false);
+    expect(getPendingAsk(conv.value.id)).toBeNull();
+  });
+
+  test("runTurn(): a draft that opens with a promise is never the reply; the forced lookup runs the real websearch recipe and its answer goes out", async () => {
+    const { actor } = await owner();
+    await withLookupStub({ draft: "Let me check that for you." }, async (seen) => {
+      const result = await runTurn(actor, "chat", "when is the new album out");
+      expect(result.ok).toBe(true);
+      if (!result.ok) return;
+      expect(seen.forced).toBe(1);
+      expect(seen.queries).toEqual(["when the new album is out"]);
+      expect(result.value.source).toBe("plugin");
+      expect(result.value.plugin_id).toBe("websearch");
+      expect(result.value.reply.text).toBe(SEARCH_ANSWER);
+      expect(retained(result.value.turn_id)?.map((o) => [o.packageId, o.status])).toEqual([["websearch", "succeeded"]]);
+      expect(getPendingAsk(result.value.conversation_id)).toBeNull();
+    });
+  });
+
+  test("both paths: a hesitation fragment ahead of the promise does not hide it (a review)", async () => {
+    const { actor, client } = await owner();
+    await withLookupStub({ draft: "Hmm... let me check that for you. It should be soon." }, async (seen) => {
+      const result = await runTurn(actor, "chat", "when is the new album out");
+      expect(result.ok && result.value.reply.text).toBe(SEARCH_ANSWER);
+      expect(seen.forced).toBe(1);
+      const res = await client.post("/api/turn/stream", { text: "when is the new album out" });
+      const events = await readNdjson(res);
+      expect(events.map((e) => e.type)).toEqual(["turn_meta", "done"]);
+      expect(seen.forced).toBe(2);
+      expect((events[1]!.value as { reply: { text: string } }).reply.text).toBe(SEARCH_ANSWER);
+    });
+  });
+
+  test("both paths: a think block's own 'let me check' is never the promise, and the block travels unread (a review)", async () => {
+    const { actor, client } = await owner();
+    // The block promises, the visible reply does not: no forced lookup,
+    // the block kept on the text.
+    await withLookupStub({ draft: "<think>Let me check what I know about this.</think>I don't have a date for that one." }, async (seen) => {
+      const result = await runTurn(actor, "chat", "when is the new album out", { thinking: true });
+      expect(result.ok).toBe(true);
+      if (!result.ok) return;
+      expect(seen.forced).toBe(0);
+      expect(result.value.reply.text).toContain("I don't have a date for that one.");
+      expect(result.value.reply.text).toContain("<think>Let me check what I know about this.</think>");
+    });
+    // The visible reply promises behind a block: the block passes
+    // through, the promise is held and the forced lookup runs.
+    await withLookupStub({ draft: "<think>Let me see if I remember.</think>Let me check that for you. It should be soon." }, async (seen) => {
+      const res = await client.post("/api/turn/stream", { text: "when is the new album out", thinking: true });
+      const events = await readNdjson(res);
+      expect(seen.forced).toBe(1);
+      const deltas = events.filter((e) => e.type === "delta").map((e) => e.text).join("");
+      expect(deltas).not.toContain("Let me check that for you.");
+      expect((events.find((e) => e.type === "done")!.value as { reply: { text: string } }).reply.text).toBe(SEARCH_ANSWER);
+    });
+  });
+
+  test("runTurn(): a promise whose forced lookup produced no call keeps the rest of the draft, or the honest line when the promise was the whole reply", async () => {
+    const { actor } = await owner();
+    const { LOOKUP_FAILED_LINE } = await import("@/lib/turnEngine");
+    await withLookupStub({ draft: "Let me look that up. It's the band you played last week, right?", forcedCall: false }, async (seen) => {
+      const result = await runTurn(actor, "chat", "when is the new album out");
+      expect(result.ok).toBe(true);
+      if (!result.ok) return;
+      expect(seen.forced).toBe(1);
+      expect(result.value.source).toBe("model");
+      expect(result.value.reply.text).toBe("It's the band you played last week, right?");
+    });
+    await withLookupStub({ draft: "Let me look that up.", forcedCall: false }, async () => {
+      const result = await runTurn(actor, "chat", "when is the new album out");
+      expect(result.ok).toBe(true);
+      if (!result.ok) return;
+      expect(result.value.reply.text).toBe(LOOKUP_FAILED_LINE);
+    });
+  });
+
+  test("runTurn(): a promise with the lookup already on the turn is a narration of a lookup that ran, not a new one", async () => {
+    const { actor } = await owner();
+    // The model calls websearch on its own first offer; the summary it
+    // then writes may open with "let me check": no second lookup.
+    __resetLlmSupervisorForTests();
+    const { startStubLlmServer } = await import("@maipai/spec/llm/ts/stubServer.js");
+    let forced = 0;
+    let called = 0;
+    const stub = startStubLlmServer(0, {
+      scriptedToolCalls: (request) => {
+        if (request.tool_choice === "required") forced++;
+        if (called++ === 0 && request.tools?.some((t) => t.function.name === "websearch")) return [{ id: "call-1", type: "function", function: { name: "websearch", arguments: JSON.stringify({ expression: "when the new album is out" }) } }];
+        return undefined;
+      },
+      scriptedChatReply: (request) => (request.messages.some((m) => typeof m.content === "string" && m.content.includes("BEGIN SEARCH RESULTS")) ? SEARCH_ANSWER : "Let me check that for you."),
+    });
+    process.env.MAIPAI_LLAMA_SERVER_URL = stub.url;
+    const searxng = Bun.serve({ port: 0, fetch: () => Response.json({ results: [{ title: "The new album", url: "https://example.com/album", content: "Out on September 22." }] }) });
+    setHouseholdSettingValue("search.searxng_url", `http://127.0.0.1:${searxng.port}`);
+    try {
+      const result = await runTurn(actor, "chat", "when is the new album out");
+      expect(result.ok).toBe(true);
+      if (!result.ok) return;
+      expect(result.value.plugin_id).toBe("websearch");
+      expect(result.value.reply.text).toBe(SEARCH_ANSWER);
+      expect(forced).toBe(0);
+    } finally {
+      stub.stop();
+      searxng.stop(true);
+      delete process.env.MAIPAI_LLAMA_SERVER_URL;
+      __resetLlmSupervisorForTests();
+    }
+  });
+
+  test("the stream: the promised first sentence never reaches the wire; the forced lookup's answer is the done value", async () => {
+    const { client } = await owner();
+    await withLookupStub({ draft: "Let me check that for you. It should be soon." }, async (seen) => {
+      const res = await client.post("/api/turn/stream", { text: "when is the new album out" });
+      expect(res.status).toBe(200);
+      const events = await readNdjson(res);
+      expect(events.map((e) => e.type)).toEqual(["turn_meta", "done"]);
+      expect(seen.forced).toBe(1);
+      const value = events[1]!.value as { source: string; plugin_id?: string; reply: { text: string }; conversation_id: string; turn_id: string };
+      expect(value.source).toBe("plugin");
+      expect(value.plugin_id).toBe("websearch");
+      expect(value.reply.text).toBe(SEARCH_ANSWER);
+      expect(retained(value.turn_id)?.map((o) => [o.packageId, o.status])).toEqual([["websearch", "succeeded"]]);
+      expect(getPendingAsk(value.conversation_id)).toBeNull();
+    });
+  });
+
+  test("the stream: a promise whose forced lookup produced no call streams the honest line, never the promise", async () => {
+    const { client } = await owner();
+    const { LOOKUP_FAILED_LINE } = await import("@/lib/turnEngine");
+    await withLookupStub({ draft: "Let me look that up for you.", forcedCall: false }, async (seen) => {
+      const res = await client.post("/api/turn/stream", { text: "when is the new album out" });
+      const events = await readNdjson(res);
+      expect(seen.forced).toBe(1);
+      const text = events.filter((e) => e.type === "delta").map((e) => e.text).join("");
+      expect(text.trim()).toBe(LOOKUP_FAILED_LINE);
+      const value = events.find((e) => e.type === "done")!.value as { source: string; reply: { text: string } };
+      expect(value.reply.text).toBe(LOOKUP_FAILED_LINE);
+      expect(value.source).toBe("model");
+    });
+  });
+
+  test("the stream: a plain answer is not held back, and an offer later in it binds the lookup", async () => {
+    const { client } = await owner();
+    await withLookupStub({ draft: "I don't have a date for that one. Want me to look it up?" }, async (seen) => {
+      const res = await client.post("/api/turn/stream", { text: "when is the new album out" });
+      const events = await readNdjson(res);
+      expect(seen.forced).toBe(0);
+      const value = events.find((e) => e.type === "done")!.value as { source: string; reply: { text: string }; conversation_id: string };
+      expect(value.source).toBe("model");
+      expect(value.reply.text).toBe("I don't have a date for that one. Want me to look it up?");
+      expect(getPendingAsk(value.conversation_id)).toMatchObject({ kind: "lookup", packageId: "websearch", args: { expression: "when is the new album out" } });
+    });
+  });
+
+  test("the stream: a turn with no tools offered (a guest, no eligible package) streams as before; the hold is a pass-through", async () => {
+    // A review of the first cut: the hold read the model turn's lookup
+    // set eagerly, before the no-tools branch's own return, and every
+    // no-tools stream threw before turn_meta.
+    const { client } = await owner();
+    const created = await client.post("/api/people", { displayName: "Marlow", role: "guest", guestExpiresAt: new Date(Date.now() + 86_400_000).toISOString() });
+    expect(created.status).toBe(201);
+    const guest = db.select().from(people).where(eq(people.displayName, "Marlow")).get()!;
+    await withLookupStub({ draft: "Let me check that for you. It should be soon." }, async (seen) => {
+      const result = await runTurnStream(guest, "chat", "when is the new album out");
+      expect(result.ok).toBe(true);
+      if (!result.ok || result.kind !== "stream") return;
+      const deltas: string[] = [];
+      for await (const delta of result.tokens) deltas.push(delta);
+      const value = result.finalize(deltas.join(""));
+      expect(seen.forced).toBe(0);
+      expect(value.source).toBe("model");
+      expect(value.reply.text).toContain("Let me check that for you.");
+      // Nothing could run the lookup for a guest, so nothing binds.
+      expect(getPendingAsk(value.conversation_id)).toBeNull();
+    });
+  });
+
+  test("runTurn(): 'do it' after an offer runs the websearch through the ask, bound to the question, with the outcome retained via ask", async () => {
+    const { actor } = await owner();
+    await withLookupStub({ draft: "I'm not sure of the date. Want me to look it up?" }, async (seen) => {
+      const conv = resolveOrCreateConversation(actor, "chat");
+      if (!conv.ok) throw new Error(conv.error);
+      const offered = await runTurn(actor, "chat", "when is the new album out", { conversationId: conv.value.id });
+      expect(offered.ok && offered.value.reply.text).toBe("I'm not sure of the date. Want me to look it up?");
+      expect(getPendingAsk(conv.value.id)?.kind).toBe("lookup");
+      const consented = await runTurn(actor, "chat", "do it", { conversationId: conv.value.id });
+      expect(consented.ok).toBe(true);
+      if (!consented.ok) return;
+      expect(consented.value.source).toBe("plugin");
+      expect(consented.value.plugin_id).toBe("websearch");
+      expect(consented.value.reply.text).toBe(SEARCH_ANSWER);
+      expect(seen.queries).toEqual(["when is the new album out"]);
+      expect(seen.forced).toBe(0);
+      expect(retained(consented.value.turn_id)?.map((o) => [o.packageId, o.status, o.via, o.args])).toEqual([["websearch", "succeeded", "ask", { expression: "when is the new album out" }]]);
+      expect(getPendingAsk(conv.value.id)).toBeNull();
+      // The consent word carries the protocol signal, not a bare directive.
+      const row = db.select({ signal: conversationTurns.signal }).from(conversationTurns).where(eq(conversationTurns.id, consented.value.turn_id)).get();
+      expect(JSON.parse(row!.signal!).source).toBe("protocol");
+    });
+  });
+
+  test("runTurn(): a refusal of the offer leaves it, and anything else clears it and is its own turn", async () => {
+    const { actor } = await owner();
+    await withLookupStub({ draft: "I'm not sure of the date. Want me to look it up?" }, async (seen) => {
+      const conv = resolveOrCreateConversation(actor, "chat");
+      if (!conv.ok) throw new Error(conv.error);
+      await runTurn(actor, "chat", "when is the new album out", { conversationId: conv.value.id });
+      expect(getPendingAsk(conv.value.id)?.kind).toBe("lookup");
+      const refused = await runTurn(actor, "chat", "no thanks", { conversationId: conv.value.id });
+      expect(refused.ok && refused.value.source).toBe("confirm");
+      expect(refused.ok && refused.value.reply.text).toBe("Okay, I'll leave it.");
+      expect(getPendingAsk(conv.value.id)).toBeNull();
+      expect(seen.queries).toEqual([]);
+      // Offered in a fresh conversation (the same offer repeated after a
+      // refusal is REG-01's repeat_question cut), then the person moves
+      // on: no search, the new utterance routes as itself, the offer is gone.
+      const { createConversation } = await import("@/lib/conversationHistory");
+      const fresh = createConversation(actor, { surface: "chat" });
+      if (!fresh.ok) throw new Error(fresh.error);
+      const freshId = fresh.value.id;
+      await runTurn(actor, "chat", "when is the new album out", { conversationId: freshId });
+      expect(getPendingAsk(freshId)?.kind).toBe("lookup");
+      const movedOn = await runTurn(actor, "chat", "what's on my shopping list", { conversationId: freshId });
+      expect(movedOn.ok && movedOn.value.plugin_id).toBe("list-view");
+      expect(getPendingAsk(freshId)).toBeNull();
+      expect(seen.queries).toEqual([]);
+    });
+  });
+
+  test("runTurn(): a consent word after an offer when the search fails takes the honest line as a plugin error", async () => {
+    const { actor } = await owner();
+    const { LOOKUP_FAILED_LINE } = await import("@/lib/turnEngine");
+    await withLookupStub({ draft: "I'm not sure of the date. Want me to look it up?", searxng: false }, async () => {
+      const conv = resolveOrCreateConversation(actor, "chat");
+      if (!conv.ok) throw new Error(conv.error);
+      await runTurn(actor, "chat", "when is the new album out", { conversationId: conv.value.id });
+      const consented = await runTurn(actor, "chat", "yes please", { conversationId: conv.value.id });
+      expect(consented.ok).toBe(true);
+      if (!consented.ok) return;
+      expect(consented.value.source).toBe("plugin_error");
+      expect(consented.value.reply.text).toBe(LOOKUP_FAILED_LINE);
+      expect(retained(consented.value.turn_id)?.map((o) => [o.packageId, o.status, o.via])).toEqual([["websearch", "failed", "ask"]]);
+    });
+  });
+});

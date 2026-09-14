@@ -38,7 +38,7 @@ export function visibleText(text: string): string {
 
 /** The think blocks a reply carries, verbatim, to travel with the
  * repaired visible text. */
-function thinkingPrefix(text: string): string {
+export function thinkingPrefix(text: string): string {
   const closed = text.match(THINK_BLOCK_RE)?.join("") ?? "";
   const open = text.replace(THINK_BLOCK_RE, "").match(OPEN_THINK_RE)?.[0] ?? "";
   return `${closed}${open}`;

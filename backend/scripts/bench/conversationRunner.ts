@@ -12,8 +12,12 @@
 import { eq, and, or, ne, isNull } from "drizzle-orm";
 import { db, sqlite } from "@/db";
 import { conversationTurns, memoryRecords, people, lists, entities, relationships, episodes as episodesTable } from "@/db/schema";
-import { runTurnStream, type TurnStreamResult } from "@/lib/turnEngine";
-import { createConversation, getPendingAsk, turnSignalOf } from "@/lib/conversationHistory";
+import { runTurnStream, loadAllManifests, commandOpeners, judgeStatusAtInsert, notePendingLookup, type TurnStreamResult } from "@/lib/turnEngine";
+import { createConversation, getPendingAsk, turnSignalOf, logTurn, outcomesForConversation } from "@/lib/conversationHistory";
+import { classifyTurnSignal } from "@/lib/turnSignal";
+import { speakerAgeBand } from "@/lib/ageBand";
+import { evaluateSafety } from "@/lib/safety";
+import { newConversationTurnId } from "@/lib/id";
 import { activeTurnCount } from "@/lib/turnActivity";
 import { remember } from "@/lib/memory";
 import { deleteEpisodesForPerson } from "@/lib/episodes";
@@ -125,6 +129,46 @@ export interface FakeHomeAssistant {
  * where it lands, never inferred from turn rows. Points the household's
  * `home.base_url` and `home.access_token` at itself (the bench's
  * disposable database). */
+/** LOOKUP-01: a fake SearXNG (`/search?q=...&format=json`) answering
+ * every query with two canned results built from the query's own words,
+ * so a forced or accepted lookup has a source to cite without the
+ * network; `queries` records what the hub searched for. The design's
+ * "lookups answered from recorded fixtures". Sets `search.searxng_url`
+ * on the bench's own household. */
+export interface FakeSearxng {
+  url: string;
+  queries: string[];
+  stop(): void;
+}
+export function startFakeSearxng(): FakeSearxng {
+  const queries: string[] = [];
+  const server = Bun.serve({
+    port: 0,
+    hostname: "127.0.0.1",
+    fetch(req) {
+      const url = new URL(req.url);
+      if (url.pathname !== "/search") return new Response("not found", { status: 404 });
+      const q = url.searchParams.get("q") ?? "";
+      queries.push(q);
+      const slug = q.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 40) || "query";
+      // The fixture's own world subject gets real canned facts; every
+      // other query gets a result that says nothing, so the rows that
+      // check a real fact fail as they did with no search at all.
+      const results = /marsh lantern/i.test(q)
+        ? [
+            { title: "Marsh Lantern: the new album (release details)", url: `https://example.com/${slug}`, content: "The new Marsh Lantern album is out on September 22 with 12 tracks; the first single is already out and a spring tour is announced." },
+            { title: "Marsh Lantern album reviews", url: `https://example.com/${slug}/reviews`, content: "Reviews call it their strongest record in years; the drumming on the second track stands out." },
+          ]
+        : [{ title: `Search results for ${q}`, url: `https://example.com/${slug}`, content: `No further details were found for ${q}.` }];
+      return Response.json({ query: q, results });
+    },
+  });
+  const url = `http://127.0.0.1:${server.port}`;
+  const set = setHouseholdSettingValue("search.searxng_url", url);
+  if (!set.ok) throw new Error(`the fake SearXNG could not set search.searxng_url: ${set.error}`);
+  return { url, queries, stop: () => server.stop(true) };
+}
+
 export function startFakeHomeAssistant(): FakeHomeAssistant {
   const calls: Record<string, number> = {};
   const server = Bun.serve({
@@ -250,6 +294,22 @@ async function driveTurn(
   const value = result.finalize(text, outcome as Parameters<typeof result.finalize>[1]);
   const finalValue = resolved ?? value;
   return { value: finalValue, text: finalValue.reply.text, timings: { firstDeltaMs: firstDeltaMs ?? elapsed(), firstSentenceMs: firstSentenceMs ?? elapsed(), totalMs: elapsed() }, error: null, interrupted };
+}
+
+/** The coherence review's question 5 (row 4): the runner scripts the
+ * hub's own reply for this turn instead of calling the model, so a row
+ * can test the acceptance half of an offer before the engine offers
+ * unprompted. The turn is logged through logTurn() with the frozen
+ * signal prepareTurn() would compute, and the engine's own offer scan
+ * (notePendingLookup) binds the offer, one definition. */
+function seedTurn(actor: PersonRow, say: string, reply: string, conversationId: string): { value: TurnValue; text: string; timings: Timings; error: string | null; interrupted: boolean } {
+  const turnId = newConversationTurnId();
+  const signal = classifyTurnSignal({ text: say, commandOpeners: commandOpeners(loadAllManifests()), ageBand: speakerAgeBand(actor, new Date()) });
+  const safety = evaluateSafety(say, speakerAgeBand(actor, new Date()));
+  const value: TurnValue = { reply: { text: reply }, source: "model", safety, conversation_id: conversationId, turn_id: turnId };
+  logTurn(actor, "chat", say, value, { signal, judgeStatus: judgeStatusAtInsert(value, signal) });
+  notePendingLookup(conversationId, reply, say, []);
+  return { value, text: reply, timings: { firstDeltaMs: 0, firstSentenceMs: 0, totalMs: 0 }, error: null, interrupted: false };
 }
 
 function memoryRowsFor(turnId: string | null): string[] {
@@ -453,7 +513,7 @@ export async function runConversation(conv: BenchConversation, deps: RunDeps): P
     const beforeRoutes = new Set(deps.log.routes.keys());
     const jobsBefore = jobsNow(actor);
     const deliveriesBefore = new Set(listPending(actor).map((n) => n.id));
-    const driven = await driveTurn(actor, turn.say, { conversationId, supersedes, interrupt: turn.interrupt });
+    const driven = turn.seedReply !== undefined ? seedTurn(actor, turn.say, turn.seedReply, conversationId) : await driveTurn(actor, turn.say, { conversationId, supersedes, interrupt: turn.interrupt });
     await deps.proxy?.settled(); // the teed reply text lands a tick after the client's read
     // An interrupted turn logs no [turn] line today (nothing is
     // finalized for a reply nobody read); its id is on the [route] line.
@@ -515,6 +575,11 @@ export async function runConversation(conv: BenchConversation, deps: RunDeps): P
         .where(isNull(entities.deletedAt))
         .all(),
       relationships: relationshipsOf(actor),
+      // LOOKUP-01 (the coherence review's outcomeArgs): the turn row's
+      // own retained outcomes, package id, arguments and the path.
+      // `rejected` is CHAT-13's slot (a correction's rejected value on
+      // the outcome), unread until the correction path retains it.
+      outcomes: turnId ? (outcomesForConversation(conversationId).find((o) => o.turnId === turnId)?.outcomes ?? []).map((o) => ({ packageId: o.packageId, args: o.args ?? {}, via: o.via ?? null, rejected: null })) : [],
       assistantEpisodes: db
         .select({ text: episodesTable.text })
         .from(episodesTable)

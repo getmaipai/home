@@ -419,7 +419,11 @@ export function resolveOrCreateConversation(
 // ==== Session C step 2: pendingAsk (Tier 2 confirmation / ask continuation) ====
 
 export interface PendingAsk {
-  kind: "confirm" | "ask";
+  /** LOOKUP-01: `lookup` is an offer or a late promise in the hub's own
+   * reply ("want me to look it up?"), bound to the query; a consent word
+   * runs the websearch, a refusal clears it, anything else falls
+   * through to routing. */
+  kind: "confirm" | "ask" | "lookup";
   prompt: string;
   packageId: string;
   args: Record<string, unknown>;

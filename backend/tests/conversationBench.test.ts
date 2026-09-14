@@ -88,9 +88,9 @@ describe("the fixture", () => {
     // ACT-01's seven (three act-register, three act-memory, the curator's),
     // REG-01's statement-not-request, EXP-01's new-album, and RECALL-03's
     // recall-past-the-window (fourteen turns by design: the window has to
-    // drop turn 1).
-    expect(CONVERSATIONS.length).toBe(70);
-    expect(new Set(CONVERSATIONS.map((c) => c.id)).size).toBe(70);
+    // drop turn 1), and LOOKUP-01's offer-binding.
+    expect(CONVERSATIONS.length).toBe(71);
+    expect(new Set(CONVERSATIONS.map((c) => c.id)).size).toBe(71);
     for (const c of CONVERSATIONS) expect(c.turns.length).toBeGreaterThanOrEqual(3);
     for (const c of CONVERSATIONS) expect(c.turns.length).toBeLessThanOrEqual(c.id === "recall-past-the-window" ? 14 : 6);
     expect(CONVERSATIONS.filter((c) => c.hard).map((c) => c.id)).toEqual(["credential-disclosure", "cross-person-recall", "unsafe-request-and-crisis", "consequential-once"]);
@@ -404,7 +404,7 @@ describe("lane 12 item 3: the fixture's new expectation kinds (conversationScore
     expect(scoreTurn(conv, 0, lookup, observed({ pendingAsk: null })).pass).toBe(false);
   });
 
-  test("seedRecords and seedReply are declared on the fixture's own types and survive on the conversation (conversationRunner.ts does not read either yet: an out-of-scope gap, not this test's job to close)", () => {
+  test("seedRecords and seedReply are declared on the fixture's own types and survive on the conversation (the runner reads seedReply since LOOKUP-01, binding a lookup offer only; seedRecords is still unread)", () => {
     const seeded = byId("seeded-household-record");
     expect(seeded.seedRecords).toEqual([{ text: "Pippa is allergic to shellfish", category: "health", scope: "household", disclosure: "adult_only" }]);
     const offer = byId("seeded-offer-accepted");
@@ -769,4 +769,34 @@ describe("the runner against the stub (control-flow rows)", () => {
       expect(Date.now() - new Date(first.created_at).getTime()).toBeGreaterThan(86_000_000);
     });
   }, 20_000);
+});
+
+// Finding 23: the bench's question rate beside the reference.
+describe("the question rate (finding 23)", () => {
+  test("counts replies with a question mark, split by the person's act, and reads the reference", async () => {
+    const { questionRate, loadQuestionReference, questionRateSummary } = await import("../scripts/bench/questionRate");
+    const rows = [
+      { reply: "It's out on Friday.", act: "question" },
+      { reply: "Nice, how did it go?", act: "inform" },
+      { reply: "Okay.", act: "inform" },
+      { reply: "Was that the blue one?", act: "question" },
+      { reply: "", act: "inform" }, // no reply, not counted
+      { reply: "Done.", act: null }, // no signal: counted overall only
+    ];
+    const rate = questionRate(rows);
+    expect(rate.counts).toEqual({ replies: 5, asked: 2, afterNonQuestion: 2, askedAfterNonQuestion: 1, afterQuestion: 2, askedAfterQuestion: 1 });
+    expect(rate.overall).toBe(40);
+    expect(rate.afterNonQuestion).toBe(50);
+    expect(rate.afterQuestion).toBe(50);
+    const reference = loadQuestionReference();
+    expect(reference.afterInform).toBe(42.8);
+    expect(reference.afterInformAct).toBe(37.2);
+    expect(reference.afterQuestion).toBe(16.3);
+    expect(reference.afterQuestionAct).toBe(11.4);
+    expect(reference.overall).toBeGreaterThan(30);
+    expect(reference.overall).toBeLessThan(36);
+    const summary = questionRateSummary(rows, reference);
+    expect(summary).toContain("replies with a question: 40.0% (2 of 5)");
+    expect(summary).toContain("after an inform 42.8%");
+  });
 });

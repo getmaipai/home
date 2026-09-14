@@ -4858,3 +4858,186 @@ yesterday` turn 1 once (three experience claims skipped, the cannot-
 experience line standing), `new-album` turn 4 once ("I'll make sure to
 give it a listen once it drops" skipped, the rest lacking a subject
 word).
+
+## LOOKUP-01: a promise is the lookup, an offer is a pending ask (2026-09-14)
+
+The design pass's section 4, taken ahead of ASK-01 by the coordinator.
+The chat model decided alone whether a lookup ran, and when it wrote
+"Let me check that for you" as prose the sentence went out as the
+reply: the streaming path had committed to text, the lookup family in
+`lib/guards.ts` covered only the past tense, and an offer ("want me to
+look it up?") created no pending ask, so "do it" on the next turn
+routed as a bare command.
+
+**The shapes, one definition.** `lookupShapeOf(sentence)` in
+`lib/guards.ts` reads a sentence as a `promise` ("let me check / look
+that up / find out / see what I can find", "I'll check / look it up /
+search for that", "give me a second while I check"), an `offer` ("want
+me to / would you like me to / shall I / should I / I could look that
+up", "happy to check"), or neither. The verb list is the lookup
+family's own (check, look up, look into, find out, see what or if,
+search, dig up, double-check, verify, confirm, pull up, get you the
+details), with the shapes that are not lookups excluded where the
+words overlap: "check it out" and "give it a listen" are EXP-01's plan
+claims, "I'll look after the dog" is not a lookup (a bare "look" never
+is), "let me know how it goes" is the person's turn to speak,
+"I checked and it is out on Friday" is the past tense the action
+family already reads. `lookupAnswered(outcomes)` is true when a
+websearch or knowledge outcome on the turn succeeded.
+
+**A first-sentence promise is never sent.** On the blocking path, a
+promise or an offer in the draft's first sentence with no answered
+lookup on the turn (`promisesLookup`) joins the invention retry's
+condition: the forced lookup runs (`lookupTools` with `tool_choice`
+required, the same completion the invention retry makes), and a
+resolved call goes out the way every package answer does (source
+`plugin`, the websearch's outcome retained). When the forced
+completion produces no call, the reply is the draft without its
+promise (`withoutPromise()`: the sentences after the first) or, when
+the promise was the whole draft, the lookup family's honest line,
+`LOOKUP_FAILED_LINE` ("That lookup didn't work, sorry."). On the
+streaming path `holdForLookup()` sits between OUT-01's opening hold
+and the first-step guard: it buffers until the first sentence ends or
+`LOOKUP_HOLD_MAX_CHARS` (72 visible characters, about twelve tokens)
+have arrived, and on a promise or an offer with no answered lookup it
+aborts the draft's own request (`draftAbort`, the controller the
+stream's fetch was started with, so llama-server stops generating the
+abandoned reply and the slot is free; the caller's signal forwards to
+it), closes the iterator, counts the regeneration, and runs the same
+forced completion; the resolved
+answer is the stream's `{ resolved }` outcome (no delta, the done
+value the package's), and a forced completion with no call streams
+the honest line. The stream drops the rest of the draft where the
+blocking path keeps it: the draft was closed before the forced
+completion could run on the single slot, and a promise's tail is
+rarely an answer. A promise on a turn whose lookup already answered
+(the model called websearch on its first offer and then narrated) is
+left alone: `lookupAnswered()` gates both paths, so no second lookup
+runs.
+
+**An offer is a pending ask.** `PendingAsk.kind` gains `lookup`
+(`lib/conversationHistory.ts`). After `finalizeReply()` on both paths
+(never on an ephemeral turn), `notePendingLookup()` reads the reply
+that went out: an offer or a promise anywhere in it, with no answered
+lookup, sets a `lookup` pending ask whose `args.expression` is the
+person's own utterance and whose prompt is the offering sentence. The
+forced lookup's paths never leave a promise in the reply (the answer
+went out as the package's, or the draft lost its first sentence), so
+a first-sentence promise that does reach here is one that reached the
+wire (past the stream's hold bound, after the turn's generation budget
+was spent, or with no tools offered) and is bound like any other. `resolvePendingAsk()` takes it first: a consent
+word (`AFFIRMATIVE_RE`: "do it", "sure", "yes please", "go ahead")
+runs the websearch through `runPlugin()` with the bound expression,
+the outcome retained `via: "ask"` with a `${turnId}:lookup` call id,
+the protocol signal `lookup` affirmative, the reply the package's or
+the honest line as `plugin_error`; a refusal (`ASK_CANCEL_RE`) clears
+it with "Okay, I'll leave it." and the negative protocol signal; any
+other utterance clears it and falls through to routing, the person
+having moved on. The bench's seeded-reply turns call `notePendingLookup()` too, so a
+scripted offer binds the way a generated one does. Until CHAT-13 gives
+the turn a subject, the forced completion is the invention retry's own
+(the model writes the websearch expression from the same messages) and
+the pending ask binds the utterance verbatim.
+
+**The bench.** `startFakeSearxng()` in `conversationRunner.ts` serves
+`/search?format=json` on a loopback port and sets `search.searxng_url`
+for the run, so the lookups the fixture asserts run the real websearch
+recipe against canned results: the fixture's own world subject (Marsh
+Lantern) gets a release date and a track count, every other query
+gets a result that says nothing, so a row that checks a real fact
+fails as it did with no search. The `offer-binding` conversation
+(section 4): a seeded offer on "when is the new Marsh Lantern album
+out" leaves a `lookup` pending ask; "do it" runs the websearch via ask
+with the question as its expression and a source; "cool, and how many
+tracks" is a lookup with a source and no promise. The `new-album` "when
+is it out" row (a lookup with a source, no promise or offer phrase) is
+this item's other acceptance. EXP-01's two fold rows from the
+coordinator's read of RECALL-03's set: "I'll make sure to check it out
+when it drops" and "give it a listen once it drops" are plan claims
+(the will or make-sure-to form in `PLANNED_EXPERIENCE_RE`, the same
+forms in the fixture's `PLAN_CLAIM`), asserted on
+`recall-past-the-window` turn 1 and `new-album` turn 4.
+
+**Tests** in `tests/turnEngine.test.ts` ("LOOKUP-01"): the shapes; the
+helpers; the blocking forced lookup through the real websearch recipe
+against a loopback SearXNG and the stub's summary; the no-call case
+keeping the rest of the draft and the whole-draft case taking the
+honest line; a promise after the model's own answered lookup running
+nothing; the stream's held first sentence never reaching the wire with
+the package's done value; the stream's honest line; a plain answer not
+held and its trailing offer bound; "do it" running the websearch via
+ask with the protocol signal on the row; a refusal, and a fresh
+conversation's offer cleared by an unrelated utterance (the same offer
+repeated after a refusal is REG-01's `repeat_question` cut, as it
+should be); a consent word with no search server taking the honest
+line as a plugin error.
+
+**The review, taken.** Six findings on the first cut. A filler alone
+("hang on", "give me a second", "one minute of stretching") read as a
+promise: the lookup verb is required behind it now. The verb list
+admitted the words' other meanings ("I can see how that would be
+frustrating", "I'll check in with you later", "I'll check on Rover",
+"I'll confirm with Pippa", "I'll see what I can do"): "check in / on /
+with / back" are excluded, "see" is a lookup only as "see if / whether"
+without a care tail or "see what I can find / comes up", "confirm" is
+gone, and a verb whose object is the household's own (the list, the
+calendar, a timer, a memory) is no lookup shape, so an offer to check
+the list never binds a websearch. Closing the JS iterator did not stop
+the engine (the abandoned draft kept the slot the forced completion
+waited for): the draft's request is aborted first. A first-sentence
+promise that reached the wire (the hold's bound, the generation
+budget, no tools offered) was never bound: `notePendingLookup()` binds
+any sentence now. The fixture's `pending-ask-lookup` row had claimed
+the `lookup` kind for a lookup package's missing argument (item 4a's
+`ask` kind); the row reads `ask` now and the note says which is which.
+
+**The second review, on the gated worktree.** Eight findings; five
+taken, three read. Taken: the stream's hold read the model turn's
+lookup set eagerly, before the no-tools branch's own return, so every
+stream with no tools offered (a guest, no eligible package) threw
+before `turn_meta` (the gate had no such test; it does now, and the
+view is hoisted the way `modelMessages` is); a hesitation fragment
+("Hmm...") ahead of the promise was the first sentence to both paths
+and its own dots ended the stream's hold, so the promise slipped past
+(`firstSentenceIndex()` skips the fragment, `firstSentenceComplete()`
+waits for the real sentence's own stop, `withoutPromise()` drops both);
+a signal already aborted before the draft started never reached the
+draft's controller (forwarded at once now); a clarification opener
+("let me see if I've got this right", "let me double-check I
+understood", "can I check something with you") read as a promise (the
+understanding forms are excluded); and an offer bound the websearch
+whether or not the turn had it among its lookup tools, so a guest's
+"yes" would have reached a package that refuses (`notePendingLookup()`
+takes the turn's lookup ids and binds nothing without websearch). Read:
+the observed outcome's `rejected` is CHAT-13's slot for a correction's
+rejected value, not a rejected call's arguments (a comment says so);
+the fixture test's title said the runner did not read `seedReply` (it
+does, binding a lookup offer only, and the `seeded-offer-accepted`
+row's note says a reminder offer binds nothing yet); "check the
+weather" stays a lookup shape (the websearch answers it too, and
+CHAT-13's ladder picks the source).
+
+**The question rate, printed (finding 23).** The bench's summary
+gains a "Question rate" section (`scripts/bench/questionRate.ts`, pure,
+with a test): replies carrying a question mark over replies, the same
+split by the person's turn's act from the frozen signal (after a
+non-question turn, after a question), beside the DailyDialog
+reference `reference/dailydialog.json` carries (a "?" in the next
+turn after an inform 42.8 percent, a question act 37.2; after a
+question 16.3, a question act 11.4; the act-weighted overall 32.9).
+No behavior change rides with it; ACT-03's register table is where
+the rate becomes a decision. One reading for the finding's own
+numbers: the 11.4 and 16.3 it quotes as "after a statement" are the
+reference's after-a-question figures; after an inform the reference
+is 37.2 and 42.8, so the bench's 31 percent sits at the reference's
+overall and the live 48 percent above it.
+
+**Three hub items from the robot's design pass**, filed in
+`docs/BACKLOG.md` after CHAT-16 at the coordinator's placement, each
+pointing at bot `docs/dev.md`: RUNTIME-01 (the household runtime as a
+workspace package the hub runs, the injected ports and the exposed
+calls named, the robot pinning a version and a digest), SURFACE-01
+(`robot` in `IMPLEMENTED_SURFACES` with spoken presentation, sensitive
+records withheld unless present and alone, the `present` list) and
+WIRE-01 (`signal` after `turn_meta`, `plan` before the first delta once
+ACT-03 lands, `cancel` with the real abort).
