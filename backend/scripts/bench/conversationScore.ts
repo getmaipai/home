@@ -7,7 +7,6 @@
 // scored by word matching: it prints the reply with a blank verdict
 // column for a person to fill, and the ranking lists those verdicts
 // apart from the scored failures.
-import { EPISODES_HEADER } from "@/lib/episodes";
 import { tokenize } from "@/lib/text";
 import { splitIntoSentences } from "@/lib/guards";
 import type { BenchConversation, BenchTurn, TurnExpectation } from "./conversationFixture";
@@ -407,12 +406,15 @@ export function renderRanking(failures: readonly Failure[], limit = 5): string {
 
 /** RECALL-02: the episode lines the context carries, counted under the
  * block's own header (the lines that start with "- " until the next
- * blank line). */
+ * blank line). This module stays free of the database, so the header
+ * is its own copy of episodes.ts's EPISODES_HEADER, pinned equal by
+ * tests/conversationBench.test.ts. */
+export const EPISODES_HEADER_TEXT = "From earlier conversations (what was said, not necessarily true):";
 export function episodeLinesIn(context: string | null): number {
   if (!context) return 0;
-  const at = context.indexOf(EPISODES_HEADER);
+  const at = context.indexOf(EPISODES_HEADER_TEXT);
   if (at < 0) return 0;
-  const after = context.slice(at + EPISODES_HEADER.length).split("\n\n")[0] ?? "";
+  const after = context.slice(at + EPISODES_HEADER_TEXT.length).split("\n\n")[0] ?? "";
   return after.split("\n").filter((l) => l.startsWith("- ")).length;
 }
 

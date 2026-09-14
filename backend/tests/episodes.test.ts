@@ -612,13 +612,27 @@ describe("RECALL-02: episodes are evidence, never lines", () => {
     }
   });
 
-  test("a turn with fewer than three content words, or one about this conversation, earns no lookup", () => {
+  test("a turn with fewer than two content words, or one about this conversation, earns no lookup", () => {
     expect(episodeQueryEligible("what were we talking about")).toBe(false);
     expect(episodeQueryEligible("say that again")).toBe(false);
     expect(episodeQueryEligible("what did you mean")).toBe(false);
+    expect(episodeQueryEligible("thanks")).toBe(false);
+    expect(episodeQueryEligible("okay")).toBe(false);
+    // Two content words, but a bare greeting or acknowledgment: last
+    // week's greeting would clear the lexical floor otherwise.
     expect(episodeQueryEligible("good morning")).toBe(false);
+    expect(episodeQueryEligible("Good morning!")).toBe(false);
     expect(episodeQueryEligible("sounds good")).toBe(false);
+    expect(episodeQueryEligible("thanks a lot")).toBe(false);
+    expect(episodeQueryEligible("good morning MaiPai")).toBe(false);
+    expect(episodeQueryEligible("hi Marlow!")).toBe(false);
+    expect(episodeQueryEligible("morning everyone")).toBe(false);
+    // A bare word plus a content word is not a social turn.
+    expect(episodeQueryEligible("nice car")).toBe(true);
+    expect(episodeQueryEligible("no dentist")).toBe(true);
+    expect(episodeQueryEligible("good morning, is the dentist tomorrow")).toBe(true);
     expect(episodeQueryEligible("is a standing desk worth it")).toBe(true);
+    expect(episodeQueryEligible("when is my dentist appointment")).toBe(true);
     expect(episodeQueryEligible("what day is my dentist appointment")).toBe(true);
     expect(contentTerms("Sage is getting a Tempo treadmill for the office")).toEqual(["sage", "getting", "tempo", "treadmill", "office"]);
   });

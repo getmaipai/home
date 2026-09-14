@@ -14,6 +14,9 @@ import { FORGET_COMMAND_ID } from "@/lib/forgetCommand";
 import * as chrono from "chrono-node";
 import type { ConversationTurnRow } from "@/wire";
 import type { PersonRow } from "@/types";
+import { asksWhatHubSaid, asksAboutEarlierTalk } from "@/lib/recallShapes";
+import { isBareSocialTurn } from "@/lib/guards";
+export { asksWhatHubSaid, asksAboutEarlierTalk };
 
 /** getmaipai/home#78: whether a turn's reply text is something MaiPai
  * actually answered, read from the row's own fields, never from the
@@ -214,37 +217,27 @@ export interface RecallEpisodesOptions {
   preferHubSide?: boolean;
 }
 
-/** RECALL-02: the shapes that ask what the hub itself said: the "you"
- * form of the recall package's own routing examples ("what did you
- * say / suggest / recommend / tell me"). Only then may an assistant-
- * side episode enter the prompt. */
-const ASKS_WHAT_HUB_SAID_RE = /\b(?:what|which)\s+(?:did|had|have)\s+you\s+(?:say|said|suggest(?:ed)?|recommend(?:ed)?|tell|told|mention(?:ed)?|advise[d]?|propose[d]?|think|reply|answer(?:ed)?)\b|\bwhat\s+was\s+your\s+(?:suggestion|recommendation|advice|answer|take|idea)\b|\b(?:remind me|tell me)\s+what\s+you\s+(?:said|suggested|recommended|told)\b|\bdid\s+you\s+(?:say|suggest|recommend|mention)\b|\byou\s+(?:said|suggested|recommended|mentioned)\s+(?:something|that)\b/i;
-export function asksWhatHubSaid(utterance: string): boolean {
-  return ASKS_WHAT_HUB_SAID_RE.test(utterance);
-}
-
-/** RECALL-02: a turn that asks about earlier talk on either side, the
- * recall package's own routing examples ("what did I say / tell you",
- * "do you remember what I said", "what did we decide") and the hub's
- * shapes above: its answer is a restatement by design, so a restated
- * episode is the answer there, not an unrelated recall. */
-const ASKS_ABOUT_EARLIER_TALK_RE = /\b(?:what|which)\s+(?:did|have|had)\s+(?:i|we)\s+(?:say|said|tell|told|mention(?:ed)?|decide[d]?|talk(?:ed)?|agree[d]?|ask(?:ed)?)\b|\bdo\s+you\s+remember\s+(?:what|when|if|that)?\s*(?:i|we)\b|\b(?:remind me|tell me)\s+what\s+(?:i|we)\s+(?:said|told|decided|mentioned)\b|\bwhat\s+(?:did|have)\s+(?:i|we)\s+(?:talk|talked)\s+about\b/i;
-export function asksAboutEarlierTalk(utterance: string): boolean {
-  return asksWhatHubSaid(utterance) || ASKS_ABOUT_EARLIER_TALK_RE.test(utterance);
-}
-
 /** RECALL-02: a turn about this conversation itself, whose evidence is
  * the window already in the messages: recalls no episodes. */
 const ABOUT_THIS_CONVERSATION_RE = /\bwhat\s+(?:were|are)\s+we\s+(?:talking|discussing|saying)\b|\bwhat\s+(?:did|do)\s+you\s+mean\b|\bsay\s+that\s+again\b|\bcome\s+again\b|\bwhat\s+was\s+(?:i|that)\s+(?:saying|talking about)\b|\bwhere\s+were\s+we\b|\bwhat\s+were\s+you\s+saying\b/i;
-const MIN_CONTENT_WORDS = 3;
+/** Two, by the coordinator's decision on the first measurement (the
+ * design said three): the lexical floor already demands both words of
+ * a two-word query, so a two-word question that clears it is a real
+ * match, and "when is my dentist appointment" is exactly the recall
+ * question the block exists for. */
+const MIN_CONTENT_WORDS = 2;
 
 /** RECALL-02: whether an utterance earns an episode lookup at all. Fewer
- * than three content words (after stopwords) is a query with almost no
+ * than two content words (after stopwords) is a query with almost no
  * content, whose nearest episode is noise; a question about this
  * conversation is answered by the window. Until CHAT-13's resolved
  * subject becomes the query, this is the gate. */
 export function episodeQueryEligible(utterance: string): boolean {
   if (ABOUT_THIS_CONVERSATION_RE.test(utterance)) return false;
+  // A bare greeting or acknowledgment has two content words ("good
+  // morning", "sounds good") and an earlier one every day: the lexical
+  // floor would admit last week's greeting, so it recalls nothing.
+  if (isBareSocialTurn(utterance)) return false;
   return contentTerms(utterance).length >= MIN_CONTENT_WORDS;
 }
 
@@ -486,7 +479,7 @@ export function recallEpisodes(actor: PersonRow, query: string, queryVector: Flo
   // half's is two shared content words, or one when the vector half
   // also admitted the row.
   // A one-word query (the conversations search's own lookup; the
-  // prompt never sends fewer than three content words) can share at
+  // prompt never sends fewer than two content words) can share at
   // most one, and does. The turn is the unit: the shared words are
   // counted over the candidate side and its paired side together, since
   // "did we decide on the trip" / "the coast in October" is one exchange

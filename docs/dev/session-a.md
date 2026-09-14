@@ -3861,7 +3861,7 @@ side and its paired side together (the turn is the unit: "did we
 decide on the trip" / "the coast in October" is one exchange about the
 trip to the coast), or one shared word and a vector cosine at or
 above the episode floor; a one-word query (the search's own lookup;
-the prompt never sends fewer than three content words) needs its one.
+the prompt never sends fewer than two content words) needs its one.
 Each half clears its own floor before reciprocal rank fusion, so a
 candidate that survives only one half is never ranked as if both
 agreed.
@@ -3894,21 +3894,37 @@ place.
 
 **The query is the subject, not the turn.** Until CHAT-13's resolved
 subject becomes the query: `episodeQueryEligible()` refuses a turn
-with fewer than three content words after stopwords ("good morning",
-"sounds good", "say that again") and a question about this
-conversation ("what were we talking about", "what did you mean",
-"where were we"); the window is their evidence. A two-content-word
-question ("when is my dentist appointment", "what is Rover's
-birthday") recalls nothing until then, the design's number kept as
-written and the cost named for the coordinator (the lexical floor
-already asks a two-word query for both words, so two would be the
-safe number if the design moves); JOIN-01's own test moved to "what
-day is my dentist appointment" against "my dentist appointment is on
-Thursday", three words and two shared, the floor with no vector to
-help.
+with fewer than two content words after stopwords ("thanks", "okay",
+"say that again") and a question about this conversation ("what were
+we talking about", "what did you mean", "where were we"); the window
+is their evidence. The design said three; the first cut kept it and
+named the cost (a two-content-word question, "when is my dentist
+appointment", "what is Rover's birthday", recalled nothing), and the
+coordinator moved it to two on that reasoning: the lexical floor
+already demands both words of a two-word query, so a two-word
+question that clears it is a real match, and the dentist question is
+exactly the recall the block exists for. The cost the review named
+at two, a bare greeting or acknowledgment ("good morning", "sounds
+good": two content words, and an earlier one every day that would
+clear the lexical floor), is closed by `isBareSocialTurn()` in
+guards.ts, built from the greeting and acknowledgment vocabularies
+the guards already hold: such a turn recalls nothing. JOIN-01's own
+test moved to
+"what day is my dentist appointment" against "my dentist appointment
+is on Thursday" while the gate was three; it stays, three words and
+two shared, the floor with no vector to help.
 
 **Volume.** Three lines and 400 characters, from five and 600;
 `prepareTurn()` asks for three.
+
+**The shapes live apart from the store.** `asksWhatHubSaid()` and
+`asksAboutEarlierTalk()` sit in `lib/recallShapes.ts`, free of the
+database, because `guards.ts` reads them and the offline bench entry
+imports the guards before `setup.ts` has checked the data directory:
+the first seeded attempt refused itself with "not empty" after
+`episodes.ts` opened the store on import. The bench's scorer keeps
+its own copy of the episode block's header for the same reason,
+pinned to `EPISODES_HEADER` by a test.
 
 **The guard reads episodes.** `guardUnrelatedRecall()` reads
 `ctx.episodes` beside `ctx.sources`: a reply sentence whose words

@@ -1162,10 +1162,11 @@ invented for the roster's household, and added to
     side by default, the hub's side only on a "what did you say" turn
     and then as a reported note; the lexical floor of two shared words
     (or one plus the vector floor) before fusion; the vector floor
-    raised to the measured 0.72; no block under three content words or
-    on a question about this conversation; three lines and 400
-    characters; the guard reads episodes. Three seeded runs recorded
-    there.
+    raised to the measured 0.72; no block under two content words (the
+    design's three moved to two on the first measurement, the
+    coordinator's decision) or on a question about this conversation;
+    three lines and 400 characters; the guard reads episodes. Three
+    seeded runs recorded there.
 
     Objective: a reply never copies a sentence from another
     conversation, and a short or meta turn recalls nothing. Files:
@@ -1181,8 +1182,9 @@ invented for the roster's household, and added to
     system note with the paired user side, never `you replied: "..."`;
     a lexical floor (two shared content words, or one plus the vector
     floor), measured on the recall-floor bench and recorded; no episode
-    block on a turn with fewer than three content words or a question
-    about this conversation; at most three lines and 400 characters;
+    block on a turn with fewer than two content words (amended from
+    three, 2026-09-14) or a question about this conversation; at most
+    three lines and 400 characters;
     `guardUnrelatedRecall` reads `ctx.episodes` beside `ctx.sources`.
     Acceptance: the `copied-line` conversation (design note, section 1,
     the explicit-history third conversation included) and the opening

@@ -342,7 +342,7 @@ async function main(): Promise<{ executed: number; engine: string }> {
     }
     // The prompt's own gate first: a query production would never send
     // recalls nothing, and a row that passes here must be one it sends.
-    if (!episodeQueryEligible(query)) throw new Error(`"${query}" would not earn a lookup in the prompt (fewer than three content words, or about this conversation)`);
+    if (!episodeQueryEligible(query)) throw new Error(`"${query}" would not earn a lookup in the prompt (fewer than two content words, or about this conversation)`);
     const recalled = recallEpisodes(actor, query, q, { sides: "both" });
     return { best, wantedCosine, wantedShared, recalled: recalled.map((m) => turnConversation.get(m.episode.turnId) ?? "?") };
   };

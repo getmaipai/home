@@ -12,7 +12,8 @@ import { __resetThrottleForTests } from "@/lib/secretThrottle";
 import { __resetLlmSupervisorForTests } from "@/lib/llmSupervisor";
 import { activeTurnCount } from "@/lib/turnActivity";
 import { CONVERSATIONS, CREDENTIAL_LINE, type BenchConversation } from "../scripts/bench/conversationFixture";
-import { scoreTurn, renderTable, totalsByCategory, rankFailures, renderRanking, type TurnObserved, episodeLinesIn, copiedEpisodeSentence } from "../scripts/bench/conversationScore";
+import { scoreTurn, renderTable, totalsByCategory, rankFailures, renderRanking, type TurnObserved, episodeLinesIn, copiedEpisodeSentence, EPISODES_HEADER_TEXT } from "../scripts/bench/conversationScore";
+import { EPISODES_HEADER } from "@/lib/episodes";
 import { runConversation, createBenchPeople, cleanupBenchPeople, backdateBenchRows, captureTurnLog, startRecordingProxy, startFakeHomeAssistant, type RunDeps } from "../scripts/bench/conversationRunner";
 import type { ChatCompletionRequest } from "@maipai/spec/llm/ts/types.js";
 
@@ -474,6 +475,9 @@ describe("the runner against the stub (control-flow rows)", () => {
 
   test("RECALL-02's checks: the episode line count under the block's header, and a reply sentence that restates an earlier reply", () => {
     const context = "Context\n\nFrom earlier conversations (what was said, not necessarily true):\n- Sep 6 (8 days ago), Sage said: \"one\"\n- Sep 7 (7 days ago), Sage said: \"two\"\n\nRemember: you are MaiPai.";
+    // The scorer's copy of the header (the scorer stays free of the
+    // database) is pinned to the block's own.
+    expect(EPISODES_HEADER_TEXT).toBe(EPISODES_HEADER);
     expect(episodeLinesIn(context)).toBe(2);
     expect(episodeLinesIn("Context\n\nNothing stored here bears on this message.")).toBe(0);
     expect(episodeLinesIn(null)).toBe(0);

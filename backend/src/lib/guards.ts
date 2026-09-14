@@ -22,7 +22,7 @@
 // never rewritten by anything here, only the model's own words are ever
 // second-guessed.
 import { tokenize } from "@/lib/text";
-import { asksAboutEarlierTalk } from "@/lib/episodes";
+import { asksAboutEarlierTalk } from "@/lib/recallShapes";
 import { pickVariant } from "@/lib/replyVariation";
 import { utteranceShape, type UtteranceShape } from "@/lib/utteranceShape";
 import type { ToolExecutionOutcome } from "@/lib/turnContext";
@@ -610,7 +610,11 @@ function guardUnrelatedRecall(sentence: string, ctx: GuardContext): GuardReason 
 // in the utterance (a shared 4+ letter stem counts, so "playing" answers
 // "play"). Restating is never an answer.
 
-const ACK_LEAD_RE = /^(?:okay|ok|alright|right|sure|yeah|yes|oh|ah|so|got it|nice|cool|mm-?hmm|mm)\b[\s,.!-]*/i;
+// One list for the two shapes that read it: the near-echo's leading
+// acknowledgment below, and the bare social turn RECALL-02 refuses a
+// lookup on.
+const ACK_WORDS = "okay|ok|alright|right|sure|yeah|yes|oh|ah|so|got it|nice|cool|mm-?hmm|mm";
+const ACK_LEAD_RE = new RegExp(`^(?:${ACK_WORDS})\\b[\\s,.!-]*`, "i");
 
 // Live-found 2026-09-07, Jesse: "good morning" -> "Good morning!" was
 // getting flagged near_echo too. The check below works by asking whether
@@ -640,6 +644,22 @@ const ACK_LEAD_RE = /^(?:okay|ok|alright|right|sure|yeah|yes|oh|ah|so|got it|nic
 // bare greeting, so GREETING_ONLY_RE doesn't match it either.
 const GREETING_ONLY_RE =
   /^(?:(?:good\s+)?(?:morning|afternoon|evening|night)|hello|hi|hey|howdy|greetings|yo|what'?s up)\b(?:\s+(?:there|to you|too))*[\s!.,?]*$/i;
+/** RECALL-02: a turn that is only a greeting or an acknowledgment
+ * ("good morning", "sounds good", "thanks!"): the one shape whose words
+ * are the same every day, so an episode lookup on it would recall last
+ * week's greeting. Built from the same vocabularies the near-echo and
+ * greeting exemptions use, one definition. */
+const BARE_ACK_RE = new RegExp(`^(?:${ACK_WORDS}|yep|nope|no|great|perfect|sounds good|sounds great|will do|thanks|thank you|thanks a lot|see you|bye|goodbye|good ?bye|later)\\b(?:\\s+(?:then|thanks|so much|a lot))*[\\s!.,]*$`, "i");
+export function isBareSocialTurn(text: string): boolean {
+  const t = text.trim();
+  if (GREETING_ONLY_RE.test(t) || BARE_ACK_RE.test(t)) return true;
+  // With an addressee ("good morning MaiPai", "hi Marlow", "thanks
+  // Sage", "morning everyone"): a trailing name (capitalized) or a
+  // group word after the bare form is still bare; "nice car" is not.
+  const withoutAddressee = t.replace(/[,\s]+(?:\p{Lu}\p{L}*|everyone|everybody|all|guys|folks|there)[\s!.,?]*$/u, "");
+  return withoutAddressee !== t && withoutAddressee.length > 0 && (GREETING_ONLY_RE.test(withoutAddressee) || BARE_ACK_RE.test(withoutAddressee));
+}
+
 const GREETING_ANYWHERE_RE =
   /\b(?:good\s+(?:morning|afternoon|evening|night)|hello|hi|hey|howdy|greetings|yo|what'?s up)\b/i;
 
