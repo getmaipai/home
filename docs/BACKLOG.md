@@ -1302,9 +1302,19 @@ invented for the roster's household, and added to
     read from the retained outcomes; CHAT-13's world `SubjectRef` once
     it exists) is `world` unless it is the speaker's own preference or
     plan; an inferred kind or relationship is ASK-01's candidate, never
-    a record. Acceptance: one judge-eval turn per class with roster
-    names, plus "Quill was here" persisting no kind and no relation, at
-    100 percent precision on those rows; the seeded bench's memory rows
+    a record; once ACT-01 exists, a candidate's content words must fall
+    inside an `asserted` or `reported` inform or commissive span (a
+    question, a directive's argument, a quoted, hypothetical or joke
+    span yields nothing, reason `stance`), a `reported` record names its
+    source and is capped at importance 0.4, an emotional inform about
+    the self is a `state` with `valid_to` (never a preference or
+    identity) at the intensity's importance band, a low-intensity mood
+    with no time or event word yields nothing, and a turn aimed at the
+    hub yields nothing (dev.md section 12, part 6). Acceptance: one
+    judge-eval turn per class with roster names, plus "Quill was here"
+    persisting no kind and no relation, at 100 percent precision on
+    those rows; the `act-memory` conversation (section 12, part 6),
+    three seeded runs, effects on the memory table; the seeded bench's memory rows
     unchanged; the drop counts in the run header. Out of scope: the
     prompt's wording. Exit: `bun test tests/memoryJudge.test.ts`, the
     judge-eval bench, `bash scripts/check.sh`.
@@ -1533,12 +1543,20 @@ invented for the roster's household, and added to
     fact; time-sensitive facts expired; every active record verified
     to trace to the speaker's words or an authoritative integration,
     assistant-derived ones quarantined; unknown-kind entities turned
-    into ASK-01 open questions; confidence lowered on contradiction.
-    Never resolves a conflict itself: the next relevant conversation
-    asks. Acceptance: a seeded store with each defect class comes out
+    into ASK-01 open questions; confidence lowered on contradiction;
+    a `state` expired at its `valid_to` (kept for the person, absent
+    from recall), extended on a re-assertion, and turned into a
+    proposal after three re-assertions in separate conversations across
+    two weeks, never promoted to a trait on its own; a dated `goal` or
+    `event` faded the day after; a `reported` record superseded, never
+    extended, by the speaker's own later assertion (dev.md section 12,
+    part 6). Never resolves a conflict itself: the next relevant
+    conversation asks. Acceptance: a seeded store with each defect class comes out
     with the right statuses and no invented resolution; a disputed
     record is absent from the next prompt; the open question is asked
-    on the next turn. Exit: the named tests, `bash scripts/check.sh`.
+    on the next turn; the curator conversation of section 12, part 6
+    (a state extended, then expired, then proposed), driven with the
+    bench's clock, three seeded runs. Exit: the named tests, `bash scripts/check.sh`.
 
 <a id="pref-01"></a>
 
@@ -1571,14 +1589,21 @@ invented for the roster's household, and added to
     neutral, happiness, surprise, sadness, anger, disgust, fear;
     `intensity`; `target`: self, other, hub, world; `refersToPrior`;
     `corrects`; `confidence` per axis; `source`: rule, head,
-    fallback), fixtures, both bindings. Then: `backend/src/lib/turnAct.ts`
+    fallback; `spans`, one per clause with its own `act`, its `stance`
+    (asserted, reported, quoted, hypothetical, joke) and its range, the
+    turn-level act the dominant span's by the fixed precedence), fixtures,
+    both bindings. Then: `backend/src/lib/turnAct.ts`
     (the deterministic pass: greeting and closing from the near-echo
     guard's own vocabulary plus thanks and goodbyes; backchannel as a
     one-to-three-word turn with no content word; question and
     directive from `utteranceShape()`; `corrects` from the negation
     and correction phrases the consent and cancel vocabularies list;
     intensity from surface cues; target from the pronoun and the
-    roster; emotion only on an unmistakable cue), `backend/src/lib/
+    roster; emotion only on an unmistakable cue; the clause spans from
+    `utteranceShape()`'s own split, each with its stance from the
+    markers alone, the head never guessing one), `backend/src/lib/
+    memoryJudge.ts` (a turn whose every span is a greeting, closing or
+    backchannel is marked `skipped` before it is queued), `backend/src/lib/
     turnContext.ts` (`TurnContext.act`; `UtteranceShape` becomes a
     projection of it, one reading for the router and the guards),
     `backend/src/lib/turnEngine.ts` (filled in `prepareTurn()` after

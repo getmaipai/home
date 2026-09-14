@@ -14281,6 +14281,127 @@ an emotion never changes recall's scope, and a directive act never
 skips a confirmation. And the act is never a memory: it is turn state,
 recorded on the review, never a record about the person.
 
+**6. The same field on the memory side.** The act and the emotion
+decide what the judge may write as well as what the composer says,
+and the two paths read one record at two granularities, stated here
+because the difference is real: the composer answers the whole turn,
+so it reads the turn-level act and emotion; the judge extracts from
+clauses, because one turn carries an inform and a directive ("I'm
+making lasagna tonight, set a timer for forty minutes"), or a quote
+inside a statement ("my sister Nadia says she hates cilantro"), and a
+turn-level label would mark the whole thing one way. So `TurnAct`
+carries `spans`: one entry per clause (the clause split
+`utteranceShape()` already makes), each with its own `act`, its
+`stance`, and its character range, and the turn-level `act` is the
+dominant span's by a fixed precedence (directive, question,
+commissive, inform, then the management acts), which is what routing
+and the composer need. One schema, one rule pass, one head; the
+composer reads the top, the judge reads the spans. Nothing is
+classified twice.
+
+*Stance, the marking the judge reads.* Each span carries `stance`:
+`asserted` (the speaker's own claim, about themselves or another:
+"Quill likes seltzer"); `reported` (secondhand through a named source:
+"Nadia says", "according to Quill", "I heard from Rover that");
+`quoted` (words attributed verbatim to someone or something:
+quotation marks, "she said", "the sign says", a pasted line);
+`hypothetical` (a conditional or imagined state: "if we got a cat",
+"what if", "imagine", "I would", "suppose"); `joke` (irony or play,
+read only on an unmistakable marker: a laugh token, "jk", "yeah
+right", "as if", and the emotion head's happiness beside an
+exaggeration; when in doubt, never joke); a question or a management
+act has no stance. The rule pass sets stance from the markers; the
+head never guesses one, because a wrong `asserted` is a false memory
+and a wrong `joke` loses a real one, and the markers are surface
+forms a rule reads better than a small model.
+
+*Which acts can yield a memory.* Only an `inform` or a `commissive`
+span with stance `asserted` or `reported`. A `question` yields nothing
+(the judge's rule today, now structural: the fact inside "does Pippa's
+school allow peanuts" is not the speaker asserting it). A `directive`
+yields a package outcome or a task, never a memory; the one directive
+that writes a record is the remember package, by the person's
+explicit ask, on its own path. A `greeting`, `closing` or `backchannel`
+yields nothing, and a turn whose every span is one of those is marked
+`skipped` for the judge before it is queued, which is also a cost
+saving: about a third of turns never reach the 4B. A `quoted`,
+`hypothetical` or `joke` span yields nothing about anyone. A
+`reported` span yields a record about the named third party only
+(subject the entity, step 3a), at reduced importance (capped at 0.4)
+and with the source named in the record's text ("Nadia says she hates
+cilantro", never "Nadia hates cilantro"), and never a record about the
+speaker. MEM-06's grounding rule reads the label: a candidate's
+content words must fall inside an `asserted` or `reported` inform or
+commissive span, and a candidate grounded in a question, a directive's
+argument, a quoted, hypothetical or joke span is dropped with the
+reason `stance`, counted on the same log line as `ungrounded`,
+`passing` and `world`.
+
+*Emotion and intensity set the category, the importance and the
+lifetime.* A `commissive` span ("I'll book the dentist tomorrow", "we're
+doing pizza Friday") is a `goal` or `event` with `valid_to` at the
+stated time or fourteen days, and it is the record a follow-through
+prompt (F2, B3) reads later. An `inform` about the self with sadness,
+fear, anger or disgust is a `state`, never a `preference` or
+`identity`: "I've been dreading the dentist all week" is a state with
+`valid_to` seven days out (the dentist's date when the turn names
+one), and "I hate mornings" said once, angry, is a state too; a trait
+is earned by repetition across conversations, which the curator
+notices and proposes (PREF-01, REVIEW-01), never writes. A low-
+intensity mood with no durable cause ("I'm tired") stays excluded, the
+judge's one-moment rule made structural: an emotional inform with
+intensity `low` and no time or event word yields nothing. Intensity
+raises a state's importance (low 0.3, mid 0.5, high 0.7, the judge's
+own bands) so the next few days' recall carries it, and it never
+raises a fact's: "the dishwasher is broken AGAIN" is a fact at the fact
+band, whatever the capitals. An emotion aimed at the hub (`target:
+hub`, a correction, frustration) yields no memory at all; it is
+REVIEW-01's signal and CHAT-13's correction. Happiness about an event
+is an `event` at the event band, dated.
+
+*What the curator keeps and lets fade (CUR-01).* A `state` expires at
+its `valid_to`: the curator sets `expired_at` and recall stops reading
+it, and the record stays for the person to see; a re-assertion before
+then (the same subject and feeling, any conversation) extends
+`valid_to` from the new turn and bumps `uses`. Three re-assertions in
+separate conversations across two weeks make a proposal (a preference
+or a standing fact, with the three turns as evidence) that the person
+accepts or dismisses; the curator never promotes a state on its own. A
+`goal` or `event` with a date fades the day after it; a follow-through
+question (F2) is asked before it fades when the mechanism exists, and
+silence lets it expire. A `reported` record is never extended by the
+speaker's own later assertion: if the speaker later asserts it in
+their own words, that is a new `asserted` record and the reported one
+is superseded by it (#88's supersession), so the store never holds
+hearsay beside the fact it became.
+
+*Bench rows.* A conversation `act-memory`, roster names, three seeded
+runs, every effect read from the memory table after the judge drains:
+"my sister Nadia says she hates cilantro" (effects: a record whose
+subject is Nadia, importance at most 0.4, text carrying "says"; no
+active record that the speaker dislikes cilantro); "if we ever got a
+cat I'd call it Marsh" (effect: no record with "cat" or "Marsh"); "ha,
+I'm basically a professional chef now" (effect: no record with "chef");
+"I'll book the dentist tomorrow" (effects: a `goal` record with
+`valid_to` within two days and "dentist"); "set a timer for forty
+minutes" (effects: a timer outcome on the turn; no record from the
+turn); "I've been dreading the dentist all week" (effects: a `state`
+record with `valid_to` at most seven days out, importance in the mid
+band, no `preference` or `identity` record from the turn); "I'm tired"
+(effect: no record); "ugh, you keep getting this wrong" (effects: no
+record; `target: hub` on the turn); "thanks, night" (effects: no
+record; the turn's `judge_status` is `skipped`). A second conversation
+for the curator, driven with the bench's clock: the dentist state
+re-asserted four days later (effect: `valid_to` extended from the new
+turn), then the clock moved past it with no re-assertion (effect:
+`expired_at` set, the record absent from the next turn's context, the
+row still present for the person), then the same feeling asserted in
+a third and a fourth conversation (effect: a proposal exists and no
+new `preference` record does). The existing disclose-then-recall,
+correction-then-recall and coworker-likes-seltzer rows gain the stance
+assertion on their inform turns (`asserted`), so a regression that
+starts marking plain statements as anything else fails there.
+
 **Sequence and sizes.** ACT-01, the spec and the rule pass (S),
 before REG-01, which then reads the act; ACT-02, the head, its
 training script and validation (M), after ACT-01 and independent of
@@ -14290,7 +14411,11 @@ consumers, the bench rows and the rubric line (M), rides with CHAT-16
 (the moves are the composer's), with the context line and the length
 rule landing on the current prompt path as soon as ACT-01 exists;
 REVIEW-01 gains `wrong_move` and the transition report when it is
-built, after ACT-03.
+built, after ACT-03. The memory half (part 6) lands across the
+items it names: the spans and the stance in ACT-01's spec and rule
+pass; the stance rule and the `act-memory` rows in MEM-06; the fade,
+extend and propose rules in CUR-01; the skipped management turns in
+ACT-01's engine half.
 
 ### The sequence, all items
 
