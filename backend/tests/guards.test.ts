@@ -1091,6 +1091,15 @@ describe("EXP-01: the outside review's cases", () => {
   });
 });
 
+describe("RECALL-03's set: a recalled fact said back as 'you told me' stands", () => {
+  test("the attribution's frame words are scaffolding, never the invented part", () => {
+    const earlier = { utterance: "what did I tell you at the start", act: "question" as const, episodes: ["the new Marsh Lantern album comes out at midnight on Friday"] };
+    expect(guardReply("You told me the Marsh Lantern album comes out at midnight on Friday.", ctx(earlier)).reason).toBeNull();
+    expect(guardReply("You told me earlier it comes out at midnight on Friday.", ctx(earlier)).reason).toBeNull();
+    expect(guardReply("You told me the album has twelve tracks.", ctx(earlier)).reason).toBe("invention");
+  });
+});
+
 describe("GUARD-LINES: the replacement bank says the plain honest line", () => {
   test("no line any guard can speak carries 'told' or 'nobody', and the household and world lines are the design's", async () => {
     const { allReplacementLines } = await import("@/lib/guards");

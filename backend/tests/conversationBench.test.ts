@@ -100,6 +100,25 @@ describe("the fixture", () => {
     }
   });
 
+  test("RECALL-03: the recall-past-the-window fillers spend the window before turn 1 (the first seeded set's fillers did not)", async () => {
+    resetDb();
+    const people = createBenchPeople();
+    const actor = people.owner;
+    const { logTurn, createConversation, buildConversationWindow } = await import("@/lib/conversationHistory");
+    const conv = createConversation(actor, { surface: "chat" });
+    if (!conv.ok) throw new Error(conv.error);
+    const row = byId("recall-past-the-window");
+    const safe = { flagged: false, categories: [], action: "allow" as const, notify_parent: false, matched_signals: [], checked_at: new Date().toISOString() };
+    // The eleven turns before the first ask, the hub's replies short.
+    row.turns.slice(0, 11).forEach((t, i) => {
+      safe.checked_at = new Date(Date.now() - (20 - i) * 60_000).toISOString();
+      logTurn(actor, "chat", t.say, { reply: { text: "Okay." }, source: "model", safety: { ...safe }, conversation_id: conv.value.id, turn_id: `turn-rw-${i}` });
+    });
+    const window = buildConversationWindow(conv.value);
+    expect(window.droppedOlder).toBe(true);
+    expect(window.turnIds).not.toContain("turn-rw-0");
+  });
+
   test("a free-text row carries no fixed line: the reader judges it; a presence or absence check on it is a fact (something about the film was said, no sign-off), not a grade", () => {
     for (const c of CONVERSATIONS) {
       for (const t of c.turns) {

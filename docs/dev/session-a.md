@@ -4814,3 +4814,47 @@ and scanned the whole vector table (it scopes the scan to the
 conversation now); the fixture's "not sure about that" lost its stop;
 and the note claimed the `new-album` row forbade the promise before
 the row did.
+
+**The seeded set** (2026-09-14, after c2ed20e; the 8B chat engine, the
+4B judge, seed 20260913, three runs, under Session B's `check.sh` runs
+for part of it; logs `bench-recall03-set1-seed-{a,b,c}.log`). Scored
+turns 189, 188 and 186 of 251 against EXP-01's 183, 186 and 184 of 247
+(the four new scored turns are `recall-past-the-window`'s fact and its
+three asks). No reply in any run carried "told" or "nobody": GUARD-
+LINES holds. The three target asks failed in every run, and the read
+found two things. The fixture's fillers were too short: the window's
+budget was never spent, turn 1 stayed in the window, the model
+answered from it ("You mentioned it comes out at midnight on Friday")
+and the row's `recallInContext` check, which reads the context
+message, missed; no "Earlier in this conversation" block was ever
+rendered in the set. The fillers' user text alone is over the window's
+budget now, so turn 1 is dropped whatever the replies' length (a test
+in `tests/conversationBench.test.ts` feeds the fixture's own turns
+through `buildConversationWindow()` and pins the drop; the follow-up's
+review caught that the first cut relied on the replies' length and
+that the note claimed a test not in the commit). With the block
+rendered, the second read: the model's answer "You told me the Marsh
+Lantern album comes out at midnight on Friday" was cut by the
+attribution guard, which read "me" as the invented word after "You
+told"; the attribution's frame words ("me", "you", "us", "earlier",
+"before") are scaffolding now, with a test. The partial rerun (the
+row, three runs quiet, logs `bench-recall03-rerun-seed-{a,b,c}.log`):
+all three asks pass in every run ("You told me it comes out at
+midnight on Friday", "Ah, right, starting with the album release", "You
+told me the Marsh Lantern album comes out at midnight on Friday"); in
+the same rerun `copied-line-history` turn 1 drew `claimed_statement`
+three times ("I said I'd look them up", the invented promise EXP-01
+exists for; the reported note was there and the model invented
+anyway), a correct cut on the target class. Against EXP-01's set:
+fixed in every run `coworker-likes-seltzer` turn 4, `never-mind-on-an-
+ask` turn 3 and `new-album` turn 5; newly failing once or twice each,
+`edit-then-recall` turn 1 and `fact-asked-next-day` turn 1 (the 8B's
+"Got it, added to the list" skipped three times, the acknowledgment
+line standing), `act-register-feelings` turns 3 and 5 (ACT-03's),
+`prior-reply-grounding` turn 5 (the rendering class), `act-memory-
+curator` turn 1 (CUR-01's), `statement-not-request` turn 2 once ("just
+thought you might need a reminder", the model's offer), `thread-from-
+yesterday` turn 1 once (three experience claims skipped, the cannot-
+experience line standing), `new-album` turn 4 once ("I'll make sure to
+give it a listen once it drops" skipped, the rest lacking a subject
+word).

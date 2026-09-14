@@ -664,7 +664,10 @@ function guardInvention(sentence: string, ctx: GuardContext): GuardReason | null
     // words) is what actually tells a real quote from a fabricated one.
     // "that" (item 1b, #67: "Sage mentioned that Pippa is allergic to
     // peanuts", every content word grounded, was cut for the "that").
-    const scaffold = new Set(["said", "says", "told", "mentioned", "that", "your", "brother", "sister", "mother", "mom", "father", "dad"]);
+    // "me", "you" and "us" are the attribution's own frame ("You told
+    // me the album comes out at midnight": RECALL-03's set cut the
+    // recalled fact for the "me").
+    const scaffold = new Set(["said", "says", "told", "mentioned", "that", "your", "brother", "sister", "mother", "mom", "father", "dad", "me", "you", "us", "earlier", "before"]);
     if (unclaimedWords(sentence, grounded).some((w) => !scaffold.has(w))) return "invention";
   }
 
