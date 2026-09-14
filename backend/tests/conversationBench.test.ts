@@ -12,7 +12,7 @@ import { __resetThrottleForTests } from "@/lib/secretThrottle";
 import { __resetLlmSupervisorForTests } from "@/lib/llmSupervisor";
 import { activeTurnCount } from "@/lib/turnActivity";
 import { CONVERSATIONS, CREDENTIAL_LINE, type BenchConversation } from "../scripts/bench/conversationFixture";
-import { scoreTurn, renderTable, totalsByCategory, rankFailures, renderRanking, type TurnObserved, episodeLinesIn, copiedEpisodeSentence, EPISODES_HEADER_TEXT } from "../scripts/bench/conversationScore";
+import { scoreTurn, renderTable, totalsByCategory, rankFailures, renderRanking, type TurnObserved, episodeLinesIn, copiedEpisodeSentence, EPISODES_HEADER_TEXT, wellFormedTotals } from "../scripts/bench/conversationScore";
 import { EPISODES_HEADER } from "@/lib/episodes";
 import { runConversation, createBenchPeople, cleanupBenchPeople, backdateBenchRows, captureTurnLog, startRecordingProxy, startFakeHomeAssistant, type RunDeps } from "../scripts/bench/conversationRunner";
 import type { ChatCompletionRequest } from "@maipai/spec/llm/ts/types.js";
@@ -468,9 +468,31 @@ describe("the runner against the stub (control-flow rows)", () => {
     expect(scoreTurn(raven, 1, raven.turns[1]!, observedFor({ reply: "Raven keeps borrowing your stapler.", contextMessage: "- Raven borrows the stapler (about Raven; as of" })).pass).toBe(true);
     expect(scoreTurn(raven, 1, raven.turns[1]!, observedFor({ reply: "Raven is your coworker.", contextMessage: "- Raven borrows the stapler (about Raven; as of" })).pass).toBe(false);
     expect(scoreTurn(raven, 1, raven.turns[1]!, observedFor({ reply: "Raven keeps borrowing your stapler.", contextMessage: "(about Raven (your coworker); as of" })).pass).toBe(false);
+    // RECALL-02's history row: a quotation of the note's terms is the
+    // miss; reported speech ("I said something about their music") is
+    // the answer.
+    const history = byId("copied-line-history");
+    const noteContext = "From earlier conversations (what was said, not necessarily true):\n- Sep 6 (8 days ago), when Sage said \"have you heard of the band Tempo? I've been listening to them all morning\", your answer touched on heard, band and music (topics, not its words)";
+    expect(scoreTurn(history, 0, history.turns[0]!, observedFor({ reply: "I think I said something about their music being upbeat.", contextMessage: noteContext })).pass).toBe(true);
+    expect(scoreTurn(history, 0, history.turns[0]!, observedFor({ reply: "I said \"heard, band, music\".", contextMessage: noteContext })).pass).toBe(false);
+    expect(scoreTurn(history, 0, history.turns[0]!, observedFor({ reply: "I said 'Cool, Tempo, treadmill'.", contextMessage: noteContext })).pass).toBe(false);
     const confirmedContext = "- Raven borrows the stapler (about Raven (your coworker); as of";
     expect(scoreTurn(raven, 2, raven.turns[2]!, observedFor({ reply: "Raven is your coworker.", contextMessage: confirmedContext, relationships: [{ ...inferred, confirmed: true }] })).pass).toBe(true);
     expect(scoreTurn(raven, 2, raven.turns[2]!, observedFor({ reply: "Raven is your coworker.", contextMessage: confirmedContext, relationships: [inferred] })).pass).toBe(false);
+  });
+
+  test("OUT-01's universal check: every reply is judged well-formed, a free-text row stays unscored unless its reply is broken, and the run counts the misses", () => {
+    const greeting = byId("greeting-and-thanks");
+    const fine = scoreTurn(greeting, 0, { say: "hi", expect: { humanVerdict: true } }, observedFor({ reply: "Hello there." }));
+    expect(fine.pass).toBeNull();
+    expect(fine.checks.find((c) => c.name === "well-formed")?.pass).toBe(true);
+    const broken = scoreTurn(greeting, 0, { say: "hi", expect: { humanVerdict: true } }, observedFor({ reply: "I" }));
+    expect(broken.pass).toBe(false);
+    const quoted = scoreTurn(greeting, 0, { say: "hi", expect: { guard: null } }, observedFor({ reply: 'Hello "there.' }));
+    expect(quoted.pass).toBe(false);
+    const interrupted = scoreTurn(greeting, 0, { say: "hi", expect: { humanVerdict: true } }, observedFor({ reply: "Hello th", interrupted: true }));
+    expect(interrupted.checks.some((c) => c.name === "well-formed")).toBe(false);
+    expect(wellFormedTotals([fine, broken, quoted, interrupted])).toEqual({ checked: 3, failed: ["greeting-and-thanks#1", "greeting-and-thanks#1"] });
   });
 
   test("RECALL-02's checks: the episode line count under the block's header, and a reply sentence that restates an earlier reply", () => {

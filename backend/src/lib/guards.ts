@@ -53,7 +53,14 @@ export type GuardReason =
   /** #92: a sentence that is nothing but a bracketed system note ("[Knowledge
    * could not answer.]"), the window's own description of an earlier
    * non-model turn, echoed back as if it were a reply. */
-  | "placeholder_echo";
+  | "placeholder_echo"
+  /** OUT-01: the reply as produced was not a sentence (a lone token, an
+   * empty reply, a fragment) and the one regeneration was not either;
+   * the fixed line stands in. Never the honesty vocabulary: nothing
+   * was unknown, the output broke. Set by the reply boundary
+   * (turnEngine.ts's finalizeReply and the streaming hold), not by
+   * guardSentence(). */
+  | "malformed";
 
 export interface GuardContext {
   utterance: string;
@@ -170,6 +177,12 @@ const ACKNOWLEDGE = ["Okay.", "Got it.", "Noted."];
 const CANNOT_EXPERIENCE = [
   "I can't actually watch or go anywhere myself.",
   "I don't get to watch things or go places, so I can't say from experience.",
+];
+/** OUT-01: the line for a reply that broke, never "I don't know". */
+export const MALFORMED = [
+  "Sorry, I lost my train of thought. Say that again?",
+  "I fumbled that one. Ask me again?",
+  "Lost the thread there, sorry. One more time?",
 ];
 const MED_CAUTION = [
   "I'm not able to give medication amounts - check with a pharmacist or the label.",
@@ -1150,6 +1163,7 @@ const REPLACEMENT_FOR: Record<GuardReason, readonly string[]> = {
   example_parrot: DONT_KNOW,
   placeholder_echo: DONT_KNOW,
   claimed_experience: CANNOT_EXPERIENCE,
+  malformed: MALFORMED,
 };
 
 /** The honest line a guard hit replaces text with, for a given reason -

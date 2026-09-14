@@ -21,6 +21,8 @@ import { matchCommand, runCommand } from "@/lib/commands";
 import { notifyIfFlagged } from "@/lib/notifications";
 import { recall, bumpUsage, getProfileParagraph, type RecallMatch } from "@/lib/memory";
 import { subjectLabel, subjectRosterFor } from "@/lib/subjects";
+import { AFFIRMATIVE_RE, NEGATIVE_RE } from "@/lib/consentVocab";
+import { repairReply, assessReply, isShortMalformed, repairTail, closeDanglingClause, visibleText, RETRY_TOKEN_CAP } from "@/lib/wellFormed";
 import { recallEpisodes, formatEpisodesForPrompt, formatEpisodeLine, episodeQuote, episodeQueryEligible, asksWhatHubSaid, PROMPT_BLOCK_MAX_LINES, type EpisodeMatch } from "@/lib/episodes";
 import { intentFor, markIncluded, guardContextFrom, outcomeOf, type TurnContext, type TurnEvidence, type ToolExecutionOutcome, type RejectedReason } from "@/lib/turnContext";
 import { newConversationTurnId } from "@/lib/id";
@@ -1335,15 +1337,9 @@ type PreparedTurn =
 // deterministically and instantly (a "yes" waiting on an LLM round trip
 // to be recognized as "yes" is its own small reliability problem to
 // invite for no reason).
-// CHAT-15: consent is the whole message, never a prefix ("no thanks"
-// still opens with "no" and is a no). "Yes, but don't do it" opens with
-// "yes" and is not consent; only consent words, as many as the person
-// likes ("yeah, sure", "yes yes", "ok go ahead"), with at most a
-// courtesy and terminal punctuation, run a consequential action.
-// Anything else asks "yes or no?" once and runs nothing.
-const CONSENT_WORD = String.raw`(?:yes|yeah|yep|yup|sure|ok|okay|go ahead|do it|please do|confirm(?:ed)?|sure thing|go for it|do that|absolutely|of course|correct|right|affirmative|i'?m sure|i am sure|fine|alright)`;
-const AFFIRMATIVE_RE = new RegExp(String.raw`^\s*${CONSENT_WORD}(?:[,\s!.]+(?:${CONSENT_WORD}|please|thanks|thank you|and do it))*\s*[.!,]*\s*$`, "i");
-const NEGATIVE_RE = /^(no|nope|nah|cancel|never ?mind|don'?t|stop)\b/i;
+// CHAT-15: consent is the whole message, never a prefix; the
+// vocabularies live in consentVocab.ts (OUT-01 shares them with the
+// reply boundary's short-answer list).
 // Item 4a: the cancel of an ask is the whole utterance, never a prefix.
 const ASK_CANCEL_RE = /^(?:(?:no|nah|nope|actually|ok(?:ay)?|oh)[,\s]+)*(?:no|nope|nah|cancel(?: (?:that|it))?|never ?mind(?: (?:that|it|about it))?|forget (?:it|that|about it)|stop|no thanks|no thank you|don'?t(?: bother| worry(?: about it)?)?|skip it|leave it)\s*[.!]?$/i;
 
@@ -2475,8 +2471,54 @@ export function applyOutputBoundary(actor: PersonRow, value: TurnValue): TurnVal
   return value;
 }
 
-function finalizeReply(actor: PersonRow, rawValue: TurnValue): TurnValue {
-  const value = applyOutputBoundary(actor, rawValue);
+/** OUT-01: what the reply boundary records about a reply it had to
+ * mend: the reason lands in the turn's guard hits, and `replaced` says
+ * the fixed line stood in for the producer's text. */
+export interface ReplyTrace {
+  hits: GuardReason[];
+  replaced: boolean;
+  /** The streaming path: the text was already delivered, so a reply
+   * that still fails the rule after repair is kept as streamed and
+   * only recorded, never swapped for a line the person never heard. */
+  delivered?: boolean;
+}
+
+/** OUT-01: the well-formed rule at the one boundary every producer
+ * passes (dev.md, "The chat design pass", section 2): the repair first
+ * (control markers out, an unmatched edge quotation mark stripped, a
+ * whole quoted sentence unquoted, a dangling connector closed, a stop
+ * added); then the rule (a sentence with a terminator and two words or
+ * one short answer, balanced marks). A model reply that still fails
+ * takes the `malformed` line (its one regeneration ran in the caller);
+ * a package's, a command's or a confirm's line that fails is a bug in
+ * that producer, logged loudly and replaced by the same line. A
+ * safety refusal is not a reply and passes through. */
+function enforceWellFormed(actor: PersonRow, value: TurnValue, trace?: ReplyTrace): TurnValue {
+  if (value.source === "safety_refuse") return value;
+  const repaired = repairReply(value.reply.text);
+  const reason = assessReply(repaired);
+  if (reason === null) return repaired === value.reply.text ? value : { ...value, reply: { ...value.reply, text: repaired } };
+  if (value.source !== "model") {
+    console.error(`[turn] ${value.source} reply for turn ${value.turn_id} is malformed (${reason}): ${JSON.stringify(value.reply.text.slice(0, 120))}; a bug in that producer, replaced by the malformed line`);
+  }
+  if (trace?.delivered) {
+    trace.hits.push("malformed");
+    return repaired === value.reply.text ? value : { ...value, reply: { ...value.reply, text: repaired } };
+  }
+  if (trace) {
+    trace.hits.push("malformed");
+    trace.replaced = true;
+  }
+  return { ...value, reply: { text: replacementFor("malformed", actor.id) } };
+}
+
+/** Test seam: the boundary's rule on one value, as finalizeReply() runs it. */
+export function enforceWellFormedForTests(actor: PersonRow, value: TurnValue, trace?: ReplyTrace): TurnValue {
+  return enforceWellFormed(actor, value, trace);
+}
+
+function finalizeReply(actor: PersonRow, rawValue: TurnValue, trace?: ReplyTrace): TurnValue {
+  const value = enforceWellFormed(actor, applyOutputBoundary(actor, rawValue), trace);
   const { text, speech } = value.reply;
   // An explicit speech text that differs from the visible text is kept
   // as authored (already evaluated above); nothing here re-normalizes it.
@@ -2622,6 +2664,27 @@ async function runTurnHoldingLease(
       };
     };
 
+    // OUT-01: the model's text meets the well-formed rule before the
+    // guards read it (a fragment cannot be judged for invention). The
+    // repair first; a short output that is still not a sentence gets
+    // one regeneration under a small token cap, whose own repair is
+    // what stands (never a third try); a long malformed output is
+    // repaired in place, so one slow generation never becomes two (the
+    // reconciled review's bound). Empty text marks the malformed line
+    // for finalizeReply(). `mayRetry` is false on the branch that is
+    // itself already a second generation.
+    const shapeModelText = async (raw: string, mayRetry: boolean): Promise<string> => {
+      const repaired = repairReply(raw);
+      if (assessReply(repaired) === null) return repaired;
+      if (!mayRetry || !isShortMalformed(raw)) return repaired;
+      // Thinking off for the regeneration: under the cap a think block
+      // would be the whole output, and its tags travel to the client.
+      const again = await complete("chat", prepared.messages, { thinking: false, max_tokens: RETRY_TOKEN_CAP });
+      if (!again.ok) return repaired;
+      const second = repairReply(again.value.text);
+      return assessReply(second) === null ? second : "";
+    };
+
     // Fix E (docs/dev.md's "Chat reliability" - native tool calling, one
     // round trip): `tools` rides on the SAME completion call that would
     // otherwise answer in plain text - no separate up-front call, unlike
@@ -2661,7 +2724,7 @@ async function runTurnHoldingLease(
         if (!retry.ok) {
           return { ok: false, status: 503, code: "unavailable", error: retry.error };
         }
-        value = answerWithSafetyAndGuards(retry.value.text);
+        value = answerWithSafetyAndGuards(await shapeModelText(retry.value.text, false));
       }
     } else {
       // getmaipai/home#67, live-found 2026-09-07: the model, offered
@@ -2714,7 +2777,7 @@ async function runTurnHoldingLease(
       // genuinely open-ended lookup fallback, never an action package
       // the model could satisfy "required" with by inventing a call
       // instead of a fact.
-      const rawText = completion.value.text;
+      const rawText = await shapeModelText(completion.value.text, true);
       // getmaipai/home#67 code review: `replyHasQuestion` must match what
       // guardReply() itself will compute for this SAME text a few lines
       // down (`fullReplyCtx`, guards.ts) - a first cut left it unset
@@ -2756,8 +2819,9 @@ async function runTurnHoldingLease(
     }
   }
 
-  value = finalizeReply(actor, value);
-  logTurnSafely(actor, surface, text, value, { startedAt, guardHits, guardReplaced, supersedes: opts.supersedes, outcomes: prepared.kind === "immediate" ? prepared.outcomes : prepared.turnContext.outcomes });
+  const trace: ReplyTrace = { hits: guardHits, replaced: guardReplaced };
+  value = finalizeReply(actor, value, trace);
+  logTurnSafely(actor, surface, text, value, { startedAt, guardHits, guardReplaced: trace.replaced, supersedes: opts.supersedes, outcomes: prepared.kind === "immediate" ? prepared.outcomes : prepared.turnContext.outcomes });
   return { ok: true, value };
 }
 
@@ -2979,7 +3043,10 @@ export async function* gateOutputSafety(
     if (safety.action === "refuse") throw new StreamSafetyRefusal(wholeRefusal(pending) ?? safety);
     const whole = wholeRefusal(pending);
     if (whole) throw new StreamSafetyRefusal(whole);
-    yield pending;
+    // OUT-01: the final buffered span is repaired against what was
+    // delivered (a dangling connector closed, a stop added, an
+    // unmatched closing quotation mark dropped), never emitted raw.
+    yield repairTail(delivered, pending);
   }
 
   return lastFlagged;
@@ -3146,16 +3213,24 @@ async function* sentenceCaseStream<R>(inner: AsyncGenerator<string, R, void>): A
   }
 }
 
-export function closeDanglingClause(text: string): string {
-  const trimmed = text.trimEnd();
-  // A code review (2026-09-07) found this only stripped ONE trailing
-  // character: a doubled run some models emit for an em dash ("--")
-  // left one dash behind ("...releases-."), a visibly worse result than
-  // the dangling comma this function exists to fix. `+` strips the
-  // WHOLE trailing run of clause-connector characters, not just its
-  // last one.
-  const stripped = trimmed.replace(/\s*[,;:\-–—]+$/, "");
-  return stripped === trimmed ? text : `${stripped}.`;
+// OUT-01: closeDanglingClause() lives in wellFormed.ts now, one of the
+// repair's steps; re-exported for its callers and tests.
+export { closeDanglingClause };
+
+/** OUT-01: when the opening hold releases: two words, a sentence
+ * boundary, or a bound of characters so a long unbroken opener never
+ * waits (a few tokens at the chat engine's rate). */
+export const OPENING_HOLD_MAX_CHARS = 40;
+/** With thinking on, the visible opening comes after the think block;
+ * the hold reads the visible text and never waits past this much raw
+ * text for it, so the block itself does not hold the wire. */
+const OPENING_HOLD_MAX_RAW_CHARS = 400;
+export function openingReleases(buffer: string): boolean {
+  if (buffer.length >= OPENING_HOLD_MAX_RAW_CHARS) return true;
+  const visible = visibleText(buffer);
+  if (visible.length >= OPENING_HOLD_MAX_CHARS) return true;
+  if (/[.!?…]/.test(visible)) return true;
+  return (visible.match(/[\p{L}\p{N}]+/gu) ?? []).length >= 2;
 }
 
 /** Same safety-first routing and deterministic plugin floor as runTurn(),
@@ -3234,11 +3309,26 @@ async function runTurnStreamHoldingLease(
   const prepared = await prepareTurn(actor, surface, text, loadAllManifests(), conversation, lease, resolveSupersedes(opts.supersedes, conversation.id));
 
   if (prepared.kind === "immediate") {
-    const value = finalizeReply(actor, prepared.value);
+    const trace: ReplyTrace = { hits: [], replaced: false };
+    const value = finalizeReply(actor, prepared.value, trace);
     lease.release(); // the caller's finally would too; released here so the log line below carries the finished state
-    logTurnSafely(actor, surface, text, value, { startedAt, guardHits: [], supersedes: opts.supersedes, ephemeral: opts.ephemeral, outcomes: prepared.outcomes });
+    logTurnSafely(actor, surface, text, value, { startedAt, guardHits: trace.hits, guardReplaced: trace.replaced, supersedes: opts.supersedes, ephemeral: opts.ephemeral, outcomes: prepared.outcomes });
     return { ok: true, kind: "immediate", value };
   }
+
+  // OUT-01: how many generations this turn has spent. peekAndHandle()'s
+  // no-tools retry is a second one; the opening hold's regeneration
+  // of a fragment is allowed only while this is one, so a turn never
+  // runs three.
+  let generations = 1;
+  // OUT-01: the boundary's record for a tool-resolved package line
+  // (peekAndHandle() finalizes it; finalize() logs it), so a package
+  // line the boundary had to replace carries `malformed` on its row
+  // the way the blocking path's does.
+  const resolvedTrace: ReplyTrace = { hits: [], replaced: false };
+  // The model turn's own messages, for the hold's regeneration below
+  // (prepared is narrowed after this closure is defined).
+  const modelMessages = (prepared as Extract<typeof prepared, { kind: "model" }>).messages;
 
   // Fix E (docs/dev.md's "Chat reliability" - native tool calling, one
   // round trip): shared by every branch below that ends up with a real
@@ -3302,6 +3392,73 @@ async function runTurnStreamHoldingLease(
       yield first.value;
       return yield* iterator;
     }
+    // OUT-01: the opening hold. The first chunk is held until it carries
+    // two words or a sentence boundary (a few tokens, tens of
+    // milliseconds), so a fragment is known before anything is on the
+    // wire: when the stream ends inside the hold, the whole reply is the
+    // buffer, repaired and judged here. An empty reply or a fragment
+    // gets one regeneration under a small token cap (never when this
+    // turn already spent a second generation), its repair stands, and
+    // a second fragment takes the malformed line. A tool-resolved
+    // return value passes through untouched: it yields no text.
+    async function* holdOpening(
+      inner: AsyncGenerator<string, ToolCall[] | undefined | { resolved: TurnValue }, void>,
+      mayRetry: boolean,
+    ): AsyncGenerator<string, ToolCall[] | undefined | { resolved: TurnValue }, void> {
+      const iterator = inner[Symbol.asyncIterator]();
+      let buffer = "";
+      let released = false;
+      let step = await iterator.next();
+      while (!step.done) {
+        if (released) {
+          yield step.value;
+        } else {
+          buffer += step.value;
+          if (openingReleases(buffer)) {
+            released = true;
+            yield buffer;
+          }
+        }
+        step = await iterator.next();
+      }
+      if (released) return step.value;
+      const outcome = step.value;
+      if (outcome && !Array.isArray(outcome) && "resolved" in outcome) return outcome;
+      if (Array.isArray(outcome) && outcome.length > 0) return outcome;
+      const repaired = repairReply(buffer);
+      if (assessReply(repaired) === null) {
+        yield repaired;
+        return outcome;
+      }
+      if (mayRetry && generations < 2) {
+        generations++;
+        const again = await startCompleteStream("chat", modelMessages, { thinking: false, max_tokens: RETRY_TOKEN_CAP }, opts.signal);
+        if (again.ok) {
+          // A regeneration that fails before it has put anything on the
+          // wire (an idle timeout, the engine restarting) is not the
+          // turn's failure: the first generation finished, and the
+          // malformed line is the answer; after its first yield a
+          // failure is the stream's, as for any reply.
+          const nested = holdOpening(again.tokens, false);
+          let first: IteratorResult<string, ToolCall[] | undefined | { resolved: TurnValue }>;
+          try {
+            first = await nested.next();
+          } catch (err) {
+            console.error(`[turn] the regeneration for turn ${prepared.turnId} failed before any text: ${(err as Error).message}`);
+            first = { done: true, value: undefined };
+            // Falls through to the malformed line below.
+          }
+          if (!first.done) {
+            yield first.value;
+            return yield* nested;
+          }
+        }
+      }
+      guardHits.push("malformed");
+      guardReplaced = true;
+      yield `${replacementFor("malformed", actor.id)} `;
+      return outcome;
+    }
     return {
       ok: true,
       kind: "stream",
@@ -3310,7 +3467,7 @@ async function runTurnStreamHoldingLease(
       startedAt,
       tokens: holdLease(
         sentenceCaseStream(
-          gateGuards(gateOutputSafety(guardFirstStep(tokens), actor, prepared.turnId), () => guardContextFrom(prepared.turnContext), actor.id, (reason, replaced) => {
+          gateGuards(gateOutputSafety(guardFirstStep(holdOpening(tokens, true)), actor, prepared.turnId), () => guardContextFrom(prepared.turnContext), actor.id, (reason, replaced) => {
             // The reason that replaced is the one the row records
             // (guard_reason reads the first hit, #78): a skipped
             // sentence's hit (item 1b) can come before it, and the
@@ -3337,7 +3494,7 @@ async function runTurnStreamHoldingLease(
         // place logTurnSafely() runs for it.
         if (outcome && "resolved" in outcome) {
           finalized = outcome.resolved;
-          logTurnSafely(actor, surface, text, outcome.resolved, { startedAt, guardHits: [], supersedes: opts.supersedes, ephemeral: opts.ephemeral, outcomes: prepared.turnContext.outcomes });
+          logTurnSafely(actor, surface, text, outcome.resolved, { startedAt, guardHits: resolvedTrace.hits, guardReplaced: resolvedTrace.replaced, supersedes: opts.supersedes, ephemeral: opts.ephemeral, outcomes: prepared.turnContext.outcomes });
           return outcome.resolved;
         }
         const outputSafety = outcome;
@@ -3389,20 +3546,29 @@ async function runTurnStreamHoldingLease(
         // end differently) - closes the dangling clause into a real
         // sentence rather than leaving a floating comma/dash/colon.
         const finalText = guardHits.length > 0 ? closeDanglingClause(replyText) : replyText;
-        const value: TurnValue = finalizeReply(actor, {
-          reply: { text: finalText },
-          source: refusedWithNothingDelivered ? "safety_refuse" : "model",
-          safety: outputSafety ?? prepared.safety,
-          crisis_resources: crisisResources,
-          conversation_id: conversation.id,
-          turn_id: prepared.turnId,
-        });
+        // OUT-01: the text is on the wire already; the boundary repairs
+        // what it can (idempotent on a stream the hold and the tail
+        // repair already shaped) and records a reply that still fails
+        // the rule rather than replacing what the person heard.
+        const trace: ReplyTrace = { hits: guardHits, replaced: guardReplaced, delivered: true };
+        const value: TurnValue = finalizeReply(
+          actor,
+          {
+            reply: { text: finalText },
+            source: refusedWithNothingDelivered ? "safety_refuse" : "model",
+            safety: outputSafety ?? prepared.safety,
+            crisis_resources: crisisResources,
+            conversation_id: conversation.id,
+            turn_id: prepared.turnId,
+          },
+          trace,
+        );
         // CHAT-18: the lease was released above (or by the generator's
         // own exhaustion or abort before this ran); a disconnect before
         // finalize() no longer leaks anything, since holdLease()'s
         // `finally` releases on the aborted fetch's throw.
         finalized = value;
-        logTurnSafely(actor, surface, text, value, { startedAt, guardHits, guardReplaced, supersedes: opts.supersedes, ephemeral: opts.ephemeral, outcomes: prepared.turnContext.outcomes });
+        logTurnSafely(actor, surface, text, value, { startedAt, guardHits, guardReplaced: trace.replaced, supersedes: opts.supersedes, ephemeral: opts.ephemeral, outcomes: prepared.turnContext.outcomes });
         return value;
       },
     };
@@ -3476,12 +3642,15 @@ async function runTurnStreamHoldingLease(
           // The package answered. Handed back whole, past both gates;
           // buildStreamResult()'s finalize() logs it and marks the turn
           // finished, so neither happens here.
-          return { resolved: finalizeReply(actor, resolved) };
+          // OUT-01: a package line that fails the rule is replaced and
+          // logged loudly by the boundary; finalize() logs the trace.
+          return { resolved: finalizeReply(actor, resolved, resolvedTrace) };
         }
         // Every proposed call failed - the exact "ask again, never a
         // silent drop" contract: a genuinely second completion, this time
         // without tools, streamed normally through the SAME gate every
         // ordinary reply goes through.
+        generations++; // OUT-01: the opening hold may not regenerate after this
         const retry = await startCompleteStream("chat", modelPrepared.messages, { thinking: opts.thinking }, opts.signal);
         // buildStreamResult()'s guardFirstStep() catches this (nothing
         // has been yielded yet) and marks the turn finished.

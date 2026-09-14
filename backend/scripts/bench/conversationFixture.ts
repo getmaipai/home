@@ -728,7 +728,7 @@ export const CONVERSATIONS: readonly BenchConversation[] = [
     category: "memory",
     note: "RECALL-02, the explicit-history shape: asked what the hub said about the band, the earlier answer comes back as a reported note with the person's paired words, never as a first-person line; nothing else does",
     turns: [
-      { say: "what did you say about the band Tempo before", newConversation: true, expect: { recallInContext: ["your answer touched on", "band Tempo"], mustNotContain: HONESTY_LINES + "|touched on|i said\\b", guard: null } },
+      { say: "what did you say about the band Tempo before", newConversation: true, expect: { recallInContext: ["your answer touched on", "band Tempo"], mustNotContain: HONESTY_LINES + "|touched on|i said\\s*[\"'\u201c\u2018]", guard: null } },
       { say: "and what did I say about Tempo's second album", expect: { recallInContext: ["band Tempo|second album"], mustContain: "listening|morning|tempo|album" } },
       { say: "thanks", expect: { episodesInContext: 0, guard: null, humanVerdict: true } },
     ],

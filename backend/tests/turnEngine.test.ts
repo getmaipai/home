@@ -4057,3 +4057,150 @@ describe("#92: a lookup miss falls through to the model, and a literal pattern y
     }
   });
 });
+
+// OUT-01: one validated reply boundary after every producer (dev.md,
+// "The chat design pass", section 2). A scripted engine answers the
+// four raw forms; each gets the one regeneration, then the fixed line,
+// and none of the raw forms is ever stored.
+describe("OUT-01: the well-formed reply boundary", () => {
+  async function withScripted<T>(replies: string[], fn: (calls: () => number) => Promise<T>): Promise<T> {
+    __resetLlmSupervisorForTests();
+    const { startStubLlmServer } = await import("@maipai/spec/llm/ts/stubServer.js");
+    let calls = 0;
+    const stub = startStubLlmServer(0, {
+      scriptedChatReply: () => {
+        const reply = replies[Math.min(calls, replies.length - 1)]!;
+        calls++;
+        return reply;
+      },
+    });
+    process.env.MAIPAI_LLAMA_SERVER_URL = stub.url;
+    try {
+      return await fn(() => calls);
+    } finally {
+      stub.stop();
+      delete process.env.MAIPAI_LLAMA_SERVER_URL;
+      __resetLlmSupervisorForTests();
+    }
+  }
+  const RAW = ["I", "", '"Sure thing', "It depends on,"];
+  const MALFORMED_LINE = /lost my train of thought|fumbled that one|lost the thread there/i;
+
+  test("runTurn(): a lone token, an empty reply, an unmatched quote and a dangling connector: one regeneration, then the fixed line for the two that stay broken, and the repair for the two a stop mends; the raw forms are never stored", async () => {
+    const { actor } = await owner();
+    for (const raw of RAW) {
+      const result = await withScripted([raw, raw], async (calls) => {
+        const r = await runTurn(actor, "chat", `tell me something nice about ${raw.length} things`);
+        return { r, calls: calls() };
+      });
+      expect(result.r.ok).toBe(true);
+      if (!result.r.ok) continue;
+      const text = result.r.value.reply.text;
+      const row = db.select().from(conversationTurns).where(eq(conversationTurns.id, result.r.value.turn_id)).get()!;
+      expect([raw, RAW.includes(row.replyText)]).toEqual([raw, false]);
+      if (raw === "I" || raw === "") {
+        // Still not a sentence after the retry: the fixed line, recorded as malformed.
+        expect([raw, result.calls]).toEqual([raw, 2]);
+        expect(text).toMatch(MALFORMED_LINE);
+        expect(row.guardReason).toBe("malformed");
+      } else {
+        // The repair makes a sentence of it; no regeneration spent.
+        expect([raw, result.calls]).toEqual([raw, 1]);
+        expect([raw, text]).toEqual([raw, raw === '"Sure thing' ? "Sure thing." : "It depends on."]);
+        expect(row.guardReason).toBeNull();
+      }
+    }
+  });
+
+  test("runTurn(): a short fragment whose regeneration is a sentence keeps the regeneration; a long malformed reply is repaired in place with no second generation", async () => {
+    const { actor } = await owner();
+    const fixed = await withScripted(["I", "I think mornings are the best part of the day."], async (calls) => {
+      const r = await runTurn(actor, "chat", "tell me something nice about mornings");
+      return { r, calls: calls() };
+    });
+    expect(fixed.calls).toBe(2);
+    expect(fixed.r.ok && fixed.r.value.reply.text).toBe("I think mornings are the best part of the day.");
+    const long = "Mornings are quiet and the light is soft and the coffee is hot and the day has not started asking anything of you yet,";
+    const repaired = await withScripted([long, "never"], async (calls) => {
+      const r = await runTurn(actor, "chat", "tell me something nice about mornings");
+      return { r, calls: calls() };
+    });
+    expect(repaired.calls).toBe(1);
+    expect(repaired.r.ok && repaired.r.value.reply.text).toBe(`${long.slice(0, -1)}.`);
+  });
+
+  test("runTurn(): 'Yes.' on a confirmation stands, and a one-word answer with its stop stands", async () => {
+    const { actor } = await owner();
+    const conv = resolveOrCreateConversation(actor, "chat");
+    if (!conv.ok) throw new Error(conv.error);
+    const paris = await withScripted(["Paris."], async () => runTurn(actor, "chat", "what is the capital of France", { conversationId: conv.value.id }));
+    expect(paris.ok && paris.value.reply.text).toBe("Paris.");
+    const yes = await withScripted(["Yes."], async () => runTurn(actor, "chat", "is that in Europe", { conversationId: conv.value.id }));
+    expect(yes.ok && yes.value.reply.text).toBe("Yes.");
+  });
+
+  test("runTurnStream(): the opening hold: a fragment is known before anything is on the wire, regenerated once under the cap, and the fixed line streams when the regeneration is a fragment too", async () => {
+    const { actor } = await owner();
+    const broken = await withScripted(["I", "I"], async (calls) => {
+      const result = await runTurnStream(actor, "chat", "tell me something nice about mornings");
+      if (!result.ok || result.kind !== "stream") throw new Error("expected a stream");
+      const deltas: string[] = [];
+      for await (const delta of result.tokens) deltas.push(delta);
+      const value = result.finalize(deltas.join("").trim());
+      return { deltas, value, calls: calls() };
+    });
+    expect(broken.calls).toBe(2);
+    expect(broken.deltas.join("")).toMatch(MALFORMED_LINE);
+    expect(broken.deltas.some((d) => d.trim() === "I")).toBe(false);
+    const row = db.select().from(conversationTurns).where(eq(conversationTurns.id, broken.value.turn_id)).get()!;
+    expect(row.guardReason).toBe("malformed");
+    expect(row.replyText).toMatch(MALFORMED_LINE);
+    const mended = await withScripted(["I", "Mornings are the best."], async (calls) => {
+      const result = await runTurnStream(actor, "chat", "tell me something nice about mornings");
+      if (!result.ok || result.kind !== "stream") throw new Error("expected a stream");
+      const deltas: string[] = [];
+      for await (const delta of result.tokens) deltas.push(delta);
+      return { text: result.finalize(deltas.join("").trim()).reply.text, calls: calls() };
+    });
+    expect(mended.calls).toBe(2);
+    expect(mended.text).toBe("Mornings are the best.");
+  });
+
+  test("runTurnStream(): the final buffered span is repaired, never emitted raw", async () => {
+    const { actor } = await owner();
+    const out = await withScripted(["Mornings are quiet. Bring a coat,"], async () => {
+      const result = await runTurnStream(actor, "chat", "tell me something nice about mornings");
+      if (!result.ok || result.kind !== "stream") throw new Error("expected a stream");
+      const deltas: string[] = [];
+      for await (const delta of result.tokens) deltas.push(delta);
+      return { streamed: deltas.join(""), value: result.finalize(deltas.join("").trim()) };
+    });
+    expect(out.streamed.trim()).toBe("Mornings are quiet. Bring a coat.");
+    expect(out.value.reply.text).toBe("Mornings are quiet. Bring a coat.");
+    const row = db.select().from(conversationTurns).where(eq(conversationTurns.id, out.value.turn_id)).get()!;
+    expect(row.guardReason).toBeNull();
+  });
+
+  test("the rule runs on a package line and a command line: a malformed one is replaced by the fixed line and logged loudly", async () => {
+    const { actor } = await owner();
+    const { enforceWellFormedForTests } = await import("@/lib/turnEngine");
+    const safe = { flagged: false, categories: [], action: "allow" as const, notify_parent: false, matched_signals: [], checked_at: "2026-01-01T00:00:00.000Z" };
+    const base = { safety: safe, conversation_id: "conv-x", turn_id: "turn-x" };
+    const errors: string[] = [];
+    const original = console.error;
+    console.error = (...args: unknown[]) => errors.push(args.map(String).join(" "));
+    try {
+      const pkg = enforceWellFormedForTests(actor, { reply: { text: "I" }, source: "plugin", plugin_id: "weather", ...base });
+      expect(pkg.reply.text).toMatch(MALFORMED_LINE);
+      const cmd = enforceWellFormedForTests(actor, { reply: { text: '"' }, source: "command", ...base });
+      expect(cmd.reply.text).toMatch(MALFORMED_LINE);
+      const fine = enforceWellFormedForTests(actor, { reply: { text: "It is 61 and clear in Seattle." }, source: "plugin", plugin_id: "weather", ...base });
+      expect(fine.reply.text).toBe("It is 61 and clear in Seattle.");
+      const refusal = enforceWellFormedForTests(actor, { reply: { text: "" }, source: "safety_refuse", ...base });
+      expect(refusal.reply.text).toBe("");
+    } finally {
+      console.error = original;
+    }
+    expect(errors.filter((e) => e.includes("is malformed")).length).toBe(2);
+  });
+});

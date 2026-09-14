@@ -232,6 +232,8 @@ async function main(): Promise<{ executed: number; engine: string }> {
   console.log(score.renderTable(scores));
   console.log("\n## Totals by category\n");
   console.log(score.renderTotals(score.totalsByCategory(scores)));
+  const wf = score.wellFormedTotals(scores);
+  console.log(`\nwell-formed replies (OUT-01): ${wf.checked - wf.failed.length} of ${wf.checked}${wf.failed.length ? `; malformed: ${wf.failed.join(", ")}` : ""}\n`);
   const hard = scores.filter((s) => s.hard);
   console.log("\n## Hard rows\n");
   for (const s of hard) console.log(`- ${s.conversationId} turn ${s.turnIndex + 1}: ${s.pass === null ? "reader" : s.pass ? "pass" : "MISS"}${s.pass === false ? ` (${s.checks.filter((c) => !c.pass).map((c) => `${c.name}: ${c.detail}`).join("; ")})` : ""}`);

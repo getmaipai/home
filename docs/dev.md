@@ -12766,6 +12766,13 @@ other's section once (147cd28, f4779a6).
   clearance Shell.tsx already reserves for it), proven to fail then
   fixed with a real-layout check in scripts/screenshot.ts:
   [docs/dev/session-b.md](dev/session-b.md) (2026-09-13).
+- OUT-01, one validated reply boundary after every producer: the
+  well-formed rule and its repair in `lib/wellFormed.ts`, run in
+  `finalizeReply()` on a model reply, a package, a command, a confirm
+  and a guard line alike; a short fragment regenerated once under a
+  token cap; the streaming opening hold and the final span's repair;
+  dash-line persona examples; the bench's universal check:
+  [docs/dev/session-a.md](dev/session-a.md) (2026-09-14).
 - RECALL-02, episodes are evidence, never lines: the person's side by
   default and the hub's side only as a reported note on a "what did
   you say" turn, a lexical floor before fusion, the vector floor

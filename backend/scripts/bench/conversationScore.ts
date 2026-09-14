@@ -8,6 +8,7 @@
 // column for a person to fill, and the ranking lists those verdicts
 // apart from the scored failures.
 import { tokenize } from "@/lib/text";
+import { assessReply } from "@/lib/wellFormed";
 import { splitIntoSentences } from "@/lib/guards";
 import type { BenchConversation, BenchTurn, TurnExpectation } from "./conversationFixture";
 
@@ -289,7 +290,21 @@ export function scoreTurn(conversation: BenchConversation, turnIndex: number, tu
     const all = observed.relationships.map((r) => `${r.type} ${r.name} ${r.source}${r.confirmed ? " confirmed" : ""}`).join(", ") || "none";
     checks.push({ name: "relationship", pass, detail: edge ? `${edge.type} ${edge.name} ${edge.source}${edge.confirmed ? " confirmed" : ""}` : `no ${want.type} with ${want.name} (relationships: ${all})` });
   }
-  const pass = checks.length === 0 ? null : checks.every((c) => c.pass);
+  // OUT-01: the universal check. Every reply that reached the person
+  // passes the well-formed rule (a sentence with a stop, balanced
+  // marks, no control marker), whatever else the row asks, so the
+  // fragment and stray-quote rate is a number per run, not a row. An
+  // interrupted turn's partial text is E4's reconciliation, not this.
+  if (!observed.interrupted && reply.trim()) {
+    const reason = assessReply(reply);
+    checks.push({ name: "well-formed", pass: reason === null, detail: reason === null ? "a sentence" : `${reason}: "${reply.slice(0, 80)}"` });
+  }
+  // A row with no expectation of its own stays unscored (a free-text
+  // row prints for a person) unless its reply failed the universal
+  // check, which is a miss on any row.
+  const own = checks.filter((c) => c.name !== "well-formed");
+  const wellFormedFailed = checks.some((c) => c.name === "well-formed" && !c.pass);
+  const pass = own.length === 0 ? (wellFormedFailed ? false : null) : checks.every((c) => c.pass);
   return {
     conversationId: conversation.id,
     category: conversation.category,
@@ -316,8 +331,11 @@ export function renderTable(scores: readonly TurnScore[]): string {
     const failed = s.checks.filter((c) => !c.pass);
     // A failing scored row carries the reply too: the reader ranks what
     // a parent would notice, which needs the words, not only the check.
+    // The universal well-formed check reads as silence when it passes:
+    // a free-text row still prints just the reply.
+    const own = s.checks.filter((c) => c.name !== "well-formed");
     const observed =
-      s.humanVerdict && s.checks.length === 0
+      s.humanVerdict && own.length === 0 && failed.length === 0
         ? `"${cell(s.observed.reply)}"`
         : failed.length
           ? `${failed.map((c) => `${c.name}: ${c.detail}`).join("; ")}; "${cell(s.observed.reply)}"${s.observed.guardReplaced && s.observed.rawModelText ? ` (the model said "${cell(s.observed.rawModelText)}")` : ""}`
@@ -337,6 +355,20 @@ export interface CategoryTotal {
   humanRows: number;
   conversations: number;
   conversationsBroken: number;
+}
+
+/** OUT-01: the run's own fragment number: the turns whose reply failed
+ * the well-formed check, over the turns it ran on. */
+export function wellFormedTotals(scores: readonly TurnScore[]): { checked: number; failed: readonly string[] } {
+  let checked = 0;
+  const failed: string[] = [];
+  for (const s of scores) {
+    const c = s.checks.find((x) => x.name === "well-formed");
+    if (!c) continue;
+    checked++;
+    if (!c.pass) failed.push(`${s.conversationId}#${s.turnIndex + 1}`);
+  }
+  return { checked, failed };
 }
 
 export function totalsByCategory(scores: readonly TurnScore[]): CategoryTotal[] {

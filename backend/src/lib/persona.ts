@@ -251,9 +251,13 @@ const FILLER_FRAGMENT: Record<Persona["filler_density"], string> = {
 // plan's own "keep the prose under about 150 tokens" applies to this
 // ADDITION specifically, not to the four dial sentences above it, which
 // predate step 8 and already run close to that budget on their own).
+// OUT-01: each example is a dash line with no quotation marks. Rendered
+// inside double quotes, the model's own closing quote and a reply that
+// restated itself inside quotation marks were the prompt's format
+// echoed back (the design pass, finding 17).
 function examplesBlock(examples: readonly string[] | undefined): string {
   if (!examples || examples.length === 0) return "";
-  const lines = examples.map((e) => `"${e}"`).join("\n");
+  const lines = examples.map((e) => `- ${e}`).join("\n");
   return ` Some examples of how you talk:\n${lines}`;
 }
 

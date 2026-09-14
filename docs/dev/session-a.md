@@ -3984,3 +3984,127 @@ could, help...'"), a finding about the rendering: the note now reads
 its words)", the leading acknowledgment stripped by the near-echo's
 own rule, and the history row forbids the quoted form. The rerun of
 the three copied-line rows on that fix follows.
+
+## OUT-01: one validated reply boundary after every producer (2026-09-14)
+
+The design (dev.md, "The chat design pass", section 2) as built,
+with the reconciled review's bound on the retry.
+
+**The rule and the repair, one definition.** `backend/src/lib/wellFormed.ts`,
+free of the store so the bench's scorer and the guards read it too.
+`repairReply()` first: control markers out (a chat template's own
+turn markers), an unmatched double quotation mark at either edge
+stripped and a reply that is one whole quoted sentence unquoted
+(interior quotes stand; apostrophes are never touched, a contraction
+more often than a quote), an unmatched edge bracket dropped, a
+dangling connector closed (`closeDanglingClause()`, moved here from
+the turn engine), and a stop added to a clause that simply stopped.
+Then `assessReply()`: empty; a control marker (a chat template's turn
+markers; never the think tags); unbalanced marks; a fragment, which
+is no terminator, or one word that is a function word ("I.", "The.").
+Both are judged on the visible text: a think block, closed or cut
+open by a cap, is the model's reasoning, stripped whole by the
+frontend, and travels intact in front of the repaired reply, never
+counted (a review found a stray quote in the reasoning replacing a
+good reply, and a fragment after a block passing on the reasoning's
+words). The marks are read as a person would: straight and curly
+double quotes one family, an inch mark after a digit (unless a quote is open before it: "1" closes one) and an
+emoticon's face not quotes or brackets, a list marker's "1)" not a
+closer, and an emoji, an emoticon or a code fence ending a line on
+its own with no stop added after it, an emoji alone a whole reply (a
+review found the plain count calling "5" wide", ":)" and "1) go now
+2) wait" broken, a stop landing after an emoji, and a later one found
+the marks indexed by code point while the text was sliced by UTF-16
+unit, so an emoji before a quote shifted the mark that was dropped:
+every index here is UTF-16 now). An interior stray mark is removed
+rather than the reply discarded, so a long reply is repaired in place
+as the design says. One word with its stop is an answer ("Paris.",
+"Done.", "Yes."): the design's short-answer list (the consent and
+negative vocabularies, now in `consentVocab.ts` beside the pending
+ask's own regexes, plus "done", "okay" and the closers) is what the
+repair gives a stop to on its own; the first cut applied the list to
+every one-word reply and turned "Paris." for "what is the capital of
+France" into the malformed line, which the engine's own test caught.
+
+**The boundary.** `finalizeReply()` runs `enforceWellFormed()` right
+after the safety boundary, on every producer (a model reply on both
+paths, a package's line, a command's, a confirm or ask, a guard
+replacement; a safety refusal is not a reply and passes). A model
+reply that still fails after repair takes the `malformed` line, a
+new guard reason with its own small bank ("Sorry, I lost my train of
+thought. Say that again?"), never the honesty vocabulary; a package's
+or a command's line that fails is a bug in that producer, logged
+loudly and replaced by the same line. The turn's guard hits and the
+replaced flag travel through a `ReplyTrace`, so the row records
+`malformed`.
+
+**The retry, bounded.** On the blocking path the model's text is
+shaped before the guards read it (a fragment cannot be judged for
+invention): a short malformed output (60 characters or fewer) earns
+one regeneration under a 48-token cap, and that regeneration's own
+repair is what stands, never a third try; a long malformed output is
+repaired in place; the branch that is already a second generation
+(the failed-tools retry) repairs and never regenerates. So one slow
+generation never becomes two (the reconciled review's bound). The
+regeneration runs with thinking off: under the cap a think block
+would be the whole output; shortness is measured on the visible text,
+so a first generation that spent itself on reasoning and produced
+nothing visible is regenerated. With thinking on, the streaming hold
+reads the visible text after the block and never waits past four
+hundred raw characters for it. One thing the seeded bench cannot show: its
+sampler seed is pinned process-wide, so a regeneration sends the same
+messages with the same seed and reproduces the same fragment; the
+bench's well-formed number measures the deterministic repair and the
+fixed line, and a regeneration that succeeds is production's to
+show (a review).
+
+**Streaming.** The opening hold: the first chunk is held until it
+carries two words, a sentence boundary or forty characters (a few
+tokens, tens of milliseconds at the chat engine's rate), so a
+fragment is known before anything is on the wire; when the stream
+ends inside the hold, the whole reply is the buffer, repaired and
+judged there, regenerated once under the cap while the turn has
+spent one generation, and the malformed line streams when the
+regeneration is a fragment too, or when the regeneration fails
+before putting anything on the wire (the first generation finished;
+its failure is not the turn's). The final buffered span (what the
+model's generation left after its last sentence boundary) goes
+through `repairTail()` against what was delivered instead of
+unconditional emission: a dangling connector closed, a stop added,
+an unmatched closing quotation mark dropped. `finalize()` then runs
+the same boundary with `delivered: true`: the text is on the wire, so
+a reply that still fails is kept as streamed and recorded, never
+swapped for a line the person never heard. The spoken-cue timer is
+unaffected.
+
+**The prompt's examples.** `examplesBlock()` renders each companion
+example as a dash line with no quotation marks. The persona-eval
+bench, run on this machine's chat engine before and after (unpinned
+sampling, forty cases): quoted examples address-form 40/40, length-cap
+39/40, forbidden-phrases 23/40, repeated-framing 4/40; dash lines
+40/40, 37/40, 26/40, 0/40. Voice fidelity holds; the two length misses
+are within the unpinned run's own noise, and the framing repeats went
+to zero.
+
+**Measured everywhere.** The bench's scorer runs the rule on every
+reply that reached the person (`well-formed`, an interrupted turn's
+partial text excepted: E4's reconciliation, not this), a free-text row
+staying unscored unless its reply is broken, and the live run prints
+"well-formed replies: N of M" with the misses named, so the fragment
+and stray-quote rate is a number per run.
+
+**Tests.** `tests/wellFormed.test.ts` (the repair, the rule, every
+guard replacement line and malformed line passing the rule, the tail);
+`tests/turnEngine.test.ts` "OUT-01" (a scripted engine answering "I",
+an empty string, an unmatched quote and a dangling connector on the
+blocking path: one regeneration then the fixed line for the two that
+stay broken, the repair for the two a stop mends, no raw form stored;
+a short fragment whose regeneration is a sentence keeps it; a long
+malformed reply repaired with no second generation; "Yes." and
+"Paris." stand; the streaming hold and the fixed line; the final span
+repaired; the rule on a package line, a command line and a refusal);
+`tests/persona.test.ts` (dash lines, never quoted);
+`tests/conversationBench.test.ts` (the universal check and the run's
+count). RECALL-02's history-row regex fix (a quotation mark after "I
+said") rides here, as the coordinator directed. Three seeded runs
+below.

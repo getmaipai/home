@@ -1196,7 +1196,15 @@ invented for the roster's household, and added to
 
 <a id="out-01"></a>
 
-- [ ] **OUT-01: One validated reply boundary after every producer** (S)
+- [x] **OUT-01: One validated reply boundary after every producer** (S)
+    Done 2026-09-14 (docs/dev/session-a.md "OUT-01"): the rule and the
+    repair in `lib/wellFormed.ts`, run in `finalizeReply()` on every
+    producer; a short malformed model output regenerated once under a
+    48-token cap, its repair standing; the streaming opening hold and
+    the final span's repair; the `malformed` line; dash-line persona
+    examples (persona-eval before and after recorded); the bench's
+    universal `well-formed` check and per-run count. Three seeded runs
+    recorded there.
 
     Objective: a fragment, a lone token, an empty reply or a reply with
     an unmatched quotation mark is never sent or stored, from any
@@ -1831,6 +1839,22 @@ invented for the roster's household, and added to
     session, once this script exists), CANDOR and MSC (second phase,
     licenses to confirm). Exit: the script's own run on a quiet
     machine, `bash scripts/check.sh`.
+
+    Dataset half shipped 2026-09-14, Session B (lane 12 item 4), amended
+    per the coherence review's own split (dev.md, "Coherence review,
+    2026-09-14", question 5: this item's replay-through-the-engine half
+    is Session A's, memory mode, later): `backend/scripts/bench/
+    datasets/` - the registry (`registry.json`, one entry per dataset
+    downloaded into `data-scratch/datasets/`, a `verify` command
+    checking checksums, a separate `download` command), the internal
+    form (`types.ts`), loaders for LongMemEval-cleaned, LoCoMo and
+    DailyDialog into it (`longmemeval.ts`, `locomo.ts`, `dailydialog.ts`,
+    each proven both against a small embedded unit-test sample and live
+    against the real downloaded file), and the coherence review's own
+    40-per-type LongMemEval sample, seeded and deterministic
+    (`sample.ts`, `sample-manifest.json`, 230 ids). Design note:
+    `docs/dev/session-b.md`, "Lane 12 item 4". Left: the engine replay
+    itself (Session A's).
 
 <a id="cur-01"></a>
 
