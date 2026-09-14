@@ -5032,6 +5032,75 @@ reference's after-a-question figures; after an inform the reference
 is 37.2 and 42.8, so the bench's 31 percent sits at the reference's
 overall and the live 48 percent above it.
 
+**The seeded set** (2026-09-14, on 3d4fefc; the 8B chat engine, the
+4B judge started for the set and stopped after it, the default seed,
+three runs on a quiet machine; logs `bench-lookup01-set1-seed-{a,b,c}.log`).
+Scored 193, 194 and 193 of 254 against RECALL-03's 189, 188 and 186
+of 251 (three scored turns new, `offer-binding`'s). The item's rows:
+`new-album` turn 2 passed every run (a lookup with a source, no
+promise; it had failed every run before), `offer-binding` turns 1 and
+2 passed every run (the offer bound; "do it" ran the websearch via ask
+with the question as its expression and a source), `new-album` turn 4
+passed every run (the fold's plan claim absent), and RECALL-03's three
+asks held in the full set. The question rate per run: 29.5, 27.7 and
+29.5 percent of replies carried a question (after a non-question turn
+30.8, 26.7, 31.5; after a question 28.2, 29.1, 27.4) against the
+reference's 32.9 overall, 42.8 after an inform and 16.3 after a
+question: the hub asks back less than people after a statement and far
+more after a question. The read, with the coordinator's decisions:
+`act-register-requests` turn 5 ("why does Rover keep getting sick")
+failed every run and had passed every run before, a regression: the
+draft promised a lookup and the forced websearch ran on a household
+subject (the family's dog), the reply the plugin's empty-result
+summary ("The search results do not provide any specific information
+about why Rover keeps getting sick"); fixed below. `offer-binding` turn
+3 answered "12 tracks" from the previous turn's own lookup result still
+in the window, which is right (a person would not search again): the
+row accepts a reply grounded there, a fresh lookup allowed.
+`pending-ask-lookup` turn 1 stays CHAT-13's row, with a finding on it:
+the phrase misses the weather patterns and the model invented a
+forecast with no lookup and no ask, and every guard passed it (the
+invented-world-fact class, the currency case's). `recall-past-the-window`
+turn 1: the 8B wrote "I'll make sure to check it out when it drops" in
+every run and the fold's guard replaced it, which is right; the row
+stays written to fail until ACT-03 with CHAT-16 owns the claim.
+`statement-not-request` turn 1 failed twice with an unrelated stored
+fact or the list said back as the reply, `unrelated_recall` silent:
+variance on a pre-existing class, recorded as finding 25 in the
+program file. Every other failing row failed the same way in RECALL-03's
+set (the written-to-fail rows for CHAT-13, MEM-06, CUR-01, ACT-03,
+AGE-01 and CHAT-16, and the memory-row-detail floors). Fixed against
+RECALL-03's set: `clarify-only-when-ambiguous` turn 2,
+`memory-control-in-chat` turn 3, `polite-command` turn 2,
+`statement-not-request` turn 2, `thread-from-yesterday` turn 1.
+
+**The follow-up (the household subject).** A question that carries a
+household subject (`asksAboutHousehold()`: the roster and the registry
+as `routeLiteral()`'s own `household_subject` yield reads them, minus a
+roster name that is part of a longer proper noun, so "the new Marsh
+Lantern album" with Marsh on the roster is a world subject and "Marsh
+and I" is the household) is never looked up on the web: on both paths
+a promise or an offer in the first sentence is dropped and the rest
+stands (the question's own emptied line when the promise was the whole
+draft), nothing binds, and the invention retry's forced lookup stands
+down too (the web cannot ground a guess about the family; the guards
+cut it as before). The held or dropped sentence's shape and length are
+logged on a `[turn]` line on both paths, never its text (a transcript
+fragment stays out of the log; the bench reads the draft from the
+recording proxy). A test in the row's own words, with Rover a
+registered pet, on both paths, plus the whole-draft case and the
+proper-noun cases. The follow-up's own review gave the proper-noun
+rule (Marsh on the roster from RECALL-02's row would have stood down
+the `new-album` and `offer-binding` lookups in a full run), the
+dropped promise (a promise nobody keeps is the plan claim EXP-01 and
+REG-01 exist for), the invention retry's stand-down, and the log's
+shape-only line. Two follow-ups recorded, not fixed here: the empty-lookup reply
+shape (the websearch recipe's summary of an empty result reaches the
+person verbatim, "The search results do not provide..."; CHAT-13's
+ladder decides what is said instead, and CHAT-16's `search_voice`
+family cuts the phrase), and a household subject named only by a frame
+("my dog", no name on the roster) is ASK-01's household-frame rule.
+
 **Three hub items from the robot's design pass**, filed in
 `docs/BACKLOG.md` after CHAT-16 at the coordinator's placement, each
 pointing at bot `docs/dev.md`: RUNTIME-01 (the household runtime as a

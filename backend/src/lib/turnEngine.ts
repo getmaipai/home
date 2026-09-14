@@ -1175,6 +1175,20 @@ function namesHouseholdMember(text: string, roster: readonly string[]): boolean 
   return roster.some((name) => name.length > 1 && new RegExp(`(?<![\\p{L}\\p{N}])${name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}(?![\\p{L}\\p{N}])`, "iu").test(text));
 }
 
+/** LOOKUP-01's follow-up: whether the question is about a household
+ * subject, for the lookup paths. namesHouseholdMember()'s whole-word
+ * match, minus a roster name that is part of a longer proper noun (a
+ * review: "the new Marsh Lantern album" with Marsh on the roster is a
+ * world subject; "Marsh and I" or "why does Rover keep getting sick" is
+ * the household). */
+export function asksAboutHousehold(text: string, roster: readonly string[]): boolean {
+  return roster.some((name) => {
+    if (name.length <= 1) return false;
+    const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    return new RegExp(`(?<![\\p{L}\\p{N}])(?<!\\p{Lu}\\p{L}*\\s)${escaped}(?![\\p{L}\\p{N}])(?!\\s+\\p{Lu}\\p{L}+)`, "iu").test(text);
+  });
+}
+
 /** The literal yield's own reason, for the `[route]` line. */
 export type LiteralYield = { id: string; reason: "household_subject" | "arithmetic" };
 
@@ -1422,10 +1436,10 @@ export function firstSentenceComplete(sentences: readonly string[]): boolean {
 /** The draft without its first sentence's promise (and any hesitation
  * ahead of it): the rest when there is one, the honest line when the
  * promise was the whole reply. */
-export function withoutPromise(text: string): string {
+export function withoutPromise(text: string, fallback: string = LOOKUP_FAILED_LINE): string {
   const sentences = splitIntoSentences(text);
   const rest = sentences.slice((firstSentenceIndex(sentences) ?? 0) + 1).join(" ").trim();
-  return rest.length > 0 ? rest : LOOKUP_FAILED_LINE;
+  return rest.length > 0 ? rest : fallback;
 }
 /** LOOKUP-01: an offer or a promise anywhere in the reply that went
  * out, with no lookup that answered, becomes a `lookup` pending ask
@@ -2997,7 +3011,7 @@ async function runTurnHoldingLease(
       // genuinely open-ended lookup fallback, never an action package
       // the model could satisfy "required" with by inventing a call
       // instead of a fact.
-      const rawText = await shapeModelText(completion.value.text, true);
+      let rawText = await shapeModelText(completion.value.text, true);
       // getmaipai/home#67 code review: `replyHasQuestion` must match what
       // guardReply() itself will compute for this SAME text a few lines
       // down (`fullReplyCtx`, guards.ts) - a first cut left it unset
@@ -3029,9 +3043,27 @@ async function runTurnHoldingLease(
       const visibleReply = visibleText(rawText);
       const visibleSentences = splitIntoSentences(visibleReply);
       const firstIndex = firstSentenceIndex(visibleSentences);
-      const promisesLookup = firstIndex !== null && lookupShapeOf(visibleSentences[firstIndex]!) !== null && !lookupAnswered(prepared.turnContext.outcomes);
+      // A household subject in the question (the roster and the
+      // registry, the same household_subject yield routeLiteral() applies
+      // to the knowledge pattern) is never looked up on the web: the
+      // promise stands as text and binds nothing (LOOKUP-01's follow-up:
+      // "why does Rover keep getting sick" ran a websearch on the dog).
+      const householdSubject = asksAboutHousehold(text, prepared.turnContext.roster);
+      const firstShape = firstIndex !== null && !lookupAnswered(prepared.turnContext.outcomes) ? lookupShapeOf(visibleSentences[firstIndex]!) : null;
+      const promisesLookup = firstShape !== null && !householdSubject;
+      // A promise about the household is not kept by any lookup: the
+      // sentence is dropped and the rest stands, or the act's own
+      // emptied line (a review).
+      if (firstShape !== null && householdSubject) {
+        console.log(`[turn] a ${firstShape} to look up a household subject on turn ${prepared.turnId} is dropped (${visibleSentences[firstIndex!]!.length} chars)`);
+        rawText = `${thinkingPrefix(rawText)}${withoutPromise(visibleReply, emptiedLine({ act: prepared.signal?.primary_act, utterance: text, personId: actor.id }))}`;
+      }
 
-      if (offeringTools && (looksInvented || promisesLookup) && prepared.lookupTools.length > 0) {
+      // The invention retry's forced lookup stands down on a household
+      // subject too (the review of the follow-up): the web cannot ground
+      // a guess about the family, and the guards cut it as before.
+      if (offeringTools && ((looksInvented && !householdSubject) || promisesLookup) && prepared.lookupTools.length > 0) {
+        if (promisesLookup) console.log(`[turn] a ${firstShape} to look something up on turn ${prepared.turnId} (${visibleSentences[firstIndex!]!.length} chars); the forced lookup runs`);
         const lookupIds = new Set(prepared.lookupTools.map((t) => t.id));
         prepared.timings.retries++;
         const forced = await complete("chat", prepared.messages, { thinking: opts.thinking, tools: prepared.lookupTools, tool_choice: "required" });
@@ -3080,7 +3112,7 @@ async function runTurnHoldingLease(
   value = finalizeReply(actor, value, trace);
   // LOOKUP-01: an offer or a late promise in the reply that went out
   // binds the next consent word to the lookup.
-  if (prepared.kind === "model" && value.source === "model") notePendingLookup(conversation.id, value.reply.text, text, prepared.turnContext.outcomes, prepared.lookupTools.map((t) => t.id));
+  if (prepared.kind === "model" && value.source === "model" && !asksAboutHousehold(text, prepared.turnContext.roster)) notePendingLookup(conversation.id, value.reply.text, text, prepared.turnContext.outcomes, prepared.lookupTools.map((t) => t.id));
   if (prepared.kind === "model") prepared.timings.finalize_ms = Date.now() - generationDone;
   logTurnSafely(actor, surface, text, value, { startedAt, guardHits, guardReplaced: trace.replaced, supersedes: opts.supersedes, outcomes: prepared.kind === "immediate" ? prepared.outcomes : prepared.turnContext.outcomes, signal: prepared.signal, timings: prepared.timings });
   return { ok: true, value };
@@ -3724,6 +3756,10 @@ async function runTurnStreamHoldingLease(
     const lookupIds = new Set(offeringTools ? modelTurn.lookupTools.map((t) => t.id) : []);
     async function* holdForLookup(inner: AsyncGenerator<string, ToolCall[] | undefined | { resolved: TurnValue }, void>): AsyncGenerator<string, ToolCall[] | undefined | { resolved: TurnValue }, void> {
       if (!offeringTools || lookupIds.size === 0 || lookupAnswered(modelTurn.turnContext.outcomes)) return yield* inner;
+      // A household subject in the question is never looked up on the
+      // web (the follow-up, as on the blocking path): a promise about it
+      // is dropped and the rest streams.
+      const householdSubject = asksAboutHousehold(text, modelTurn.turnContext.roster);
       const iterator = inner[Symbol.asyncIterator]();
       let buffer = "";
       // A think block is not held (a review: OUT-01's rule that the
@@ -3763,10 +3799,32 @@ async function runTurnStreamHoldingLease(
       const sentences = splitIntoSentences(visibleText(buffer));
       const first = sentences[firstSentenceIndex(sentences) ?? 0] ?? "";
       const shape = lookupShapeOf(first);
+      if (shape && householdSubject) {
+        console.log(`[turn] a ${shape} to look up a household subject on turn ${modelTurn.turnId} is dropped (${first.length} chars)`);
+        const visibleNow = visibleText(buffer);
+        const rest = visibleNow.slice(visibleNow.indexOf(first) + first.length).replace(/^\s+/, "");
+        let sent = false;
+        if (rest.length > 0) {
+          yield `${thinkingPrefix(buffer)}${rest}`;
+          sent = true;
+        }
+        while (!step.done) {
+          step = await iterator.next();
+          if (step.done) break;
+          if (step.value.length > 0) sent = true;
+          yield step.value;
+        }
+        if (!sent) yield `${emptiedLine({ act: modelTurn.signal?.primary_act, utterance: text, personId: actor.id })} `;
+        return step.value;
+      }
       if (shape && !lookupAnswered(modelTurn.turnContext.outcomes) && generations < 2) {
         // The draft stops here; what the model was about to say is not
         // an answer: the engine's request is aborted (the slot freed),
-        // then the iterator closed. Then the lookup, forced.
+        // then the iterator closed. Then the lookup, forced. The held
+        // sentence's shape and length are logged (never its text: a
+        // transcript fragment stays out of the log), since it reaches
+        // neither the wire nor the row.
+        console.log(`[turn] a ${shape} to look something up on turn ${modelTurn.turnId} (${first.length} chars); the draft is closed and the forced lookup runs`);
         if (!step.done) {
           draftAbort.abort();
           await iterator.return(undefined).catch(() => undefined);
@@ -4000,7 +4058,7 @@ async function runTurnStreamHoldingLease(
         finalized = value;
         // LOOKUP-01: an offer or a late promise that went out on the
         // wire binds the next consent word to the lookup.
-        if (value.source === "model" && !opts.ephemeral) notePendingLookup(conversation.id, value.reply.text, text, prepared.turnContext.outcomes, prepared.lookupTools.map((t) => t.id));
+        if (value.source === "model" && !opts.ephemeral && !asksAboutHousehold(text, prepared.turnContext.roster)) notePendingLookup(conversation.id, value.reply.text, text, prepared.turnContext.outcomes, prepared.lookupTools.map((t) => t.id));
         prepared.timings.finalize_ms = Date.now() - finalizeStart;
         logTurnSafely(actor, surface, text, value, { startedAt, guardHits, guardReplaced: trace.replaced, supersedes: opts.supersedes, ephemeral: opts.ephemeral, outcomes: prepared.turnContext.outcomes, signal: prepared.signal, timings: prepared.timings });
         return value;

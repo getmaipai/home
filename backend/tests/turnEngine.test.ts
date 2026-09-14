@@ -4589,6 +4589,55 @@ describe("LOOKUP-01: a promise is the lookup, an offer is a pending ask", () => 
     });
   });
 
+  test("both paths: a question about a household subject is never looked up on the web; the promise stands and binds nothing (the set's act-register-requests#5)", async () => {
+    const { actor, client } = await owner();
+    const { ensureSubjectEntity } = await import("@/lib/subjects");
+    const rover = ensureSubjectEntity(actor, { name: "Rover", kind: "pet" }, true);
+    expect(rover.ok).toBe(true);
+    await withLookupStub({ draft: "Let me look into that for you. Dogs can get sick for a lot of reasons." }, async (seen) => {
+      const conv = resolveOrCreateConversation(actor, "chat");
+      if (!conv.ok) throw new Error(conv.error);
+      const result = await runTurn(actor, "chat", "why does Rover keep getting sick", { conversationId: conv.value.id });
+      expect(result.ok).toBe(true);
+      if (!result.ok) return;
+      expect(seen.forced).toBe(0);
+      expect(seen.queries).toEqual([]);
+      expect(result.value.source).toBe("model");
+      expect(result.value.plugin_id).toBeUndefined();
+      // The promise the hub cannot keep is dropped; the rest stands.
+      expect(result.value.reply.text).toBe("Dogs can get sick for a lot of reasons.");
+      expect(getPendingAsk(conv.value.id)).toBeNull();
+      const res = await client.post("/api/turn/stream", { text: "why does Rover keep getting sick", conversation_id: conv.value.id });
+      const events = await readNdjson(res);
+      expect(seen.forced).toBe(0);
+      const value = events.find((e) => e.type === "done")!.value as { source: string; plugin_id?: string; reply: { text: string } };
+      expect(value.source).toBe("model");
+      expect(value.plugin_id).toBeUndefined();
+      expect(value.reply.text).toBe("Dogs can get sick for a lot of reasons.");
+      expect(getPendingAsk(conv.value.id)).toBeNull();
+    });
+    // A promise that was the whole draft takes the question's emptied line.
+    // (the DONT_KNOW bank, rotated per person by emptiedLine()).
+    const dontKnow = /^I(?:'m not sure about| don't know) that one(?:, sorry)?\.$/;
+    await withLookupStub({ draft: "Let me look into that for you." }, async (seen) => {
+      const result = await runTurn(actor, "chat", "why does Rover keep getting sick");
+      expect(result.ok && result.value.reply.text).toMatch(dontKnow);
+      const res = await client.post("/api/turn/stream", { text: "why does Rover keep getting sick" });
+      const events = await readNdjson(res);
+      const value = events.find((e) => e.type === "done")!.value as { reply: { text: string } };
+      expect(value.reply.text.trim()).toMatch(dontKnow);
+      expect(seen.forced).toBe(0);
+    });
+    // A roster name inside a longer proper noun is a world subject (a
+    // review: Marsh on the roster, the Marsh Lantern album asked about).
+    const { asksAboutHousehold } = await import("@/lib/turnEngine");
+    expect(asksAboutHousehold("when is the new Marsh Lantern album out", ["Marsh", "Rover"])).toBe(false);
+    expect(asksAboutHousehold("Marsh and I are training for the 10k", ["Marsh"])).toBe(true);
+    expect(asksAboutHousehold("why does Rover keep getting sick", ["Marsh", "Rover"])).toBe(true);
+    expect(asksAboutHousehold("is Rover Junior a good name", ["Rover"])).toBe(false);
+    expect(asksAboutHousehold("what is the capital of France", ["Marsh"])).toBe(false);
+  });
+
   test("both paths: a hesitation fragment ahead of the promise does not hide it (a review)", async () => {
     const { actor, client } = await owner();
     await withLookupStub({ draft: "Hmm... let me check that for you. It should be soon." }, async (seen) => {

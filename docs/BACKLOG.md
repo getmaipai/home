@@ -1581,8 +1581,13 @@ invented for the roster's household, and added to
     forced lookup a subject, the forced completion is the invention
     retry's own (the model writes the expression from the same
     messages) and the pending ask binds the person's utterance
-    verbatim as the expression. The seeded set waits on the machine
-    (Session B's replay first).
+    verbatim as the expression. The seeded set: 193, 194 and 193 of
+    254 (RECALL-03's 189, 188, 186 of 251), the item's rows green in
+    every run; its one regression (a promised lookup forced on a
+    household subject) fixed in the follow-up: a question carrying a
+    household subject is never looked up on the web and binds nothing.
+    Follow-ups left on record: the empty-lookup reply shape (CHAT-13's
+    ladder), the frame-only household subject (ASK-01).
 
     Objective: "let me check that for you" runs the check, and "do it"
     after an offer runs the offer. Files: `backend/src/lib/turnEngine.ts`
