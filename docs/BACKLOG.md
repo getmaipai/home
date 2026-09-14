@@ -1302,15 +1302,21 @@ invented for the roster's household, and added to
     read from the retained outcomes; CHAT-13's world `SubjectRef` once
     it exists) is `world` unless it is the speaker's own preference or
     plan; an inferred kind or relationship is ASK-01's candidate, never
-    a record; once ACT-01 exists, a candidate's content words must fall
-    inside an `asserted` or `reported` inform or commissive span (a
-    question, a directive's argument, a quoted, hypothetical or joke
-    span yields nothing, reason `stance`), a `reported` record names its
-    source and is capped at importance 0.4, an emotional inform about
-    the self is a `state` with `valid_to` (never a preference or
-    identity) at the intensity's importance band, a low-intensity mood
-    with no time or event word yields nothing, and a turn aimed at the
-    hub yields nothing (dev.md section 12, part 6). Acceptance: one
+    a record; once ACT-01 exists, the clause contract (dev.md section
+    12, part 6): every proposed fact cites one eligible clause (an
+    `inform` or `commissive` with stance `asserted` or `reported`),
+    every proper noun and number in it is grounded in that clause, the
+    fact's subject matches the clause's subject, a `reported` clause
+    yields a record about the third party only, capped at importance
+    0.4 with the source named, a `commissive` clause yields only a
+    `goal`, `project` or dated `event`, a `moderate` emotion about the
+    speaker or a named subject yields a `state` at importance 0.3 with
+    `valid_to` 24 hours out and a `high` one at 0.5 with seven days,
+    an explicit time always winning, `none` or `low` yielding nothing,
+    and one utterance may split into an event and a state; the
+    rejections `ineligible_act`, `quoted`, `hypothetical`, `joking`,
+    `unknown_grounding`, `subject_mismatch`, `invalid_emotion_category`
+    and `missing_valid_to` counted beside the rest. Acceptance: one
     judge-eval turn per class with roster names, plus "Quill was here"
     persisting no kind and no relation, at 100 percent precision on
     those rows; the `act-memory` conversation (section 12, part 6),
@@ -1508,8 +1514,11 @@ invented for the roster's household, and added to
     evaluation result, status, provenance) and a per-record retrieval
     signal on `memory-record.schema.json`; fixtures and bindings.
     Then: `backend/src/lib/turnReview.ts` (the immediate deterministic
-    checks on every turn, from the turn context and the retained
-    outcomes; the nightly pass on the background engine with the 4B
+    checks on every turn, from the turn context, the stored signal and
+    plan (ACT-01, ACT-03: `act_mismatch`, `emotion_mismatch`,
+    `missing_reaction`, `unwanted_question`, `closing_reopened`,
+    `register_plan_violation`, `playful_under_distress`) and the
+    retained outcomes; the nightly pass on the background engine with the 4B
     drafting and every finding confirmed mechanically), the auto-apply
     set (rank, duplicates, disputed, a household routing example,
     package preference, the assistant-prose flag, stale evidence
@@ -1544,18 +1553,24 @@ invented for the roster's household, and added to
     to trace to the speaker's words or an authoritative integration,
     assistant-derived ones quarantined; unknown-kind entities turned
     into ASK-01 open questions; confidence lowered on contradiction;
-    a `state` expired at its `valid_to` (kept for the person, absent
-    from recall), extended on a re-assertion, and turned into a
-    proposal after three re-assertions in separate conversations across
-    two weeks, never promoted to a trait on its own; a dated `goal` or
-    `event` faded the day after; a `reported` record superseded, never
-    extended, by the speaker's own later assertion (dev.md section 12,
-    part 6). Never resolves a conflict itself: the next relevant
+    `valid_to` made a read boundary (recall and the profile paragraph
+    exclude a record past it before any sweep; the curator then
+    archives it with `expired_at`, provenance intact; pinning never
+    revives an expired state), a state extended on a re-assertion,
+    repeated states kept as episodes with three across two weeks
+    producing an open question or a proposal and never a trait, a
+    later denial or correction superseding the active state, an event
+    surviving the state it came with, a dated `goal` or `event` fading
+    the day after, a `reported` record superseded and never extended by
+    the speaker's own later words (dev.md section 12, part 6). Never
+    resolves a conflict itself: the next relevant
     conversation asks. Acceptance: a seeded store with each defect class comes out
     with the right statuses and no invented resolution; a disputed
     record is absent from the next prompt; the open question is asked
-    on the next turn; the curator conversation of section 12, part 6
-    (a state extended, then expired, then proposed), driven with the
+    on the next turn; a record past `valid_to` absent from the next
+    context before the sweep; the `act-memory-curator` conversation of
+    section 12, part 6 (extended, expired, the event surviving, three
+    states with no trait, a denial superseding), driven with the
     bench's clock, three seeded runs. Exit: the named tests, `bash scripts/check.sh`.
 
 <a id="pref-01"></a>
@@ -1580,116 +1595,154 @@ invented for the roster's household, and added to
 
 <a id="act-01"></a>
 
-- [ ] **ACT-01: The act and emotion of a turn, the spec and the rule pass** (S, before REG-01)
+- [ ] **ACT-01: The turn signal, the spec, the producer's first layers, and the rows** (S-M, before REG-01)
 
-    Objective: the engine records what kind of turn the person made
-    and how they feel, one definition for every consumer. Spec first:
-    `spec/schemas/turn-act.schema.json` (`act`: inform, question,
-    directive, commissive, greeting, closing, backchannel; `emotion`:
-    neutral, happiness, surprise, sadness, anger, disgust, fear;
-    `intensity`; `target`: self, other, hub, world; `refersToPrior`;
-    `corrects`; `confidence` per axis; `source`: rule, head,
-    fallback; `spans`, one per clause with its own `act`, its `stance`
-    (asserted, reported, quoted, hypothetical, joke) and its range, the
-    turn-level act the dominant span's by the fixed precedence), fixtures,
-    both bindings. Then: `backend/src/lib/turnAct.ts`
-    (the deterministic pass: greeting and closing from the near-echo
-    guard's own vocabulary plus thanks and goodbyes; backchannel as a
-    one-to-three-word turn with no content word; question and
-    directive from `utteranceShape()`; `corrects` from the negation
-    and correction phrases the consent and cancel vocabularies list;
-    intensity from surface cues; target from the pronoun and the
-    roster; emotion only on an unmistakable cue; the clause spans from
-    `utteranceShape()`'s own split, each with its stance from the
-    markers alone, the head never guessing one), `backend/src/lib/
-    memoryJudge.ts` (a turn whose every span is a greeting, closing or
-    backchannel is marked `skipped` before it is queued), `backend/src/lib/
-    turnContext.ts` (`TurnContext.act`; `UtteranceShape` becomes a
-    projection of it, one reading for the router and the guards),
-    `backend/src/lib/turnEngine.ts` (filled in `prepareTurn()` after
-    the subject; a literal-pattern turn is a directive), `backend/
-    scripts/bench/conversationFixture.ts` (an `act` and `emotion`
-    expectation on every existing turn) and `conversationScore.ts`
-    (the effect check, like `subject`), `backend/tests/turnAct.test.ts`.
-    Mirror: `utteranceShape.ts` and `intentFor()`. Acceptance: every
-    fixture turn's recorded act matches its expectation at 95 percent
-    or better across three seeded runs; the rule pass scored on
-    DailyDialog's test split (research use, never shipped) with the
-    greeting and closing relabel, macro F1 per act recorded in the
-    dev docs; no consumer reads a second shape. Out of scope: the
-    head (ACT-02), the register table (ACT-03). Exit: the spec suite,
-    `bun test tests/turnAct.test.ts tests/utteranceShape.test.ts`,
-    `bash scripts/check.sh`.
+    Objective: the engine records, before routing and frozen for the
+    turn, what kind of turn the person made and what it expressed, on
+    the shared turn record, one definition for every consumer. Spec
+    first: `spec/schemas/turn-signal.schema.json` (`primary_act`,
+    `secondary_acts`, `expressed_emotion`, `emotion_intensity`,
+    `target`, `repair`, `refers_to_prior`, `clauses` with range, act,
+    stance, subject, emotion, intensity, confidence; `act_confidence`,
+    `emotion_confidence`, `source`, `classifier_id`), a
+    `conversation-turn.schema.json` that settles the shared turn record
+    the robot syncs through the hub and carries the signal beside the
+    outcomes, `reply-plan.schema.json` (the moves as required, allowed,
+    forbidden; playfulness; `max_sentences`; `max_words`),
+    `model-capabilities.schema.json` (a `turn-signal` role and a `head`
+    engine kind), fixtures, both bindings. Then:
+    `backend/src/lib/turnSignal.ts` (`classifyTurnSignal()` with the
+    protocol layer first, reading the pending ask, then the
+    high-precision rules: greeting and closing from the near-echo
+    guard's vocabulary plus thanks and goodbyes, backchannel as a
+    one-to-three-word turn with no content word, question and directive
+    from `utteranceShape()`, `repair` from the negation and correction
+    phrases the consent and cancel vocabularies list, intensity from
+    surface cues, target from the pronoun and the roster, the clause
+    split from `utteranceShape()`'s own split with the unmistakable
+    stance markers, emotion only on an unmistakable cue; the
+    conservative fallback), `backend/src/lib/turnContext.ts`
+    (`TurnContext.signal` replaces `shape`; `UtteranceShape` becomes a
+    projection inside routing during migration), `backend/src/lib/
+    turnEngine.ts` (the protocol and rule layers before routing; a
+    literal-pattern win freezes a directive; the signal written to the
+    turn row by `logTurn`), `backend/src/lib/memoryJudge.ts` (the queue
+    keyed on an eligible clause in the stored signal instead of the
+    reply's source; a turn with none marked `skipped` before it is
+    queued), `backend/scripts/bench/conversationFixture.ts` (`act`,
+    `emotion` and `stance` expectations on every turn; the `memoryRows`
+    expectation; the `act-register`, `act-memory` and
+    `act-memory-curator` conversations of dev.md section 12) and
+    `conversationScore.ts`, `backend/scripts/bench/turn-signal.ts` (the
+    DailyDialog distribution and scoring adapter, research use only,
+    with the label definitions pinned in the dataset registry),
+    `backend/tests/turnSignal.test.ts`. Mirror: `utteranceShape.ts`,
+    `intentFor()`, `resolvePendingAsk()`. Acceptance: every fixture
+    turn's recorded signal matches its expectation at 95 percent or
+    better on acts across three seeded runs; the rule pass and the
+    current lexical shape scored on DailyDialog's test split with the
+    relabel, macro F1 per act and the baseline recorded in the dev
+    docs; a disclosure beside a package answer reaches the judge; a
+    closing turn is skipped; no consumer reads a second shape. Out of
+    scope: the heads (ACT-02), the plan and the composer (ACT-03), the
+    clause contract and the curator rules (MEM-06, CUR-01). Exit: the
+    spec suite, `bun test tests/turnSignal.test.ts
+    tests/utteranceShape.test.ts tests/memoryJudge.test.ts`, `bash
+    scripts/check.sh`.
 
 <a id="act-02"></a>
 
-- [ ] **ACT-02: The act and emotion head on the utterance embedding** (M, after ACT-01)
+- [ ] **ACT-02: The act, emotion and stance heads on the utterance embedding** (M, after ACT-01)
 
-    Objective: inform versus commissive, an unpunctuated question, and
-    the emotion in the common case, decided in microseconds from the
-    vector the turn already computes, with a license-clean artifact.
-    Files: `backend/scripts/train/act-head.ts` (dev-time only: labels
-    the act corpus with the 4B under the DailyDialog definitions over
-    Taskmaster-1, CCPE-M, the bench fixture and synthetic roster
-    dialogues; trains two multinomial heads over the nomic vector, the
-    emotion head on GoEmotions with its published Ekman mapping;
-    writes the artifact with the embedding identity and the validation
-    numbers), `backend/src/lib/actAssets.ts` (the `embedAssets.ts`
-    pattern: pinned URL, pinned checksum, a clear offline message),
-    `backend/src/lib/turnAct.ts` (the head after the rules; refused at
-    load when the embedding identity differs, CHAT-09; `source:
-    fallback` when the embed engine is down), `home/data-scratch/
-    datasets/SOURCES.md` (GoEmotions, Apache 2.0, added to the
-    downloads; the 500-turn reviewed sample recorded), the catalog
-    model package. Mirror: `wakewordAssets.ts` for a small trained
-    artifact fetched on demand; the org's training rules (verify the
+    Objective: inform versus commissive, an unpunctuated question, the
+    emotion in the common case and a clause's stance when no marker
+    settled it, decided in microseconds from the vector the turn
+    already computes, with a license-clean, calibrated artifact.
+    Files: `backend/scripts/train/turn-signal-heads.ts` (dev-time only:
+    labels the act and stance corpus with the 4B under the DailyDialog
+    act definitions and the stance definitions over Taskmaster-1,
+    CCPE-M, the bench fixture and synthetic roster dialogues; trains
+    three multinomial heads over the nomic vector, the emotion head on
+    GoEmotions with its published Ekman mapping; class-weighted loss,
+    temperature scaling per head on a held-out split, per-class
+    thresholds chosen on precision; writes the artifact with the
+    embedding identity, the label-map version and the validation
+    numbers), `backend/src/lib/turnSignalAssets.ts` (the
+    `wakewordAssets.ts` pattern: pinned URL, pinned checksum, single-
+    flight, a clear offline message), `backend/src/lib/turnSignal.ts`
+    (the heads after the rules, run right after the embed for every
+    model turn; refused at load when the embedding identity differs,
+    CHAT-09; `source: fallback` when the embed engine is down or the
+    artifact is missing; below a class threshold a clause is `unknown`),
+    `home/data-scratch/datasets/SOURCES.md` (GoEmotions, Apache 2.0,
+    added; the 500-turn reviewed sample recorded; the DailyDialog paper
+    pinned for the label definitions), the catalog model package.
+    Mirror: `wakewordAssets.ts`; the org's training rules (verify the
     data landed, validate on held-out real data, never a household
-    recording or transcript in the set). Acceptance: on DailyDialog's
-    test split, rules plus head beat the rule pass alone on macro F1
-    for acts and for the neutral-versus-not emotion split by a stated
-    margin, else the head does not ship; the fixture floor of ACT-01
-    holds; the artifact loads only against its embedding identity;
-    the per-turn cost is measured under one millisecond. Out of scope:
-    a separate encoder model, any training in the house. Exit: the
-    training script's own validation report checked into the dev
-    docs, `bun test tests/turnAct.test.ts tests/actAssets.test.ts`,
-    `bash scripts/check.sh`.
+    transcript in the set). Acceptance: on DailyDialog's test split and
+    on the fixture, rules plus heads beat the rule pass alone on act
+    macro F1 and on the neutral-versus-not emotion split by a stated
+    margin, with per-class precision and recall, confusion, calibration
+    error and the neutral false-positive rate reported at the natural
+    distribution and on a balanced slice, else the heads do not ship;
+    stance precision per class on the reviewed sample; the fixture
+    floors of ACT-01 hold; the artifact loads only against its
+    embedding identity; the per-turn cost measured under one
+    millisecond warm. The measured alternative, built only if the
+    heads fall short on context-dependent fragments after the protocol
+    layer: a MiniLM-class encoder reading the previous hub turn plus
+    the person's, through the ONNX runtime the backend already
+    carries, at a warm CPU p95 under 20 ms on the hub and the robot.
+    Out of scope: any training in the house. Exit: the training
+    script's validation report in the dev docs, `bun test
+    tests/turnSignal.test.ts tests/turnSignalAssets.test.ts`, `bash
+    scripts/check.sh`.
 
 <a id="act-03"></a>
 
-- [ ] **ACT-03: The register table, from act and emotion to the composer's moves** (M, rides with CHAT-16)
+- [ ] **ACT-03: The reply plan, from the signal to the composer's permitted moves** (M, rides with CHAT-16)
 
-    Objective: the engine chooses the moves and the length from the
-    act and emotion; the companion chooses the wording; the model
-    writes the words. Files: `backend/src/lib/register.ts` (the table
-    in dev.md section 12, one definition: moves in order, length, the
-    never list, the emotion and companion modulations),
-    `backend/src/lib/turnEngine.ts` (one context line per turn from
-    the table, placed ahead of the memory section; the length into
-    CHAT-12's reserve; the ask-back, care and close moves beside
-    CHAT-16's four), `backend/src/lib/persona.ts` (`engagement` and
-    `directness` read by the table, the "no follow-up question" prose
-    retired in favor of the table), `backend/src/lib/guards.ts`
-    (REG-01's statement rule reads the act; `near_echo` and
-    `repeat_question` read it; a `wrong_move` check for the bench),
-    `backend/src/lib/personaJudge.ts` (the rubric line, with the
-    recorded act and emotion printed per exchange),
-    `backend/scripts/bench/conversationFixture.ts` (the `act-register`
-    conversation; the act assertion on feeling-before-task, asks-back,
-    child-register, length-matches-the-moment and greeting-and-thanks),
-    `docs/user/chat.md`. Mirror: the composer's four moves and the
-    claim-type ladder (CHAT-16), `composePersonaPrompt()`. Acceptance:
-    the `act-register` conversation (design note, section 12, part 4)
-    and the five existing register rows, three seeded runs, every
-    turn's act recorded and every move read from the reply's effect
-    (a question mark present or absent, a sentence count, no offer, no
-    play word, no closer); the persona-eval judge scores the fit line
-    per bundled companion; the direct companion drops react on
-    questions and keeps care on sadness; the crisis overlay and every
-    guard unchanged on every row. Out of scope: canned replies per
-    label, a second prompt path, any register rule over a safety or
-    privacy decision. Exit: the named tests, the persona-eval bench,
-    `bash scripts/check.sh`.
+    Objective: the engine decides which moves exist and how long the
+    reply is; the companion decides the wording of the optional ones;
+    the model writes the words; a forbidden move is dropped
+    structurally. Files: `backend/src/lib/register.ts` (the base table
+    by act, the emotion overrides, the companion modulation inside the
+    envelope, the explicit brevity request, the surface; one typed
+    `ReplyPlan` per turn), `backend/src/lib/turnEngine.ts` (one context
+    line per turn from the plan, ahead of the memory section;
+    `max_words` into CHAT-12's reserve; the plan and the typed moves
+    persisted beside the signal), the composer (CHAT-16: typed move
+    fields on the `ComposedTurn`, `react`, `care`, `say`, `pick`,
+    `point`, `ask_back`, `close`; a forbidden move omitted before the
+    boundary), `backend/src/lib/persona.ts` (`engagement` and
+    `directness` read by the table; the reaction and follow-up prose
+    retired, the remaining sentences realization only),
+    `backend/src/lib/guards.ts` (REG-01's statement rule reads the
+    signal; `near_echo` and `repeat_question` read it; a
+    `plan_violation` family: an unwanted follow-up, a missing required
+    acknowledgment, a closing reopened, playfulness under distress, a
+    length over the cap), `backend/src/lib/personaJudge.ts` (the rubric
+    line, with the stored signal, plan and outcome printed per
+    exchange), `backend/scripts/bench/conversationFixture.ts` (the
+    `act-register` conversation's plan checks; the signal assertion on
+    feeling-before-task, asks-back, child-register,
+    length-matches-the-moment and greeting-and-thanks),
+    `docs/user/chat.md`. Mirror: CHAT-16's composer and claim-type
+    ladder, `composePersonaPrompt()`. Acceptance: the `act-register`
+    conversation (dev.md section 12, part 4) and the five existing
+    register rows, three seeded runs, every turn's signal recorded and
+    every move read from the typed moves and the reply's effect; the
+    persona-eval judge scores the fit line per bundled companion and
+    every correctness row runs under every companion; the direct
+    companion drops an optional react on questions and keeps a required
+    acknowledgment on sadness; "just the numbers" suppresses the
+    optional moves under every companion; the crisis overlay and every
+    guard unchanged on every row; one authority for register (a test
+    that the persona prose carries no move decision). Out of scope:
+    canned replies per label, a second prompt path, any plan rule over
+    a safety, authorization, confirmation, evidence or privacy
+    decision. Exit: the named tests, the persona-eval bench, `bash
+    scripts/check.sh`.
 
 ## Chat direction 2026-09-12: the next block, two tracks
 

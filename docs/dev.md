@@ -14023,399 +14023,586 @@ family sees improving is their data, with a paper trail.
 
 ### 12. The act and the emotion of a turn, and the register they drive (2026-09-14)
 
-An addendum to the pass, on the coordinator's question: the engine
-has no notion of what kind of turn the person just made (an inform, a
-question, a directive, a commitment, a greeting, a closing) or of its
-feeling, so every register decision (react, ask back, be brief, be
-playful, be careful) is the chat model's alone, and an 8B makes it
-badly. The findings show it: a closer on an opening statement, a
-question back after a closing, an echo instead of an answer on a
-short turn, a plan of action where care was due, an assistant's
-"noted" on a statement. This section decides how the engine knows the
-act and the emotion, and how that knowledge drives the reply, in the
-platform's shape: the engine decides, the model writes the words.
+An addendum to the pass, on the coordinator's question and then on
+Jesse's: the engine has no notion of what kind of turn the person just
+made (an inform, a question, a directive, a commitment, a greeting, a
+closing) or of its feeling, so every register decision (react, ask
+back, be brief, be playful, be careful) is the chat model's alone, and
+an 8B makes it badly; and the same field has to serve the memory side,
+so that a quote, a hypothetical, a joke or a third-person report is
+never written as the speaker's own fact. The findings show the reply
+half: a closer on an opening statement, a question back after a
+closing, an echo instead of an answer on a short turn, a plan of action
+where care was due, an assistant's "noted" on a statement. The memory
+records of the same evening show the other half. This section decides
+how the engine knows the act and the emotion, how that knowledge
+drives the reply, and how it gates memory, in the platform's shape: the
+engine decides, the model writes the words, and none of these fields
+can turn a model inference into a household fact. Written first by
+this session, then reconciled with two outside readings of the same
+brief (Codex; part 7 lists what they changed).
 
 **What exists today.** `utteranceShape()` in `lib/utteranceShape.ts`
 reads four shapes (question, command, first_person, statement) for
-routing, and `intentFor()` in `lib/turnContext.ts` projects them onto
-three intent kinds. That is a router's reading, tuned so a command
-never misses a package; it says nothing about a greeting, a closing, a
-backchannel ("nice", "ok"), a commitment ("I'll try that"), a
-correction, or a feeling. `persona.ts` carries the register as prose
-(four dials, one sentence each) that the model may or may not follow,
-and the "engagement" dial's "no follow-up question tacked on" pulls
-against the friend rule on every opening statement. The persona judge
-grades voice, never whether the move fit the turn. DailyDialog (EVAL-07)
-labels 87,170 turns with exactly the act and emotion sets this needs,
-and its transitions are a measured record of what a person does next.
+routing, computed after literal and semantic routing and copied onto
+the turn context; `intentFor()` projects them onto three intent kinds.
+That is a router's reading, tuned so a command never misses a package;
+"first_person" is not a speech act, "statement" mixes an inform, a
+commitment, a closing, an acknowledgment and a correction, and there
+is no emotion. `persona.ts` carries the register as prose (four dials,
+one sentence each) that the model may or may not follow, and its
+"engagement" dial decides on its own whether an emotional disclosure
+gets care or a question, which is the model deciding, not the engine.
+The judge's queue (`pendingTurnWhere()` in `lib/memoryJudge.ts`) takes
+only turns whose reply came from the model, so a disclosure beside a
+package answer is never judged (CHAT-07's open gap), and the judge's
+SOURCE RULE is prose. `valid_to` is written on a state and consumed by
+nothing at read time. The persona judge grades voice, never whether the
+move fit the turn. `conversation_turns` is hub-internal while the
+conversation spec says robot turns sync through the hub: a shared turn
+record is a debt this item pays, because the signal has to live on it.
+DailyDialog (EVAL-07) labels 102,979 turns with exactly the act and
+emotion sets this needs, and its transitions are a measured record of
+what a person does next.
 
-**1. The representation: `TurnAct`, spec first.** One record beside
-the subject on the turn context, declared in the spec
-(`spec/schemas/turn-act.schema.json`, beside `subject-ref`), because
-the robot runs the same engine and the review record (REVIEW-01)
-carries it:
+**1. The representation: `TurnSignal`, spec first, on the shared turn
+record.** One record, declared in `spec/schemas/turn-signal.schema.json`
+and carried by a new `conversation-turn.schema.json` (the shared turn
+record the robot syncs through the hub, settled at the same time),
+computed once, frozen before the model runs, persisted beside
+`outcomes` on the turn row so the delayed judge and REVIEW-01 read what
+the live engine believed, never a later reclassification:
 
-- `act`: `inform | question | directive | commissive | greeting |
-  closing | backchannel`. The first four are DailyDialog's own set;
-  greeting, closing and backchannel are the conversation-management
-  acts the findings need and DailyDialog folds into inform (a greeting
-  and a "thanks, bye" are inform there; the mapping in part 2 handles
-  it).
-- `emotion`: `neutral | happiness | surprise | sadness | anger |
-  disgust | fear`, DailyDialog's seven, Ekman plus neutral, which is
-  also the set GoEmotions maps onto.
-- `intensity`: `low | mid | high`, deterministic from surface cues
-  (capitals, repeated punctuation, an expletive, a repeated word, a
-  strong intensifier); DailyDialog has no intensity, so this is never
-  learned.
-- `target`: `self | other | hub | world`, whom the emotion is about:
-  the speaker's own state ("what a long day"), another person or pet,
-  the hub itself ("you're not listening"), or a thing in the world.
-  Anger at the hub and sadness about oneself drive different moves.
-- `refersToPrior`: whether the turn leans on a previous turn (a
-  pronoun with no name, ellipsis, a bare referent, a reflected
-  question); read from CHAT-13's resolver, never recomputed.
-- `corrects`: whether the turn corrects the hub ("no, the other one",
-  "that's not what I asked", "wrong"); the Taskmaster-1 corrections are
-  the reference shapes; CHAT-13's rejected-subject rule reads it.
-- `confidence` (0 to 1 for the act and for the emotion separately),
-  and `source`: `rule | head | fallback`, so the review can tell what
-  decided.
+- `primary_act`: `inform | question | directive | commissive |
+  greeting | closing | backchannel`. The first four are DailyDialog's
+  own set; greeting, closing and backchannel are the management acts
+  the findings need (DailyDialog folds them into inform; the mapping in
+  part 2 handles it). The primary act is the clause that determines
+  the immediate response, by a fixed precedence: directive, question,
+  commissive, inform, then the management acts.
+- `secondary_acts`: the other clauses' acts, ordered, so "add milk,
+  and when is Pippa's appointment" keeps both.
+- `expressed_emotion`: `neutral | happiness | surprise | sadness |
+  anger | disgust | fear`, DailyDialog's seven (Ekman plus neutral, the
+  set GoEmotions maps onto). "Expressed" on purpose: what the words
+  express, never a claim about the person's inner state, and the engine
+  never states an inferred feeling back ("that sounds rough", never
+  "you're devastated").
+- `emotion_intensity`: `none | low | moderate | high`, deterministic
+  from surface cues (capitals, repeated punctuation, an expletive, a
+  repeated word, a strong intensifier); DailyDialog has no intensity,
+  so it is never learned, and a classifier's confidence is never read
+  as intensity (one answers "how sure", the other "how strong").
+- `target`: `self | other | hub | world`, whom the emotion is about.
+  Anger at the hub and sadness about oneself drive different moves and
+  different memory.
+- `repair`: `none | correction | retraction`, orthogonal to the act
+  ("no, Friday, not Thursday" is still an inform); the Taskmaster-1
+  corrections are the reference shapes; CHAT-13's rejected-subject
+  rule and the memory supersede path read it.
+- `refers_to_prior`: whether the turn leans on a previous turn (a bare
+  pronoun, ellipsis, a reflected question), read from CHAT-13's
+  resolver, never recomputed.
+- `clauses`: one entry per clause (the split `utteranceShape()`
+  already makes), each with its character range, its own `act`, its
+  `stance` (`asserted | reported | quoted | hypothetical | joke |
+  unknown`), its `subject` (`speaker | named { name, entity_id }
+  | household | world | unknown`), its emotion and intensity, and a
+  confidence. The turn-level fields are derived from the clauses, never
+  classified separately.
+- `act_confidence`, `emotion_confidence`, `source` (`protocol | rule
+  | head | fallback`) and `classifier_id` (the artifact's identity, so
+  a persisted signal says what produced it).
 
-It lives on `TurnContext.act`, filled in `prepareTurn()` right after
-the subject, and it is the one definition for every consumer:
-`UtteranceShape` becomes a projection of it (question is question;
-command is directive; first_person and statement are inform,
-commissive, greeting, closing or backchannel), so the router and the
-guards stop reading two different shapes; the composer reads it for
-moves and length (part 3); the guards read it where they read the
-shape today (`shapeOf`, REG-01's statement rule, `near_echo`,
-`repeat_question`); REVIEW-01 records it on every `TurnReview` and
-reports the distribution; the persona judge's rubric names it. A
-literal-pattern turn (a package ran before any model) is a directive by
-construction with the emotion read by the rule pass alone.
+One definition, two views. The composer answers the whole turn, so it
+reads the primary act, the secondary acts and the strongest marked
+emotion; the judge extracts propositions, so it reads the clause that
+supports each one. "Pippa said she hates cilantro, but I'd eat it if
+it were milder" is one turn with a reported clause about Pippa and a
+hypothetical clause about the speaker, and a turn-level label alone
+would mark all of it one way, which is unsafe for memory. Nothing is
+classified twice: `UtteranceShape` becomes a projection of the primary
+act inside the router during migration, the guards read the signal
+where they read the shape today (`shapeOf`, REG-01's statement rule,
+`near_echo`, `repeat_question`), the composer reads it for the plan
+(part 3), the judge reads the clauses (part 6), REVIEW-01 records it on
+every `TurnReview`, and the persona judge's rubric names it.
 
-**2. How it is produced: rules first, a head on the embedding the
-turn already has, the models never on the interactive path.** The
-options, against the principles: the chat model (a second completion
-or in-band tagging) costs a round trip on every turn and asks the
-unreliable party to grade itself, out; the judge on the 4B is the
-background engine and seconds away, out for the turn and right for
-the nightly relabel and for making training labels at dev time; a
-separate small encoder (a fine-tuned MiniLM) is a third model process
-on a home machine for a task the embedding engine already covers,
-out; rules alone are fast, license-clean and blind to emotion and to
-inform-versus-commissive, so they are the first pass and the fallback,
-not the whole. The choice:
+**2. How it is produced: protocol state first, rules second, a head on
+the embedding the turn already has third, a conservative fallback, and
+the models never on the interactive path.** The options, against the
+principles: the chat model (a second completion or in-band tagging)
+costs a round trip on every turn and asks the unreliable party to
+grade itself, out; the judge on the 4B is the background engine and
+seconds away, out for the turn and right for the nightly review and for
+making training labels at dev time; rules alone are fast, license-clean
+and blind to emotion and to inform-versus-commissive, so they are a
+layer, not the whole. `classifyTurnSignal()` in `lib/turnSignal.ts` owns
+one precedence:
 
-- *A deterministic first pass* (`lib/turnAct.ts`) decides what surface
-  form decides with near certainty: greeting and closing (the greeting
-  vocabulary the near-echo guard already has, "thanks", "bye",
-  "goodnight", "that's all"), backchannel (a turn of one to three
-  words with no content word beyond an acknowledgment or a reaction
-  word), question (the shape's own reading), directive (a command
-  opener or a package pattern win), `corrects` (the negation openers
-  and the correction phrases the consent and cancel vocabularies
-  already list, plus "wrong", "not that", "I meant"), intensity, and
-  `target` from the pronoun and the roster. It also sets emotion when
-  a cue is unmistakable (an expletive with anger words, "so happy",
-  "I'm scared").
-- *A trained head on the utterance vector* decides the rest: inform
-  versus commissive, question versus inform on an unpunctuated typed
-  turn, and the emotion in the common case where the words carry it
-  without a keyword. The turn already embeds the utterance for routing
-  and recall on every model turn (`utteranceVector` in `prepareTurn()`),
-  so the head costs a matrix multiply in JavaScript, microseconds, and
-  no new model process: it is a small multinomial head (one for the
-  act, one for the emotion) over the 768-dimensional nomic vector,
-  weights in a JSON artifact under 200 KB. Prebuilt over hand-built:
-  the embedding model is the prebuilt part; the head is ours, trained
-  by a dev-time script, versioned, and tied to the embedding identity
-  CHAT-09 defines (it is refused at load when the running embed model
-  is not the one it was trained on, and the rule pass alone runs, with
-  `source: fallback`, which is also what happens when the embed engine
-  is down).
-- *Training data, license-clean, because the head ships.* DailyDialog
-  is CC BY-NC-SA and the program's rule is that nothing from a research
-  license ships, so DailyDialog trains nothing that ships: it is the
-  validation set and the distribution reference (part 4). Emotion
-  trains on GoEmotions (Apache 2.0, 58,000 labeled comments, with its
-  own published mapping from 27 labels onto the Ekman six plus
-  neutral, which is our set exactly); the act head trains on a corpus
-  labeled at dev time by the 4B under the DailyDialog label
-  definitions over license-clean text (Taskmaster-1 and CCPE-M, both
-  CC BY 4.0, our own bench fixture, and synthetic roster-name
-  dialogues), with a 500-turn sample of those labels reviewed by a
-  person and the agreement recorded. If the act head validated on
-  DailyDialog's test split does not beat the rule pass alone by a
-  stated margin, the rule pass ships without it and the head stays a
-  REVIEW-01 signal. The label mapping: DailyDialog's inform, question,
-  directive and commissive are ours one to one; its greeting and
-  closing turns (labeled inform there) are relabeled by the rule pass
-  before scoring so the comparison is fair; GoEmotions' joy is our
-  happiness, its neutral ours, the other five one to one, and its
-  labels outside the Ekman mapping are dropped.
-- *How it ships.* An artifact the download system fetches on demand
-  (`lib/actAssets.ts`, the `embedAssets.ts` pattern: pinned URL,
-  pinned checksum, a clear message when offline), never a tracked
-  file; released as a catalog model package the hub and the robot both
-  install; the training script, the dataset registry rows and the
-  validation numbers live in the repo, the data and the weights do
-  not.
+1. *Protocol state wins.* An answer to a pending confirmation, ask,
+   `who` or `lookup` question is interpreted by that state machine
+   (`resolvePendingAsk()`); a text classifier never reinterprets "yes"
+   after the engine already knows what it asked. `source: protocol`.
+2. *High-precision rules win.* An exact closing or greeting (the
+   near-echo guard's own vocabulary plus thanks and goodbyes), a
+   backchannel (a turn of one to three words with no content word
+   beyond an acknowledgment or a reaction word), an explicit question
+   form, a package-declared command opener or a literal pattern win
+   (a directive by construction), `repair` from the negation and
+   correction phrases the consent and cancel vocabularies already list
+   ("wrong", "not that", "I meant", "never mind that"), intensity from
+   surface cues, `target` from the pronoun and the roster, and the
+   stance markers that are unmistakable (quotation marks and "she
+   said" for quoted; "says", "according to", "I heard from" for
+   reported; "if", "what if", "imagine", "suppose", "I would" for
+   hypothetical). An exact close is never reopened because a score
+   missed its threshold. `source: rule`.
+3. *The head decides the remainder:* inform versus commissive, a
+   question with no question mark, the emotion in the common case, and
+   a clause's stance when no marker settled it (joke above all, which
+   markers alone cannot read: a laugh token, "jk", "as if" plus the
+   emotion head's happiness beside an exaggeration is the rule's part;
+   irony without a marker is the head's, at a precision threshold, and
+   below it the clause is `unknown` and writes nothing). Three small
+   multinomial heads (act, emotion, stance) over the 768-dimensional
+   nomic vector the turn already computes for routing and recall
+   (`utteranceVector` in `prepareTurn()`): a matrix multiply in
+   JavaScript, microseconds, no new model process; weights in a JSON
+   artifact under 300 KB, tied to the embedding identity CHAT-09
+   defines and refused at load when the running embed model is not
+   the one it was trained on. Prebuilt over hand-built: the embedding
+   model is the prebuilt part, and a runtime wall of joke and
+   hypothetical regexes is exactly what the head is for. `source:
+   head`. The order of filling is two-phase because the embed is
+   computed only on a literal miss (FAST-04): the protocol and rule
+   layers run before routing, a literal-pattern win freezes the signal
+   as a directive with the rule pass's emotion, and the head runs
+   right after the embed for every model turn, before the prompt is
+   built, so the signal is frozen before the model runs in both cases.
+   The measured alternative, if the head's F1 on context-dependent
+   fragments ("I will tomorrow", "that again") falls short after the
+   protocol layer has taken the confirmations: a compact encoder
+   (MiniLM class) reading the previous hub turn plus the person's, run
+   through the ONNX runtime the backend already carries for wake
+   words, with a warm CPU p95 budget of 20 ms on the hub and the robot
+   as its acceptance. The head ships first because it costs nothing;
+   the encoder is built only if the bench says the head is not enough.
+4. *Low-confidence fallback is conservative:* an explicit question or
+   directive from the rules stands; otherwise inform, neutral, every
+   clause `unknown`, `source: fallback`; the same when the embed
+   engine is down or the artifact is missing.
 
-**3. How it drives the reply.** The act and the emotion choose the
-composer's moves and the length; the companion's dials choose the
-wording within them; the model writes the words. The table is one
-definition in the composer (`lib/register.ts`), read by the context
-message (one line: "This turn is a statement about themselves, sad,
-mildly; respond to the feeling first, one or two sentences, no
-tasks"), by CHAT-12's output reserve, and by the guards that check the
-result. The moves are CHAT-16's (react, pick, say, point) plus the
-three this section adds (ask back, care, close):
+*Training data, license-clean, because the head ships.* DailyDialog is
+CC BY-NC-SA and the program's rule is that nothing from a research
+license ships, so DailyDialog trains nothing that ships: it is the
+validation set and the distribution reference (part 4), and whether a
+derivative weight could ship is a question we do not need to ask. The
+emotion head trains on GoEmotions (Apache 2.0, 58,000 labeled comments,
+with its own published mapping from 27 labels onto the Ekman six plus
+neutral, our set exactly; joy is our happiness; labels outside the
+mapping are dropped). The act and stance heads train on a corpus
+labeled at dev time by the 4B under the DailyDialog act definitions and
+our stance definitions over license-clean text (Taskmaster-1 and
+CCPE-M, both CC BY 4.0, our own bench fixture, and synthetic roster-
+name dialogues), with a 500-turn sample of those labels reviewed by a
+person and the agreement recorded; the reviewed Taskmaster corrections
+also validate `repair`, and the CCPE-M preference turns validate that
+an inform stays an inform and never a request. Training uses a
+class-weighted loss, each head is calibrated separately by temperature
+scaling on a held-out split, and per-class thresholds are chosen on
+precision: a false neutral is awkward, a false fear or sadness makes
+the companion behave wrongly, and a false `asserted` is a false
+memory. The DailyDialog label mapping: acts 1 to 4 are inform,
+question, directive, commissive; emotions 0 to 6 are neutral, anger,
+disgust, fear, happiness, sadness, surprise; the original paper's
+definitions are pinned in the dataset registry before training, since
+the mirror carries the label files without them; DailyDialog's greeting
+and closing turns (labeled inform there) are relabeled by the rule pass
+before scoring so the comparison is fair. If the heads validated on
+DailyDialog's test split do not beat the rule pass alone by a stated
+margin, the rules ship without them and the heads stay a REVIEW-01
+signal.
 
-| Act | Emotion | Moves, in order | Length | Never |
-|---|---|---|---|---|
-| inform, about self or another, neutral | | react (one clause), then ask back when the companion asks (part below) | one to two sentences | an answer nobody asked for, a closer, "noted" |
-| inform | happiness, surprise | react in kind, play allowed, ask back | one to two | a task, a caution |
-| inform | sadness, fear, about self | care first (one sentence to the feeling), then at most one question about the person | one to two, shorter at high intensity | play, an offer, a task, a closer, any exclamation |
-| inform | anger, disgust, about the world or another | acknowledge, stay on their side, no pick | one to two | play, a lecture, an offer |
-| inform or directive with `corrects` | anger at the hub, any intensity | acknowledge in one clause, then do the corrected thing (CHAT-13 re-asks the question against the corrected subject) | as the corrected act needs | an apology paragraph, "I'm still learning", a repeat of the rejected subject |
-| question | any | say (the ladder), pick when a lookup ran, point at sources | one sentence; more only with `explicitDetailedAnswer` or research mode | a reaction preamble, a question back unless `ambiguous` (then the one clarifying question and nothing else) |
-| question | sadness, fear | care in one clause, then say | one to two | play |
-| directive | any | act (the package), narrate the outcome (CHAT-04), confirm first when consequential | one sentence | a reaction, a question back except the ask for a missing argument |
-| commissive ("I'll try that", "I'll do it tonight") | any | acknowledge in one clause; offer the follow-through mechanism once (a reminder) when one exists | one sentence | a lecture, a second offer, a question back |
-| greeting | any | greet back, one opener; a memory-driven prompt may ride here (B3, F1) | one sentence | a menu of what it can do |
-| closing ("thanks", "goodnight", "ok bye") | any | close | one sentence | a question back, an offer, "let me know if" |
-| backchannel ("nice", "ok", "hm") | any | one new bit on the active subject, or a short reaction | at most one sentence | an echo, a question back twice in a row, a subject change |
+*How it ships.* An artifact the download system fetches on demand
+(`lib/turnSignalAssets.ts`, the `wakewordAssets.ts` pattern: pinned
+URL, pinned SHA-256, a local path, single-flight, a clear message when
+offline), never a tracked file; declared in the spec's model
+capabilities (`model-capabilities.schema.json` gains a `turn-signal`
+role and a `head` engine kind beside the existing ones, with the label
+map version, license, checksum and download size on the record) and
+released as a catalog model package the hub and the robot both
+install; an engine asset, versioned, never a Settings choice. The
+training script, the dataset registry rows and the validation numbers
+live in the repo; the data and the weights do not.
 
-The emotion modulates across rows: `high` intensity shortens every
-row by one sentence; play (a joke, an exclamation, teasing) is allowed
-only on happiness, surprise and neutral, never on sadness, fear, anger
-or disgust; care replaces react whenever the emotion is sadness or fear
-about the self, whatever the act; anger at the hub turns off every
-optional move. The companion modulates within a row, never across:
-`engagement: brief` drops the ask-back move except on sadness and fear
-(where the one question about the person stays, a friend's move, not a
-habit); `curious` keeps it; `directness: direct` drops the react move
-on questions and directives and keeps care on sadness; `formality`
-and `filler_density` change wording only; the register never changes
-what the ladder does or whether a package runs. The DailyDialog
-transitions are the reference the table was set against, not a rule:
-a person answers an inform with a question 43 percent of the time and
-a question with a question 16 percent, which is why ask-back is the
-default after an inform and the exception after a question.
+**3. How it drives the reply: a plan of permitted moves, not an
+order.** The engine turns the signal, the protocol state, the surface,
+an explicit brevity request and the available evidence into a typed
+`ReplyPlan` (`lib/register.ts`, one definition, spec-shaped beside the
+signal so the review can check it): for each move (`react`, `care`,
+`say`, `pick`, `point`, `ask_back`, `close`) a value of `required |
+allowed | forbidden`, `playfulness: allowed | forbidden`,
+`max_sentences` and `max_words`. The composer realizes the plan in the
+companion's voice and returns typed move fields on the `ComposedTurn`
+(CHAT-16), so the engine can drop a forbidden follow-up or reaction
+without inferring a sentence's purpose from prose. This replaces the
+fixed "react, pick, say, point" order of section 6: the four moves stay
+the vocabulary, and the act, the emotion, the evidence and the surface
+decide which ones exist, because reacting before a timer confirmation
+or a direct factual answer is wrong and pointing is meaningless without
+a source or a deliverable. One line in the context message states the
+plan to the model ("a statement about themselves, sad, moderately:
+acknowledge the feeling first, one or two sentences, no tasks, no
+question unless it is about them"), placed ahead of the memory section;
+`max_words` feeds CHAT-12's reserve.
 
-*What REG-01 and REVIEW-01 become.* REG-01 stays an item and shrinks:
-its "a statement is not a request" half is the act (an action claim on
-a turn whose act is not directive is skipped, one rule instead of a
-shape test), and its assistant-register scrub and `repeat_question`
-stay as output-side guards, since they catch what the model writes
-whatever the act. REVIEW-01 stays separate (it is nightly and it reads
-what happened; the act is per turn and decides what happens) and
-gains: the act and emotion on every `TurnReview`; a defect code
-`wrong_move` (a question back after a closing, an answer with no
-reaction on an inform, play on a sad turn, an offer on a commissive)
-read from the reply's sentences against the table; and the household's
-own transition table beside DailyDialog's in the weekly report.
+The base table, by primary act:
+
+| Act | React | Care | Say | Pick | Point | Ask back | Length (chat) |
+|---|---|---|---|---|---|---|---|
+| inform | allowed; required on a marked emotion or a personal disclosure | per emotion | allowed, never an action claim | forbidden | forbidden | companion-gated; the default after an inform (part 4) | one sentence, 30 words; two on a disclosure |
+| question | forbidden except one clause of care on sadness or fear | per emotion | required, answer first, by the claim-type ladder | required when the evidence offers choices | allowed only with a source, a link or a document | forbidden except the one clarifying question when the subject is `ambiguous`, or one useful continuation | two sentences, 60 words; one on voice |
+| directive | forbidden unless a marked emotion can be acknowledged without delaying the action | per emotion | required after the outcome, the confirmation or the failure (CHAT-04's narration) | the outcome decides | allowed for a real deliverable | only a missing argument or a confirmation | one sentence, 25 words |
+| commissive | required, brief | per emotion | allowed as an acknowledgment, never a claim that the hub acted | forbidden | forbidden | forbidden; a curious companion may ask one relevant question; one offer of the follow-through mechanism (a reminder) when it exists | one sentence, 20 words |
+| greeting | one reciprocal greeting and one opener | none | forbidden beyond that; a memory-driven prompt may ride here (B3, F1) | forbidden | forbidden | forbidden | one sentence, 15 words |
+| closing | one reciprocal close | none | forbidden beyond the close | forbidden | forbidden | forbidden | one sentence, 8 words |
+| backchannel | a short reaction, or one new bit on the active subject | none | allowed | forbidden | forbidden | forbidden twice in a row | one sentence, 20 words |
+
+The expressed emotion then overrides, whatever the act: neutral, no
+override; happiness, one warm or playful reaction permitted if the
+companion permits it, and never an inflated directive or simple
+question; surprise, one short matching reaction, then the act's normal
+move; sadness, a short acknowledgment required before any optional
+content, playfulness and filler forbidden, no forced question; fear, a
+calm acknowledgment required where safe, playfulness and filler
+forbidden, then answer or act directly; anger, acknowledge the
+frustration without agreeing with an unverified claim, no playful,
+defensive or verbose language, and with `target: hub` every optional
+move off and the corrected thing done (CHAT-13 re-asks the question
+against the corrected subject); disgust, recognize the aversion in a
+clause, never echo the graphic detail. `high` intensity shortens every
+row by one sentence. The engine never states an inferred feeling.
+
+The companion modulates only the optional moves, inside the envelope:
+`directness: direct` removes an optional react, point or follow-up and
+can never remove a required acknowledgment; `engagement: brief` forbids
+optional questions, `balanced` permits one when useful, `curious`
+permits one after an inform or a commissive once the turn is addressed;
+formality and complexity change realization only; filler density
+applies only where playfulness is allowed and is masked under sadness,
+fear, anger and disgust; an explicit "just the numbers" suppresses the
+optional reaction and follow-up for every companion; a clarification
+(ASK-01), safety wording, authorization and confirmation stay engine
+policy under every companion. The persona prose in `persona.ts` that
+decides reaction and follow-up today is retired when the plan is
+enforced, so there is one authority; the remaining sentences describe
+realization only. The DailyDialog transitions are the reference the
+table was set against, not a rule: a person answers an inform with a
+question 43 percent of the time and a question with a question 16
+percent, which is why ask-back is the default after an inform and the
+exception after a question.
+
+*What REG-01 and REVIEW-01 become.* REG-01 becomes two layers: before
+generation, the plan itself (an inform, a commissive or a closing
+forbids an unsupported action claim, a closing forbids a question, a
+directive's reply narrates observed outcomes only); after generation,
+the guards enforce the plan (the existing `assistant_register`,
+`repeat_question` and action-claim checks stay, and a `plan_violation`
+family reads the typed moves against the plan: an unwanted follow-up,
+a missing required acknowledgment, a closing reopened, playfulness
+under distress, a length over the cap). REVIEW-01 stays separate (it is
+nightly and reads what happened; the signal is per turn and decides
+what happens) and reviews the stored chain, signal to plan to typed
+moves to evidence ids, with these defect codes replacing the earlier
+single one: `act_mismatch`, `emotion_mismatch`, `missing_reaction`,
+`unwanted_question`, `closing_reopened`, `register_plan_violation`,
+`playful_under_distress`; the nightly judge may flag a mismatch and
+never rewrites the signal or the companion policy on its own; the
+household's own transition table sits beside DailyDialog's in the
+weekly report.
 
 **4. How it is measured.**
 
-- *The reference.* DailyDialog's training split, computed once by the
-  bench and recorded in the run header: acts inform 45.7 percent,
-  question 28.6, directive 16.3, commissive 9.3; emotions neutral 82.8,
-  happiness 12.8, surprise 1.8, sadness 1.1, anger 0.9, disgust 0.3,
-  fear 0.2; after an inform the next turn is an inform 47 percent of
-  the time and a question 37, and carries a question mark 43 percent
-  of the time; after a question, an inform 76 percent and a question
-  16; after a directive, a commissive 57 percent. These are what a
-  person does next; the hub's own transition table (REVIEW-01) is read
-  beside them, and a large gap on a row is a finding (a hub that asks
-  back after 80 percent of informs is nagging; after 5 percent it is a
-  wall).
-- *The classifier.* Macro F1 per act and per emotion on DailyDialog's
-  test split (the greeting and closing relabel applied), reported for
-  the rule pass alone and for rules plus head, and the same on every
-  turn of our own fixture, which gains an `act` and `emotion`
-  expectation per turn (the effect standard: the act recorded on the
-  turn, like `subject`), at a floor of 95 percent on acts and 90 on
-  the neutral-versus-not split of emotion before the head ships.
+- *The reference.* DailyDialog across its three splits, computed once
+  by the bench and recorded in the run header: 13,118 dialogues,
+  102,979 turns; acts inform 45.2 percent, question 28.6, directive
+  16.8, commissive 9.4; emotions neutral 83.1, happiness 12.5,
+  surprise 1.8, sadness 1.1, anger 1.0, disgust 0.3, fear 0.2; in the
+  training split, after an inform the next turn is an inform 47
+  percent of the time and a question 37, and carries a question mark
+  43 percent of the time; after a question, an inform 76 percent and a
+  question 16; after a directive, a commissive 57 percent. These are
+  what a person does next; the hub's own transition table (REVIEW-01)
+  is read beside them, and a large gap on a row is a finding (a hub
+  that asks back after 80 percent of informs is nagging; after 5
+  percent it is a wall). DailyDialog has no closing, greeting or
+  backchannel class, so those three get their own reviewed rows.
+- *The classifier.* On DailyDialog's test split (research use, never
+  shipped; the relabel applied) and on our fixture, for the rule pass
+  alone and for rules plus heads: act macro F1, per-class precision
+  and recall, the confusion matrix and calibration error; emotion
+  macro F1, per-class precision and recall, the neutral false-positive
+  rate and calibration error (accuracy alone lets an always-neutral
+  classifier score 83 percent); closing, greeting and backchannel
+  precision and recall on the reviewed rows; stance precision per
+  class on the reviewed sample; warm p50 and p95 per turn on the hub
+  and the robot; the fallback rate and the missing-artifact behavior.
+  Reported at the natural distribution and on a balanced slice, since
+  the rare emotions are where the 8B needs the most control. The
+  fixture gains an `act`, `emotion` and `stance` expectation per turn
+  (the effect standard: the signal recorded on the turn, like
+  `subject`), at a floor of 95 percent on acts and 90 on the
+  neutral-versus-not split before a head ships.
 - *The moves.* A bench conversation `act-register`, roster names,
-  three seeded runs, with the act and emotion asserted on each turn
-  and the move read from the reply's effect: "Pippa got the lead in the
-  school play" (inform, happiness; effects: `act: inform`, `emotion:
-  happiness`; the reply has a question mark; no closer; two sentences
-  at most); "ugh, Rover chewed my only good headphones" (inform, anger
-  about another; effects: no question mark that asks the person to do
-  something, no offer, no play word, at most two sentences); "I've
-  been dreading the dentist all week" (inform, fear about self;
-  effects: `care` is the first sentence, read as no task word, no
-  offer, no exclamation, one question at most, about the person); "I'll
-  book it tomorrow" (commissive; effects: one sentence, at most one
-  offer, no question back); "ok" (backchannel; effects: at most one
-  sentence, not an echo, no question back); "thanks, night" (closing;
-  effects: one sentence, no question mark, no offer, no closer
-  phrase). The existing rows keep their checks and gain the act
-  assertion: feeling-before-task (B7), asks-back (D2), child-register
-  (B6), length-matches-the-moment (D3), and the closing turn of
-  greeting-and-thanks. Registers that need a human read (warmth, play)
-  stay reader's rows beside the effect checks.
+  three seeded runs, with the signal asserted on each turn and the move
+  read from the typed moves and the reply's effect: "Pippa got the lead
+  in the school play" (inform, happiness: a question mark; no closer;
+  two sentences at most); "ugh, Rover chewed my only good headphones"
+  (inform, anger about another: no task question, no offer, no play
+  word, two sentences at most); "I've been dreading the dentist all
+  week" (inform, fear about self, moderate: care as the first sentence,
+  no task word, no offer, no exclamation, at most one question, about
+  the person); "I'll book it tomorrow" (commissive: one sentence, at
+  most one offer, no question); "ok" (backchannel: one sentence, not an
+  echo, no question); "add oat milk to the list, and when is Pippa's
+  appointment" (directive with a secondary question: the package ran
+  once, both intents answered, the outcome sentence first); "no,
+  Friday, not Thursday" (inform, repair correction: one clause of
+  acknowledgment, the corrected fact used, no apology paragraph); "you
+  added the wrong item" (inform, anger at the hub: a concise
+  acknowledgment, no invented action, the outcome checked); "why does
+  Rover keep getting sick" (question, fear: a careful answer, no play
+  word); "play the birthday playlist" (directive, happiness: the action
+  not delayed by chatter); "I got the job" (inform, happiness: a warm
+  reaction permitted, no assistant closer); "Rover died yesterday"
+  (inform, sadness, high: a careful acknowledgment required, no play,
+  no question forced); "thanks, that's all for tonight" (closing: one
+  sentence, no question mark, no offer, no new subject). The existing
+  rows keep their checks and gain the signal assertion: feeling-before-
+  task (B7), asks-back (D2), child-register (B6), length-matches-the-
+  moment (D3), greeting-and-thanks. Every correctness row runs under
+  every bundled companion (COMP-03). Warmth and play stay reader's
+  rows beside the effect checks.
 - *The rubric line.* The persona judge's prompt (`lib/personaJudge.ts`)
-  gains one line beside voice: "the reply's move fits the person's
-  turn: a reaction to a statement, an answer to a question, care first
-  on a sad or frightened turn, a one-line close to a goodbye, and no
-  question back after a closing or twice in a row", with the act and
-  emotion the engine recorded printed on each exchange so the judge
-  grades the fit and never re-guesses the act.
+  gains, with the stored signal, plan and outcome printed per exchange
+  so it never re-guesses them: "given the person's act and expressed
+  emotion, the plan and the outcome, did the reply address the act,
+  perform every required move, avoid every forbidden move, match the
+  emotion without inventing a feeling, stay within the length cap, and
+  avoid an unnecessary question; cite the failing clause and return
+  pass or one defect code".
 
-**5. What it must never do.** No label-driven canned replies: the act
-picks the moves and the length, the model still writes every sentence,
-and the only fixed lines remain the engine's own (an ask, a confirm, a
-guard's replacement, the malformed line). No second prompt path: the
-act is one line in the context message and one row in the composer's
-table, the same messages, the same composer, the same guards, for every
-companion. No register rule overrides a safety or privacy decision: the
-safety classifier runs before the act is read and after the reply is
-written, the crisis overlay rides on any register, care never suppresses
-it, a happy or playful register never widens what a child may be told,
-an emotion never changes recall's scope, and a directive act never
-skips a confirmation. And the act is never a memory: it is turn state,
-recorded on the review, never a record about the person.
+**5. What it must never decide.** Input or output safety, a content
+ceiling, authorization or a grant, a consequential action's
+confirmation, whether a tool succeeded, whether a claim is supported,
+memory truth, scope, sensitivity or consent, whether crisis resources
+appear, or whether a person's words reach anyone else: those belong to
+safety, evidence, outcomes and permissions, and the one output safety
+boundary runs on every reply source before display or speech whatever
+the label says. No label-driven canned replies: the plan picks the
+moves and the length, the model writes every sentence, and the only
+fixed lines remain the engine's own (an ask, a confirm, a guard's
+replacement, the malformed line). No second prompt path: one line in
+the context message and one plan, the same messages, the same composer,
+the same guards, for every companion. No mutable per-household
+classifier and no learning from uncorrected conversations (section 11's
+gate). And the signal is turn state, recorded on the turn and the
+review, never a memory about the person. What the 8B will still get
+wrong with the right plan (an awkward acknowledgment, emotion pinned on
+the wrong subject, irony without a marker, prosody lost in a
+transcript) is what the guards, the subject resolver, the evidence
+ladder and the outcomes remain for: the signal narrows the model's
+discretion over register; it does not solve conversation.
 
-**6. The same field on the memory side.** The act and the emotion
-decide what the judge may write as well as what the composer says,
-and the two paths read one record at two granularities, stated here
-because the difference is real: the composer answers the whole turn,
-so it reads the turn-level act and emotion; the judge extracts from
-clauses, because one turn carries an inform and a directive ("I'm
-making lasagna tonight, set a timer for forty minutes"), or a quote
-inside a statement ("my sister Nadia says she hates cilantro"), and a
-turn-level label would mark the whole thing one way. So `TurnAct`
-carries `spans`: one entry per clause (the clause split
-`utteranceShape()` already makes), each with its own `act`, its
-`stance`, and its character range, and the turn-level `act` is the
-dominant span's by a fixed precedence (directive, question,
-commissive, inform, then the management acts), which is what routing
-and the composer need. One schema, one rule pass, one head; the
-composer reads the top, the judge reads the spans. Nothing is
-classified twice.
+**6. The same field on the memory side.** The act decides whether
+speech can be evidence, the stance decides whose evidence it is and
+whether it is literal, and the emotion decides only whether a bounded
+state is worth keeping.
 
-*Stance, the marking the judge reads.* Each span carries `stance`:
-`asserted` (the speaker's own claim, about themselves or another:
-"Quill likes seltzer"); `reported` (secondhand through a named source:
-"Nadia says", "according to Quill", "I heard from Rover that");
-`quoted` (words attributed verbatim to someone or something:
-quotation marks, "she said", "the sign says", a pasted line);
-`hypothetical` (a conditional or imagined state: "if we got a cat",
-"what if", "imagine", "I would", "suppose"); `joke` (irony or play,
-read only on an unmistakable marker: a laugh token, "jk", "yeah
-right", "as if", and the emotion head's happiness beside an
-exaggeration; when in doubt, never joke); a question or a management
-act has no stance. The rule pass sets stance from the markers; the
-head never guesses one, because a wrong `asserted` is a false memory
-and a wrong `joke` loses a real one, and the markers are surface
-forms a rule reads better than a small model.
+*Eligibility, per clause.* Only an `inform` or a `commissive` clause
+with stance `asserted` or `reported` can yield a memory. A `question`
+yields nothing (asking is not asserting; the fact inside "does Pippa's
+school allow peanuts" is not the speaker's claim, and neither is an
+emotion inside the hub's own answer). A `directive` yields a package
+outcome or a task, never a memory, and its embedded wording is never
+reinterpreted as an inform ("tell Pippa I'm scared" writes nothing);
+the remember package is the one explicit, auditable memory operation
+on a directive, on its own path, and the judge never extracts a second
+record from that turn. A `greeting`, `closing` or `backchannel` yields
+nothing. A `quoted`, `hypothetical`, `joke` or `unknown` clause yields
+nothing about anyone; precision wins on an uncertain label, because a
+missed low-value memory can be said again and a false one contaminates
+recall, the profile and the companion for months. A mixed turn is
+handled per clause: "add oat milk to the list, and I prefer that brand"
+is a list outcome plus one preference from the inform clause. Two
+structural consequences: the judge's queue selects any completed turn
+whose stored signal has an eligible clause, no longer turns whose
+reply came from the model (a disclosure beside a package answer is
+judged; CHAT-07 closes here), and a turn with no eligible clause is
+marked `skipped` before it is queued, which takes about a third of
+turns off the 4B.
 
-*Which acts can yield a memory.* Only an `inform` or a `commissive`
-span with stance `asserted` or `reported`. A `question` yields nothing
-(the judge's rule today, now structural: the fact inside "does Pippa's
-school allow peanuts" is not the speaker asserting it). A `directive`
-yields a package outcome or a task, never a memory; the one directive
-that writes a record is the remember package, by the person's
-explicit ask, on its own path. A `greeting`, `closing` or `backchannel`
-yields nothing, and a turn whose every span is one of those is marked
-`skipped` for the judge before it is queued, which is also a cost
-saving: about a third of turns never reach the 4B. A `quoted`,
-`hypothetical` or `joke` span yields nothing about anyone. A
-`reported` span yields a record about the named third party only
-(subject the entity, step 3a), at reduced importance (capped at 0.4)
-and with the source named in the record's text ("Nadia says she hates
-cilantro", never "Nadia hates cilantro"), and never a record about the
-speaker. MEM-06's grounding rule reads the label: a candidate's
-content words must fall inside an `asserted` or `reported` inform or
-commissive span, and a candidate grounded in a question, a directive's
-argument, a quoted, hypothetical or joke span is dropped with the
-reason `stance`, counted on the same log line as `ungrounded`,
-`passing` and `world`.
+*Grounding, the clause contract (MEM-06 reads the label).* Every
+proposed fact cites one eligible clause; every proper noun and number
+in it is grounded in that clause (the content-word check stays as the
+second gate); the fact's subject matches the clause's `subject`; a
+`reported` clause can produce a record about the named third party or
+a household subject only, never about the speaker, at importance
+capped at 0.4 and with the source named in the text ("Nadia says she
+hates cilantro", never "Nadia hates cilantro"), and a `quoted` clause
+never flattens into a settled fact about the quoted person either
+("Quill said, 'I hate seltzer'" writes neither a speaker preference nor
+a Quill preference); a `commissive` clause can produce only a `goal`,
+`project`, or a dated `event` for the speaker; an emotional fact
+follows the state rule below. Rejections, each counted on the judge's
+log line beside `ungrounded`, `passing` and `world`: `ineligible_act`,
+`quoted`, `hypothetical`, `joking`, `unknown_grounding`,
+`subject_mismatch`, `invalid_emotion_category`, `missing_valid_to`. The
+deterministic validator decides; the judge's own rubric line ("cite the
+exact eligible clause; preserve its asserted, committed or reported
+subject; reject quoted, hypothetical, joking, unknown, question,
+directive and closing material; encode a meaningful emotion only as a
+bounded state") is guidance to the model, never the gate.
 
-*Emotion and intensity set the category, the importance and the
-lifetime.* A `commissive` span ("I'll book the dentist tomorrow", "we're
-doing pizza Friday") is a `goal` or `event` with `valid_to` at the
-stated time or fourteen days, and it is the record a follow-through
-prompt (F2, B3) reads later. An `inform` about the self with sadness,
-fear, anger or disgust is a `state`, never a `preference` or
-`identity`: "I've been dreading the dentist all week" is a state with
-`valid_to` seven days out (the dentist's date when the turn names
-one), and "I hate mornings" said once, angry, is a state too; a trait
-is earned by repetition across conversations, which the curator
-notices and proposes (PREF-01, REVIEW-01), never writes. A low-
-intensity mood with no durable cause ("I'm tired") stays excluded, the
-judge's one-moment rule made structural: an emotional inform with
-intensity `low` and no time or event word yields nothing. Intensity
-raises a state's importance (low 0.3, mid 0.5, high 0.7, the judge's
-own bands) so the next few days' recall carries it, and it never
-raises a fact's: "the dishwasher is broken AGAIN" is a fact at the fact
-band, whatever the capitals. An emotion aimed at the hub (`target:
-hub`, a correction, frustration) yields no memory at all; it is
-REVIEW-01's signal and CHAT-13's correction. Happiness about an event
-is an `event` at the event band, dated.
+*Emotion, category, importance and lifetime.* The reply reacts to
+expressed emotion at any intensity; memory keeps only a meaningful,
+bounded state, and never turns an emotion into an identity, a
+preference or a trait ("I'm furious today" is not "an angry person").
+The rule: intensity `none` or `low` writes nothing (the judge's
+one-moment exclusion made structural: "I'm a little annoyed about the
+traffic" is gone by tomorrow); `moderate`, explicitly about the speaker
+or a named subject, writes a `state` at importance 0.3 with `valid_to`
+24 hours out; `high` writes a `state` at importance 0.5 with `valid_to`
+seven days out (the existing seven-day state expiry). An explicit time
+always wins: "nervous until the appointment tomorrow" ends after the
+appointment, "stressed this week" at the week's end. A durable
+condition stated in words ("I've had anxiety for three years") is an
+asserted fact under the normal policy and its sensitivity rules, never
+derived from the emotion label. A commissive is a `goal` or a dated
+`event` with `valid_to` at the stated time or fourteen days, the record
+a follow-through prompt (F2, B3) reads later. Intensity never raises a
+fact's importance: "the dishwasher is broken AGAIN" is a fact at the
+fact band. The judge may split one utterance: "Rover died yesterday,
+and I'm devastated" yields an event about Rover under the ordinary
+rules and a high state about the speaker; when the state expires the
+event remains, and grief is never a trait. `target: hub` writes
+nothing: a correction is CHAT-13's and REVIEW-01's. The 24-hour and
+seven-day defaults are starting values to measure against family use.
 
-*What the curator keeps and lets fade (CUR-01).* A `state` expires at
-its `valid_to`: the curator sets `expired_at` and recall stops reading
-it, and the record stays for the person to see; a re-assertion before
-then (the same subject and feeling, any conversation) extends
-`valid_to` from the new turn and bumps `uses`. Three re-assertions in
-separate conversations across two weeks make a proposal (a preference
-or a standing fact, with the three turns as evidence) that the person
-accepts or dismisses; the curator never promotes a state on its own. A
-`goal` or `event` with a date fades the day after it; a follow-through
-question (F2) is asked before it fades when the mechanism exists, and
-silence lets it expire. A `reported` record is never extended by the
-speaker's own later assertion: if the speaker later asserts it in
-their own words, that is a new `asserted` record and the reported one
-is superseded by it (#88's supersession), so the store never holds
-hearsay beside the fact it became.
+*What the curator keeps and lets fade (CUR-01).* `valid_to` becomes a
+read boundary: recall and the profile paragraph exclude a record past
+it before any sweep runs, and the curator then archives it with
+`expired_at`, provenance intact, kept for the person to see; pinning
+preserves history and never revives an expired state as current. A
+re-assertion before `valid_to` (the same subject and feeling, any
+conversation) extends it from the new turn and bumps `uses`. Repeated
+states stay repeated episodes: three in separate conversations across
+two weeks produce an open question or a review proposal the person
+answers, never a written trait, and only the person's own words
+("I've had anxiety for years") make a durable record. A later denial or
+correction ("I'm not nervous anymore", `repair`) supersedes the active
+state (#88's path). A `goal` or dated `event` fades the day after its
+date, after the follow-through question when that mechanism exists. A
+`reported` record is superseded, never extended, by the speaker's own
+later assertion in their own words, so the store never holds hearsay
+beside the fact it became. The category-to-tier mapping stays (a state
+is episodic); importance changes ranking and decay, never tier.
 
-*Bench rows.* A conversation `act-memory`, roster names, three seeded
-runs, every effect read from the memory table after the judge drains:
-"my sister Nadia says she hates cilantro" (effects: a record whose
-subject is Nadia, importance at most 0.4, text carrying "says"; no
-active record that the speaker dislikes cilantro); "if we ever got a
-cat I'd call it Marsh" (effect: no record with "cat" or "Marsh"); "ha,
-I'm basically a professional chef now" (effect: no record with "chef");
-"I'll book the dentist tomorrow" (effects: a `goal` record with
-`valid_to` within two days and "dentist"); "set a timer for forty
-minutes" (effects: a timer outcome on the turn; no record from the
-turn); "I've been dreading the dentist all week" (effects: a `state`
-record with `valid_to` at most seven days out, importance in the mid
-band, no `preference` or `identity` record from the turn); "I'm tired"
-(effect: no record); "ugh, you keep getting this wrong" (effects: no
-record; `target: hub` on the turn); "thanks, night" (effects: no
-record; the turn's `judge_status` is `skipped`). A second conversation
-for the curator, driven with the bench's clock: the dentist state
-re-asserted four days later (effect: `valid_to` extended from the new
-turn), then the clock moved past it with no re-assertion (effect:
-`expired_at` set, the record absent from the next turn's context, the
-row still present for the person), then the same feeling asserted in
-a third and a fourth conversation (effect: a proposal exists and no
-new `preference` record does). The existing disclose-then-recall,
-correction-then-recall and coworker-likes-seltzer rows gain the stance
-assertion on their inform turns (`asserted`), so a regression that
-starts marking plain statements as anything else fails there.
+*Bench rows.* The fixture gains a `memoryRows` expectation (text
+fragments, category, subject name, status, an importance range, a
+`valid_to` window relative to the turn, or null for none), read from
+the memory table after the judge drains, three seeded runs, every check
+passing all three. `act-memory`: "I prefer quiet films" (one active
+preference, speaker scope, no duplicate); "I'll call the dentist
+tomorrow" (one goal or event, the speaker's, `valid_to` within two
+days); "does Pippa prefer quiet films" (zero records from the turn);
+"add oat milk to the list" (zero records; one list outcome); "thanks,
+that's all tonight" (zero records; `judge_status` skipped); "add oat
+milk, and I prefer that brand" (a list outcome plus one preference from
+the inform clause only); "Pippa said she hates cilantro" (no speaker
+preference; no flattened preference about Pippa); "if I lived in Paris
+I'd walk everywhere" (zero records); "my sister Nadia says she hates
+cilantro" (one record with Nadia as subject, importance at most 0.4,
+text carrying "says"; no speaker preference); "ha, I'm basically a
+professional chef now" (zero records); "I'm a little annoyed about the
+traffic" (zero state records); "I'm nervous about tomorrow's
+appointment" (one state, importance 0.3, `valid_to` near the
+appointment or within 24 hours); "I'm terrified about the storm
+tonight" (one state, importance 0.5, `valid_to` within seven days);
+"Rover died yesterday, and I'm devastated" (an event and a state,
+separate; no identity record); "Quill is furious about the delay" (at
+most a bounded state about Quill; nothing about the speaker); "Quill
+said he was furious, but I think he was joking" (no settled emotional
+fact about either); "set a timer for ten minutes" then the
+confirmation (the outcome persists; no record from the reply text).
+`act-memory-curator`, driven with the bench's clock: the nervous state
+re-asserted a day later (`valid_to` extended from the new turn); the
+clock past `valid_to` (the record absent from the next turn's context
+before the sweep, then `expired_at` set by the curator, the row still
+present); "how's Rover" after the grief state expired (the event
+active, the state not); "I'm stressed today" in three dated
+conversations (three bounded states, a proposal or an open question,
+no identity or preference record); "I'm not nervous anymore" (the
+nervous state superseded). The existing disclose-then-recall,
+correction-then-recall and coworker-likes-seltzer rows gain the
+`asserted` stance assertion on their inform turns.
 
-**Sequence and sizes.** ACT-01, the spec and the rule pass (S),
-before REG-01, which then reads the act; ACT-02, the head, its
-training script and validation (M), after ACT-01 and independent of
-the chat items, shipping only if it beats the rules; ACT-03, the
-register table in the composer and the context line, the guards'
-consumers, the bench rows and the rubric line (M), rides with CHAT-16
-(the moves are the composer's), with the context line and the length
-rule landing on the current prompt path as soon as ACT-01 exists;
-REVIEW-01 gains `wrong_move` and the transition report when it is
-built, after ACT-03. The memory half (part 6) lands across the
-items it names: the spans and the stance in ACT-01's spec and rule
-pass; the stance rule and the `act-memory` rows in MEM-06; the fade,
-extend and propose rules in CUR-01; the skipped management turns in
-ACT-01's engine half.
+**7. The outside review, reconciled.** Two readings of this brief
+(Codex, the register half and the memory half) arrived after the first
+cut and changed it in these places, all taken: the signal computed
+before routing and frozen, persisted on a shared `conversation-turn`
+spec record so the judge and the review read what the engine believed;
+protocol state as the first layer of production; `expressed_emotion`
+named for what it is and the engine never stating a feeling back;
+`repair` as an enum orthogonal to the act; `secondary_acts` and the
+clause `subject`; `unknown` as a stance that writes nothing;
+class-weighted training, per-head calibration and precision-chosen
+thresholds, with the natural and balanced reports and the always-
+neutral trap named; the artifact declared in the model-capabilities
+spec; a typed `ReplyPlan` of permitted moves replacing the fixed order,
+with typed move fields on the `ComposedTurn` so a forbidden move is
+dropped structurally; the base table's lengths and the emotion
+overrides in their wording; REG-01 as two layers and REVIEW-01's seven
+defect codes; the judge queue keyed on the signal rather than the
+reply's source; the clause contract with its eight rejection reasons;
+the intensity bands (none and low write nothing, moderate 0.3 at 24
+hours, high 0.5 at seven days); the event-and-state split; `valid_to`
+as a read boundary and the pinning rule; the `memoryRows` fixture
+shape and the row sets in part 4 and part 6. Kept as designed here,
+with the reason: the heads over the existing embedding ship first
+because they cost nothing per turn and the protocol layer takes the
+context-dependent fragments the encoder was meant for, with the ONNX
+encoder as the measured alternative; greeting and backchannel stay as
+acts because the findings and the plan need them (Codex's five acts
+had only closing), and all three management acts get reviewed rows
+since DailyDialog lacks them; the act and stance heads train on a
+4B-labeled license-clean corpus with a reviewed sample rather than
+waiting for annotated permissive data, since the validation on
+DailyDialog's test split decides whether that was enough; and the
+sequence stays (spec and rows first, then the producer, REG-01 reading
+it, the plan with CHAT-16, REVIEW-01 after), which is Codex's own order.
+
+**Sequence and sizes.** ACT-01, the spec (`turn-signal`, the shared
+`conversation-turn`, `reply-plan`, the model-capabilities additions, the
+review codes), the protocol and rule layers of `classifyTurnSignal()`
+in front of routing, the signal on the turn row, the fixture's signal
+and `memoryRows` expectations with the rows above, and the baselines
+(S-M), before REG-01, which then reads the signal; ACT-02, the heads,
+the training script, calibration and validation, the fetched artifact
+(M), after ACT-01 and independent of the chat items, shipping only if
+they beat the rules; ACT-03, the `ReplyPlan`, the context line, the
+typed moves on the composer, the `plan_violation` family, the persona
+prose retired to realization, the rubric line (M), rides with CHAT-16,
+with the context line and the length rule landing on the current
+prompt path as soon as ACT-01 exists; the memory half lands across
+the items it names (the clause contract, the queue keyed on the
+signal and the `act-memory` rows in MEM-06; the read boundary, the
+extend, expire and propose rules and the curator rows in CUR-01; the
+skipped turns in ACT-01's engine half); REVIEW-01 gains its seven codes
+and the transition report when built, after ACT-03; the robot consumes
+the same generated types, the same fetched artifact, the same fallback
+and the same fixtures.
 
 ### The sequence, all items
 
@@ -14445,8 +14632,12 @@ ACT-01's engine half.
    learning path is the standing rule from today, and its first
    opt-in adapter item is written when the bench shows a model
    problem the engine cannot decide.
-7. **The act and the emotion (section 12):** ACT-01 (spec and the
-   rule pass) before REG-01; ACT-02 (the head) after ACT-01,
-   independent of the chat items; ACT-03 (the register table, the
-   consumers, the rows, the rubric line) with CHAT-16; REVIEW-01's
-   `wrong_move` and transition report after ACT-03.
+7. **The act and the emotion (section 12):** ACT-01 (the spec, the
+   protocol and rule layers in front of routing, the signal on the
+   shared turn record, the rows and baselines) before REG-01; ACT-02
+   (the heads and the fetched artifact) after ACT-01, independent of
+   the chat items; ACT-03 (the `ReplyPlan`, the typed moves, the
+   `plan_violation` family, the rubric line) with CHAT-16; the memory
+   half inside MEM-06 and CUR-01; REVIEW-01's seven register codes and
+   transition report after ACT-03; the robot on the same types,
+   artifact and fixtures.
