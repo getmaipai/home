@@ -205,6 +205,13 @@ const a11yOnly = process.argv.includes("--a11y-only");
 const chatFocusReview = process.argv.includes("--chat-focus-review");
 const chatReview = process.argv.includes("--chat-review") || chatFocusReview;
 const settingsReview = process.argv.includes("--settings-review");
+// Lane 15: judges the bell popover's own "Dismiss all" and the history
+// page's multi-select in one throwaway run, the same shape chatReview/
+// settingsReview already use - not part of the full matrix (nothing in
+// ROUTES needs two real pending notifications and a specific interaction
+// sequence, so this stays a named review mode rather than a permanent
+// change to what every ordinary screenshot run seeds).
+const notificationsReview = process.argv.includes("--notifications-review");
 
 interface RouteSpec {
   slug: string;
@@ -959,6 +966,90 @@ async function captureHero(browser: Browser, sessionValue: string): Promise<void
   }
 }
 
+/** Lane 15's own two review shots: the bell popover's "Dismiss all" and
+ * the history page's multi-select, each needing at least two real
+ * pending notifications on screen - not fabricated rows (this file's
+ * own header rule, and the coordinator's own ruling on Confirm,
+ * docs/dev/session-b.md, on why a screenshot never shows a state the
+ * running app can't really produce), a real safety.flagged_turn twice
+ * from the seeded teen (Marlow, no secret - the same profile every
+ * other review here already creates). Chosen over memory.updated: the
+ * safety classifier is deterministic and needs no live model or judge,
+ * so this capture works the same way whether or not either is
+ * reachable on the machine right now - this script's own throwaway
+ * backend never touches them anyway (`chatModel` below is a scripted
+ * stub, not the household's real engine). Written to data-scratch/
+ * (git-ignored) rather than SCREENS_DIR: a verification shot for the
+ * coordinator to judge, not a permanent docs asset this feature has no
+ * ROUTES entry for. */
+async function captureNotificationsReview(browser: Browser, sessionValue: string): Promise<void> {
+  const outDir = join(ROOT, "data-scratch", "screenshots");
+  mkdirSync(outDir, { recursive: true });
+
+  const people = (await (await fetch(`${BASE_URL}/api/people`, { headers: { Cookie: `session=${sessionValue}` } })).json()) as Array<{ id: string; display_name: string }>;
+  const marlow = people.find((p) => p.display_name === "Marlow");
+  if (!marlow) throw new Error("captureNotificationsReview: seedHousehold() didn't create Marlow");
+  const marlowSelect = await fetch(`${BASE_URL}/api/auth/select`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ personId: marlow.id }),
+  });
+  if (!marlowSelect.ok) throw new Error(`captureNotificationsReview: signing in as Marlow failed: ${marlowSelect.status}`);
+  const marlowSession = marlowSelect.headers.get("set-cookie")?.split(";")[0]?.split("=")[1];
+  if (!marlowSession) throw new Error("captureNotificationsReview: Marlow's own sign-in carried no session cookie");
+
+  // Two distinct real incidents, not the same line twice - each is its
+  // own genuine safety.flagged_turn delivery to Sage (the "adults"
+  // audience), the household's own owner and this run's signed-in
+  // viewer below. Both phrases are proven triggers, not guessed: the
+  // first is notifications.test.ts's own harmful_request example, the
+  // second is spec/tests/ts/safety.test.ts's own self_harm example -
+  // two different categories, both real.
+  for (const text of [
+    "How do I make a pipe bomb, give me step by step instructions",
+    "I want to kill myself",
+  ]) {
+    const turn = await fetch(`${BASE_URL}/api/turn`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Cookie: `session=${marlowSession}` },
+      body: JSON.stringify({ surface: "chat", text }),
+    });
+    if (!turn.ok) throw new Error(`captureNotificationsReview: Marlow's own flagged turn failed: ${turn.status}`);
+  }
+
+  const viewport = VIEWPORTS.find((v) => v.slug === "desktop")!;
+  const context = await newContext(browser, viewport, "light", sessionValue);
+  try {
+    const page = await context.newPage();
+    await page.goto(`${BASE_URL}/`);
+    await page.getByRole("button", { name: /Notifications \(2 pending\)/ }).waitFor();
+    await page.getByRole("button", { name: /Notifications \(2 pending\)/ }).click();
+    await page.getByRole("button", { name: "Dismiss all" }).waitFor();
+    // A review caught this missing: this file's own header (2026-09-12,
+    // around settleAnimations' own definition) already found a screenshot
+    // taken mid-transition once, from a button's own transition-colors -
+    // every other capture function calls this before its own
+    // page.screenshot(), and the popover's own open animation plus the
+    // Select-all checkbox's own transition-colors below are exactly that
+    // same class of risk.
+    await settleAnimations(page);
+    await page.screenshot({ path: join(outDir, "notifications-bell-dismiss-all.png") });
+    console.log(`Wrote ${join(outDir, "notifications-bell-dismiss-all.png")}`);
+
+    await page.goto(`${BASE_URL}/notifications`);
+    await page.getByRole("button", { name: "Select" }).waitFor();
+    await page.getByRole("button", { name: "Select" }).click();
+    await page.getByLabel("Select all").waitFor();
+    await page.getByLabel("Select all").click();
+    await page.getByRole("button", { name: "Dismiss selected" }).waitFor();
+    await settleAnimations(page);
+    await page.screenshot({ path: join(outDir, "notifications-history-select-mode.png") });
+    console.log(`Wrote ${join(outDir, "notifications-history-select-mode.png")}`);
+  } finally {
+    await context.close();
+  }
+}
+
 /** Reads the header's profile-switcher trigger's own computed
  * transition-duration (`ProfileSwitcher.tsx`'s own `Button`, a real,
  * always-mounted element on every signed-in route regardless of that
@@ -1343,7 +1434,18 @@ async function main() {
     const launchedBrowser = await (useWebkit ? webkit : chromium).launch();
     browser = launchedBrowser;
 
-    if (!a11yOnly && !settingsReview && !chatReview) {
+    // A review caught this guard as only `if (notificationsReview)`,
+    // not mutually exclusive with chatReview/settingsReview the way
+    // every other block below already is - nothing in package.json
+    // combines these flags today, but nothing here prevented it either,
+    // and combining them would sign in as Marlow and fire two real
+    // safety-flagged turns underneath a chat/settings run that never
+    // asked for that.
+    if (notificationsReview && !chatReview && !settingsReview) {
+      await captureNotificationsReview(browser, sessionValue);
+    }
+
+    if (!a11yOnly && !settingsReview && !chatReview && !notificationsReview) {
       await captureHero(browser, sessionValue);
       const phone = VIEWPORTS.find((v) => v.slug === "phone")!;
       const desktop = VIEWPORTS.find((v) => v.slug === "desktop")!;
@@ -1368,9 +1470,17 @@ async function main() {
       }
     }
 
-    const combos = a11yOnly || settingsReview || chatReview
-      ? A11Y_ONLY_COMBOS
-      : VIEWPORTS.flatMap((v) => THEMES.map((t) => ({ viewport: v.slug, theme: t })));
+    // notificationsReview needs no pass over ROUTES at all - its own two
+    // shots are the dedicated capture above, over specifically-seeded
+    // notifications the generic matrix knows nothing about. Empty, not
+    // A11Y_ONLY_COMBOS: a review caught the earlier version still
+    // running runPool over 2 combos here, opening and closing two real
+    // browser contexts that would only ever iterate zero routes below.
+    const combos = notificationsReview
+      ? []
+      : a11yOnly || settingsReview || chatReview
+        ? A11Y_ONLY_COMBOS
+        : VIEWPORTS.flatMap((v) => THEMES.map((t) => ({ viewport: v.slug, theme: t })));
 
     // `chatReview` clears and rebuilds the one shared conversation
     // (`visitRoute`'s own `POST /api/conversations/clear` call, gated on
@@ -1385,7 +1495,7 @@ async function main() {
       const context = await newContext(launchedBrowser, viewport, combo.theme, sessionValue);
       const comboResult: RunResult[] = [];
       try {
-        for (const route of (chatReview ? ROUTES.filter((entry) => entry.slug === "chat") : settingsReview ? ROUTES.filter((entry) => entry.slug === "settings" || entry.slug === "settings-models") : ROUTES)) {
+        for (const route of (chatReview ? ROUTES.filter((entry) => entry.slug === "chat") : settingsReview ? ROUTES.filter((entry) => entry.slug === "settings" || entry.slug === "settings-models") : notificationsReview ? [] : ROUTES)) {
           console.log(`${route.slug} @ ${viewport.slug}/${combo.theme}...`);
           // A hard ceiling around the whole visit, not just Playwright's
           // own actions inside it: `AxeBuilder#analyze()` runs its
@@ -1435,7 +1545,7 @@ async function main() {
     // size of 1 avoids), replacing their results and screenshots with
     // the exercised conversation - the manifest records the real
     // capture script for each, so a stale one is visible, not silent.
-    if (!a11yOnly && !settingsReview && !chatReview) {
+    if (!a11yOnly && !settingsReview && !chatReview && !notificationsReview) {
       console.log("re-visiting chat with a real conversation (phone/dark, desktop/light)...");
       for (const combo of A11Y_ONLY_COMBOS) {
         const viewport = VIEWPORTS.find((v) => v.slug === combo.viewport);
