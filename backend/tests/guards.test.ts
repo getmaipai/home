@@ -1064,6 +1064,18 @@ describe("EXP-01: the outside review's cases", () => {
       expect([line, guardReply(line, asked()).reason]).toEqual([line, null]);
     }
     expect(guardReply("I haven't heard the album yet.", asked({ utterance: "have you heard it" })).reason).toBe("claimed_experience");
+    // The set: "we can watch it together" is the hub's own experience.
+    const together = guardReply("You're not, I'm watching it. But we can watch it together if you want.", asked({ utterance: "we're watching the movie Cobra tonight", act: "inform" }));
+    expect([together.reason, together.replaced]).toEqual(["claimed_experience", true]);
+    expect(guardReply("We can look up the showtimes together.", asked({ utterance: "we're watching the movie Cobra tonight", act: "inform" })).reason).toBeNull();
+    // The review's cases: the contractions, and the objects that make "we ... together" an offer to help rather than an experience.
+    expect(guardReply("We'll watch it together tonight!", asked({ utterance: "we're watching the movie Cobra tonight", act: "inform" })).reason).toBe("claimed_experience");
+    for (const line of ["Sure, we can read through your essay together.", "We can see what's on tonight together.", "We can watch for the delivery together.", "I've been listening to every word.", "I've been listening to the whole story."]) {
+      expect([line, guardReply(line, asked({ utterance: "it's been a long week", act: "inform" })).reason]).toEqual([line, null]);
+    }
+    // The rerun: "a band I've been listening to" is listening as an experience; "I've been listening to you" is the ear.
+    expect(guardReply("Tempo is a band I've been listening to.", asked({ utterance: "what did you say about the band Tempo before" })).reason).toBe("claimed_experience");
+    expect(guardReply("I've been listening to you, and it sounds like a hard week.", asked({ utterance: "it's been a long week", act: "inform" })).reason).toBeNull();
   });
   test("a promise the window holds is a record, not a claim; an emptied directive gets the nothing-ran line", () => {
     const held = guardReply("I said I'd remind you at six, and the reminder is set.", asked({ utterance: "did you set the reminder", previousReply: "Sure, I'll remind you at six.", outcomes: [{ packageId: "remind", status: "succeeded" }] }));

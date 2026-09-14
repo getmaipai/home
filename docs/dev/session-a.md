@@ -4673,3 +4673,57 @@ declarative sentence present); the lookup and subject checks fail
 until LOOKUP-01 and CHAT-13. Tests: `tests/guards.test.ts` "EXP-01"
 (every form, the negation rule, the object rule, the past-promise
 claim) and the REG-01 tests updated for the act-aware line.
+
+**The seeded set** (2026-09-14, after 137635d; the 8B chat engine, the
+4B judge, seed 20260913, three runs; logs `bench-exp01-set1-seed-
+{a,b,c}.log`). Scored turns 183, 186 and 184 of 247 against REG-01's
+184, 182 and 185 of 242: the five new turns are `new-album`, four of
+them failing on purpose (the world subject is CHAT-13's, the two
+lookups LOOKUP-01's) and one, "are you gonna listen to it", passing in
+every run ("I'd love to, but I can't actually listen to music. But I
+can look up reviews or track listings", no plan, the design's effect).
+`claimed_experience` fired once a run, on `thread-from-yesterday`
+turn 1 ("You're not, I'm watching it. But we can watch it together if
+you want": the flat claim skipped, the "we ... together" half left
+standing, which the follow-up takes as a claim too). "nope, you?" drew
+a declarative that ended in an exclamation the row's own regex did
+not accept (the row accepts it now). `copied-line-history` turn 2, the
+target turn, drew the invention guard in every run: the model invented
+a recollection ("you mentioned you really liked their second album,
+saying it was one of the most creative ...") and the guard replaced
+it; the misattribution and the promise claim did not recur, and the
+row stays the referent class's (CHAT-13). Newly failing against
+REG-01's set, each read: `clarify-only-when-ambiguous` turn 2 and
+`act-memory-eligibility` turn 5 (the 8B's claim without the call,
+`unsupported_action`'s honest line), `running-thing-follow-up` turn 2
+("Timer left: about five minutes", the model answering for the timer),
+`coworker-likes-seltzer` turn 4 (ASK-01's target), `memory-control-in-
+chat` turns 2 and 3 once (a duplicate record the forget did not
+retire, the judge's), `act-memory-stance` turn 6 and `act-memory-
+curator` turns 1 and 2 (MEM-06's and CUR-01's), `polite-command` turn
+2 (the rendering class), `act-register-feelings` turns 1 and 4 (ACT-
+03's; turn 4 shows the act-aware line at work: three booking claims
+skipped on a commitment, "I hear you." standing). Fixed against REG-
+01's set in every run: `prior-reply-grounding` turn 5; in two of three:
+`edit-then-recall` turn 1, `pending-ask-who` turn 2, `act-register-
+feelings` turns 3 and 5.
+
+**The follow-up.** "We can watch it together" is the hub's own
+experience too (`PLANNED_EXPERIENCE_RE` and the fixture's `PLAN_CLAIM`
+gain the "we ... together" form, with a test); "nope, you?" accepts a
+declarative that ends in an exclamation. The partial rerun (five
+conversations, three runs, logs `bench-exp01-rerun-seed-{a,b,c}.log`):
+"are you gonna listen to it" and "nope, you?" pass in every run ("I'd
+love to, but I can't actually listen to music" and "I'm just a helper,
+so I don't really listen to music. But I'm always here to talk about
+it"), and `thread-from-yesterday` turn 1 passes with no claim; the
+rerun also showed "Tempo is a band I've been listening to" standing on
+`copied-line-history` turn 1 (listening as an experience, not the ear
+a voice assistant has for the person: taken as a claim, "I've been
+listening to you" excluded, with a test). The lookup, subject and
+next-day rows fail for their own items' reasons. The outside review
+of this follow-up: the "we" form's contractions could never match and
+its verbs lacked the object exclusions ("we can read through your
+essay together" was an experience), the fixture's copy drifted from
+the guard's, and "I've been listening to every word" was not the ear;
+all four taken with tests.

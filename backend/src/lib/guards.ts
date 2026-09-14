@@ -363,7 +363,7 @@ const CLAIMED_EXPERIENCE_RE =
 // the person is telling), "read it to you" (the hub reads aloud),
 // "see if it suits you". "try" is not here: "try a different approach"
 // is not tasting.
-const EXPERIENCE_VERBS = String.raw`(?:watch(?:ing)?(?! (?:what|how|for|out for))|see(?:ing)?(?! (?:what|how|if|whether|your|you|where|which|who))|hear(?:ing)?(?! (?:what|how|about|your|from|more|all|back|you|the rest|the story|that|this|it from))|listen(?:ing)?(?! (?:to what|to how|to you|for|to the rest))|play(?:ing)?(?! (?:it|that|them) (?:for|back|to you))|read(?:ing)?(?! (?:what|your|you|it to|that to|them to|this to|aloud|out|the room))|check(?:ing)?(?: it| that| them| this)? out|giv(?:e|ing) (?:it|that|them) a (?:listen|watch|go|spin)|catch(?:ing)?|stream(?:ing)?|binge(?:ing)?|bingeing)\b`;
+const EXPERIENCE_VERBS = String.raw`(?:watch(?:ing)?(?! (?:what|how|for|out for))|see(?:ing)?(?! (?:what|how|if|whether|your|you|where|which|who))|hear(?:ing)?(?! (?:what|how|about|your|from|more|all|back|you|the rest|the story|that|this|it from))|listen(?:ing)?(?! (?:to what|to how|to you|for|to the rest))|play(?:ing)?(?! (?:it|that|them) (?:for|back|to you))|read(?:ing)?(?! (?:what|your|you|it to|that to|them to|this to|aloud|out|through|over|back|along|the room))|check(?:ing)?(?: it| that| them| this)? out|giv(?:e|ing) (?:it|that|them) a (?:listen|watch|go|spin)|catch(?:ing)?|stream(?:ing)?|binge(?:ing)?|bingeing)\b`;
 // A plan spoken as the hub's own: the first-person forms, and the
 // intent phrases that are first person by nature with the subject
 // implied ("can't wait to hear it"); "want to see the list?" is an
@@ -373,6 +373,14 @@ const PLANNED_EXPERIENCE_RE = new RegExp(
     EXPERIENCE_VERBS +
     String.raw`|^\W*(?:can'?t wait to|excited to|looking forward to|dying to)\s+` +
     EXPERIENCE_VERBS +
+    // "We can watch it together" is the hub's own experience too (the
+    // set: the skipped "I'm watching it" left this half standing).
+    String.raw`|\bwe(?: can| could| should|'ll| will|'d| would)\s+` +
+    EXPERIENCE_VERBS +
+    String.raw`[^.!?]*\btogether\b` +
+    // "a band I've been listening to" is listening as an experience, not
+    // as the ear a voice assistant has for the person (the rerun).
+    String.raw`|\bi(?:'ve| have)(?: been)? listen(?:ed|ing) to(?! (?:you|what|how|your|every|each|the whole|all|everything|both|carefully|closely|that|this))` +
     // A bare "I'm excited to" at the end, its verb elided.
     String.raw`|\bi(?:'m| am)?\s*(?:can'?t wait|excited to|looking forward to (?:it|that|this)|curious to)[.!]*\s*$` +
     // "haven't ... yet" with an experiential object ("I haven't heard
