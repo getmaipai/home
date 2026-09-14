@@ -130,11 +130,12 @@ describe("createChatModelAdapter streaming", () => {
 
   // A "spoken_cue" event (backend/src/wire.ts, 2026-09-05: fires at most
   // once when the model's own first token is genuinely slow) is spoken
-  // but never yielded as content - the whole reason it exists is to fill
-  // dead air, not to become part of the message (which is also what keeps
-  // the UI's own loading indicator up through it: nothing yields until a
-  // real delta arrives).
-  test("a spoken_cue plays before the real reply and never gets yielded as content", async () => {
+  // but never yielded as message CONTENT - the whole reason it exists is
+  // to fill dead air, not to become part of the message. Lane 11 item 1
+  // added the one thing it's missing: a metadata-only yield that drives
+  // the transient activity line (chatTurnActivity.ts), for the person who
+  // can't hear it play.
+  test("a spoken_cue plays before the real reply, sets the activity line, and is never yielded as content", async () => {
     const { stream, release } = staggeredNdjsonStream(
       [{ type: "spoken_cue", text: "One sec." }],
       [
@@ -164,16 +165,22 @@ describe("createChatModelAdapter streaming", () => {
       })();
 
       // Only the cue has arrived so far (the stream is staggered, still
-      // holding restLines back) - the loop has consumed it (no yield: a
-      // spoken_cue never touches `visible`) and is now blocked awaiting
-      // the next line, so nothing should have yielded yet.
+      // holding restLines back) - one metadata-only yield (the activity
+      // line), no content part at all.
       await new Promise((resolve) => setTimeout(resolve, 10));
-      expect(yields).toHaveLength(0);
+      expect(yields).toHaveLength(1);
+      expect(yields[0]?.content).toBeUndefined();
+      expect(yields[0]?.metadata?.custom).toEqual({ activity: "One sec." });
       expect(env.ttsCalls).toEqual(["One sec."]);
 
       release();
       await done;
       expect(lastText(yields)).toBe("The real answer.");
+      // The first real delta clears the activity line with its own
+      // metadata-only yield (an empty custom bag), ahead of the content
+      // yield right after it.
+      expect(yields[1]).toEqual({ metadata: { custom: {} } });
+      expect(yields[2]).toEqual({ content: [{ type: "text", text: "The real answer." }] });
       await new Promise((resolve) => setTimeout(resolve, 20));
       expect(env.ttsCalls).toEqual(["One sec.", "The real answer."]);
     } finally {
@@ -382,6 +389,78 @@ describe("createChatModelAdapter streaming", () => {
       }
       await new Promise((resolve) => setTimeout(resolve, 20));
       expect(speakingEvents).toEqual([false, true, false]);
+    } finally {
+      env.restore();
+    }
+  });
+});
+
+// Lane 11 item 1 (docs/plans/session-b-lane-11-2026-09-13.md): CHAT-16's
+// forward-compatible `status` event (chatTurnActivity.ts's own header on
+// why it's cast this way, not yet a real TurnStreamEvent member) and the
+// transient activity line both producer sides drive - the render side
+// (thread.aui.tsx's "indicator" case reading chatTurnActivity.ts's
+// useTurnActivity()) is the same "read straight off the message's own
+// metadata" shape chatSourceCaption.tsx/chatMemoryChip.tsx already have
+// direct coverage for, so what's new here is only the producer: what the
+// adapter yields and when, one test per acceptance promise. No live
+// screenshot is possible for this item: the backend doesn't emit a real
+// `status` event yet (Session A, CHAT-16) - this file's own stubbed
+// stream is the only fixture that exists to test against.
+describe("Lane 11 item 1: the transient activity line (chatTurnActivity.ts)", () => {
+  test("a status event sets the activity line; the first delta clears it", async () => {
+    const env = stubEnvironment(
+      ndjsonStream([
+        { type: "status", text: "Checking that for you", stage: "lookup" },
+        { type: "delta", text: "Here's what I found." },
+        { type: "done", value: { reply: { text: "Here's what I found." }, source: "model", safety: SAFETY } },
+      ]),
+    );
+    try {
+      const { yields } = await collect([fakeUserMessage("what's the weather")]);
+      expect(yields[0]).toEqual({ metadata: { custom: { activity: "Checking that for you" } } });
+      expect(yields[1]).toEqual({ metadata: { custom: {} } });
+      expect(yields[2]).toEqual({ content: [{ type: "text", text: "Here's what I found." }] });
+      expect(lastText(yields)).toBe("Here's what I found.");
+    } finally {
+      env.restore();
+    }
+  });
+
+  // An immediate plugin/safety reply never emits a "delta" at all
+  // (chatModelAdapter.ts's own "done" comment) - the terminal event has
+  // to be the fallback that clears a shown activity line, not only a
+  // delta, or a quick tool-floor reply would leave "Checking that for
+  // you" stuck in the message's metadata forever.
+  test("a done event with no delta in between still clears a shown activity line", async () => {
+    const env = stubEnvironment(
+      ndjsonStream([
+        { type: "status", text: "One moment", stage: "tool" },
+        { type: "done", value: { reply: { text: "Quick answer." }, source: "plugin", safety: SAFETY } },
+      ]),
+    );
+    try {
+      const { yields } = await collect([fakeUserMessage("do a thing")]);
+      expect(yields[0]).toEqual({ metadata: { custom: { activity: "One moment" } } });
+      const finalYield = yields[yields.length - 1];
+      expect(finalYield?.metadata?.custom).not.toHaveProperty("activity");
+      expect(lastText(yields)).toBe("Quick answer.");
+    } finally {
+      env.restore();
+    }
+  });
+
+  test("a stream with no status or spoken_cue never touches the activity line", async () => {
+    const env = stubEnvironment(
+      ndjsonStream([
+        { type: "delta", text: "Plain reply." },
+        { type: "done", value: { reply: { text: "Plain reply." }, source: "model", safety: SAFETY } },
+      ]),
+    );
+    try {
+      const { yields } = await collect([fakeUserMessage("hi")]);
+      expect(yields.some((y) => y.metadata?.custom && "activity" in y.metadata.custom)).toBe(false);
+      expect(lastText(yields)).toBe("Plain reply.");
     } finally {
       env.restore();
     }

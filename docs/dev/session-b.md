@@ -2044,3 +2044,97 @@ malformed expression); `bun test` in `spec/`, 556 pass - the shared
 fixture is what proves the TypeScript side agrees, not a separate
 Python-only claim. Gate (`bash scripts/check.sh` in a throwaway
 worktree): clean on the first try. Commit: f8a229d.
+
+## Lane 11 item 1: the chat shows what MaiPai is doing during a turn
+
+Work order: `docs/plans/session-b-lane-11-2026-09-13.md`. Backend
+(CHAT-16 emitting the real `status` event) is Session A's; this item
+builds the rendering against a fixture, the way lane 10 item 1 built
+`sources` rendering ahead of the engine change that feeds it - tracked
+as its own BACKLOG line ("Engine emits `status` events at lookup
+start (CHAT-16)") rather than folded into CHAT-16's own big entry,
+since what's actually outstanding now is one narrow, named piece of
+that item, not a redesign of it.
+
+**Design decision (the item's own step 1): one activity line, not
+two.** Read how `spoken_cue` reaches the screen today before touching
+anything: `chatModelAdapter.ts`'s existing comment on the "indicator"
+part (thread.aui.tsx's pulsing "Assistant is working" dot) already
+names the real requirement - "if a spoken_cue is still audibly
+playing, exactly the moment someone without audio needs that
+indicator most." That gap was real: a `spoken_cue` has always been
+spoken-only, with zero visible trace, which is exactly backwards for
+anyone who can't hear it (speakers off, a deaf household member, a
+muted tab). A `status` event solves that same problem from the other
+direction (silent, visible-only). Splitting them into two separate
+UI states would mean deciding which one wins when both are set, or
+showing two lines at once for what a person experiences as one thing
+("MaiPai is doing something right now") - the default the work order
+names is the right one: a single transient `activity` field
+(`chatTurnActivity.ts`) that either event kind sets, cleared the same
+way regardless of which one set it.
+
+**Producer: `chatModelAdapter.ts`.** `status` isn't a real
+`TurnStreamEvent` member yet (CHAT-16 hasn't shipped it) - the same
+forward-compatible narrow cast lane 10 used for `sources` on
+`TurnValue`, just applied to the whole event object instead of one
+field: `rawEvent as TurnStreamEvent | TurnStatusEvent`
+(`chatTurnActivity.ts`'s own `TurnStatusEvent`), so the rest of the
+existing `if`/`else if` discriminated-union chain narrows correctly
+with no cast needed at any individual branch, error branch included.
+Both `status` and `spoken_cue` now yield `{ metadata: { custom: {
+activity: event.text } } }` (a real, tracked `activityShown` boolean,
+not inferred from `visible`, since the activity is about what's
+happening BEFORE any real text exists). Cleared two ways, matching
+the acceptance's own two triggers: the first `delta` after
+`activityShown` yields its own separate `{ metadata: { custom: {} } }`
+update ahead of the normal content yield (not piggybacked onto the
+conditional `if (visible) yield` line, which a delta landing entirely
+inside an open `<think>` block would skip entirely, leaving the
+activity stuck); and the `done` event's own final yield already
+builds a fresh `metadata.custom` object without an `activity` key,
+which clears it for free with no code added there - covers the
+"immediate plugin/safety reply, no delta at all" case the file's own
+`done`-branch comment already documents.
+
+**Consumer: `thread.aui.tsx`.** No new spinner, no new line: the
+existing "indicator" part (rendered only while the message has no
+visible text yet - the same pulsing dot this file's own `<think>`-
+block code review from 2026-09-06 made sure stays up through exactly
+this window) now shows `chatTurnActivity.ts`'s `useTurnActivity()`
+value in place of its hardcoded "Thinking…" when one is set, same
+`aria-label`, same `aria-live="polite"` the wrapping content div
+already carries for a running message. `activity` is read straight
+off `message.metadata.custom`, the identical shape
+`chatSourceCaption.tsx`/`chatMemoryChip.tsx` already read that bag
+through - never present on a reloaded row (`chatHistoryAdapter.ts`
+has no source for it: no such column exists on
+`ConversationTurnWithMemoryIds`), so "never in history" holds by
+construction, not by a runtime check.
+
+**Verified**: `bunx tsc --noEmit && eslint .` clean; `bun test` in
+frontend, 563 passing across 86 files. One test per acceptance
+promise, all in `chatModelAdapter.test.ts` unless noted: a `status`
+event sets the activity line and the first delta clears it (asserts
+the exact yield sequence: activity-set, then a separate empty-custom
+clear, then the plain content yield); a `done` with no delta in
+between still clears a shown activity line (the plugin/safety-reply
+shape); a stream with neither `status` nor `spoken_cue` never touches
+`metadata.custom.activity` at all; the existing `spoken_cue` test
+updated for its own new metadata-only yield (was asserting zero
+yields while only the cue had arrived - now asserts exactly one,
+carrying the activity text and no content, matching "never yielded as
+content" precisely rather than "never yields anything"). "Never in
+history": `chatHistoryAdapter.test.ts` gained a small guard asserting
+a reloaded reply's metadata never carries an `activity` key - nothing
+today could set it, so this is future-proofing against a later edit
+that accidentally does, not a behavior possible to trigger yet.
+
+**No live screenshot for this item**, as the work order itself
+expects: the backend doesn't emit a real `status` event yet (that's
+the BACKLOG line left open, CHAT-16, Session A), and `spoken_cue`
+already existed with no visible change before this landed, so there
+is no real turn today whose screenshot would show the new line
+differently than before. The render side is proven the same way
+`chatSourceCaption.tsx`'s own tests already prove a metadata-bag read
+works (a fixed, seeded message), not through a live capture.

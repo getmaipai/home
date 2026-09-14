@@ -114,6 +114,18 @@ describe("rowsToBranchableMessages", () => {
     const row3User = items.find(({ message }) => message.id === "row-3-user")!;
     expect(row3User.parentId).toBe(row1User.parentId); // a third sibling under the same original parent
   });
+
+  // Lane 11 item 1's own acceptance: "never persisted, never in history."
+  // chatTurnActivity.ts's `activity` field only ever exists on a message
+  // still streaming live (chatModelAdapter.ts) - a reloaded row has no
+  // source for it at all (no such column on ConversationTurnWithMemoryIds),
+  // so this is a guard against a future edit accidentally adding one, not
+  // a behavior that's ever been possible to trigger today.
+  test("a reloaded reply's metadata never carries a live-only activity line", () => {
+    const items = flatten(rowsToBranchableMessages([makeRow("row-1", "an ordinary reply")], "Nova", "conv-example123"));
+    const reply = items.find(({ message }) => message.id === "row-1-reply")!;
+    expect(reply.message.metadata?.custom).not.toHaveProperty("activity");
+  });
 });
 
 describe("createChatHistoryAdapter", () => {

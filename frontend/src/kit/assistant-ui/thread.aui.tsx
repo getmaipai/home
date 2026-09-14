@@ -34,6 +34,7 @@ import { setPendingSupersedes } from "@/apps/chat/chatEditSupersedes";
 import { MemoryUpdatedChip } from "@/apps/chat/chatMemoryChip";
 import { ChatSourceCaption } from "@/apps/chat/chatSourceCaption";
 import { markCitations, type TurnWithSources } from "@/apps/chat/chatCitations";
+import { useTurnActivity } from "@/apps/chat/chatTurnActivity";
 import { createCitationComponents } from "@/apps/chat/chatCitationLink";
 import { SourcesCard } from "@/apps/chat/chatSourcesCard";
 import { DayBoundaryProvider, DayDivider, MessageTimestamp } from "@/apps/chat/chatDayDivider";
@@ -520,6 +521,12 @@ const AssistantMessage: FC = () => {
   const sources = useAuiState((s) => (s.message.metadata?.custom as TurnWithSources | undefined)?.sources);
   const citationComponents = useMemo(() => createCitationComponents(sources), [sources]);
   const markCitationsIn = useMemo(() => (text: string) => markCitations(text, sources), [sources]);
+  // Lane 11 item 1: the same existing pending affordance below (the
+  // pulsing dot, "indicator" part) just swaps its static "Thinking…" for
+  // this transient text when CHAT-16's status/spoken_cue has one -
+  // chatTurnActivity.ts's own header on why this is the one field both
+  // event kinds drive.
+  const activity = useTurnActivity();
 
   return (
     <MessagePrimitive.Root
@@ -600,7 +607,7 @@ const AssistantMessage: FC = () => {
                     className="inline-flex items-center gap-2 text-sm text-muted-foreground motion-safe:animate-pulse"
                     aria-label="Assistant is working"
                   >
-                    <><span aria-hidden="true">●</span> Thinking…</>
+                    <><span aria-hidden="true">●</span> {activity ?? "Thinking…"}</>
                   </span>
                 );
               default:

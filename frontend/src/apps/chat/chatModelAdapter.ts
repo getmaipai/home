@@ -1,10 +1,11 @@
 import type { ChatModelAdapter, ChatModelRunOptions, ChatModelRunResult } from "@assistant-ui/react";
-import { api, readTurnStream, ApiError } from "@/lib/api";
+import { api, readTurnStream, ApiError, type TurnStreamEvent } from "@/lib/api";
 import { SentenceSpeechScheduler } from "@/lib/sentenceSpeechScheduler";
 import { splitReadyChunks } from "@/lib/sentenceChunker";
 import { normalizeForSpeech } from "@maipai/spec/voice/ts/normalizeForSpeech.js";
 import { messageText } from "@/apps/chat/chatMessageText";
 import type { TurnWithSources } from "@/apps/chat/chatCitations";
+import type { TurnStatusEvent } from "@/apps/chat/chatTurnActivity";
 
 // Qwen3's hybrid thinking mode wraps its reasoning in a `<think>...</think>`
 // block ahead of the real answer when enabled (llm.ts's `thinking` option);
@@ -135,6 +136,12 @@ export function createChatModelAdapter(deps: ChatModelAdapterDeps): ChatModelAda
       let searchFrom = 0;
       let spokenLength = 0;
       let sawTerminalEvent = false;
+      // Lane 11 item 1: true from the moment a `status`/`spoken_cue`
+      // event has set the transient activity line (chatTurnActivity.ts)
+      // until the next delta clears it - tracked here, not derived from
+      // `visible`, since the activity is about what's happening BEFORE
+      // any real text exists, not about the text itself.
+      let activityShown = false;
 
       // Resolves as much of `raw.slice(scanPos)` as currently possible into
       // `visible`, holding back only a still-ambiguous suffix that might
@@ -211,7 +218,12 @@ export function createChatModelAdapter(deps: ChatModelAdapterDeps): ChatModelAda
         const conversationId = await deps.getConversationId?.();
         abortSignal.throwIfAborted();
         const response = await api.streamTurn(text, abortSignal, { thinking: deps.consumeThinking(), conversationId, supersedes });
-        for await (const event of readTurnStream(response)) {
+        // Lane 11 item 1's own forward-compatible cast (chatTurnActivity.ts's
+        // header): `status` isn't a real TurnStreamEvent member on the wire
+        // yet, the same "cast the whole event, not just a field" shape
+        // `TurnWithSources` uses for `sources` on `TurnValue` below.
+        for await (const rawEvent of readTurnStream(response)) {
+          const event = rawEvent as TurnStreamEvent | TurnStatusEvent;
           if (event.type === "turn_meta") {
             // The contract's first line on every turn (routes/turn.ts).
             // Not consumed yet (chatActionBar.tsx's "Remember this" still
@@ -226,6 +238,16 @@ export function createChatModelAdapter(deps: ChatModelAdapterDeps): ChatModelAda
             deps.onReplyState?.("responding");
             raw += event.text;
             resolveRaw();
+            if (activityShown) {
+              // Lane 11 item 1's own acceptance: "the first delta removes
+              // it" - a real content update can still be empty this same
+              // delta (entirely inside an open <think> block, below), so
+              // this clears on its own yield rather than piggybacking on
+              // the conditional content one just below, which would miss
+              // exactly that case.
+              activityShown = false;
+              yield { metadata: { custom: {} } };
+            }
             // Only yield once there's something to show. A delta that lands
             // entirely inside an open <think> block leaves `visible` "" -
             // yielding that anyway would hand assistant-ui a real (if empty)
@@ -244,16 +266,31 @@ export function createChatModelAdapter(deps: ChatModelAdapterDeps): ChatModelAda
             for (const chunk of chunks) scheduler.enqueueSentence(normalizeForSpeech(chunk));
             spokenLength += consumed;
           } else if (event.type === "spoken_cue") {
-            // Spoken only, never displayed and never counted against
-            // `spokenLength`: `visible`/the chat bubble and conversation
-            // history are untouched (backend/src/wire.ts's own comment on
-            // why - a small model that saw its own cue in its history
-            // would start opening every reply with it). Enqueuing it here,
-            // ahead of any real content, is the whole mechanism: the
+            // Spoken only, never displayed as message content and never
+            // counted against `spokenLength`: `visible`/the chat bubble and
+            // conversation history are untouched (backend/src/wire.ts's own
+            // comment on why - a small model that saw its own cue in its
+            // history would start opening every reply with it). Enqueuing it
+            // here, ahead of any real content, is the whole mechanism: the
             // scheduler is a plain FIFO queue, so it plays first and the
-            // real reply's sentences (enqueued above as they arrive)
-            // follow right after.
+            // real reply's sentences (enqueued above as they arrive) follow
+            // right after.
             scheduler.enqueueSentence(event.text);
+            // Lane 11 item 1's own decision (chatTurnActivity.ts): a
+            // spoken_cue also drives the same transient activity line a
+            // `status` event does below - this file's own older comment on
+            // "the moment someone without audio needs that indicator most"
+            // was the gap (a cue playing has never had any VISIBLE trace).
+            activityShown = true;
+            yield { metadata: { custom: { activity: event.text } } };
+          } else if (event.type === "status") {
+            // Additive, CHAT-16 (Session A): not yet a real TurnStreamEvent
+            // member (chatTurnActivity.ts's header) - `stage` isn't read
+            // here, since the activity line shows the event's own text
+            // verbatim, the same "no spinner icon invented" instruction
+            // that also means no per-stage icon or color.
+            activityShown = true;
+            yield { metadata: { custom: { activity: event.text } } };
           } else if (event.type === "done") {
             sawTerminalEvent = true;
             // Authoritative, not just the incrementally-built preview: a

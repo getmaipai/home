@@ -572,6 +572,17 @@ not permission to expand scope.
     package recipe fixtures, frontend adapter/source tests, affected catalog
     checks and full exit gate.
 
+- [ ] **Engine emits `status` events at lookup start (CHAT-16)** (S) -
+      the visible "what MaiPai is doing" line during a turn is built and
+      ready on the frontend (lane 11 item 1, docs/dev/session-b.md): the
+      transient activity line, a `status` event's own text (`stage:
+      "lookup" | "thinking" | "tool"`), and a `spoken_cue` both drive it,
+      cleared by the first delta or the terminal event, never persisted.
+      Left unchecked: `turnEngine.ts` doesn't emit `status` yet - CHAT-16
+      is the natural place (the same lookup-before-answering path that
+      makes a "Checking that for you" line worth having in the first
+      place), Session A's own work, wired to the exact shape above.
+
 <a id="chat-17"></a>
 
 - [ ] **CHAT-17: Share streaming and blocking turn execution without dropping calls** (M)
