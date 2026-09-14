@@ -12922,3 +12922,782 @@ other's section once (147cd28, f4779a6).
   #108 (percent-of a unit conversion works in TypeScript's single-
   evaluator design, fails in Python's separate regex-then-pint split):
   [docs/dev/session-b.md](dev/session-b.md) (2026-09-13).
+
+## The chat design pass: findings 1 to 18, and the companions brief (2026-09-13)
+
+The design for the eighteen findings in
+[docs/plans/media-conversation-program-2026-09-13.md](plans/media-conversation-program-2026-09-13.md)
+("Findings from live use, 2026-09-13 evening") and for
+[docs/plans/companions-design-brief-2026-09-13.md](plans/companions-design-brief-2026-09-13.md),
+written by a separate design session on the stronger model, as the
+program's rule requires. Read for it: the org and repo standards, the
+program file, the competencies checklist, the Session A design notes
+for 4b, 4c, BENCH-01, the judge's echo filter, CHAT-15 and step 3a,
+the code that produces each behavior (`lib/turnEngine.ts`,
+`lib/episodes.ts`, `lib/conversationHistory.ts`, `lib/memoryJudge.ts`,
+`lib/guards.ts`, `lib/persona.ts`, `lib/subjects.ts`, the bench
+fixture and the live runner), the seeded bench logs of 2026-09-13, the
+live turns and memory records of the evening (read only, on the dev
+machine, and quoted nowhere: every example below uses the persona
+roster and fictional subjects), the legacy hub's entity-first recall
+(`memory/recall.ts` in the mirror) and the legacy robot's topic
+tracker (`dialogue/topic.py`), the pattern TURN-01 already names.
+
+The priority line first (the hub never asks about what it does not
+know, acts as if it knows what it was never told, copies other
+conversations into this one, sends broken text, reads search results
+aloud like an article), then the remaining findings, then the brief.
+Every section names the root cause in the code, the design (what
+changes, where, one definition), why that is the platform's shape and
+not a patch, the acceptance in the bench's effect form (a conversation
+with roster names, the turns it must pass, three seeded runs), and the
+size. The backlog items are in
+[BACKLOG.md](BACKLOG.md#design-pass-2026-09-13), under the chat area,
+with the amendments to CHAT-13 and CHAT-16 in place on those items.
+
+### 0. What the findings share
+
+Three mechanisms recur under most of the eighteen, and the design
+below is organized around removing them rather than around the
+symptoms:
+
+1. **The prompt hands the model dialogue to imitate.** The "From
+   earlier conversations" block quotes the hub's own past replies as
+   `you replied: "..."`, and the companion's example lines are rendered
+   inside quotation marks. An 8B copies quoted dialogue with no effort
+   at all, which is finding 1 nine times over (a sentence from another
+   conversation, verbatim), finding 16 (a paragraph about a band whose
+   name appeared in a product name), and the stray quotation marks of
+   finding 17.
+2. **The engine does not represent what it knows.** Nothing on the
+   turn says "this name is new", "this subject is current", "the hub
+   just promised a lookup", "the person rejected that subject". The
+   model fills each gap by improvising, which is findings 2, 3, 7, 10,
+   11, 14 and 15. The fix in every case is a slot on the turn context
+   that the engine fills deterministically and the prompt, the guards
+   and the composer all read: one definition, the CHAT-01 shape.
+3. **The output boundary checks honesty per sentence and nothing
+   else.** A reply of one letter, a reply that is only a question
+   already asked, a reply in the search package's voice, a reply in
+   assistant register all pass. Findings 6, 12, 13, 17 and 18. The fix
+   is a well-formedness and register pass at the one boundary CHAT-02
+   established, not more prompt prose.
+
+### 1. Copied conversations and random subject changes (findings 1, 9, 16)
+
+**Root cause, in the code.** `recallEpisodes()` in `lib/episodes.ts`
+fuses two candidate lists by reciprocal rank. The vector half has a
+floor (`EPISODE_MIN_COSINE = 0.55`). The lexical half has none: the
+FTS5 query ORs every content word of the utterance, so a single shared
+word ("scary", "spinoff", a band's name inside a product's name)
+admits an episode from any earlier conversation, and rank fusion then
+ranks a lexical-only candidate as if it were relevant. The block is
+built on every model turn (`prepareTurn()`, the `recallEpisodes` call
+beside `recall()`), for any utterance, including a two-word one and a
+question about this conversation ("what were we talking about"), where
+the query has almost no content and the nearest episode is noise.
+`formatEpisodeLine()` then renders the assistant side as
+`you replied: "<sentence>"`, a complete sentence in the hub's own
+voice, dated, sitting in the prompt of a short turn that gives the
+model little else to say. The guard that exists for this,
+`guardUnrelatedRecall()` in `lib/guards.ts`, reads `ctx.sources` (the
+memory bullets) and never `ctx.episodes`, so an episode copied
+verbatim is not a hit. The seeded bench shows the same class with
+roster names: household-subject-dog#1 answered an opening line about
+the dog with a sentence about another conversation's cake, and
+household-subject-person#1 closed a line about bread with the moon
+landing from the history fixture's conversation.
+
+**Design (RECALL-02: episodes are evidence, never lines).** One
+change in `lib/episodes.ts`, one in `lib/guards.ts`, one in
+`prepareTurn()`:
+
+1. *The person's side by default.* An assistant-side episode enters
+   the prompt only when the utterance asks what the hub said (the
+   recall package's own routing examples are the definition of that
+   shape: "what did you say / suggest / recommend / tell me"), and
+   then as reported speech in a system note ("On Sep 6 you suggested
+   a lasagna recipe"), never as a quoted first-person sentence. The
+   person's side stays quoted, because it is what the person said and
+   the model must not paraphrase it into something else.
+2. *A floor on the lexical half.* A lexical candidate needs two
+   content words in common with the query, or one content word and a
+   vector cosine at or above the existing floor. A candidate that
+   survives only one half must clear that half's own floor before
+   fusion; fusion ranks survivors only. The floor is measured on the
+   recall-floor bench (`scripts/bench/recall-floor.ts` gains episode
+   rows) and recorded, not guessed.
+3. *The query is the subject, not the turn.* Once CHAT-13 lands, the
+   retrieval query is the bounded query CHAT-10 builds from the
+   resolved subject. Until then: a turn with fewer than three content
+   words after stopwords, or a question about this conversation
+   ("what were we talking about", "what did you mean", "say that
+   again"), recalls no episodes at all. The conversation window is the
+   evidence for those, and it is already in the messages.
+4. *Volume.* At most three lines and 400 characters (from five and
+   600). Fewer lines, each earned.
+5. *The guard reads episodes.* `guardUnrelatedRecall()` reads
+   `ctx.episodes` beside `ctx.sources`, so a reply sentence whose
+   content words overlap an episode line by 80 percent or more and
+   share nothing with the utterance or the person's last two turns is
+   the `unrelated_recall` cut it was always meant to be.
+
+**Why this is the platform's shape.** The block was designed (JOIN-01)
+as evidence for a question about the past. Rendering the hub's own
+sentences as dialogue turned evidence into a completion, and the
+lexical half's missing floor turned "what the household said about
+this" into "anything that shares a word". Both are corrections to the
+one recall path, not a second one; the floor lives beside the vector
+floor that already exists; the guard reads the evidence the turn
+context already carries (CHAT-01). No prompt line is added.
+
+**Acceptance.** A bench conversation `copied-line` on one person, two
+conversations apart. Conversation A: "I've been listening to Tempo all
+morning" and two follow-ups that get the hub's reaction and a review.
+Conversation B, a fresh conversation, three turns: "do you think local
+coding models are any good" (effect: no sentence of the reply equals
+or contains, at 80 percent word overlap, any assistant-side sentence
+stored as an episode; the context message carries no assistant-side
+episode line); "Sage is getting a Tempo Studio for coding" (effect:
+the context carries no episode from conversation A; the reply's
+content words do not include the band's album or members); "what were
+we talking about" (effect: the context carries no episode lines at
+all; the reply names the current subject, coding models). The
+household-subject-dog#1 and household-subject-person#1 opening turns
+are the second check (`guard: null`, and the reply contains no
+sentence from another fixture conversation's replies). Three seeded
+runs, the runner's existing rule. **Size S-M.** Before CHAT-13.
+
+### 2. Broken output (findings 13 and 17): the well-formed reply gate
+
+**Root cause, in the code.** Nothing between the engine and the
+person checks that a reply is a sentence. The streaming path releases
+each delta as it arrives and `finalize()` in `runTurnStreamHoldingLease`
+accepts whatever was delivered, including a single letter followed by
+the end of stream; the blocking path's `answerWithSafetyAndGuards()`
+does the same. `closeDanglingClause()` runs only after a guard hit and
+fixes only trailing connectors. A second cause for the stray quotation
+marks: `examplesBlock()` in `lib/persona.ts` renders the companion's
+example lines inside double quotes, so the model's own closing quote
+and its "Sorry, I meant to say, \"...\"" shape are the prompt's format
+echoed back.
+
+**Design (OUT-01).** One well-formedness rule at the one output
+boundary CHAT-02 built, on both paths:
+
+1. *Minimum shape.* A reply is at least two words and ends in a
+   terminator, or it is a fixed line the engine chose. A lone token or
+   a fragment gets one regeneration (the same one-retry pattern as the
+   invention retry in `runTurnHoldingLease`, bounded to one). If the
+   retry is also a fragment, a fixed line from a new small bank
+   (`MALFORMED`: "Sorry, I lost my train of thought. Say that again?")
+   under a new reason `malformed`. The bank is not the honesty
+   vocabulary; it never says "I don't know".
+2. *Quotation marks.* An unmatched quotation mark at either edge is
+   stripped; a reply that is one whole quoted sentence is unquoted.
+   Interior quotes stand.
+3. *Streaming.* The first chunk is held until it carries two words or
+   a sentence boundary (a bound of a few tokens, tens of milliseconds
+   on the chat engine), so a fragment is known before anything is on
+   the wire: the end of stream arrives before the hold releases. The
+   spoken-cue timer is unaffected (it starts from `startedAt`).
+4. *The prompt's examples.* `examplesBlock()` renders each example as
+   a dash line with no quotation marks; the persona-eval bench reruns
+   to show voice fidelity holds.
+5. *Measured everywhere.* The bench gains a universal check on every
+   row (`wellFormed`: two words, a terminator, no unmatched quote), so
+   the fragment and stray-quote rate is a number per run, not a row.
+   A note for the run: if the fragment rate moves with the sampler
+   settings (XTC removes the top tokens; a reply whose only good
+   continuation was the top token can end early), that is a
+   measurement to record in the run header, not a change made here.
+
+**Why this is the platform's shape.** The model cannot be asked not
+to stop early; the engine is the only party that sees the end of
+stream. The rule lives at the boundary that already owns safety and
+guards, applies to every producer of a model reply, and is measured
+on every row. **Size S.** Before CHAT-13, since it is universal.
+
+### 3. Unknown names: ask, never assume (findings 10, 11, 14, 15)
+
+**Root cause, in the code.** The turn's notion of "who the hub knows"
+is `rosterNames` in `prepareTurn()` (the active people, plus, after
+step 3a, the speaker's own person and pet entities through
+`subjectRosterFor()`). A name outside that set is represented nowhere:
+not on the turn context, not in the prompt, not in the guards. The
+prompt's "What you already know about this household" section and its
+trust reminder give the model a frame in which knowing is rewarded,
+and the model obliges ("that's right, Nadia had her birthday"). The
+invention family (`guardInvention()`) reads traits, places, activities,
+attributed quotes and experience; it has no shape for a claim of prior
+knowledge about a name the person just said, and no shape for a kind
+assumed for a name (a landlord for a dog). Step 3a creates the entity
+in the background after the turn, with the model's guessed kind, so
+the engine learns the name a few seconds after the reply that needed
+it, and learns the kind the model guessed rather than the one the
+person would have given if asked. Pronoun drift (finding 14) follows:
+the entity has no pronouns, the prompt carries none, and an 8B picks
+one.
+
+**Design (ASK-01: the unknown-name rule).** One mechanism, four parts,
+one slot on the turn context, one ask kind, one creation path:
+
+1. *Spec first.* `entity.schema.json` gains `pronouns` (nullable
+   string, the same field the companion block already has), set from
+   the person's own usage or their answer. `vocab/relationship-types.json`
+   gains `relative_of` (person to person, symmetric, terminable), the
+   relation people state in passing ("my nephew", "my aunt") that the
+   vocabulary has no type for; the specific word goes in the entity's
+   description. A new `vocab/entity-kind-nouns.json` maps the nouns a
+   person answers with to a kind (dog, cat, puppy, kitten to pet;
+   nephew, coworker, neighbor, friend to person; shop, school, park to
+   place; the appliance and vehicle nouns to thing), one definition
+   the hub and the robot both read.
+2. *Turn-time detection.* `prepareTurn()` resolves the names in the
+   utterance before the model runs: candidates are the proper nouns a
+   maintained tagger finds (`compromise`, MIT, the org's prebuilt rule;
+   its person and proper-noun tags over the utterance) plus any word
+   framed by a relation phrase the judge's prompt already lists ("my
+   X", "our X", "X's"), and a candidate is `unknown` when it is not in
+   the roster, not a name or alias in the speaker's registry, and not
+   a world subject the turn resolved (CHAT-13's resolver; before it, a
+   typed source hit). The turn context gains `unknownNames`
+   (`{ name, hintedKind }`, the hint from the relation phrase's noun
+   when there is one). The known gap, stated: a lowercase name typed
+   with no relation phrase ("i think juniper just went to the
+   bathroom") is not detected at turn time; part 4 catches it.
+3. *The ask is the engine's.* The context message says, in one line,
+   "Names in this message you have never heard before: Juniper. You
+   don't know who or what Juniper is." The reply then carries the ask:
+   if the model's own reply asks (a question sentence naming the
+   unknown), nothing is added; otherwise the engine appends its own
+   question ("Who's Juniper?", or with a hint, "Is Juniper a person or
+   a pet?") and sets a pending ask of kind `who` bound to the name (a
+   third kind beside `confirm` and `ask` in `PendingAsk`, resolved by
+   `resolvePendingAsk()` like the others). The answer ("she's our
+   dog", "my nephew, he's ten") is read by one deterministic parser:
+   the kind from the noun vocabulary, the relation from the relation
+   phrases, the pronoun from the answer's own pronoun; it calls step
+   3a's `ensureSubjectEntity()` with `stated: true` and `writeRelation()`
+   with `stated: true`, the exact path the judge uses, so the entity
+   the person answered about is `local`, never `inferred`. An answer
+   the parser cannot read falls through to the model with the ask
+   cleared, and the judge's own extraction still runs on it.
+4. *The judge's open question, for what the detector misses.* When
+   the judge (step 3a) creates an `inferred` entity whose kind came
+   from the model rather than from the speaker's words, it writes an
+   open question on the conversation (`conversations.open_question`,
+   the pending-ask slot's shape but not consumed by the next
+   utterance: asked once at the end of the next reply on that
+   conversation, then cleared). This is competency B3's mechanism
+   (a memory-driven prompt) used for the first time, and it is what
+   makes "ask, never assume" hold even for a lowercase name typed with
+   no framing: the reply that assumed still goes out (the guards below
+   strip what they can), and the very next reply asks.
+5. *Two guard shapes.* `false_familiarity`: a sentence that claims
+   prior knowledge ("that's right", "I remember", "I know", "as you
+   mentioned", "I recall", "I've heard about") of an unknown name with
+   no memory or entity evidence naming it; cuttable; the replacement
+   is the ask itself ("I don't know Juniper yet. Who's that?"), so the
+   replacement is also the fix. `pronoun_mismatch`: a reply pronoun
+   that contradicts the subject's stored pronouns, or the pronoun the
+   person used for the name on this turn or the last two; skippable.
+   The kind assumption itself (a landlord for a dog) needs no shape of
+   its own: with the unknown line in the context and the ask appended,
+   the advice is deferred until the person answers, and the bench row
+   below checks that no role noun for a person is applied to an
+   unknown name before the answer.
+
+**Why this is the platform's shape.** The known set already exists
+(the roster, the registry, the resolver); what was missing was its
+complement on the turn. The ask uses the pending-ask mechanism the
+engine already has, the answer uses step 3a's creation path, the
+pronoun is a spec field the robot inherits, and the judge's open
+question is the first use of a slot the competencies checklist already
+called for (B3, F1). Nothing here is a second identity graph or a
+second ask system, and the model never gets to decide whether a name
+is known.
+
+**Acceptance.** Three bench conversations, three seeded runs each.
+`unknown-name-person`: "Clover bought the new Harrow game but it was
+too scary" (effects: `unknownNames` on the turn carries Clover; the
+context message carries the unknown line; the guard is null or
+`false_familiarity` cut with nothing of the claim kept; the
+conversation's pending ask after the turn is `who` for Clover); "he's
+my nephew, he's ten" (effects: an entity Clover of kind person exists
+with `source: local`, a `relative_of` relationship from the owner
+stated by the owner, pronouns he; the pending ask is gone);
+"what games would you suggest for him" (effects: the subject on the
+turn is Clover; the context carries his age; the reply contains no
+`false_familiarity`). `unknown-name-pet-lowercase`: "i think juniper
+just went to the bathroom in the living room" (effects: no sentence
+applies a person role to the name, checked as `mustNotContain`
+landlord, tenant, roommate, kid, coworker; within ten seconds either
+the pending ask or the judge's open question names juniper);
+"she's a dog" (effects: a pet entity named Juniper exists, pronouns
+she, `source: local`); "does she need a bath" (effect: every pronoun
+in the reply referring to the subject is she or her, read against the
+entity's pronouns, never he or him). `unknown-name-birthday`: "oh man,
+yesterday was Nadia's birthday" (effects: no sentence of the reply
+claims prior knowledge, guard null or `false_familiarity` cut; the ask
+is present as a question sentence naming Nadia); "how do you know
+about her?" (effects: the reply carries no prior-knowledge claim, and
+its content grounds in the person's own words, checked by the guard
+context's grounding: every proper noun in the reply is in the
+utterance, the history or the evidence). **Size M** (spec S, engine
+M). The spec part first, then the engine; the detector is the first
+half of CHAT-13's resolver and CHAT-13 reuses it.
+
+### 4. Promises, offers, currency and corrections (findings 2, 3, 7, and 6 in part)
+
+**Root cause, in the code.** The chat model decides alone whether a
+lookup runs. `intentFor()` in `lib/turnContext.ts` marks every
+question `lookup`, and nothing reads that. When the model writes "Let
+me check that for you" as prose, the streaming path has already
+committed to text (the peek in `peekAndHandle()` saw a text delta, so
+no tool call can follow) and the sentence is sent as a reply. The
+lookup action family in `lib/guards.ts` covers the past tense ("I
+looked that up") and neither a promise ("let me check") nor an offer
+("want me to look it up?"). An offer creates no pending ask
+(`PendingAsk.kind` is `confirm | ask`), so "do it" on the next turn
+binds to nothing, routes as a bare command, and the model asks what to
+do. A currency question ("when does it come out", "how many episodes",
+"what are the reviews") on a new release is answered from the model's
+knowledge because the same decision is the model's; finding 3 is the
+invented count, day and verdict. A correction ("wrong show") is an
+ordinary utterance: the wrong subject stays in the window as the
+hub's own assistant message, and the next question about the same
+field is answered about the same wrong subject again (finding 7).
+
+**Design, in three parts.**
+
+*LOOKUP-01: a promise is the lookup, an offer is a pending ask (S-M,
+before CHAT-16).* The engine reads the reply's first sentence (the
+blocking path has the whole text; the streaming path holds the first
+sentence or the first twelve tokens, whichever comes first, a bound
+the OUT-01 hold already pays for) for the promise or offer shape:
+"let me check / look / find out / see", "I'll check / look that up",
+"want me to / would you like me to / should I look / check", "I can
+check / look that up". With no lookup outcome on the turn, the engine
+does not send the sentence: it runs the forced lookup the invention
+retry in `runTurnHoldingLease` already knows how to run (the
+`lookupTools` set with `tool_choice` forced), on the resolved subject
+and the question, and the result goes out the way every lookup result
+does (the package's Tier 1 line until CHAT-16, the composer after).
+A promise later in the reply, or one the stream has already released,
+becomes a pending ask of kind `lookup` bound to the resolved query, so
+"do it", "sure", "yes", "go ahead" resolve through `resolvePendingAsk()`
+to a websearch (or the typed source, per the ladder) rather than to a
+bare command. Cost: one extra completion on a promise turn, which is
+the turn that would have wasted a round trip anyway.
+
+*CHAT-13, amended: the lookup decision is the engine's.* The turn's
+`intent.kind` is `lookup` when the resolved subject is a world subject
+and the question asks for an exact field (a date, a count, a day of
+the week, a schedule, reviews, a rating, a runtime, a price, "is it
+out") and the subject's recency is `current` or `unknown`. Recency is
+a field on the resolved subject: `current` when the utterance or the
+subject's own words say so (new, upcoming, latest, this season, coming
+out, just dropped, the remake, the sequel) or a typed source dates it
+within the last year; `dated` when a typed source dates it earlier;
+`unknown` otherwise. Only a `dated` subject may take an exact field
+from the model's own knowledge. CHAT-16's ladder then runs with the
+model's knowledge off the ladder for a current subject: a rung that
+finds nothing composes "I couldn't find that" for the world (allowed;
+the honesty vocabulary is for the household), never a number.
+
+*CHAT-13, amended: corrections and reflected questions are subject
+operations.* "Wrong show", "no, not that one", "I meant X", "that's
+not what I asked" pop the active subject onto the conversation's
+`rejected` list; the unresolved question (TURN-01's slot, pulled
+forward into CHAT-13) is re-asked against the corrected subject on the
+next turn without the person repeating it, and a bare "do it" or "go
+on" after a correction re-runs that question; a reply sentence naming
+a rejected subject is cut (`rejected_subject`); the window annotates
+the turn that answered about the rejected subject with a system note
+(the `guardedTurnNote()` shape) so the model does not re-read it as
+fact. "You?", "what about you", "and you", "how about you" after the
+hub asked the person a question is that question addressed to the
+hub: the turn's resolved text is the question with the hub as its
+subject, which puts it in the experience category (section 7) and
+gives the model a referent for "you". A reply that is only the
+previous reply's question said back (finding 6's " What about you?",
+finding 10's tense loop) is `repeat_question`, skippable: the engine
+compares each reply sentence with the question sentences of the hub's
+previous reply, a deterministic check that needs no prompt.
+
+**Why this is the platform's shape.** The program already decided the
+engine runs the lookup when the model is unsure. A promise in the
+reply is the model saying it is unsure, in the only channel it has;
+the engine taking the decision back on that signal is the same rule,
+applied one sentence later. Recency is a property of the subject, not
+of a topic word, so it holds for a film, a game, a band's tour and a
+product alike. Corrections as subject-stack operations are what
+TURN-01's referent slot was for, moved earlier because finding 7
+showed a correction is the common case, not the edge.
+
+**Acceptance.** `new-release`: "I can't wait for the new Harrow
+series" (effects: guard null, no experience claim, a reaction, no
+closer); "do you know when it comes out" (effects: `lookupWithSource`
+true, the reply carries no promise or offer sentence, checked as
+`mustNotContain` "let me check|I can help you|would you like me to
+look|want me to look"); "how many episodes" (effect: the reply
+contains a number only if the turn has a succeeded lookup outcome
+with a source; otherwise the reply says it could not find it and
+contains no digit); "are you gonna watch it" and "no, you?" (section
+7's rows). `correction`: "did you see the new Riff and Rivet spinoff,
+I forgot what it's called" (effect: a lookup ran); "what day of the
+week are new episodes" (effect: a lookup ran whose arguments name the
+resolved subject); "wrong show, you're mixing things up" (effects: the
+subject recorded on the turn is not the rejected one; the rejected
+list holds it); "do it" (effects: the re-asked question runs against
+the corrected subject: a lookup outcome whose arguments name the new
+subject; no sentence names the rejected one). `offer-binding`, until
+CHAT-16 makes offers rare: a turn whose reply the runner seeds with an
+offer sentence, then "do it" (effect: a websearch outcome on the turn,
+`via: "ask"`). Three seeded runs. **Sizes:** LOOKUP-01 S-M; the two
+CHAT-13 amendments are inside CHAT-13's M.
+
+### 5. Register: a statement is not a request, and the assistant voice (findings 12, 14 in part, 10's loop)
+
+**Root cause, in the code.** A first-person statement about a
+conversation with someone ("I told Quill I'm giving up on local models
+for coding") got "Okay, I've noted that": the model reads a statement
+as something to file, a habit the memory block's trust reminder and
+the remember package's own register encourage. When the person
+objected, the model produced an action claim, and `unsupportedActionLine()`
+narrated the honest line from the flagged sentence's family ("I
+haven't added anything to your list") regardless of the utterance's
+shape, so the replacement inherited the model's invention and told the
+person about a list nobody had mentioned. "I'm still learning", "Let
+me know if you need anything else", "Sorry if I confused you" are the
+assistant register; #95 covers closers and the list is short.
+
+**Design (REG-01).** Three deterministic rules at the output boundary,
+no prompt change:
+
+1. *Statements take no action claims.* On a statement-shaped turn
+   (`shapeOf(ctx)` is statement) with no outcome, an action-claim
+   sentence is skipped, not replaced. If nothing remains, one retry
+   with a system note on the messages ("Nothing was asked; respond to
+   what they said"), the same one-retry pattern as the invention
+   retry; a second empty result takes the `malformed` line of OUT-01.
+   The narrated replacement stays for command-shaped turns, where it
+   is right.
+2. *The assistant register is stripped.* One list beside #95's
+   closers (the same list, extended, one definition): "I've noted
+   that", "I'm still learning", "let me know if you need anything
+   else", "I'm here to help", "as an AI", "sorry if I confused you",
+   "let me know what you need", "happy to help". A sentence that is
+   only one of these is skipped (`assistant_register`, skippable); a
+   sentence that carries one as a tail keeps its head.
+3. *No question said twice.* `repeat_question` from section 4.
+
+The longer-term answer to register is the companion's own
+(section 9, and EVAL-03's control vector); these three rules are what
+holds until then and what every companion inherits after.
+
+**Why this is the platform's shape.** The engine knows the utterance's
+shape (the router computes it) and the previous reply's sentences; the
+model does not need to be told what a statement is. The replacement
+bank narrating an invented family was the one place a guard could add
+a fact, and it no longer can. **Size S.** Before CHAT-13.
+
+**Acceptance.** `statement-not-request`: "I told Quill I'm giving up
+on local models for coding" (effects: no outcome on the turn; the
+reply contains no action claim and no assistant-register sentence,
+checked by guard null or `assistant_register` cut; the reply contains
+a reaction or a question, `mustContain` "\\?|that|why|how"); "you
+didn't do anything, I was just talking" (effects: no `unsupported_action`
+replacement; the reply contains no family narration, `mustNotContain`
+"list|timer|reminder"); "anyway, Quill was going to buy a new machine
+for it but now he's not" (effects: no sentence from another
+conversation, section 1's check; the subject on the turn is Quill).
+Three seeded runs.
+
+### 6. Search results in a friend's voice (findings 18 and 5, and the CHAT-16 verdict)
+
+**Root cause, in the code.** `backend/packages/websearch/recipe.json`
+runs an `llm_complete` step whose prompt asks for "one or two
+sentences" from the results, in the package's own voice, and says
+"don't list your sources". The Tier 1 reply is that sentence, spoken
+as-is. The URL the person asked for is in the retained outcome's
+`source` (CHAT-15) and the frontend's `SourcesCard` is built (lane 10
+item 1), and nothing carries one to the other. The reply reads like
+an encyclopedia entry because it is one: a summary written to be
+complete, with no speaker.
+
+**The verdict on CHAT-16.** Its design (one composer for every factual
+result, the selected companion's voice, no package text spoken as-is)
+is necessary and not sufficient. A composer told "phrase this" on an
+8B produces the same summary with a warmer opening. It needs a
+contract with moves, a length, and a guard family on its own output.
+
+**Design (the CHAT-16 amendment).**
+
+1. *The composer's four moves, in this order:* react (one clause, in
+   the companion's register: "oh nice, there's a bunch"); pick (the
+   one result that answers, or two, never the list); say it (as a
+   person who just looked, in the person's terms: "the one everyone's
+   recommending for that age is Marsh Lantern"); point (the sources as
+   chips, the details pane for the rest, "the link's on your phone" on
+   a voice surface). The composer prompt is fixed product copy in
+   `lib/persona.ts`'s pattern, the results are data in a tool-result
+   message, tools are absent.
+2. *Length.* Two sentences in chat, one on a voice surface, CHAT-12's
+   budget as the ceiling. Everything else is the document (section
+   9).
+3. *A `search_voice` guard family on the composed output,* cuttable:
+   "the search results", "according to the results", "based on my
+   search", "the results show", "I found that", "some recommended",
+   "include options such as", "in <year>, some". A composed reply that
+   loses every sentence to it is recomposed once, then takes the
+   `malformed` line.
+4. *A link is a deliverable.* When the ask is for a link, a URL, a
+   trailer, or "where can I watch / read", the reply's `sources` carry
+   the URL (one chip is the answer) and the line says it is there;
+   never "no link" and never a spoken URL. The decision table gains
+   the row.
+5. *The websearch recipe returns data.* The `llm_complete` step and
+   its source-suppression instruction go; the recipe returns bounded
+   title, snippet and URL rows in `data`, the item's own text.
+6. *The experience category composes too* (section 7): "have you seen
+   it", "are you gonna watch it" and a reflected "you?" are composed
+   from the category, not left to the model.
+
+**Why this is the platform's shape.** One composer already owns every
+result; the contract and the guard family are how the composer is
+held to the design, the same way the guards hold the model to the
+household's facts. The package returning data instead of prose is
+principle 4: one definition of how a result is said.
+
+**Acceptance.** `search-in-a-voice`: "what new games would you suggest
+for a ten-year-old" (effects: `lookupWithSource` true; the reply
+contains no `search_voice` phrase; `maxWords` 60; a reader's row for
+the four moves); "can you get me a link to the trailer for Harrow"
+(effects: the turn's `sources` is non-empty and one entry's URL is a
+video page; the reply contains no "http"; `mustNotContain` "no link|
+couldn't find a link"). The game and film opinion rows already in the
+fixture gain the `search_voice` check. Three seeded runs. **Rides
+inside CHAT-16's M.**
+
+### 7. Experience claims (finding 4)
+
+**Root cause, in the code.** `CLAIMED_EXPERIENCE_RE` in `lib/guards.ts`
+reads a flat first-person claim in the past or progressive ("I
+watched", "I'm watching"); its negation exemption passes the whole
+sentence, so "I haven't seen it yet, but I'm excited to check it out"
+stands, and a plan ("are you gonna watch it" answered with a plan to)
+has no shape at all.
+
+**Design (EXP-01, S, now; the composed half rides with CHAT-16).** The
+shape gains intent forms ("going to / gonna / plan to / can't wait to /
+excited to / looking forward to / curious to" plus watch, see, play,
+read, try, check out) and "haven't ... yet" ("yet" is a plan); the
+negation exemption applies only to a plain negation with no "yet" and
+no "but". The reason stays `claimed_experience`, skippable, with the
+`CANNOT_EXPERIENCE` line when nothing else was said. Under CHAT-16, a
+question about the hub's own experience (the reflected "you?" of
+section 4 included) is composed from the category: the experience line
+plus a familiarity clause from evidence (a typed source's synopsis, a
+lookup's snippet, or the model's own knowledge for a dated subject),
+never free prose about its plans.
+
+**Acceptance.** In `new-release`: "are you gonna watch it" (effects:
+no experience or plan claim; the reply still says something about the
+subject, `mustContain` a content word from the subject's evidence);
+"no, you?" (effects: the resolved text on the turn is the hub's
+question addressed to the hub; no experience claim; the reply is not
+only a question, `wellFormed` and a declarative sentence present).
+The film row's "have you seen it" keeps its check. Three seeded runs.
+
+### 8. Memory quality: the judge grounds every fact in the speaker's words
+
+Not on the priority line as written, and part of the second item on
+it: a judge that writes world facts and the hub's own replies as facts
+about the speaker is how the hub comes to "know" what it was never
+told. The echo filter and the 4B pin (MEM-05) are in; this is the
+structural rule beside them.
+
+**Root cause, in the code.** The SOURCE RULE in `buildExtractionPrompt()`
+is prose. The echo filter grounds the prompt's own examples against
+the speaker's words; nothing grounds an ordinary fact, so a sentence
+from the reply, a lookup result, or the weather becomes "Sage is
+planning to have ten episodes" or "Sage is not going to rain today".
+A passing state ("Sage is checking the weather", "Sage is discussing
+whether the kid can watch") is category `state` with a conversational
+verb, which the prompt's category list does not exclude.
+
+**Design (MEM-06, S-M, the judge's owner, independent of CHAT-13).**
+At the judge's output, after the echo filter, three rejections, each
+counted on the same log line:
+
+1. *Grounded facts only.* A kept fact shares at least half its content
+   words, and every proper noun and number it carries, with the
+   speaker's own words on the turn (plus an assistant line the speaker
+   confirmed, the echo filter's own reading of the turn). A fact
+   grounded only in the reply or in a lookup result is `ungrounded`.
+2. *No passing states.* A `state` whose verb is a conversational
+   progressive (the 4c list in `lib/guards.ts`: asking, saying,
+   wondering, discussing, checking, explaining, telling, looking for,
+   thinking about, talking about; one list, exported and shared) is
+   `passing`.
+3. *No world subjects as speaker facts.* A fact whose subject is the
+   turn's world subject (CHAT-13's subject of kind world; before it,
+   the title of a succeeded lookup or typed-source outcome on the
+   turn, read from the retained outcomes) is `world` unless it is a
+   preference or a plan of the speaker's own ("Sage wants to see
+   Harrow" stays; "Harrow premieres in October" goes).
+
+**Acceptance.** The judge-eval fixture gains one turn per rejection
+class with roster names (a reply-only fact, a lookup-only fact, a
+passing state, a world-subject fact, and the preference that must
+stay); precision on the fixture at 100 percent for those rows; the
+seeded bench's memory rows unchanged; the per-run drop counts in the
+run header. **Size S-M.**
+
+### 9. The companions brief, designed
+
+The brief's direction, in the platform's shape: one turn engine, one
+evidence store, one memory with one more scope, companions as
+packages, bindings as spec fields. Items COMP-01 to COMP-06, SPEAK-01
+and WAKE-02 in the backlog; the robot's parity line goes in the
+robot's own backlog when the hub items land.
+
+**COMP-01: the details pane and its documents (M, after CHAT-16).** A
+turn may carry a `document`, built lazily from the turn's retained
+outcomes through the composer when the pane is opened (or streamed
+after the line in research mode), stored on the turn row in a
+`document` JSON column beside `outcomes` once built, exposed on the
+wire additively (`document_available: boolean` on `TurnValue`, and
+`GET /api/conversations/turns/:id/document`, a Zod route so the API
+docs carry it). Four document types, each the typed shape with its
+sources, never model prose where a typed source answered: `lookup` (a
+results list: title, one line, source), `card` (a typed source's
+record: a film, a person, a place), `procedure` (steps, with
+quantities where the evidence has them), `comparison` (a table of the
+subjects compared). A document exists only when the turn had material
+for one: a lookup ran, a typed source answered, or the ask was
+procedural or factual (the routing corpus's own "how do I", "who is",
+"compare", "the whole recipe" shapes); chit-chat has none, and the
+handle does not render. The chat shows a "Details" handle beside the
+source chips; a pane on the right at desktop widths, a bottom sheet on
+a phone (the shell's responsive rules in UI.md); a voice surface never
+reads it and says where it is ("it's on your phone", "on the hub
+screen"). An explicit ask ("the whole recipe", "the full rundown")
+opens it and the line says one sentence; the companion may offer it
+in the composer's fourth move. Once open it follows the subject: a
+follow-up on the same subject ("can I use frozen bananas?") recomposes
+the document with the new evidence in place, the living-document
+behavior, and a subject change closes it. Cost on ordinary chat: none;
+the document is never built until opened.
+
+**COMP-02: research mode (S, after COMP-01).** A per-conversation
+preference (`conversations.mode`: `chat | research`, a spec field,
+additive) with a toggle in the chat header: the pane stays open, the
+document streams after the line, the line takes the shorter budget.
+The bubble is never an article in either mode.
+
+**COMP-03: the companion package's full shape (M, spec first).** The
+manifest's `companion` block gains: `directness` (`direct | conversational`,
+the dial the brief's "MaiPai direct" needs: the point first, short
+reasoning, no reactions or offers; every existing dial stays),
+`specialty` (free tags a person can read in the catalog: "tech help",
+"stories"), `voice` (a voice package id, the default for this
+companion), `wake_word` (a wakeword package id, the default name it
+answers to), `kid_safe` (boolean, reviewed at catalog admission), and
+`rapport` (boolean: whether it keeps its own rapport scope, COMP-05).
+MaiPai stays the default companion and gets `directness: direct`;
+the bundled personalities keep `conversational`. `composePersonaPrompt()`
+renders the new dial as one sentence like the others; the persona-eval
+bench gains a directness row per companion (the point first, no
+offer). Every companion's register follows the ask within its
+personality: "just the numbers" gets the numbers from the warm one
+too, which is the composer's contract (section 6) applied per
+companion, not a second path. The rule that makes the rest safe is
+restated as a test: no companion has its own engine, prompt path,
+evidence ladder, guard set or memory; the persona-eval runs every
+correctness row of the conversation bench once per bundled companion.
+
+**COMP-04: per-person companion sets and the kid-safe rule (M, after
+COMP-03).** A person-scope settings key `companions.enabled` (a list
+of installed companion ids, the settings standard's generic renderer),
+editable by the person for an adult and only by an adult for a child;
+a child's list may hold only `kid_safe` companions (validated at
+write, never a filter at read). `persona.active_id` becomes the
+person's default; a message may name a companion (a header pick in
+chat, the name as the opener in text, the wake word on voice) and
+the turn carries `companion_id` (the conversation record already has
+it). Switching never changes the conversation or what the hub knows.
+The family surfaces (a TV, the robot, a child's profile) meet a
+companion first through the device binding (COMP-06); MaiPai direct is
+the one a person reaches for by name.
+
+**COMP-05: rapport, one more scope on memory (M, spec first).**
+`memory-record.schema.json`'s `scope` gains `companion`, with a
+`companion_id` field (nullable, required when scope is companion). The
+judge writes a rapport fact (how the companion addresses the person, a
+running joke, what they talked about) at that scope when the fact is
+about the companion and the person rather than about the person; the
+prompt's memory section renders the active companion's rapport
+records under their own line; recall reads household, person and the
+active companion's rapport, never another companion's (a hard bench
+row, the B5 shape). Shared knowledge, separate rapport, one store.
+
+**COMP-06: wake word to companion bindings (L, spec first).** A wake
+word names a slot, the speaker names the person, the person's binding
+names the companion. `person.schema.json` gains `wake_bindings`
+(`[{ wakeword_id, companion_id, voice_id }]`); `device.schema.json`
+gains `default_bindings` (the same shape, admin-set; the existing
+`person_id` already marks a device personal). Resolution for a voice
+turn, one function with a unit-tested table: the identified speaker's
+own binding of the word; else the device's binding; else the
+household's default; an unknown speaker on a shared device gets the
+device's or the household's binding, and the reply asks who is
+speaking only when it matters (a personal memory would be read, a
+child-safety decision would be made), never otherwise. Two people may
+bind the same word to different companions; a person may bind any
+installed word to any of their companions; a newly trained word is a
+package registered the same way. The bindings sync to the robot as
+spec records (no data debt), and the robot resolves the same table.
+
+**SPEAK-01: speaker identification on shared devices (L, hardware).**
+An enrolled voice print per household member (a maintained speaker-
+embedding model, run locally, the bot's microphone pipeline as the
+first home), the audit's "no speaker identity" gap, now on the
+critical path for COMP-06 on shared surfaces. Acceptance is a real-
+microphone check: three enrolled roster voices, each recognized on the
+bench array at a stated rate, an unenrolled voice reported unknown,
+recorded with the hardware description and never a household
+recording in the repo. Until it lands, shared devices use the device
+binding alone.
+
+**WAKE-02: wake-word training as a household feature (L, after the
+bot's pipeline item).** The hub's UI for training a new word under the
+org's training rules (real speech through the real microphone, near
+misses, verified data), registering the result as a wakeword package
+a person can bind. The pipeline is the bot's existing item; this is
+its household front and the package registration.
+
+**Sequence of the brief's items:** COMP-01 after CHAT-16; COMP-03
+spec then COMP-04 and COMP-05 spec, in parallel with COMP-01; COMP-02
+after COMP-01; COMP-06 spec after COMP-03, its engine after COMP-04;
+SPEAK-01 and WAKE-02 with the bot's hardware work.
+
+### The sequence, all items
+
+1. **Before CHAT-13 is built:** RECALL-02, OUT-01, REG-01, EXP-01
+   (the guard half), ASK-01 spec, ASK-01 engine, LOOKUP-01. MEM-06 in
+   parallel on the judge's side. Each is a bench row set that fails
+   today and passes three seeded runs when done.
+2. **CHAT-13, as amended:** the subject stack with `rejected`,
+   recency on the resolved subject, the lookup decision, the reflected
+   question, the unresolved-question slot, `repeat_question`,
+   "what were we talking about" from the stack, and ASK-01's resolver
+   as its first half.
+3. **Rides with CHAT-16:** the composer's four moves and length, the
+   `search_voice` family, the link deliverable, the websearch recipe
+   returning data, the experience category composed, the lookup offer
+   made rare by the ladder.
+4. **After CHAT-16:** COMP-01, COMP-02, COMP-03 to COMP-05, COMP-06,
+   SPEAK-01, WAKE-02, the robot parity line.

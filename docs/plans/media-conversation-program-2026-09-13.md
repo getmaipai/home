@@ -92,7 +92,16 @@ inside step 4 if the composer needs it, not before. The judge's
 subject-resolution item (baseline-fixes 3) follows this program; #98
 and #99 are small items between steps.
 
-## Findings from live use, 2026-09-13 evening (design pending)
+## Findings from live use, 2026-09-13 evening (designed 2026-09-13)
+
+**Designed:** the design pass landed in
+[docs/dev.md, "The chat design pass"](../dev.md#the-chat-design-pass-findings-1-to-18-and-the-companions-brief-2026-09-13),
+one section per finding group, with the backlog items under
+[BACKLOG.md, "Design pass 2026-09-13"](../BACKLOG.md#design-pass-2026-09-13)
+and the amendments on CHAT-13 and CHAT-16 themselves. The order:
+RECALL-02, OUT-01, REG-01, EXP-01, ASK-01, LOOKUP-01 and MEM-06 before
+CHAT-13 is built; the amendments ride with CHAT-13 and CHAT-16; the
+companions items follow CHAT-16.
 
 Defect classes observed by the coordinator in live household chat,
 recorded as findings, not designed. The rule: the design for these

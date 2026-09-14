@@ -1,4 +1,9 @@
-# Companions: the design brief (2026-09-13, design pending)
+# Companions: the design brief (2026-09-13, designed 2026-09-13)
+
+**Designed:** [docs/dev.md, "The chat design pass", section 9](../dev.md#the-chat-design-pass-findings-1-to-18-and-the-companions-brief-2026-09-13)
+and the items COMP-01 to COMP-06, SPEAK-01 and WAKE-02 under
+[BACKLOG.md, "Design pass 2026-09-13"](../BACKLOG.md#design-pass-2026-09-13),
+all after CHAT-16.
 
 Jesse's product direction from a brainstorm with the coordinator on
 the evening of 2026-09-13, recorded as input for the design pass that
