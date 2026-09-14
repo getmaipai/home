@@ -61,6 +61,15 @@ export function NotificationBell() {
     for (const n of query.data) {
       if (!seenIds.current.has(n.id)) {
         seenIds.current.add(n.id);
+        // Jesse, 2026-09-13: no toast for a memory save. When the
+        // originating message is still on screen, chatMemoryChip.tsx's
+        // "Memory updated" chip already shows it there; when it isn't
+        // (the judge can finish well after someone has moved on to
+        // another page - memoryJudge.ts runs off a background queue),
+        // this bell's own badge and pending list are the fallback - a
+        // real delivery still lands there and in the 30-day history,
+        // only the toast itself is skipped.
+        if (n.typeId === "memory.updated") continue;
         push(n.text);
       }
     }

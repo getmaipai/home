@@ -147,4 +147,34 @@ describe("NotificationBell", () => {
       restore();
     }
   });
+
+  // Jesse, 2026-09-13: a memory-saved toast on top of the "Memory
+  // updated" chip (chatMemoryChip.tsx) is a redundant second ping for
+  // the same event - the chip is the indicator now, this delivery type
+  // must never toast, only every other type still does (the test above,
+  // which relies on the exact same "toast renders without the popover
+  // open" behavior to prove a toast fired at all).
+  test("a memory.updated arrival never toasts, but still shows in the pending list", async () => {
+    const restore = stubFetch({ "/api/notifications": [] });
+    try {
+      const { findByRole, getByRole, getByText, queryByText, queryClient } = renderBell();
+      await findByRole("button", { name: /Notifications$/ });
+
+      queryClient.setQueryData(["notifications"], [{ ...notification("n1", "I remembered: the wifi password"), typeId: "memory.updated" }]);
+
+      // The badge update proves the delivery reached this component at
+      // all - if the toast-skip also silently dropped the item, this
+      // would hang forever.
+      await waitFor(() => expect(getByRole("button", { name: /Notifications \(1 pending\)/ })).toBeInTheDocument());
+      // No toast: the popover is still closed here, so the only way this
+      // text could be findable is a toast, exactly the assertion the test
+      // above makes in reverse.
+      expect(queryByText("I remembered: the wifi password")).toBeNull();
+
+      fireEvent.click(getByRole("button", { name: /Notifications \(1 pending\)/ }));
+      expect(getByText("I remembered: the wifi password")).toBeInTheDocument();
+    } finally {
+      restore();
+    }
+  });
 });
