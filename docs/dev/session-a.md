@@ -3796,5 +3796,34 @@ on a turn (the Confirm control driven from the bench). Rows:
 `colleague_of`) and `inferred-coworker-candidate` (the same manager
 and a borrowed stapler: an inferred `colleague_of` stored as a
 candidate, "who is Raven" with no coworker line in the context and no
-coworker claim in the reply, then plain after the confirm). Three
-seeded runs below.
+coworker claim in the reply, then plain after the confirm).
+
+**The seeded sets (2026-09-14, this machine, nothing else running; chat
+engine llama-server b10797 on qwen3-8b-instruct-q4-k-m, judge the 4B
+qwen3-4b-q4-k-m on its own server, embed on its own, seed 20260913
+pinned, three runs each).** The first set, on 36048e6: 127, 126 and
+126 of 162 scored turns, the four hard rows green in every run,
+`coworker-likes-seltzer` turns 2 to 4 green in every run, and the two
+provenance rows failing in every run for one reason: the 4B marked
+"Raven and I got the same manager" a stated colleague (a stated edge
+where a candidate was due), pointed the seltzer row's relation at the
+speaker in one run (no edge written), and once echoed a persona from
+the rule's own example into an unrelated fact; those are the phrase
+gate, the self-pointed redirect and the nameless rule above (7845795).
+The second set, on 7845795: 131, 130 and 129 of 162, the hard rows
+green in every run, `coworker-likes-seltzer` 12 of 12 turn-runs green
+but one (run 2, "what does Quill drink": the record was in the
+context and the 8B answered with an honesty line, the chat model's
+misfire, not the judge's), and `inferred-coworker-candidate` 9 of 9:
+the relation stored inferred and unconfirmed, no coworker line in the
+context and no coworker claim in the reply before the confirm, plain
+after it. The residual run-to-run variance of the pinned seed is
+larger than CHAT-15's set measured (47 and 109 replies differing
+between consecutive runs, none of them the target rows' verdicts
+except the one above); the rows that flip are the ones BENCH-01
+already lists as the seed's residue. One thing the candidate row
+showed that 3a does not fix: with no coworker line, "who is Raven"
+had the 8B invent a kind in one run ("the child who shares the
+house"), the unknown-name defect the design pass assigns to ASK-01
+(the ask, the false_familiarity guard); 3a's part is that the hub
+never asserted the guess as its own.
