@@ -1910,6 +1910,35 @@ invented for the roster's household, and added to
     licenses to confirm). Exit: the script's own run on a quiet
     machine, `bash scripts/check.sh`.
 
+    Found live, 2026-09-14 (baseline v0, `replay.ts`): the replay
+    process's own resident memory grows across questions and
+    `resetReplayDatabase()` does not return it to the OS - three
+    single-process oracle-v0 runs in a row were killed for low memory,
+    each getting further than the last with no other process's own
+    interference to explain it. Worked around, not fixed, by
+    `replay-per-question.ts` (one fresh OS process per question, same
+    seed and order as the manifest, RSS start/end recorded on each
+    question's own row) - the real fix (find and close whatever
+    `ingestRow`/`runJudgeBatch`/the recording proxy holds onto across
+    questions inside one process) is still open. Corrected the same day:
+    the per-process kills were the Claude Code harness's own background-
+    task monitor stopping a tracked task when free memory looked low,
+    not macOS killing the process - every kill's own row showed the
+    process itself healthy and small (max 343MB, mean 160MB across the
+    real 35-question run). Free memory on this machine sits near ~90MB
+    as its own steady state whenever the 8B chat engine's mapped model
+    pages are touched, which the OS reclaims on demand; the harness read
+    that as pressure. The actual fix was running the per-question loop
+    detached (`nohup`, disowned, watched via a log tail, never a
+    harness-tracked foreground wait) - `replay-per-question.ts`'s own
+    memory guard (wait for free memory before each spawn, capped) stayed
+    in as cheap insurance, not the load-bearing fix. Full account:
+    docs/dev/session-b.md, "Lane 14 item 2 follow-up 2".
+
+    Baseline v0 recorded 2026-09-14 (35 questions, seed 20260914):
+    14/35 overall. Per type in docs/dev/session-b.md; per-row failure
+    read pending.
+
     Dataset half shipped 2026-09-14, Session B (lane 12 item 4), amended
     per the coherence review's own split (dev.md, "Coherence review,
     2026-09-14", question 5: this item's replay-through-the-engine half

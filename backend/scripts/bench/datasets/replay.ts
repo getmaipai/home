@@ -26,6 +26,7 @@
 import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { readFileSync } from "node:fs";
+import type { TurnValue } from "@/wire";
 import { startRecordingProxy } from "../recordingProxy";
 import { loadLongMemEval } from "./longmemeval";
 import { loadLocomo } from "./locomo";
@@ -303,13 +304,55 @@ async function drainJudge(label: string): Promise<void> {
 
 // ==== asking the question as a live turn ====
 
-async function askQuestion(actor: Awaited<ReturnType<typeof personRow>>, conversationId: string, question: string): Promise<string> {
+interface AskedQuestion {
+  reply: string;
+  turnId: string;
+}
+
+async function askQuestion(actor: Awaited<ReturnType<typeof personRow>>, conversationId: string, question: string): Promise<AskedQuestion> {
   const result = await runTurnStream(actor, "chat", question, { conversationId });
   if (!result.ok) throw new Error(`replay: runTurnStream refused the question: ${result.error}`);
-  if (result.kind === "immediate") return result.value.reply.text;
+  if (result.kind === "immediate") return { reply: result.value.reply.text, turnId: result.value.turn_id };
+  // A review caught the previous version of this function draining
+  // `result.tokens` with a bare `for await` and returning - which never
+  // calls `result.finalize()`, the one thing that actually persists the
+  // conversation_turns row (turnEngine.ts's own logTurnSafely(), inside
+  // finalize()). Without it, turnGuardAndSource() below would find no
+  // row for nearly every question (a plain Q&A routes through the
+  // "model" tier, i.e. kind: "stream", not "immediate") and silently
+  // read guardReason/source as null across the whole run. Mirrored from
+  // conversationRunner.ts's own driveTurn(): read the generator manually
+  // so its own `.done` return value (the finalize outcome) is captured,
+  // then ALWAYS call finalize() - a second review caught the first fix
+  // here skipping it (`resolved ?? result.finalize(...)`, which
+  // short-circuits past finalize whenever a tool call already resolved
+  // the turn) even though finalize() is exactly the driveTurn() pattern
+  // for that path too: it is the one place logTurnSafely() runs, safe
+  // to call unconditionally, and itself returns the resolved value when
+  // there is one - skipping it was reintroducing the identical
+  // never-persisted-for-some-questions bug for the tool-resolved subset.
+  const iterator = result.tokens[Symbol.asyncIterator]();
   let text = "";
-  for await (const delta of result.tokens) text += delta;
-  return text;
+  let step = await iterator.next();
+  while (!step.done) {
+    text += step.value;
+    step = await iterator.next();
+  }
+  const outcome = step.value;
+  const resolved = outcome && typeof outcome === "object" && "resolved" in outcome ? (outcome as { resolved: TurnValue }).resolved : null;
+  const finalized = result.finalize(text, outcome as Parameters<typeof result.finalize>[1]);
+  const value = resolved ?? finalized;
+  return { reply: value.reply.text, turnId: value.turn_id };
+}
+
+/** The live turn's own guard/source, the same two fields the household
+ * bench's own [bench-turn] line carries (conversationRunner.ts's
+ * `guardReplaced: row?.guardReason`, `source: ... row?.source`) - read
+ * from the persisted row rather than the stream result, since a
+ * guard's own replacement happens after the stream resolves. */
+async function turnGuardAndSource(turnId: string): Promise<{ guardReason: string | null; source: string | null }> {
+  const row = db.select({ guardReason: conversationTurns.guardReason, source: conversationTurns.source }).from(conversationTurns).where(eq(conversationTurns.id, turnId)).get();
+  return { guardReason: row?.guardReason ?? null, source: row?.source ?? null };
 }
 
 // ==== grading (LongMemEval) ====
@@ -361,20 +404,22 @@ async function runLongMemEval(questions: readonly LongMemEvalQuestion[], convers
         const askAt = parseLongMemEvalDate(q.questionDate);
         if (askAt) __setPromptClockForBench(() => askAt);
         proxy.reset();
-        const reply = await askQuestion(actor, created.value.id, q.question);
+        const asked = await askQuestion(actor, created.value.id, q.question);
         await proxy.settled();
+        const { guardReason, source } = await turnGuardAndSource(asked.turnId);
         const contextMessage = proxy.requests.length ? proxy.requests.map((r) => r.systemText).join("\n") : null;
         const recallHits = computeRecallHits(longMemEvalEvidenceTurns(conv), contextMessage);
-        const verdict = await gradeLongMemEvalReply(q.question, q.answer, reply);
-        results.push({ questionId: q.questionId, questionType: q.questionType, isAbstention: q.isAbstention, reply, grader: "4b", verdict, contextMessage, recallHits, judgeWrittenRecords });
-        console.log(`[replay-question] ${JSON.stringify({ questionId: q.questionId, type: q.questionType, isAbstention: q.isAbstention, verdict, reply, recallHits, judgeWrittenRecords: judgeWrittenRecords.map((r) => `${r.status}: ${r.text}`) })}`);
+        const verdict = await gradeLongMemEvalReply(q.question, q.answer, asked.reply);
+        const row: LongMemEvalResult = { questionId: q.questionId, questionType: q.questionType, isAbstention: q.isAbstention, question: q.question, referenceAnswer: q.answer, reply: asked.reply, grader: "4b", verdict, contextMessage, recallHits, judgeWrittenRecords, guardReason, source };
+        results.push(row);
+        console.log(`[replay-question] ${JSON.stringify({ ...row, judgeWrittenRecords: judgeWrittenRecords.map((r) => `${r.status}: ${r.text}`) })}`);
       } finally {
         __setPromptClockForBench(null);
       }
     } catch (err) {
       const message = (err as Error).message;
       console.error(`[replay] question ${q.questionId} threw, scored incorrect: ${message}`);
-      results.push({ questionId: q.questionId, questionType: q.questionType, isAbstention: q.isAbstention, reply: "", grader: "4b", verdict: "incorrect", error: message, contextMessage: null, recallHits: [], judgeWrittenRecords: [] });
+      results.push({ questionId: q.questionId, questionType: q.questionType, isAbstention: q.isAbstention, question: q.question, referenceAnswer: q.answer, reply: "", grader: "4b", verdict: "incorrect", error: message, contextMessage: null, recallHits: [], judgeWrittenRecords: [], guardReason: null, source: null });
     }
     try {
       resetReplayDatabase();
@@ -415,14 +460,15 @@ async function runLocomo(conversations: readonly DatasetConversation[], question
         for (const q of questions) {
           try {
             proxy.reset();
-            const reply = await askQuestion(actor, created.value.id, q.question);
+            const asked = await askQuestion(actor, created.value.id, q.question);
             await proxy.settled();
+            const { guardReason, source } = await turnGuardAndSource(asked.turnId);
             const contextMessage = proxy.requests.length ? proxy.requests.map((r) => r.systemText).join("\n") : null;
             const recallHits = computeRecallHits(locomoEvidenceTurns(conv, q.evidenceTurnIds), contextMessage);
-            const diagnostics: RecallDiagnostics = { contextMessage, recallHits, judgeWrittenRecords };
-            const scored = scoreLocomo(conv.id, q.category, reply, q.answer, q.adversarialAnswer, diagnostics);
+            const diagnostics: RecallDiagnostics = { contextMessage, recallHits, judgeWrittenRecords, guardReason, source };
+            const scored = scoreLocomo(conv.id, q.category, q.question, asked.reply, q.answer, q.adversarialAnswer, diagnostics);
             results.push(scored);
-            console.log(`[replay-question] ${JSON.stringify({ conversationId: conv.id, category: q.category, f1: scored.f1, refusedAdversarialPremise: scored.refusedAdversarialPremise, reply, recallHits, judgeWrittenRecords: judgeWrittenRecords.map((r) => `${r.status}: ${r.text}`) })}`);
+            console.log(`[replay-question] ${JSON.stringify({ ...scored, judgeWrittenRecords: judgeWrittenRecords.map((r) => `${r.status}: ${r.text}`) })}`);
           } catch (err) {
             const message = (err as Error).message;
             console.error(`[replay] ${conv.id} category ${q.category} question threw: ${message}`);
@@ -431,7 +477,7 @@ async function runLocomo(conversations: readonly DatasetConversation[], question
             // threw) - reused rather than reported empty, so this row
             // still reads "stored, the live turn errored" instead of
             // falsely reading "nothing was ever stored".
-            results.push({ conversationId: conv.id, category: q.category, reply: "", answer: q.answer, adversarialAnswer: q.adversarialAnswer, f1: 0, refusedAdversarialPremise: null, error: message, contextMessage: null, recallHits: [], judgeWrittenRecords });
+            results.push({ conversationId: conv.id, category: q.category, question: q.question, reply: "", answer: q.answer, adversarialAnswer: q.adversarialAnswer, f1: 0, refusedAdversarialPremise: null, error: message, contextMessage: null, recallHits: [], judgeWrittenRecords, guardReason: null, source: null });
           }
         }
       } finally {
@@ -440,7 +486,7 @@ async function runLocomo(conversations: readonly DatasetConversation[], question
     } catch (err) {
       const message = (err as Error).message;
       console.error(`[replay] ${conv.id} ingestion threw, its ${questions.length} question(s) skipped: ${message}`);
-      for (const q of questions) results.push({ conversationId: conv.id, category: q.category, reply: "", answer: q.answer, adversarialAnswer: q.adversarialAnswer, f1: 0, refusedAdversarialPremise: null, error: message, contextMessage: null, recallHits: [], judgeWrittenRecords: [] });
+      for (const q of questions) results.push({ conversationId: conv.id, category: q.category, question: q.question, reply: "", answer: q.answer, adversarialAnswer: q.adversarialAnswer, f1: 0, refusedAdversarialPremise: null, error: message, contextMessage: null, recallHits: [], judgeWrittenRecords: [], guardReason: null, source: null });
     }
     try {
       resetReplayDatabase();

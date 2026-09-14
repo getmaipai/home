@@ -4,7 +4,7 @@
 import { describe, expect, test } from "bun:test";
 import { tokenF1, scoreLocomo, longMemEvalTotalsByType, locomoTotalsByCategory, computeRecallHits, type LongMemEvalResult, type LocomoResult, type RecallDiagnostics } from "../scripts/bench/datasets/replayScore";
 
-const NO_DIAGNOSTICS: RecallDiagnostics = { contextMessage: null, recallHits: [], judgeWrittenRecords: [] };
+const NO_DIAGNOSTICS: RecallDiagnostics = { contextMessage: null, recallHits: [], judgeWrittenRecords: [], guardReason: null, source: null };
 
 describe("tokenF1", () => {
   test("an exact match scores 1", () => {
@@ -45,24 +45,24 @@ describe("tokenF1", () => {
 
 describe("scoreLocomo", () => {
   test("category 1-4 scores the reply's own F1 against the answer", () => {
-    const r = scoreLocomo("l1", 3, "Last summer", "Last summer", null, NO_DIAGNOSTICS);
+    const r = scoreLocomo("l1", 3, "When was your last summer trip?", "Last summer", "Last summer", null, NO_DIAGNOSTICS);
     expect(r.f1).toBe(1);
     expect(r.refusedAdversarialPremise).toBeNull();
   });
 
   test("category 5 (adversarial): a reply that does not repeat the adversarial answer's own words is a refusal, correctly", () => {
-    const r = scoreLocomo("l1", 5, "I don't have anything in the notes about that.", null, "Yes, you mentioned Rome last spring.", NO_DIAGNOSTICS);
+    const r = scoreLocomo("l1", 5, "Did I mention Rome?", "I don't have anything in the notes about that.", null, "Yes, you mentioned Rome last spring.", NO_DIAGNOSTICS);
     expect(r.refusedAdversarialPremise).toBe(true);
     expect(r.f1).toBe(0); // category 5 never scores F1 against a "right" answer
   });
 
   test("category 5: a reply substantially repeating the adversarial answer is not a refusal", () => {
-    const r = scoreLocomo("l1", 5, "Yes, you mentioned Rome last spring.", null, "Yes, you mentioned Rome last spring.", NO_DIAGNOSTICS);
+    const r = scoreLocomo("l1", 5, "Did I mention Rome?", "Yes, you mentioned Rome last spring.", null, "Yes, you mentioned Rome last spring.", NO_DIAGNOSTICS);
     expect(r.refusedAdversarialPremise).toBe(false);
   });
 
   test("category 1-4 with no answer text scores 0, never throws", () => {
-    const r = scoreLocomo("l1", 4, "Some reply.", null, null, NO_DIAGNOSTICS);
+    const r = scoreLocomo("l1", 4, "Some question?", "Some reply.", null, null, NO_DIAGNOSTICS);
     expect(r.f1).toBe(0);
   });
 });
@@ -107,12 +107,16 @@ describe("longMemEvalTotalsByType", () => {
     questionId: "q1",
     questionType: "single-session-user",
     isAbstention: false,
+    question: "",
+    referenceAnswer: "",
     reply: "",
     grader: "4b",
     verdict: "correct",
     contextMessage: null,
     recallHits: [],
     judgeWrittenRecords: [],
+    guardReason: null,
+    source: null,
     ...over,
   });
 
@@ -134,7 +138,7 @@ describe("longMemEvalTotalsByType", () => {
 });
 
 describe("locomoTotalsByCategory", () => {
-  const mk = (over: Partial<LocomoResult>): LocomoResult => ({ conversationId: "l1", category: 1, reply: "", answer: null, adversarialAnswer: null, f1: 0, refusedAdversarialPremise: null, contextMessage: null, recallHits: [], judgeWrittenRecords: [], ...over });
+  const mk = (over: Partial<LocomoResult>): LocomoResult => ({ conversationId: "l1", category: 1, question: "", reply: "", answer: null, adversarialAnswer: null, f1: 0, refusedAdversarialPremise: null, contextMessage: null, recallHits: [], judgeWrittenRecords: [], guardReason: null, source: null, ...over });
 
   test("mean F1 per category, categories in ascending order", () => {
     const totals = locomoTotalsByCategory([mk({ category: 3, f1: 1 }), mk({ category: 3, f1: 0 }), mk({ category: 2, f1: 0.5 })]);

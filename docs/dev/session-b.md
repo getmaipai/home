@@ -3174,4 +3174,128 @@ tested (138-144 datasets-directory tests across the three commits, `tsc
 --noEmit` clean each time) entirely without the engine, under Session
 A's own concurrent hold - edits and this directory's own scoped test
 runs only, `check.sh` and the actual v0 run both waiting on "clear".
-on a quiet machine, reported here per type with the log path.
+
+(A stray leftover fragment from an earlier edit pass sat here until
+this pass cleaned it up: "on a quiet machine, reported here per type
+with the log path" - superseded by the actual report below.)
+
+## Lane 14 item 2 follow-up 2: five kills, a harness lesson, and baseline v0's real numbers
+
+`check.sh` passed clean on b/eval07-oracle-v0-manifest first try;
+landed as 8d5eef5. The actual 35-question run took five attempts
+before it produced anything, and the fifth attempt's own diagnosis was
+wrong in an instructive way.
+
+**Attempts 1-2** (single process, the whole 35-question run in one
+`bun` process): killed partway through (2 of 35, then 1 of 35 done)
+even with nothing else running on the machine. Diagnosis at the time:
+the process's own resident memory was growing across questions and
+`resetReplayDatabase()`'s logical `DELETE` wipe never returns memory to
+the OS, only a process exit does.
+
+**Attempt 3** (`replay-per-question.ts`, new: one fresh OS process per
+question via `--only <id>`, so the OS reclaims everything on each
+question's own exit): killed again, but with a real result this time -
+question 1 completed clean, RSS 176KB -> 270,688KB (264MB), released on
+exit exactly as designed. The kill hit as question 2 started. System
+diagnostics at that moment: 10.48GB wired, ~82-140MB free, two
+`llama-server` processes alone using 5.6GB and 2.0GB RSS. Revised
+diagnosis: the per-process design was working: the standing load from
+the two engines plus everything else running on the machine was simply
+leaving too little headroom for anything new to start.
+
+**Attempt 4** added a defensive pre-spawn memory guard (wait for free
+memory >= 400MB, capped at 2 minutes, logging every poll -
+`parseFreeMemoryMb()`/`waitForMemory()`, unit tested against a real
+`vm_stat` sample). Killed a fifth time regardless - but the guard's own
+log was the clue: free memory crashed from 2.5GB to under 100MB within
+about 90 seconds of the run starting, while the only work in flight was
+one question using 132MB and releasing it cleanly on exit. Something
+was consuming multiple GB fast, independent of anything this script was
+doing.
+
+**The actual cause**, per the coordinator's own read of the pattern:
+every kill's own subprocess was healthy and small right up to the line
+- "stopped because the system is running low on memory" was the Claude
+Code harness's own background-task monitor stopping a *tracked* task
+when free memory looked low, not macOS killing the process. Free memory
+on this machine sits near ~90MB as its own steady state whenever the 8B
+chat engine's mapped model pages are touched (an mmap'd model file
+shows as resident only when its pages are actually touched; macOS
+reclaims that instantly on demand, which is by design and not a
+shortage) - normal behavior the harness's own conservative heuristic
+read as danger. Session A's own seeded sets had never hit this because
+they run detached already.
+
+**The fix**: launch the per-question loop with `nohup ... & disown`
+(confirmed orphaned - `PPID 1`, not a child of the shell) so it is
+never a harness-tracked task at all, and watch its own log via a
+`Monitor` tailing the file (filtered to each question's own "done
+(exit ...)" line, `gave up waiting`, and the final summary) instead of
+a foreground wait. The memory guard stayed in - it costs nothing and is
+real (if thin) insurance - but with the real steady state near 90MB,
+its original 400MB/120s settings meant it would wait its full two
+minutes before every one of 35 questions (over an hour of nothing);
+lowered to a 10s cap for future runs (a run already in flight when this
+changed kept its own original settings - nothing here hot-reloads a
+running process, and the in-flight run was left alone rather than
+restarted and losing its own progress).
+
+**Baseline v0, the real run** (detached, 2026-09-14T16:44:56Z -
+2026-09-14T19:07:46Z, 2h23m, seed 20260914, 35 questions): 35/35
+completed, 0 processes exited non-zero. Per-process RSS growth (end -
+start) across the whole run: mean 160MB, min 0MB, max 343MB - the
+per-process design's own promise held for the entire 35, not just the
+early clean runs.
+
+| Type | Correct | n | Accuracy |
+|---|---|---|---|
+| knowledge-update | 5 | 5 | 100.0% |
+| multi-session | 0 | 5 | 0.0% |
+| single-session-assistant | 4 | 5 | 80.0% |
+| single-session-preference | 2 | 5 | 40.0% |
+| single-session-user | 1 | 5 | 20.0% |
+| temporal-reasoning | 1 | 5 | 20.0% |
+| abstention (dedicated stratum) | 1 | 5 | 20.0% |
+| **overall** | **14** | **35** | **40.0%** |
+
+Log (every row carries its own `recallHits`, `judgeWrittenRecords`, and
+`processStartRssKb`/`processEndRssKb`):
+`data-scratch/eval/replay-longmemeval-oracle-v0-per-question.log`
+(git-ignored, this machine only). Per-row failure read (defect / scorer
+/ variance, per the org's own rule) is the coordinator's own pass from
+this log, not done here.
+
+Verified: `tsc --noEmit` clean, 10 new tests
+(`datasetsReplayPerQuestionLog.test.ts`, pure text-transform and
+`vm_stat`-parsing logic, no engine) plus the existing datasets-directory
+suite. `replay-per-question.ts` and `replayPerQuestionLog.ts` land on
+`b/eval07-per-question-runner`.
+
+**For the next run**, reading all 21 of this run's own misses surfaced
+a real gap and a real bug, both fixed on this same branch (no rerun -
+the 35-question log above stays as recorded):
+
+- The printed `[replay-question]` line was missing `contextMessage`
+  even though `LongMemEvalResult`/`LocomoResult` both already carry it
+  (it was on the object pushed to the in-memory results array and the
+  now-largely-unused per-run JSON file, never on the actual printed
+  line the per-question runner's own combined log is built from). Fixed
+  by having the printed line spread the same row object that gets
+  pushed, so the two can no longer drift apart the way they just did.
+- Added `question` (the dataset's own text) and `referenceAnswer`
+  (LongMemEval only; LoCoMo already carries `answer`/
+  `adversarialAnswer`) so a reader of the log doesn't have to
+  cross-reference the raw dataset file.
+- Added `guardReason`/`source` (`askQuestion()` now returns the live
+  turn's own id; a new `turnGuardAndSource()` reads
+  `conversationTurns.guardReason`/`.source` back) - the same two fields
+  the household bench's own `[bench-turn]` line carries, so a miss can
+  be split between "a guard replaced the reply" and "the model itself
+  got it wrong", per the coordinator's own read of the 21 misses.
+
+No new tests for this fix specifically (`scoreLocomo()`'s signature grew
+a `question` parameter and `RecallDiagnostics` grew `guardReason`/
+`source` - the existing `datasetsReplayScore.test.ts` call sites and
+factories were updated to match, not added to); 155 datasets-directory
+tests total, `tsc --noEmit` clean.

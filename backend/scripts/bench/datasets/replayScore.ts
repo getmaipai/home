@@ -32,6 +32,14 @@ export interface LongMemEvalResult {
   questionId: string;
   questionType: string;
   isAbstention: boolean;
+  /** The dataset's own question text - so a reader of the log line
+   * doesn't have to cross-reference the raw dataset file to see what
+   * was actually asked. */
+  question: string;
+  /** The dataset's own reference answer, never shown to the turn
+   * itself (only the grader sees it) - carried on the row purely for a
+   * reader classifying a miss. */
+  referenceAnswer: string;
   reply: string;
   /** Which grader produced the verdict - recorded so a reader of the
    * numbers knows whose judgment they are reading. */
@@ -49,11 +57,22 @@ export interface LongMemEvalResult {
   contextMessage: string | null;
   recallHits: RecallHit[];
   judgeWrittenRecords: JudgeWrittenRecord[];
+  /** The live turn's own row (conversationTurns.guardReason/source) -
+   * the same two fields the household bench's own [bench-turn] line
+   * carries, so a miss can be split between "a guard replaced the
+   * reply" and "the model itself got it wrong" rather than reading as
+   * one undifferentiated verdict. Null when no live turn was ever
+   * reached (a thrown question). */
+  guardReason: string | null;
+  source: string | null;
 }
 
 export interface LocomoResult {
   conversationId: string;
   category: 1 | 2 | 3 | 4 | 5;
+  /** The dataset's own question text, the same reasoning as
+   * LongMemEvalResult's own field. */
+  question: string;
   reply: string;
   answer: string | null;
   adversarialAnswer: string | null;
@@ -67,6 +86,9 @@ export interface LocomoResult {
   contextMessage: string | null;
   recallHits: RecallHit[];
   judgeWrittenRecords: JudgeWrittenRecord[];
+  /** Same two fields as LongMemEvalResult's own - see there. */
+  guardReason: string | null;
+  source: string | null;
 }
 
 const STOPWORDS = new Set(["a", "an", "the", "is", "are", "was", "were", "of", "to", "in", "on", "at", "and", "or"]);
@@ -146,14 +168,19 @@ export interface RecallDiagnostics {
   contextMessage: string | null;
   recallHits: RecallHit[];
   judgeWrittenRecords: JudgeWrittenRecord[];
+  /** The live turn's own conversationTurns.guardReason/source - same
+   * two fields the household bench's own [bench-turn] line carries,
+   * gathered from the database the same way judgeWrittenRecords is. */
+  guardReason: string | null;
+  source: string | null;
 }
 
-export function scoreLocomo(conversationId: string, category: 1 | 2 | 3 | 4 | 5, reply: string, answer: string | null, adversarialAnswer: string | null, diagnostics: RecallDiagnostics): LocomoResult {
+export function scoreLocomo(conversationId: string, category: 1 | 2 | 3 | 4 | 5, question: string, reply: string, answer: string | null, adversarialAnswer: string | null, diagnostics: RecallDiagnostics): LocomoResult {
   if (category === 5) {
     const overlapWithTrap = adversarialAnswer ? tokenF1(reply, adversarialAnswer) : 0;
-    return { conversationId, category, reply, answer, adversarialAnswer, f1: 0, refusedAdversarialPremise: overlapWithTrap < ADVERSARIAL_REPEAT_THRESHOLD, ...diagnostics };
+    return { conversationId, category, question, reply, answer, adversarialAnswer, f1: 0, refusedAdversarialPremise: overlapWithTrap < ADVERSARIAL_REPEAT_THRESHOLD, ...diagnostics };
   }
-  return { conversationId, category, reply, answer, adversarialAnswer, f1: answer !== null ? tokenF1(reply, answer) : 0, refusedAdversarialPremise: null, ...diagnostics };
+  return { conversationId, category, question, reply, answer, adversarialAnswer, f1: answer !== null ? tokenF1(reply, answer) : 0, refusedAdversarialPremise: null, ...diagnostics };
 }
 
 export interface TypeTotal {
