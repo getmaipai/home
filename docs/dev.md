@@ -12766,6 +12766,13 @@ other's section once (147cd28, f4779a6).
   clearance Shell.tsx already reserves for it), proven to fail then
   fixed with a real-layout check in scripts/screenshot.ts:
   [docs/dev/session-b.md](dev/session-b.md) (2026-09-13).
+- REG-01, a statement is not a request and the assistant register is
+  stripped: the three output-boundary rules in `lib/guards.ts` reading
+  the signal's act (an action claim on a statement skipped, never
+  narrated; the register list beside the closers, skipped or cut; the
+  previous question said back skipped), with the engine's one retry
+  with a note on both paths: [docs/dev/session-a.md](dev/session-a.md)
+  (2026-09-14).
 - ACT-01, the turn signal: `classifyTurnSignal()` in `lib/turnSignal.ts`
   (the protocol layer on a consumed pending ask, the high-precision
   rules over `utteranceShape()`'s own clause split, the conservative
