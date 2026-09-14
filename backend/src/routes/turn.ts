@@ -128,7 +128,7 @@ export async function* streamTurnEvents(
     // all. finalize() returns that TurnValue as-is, so this is still
     // exactly one "done" line either way, and the resolved case simply
     // has no "delta" lines before it.
-    const value = result.finalize(fullText, current.value);
+    const value = result.finalize(fullText.trim(), current.value);
     yield { type: "done", value };
   } catch (err) {
     // This catch had no server-side log at all (a live incident,
@@ -179,7 +179,10 @@ export async function* streamTurnEvents(
     // flagged turn" - unlike a generic mid-stream crash with nothing
     // real to log, an all-refused turn is exactly the case worth a
     // record of.
-    if (fullText.trim() || safetyRefusal) result.finalize(fullText, safetyRefusal?.safety);
+    // Trimmed at the edges (#99's review): a paragraph break beside a
+    // sentence the guards skipped would otherwise open or close the
+    // stored reply with a bare blank line the blocking path never has.
+    if (fullText.trim() || safetyRefusal) result.finalize(fullText.trim(), safetyRefusal?.safety);
   }
 }
 
