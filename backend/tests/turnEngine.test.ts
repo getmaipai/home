@@ -1204,6 +1204,45 @@ describe("lib/turnEngine.ts runTurnStream() output-safety gate (step 9)", () => 
     });
   });
 
+  // getmaipai/home#99: a blank line between "...feels dry." and "How
+  // much..." (a terminator, then two newlines, then a capital) is a
+  // boundary of its own, so it landed in the loop as a whitespace-only
+  // span and the "nothing to check" skip dropped it from the reply.
+  test("gateOutputSafety() keeps a blank line between two sentences (#99)", async () => {
+    const { childRow } = await ownerAndChild();
+    const reply = "Water it when the soil feels dry.\n\nHow much space do you have?";
+    async function* wordByWord(): AsyncGenerator<string, undefined, void> {
+      for (const piece of reply.split(/(?<= )|(?=\n)/)) yield piece;
+      return undefined;
+    }
+    const delivered: string[] = [];
+    for await (const chunk of gateOutputSafety(wordByWord(), childRow)) delivered.push(chunk);
+    expect(delivered.join("")).toBe(reply);
+    const oneDelta = async function* (): AsyncGenerator<string, undefined, void> {
+      yield reply;
+      return undefined;
+    };
+    const atOnce: string[] = [];
+    for await (const chunk of gateOutputSafety(oneDelta(), childRow)) atOnce.push(chunk);
+    expect(atOnce.join("")).toBe(reply);
+  });
+
+  // The review of #99's fix: a paragraph break is passed on but is not
+  // something spoken, so a reply whose every sentence the guards skip
+  // still ends in the honest line, never in a bare blank line.
+  test("a blank line between two skipped sentences does not count as having spoken (#99)", async () => {
+    const { childRow } = await ownerAndChild();
+    async function* twoClaims(): AsyncGenerator<string, undefined, void> {
+      yield "I watched it last night.\n\nI ate popcorn too.";
+      return undefined;
+    }
+    const delivered: string[] = [];
+    for await (const chunk of gateGuards(gateOutputSafety(twoClaims(), childRow), { utterance: "did you ever go camping" }, childRow.id)) delivered.push(chunk);
+    const text = delivered.join("");
+    expect(text.trim()).not.toBe("");
+    expect(text).not.toMatch(/watched|popcorn/);
+  });
+
   // A review (2026-09-05) found the first version of gateOutputSafety()
   // checked and yielded a whole BATCH of newly-ready sentences at once
   // (every sentence that completed within the same raw delta): if the
@@ -2195,6 +2234,10 @@ describe("item 4b: forget in conversation is honored or refused, never 'Got it.'
       const kept = await runTurn(actor, "chat", "remember that Marlow's birthday is in June", { conversationId: conv.value.id });
       expect(kept.ok && kept.value.plugin_id).toBe("remember");
       const said = await runTurn(actor, "chat", "Pippa is allergic to peanuts", { conversationId: conv.value.id });
+      // Seen once in a full gate: the model turn came back not-ok with
+      // no row, and "forget that" then pointed at the remember turn.
+      // Named here so the next time says why the turn failed.
+      expect(said.ok ? said.value.source : `turn failed: ${said.error}`).toBe("model");
       const forgot = await runTurn(actor, "chat", "forget that", { conversationId: conv.value.id });
       expect(forgot.ok && forgot.value.reply.text).toMatch(/hadn't kept|won't/i);
       const row = db.select().from(conversationTurns).where(eq(conversationTurns.id, said.ok ? said.value.turn_id : "")).get()!;

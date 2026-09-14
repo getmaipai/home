@@ -43,15 +43,22 @@ three structural problems, each with an existing item:
    household subjects; #67 finishes it by taking the words out of the
    prompt.
 3. **The chat model decides alone whether to look something up, and an
-   8B declines.** Prompting harder cannot make that reliable. Exact
-   public facts need a typed source when one exists (media, weather,
-   the knowledge package's Wikipedia summary for anything else),
-   routed to deterministically on a resolved subject of a matching
-   kind, retained as turn evidence (not memory), and phrased through
-   one composer in the companion's voice. The routing rule is by
-   subject kind, never by a topic word. That is the planned media package (BACKLOG,
-   Skills: "Music / media search"), CHAT-15 (typed outcomes retained),
-   and CHAT-16 (one composed path).
+   8B declines.** Prompting harder cannot make that reliable. The
+   hub's general lookup is websearch through the household's own
+   SearXNG instance: private by construction, and the spine for every
+   kind of world question (facts, films, music, news, sports,
+   showtimes, opinion, anything current). When the model is unsure
+   about a world subject, the engine runs that lookup, not the model's
+   choice. Typed sources (media-lookup on Wikidata, weather, the
+   knowledge package's Wikipedia summary) are accelerators for
+   specific fields on a resolved subject of a matching kind, tried
+   first because they return structured facts; SearXNG answers
+   everything they cannot. Every result is retained as turn evidence
+   (not memory) and phrased through one composer in the companion's
+   voice. The routing rule is by subject kind, never by a topic word.
+   That is CHAT-15 (typed outcomes retained), CHAT-16 (one composed
+   path, designed around web results first), and the media package
+   as one accelerator.
 
 ## The target flow
 
@@ -75,14 +82,62 @@ these need household evidence and may honestly say "I don't know").
 | 0 | #67 as corrected: honesty words out of the prompt; the film conversation as a permanent bench row set | A (in flight) | none |
 | 1 | The media package: film and TV metadata, keyless (Wikidata for the typed fields, Wikipedia summary for the synopsis), typed result `{ title, year, kind, director, cast, runtime_min, rating, synopsis, source }`, routing examples, five-example minimum, privacy rows, tests against recorded fixtures | B | none (isolated package directory) |
 | 2 | CHAT-15: typed outcomes retained for every accepted package call, on the turn and the conversation, never as memory | A | CHAT-01 (done) |
-| 3 | CHAT-13 with the subject half of CHAT-10: the active subject on the turn context (an entity with a kind, a name, a year when known), resolved from the current text or the last two same-thread user messages; pronoun and "that one" follow-ups resolve to it; a factual media follow-up on a resolved media subject routes to the media package deterministically | A | 2, and B's package for the live rows |
-| 4 | CHAT-16: one composer for every factual result, phrased through the selected companion with the active subject and recent turns as context; no package text spoken as-is | A | 2, 3 |
+| 3a | Entities and subjects from conversation (spec first): a memory record gains an optional subject (an entity id) beside its text; the judge creates a person, pet, place or organization entity when a sentence names a new one, and a relationship record when the sentence states one ("my coworker Quill"), owned by the speaker like the memory; recall and the guards use the subject id, not only the name in the text. Jesse's example is the bench row: "my coworker Quill likes seltzer", then "do I like seltzer" (does not know, no guess), "what does Quill drink" (seltzer), "who is Quill" (your coworker) | A | 2 |
+| 3 | CHAT-13 with the subject half of CHAT-10: the active subject on the turn context (an entity with a kind, a name, a year when known), resolved from the current text or the last two same-thread user messages; pronoun and "that one" follow-ups resolve to it; a factual media follow-up on a resolved media subject routes to the media package deterministically | A | 2, 3a, and B's package for the live rows |
+| 4 | CHAT-16: one composer for every factual result, phrased through the selected companion with the active subject and recent turns as context; no package text spoken as-is. Evidence ladder for a world subject: the typed source first (media-lookup, weather, knowledge), then websearch through the household's own SearXNG when the typed source misses or the field is null or the question is about opinion or currency ("is it any good", "what's on tonight", a film too new to be catalogued), then the model's own knowledge, and never a "don't know" while a rung remains. | A | 2, 3 |
 | 5 | The film conversation and four more of the same shape on other subject kinds (a band, a city, a historical event, a video game: an opening statement, "have you heard of it", two factual follow-ups with pronouns, one opinion question) plus three household-subject conversations of the same shape (the family dog, a family member, a thing in the house: an opening statement that carries a fact, a friend-like reaction, a pronoun follow-up answered from what was just said, a follow-up two turns later that must not confuse the household subject with a world one of the same name) pass three identical runs end to end, with the four categories each shown by a row; the general subjects go through the knowledge package or model knowledge, proving the mechanism is not media-specific | A | 0 to 4 |
 
 CHAT-12 (budgets) is a technical prerequisite CHAT-16 names; take it
 inside step 4 if the composer needs it, not before. The judge's
 subject-resolution item (baseline-fixes 3) follows this program; #98
 and #99 are small items between steps.
+
+## Findings from live use, 2026-09-13 evening (design pending)
+
+Defect classes observed by the coordinator in live household chat,
+recorded as findings, not designed. The rule: the design for these
+gaps is done in a separate pass with a stronger model, not by the
+coordinator or Session A on the fly. Session A builds nothing for them
+until that pass lands; each becomes a bench row (persona roster,
+fictional subjects) so the pass is judged the same way as every other
+item. The one exception is a data gap, not a design: the weather
+package fetches only the current temperature (`current=temperature_2m`),
+so a rain question can only be answered with a temperature; it returns
+conditions, precipitation chance and today's high and low as typed
+fields, beside #98.
+
+1. A reply copied verbatim from a different conversation on a short
+   turn (an opinion question about one subject answered with an
+   earlier conversation's review of another). Observed cause: the
+   prompt's "From earlier conversations" block (lib/episodes.ts,
+   turnEngine.ts near line 1749) quotes the hub's own past replies as
+   well as the person's words.
+2. "Let me check that for you" with no check, and the follow-up "do
+   it" answered with "what do you need done?".
+3. Confident invention about a new release (an episode count, an air
+   day, a review verdict, a different film's reviews for the one
+   asked about).
+4. An experience claim about media (having seen or planning to watch).
+5. A link ask answered with a summary and no link.
+6. A short turn echoed back instead of answered.
+7. An explicit correction ("wrong show") acknowledged and then the
+   same wrong subject repeated.
+8. A rain question answered with a temperature in an unnamed place
+   (the data gap above; #98).
+
+Memory quality, same evening: the memory judge writes its own
+extraction prompt's few-shot examples as memories (memoryJudge.ts,
+buildExtractionPrompt, lines 218 to 243), including the prompt's own
+negative example (a password, which the prompt says is never a
+memory) and a template placeholder verbatim, re-extracted on unrelated
+turns and superseding the previous copy each time; it attributes world
+facts and the hub's own replies to the speaker; and it saves the
+passing state of a conversation instead of the durable fact in it. In
+the sample read, about one record in ten was a real memory. Two
+decisions for Jesse, not design: whether the example-echo and stored-
+credential class is fixed now as a bug (a rejection at the judge's
+output) or waits for the pass; and MEM-05 ("prove the small judge or
+fall back to the 4B pin"), for which this is the re-run evidence.
 
 ## Rules
 

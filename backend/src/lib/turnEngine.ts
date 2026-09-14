@@ -2677,7 +2677,7 @@ export async function* gateOutputSafety(
     return safety;
   };
   const wholeRefusal = (next: string): SafetyResult | null => {
-    if (!delivered) return null;
+    if (!delivered.trim()) return null; // whitespace alone (#99) is nothing delivered
     const whole = forOutput(evaluateSafety(`${delivered}${next}`, band));
     if (whole.action !== "refuse") return null;
     notifyOncePerTurn(actor, whole, turnId, "[turn]");
@@ -2696,7 +2696,17 @@ export async function* gateOutputSafety(
       const rawSpan = pending.slice(0, end);
       pending = pending.slice(end);
       const trimmed = rawSpan.trim();
-      if (!trimmed) continue; // a boundary with nothing but whitespace before it - nothing to check or yield
+      // A boundary with nothing but whitespace before it: a blank line
+      // between two sentences (a terminator, two newlines, a capital)
+      // lands here on its own. Nothing to classify, but it is still the
+      // reply's own whitespace and goes downstream like every other
+      // sentence's does (#99: "...feels dry.How much..." was the
+      // paragraph break dropped here, before storage).
+      if (!trimmed) {
+        delivered += rawSpan;
+        yield rawSpan;
+        continue;
+      }
       const safety = checkAndNotify(trimmed);
       // A refusal throws with the WHOLE reply's result when something was
       // already delivered, so an earlier sentence's self-harm category
@@ -2830,7 +2840,10 @@ export async function* gateGuards(
       while (!rest.done) rest = await iterator.next();
       return rest.value;
     }
-    spokeAnything = true;
+    // A whitespace-only span (a paragraph break, #99) is passed on but
+    // is not something spoken: an all-skipped reply still ends in the
+    // honest line, not in "\n\n" (the review of #99's fix).
+    if (trimmed) spokeAnything = true;
     yield rawSpan;
     step = await iterator.next();
   }
@@ -3093,7 +3106,7 @@ async function runTurnStreamHoldingLease(
         // partial content already streamed stays source: "model" so that
         // content survives in the log rather than being erased by a canned
         // phrase the household never actually heard replace it.
-        const refusedWithNothingDelivered = outputSafety?.action === "refuse" && replyText === "";
+        const refusedWithNothingDelivered = outputSafety?.action === "refuse" && replyText.trim() === "";
         // A review (2026-09-05) found this always used prepared.crisis
         // Resources (the INPUT check's own derivation) even when
         // `outputSafety` was the one actually flagged - so a self_harm

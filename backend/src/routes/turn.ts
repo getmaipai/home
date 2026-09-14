@@ -179,7 +179,7 @@ export async function* streamTurnEvents(
     // flagged turn" - unlike a generic mid-stream crash with nothing
     // real to log, an all-refused turn is exactly the case worth a
     // record of.
-    if (fullText || safetyRefusal) result.finalize(fullText, safetyRefusal?.safety);
+    if (fullText.trim() || safetyRefusal) result.finalize(fullText, safetyRefusal?.safety);
   }
 }
 
