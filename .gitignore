@@ -40,8 +40,16 @@ frontend/public/ort/
 spec/schemas.resolved/
 
 # scripts/screenshot.ts's throwaway demo backend data - regenerated every
-# run, never the real household, never committed
+# run, never the real household, never committed. Suffixed by a reserved
+# port per run since #105 (two concurrent runs used to race on one shared
+# .demo-data/, one's rmSync deleting the other's in-flight seed). Matches
+# the script's own sweepStaleDemoDataDirs() filter exactly (a code review
+# caught a bare `.demo-data*/` as broader than that filter - it would also
+# match an unrelated future `.demo-data<word>/` directory the sweep would
+# never touch) - the bare legacy name from before #105, or a hyphen then
+# the reserved port number.
 .demo-data/
+.demo-data-*/
 
 # scripts/screenshot.ts's non-Chromium output (issue #76): only Chromium's
 # renders are the published docs screenshots; every other browser (--webkit,

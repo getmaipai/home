@@ -2482,3 +2482,232 @@ the time) - full `check.sh` clean (2317 backend + 580 frontend
 passing), code review clean apart from the two findings above (the
 tradeoff, addressed by documenting it; the BACKLOG drift, fixed in the
 same commit).
+
+## getmaipai/home#105: the screenshot backend's own fixed ports
+
+Own S item, assigned because `scripts/screenshot.ts` is Session B's own
+lane. `PORT` (the seeded backend's own HTTP port) and `REPAIR_SEED_PORT`
+(the deliberate Wyoming-port occupier, lane 6's own fix) were both
+hardcoded literals - `reserveFreePort()` (`backend/tests/fixtures`,
+already proven for the fake llama servers in the backend test suite,
+c979887) replaces both, an OS-assigned free port per run instead of two
+runs fighting over the same two numbers.
+
+**A second, undocumented collision found reproducing the bug, not
+named in the issue's own text**: `DATA_DIR` (the seeded backend's own
+`.demo-data/`) was ALSO one fixed, shared name - `main()`'s own
+`rmSync`+`mkdirSync` pair could delete a concurrently-running session's
+in-flight seeded household mid-seed, a real bug independent of the
+port one and just as capable of producing the exact same "the gate
+went red for a reason that has nothing to do with the change" symptom
+the issue describes. Suffixed by the same reserved port (already a
+real per-run-unique value, so it doubles as the directory suffix
+rather than inventing a second one) - `.gitignore`'s own exact-match
+`.demo-data/` widened to `.demo-data*/` to keep matching.
+
+**Verified live, not just read**: two runs started together, in two
+separate throwaway worktrees (matching how this org's own workflow
+actually produces the collision - Session A and B always gate in
+separate checkouts, never two processes in one directory, per CLAUDE.md's
+own worktree rule) - both finished green. A first attempt ran two
+processes from ONE shared worktree instead, which is a strictly
+HARDER scenario than the real bug: it additionally collided on
+`frontend/dist/` (`bun run build`'s own fixed Vite output directory,
+both processes' PWA plugin racing to rename `sw.mjs` to `sw.js`) - a
+real finding, but not the reported bug (nobody runs this pipeline
+twice from the same checkout at once) and not fixed here; filed as
+getmaipai/home#115 rather than silently dropped. The two-worktree run
+is the one that matches #105's own actual scenario, and it passed
+clean.
+
+**Code review (medium) found two more, both fixed.** A stale, killed-
+before-cleanup run (SIGKILL under port contention - this file's own
+documented case; Ctrl-C; a crash) used to leave an orphaned
+`.demo-data-<port>/` behind forever, since the OLD single fixed name
+got wiped by the very NEXT run's own `rmSync` regardless of how the
+previous one ended, and the new per-run-unique naming traded that
+away. `sweepStaleDemoDataDirs()` reclaims anything named
+`.demo-data-*` older than two hours (a full matrix run is minutes, not
+hours, so nothing real is ever mistaken for stale) before a run
+creates its own - verified live: a manually created, backdated
+`.demo-data-99999/` was gone after the next run, a normal run's own
+directory was cleaned up as usual. Also fixed: a comment citing stale
+line numbers for the `rmSync`/`mkdirSync` pair it explained - named by
+function instead, since line numbers drift and names don't.
+
+**A second review pass (medium) found two more, both genuinely narrow
+races rather than guaranteed repros - one fixed properly, one accepted
+and documented.** (1) The sweep's own first version used a plain age
+threshold (2 hours), which turned out to be its own smaller copy of
+the identical #105 bug: a run that's still genuinely alive but
+abnormally slow (`bun run build` hung on a bad network fetch is
+unbounded, unlike `waitForHealth()`'s own 15s cap) crosses that
+threshold while still holding its directory, and a second run's sweep
+would delete it out from under the first. Fixed properly rather than
+just documented: each run now writes its own PID into an `owner-pid`
+marker the instant it creates its directory; the sweep checks
+`process.kill(pid, 0)` (ESRCH for a dead process, no signal actually
+sent) and removes only a directory whose owner is confirmed dead,
+keeping an alive one no matter how old it looks - the age threshold
+survives only as the fallback for a marker-less directory (one from
+before this fix, or killed in the one-call window between `mkdirSync`
+and writing its own marker). Verified live, not just read: three fake
+directories (dead PID + old mtime, alive PID + old mtime, no marker +
+old mtime) - after one real run, only the alive-PID one survived,
+proving the exact race the review found is now closed rather than
+just narrowed. One residual gap named rather than chased further: OS
+PID reuse (a leaked marker's dead owner's PID later reassigned to an
+unrelated live process) would read as "still alive" forever, skipping
+the age-based fallback that exists for exactly this - needs a real
+coincidence on a personal dev machine running this pipeline for
+minutes at a time, filed as getmaipai/home#116 rather than adding
+start-time comparison (not simply available from Bun) for a
+vanishingly unlikely case.
+
+**A third code review pass found three more; two fixed, one was a
+mistake in this very file's own claim.** `Number("")` (an empty or
+truncated marker from a run killed mid-write) parses to `0`, and
+`process.kill(0, 0)` signals this script's OWN process group rather
+than throwing ESRCH - `isProcessAlive(0)` read that as "alive," which
+would have made ANY corrupted marker permanently exempt its directory
+from the sweep, guaranteeing the exact leak this fix exists to close
+rather than merely risking it. Fixed: real PIDs are always positive,
+so `ownerPid > 0` is checked before trusting `isProcessAlive()` at
+all. Also fixed: the sweep's own filter (`.startsWith(".demo-data-")`)
+never matched the bare, un-suffixed `.demo-data` name every run before
+this fix used, so a leftover from before #105 would sit unswept
+forever - now matches both the old and new shapes. Re-verification
+(the same fixture test as before, plus a fourth: an empty marker file,
+which used to be kept forever and should now be swept) held for a
+machine-quiet window another session needed for its own seeded bench
+runs - resumed and completed once clear.
+
+(2) `PORT` is still reserved (bind-then-release) before several
+synchronous operations - the sweep's own readdir/stat loop, `mkdirSync`,
+`seedWeatherCache`'s file writes, the stub LLM server's own startup -
+run ahead of the backend that actually binds it, a real if now-narrow
+TOCTOU gap (down from the entire multi-minute frontend build to a
+handful of fast synchronous calls). Not closed further here: this is
+the exact same "reserve, then bind later" shape
+`backend/tests/fixtures/reserveFreePort.ts` already uses and accepts
+for the backend test suite's own fake llama servers - a real fix means
+inverting control (the spawned backend binds port 0 itself and reports
+back what it got, rather than being told a number in advance), a
+genuinely bigger, more invasive change than this S item's own scope for
+a gap #105's own four real collisions never actually needed this
+narrow (those were two ALWAYS-fixed, ALWAYS-colliding ports, not a
+millisecond race). Filed as getmaipai/home#114 rather than silently
+dropped.
+
+**A third review pass caught a real mistake in this file's own earlier
+verification claim, not just in the code.** "check.sh's own frontend
+build/lint step type-checks this file" is false - `frontend/tsconfig.json`'s
+`include` is `["src", "tests"]` (frontend-relative) and
+`backend/tsconfig.json`'s own `["src", "tests", "scripts"]` resolves to
+`backend/scripts`, not the repo-root `scripts/` this file lives in;
+`bun run a11y`/`screenshots` runs it straight through Bun's own runtime
+transpiler (type-STRIPPING, never type-CHECKING). Nothing in the normal
+gate has ever type-checked this file. Found a real way to, rather than
+leaving it unchecked: `backend/`'s own `node_modules` already carries
+`@types/bun` (backend's own `tsconfig.json` needs it), so running `tsc`
+from there against the root file with the same compiler options
+resolves cleanly - `cd backend && bunx tsc --noEmit --skipLibCheck
+--module ESNext --moduleResolution bundler --target ESNext --types bun
+--esModuleInterop --resolveJsonModule ../scripts/screenshot.ts` - clean
+exit 0 against this diff's own final code, cross-workspace imports
+(`../spec/llm/ts/stubServer`, `./tests/fixtures/reserveFreePort`) and
+all. Filed as its own gap (getmaipai/home#113 - the same check.sh
+coverage hole exists for every file under `scripts/`, not just this
+one), not fixed here.
+
+Verified: the direct `tsc` invocation above, clean; full
+`check.sh` green in a throwaway worktree (2317 backend + 580 frontend,
+before the second review pass's own two fixes); frontend lint/build
+and the screenshot script's own `--a11y-only` re-verified clean after
+them (the backend test suite itself not re-run a second time - Session
+A's own concurrent final gate was running on this same machine, and
+this diff never touches `backend/`, so a fresh full run would have
+proven nothing beyond what the earlier clean one already did, at the
+cost of contending with their run); two live concurrent-worktree runs
+both green, matching the real reported topology; the PID-liveness
+sweep proven live with three planted fixture directories.
+
+**A fresh full `check.sh` gate, then a fourth review pass in
+`home-gate-b10` (2317 backend + 580 frontend green, all standards
+checks green), found three more real bugs, all fixed:**
+
+1. `PORT` and `REPAIR_SEED_PORT` could collide with EACH OTHER, not
+   just across two concurrent runs: `reserveFreePort()` binds a port
+   just to check it's free, then releases it immediately, so `PORT`
+   (reserved, then released, at the top of `main()`) could legally be
+   handed straight back to `REPAIR_SEED_PORT`'s own independent
+   `reserveFreePort()` call a few dozen lines later - and
+   `REPAIR_SEED_PORT`'s own `Bun.listen` would then occupy the exact
+   port the backend was about to try to bind, guaranteeing the
+   collision this whole fix exists to prevent, self-inflicted this
+   time. Fixed with a retry loop: `REPAIR_SEED_PORT` is re-reserved
+   until it differs from `PORT`.
+2. `isProcessAlive()` read any non-`ESRCH` error as "the process is
+   alive," which includes Node's own `TypeError{code:
+   "ERR_INVALID_ARG_TYPE"}` for a PID outside the valid range
+   (confirmed live against this repo's Bun runtime) - a corrupted or
+   garbled owner-pid marker (not just an empty one, already guarded by
+   `ownerPid > 0`) would read as permanently alive and never get
+   swept, the exact leak this mechanism exists to close. Fixed: only
+   `EPERM` (a real process that exists but isn't ours to signal) now
+   counts as alive; everything else, `ESRCH` included, counts as dead.
+3. The widened `.gitignore` pattern (`.demo-data*/`) was broader than
+   the sweep's own filter (`n === ".demo-data" || n.startsWith(
+   ".demo-data-")`) - it would also match an unrelated future
+   `.demo-data<word>/` directory the sweep would never touch. Fixed to
+   two exact patterns matching the code precisely.
+
+Fixing (1) and (2) added new throw points into a stretch of `main()`
+that ran entirely before the existing try/finally (stale-directory
+sweep, `mkdirSync`, `seedWeatherCache`, starting the stub LLM server,
+now two `reserveFreePort()` calls and a `Bun.listen`) - the same review
+pass flagged that as a real, if narrower, version of the exact
+"nothing cleans up an early throw" problem #105 itself is about, since
+this fix's own new throw points sit right in it. Wrapped explicitly:
+a try/catch around chatModel-start-through-backend-spawn that stops
+`chatModel` and removes `DATA_DIR` before rethrowing, rather than
+widening the real try/finally further up and changing what it means
+for every capture step already inside it.
+
+**A fifth review pass on that catch block itself found two more real
+gaps in the fix for the fourth's own findings**, both fixed: the catch
+never stopped `repairSeedListener` when `Bun.listen` had already
+succeeded but the backend's own `Bun.spawn` then threw (a bound TCP
+socket leaking for the rest of the process's life); and its own three
+cleanup calls were unguarded, so a throw from any one of them (say,
+`chatModel.stop()` called on an already-torn-down server) would mask
+the real error and skip whatever cleanup came after it. Every step is
+now independently wrapped and best-effort, and the original error is
+always what gets rethrown. The same pass re-surfaced the PID-reuse gap
+from the second review round (already filed, getmaipai/home#116) and
+pointed out this file's own "right before... tiny gap" comment on
+`PORT`'s reservation understated how much real work (the sweep,
+`mkdirSync`/`writeFileSync`, `seedWeatherCache`, starting the stub
+model server, `REPAIR_SEED_PORT`'s own reserve-then-bind) actually runs
+in that window - corrected the comment's wording rather than the
+already-filed #114 finding itself, which the real gap still is.
+
+One more real, low-severity finding from the fourth pass was left
+unfixed and filed instead of blocking the commit further: a leftover
+directory's marker file existing but being corrupt or empty (a run
+killed in the sub-millisecond window mid-`writeFileSync`) skips the
+sweep's own age-based grace period entirely, unlike a directory with
+no marker at all - an extremely narrow race (a few bytes' write
+interrupted at the exact instant another process's sweep reads it) on
+a script that runs for minutes at a time on a personal dev machine.
+Filed as getmaipai/home#117 rather than adding still more machinery to
+a mechanism a design-level observation in the same review already
+questioned the shape of (a hand-rolled PID-liveness sweep versus
+`fs.mkdtempSync`'s OS-managed uniqueness and cleanup - noted, not
+acted on, since the fix as it stands is now verified correct and the
+redesign is a bigger change than this item's own scope).
+
+Re-verified after every round: the direct `tsc` invocation above,
+clean each time; a full `check.sh` gate, green, run fresh after the
+fourth round's three fixes and again after the fifth round's two.
+Closes #105.
