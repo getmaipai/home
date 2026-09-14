@@ -12766,6 +12766,9 @@ other's section once (147cd28, f4779a6).
   clearance Shell.tsx already reserves for it), proven to fail then
   fixed with a real-layout check in scripts/screenshot.ts:
   [docs/dev/session-b.md](dev/session-b.md) (2026-09-13).
+- The memory judge drops its own prompt's examples, an unfilled
+  placeholder and a credential at its output, counted per turn:
+  [docs/dev/session-a.md](dev/session-a.md) (2026-09-13).
 - CHAT-15, typed outcomes retained for every accepted package call: a
   `rejected` status with its reason, whole-batch validation before any
   run or ask, whole-message consent, a `conversation_turns.outcomes`

@@ -3449,3 +3449,66 @@ family guard already reads; "Yes," with a trailing comma (a voice
 transcript's habit) is consent. The row trim (actions dropped, then
 data past the budget, then a page-sized article, then the reply cut)
 and the unparsable-row skip got their test.
+
+## The judge's example echo, dropped at the output (2026-09-13)
+
+Live use showed the memory judge writing its own extraction prompt's
+few-shot examples as memories on turns that had nothing to do with
+them: the trip example, the wedding sentence with its template
+placeholder ("<the actual month/year>") verbatim, the cilantro
+preference, the relationship example, and the prompt's own negative
+password line, the one the prompt says is never a memory. About one
+record in ten was real. The fix is at the judge's output, not a
+rewording of the examples: `rejectPromptEchoes` in memoryJudge.ts
+drops an extracted candidate that (a) is an example echo, (b) carries
+an unfilled template placeholder, or (c) reads like a credential (the
+memory content policy's own detector, the door remember() already
+has). Each turn's drops are counted on one log line by reason, so a
+bench run says how often the model echoed its instructions.
+
+What "an echo" is took a review to get right. The first cut compared
+normalized texts by token overlap against the examples, and the
+review showed that dropping every trip in the prompt's own mandated
+short form ("Sage was in Ohio, September 13, 2026" against "Sage was
+in Brazil, September 13, 2026": the date tokens dominate), a trip to
+the in-laws anywhere, a real cilantro dislike, and the paraphrase of
+the fridge note the prompt teaches. The rule now reads the turn: each
+example has anchor words (its content words minus the speaker's name
+in any form, the date and stopwords: {brazil, visiting, wife,
+family}, {dislikes, cilantro}, {wifi, password, written, fridge},
+{getting, married, actual, month, year}), and a candidate is an echo
+when it carries an example's anchors (two, or all of a one-anchor
+example) and the person's own words on this turn contain none of the
+ones it carries. So "Sage dislikes cilantro" is an echo after "hello"
+and a fact after "I hate cilantro"; "Sage was in Ohio, ..." carries no
+Brazil anchor and stands; the wedding template echoed without its
+brackets carries five anchors and goes; "Willow is Sage's wife"
+carries one of {name, wife} and stands. A second review tightened
+the anchors: pronouns are never anchors (the POSSESSIVE RULE puts
+"his" into every resolved trip, so "visiting his parents" after "see
+my parents" is a fact); a template is known by its placeholder's own
+words ({actual, month, year}, {name}), never by the phrase the prompt
+mandates for every wedding, so "getting married in October 2026"
+after "our wedding is in October" is a fact; the short trip example's
+single anchor {brazil} counts only against a candidate of that exact
+shape; and the turn the filter reads is the person's words plus the
+assistant's line they may have confirmed ("yep, that's right"). A
+third review added calendar words to the words that never anchor
+(month names, "month", "year"): a recurring event phrased "every year
+in the month of July" is a fact, and an echo with its month changed
+still goes. The one soft spot, accepted and recorded: a model that normalizes a
+paraphrase into an example's own words ("scary films" into "loves
+horror movies") on a turn that said none of them loses that record.
+The placeholder rule takes a
+bracketed phrase that opens with a letter and is not an address, so
+"<120 over 80" is a measurement. `promptExampleTexts` is the one
+list, and a test asserts every entry appears verbatim in the prompt,
+so the filter and the prompt cannot drift. Regression tests feed each
+shape seen (plus the bracket-less placeholder and the date-changed
+trip, the date built from the turn's own month so the test does not
+expire) as the judge's output for "hello" and show all eight dropped
+and counted; the same shapes on a turn that said them are kept; a
+trip in the short form, a dislike, a relationship and a filled
+template are kept on any turn. The suite's older fixtures moved off
+"cilantro" while the first cut was in; they stay moved, since a
+fixture should not lean on the prompt's own example text either way.

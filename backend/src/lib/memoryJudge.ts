@@ -57,6 +57,7 @@
 // enough to burn a turn's whole budget over.
 import { eq, and, isNull, isNotNull, notInArray, ne, asc } from "drizzle-orm";
 import { detectCredential } from "@/lib/memoryContentPolicy";
+import { tokenize } from "@/lib/text";
 import { db } from "@/db";
 import { conversationTurns, people, memoryRecords } from "@/db/schema";
 import { complete, embed, type LlmMessage } from "@/lib/llm";
@@ -191,9 +192,33 @@ export function exampleDateFor(turnDate: Date): string {
   return `${day.getFullYear()}-${two(day.getMonth() + 1)}-${two(day.getDate())}T12:00:00${offset}`;
 }
 
+/** The prompt's own example and template texts, one source for the
+ * prompt below and for the echo filter (`rejectPromptEchoes`): a
+ * small model re-emits these as memories on turns that have nothing
+ * to do with them (2026-09-13, live), so any extracted record that
+ * matches one, with the speaker's name substituted, is not a fact. */
+export function promptExampleTexts(speakerName: string, turnDate: string): string[] {
+  return [
+    `${speakerName} is getting married in <the actual month/year>`,
+    `<name> is ${speakerName}'s wife`,
+    `${speakerName} was in Brazil, ${turnDate}`,
+    `${speakerName} said hi`,
+    `Rover loves horror movies, ${speakerName}'s brother`,
+    `${speakerName} dislikes cilantro`,
+    `the wifi password is written on the fridge`,
+    `The wifi password is Juniper2026`,
+    `${speakerName} was in Brazil visiting his wife's family, ${turnDate}`,
+  ];
+}
+
+/** The turn's day as the prompt spells it (and the echo filter reads). */
+export function turnDateFor(turnTimestamp: string): string {
+  return new Date(turnTimestamp).toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" });
+}
+
 export function buildExtractionPrompt(speakerName: string, turnTimestamp: string): string {
   const turnDateObj = new Date(turnTimestamp);
-  const turnDate = turnDateObj.toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" });
+  const turnDate = turnDateFor(turnTimestamp);
   // A real, computed ISO-8601-with-offset example date (not a bare
   // "<the 20th>" placeholder) - a code review (2026-09-05) found the
   // prompt gave the model no format guidance for valid_from/valid_to at
@@ -292,6 +317,105 @@ function normalizeFact(raw: unknown): ExtractedFact | null {
     valid_from: normalizeDate(r.valid_from),
     valid_to: normalizeDate(r.valid_to),
   };
+}
+
+/** Content words with possessives folded ("Sage's" is "sage"), so the
+ * speaker's name is skipped in every form it takes. */
+function contentWords(text: string): Set<string> {
+  return new Set([...tokenize(text.replace(/[<>]/g, " "))].map((w) => w.replace(/'s$|'$/, "")));
+}
+
+// Words the prompt's rules put into any fact of the shape, never a sign
+// of the example itself: the POSSESSIVE RULE turns the person's "my"
+// into "his"/"her", so a pronoun is in every resolved fact.
+const PRONOUNS = new Set(["his", "her", "hers", "their", "theirs", "him", "them", "its", "my", "our", "your"]);
+// Calendar words are never anchors either: a month name (the echoed
+// date with its month changed), or the wedding template's own
+// "month"/"year", which a real recurring-event fact ("every year in the
+// month of July") uses about nothing wedding-related.
+const CALENDAR = new Set("january february march april may june july august september october november december month months year years day days week weeks today".split(" "));
+
+/** The words that make an example the example: its content words minus
+ * the speaker's name in any form, the date, pronouns and stopwords
+ * ({brazil, visiting, wife, family} for the trip; {dislikes, cilantro};
+ * {wifi, password, written, fridge}; {rover, loves, horror, movies,
+ * brother}). A template with a placeholder is known by the placeholder's
+ * own words ({actual, month, year}; {name}), never by the phrase the
+ * prompt tells the model to produce for every wedding ("getting
+ * married"), so a real wedding is a fact and the template echoed with
+ * or without its brackets is not. */
+function anchorWords(example: string, speakerName: string, turnDate: string): Set<string> {
+  const placeholders = [...example.matchAll(/<([^<>]*)>/g)].map((m) => m[1]!);
+  const source = placeholders.length > 0 ? placeholders.join(" ") : example;
+  const skip = new Set([...contentWords(speakerName), ...contentWords(turnDate), ...PRONOUNS, ...CALENDAR]);
+  return new Set([...contentWords(source)].filter((w) => !skip.has(w) && !/^\d+$/.test(w)));
+}
+
+/** Unfilled template text: "<name>", "<the actual month/year>"; a
+ * bracketed phrase that opens with a letter and is not an address. */
+const TEMPLATE_PLACEHOLDER_RE = /<[a-z][^<>@]{1,79}>/i;
+
+export type EchoDropReason = "example_echo" | "placeholder" | "credential";
+
+/** The judge's output-side rejection (2026-09-13, live): a small model
+ * writes the extraction prompt's own few-shot examples as memories
+ * (the trip, the wedding placeholder, the cilantro preference, the
+ * relationship example, the prompt's own negative password line),
+ * sometimes with the template placeholder verbatim. A candidate is an
+ * echo when it carries two of an example's anchor words (an example
+ * with one anchor, the short trip's {brazil}, needs the candidate to
+ * be that example word for word) and the turn, the person's words and
+ * the assistant's line they may have confirmed, contains none of the
+ * anchors it carries: "Sage dislikes cilantro" is an echo after
+ * "hello" and a fact after "I hate cilantro" or after "yep" to "still
+ * can't stand cilantro?"; "Sage was in Ohio visiting his parents" carries
+ * one anchor and stands; the wedding template echoed without its
+ * brackets carries {actual, month, year} and goes. An unfilled
+ * placeholder goes whatever the turn said, and so does a candidate
+ * that reads like a credential (the memory content policy's detector,
+ * the door remember() already has). Each drop is counted on one log
+ * line so the bench can see it. The one soft spot, accepted: a model
+ * that normalizes a paraphrase into an example's own words ("scary
+ * films" into "loves horror movies") on a turn that said none of them
+ * loses that record. */
+export function rejectPromptEchoes(
+  facts: ExtractedFact[],
+  speakerName: string,
+  turnDate: string,
+  turnText: string,
+): { kept: ExtractedFact[]; dropped: { fact: ExtractedFact; reason: EchoDropReason }[] } {
+  const skip = new Set([...contentWords(speakerName), ...contentWords(turnDate), ...PRONOUNS, ...CALENDAR]);
+  const examples = promptExampleTexts(speakerName, turnDate).map((e) => ({
+    anchors: anchorWords(e, speakerName, turnDate),
+    shape: [...contentWords(e)].filter((w) => !skip.has(w) && !/^\d+$/.test(w)).join(" "),
+  }));
+  const said = contentWords(turnText);
+  const kept: ExtractedFact[] = [];
+  const dropped: { fact: ExtractedFact; reason: EchoDropReason }[] = [];
+  for (const fact of facts) {
+    if (TEMPLATE_PLACEHOLDER_RE.test(fact.text)) {
+      dropped.push({ fact, reason: "placeholder" });
+      continue;
+    }
+    if (detectCredential(fact.text).detected) {
+      dropped.push({ fact, reason: "credential" });
+      continue;
+    }
+    const words = contentWords(fact.text);
+    const shape = [...words].filter((w) => !skip.has(w) && !/^\d+$/.test(w)).join(" ");
+    const echoes = examples.some(({ anchors, shape: exampleShape }) => {
+      if (anchors.size === 0) return false;
+      const carried = [...anchors].filter((a) => words.has(a));
+      const matches = anchors.size >= 2 ? carried.length >= 2 : carried.length === 1 && shape === exampleShape;
+      return matches && carried.every((a) => !said.has(a));
+    });
+    if (echoes) {
+      dropped.push({ fact, reason: "example_echo" });
+      continue;
+    }
+    kept.push(fact);
+  }
+  return { kept, dropped };
 }
 
 /** Phase 1: one grammar-constrained chat call, or null on any failure
@@ -451,10 +575,20 @@ export async function judgeTurn(turn: ConversationTurnRow): Promise<JudgeTurnRes
     markDone(turn.id);
     return { ok: true, factsWritten: 0 };
   }
-  const facts = await extractFacts(sanitizeForPrompt(speaker.displayName), turn);
-  if (facts === null) {
+  const speakerName = sanitizeForPrompt(speaker.displayName);
+  const extracted = await extractFacts(speakerName, turn);
+  if (extracted === null) {
     markAttempt(turn.id, turn.judgeAttempts + 1);
     return { ok: false, factsWritten: 0 };
+  }
+  // The output-side rejection: the prompt's own examples, an unfilled
+  // placeholder, a credential. Counted per drop, so a run's log says
+  // how often the model echoed its instructions instead of the turn.
+  const { kept: facts, dropped } = rejectPromptEchoes(extracted, speakerName, turnDateFor(turn.createdAt), `${turn.userText}\n${turn.replyText}`);
+  if (dropped.length > 0) {
+    const counts: Record<string, number> = {};
+    for (const d of dropped) counts[d.reason] = (counts[d.reason] ?? 0) + 1;
+    console.log(`[memory.judge] turn ${turn.id}: dropped ${dropped.length} extracted candidate(s) ${JSON.stringify(counts)}`);
   }
   // #88, the race: the edit may have landed while the model extracted
   // (seconds), after archiveByProvenance() found nothing to retire; a
