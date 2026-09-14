@@ -295,8 +295,61 @@ knowledge-update reported separately); (2) register: teacher-forced
 turns (the real history up to turn t, our reply at t) scored by the
 persona judge's rubric (reaction, question back, no article voice, no
 assistant register) against the human's reply, never exact match.
+Amended 2026-09-14 after the outside review (Codex): a human reply is
+never the one correct answer, so the register mode does not score our
+reply against the human's. Instead the human conversations are raw
+material for finding phenomena (corrections and retractions, pronoun
+and elliptical follow-ups, indirect requests, mixed intent, topic
+returns, third-person facts versus the speaker's own, quotations that
+must never become memories, temporary versus durable facts,
+preference changes, unanswerable questions, repeated questions and
+frustration, closings), tagged by a local model and reviewed by a
+person, then rewritten into our own executable scenarios in the bench
+fixture shape (roster names, controlled clock, seeded state,
+observable effects), which is the household bench's own mechanism
+extended, never a second framework. Graders in order: deterministic
+state and behavior assertions first (the package ran once, the memory
+was written or retired, private data stayed out of another person's
+context); evidence-based rubrics second (the judge cites the rubric
+item and the evidence; a sample checked against human labels); blind
+human comparisons for naturalness last, at milestones. Never BLEU or
+overlap with the human reply. Results by phenomenon and subsystem
+with a failure-localization reading (the right tool absent from the
+candidates points at routing; offered but not called at the tool
+description; called with the wrong argument at context resolution;
+the memory exists but was not retrieved at the retrieval query; it
+reached the model and the answer is wrong at prompt composition;
+correct but rejected at the guard); privacy and consequential-action
+failures are zero-tolerance gates; a held-out set the prompt writers
+never see, including newly authored scenarios because public data may
+sit in a model's pretraining. Three tiers: the per-commit corpus, the
+live seeded bench, a 30-to-50 conversation human review set. Real
+household failures enter only through the safe loop: a person flags a
+turn on the hub, a local diagnostic bundle captures the pipeline
+decisions, the failure is rewritten as a synthetic scenario, the raw
+transcript never leaves the hub or enters git.
+
+Sources, two halves: graded memory sets replayed as they are
+(LongMemEval-cleaned, LoCoMo: their questions are ground truth, an
+answer or "nothing was said"), and phenomenon sources mined and
+rewritten (Taskmaster-1, CC BY 4.0, spoken task talk with corrections;
+CCPE-M, CC BY 4.0, 502 conversations eliciting preferences, the
+closest public data to the judge's job; QuAC, CC BY-SA 4.0,
+elliptical follow-ups and unanswerable questions; MultiWOZ, mixed
+intents and topic switches; DailyDialog, register). A registry file
+beside the downloads records name, version, URL, checksum, license,
+attribution, collection method, sensitive content, allowed uses and
+which split is held out. Not used: Switchboard (LDC license), CHILDES
+and TalkBank (participant protections), scraped logs, subtitles,
+Reddit, ShareGPT (consent and provenance unclear). The human step is
+real work: about 200 reviewed fragments across 20 to 25 phenomena and
+about 100 rewritten scenarios, a few hours for a person reading the
+model's proposals; that is Jesse's or a design-pass session's, never a
+coder session's.
+
 Order: LongMemEval-cleaned first (MIT, and abstention is our weakest
-class), then LoCoMo, then DailyDialog for register; MSC and CANDOR
+class), then LoCoMo, then the phenomenon mining on Taskmaster-1 and
+CCPE-M, then QuAC and MultiWOZ; MSC (license to confirm) and CANDOR
 later. Acceptance: the first run is the baseline, recorded in
 session-a.md with the dataset version and checksum, the engine build
 and models; every later engine item reports its delta on the same
