@@ -125,6 +125,31 @@ fields, beside #98.
 8. A rain question answered with a temperature in an unnamed place
    (the data gap above; #98).
 
+Household-subject conversations, later the same evening (the same
+rule, classes only):
+
+9. Class 1 again, five times, across subjects: a short or odd turn
+   answered with a sentence from a different conversation, including
+   one triggered by a word that also names a band. The dominant defect
+   in every conversation observed.
+10. Claiming prior knowledge of a household person the speaker has
+    just named ("that's right, X had his birthday"), then unable to
+    say how, then a tense loop. The invention guards cover activities
+    and traits, not confirming the speaker's own statement as known.
+11. A new household name (a relative, a coworker, a pet) never asked
+    about; when the speaker later says the name is a dog, the earlier
+    advice had assumed a person. Step 3a creates the entity from
+    conversation; nothing yet makes the hub ask who a new name is, the
+    way a person would.
+12. Chit-chat about a conversation with someone treated as a command
+    ("I've noted that"), followed by a guard line about a list nobody
+    mentioned: routing plus a replacement bank inventing context.
+13. A reply consisting of a single word ("I"), sent as is. An empty or
+    fragment reply must never be sent.
+14. Pronoun drift for a household subject (the wrong gender for a pet
+    whose sex the speaker had just used) and a robotic register ("I've
+    noted that", "I'm still learning").
+
 Memory quality, same evening: the memory judge writes its own
 extraction prompt's few-shot examples as memories (memoryJudge.ts,
 buildExtractionPrompt, lines 218 to 243), including the prompt's own
