@@ -225,6 +225,22 @@ rule, classes only):
     design is enough or the composer needs a stronger rule (react,
     pick, offer the next step, in the companion's register).
 
+19. A date given as a fact ("September 15") turned into the wrong
+    relative phrase ("a few days from now" when it is tomorrow), then
+    a cover story when corrected ("I'm just being playful"). Date
+    arithmetic is the model's alone today; the composer's typed data
+    is where a date becomes "tomorrow" deterministically (CHAT-16), and
+    an invented reason for a mistake is the same class as an invented
+    fact (EXP-01's claimed_statement, extended to claims about the
+    hub's own intent).
+20. A fact stated at the start of a conversation was unreachable
+    twelve turns later ("what time did I tell you"): the window had
+    dropped it, episode recall excludes the current conversation by
+    design, and the invention guard cut the reply to the honesty line.
+    Observed 2026-09-14 on main at 137635d. Queued as RECALL-03 with
+    the guard replacement bank losing the honesty vocabulary
+    (GUARD-LINES), both ahead of ASK-01.
+
 Read together: the hub never asks about what it does not know, acts as
 if it knows what it was never told, copies other conversations into
 this one, sends broken text, and reads search results aloud like an
