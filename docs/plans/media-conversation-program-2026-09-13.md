@@ -160,10 +160,23 @@ rule, classes only):
     quotation mark, a reply of one word. Output that is not a sentence
     is never sent.
 
+18. Web search replies read like an encyclopedia entry, not like a
+    friend who just looked something up: a paragraph of summarized
+    results in the search package's own voice ("the search results
+    show that ...", "in 2026, some recommended games include ..."),
+    with no reaction, no pick, no follow-up. Jesse's own emphasis:
+    this is the big one for how the hub sounds. CHAT-16 is the designed
+    answer (no package text spoken as-is; one composer phrases every
+    result through the companion with the active subject and the
+    recent turns as context), and the design pass judges whether that
+    design is enough or the composer needs a stronger rule (react,
+    pick, offer the next step, in the companion's register).
+
 Read together: the hub never asks about what it does not know, acts as
 if it knows what it was never told, copies other conversations into
-this one, and sends broken text. Those four are the priority for the
-design pass, ahead of every media-specific item.
+this one, sends broken text, and reads search results aloud like an
+article. Those five are the priority for the design pass, ahead of
+every media-specific item.
 
 Memory quality, same evening: the memory judge writes its own
 extraction prompt's few-shot examples as memories (memoryJudge.ts,
