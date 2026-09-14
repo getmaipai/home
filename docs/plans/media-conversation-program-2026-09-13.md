@@ -266,10 +266,17 @@ rule, classes only):
     Measured 2026-09-14: 48 percent of live replies since the previous
     evening carried a question (45 of 93); 31 percent on the bench's
     last full run (80 of 261). The human reference
-    (backend/scripts/bench/datasets/reference/dailydialog.json): a
-    question after a statement 11.4 percent of the time at the act
-    level, 16.3 percent counting any question mark in the next turn.
-    Causes: the persona prose asks for a follow-up on anything
+    (backend/scripts/bench/datasets/reference/dailydialog.json),
+    read correctly (Session A's correction of the first reading): a
+    question back after an inform 37.2 percent of the time at the act
+    level, 42.8 counting any question mark; after a question 11.4 and
+    16.3; the act-weighted overall 32.9. So the bench's 31 sits at the
+    human rate and the live 48 is about one and a half times it, not
+    the three to four first stated; what feels like more is the shape
+    (an offer or a check-in as the closing sentence, "would you like
+    me to", rather than a content question about what the person
+    said). The bench now prints the rate per person-act beside the
+    reference so the comparison is exact. Causes: the persona prose asks for a follow-up on anything
     personal; bench rows reward a question back; the register work
     removed closers but set no rate. Rule for ACT-03: the register
     table carries an ask-back rate per act and emotion calibrated to
