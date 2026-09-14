@@ -252,6 +252,16 @@ rule, classes only):
     it called?"). Never a third guess. The chat is the bench row with
     a fictional game and roster names.
 
+22. Measured on public data (EVAL-07's first diagnostic question,
+    2026-09-14): a two-fact temporal question missed because the judge
+    never wrote one fact and wrote the other then edited it away
+    across four supersede revisions, the final active record keeping
+    an unrelated aside and losing the fact itself. The silent-overwrite
+    path the design pass named on decideDedupe(); MEM-06's acceptance
+    gains a row where a fact restated with added detail keeps its core
+    across revisions, and CUR-01's a row where supersede never removes
+    content the person stated.
+
 Read together: the hub never asks about what it does not know, acts as
 if it knows what it was never told, copies other conversations into
 this one, sends broken text, and reads search results aloud like an
