@@ -295,7 +295,46 @@ async function seedHousehold(): Promise<string> {
   });
   if (!place.ok) throw new Error(`seed household.home_place failed: ${place.status}`);
 
+  await seedPeopleAndThings(sessionValue);
+
   return sessionValue;
+}
+
+// Lane 11 item 2: real content for the Memory app's "People and things"
+// tab (persona-roster names, per this file's own header - never Jesse's
+// real household). A pet owned by Sage, both directions stored
+// (`owns`/`owned_by`) - only a `source: "stated"` relationship exists
+// anywhere in this hub today (createRelationship() always writes it;
+// step 3a's own judge is what will ever produce an `inferred` one, not
+// built yet), so that's the only kind this seeds. The "Unconfirmed" mark
+// itself is proven by PeopleAndThings.test.tsx's own stubbed fixture,
+// not a live screenshot - fabricating an inferred row straight in the
+// database for one picture would show a state the running app can never
+// actually produce, the same dishonesty the coordinator's own ruling on
+// Confirm (docs/dev/session-b.md) rejected for the button.
+async function seedPeopleAndThings(sessionValue: string): Promise<void> {
+  const cookie = { Cookie: `session=${sessionValue}` };
+  async function createEntity(body: Record<string, unknown>): Promise<string> {
+    const res = await fetch(`${BASE_URL}/api/entities`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...cookie },
+      body: JSON.stringify(body),
+    });
+    if (!res.ok) throw new Error(`seed entity ${body.name} failed: ${res.status}`);
+    return ((await res.json()) as { id: string }).id;
+  }
+
+  const [juniper, sage] = await Promise.all([
+    createEntity({ kind: "pet", name: "Juniper", scope: "household" }),
+    createEntity({ kind: "person", name: "Sage", scope: "household" }),
+  ]);
+
+  const owns = await fetch(`${BASE_URL}/api/relationships`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...cookie },
+    body: JSON.stringify({ type: "owns", from_id: sage, to_id: juniper, scope: "household" }),
+  });
+  if (!owns.ok) throw new Error(`seed relationship owns failed: ${owns.status}`);
 }
 
 const PAGE_VISIT_TIMEOUT_MS = chatReview ? 90000 : 30000;
@@ -680,6 +719,57 @@ async function capturePaletteOpen(browser: Browser, sessionValue: string, viewpo
     await page.getByText("Ask MaiPai: weather", { exact: true }).waitFor();
     await settleAnimations(page);
     await page.screenshot({ path: join(SCREENS_DIR, `search-palette-${viewport.slug}-${theme}.png`) });
+  } finally {
+    await context.close();
+  }
+}
+
+/** Lane 11 item 2's own acceptance: "the screenshot script gains the
+ * section (desktop and phone), opened and judged." The route matrix's
+ * own /memory capture never sees this section - Radix's Tabs.Content
+ * doesn't mount an inactive panel at all, so the tab has to be clicked
+ * open first, the same "a small dedicated capture" shape
+ * `capturePaletteOpen()` above uses rather than folding a click into
+ * the shared per-route loop (which would also mean the ordinary
+ * `memory-*.png` capture picks up whichever tab was left open instead
+ * of the default Memories view). */
+async function capturePeopleAndThings(browser: Browser, sessionValue: string, viewport: ViewportSpec, theme: "light" | "dark"): Promise<void> {
+  const context = await newContext(browser, viewport, theme, sessionValue);
+  try {
+    const page = await context.newPage();
+    await page.goto(`${BASE_URL}/memory`);
+    await page.getByRole("heading", { level: 1 }).first().waitFor({ timeout: 15000 });
+    await page.locator('[role="status"]').first().waitFor({ state: "detached", timeout: 5000 }).catch(() => {});
+    await page.getByRole("tab", { name: "People and things" }).click();
+    await page.getByText("owner of Juniper").waitFor();
+    await settleAnimations(page);
+
+    // A code review caught TabsTrigger's own 48px hit-area extension
+    // (kit/ui/tabs.tsx's `before:-inset-y-3.5`, a real element with no
+    // `pointer-events: none`) as capable of reaching past the gap
+    // between TabsList and TabsContent into the content's own top edge
+    // - happy-dom's own getBoundingClientRect() always reads zeroed
+    // (this file's own established reason every real-layout check lives
+    // here, not in a unit test), so this is the only place it can be
+    // proven. `elementFromPoint` a few pixels inside TabsContent's own
+    // top edge and confirm it isn't the trigger's invisible pseudo-
+    // element intercepting the tap.
+    const boundaryHit = await page.evaluate(() => {
+      const content = document.querySelector('[role="tabpanel"]:not([hidden])');
+      const trigger = document.querySelector('[role="tab"][aria-selected="true"]');
+      if (!content || !trigger) return { ok: false, reason: "tabpanel or active tab not found" };
+      const rect = content.getBoundingClientRect();
+      const x = rect.left + 10;
+      const y = rect.top + 3;
+      const hit = document.elementFromPoint(x, y);
+      const hitsTrigger = hit === trigger || trigger.contains(hit);
+      return { ok: !hitsTrigger, x, y, hitTag: hit?.tagName, hitsTrigger };
+    });
+    if (!boundaryHit.ok) {
+      throw new Error(`A tap just inside TabsContent's own top edge (${JSON.stringify(boundaryHit)}) hits the active tab's own invisible hit-area instead of the content below it`);
+    }
+
+    await page.screenshot({ path: join(SCREENS_DIR, `memory-people-${viewport.slug}-${theme}.png`) });
   } finally {
     await context.close();
   }
@@ -1074,6 +1164,8 @@ async function main() {
       const desktop = VIEWPORTS.find((v) => v.slug === "desktop")!;
       await capturePaletteOpen(browser, sessionValue, phone, "dark");
       await capturePaletteOpen(browser, sessionValue, desktop, "light");
+      await capturePeopleAndThings(browser, sessionValue, phone, "dark");
+      await capturePeopleAndThings(browser, sessionValue, desktop, "light");
       // Isolated, unlike the captures above: it hardcodes one chunk's own
       // hashed-filename prefix and races a fixed delay against a fixed
       // timeout, both of which are more likely to need adjusting after an

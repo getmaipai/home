@@ -5,6 +5,8 @@ import type { MemoryRecord } from "@maipai/spec/gen/ts/memory-record.js";
 import type { PackageManifest } from "@maipai/spec/gen/ts/manifest.js";
 import type { Issue } from "@maipai/spec/gen/ts/issue.js";
 import type { Conversation } from "@maipai/spec/gen/ts/conversation.js";
+import type { Entity } from "@maipai/spec/gen/ts/entity.js";
+import type { Relationship } from "@maipai/spec/gen/ts/relationship.js";
 import type {
   Roster,
   TurnValue,
@@ -53,6 +55,8 @@ export type Role = Person["role"];
 // place.
 export type { Roster, TurnValue, TurnStreamEvent, ConversationTurnRow, ConversationTurnWithMemoryIds, ConversationSummary, ResolvedSetting, BackupInfo, HardwareInfo, ModelFit, ModelJob, EngineStatus, EngineStatsSample, ClonedVoiceInfo, RoutingStats, PrivacyConnection, PendingRestore, CommandRow, CommandAction, NotificationDeliveryView, HealthStatus, EngineHealthEntry };
 export type { MemoryRecord };
+export type { Entity };
+export type { Relationship };
 export type { PackageManifest };
 export type { Issue };
 export type { Conversation };
@@ -417,6 +421,29 @@ export const api = {
     request<CommandRow>("/api/commands", { method: "POST", body: JSON.stringify(input) }),
   deleteCommand: (id: string) =>
     request<{ id: string }>(`/api/commands/${encodeURIComponent(id)}`, { method: "DELETE" }),
+  // Lane 11 item 2: "anything the household knows about" (routes/entities.ts,
+  // relationships.ts) - the household-scoped list plus this actor's own
+  // person-scoped rows, exactly what GET /api/entities and /api/relationships
+  // already return; no client-side re-filtering.
+  entities: (kind?: string) => request<Entity[]>(`/api/entities${kind ? `?kind=${encodeURIComponent(kind)}` : ""}`),
+  createEntity: (input: {
+    kind: "person" | "pet" | "place" | "organization" | "thing";
+    name: string;
+    place_kind?: "map" | "area" | null;
+    scope?: "household" | "person";
+    account_person_id?: string | null;
+  }) => request<Entity>("/api/entities", { method: "POST", body: JSON.stringify(input) }),
+  // kind is deliberately not editable (backend/src/lib/entities.ts's own
+  // updateEntity() comment: "set once at creation and never move
+  // afterward... a household that got a kind wrong deletes the entity
+  // and makes a new one" - a real design invariant, not a gap).
+  updateEntity: (id: string, edit: { name?: string }) =>
+    request<Entity>(`/api/entities/${encodeURIComponent(id)}`, { method: "PATCH", body: JSON.stringify(edit) }),
+  deleteEntity: (id: string) => request<{ id: string }>(`/api/entities/${encodeURIComponent(id)}`, { method: "DELETE" }),
+  relationships: () => request<Relationship[]>("/api/relationships"),
+  createRelationship: (input: { type: string; from_id: string; to_id: string; scope?: "household" | "person" }) =>
+    request<Relationship>("/api/relationships", { method: "POST", body: JSON.stringify(input) }),
+  deleteRelationship: (id: string) => request<{ id: string }>(`/api/relationships/${encodeURIComponent(id)}`, { method: "DELETE" }),
   notifications: () => request<NotificationDeliveryView[]>("/api/notifications"),
   notificationHistory: () => request<NotificationDeliveryView[]>("/api/notifications/history"),
   markNotificationRead: (id: string) =>

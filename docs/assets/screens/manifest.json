@@ -52,7 +52,7 @@
     "route": "memory",
     "viewport": "phone",
     "theme": "light",
-    "capturedAt": "2026-09-13T22:54:57.391Z",
+    "capturedAt": "2026-09-14T02:39:19.749Z",
     "captureScript": "scripts/screenshot.ts"
   },
   "privacy-phone-light.png": {
@@ -171,7 +171,7 @@
     "route": "memory",
     "viewport": "phone",
     "theme": "dark",
-    "capturedAt": "2026-09-13T22:54:57.391Z",
+    "capturedAt": "2026-09-14T02:39:19.749Z",
     "captureScript": "scripts/screenshot.ts"
   },
   "privacy-phone-dark.png": {
@@ -290,7 +290,7 @@
     "route": "memory",
     "viewport": "tablet",
     "theme": "light",
-    "capturedAt": "2026-09-13T22:54:57.391Z",
+    "capturedAt": "2026-09-14T02:39:19.749Z",
     "captureScript": "scripts/screenshot.ts"
   },
   "privacy-tablet-light.png": {
@@ -409,7 +409,7 @@
     "route": "memory",
     "viewport": "tablet",
     "theme": "dark",
-    "capturedAt": "2026-09-13T22:54:57.391Z",
+    "capturedAt": "2026-09-14T02:39:19.749Z",
     "captureScript": "scripts/screenshot.ts"
   },
   "privacy-tablet-dark.png": {
@@ -528,7 +528,7 @@
     "route": "memory",
     "viewport": "desktop",
     "theme": "light",
-    "capturedAt": "2026-09-13T22:54:57.391Z",
+    "capturedAt": "2026-09-14T02:39:19.749Z",
     "captureScript": "scripts/screenshot.ts"
   },
   "privacy-desktop-light.png": {
@@ -647,7 +647,7 @@
     "route": "memory",
     "viewport": "desktop",
     "theme": "dark",
-    "capturedAt": "2026-09-13T22:54:57.391Z",
+    "capturedAt": "2026-09-14T02:39:19.749Z",
     "captureScript": "scripts/screenshot.ts"
   },
   "privacy-desktop-dark.png": {
@@ -766,7 +766,7 @@
     "route": "memory",
     "viewport": "far",
     "theme": "light",
-    "capturedAt": "2026-09-13T22:54:57.391Z",
+    "capturedAt": "2026-09-14T02:39:19.749Z",
     "captureScript": "scripts/screenshot.ts"
   },
   "privacy-far-light.png": {
@@ -885,7 +885,7 @@
     "route": "memory",
     "viewport": "far",
     "theme": "dark",
-    "capturedAt": "2026-09-13T22:54:57.391Z",
+    "capturedAt": "2026-09-14T02:39:19.749Z",
     "captureScript": "scripts/screenshot.ts"
   },
   "privacy-far-dark.png": {

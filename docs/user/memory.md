@@ -31,6 +31,16 @@ Tap **Export**. This downloads everything MaiPai remembers about you. Keep the f
 
 Owners and admins can switch to another household member. Use the person picker at the top of the page. You'll see their memories the same way. You can view or forget entries there too. This helps you manage what MaiPai keeps about a child.
 
+## People and things
+
+MaiPai also keeps a list of who and what it knows about: people, pets, places, groups, and things, plus how they connect ("Sage's coworker Marsh," "Bramble's dog Rover"). Open **Memory**, then tap **People and things** at the top.
+
+Tap **Add** to add someone or something new. Give it a name and pick what kind it is. You can also say how it connects to someone in your household.
+
+To fix a name, tap **Edit name** under it. To remove something MaiPai shouldn't have, tap **Remove**, or **Select** to remove several at once.
+
+Sometimes a connection is marked **Unconfirmed**. That means MaiPai guessed it from a conversation and no one has said it's true yet. If it's wrong, tap the small **×** next to it to remove it.
+
 ## Passwords and keys
 
 MaiPai does not keep passwords, PINs, API keys or tokens in memory. If you say one in chat, it answers "Keep passwords and keys in Credentials, not in chat." and stores nothing. It also blanks the password out of the chat history, so it is never saved anywhere.

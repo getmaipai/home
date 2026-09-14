@@ -685,6 +685,44 @@ not permission to expand scope.
     when this lands).
     Checks: named suites, history/activity tests, shared client tests, and
     full exit gate; contention measurements belong to CHAT-23.
+    Note (2026-09-13, CONC-01 below): "one active operation" is
+    background against interactive, never one person against another;
+    the arbiter admits up to N interactive turns at once.
+
+<a id="conc-01"></a>
+
+- [ ] **CONC-01: Concurrent household conversations** (M)
+
+    Several people chat at once (a phone, the TV, the robot) and none
+    waits for the others. The chat engine runs N slots with
+    llama-server's continuous batching (N sized to the card: the 8B's
+    weights once, one context per slot); the arbiter admits up to N
+    interactive turns at once and still makes background work yield to
+    any of them; the prefix cache holds the shared system prompt across
+    slots; per-person rate limits stay (#102); the judge stays on its
+    own engine. Text and reasoning: `docs/plans/
+    media-conversation-program-2026-09-13.md`, "Requirement recorded
+    2026-09-13". Depends on: CHAT-19. Files: `backend/src/lib/
+    llmSupervisor.ts` (slots), `llm.ts` (`id_slot`), the arbiter,
+    `scripts/bench/conversation.ts`. Acceptance: two conversations
+    interleaved turn for turn on separate people, each reply under 1.5
+    times its solo latency, no reply from one conversation ever
+    containing the other's text, three seeded runs. Out of scope: a
+    second model, residency policy. Checks: llm and supervisor suites,
+    the bench, full exit gate.
+
+- [ ] **EVAL: One 8B, two slots, the judge yields** (M)
+
+    An experiment, after CHAT-19: the memory judge on a second slot of
+    the chat engine that runs only when no reply is in progress,
+    against today's separate 4B engine. Judged by reply latency under
+    load, judge precision (the judge eval's scorer), and drain time
+    per bench run; kept only if it wins on all three. It does not
+    change CONC-01's requirement (`docs/plans/
+    media-conversation-program-2026-09-13.md`). Depends on: CHAT-19,
+    CONC-01. Files: `backend/src/lib/backgroundSupervisor.ts`,
+    `llmSupervisor.ts`, `scripts/bench/judge-eval.ts`. Checks: the
+    judge eval and the seeded bench, three runs each way.
 
 <a id="chat-20"></a>
 
@@ -1646,7 +1684,21 @@ Track B: MEM-01, MEM-02, MEM-03, MEM-04, MEM-05. Then JOIN-01, JOIN-02.
 
 <a id="mem-05"></a>
 
-- [ ] **MEM-05: Prove the small judge, or fall back to the 4B pin** (S)
+- [x] **MEM-05: Prove the small judge, or fall back to the 4B pin** (S)
+    Resolved as switch, 2026-09-13 (Jesse's decision), verified at the
+    commit that carries this line: the household default background
+    model is qwen3-4b-q4-k-m; the 1.7B stays behind
+    `MAIPAI_BACKGROUND_MODEL=qwen3-1.7b`. Live use showed the 1.7B
+    re-emitting its extraction prompt's few-shot examples as memories,
+    attributing the hub's replies and world facts to the speaker, and
+    saving a conversation's passing state instead of the durable fact,
+    about one record in ten real. judge-eval (real scorer, n=2, this
+    machine): 1.7B precision 66.7%, recall 100%, 3.19 s/turn; 4B
+    precision 100%, recall 100%, 7.31 s/turn cold. On the seeded bench
+    with the judge's prompt cache: 1.8 s per judged turn (218 s for 120
+    turns) against the 1.7B's 1.2 s, and one echo drop per run against
+    13 to 19. Numbers and the CHAT-15 three-run set in
+    docs/dev/session-a.md "MEM-05".
 
     Status (2026-09-13, measured with the real scorer, left open): the
     1.7B (a5015c1's own number), the 4B, and the 8B baseline all now run
@@ -3240,9 +3292,9 @@ for Repairs, Backups, AI models, and the person-pickers on
 Conversations/Memory) is the right mechanism for a parent's controls
 page on top of what F built below - `settings.admin`'s own grant-action
 wording in `spec/vocab/grant-actions.json` is still a stated future
-state, not something built against yet. A frontend for entities,
-relationships, grants, and approvals is real, unstarted work for a
-future session now that F's hub half exists.
+state, not something built against yet. Entities and relationships got
+their own frontend, lane 11 item 2 (2026-09-13, below); grants and
+approvals are still real, unstarted work for a future session.
 
 - [x] **The hub half of entities and relationships** (Session F step 7,
       2026-09-06) - tables and migration (`entities`, `relationships`,
@@ -3303,6 +3355,25 @@ future session now that F's hub half exists.
       questions to answer before any code: does inference ship at all in
       v1, and may a parent see a relationship inferred from their teen's
       conversation? Both are Jesse's, not research questions.
+- [x] **A frontend for entities and relationships** (M, lane 11 item 2,
+      2026-09-13, docs/dev/session-b.md) - "People and things," a
+      section in the Memory app: list by kind with relationships in
+      plain words, create (with an optional relationship to a household
+      member), edit a name, remove one or several. `docs/user/memory.md`
+      gained its own section.
+- [ ] **Confirming an inferred entity or relationship** (S, waits on
+      3a's own judge - nothing produces one yet) - `updateEntity()`/
+      `updateRelationship()` (backend/src/lib/entities.ts, relationships.ts)
+      have no field for moving `source: "inferred"` to `"stated"` at
+      all today; PATCH's own body schema doesn't accept one either. The
+      frontend already reads and shows `source`/`confirmed_by_person_id`
+      exactly as stored (an inferred one marked "Unconfirmed," read-
+      only) - once step 3a adds a real confirm transition (inferred to
+      stated, `confirmed_by_person_id` set, a household adult only,
+      validated server-side so the transition can't run backward or be
+      spoofed by an arbitrary PATCH), the one thing left is a Confirm
+      button calling it. Not built now: a button calling a route that
+      doesn't exist would return 200 and silently do nothing.
 - [ ] **A speech profile per person** (M) - how to address someone
       (complexity, pace, vocabulary), distinct from persona, which is who
       the assistant is being. `persona.ts` already has a `complexity`

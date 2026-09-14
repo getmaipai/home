@@ -7,6 +7,13 @@ import {
 } from "@/kit/ui/select";
 
 interface SelectProps {
+  /** Never pass "" - Radix's own Select treats an empty string as
+   * "unset" (its `shouldShowPlaceholder` check), so the closed trigger
+   * shows nothing at all instead of matching your option's own label
+   * (found live, lane 11 item 2, 2026-09-13: PeopleAndThings.tsx's own
+   * "relate to no one" sentinel was "" before a code review caught the
+   * blank trigger). An "unselected"/"none" state needs a real, non-
+   * empty sentinel value with its own entry in `options`. */
   value: string;
   onValueChange: (value: string) => void;
   options: string[];

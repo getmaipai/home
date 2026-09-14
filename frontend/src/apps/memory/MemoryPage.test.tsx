@@ -1,6 +1,6 @@
 import { describe, expect, test, mock, afterEach } from "bun:test";
 import { cleanup, fireEvent, waitFor } from "@testing-library/react";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter, useLocation } from "react-router-dom";
 import { MemoryPage } from "@/apps/memory/MemoryPage";
 import { renderWithQueryClient } from "../../../tests/renderWithQueryClient";
 import type { MemoryRecord, Roster } from "@/lib/api";
@@ -421,6 +421,66 @@ describe("MemoryPage", () => {
         expect(
           await findByText(/1 of 2 could not be forgotten: only owner or admin may forget an entity or pinned memory/),
         ).toBeInTheDocument();
+      } finally {
+        restore();
+      }
+    });
+  });
+
+  // docs/UI.md: "the active tab lives in the URL" - a second code review
+  // caught this section fully uncontrolled (a reload or a shared link
+  // always landed on Memories regardless of what was open).
+  describe("the People and things tab lives in the URL", () => {
+    function Location() {
+      return <div data-testid="location">{useLocation().pathname + useLocation().search}</div>;
+    }
+
+    function renderMemoryPageWithLocation(path: string) {
+      return renderWithQueryClient(
+        <MemoryRouter initialEntries={[path]}>
+          <Location />
+          <MemoryPage person={defaultPerson()} />
+        </MemoryRouter>,
+      );
+    }
+
+    test("?section=people-and-things opens directly on that tab", async () => {
+      const restore = stubFetch({ "/api/memory": [], "/api/entities": [], "/api/relationships": [], "/api/people": [] });
+      try {
+        const { findByRole } = renderMemoryPageWithLocation("/memory?section=people-and-things");
+        expect(await findByRole("tab", { name: "People and things", selected: true })).toBeInTheDocument();
+      } finally {
+        restore();
+      }
+    });
+
+    test("a stray or unknown ?section= value falls back to Memories, not a blank tab", async () => {
+      const restore = stubFetch({ "/api/memory": [] });
+      try {
+        const { findByRole } = renderMemoryPageWithLocation("/memory?section=nonsense");
+        expect(await findByRole("tab", { name: "Memories", selected: true })).toBeInTheDocument();
+      } finally {
+        restore();
+      }
+    });
+
+    test("switching tabs updates the URL, without disturbing an existing ?ids=", async () => {
+      const restore = stubFetch({
+        "/api/memory": [record({ id: "mem1-abc123" })],
+        "/api/entities": [],
+        "/api/relationships": [],
+        "/api/people": [],
+      });
+      try {
+        const { findByRole, getByTestId } = renderMemoryPageWithLocation("/memory?ids=mem1-abc123");
+        // Radix's own TabsTrigger selects on mousedown, not click
+        // (@radix-ui/react-tabs) - a plain fireEvent.click() never fires
+        // a mousedown at all, so it silently never selected anything.
+        fireEvent.mouseDown(await findByRole("tab", { name: "People and things" }), { button: 0 });
+        await waitFor(() => expect(getByTestId("location").textContent).toBe("/memory?ids=mem1-abc123&section=people-and-things"));
+
+        fireEvent.mouseDown(await findByRole("tab", { name: "Memories" }), { button: 0 });
+        await waitFor(() => expect(getByTestId("location").textContent).toBe("/memory?ids=mem1-abc123"));
       } finally {
         restore();
       }

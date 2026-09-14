@@ -2138,3 +2138,291 @@ is no real turn today whose screenshot would show the new line
 differently than before. The render side is proven the same way
 `chatSourceCaption.tsx`'s own tests already prove a metadata-bag read
 works (a fixed, seeded message), not through a live capture.
+
+## Lane 11 item 2: People and things, the household's registry
+
+Work order: `docs/plans/session-b-lane-11-2026-09-13.md`. Entities and
+relationships (`routes/entities.ts`, `relationships.ts`,
+`spec/schemas/entity.schema.json`, `relationship.schema.json`) had real
+backend routes and zero frontend. Closes the BACKLOG's own "A frontend
+for entities, relationships, grants, and approvals is real, unstarted
+work" line (below, for entities/relationships only - grants and
+approvals stay unstarted).
+
+**Two real gaps found reading the backend closely, before writing any
+frontend code, both escalated rather than guessed past:**
+
+1. **Confirm has no route to call.** The work order's own text said
+   Confirm "sets the relationship's provenance to `stated` through the
+   existing update route" - not true. `updateRelationship()`'s
+   `RelationshipEdit` type (and the PATCH route's own Zod body schema)
+   only accepts `status`/`valid_to`/`note`; there is no `source` or
+   `confirmed_by_person_id` field anywhere in the edit path, and
+   `createRelationship()` always writes `source: "stated"` today (its
+   own comment: "this hub-write path never produces" an inferred one -
+   step 3a, Session A, not built). The same gap exists on Entity
+   (`createEntity()` always writes `source: "hub"`; its own PATCH body
+   has no `source` field either). Worse than "not built": a PATCH
+   carrying an extra `source` field wouldn't error, zod's default
+   object parsing just drops unknown keys - a naive Confirm button
+   would read as succeeding (200) while silently doing nothing.
+   **Coordinator's ruling**: build what the routes support today (list,
+   create, edit name, delete, batch delete, scope labels); show a
+   relationship's `source` read-only exactly as stored (`inferred`
+   marked "Unconfirmed," no Confirm button) so the day 3a's judge
+   writes a real inferred row it renders correctly with zero frontend
+   change; BACKLOG names the still-missing confirm transition under
+   entities, the same "engine emits `status` events" shape item 1's own
+   CHAT-16 line uses. Acceptance's own "Confirm flips it" promise
+   withdrawn, replaced with "an inferred relationship in a stubbed list
+   renders the unconfirmed mark."
+2. **`kind` is deliberately immutable, not a gap.** The work order also
+   said "edit name and kind inline." `updateEntity()`'s own comment is
+   explicit and well-reasoned: "kind... set once at creation and never
+   move afterward... A household that got a [kind] wrong deletes the
+   entity and makes a new one rather than reclassifying it in place."
+   Unlike the Confirm gap, this one carries its own clear rationale in
+   the code (an entity's kind decides which relationship types may even
+   attach to it - changing it out from under existing edges is a real
+   correctness hazard, not a UI inconvenience), so it didn't need
+   escalating: the create/delete path already covers "reclassify by
+   replacing," and only `name` is editable inline.
+
+**Design decisions made directly, each with a concrete reason:**
+
+- **A tab inside the Memory app, not a second nav route.** The work
+  order allowed either; entities/relationships are a different record
+  shape from memories with no shared query to join on (a merged list
+  would need a fake unifying type), and adding a sixth top-level nav
+  item for one more list didn't seem to earn its own permanent sidebar
+  slot the way Memory's existing "what MaiPai knows" framing already
+  covers both. `kit/ui/tabs.tsx` (a shadcn primitive that existed but
+  had never been used by a real page) is genuinely used for the first
+  time here.
+- **Relationship rendering: no duplication, no drops.** Every non-
+  symmetric edge stores BOTH directions as separate rows
+  (`createRelationship()`'s own inverse write) - a symmetric type
+  (`sibling_of`/`partner_of`/`friend_of`) stores exactly one. Showing
+  a relationship under an entity's own row by matching `from_id` alone
+  would silently drop every symmetric edge from the second party's own
+  row (no reciprocal row exists to match); matching `from_id` OR `to_id`
+  unconditionally would double-show every ordinary edge (the reciprocal
+  row's own `to_id` happens to equal the same entity). The fix
+  (`relationshipLabels.ts`'s `relationshipLinesFor`): match `from_id`
+  always, and `to_id` only when the vocabulary itself marks that type
+  `symmetric` - verified directly with two tests, one plain `owns`/
+  `owned_by` pair (each entity shows its own line, no duplicate) and
+  one `friend_of` pair (shows under both, since only one row exists).
+- **The relationship-type picker reads `spec/vocab/relationship-types.json`
+  directly**, a plain JSON import (`resolveJsonModule`, already on):
+  the same "shared spec, not a backend round trip" precedent
+  `normalizeForSpeech.js`/`lineReader.js` already set for this app, and
+  the vocabulary's own header calls itself "a closed list" - safe to
+  trust client-side. `relationshipOptionsBetween()` checks both
+  directions between the new entity's kind and `person` (a type like
+  `lives_at` only permits person/pet->place, so creating a *place*
+  needs the reversed check to find it at all) and dedupes by id so a
+  same-kind symmetric type isn't offered twice for one meaning.
+- **"Someone in the household" is a lookup-or-create.** Nothing
+  auto-creates a person-kind Entity for a real signed-in household
+  member (Entity and Person are deliberately different records -
+  `entities.ts`'s own header: "An Entity is NOT an account"). The
+  create flow's own "relate to" picker offers real household members
+  (`GET /api/people`), and on submit either reuses an existing
+  `kind: "person"` entity whose `account_person_id` matches, or creates
+  one (household-scoped, named from their own display name) - both
+  through the existing entity route, no backend change.
+- **Batch delete, no bulk route.** Unlike `/api/people/batch-delete` and
+  `/api/memory/batch-forget`, there is no bulk entity-delete endpoint.
+  One `DELETE` per selected id (`Promise.allSettled`), still one
+  confirmation and a real partial-success report (`docs/UI.md`'s own
+  batch-actions rule asks for the pattern, not specifically a single
+  round trip).
+
+**A real, pre-existing kit bug found live, not by this item's own
+code**: `kit/ui/tabs.tsx` had never been used by a real page before
+this, and the screenshot pipeline's own touch-target-floor check
+(lane 7 item 1, `scripts/screenshot.ts`) failed on every `/memory`
+combo the moment a real Tabs bar rendered - `TabsTrigger`'s painted
+height (~31px) was under the 48px floor, and separately, Radix's own
+`RovingFocusGroup` puts a real `tabIndex` on the `TabsList` wrapper
+itself (not just each trigger), which the sweep's own
+`[tabindex]:not([tabindex="-1"])` selector caught as if the wrapper
+were its own click target. Fixed in the kit, not app-side: `TabsTrigger`
+gained the same `::before` hit-area-extension technique `button.tsx`'s
+compact sizes already use (`-inset-3.5`, credited by the sweep's own
+pseudo-element logic), and `TabsList` gained
+`data-touch-target-exempt` (the same documented-exception marker
+`sidebar.tsx`'s `SidebarRail` already uses, for the identical
+"container, not the real target" reason). Verified with `--a11y-only`
+(fast, 2 combos) before committing to a full run: 34 pages, 0
+violations either time once both fixes landed.
+
+**Verified**: `bunx tsc --noEmit && eslint .` clean; `bun test` in
+frontend, 574 passing (11 new in `PeopleAndThings.test.tsx`: grouped
+listing with plain-word relationships both for an ordinary and a
+symmetric pair, the "Unconfirmed" mark with no Confirm button anywhere,
+a stated relationship carries no mark, household vs person scope
+labels, edit-name round-trip through PATCH, single and batch delete
+round-trips through DELETE with the real per-item confirmation, create
+posting the right `kind`, a place requiring map/area before it can be
+created, and the full "relate to a household member" lookup-or-create-
+then-state sequence). Full `bash scripts/check.sh` in a throwaway
+worktree (below). Live: the full screenshot matrix (136 pages) plus
+`capturePeopleAndThings()`'s own two dedicated captures
+(`memory-people-{desktop,phone}-{light,dark}.png`, mirroring
+`capturePaletteOpen()`'s own "small dedicated capture" shape rather
+than folding a tab click into the shared per-route loop, which would
+also make the ordinary `memory-*.png` capture pick up whichever tab
+was last left open) all passed at 0 violations/0 overflow; both new
+images opened and read - real content, no spinner or empty state,
+correct in both themes. `seedHousehold()` gained `seedPeopleAndThings()`
+(persona-roster names: Sage owns Juniper) for real content to
+screenshot; no inferred relationship is seeded (nothing can produce
+one through the real API, and writing one straight into the database
+for a picture would show a state the running app can never actually
+reach - the same honesty the Confirm ruling above already settled).
+
+**Code review (medium effort) found eight issues; six fixed here, two
+escalated (both real, both backend).** Fixed: (1) a partial-failure
+error (the entity saved, its relationship didn't) was set and then the
+form closed in the same tick - `createError`'s own `<p>` only renders
+while `creating` is true, so it was never actually visible; now the
+form only closes on full success, the name field still clears either
+way (a resubmit would otherwise duplicate the entity). (2) The "relate
+to" picker's `NO_RELATION` sentinel was `""`, which Radix's own Select
+treats as "unset" (`shouldShowPlaceholder`) - the closed trigger showed
+nothing instead of "Not related to anyone"; changed to `"none"`. (3)
+`relateTypeId` survived a kind change even though its own options are
+filtered by kind - reset on every kind change so a stale id from the
+old kind's list can't silently submit under the new one. (4) The
+relationship-remove icon button used a raw `size-6` className override
+with no hit-area extension, landing at 24x24px under the 48px floor -
+switched to the kit's own `icon-xs` size, which already carries the
+right `before:-inset` credit. (5) `TabsTrigger`'s new hit-area fix
+(above) extended into the ADJACENT trigger too - the default
+`TabsList` variant has no gap between triggers, so the two 14px
+extensions overlapped by 28px and a tap near the shared edge could
+activate the wrong tab; fixed by crediting only the cross axis
+(`-inset-y` for horizontal tabs, `-inset-x` for vertical), since both
+triggers' own painted widths already clear 48px without any horizontal
+help. Three new regression tests (`PeopleAndThings.test.tsx`): the
+partial-failure error stays visible and the form stays open; the
+picker shows its own label by default, not a blank trigger; changing
+kind clears a relationship type that no longer applies. Re-verified
+live: `--a11y-only` clean (34 pages, 0 violations) before committing to
+the full 136-page run, both new screenshots re-opened and read after
+the `icon-xs` swap.
+
+Escalated rather than fixed (both genuinely backend/entities.ts,
+relationships.ts territory, out of this session's lane): (6)
+`deleteEntity()` never cleans up the relationships that pointed at the
+deleted entity (`backend/src/lib/entities.ts`) - always true of the
+backend, only reachable through a real Delete button now. The frontend
+already degrades gracefully (`relationshipLinesFor()`'s own "someone no
+longer known" fallback), but the stale row itself needs a real fix.
+Filed [getmaipai/home#110](https://github.com/getmaipai/home/issues/110).
+(7) `createEntity()`/the `entities` table have no uniqueness check on
+`account_person_id`, so two near-simultaneous "relate to a household
+member" actions (two tabs, a fast double-submit before `refresh()`
+lands) can both decide no entity exists yet and both create one,
+splitting that person across two rows - low odds, a real fix needs a
+unique index or a real find-or-create inside `createEntity()` itself.
+Filed [getmaipai/home#111](https://github.com/getmaipai/home/issues/111).
+
+**A ninth finding, on this session's own docs and tests, not the
+product:** the illustrative names in the item's own work order
+("Dean," "Snoopy") aren't on the org's persona roster
+(`getmaipai/CLAUDE.md`) - copied verbatim into `docs/user/memory.md`
+and reused as `PeopleAndThings.test.tsx` fixture data before the review
+caught it. Fixed: "Marsh" (coworker) and "Rover" (dog) throughout both
+files.
+
+**A second review pass on that fix (medium effort) found eight more
+things, five fixed here, three deferred with a reason.** Fixed: (1) the
+`gap-2` fix for finding (5) above created a new, more subtle version of
+the same overlap bug - `TabsTrigger`'s own `-inset-y-3.5` (14px)
+reached past the default gap (8px) plus `TabsList`'s own padding (3px),
+11px of clearance, into `TabsContent`'s own top edge, so a tap on the
+first few pixels of a tab's content could still activate the trigger
+instead. Fixed with real spacing rather than a smaller inset (which
+would have reopened the original 48px-floor problem): this page's own
+`<Tabs className="gap-4">` (16px), leaving 5px of real margin past the
+14px extension. Proven live, not just by arithmetic - happy-dom's
+`getBoundingClientRect()` always reads zeroed regardless of CSS (this
+file's own established reason every real-layout check lives in
+`scripts/screenshot.ts`, not a unit test) - `capturePeopleAndThings()`
+gained an `elementFromPoint()` check a few pixels inside the active
+panel's own top edge, failing loudly if it resolves to the trigger
+instead of the content; the full 136-page run passed clean afterward.
+(2) Batch delete's partial-failure message named only the FIRST
+rejected item's own reason as if it explained every failure - two
+different causes (say a 403 and a timeout) used to read as one shared
+one; now every distinct reason is listed. (3) `Select.tsx`'s own JSDoc
+gained the "never pass value=\"\"" warning the first review pass's own
+fix (`NO_RELATION = "none"`) had to discover the hard way, so the next
+caller who needs an "unselected" state doesn't reproduce the identical
+blank-trigger bug. (4) `editingId`/`editValue`/`savingEdit` (three
+separate hooks that could drift out of sync) consolidated into one
+`editing: {id, value, saving} | null`, the same discriminated-union
+shape `confirmingDelete` two lines below already uses. (5)
+`seedPeopleAndThings()`'s two independent entity creates ran
+sequentially instead of via `Promise.all` - no caller depends on the
+other's result.
+
+Deferred, each with a concrete reason rather than silently skipped: a
+suggestion to consolidate the create form's remaining 8 `useState`
+hooks into one form-state object - real, but a much larger refactor
+than this item's own scope, right before a commit, with no second bug
+found beyond the one (3) already fixed; a suggestion to teach
+`scripts/screenshot.ts`'s touch-target sweep to recognize Radix's
+`RovingFocusGroup` pattern generically instead of the per-component
+`data-touch-target-exempt` marker - the marker already matches
+`sidebar.tsx`'s own established precedent for the identical "wrapper,
+not a real target" shape, and there is no clean, general DOM signal
+that distinguishes a roving-tabindex container from a genuinely
+clickable one; `relationshipLinesFor()`'s O(entities×relationships) scan
+per render - real, and negligible at any household's actual scale, the
+same "not for hypothetical future requirements" the org's own
+principles already name.
+
+Re-verified after both passes: `bunx tsc --noEmit && eslint .` clean;
+`bun test` in frontend, 577 passing (3 more regression tests from the
+first pass); `--a11y-only` clean, then the full 136-page run clean
+(0 violations, 0 overflow, the new tab-boundary check included); both
+screenshots re-opened and read once more.
+
+**A third review pass (the diff's own final gate re-review) found two
+more, both fixed.** (1) The `gap-4` fix for the trigger/content overlap
+(above) only protected `MemoryPage.tsx`'s own usage, the one real
+consumer today - `kit/ui/tabs.tsx`'s own default stayed `gap-2`, so any
+FUTURE page rendering `<Tabs>` at the primitive's own default spacing
+would hit the identical bug, needing to be independently rediscovered.
+Moved the fix to the default itself (`gap-4` on `Tabs`'s own base
+className, `MemoryPage.tsx`'s now-redundant override removed) - a
+zero-risk change today (this is still the only real consumer) that
+closes the gap for whichever page uses this primitive next, matching
+"the kit refuses to go below" as a property of the kit, not something
+each caller has to remember. (2) This section was fully uncontrolled -
+`docs/UI.md`'s own tab rule ("the active tab lives in the URL") was
+missed entirely: a reload, a shared link, or the browser's own back/
+forward always landed on Memories regardless of what was actually
+open. Fixed: `?section=people-and-things` via the same `useSearchParams`
+the `?ids=` deep link already uses, defaulting to Memories for anything
+else (absent, or a stray/stale value); switching tabs updates the URL
+without disturbing `?ids=` if present. Three new tests
+(`MemoryPage.test.tsx`): the deep link opens directly on that tab, an
+unrecognized `?section=` value falls back rather than showing nothing,
+and switching tabs updates the URL both ways while a concurrent `?ids=`
+survives untouched - the last one is also what caught a real test-
+harness gap, not a product bug: Radix's own `TabsTrigger` selects on
+`mousedown`, not `click` (`@radix-ui/react-tabs`), so `fireEvent.click()`
+alone never fires anything at all; `fireEvent.mouseDown()` is what a
+real pointer's own down-before-click sequence already does in any
+actual browser.
+
+Re-verified once more: `bunx tsc --noEmit && eslint .` clean; `bun test`
+in frontend, 580 passing. The full gate (`bash scripts/check.sh`),
+`--a11y-only`, and the full screenshot run were paused mid-verification
+for a quiet-machine bench window another session needed, resumed once
+clear.

@@ -9,9 +9,11 @@ import { DestructiveConfirm } from "@/kit/primitives/DestructiveConfirm";
 import { BatchBar, SelectModeToggle } from "@/kit/primitives/BatchBar";
 import { Checkbox } from "@/kit/ui/checkbox";
 import { Button } from "@/kit/ui/button";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/kit/ui/tabs";
 import { getIcon } from "@/kit/icons";
 import { api, ApiError, isOwnerOrAdminRole, type MemoryRecord, type PersonRosterEntry, type Roster } from "@/lib/api";
 import { cn, FOCUS_RING } from "@/kit/utils";
+import { PeopleAndThings } from "@/apps/memory/PeopleAndThings";
 
 const ArchiveIcon = getIcon("archive");
 
@@ -384,9 +386,28 @@ export function MemoryPage({ person }: MemoryPageProps) {
   // clear-all are hidden while this filter is active - it's a narrow,
   // temporary view of what chat just changed, not the place to batch-act
   // on the whole list.
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const idsParam = searchParams.get("ids");
   const filterIds = idsParam ? new Set(idsParam.split(",")) : null;
+
+  // docs/UI.md: "the active tab lives in the URL" - `?section=` rather
+  // than a separate piece of component state, so a reload, a shared
+  // link, and the browser's own back/forward all land on the same tab
+  // a person was actually looking at. Anything but the one other real
+  // value falls back to Memories (a stray or stale `?section=` should
+  // never show a blank tab).
+  const activeTab = searchParams.get("section") === "people-and-things" ? "people-and-things" : "memories";
+  function onTabChange(value: string) {
+    setSearchParams(
+      (prev) => {
+        const next = new URLSearchParams(prev);
+        if (value === "people-and-things") next.set("section", value);
+        else next.delete("section");
+        return next;
+      },
+      { replace: true },
+    );
+  }
 
   const canViewOthers = isOwnerOrAdminRole(person.role);
   const [viewing, setViewing] = useState<string>(ME);
@@ -422,24 +443,47 @@ export function MemoryPage({ person }: MemoryPageProps) {
     <Page title="Memory">
       {/* eslint-disable-next-line jsx-a11y/no-noninteractive-tabindex -- a keyboard-scrollable region, not a widget (DetailPane.tsx's own precedent). */}
       <div tabIndex={0} className={cn("flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto p-4", FOCUS_RING)}>
-        {personPicker}
-        {viewingPerson ? (
-          <OtherPersonMemories personId={viewingPerson.id} personName={viewingPerson.display_name} />
-        ) : (
-          <>
-            {filterIds ? (
-              <div className="flex items-center justify-between gap-2 rounded-lg bg-muted px-3 py-2 text-sm">
-                <span>
-                  Showing {visibleCount ?? 0} memory update{visibleCount === 1 ? "" : "s"}
-                </span>
-                <Link to="/memory" className="text-primary underline">
-                  Show all
-                </Link>
-              </div>
-            ) : null}
-            <OwnMemories filterIds={filterIds} />
-          </>
-        )}
+        {/* Lane 11 item 2: a real sibling section within the app that
+            already owns "what MaiPai knows" (the work order's own
+            phrasing), not a second nav entry - entities/relationships are
+            a different record shape from memories with no shared query to
+            join on, so a tab (not a merged list) is the honest split.
+            Defaults to Memories, so `?ids=` deep links from the chat chip
+            (below) still land where they always have. `activeTab`/
+            `onTabChange` (below) keep this in the URL, per docs/UI.md's
+            own tab rule ("the active tab lives in the URL") - a second
+            review pass caught this section as fully uncontrolled, so a
+            reload, a shared link, or the browser's own back/forward
+            always landed back on Memories. */}
+        <Tabs value={activeTab} onValueChange={onTabChange}>
+          <TabsList>
+            <TabsTrigger value="memories">Memories</TabsTrigger>
+            <TabsTrigger value="people-and-things">People and things</TabsTrigger>
+          </TabsList>
+          <TabsContent value="memories" className="flex flex-col gap-4">
+            {personPicker}
+            {viewingPerson ? (
+              <OtherPersonMemories personId={viewingPerson.id} personName={viewingPerson.display_name} />
+            ) : (
+              <>
+                {filterIds ? (
+                  <div className="flex items-center justify-between gap-2 rounded-lg bg-muted px-3 py-2 text-sm">
+                    <span>
+                      Showing {visibleCount ?? 0} memory update{visibleCount === 1 ? "" : "s"}
+                    </span>
+                    <Link to="/memory" className="text-primary underline">
+                      Show all
+                    </Link>
+                  </div>
+                ) : null}
+                <OwnMemories filterIds={filterIds} />
+              </>
+            )}
+          </TabsContent>
+          <TabsContent value="people-and-things">
+            <PeopleAndThings />
+          </TabsContent>
+        </Tabs>
       </div>
     </Page>
   );
