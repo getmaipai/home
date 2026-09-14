@@ -2986,3 +2986,110 @@ in `datasetsReference.test.ts`, all green; the full datasets-directory
 suite (95 tests across 10 files) green. Nothing under `backend/src/`
 touched; the bench runner and fixture untouched (Session A is in ACT-01's
 seeded set).
+
+## Lane 14 item 2: EVAL-07's memory replay, built (dry run pending)
+
+The replay half of EVAL-07 (BACKLOG, the program file's own section):
+LongMemEval-oracle and LoCoMo replayed through the real engine, scored
+by each dataset's own rule, no chat completion spent reproducing a
+history that already happened. New files only, over lane 12/13's own
+loaders, driving the engine through `conversationLive.ts`'s and
+`setup.ts`'s own entry points (imported, never edited, same as every
+lane so far); nothing under `backend/src/`, the bench runner, live,
+fixture or scorer touched.
+
+**The pure half** (`replayIngest.ts`, `replayScore.ts`; 30 tests, no
+engine): `sessionToIngestRows()` pairs a session's own alternating
+turns into ingest rows - the household member's own turn is the row's
+user text, every immediately following turn by someone else joins
+into the row's own reply text (never generated), a household-member
+turn with nothing following it gets an empty reply rather than an
+invented one. `tokenF1()` is the standard SQuAD-style token-overlap
+metric LoCoMo's own paper uses; `scoreLocomo()` applies it to
+categories 1-4 and, for category 5 (adversarial), scores whether the
+reply refused the false premise instead - LoCoMo's own eval treats
+repeating the adversarial answer back as the failure case, not a
+"right answer" that does not exist for that category.
+`longMemEvalTotalsByType()` keeps abstention as its own bucket, never
+folded into whichever question_type an abstention question happens to
+carry (the coherence review's own rule).
+
+**The orchestrator** (`replay.ts`): ingestion is the memory path, not
+the chat path. Each history session becomes a conversation on one
+fresh, disposable household member; `classifyTurnSignal()` and
+`judgeStatusAtInsert()` run the same way the live engine runs them, so
+the real judge (the 4B) queues the ingested rows exactly as it would a
+live turn's; the question is then asked once as a real live turn
+(`runTurnStream()`) and scored - LongMemEval by a grader (the 4B,
+`completeBackground()`, the dataset's own reference answer never
+reaching the turn itself, only the grader) into judged accuracy per
+type; LoCoMo by F1 with the adversarial rule above.
+
+A code review, before any live run (nothing here has executed yet -
+engine use is the coordinator's own hold, cleared like a seeded set),
+found and this fixes four things that would have quietly produced
+wrong numbers even though `tsc` had nothing to say about any of them:
+
+1. **The prompt clock never reached the persisted timestamp.**
+   `__setPromptClockForBench()` only feeds `frozenClock()`
+   (`turnEngine.ts`'s own live-turn path); the stored `created_at` on
+   every ingested row actually came from `evaluateSafety()`'s own
+   `checked_at`, which the safety classifier stamps with the real
+   wall clock unconditionally. Every ingested row would have landed
+   with today's date regardless of the dataset's own history, and
+   `memoryJudge.ts`'s own extraction prompt is built from that exact
+   field - the judge would have grounded every fact in the wrong
+   year, for every row, silently. Fixed by overwriting
+   `safety.checked_at` to the session's own instant after the call.
+2. **Cleanup between questions silently failed.** A bare
+   `DELETE FROM people` hits a foreign-key violation the moment any
+   row anywhere references that person (always, after ingestion;
+   SQLite runs with `foreign_keys = ON`), caught and only logged - so
+   the previous question's household-scope memory facts (no owning
+   person, visible to any household member by design) stayed live for
+   the next question's own fresh person, contaminating the very
+   per-question isolation the accuracy numbers depend on. Fixed with
+   a full, dependency-ordered wipe of every table this run's own
+   ingestion, the judge or `subjects.ts` could have written
+   (`resetReplayDatabase()`) between questions - never `resetDb()`
+   (`tests/reset-db.ts`), which is guarded to refuse outside a
+   disposable `bun test` directory and is explicitly not a `bun run`
+   script's to call.
+3. **One bad question could lose every earlier one's result.** The
+   per-question loop had a `finally` but no `catch`; an exception
+   anywhere inside one question propagated out of the whole run
+   before anything was written to disk. Now caught per question (and,
+   for LoCoMo, per question within a shared conversation too), scored
+   incorrect with the error recorded, the run keeps going.
+4. **LoCoMo's own category-5 total was reported as a misleading
+   `mean F1=0.000`.** `scoreLocomo()` always sets `f1: 0` for the
+   adversarial category (there is no "right answer" to score against);
+   `CategoryTotal.meanF1` is now `null` for category 5 and the report
+   prints only its own real metric, the refusal rate.
+
+Two more, documented rather than fixed (both genuine, both real
+constraints of the existing schema/pipeline, not oversights): the
+ingested row's own `source` is `"model"` (`TurnValue`'s enum,
+`wire.ts`, out of scope to extend here) - the only value that both
+avoids implying a package ran and stays judgeable, at the accepted
+cost that `episodes.ts` and every other `source` reader treat a
+replayed row exactly like a real, live MaiPai reply; and the
+dataset's own reply-side text never passes through the real
+output-safety gate a live reply would (that needs
+`gateOutputSafety()`'s own guard/redaction pipeline, out of scope to
+pull in here) - `ingestRow()` now at least re-checks it and logs
+loudly if a line would have been flagged, rather than staying silent.
+`maybeRefreshConversationSummary()` (exported, called directly) also
+now runs after ingestion, since the real engine's own equivalent
+(`scheduleSummaryRefresh()`) is private to `turnEngine.ts` and debounced
+besides - without it, `buildConversationWindow()` would have shown the
+live question turn a hard-truncated window with no summary fallback
+for anything older than its own newest-turns-kept bound.
+
+Verified so far (no engine, per the hold): `bun run lint` (`tsc
+--noEmit`) clean; 30 new tests (`datasetsReplayIngest.test.ts`,
+`datasetsReplayScore.test.ts`) plus the existing datasets-directory
+suite, 120 tests across 12 files, all green. Left, on the
+coordinator's "clear": the dry run (one oracle question, ingested and
+asked for real) and, once that's read, the first full oracle baseline
+on a quiet machine, reported here per type with the log path.
