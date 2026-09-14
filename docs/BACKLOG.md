@@ -1270,6 +1270,28 @@ invented for the roster's household, and added to
     the companions and manifest changes (SPEC-02). Exit: the spec suite,
     `bash scripts/check.sh`.
 
+    Second reading taken 2026-09-14, Session B, same bump: an outside
+    review of 29ac71f found the schema's own `fact_confidence` default
+    (`null`) never matched what a memory record actually requires
+    (non-null, 1.0 on migration) - a `memory-legacy` fixture now proves
+    the schema's own migration claim is a real, constructible record,
+    not just prose. The bigger finding: every cross-field rule (scope
+    needing its person/companion_id, `child_disclosure`'s scope rule,
+    `fact_confidence`'s kind rule) lived only in the TypeScript
+    validator, so a robot validating by the Python binding alone could
+    write what the hub refuses. `spec/records/py/validate.py` is now
+    that rule set's Python twin, plus seven more refusals in both
+    languages: a non-companion scope with a `companion_id`,
+    `child_disclosure_set_by`/`_set_at` set inconsistently,
+    `retrieval_feedback`'s `corrections`/`last_corrected_at` pairing,
+    `TurnSignal.source: head` needing a `classifier_id` (and no other
+    source having one), clause ranges unordered, overlapping, or past
+    the utterance's length, an `OpenQuestion` whose status contradicts
+    its own timestamps, and a world `SubjectRef` with `source_kind` and
+    `stable_key` not both set or both null. A refusal fixture per rule
+    runs in both suites (`spec/tests/ts/record-validate.test.ts`,
+    the new `spec/tests/py/test_record_validate.py`).
+
 <a id="reg-01"></a>
 
 - [ ] **REG-01: A statement is not a request, and the assistant register is stripped** (S)

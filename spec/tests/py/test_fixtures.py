@@ -97,7 +97,7 @@ def test_source_fixture():
     Source.model_validate(load_fixture("source.example.json"))
 
 
-@pytest.mark.parametrize("kind", ["memory", "entity", "episode"])
+@pytest.mark.parametrize("kind", ["memory", "memory-legacy", "entity", "episode"])
 def test_memory_record_fixtures(kind):
     MemoryRecord.model_validate(load_fixture(f"memory-record.{kind}.example.json"))
 

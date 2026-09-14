@@ -16,6 +16,9 @@ import {
   validateGrant,
   validateList,
   validateMemoryRecord,
+  validateTurnSignal,
+  validateOpenQuestion,
+  validateSubjectRef,
   inverseRelationship,
 } from "../../records/ts/validate.js";
 import type { Entity } from "../../gen/ts/entity.js";
@@ -23,6 +26,9 @@ import type { Relationship } from "../../gen/ts/relationship.js";
 import type { Grant } from "../../gen/ts/grant.js";
 import type { List } from "../../gen/ts/list.js";
 import type { MemoryRecord } from "../../gen/ts/memory-record.js";
+import type { TurnSignal } from "../../gen/ts/turn-signal.js";
+import type { OpenQuestion } from "../../gen/ts/open-question.js";
+import type { SubjectRef } from "../../gen/ts/subject-ref.js";
 
 const FIXTURES = join(import.meta.dir, "..", "..", "fixtures", "records");
 const load = <T>(name: string): T => JSON.parse(readFileSync(join(FIXTURES, name), "utf-8")) as T;
@@ -35,6 +41,10 @@ const estrangedRel = () => load<Relationship>("relationship.estranged.example.js
 const inferredRel = () => load<Relationship>("relationship.inferred.example.json");
 const grant = () => load<Grant>("grant.example.json");
 const memoryRecord = () => load<MemoryRecord>("memory-record.memory.example.json");
+const legacyMemoryRecord = () => load<MemoryRecord>("memory-record.memory-legacy.example.json");
+const turnSignal = () => load<TurnSignal>("turn-signal.example.json");
+const openQuestion = () => load<OpenQuestion>("open-question.example.json");
+const worldSubjectRef = () => load<SubjectRef>("subject-ref.world.example.json");
 const shoppingList = () => load<List>("list.shopping.example.json");
 const todoList = () => load<List>("list.todo.example.json");
 const customList = () => load<List>("list.custom.example.json");
@@ -162,6 +172,152 @@ describe("memory record rules", () => {
       confidence_evidence: [{ source_id: "turn-1", source_person_id: null, kind: "initial_assertion", observed_at: "2026-09-14T00:00:00Z" }],
     };
     expect(validateMemoryRecord(withEvidence)).toContainEqual(expect.stringContaining("confidence_evidence is only meaningful"));
+  });
+
+  // Item 1b (SPEC-01's second reading, 2026-09-14): the migrated-legacy
+  // shape the schema's own description promises (1.0, one
+  // legacy_assertion entry) is a real, valid record, not just prose.
+  test("the migrated-legacy fixture is itself valid", () => {
+    expect(validateMemoryRecord(legacyMemoryRecord())).toEqual([]);
+  });
+
+  test("child_disclosure_set_by and _set_at must be set together", () => {
+    expect(
+      validateMemoryRecord({ ...memoryRecord(), scope: "household", person: null, child_disclosure_set_by: "person-a1b2c3", child_disclosure_set_at: null }),
+    ).toContainEqual(expect.stringContaining("must be set together"));
+    expect(
+      validateMemoryRecord({ ...memoryRecord(), scope: "household", person: null, child_disclosure_set_by: null, child_disclosure_set_at: "2026-09-14T00:00:00Z" }),
+    ).toContainEqual(expect.stringContaining("must be set together"));
+  });
+
+  // A third code review on item 1b caught this: the pairing test above
+  // only proves the two fields move together, not that either is
+  // meaningless on a scope where child_disclosure itself must stay null.
+  test("child_disclosure_set_by and _set_at are also meaningless on person and self scope", () => {
+    expect(
+      validateMemoryRecord({ ...memoryRecord(), scope: "person", child_disclosure_set_by: "person-a1b2c3", child_disclosure_set_at: "2026-09-14T00:00:00Z" }),
+    ).toContainEqual(expect.stringContaining("meaningless on person scope"));
+    expect(
+      validateMemoryRecord({ ...memoryRecord(), scope: "self", person: null, child_disclosure_set_by: "person-a1b2c3", child_disclosure_set_at: "2026-09-14T00:00:00Z" }),
+    ).toContainEqual(expect.stringContaining("meaningless on self scope"));
+  });
+
+  test("retrieval_feedback.corrections and last_corrected_at move together", () => {
+    expect(
+      validateMemoryRecord({ ...memoryRecord(), retrieval_feedback: { corrections: 0, last_corrected_at: "2026-09-14T00:00:00Z" } }),
+    ).toContainEqual(expect.stringContaining("must be null while corrections is 0"));
+    expect(
+      validateMemoryRecord({ ...memoryRecord(), retrieval_feedback: { corrections: 2, last_corrected_at: null } }),
+    ).toContainEqual(expect.stringContaining("must be set once corrections is above 0"));
+    expect(
+      validateMemoryRecord({ ...memoryRecord(), retrieval_feedback: { corrections: 0, last_corrected_at: null } }),
+    ).toEqual([]);
+  });
+});
+
+describe("turn signal rules", () => {
+  test("every shipped fixture is valid", () => {
+    expect(validateTurnSignal(turnSignal())).toEqual([]);
+  });
+
+  test("source: head must carry a classifier_id", () => {
+    expect(validateTurnSignal({ ...turnSignal(), source: "head", classifier_id: null })).toContainEqual(
+      expect.stringContaining("must carry a classifier_id"),
+    );
+  });
+
+  test("classifier_id is only meaningful when source is head", () => {
+    expect(validateTurnSignal({ ...turnSignal(), source: "rule", classifier_id: "act-head-v1" })).toContainEqual(
+      expect.stringContaining("only meaningful when source is head"),
+    );
+  });
+
+  test("a clause range unordered within itself is rejected", () => {
+    const signal = turnSignal();
+    const bad = { ...signal, clauses: [{ ...signal.clauses[0]!, range: { start: 10, end: 2 } }] };
+    expect(validateTurnSignal(bad)).toContainEqual(expect.stringContaining("unordered"));
+  });
+
+  test("a clause range past the utterance's own length is rejected when the text is supplied", () => {
+    const signal = turnSignal();
+    const bad = { ...signal, clauses: [{ ...signal.clauses[0]!, range: { start: 0, end: 500 } }] };
+    expect(validateTurnSignal(bad, "short utterance")).toContainEqual(expect.stringContaining("runs past the utterance's own length"));
+    // Without the utterance text, the same signal is not checked against a length at all.
+    expect(validateTurnSignal(bad)).toEqual([]);
+  });
+
+  test("overlapping clause ranges are rejected", () => {
+    const signal = turnSignal();
+    const base = signal.clauses[0]!;
+    const bad = { ...signal, clauses: [{ ...base, range: { start: 0, end: 10 } }, { ...base, range: { start: 5, end: 15 } }] };
+    expect(validateTurnSignal(bad)).toContainEqual(expect.stringContaining("overlap"));
+  });
+});
+
+describe("open question rules", () => {
+  test("every shipped fixture is valid", () => {
+    expect(validateOpenQuestion(openQuestion())).toEqual([]);
+  });
+
+  test("pending must not carry asked_at", () => {
+    expect(validateOpenQuestion({ ...openQuestion(), status: "pending", asked_at: "2026-09-14T00:00:00Z", resolved_at: null })).toContainEqual(
+      expect.stringContaining("must not carry asked_at"),
+    );
+  });
+
+  test("asked, answered and declined must carry asked_at", () => {
+    for (const status of ["asked", "answered", "declined"] as const) {
+      expect(validateOpenQuestion({ ...openQuestion(), status, asked_at: null })).toContainEqual(
+        expect.stringContaining("must carry asked_at"),
+      );
+    }
+  });
+
+  test("answered and declined must carry resolved_at", () => {
+    for (const status of ["answered", "declined"] as const) {
+      expect(
+        validateOpenQuestion({ ...openQuestion(), status, asked_at: "2026-09-14T00:00:00Z", resolved_at: null }),
+      ).toContainEqual(expect.stringContaining("must carry resolved_at"));
+    }
+  });
+
+  test("pending, asked and expired must not carry resolved_at", () => {
+    for (const status of ["pending", "asked", "expired"] as const) {
+      expect(
+        validateOpenQuestion({ ...openQuestion(), status, asked_at: status === "pending" ? null : "2026-09-14T00:00:00Z", resolved_at: "2026-09-14T01:00:00Z" }),
+      ).toContainEqual(expect.stringContaining("must not carry resolved_at"));
+    }
+  });
+
+  test("a valid answered question has both timestamps", () => {
+    expect(
+      validateOpenQuestion({ ...openQuestion(), status: "answered", asked_at: "2026-09-14T00:00:00Z", resolved_at: "2026-09-14T01:00:00Z" }),
+    ).toEqual([]);
+  });
+});
+
+describe("subject ref rules", () => {
+  test("every shipped fixture is valid", () => {
+    expect(validateSubjectRef(worldSubjectRef())).toEqual([]);
+  });
+
+  test("household and unresolved refs have nothing to check", () => {
+    expect(validateSubjectRef({ type: "household", entity_id: "ent-a1b2c3", carried_question: null })).toEqual([]);
+    expect(
+      validateSubjectRef({ type: "unresolved", surface_form: "Quill", candidate_kinds: [], provenance: "turn-1", confidence: 0.4, carried_question: null }),
+    ).toEqual([]);
+  });
+
+  test("a world ref's source_kind and stable_key must be set together", () => {
+    const ref = worldSubjectRef();
+    if (ref.type !== "world") throw new Error("fixture is not the world variant");
+    expect(validateSubjectRef({ ...ref, source_kind: null, stable_key: "Q123456789" })).toContainEqual(
+      expect.stringContaining("must be set together"),
+    );
+    expect(validateSubjectRef({ ...ref, source_kind: "wikidata", stable_key: null })).toContainEqual(
+      expect.stringContaining("must be set together"),
+    );
+    expect(validateSubjectRef({ ...ref, source_kind: null, stable_key: null })).toEqual([]);
   });
 });
 

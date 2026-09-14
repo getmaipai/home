@@ -54,7 +54,7 @@ describe("record fixtures validate against their generated Zod models", () => {
     ).not.toThrow();
   });
 
-  for (const kind of ["memory", "entity", "episode"]) {
+  for (const kind of ["memory", "memory-legacy", "entity", "episode"]) {
     test(`memory-record.${kind}.example.json`, () => {
       expect(() =>
         MemoryRecord.parse(loadFixture(`memory-record.${kind}.example.json`)),

@@ -23,6 +23,9 @@ import type { Relationship } from "../../gen/ts/relationship.js";
 import type { Grant } from "../../gen/ts/grant.js";
 import type { List } from "../../gen/ts/list.js";
 import type { MemoryRecord } from "../../gen/ts/memory-record.js";
+import type { TurnSignal } from "../../gen/ts/turn-signal.js";
+import type { OpenQuestion } from "../../gen/ts/open-question.js";
+import type { SubjectRef } from "../../gen/ts/subject-ref.js";
 
 const VOCAB_DIR = join(import.meta.dir, "..", "..", "vocab");
 
@@ -324,6 +327,20 @@ export function validateMemoryRecord(record: MemoryRecord): Problems {
     if (record.child_disclosure !== null) {
       problems.push(`child_disclosure is meaningless on ${record.scope} scope and must stay null`);
     }
+    // A third code review on item 1b caught the gap: the pairing check
+    // just below only proves set_by and set_at move together, not that
+    // either is meaningless here too - a person/self record could claim
+    // an adult set a disclosure the record doesn't even carry.
+    if (record.child_disclosure_set_by !== null || record.child_disclosure_set_at !== null) {
+      problems.push(`child_disclosure_set_by and child_disclosure_set_at are meaningless on ${record.scope} scope and must stay null`);
+    }
+  }
+
+  // Item 1b (a second reading of SPEC-01, 2026-09-14): set_by and set_at
+  // are one fact together (who acted, and when) - one present without
+  // the other is a half-written record no reader can trust.
+  if ((record.child_disclosure_set_by === null) !== (record.child_disclosure_set_at === null)) {
+    problems.push("child_disclosure_set_by and child_disclosure_set_at must be set together, or both null");
   }
 
   // Section 14: fact credence exists only where a proposition can be
@@ -336,7 +353,88 @@ export function validateMemoryRecord(record: MemoryRecord): Problems {
     if (record.confidence_evidence.length > 0) problems.push(`confidence_evidence is only meaningful on a memory record, not a ${record.record_kind}`);
   }
 
+  // Item 1b: retrieval_feedback's own two fields tell one story (how many
+  // times, and when most recently) - a count with no date, or a date with
+  // no count, is a signal REVIEW-01 could never have produced honestly.
+  const feedback = record.retrieval_feedback;
+  if (feedback.corrections === 0 && feedback.last_corrected_at !== null) {
+    problems.push("retrieval_feedback.last_corrected_at must be null while corrections is 0");
+  }
+  if (feedback.corrections > 0 && feedback.last_corrected_at === null) {
+    problems.push("retrieval_feedback.last_corrected_at must be set once corrections is above 0");
+  }
+
   return problems;
+}
+
+/** Item 1b: TurnSignal.source and classifier_id are one fact - which
+ * layer produced the signal, and (only for the head layer) which
+ * artifact. `clauses` ranges are checked against each other and,
+ * when the turn's own utterance is supplied, against its length -
+ * optional because a signal can be validated on its own, off the
+ * turn record that carries the text a clause range indexes into. */
+export function validateTurnSignal(signal: TurnSignal, utteranceText?: string): Problems {
+  const problems: Problems = [];
+
+  if (signal.source === "head") {
+    if (signal.classifier_id === null) problems.push("source: head must carry a classifier_id");
+  } else if (signal.classifier_id !== null) {
+    problems.push(`classifier_id is only meaningful when source is head, not ${signal.source}`);
+  }
+
+  const sorted = [...signal.clauses].sort((a, b) => a.range.start - b.range.start);
+  for (let i = 0; i < sorted.length; i++) {
+    const { start, end } = sorted[i]!.range;
+    if (end < start) problems.push(`a clause range is unordered: start ${start} is after end ${end}`);
+    if (utteranceText !== undefined && end > utteranceText.length) {
+      problems.push(`a clause range (${start}-${end}) runs past the utterance's own length (${utteranceText.length})`);
+    }
+    const next = sorted[i + 1];
+    if (next && next.range.start < end) {
+      problems.push(`clause ranges overlap: ${start}-${end} and ${next.range.start}-${next.range.end}`);
+    }
+  }
+
+  return problems;
+}
+
+/** Item 1b: an OpenQuestion's own status and its timestamps have to
+ * agree on what has actually happened. pending is strictly before
+ * asked_at exists; asked and answered/declined require it. Only
+ * answered/declined may carry resolved_at - expired is a lapse, not a
+ * resolution, and its own asked_at is left unconstrained (an
+ * expired question may have lapsed before it was ever asked, or after,
+ * per its own description). */
+export function validateOpenQuestion(question: OpenQuestion): Problems {
+  const problems: Problems = [];
+
+  if (question.status === "pending" && question.asked_at !== null) {
+    problems.push("a pending open question must not carry asked_at yet");
+  }
+  if ((question.status === "asked" || question.status === "answered" || question.status === "declined") && question.asked_at === null) {
+    problems.push(`status ${question.status} must carry asked_at`);
+  }
+  if ((question.status === "answered" || question.status === "declined") && question.resolved_at === null) {
+    problems.push(`status ${question.status} must carry resolved_at`);
+  }
+  if ((question.status === "pending" || question.status === "asked" || question.status === "expired") && question.resolved_at !== null) {
+    problems.push(`status ${question.status} must not carry resolved_at`);
+  }
+
+  return problems;
+}
+
+/** Item 1b: a world SubjectRef's source_kind and stable_key name one
+ * typed source's answer together - a kind with no key, or a key with
+ * no kind naming what answered, is not traceable to anything. Only the
+ * world variant carries either field; household and unresolved refs
+ * have nothing to check here. */
+export function validateSubjectRef(ref: SubjectRef): Problems {
+  if (ref.type !== "world") return [];
+  if ((ref.source_kind === null) !== (ref.stable_key === null)) {
+    return ["a world SubjectRef's source_kind and stable_key must be set together, or both null"];
+  }
+  return [];
 }
 
 /** Step 8's own cross-field rule, the same shape Entity's place_kind
