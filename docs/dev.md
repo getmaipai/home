@@ -13883,36 +13883,51 @@ system need custom training or reinforcement learning, and should
 something review transcripts, replies, memories, captures and prompts
 and adjust.
 
-**The hard rule.** Production conversations never modify model
-weights. No per-household fine-tune, no reinforcement learning from
-household chat, no online adapter, no silent update of anything
-learned from an uncertain signal. The defects this pass designed
-against are engine defects (what is known, what the subject is,
-whether a lookup runs, whether a reply is a sentence); training would
-mask them. A model file that had absorbed household facts could not
-honor "forget that", the Memory page, retention or a person leaving,
-and a family cannot validate a fine-tuned chat model in their kitchen
+**The rule: the product evolves, through a gated path (Jesse,
+2026-09-13: "we want our product to evolve", replacing an earlier
+"never").** Learning that changes a model, in the house or by us, is
+allowed on four conditions and refused without any of them: it is
+opt-in per household (never a default, never silent); it runs
+locally and nothing leaves the house; it produces a versioned
+artifact (an adapter or a model package with a checksum) that a
+person can switch off or roll back in one click, with the base model
+untouched underneath; and it takes effect only after the full
+conversation bench, run locally on the shipped fixture, passes
+against the unchanged baseline with no protected row regressing.
+The child-safety invariants and the guards are outside the reach of
+any learned change, in the engine, not the weights. What stays
+refused: continuous or online updates from ordinary chat (no gate can
+run per turn), reinforcement from replies nobody corrected, and a
+household's transcripts as an untracked dataset. Today the defects
+this pass designed against are engine defects (what is known, what
+the subject is, whether a lookup runs, whether a reply is a
+sentence); training would mask them, so the engine work comes first
+and the learning items below (REVIEW-01, CUR-01, PREF-01) are the
+first way the product evolves in a house. A learned model file also
+cannot honor "forget that" or a person leaving on its own, which is
+why a learned artifact is versioned and switchable rather than
+merged, and why a family's validation is the bench, never a feeling
 (the wake-word lesson: a number from the generator that made the
-training set is not evidence). Any future fine-tune is ours, done
-once, offline, on a reviewed dataset of synthetic and roster-name
-conversations, versioned as a catalog model package with a pinned
-checksum, and it ships only if the full conversation bench passes
-against the unchanged baseline. The candidates, in order of likely
-payoff, none scheduled: the memory extractor for cost once MEM-06's
-validator holds (a 1.7B trained on the extraction task with the
-validator behind it against the 4B's 1.8 s per turn; training is
-never a substitute for the validator); a small classifier for
-utterance shape, claim type and intent on the routing and guard
-corpora, deterministic at inference; a companion adapter only if
-EVAL-03's activation steering is shown, repeatedly, unable to make a
-companion distinct. Reinforcement learning is considered only for a
-measured problem that routing, constrained outputs, retrieval and a
-small supervised adapter cannot solve, and nothing meets that bar.
-The two things that are trained or enrolled in the house stay narrow:
-wake words (a small audio classifier under the org's training rules,
-the household's false triggers as negatives) and speaker prints
-(SPEAK-01: enrollment with consent, a local embedding per person,
-compared at turn time, never updated from an uncertain match).
+training set is not evidence). Our own fine-tunes, done once and
+shipped as catalog model packages under the same gate, are the
+candidates in order of likely payoff, none scheduled: the memory
+extractor for cost once MEM-06's validator holds (a 1.7B trained on
+the extraction task with the validator behind it against the 4B's
+1.8 s per turn; training is never a substitute for the validator); a
+small classifier for utterance shape, claim type and intent on the
+routing and guard corpora, deterministic at inference; a companion
+adapter if EVAL-03's activation steering is shown unable to make a
+companion distinct; and, once the engine items land and the bench
+shows what remains a model problem, a household-opt-in adapter under
+the four conditions, the item written when that evidence exists.
+Reinforcement learning is considered only for a measured problem
+that routing, constrained outputs, retrieval and a supervised adapter
+cannot solve. The two things trained or enrolled in the house today
+stay narrow: wake words (a small audio classifier under the org's
+training rules, the household's false triggers as negatives) and
+speaker prints (SPEAK-01: enrollment with consent, a local embedding
+per person, compared at turn time, never updated from an uncertain
+match).
 
 **What adapts.** Records and bounded configuration the engine reads,
 each with provenance the person can see and undo, never a generated
@@ -13984,8 +13999,8 @@ them items:
 **What the loop must never do.** Rewrite a prompt from transcript
 criticism; treat the hub's own reply as proof a household fact is
 true; turn an inferred relationship into an accepted memory; update
-weights from conversations; reinforce a reply because nobody corrected
-it; use household transcripts as an untracked dataset; delete
+weights outside the gated path above; reinforce a reply because nobody
+corrected it; use household transcripts as an untracked dataset; delete
 contradictory evidence to look consistent; let one companion's
 behavior change the shared engine, guards or evidence policy.
 
@@ -14021,5 +14036,7 @@ family sees improving is their data, with a paper trail.
 5. **After CHAT-16:** COMP-01, COMP-02, COMP-03 to COMP-05, COMP-06,
    SPEAK-01, WAKE-02, the robot parity line.
 6. **Learning (section 11), after MEM-06 and ASK-01:** CUR-01, then
-   REVIEW-01 (spec first), then PREF-01 (spec first); the training
-   policy is a standing rule from today, with no item.
+   REVIEW-01 (spec first), then PREF-01 (spec first); the gated
+   learning path is the standing rule from today, and its first
+   opt-in adapter item is written when the bench shows a model
+   problem the engine cannot decide.
