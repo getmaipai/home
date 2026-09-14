@@ -2711,3 +2711,100 @@ Re-verified after every round: the direct `tsc` invocation above,
 clean each time; a full `check.sh` gate, green, run fresh after the
 fourth round's three fixes and again after the fifth round's two.
 Closes #105.
+
+## Lane 12 item 4: EVAL-07's dataset half
+
+EVAL-07 (BACKLOG; `docs/plans/media-conversation-program-2026-09-13.md`,
+"EVAL-07") splits into the engine replay (Session A, memory mode,
+later) and everything before it, which touches no engine code and
+lands here: `backend/scripts/bench/datasets/`.
+
+**The internal form** (`types.ts`), so Session A's own replay consumes
+one shape regardless of which public dataset it came from:
+
+```ts
+interface DatasetTurn {
+  turnId: string | null;   // the dataset's own reference (LoCoMo's "D1:3"), or a synthesized one
+  speaker: string;
+  text: string;
+  act: number | null;      // DailyDialog's own 1-4 (dev.md section 12's mapping)
+  emotion: number | null;  // DailyDialog's own 0-6
+  isEvidence: boolean;     // LongMemEval's has_answer, or cited by a LoCoMo qa row
+}
+interface DatasetSession {
+  sessionId: string;
+  timestamp: string | null;  // the dataset's own date string, not normalized here
+  turns: DatasetTurn[];
+}
+interface DatasetConversation {
+  id: string;
+  source: "longmemeval" | "locomo" | "dailydialog";
+  modality: "text";
+  sessions: DatasetSession[];
+}
+```
+
+Plus two per-dataset question shapes carried alongside, never folded
+into the conversation itself (the question is graded, the conversation
+is what it's graded against): `LongMemEvalQuestion` (questionId,
+questionType, isAbstention read from the id's own `_abs` suffix,
+question, answer, questionDate, conversationId, answerSessionIds) and
+`LocomoQuestion` (conversationId, question, answer, adversarialAnswer,
+category 1-5, evidenceTurnIds). LongMemEval gives each question its own
+distinct haystack, so a question's own id is its conversation's id, one
+to one; LoCoMo's ten conversations each carry about 200 questions,
+many to one.
+
+**The registry** (`registry.json` + `registry.ts`): one entry per
+dataset actually downloaded into `home/data-scratch/datasets/`
+(SOURCES.md and SHA256SUMS beside the files, git-ignored, never copied
+into the tracked tree) - name, version, url, per-file sha256 (copied
+from this repo's own SHA256SUMS, never trusted from a listing),
+license, attribution, collection method, whether it holds real
+identities, allowed uses, the held-out split, which loader module
+reads it (`null` for a dataset downloaded ahead of the item that needs
+it - Taskmaster-1, CCPE-M, MultiWOZ, QuAC, GoEmotions, all phenomenon-
+mining or ACT-02 sources, none of them this item's job). `verify.ts`
+checks every registered file's checksum and never downloads; a
+separate `download.ts` fetches only what `verify` reports missing, at
+the registry's own pinned URL, and deletes anything that fails its
+checksum after fetching rather than keeping a half-trusted file. Live
+run, 2026-09-14: `verify.ts` reports 21 ok, 0 missing, 0 mismatched
+against every file this session's own earlier download actually
+produced.
+
+**The loaders**, one per dataset this item owns (`longmemeval.ts`,
+`locomo.ts`, `dailydialog.ts`), each a pure function from the
+dataset's own raw JSON (or, for DailyDialog, its own three aligned
+text files) to the internal form above - no file I/O inside the pure
+function itself, which is what keeps each one's own unit test small,
+offline and embedded-sample-only (`backend/tests/datasetsLongMemEval
+.test.ts`, `datasetsLocomo.test.ts`, `datasetsDailyDialog.test.ts`),
+never reading the real multi-hundred-megabyte files. Each loader was
+also run live against the real downloaded file once, to prove the
+unit test's small embedded sample was not accidentally testing a
+shape the real release does not have: LongMemEval's S set loads to
+500 conversations and 500 questions (30 of them abstention, matching
+`_abs`-suffixed ids); the oracle file the same shape at 500/500; LoCoMo
+loads to 10 conversations and 1,986 questions across all five
+categories; DailyDialog's test split (via `loadDailyDialogSplit()`,
+which shells out to the system `unzip -p` rather than extracting
+anything to disk) loads to 1,000 conversations.
+
+**The sample** (`sample.ts`): the coherence review's own rule (dev.md,
+"Coherence review, 2026-09-14", question 5) - 40 questions per question
+type, abstention questions prioritized within their own type, seeded
+and deterministic (a small dependency-free `mulberry32` PRNG, a fixed
+seed constant `SAMPLE_SEED`), knowledge-update ordered first among
+types in the manifest. `generate-sample-manifest.ts` regenerates
+`sample-manifest.json` from the real S set (committed output, ids
+only, the same "regenerate and commit" shape `spec/`'s own codegen
+uses) - live run, 2026-09-14: 230 ids (40 each for knowledge-update,
+multi-session, single-session-assistant, single-session-user and
+temporal-reasoning; single-session-preference keeps all 30 it has,
+fewer than the target).
+
+**Out of scope, left for later items**: running anything through the
+engine (Session A's replay); the phenomenon-mining tags over
+Taskmaster-1/CCPE-M/QuAC/MultiWOZ (after CHAT-16); GoEmotions training
+(ACT-02). Nothing under `backend/src/` touched.

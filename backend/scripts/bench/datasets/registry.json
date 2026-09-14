@@ -1,0 +1,194 @@
+{
+  "$comment": "Lane 12 item 4: one entry per dataset downloaded into home/data-scratch/datasets/ (git-ignored, never copied into the tracked tree, never shipped). sha256 values are copied from data-scratch/datasets/SHA256SUMS, the checksums this repo's own download actually produced (org rule: never trusted from a listing). `loader` names the module in this directory that reads it, or null for a dataset with no loader yet (downloaded for a later item - the phenomenon-mining sources, ACT-02's emotion-head training data). `heldOut` names the split this project reserves and never samples questions or scenarios from, so a later item's prompt-writing or tuning cannot see what the eval checks.",
+  "datasets": [
+    {
+      "name": "longmemeval-cleaned",
+      "version": "cleaned (S and oracle)",
+      "url": "https://huggingface.co/datasets/xiaowu0162/longmemeval-cleaned",
+      "license": "MIT",
+      "attribution": "Wu et al., \"LongMemEval: Benchmarking Chat Assistants on Long-Term Interactive Memory\", ICLR 2025.",
+      "collectionMethod": "Synthetic long-term chat histories assembled by the paper's authors (GPT-4-authored sessions plus real ShareGPT-derived filler sessions as distractors), with hand-authored and verified questions over six question types.",
+      "holdsRealIdentities": true,
+      "holdsRealIdentitiesNote": "The filler/distractor sessions in the S set are drawn from ShareGPT, real (if pseudonymous) user-model conversations shared publicly by their authors - treated conservatively as holding real identities even though the questions and answer-bearing sessions themselves are synthetic.",
+      "allowedUses": ["research", "internal-eval"],
+      "heldOut": "none named by the paper; this project holds out the ids NOT in sample-manifest.json (sample.ts's own selection) from any prompt-writing or tuning session, per the coherence review's rule.",
+      "loader": "longmemeval.ts",
+      "files": [
+        { "path": "longmemeval_s_cleaned.json", "sha256": "d6f21ea9d60a0d56f34a05b609c79c88a451d2ae03597821ea3d5a9678c3a442" },
+        { "path": "longmemeval_oracle.json", "sha256": "821a2034d219ab45846873dd14c14f12cfe7776e73527a483f9dac095d38620c" }
+      ],
+      "download": [
+        { "path": "longmemeval_s_cleaned.json", "url": "https://huggingface.co/datasets/xiaowu0162/longmemeval-cleaned/resolve/main/longmemeval_s_cleaned.json" },
+        { "path": "longmemeval_oracle.json", "url": "https://huggingface.co/datasets/xiaowu0162/longmemeval-cleaned/resolve/main/longmemeval_oracle.json" }
+      ]
+    },
+    {
+      "name": "longmemeval-cleaned-m",
+      "version": "cleaned (M)",
+      "url": "https://huggingface.co/datasets/xiaowu0162/longmemeval-cleaned",
+      "license": "MIT",
+      "attribution": "Wu et al., \"LongMemEval: Benchmarking Chat Assistants on Long-Term Interactive Memory\", ICLR 2025.",
+      "collectionMethod": "Same as longmemeval-cleaned, with a larger distractor pool per question (the paper's own \"M\" haystack size).",
+      "holdsRealIdentities": true,
+      "holdsRealIdentitiesNote": "Same ShareGPT-derived filler sessions as the S set, at a larger scale.",
+      "allowedUses": ["research", "internal-eval"],
+      "heldOut": "not sampled by this item at all (the S set's own 500 questions already cover every question id the M set reuses); kept only in case a future item needs the larger haystack.",
+      "loader": null,
+      "files": [
+        { "path": "longmemeval_m_cleaned.json", "sha256": "9d79e5524794a2e6900a3aa9cb7d9152c5a3e8319c9a87c25494ba1eacee495f" }
+      ],
+      "download": [
+        { "path": "longmemeval_m_cleaned.json", "url": "https://huggingface.co/datasets/xiaowu0162/longmemeval-cleaned/resolve/main/longmemeval_m_cleaned.json" }
+      ]
+    },
+    {
+      "name": "locomo",
+      "version": "locomo10 (the ten publicly released of the paper's fifty)",
+      "url": "https://github.com/snap-research/locomo",
+      "license": "CC BY-NC 4.0",
+      "attribution": "Maharana et al., \"Evaluating Very Long-Term Conversational Memory of LLM Agents\", 2024 (Snap Research).",
+      "collectionMethod": "Fully synthetic: LLM agents role-playing two generated personas over up to 35 dated sessions, with hand-verified question-answer pairs across five question categories.",
+      "holdsRealIdentities": false,
+      "allowedUses": ["research", "internal-eval", "non-commercial"],
+      "heldOut": "none named by the paper; this project treats the whole released set as eval-only (ingested whole per the coherence review, never used to tune a prompt).",
+      "loader": "locomo.ts",
+      "files": [
+        { "path": "locomo10.json", "sha256": "79fa87e90f04081343b8c8debecb80a9a6842b76a7aa537dc9fdf651ea698ff4" }
+      ],
+      "download": [
+        { "path": "locomo10.json", "url": "https://raw.githubusercontent.com/snap-research/locomo/main/data/locomo10.json" }
+      ]
+    },
+    {
+      "name": "dailydialog",
+      "version": "Li et al. 2017 (roskoN mirror)",
+      "url": "https://huggingface.co/datasets/roskoN/dailydialog",
+      "license": "CC BY-NC-SA 4.0",
+      "attribution": "Li et al., \"DailyDialog: A Manually Labelled Multi-turn Dialogue Dataset\", IJCNLP 2017.",
+      "collectionMethod": "Dialogues drawn from English-practice websites for everyday conversation, manually labelled with a dialogue act and an emotion per turn.",
+      "holdsRealIdentities": false,
+      "allowedUses": ["research", "internal-eval", "non-commercial", "share-alike"],
+      "heldOut": "the test split (test.zip) is never used for register-reference sampling in this project, only train and validation.",
+      "loader": "dailydialog.ts",
+      "files": [
+        { "path": "dailydialog/train.zip", "sha256": "c5179ab5a9a86a77b9d29114087c6b82cc4cb366abea25a43a0c24be761133f7" },
+        { "path": "dailydialog/validation.zip", "sha256": "1dbcb00a0b4fe709788ce6604b561ba76557c88fe41f049d7899287838f0ec6a" },
+        { "path": "dailydialog/test.zip", "sha256": "cfffc0bab93a3697c2562a9ee35c4533f0de2a93e86a4e4d3ea45cbde4bea00f" }
+      ],
+      "download": [
+        { "path": "dailydialog/train.zip", "url": "https://huggingface.co/datasets/roskoN/dailydialog/resolve/main/train.zip" },
+        { "path": "dailydialog/validation.zip", "url": "https://huggingface.co/datasets/roskoN/dailydialog/resolve/main/validation.zip" },
+        { "path": "dailydialog/test.zip", "url": "https://huggingface.co/datasets/roskoN/dailydialog/resolve/main/test.zip" }
+      ]
+    },
+    {
+      "name": "taskmaster-1",
+      "version": "TM-1-2019",
+      "url": "https://github.com/google-research-datasets/Taskmaster",
+      "license": "CC BY 4.0",
+      "attribution": "Byrne et al., \"Taskmaster-1: Toward a Realistic and Diverse Dialog Dataset\", EMNLP 2019 (Google Research).",
+      "collectionMethod": "Crowdsourced: self-dialogs written solo by one crowdworker playing both sides; woz-dialogs collected two-crowdworker Wizard-of-Oz sessions.",
+      "holdsRealIdentities": false,
+      "allowedUses": ["research", "internal-eval", "commercial-with-attribution"],
+      "heldOut": "not sampled by any item yet; downloaded for the phenomenon-mining item (mixed intent, corrections in spoken task talk), which lands after CHAT-16.",
+      "loader": null,
+      "files": [
+        { "path": "taskmaster1/self-dialogs.json", "sha256": "1e590ed0ccee279e40c2fb9e083d3b9417477c6bfe35ce5b2277167698dd858d" },
+        { "path": "taskmaster1/woz-dialogs.json", "sha256": "cd3bc4e968487315d412c044d30af2bf0a4b33c3ef8b74c589f1e1fa832bf72f" },
+        { "path": "taskmaster1/ontology.json", "sha256": "b8103a812799a8c0095800ba9fbf2b4654bccf7f099daa8a4a145c340a69bc52" }
+      ],
+      "download": [
+        { "path": "taskmaster1/self-dialogs.json", "url": "https://raw.githubusercontent.com/google-research-datasets/Taskmaster/master/TM-1-2019/self-dialogs.json" },
+        { "path": "taskmaster1/woz-dialogs.json", "url": "https://raw.githubusercontent.com/google-research-datasets/Taskmaster/master/TM-1-2019/woz-dialogs.json" },
+        { "path": "taskmaster1/ontology.json", "url": "https://raw.githubusercontent.com/google-research-datasets/Taskmaster/master/TM-1-2019/ontology.json" }
+      ]
+    },
+    {
+      "name": "ccpe-m",
+      "version": "2019 release",
+      "url": "https://github.com/google-research-datasets/ccpe",
+      "license": "CC BY 4.0",
+      "attribution": "Radlinski et al., \"Coached Conversational Preference Elicitation\", SIGdial 2019 (Google Research).",
+      "collectionMethod": "Crowdsourced: two workers per session, one coached to elicit the other's movie preferences.",
+      "holdsRealIdentities": false,
+      "allowedUses": ["research", "internal-eval", "commercial-with-attribution"],
+      "heldOut": "not sampled by any item yet; downloaded for the phenomenon-mining item (the preference-extraction reference), which lands after CHAT-16.",
+      "loader": null,
+      "files": [
+        { "path": "ccpe/data.json", "sha256": "4ff051ea7ea60cf0f480c911c7e2cfed56434e2e2c9ea8965ac5e26365773f0a" }
+      ],
+      "download": [
+        { "path": "ccpe/data.json", "url": "https://raw.githubusercontent.com/google-research-datasets/ccpe/master/data.json" }
+      ]
+    },
+    {
+      "name": "multiwoz",
+      "version": "2.1",
+      "url": "https://github.com/budzianowski/multiwoz",
+      "license": "MIT (repository); see the dataset's own README for the data license",
+      "attribution": "Eric et al., \"MultiWOZ 2.1: A Consolidated Multi-Domain Dialogue Dataset with State Corrections and State Tracking Baselines\", LREC 2020.",
+      "collectionMethod": "Crowdsourced Wizard-of-Oz multi-domain task dialogues (Cambridge).",
+      "holdsRealIdentities": false,
+      "allowedUses": ["research", "internal-eval"],
+      "heldOut": "not sampled by any item yet; downloaded for the phenomenon-mining item (mixed intents and topic switches), which lands after CHAT-16.",
+      "loader": null,
+      "files": [
+        { "path": "multiwoz/MultiWOZ_2.1.zip", "sha256": "8db3f6afe591383b8523b271f07727693e73012ecce47f3ac7987191e09b7523" }
+      ],
+      "download": [
+        { "path": "multiwoz/MultiWOZ_2.1.zip", "url": "https://github.com/budzianowski/multiwoz/raw/master/data/MultiWOZ_2.1.zip" }
+      ]
+    },
+    {
+      "name": "quac",
+      "version": "v0.2",
+      "url": "https://s3.amazonaws.com/my89public/quac",
+      "license": "CC BY-SA 4.0",
+      "attribution": "Choi et al., \"QuAC: Question Answering in Context\", EMNLP 2018.",
+      "collectionMethod": "Crowdsourced: a student asks free-form questions about a Wikipedia section, a teacher (with access to the article) answers with a quoted span.",
+      "holdsRealIdentities": false,
+      "allowedUses": ["research", "internal-eval", "share-alike"],
+      "heldOut": "val_v0.2.json is treated as this project's held-out split; train_v0.2.json only is used if a later item needs examples.",
+      "loader": null,
+      "files": [
+        { "path": "quac/train_v0.2.json", "sha256": "ff5cca5a2e4b4d1cb5b5ced68b9fce88394ef6d93117426d6d4baafbcc05c56a" },
+        { "path": "quac/val_v0.2.json", "sha256": "09e622916280ba04c9352acb1bc5bbe80f11a2598f6f34e934c51d9e6570f378" }
+      ],
+      "download": [
+        { "path": "quac/train_v0.2.json", "url": "https://s3.amazonaws.com/my89public/quac/train_v0.2.json" },
+        { "path": "quac/val_v0.2.json", "url": "https://s3.amazonaws.com/my89public/quac/val_v0.2.json" }
+      ]
+    },
+    {
+      "name": "goemotions",
+      "version": "2020 release",
+      "url": "https://github.com/google-research/google-research/tree/master/goemotions",
+      "license": "Apache 2.0",
+      "attribution": "Demszky et al., \"GoEmotions: A Dataset of Fine-Grained Emotions\", ACL 2020 (Google Research).",
+      "collectionMethod": "Real Reddit comments, filtered for length and profanity, hand-labelled with fine-grained emotion categories by crowdworkers.",
+      "holdsRealIdentities": true,
+      "holdsRealIdentitiesNote": "Real (pseudonymous) Reddit users' own public comments, not synthetic or crowdworker-authored text - the one dataset in this registry that is real social-media speech rather than a constructed dialogue.",
+      "allowedUses": ["research", "internal-eval", "commercial-with-attribution"],
+      "heldOut": "test.tsv is treated as this project's held-out split; train.tsv/dev.tsv only are used for the emotion head's own training data (ACT-02, ahead of this item).",
+      "loader": null,
+      "files": [
+        { "path": "goemotions/train.tsv", "sha256": "1c254a142be5c00e80d819b9ae1bbd36d94b2eeb8f4b1271846508d57e57d9c5" },
+        { "path": "goemotions/dev.tsv", "sha256": "575489c079c9de1097062a01738f998590d6b7ead66dd1c9fd1d2ba01fd8bc62" },
+        { "path": "goemotions/test.tsv", "sha256": "0587b2dd8b27b97352adbfc3fb083d46005c8946657fdc2b1ca8b1cc7f1f8be4" },
+        { "path": "goemotions/emotions.txt", "sha256": "45c3ef86782d2a4d7fedcd6d8c111aa0d0e94720689bd164fac94fefb4495a89" },
+        { "path": "goemotions/goemotions_1.csv", "sha256": "cac049036bad5d68d1081f72b65f2cc51e4df82af05e3e22cfa747051cac1af3" },
+        { "path": "goemotions/goemotions_2.csv", "sha256": "f699ecc5aa425c1720c1d02475f1e41815244b680bd75b282eb770d2c76cd84d" },
+        { "path": "goemotions/goemotions_3.csv", "sha256": "467f1e7191af00f2e76cc7f425885c2dc304bea8aff284b10e8c460d22f2e1af" }
+      ],
+      "download": [
+        { "path": "goemotions/train.tsv", "url": "https://raw.githubusercontent.com/google-research/google-research/master/goemotions/data/train.tsv" },
+        { "path": "goemotions/dev.tsv", "url": "https://raw.githubusercontent.com/google-research/google-research/master/goemotions/data/dev.tsv" },
+        { "path": "goemotions/test.tsv", "url": "https://raw.githubusercontent.com/google-research/google-research/master/goemotions/data/test.tsv" },
+        { "path": "goemotions/emotions.txt", "url": "https://raw.githubusercontent.com/google-research/google-research/master/goemotions/data/emotions.txt" },
+        { "path": "goemotions/goemotions_1.csv", "url": "https://storage.googleapis.com/gresearch/goemotions/data/full_dataset/goemotions_1.csv" },
+        { "path": "goemotions/goemotions_2.csv", "url": "https://storage.googleapis.com/gresearch/goemotions/data/full_dataset/goemotions_2.csv" },
+        { "path": "goemotions/goemotions_3.csv", "url": "https://storage.googleapis.com/gresearch/goemotions/data/full_dataset/goemotions_3.csv" }
+      ]
+    }
+  ]
+}
