@@ -293,6 +293,32 @@ rule, classes only):
     an exact figure exists only at the expert disclosure level per
     companion (SETTINGS.md's three levels).
 
+24. EVAL-07 baseline v0 (LongMemEval oracle, 35 questions, seeded,
+    2026-09-14, main at 512664d plus the fixes since): 14 of 35.
+    Per type: knowledge-update 5/5, single-session-assistant 4/5,
+    single-session-preference 2/5, single-session-user 1/5,
+    temporal-reasoning 1/5, multi-session 0/5, abstention 1/5. The
+    coordinator's read of the 21 misses, by class: (a) eight where the
+    evidence was in the turn's context and the reply was an honest
+    line anyway ("I don't know that one", "I don't have information
+    on"): either a guard cutting a grounded answer about the person
+    (the RECALL-03 shape) or the model abstaining with evidence
+    present; the row lacks the guard reason, added for the next run;
+    the largest bucket and a real defect either way. (b) Three of the
+    four abstention misses invented a fact about the person from
+    related history (pages read, a weekly game, days abroad): the
+    priority defect measured, ASK-01's false-familiarity family and
+    EXP-01's claims. (c) Two preference questions where the judge
+    wrote nothing for the history: the preference was stated inside a
+    question turn, which ACT-01's turn-level eligibility skips; MEM-06's
+    clause contract is the fix and this confirms its design. (d) Three
+    wrong answers over present evidence (a count, an amount, a date
+    difference): model reasoning and CHAT-16's typed dates. (e) One
+    generic answer ignoring the fact in context; one assistant-side
+    question the design does not serve (the hub's own replies are not
+    recalled by identity). The numbers are the baseline every later
+    item reports against; the run costs 2h23m on the Mac's engines.
+
 Read together: the hub never asks about what it does not know, acts as
 if it knows what it was never told, copies other conversations into
 this one, sends broken text, and reads search results aloud like an
