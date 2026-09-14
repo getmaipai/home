@@ -507,6 +507,8 @@ describe("the runner against the stub (control-flow rows)", () => {
     expect(copiedEpisodeSentence("Honestly, Tempo's second album is the one to start with, the drumming is unreal.", earlier)).not.toBeNull();
     expect(copiedEpisodeSentence("A standing desk helps if you switch often; try an hour at a time.", earlier)).toBeNull();
     expect(copiedEpisodeSentence("Unreal.", earlier)).toBeNull();
+    // RECALL-02b: a closer restated from an earlier reply is not a copied line.
+    expect(copiedEpisodeSentence("Bread it is. Is there anything specific you need help with?", ["Is there anything specific you need help with?"])).toBeNull();
     const row = byId("copied-line");
     expect(scoreTurn(row, 3, row.turns[3]!, observedFor({ reply: "A standing desk helps if you switch often.", contextMessage: "Nothing stored here bears on this message.", assistantEpisodes: earlier })).pass).toBe(true);
     expect(scoreTurn(row, 3, row.turns[3]!, observedFor({ reply: "Tempo's second album is the one to start with, the drumming is unreal.", contextMessage: "Nothing stored here bears on this message.", assistantEpisodes: earlier })).pass).toBe(false);

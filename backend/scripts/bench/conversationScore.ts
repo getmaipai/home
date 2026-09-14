@@ -9,7 +9,7 @@
 // apart from the scored failures.
 import { tokenize } from "@/lib/text";
 import { assessReply } from "@/lib/wellFormed";
-import { splitIntoSentences } from "@/lib/guards";
+import { splitIntoSentences, isCloserSentence } from "@/lib/guards";
 import type { BenchConversation, BenchTurn, TurnExpectation } from "./conversationFixture";
 
 export interface TurnObserved {
@@ -457,6 +457,8 @@ export function episodeLinesIn(context: string | null): number {
 export function copiedEpisodeSentence(reply: string, episodes: readonly string[]): string | null {
   const earlier = episodes.flatMap((e) => splitIntoSentences(e).map(tokenize)).filter((p) => p.size >= 3);
   for (const sentence of splitIntoSentences(reply || "")) {
+    // RECALL-02b: a closer is not a copied line (the guard's own rule).
+    if (isCloserSentence(sentence)) continue;
     const said = tokenize(sentence);
     if (said.size < 3) continue;
     for (const pool of earlier) {

@@ -319,7 +319,9 @@ describe("MEM-04 recallEpisodes()", () => {
   test("\"what recipe did you suggest last week\" ranks the assistant turn from seven days ago first, not the three-week-old recipe", async () => {
     const { actor } = await setupOwner();
     seedThreeWeeks(actor);
-    const matches = recallEpisodes(actor, "what recipe did you suggest last week", undefined, { now: NOW });
+    // RECALL-02b: the person's side is the default; a question about what
+    // the hub suggested asks for both sides, as prepareTurn() does.
+    const matches = recallEpisodes(actor, "what recipe did you suggest last week", undefined, { now: NOW, sides: "both", preferHubSide: true });
     expect(matches.length).toBeGreaterThan(0);
     expect(matches[0]!.episode.turnId).toBe("t-risotto");
     expect(matches[0]!.episode.speaker).toBe("assistant");
@@ -377,7 +379,7 @@ describe("MEM-04 recallEpisodes()", () => {
     place("t-dessert", "assistant", [1, 0, 0]);
     place("t-risotto", "assistant", [0, 1, 0]);
     place("t-trip", "assistant", [0, 0, 1]);
-    const matches = recallEpisodes(actor, "what did you say", new Float32Array([0.95, 0.05, 0]), { now: NOW });
+    const matches = recallEpisodes(actor, "what did you say", new Float32Array([0.95, 0.05, 0]), { now: NOW, sides: "both" });
     expect(matches[0]!.episode.turnId).toBe("t-dessert");
     // Below the cosine floor nothing comes back: a question about something
     // never said is empty, not the nearest unrelated turn.
@@ -391,7 +393,7 @@ describe("MEM-04 recallEpisodes()", () => {
     const embedded = await embedPendingEpisodes();
     expect(embedded).toBeGreaterThan(0);
     expect(db.select().from(pendingEpisodeEmbeddings).all()).toHaveLength(0);
-    const matches = recallEpisodes(actor, "risotto", new Float32Array(768), { now: NOW });
+    const matches = recallEpisodes(actor, "risotto", new Float32Array(768), { now: NOW, sides: "both" }); // "risotto" is in the hub's side of t-risotto
     expect(matches.map((m) => m.episode.turnId)).toContain("t-risotto");
   });
 });
@@ -493,7 +495,7 @@ describe("getmaipai/home#78: guard lines and plugin errors are never recalled as
       expect(rows.filter((r) => r.speaker === "assistant")).toEqual([]);
 
       // A later conversation recalling either finds only the person's side.
-      const later = recallEpisodes(actor, "what did you say about my brother", undefined, { now: new Date() });
+      const later = recallEpisodes(actor, "what did you say about my brother", undefined, { now: new Date(), sides: "both" });
       expect(later.every((m) => m.episode.speaker === "user")).toBe(true);
       const block = formatEpisodesForPrompt(later, "Sage", "en-US", new Date());
       expect(block).not.toContain("you replied");
@@ -552,7 +554,7 @@ describe("MEM-04 formatEpisodesForPrompt()", () => {
     // RECALL-02: a bag of one word per turn clears no lexical floor; the
     // query shares two words with the risotto turn and one plus its pair
     // with the tart turn.
-    const matches = recallEpisodes(actor, "the mushroom risotto recipe for the picnic", undefined, { now: NOW, limit: 5 });
+    const matches = recallEpisodes(actor, "the mushroom risotto recipe for the picnic", undefined, { now: NOW, limit: 5, sides: "both" });
     const block = formatEpisodesForPrompt(matches, "Marlow", "en-US", NOW);
     expect(block.startsWith("From earlier conversations (what was said, not necessarily true):")).toBe(true);
     // RECALL-02: the hub's side is reported (the person's paired words
@@ -582,8 +584,9 @@ describe("RECALL-02: episodes are evidence, never lines", () => {
     const userOnly = recallEpisodes(actor, "the mushroom risotto recipe for the visitors", undefined, { now: NOW, sides: "user" });
     expect(userOnly.length).toBeGreaterThan(0);
     expect(userOnly.every((m) => m.episode.speaker === "user")).toBe(true);
-    // The search's own reading keeps the side that matched, verbatim.
-    const search = recallEpisodes(actor, "what did you suggest we cook for the visitors", undefined, { now: NOW });
+    // The search's own reading (both sides, no preference) keeps the
+    // side that matched, verbatim.
+    const search = recallEpisodes(actor, "what did you suggest we cook for the visitors", undefined, { now: NOW, sides: "both" });
     expect(search[0]!.episode.speaker).toBe("user");
     expect(search[0]!.episode.text).toBe("what should we cook for the visitors");
     const both = recallEpisodes(actor, "what did you suggest we cook for the visitors", undefined, { now: NOW, sides: "both", preferHubSide: true });
@@ -640,10 +643,27 @@ describe("RECALL-02: episodes are evidence, never lines", () => {
     expect(episodeQueryEligible("nice car")).toBe(true);
     expect(episodeQueryEligible("no dentist")).toBe(true);
     expect(episodeQueryEligible("good morning, is the dentist tomorrow")).toBe(true);
+    // RECALL-02b: a thank-you with its object, and the other ways of
+    // asking about this conversation.
+    for (const q of ["thanks for the update", "thank you for the reminder!", "Thanks for the heads up, MaiPai", "what did we discuss", "what were we covering", "what have we covered so far", "what did we just talk about", "what was that about"]) {
+      expect([q, episodeQueryEligible(q)]).toEqual([q, false]);
+    }
+    expect(episodeQueryEligible("thanks for the recipe, what was the oven temperature")).toBe(true);
+    // With a subject after it, a past-tense form is about earlier talk.
+    expect(episodeQueryEligible("what did we discuss about the coast trip")).toBe(true);
+    expect(episodeQueryEligible("what did we talk about regarding Marsh's training")).toBe(true);
     expect(episodeQueryEligible("is a standing desk worth it")).toBe(true);
     expect(episodeQueryEligible("when is my dentist appointment")).toBe(true);
     expect(episodeQueryEligible("what day is my dentist appointment")).toBe(true);
     expect(contentTerms("Sage is getting a Tempo treadmill for the office")).toEqual(["sage", "getting", "tempo", "treadmill", "office"]);
+  });
+
+  test("RECALL-02b: the person's side is the default for every caller; the hub's side is opt-in", async () => {
+    const { actor } = await setupOwner();
+    seedThreeWeeks(actor);
+    // "risotto" is only in the hub's side of t-risotto: the default finds nothing.
+    expect(recallEpisodes(actor, "risotto", undefined, { now: NOW })).toEqual([]);
+    expect(recallEpisodes(actor, "risotto", undefined, { now: NOW, sides: "both" }).map((m) => m.episode.turnId)).toEqual(["t-risotto"]);
   });
 
   test("the lexical floor: one shared word admits nothing, two admit the turn, one plus the vector floor admits it", async () => {

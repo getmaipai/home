@@ -200,13 +200,15 @@ export interface RecallEpisodesOptions {
    * review on JOIN-01). */
   excludeWholeConversation?: boolean;
   now?: Date;
-  /** RECALL-02: which side of a turn may be recalled. The prompt
-   * (prepareTurn) asks for the person's own side unless the utterance
-   * asks what the hub said (asksWhatHubSaid()): the hub's prose is
-   * output, not evidence, and a recalled first-person sentence was
-   * being copied into new replies; when it does enter, it is rendered
+  /** RECALL-02: which side of a turn may be recalled. The person's own
+   * side by default (RECALL-02b: the assistant side is opt-in): the
+   * hub's prose is output, not evidence, and a recalled first-person
+   * sentence was being copied into new replies. The prompt
+   * (prepareTurn) asks for `both` only when the utterance asks what the
+   * hub said (asksWhatHubSaid()), and then the hub's side is rendered
    * as a reported note beside its paired user side, never as a line.
-   * The conversations search reads both sides, the default. */
+   * The conversations search and the memory bench ask for `both`
+   * explicitly: a person searching their history wants both sides. */
   sides?: "user" | "both";
   /** RECALL-02, the prompt's "what did you say" turn: a turn found by
    * the person's words ("what did you suggest for the six visitors"
@@ -218,8 +220,12 @@ export interface RecallEpisodesOptions {
 }
 
 /** RECALL-02: a turn about this conversation itself, whose evidence is
- * the window already in the messages: recalls no episodes. */
-const ABOUT_THIS_CONVERSATION_RE = /\bwhat\s+(?:were|are)\s+we\s+(?:talking|discussing|saying)\b|\bwhat\s+(?:did|do)\s+you\s+mean\b|\bsay\s+that\s+again\b|\bcome\s+again\b|\bwhat\s+was\s+(?:i|that)\s+(?:saying|talking about)\b|\bwhere\s+were\s+we\b|\bwhat\s+were\s+you\s+saying\b/i;
+ * the window already in the messages: recalls no episodes. The
+ * past-tense forms ("what did we discuss") are anchored to the end of
+ * the utterance: with a subject after them ("what did we discuss about
+ * the coast trip") the question is about earlier talk and earns its
+ * lookup (recallShapes.ts's asksAboutEarlierTalk reads that form). */
+const ABOUT_THIS_CONVERSATION_RE = /\bwhat\s+(?:were|are)\s+we\s+(?:talking|discussing|saying|covering|on about)\b|\bwhat\s+(?:did|do|have)\s+we\s+(?:just\s+)?(?:discuss(?:ed)?|cover(?:ed)?|talk(?:ed)? about|go(?:ne)? over)(?:\s+(?:just now|so far|today|earlier|here|already))?\s*[?.!]*\s*$|\bwhat\s+(?:did|do)\s+you\s+mean\b|\bsay\s+that\s+again\b|\bcome\s+again\b|\bwhat\s+was\s+(?:i|that)\s+(?:saying|talking about)\b|\bwhere\s+were\s+we\b|\bwhat\s+were\s+you\s+saying\b|\bwhat\s+was\s+(?:that|this)\s+about\b/i;
 /** Two, by the coordinator's decision on the first measurement (the
  * design said three): the lexical floor already demands both words of
  * a two-word query, so a two-word question that clears it is a real
@@ -410,7 +416,7 @@ export function recallEpisodes(actor: PersonRow, query: string, queryVector: Flo
   // branch; its episodes stay stored and are never recalled. Read at
   // query time, so an edit after the episode was recorded takes effect
   // on the next recall with nothing rewritten.
-  const sides = opts.sides ?? "both";
+  const sides = opts.sides ?? "user";
   const queryTerms = contentTerms(query);
   const lexical: CandidateRow[] = [];
   const fts = ftsQueryFor(query);

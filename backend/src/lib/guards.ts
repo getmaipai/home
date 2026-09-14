@@ -591,9 +591,36 @@ function guardInvention(sentence: string, ctx: GuardContext): GuardReason | null
 // case still flags: nothing in "when is my eye exam" shares a stem with
 // "dentist", "thursday", "four".
 
+/** RECALL-02b: a closer, the sentence a reply ends on that says nothing
+ * about the subject ("Is there anything specific you need help with?",
+ * "Let me know if you need anything else"). Never an unrelated-recall
+ * candidate: the 8B reuses these across conversations and an 80
+ * percent overlap with an earlier one is not a copied line; REG-01's
+ * register scrub is what removes them. One definition, read by the
+ * guard and by the bench's noCopiedEpisode check. */
+export const CLOSER_RE =
+  /\b(?:anything (?:else|specific|more)|let me know|need (?:any )?help|help (?:you )?with|(?:how )?can i help|is there anything|what else|feel free|happy to help|hope (?:that|this) helps|enjoy (?:the|your)|have fun|take care|you'?re welcome|no problem|glad (?:to|i could) help|let me know if|just (?:ask|say)|i'?m here if)\b/i;
+/** The connective words a closer is built from beside its phrases
+ * ("Let me know IF you NEED ANYTHING ELSE"), none of them a subject. */
+const CLOSER_FILLER_RE = /\b(?:if|else|can|could|need|any|other|more|specific|particular|questions?|ask|just|want|like|further|something|anything|there|is|you|i|me|with|to|for|about|of|the|a|an|and|or|that|this|it|on|in|at|be|do|have|help|know)\b/gi;
+export function isCloserSentence(sentence: string): boolean {
+  if (!CLOSER_RE.test(sentence)) return false;
+  // A closer is the whole sentence, not a prefix on a copied line
+  // ("Enjoy the second album, the drumming is unreal"): nothing is left
+  // after the closer phrases and their connective words are taken out.
+  const residual = sentence
+    .replace(/['’](?:s|d|m|re|ll|ve|t)\b/gi, " ") // contractions' tails are not subjects
+    .replace(new RegExp(CLOSER_RE.source, "gi"), " ")
+    .replace(CLOSER_FILLER_RE, " ");
+  // Nothing left: a closer that names a subject ("Feel free to ask
+  // about Tempo") is a line about that subject, and the guard reads it.
+  return tokenize(residual).size === 0;
+}
+
 function guardUnrelatedRecall(sentence: string, ctx: GuardContext): GuardReason | null {
   const said = tokenize(sentence);
   if (said.size < 2) return null;
+  if (isCloserSentence(sentence)) return null;
   const recent = (ctx.history ?? []).slice(-RECENT_TURNS_FOR_RECALL);
   const asked = [...tokenize([ctx.utterance, ...recent].join(" "))];
   // RECALL-02: a recalled episode is a candidate too. A sentence that
@@ -662,7 +689,10 @@ const GREETING_ONLY_RE =
  * are the same every day, so an episode lookup on it would recall last
  * week's greeting. Built from the same vocabularies the near-echo and
  * greeting exemptions use, one definition. */
-const BARE_ACK_RE = new RegExp(`^(?:${ACK_WORDS}|yep|nope|no|great|perfect|sounds good|sounds great|will do|thanks|thank you|thanks a lot|see you|bye|goodbye|good ?bye|later)\\b(?:\\s+(?:then|thanks|so much|a lot))*[\\s!.,]*$`, "i");
+// RECALL-02b: a thank-you with what it is for ("thanks for the update",
+// "thank you for the reminder") is still bare: the object is the hub's
+// own last act, not a subject to look up.
+const BARE_ACK_RE = new RegExp(`^(?:${ACK_WORDS}|yep|nope|no|great|perfect|sounds good|sounds great|will do|thanks|thank you|thanks a lot|see you|bye|goodbye|good ?bye|later)\\b(?:\\s+(?:then|thanks|so much|a lot|for (?:the |that |this |your )?(?:update|help|info|heads up|reminder|tip|answer|reply|explanation|quick reply|quick answer)))*[\\s!.,]*$`, "i");
 /** A leading acknowledgment ("Cool, ...", "Okay so ...") taken off,
  * the near-echo's own first step, for a reader that wants the content
  * behind it (RECALL-02's answer topics). */

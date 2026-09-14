@@ -1166,7 +1166,12 @@ invented for the roster's household, and added to
     design's three moved to two on the first measurement, the
     coordinator's decision) or on a question about this conversation;
     three lines and 400 characters; the guard reads episodes. Three
-    seeded runs recorded there.
+    seeded runs recorded there. RECALL-02b (2026-09-14, an outside
+    reading): the person's side is every caller's default and the
+    hub's side opt-in (the callers enumerated in the commit), a
+    thank-you with its object and "what did we discuss" refuse a
+    lookup, a closer is never a copied line, and three tests read the
+    final prompt.
 
     Objective: a reply never copies a sentence from another
     conversation, and a short or meta turn recalls nothing. Files:
@@ -1397,7 +1402,12 @@ invented for the roster's household, and added to
     once at the end of the next reply, never again after "not now").
     Acceptance: the three conversations
     in the design note, section 3 (`unknown-name-person`,
-    `unknown-name-pet-lowercase`, `unknown-name-marathon`), three seeded
+    `unknown-name-pet-lowercase`, `unknown-name-marathon`), plus
+    `coworker-likes-seltzer` turn 4 as a target row for the
+    false-familiarity family (OUT-01's set, 2026-09-14: "who is Quill"
+    answered "the child in the house, Bramble's sibling" with the
+    coworker label in the context, a household invention the guards
+    did not catch), three seeded
     runs; unit tests per part (the resolver's known set, the appended
     ask deduped against the model's own question and appended under the
     brief persona, the answer parser for a pet, a relative and an

@@ -654,7 +654,7 @@ export const CONVERSATIONS: readonly BenchConversation[] = [
     turns: [
       { say: "remember that Marlow's birthday is in June", expect: { memoryWritten: [["june"]], guard: null } },
       { say: "actually, forget what I told you about Marlow's birthday", drainJudge: true, expect: { recordRetired: [["june"]], mustContain: "forgot|forgotten|removed|gone|won't remember|deleted|cleared", mustNotContain: HONESTY_LINES } },
-      { say: "when is Marlow's birthday", newConversation: true, expect: { mustNotContain: "june" } },
+      { say: "when is Marlow's birthday", newConversation: true, expect: { mustContain: HONESTY_LINES + "|don't have|no longer|don't know|not sure|can't recall|nothing (stored|saved)|isn't (stored|saved)|haven't got", mustNotContain: "june|\\bsoon\\b|few days|next (week|month)|coming up" } },
     ],
   },
   {

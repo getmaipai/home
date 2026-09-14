@@ -340,6 +340,24 @@ describe("unrelated recall (bot-legacy's own test: eye exam answered from the de
     expect(ownUnasked.reason).toBe("unrelated_recall");
   });
 
+  test("RECALL-02b: a closer is never a copied line, whatever it overlaps", () => {
+    const closer = "Is there anything specific you need help with?";
+    const g = guardReply(`Bread is a classic at school fairs. ${closer}`, ctx({ utterance: "Marlow has been up since five baking bread for the school fair", episodes: [closer, "Let me know if you need anything else."] }));
+    expect(g.reason).toBeNull();
+    expect(g.reply).toContain(closer);
+    // The everyday closers, whole.
+    for (const line of ["Let me know if you need anything else.", "Is there anything else I can help you with?", "Feel free to ask if you need anything else.", "Let me know if you have any other questions.", "Hope that helps!", "Let me know if there's anything else you'd like.", "I'm happy to help if there's anything else you'd like to know."]) {
+      const whole = guardReply(line, ctx({ utterance: "what should I cook tonight", episodes: [line] }));
+      expect([line, whole.reason]).toEqual([line, null]);
+    }
+    // A closer phrase in front of a copied line is not a closer.
+    const prefixed = guardReply("Enjoy the second album, the drumming is unreal.", ctx({ utterance: "what should I cook tonight", episodes: ["Tempo's second album is the one to start with, the drumming is unreal"] }));
+    expect(prefixed.reason).toBe("unrelated_recall");
+    // A closer that names a subject is a line about that subject.
+    const named = guardReply("Feel free to ask about Tempo, their second album is the one to start with.", ctx({ utterance: "what should I cook tonight", episodes: ["Feel free to ask about Tempo, their second album is the one to start with."] }));
+    expect(named.reason).toBe("unrelated_recall");
+  });
+
   test("the identical line answering the RIGHT question stands", () => {
     const g = guardReply("The dentist is on Thursday at four.", ctx({ utterance: "when is the dentist", sources: SOURCES }));
     expect(g.reason).toBeNull();

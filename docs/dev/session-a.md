@@ -4145,3 +4145,66 @@ edit-then-recall, household-location, household-subject-person#1,
 inferred-coworker-candidate#3, memory-control-in-chat, memory-
 driven-prompt#2, never-mind-on-an-ask#3, prior-reply-grounding#5,
 pronoun-follow-up#1) are the seed's residue under load.
+
+## RECALL-02b: the outside reading of RECALL-02 (2026-09-14)
+
+Three findings from an outside reading of 13d51e2, 604b2b8 and
+a4c6c14, taken, and two rows the coordinator's read of OUT-01's set
+sent here.
+
+**The inventory.** `recallEpisodes()` now defaults to the person's
+side; the hub's side is opt-in. Every caller: `prepareTurn()` in
+`turnEngine.ts` (the prompt: `user`, or `both` with `preferHubSide`
+when `asksWhatHubSaid()`), `GET /api/conversations/search` in
+`routes/conversations.ts` (`both`, explicit: a person searching their
+history wants the hub's answers, returned as the side that matched,
+verbatim), `scripts/bench/memory/run.ts` (`both`, explicit: it
+measures recall of what was said), `scripts/bench/recall-floor.ts`
+(`both`, as before). Every producer of `ctx.episodes`: one,
+`guardContextFrom()` in `turnContext.ts`, from the turn evidence of
+kind `episode` that `prepareTurn()` alone builds. The tests that
+relied on the old default say `both` now, each with its reason.
+
+**The short-turn gate, widened.** `isBareSocialTurn()` takes a
+thank-you with its object ("thanks for the update", "thank you for
+the reminder", "thanks for the heads up, MaiPai"), the object being
+the hub's own last act; `ABOUT_THIS_CONVERSATION_RE` takes "what did
+we discuss", "what were we covering", "what have we covered so far",
+"what did we just talk about", "what was that about". Each phrasing
+has a test; "thanks for the recipe, what was the oven temperature"
+still earns its lookup.
+
+**The final prompt, read.** Three integration tests in
+`turnEngine.test.ts` capture the request a scripted engine receives:
+a recall-shaped question with a complete-sentence assistant episode
+stored carries the reported note and the person's paired words and
+never the hub's sentence, "you replied" or a first-person quote; a
+question that is not about earlier talk shows no hub-side episode
+with one available; a legitimate restatement in other words of the
+person's recalled line stands. The copied-line cut itself stays the
+guard's unit test: through the real prompt, a turn that shares
+nothing with a line never has it recalled, the floor doing the
+guard's job one step earlier, so the 80 percent rule could fire only
+on a vector-recalled line restated to an unrelated turn, which is
+the cut it exists for; recorded as the accepted edge.
+
+**From OUT-01's set.** A closer ("Is there anything specific you
+need help with?") is never a copied line: `isCloserSentence()` in
+guards.ts, one definition read by `guardUnrelatedRecall()` and by the
+bench's `noCopiedEpisode`, and a closer is the whole sentence
+(nothing is left after its phrases, their connective words and the
+contractions' tails are taken out), never a prefix on a copied line
+("Enjoy the second album, the drumming is unreal" is still cut) and
+never one that names a subject ("Feel free to ask about Tempo" is a
+line about Tempo; two reviews); the closer
+itself is REG-01's register scrub to remove. The past-tense
+about-this-conversation forms are anchored to the end of the
+utterance, so "what did we discuss about the coast trip" keeps its
+lookup as a question about earlier talk (the same review). The forget confirmation lists a text once (the
+judge's copy and the explicit one read the same). The
+`memory-control-in-chat` row's third turn asks for an honest line and
+forbids the invented "soon, a few days away" the set showed passing
+on the absence of "June" alone. `coworker-likes-seltzer` turn 4 is
+logged on ASK-01 as a target row for the false-familiarity family. No
+seeded set for this item, by the coordinator's rule; the household
+bench's unit scorer is the check.

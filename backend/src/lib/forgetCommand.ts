@@ -147,7 +147,10 @@ function skipTurns(actor: PersonRow, turnIds: string[]): { swept: string[]; refu
 }
 
 function saidForgotten(texts: string[], refused: boolean): string {
-  const said = `Forgotten: ${texts.map((t) => t.replace(/[.!]+$/, "")).join("; ")}.`;
+  // The same text twice (the judge's copy of a fact and the explicit
+  // one) reads once (a coordinator's read of the bench, 2026-09-14).
+  const shown = [...new Map(texts.map((t) => [t.replace(/[.!]+$/, "").trim().toLowerCase(), t.replace(/[.!]+$/, "")])).values()];
+  const said = `Forgotten: ${shown.join("; ")}.`;
   // A record the person may not clear (an entity or a pinned one, for a
   // non-admin) is named in the reply, never silently kept (finding 10).
   return refused ? `${said} ${NOT_YOURS_REST}` : said;

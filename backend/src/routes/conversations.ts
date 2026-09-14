@@ -129,7 +129,11 @@ conversationsRoutes.openapi(searchRoute, async (c) => {
   // has none yet, so it embeds once here (undefined when the embed
   // engine is down, in which case lexical recall alone answers).
   const vector = await embedQueryForRecall(q);
-  const results = recallEpisodes(actor, q, vector, { limit, includeSuperseded: true }); // #88: the history view keeps what was said
+  // #88: the history view keeps what was said; RECALL-02b: both sides,
+  // the side that matched returned verbatim (a person searching their
+  // history wants the hub's answers too; the prompt's own recall reads
+  // the person's side only).
+  const results = recallEpisodes(actor, q, vector, { limit, includeSuperseded: true, sides: "both" });
   return c.json(
     results.map((m) => ({
       turn_id: m.episode.turnId,

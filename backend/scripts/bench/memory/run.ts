@@ -195,7 +195,9 @@ async function main(): Promise<{ executed: number; engine: string }> {
     }
     await embedPendingEpisodes();
     const vector = await embedQueryForRecall(c.question);
-    const matches = recallEpisodes(actor as PersonRow, c.question, vector, { now });
+    // RECALL-02b: both sides, explicitly; this bench measures recall of
+    // what was said, not the prompt's own person-side reading.
+    const matches = recallEpisodes(actor as PersonRow, c.question, vector, { now, sides: "both" });
     const top = matches[0]?.episode.turnId ?? null;
     const pass = c.expectTurnId === null ? matches.length === 0 : top === c.expectTurnId;
     results.push({ category: "episodes", id: c.id, pass, question: c.question, reply: top ? `top=${top}` : "(nothing)" });

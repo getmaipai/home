@@ -2554,6 +2554,8 @@ describe("item 4b: forget in conversation is honored or refused, never 'Got it.'
     expect(juneEpisodes()).toBeGreaterThan(0);
     const forgot = await runTurn(actor, "chat", "forget what I told you about Marlow's birthday", { conversationId: second.value.id });
     expect(forgot.ok && forgot.value.reply.text).toMatch(/^Forgotten: /);
+    // RECALL-02b: the same text once, whatever wrote it twice.
+    expect((forgot.ok ? forgot.value.reply.text : "").match(/on the fridge/g)?.length ?? 0).toBeLessThanOrEqual(1);
     expect(records(actor.id).filter((r) => r.status === "active" && /june/i.test(r.text))).toEqual([]);
     expect(juneEpisodes()).toBe(0);
     const later = await runTurn(actor, "chat", "when is Marlow's birthday", { conversationId: (createConversation(actor, { surface: "chat" }) as { ok: true; value: { id: string } }).value.id });
@@ -2903,6 +2905,88 @@ describe("item 4a: a tool never runs on an argument the person did not say", () 
 // conversation. The whole path is real: runTurn() logs conversation
 // one's turn (which records its episodes), and the second conversation's
 // assembled messages are read off the request the stub receives.
+// RECALL-02b: the final context, not only the units. A scripted engine
+// answers; the request the stub receives is the prompt the model saw.
+describe("RECALL-02b: the prompt the model sees", () => {
+  async function captureContext(actor: PersonRow, utterance: string, conversationId: string, reply: string): Promise<{ context: string; value: TurnValue }> {
+    __resetLlmSupervisorForTests();
+    const { startStubLlmServer } = await import("@maipai/spec/llm/ts/stubServer.js");
+    let captured: ChatCompletionRequest | null = null;
+    const stub = startStubLlmServer(0, {
+      scriptedChatReply: (request: ChatCompletionRequest) => {
+        captured = request;
+        return reply;
+      },
+    });
+    process.env.MAIPAI_LLAMA_SERVER_URL = stub.url;
+    try {
+      const result = await runTurn(actor, "chat", utterance, { conversationId });
+      if (!result.ok) throw new Error(result.error);
+      const context = captured!.messages.filter((m) => m.role === "system").map((m) => m.content).join("\n");
+      return { context, value: result.value };
+    } finally {
+      stub.stop();
+      delete process.env.MAIPAI_LLAMA_SERVER_URL;
+      __resetLlmSupervisorForTests();
+    }
+  }
+
+  async function earlierConversation(actor: PersonRow, userText: string, replyText: string): Promise<void> {
+    const { logTurn, createConversation } = await import("@/lib/conversationHistory");
+    const conv = createConversation(actor, { surface: "chat" });
+    if (!conv.ok) throw new Error(conv.error);
+    const safe = { flagged: false, categories: [], action: "allow" as const, notify_parent: false, matched_signals: [], checked_at: new Date(Date.now() - 3 * 86_400_000).toISOString() };
+    logTurn(actor, "chat", userText, { reply: { text: replyText }, source: "model", safety: safe, conversation_id: conv.value.id, turn_id: `turn-earlier-${Math.random().toString(36).slice(2, 10)}` });
+  }
+  const HUB_SENTENCE = "Try a mushroom risotto recipe, it feeds six and reheats well.";
+
+  test("a recall-shaped question carries the hub's side as a reported note: no assistant sentence, no first-person quote, in the exact prompt", async () => {
+    const { actor } = await owner();
+    await earlierConversation(actor, "what should we cook for the six visitors on Saturday", HUB_SENTENCE);
+    const { createConversation } = await import("@/lib/conversationHistory");
+    const conv = createConversation(actor, { surface: "chat" });
+    if (!conv.ok) throw new Error(conv.error);
+    const { context } = await captureContext(actor, "what did you suggest we cook for the six visitors", conv.value.id, "I suggested a mushroom risotto.");
+    expect(context).toContain("From earlier conversations");
+    expect(context).toContain('when Sage said "what should we cook for the six visitors on Saturday"');
+    expect(context).toContain("your answer touched on");
+    expect(context).not.toContain(HUB_SENTENCE);
+    expect(context).not.toContain("you replied");
+    expect(context).not.toMatch(/"Try a mushroom/);
+  });
+
+  test("a question that is not about earlier talk shows no hub-side episode at all, even with one available", async () => {
+    const { actor } = await owner();
+    await earlierConversation(actor, "what should we cook for the six visitors on Saturday", HUB_SENTENCE);
+    const { createConversation } = await import("@/lib/conversationHistory");
+    const conv = createConversation(actor, { surface: "chat" });
+    if (!conv.ok) throw new Error(conv.error);
+    const { context } = await captureContext(actor, "is a mushroom risotto hard to make for six visitors", conv.value.id, "Not really, it just needs stirring.");
+    expect(context).not.toContain("your answer touched on");
+    expect(context).not.toContain(HUB_SENTENCE);
+    expect(context).not.toContain("risotto recipe, it feeds");
+  });
+
+  test("a recall-shaped question keeps the person's recalled line restated in other words", async () => {
+    const { actor } = await owner();
+    await earlierConversation(actor, "I want to run three miles every morning before work", "Nice, mornings are the best time for it.");
+    const { createConversation } = await import("@/lib/conversationHistory");
+    const conv = createConversation(actor, { surface: "chat" });
+    if (!conv.ok) throw new Error(conv.error);
+    // Asked about the plan (two shared content words, the lexical
+    // floor with no vector to help): the person's own line comes back
+    // in the prompt, and a reply that restates it in other words
+    // stands, since the turn asks about earlier talk.
+    const asked = await captureContext(actor, "what did I tell you about running three miles", conv.value.id, "You said you want three miles every morning before work.");
+    expect(asked.context).toContain('Sage said: "I want to run three miles every morning before work"');
+    expect(asked.value.reply.text).toBe("You said you want three miles every morning before work.");
+    // The copied-line cut itself is the guard's unit test (a reply
+    // restating the line to a turn that shares nothing with it): through
+    // the real prompt a turn sharing nothing with the line never has it
+    // recalled, which is the floor doing the same job one step earlier.
+  });
+});
+
 describe("JOIN-01: recalled episodes reach the prompt and the guards", () => {
   test("'my dentist is on Thursday' said in one conversation, never judged, answers 'what day is my dentist appointment' in a new one", async () => {
     const { actor } = await owner();
