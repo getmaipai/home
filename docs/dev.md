@@ -12766,6 +12766,10 @@ other's section once (147cd28, f4779a6).
   clearance Shell.tsx already reserves for it), proven to fail then
   fixed with a real-layout check in scripts/screenshot.ts:
   [docs/dev/session-b.md](dev/session-b.md) (2026-09-13).
+- MEM-05 resolved as switch: the judge's default model is the 4B, the
+  1.7B behind `MAIPAI_BACKGROUND_MODEL=qwen3-1.7b`; the eval and the
+  seeded bench numbers, and CHAT-15's three-run set on the shipped
+  judge: [docs/dev/session-a.md](dev/session-a.md) (2026-09-13).
 - The memory judge drops its own prompt's examples, an unfilled
   placeholder and a credential at its output, counted per turn:
   [docs/dev/session-a.md](dev/session-a.md) (2026-09-13).

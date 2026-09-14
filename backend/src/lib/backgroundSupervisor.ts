@@ -58,9 +58,11 @@ const state = hotReloadState<BackgroundSupervisorState>("backgroundSupervisor", 
  * 3.5 GB after load to 9.4 GB in three bench runs and 11 GB over a day,
  * with the machine swapping. No `--cache-reuse` either: it only ever
  * reused from that cache. The slot count is left to llama-server's
- * auto (four): measured, one slot loads at the same 4.4 GB resident as
- * four, so the base is the model and its compute buffers, not the KV
- * pool, and a change there would serialize the summaries for nothing. */
+ * auto (four): measured on the 1.7B Q8_0 (the pin until MEM-05), one
+ * slot loads at the same 4.4 GB resident as four, so the base is the
+ * model and its compute buffers, not the KV pool, and a change there
+ * would serialize the summaries for nothing; the 4B's own figure is
+ * larger by its weights, the shape of the finding holds. */
 export function backgroundLaunchArgs(binPath: string, modelPath: string, port: number, gpuLayers: number): string[] {
   return [
     binPath,

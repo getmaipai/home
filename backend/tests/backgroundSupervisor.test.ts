@@ -87,11 +87,19 @@ describe("backgroundAssets", () => {
     expect(BACKGROUND_MODEL_SHA256).toMatch(/^[0-9a-f]{64}$/);
   });
 
-  test("fallback model switch selects the other file when MAIPAI_BACKGROUND_MODEL=qwen3-4b", async () => {
-    process.env.MAIPAI_BACKGROUND_MODEL = "qwen3-4b";
-    const { backgroundModelPath, BACKGROUND_MODEL_FALLBACK_FILE } = await import("@/lib/backgroundAssets");
-    const path = backgroundModelPath();
-    expect(path).toContain(BACKGROUND_MODEL_FALLBACK_FILE);
+  // MEM-05: the 4B is the household default; the 1.7B is the small
+  // alternative behind MAIPAI_BACKGROUND_MODEL=qwen3-1.7b.
+  test("the default background model is the 4B; MAIPAI_BACKGROUND_MODEL=qwen3-1.7b selects the small one", async () => {
+    const { backgroundModelPath, BACKGROUND_MODEL_FILE, BACKGROUND_MODEL_SMALL_FILE } = await import("@/lib/backgroundAssets");
+    delete process.env.MAIPAI_BACKGROUND_MODEL;
+    expect(backgroundModelPath()).toContain(BACKGROUND_MODEL_FILE);
+    expect(BACKGROUND_MODEL_FILE).toBe("qwen3-4b-q4-k-m.gguf");
+    process.env.MAIPAI_BACKGROUND_MODEL = "qwen3-1.7b";
+    try {
+      expect(backgroundModelPath()).toContain(BACKGROUND_MODEL_SMALL_FILE);
+    } finally {
+      delete process.env.MAIPAI_BACKGROUND_MODEL;
+    }
   });
 });
 

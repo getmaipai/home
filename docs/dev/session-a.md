@@ -3512,3 +3512,50 @@ trip in the short form, a dislike, a relationship and a filled
 template are kept on any turn. The suite's older fixtures moved off
 "cilantro" while the first cut was in; they stay moved, since a
 fixture should not lean on the prompt's own example text either way.
+
+## MEM-05: the judge moves to the 4B (2026-09-13)
+
+Jesse's decision, resolved as switch. The defect class the 1.7B showed
+in live use on 2026-09-13: it re-emitted its own extraction prompt's
+few-shot examples as memories (the prompt's negative password example
+and a template placeholder included), attributed the hub's replies and
+world facts to the speaker, and saved the passing state of a
+conversation instead of the durable fact; about one record in ten was
+real. The echo filter (above) catches the first class at the output;
+the other two are judgment, and the 4B has it.
+
+The pin: `backgroundAssets.ts` now defaults to qwen3-4b-q4-k-m (2.5 GB,
+the same pinned URL and checksum the fallback carried), and the 1.7B
+stays as the small alternative behind `MAIPAI_BACKGROUND_MODEL=
+qwen3-1.7b`; the user privacy page's download size says 2.5 GB. The
+extraction prompt's examples are untouched (the example-echo filter
+was the separate decision, landed before this).
+
+Measured, this machine (Apple silicon laptop, the background engine's
+own launch shape: llama-server b10797, -c 8192, -ngl 0, -t 4, fa on,
+cache-ram 0), the 4B on a second port beside the 1.7B:
+
+| judge | judge-eval precision | recall | s/turn (eval, cold) | bench s/judged turn (cache) | echo drops per run |
+|---|---|---|---|---|---|
+| qwen3-1.7b-q8-0 | 66.7% | 100% | 3.19 | 1.2 (146 s / 119) | 13 to 19 |
+| qwen3-4b-q4-k-m | 100% | 100% | 7.31 | 1.8 (218 s / 120; 258 s cold) | 1 |
+
+The eval is n=2 and says what it said before (MEM-05's open status
+had the same shape at 2.59 and 7.0 s); the bench figures are the
+household's real per-turn cost with the judge's prompt cache hitting
+(the example-date fix): the 4B costs 1.5x the 1.7B per judged turn,
+not 2.7x.
+
+CHAT-15's acceptance, the three-run seeded set on the shipped judge
+(seed 20260913, prompt clock pinned, nothing else on the machine, the
+rule from the echo filter's finding): 127, 127 and 127 of 159; 113 of
+159 replies identical across all three; two rows flip
+(pronoun-follow-up#1, feeling-before-task#1). Target turns, all
+stable across the three: world-knowledge-film#1 (4c; the same opening
+line in all three), memory-control-in-chat#1 to #3 (4b),
+compound-request#1, never-mind-on-an-ask#1 to #3,
+timer-then-follow-up#1, list-then-follow-up#1 and #2,
+disclose-then-recall-later#3 (the 4a and CHAT-15 tool rows);
+prior-reply-grounding#4 and coworker-likes-seltzer#1 fail in all
+three, the designed misses, unchanged. The 4B's echo drops: one
+example echo per run.
