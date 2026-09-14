@@ -234,6 +234,68 @@ background never competes for the chat card. The "one 8B, two slots,
 judge yields" experiment (EVAL, after CHAT-19) is a separate question
 and does not change this requirement.
 
+## EVAL-07: public conversation datasets as a second bench (2026-09-14, Jesse's ask, researched)
+
+Why: the household bench (47 conversations, roster names) tests the
+guards and the registry in this house; it cannot tell whether the hub
+sounds and remembers like a person across weeks of real talk. Public
+two-person and long-memory datasets can, and they are graded by
+someone else, so the numbers are not ours to argue with.
+
+What was checked (2026-09-14):
+
+- LoCoMo (Snap Research): very long two-person conversations, about
+  300 turns over up to 35 dated sessions, with graded questions in
+  five kinds (single-hop, multi-hop, temporal, open-domain,
+  adversarial), each annotated with the turn ids holding the answer;
+  metric F1. The public release is `data/locomo10.json` (ten
+  conversations; the paper's fifty are not all released). License CC
+  BY-NC 4.0: research use, attribution, never shipped in the product.
+- LongMemEval (ICLR 2025), the `longmemeval-cleaned` release on
+  Hugging Face (the original is deprecated for noisy sessions): 500
+  questions over long user-assistant histories, six kinds including
+  knowledge-update (a fact that changed) and abstention (a question
+  about something never said, where the right answer is "I don't
+  know"). MIT. The abstention and knowledge-update kinds map exactly
+  onto our "acts as if it knows what it was never told" and the
+  supersede path. LongMemEval-V2 is a web-agent benchmark, not this.
+- DailyDialog: 13,000 short everyday two-person conversations with
+  emotion and act labels, CC BY-NC-SA 4.0; the register reference
+  (reaction, question back, short turns).
+- MSC (Multi-Session Chat, ParlAI): five sessions per pair over
+  simulated days, persona-grounded; license not confirmed in the
+  ParlAI page, check before download.
+- CANDOR: 1,656 real recorded conversations between strangers,
+  transcribed with timing; CC BY-NC 4.0 by registration. The most
+  natural spoken data; second phase, after the text ones.
+- Known limit of all of them (2026 memory-benchmark surveys): they
+  grade retrieval, barely the write step (what is worth keeping), and
+  never concurrency; our own bench and CUR-01 stay the judge of those.
+
+The item (M, Session A, after MEM-06 and before CUR-01, so the
+curator and the quality controller are judged against a public
+baseline): a bench script under `backend/scripts/bench/` that
+downloads a dataset at a pinned version with a checksum into the
+ignored data directory (download, never vendor; research licenses
+mean nothing from them ships), converts it to the bench's own fixture
+shape, replays it through the live engine with the seed pinned and a
+quiet machine, and scores it. Two modes: (1) memory: the dataset's
+own questions asked after its sessions have been ingested as
+conversations on a seeded household, scored by its own metric (F1
+for LoCoMo; the judged accuracy for LongMemEval, with abstention and
+knowledge-update reported separately); (2) register: teacher-forced
+turns (the real history up to turn t, our reply at t) scored by the
+persona judge's rubric (reaction, question back, no article voice, no
+assistant register) against the human's reply, never exact match.
+Order: LongMemEval-cleaned first (MIT, and abstention is our weakest
+class), then LoCoMo, then DailyDialog for register; MSC and CANDOR
+later. Acceptance: the first run is the baseline, recorded in
+session-a.md with the dataset version and checksum, the engine build
+and models; every later engine item reports its delta on the same
+runs beside the household bench. Privacy row: the download endpoints
+(GitHub, Hugging Face) are development-only and never part of the
+product; no privacy page change.
+
 ## Rules
 
 Each step's acceptance is three identical bench runs; the film rows
