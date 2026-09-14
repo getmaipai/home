@@ -149,6 +149,21 @@ rule, classes only):
 14. Pronoun drift for a household subject (the wrong gender for a pet
     whose sex the speaker had just used) and a robotic register ("I've
     noted that", "I'm still learning").
+15. Assumptions in place of a question: an unknown name was assumed to
+    be a person and the advice built on it (a landlord, cleaning up
+    after a tenant); a wrong assumption is never corrected by asking.
+    The rule a person follows, and the hub does not: when a name, a
+    kind, or a fact is unknown, ask, never assume.
+16. Random subject changes with no prompt from the speaker (a paragraph
+    about an unrelated band; a suggestion to photograph a mess).
+17. Broken output sent as a reply: a sentence ending in a stray
+    quotation mark, a reply of one word. Output that is not a sentence
+    is never sent.
+
+Read together: the hub never asks about what it does not know, acts as
+if it knows what it was never told, copies other conversations into
+this one, and sends broken text. Those four are the priority for the
+design pass, ahead of every media-specific item.
 
 Memory quality, same evening: the memory judge writes its own
 extraction prompt's few-shot examples as memories (memoryJudge.ts,
