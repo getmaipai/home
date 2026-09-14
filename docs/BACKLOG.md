@@ -326,6 +326,15 @@ not permission to expand scope.
     or migration that guesses dates for existing undated facts. Checks:
     memory/judge tests, changed shared record fixtures, full exit gate.
 
+    **Amended 2026-09-14 (dev.md section 14, part 4):** the same reader
+    renders credence into the bullet: a certain record plainly, a
+    provisional one (confidence below 0.8) with its source and its
+    softness on the hub's knowledge, a disputed pair with both sources;
+    the guards read the record's level (`overclaimed_fact` when the
+    model states a provisional fact flatly; `doubt_of_person`, cuttable,
+    on "if that's true", "supposedly", "you claimed"). Acceptance adds
+    the recall turns of the `credence` conversation, three seeded runs.
+
 <a id="chat-09"></a>
 
 - [ ] **CHAT-09: Version vector spaces and remove stale routing examples** (M)
@@ -653,9 +662,18 @@ not permission to expand scope.
     and stays for an adult; a rating question from a child is answered
     as a parent would from the typed field and the band, never the
     rating's own words; sources and links are never shown on the child
-    band and stay on the outcome; the ladder is unchanged. Acceptance
-    adds `child-goldfish`'s adult twin and a rating question asked by
-    the child and by the owner on the film row, three seeded runs.
+    band and stay on the outcome; the ladder is unchanged. Every
+    lookup or retained result reaches the composer as a typed
+    disposition (`full`; `summary` with categories and safe
+    descriptors; `withheld` with the reason `content_ceiling` or
+    `household_disclosure` and the policy `adult_should_tell`), the
+    withheld text removed before prompt construction and the evidence
+    ids proving what entered; a dial at `off` means no vivid or
+    instructional detail, never denial of an ordinary fact about
+    injury or death; the rubric line gains the band, the disclosure
+    decisions and privacy (section 13, part 9). Acceptance adds
+    `child-goldfish`'s adult twin and a rating question asked by the
+    child and by the owner on the film row, three seeded runs.
 
 - [ ] **Engine emits `status` events at lookup start (CHAT-16)** (S) -
       the visible "what MaiPai is doing" line during a turn is built and
@@ -1331,8 +1349,22 @@ invented for the roster's household, and added to
     clause whose subject is an adult writes nothing about the adult and
     at most a `state` about the child, `sensitive`, person scope; a
     child's turn never writes an `adults`-audience record; dev.md
-    section 13, part 5) counted beside the rest. Acceptance: one
-    judge-eval turn per class with roster names, plus "Quill was here"
+    section 13, part 5) counted beside the rest; two channels, the
+    proposition channel (asserted or reported inform and commissive
+    clauses only) and the emotional-state channel (a moderate or high
+    expressed emotion writes a bounded state about the identified
+    speaker from an inform, a question or a commissive, citing the
+    emotional clause and never the proposition inside a question), with
+    the rejections `question_proposition`, `emotion_subject_mismatch`,
+    `minor_state_about_other` and `disclosure_escalation` (the judge
+    never raises a record's disclosure; section 13, part 9). **Amended
+    2026-09-14 (dev.md section 14):** `confidence` and
+    `corroborated_by` on the memory record (spec first) and the
+    deterministic write-time rule: 1.0 for a routine claim, 0.6 for a
+    life-events class, a contradiction of an active certain record or
+    an unknown subject, plus 0.1 per date, place or name to a cap of
+    0.8; a reported record keeps its cap; the judge model never sets
+    it. Acceptance: one judge-eval turn per class with roster names, plus "Quill was here"
     persisting no kind and no relation, at 100 percent precision on
     those rows; the `act-memory` conversation (section 12, part 6),
     three seeded runs, effects on the memory table; the seeded bench's memory rows
@@ -1438,7 +1470,14 @@ invented for the roster's household, and added to
     unidentified speaker on a shared device gets the child band's plan,
     ceiling and audience and no person-scope recall (COMP-06's rule),
     and a guest reads as adult for register and as child for audience
-    and ceiling. Exit: the suites, `bash scripts/check.sh`.
+    and ceiling; the kid-safe rule is validated at the selection
+    boundary on every turn, not only at write time (a person ages into
+    a stricter band, a manifest changes, an unknown speaker inherits a
+    device binding), with an invalid selection falling back to the
+    bundled kid-safe default and the reason recorded; no companion can
+    change the band, the disclosure result, the notification decision,
+    the safety result or a memory's scope (section 13, part 9). Exit:
+    the suites, `bash scripts/check.sh`.
 
 <a id="comp-05"></a>
 
@@ -1586,8 +1625,13 @@ invented for the roster's household, and added to
     later denial or correction superseding the active state, an event
     surviving the state it came with, a dated `goal` or `event` fading
     the day after, a `reported` record superseded and never extended by
-    the speaker's own later words (dev.md section 12, part 6). Never
-    resolves a conflict itself: the next relevant
+    the speaker's own later words (dev.md section 12, part 6); credence
+    moved by evidence only (dev.md section 14, part 3): +0.2 on a
+    re-assertion on a different day, +0.3 and `corroborated_by` on the
+    same claim from another household member, the supersede path on a
+    contradiction by the same person, `disputed` with both sources
+    rendered on one by another member, and never a decay with time.
+    Never resolves a conflict itself: the next relevant
     conversation asks. Acceptance: a seeded store with each defect class comes out
     with the right statuses and no invented resolution; a disputed
     record is absent from the next prompt; the open question is asked
@@ -1595,7 +1639,8 @@ invented for the roster's household, and added to
     context before the sweep; the `act-memory-curator` conversation of
     section 12, part 6 (extended, expired, the event surviving, three
     states with no trait, a denial superseding), driven with the
-    bench's clock, three seeded runs. Exit: the named tests, `bash scripts/check.sh`.
+    bench's clock, three seeded runs; the `corroborated` and
+    `contradicted` rows of section 14, part 7. Exit: the named tests, `bash scripts/check.sh`.
 
 <a id="pref-01"></a>
 
@@ -1771,7 +1816,22 @@ invented for the roster's household, and added to
     never across it), the `band_claim` guard row, and the three child
     conversations (`child-family-conflict`, `child-grandma`,
     `child-goldfish`, section 13 part 8) plus the adult twins, run
-    under every bundled companion, three seeded runs. Out of scope:
+    under every bundled companion, three seeded runs; the plan gains
+    the typed fields `age_band`, `vocabulary_level`, `explanation_style`,
+    `trusted_adult_move` (`defer`) and `content_disclosure`, the caps
+    are the minimum of the act, emotion, band, surface and brevity caps
+    and the optional moves the intersection of the four masks, and the
+    `plan_violation` family gains `age_register_violation`,
+    `missing_child_care`, `missing_trusted_adult`, `patronizing_register`
+    and `disclosure_violation` (section 13, part 9). **Amended
+    2026-09-14 (dev.md section 14):** the surprise move (an inform in a
+    life-events class or against an active certain record sets `react`
+    and `ask_back` required whatever the engagement dial, the question
+    about the claim never its truth) and the contradiction move (one
+    light clarifying question naming the hub's own record, asked once
+    per pair, the answer superseding or leaving the old record, never
+    an argument, never a silent overwrite), with the `credence`
+    conversation (section 14, part 7), three seeded runs. Out of scope:
     canned replies per label, a second prompt path, any plan rule over
     a safety, authorization, confirmation, evidence or privacy
     decision. Exit: the named tests, the persona-eval bench, `bash
@@ -1785,19 +1845,23 @@ invented for the roster's household, and added to
     reaches a child from the hub, by a field an adult sets with a safe
     default, and the child is deferred to a parent with care, never
     lied to and never recited a record. Spec first:
-    `spec/schemas/memory-record.schema.json` gains `audience:
-    household | adults` (default `household`), a new
-    `spec/vocab/adult-to-tell.json` (the classes: a death or a funeral,
-    an illness or a diagnosis, a pregnancy, a separation or a divorce,
-    money and debt, a legal or police matter, a job loss, an adult's
-    private plan to leave or move), fixtures, both bindings. Then:
+    `spec/schemas/memory-record.schema.json` gains `child_disclosure:
+    child_ok | teen_ok | adult_only` with `child_disclosure_set_by` and
+    `child_disclosure_set_at` (null on person and self scope; the
+    default by class, never raised by the judge on an existing record;
+    section 13, part 9), a new `spec/vocab/life-events.json` carrying
+    the adult-to-tell classes (a death or a funeral, an illness or a
+    diagnosis, a pregnancy, a separation or a divorce, money and debt, a
+    legal or police matter, a job loss, an adult's private plan to leave
+    or move) and section 14's life-events classes as one file, fixtures,
+    both bindings. Then:
     `backend/src/lib/memoryJudge.ts` (the deterministic default at
     write time: `adults` when the subject is a memorialized person or
     the text falls in a class or the sensitivity detector flags it,
     never the judge model's call), `backend/src/lib/memory.ts`
     (`canRead()` gains the band: a child reads their own person-scope
-    records and household records with audience `household` and not
-    `sensitive`; recall, the profile paragraph and episode recall all
+    records and household records at `child_ok` and not `sensitive`, a
+    teen those at `child_ok` or `teen_ok`; recall, the profile paragraph and episode recall all
     through it; a teen reads as adult unless an adult-written key sets
     the teen's audience to child), `backend/src/lib/turnEngine.ts` and
     `register.ts` (the `defer` move when a child's question resolves
@@ -1815,8 +1879,10 @@ invented for the roster's household, and added to
     its adult twin, three seeded runs, the effects on the context
     message and the memory table; unit tests for the default per class
     and for the memorialized subject, the band in `canRead()` for
-    child, teen, adult and guest, and the adult's flip. Out of scope:
-    the notification (AGE-02), the plan's band axis (ACT-03). Exit:
+    child, teen, adult and guest, and the adult's flip; the `teen_ok`
+    record withheld from the child and available to a teen, and the
+    unknown speaker receiving the child result. Out of scope: the
+    notification (AGE-02), the plan's band axis (ACT-03). Exit:
     the spec suite, `bun test tests/memory.test.ts
     tests/memoryJudge.test.ts tests/turnEngine.test.ts`, `bash
     scripts/check.sh`.
@@ -1832,12 +1898,18 @@ invented for the roster's household, and added to
     parents are notified, on by default, with no switch per child or
     per household. Files:
     `backend/src/lib/notificationTypes.ts` (`child.worrying_conversation`,
-    level warning, audience `adults`, fixed copy with no slot for the
-    child's text), `backend/src/lib/turnEngine.ts` (`notifyOncePerTurn()`
+    level `time_sensitive`, audience `adults`, fixed copy naming the
+    child and that a check-in may help, with no slot for the child's
+    text, the adults' names, the topic, memory text or a transcript
+    link; stored as the child id, the turn id for dedupe and audit, the
+    policy version and the coarse result; never the safety result and
+    never marking the conversation unsafe), `backend/src/lib/turnEngine.ts` (`notifyOncePerTurn()`
     fires it from the stored signal and the subject: the child band,
     sadness, fear or anger at moderate or high intensity with `target:
     other` naming a household adult or an unknown person, or a subject
-    in the fixed list, or today's `notify_parent`), `lib/register.ts`
+    in the fixed list, or today's `notify_parent`; never sadness or fear
+    alone, so a sad question about a story or a pet does not notify, a
+    row), `lib/register.ts`
     (the "I might mention to a grown-up that you seemed sad" clause in
     the child's plan when the notice fires), `docs/user/privacy.md` and
     `docs/user/people.md` (what the notice carries and that it cannot be

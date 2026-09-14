@@ -14643,8 +14643,8 @@ band's rows are an envelope the companion's dials never leave:
 
 | Band | Moves | Length (chat) | Vocabulary and stance |
 |---|---|---|---|
-| child (under 13) | care is `required` on any marked negative emotion whatever the act; `ask_back` at most one, about the child, never a task; `point` forbidden (no sources, no links, no document); `pick` forbidden; `close` warm and short; `care` on any question that touches a living thing, a fear or a loss | one sentence, 20 words; two on a disclosure or a why-question; never a paragraph | `complexity: simple` forced (the companion's dial may only be simpler, never above); concrete words, no abstractions, no idioms a child cannot parse, no numbers beyond what the answer needs; honest, never a lie of kindness; always the child's own subject, never a redirect to a task; a trusted adult named as the place for what the hub will not decide |
-| teen (13 to 17) | the adult table with `point` allowed for a source or a link (never a document without an adult's ask, COMP-01); `ask_back` companion-gated; care as the emotion overrides say | the adult lengths capped at two sentences | `complexity` capped at `standard`; no talking down; the adult stance on facts within the teen ceiling |
+| child (under 13) | care is `required` on any marked negative emotion whatever the act; `ask_back` at most one, about the child, never a task; `point` forbidden (no sources, no links, no document); `pick` forbidden; `close` warm and short; `care` on any question that touches a living thing, a fear or a loss | two sentences, 40 words; three and 45 on a disclosure or an adult-to-tell answer; never a paragraph; the lower of the act, emotion, band, surface and brevity caps wins | `complexity: simple` forced (the companion's dial may only be simpler, never above); concrete words, no abstractions, no idioms a child cannot parse, no numbers beyond what the answer needs; honest, never a lie of kindness; always the child's own subject, never a redirect to a task; a trusted adult named as the place for what the hub will not decide |
+| teen (13 to 17) | the adult table with `point` allowed for a source or a link (never a document without an adult's ask, COMP-01); `ask_back` companion-gated; care as the emotion overrides say | two sentences, 55 words; three and 65 on a sensitive or distressed answer | `complexity` capped at `standard`; no talking down; the adult stance on facts within the teen ceiling |
 | adult | section 12's table as written | as written | the companion's dials |
 
 The emotion overrides (section 12) apply on every band, and on the
@@ -14872,6 +14872,81 @@ child's words and the parent notification of today). These three join
 the existing child-register row (B6) and run under every bundled
 companion (COMP-03), since the band's envelope must hold for each.
 
+**9. The outside review, reconciled (Codex, 2026-09-14).** Taken, and
+folded into the parts above and the items: the band on the frozen turn
+signal as `age_band` with an `age_band_basis` (`identified_profile |
+unknown_speaker_default`), one spec enum generating the type that
+`speakerAgeBand()`, the turn context (today a bare `string`), the
+ceiling, the plan, the judge and the robot all use, and never the
+birthday or a numeric age on a turn; the processing order stated once
+(identity, the frozen band, input safety, the signal, retrieval, the
+privacy and disclosure projection, the plan from act, emotion and band,
+the companion within it, composition, the plan guards and output
+safety) with the precedence fixed (safety decides whether composition
+runs; privacy and disclosure decide what evidence enters; act and
+emotion pick the moves; the band narrows; the companion narrows or
+styles; brevity narrows; the guards inspect), so the 8B never sees
+what it is then asked not to repeat; the child envelope's lengths as
+bench baselines rather than my one sentence (two sentences and 40
+words, three and 45 on a disclosure or an adult-to-tell answer; the
+teen at two and 55, three and 65; the lower of the act, emotion, band,
+surface and brevity caps always wins, and the optional moves are the
+intersection of the act's, the emotion's, the band's and the
+companion's masks); the evidence projection as a typed disposition
+(`full`, `summary` with categories and safe descriptors, `withheld`
+with the reason `content_ceiling` or `household_disclosure`), the
+withheld record's text removed before prompt construction with only
+the disposition and `adult_should_tell` reaching the composer, and
+the rule that a dial at `off` means no vivid or instructional detail,
+never denial of an ordinary fact about injury or death; the
+disclosure field at three levels (`child_ok | teen_ok | adult_only`,
+with `set_by` and `set_at`, null on person and self scope, an
+adult-authorized memory operation the only writer past the default,
+the judge never raising a record's disclosure); the emotional-state
+channel as the one narrow exception to "a question yields nothing":
+a moderate or high expressed emotion may write a bounded state about
+the identified speaker from an inform, a question or a commissive,
+citing the emotional clause and the signal and never the proposition
+inside the question, with the rejections `question_proposition`,
+`emotion_subject_mismatch`, `minor_state_about_other` and
+`disclosure_escalation` beside `child_about_adult`; the notification's
+shape (level `time_sensitive`, not the hard-safety level; the body
+naming the child and that a check-in may help, never the words, the
+adults' names, the topic, an accusation, memory text or a transcript
+link; stored as the child id, the turn id for dedupe and audit, the
+policy version and the coarse result; never derived from sadness or
+fear alone, so a sad question about a story or a pet does not notify;
+never reusing the safety result or marking the conversation unsafe);
+the kid-safe rule validated at the selection boundary on every turn
+with a fallback to the bundled kid-safe default and the reason
+recorded, since a person ages into a stricter band, a manifest can
+change and an unknown speaker can inherit a device binding; the typed
+plan fields (`age_band`, `vocabulary_level`, `explanation_style`,
+`trusted_adult_move`, `content_disclosure`) and the plan violations
+(`age_register_violation`, `missing_child_care`,
+`missing_trusted_adult`, `patronizing_register`,
+`disclosure_violation`); the rubric line extended with the band, the
+disclosure decisions and privacy; the canary proof in the family-
+conflict row (two adults' person-scope records seeded, their ids and
+text absent from the candidates, the evidence, the included ids, the
+serialized messages, the moves and the reply); and the teen's
+disclosure and the unknown speaker's result as rows on the grandma
+conversation.
+
+Kept as designed here, with the reason: the disclosure default is by
+class, not `adult_only` for every household record, because a child
+asking the dog's name or the trash day must not be sent to a parent,
+and the class list plus the memorialized-person rule is what "safe by
+default" protects; Codex's point that automatic capture must never
+raise visibility is kept as the rule on existing records. The
+trusted-adult move keeps its own name, `defer`, beside `point`, which
+stays the sources move (forbidden on the child band), so one word
+does not mean two things. The two new items stay AGE-01 and AGE-02
+rather than one CHILD-01: the disclosure field and the notice are
+different owners' work with different gates, and neither creates a
+separate child composer, persona, classifier or store, which is the
+constraint Codex meant.
+
 **Sequence and sizes.** The band axis on the plan and the child rows
 ride with ACT-03 (amended below); the ceiling on evidence rides with
 CHAT-16 (amended); the audience field, the `adult-to-tell` vocabulary,
@@ -14883,6 +14958,154 @@ after AGE-01, under Jesse's decision (b); the judge rule
 rule is COMP-06's text already and COMP-04 gains the adult-written keys
 (amended). Nothing here waits on a model: every rule is a table, a
 field or a vocabulary the engine reads.
+
+### 14. Credence on a fact, never doubt of the person (2026-09-14)
+
+An addendum on the coordinator's brief: a memory the judge writes is
+either there or not, and recall says it as flatly on one offhand
+telling as after a month of confirmation. A person holds a claim more
+lightly the bigger and newer it is, and firms it up as the details
+arrive, as it is said again, as someone else says it too; and when a
+new claim collides with something well established, a person asks one
+light question, not "if that's true". This section puts that credence
+on the record, in the platform's shape: a number set deterministically
+at write time, moved by evidence the engine can see, read by recall
+into how the fact is said and by the plan into one move, and never a
+reason to doubt the person to their face or to withhold an action on
+their own words.
+
+**What exists.** `memory-record.schema.json` carries `importance` and
+no confidence; an inferred relationship carries `confidence` and
+`evidence` (step 3a) and is now a candidate for the open question
+(section 3). Recall renders every bullet the same way ("<text> (as of
+<date>, <n> days ago)"). The supersede path (#88, CHAT-06) replaces a
+record when the person corrects it, and CUR-01 marks a conflict
+`disputed`. CHAT-08 is the read-time validity item on the one recall
+reader, which is where a read-time rendering rule belongs.
+
+**1. The representation.** `memory-record.schema.json` gains
+`confidence` (0 to 1, nullable; null on records written before it
+existed, read as certain) and `corroborated_by` (person ids, default
+empty), on asserted records only: a reported record keeps its cap
+(section 12, part 6) and its named source, and a candidate inferred by
+the judge is not a record at all. Two levels are what recall and the
+plan read: `provisional` (below 0.8) and `certain` (0.8 and above);
+the number is what the curator moves.
+
+**2. Set at write time by how ordinary the claim is, deterministically.**
+The judge model never sets it. A routine claim (a preference, a
+habit, a fact about a thing, a dated appointment, a plan for the
+week) is certain on one telling: 1.0. A claim is provisional on one
+telling, at 0.6, when it is life-changing or surprising relative to
+what the hub knows: its text falls in a life-events class (a new
+member of the household or a departure, a move, a marriage or a
+separation, a pregnancy or a birth, a death, a diagnosis, a job change,
+a large purchase, a new pet; one vocabulary, `spec/vocab/life-events.json`,
+which also carries the adult-to-tell classes of section 13 so one list
+serves both), or it contradicts an active certain record about the
+same subject (the dedupe pass already finds that pair), or its subject
+is an entity the hub has never heard of (ASK-01's unknown). Detail in
+the same clause raises the start: a date, a place or a name each add
+0.1, to a cap of 0.8, since a claim with particulars is the way people
+say a thing that is true.
+
+**3. Moved by evidence the engine can see (CUR-01).** Raised by a
+re-assertion on a different day (the same subject and claim, any
+conversation, +0.2), and by corroboration by another household member
+(a record of the same claim in their own scope or the household's,
+`corroborated_by` gains their id, +0.3, which makes any provisional
+claim certain); lowered by a contradiction: from the same person it is
+the supersede path (the old record `superseded_by` the new, never a
+number game), from another member it is `disputed` (both stand, both
+render with their sources, the next relevant conversation asks). A
+provisional record that is never re-asserted or corroborated keeps its
+number; the curator never decays confidence with time, because
+silence is not evidence.
+
+**4. How it reads at recall (CHAT-08).** The one recall reader renders
+credence into the bullet, and the composer says it that way: a
+certain fact plainly ("Rover is a rabbit"); a provisional one with its
+source and its softness ("you mentioned the other day that you're
+moving in June", "Sage said Quill's getting married"), with the
+softness on the hub's knowledge, never on the person: "if that's
+true", "supposedly", "you claimed" are guard rows (`doubt_of_person`,
+cuttable). A disputed pair renders both with their sources. The
+context message's bullet form gains the rendering, so the model reads
+the softness rather than being told to hedge; the guards read the
+record's level, so a provisional fact stated as flat certainty by the
+model is the `overclaimed_fact` cut, and a certain one hedged ("I
+think you said") is not a defect.
+
+**5. Two moves on the plan (ACT-03).** *The surprise move:* an inform
+whose clause falls in a life-events class, or contradicts an active
+certain record, sets `react` and `ask_back` required whatever the
+companion's engagement dial says (a big claim gets a reaction and one
+question, because that is how the details arrive: "wait, June? where
+to?"), with the question about the claim, never about whether it is
+true. *The contradiction move:* a claim against a well-established
+fact (a certain record re-asserted or corroborated at least once) gets
+one light clarifying question in the same reply ("hang on, I had Rover
+down as a rabbit, did I get that wrong?"), and the person's answer
+decides: a confirmation supersedes the old record at once (provenance
+kept, the person's words as the evidence), a retraction leaves it; the
+question is asked once, never twice on the same pair, and a second
+telling of the new claim in any later turn supersedes without a
+question. Never an argument, never a silent overwrite. The judge holds
+the new claim as a candidate until the answer, the same shape as the
+open question.
+
+**6. Invariants.** The hub never accuses: no sentence tells the person
+they are wrong, lying or inconsistent (the clarifying question names
+the hub's own record as the thing that might be wrong). The hub never
+withholds an action on the person's own words: a directive runs
+whatever the confidence of anything it touches ("add Quill's wedding
+to the calendar" runs; the record's credence is the memory's business).
+Hyperbole and a joke are a stance, not a low-confidence fact: "I've
+told you a million times" writes nothing with "million" and lowers
+nothing; a `joke` clause writes nothing (section 12, part 6); an
+exaggeration on a certain claim changes no number. Credence never
+changes what a child may hear (section 13's disclosure is a separate
+axis), never changes safety, and is never a memory about the person's
+reliability: it sits on the fact.
+
+**7. Bench rows** (`credence`, roster names, three seeded runs, effects
+on the memory table, the context message and the plan): "we're moving
+to Lisbon in June" (effects: one record at confidence between 0.6 and
+0.8, `provisional`; the plan has `react` and `ask_back` required; the
+reply asks one question about the move and none about its truth,
+`mustNotContain` "really|sure|if that's"); the next day, "the Lisbon
+move is the 14th, we signed today" (effects: the record's confidence
+raised by the re-assertion and the date, `certain`; a recall turn after
+it renders the fact plainly, `mustNotContain` "you mentioned|you
+said"); before that, a recall turn ("when are we moving") on the
+provisional record (effects: the bullet carries the source and the
+softness, the reply says it softly and never "if that's true", guard
+null); `corroborated`: Sage says "Rover's been limping since Sunday",
+then Bramble in another conversation says "Rover is limping" (effects:
+Sage's record `corroborated_by` carries Bramble's id and is `certain`;
+Bramble's own record is not a duplicate of Sage's in Sage's scope);
+`contradicted`: with a certain, re-asserted record that Rover is a
+rabbit, "Rover the cat knocked the plant over" (effects: one clarifying
+question in the reply naming the hub's record, the old record still
+active, the new claim held as a candidate); "yeah, Rover's a cat, I
+must have said rabbit by mistake" (effects: the old record
+`superseded_by` the new, the new active and certain, no second
+question on a later Rover turn); a variant where the person answers
+"no, rabbit" (effects: the old record active, no new record); `joke`:
+"I've told you a million times, the recycling is Tuesday" (effects: one
+record about Tuesday, none with "million", the Tuesday record's
+confidence unchanged); and the section 12 joke row unchanged. A
+directive touching a provisional subject ("add the Lisbon move to the
+calendar") runs (effect: the package outcome on the turn, no
+confirmation beyond the package's own). Three seeded runs.
+
+**Sequence and sizes.** The spec fields and the write-time rule ride
+inside MEM-06 (amended, S on top); the raise, corroborate and dispute
+rules inside CUR-01 (amended); the rendering and the two guard rows
+inside CHAT-08 (amended, which becomes the read-time item for both
+validity and credence); the two moves and the rows inside ACT-03
+(amended); the life-events vocabulary lands with AGE-01's adult-to-tell
+list as one file. No new item.
 
 ### The sequence, all items
 
@@ -14930,3 +15153,8 @@ field or a vocabulary the engine reads.
    never the words, no switch) after AGE-01;
    `child_about_adult` inside MEM-06; the adult-written keys in
    COMP-04.
+9. **Credence (section 14):** no new item; the spec fields and the
+   write-time rule in MEM-06, the raise, corroborate and dispute rules
+   in CUR-01, the rendering and the two guard rows in CHAT-08, the
+   surprise and contradiction moves and the `credence` rows in ACT-03;
+   the life-events vocabulary lands with AGE-01's list as one file.
