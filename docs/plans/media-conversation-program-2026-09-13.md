@@ -272,6 +272,14 @@ What was checked (2026-09-14):
   grade retrieval, barely the write step (what is worth keeping), and
   never concurrency; our own bench and CUR-01 stay the judge of those.
 
+Downloaded 2026-09-14 into `home/data-scratch/datasets/` (git-ignored;
+SOURCES.md and SHA256SUMS beside the files): locomo10.json (10
+conversations, about 200 questions each), longmemeval_s_cleaned.json
+(500 questions; the abstention cases are the ones whose answer is
+that nothing was said) and longmemeval_oracle.json, DailyDialog's
+three zips. The script pins those checksums and re-downloads only
+when a file is missing.
+
 The item (M, Session A, after MEM-06 and before CUR-01, so the
 curator and the quality controller are judged against a public
 baseline): a bench script under `backend/scripts/bench/` that
